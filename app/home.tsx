@@ -39,8 +39,6 @@ import {
   Zap,
   ChevronDown,
   ChevronUp,
-  Compass,
-  Radio,
   Wrench,
   ShieldCheck,
   CheckCircle2,
@@ -56,7 +54,6 @@ import {
 import { C } from '@/lib/ui';
 import BottomNav from '@/components/BottomNav';
 import LocationSelectorModal from '@/components/LocationSelectorModal';
-import { generateNeighborhoodPulseAI } from '@/lib/aiAssistant';
 
 const { width } = Dimensions.get('window');
 
@@ -95,9 +92,6 @@ export default function Home() {
   const [selectedDistrict, setSelectedDistrict] = useState('كل الأحياء');
   const [showLocationModal, setShowLocationModal] = useState(false);
 
-  // Proximity Radius filter (0-2km in district, 2-5km nearby, city-wide)
-  const [proximityRadius, setProximityRadius] = useState<'district' | 'nearby' | 'city'>('district');
-  const [pulseExpanded, setPulseExpanded] = useState(true);
 
   // Unread badge count
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
@@ -304,11 +298,7 @@ export default function Home() {
       if (!match) return false;
     }
     if (selectedCity === 'كل المدن') return true;
-    if (proximityRadius === 'city') {
-      if (q.city && !q.city.includes(selectedCity) && !selectedCity.includes(q.city)) return false;
-      return true;
-    }
-    if (proximityRadius === 'district' && selectedDistrict !== 'كل الأحياء') {
+    if (selectedDistrict !== 'كل الأحياء') {
       if (q.district && !q.district.includes(selectedDistrict) && !selectedDistrict.includes(q.district)) return false;
     }
     if (q.city && !q.city.includes(selectedCity) && !selectedCity.includes(q.city)) return false;
@@ -322,11 +312,7 @@ export default function Home() {
       if (!match) return false;
     }
     if (selectedCity === 'كل المدن') return true;
-    if (proximityRadius === 'city') {
-      if (r.city && !r.city.includes(selectedCity) && !selectedCity.includes(r.city)) return false;
-      return true;
-    }
-    if (proximityRadius === 'district' && selectedDistrict !== 'كل الأحياء') {
+    if (selectedDistrict !== 'كل الأحياء') {
       if (r.district && !r.district.includes(selectedDistrict) && !selectedDistrict.includes(r.district)) return false;
     }
     if (r.city && !r.city.includes(selectedCity) && !selectedCity.includes(r.city)) return false;
@@ -340,13 +326,6 @@ export default function Home() {
 
   const toolQuestions = filteredQuestions.filter(
     q => q.is_tool_sharing || q.item_type === 'tool_sharing' || (q.title && (q.title.includes('إعارة') || q.title.includes('دريل') || q.title.includes('سلم')))
-  );
-
-  // Dynamic AI Neighborhood Pulse
-  const neighborhoodPulse = generateNeighborhoodPulseAI(
-    selectedCity,
-    selectedDistrict,
-    filteredQuestions.length || 15
   );
 
   return (
@@ -507,78 +486,6 @@ export default function Home() {
               );
             })}
           </ScrollView>
-        </View>
-
-        {/* ======================================================== */}
-        {/* 3. SMART NEIGHBORHOOD HUB (AI Pulse & Distance Filter)   */}
-        {/* ======================================================== */}
-        <View style={styles.hubCard}>
-          {/* Top Hub Row: AI Pulse Header */}
-          <View style={styles.hubHeader}>
-            <View style={styles.hubSolvedBadge}>
-              <Text style={styles.hubSolvedText}>نسبة الحل {neighborhoodPulse.solvedRate}</Text>
-            </View>
-            <Pressable
-              style={styles.hubTitleRow}
-              onPress={() => setPulseExpanded(!pulseExpanded)}
-            >
-              <Text style={styles.hubTitle}>{neighborhoodPulse.headline}</Text>
-              <Sparkles size={16} color="#0891b2" />
-              {pulseExpanded ? <ChevronUp size={16} color="#0891b2" /> : <ChevronDown size={16} color="#0891b2" />}
-            </Pressable>
-          </View>
-
-          {pulseExpanded && (
-            <View style={styles.hubExpandedBody}>
-              <Text style={styles.hubSummaryText}>{neighborhoodPulse.smartSummary}</Text>
-              
-              {/* Trending Topics Tags */}
-              <View style={styles.hubTopicsRow}>
-                {neighborhoodPulse.trendingTopics.map((topic, i) => (
-                  <Pressable 
-                    key={i} 
-                    style={styles.hubTopicPill}
-                    onPress={() => setSearchQuery(topic)}
-                  >
-                    <Text style={styles.hubTopicText}>🔥 {topic}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-          )}
-
-          {/* Proximity Radius Filter Tabs Inside Hub */}
-          <View style={styles.proximityBar}>
-            <Pressable
-              style={[styles.proxPill, proximityRadius === 'district' && styles.proxPillActive]}
-              onPress={() => setProximityRadius('district')}
-            >
-              <MapPin size={13} color={proximityRadius === 'district' ? '#fff' : '#0891b2'} />
-              <Text style={[styles.proxPillText, proximityRadius === 'district' && styles.proxPillTextActive]}>
-                في حيي (0 - 2 كم)
-              </Text>
-            </Pressable>
-
-            <Pressable
-              style={[styles.proxPill, proximityRadius === 'nearby' && styles.proxPillActive]}
-              onPress={() => setProximityRadius('nearby')}
-            >
-              <Compass size={13} color={proximityRadius === 'nearby' ? '#fff' : '#0891b2'} />
-              <Text style={[styles.proxPillText, proximityRadius === 'nearby' && styles.proxPillTextActive]}>
-                الأحياء المجاورة (2 - 5 كم)
-              </Text>
-            </Pressable>
-
-            <Pressable
-              style={[styles.proxPill, proximityRadius === 'city' && styles.proxPillActive]}
-              onPress={() => setProximityRadius('city')}
-            >
-              <Radio size={13} color={proximityRadius === 'city' ? '#fff' : '#0891b2'} />
-              <Text style={[styles.proxPillText, proximityRadius === 'city' && styles.proxPillTextActive]}>
-                كامل المدينة
-              </Text>
-            </Pressable>
-          </View>
         </View>
 
         {/* ======================================================== */}
