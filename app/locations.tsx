@@ -1,10 +1,188 @@
-import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, Text } from 'react-native';
+import { useState } from 'react';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  Platform,
+} from 'react-native';
 import { router } from 'expo-router';
-import { supabase } from '@/lib/supabase';
-import { S } from '@/lib/ui';
-export default function Locations(){
- const [regions,setRegions]=useState<any[]>([]);
- useEffect(()=>{supabase.from('saudi_regions').select('*').order('name').then(({data})=>setRegions(data??[]))},[]);
- return <ScrollView contentContainerStyle={S.page}><Text style={S.title}>اختر منطقتك 🇸🇦</Text><Text style={S.subtitle}>نستخدمها لتقريب الأسئلة والطلبات والخدمات منك.</Text>{regions.map(r=><Pressable key={r.id} style={S.card} onPress={()=>router.push({pathname:'/cities',params:{regionId:r.id}})}><Text style={{fontSize:18,fontWeight:'900',textAlign:'right'}}>{r.name}</Text></Pressable>)}</ScrollView>
+import { SAUDI_REGIONS } from '@/lib/saudiLocations';
+import { ChevronRight, MapPin, Search, ChevronLeft } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import BottomNav from '@/components/BottomNav';
+
+export default function Locations() {
+  const [search, setSearch] = useState('');
+
+  const filtered = SAUDI_REGIONS.filter(r =>
+    r.name.includes(search.trim()) ||
+    r.cities.some(c => c.name.includes(search.trim()))
+  );
+
+  return (
+    <View style={styles.container}>
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        {/* Header Hero */}
+        <LinearGradient
+          colors={['#0891b2', '#0e7490', '#0f172a']}
+          style={styles.hero}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
+          <View style={styles.navBar}>
+            <Pressable onPress={() => router.back()} style={styles.iconBtn}>
+              <ChevronRight size={28} color="#fff" />
+            </Pressable>
+            <Text style={styles.navTitle}>مناطق المملكة 🇸🇦</Text>
+            <View style={{ width: 28 }} />
+          </View>
+          <Text style={styles.heroSub}>
+            اختر منطقتك لتصفح المدن والأحياء وتخصيص تجربتك في حيّنا.
+          </Text>
+
+          <View style={styles.searchBar}>
+            <TextInput
+              style={styles.searchInput}
+              value={search}
+              onChangeText={setSearch}
+              placeholder="ابحث عن منطقة أو مدينة..."
+              placeholderTextColor="#94a3b8"
+            />
+            <Search size={20} color="#0891b2" />
+          </View>
+        </LinearGradient>
+
+        <View style={styles.content}>
+          {filtered.map(r => (
+            <Pressable
+              key={r.name}
+              style={styles.regionCard}
+              onPress={() => router.push({ pathname: '/cities', params: { regionName: r.name } })}
+            >
+              <ChevronLeft size={18} color="#94a3b8" />
+              <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                <Text style={styles.regionTitle}>{r.name}</Text>
+                <Text style={styles.regionSub}>{r.cities.length} مدن ومحافظات رئيسية</Text>
+              </View>
+              <View style={styles.pinBox}>
+                <MapPin size={20} color="#0891b2" />
+              </View>
+            </Pressable>
+          ))}
+        </View>
+
+        <View style={{ height: 100 }} />
+      </ScrollView>
+
+      <View style={styles.bottomNavWrapper}>
+        <BottomNav />
+      </View>
+    </View>
+  );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+  },
+  scroll: {
+    paddingBottom: 20,
+  },
+  hero: {
+    paddingTop: Platform.OS === 'ios' ? 52 : 36,
+    paddingHorizontal: 20,
+    paddingBottom: 24,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+  },
+  navBar: {
+    flexDirection: 'row-reverse',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  iconBtn: {
+    padding: 6,
+  },
+  navTitle: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '900',
+  },
+  heroSub: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 13,
+    textAlign: 'right',
+    marginBottom: 16,
+    lineHeight: 18,
+  },
+  searchBar: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    height: 48,
+    gap: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  searchInput: {
+    flex: 1,
+    color: '#0f172a',
+    fontSize: 13,
+    textAlign: 'right',
+  },
+  content: {
+    paddingHorizontal: 18,
+    paddingTop: 16,
+  },
+  regionCard: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+    gap: 12,
+  },
+  pinBox: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#ecfeff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  regionTitle: {
+    color: '#0f172a',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  regionSub: {
+    color: '#64748b',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  bottomNavWrapper: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+  },
+});
