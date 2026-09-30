@@ -809,10 +809,10 @@ export default function Profile() {
               <ChevronLeft size={18} color="#94a3b8" />
             </Pressable>
 
-            {p.role === 'admin' || p.role === 'moderator' ? (
+            {p.role === 'admin' ? (
               <Pressable style={[styles.actionBtn, { borderBottomWidth: 0 }]} onPress={() => router.push('/admin')}>
                 <Shield size={20} color={C.accent} />
-                <Text style={[styles.actionBtnText, { color: C.accent }]}>لوحة الإدارة والمراقبة</Text>
+                <Text style={[styles.actionBtnText, { color: C.accent }]}>لوحة تحكم مدير النظام 👑</Text>
               </Pressable>
             ) : null}
           </View>

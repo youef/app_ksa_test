@@ -366,14 +366,14 @@ export default function SettingsScreen() {
             </Text>
           </Pressable>
 
-          {(role === 'admin' || role === 'moderator') && (
+          {role === 'admin' && (
             <Pressable
               style={[styles.actionBtn, { borderBottomWidth: 0 }]}
               onPress={() => router.push('/admin')}
             >
               <Shield size={20} color={C.accent} />
               <Text style={[styles.actionBtnText, { color: C.accent }]}>
-                لوحة الإدارة والإشراف المتقدمة
+                لوحة تحكم مدير النظام 👑
               </Text>
             </Pressable>
           )}
