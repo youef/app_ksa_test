@@ -364,10 +364,147 @@ export default function Admin() {
     );
   };
 
-  // 5. Send Direct Admin Notice to User
+  // 5. Send Direct Admin Notice using the canonical notifications schema.
   const handleSendDirectNotice = async () => {
     if (!inspectedUser || !directMsgText.trim()) return;
     setSendingDirectMsg(true);
+    try {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) throw new Error('انتهت جلسة الدخول.');
+      const { error } = await supabase.from('notifications').insert({
+        user_id: inspectedUser.id,
+        type: 'admin_notice',
+        title: 'إشعار من إدارة حيّنا',
+        body: directMsgText.trim(),
+        data: { actor_id: u.user.id },
+      });
+      if (error) throw error;
+      await addAuditLog('إرسال تنبيه إداري خاص', inspectedUser.display_name || inspectedUser.username, 'user', inspectedUser.id);
+      showToast('تم إرسال التنبيه الإداري للمستخدم بنجاح 📨');
+      setDirectMsgText('');
+    } catch (e: any) {
+      Alert.alert('خطأ', e.message || 'تعذر إرسال الإشعار');
+    } finally {
+      setSendingDirectMsg(false);
+    }
+  };
+
+  // 6. Reports Actions
+  const resolveReport = async (id: string, action: 'resolved' | 'dismissed') => {
+    const { data: u } = await supabase.auth.getUser();
+    const { error } = await supabase.from('reports').update({
+      status: action,
+      reviewed_by: u.user?.id,
+      reviewed_at: new Date().toISOString()
+    }).eq('id', id);
+    if (error) {
+      Alert.alert('خطأ', error.message);
+      return;
+    }
+    setReports(prev => prev.map(r => r.id === id ? { ...r, status: action } : r));
+    await addAuditLog(action === 'resolved' ? 'معالجة وإغلاق بلاغ' : 'تجاهل بلاغ', 'بلاغ #' + id.slice(0, 6), 'report', id);
+    showToast(action === 'resolved' ? 'تم حل وإغلاق البلاغ بنجاح ✓' : 'تم تجاهل البلاغ ✕');
+  };
+
+  // 7. Delete Offensive Content Reported
+  const deleteReportedContent = async (report: any) => {
+    confirmAction(
+      'حذف المحتوى المخالف',
+      'هل أنت متأكد من حذف هذا المحتوى نهائياً من قاعدة البيانات وإغلاق البلاغ؟',
+      async () => {
+        try {
+          let error: any = null;
+          if (report.target_type === 'question' && report.target_id) {
+            ({ error } = await supabase.from('questions').delete().eq('id', report.target_id));
+          } else if (report.target_type === 'request' && report.target_id) {
+            ({ error } = await supabase.from('requests').delete().eq('id', report.target_id));
+          } else if (report.target_type === 'answer' && report.target_id) {
+            ({ error } = await supabase.from('answers').delete().eq('id', report.target_id));
+          } else if (report.target_type === 'service' && report.target_id) {
+            ({ error } = await supabase.from('services').delete().eq('id', report.target_id));
+          } else {
+            throw new Error('نوع المحتوى غير مدعوم للحذف من لوحة الإدارة.');
+          }
+          if (error) throw error;
+          await resolveReport(report.id, 'resolved');
+          await addAuditLog('حذف محتوى مخالف', 'بلاغ #' + report.id.slice(0, 6), report.target_type, report.target_id);
+          showToast('تم حذف المحتوى المخالف وإغلاق البلاغ 🗑️');
+          await load();
+        } catch (e: any) {
+          Alert.alert('خطأ', e.message || 'تعذر حذف المحتوى');
+        }
+      }
+    );
+  };
+
+  // 8. Relational Verification Desk Decision with Citizen Notification
+  const handleVerificationDecision = async (id: string, userId: string, action: 'approved' | 'rejected', userName: string) => {
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) return;
+    try {
+      const { error: requestError } = await supabase.from('verification_requests').update({
+        status: action,
+        reviewed_by: u.user.id,
+        reviewed_at: new Date().toISOString()
+      }).eq('id', id);
+      if (requestError) throw requestError;
+
+      if (action === 'approved') {
+        const { error: profileError } = await supabase.from('profiles').update({
+          is_verified: true,
+          verification_status: 'verified'
+        }).eq('id', userId);
+        if (profileError) throw profileError;
+      }
+
+      const { error: notificationError } = await supabase.from('notifications').insert({
+        user_id: userId,
+        type: 'verification',
+        title: action === 'approved' ? 'تم اعتماد التوثيق' : 'تحديث طلب التوثيق',
+        body: action === 'approved'
+          ? 'تم اعتماد طلب توثيق حسابك في منصة حيّنا.'
+          : 'تمت مراجعة طلب توثيق حسابك. يمكنك التقديم مجدداً بعد تحديث البيانات.',
+        data: { actor_id: u.user.id, request_id: id, status: action }
+      });
+      if (notificationError) throw notificationError;
+
+      await addAuditLog(action === 'approved' ? 'اعتماد طلب توثيق رسمي' : 'رفض طلب توثيق رسمي', userName, 'verification', id);
+      setVerifications(prev => prev.map(v => v.id === id ? { ...v, status: action } : v));
+      showToast(action === 'approved' ? 'تم اعتماد التوثيق وإرسال الإشعار ✓' : 'تم رفض الطلب وإرسال الإشعار');
+    } catch (e: any) {
+      Alert.alert('خطأ', e.message || 'تعذر معالجة طلب التوثيق');
+    }
+  };
+
+  // 9. Delete Inappropriate Content Item
+  const deleteContentItem = async (id: string, type: 'question' | 'request', title: string) => {
+    confirmAction(
+      'حذف المنشور',
+      'هل ترغب في حذف "' + title + '" نهائياً من منصة حيّنا؟',
+      async () => {
+        try {
+          const table = type === 'question' ? 'questions' : 'requests';
+          const { error } = await supabase.from(table).delete().eq('id', id);
+          if (error) throw error;
+          if (type === 'question') setQuestionsList(prev => prev.filter(q => q.id !== id));
+          else setRequestsList(prev => prev.filter(r => r.id !== id));
+          await addAuditLog('حذف منشور', title, type, id);
+          showToast('تم حذف المنشور بنجاح 🗑️');
+        } catch (e: any) {
+          Alert.alert('خطأ', e.message || 'تعذر حذف المنشور');
+        }
+      }
+    );
+  };
+
+  // 10. Send Broadcast Announcement to actual recipients.
+  const handleSendBroadcast = async () => {
+    if (!broadcastTitle.trim() || !broadcastBody.trim()) {
+      Alert.alert('تنبيه', 'يرجى كتابة عنوان وتفاصيل التعميم');
+      return;
+    }
+
+    setSendingBroadcast(true);
     try {
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) throw new Error('انتهت جلسة الدخول.');
@@ -377,7 +514,7 @@ export default function Admin() {
       const rows = recipients.map((userId: string) => ({
         user_id: userId,
         type: 'broadcast',
-        title: `${badgeIcon} ${broadcastTitle.trim()}`,
+        title: badgeIcon + ' ' + broadcastTitle.trim(),
         body: broadcastBody.trim(),
         data: { actor_id: u.user.id, broadcast_type: broadcastType },
       }));
@@ -386,7 +523,7 @@ export default function Admin() {
         if (error) throw error;
       }
       await addAuditLog('نشر تعميم وبث رسمي للجيران', broadcastTitle.trim(), 'broadcast');
-      showToast(`تم إرسال ونشر التعميم إلى ${recipients.length} مستخدم 📢`);
+      showToast('تم إرسال ونشر التعميم إلى ' + recipients.length + ' مستخدم 📢');
       setBroadcastTitle('');
       setBroadcastBody('');
     } catch (e: any) {
