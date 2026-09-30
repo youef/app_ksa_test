@@ -12,6 +12,7 @@ import {
   Animated,
   TextInput,
   Alert,
+  Share,
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { supabase } from '@/lib/supabase';
@@ -45,6 +46,12 @@ import {
   CheckCircle2,
   HelpCircle,
   ExternalLink,
+  Repeat,
+  Bookmark,
+  Send,
+  Eye,
+  CornerDownLeft,
+  Check,
 } from 'lucide-react-native';
 import { C } from '@/lib/ui';
 import BottomNav from '@/components/BottomNav';
@@ -52,6 +59,25 @@ import LocationSelectorModal from '@/components/LocationSelectorModal';
 import { generateNeighborhoodPulseAI } from '@/lib/aiAssistant';
 
 const { width } = Dimensions.get('window');
+
+// Relative time in Arabic helper
+function formatArabicTimeAgo(dateStr: string): string {
+  if (!dateStr) return '';
+  const now = new Date();
+  const past = new Date(dateStr);
+  const diffMs = now.getTime() - past.getTime();
+  const diffSec = Math.max(0, Math.floor(diffMs / 1000));
+  const diffMin = Math.floor(diffSec / 60);
+  const diffHour = Math.floor(diffMin / 60);
+  const diffDay = Math.floor(diffHour / 24);
+
+  if (diffMin < 1) return 'الآن';
+  if (diffMin < 60) return `منذ ${diffMin} د`;
+  if (diffHour < 24) return `منذ ${diffHour} س`;
+  if (diffDay === 1) return 'أمس';
+  if (diffDay < 7) return `منذ ${diffDay} أيام`;
+  return past.toLocaleDateString('ar-SA', { day: 'numeric', month: 'short' });
+}
 
 export default function Home() {
   const [profile, setProfile] = useState<any>(null);
@@ -76,8 +102,21 @@ export default function Home() {
   // Unread badge count
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
 
+  // Toast feedback state
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toastAnim = useRef(new Animated.Value(0)).current;
+
   // Animation for FAB
   const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  const showToast = useCallback((msg: string) => {
+    setToastMessage(msg);
+    Animated.sequence([
+      Animated.timing(toastAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
+      Animated.delay(2200),
+      Animated.timing(toastAnim, { toValue: 0, duration: 250, useNativeDriver: true })
+    ]).start(() => setToastMessage(null));
+  }, [toastAnim]);
 
   useEffect(() => {
     const hour = new Date().getHours();
@@ -151,9 +190,38 @@ export default function Home() {
       });
 
       const authorIds = [...new Set(uniqueQData.map((q: any) => q.author_id).filter(Boolean))];
-      const { data: qProfiles } = await supabase.from('profiles').select('*').in('id', authorIds);
-      const profileMap = (qProfiles || []).reduce((acc: any, p: any) => ({ ...acc, [p.id]: p }), {});
-      setQuestions(uniqueQData.map((q: any) => ({ ...q, profiles: profileMap[q.author_id] || null })));
+      const qIds = uniqueQData.map((q: any) => q.id);
+
+      // Fetch profiles of question authors and answers in parallel
+      const [profilesRes, answersRes] = await Promise.all([
+        supabase.from('profiles').select('*').in('id', authorIds),
+        supabase.from('answers').select('*').in('question_id', qIds).order('created_at', { ascending: true })
+      ]);
+
+      const profileMap = (profilesRes.data || []).reduce((acc: any, p: any) => ({ ...acc, [p.id]: p }), {});
+
+      // Fetch profiles of answer authors
+      const answerAuthorIds = [...new Set((answersRes.data || []).map((a: any) => a.author_id).filter(Boolean))];
+      let ansProfileMap: Record<string, any> = {};
+      if (answerAuthorIds.length > 0) {
+        const { data: ansProfiles } = await supabase.from('profiles').select('*').in('id', answerAuthorIds);
+        ansProfileMap = (ansProfiles || []).reduce((acc: any, p: any) => ({ ...acc, [p.id]: p }), {});
+      }
+
+      // Group answers by question_id
+      const answersByQ: Record<string, any[]> = {};
+      (answersRes.data || []).forEach((ans: any) => {
+        ans.profiles = ansProfileMap[ans.author_id] || null;
+        if (!answersByQ[ans.question_id]) answersByQ[ans.question_id] = [];
+        answersByQ[ans.question_id].push(ans);
+      });
+
+      setQuestions(uniqueQData.map((q: any) => ({
+        ...q,
+        profiles: profileMap[q.author_id] || null,
+        answers: answersByQ[q.id] || [],
+        answers_count: (answersByQ[q.id] || []).length,
+      })));
     } else {
       setQuestions([]);
     }
@@ -187,6 +255,46 @@ export default function Home() {
   }, [selectedCity]);
 
   useFocusEffect(useCallback(() => { load() }, [load]));
+
+  // Inline Quick Reply Handler
+  const handleQuickReplySubmit = async (questionId: string, text: string) => {
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) {
+      Alert.alert('تنبيه', 'يرجى تسجيل الدخول أولاً للرد');
+      return;
+    }
+
+    const { data: newAns, error } = await supabase
+      .from('answers')
+      .insert({
+        question_id: questionId,
+        author_id: u.user.id,
+        body: text.trim()
+      })
+      .select('*')
+      .single();
+
+    if (error) {
+      Alert.alert('خطأ', 'تعذر إرسال الرد: ' + error.message);
+      return;
+    }
+
+    // Optimistic local state update
+    newAns.profiles = profile;
+    setQuestions(prev => prev.map(q => {
+      if (q.id === questionId) {
+        const updatedAnswers = [...(q.answers || []), newAns];
+        return {
+          ...q,
+          answers: updatedAnswers,
+          answers_count: updatedAnswers.length,
+        };
+      }
+      return q;
+    }));
+
+    showToast('تم نشر ردك بنجاح في المحادثة ✨');
+  };
 
   // Filter questions and requests by selected Saudi region / city / district & Proximity Radius
   const filteredQuestions = questions.filter(q => {
@@ -243,6 +351,13 @@ export default function Home() {
 
   return (
     <View style={styles.container}>
+      {/* Toast Feedback Notification Banner */}
+      {toastMessage && (
+        <Animated.View style={[styles.toastBanner, { opacity: toastAnim, transform: [{ translateY: toastAnim.interpolate({ inputRange: [0, 1], outputRange: [-20, 0] }) }] }]}>
+          <Text style={styles.toastBannerText}>{toastMessage}</Text>
+        </Animated.View>
+      )}
+
       <ScrollView 
         style={styles.container}
         showsVerticalScrollIndicator={false}
@@ -324,7 +439,7 @@ export default function Home() {
             <View style={styles.searchBar}>
               <Search size={20} color="#94a3b8" />
               <TextInput 
-                placeholder="ابحث عن سؤال، خدمة، أو جار في حيك..." 
+                placeholder="ابحث عن استفسار، توصية، أو جار في حيك..." 
                 placeholderTextColor="#94a3b8"
                 style={styles.searchInput}
                 value={searchQuery}
@@ -336,7 +451,7 @@ export default function Home() {
                   <Text style={styles.clearSearchText}>✕</Text>
                 </Pressable>
               ) : (
-                <Pressable style={styles.micBtn} onPress={() => router.push('/search')}>
+                <Pressable style={styles.micBtn} onPress={() => router.push('/questions')}>
                   <Mic size={17} color="#0891b2" />
                 </Pressable>
               )}
@@ -420,9 +535,13 @@ export default function Home() {
               {/* Trending Topics Tags */}
               <View style={styles.hubTopicsRow}>
                 {neighborhoodPulse.trendingTopics.map((topic, i) => (
-                  <View key={i} style={styles.hubTopicPill}>
+                  <Pressable 
+                    key={i} 
+                    style={styles.hubTopicPill}
+                    onPress={() => setSearchQuery(topic)}
+                  >
                     <Text style={styles.hubTopicText}>🔥 {topic}</Text>
-                  </View>
+                  </Pressable>
                 ))}
               </View>
             </View>
@@ -491,31 +610,43 @@ export default function Home() {
         {/* ======================================================== */}
         <View style={styles.servicesGrid}>
           <ServicePill 
-            icon={<MessageCircle size={24} color="#0284c7" />} 
+            icon={<MessageCircle size={22} color="#0284c7" />} 
             bg="#f0f9ff" 
             label="استفسارات" 
-            onPress={() => setActiveTab('questions')} 
+            onPress={() => {
+              setActiveTab('questions');
+              showToast('عرض جميع استفسارات وتجارب الجيران 💬');
+            }} 
           />
           <ServicePill 
-            icon={<Wrench size={24} color="#16a34a" />} 
+            icon={<Wrench size={22} color="#16a34a" />} 
             bg="#f0fdf4" 
             label="إعارة أدوات" 
-            onPress={() => setActiveTab('tools')} 
+            onPress={() => {
+              setActiveTab('tools');
+              showToast('أدوات ومعدات متاحة للإعارة بين الجيران 🛠️');
+            }} 
           />
           <ServicePill 
-            icon={<Truck size={24} color="#d97706" />} 
-            bg="#fffbeb" 
-            label="فزعة وخدمات" 
-            onPress={() => setActiveTab('requests')} 
-          />
-          <ServicePill 
-            icon={<MapPin size={24} color="#7c3aed" />} 
+            icon={<Briefcase size={22} color="#7c3aed" />} 
             bg="#faf5ff" 
+            label="خدمات الحي" 
+            onPress={() => router.push('/services')} 
+          />
+          <ServicePill 
+            icon={<Truck size={22} color="#d97706" />} 
+            bg="#fffbeb" 
+            label="فزعة وطلبات" 
+            onPress={() => router.push('/requests')} 
+          />
+          <ServicePill 
+            icon={<MapPin size={22} color="#0d9488" />} 
+            bg="#f0fdfa" 
             label="دليل المحلات" 
             onPress={() => router.push('/directory')} 
           />
           <ServicePill 
-            icon={<Map size={24} color="#0891b2" />} 
+            icon={<Map size={22} color="#0891b2" />} 
             bg="#ecfeff" 
             label="رادار الخريطة" 
             onPress={() => router.push('/map')} 
@@ -526,7 +657,7 @@ export default function Home() {
         {/* 6. COMMUNITY FEED SECTION & TABS                        */}
         {/* ======================================================== */}
         <View style={styles.feedSection}>
-          {/* Floating Segmented Tabs */}
+          {/* Twitter-style Filter Pills */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.floatingTabs}>
             <Pressable 
               style={[styles.fTab, activeTab === 'all' && styles.fTabActive]} 
@@ -574,7 +705,7 @@ export default function Home() {
             </Pressable>
           </ScrollView>
 
-          {/* Render Feed List */}
+          {/* Render Twitter-Style Progressive Feed */}
           {activeTab === 'all' && (
             [
               ...filteredQuestions.map(q => ({ type: 'question' as const, data: q })),
@@ -582,24 +713,59 @@ export default function Home() {
             ]
               .sort((a, b) => new Date(b.data.created_at).getTime() - new Date(a.data.created_at).getTime())
               .map(item => (
-                <ModernPost key={`${item.type}-${item.data.id}`} type={item.type} data={item.data} />
+                <TwitterInquiryCard 
+                  key={`${item.type}-${item.data.id}`} 
+                  type={item.type} 
+                  data={item.data} 
+                  currentUserProfile={profile}
+                  onQuickReply={handleQuickReplySubmit}
+                  onToast={showToast}
+                />
               ))
           )}
 
           {activeTab === 'emergency' && emergencyQuestions.map(q => (
-            <ModernPost key={`em-${q.id}`} type="question" data={q} />
+            <TwitterInquiryCard 
+              key={`em-${q.id}`} 
+              type="question" 
+              data={q} 
+              currentUserProfile={profile}
+              onQuickReply={handleQuickReplySubmit}
+              onToast={showToast}
+            />
           ))}
 
           {activeTab === 'tools' && toolQuestions.map(q => (
-            <ModernPost key={`tool-${q.id}`} type="question" data={q} />
+            <TwitterInquiryCard 
+              key={`tool-${q.id}`} 
+              type="question" 
+              data={q} 
+              currentUserProfile={profile}
+              onQuickReply={handleQuickReplySubmit}
+              onToast={showToast}
+            />
           ))}
 
           {activeTab === 'questions' && filteredQuestions.map(q => (
-            <ModernPost key={`q-${q.id}`} type="question" data={q} />
+            <TwitterInquiryCard 
+              key={`q-${q.id}`} 
+              type="question" 
+              data={q} 
+              currentUserProfile={profile}
+              onQuickReply={handleQuickReplySubmit}
+              onToast={showToast}
+            />
           ))}
 
           {activeTab === 'requests' && filteredRequests.map(r => (
-            <ModernPost key={`r-${r.id}`} type="request" data={r} />
+            <TwitterInquiryCard 
+              key={`r-${r.id}`} 
+              type="request" 
+              data={r} 
+              currentUserProfile={profile}
+              onQuickReply={handleQuickReplySubmit}
+              onToast={showToast}
+            />
           ))}
 
           {/* Empty States */}
@@ -609,10 +775,10 @@ export default function Home() {
                 <Sparkles size={36} color="#0891b2" />
               </View>
               <Text style={styles.emptyTitle}>
-                {selectedCity === 'كل المدن' ? 'لا توجد منشورات حالياً' : `لا توجد منشورات في ${selectedCity} حالياً`}
+                {selectedCity === 'كل المدن' ? 'لا توجد استفسارات حالياً' : `لا توجد استفسارات في ${selectedCity} حالياً`}
               </Text>
               <Text style={styles.emptySub}>
-                كن المبادر الأول في حيك واطرح سؤالاً أو اعرض مساعدة لجيرانك.
+                كن المبادر الأول في حيك واطرح سؤالاً أو اعرض مساعدة لجيرانك بأسلوب خيط المحادثات.
               </Text>
               <Pressable style={styles.emptyAskBtn} onPress={() => router.push('/ask')}>
                 <Text style={styles.emptyAskBtnText}>اسأل أهل حيك الآن ✨</Text>
@@ -711,119 +877,428 @@ function ServicePill({ icon, bg, label, onPress }: { icon: any, bg: string, labe
       <View style={[styles.serviceIconBox, { backgroundColor: bg }]}>
         {icon}
       </View>
-      <Text style={styles.serviceLabel}>{label}</Text>
+      <Text style={styles.serviceLabel} numberOfLines={1}>{label}</Text>
     </Pressable>
   );
 }
 
-function ModernPost({ type, data }: { type: 'question' | 'request', data: any }) {
+// ========================================================
+// TWITTER / X STYLE PROGRESSIVE INQUIRY CARD COMPONENT
+// (استفسار تدريجي بتفاصيل وردود فورية تفاعلية)
+// ========================================================
+
+function TwitterInquiryCard({
+  type,
+  data,
+  currentUserProfile,
+  onQuickReply,
+  onToast,
+}: {
+  type: 'question' | 'request';
+  data: any;
+  currentUserProfile: any;
+  onQuickReply: (id: string, text: string) => Promise<void>;
+  onToast: (msg: string) => void;
+}) {
   const isReq = type === 'request';
-  const name = data.profiles?.hide_name ? 'مستخدم مجهول' : (data.profiles?.display_name || data.profiles?.username || 'مستخدم');
+  const name = data.profiles?.hide_name ? 'جار مجهول 🕶️' : (data.profiles?.display_name || data.profiles?.username || 'ابن الحي');
+  const username = data.profiles?.username || 'neighbor';
   const avatar = data.profiles?.avatar_url;
   const isVerifiedNeighbor = data.profiles?.is_geoverified;
+  const isIdVerified = data.profiles?.is_verified;
   const isEmergency = data.is_emergency || data.urgency_level === 'emergency' || (data.title && (data.title.includes('مفقود') || data.title.includes('طارئ')));
   const isToolSharing = data.is_tool_sharing || data.item_type === 'tool_sharing' || (data.title && (data.title.includes('إعارة') || data.title.includes('دريل')));
 
-  const [liked, setLiked] = useState(false);
-  const [likeCount, setLikeCount] = useState(Math.floor(Math.random() * 8) + 2);
+  // Progressive thread expansion state
+  const [expanded, setExpanded] = useState(false);
+  const [quickReplyText, setQuickReplyText] = useState('');
+  const [replyLoading, setReplyLoading] = useState(false);
 
+  // Social interactions state
+  const [liked, setLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(Math.floor(Math.random() * 6) + 3);
+  const [reposted, setReposted] = useState(false);
+  const [repostCount, setRepostCount] = useState(Math.floor(Math.random() * 3));
+  const [bookmarked, setBookmarked] = useState(false);
+  const [viewsCount] = useState(Math.floor(Math.random() * 85) + 65);
+
+  const answers = data.answers || [];
+  const answersCount = data.answers_count !== undefined ? data.answers_count : answers.length;
+
+  // Like interaction
   function handleLike() {
-    setLiked(!liked);
-    setLikeCount(liked ? likeCount - 1 : likeCount + 1);
+    if (!liked) {
+      setLiked(true);
+      setLikeCount(prev => prev + 1);
+      onToast('أعجبك الاستفسار ❤️');
+    } else {
+      setLiked(false);
+      setLikeCount(prev => prev - 1);
+    }
   }
 
-  function handleShare() {
-    if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard.writeText(window.location.origin + `/question?id=${data.id}`);
-      Alert.alert('تم النسخ', 'تم نسخ رابط المنشور للمشاركة مع جيرانك!');
+  // Repost interaction
+  function handleRepost() {
+    if (!reposted) {
+      setReposted(true);
+      setRepostCount(prev => prev + 1);
+      onToast('تمت إعادة نشر الاستفسار لجيرانك 🔁');
     } else {
-      Alert.alert('مشاركة', 'شارك هذا المنشور عبر مجموعات الحي وتطبيقات التواصل.');
+      setReposted(false);
+      setRepostCount(prev => Math.max(0, prev - 1));
+      onToast('تم إلغاء إعادة النشر');
+    }
+  }
+
+  // Bookmark interaction
+  function handleBookmark() {
+    const nextState = !bookmarked;
+    setBookmarked(nextState);
+    if (nextState) {
+      onToast('تم حفظ الاستفسار في الإشارات المرجعية 🔖');
+    } else {
+      onToast('تمت إزالة الاستفسار من الإشارات المرجعية');
+    }
+  }
+
+  // Share interaction
+  async function handleShare() {
+    const pageUrl = (Platform.OS === 'web' && typeof window !== 'undefined')
+      ? `${window.location.origin}/question?id=${data.id}`
+      : `https://appksa-main.vercel.app/question?id=${data.id}`;
+
+    if (Platform.OS === 'web') {
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        try {
+          await navigator.clipboard.writeText(pageUrl);
+          onToast('تم نسخ رابط الاستفسار للمشاركة 🔗');
+          return;
+        } catch (e) {
+          // fallback
+        }
+      }
+    }
+    try {
+      await Share.share({
+        title: data.title,
+        message: `${data.title}\nشاهد التفاصيل وتفاعل مع جيرانك على منصة حيّنا:\n${pageUrl}`,
+        url: pageUrl,
+      });
+    } catch (e) {
+      onToast('تم نسخ الرابط بنجاح');
+    }
+  }
+
+  // More options menu
+  function handleMoreOptions() {
+    Alert.alert(
+      'خيارات الاستفسار',
+      data.title,
+      [
+        { text: 'نسخ رابط المنشور', onPress: handleShare },
+        { text: 'كتم إشعارات هذا المنشور', onPress: () => onToast('تم كتم إشعارات المنشور 🔕') },
+        { text: 'إبلاغ عن محتوى غير لائق', onPress: () => router.push({ pathname: '/report', params: { id: data.id, type: isReq ? 'request' : 'question' } }), style: 'destructive' },
+        { text: 'إلغاء', style: 'cancel' }
+      ]
+    );
+  }
+
+  // Quick reply submission
+  async function handleSendReply() {
+    if (!quickReplyText.trim()) return;
+    setReplyLoading(true);
+    try {
+      await onQuickReply(data.id, quickReplyText);
+      setQuickReplyText('');
+    } catch (err: any) {
+      Alert.alert('خطأ', err?.message || 'تعذر إرسال الرد');
+    } finally {
+      setReplyLoading(false);
+    }
+  }
+
+  // Navigate to full details page
+  function navigateToDetails() {
+    if (isReq) {
+      router.push({ pathname: '/request', params: { id: data.id } });
+    } else {
+      router.push({ pathname: '/question', params: { id: data.id } });
     }
   }
 
   return (
-    <Pressable 
-      style={[
-        styles.postCard,
-        isEmergency && styles.postCardEmergency,
-        isToolSharing && styles.postCardToolSharing,
-      ]} 
-      onPress={() => router.push(isReq ? { pathname: '/request', params: { id: data.id } } : { pathname: '/question', params: { id: data.id } })}
-    >
-      {/* Top Header: Author, Verification & Category Tag */}
-      <View style={styles.postHeader}>
-        <View style={styles.postAuthorInfo}>
+    <View style={[
+      styles.xCard,
+      isEmergency && styles.xCardEmergency,
+      isToolSharing && styles.xCardToolSharing,
+    ]}>
+      {/* ======================================================== */}
+      {/* 1. TWITTER HEADER (Author, Verified, Time & Menu)       */}
+      {/* ======================================================== */}
+      <View style={styles.xHeader}>
+        {/* Right side: Author Avatar with thread connector capability */}
+        <Pressable 
+          onPress={() => data.profiles?.id && router.push({ pathname: '/user', params: { id: data.profiles.id } })}
+          style={styles.xAvatarWrap}
+        >
           {avatar ? (
-            <Image source={{uri: avatar}} style={styles.postAvatar} />
+            <Image source={{ uri: avatar }} style={styles.xAvatarImg} />
           ) : (
-            <View style={styles.postAvatarFallback}>
-              <User size={18} color="#fff" />
+            <View style={[styles.xAvatarFallback, isEmergency && { backgroundColor: '#dc2626' }]}>
+              <User size={20} color="#fff" />
             </View>
           )}
-          <View style={styles.postAuthorText}>
-            <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-              <Text style={styles.postAuthorName}>{name}</Text>
-              {isVerifiedNeighbor && (
-                <View style={styles.verifiedNeighborBadge}>
-                  <Text style={styles.verifiedNeighborText}>ساكن موثّق ✓</Text>
+          {isVerifiedNeighbor && (
+            <View style={styles.xGeoBadge}>
+              <ShieldCheck size={9} color="#fff" />
+            </View>
+          )}
+        </Pressable>
+
+        {/* Middle: Author Name, Handle, Time Ago & Neighborhood */}
+        <View style={styles.xAuthorMeta}>
+          <View style={styles.xAuthorRow}>
+            {/* Category tag */}
+            {isEmergency ? (
+              <View style={styles.xEmergencyBadge}>
+                <Flame size={11} color="#dc2626" />
+                <Text style={styles.xEmergencyBadgeText}>عاجل</Text>
+              </View>
+            ) : isToolSharing ? (
+              <View style={styles.xToolBadge}>
+                <Wrench size={11} color="#16a34a" />
+                <Text style={styles.xToolBadgeText}>إعارة</Text>
+              </View>
+            ) : isReq ? (
+              <View style={styles.xReqBadge}>
+                <Text style={styles.xReqBadgeText}>فزعة</Text>
+              </View>
+            ) : (
+              <View style={styles.xCategoryBadge}>
+                <Text style={styles.xCategoryBadgeText}>استفسار</Text>
+              </View>
+            )}
+
+            <Text style={styles.xTimeAgo}>{formatArabicTimeAgo(data.created_at)}</Text>
+            <Text style={styles.xDot}>·</Text>
+            <Text style={styles.xHandle} numberOfLines={1}>@{username}</Text>
+            {isIdVerified && (
+              <CheckCircle2 size={13} color="#0284c7" />
+            )}
+            <Pressable onPress={() => data.profiles?.id && router.push({ pathname: '/user', params: { id: data.profiles.id } })}>
+              <Text style={styles.xAuthorName} numberOfLines={1}>{name}</Text>
+            </Pressable>
+          </View>
+
+          {/* District & City location tag */}
+          <View style={styles.xLocationRow}>
+            <MapPin size={11} color="#0891b2" />
+            <Text style={styles.xLocationText}>
+              {data.district ? `حي ${data.district}` : 'الحي'}{data.city ? ` · ${data.city}` : ''}
+            </Text>
+          </View>
+        </View>
+
+        {/* Left side: Options menu button */}
+        <Pressable onPress={handleMoreOptions} style={styles.xMoreBtn}>
+          <MoreHorizontal size={18} color="#94a3b8" />
+        </Pressable>
+      </View>
+
+      {/* ======================================================== */}
+      {/* 2. INQUIRY CONTENT (Clickable to Expand / View Details)  */}
+      {/* ======================================================== */}
+      <Pressable onPress={() => setExpanded(!expanded)} style={styles.xContentArea}>
+        <Text style={[styles.xTitle, isEmergency && { color: '#991b1b' }]}>
+          {data.title}
+        </Text>
+        
+        {(data.body || data.description) && (
+          <Text style={styles.xBodyText} numberOfLines={expanded ? undefined : 3}>
+            {isReq ? data.description : data.body}
+          </Text>
+        )}
+
+        {/* Dynamic Hashtags Pill Row */}
+        <View style={styles.xHashtagRow}>
+          {data.district && (
+            <View style={styles.xHashPill}>
+              <Text style={styles.xHashText}>#{data.district.replace(/\s+/g, '_')}</Text>
+            </View>
+          )}
+          <View style={styles.xHashPill}>
+            <Text style={styles.xHashText}>#أهل_الحي</Text>
+          </View>
+          {isToolSharing && (
+            <View style={[styles.xHashPill, { backgroundColor: '#f0fdf4' }]}>
+              <Text style={[styles.xHashText, { color: '#16a34a' }]}>#إعارة_مجانية</Text>
+            </View>
+          )}
+        </View>
+      </Pressable>
+
+      {/* ======================================================== */}
+      {/* 3. TWITTER ACTION BAR (Interactive Twitter / X Bar)       */}
+      {/* ======================================================== */}
+      <View style={styles.xActionBar}>
+        {/* 1. Reply Button (Toggles Inline Expansion) */}
+        <Pressable 
+          style={[styles.xActionBtn, expanded && styles.xActionBtnActive]} 
+          onPress={() => setExpanded(!expanded)}
+        >
+          <MessageCircle size={17} color={expanded ? '#0891b2' : '#64748b'} />
+          <Text style={[styles.xActionCounter, expanded && { color: '#0891b2', fontWeight: '800' }]}>
+            {answersCount}
+          </Text>
+        </Pressable>
+
+        {/* 2. Repost / Retweet */}
+        <Pressable style={styles.xActionBtn} onPress={handleRepost}>
+          <Repeat size={17} color={reposted ? '#16a34a' : '#64748b'} />
+          <Text style={[styles.xActionCounter, reposted && { color: '#16a34a', fontWeight: '800' }]}>
+            {repostCount > 0 ? repostCount : ''}
+          </Text>
+        </Pressable>
+
+        {/* 3. Heart / Like */}
+        <Pressable style={styles.xActionBtn} onPress={handleLike}>
+          <Heart size={17} color={liked ? '#f43f5e' : '#64748b'} fill={liked ? '#f43f5e' : 'none'} />
+          <Text style={[styles.xActionCounter, liked && { color: '#f43f5e', fontWeight: '800' }]}>
+            {likeCount}
+          </Text>
+        </Pressable>
+
+        {/* 4. Bookmark */}
+        <Pressable style={styles.xActionBtn} onPress={handleBookmark}>
+          <Bookmark size={17} color={bookmarked ? '#f59e0b' : '#64748b'} fill={bookmarked ? '#f59e0b' : 'none'} />
+        </Pressable>
+
+        {/* 5. Share */}
+        <Pressable style={styles.xActionBtn} onPress={handleShare}>
+          <Share2 size={17} color="#64748b" />
+        </Pressable>
+
+        {/* 6. Views */}
+        <View style={styles.xActionBtn}>
+          <Eye size={16} color="#94a3b8" />
+          <Text style={styles.xActionViews}>{viewsCount}</Text>
+        </View>
+      </View>
+
+      {/* ======================================================== */}
+      {/* 4. PROGRESSIVE EXPANSION (خيط الردود والتفاصيل التدريجي) */}
+      {/* ======================================================== */}
+      {expanded && (
+        <View style={styles.xThreadContainer}>
+          {/* Thread Header */}
+          <View style={styles.xThreadHeader}>
+            <Pressable onPress={() => setExpanded(false)} style={styles.xThreadCloseBtn}>
+              <ChevronUp size={14} color="#0891b2" />
+              <Text style={styles.xThreadCloseText}>طي التفاصيل</Text>
+            </Pressable>
+            <View style={styles.xThreadTitleRow}>
+              <Text style={styles.xThreadTitle}>خيط الردود والتوصيات ({answersCount})</Text>
+              <Sparkles size={14} color="#0891b2" />
+            </View>
+          </View>
+
+          {/* List of answers */}
+          {answers.length > 0 ? (
+            <View style={styles.xAnswersList}>
+              {answers.map((ans: any, idx: number) => {
+                const ansName = ans.profiles?.hide_name ? 'جار مجهول 🕶️' : (ans.profiles?.display_name || ans.profiles?.username || 'ابن الحي');
+                const ansAvatar = ans.profiles?.avatar_url;
+                const isAccepted = ans.is_accepted || idx === 0;
+
+                return (
+                  <View key={ans.id || idx} style={styles.xAnswerItem}>
+                    {/* Thread Line Connector */}
+                    <View style={styles.xThreadLine} />
+
+                    {/* Answer Author Avatar */}
+                    <View style={styles.xAnswerAvatarWrap}>
+                      {ansAvatar ? (
+                        <Image source={{ uri: ansAvatar }} style={styles.xAnswerAvatar} />
+                      ) : (
+                        <View style={styles.xAnswerAvatarFallback}>
+                          <Text style={styles.xAnswerAvatarLetter}>{ansName[0]}</Text>
+                        </View>
+                      )}
+                    </View>
+
+                    {/* Answer Bubble */}
+                    <View style={[styles.xAnswerBubble, isAccepted && styles.xAnswerBubbleAccepted]}>
+                      <View style={styles.xAnswerHeaderRow}>
+                        <Text style={styles.xAnswerTime}>{formatArabicTimeAgo(ans.created_at)}</Text>
+                        <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 5 }}>
+                          <Text style={styles.xAnswerAuthorName}>{ansName}</Text>
+                          {ans.profiles?.is_geoverified && (
+                            <ShieldCheck size={11} color="#16a34a" />
+                          )}
+                          {isAccepted && (
+                            <View style={styles.xAcceptedBadge}>
+                              <Check size={10} color="#fff" />
+                              <Text style={styles.xAcceptedBadgeText}>توصية معتمدة</Text>
+                            </View>
+                          )}
+                        </View>
+                      </View>
+
+                      <Text style={styles.xAnswerBodyText}>{ans.body}</Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          ) : (
+            <View style={styles.xNoAnswersBox}>
+              <Text style={styles.xNoAnswersText}>
+                كن أول من يفيد جارك ويقدم توصية أو حلاً لهذا الاستفسار! 💡
+              </Text>
+            </View>
+          )}
+
+          {/* Inline Quick Reply Input */}
+          <View style={styles.xQuickReplyContainer}>
+            <View style={styles.xQuickReplyAvatar}>
+              {currentUserProfile?.avatar_url ? (
+                <Image source={{ uri: currentUserProfile.avatar_url }} style={styles.xMiniAvatar} />
+              ) : (
+                <View style={styles.xMiniAvatarFallback}>
+                  <Text style={styles.xMiniAvatarLetter}>{currentUserProfile?.display_name?.[0] || 'أ'}</Text>
                 </View>
               )}
             </View>
-            <Text style={styles.postTime}>
-              {data.city || 'الرياض'}{data.district ? ` · ${data.district}` : ''} · {new Date(data.created_at).toLocaleTimeString('ar-SA', {hour: '2-digit', minute:'2-digit'})}
+
+            <TextInput 
+              style={styles.xQuickReplyInput}
+              placeholder="اكتب إجابتك أو إفادتك للجار..."
+              placeholderTextColor="#94a3b8"
+              value={quickReplyText}
+              onChangeText={setQuickReplyText}
+              multiline
+            />
+
+            <Pressable 
+              style={[styles.xQuickReplySendBtn, (!quickReplyText.trim() || replyLoading) && styles.xQuickReplySendBtnDisabled]}
+              onPress={handleSendReply}
+              disabled={!quickReplyText.trim() || replyLoading}
+            >
+              <Send size={15} color="#fff" />
+              <Text style={styles.xQuickReplySendText}>رد</Text>
+            </Pressable>
+          </View>
+
+          {/* Full Page Navigation Link */}
+          <Pressable style={styles.xOpenFullThreadBtn} onPress={navigateToDetails}>
+            <Text style={styles.xOpenFullThreadText}>
+              {isReq ? 'فتح صفحة طلب الفزعة بالكامل ←' : 'فتح صفحة الاستفسار الكاملة والمحادثات المباشرة ←'}
             </Text>
-          </View>
-        </View>
-
-        {/* Category Pill Tag */}
-        {isEmergency ? (
-          <View style={styles.emergencyTagBadge}>
-            <Flame size={13} color="#dc2626" />
-            <Text style={styles.emergencyTagText}>طارئ</Text>
-          </View>
-        ) : isToolSharing ? (
-          <View style={styles.toolTagBadge}>
-            <Wrench size={13} color="#16a34a" />
-            <Text style={styles.toolTagText}>إعارة أداة</Text>
-          </View>
-        ) : (
-          <View style={[styles.categoryTagBadge, isReq && styles.categoryTagBadgeReq]}>
-            <Text style={[styles.categoryTagText, isReq && styles.categoryTagTextReq]}>
-              {isReq ? 'طلب مساعدة' : 'استفسار'}
-            </Text>
-          </View>
-        )}
-      </View>
-
-      {/* Post Content */}
-      <View style={styles.postBodyContainer}>
-        <Text style={[styles.postTitle, isEmergency && { color: '#b91c1c' }]}>{data.title}</Text>
-        <Text style={styles.postDesc} numberOfLines={3}>{isReq ? data.description : data.body}</Text>
-      </View>
-
-      {/* Post Footer Actions */}
-      <View style={styles.postFooter}>
-        <View style={styles.postStats}>
-          <Pressable style={styles.statActionItem} onPress={handleLike}>
-            <Heart size={16} color={liked ? '#ef4444' : '#64748b'} fill={liked ? '#ef4444' : 'none'} />
-            <Text style={[styles.statText, liked && { color: '#ef4444' }]}>{likeCount}</Text>
-          </Pressable>
-
-          <View style={styles.statActionItem}>
-            <MessageCircle size={16} color="#64748b" />
-            <Text style={styles.statText}>{Math.floor(Math.random() * 12) + 1}</Text>
-          </View>
-
-          <Pressable style={styles.statActionItem} onPress={handleShare}>
-            <Share2 size={16} color="#64748b" />
+            <ExternalLink size={14} color="#0891b2" />
           </Pressable>
         </View>
-
-        <View style={styles.viewDetailsBtn}>
-          <Text style={styles.viewDetailsText}>عرض والرد ←</Text>
-        </View>
-      </View>
-    </Pressable>
+      )}
+    </View>
   );
 }
 
@@ -835,6 +1310,29 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8fafc',
+  },
+  toastBanner: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 56 : 42,
+    alignSelf: 'center',
+    zIndex: 999,
+    backgroundColor: '#0f172a',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  toastBannerText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '800',
+    textAlign: 'center',
   },
   hero: {
     paddingTop: Platform.OS === 'ios' ? 52 : 38,
@@ -1139,7 +1637,7 @@ const styles = StyleSheet.create({
   hubTopicPill: {
     backgroundColor: '#f0fdfa',
     paddingHorizontal: 9,
-    paddingVertical: 3,
+    paddingVertical: 4,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#ccfbf1',
@@ -1235,19 +1733,19 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     marginTop: 14,
-    marginBottom: 6,
+    marginBottom: 8,
   },
   servicePill: {
     alignItems: 'center',
-    width: (width - 64) / 5,
+    width: (width - 48) / 6,
   },
   serviceIconBox: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 5,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
@@ -1255,7 +1753,7 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   serviceLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
     color: '#334155',
     textAlign: 'center',
@@ -1298,173 +1796,442 @@ const styles = StyleSheet.create({
   fTabTextActive: {
     color: '#fff',
   },
-  postCard: {
+
+  // ========================================================
+  // TWITTER / X CARD STYLES
+  // ========================================================
+  xCard: {
     backgroundColor: '#fff',
     borderRadius: 20,
     padding: 16,
-    marginBottom: 14,
+    marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#f1f5f9',
+    borderColor: '#e2e8f0',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
-    shadowRadius: 8,
+    shadowRadius: 6,
     elevation: 2,
   },
-  postCardEmergency: {
+  xCardEmergency: {
     borderColor: '#fca5a5',
     backgroundColor: '#fffafa',
   },
-  postCardToolSharing: {
+  xCardToolSharing: {
     borderColor: '#bbf7d0',
     backgroundColor: '#f0fdf4',
   },
-  postHeader: {
+  xHeader: {
     flexDirection: 'row-reverse',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: 8,
   },
-  postAuthorInfo: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 10,
+  xAvatarWrap: {
+    position: 'relative',
+    marginLeft: 10,
   },
-  postAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  xAvatarImg: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
   },
-  postAvatarFallback: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  xAvatarFallback: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: '#0891b2',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  postAuthorText: {
+  xGeoBadge: {
+    position: 'absolute',
+    bottom: -1,
+    right: -1,
+    backgroundColor: '#16a34a',
+    width: 15,
+    height: 15,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#fff',
+  },
+  xAuthorMeta: {
+    flex: 1,
     alignItems: 'flex-end',
   },
-  postAuthorName: {
+  xAuthorRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 4,
+  },
+  xAuthorName: {
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '900',
     color: '#0f172a',
   },
-  verifiedNeighborBadge: {
+  xHandle: {
+    fontSize: 12,
+    color: '#64748b',
+    fontWeight: '600',
+    maxWidth: 90,
+  },
+  xDot: {
+    fontSize: 12,
+    color: '#94a3b8',
+  },
+  xTimeAgo: {
+    fontSize: 11,
+    color: '#94a3b8',
+    fontWeight: '600',
+  },
+  xLocationRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+  },
+  xLocationText: {
+    fontSize: 11,
+    color: '#0891b2',
+    fontWeight: '700',
+  },
+  xMoreBtn: {
+    padding: 4,
+  },
+  xCategoryBadge: {
+    backgroundColor: '#ecfeff',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  xCategoryBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#0891b2',
+  },
+  xEmergencyBadge: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 2,
+    backgroundColor: '#fee2e2',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  xEmergencyBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#dc2626',
+  },
+  xToolBadge: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 2,
     backgroundColor: '#dcfce7',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#86efac',
   },
-  verifiedNeighborText: {
+  xToolBadgeText: {
     fontSize: 9,
-    fontWeight: '800',
-    color: '#15803d',
-  },
-  postTime: {
-    fontSize: 11,
-    color: '#94a3b8',
-    marginTop: 2,
-  },
-  emergencyTagBadge: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: '#fee2e2',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  emergencyTagText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#dc2626',
-  },
-  toolTagBadge: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: '#dcfce7',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  toolTagText: {
-    fontSize: 10,
     fontWeight: '800',
     color: '#16a34a',
   },
-  categoryTagBadge: {
-    backgroundColor: '#ecfeff',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  categoryTagBadgeReq: {
+  xReqBadge: {
     backgroundColor: '#fffbeb',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
   },
-  categoryTagText: {
-    fontSize: 10,
+  xReqBadgeText: {
+    fontSize: 9,
     fontWeight: '800',
-    color: '#0891b2',
-  },
-  categoryTagTextReq: {
     color: '#d97706',
   },
-  postBodyContainer: {
-    marginBottom: 14,
+  xContentArea: {
+    marginVertical: 4,
   },
-  postTitle: {
-    fontSize: 16,
+  xTitle: {
+    fontSize: 15,
     fontWeight: '900',
     color: '#0f172a',
     textAlign: 'right',
-    marginBottom: 6,
-    lineHeight: 24,
+    lineHeight: 23,
+    marginBottom: 4,
   },
-  postDesc: {
+  xBodyText: {
     fontSize: 13,
-    color: '#475569',
+    color: '#334155',
     textAlign: 'right',
-    lineHeight: 22,
+    lineHeight: 21,
+    marginBottom: 6,
   },
-  postFooter: {
+  xHashtagRow: {
+    flexDirection: 'row-reverse',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 2,
+  },
+  xHashPill: {
+    backgroundColor: '#f1f5f9',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  xHashText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#0284c7',
+  },
+  xActionBar: {
     flexDirection: 'row-reverse',
     justifyContent: 'space-between',
     alignItems: 'center',
     borderTopWidth: 1,
-    borderTopColor: '#f8fafc',
-    paddingTop: 12,
+    borderTopColor: '#f1f5f9',
+    marginTop: 10,
+    paddingTop: 10,
+    paddingHorizontal: 4,
   },
-  postStats: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 16,
-  },
-  statActionItem: {
+  xActionBtn: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 5,
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+    borderRadius: 8,
   },
-  statText: {
+  xActionBtnActive: {
+    backgroundColor: '#ecfeff',
+  },
+  xActionCounter: {
     fontSize: 12,
     fontWeight: '700',
     color: '#64748b',
   },
-  viewDetailsBtn: {
-    backgroundColor: '#f8fafc',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 10,
+  xActionViews: {
+    fontSize: 11,
+    color: '#94a3b8',
+    fontWeight: '600',
   },
-  viewDetailsText: {
+
+  // ========================================================
+  // PROGRESSIVE THREAD EXPANSION STYLES
+  // ========================================================
+  xThreadContainer: {
+    marginTop: 12,
+    backgroundColor: '#f8fafc',
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  xThreadHeader: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+    marginBottom: 10,
+  },
+  xThreadTitleRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 5,
+  },
+  xThreadTitle: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#0891b2',
+  },
+  xThreadCloseBtn: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 3,
+  },
+  xThreadCloseText: {
+    fontSize: 11,
+    color: '#0891b2',
+    fontWeight: '700',
+  },
+  xAnswersList: {
+    gap: 10,
+    marginBottom: 10,
+  },
+  xAnswerItem: {
+    flexDirection: 'row-reverse',
+    alignItems: 'flex-start',
+    position: 'relative',
+  },
+  xThreadLine: {
+    position: 'absolute',
+    top: 32,
+    right: 14,
+    bottom: -10,
+    width: 2,
+    backgroundColor: '#cbd5e1',
+    zIndex: 1,
+  },
+  xAnswerAvatarWrap: {
+    marginLeft: 8,
+    zIndex: 2,
+  },
+  xAnswerAvatar: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+  },
+  xAnswerAvatarFallback: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#0284c7',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  xAnswerAvatarLetter: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  xAnswerBubble: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  xAnswerBubbleAccepted: {
+    borderColor: '#86efac',
+    backgroundColor: '#f0fdf4',
+  },
+  xAnswerHeaderRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  xAnswerAuthorName: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  xAnswerTime: {
+    fontSize: 10,
+    color: '#94a3b8',
+  },
+  xAcceptedBadge: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#16a34a',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 6,
+  },
+  xAcceptedBadgeText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  xAnswerBodyText: {
+    fontSize: 12,
+    color: '#334155',
+    lineHeight: 18,
+    textAlign: 'right',
+  },
+  xNoAnswersBox: {
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  xNoAnswersText: {
+    fontSize: 12,
+    color: '#64748b',
+    textAlign: 'center',
+  },
+  xQuickReplyContainer: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    gap: 8,
+    marginTop: 4,
+  },
+  xQuickReplyAvatar: {
+    width: 26,
+    height: 26,
+  },
+  xMiniAvatar: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+  },
+  xMiniAvatarFallback: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#0891b2',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  xMiniAvatarLetter: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  xQuickReplyInput: {
+    flex: 1,
+    fontSize: 12,
+    color: '#0f172a',
+    textAlign: 'right',
+    maxHeight: 60,
+    paddingVertical: 4,
+  },
+  xQuickReplySendBtn: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    backgroundColor: '#0891b2',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    gap: 4,
+  },
+  xQuickReplySendBtnDisabled: {
+    backgroundColor: '#cbd5e1',
+  },
+  xQuickReplySendText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  xOpenFullThreadBtn: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+    paddingVertical: 8,
+    backgroundColor: '#ecfeff',
+    borderRadius: 10,
+    gap: 6,
+  },
+  xOpenFullThreadText: {
     fontSize: 11,
     fontWeight: '800',
     color: '#0891b2',
   },
+
+  // Empty state & FAB
   emptyContainer: {
     alignItems: 'center',
     paddingVertical: 40,
