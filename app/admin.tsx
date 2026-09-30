@@ -149,42 +149,35 @@ export default function Admin() {
   }, [toastAnim]);
 
   // Log an admin operation to audit list
-  const addAuditLog = useCallback((action: string, targetName: string) => {
-    const newLog = {
-      id: Date.now().toString(),
+  const addAuditLog = useCallback(async (action: string, targetName: string, targetType?: string, targetId?: string) => {
+    const { data: me } = await supabase.auth.getUser();
+    if (!me.user) return;
+    const { error } = await supabase.from('admin_activity_logs').insert({
+      actor_id: me.user.id,
+      action,
+      target_type: targetType || null,
+      target_id: targetId || null,
+      metadata: { target_name: targetName },
+    });
+    if (error) console.warn('Audit log failed:', error.message);
+    else setAuditLogs(prev => [{
+      id: String(Date.now()),
       action,
       target: targetName,
       time: new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
       date: new Date().toLocaleDateString('ar-SA'),
-    };
-    setAuditLogs(prev => [newLog, ...prev.slice(0, 49)]);
+    }, ...prev.slice(0, 99)]);
   }, []);
 
   const load = useCallback(async () => {
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) return router.replace('/auth');
 
-    const userEmail = (u.user.email || '').toLowerCase().trim();
-    // Auto-detect root@gmail.com or super-admin
-    const isRootAdmin = userEmail === 'root@gmail.com' || userEmail.startsWith('root@');
-
-    let { data: pr } = await supabase.from('profiles').select('*').eq('id', u.user.id).maybeSingle();
-
-    if (isRootAdmin) {
-      if (!pr || pr.role !== 'admin') {
-        await supabase.from('profiles').upsert({
-          id: u.user.id,
-          role: 'admin',
-          is_verified: true,
-          display_name: pr?.display_name || 'مدير النظام (Root)',
-        }, { onConflict: 'id' });
-        pr = pr ? { ...pr, role: 'admin', is_verified: true } : { id: u.user.id, role: 'admin', is_verified: true, display_name: 'مدير النظام (Root)' };
-      }
-    }
-
+    // Admin authorization is database-backed only. Email/username never grants privileges.
+    const { data: pr, error: profileError } = await supabase.from('profiles').select('*').eq('id', u.user.id).maybeSingle();
+    if (profileError) throw profileError;
     setProfile(pr);
-
-    const isAdmin = pr?.role === 'admin' || isRootAdmin;
+    const isAdmin = pr?.role === 'admin';
 
     // If not admin, stop deep loading to protect resources
     if (!isAdmin) {
@@ -202,6 +195,7 @@ export default function Admin() {
       sCountRes,
       latestQRes,
       latestRRes,
+      auditRes,
     ] = await Promise.all([
       supabase.from('reports').select('*, reporter:reporter_id(display_name, username, avatar_url)').order('created_at', { ascending: false }).limit(60),
       supabase.from('verification_requests').select('*, user:user_id(id, display_name, username, city, district, avatar_url, bio, is_verified, is_geoverified, role, created_at)').order('created_at', { ascending: false }).limit(60),
@@ -211,9 +205,19 @@ export default function Admin() {
       supabase.from('services').select('id', { count: 'exact', head: true }),
       supabase.from('questions').select('*, profiles:author_id(display_name, username, avatar_url)').order('created_at', { ascending: false }).limit(40),
       supabase.from('requests').select('*, profiles:requester_id(display_name, username, avatar_url)').order('created_at', { ascending: false }).limit(40),
+      supabase.from('admin_activity_logs').select('*, actor:actor_id(display_name, username)').order('created_at', { ascending: false }).limit(100),
     ]);
 
     const allUsers = profilesRes.data ?? [];
+    const persistedLogs = auditRes.data ?? [];
+    setAuditLogs(persistedLogs.map((l: any) => ({
+      id: l.id,
+      action: l.action,
+      target: l.metadata?.target_name || l.target_type || 'النظام',
+      time: new Date(l.created_at).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+      date: new Date(l.created_at).toLocaleDateString('ar-SA'),
+      actor: l.actor?.display_name || l.actor?.username || 'مدير',
+    })));
     const allReports = repRes.data ?? [];
     const allVerifs = verifRes.data ?? [];
 
@@ -260,36 +264,6 @@ export default function Admin() {
   };
 
   // Self-promote to Admin (for owner)
-  const handleClaimAdmin = async () => {
-    setLoading(true);
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) {
-      setLoading(false);
-      return router.replace('/auth');
-    }
-
-    const { error } = await supabase
-      .from('profiles')
-      .upsert({
-        id: u.user.id,
-        role: 'admin',
-        is_verified: true,
-      }, { onConflict: 'id' });
-
-    if (error) {
-      if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        window.alert('تعذر تفعيل الصلاحية: ' + error.message);
-      } else {
-        Alert.alert('خطأ', error.message);
-      }
-      setLoading(false);
-    } else {
-      showToast('تم تفعيل صلاحية مدير النظام لحسابك بنجاح! 👑');
-      addAuditLog('تفعيل صلاحية مدير النظام', u.user.email || 'حساب المالك');
-      await load();
-    }
-  };
-
   // 1. Toggle User Role (Strictly admin or user)
   const toggleUserRole = async (targetUser: any) => {
     const isCurrentAdmin = targetUser.role === 'admin';
@@ -390,23 +364,26 @@ export default function Admin() {
     );
   };
 
-  // 5. Send Direct Admin Notice to User
+  // 5. Send Direct Admin Notice using the canonical notifications schema.
   const handleSendDirectNotice = async () => {
     if (!inspectedUser || !directMsgText.trim()) return;
     setSendingDirectMsg(true);
     try {
       const { data: u } = await supabase.auth.getUser();
-      await supabase.from('notifications').insert({
+      if (!u.user) throw new Error('انتهت جلسة الدخول.');
+      const { error } = await supabase.from('notifications').insert({
         user_id: inspectedUser.id,
-        actor_id: u.user?.id,
         type: 'admin_notice',
-        content: `👑 [إشعار من إدارة حيّنا]: ${directMsgText.trim()}`,
+        title: 'إشعار من إدارة حيّنا',
+        body: directMsgText.trim(),
+        data: { actor_id: u.user.id },
       });
-      addAuditLog('إرسال تنبيه إداري خاص', inspectedUser.display_name || inspectedUser.username);
+      if (error) throw error;
+      await addAuditLog('إرسال تنبيه إداري خاص', inspectedUser.display_name || inspectedUser.username, 'user', inspectedUser.id);
       showToast('تم إرسال التنبيه الإداري للمستخدم بنجاح 📨');
       setDirectMsgText('');
     } catch (e: any) {
-      Alert.alert('خطأ', e.message);
+      Alert.alert('خطأ', e.message || 'تعذر إرسال الإشعار');
     } finally {
       setSendingDirectMsg(false);
     }
@@ -415,14 +392,17 @@ export default function Admin() {
   // 6. Reports Actions
   const resolveReport = async (id: string, action: 'resolved' | 'dismissed') => {
     const { data: u } = await supabase.auth.getUser();
-    await supabase.from('reports').update({
+    const { error } = await supabase.from('reports').update({
       status: action,
       reviewed_by: u.user?.id,
       reviewed_at: new Date().toISOString()
     }).eq('id', id);
-
+    if (error) {
+      Alert.alert('خطأ', error.message);
+      return;
+    }
     setReports(prev => prev.map(r => r.id === id ? { ...r, status: action } : r));
-    addAuditLog(action === 'resolved' ? 'معالجة وإغلاق بلاغ' : 'تجاهل بلاغ كيدي', `بلاغ #${id.slice(0, 6)}`);
+    await addAuditLog(action === 'resolved' ? 'معالجة وإغلاق بلاغ' : 'تجاهل بلاغ', 'بلاغ #' + id.slice(0, 6), 'report', id);
     showToast(action === 'resolved' ? 'تم حل وإغلاق البلاغ بنجاح ✓' : 'تم تجاهل البلاغ ✕');
   };
 
@@ -430,117 +410,120 @@ export default function Admin() {
   const deleteReportedContent = async (report: any) => {
     confirmAction(
       'حذف المحتوى المخالف',
-      `هل أنت متأكد من حذف هذا الـ (${report.target_type}) نهائياً من قاعدة البيانات وإغلاق البلاغ؟`,
+      'هل أنت متأكد من حذف هذا المحتوى نهائياً من قاعدة البيانات وإغلاق البلاغ؟',
       async () => {
-        if (report.target_type === 'question' && report.target_id) {
-          await supabase.from('questions').delete().eq('id', report.target_id);
-        } else if (report.target_type === 'request' && report.target_id) {
-          await supabase.from('requests').delete().eq('id', report.target_id);
-        } else if (report.target_type === 'answer' && report.target_id) {
-          await supabase.from('answers').delete().eq('id', report.target_id);
+        try {
+          let error: any = null;
+          if (report.target_type === 'question' && report.target_id) {
+            ({ error } = await supabase.from('questions').delete().eq('id', report.target_id));
+          } else if (report.target_type === 'request' && report.target_id) {
+            ({ error } = await supabase.from('requests').delete().eq('id', report.target_id));
+          } else if (report.target_type === 'answer' && report.target_id) {
+            ({ error } = await supabase.from('answers').delete().eq('id', report.target_id));
+          } else if (report.target_type === 'service' && report.target_id) {
+            ({ error } = await supabase.from('services').delete().eq('id', report.target_id));
+          } else {
+            throw new Error('نوع المحتوى غير مدعوم للحذف من لوحة الإدارة.');
+          }
+          if (error) throw error;
+          await resolveReport(report.id, 'resolved');
+          await addAuditLog('حذف محتوى مخالف', 'بلاغ #' + report.id.slice(0, 6), report.target_type, report.target_id);
+          showToast('تم حذف المحتوى المخالف وإغلاق البلاغ 🗑️');
+          await load();
+        } catch (e: any) {
+          Alert.alert('خطأ', e.message || 'تعذر حذف المحتوى');
         }
-        await resolveReport(report.id, 'resolved');
-        addAuditLog(`حذف محتوى مخالف (${report.target_type})`, `بلاغ #${report.id.slice(0, 6)}`);
-        showToast('تم حذف المحتوى المخالف وإغلاق البلاغ 🗑️');
-        load();
       }
     );
   };
 
   // 8. Relational Verification Desk Decision with Citizen Notification
-  const handleVerificationDecision = async (
-    id: string, 
-    userId: string, 
-    action: 'approved' | 'rejected', 
-    userName: string
-  ) => {
+  const handleVerificationDecision = async (id: string, userId: string, action: 'approved' | 'rejected', userName: string) => {
     const { data: u } = await supabase.auth.getUser();
-    
-    // Update verification request
-    await supabase.from('verification_requests').update({
-      status: action,
-      reviewed_by: u.user?.id,
-      reviewed_at: new Date().toISOString()
-    }).eq('id', id);
+    if (!u.user) return;
+    try {
+      const { error: requestError } = await supabase.from('verification_requests').update({
+        status: action,
+        reviewed_by: u.user.id,
+        reviewed_at: new Date().toISOString()
+      }).eq('id', id);
+      if (requestError) throw requestError;
 
-    // Update profile if approved
-    if (action === 'approved') {
-      await supabase.from('profiles').update({
-        is_verified: true,
-        verification_status: 'verified'
-      }).eq('id', userId);
+      if (action === 'approved') {
+        const { error: profileError } = await supabase.from('profiles').update({
+          is_verified: true,
+          verification_status: 'verified'
+        }).eq('id', userId);
+        if (profileError) throw profileError;
+      }
 
-      // Send congratulatory citizen notification
-      await supabase.from('notifications').insert({
+      const { error: notificationError } = await supabase.from('notifications').insert({
         user_id: userId,
-        actor_id: u.user?.id,
         type: 'verification',
-        content: '🎉 تهانينا! تمت مراجعة واعتماد طلب توثيق حسابك رسمياً بالشارة الزرقاء في منصة حيّنا.'
+        title: action === 'approved' ? 'تم اعتماد التوثيق' : 'تحديث طلب التوثيق',
+        body: action === 'approved'
+          ? 'تم اعتماد طلب توثيق حسابك في منصة حيّنا.'
+          : 'تمت مراجعة طلب توثيق حسابك. يمكنك التقديم مجدداً بعد تحديث البيانات.',
+        data: { actor_id: u.user.id, request_id: id, status: action }
       });
+      if (notificationError) throw notificationError;
 
-      addAuditLog('اعتماد طلب توثيق رسمي بالشارة الزرقاء', userName);
-      showToast('تم اعتماد التوثيق وإرسال إشعار للمواطن ✓');
-    } else {
-      // Send notification explaining rejection
-      await supabase.from('notifications').insert({
-        user_id: userId,
-        actor_id: u.user?.id,
-        type: 'verification',
-        content: 'نعتذر منك، لم يتم قبول طلب التوثيق لعدم استيفاء الشروط. يمكنك مراجعة البيانات والتقديم مجدداً.'
-      });
-
-      addAuditLog('رفض طلب توثيق رسمي', userName);
-      showToast('تم رفض طلب التوثيق');
+      await addAuditLog(action === 'approved' ? 'اعتماد طلب توثيق رسمي' : 'رفض طلب توثيق رسمي', userName, 'verification', id);
+      setVerifications(prev => prev.map(v => v.id === id ? { ...v, status: action } : v));
+      showToast(action === 'approved' ? 'تم اعتماد التوثيق وإرسال الإشعار ✓' : 'تم رفض الطلب وإرسال الإشعار');
+    } catch (e: any) {
+      Alert.alert('خطأ', e.message || 'تعذر معالجة طلب التوثيق');
     }
-
-    setVerifications(prev => prev.map(v => v.id === id ? { ...v, status: action } : v));
   };
 
   // 9. Delete Inappropriate Content Item
   const deleteContentItem = async (id: string, type: 'question' | 'request', title: string) => {
     confirmAction(
       'حذف المنشور',
-      `هل ترغب في حذف "${title}" نهائياً من منصة حيّنا؟`,
+      'هل ترغب في حذف "' + title + '" نهائياً من منصة حيّنا؟',
       async () => {
-        if (type === 'question') {
-          await supabase.from('questions').delete().eq('id', id);
-          setQuestionsList(prev => prev.filter(q => q.id !== id));
-        } else {
-          await supabase.from('requests').delete().eq('id', id);
-          setRequestsList(prev => prev.filter(r => r.id !== id));
+        try {
+          const table = type === 'question' ? 'questions' : 'requests';
+          const { error } = await supabase.from(table).delete().eq('id', id);
+          if (error) throw error;
+          if (type === 'question') setQuestionsList(prev => prev.filter(q => q.id !== id));
+          else setRequestsList(prev => prev.filter(r => r.id !== id));
+          await addAuditLog('حذف منشور', title, type, id);
+          showToast('تم حذف المنشور بنجاح 🗑️');
+        } catch (e: any) {
+          Alert.alert('خطأ', e.message || 'تعذر حذف المنشور');
         }
-        addAuditLog(`حذف منشور (${type === 'question' ? 'استفسار' : 'طلب'})`, title);
-        showToast('تم حذف المنشور بنجاح 🗑️');
       }
     );
   };
 
-  // 10. Send Broadcast Announcement
+  // 10. Send Broadcast Announcement to actual recipients.
   const handleSendBroadcast = async () => {
     if (!broadcastTitle.trim() || !broadcastBody.trim()) {
-      if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        window.alert('يرجى كتابة عنوان وتفاصيل التعميم');
-      } else {
-        Alert.alert('تنبيه', 'يرجى كتابة عنوان وتفاصيل التعميم');
-      }
+      Alert.alert('تنبيه', 'يرجى كتابة عنوان وتفاصيل التعميم');
       return;
     }
 
     setSendingBroadcast(true);
     try {
       const { data: u } = await supabase.auth.getUser();
+      if (!u.user) throw new Error('انتهت جلسة الدخول.');
       const badgeIcon = broadcastType === 'emergency' ? '🚨' : broadcastType === 'weather' ? '⛈️' : broadcastType === 'maintenance' ? '🔧' : '📢';
-      
-      // Insert notification
-      await supabase.from('notifications').insert({
-        user_id: u.user?.id,
-        actor_id: u.user?.id,
+      const recipients = usersList.map((user: any) => user.id).filter(Boolean);
+      if (!recipients.length) throw new Error('لا يوجد مستخدمون مستلمون.');
+      const rows = recipients.map((userId: string) => ({
+        user_id: userId,
         type: 'broadcast',
-        content: `${badgeIcon} [تعميم إداري رسمي]: ${broadcastTitle.trim()} - ${broadcastBody.trim()}`,
-      });
-
-      addAuditLog('نشر تعميم وبث رسمي للجيران', broadcastTitle.trim());
-      showToast('تم إرسال ونشر التعميم الإداري بنجاح 📢');
+        title: badgeIcon + ' ' + broadcastTitle.trim(),
+        body: broadcastBody.trim(),
+        data: { actor_id: u.user.id, broadcast_type: broadcastType },
+      }));
+      for (let i = 0; i < rows.length; i += 500) {
+        const { error } = await supabase.from('notifications').insert(rows.slice(i, i + 500));
+        if (error) throw error;
+      }
+      await addAuditLog('نشر تعميم وبث رسمي للجيران', broadcastTitle.trim(), 'broadcast');
+      showToast('تم إرسال ونشر التعميم إلى ' + recipients.length + ' مستخدم 📢');
       setBroadcastTitle('');
       setBroadcastBody('');
     } catch (e: any) {
@@ -616,7 +599,7 @@ export default function Admin() {
   }
 
   // Strictly check role === 'admin' or root email
-  const isAuthorizedAdmin = profile?.role === 'admin' || profile?.email === 'root@gmail.com' || profile?.username === 'root';
+  const isAuthorizedAdmin = profile?.role === 'admin';
   if (!profile || !isAuthorizedAdmin) {
     return (
       <View style={styles.center}>
@@ -627,12 +610,6 @@ export default function Admin() {
         <Text style={styles.unauthorizedSub}>
           لوحة التحكم مخصصة حصرياً لمدير النظام (Admin). الصلاحيات المعتمدة في المنصة هي: مدير النظام (Admin) ومستخدم عادي (User).
         </Text>
-
-        {/* Claim Admin Button */}
-        <Pressable style={styles.claimAdminBtn} onPress={handleClaimAdmin}>
-          <Crown size={18} color="#fff" />
-          <Text style={styles.claimAdminBtnText}>تفعيل صلاحية مدير النظام لحسابي 👑</Text>
-        </Pressable>
 
         <Pressable style={styles.backBtn} onPress={() => router.replace('/home')}>
           <Text style={styles.backBtnText}>العودة للرئيسية</Text>
