@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "حيّنا",
+    "slug": "hayna",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "hayna",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "plugins": [
+      "expo-router",
+      "@maplibre/maplibre-react-native",
+      ["expo-image-picker", {
+        "photosPermission": "يحتاج حيّنا الوصول إلى صورك لاختيار صورة الملف الشخصي.",
+        "cameraPermission": "يحتاج حيّنا الكاميرا لالتقاط صورة الملف الشخصي.",
+        "microphonePermission": false
+      }],
+      ["expo-notifications", {
+        "defaultChannel": "default"
+      }]
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "sa.hayna.app"
+    },
+    "android": {
+      "package": "sa.hayna.app"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "5228885c-729d-4f4a-935d-06662dfd4beb"
+      }
+    }
+  }
+}

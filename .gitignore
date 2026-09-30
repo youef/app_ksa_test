@@ -1,0 +1,12 @@
+node_modules/
+.expo/
+dist/
+web-build/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+Expo-Go-57.0.9*
+expo-skills-temp/
+.agents/
