@@ -14,8 +14,10 @@ import { CurrentWeather, describeWeatherCode, loadCurrentWeather } from '@/lib/w
 const { width } = Dimensions.get('window');
 
 export default function Home() {
+  const [logoUri, setLogoUri] = useState('logoUri');
   const { showIsland } = useDynamicIsland();
   const [profile, setProfile] = useState<any>(null);
+  useEffect(() => { getBrandingLogo().then(setLogoUri); }, []);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [questions, setQuestions] = useState<any[]>([]);
   const [requests, setRequests] = useState<any[]>([]);
@@ -384,7 +386,7 @@ export default function Home() {
             {/* Right side: App Brand & Location Selector */}
             <View style={styles.brandAndLocation}>
               <View style={styles.brandTitleRow}>
-                <Image source={{ uri: '/assets/branding/HAYNA_LOGO.png?v=2' }} style={styles.headerLogo} resizeMode="contain" />
+                <Image source={{ uri: 'logoUri' }} style={styles.headerLogo} resizeMode="contain" />
                 <Text style={styles.heroBrandTitle}>حيّنا</Text>
               </View>
 
