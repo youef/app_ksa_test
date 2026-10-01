@@ -2,7 +2,7 @@ import { useCallback, useState, useEffect, useRef } from 'react'
 import { Pressable, RefreshControl, ScrollView, Text, View, Image, StyleSheet, Dimensions, Platform, Animated, TextInput, Alert, Modal, ActivityIndicator } from 'react-native'
 import { router, useFocusEffect } from 'expo-router'
 import { supabase } from '@/lib/supabase'
-import { getBrandingLogo } from '@/lib/branding'
+import { getBrandingLogo, subscribeBrandingLogo } from '@/lib/branding'
 import { LinearGradient } from 'expo-linear-gradient'
 import { MessageCircle, Truck, MapPin, Briefcase, Plus, Sparkles, Map, Bell, Search, Flame, CloudSun, User, Mic, ChevronDown, Wrench, ShieldCheck, Camera, RefreshCw, X } from 'lucide-react-native'
 import BottomNav from '@/components/BottomNav'
@@ -20,7 +20,10 @@ export default function Home() {
   const [logoUri, setLogoUri] = useState('/assets/branding/HAYNA_LOGO.png?v=2');
   const { showIsland } = useDynamicIsland();
   const [profile, setProfile] = useState<any>(null);
-  useEffect(() => { getBrandingLogo().then(setLogoUri); }, []);
+  useEffect(() => {
+    getBrandingLogo().then(setLogoUri);
+    return subscribeBrandingLogo(setLogoUri);
+  }, []);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [questions, setQuestions] = useState<any[]>([]);
   const [requests, setRequests] = useState<any[]>([]);
