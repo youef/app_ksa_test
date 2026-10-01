@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft } from 'lucide-react-native';
 
-const LOGO_URI = '/assets/branding/HAYNA_LOGO.png';
+const LOGO_URI = '/assets/branding/HAYNA_LOGO.png?v=2';
 
 export default function Index() {
   const [checkingSession, setCheckingSession] = useState(true);
