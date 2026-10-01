@@ -41,11 +41,85 @@ Notifications.setNotificationHandler({
   }),
 });
 
-export async function registerPushToken(): Promise<string | null> {
+const WEB_PUSH_PUBLIC_KEY =
+  process.env.EXPO_PUBLIC_VAPID_PUBLIC_KEY ||
+  'BDpMVafZSqdl9ARi4IWpkamC72aZ7D11PKtFfmfI7XzzYqASUpLedMoFtth6tDi8e8ii2MbGABauQjZqCjbzQOo';
+
+function urlBase64ToUint8Array(base64: string) {
+  const padded = (base64 + '='.repeat((4 - (base64.length % 4)) % 4)).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(padded);
+  return Uint8Array.from(raw, (c) => c.charCodeAt(0));
+}
+
+export function isIosBrowser() {
+  if (Platform.OS !== 'web' || typeof navigator === 'undefined') return false;
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+export function isStandaloneWebApp() {
+  if (typeof window === 'undefined') return false;
+  return window.matchMedia?.('(display-mode: standalone)').matches || (navigator as any).standalone === true;
+}
+
+/** Whether the current browser already has an active push subscription saved. */
+export async function hasWebPushSubscription(): Promise<boolean> {
+  if (Platform.OS !== 'web' || typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return false;
+  try {
+    const reg = await navigator.serviceWorker.getRegistration('/');
+    return !!(await reg?.pushManager.getSubscription());
+  } catch { return false; }
+}
+
+async function registerWebPush(prompt: boolean): Promise<string | null> {
+  if (typeof window === 'undefined') return null;
+  const supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+
+  if (!supported) {
+    if (!prompt) return null;
+    if (isIosBrowser() && !isStandaloneWebApp()) {
+      throw new Error('على الآيفون: افتح الموقع في Safari، اضغط زر المشاركة ثم "إضافة إلى الشاشة الرئيسية"، وافتح حيّنا من الأيقونة ثم فعّل الإشعارات من الإعدادات. (يتطلب iOS 16.4 أو أحدث)');
+    }
+    throw new Error('هذا المتصفح لا يدعم الإشعارات الفورية.');
+  }
+
+  // iOS only allows the permission prompt from a user tap, so background
+  // re-registration runs only once permission was already granted.
+  if (!prompt && Notification.permission !== 'granted') return null;
+  const permission = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission();
+  if (permission !== 'granted') {
+    if (!prompt) return null;
+    throw new Error('تم رفض إذن الإشعارات. فعّله من إعدادات الجهاز ثم حاول مجدداً.');
+  }
+
+  const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+  await navigator.serviceWorker.ready;
+  const subscription =
+    (await registration.pushManager.getSubscription()) ||
+    (await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(WEB_PUSH_PUBLIC_KEY) }));
+
+  const { data: u } = await supabase.auth.getUser();
+  if (!u.user) throw new Error('سجّل الدخول قبل تفعيل الإشعارات.');
+  const token = JSON.stringify(subscription.toJSON());
+  const { error } = await supabase
+    .from('push_tokens')
+    .upsert({ user_id: u.user.id, token, platform: 'web' }, { onConflict: 'token' });
+  if (error) throw new Error(error.message);
+  return token;
+}
+
+/**
+ * Registers this device for push. `prompt` = triggered by a user tap; on web
+ * it then throws with a readable reason instead of failing silently.
+ */
+export async function registerPushToken(options: { prompt?: boolean } = {}): Promise<string | null> {
   if (Platform.OS === 'web') {
-    // Browser permission alone is not a push subscription. The app currently
-    // registers Expo push tokens only, so do not report web push as enabled.
-    return null;
+    try {
+      return await registerWebPush(!!options.prompt);
+    } catch (err) {
+      if (options.prompt) throw err;
+      console.warn('registerWebPush error', err);
+      return null;
+    }
   }
 
   try {

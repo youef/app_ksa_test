@@ -48,6 +48,7 @@ export default function Profile() {
   const [saving, setSaving] = useState(false);
   const [editingProfile, setEditingProfile] = useState(false);
   const [locating, setLocating] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   const [stats, setStats] = useState({ questions: 0, answers: 0, followers: 0, following: 0 });
   const [savedQuestions, setSavedQuestions] = useState<any[]>([]);
@@ -121,9 +122,14 @@ export default function Profile() {
       const nextCity = place.city;
       const nextDistrict = place.district || '';
       setRegion(nextRegion); setCity(nextCity); setDistrict(nextDistrict);
-      if (nextDistrict) {
-        await savePermanentMyLocation({ region: nextRegion, city: nextCity, district: nextDistrict }, true);
-        Alert.alert('تم تحديث الموقع', 'تم ربط موقعك الحالي بالمدينة والحي في ملفك الشخصي.');
+      if (nextDistrict && userId) {
+        const locationPayload = { region: nextRegion, city: nextCity, district: nextDistrict };
+        const saved = await supabase.from('profiles').update(locationPayload).eq('id', userId).select('id').maybeSingle();
+        if (saved.error) throw saved.error;
+        if (!saved.data) throw new Error('لم يتم تحديث ملف الحساب. سجّل الخروج ثم الدخول وحاول مجدداً.');
+        setP((current: any) => ({ ...current, ...locationPayload }));
+        await savePermanentMyLocation(locationPayload, false);
+        Alert.alert('تم تحديث الموقع', `تم حفظ موقعك: حي ${nextDistrict}، ${nextCity}.`);
       } else {
         Alert.alert('تم تحديد المدينة', 'حدد الحي من القائمة ثم اضغط حفظ التغييرات لإكمال موقع البروفايل.');
       }
@@ -143,36 +149,50 @@ export default function Profile() {
       quality: 0.8,
     });
     if (result.canceled) return;
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) return;
-    const asset = result.assets[0];
-    const response = await fetch(asset.uri);
-    const blob = await response.arrayBuffer();
-    const path = u.user.id + '/avatar.jpg';
-    const up = await supabase.storage.from('avatars').upload(path, blob, { contentType: 'image/jpeg', upsert: true });
-    if (up.error) return Alert.alert('خطأ', up.error.message);
-    const { data } = supabase.storage.from('avatars').getPublicUrl(path);
-    const saved = await supabase.from('profiles').update({ avatar_url: data.publicUrl }).eq('id', u.user.id).select('id').maybeSingle();
-    if (saved.error) return Alert.alert('تعذّر حفظ الصورة', saved.error.message);
-    if (!saved.data) return Alert.alert('تعذّر حفظ الصورة', 'لم يتم تحديث ملف الحساب. أعد تسجيل الدخول ثم حاول مجدداً.');
-    setP({ ...p, avatar_url: data.publicUrl });
+    setUploadingAvatar(true);
+    try {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) throw new Error('سجّل الدخول ثم حاول مجدداً.');
+      const asset = result.assets[0];
+      const contentType = asset.mimeType || 'image/jpeg';
+      const ext = contentType.split('/')[1]?.replace('jpeg', 'jpg') || 'jpg';
+      const body = await (await fetch(asset.uri)).arrayBuffer();
+      // A fresh file name per upload avoids needing an UPDATE storage policy
+      // and stops browsers/CDN from showing the previously cached avatar.
+      const path = `${u.user.id}/avatar-${Date.now()}.${ext}`;
+      const up = await supabase.storage.from('avatars').upload(path, body, { contentType, upsert: false });
+      if (up.error) throw up.error;
+      const { data } = supabase.storage.from('avatars').getPublicUrl(path);
+      const saved = await supabase.from('profiles').update({ avatar_url: data.publicUrl }).eq('id', u.user.id).select('id').maybeSingle();
+      if (saved.error) throw saved.error;
+      if (!saved.data) throw new Error('لم يتم تحديث ملف الحساب. أعد تسجيل الدخول ثم حاول مجدداً.');
+      setP((current: any) => ({ ...current, avatar_url: data.publicUrl }));
+      Alert.alert('تم الحفظ', 'تم تحديث صورة الملف الشخصي.');
+    } catch (error: any) {
+      Alert.alert('تعذّر حفظ الصورة', error?.message || 'حاول مرة أخرى.');
+    } finally {
+      setUploadingAvatar(false);
+    }
   }
 
   // Toggle Handlers with Instant Persistence
   async function save() {
     if (!userId) return;
-    if ((region.trim() || city.trim() || district.trim()) && (!city.trim() || !district.trim())) {
-      return Alert.alert('أكمل بيانات الحي', 'لإظهار محتوى الحي وحماية الخصوصية، اختر مدينة وحيّاً محدداً. اترك الموقع كله فارغاً إذا كنت تريد حفظ الاسم فقط.');
-    }
     setSaving(true);
 
+    // Name and bio always save. Location only saves when complete (city + district)
+    // so an unfinished location pick no longer blocks saving the name.
+    const locationComplete = !!city.trim() && !!district.trim();
+    const locationCleared = !region.trim() && !city.trim() && !district.trim();
     const payload: any = {
       display_name: personalName.trim() || null,
-      region: region.trim() || null,
-      city: city.trim() || null,
-      district: district.trim() || null,
       bio: bio.trim() || null,
     };
+    if (locationComplete || locationCleared) {
+      payload.region = region.trim() || null;
+      payload.city = city.trim() || null;
+      payload.district = district.trim() || null;
+    }
 
     try {
       const result = await supabase.from('profiles').update(payload).eq('id', userId).select('id').maybeSingle();
@@ -180,13 +200,16 @@ export default function Profile() {
       if (!result.data) throw new Error('لم يُحدّث أي سجل. سجّل الخروج ثم الدخول وحاول مرة أخرى.');
 
       setP((current: any) => ({ ...current, ...payload }));
-      await savePermanentMyLocation({
-        region: region.trim() || 'المملكة',
-        city: city.trim() || 'كل المدن',
-        district: district.trim() || 'كل الأحياء',
-      }, false);
+      if (locationComplete) {
+        await savePermanentMyLocation({ region: region.trim() || 'المملكة', city: city.trim(), district: district.trim() }, false);
+      }
       setEditingProfile(false);
-      Alert.alert('تم الحفظ', 'تم تحديث الاسم والمدينة والحي والنبذة في حسابك.');
+      if (locationComplete || locationCleared) {
+        Alert.alert('تم الحفظ', 'تم تحديث الاسم والموقع والنبذة في حسابك.');
+      } else {
+        setRegion(p.region || ''); setCity(p.city || ''); setDistrict(p.district || '');
+        Alert.alert('تم حفظ الاسم والنبذة', 'لم يُحفظ الموقع لأن الحي غير محدد. اختر المدينة والحي ثم احفظ مرة أخرى.');
+      }
     } catch (error: any) {
       Alert.alert('تعذّر الحفظ', error?.message || 'لم يتم تحديث الملف. تحقق من الاتصال وإعدادات قاعدة البيانات ثم حاول مجدداً.');
     } finally {
@@ -258,10 +281,10 @@ export default function Profile() {
           </View>
 
           <View style={styles.profileSummary}>
-            <Pressable onPress={pickAvatar} style={styles.twitterAvatarWrap}>
+            <Pressable onPress={pickAvatar} disabled={uploadingAvatar} style={styles.twitterAvatarWrap} accessibilityLabel="تغيير صورة الملف الشخصي">
               {p.avatar_url ? <Image source={{ uri: p.avatar_url }} style={styles.twitterAvatar} /> :
                 <View style={styles.twitterAvatarFallback}><User size={38} color="#64748b" /></View>}
-              <View style={styles.twitterAvatarEdit}><Camera size={15} color="#fff" /></View>
+              <View style={styles.twitterAvatarEdit}>{uploadingAvatar ? <ActivityIndicator size="small" color="#fff" /> : <Camera size={15} color="#fff" />}</View>
             </Pressable>
             <Pressable style={styles.editProfileButton} onPress={() => setEditingProfile(v => !v)}>
               <Text style={styles.editProfileButtonText}>{editingProfile ? 'إغلاق التعديل' : 'تعديل الملف الشخصي'}</Text>

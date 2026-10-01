@@ -25,8 +25,29 @@ export async function getCurrentDeviceLocation(): Promise<DeviceLocation | null>
   } catch (error) { console.warn('getCurrentDeviceLocation error', error); return null; }
 }
 
+function stripPrefix(value?: string) {
+  return (value || '').replace(/^(حي|مدينة|منطقة)\s+/, '').trim();
+}
+
+async function reverseGeocodeWeb(location: DeviceLocation) {
+  try {
+    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=16&accept-language=ar&lat=${location.latitude}&lon=${location.longitude}`;
+    const res = await fetch(url, { headers: { Accept: 'application/json' } });
+    if (!res.ok) return null;
+    const json = await res.json();
+    const a = json?.address || {};
+    const city = stripPrefix(a.city || a.town || a.village || a.county);
+    if (!city) return null;
+    return {
+      region: stripPrefix(a.state || a.region),
+      city,
+      district: stripPrefix(a.suburb || a.neighbourhood || a.quarter || a.city_district || a.residential),
+    };
+  } catch (error) { console.warn('reverseGeocodeWeb error', error); return null; }
+}
+
 export async function reverseGeocodeDeviceLocation(location: DeviceLocation) {
-  if (Platform.OS === 'web') return null;
+  if (Platform.OS === 'web') return reverseGeocodeWeb(location);
   try {
     const rows = await Location.reverseGeocodeAsync({ latitude: location.latitude, longitude: location.longitude });
     const place = rows[0];

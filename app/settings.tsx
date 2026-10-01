@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
-import { registerPushToken, syncDndWithNotifications } from '@/lib/notifications';
+import { hasWebPushSubscription, isIosBrowser, isStandaloneWebApp, registerPushToken, syncDndWithNotifications } from '@/lib/notifications';
 import { C } from '@/lib/ui';
 import {
   ChevronRight,
@@ -130,6 +130,7 @@ export default function SettingsScreen() {
       setDraftEnd(dndRes.end || '07:00');
       setBlockedUsers((blockedRes || []).filter(Boolean));
       setControlsReady(await checkChatControlsReady());
+      if (Platform.OS === 'web') setPushEnabled(await hasWebPushSubscription());
     } catch (err) {
       console.log('Error loading settings:', err);
     } finally {
@@ -285,7 +286,7 @@ export default function SettingsScreen() {
 
   async function activatePushNotifications() {
     try {
-      const token = await registerPushToken();
+      const token = await registerPushToken({ prompt: true });
       if (!token) {
         Alert.alert('تعذّر التفعيل', 'لم يتم منح إذن الإشعارات أو لا يدعم هذا الجهاز تسجيل الإشعارات الفورية.');
         return;
@@ -778,6 +779,11 @@ export default function SettingsScreen() {
             <Smartphone size={20} color={C.ink} />
             <Text style={styles.actionBtnText}>{pushEnabled ? 'تم تسجيل هذا الجهاز ✓ (اضغط لإعادة المحاولة)' : 'تفعيل إشعارات الجوال الفورية'}</Text>
           </Pressable>
+          {isIosBrowser() && !isStandaloneWebApp() && (
+            <Text style={[styles.sectionDesc, { paddingVertical: 10, lineHeight: 20 }]}>
+              {'للآيفون: افتح الموقع في Safari ← زر المشاركة ← "إضافة إلى الشاشة الرئيسية"، ثم افتح حيّنا من الأيقونة واضغط تفعيل الإشعارات.'}
+            </Text>
+          )}
 
           {role === 'admin' && (
             <Pressable
