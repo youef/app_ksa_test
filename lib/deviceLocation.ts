@@ -33,20 +33,28 @@ export async function reverseGeocodeDeviceLocation(location: DeviceLocation) {
       if (!response.ok) return null;
       const data = await response.json();
       const a = data?.address || {};
-      return {
-        region: a.state || a.region || a.province || '',
-        city: a.city || a.town || a.municipality || a.county || '',
-        district: a.suburb || a.neighbourhood || a.city_district || a.quarter || '',
-      };
+      const region = a.state || a.region || a.province || a.state_district || '';
+      const city = a.city || a.town || a.village || a.municipality || a.county || a.city_district || '';
+      const district =
+        a.neighbourhood ||
+        a.suburb ||
+        a.quarter ||
+        a.city_district ||
+        a.residential ||
+        a.hamlet ||
+        '';
+      return { region, city, district };
     }
 
     const rows = await Location.reverseGeocodeAsync({ latitude: location.latitude, longitude: location.longitude });
-    const place = rows[0];
+    const place: any = rows[0];
     if (!place) return null;
-    return {
-      region: place.region || place.subregion || '',
-      city: place.city || place.subregion || '',
-      district: place.district || place.name || '',
-    };
-  } catch (error) { console.warn('reverseGeocodeDeviceLocation error', error); return null; }
+    const region = place.region || place.subregion || '';
+    const city = place.city || place.subregion || place.district || '';
+    const district = place.district || place.suburb || place.name || '';
+    return { region, city, district };
+  } catch (error) {
+    console.warn('reverseGeocodeDeviceLocation error', error);
+    return null;
+  }
 }
