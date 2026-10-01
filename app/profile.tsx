@@ -50,7 +50,9 @@ import {
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import BottomNav from '@/components/BottomNav';
+import ActionSheet from '@/components/ActionSheet';
 import LocationSelectorModal from '@/components/LocationSelectorModal';
+import ResidentCard from '@/components/ResidentCard';
 import { generateSmartBioAI } from '@/lib/aiAssistant';
 import { verifyGPSInDistrict } from '@/lib/nationalAddress';
 
@@ -604,6 +606,13 @@ export default function Profile() {
         </LinearGradient>
 
         <View style={styles.contentArea}>
+          <ResidentCard 
+            name={hideName ? 'جار مجهول' : p.display_name || 'مستخدم'} 
+            district={district} 
+            city={city} 
+            isVerified={isGeoVerified || idVerificationStatus === 'verified' || p.is_verified}
+            onPressQR={() => Alert.alert('QR Code', 'هذه الميزة قيد التطوير')}
+          />
           {/* ======================================================== */}
           {/* 2. ADVANCED PRIVACY & SECURITY CONTROLS                  */}
           {/* ======================================================== */}
@@ -846,9 +855,8 @@ export default function Profile() {
       {/* ======================================================== */}
       {/* 5. IDENTITY VERIFICATION MODAL                           */}
       {/* ======================================================== */}
-      <Modal visible={idModalOpen} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
+      <ActionSheet visible={idModalOpen} onClose={() => setIdModalOpen(false)} height="65%">
+        <View style={{ flex: 1 }}>
             <View style={styles.modalHeaderRow}>
               <Pressable onPress={() => setIdModalOpen(false)} style={styles.modalCloseBtn}>
                 <X size={20} color="#64748b" />
@@ -923,16 +931,14 @@ export default function Profile() {
                 )}
               </Pressable>
             </ScrollView>
-          </View>
         </View>
-      </Modal>
+      </ActionSheet>
 
       {/* ======================================================== */}
       {/* 6. FOLLOWERS & FOLLOWING MODAL                           */}
       {/* ======================================================== */}
-      <Modal visible={followsModalOpen} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
+      <ActionSheet visible={followsModalOpen} onClose={() => setFollowsModalOpen(false)} height="50%">
+        <View style={{ flex: 1 }}>
             <View style={styles.modalHeaderRow}>
               <Pressable onPress={() => setFollowsModalOpen(false)} style={styles.modalCloseBtn}>
                 <X size={20} color="#64748b" />
@@ -1009,16 +1015,14 @@ export default function Profile() {
                 ))}
               </ScrollView>
             )}
-          </View>
         </View>
-      </Modal>
+      </ActionSheet>
 
       {/* ======================================================== */}
       {/* 7. BLOCKED USERS MODAL                                   */}
       {/* ======================================================== */}
-      <Modal visible={blockedModalOpen} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
+      <ActionSheet visible={blockedModalOpen} onClose={() => setBlockedModalOpen(false)} height="50%">
+        <View style={{ flex: 1 }}>
             <View style={styles.modalHeaderRow}>
               <Pressable onPress={() => setBlockedModalOpen(false)} style={styles.modalCloseBtn}>
                 <X size={20} color="#64748b" />
@@ -1067,9 +1071,8 @@ export default function Profile() {
                 ))}
               </ScrollView>
             )}
-          </View>
         </View>
-      </Modal>
+      </ActionSheet>
 
       {/* Location Selector Modal */}
       <LocationSelectorModal

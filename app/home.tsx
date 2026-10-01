@@ -54,6 +54,8 @@ import {
 import { C } from '@/lib/ui';
 import BottomNav from '@/components/BottomNav';
 import LocationSelectorModal from '@/components/LocationSelectorModal';
+import { generateNeighborhoodPulseAI } from '@/lib/aiAssistant';
+import { useDynamicIsland } from '@/context/DynamicIslandContext';
 
 const { width } = Dimensions.get('window');
 
@@ -77,6 +79,7 @@ function formatArabicTimeAgo(dateStr: string): string {
 }
 
 export default function Home() {
+  const { showIsland } = useDynamicIsland();
   const [profile, setProfile] = useState<any>(null);
   const [questions, setQuestions] = useState<any[]>([]);
   const [requests, setRequests] = useState<any[]>([]);
@@ -104,13 +107,8 @@ export default function Home() {
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   const showToast = useCallback((msg: string) => {
-    setToastMessage(msg);
-    Animated.sequence([
-      Animated.timing(toastAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
-      Animated.delay(2200),
-      Animated.timing(toastAnim, { toValue: 0, duration: 250, useNativeDriver: true })
-    ]).start(() => setToastMessage(null));
-  }, [toastAnim]);
+    showIsland(msg, undefined, 'success');
+  }, [showIsland]);
 
   useEffect(() => {
     const hour = new Date().getHours();
@@ -330,12 +328,6 @@ export default function Home() {
 
   return (
     <View style={styles.container}>
-      {/* Toast Feedback Notification Banner */}
-      {toastMessage && (
-        <Animated.View style={[styles.toastBanner, { opacity: toastAnim, transform: [{ translateY: toastAnim.interpolate({ inputRange: [0, 1], outputRange: [-20, 0] }) }] }]}>
-          <Text style={styles.toastBannerText}>{toastMessage}</Text>
-        </Animated.View>
-      )}
 
       <ScrollView 
         style={styles.container}
@@ -489,6 +481,63 @@ export default function Home() {
         </View>
 
         {/* ======================================================== */}
+        {/* 3. SMART NEIGHBORHOOD HUB (AI Pulse & Distance Filter)   */}
+        {/* ======================================================== */}
+        <View style={styles.hubCard}>
+          {/* Top Hub Row: AI Pulse Header */}
+          <View style={styles.hubHeader}>
+            <View style={styles.hubSolvedBadge}>
+              <Text style={styles.hubSolvedText}>نسبة الحل {neighborhoodPulse.solvedRate}</Text>
+            </View>
+            <Pressable
+              style={styles.hubTitleRow}
+              onPress={() => setPulseExpanded(!pulseExpanded)}
+            >
+              <Text style={styles.hubTitle}>{neighborhoodPulse.headline}</Text>
+              <Sparkles size={16} color="#0891b2" />
+              {pulseExpanded ? <ChevronUp size={16} color="#0891b2" /> : <ChevronDown size={16} color="#0891b2" />}
+            </Pressable>
+          </View>
+
+          {pulseExpanded && (
+            <View style={styles.hubExpandedBody}>
+              <Text style={styles.hubSummaryText}>{neighborhoodPulse.smartSummary}</Text>
+              
+              {/* Trending Topics Tags */}
+              <View style={styles.hubTopicsRow}>
+                {neighborhoodPulse.trendingTopics.map((topic, i) => (
+                  <Pressable 
+                    key={i} 
+                    style={styles.hubTopicPill}
+                    onPress={() => setSearchQuery(topic)}
+                  >
+                    <Text style={styles.hubTopicText}>🔥 {topic}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* Neighborhood Smart Newsletter */}
+          <View style={styles.newsletterCard}>
+            <View style={styles.newsletterHeader}>
+              <Text style={styles.newsletterTitle}>نشرة حي {selectedDistrict !== 'كل الأحياء' ? selectedDistrict : 'كل الأحياء'} الذكية لهذا الأسبوع 📰</Text>
+              <View style={styles.newsletterBadge}>
+                <Text style={styles.newsletterBadgeText}>نسبة الحل 96%</Text>
+              </View>
+            </View>
+            <Text style={styles.newsletterDesc}>
+              شهد حي {selectedDistrict !== 'كل الأحياء' ? selectedDistrict : 'كل الأحياء'} هذا الأسبوع نشاطاً مميزاً بتفاعل أكثر من 132 جار، مع حل 96% من الاستفسارات وتبادل 8 أدوات ومعدات صيانة مجاناً بين الأهالي.
+            </Text>
+            <View style={styles.newsletterTrends}>
+              <Text style={styles.trendItem}>🔥 استعدادات وصيانة التكييف قبل موسم الحر</Text>
+              <Text style={styles.trendItem}>🔥 تبادل أدوات الصيانة المنزلية في سوق الحي المصغر</Text>
+              <Text style={styles.trendItem}>🔥 تجمع رياضي مسائي في ممشى الحي وحديقته</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* ======================================================== */}
         {/* 4. EMERGENCY SOS BANNER (Live Urgent Neighborhood Alert) */}
         {/* ======================================================== */}
         {emergencyQuestions.length > 0 && (
@@ -558,6 +607,51 @@ export default function Home() {
             label="رادار الخريطة" 
             onPress={() => router.push('/map')} 
           />
+        </View>
+
+        {/* ======================================================== */}
+        {/* AUDIO SPACES ROW (مجالس الحي الصوتية)                    */}
+        {/* ======================================================== */}
+        <View style={styles.spacesSection}>
+          <Text style={styles.spacesHeaderTitle}>مجالس الحي الصوتية 🎙️</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.spacesScroll}>
+            {/* Space Card 1 */}
+            <Pressable style={[styles.spaceCard, { backgroundColor: '#4f46e5' }]} onPress={() => showIsland('جاري الانضمام للمجلس...', undefined, 'info')}>
+              <View style={styles.spaceCardTop}>
+                <View style={styles.spaceLiveBadge}>
+                  <Text style={styles.spaceLiveText}>مباشر</Text>
+                </View>
+                <Text style={styles.spaceHostText}>بواسطة أبو خالد</Text>
+              </View>
+              <Text style={styles.spaceTitle}>نقاش: خطط التشجير في حي الياسمين 🌳</Text>
+              <View style={styles.spaceCardBottom}>
+                <View style={styles.spaceAvatarsRow}>
+                  <View style={[styles.spaceAvatarMini, { zIndex: 3 }]} />
+                  <View style={[styles.spaceAvatarMini, { zIndex: 2, marginLeft: -10 }]} />
+                  <View style={[styles.spaceAvatarMini, { zIndex: 1, marginLeft: -10 }]} />
+                </View>
+                <Text style={styles.spaceListenersText}>+24 يستمعون</Text>
+              </View>
+            </Pressable>
+
+            {/* Space Card 2 */}
+            <Pressable style={[styles.spaceCard, { backgroundColor: '#be185d' }]} onPress={() => showIsland('جاري الانضمام للمجلس...', undefined, 'info')}>
+              <View style={styles.spaceCardTop}>
+                <View style={styles.spaceLiveBadge}>
+                  <Text style={styles.spaceLiveText}>مباشر</Text>
+                </View>
+                <Text style={styles.spaceHostText}>بواسطة أم فهد</Text>
+              </View>
+              <Text style={styles.spaceTitle}>تجمع أمهات الحي لتبادل الخبرات ☕</Text>
+              <View style={styles.spaceCardBottom}>
+                <View style={styles.spaceAvatarsRow}>
+                  <View style={[styles.spaceAvatarMini, { zIndex: 3 }]} />
+                  <View style={[styles.spaceAvatarMini, { zIndex: 2, marginLeft: -10 }]} />
+                </View>
+                <Text style={styles.spaceListenersText}>+12 يستمعون</Text>
+              </View>
+            </Pressable>
+          </ScrollView>
         </View>
 
         {/* ======================================================== */}
@@ -2217,5 +2311,142 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
+  },
+  spacesSection: {
+    paddingVertical: 14,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: '#f1f5f9',
+    marginBottom: 10,
+  },
+  spacesHeaderTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#0f172a',
+    marginHorizontal: 16,
+    marginBottom: 12,
+    textAlign: 'right',
+  },
+  spacesScroll: {
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  spaceCard: {
+    width: 240,
+    padding: 16,
+    borderRadius: 20,
+    justifyContent: 'space-between',
+    minHeight: 130,
+  },
+  spaceCardTop: {
+    flexDirection: 'row-reverse',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  spaceLiveBadge: {
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  spaceLiveText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  spaceHostText: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  spaceTitle: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '800',
+    textAlign: 'right',
+    lineHeight: 22,
+    marginBottom: 14,
+  },
+  spaceCardBottom: {
+    flexDirection: 'row-reverse',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  spaceAvatarsRow: {
+    flexDirection: 'row-reverse',
+  },
+  spaceAvatarMini: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#cbd5e1',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  spaceListenersText: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  newsletterCard: {
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    padding: 18,
+    marginHorizontal: 16,
+    marginTop: 10,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.05,
+    shadowRadius: 15,
+    elevation: 3,
+  },
+  newsletterHeader: {
+    flexDirection: 'row-reverse',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  newsletterTitle: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#0f172a',
+    flex: 1,
+    textAlign: 'right',
+  },
+  newsletterBadge: {
+    backgroundColor: '#ecfdf5',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginRight: 10,
+  },
+  newsletterBadgeText: {
+    color: '#10b981',
+    fontWeight: '800',
+    fontSize: 12,
+  },
+  newsletterDesc: {
+    fontSize: 13,
+    color: '#64748b',
+    textAlign: 'right',
+    lineHeight: 22,
+    marginBottom: 14,
+  },
+  newsletterTrends: {
+    backgroundColor: '#f8fafc',
+    padding: 12,
+    borderRadius: 12,
+    gap: 8,
+  },
+  trendItem: {
+    fontSize: 13,
+    color: '#334155',
+    textAlign: 'right',
+    fontWeight: '600',
   },
 });

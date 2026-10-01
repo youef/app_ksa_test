@@ -1,26 +1,50 @@
-import { View, Text, Pressable, StyleSheet, Platform } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Platform, Dimensions } from 'react-native';
 import { router, usePathname } from 'expo-router';
-import { Home, MessageCircle, Search, Bell, User } from 'lucide-react-native';
+import { Home, MessageCircle, Map, Bell, User, LayoutDashboard, ShoppingBag } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { BlurView } from 'expo-blur';
+import Animated, { useAnimatedStyle, withSpring } from 'react-native-reanimated';
+
+const { width } = Dimensions.get('window');
 
 const TABS = [
   { key: '/home',          icon: Home,          label: 'الرئيسية' },
+  { key: '/market',        icon: ShoppingBag,   label: 'السوق'    },
   { key: '/messages',      icon: MessageCircle, label: 'الرسائل'  },
-  { key: '/notifications', icon: Bell,          label: 'الإشعارات'},
+  { key: '/notifications', icon: Bell,          label: 'النشاط'   },
+  { key: '/profile',       icon: User,          label: 'حسابي'    },
 ];
 
 export default function BottomNav() {
   const pathname = usePathname();
   const [unreadMsgs, setUnreadMsgs]  = useState(0);
   const [unreadNotif, setUnreadNotif] = useState(0);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     loadBadges();
+    checkAdmin();
     // refresh every 30s
     const interval = setInterval(loadBadges, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  async function checkAdmin() {
+    const { data: u } = await supabase.auth.getUser();
+    if (u?.user?.email === 'root@gmail.com') {
+      setIsAdmin(true);
+      return;
+    }
+    if (u?.user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', u.user.id)
+        .single();
+      if (profile?.role === 'admin') setIsAdmin(true);
+    }
+  }
 
   async function loadBadges() {
     const { data: u } = await supabase.auth.getUser();
@@ -34,7 +58,7 @@ export default function BottomNav() {
       .is('read_at', null);
     setUnreadNotif(nc ?? 0);
 
-    // Unread messages (conversations where last msg is not mine and not in read_by)
+    // Unread messages
     const { data: myConvs } = await supabase
       .from('conversation_members')
       .select('conversation_id')
@@ -49,7 +73,6 @@ export default function BottomNav() {
         .neq('sender_id', u.user.id)
         .order('created_at', { ascending: false });
 
-      // Count convs with unread messages (last msg in conv is unread)
       const seenConvs = new Set<string>();
       let unread = 0;
       for (const msg of lastMsgs || []) {
@@ -64,56 +87,75 @@ export default function BottomNav() {
     }
   }
 
+  const handleTabPress = (key: string) => {
+    router.push(key as any);
+  };
+
   return (
     <View style={styles.container}>
-      {TABS.map(tab => {
-        const isActive = pathname === tab.key;
-        const IconComp = tab.icon;
-        const badge = tab.key === '/messages' ? unreadMsgs
-                    : tab.key === '/notifications' ? unreadNotif
-                    : 0;
-        return (
-          <Pressable
-            key={tab.key}
-            style={styles.tab}
-            onPress={() => router.push(tab.key as any)}
-          >
-            <View style={[styles.iconWrap, isActive && styles.iconWrapActive]}>
-              <IconComp
-                size={24}
-                color={isActive ? '#0891b2' : '#9ca3af'}
-                strokeWidth={isActive ? 2.5 : 1.8}
-              />
-              {badge > 0 && (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{badge > 9 ? '9+' : badge}</Text>
-                </View>
-              )}
-            </View>
-            <Text style={[styles.label, isActive && styles.labelActive]}>
-              {tab.label}
-            </Text>
+      <BlurView intensity={Platform.OS === 'ios' ? 85 : 100} tint="light" style={styles.blurContainer}>
+        {TABS.map((tab, index) => {
+          const isActive = pathname === tab.key;
+          const IconComp = tab.icon;
+          const badge = tab.key === '/messages' ? unreadMsgs
+                      : tab.key === '/notifications' ? unreadNotif
+                      : 0;
+
+          return (
+            <Pressable
+              key={tab.key}
+              style={styles.tab}
+              onPress={() => handleTabPress(tab.key)}
+            >
+              <View style={styles.iconWrap}>
+                <Animated.View style={[styles.iconInner, isActive && styles.iconInnerActive]}>
+                  <IconComp
+                    size={26}
+                    color={isActive ? '#007AFF' : '#8E8E93'}
+                    strokeWidth={isActive ? 2.5 : 2}
+                  />
+                </Animated.View>
+                {badge > 0 && (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{badge > 9 ? '9+' : badge}</Text>
+                  </View>
+                )}
+              </View>
+              <Text style={[styles.label, isActive && styles.labelActive]}>
+                {tab.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+        {isAdmin && (
+          <Pressable style={styles.tab} onPress={() => router.push('/admin' as any)}>
+             <View style={styles.iconWrap}>
+               <Animated.View style={[styles.iconInner, pathname === '/admin' && styles.iconInnerActive]}>
+                 <LayoutDashboard size={26} color={pathname === '/admin' ? '#007AFF' : '#8E8E93'} strokeWidth={pathname === '/admin' ? 2.5 : 2} />
+               </Animated.View>
+             </View>
+             <Text style={[styles.label, pathname === '/admin' && styles.labelActive]}>لوحة التحكم</Text>
           </Pressable>
-        );
-      })}
+        )}
+      </BlurView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
+    position: 'absolute',
+    bottom: 0,
+    width: '100%',
+    backgroundColor: 'transparent',
+  },
+  blurContainer: {
     flexDirection: 'row-reverse',
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
-    paddingBottom: Platform.OS === 'ios' ? 24 : 8,
-    paddingTop: 10,
+    paddingBottom: Platform.OS === 'ios' ? 32 : 12,
+    paddingTop: 12,
     paddingHorizontal: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(0,0,0,0.1)',
   },
   tab: {
     flex: 1,
@@ -122,41 +164,48 @@ const styles = StyleSheet.create({
   },
   iconWrap: {
     position: 'relative',
-    width: 48,
-    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 18,
+    width: 44,
+    height: 36,
   },
-  iconWrapActive: {
-    backgroundColor: '#e0f2fe',
+  iconInner: {
+    width: 44,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconInnerActive: {
+    // Optionally add a subtle background for active tab like iOS 18 tab bar
   },
   badge: {
     position: 'absolute',
-    top: -2,
-    right: 4,
-    backgroundColor: '#ef4444',
-    borderRadius: 8,
-    minWidth: 16,
-    height: 16,
+    top: -4,
+    right: -2,
+    backgroundColor: '#FF3B30',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 3,
-    borderWidth: 1.5,
+    paddingHorizontal: 4,
+    borderWidth: 2,
     borderColor: '#fff',
   },
   badgeText: {
     color: '#fff',
-    fontSize: 9,
-    fontWeight: '900',
+    fontSize: 10,
+    fontWeight: '800',
   },
   label: {
-    fontSize: 11,
-    color: '#9ca3af',
-    fontWeight: '600',
+    fontSize: 10,
+    color: '#8E8E93',
+    fontWeight: '500',
+    marginTop: 2,
   },
   labelActive: {
-    color: '#0891b2',
-    fontWeight: '800',
+    color: '#007AFF',
+    fontWeight: '600',
   },
 });

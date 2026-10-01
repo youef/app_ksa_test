@@ -1,2 +1,10 @@
-import {Stack} from 'expo-router';
-export default function RootLayout(){return <Stack screenOptions={{headerShown:false,animation:'fade'}}/>;}
+import { Stack } from 'expo-router';
+import { DynamicIslandProvider } from '@/context/DynamicIslandContext';
+
+export default function RootLayout() {
+  return (
+    <DynamicIslandProvider>
+      <Stack screenOptions={{ headerShown: false, animation: 'fade' }} />
+    </DynamicIslandProvider>
+  );
+}

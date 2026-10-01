@@ -29,6 +29,7 @@ import {
 } from 'lucide-react-native';
 import { C } from '@/lib/ui';
 import { resolveShortNationalAddress, NationalAddressResolution } from '@/lib/nationalAddress';
+import ActionSheet from '@/components/ActionSheet';
 
 interface Props {
   visible: boolean;
@@ -120,14 +121,12 @@ export default function LocationSelectorModal({
   );
 
   return (
-    <Modal
+    <ActionSheet
       visible={visible}
-      animationType="slide"
-      transparent
-      onRequestClose={resetAndClose}
+      onClose={resetAndClose}
+      height="85%"
     >
-      <View style={styles.overlay}>
-        <View style={styles.modalContent}>
+      <View style={{ flex: 1 }}>
           {/* Header */}
           <View style={styles.header}>
             <Pressable onPress={resetAndClose} style={styles.closeBtn}>
@@ -337,9 +336,8 @@ export default function LocationSelectorModal({
               </>
             )}
           </ScrollView>
-        </View>
       </View>
-    </Modal>
+    </ActionSheet>
   );
 }
 
