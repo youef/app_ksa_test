@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Image, Pressable, RefreshControl, TextInput } from 'react-native';
+import { View, Text, StyleSheet, Image, Pressable, RefreshControl, TextInput, ScrollView } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import GlassHeader from '@/components/GlassHeader';
 import BottomNav from '@/components/BottomNav';
-import { ShoppingBag, MapPin, ShieldCheck, Plus, Search, Sparkles, SlidersHorizontal, Clock3, ChevronLeft } from 'lucide-react-native';
+import { ShoppingBag, MapPin, ShieldCheck, Plus, Search, Sparkles, SlidersHorizontal, Clock3 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 
 import {
@@ -24,8 +24,6 @@ export default function Market() {
     city: 'كل المدن',
     district: 'كل الأحياء',
   });
-  const scrollY = React.useRef(new Animated.Value(0)).current;
-
   useEffect(() => {
     getActiveLocation().then(setActiveLoc);
     const unsub = subscribeLocation(setActiveLoc);
@@ -114,14 +112,10 @@ export default function Market() {
         }
       />
       
-      <Animated.ScrollView
+      <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: true }
-        )}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadMarketItems} tintColor="#059669" />}
       >
         <View style={styles.heroCard}>
@@ -187,7 +181,7 @@ export default function Market() {
             </View>
           )}
         </View>
-      </Animated.ScrollView>
+      </ScrollView>
 
       {/* Bottom Navigation */}
       <View style={styles.bottomNavWrapper}>
@@ -206,7 +200,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingTop: 100, // accommodate GlassHeader
+    paddingTop: 96,
     paddingHorizontal: 16,
     paddingBottom: 110,
   },
@@ -224,13 +218,34 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  pageSubtitle: {
-    fontSize: 15,
-    color: '#64748b',
-    textAlign: 'right',
-    marginBottom: 20,
-    fontWeight: '500',
+  heroCard: {
+    backgroundColor: '#064e3b', borderRadius: 26, padding: 22, marginBottom: 22, overflow: 'hidden',
   },
+  heroTop: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10 },
+  heroIcon: { width: 40, height: 40, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.13)', alignItems: 'center', justifyContent: 'center' },
+  heroEyebrow: { color: '#a7f3d0', fontSize: 13, fontWeight: '800' },
+  heroTitle: { color: '#fff', fontSize: 27, fontWeight: '900', textAlign: 'right', lineHeight: 36, marginTop: 14 },
+  heroSubtitle: { color: '#d1fae5', fontSize: 13, lineHeight: 21, textAlign: 'right', marginTop: 8, maxWidth: '90%' },
+  heroStats: { flexDirection: 'row-reverse', alignItems: 'center', gap: 18, marginTop: 20 },
+  statValue: { color: '#fff', fontWeight: '900', fontSize: 16, textAlign: 'right' },
+  statLabel: { color: '#a7f3d0', fontSize: 11, marginTop: 3, textAlign: 'right' },
+  statDivider: { width: 1, height: 30, backgroundColor: 'rgba(255,255,255,0.22)' },
+  heroDecor: { position: 'absolute', left: -16, bottom: -20, transform: [{ rotate: '-18deg' }] },
+  searchBox: { height: 52, borderRadius: 16, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0', flexDirection: 'row-reverse', alignItems: 'center', paddingHorizontal: 15, gap: 10, marginBottom: 22 },
+  searchInput: { flex: 1, color: '#0f172a', fontSize: 14, paddingVertical: 0 },
+  sectionHeading: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  sectionTitle: { textAlign: 'right', color: '#0f172a', fontSize: 18, fontWeight: '900' },
+  sectionHint: { textAlign: 'right', color: '#94a3b8', fontSize: 12, marginTop: 3 },
+  resultsHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 },
+  resultCount: { color: '#334155', fontSize: 13, fontWeight: '800' },
+  latestLabel: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5 },
+  latestText: { color: '#64748b', fontSize: 12, fontWeight: '600' },
+  categoryPillActive: { backgroundColor: '#059669', borderColor: '#059669' },
+  cardArt: { width: 92, height: 92, borderRadius: 28, backgroundColor: '#d1fae5', justifyContent: 'center', alignItems: 'center', transform: [{ rotate: '-8deg' }] },
+  cardArtLabel: { color: '#047857', fontSize: 10, fontWeight: '800', marginTop: 5 },
+  availableBadge: { position: 'absolute', top: 12, right: 12, flexDirection: 'row-reverse', alignItems: 'center', gap: 5, borderRadius: 20, backgroundColor: '#fff', paddingHorizontal: 10, paddingVertical: 6 },
+  availableDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#10b981' },
+  availableText: { fontSize: 11, color: '#047857', fontWeight: '800' },
   categoriesRow: {
     flexDirection: 'row-reverse',
     flexWrap: 'wrap',
@@ -254,7 +269,7 @@ const styles = StyleSheet.create({
     color: '#334155',
   },
   listContainer: {
-    gap: 16,
+    gap: 14,
   },
   card: {
     backgroundColor: '#fff',
@@ -269,7 +284,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   cardImagePlaceholder: {
-    height: 140,
+    height: 155,
     backgroundColor: '#f1f5f9',
     justifyContent: 'center',
     alignItems: 'center',
@@ -349,12 +364,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#94a3b8',
     marginRight: 4,
-  },
-  ratingText: {
-    fontSize: 12,
-    color: '#f59e0b',
-    fontWeight: '600',
-    marginRight: 6,
   },
   emptyState: {
     paddingVertical: 60,
