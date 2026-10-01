@@ -16,6 +16,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
 import { savePermanentMyLocation } from '@/lib/locationSync';
+import { getCurrentDeviceLocation, reverseGeocodeDeviceLocation } from '@/lib/deviceLocation';
 import {
   Camera,
   MapPin,
@@ -46,6 +47,7 @@ export default function Profile() {
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editingProfile, setEditingProfile] = useState(false);
+  const [locating, setLocating] = useState(false);
 
   const [stats, setStats] = useState({ questions: 0, answers: 0, followers: 0, following: 0 });
   const [savedQuestions, setSavedQuestions] = useState<any[]>([]);
@@ -108,6 +110,26 @@ export default function Profile() {
     }, [loadProfile])
   );
 
+  async function useCurrentLocation() {
+    setLocating(true);
+    try {
+      const location = await getCurrentDeviceLocation();
+      if (!location) { Alert.alert('تعذّر تحديد الموقع', 'اسمح لحيّنا باستخدام موقعك أثناء استخدام التطبيق ثم حاول مرة أخرى.'); return; }
+      const place = await reverseGeocodeDeviceLocation(location);
+      if (!place?.city) { Alert.alert('تعذّر قراءة العنوان', 'تم تحديد موقعك، لكن تعذّر تحويله إلى مدينة وحي. جرّب مرة أخرى.'); return; }
+      const nextRegion = place.region || 'المملكة';
+      const nextCity = place.city;
+      const nextDistrict = place.district || '';
+      setRegion(nextRegion); setCity(nextCity); setDistrict(nextDistrict);
+      if (nextDistrict) {
+        await savePermanentMyLocation({ region: nextRegion, city: nextCity, district: nextDistrict }, true);
+        Alert.alert('تم تحديث الموقع', 'تم ربط موقعك الحالي بالمدينة والحي في ملفك الشخصي.');
+      } else {
+        Alert.alert('تم تحديد المدينة', 'حدد الحي من القائمة ثم اضغط حفظ التغييرات لإكمال موقع البروفايل.');
+      }
+    } catch (error: any) { Alert.alert('تعذّر تحديد الموقع', error?.message || 'حاول مرة أخرى.'); }
+    finally { setLocating(false); }
+  }
   async function logout() {
     await supabase.auth.signOut();
     router.replace('/auth');
@@ -290,6 +312,10 @@ export default function Profile() {
                   </Text>
                   <ChevronDown size={18} color={C.muted} />
                 </View>
+              </Pressable>
+              <Pressable style={styles.currentLocationButton} onPress={useCurrentLocation} disabled={locating}>
+                <MapPin size={17} color={C.accent} />
+                <Text style={styles.currentLocationButtonText}>{locating ? 'جارٍ تحديد موقعك…' : 'استخدام موقعي الحالي'}</Text>
               </Pressable>
               <Text style={styles.label}>نبذة</Text>
               <TextInput
@@ -815,6 +841,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e2e8f0',
   },
+  currentLocationButton: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 7, backgroundColor: '#ecfdf5', borderWidth: 1, borderColor: '#a7f3d0', borderRadius: 12, paddingVertical: 10, marginTop: 2 },
+  currentLocationButtonText: { color: C.accent, fontSize: 13, fontWeight: '900' },
   locationSelectorContent: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
