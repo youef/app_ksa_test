@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Alert, Pressable, StyleSheet, Text, TextInput, View, KeyboardAvoidingView, Platform, ScrollView, Image } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
-import { getBrandingLogo, FALLBACK_LOGO_URI } from '@/lib/branding';
+import { getBrandingLogo, FALLBACK_LOGO_URI, subscribeBrandingLogo } from '@/lib/branding';
 import { C } from '@/lib/ui';
 import { Mail, Lock, User, ArrowRight } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -15,7 +15,10 @@ export default function Auth() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => { getBrandingLogo().then(setLogoUri); }, []);
+  useEffect(() => {
+    getBrandingLogo().then(setLogoUri);
+    return subscribeBrandingLogo(setLogoUri);
+  }, []);
 
   async function submit() {
     if (!email.trim()) {
