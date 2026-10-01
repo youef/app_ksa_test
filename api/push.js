@@ -64,3 +64,5 @@ module.exports = async function handler(req, res) {
 
   return res.status(200).json({ ok: true, results });
 };
+
+// Force a fresh production deployment so updated Vercel environment variables are loaded.
