@@ -17,6 +17,7 @@ import {
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as ImagePicker from 'expo-image-picker';
 import {
   Shield,
   Users,
@@ -103,6 +104,8 @@ export default function Admin() {
   const [locationLatitude, setLocationLatitude] = useState('');
   const [locationLongitude, setLocationLongitude] = useState('');
   const [savingLocation, setSavingLocation] = useState(false);
+  const [brandingLogo, setBrandingLogo] = useState('/assets/branding/HAYNA_LOGO.png?v=2');
+  const [brandingUploading, setBrandingUploading] = useState(false);
 
   // Core Data
   const [usersList, setUsersList] = useState<any[]>([]);
@@ -163,6 +166,45 @@ export default function Admin() {
   }, [showToast]);
 
   useEffect(() => { if (activeTab === 'locations') loadCustomLocations(); }, [activeTab, loadCustomLocations]);
+
+  const loadBranding = useCallback(async () => {
+    const { data } = await supabase.from('app_branding').select('logo_url, updated_at').eq('id', 'global').maybeSingle();
+    if (data?.logo_url) setBrandingLogo(data.logo_url + (data.logo_url.includes('?') ? '&' : '?') + 'v=' + encodeURIComponent(data.updated_at || Date.now()));
+  }, []);
+
+  useEffect(() => { if (activeTab === 'branding') loadBranding(); }, [activeTab, loadBranding]);
+
+  const changeGlobalLogo = async () => {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) { showToast('اسمح بالوصول للصور لاختيار الشعار'); return; }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 1,
+      });
+      if (result.canceled || !result.assets?.[0]?.uri) return;
+      setBrandingUploading(true);
+      const asset = result.assets[0];
+      const response = await fetch(asset.uri);
+      const blob = await response.blob();
+      const path = 'global/logo-' + Date.now() + '.png';
+      const { error: uploadError } = await supabase.storage.from('branding').upload(path, blob, { contentType: 'image/png', upsert: true, cacheControl: '31536000' });
+      if (uploadError) throw uploadError;
+      const { data: publicData } = supabase.storage.from('branding').getPublicUrl(path);
+      const logoUrl = publicData.publicUrl;
+      const { data: me } = await supabase.auth.getUser();
+      const { error: dbError } = await supabase.from('app_branding').upsert({ id: 'global', logo_url: logoUrl, updated_at: new Date().toISOString(), updated_by: me.user?.id || null });
+      if (dbError) throw dbError;
+      setBrandingLogo(logoUrl + '?v=' + Date.now());
+      await addAuditLog('تغيير شعار حيّنا بالكامل', 'الهوية البصرية', 'branding');
+      showToast('تم تغيير الشعار في النظام بالكامل ✓');
+    } catch (e: any) {
+      showToast('تعذر تغيير الشعار: ' + (e?.message || 'خطأ غير متوقع'));
+    } finally { setBrandingUploading(false); }
+  };
+
 
   const saveCustomLocation = async () => {
     const name = locationName.trim();
@@ -767,6 +809,7 @@ export default function Admin() {
             onPress={() => setActiveTab('overview')}
           />
           <TabPill label="إدارة المواقع" icon={<MapPin size={15} color={activeTab === 'locations' ? '#fff' : '#64748b'} />} active={activeTab === 'locations'} onPress={() => setActiveTab('locations')} />
+          <TabPill label="الهوية والشعار" icon={<Sparkles size={15} color={activeTab === 'branding' ? '#fff' : '#64748b'} />} active={activeTab === 'branding'} onPress={() => setActiveTab('branding')} />
           <TabPill
             label={`ملف التوثيق (${stats.pendingVerif})`}
             icon={<Star size={15} color={activeTab === 'verifications' ? '#fff' : '#64748b'} />}
@@ -816,6 +859,25 @@ export default function Admin() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}
       >
+        {activeTab === 'branding' && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>الهوية البصرية والشعار</Text>
+            <Text style={styles.sectionSubDesc}>غيّر الشعار من هنا ليصبح الشعار المركزي المستخدم في شاشة الترحيب وتسجيل الدخول وهيدر التطبيق وأيقونة الويب.</Text>
+            <View style={{ alignItems: 'center', backgroundColor: '#065f46', borderRadius: 24, padding: 28, marginTop: 12, marginBottom: 14 }}>
+              <View style={{ width: 150, height: 150, borderRadius: 28, backgroundColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.28)' }}>
+                <Image source={{ uri: brandingLogo }} style={{ width: 125, height: 125 }} resizeMode="contain" />
+              </View>
+              <Text style={{ color: '#fff', fontSize: 18, fontWeight: '900', marginTop: 14 }}>شعار حيّنا الحالي</Text>
+              <Text style={{ color: '#a7f3d0', fontSize: 11, fontWeight: '700', marginTop: 4, textAlign: 'center' }}>تغيير واحد ← ينعكس على واجهات الهوية المرتبطة بالشعار</Text>
+            </View>
+            <Pressable style={[styles.btnSendNotice, brandingUploading && { opacity: 0.6 }]} onPress={changeGlobalLogo} disabled={brandingUploading}>
+              {brandingUploading ? <ActivityIndicator color="#fff" /> : <Sparkles size={17} color="#fff" />}
+              <Text style={styles.btnSendNoticeText}>{brandingUploading ? 'جارٍ رفع الشعار...' : 'تغيير الشعار الآن'}</Text>
+            </Pressable>
+            <Text style={{ marginTop: 12, color: C.muted, fontSize: 11, textAlign: 'right', lineHeight: 18 }}>اختر صورة PNG أو صورة مربعة من جهازك. سيتم حفظها في تخزين آمن مخصص للهوية وربطها مركزياً، مع الاحتفاظ بالشعار الحالي كخيار احتياطي داخل التطبيق.</Text>
+          </View>
+        )}
+
         {activeTab === 'locations' && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>إدارة المناطق والمدن والأحياء</Text>
