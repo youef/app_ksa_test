@@ -64,7 +64,15 @@ async function registerWebPushToken(): Promise<string | null> {
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) throw new Error('سجّل الدخول قبل تفعيل الإشعارات.');
 
-  const permission = await Notification.requestPermission();
+  const currentPermission = Notification.permission;
+  if (currentPermission === 'denied') {
+    console.warn('Web push permission is denied; browser settings must be changed manually.');
+    return null;
+  }
+
+  const permission = currentPermission === 'granted'
+    ? 'granted'
+    : await Notification.requestPermission();
   if (permission !== 'granted') return null;
 
   const registration = await navigator.serviceWorker.register('/sw.js');
