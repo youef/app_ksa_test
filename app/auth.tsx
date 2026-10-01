@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, TextInput, View, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, TextInput, View, KeyboardAvoidingView, Platform, ScrollView, Image } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
@@ -88,7 +88,7 @@ export default function Auth() {
         >
           <View style={styles.heroContent}>
             <View style={styles.logoBox}>
-              <Text style={styles.logoText}>ح</Text>
+              <Image source={{ uri: '/assets/branding/HAYNA_LOGO.png?v=2' }} style={styles.logoImage} resizeMode="contain" />
             </View>
             <Text style={styles.title}>حيّنا</Text>
             <Text style={styles.subtitle}>الشبكة الاجتماعية لجيرانك ومجتمعك المحلي</Text>
@@ -212,6 +212,10 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 2,
     borderColor: 'rgba(255,255,255,0.4)',
+  },
+  logoImage: {
+    width: 62,
+    height: 62,
   },
   logoText: {
     fontSize: 32,
