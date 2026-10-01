@@ -56,7 +56,7 @@ export async function registerPushToken(): Promise<string | null> {
     }
     if (final !== 'granted') return null;
 
-    const token = (await Notifications.getExpoPushTokenAsync()).data;
+    const token = (await Notifications.getExpoPushTokenAsync({ projectId: '5228885c-729d-4f4a-935d-06662dfd4beb' })).data;
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) throw new Error('سجّل الدخول قبل تسجيل هذا الجهاز للإشعارات.');
 
