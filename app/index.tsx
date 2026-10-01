@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Platform, ActivityIndicator, Image, Animated, Easing } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
-import { getBrandingLogo, FALLBACK_LOGO_URI } from '@/lib/branding';
+import { getBrandingLogo, FALLBACK_LOGO_URI, subscribeBrandingLogo } from '@/lib/branding';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft } from 'lucide-react-native';
 
