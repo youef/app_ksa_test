@@ -18,7 +18,35 @@ export default function Index() {
   const rotate = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    getBrandingLogo().then(setLogoUri);
+    getBrandingLogo().then((uri) => {
+      setLogoUri(uri);
+      if (Platform.OS === 'web' && typeof document !== 'undefined') {
+        const icon = document.querySelector('link[rel="icon"]') || document.createElement('link');
+        icon.setAttribute('rel', 'icon');
+        icon.setAttribute('href', uri);
+        document.head.appendChild(icon);
+        const apple = document.querySelector('link[rel="apple-touch-icon"]') || document.createElement('link');
+        apple.setAttribute('rel', 'apple-touch-icon');
+        apple.setAttribute('href', uri);
+        document.head.appendChild(apple);
+        const manifest = {
+          name: 'حيّنا',
+          short_name: 'حيّنا',
+          start_url: '/',
+          display: 'standalone',
+          background_color: '#065f46',
+          theme_color: '#059669',
+          dir: 'rtl',
+          lang: 'ar',
+          icons: [{ src: uri, sizes: '512x512', type: 'image/png', purpose: 'any maskable' }]
+        };
+        const blobUrl = URL.createObjectURL(new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' }));
+        const manifestLink = document.querySelector('link[rel="manifest"]') || document.createElement('link');
+        manifestLink.setAttribute('rel', 'manifest');
+        manifestLink.setAttribute('href', blobUrl);
+        document.head.appendChild(manifestLink);
+      }
+    });
     supabase.auth.getSession().then(({ data }) => {
       if (data.session?.user) {
         setSignedIn(true);
