@@ -123,8 +123,6 @@ export default function Index() {
           </View>
           <View style={styles.glassReflection} />
         </Animated.View>
-
-        <Text style={styles.brand}>حيّنا</Text>
         <Text style={styles.tagline}>بيوت تجمعنا • مجتمع ينتمي لنا</Text>
         <Text style={styles.description}>مكان يجمع أهل الحي، ويقرّب الجيران من بعض.</Text>
       </View>
@@ -216,14 +214,6 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     backgroundColor: 'rgba(255,255,255,.22)',
     transform: [{ rotate: '-18deg' }],
-  },
-  brand: {
-    color: '#ffffff',
-    fontSize: 34,
-    fontWeight: '900',
-    marginTop: 2,
-    textShadowColor: 'rgba(0,0,0,.16)',
-    textShadowRadius: 12,
   },
   tagline: {
     color: 'rgba(255,255,255,.92)',
