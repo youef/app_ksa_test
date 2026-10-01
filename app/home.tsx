@@ -427,7 +427,7 @@ export default function Home() {
         </View>
       </Modal>
 
-      {/* Twitter-style new posts indicator */
+      {/* Twitter-style new posts indicator */}
       {newPostsCount > 0 && !refreshing && (
         <Pressable
           style={styles.newPostsBanner}
