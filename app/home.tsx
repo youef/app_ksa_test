@@ -54,7 +54,6 @@ import {
 import { C } from '@/lib/ui';
 import BottomNav from '@/components/BottomNav';
 import LocationSelectorModal from '@/components/LocationSelectorModal';
-import { generateNeighborhoodPulseAI } from '@/lib/aiAssistant';
 import { useDynamicIsland } from '@/context/DynamicIslandContext';
 
 const { width } = Dimensions.get('window');
@@ -98,9 +97,6 @@ export default function Home() {
 
   // Unread badge count
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
-
-  // AI Pulse card expansion
-  const [pulseExpanded, setPulseExpanded] = useState(false);
 
   // Toast feedback state
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -328,12 +324,6 @@ export default function Home() {
   const toolQuestions = filteredQuestions.filter(
     q => q.is_tool_sharing || q.item_type === 'tool_sharing' || (q.title && (q.title.includes('إعارة') || q.title.includes('دريل') || q.title.includes('سلم')))
   );
-  // Dynamic AI Neighborhood Pulse
-  const neighborhoodPulse = generateNeighborhoodPulseAI(
-    selectedCity,
-    selectedDistrict,
-    filteredQuestions.length || 15
-  );
 
   return (
     <View style={styles.container}>
@@ -489,62 +479,7 @@ export default function Home() {
           </ScrollView>
         </View>
 
-        {/* ======================================================== */}
-        {/* 3. SMART NEIGHBORHOOD HUB (AI Pulse & Distance Filter)   */}
-        {/* ======================================================== */}
-        <View style={styles.hubCard}>
-          {/* Top Hub Row: AI Pulse Header */}
-          <View style={styles.hubHeader}>
-            <View style={styles.hubSolvedBadge}>
-              <Text style={styles.hubSolvedText}>نسبة الحل {neighborhoodPulse.solvedRate}</Text>
-            </View>
-            <Pressable
-              style={styles.hubTitleRow}
-              onPress={() => setPulseExpanded(!pulseExpanded)}
-            >
-              <Text style={styles.hubTitle}>{neighborhoodPulse.headline}</Text>
-              <Sparkles size={16} color="#0891b2" />
-              {pulseExpanded ? <ChevronUp size={16} color="#0891b2" /> : <ChevronDown size={16} color="#0891b2" />}
-            </Pressable>
-          </View>
 
-          {pulseExpanded && (
-            <View style={styles.hubExpandedBody}>
-              <Text style={styles.hubSummaryText}>{neighborhoodPulse.smartSummary}</Text>
-              
-              {/* Trending Topics Tags */}
-              <View style={styles.hubTopicsRow}>
-                {neighborhoodPulse.trendingTopics.map((topic, i) => (
-                  <Pressable 
-                    key={i} 
-                    style={styles.hubTopicPill}
-                    onPress={() => setSearchQuery(topic)}
-                  >
-                    <Text style={styles.hubTopicText}>🔥 {topic}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-          )}
-
-          {/* Neighborhood Smart Newsletter */}
-          <View style={styles.newsletterCard}>
-            <View style={styles.newsletterHeader}>
-              <Text style={styles.newsletterTitle}>نشرة حي {selectedDistrict !== 'كل الأحياء' ? selectedDistrict : 'كل الأحياء'} الذكية لهذا الأسبوع 📰</Text>
-              <View style={styles.newsletterBadge}>
-                <Text style={styles.newsletterBadgeText}>نسبة الحل 96%</Text>
-              </View>
-            </View>
-            <Text style={styles.newsletterDesc}>
-              شهد حي {selectedDistrict !== 'كل الأحياء' ? selectedDistrict : 'كل الأحياء'} هذا الأسبوع نشاطاً مميزاً بتفاعل أكثر من 132 جار، مع حل 96% من الاستفسارات وتبادل 8 أدوات ومعدات صيانة مجاناً بين الأهالي.
-            </Text>
-            <View style={styles.newsletterTrends}>
-              <Text style={styles.trendItem}>🔥 استعدادات وصيانة التكييف قبل موسم الحر</Text>
-              <Text style={styles.trendItem}>🔥 تبادل أدوات الصيانة المنزلية في سوق الحي المصغر</Text>
-              <Text style={styles.trendItem}>🔥 تجمع رياضي مسائي في ممشى الحي وحديقته</Text>
-            </View>
-          </View>
-        </View>
 
         {/* ======================================================== */}
         {/* 4. EMERGENCY SOS BANNER (Live Urgent Neighborhood Alert) */}
