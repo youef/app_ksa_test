@@ -376,7 +376,7 @@ export default function Profile() {
             </Pressable>
             <Text style={styles.twitterStat}><Text style={styles.twitterStatNum}>{stats.questions + stats.answers}</Text><Text style={styles.twitterStatLabel}> منشور</Text></Text>
           </View>
-        </View>
+        </LinearGradient>
 
         <View style={styles.contentArea}>
           {editingProfile && (
