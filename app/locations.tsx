@@ -27,7 +27,7 @@ export default function Locations() {
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* Header Hero */}
         <LinearGradient
-          colors={['#0891b2', '#0e7490', '#0f172a']}
+          colors={['#065f46', '#059669', '#10b981']}
           style={styles.hero}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
@@ -51,7 +51,7 @@ export default function Locations() {
               placeholder="ابحث عن منطقة أو مدينة..."
               placeholderTextColor="#94a3b8"
             />
-            <Search size={20} color="#0891b2" />
+            <Search size={20} color="#059669" />
           </View>
         </LinearGradient>
 
@@ -68,7 +68,7 @@ export default function Locations() {
                 <Text style={styles.regionSub}>{r.cities.length} مدن ومحافظات رئيسية</Text>
               </View>
               <View style={styles.pinBox}>
-                <MapPin size={20} color="#0891b2" />
+                <MapPin size={20} color="#059669" />
               </View>
             </Pressable>
           ))}
@@ -165,7 +165,7 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: '#ecfeff',
+    backgroundColor: '#ecfdf5',
     alignItems: 'center',
     justifyContent: 'center',
   },

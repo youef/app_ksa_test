@@ -129,7 +129,7 @@ export default function Service() {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#0891b2" />
+        <ActivityIndicator size="large" color="#059669" />
         <Text style={styles.loadingText}>جاري تحميل تفاصيل الخدمة...</Text>
       </View>
     );
@@ -153,7 +153,7 @@ export default function Service() {
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <LinearGradient
-          colors={['#0891b2', '#0e7490', '#0f172a']}
+          colors={['#065f46', '#059669', '#10b981']}
           style={styles.hero}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
@@ -213,7 +213,7 @@ export default function Service() {
                 <Image source={{ uri: provider.avatar_url }} style={styles.providerAvatar} />
               ) : (
                 <View style={styles.avatarPlaceholder}>
-                  <User size={22} color="#0891b2" />
+                  <User size={22} color="#059669" />
                 </View>
               )}
             </Pressable>
@@ -404,7 +404,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#ecfeff',
+    backgroundColor: '#ecfdf5',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -470,10 +470,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#0891b2',
+    backgroundColor: '#059669',
     paddingVertical: 15,
     borderRadius: 16,
-    shadowColor: '#0891b2',
+    shadowColor: '#059669',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 8,

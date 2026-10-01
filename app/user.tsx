@@ -244,7 +244,7 @@ export default function UserProfile() {
       {/* Top Header */}
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.iconBtn}>
-          <ChevronRight size={28} color={C.ink} />
+          <ChevronRight size={28} color="#059669" />
         </Pressable>
         <Text style={styles.title}>الملف الشخصي</Text>
         {currentUserId !== id ? (
@@ -300,7 +300,7 @@ export default function UserProfile() {
         <View style={styles.badgesRow}>
           {isPrivate && (
             <View style={styles.badgePill}>
-              <Lock size={12} color="#0891b2" />
+              <Lock size={12} color="#059669" />
               <Text style={styles.badgePillText}>حساب خاص</Text>
             </View>
           )}
@@ -342,7 +342,7 @@ export default function UserProfile() {
       {isLocked && !isBlocked && (
         <View style={styles.privateCard}>
           <View style={styles.privateIconCircle}>
-            <Lock size={32} color="#0891b2" />
+            <Lock size={32} color="#059669" />
           </View>
           <Text style={styles.privateTitle}>هذا الملف الشخصي مقفل 🔒</Text>
           <Text style={styles.privateSubtitle}>
@@ -360,7 +360,7 @@ export default function UserProfile() {
           >
             {isFollowing ? (
               <>
-                <UserCheck size={20} color="#0891b2" style={{ marginLeft: 6 }} />
+                <UserCheck size={20} color="#059669" style={{ marginLeft: 6 }} />
                 <Text style={styles.followingBtnText}>تتابعه ✓</Text>
               </>
             ) : (
@@ -517,13 +517,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#ecfeff',
+    backgroundColor: '#ecfdf5',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 10,
   },
   badgePillText: {
-    color: '#0891b2',
+    color: '#059669',
     fontSize: 11,
     fontWeight: '800',
   },
@@ -577,7 +577,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#ecfeff',
+    backgroundColor: '#ecfdf5',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
@@ -601,16 +601,16 @@ const styles = StyleSheet.create({
   followBtn: {
     flex: 1,
     flexDirection: 'row-reverse',
-    backgroundColor: '#0891b2',
+    backgroundColor: '#059669',
     borderRadius: 16,
     height: 52,
     justifyContent: 'center',
     alignItems: 'center',
   },
   followingBtn: {
-    backgroundColor: '#ecfeff',
+    backgroundColor: '#ecfdf5',
     borderWidth: 1.5,
-    borderColor: '#0891b2',
+    borderColor: '#059669',
   },
   followBtnText: {
     color: '#fff',
@@ -618,7 +618,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   followingBtnText: {
-    color: '#0891b2',
+    color: '#059669',
     fontWeight: '900',
     fontSize: 15,
   },

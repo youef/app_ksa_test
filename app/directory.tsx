@@ -69,7 +69,7 @@ export default function Directory() {
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* Header Hero */}
         <LinearGradient
-          colors={['#0891b2', '#0e7490', '#0f172a']}
+          colors={['#065f46', '#059669', '#10b981']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.hero}
@@ -96,7 +96,7 @@ export default function Directory() {
               placeholderTextColor="#94a3b8"
             />
             <Pressable onPress={() => load(search)}>
-              <Search size={20} color="#0891b2" />
+              <Search size={20} color="#059669" />
             </Pressable>
           </View>
         </LinearGradient>
@@ -105,7 +105,7 @@ export default function Directory() {
         <View style={styles.content}>
           {loading ? (
             <View style={styles.loadingBox}>
-              <ActivityIndicator size="large" color="#0891b2" />
+              <ActivityIndicator size="large" color="#059669" />
               <Text style={styles.loadingText}>جاري تحميل الدليل التجاري...</Text>
             </View>
           ) : items.length === 0 ? (
@@ -317,10 +317,10 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
   categoryBadge: {
-    color: '#0891b2',
+    color: '#059669',
     fontSize: 11,
     fontWeight: '800',
-    backgroundColor: '#ecfeff',
+    backgroundColor: '#ecfdf5',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 6,

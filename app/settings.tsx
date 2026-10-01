@@ -164,21 +164,21 @@ export default function SettingsScreen() {
       {/* Top Header */}
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <ChevronRight size={26} color={C.ink} />
+          <ChevronRight size={26} color="#059669" />
         </Pressable>
         <View style={styles.headerTitleWrap}>
           <Text style={styles.headerTitle}>الإعدادات والمميزات</Text>
           <Text style={styles.headerSubtitle}>الخصوصية، الرسائل، والميزات الحصرية</Text>
         </View>
         <View style={styles.headerIconWrap}>
-          <Sliders size={22} color={C.accent} />
+          <Sliders size={22} color="#059669" />
         </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {saving && (
           <View style={styles.savingBanner}>
-            <ActivityIndicator size="small" color="#0891b2" />
+            <ActivityIndicator size="small" color="#059669" />
             <Text style={styles.savingText}>جاري حفظ التغييرات...</Text>
           </View>
         )}
@@ -206,8 +206,8 @@ export default function SettingsScreen() {
             <Switch
               value={profilePrivacy === 'private'}
               onValueChange={togglePrivateAccount}
-              trackColor={{ false: '#e5e7eb', true: '#bae6fd' }}
-              thumbColor={profilePrivacy === 'private' ? C.accent : '#9ca3af'}
+              trackColor={{ false: '#e5e7eb', true: '#a7f3d0' }}
+              thumbColor={profilePrivacy === 'private' ? '#059669' : '#9ca3af'}
             />
           </View>
 
@@ -222,8 +222,8 @@ export default function SettingsScreen() {
             <Switch
               value={hideName}
               onValueChange={toggleHideName}
-              trackColor={{ false: '#e5e7eb', true: '#bae6fd' }}
-              thumbColor={hideName ? C.accent : '#9ca3af'}
+              trackColor={{ false: '#e5e7eb', true: '#a7f3d0' }}
+              thumbColor={hideName ? '#059669' : '#9ca3af'}
             />
           </View>
         </View>
@@ -450,7 +450,7 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: '#ecfeff',
+    backgroundColor: '#ecfdf5',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -461,14 +461,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#ecfeff',
+    backgroundColor: '#ecfdf5',
     paddingVertical: 10,
     borderRadius: 12,
     marginBottom: 16,
     gap: 8,
   },
   savingText: {
-    color: '#0891b2',
+    color: '#059669',
     fontSize: 13,
     fontWeight: '700',
   },
@@ -549,15 +549,15 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   optionItemActive: {
-    borderColor: '#0891b2',
-    backgroundColor: '#f0fdfa',
+    borderColor: '#059669',
+    backgroundColor: '#ecfdf5',
   },
   optionRadio: {
     width: 22,
     height: 22,
     borderRadius: 11,
     borderWidth: 2,
-    borderColor: '#0891b2',
+    borderColor: '#059669',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -565,7 +565,7 @@ const styles = StyleSheet.create({
     width: 11,
     height: 11,
     borderRadius: 5.5,
-    backgroundColor: '#0891b2',
+    backgroundColor: '#059669',
   },
   optionTitle: {
     fontSize: 15,

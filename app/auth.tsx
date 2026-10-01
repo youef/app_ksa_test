@@ -81,7 +81,7 @@ export default function Auth() {
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} bounces={false}>
         
         <LinearGradient 
-          colors={['#0891b2', '#0e7490']} 
+          colors={['#065f46', '#059669', '#10b981']} 
           start={{ x: 0, y: 0 }} 
           end={{ x: 1, y: 1 }}
           style={styles.headerHero}
@@ -190,7 +190,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderBottomLeftRadius: 40,
     borderBottomRightRadius: 40,
-    shadowColor: '#0891b2',
+    shadowColor: '#059669',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,
     shadowRadius: 15,
@@ -226,7 +226,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 15,
-    color: '#cffafe',
+    color: '#a7f3d0',
     textAlign: 'center',
     fontWeight: '500',
     maxWidth: 250,

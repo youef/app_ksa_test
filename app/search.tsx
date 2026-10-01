@@ -75,7 +75,7 @@ export default function SearchPage() {
     <Pressable key={`q-${q.id}`} style={styles.postCard} onPress={() => router.push({ pathname: '/question', params: { id: q.id } })}>
       <View style={styles.cardHeader}>
         <View style={styles.iconBoxBlue}>
-          <MessageCircle size={18} color="#0891b2" />
+          <MessageCircle size={18} color="#059669" />
         </View>
         <View style={styles.cardHeaderText}>
           <Text style={styles.cardTitle} numberOfLines={1}>{q.title}</Text>
@@ -104,10 +104,10 @@ export default function SearchPage() {
       {/* Modern Search Header */}
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <ArrowRight size={24} color="#111827" />
+          <ArrowRight size={24} color="#059669" />
         </Pressable>
         <View style={styles.searchBox}>
-          <SearchIcon size={20} color="#0891b2" />
+          <SearchIcon size={20} color="#059669" />
           <TextInput
             style={styles.searchInput}
             placeholder="ابحث عن جيران، أسئلة، خدمات..."
@@ -115,7 +115,7 @@ export default function SearchPage() {
             value={query}
             onChangeText={setQuery}
             autoFocus
-            selectionColor="#0891b2"
+            selectionColor="#059669"
           />
           {query.length > 0 && (
             <Pressable onPress={() => setQuery('')} style={styles.clearBtn}>
@@ -144,7 +144,7 @@ export default function SearchPage() {
       </View>
 
       <ScrollView style={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        {loading && <ActivityIndicator size="large" color="#0891b2" style={{ marginTop: 40 }} />}
+        {loading && <ActivityIndicator size="large" color="#059669" style={{ marginTop: 40 }} />}
         
         {!loading && query.length > 0 && (
           <View style={styles.resultsContainer}>
@@ -287,7 +287,7 @@ const styles = StyleSheet.create({
     color: '#6b7280',
   },
   tabTextActive: {
-    color: '#111827',
+    color: '#059669',
     fontWeight: '900',
   },
   content: {
@@ -311,13 +311,13 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   badgeCount: {
-    backgroundColor: '#e0f2fe',
+    backgroundColor: '#ecfdf5',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
   },
   badgeText: {
-    color: '#0891b2',
+    color: '#059669',
     fontSize: 12,
     fontWeight: '900',
   },
@@ -348,16 +348,16 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#cffafe',
+    backgroundColor: '#ecfdf5',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#a5f3fc',
+    borderColor: '#a7f3d0',
   },
   userAvatarLetter: {
     fontSize: 24,
     fontWeight: '900',
-    color: '#0891b2',
+    color: '#059669',
   },
   userInfo: {
     flex: 1,
@@ -376,13 +376,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   visitProfileBtn: {
-    backgroundColor: '#f3f4f6',
+    backgroundColor: '#ecfdf5',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 12,
   },
   visitProfileText: {
-    color: '#4b5563',
+    color: '#059669',
     fontSize: 13,
     fontWeight: '800',
   },
@@ -404,7 +404,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   iconBoxBlue: {
-    backgroundColor: '#ecfeff',
+    backgroundColor: '#ecfdf5',
     padding: 12,
     borderRadius: 16,
     marginLeft: 16,

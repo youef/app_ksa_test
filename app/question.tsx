@@ -87,7 +87,7 @@ export default function Question() {
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.container}>
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={({pressed}) => [styles.headerBtn, pressed && {opacity: 0.7}]}>
-          <ChevronRight size={28} color={C.ink} />
+          <ChevronRight size={24} color="#059669" />
         </Pressable>
         <Text style={styles.headerTitle}>تفاصيل السؤال</Text>
         <View style={{ width: 44 }} />

@@ -91,7 +91,7 @@ export default function Business() {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#0891b2" />
+        <ActivityIndicator size="large" color="#059669" />
         <Text style={styles.loadingText}>جاري تحميل تفاصيل المحل...</Text>
       </View>
     );
@@ -113,7 +113,7 @@ export default function Business() {
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* Header Hero */}
         <LinearGradient
-          colors={['#0891b2', '#0e7490', '#0f172a']}
+          colors={['#065f46', '#059669', '#10b981']}
           style={styles.hero}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
@@ -468,7 +468,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#0891b2',
+    backgroundColor: '#059669',
     paddingVertical: 12,
     borderRadius: 14,
   },

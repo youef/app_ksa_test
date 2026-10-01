@@ -79,7 +79,7 @@ export default function Requests() {
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* Header Hero */}
         <LinearGradient
-          colors={['#0891b2', '#0e7490', '#0f172a']}
+          colors={['#065f46', '#059669', '#10b981']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.hero}
@@ -90,7 +90,7 @@ export default function Requests() {
             </Pressable>
             <Text style={styles.navTitle}>فزعة وطلبات الحي 🤝</Text>
             <Pressable onPress={() => router.push('/new-request')} style={styles.addBtn}>
-              <Plus size={18} color="#0891b2" />
+              <Plus size={18} color="#059669" />
               <Text style={styles.addBtnText}>طلب جديد</Text>
             </Pressable>
           </View>
@@ -109,7 +109,7 @@ export default function Requests() {
               placeholderTextColor="#94a3b8"
             />
             <Pressable onPress={() => load(search, filterUrgent)}>
-              <Search size={20} color="#0891b2" />
+              <Search size={20} color="#059669" />
             </Pressable>
           </View>
         </LinearGradient>
@@ -245,7 +245,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   addBtnText: {
-    color: '#0891b2',
+    color: '#059669',
     fontSize: 12,
     fontWeight: '800',
   },
@@ -294,8 +294,8 @@ const styles = StyleSheet.create({
     borderColor: '#e2e8f0',
   },
   filterChipActive: {
-    backgroundColor: '#0891b2',
-    borderColor: '#0891b2',
+    backgroundColor: '#059669',
+    borderColor: '#059669',
   },
   filterChipUrgentActive: {
     backgroundColor: '#dc2626',

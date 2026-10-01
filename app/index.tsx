@@ -66,11 +66,12 @@ export default function Index() {
     return (
       <View style={styles.splashContainer}>
         <LinearGradient
-          colors={['#042f2e', '#0f766e', '#0891b2']}
+          colors={['#064e3b', '#065f46', '#059669']}
           style={StyleSheet.absoluteFillObject}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-        />
+        >
+        </LinearGradient>
         <View style={styles.splashContent}>
           <View style={styles.splashLogoCircle}>
             <Home size={44} color="#fff" />
@@ -87,7 +88,7 @@ export default function Index() {
   if (checkingSession) {
     return (
       <View style={[styles.splashContainer, { backgroundColor: '#042f2e' }]}>
-        <ActivityIndicator size="large" color="#0891b2" />
+        <ActivityIndicator size="large" color="#059669" />
       </View>
     );
   }
@@ -103,7 +104,7 @@ export default function Index() {
         {/* 1. HERO SECTION WITH SAUDI CIVIC BRANDING               */}
         {/* ======================================================== */}
         <LinearGradient
-          colors={['#064e3b', '#0f766e', '#0e7490', '#0f172a']}
+          colors={['#064e3b', '#065f46', '#059669', '#0f172a']}
           style={styles.heroGradient}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}

@@ -72,7 +72,7 @@ export default function Report() {
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <LinearGradient
-          colors={['#0891b2', '#0e7490', '#0f172a']}
+          colors={['#065f46', '#059669', '#10b981']}
           style={styles.hero}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
@@ -212,8 +212,8 @@ const styles = StyleSheet.create({
     borderColor: '#e2e8f0',
   },
   reasonOptionActive: {
-    borderColor: '#0891b2',
-    backgroundColor: '#ecfeff',
+    borderColor: '#059669',
+    backgroundColor: '#ecfdf5',
   },
   radioCircle: {
     width: 20,
@@ -225,13 +225,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   radioCircleActive: {
-    borderColor: '#0891b2',
+    borderColor: '#059669',
   },
   radioInner: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#0891b2',
+    backgroundColor: '#059669',
   },
   reasonText: {
     color: '#475569',
@@ -241,7 +241,7 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   reasonTextActive: {
-    color: '#0891b2',
+    color: '#059669',
     fontWeight: '800',
   },
   label: {

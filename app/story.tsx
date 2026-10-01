@@ -462,7 +462,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
   loadingScreen: { flex: 1, backgroundColor: '#0f172a', alignItems: 'center', justifyContent: 'center' },
   notFoundText: { color: '#fff', fontSize: 17, fontWeight: '700', marginBottom: 20, textAlign: 'center' },
-  backBtn: { backgroundColor: '#0891b2', paddingHorizontal: 28, paddingVertical: 12, borderRadius: 14 },
+  backBtn: { backgroundColor: '#059669', paddingHorizontal: 28, paddingVertical: 12, borderRadius: 14 },
   backBtnText: { color: '#fff', fontWeight: '800', fontSize: 15 },
   bgImage: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   gradient: {
@@ -535,7 +535,7 @@ const styles = StyleSheet.create({
   },
   authorName: { color: '#fff', fontSize: 15, fontWeight: '900' },
   counterBadge: {
-    color: '#38bdf8',
+    color: '#10b981',
     fontSize: 11,
     fontWeight: '800',
     backgroundColor: 'rgba(0,0,0,0.4)',
@@ -671,7 +671,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#0891b2',
+    backgroundColor: '#059669',
     alignItems: 'center',
     justifyContent: 'center',
   },

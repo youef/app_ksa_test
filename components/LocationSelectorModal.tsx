@@ -151,7 +151,7 @@ export default function LocationSelectorModal({
                 onPress={() => setStep(step === 'district' ? 'city' : 'region')}
                 style={styles.backBtn}
               >
-                <ChevronRight size={22} color="#0891b2" />
+                <ChevronRight size={22} color="#059669" />
               </Pressable>
             ) : (
               <View style={{ width: 40 }} />
@@ -188,14 +188,14 @@ export default function LocationSelectorModal({
                 {/* National Address Short Code Entry Box */}
                 <View style={styles.nationalAddressCard}>
                   <View style={styles.naHeaderRow}>
-                    <Sparkles size={16} color="#0891b2" />
+                    <Sparkles size={16} color="#059669" />
                     <Text style={styles.naHeaderTitle}>تحديد سريع برمز العنوان الوطني</Text>
                   </View>
                   <Text style={styles.naDesc}>
                     اكتب الرمز المختصر لعنوانك (مثال: RRRD2929) للتحديد الدقيق فوراً
                   </Text>
                   <View style={styles.naInputRow}>
-                    <Building2 size={18} color="#0891b2" />
+                    <Building2 size={18} color="#059669" />
                     <TextInput
                       style={styles.naInput}
                       placeholder="أدخل الرمز مثل RRRD2929..."
@@ -234,13 +234,13 @@ export default function LocationSelectorModal({
                   onPress={handleSelectAllKSA}
                 >
                   <View style={styles.itemRadio}>
-                    {selectedCity === 'كل المدن' && <Check size={16} color="#0891b2" />}
+                    {selectedCity === 'كل المدن' && <Check size={16} color="#059669" />}
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.itemTitle}>🇸🇦 كل مناطق المملكة العربية السعودية</Text>
                     <Text style={styles.itemDesc}>عرض كافة المنشورات والأسئلة لجميع المناطق</Text>
                   </View>
-                  <Globe2 size={24} color="#0891b2" />
+                  <Globe2 size={24} color="#059669" />
                 </Pressable>
 
                 <View style={styles.divider} />
@@ -257,7 +257,7 @@ export default function LocationSelectorModal({
                       <Text style={styles.itemDesc}>{reg.cities.length} مدن ومحافظات رئيسية</Text>
                     </View>
                     <View style={styles.itemIconWrap}>
-                      <MapPin size={18} color="#0891b2" />
+                      <MapPin size={18} color="#059669" />
                     </View>
                   </Pressable>
                 ))}
@@ -281,7 +281,7 @@ export default function LocationSelectorModal({
                         <Text style={styles.itemDesc}>{cit.districts.length} أحياء مشهورة</Text>
                       </View>
                       <View style={styles.itemIconWrap}>
-                        <MapPin size={18} color="#0891b2" />
+                        <MapPin size={18} color="#059669" />
                       </View>
                     </Pressable>
                   );
@@ -302,7 +302,7 @@ export default function LocationSelectorModal({
                 >
                   <View style={styles.itemRadio}>
                     {selectedCity === selectedCit?.name && selectedDistrict === 'كل الأحياء' && (
-                      <Check size={16} color="#0891b2" />
+                      <Check size={16} color="#059669" />
                     )}
                   </View>
                   <View style={{ flex: 1 }}>
@@ -322,13 +322,13 @@ export default function LocationSelectorModal({
                       onPress={() => handleChooseDistrict(dist)}
                     >
                       <View style={styles.itemRadio}>
-                        {isSelected && <Check size={16} color="#0891b2" />}
+                        {isSelected && <Check size={16} color="#059669" />}
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={styles.itemTitle}>{dist.name}</Text>
                       </View>
                       <View style={styles.itemIconWrap}>
-                        <MapPin size={18} color="#0891b2" />
+                        <MapPin size={18} color="#059669" />
                       </View>
                     </Pressable>
                   );
@@ -377,7 +377,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#ecfeff',
+    backgroundColor: '#ecfdf5',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -434,14 +434,14 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   itemCardSelected: {
-    borderColor: '#0891b2',
-    backgroundColor: '#f0fdfa',
+    borderColor: '#059669',
+    backgroundColor: '#ecfdf5',
   },
   itemIconWrap: {
     width: 38,
     height: 38,
     borderRadius: 12,
-    backgroundColor: '#ecfeff',
+    backgroundColor: '#ecfdf5',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -467,9 +467,9 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   nationalAddressCard: {
-    backgroundColor: '#ecfeff',
+    backgroundColor: '#ecfdf5',
     borderWidth: 1.5,
-    borderColor: '#cffafe',
+    borderColor: '#a7f3d0',
     borderRadius: 16,
     padding: 14,
     marginBottom: 6,
@@ -483,12 +483,12 @@ const styles = StyleSheet.create({
   naHeaderTitle: {
     fontSize: 14,
     fontWeight: '800',
-    color: '#0891b2',
+    color: '#059669',
     textAlign: 'right',
   },
   naDesc: {
     fontSize: 12,
-    color: '#0e7490',
+    color: '#065f46',
     textAlign: 'right',
     marginBottom: 10,
   },
@@ -498,7 +498,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#a5f3fc',
+    borderColor: '#a7f3d0',
     paddingHorizontal: 12,
     height: 44,
     gap: 8,
@@ -507,7 +507,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     fontWeight: '700',
-    color: '#0891b2',
+    color: '#059669',
     textAlign: 'right',
   },
   resolvedBox: {
@@ -518,7 +518,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#67e8f9',
+    borderColor: '#a7f3d0',
     gap: 10,
   },
   resolvedLabel: {
@@ -534,7 +534,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   applyResolvedBtn: {
-    backgroundColor: '#0891b2',
+    backgroundColor: '#059669',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 10,

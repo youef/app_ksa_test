@@ -70,7 +70,7 @@ export default function Districts() {
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* Header Hero */}
         <LinearGradient
-          colors={['#0891b2', '#0e7490', '#0f172a']}
+          colors={['#065f46', '#059669', '#10b981']}
           style={styles.hero}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
@@ -94,7 +94,7 @@ export default function Districts() {
               placeholder="ابحث عن اسم الحي..."
               placeholderTextColor="#94a3b8"
             />
-            <Search size={20} color="#0891b2" />
+            <Search size={20} color="#059669" />
           </View>
         </LinearGradient>
 
@@ -105,13 +105,13 @@ export default function Districts() {
               style={styles.districtCard}
               onPress={() => selectDistrict(d)}
             >
-              <CheckCircle2 size={18} color="#0891b2" />
+              <CheckCircle2 size={18} color="#059669" />
               <View style={{ flex: 1, alignItems: 'flex-end' }}>
                 <Text style={styles.districtTitle}>حي {d}</Text>
                 <Text style={styles.districtSub}>{city.name} · السعودية</Text>
               </View>
               <View style={styles.pinBox}>
-                <MapPin size={18} color="#0891b2" />
+                <MapPin size={18} color="#059669" />
               </View>
             </Pressable>
           ))}
@@ -208,7 +208,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: '#ecfeff',
+    backgroundColor: '#ecfdf5',
     alignItems: 'center',
     justifyContent: 'center',
   },

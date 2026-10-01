@@ -247,7 +247,7 @@ export default function Conversation() {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#0891b2" />
+        <ActivityIndicator size="large" color="#059669" />
       </View>
     );
   }
@@ -257,7 +257,7 @@ export default function Conversation() {
       {/* Header */}
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <ChevronRight size={26} color="#111827" />
+          <ChevronRight size={26} color="#059669" />
         </Pressable>
 
         <Pressable
@@ -669,7 +669,7 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
   },
   msgBubbleMine: {
-    backgroundColor: '#0891b2',
+    backgroundColor: '#059669',
     borderBottomLeftRadius: 4,
   },
   msgBubbleOther: {
@@ -711,7 +711,7 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: '#e0f2fe',
+    backgroundColor: '#ecfdf5',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
@@ -725,14 +725,14 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: '#e0f2fe',
+    backgroundColor: '#ecfdf5',
     alignItems: 'center',
     justifyContent: 'center',
   },
   emptyConvAvatarLetter: {
     fontSize: 26,
     fontWeight: '900',
-    color: '#0891b2',
+    color: '#059669',
   },
   emptyConvName: {
     fontSize: 18,
@@ -749,7 +749,7 @@ const styles = StyleSheet.create({
   },
   emptyConvHint: {
     fontSize: 12,
-    color: '#0891b2',
+    color: '#059669',
     fontWeight: '700',
   },
   inputArea: {
@@ -777,7 +777,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#0891b2',
+    backgroundColor: '#059669',
     alignItems: 'center',
     justifyContent: 'center',
   },

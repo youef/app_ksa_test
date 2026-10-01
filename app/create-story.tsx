@@ -35,14 +35,14 @@ import {
 const { width, height } = Dimensions.get('window');
 
 const BG_GRADIENTS = [
-  { id: 1, colors: ['#0891b2', '#0369a1'] as [string, string], name: 'سماء' },
+  { id: 1, colors: ['#065f46', '#059669'] as [string, string], name: 'أخضر ملكي' },
   { id: 2, colors: ['#7c3aed', '#4f46e5'] as [string, string], name: 'بنفسجي' },
   { id: 3, colors: ['#dc2626', '#ea580c'] as [string, string], name: 'غروب' },
-  { id: 4, colors: ['#059669', '#0891b2'] as [string, string], name: 'طبيعة' },
+  { id: 4, colors: ['#059669', '#10b981'] as [string, string], name: 'طبيعة' },
   { id: 5, colors: ['#d97706', '#dc2626'] as [string, string], name: 'ذهبي' },
   { id: 6, colors: ['#1e293b', '#334155'] as [string, string], name: 'ليلي' },
   { id: 7, colors: ['#be185d', '#7c3aed'] as [string, string], name: 'وردي' },
-  { id: 8, colors: ['#065f46', '#047857'] as [string, string], name: 'أخضر' },
+  { id: 8, colors: ['#064e3b', '#047857'] as [string, string], name: 'أخضر داكن' },
 ];
 
 export interface StorySlide {
@@ -323,7 +323,7 @@ export default function CreateStory() {
 
             {/* Slide Index Badge */}
             <View style={styles.slideCounterBadge}>
-              <Layers size={14} color="#0891b2" />
+              <Layers size={14} color="#10b981" />
               <Text style={styles.slideCounterText}>
                 شريحة {activeIdx + 1} من {slides.length}
               </Text>
@@ -372,7 +372,7 @@ export default function CreateStory() {
               /* No Image picked for this slide yet */
               <View style={styles.pickPromptCard}>
                 <View style={styles.promptIconCircle}>
-                  <UploadCloud size={32} color="#0891b2" />
+                  <UploadCloud size={32} color="#059669" />
                 </View>
                 <Text style={styles.promptTitle}>اختر صورة لهذه الشريحة</Text>
                 <Text style={styles.promptSub}>
@@ -385,7 +385,7 @@ export default function CreateStory() {
                 </Pressable>
 
                 <Pressable style={styles.cameraButton} onPress={takePhotoWithCamera}>
-                  <Camera size={18} color="#0891b2" />
+                  <Camera size={18} color="#059669" />
                   <Text style={styles.cameraButtonText}>التقاط بالكاميرا 📷</Text>
                 </Pressable>
               </View>
@@ -417,12 +417,12 @@ export default function CreateStory() {
           >
             {/* Add More Photos / Text Slide Action Buttons */}
             <Pressable style={styles.carouselAddBtn} onPress={pickImagesFromDevice}>
-              <ImageIcon size={18} color="#0891b2" />
+              <ImageIcon size={18} color="#10b981" />
               <Text style={styles.carouselAddText}>+ صور</Text>
             </Pressable>
 
             <Pressable style={styles.carouselAddBtn} onPress={addTextSlide}>
-              <Type size={18} color="#0891b2" />
+              <Type size={18} color="#10b981" />
               <Text style={styles.carouselAddText}>+ نص</Text>
             </Pressable>
 
@@ -671,7 +671,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   publishBtn: {
-    backgroundColor: '#0891b2',
+    backgroundColor: '#059669',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
@@ -744,7 +744,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#ecfeff',
+    backgroundColor: '#ecfdf5',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 10,
@@ -766,7 +766,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#0891b2',
+    backgroundColor: '#059669',
     width: '100%',
     paddingVertical: 12,
     borderRadius: 12,
@@ -782,15 +782,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#f0fdfa',
+    backgroundColor: '#ecfdf5',
     borderWidth: 1.5,
-    borderColor: '#99f6e4',
+    borderColor: '#a7f3d0',
     width: '100%',
     paddingVertical: 11,
     borderRadius: 12,
   },
   cameraButtonText: {
-    color: '#0891b2',
+    color: '#059669',
     fontSize: 13,
     fontWeight: '800',
   },
@@ -837,7 +837,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   carouselAddText: {
-    color: '#38bdf8',
+    color: '#10b981',
     fontSize: 11,
     fontWeight: '800',
   },
@@ -852,7 +852,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#1f2937',
   },
   thumbCardActive: {
-    borderColor: '#0891b2',
+    borderColor: '#059669',
     transform: [{ scale: 1.05 }],
   },
   thumbImage: {

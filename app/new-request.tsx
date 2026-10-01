@@ -97,7 +97,7 @@ export default function NewRequest() {
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <LinearGradient
-          colors={['#0891b2', '#0e7490', '#0f172a']}
+          colors={['#065f46', '#059669', '#10b981']}
           style={styles.hero}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
@@ -331,11 +331,11 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   submitBtn: {
-    backgroundColor: '#0891b2',
+    backgroundColor: '#059669',
     borderRadius: 16,
     paddingVertical: 15,
     alignItems: 'center',
-    shadowColor: '#0891b2',
+    shadowColor: '#059669',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 10,

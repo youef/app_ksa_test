@@ -164,7 +164,7 @@ export default function Request() {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#0891b2" />
+        <ActivityIndicator size="large" color="#059669" />
         <Text style={styles.loadingText}>جاري تحميل تفاصيل الطلب...</Text>
       </View>
     );
@@ -188,7 +188,7 @@ export default function Request() {
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* Header Hero */}
         <LinearGradient
-          colors={['#0891b2', '#0e7490', '#0f172a']}
+          colors={['#065f46', '#059669', '#10b981']}
           style={styles.hero}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
@@ -638,22 +638,22 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   offerFormCard: {
-    backgroundColor: '#ecfeff',
+    backgroundColor: '#ecfdf5',
     borderRadius: 20,
     padding: 18,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#a5f3fc',
+    borderColor: '#a7f3d0',
   },
   offerFormTitle: {
-    color: '#0e7490',
+    color: '#065f46',
     fontSize: 16,
     fontWeight: '900',
     textAlign: 'right',
     marginBottom: 4,
   },
   offerFormSub: {
-    color: '#0891b2',
+    color: '#059669',
     fontSize: 12,
     textAlign: 'right',
     marginBottom: 12,
@@ -675,7 +675,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#0891b2',
+    backgroundColor: '#059669',
     paddingVertical: 12,
     borderRadius: 14,
   },

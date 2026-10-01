@@ -11,6 +11,7 @@ import {
   Platform,
 } from 'react-native';
 import { router } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
 import {
@@ -221,16 +222,16 @@ export default function AskScreen() {
   return (
     <View style={styles.container}>
       {/* Top Header */}
-      <View style={styles.header}>
+      <LinearGradient colors={['#065f46', '#059669', '#10b981']} style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <ChevronRight size={26} color="#0f172a" />
+          <ChevronRight size={26} color="#fff" />
         </Pressable>
         <View style={{ alignItems: 'center' }}>
           <Text style={styles.headerTitle}>اسأل أهل حيك 🇸🇦</Text>
           <Text style={styles.headerSub}>مربوط بموقعك مع خوارزميات ذكاء اصطناعي فورية</Text>
         </View>
         <View style={{ width: 40 }} />
-      </View>
+      </LinearGradient>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Post Type Selector Tabs */}
@@ -522,28 +523,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingTop: 54,
-    paddingBottom: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    paddingTop: Platform.OS === 'ios' ? 52 : 38,
+    paddingBottom: 18,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
   },
   backBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: '900',
-    color: '#0f172a',
+    color: '#fff',
   },
   headerSub: {
     fontSize: 12,
-    color: '#64748b',
+    color: 'rgba(255, 255, 255, 0.85)',
     marginTop: 2,
   },
   scrollContent: {
@@ -893,14 +893,14 @@ const styles = StyleSheet.create({
   tagPillText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#0891b2',
+    color: '#059669',
   },
   tipBox: {
     backgroundColor: '#f8fafc',
     borderRadius: 10,
     padding: 10,
     borderRightWidth: 3,
-    borderRightColor: '#0891b2',
+    borderRightColor: '#059669',
   },
   tipText: {
     fontSize: 12,
@@ -946,12 +946,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#0891b2',
+    backgroundColor: '#059669',
     height: 54,
     borderRadius: 16,
     gap: 8,
     marginTop: 10,
-    shadowColor: '#0891b2',
+    shadowColor: '#059669',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 8,

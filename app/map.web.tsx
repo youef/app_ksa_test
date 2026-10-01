@@ -294,7 +294,7 @@ export default function WebMap() {
       {/* Header */}
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.iconBtn}>
-          <ChevronRight size={26} color={C.ink} />
+          <ChevronRight size={26} color="#059669" />
         </Pressable>
         <View style={{ alignItems: 'center' }}>
           <Text style={styles.title}>رادار دبابيس الحي الحية 🇸🇦</Text>
@@ -393,7 +393,7 @@ export default function WebMap() {
                 style={[styles.regionChip, isActive && styles.regionChipActive]}
                 onPress={() => handleSelectRegion(reg.id, reg.lat, reg.lng)}
               >
-                <MapPin size={13} color={isActive ? '#fff' : '#0891b2'} style={{ marginLeft: 3 }} />
+                <MapPin size={13} color={isActive ? '#fff' : '#059669'} style={{ marginLeft: 3 }} />
                 <Text style={[styles.regionChipText, isActive && styles.regionChipTextActive]}>
                   {reg.name}
                 </Text>
@@ -440,7 +440,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 11,
-    color: '#0891b2',
+    color: '#059669',
     fontWeight: '700',
     marginTop: 2,
   },
@@ -512,18 +512,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 14,
-    backgroundColor: '#ecfeff',
+    backgroundColor: '#ecfdf5',
     borderWidth: 1,
-    borderColor: '#a5f3fc',
+    borderColor: '#a7f3d0',
   },
   regionChipActive: {
-    backgroundColor: '#0891b2',
-    borderColor: '#0891b2',
+    backgroundColor: '#059669',
+    borderColor: '#059669',
   },
   regionChipText: {
     fontSize: 12,
     fontWeight: '800',
-    color: '#0891b2',
+    color: '#059669',
   },
   regionChipTextActive: {
     color: '#fff',
