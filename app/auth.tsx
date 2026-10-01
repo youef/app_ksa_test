@@ -2,16 +2,20 @@ import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, TextInput, View, KeyboardAvoidingView, Platform, ScrollView, Image } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
+import { getBrandingLogo, FALLBACK_LOGO_URI } from '@/lib/branding';
 import { C } from '@/lib/ui';
 import { Mail, Lock, User, ArrowRight } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 export default function Auth() {
+  const [logoUri, setLogoUri] = useState(FALLBACK_LOGO_URI);
   const [isLogin, setIsLogin] = useState(true);
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => { getBrandingLogo().then(setLogoUri); }, []);
 
   async function submit() {
     if (!email.trim()) {
@@ -88,7 +92,7 @@ export default function Auth() {
         >
           <View style={styles.heroContent}>
             <View style={styles.logoBox}>
-              <Image source={{ uri: '/assets/branding/HAYNA_LOGO.png?v=2' }} style={styles.logoImage} resizeMode="contain" />
+              <Image source={{ uri: 'logoUri' }} style={styles.logoImage} resizeMode="contain" />
             </View>
             <Text style={styles.title}>حيّنا</Text>
             <Text style={styles.subtitle}>الشبكة الاجتماعية لجيرانك ومجتمعك المحلي</Text>
