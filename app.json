@@ -10,14 +10,26 @@
     "plugins": [
       "expo-router",
       "@maplibre/maplibre-react-native",
-      ["expo-image-picker", {
-        "photosPermission": "يحتاج حيّنا الوصول إلى صورك لاختيار صورة الملف الشخصي.",
-        "cameraPermission": "يحتاج حيّنا الكاميرا لالتقاط صورة الملف الشخصي.",
-        "microphonePermission": false
-      }],
-      ["expo-notifications", {
-        "defaultChannel": "default"
-      }]
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "يحتاج حيّنا الوصول إلى صورك لاختيار صورة الملف الشخصي.",
+          "cameraPermission": "يحتاج حيّنا الكاميرا لالتقاط صورة الملف الشخصي.",
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "defaultChannel": "default"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "يحتاج حيّنا إلى موقعك لإظهار موقعك على الخريطة وتخصيص الحي."
+        }
+      ]
     ],
     "ios": {
       "supportsTablet": true,
