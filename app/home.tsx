@@ -106,6 +106,45 @@ export default function Home() {
     return unsub;
   }, []);
 
+  const refreshLiveLocation = useCallback(async () => {
+    try {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) return false;
+      const device = await getCurrentDeviceLocation();
+      if (!device) return false;
+      const place = await reverseGeocodeDeviceLocation(device);
+      const live = {
+        region: place?.region?.trim() || '',
+        city: place?.city?.trim() || '',
+        district: place?.district?.trim() || '',
+      };
+      if (!live.region || !live.city || !live.district) return false;
+
+      await savePermanentMyLocation(live, true);
+      setSelectedRegion(live.region);
+      setSelectedCity(live.city);
+      setSelectedDistrict(live.district);
+      setProfile((current: any) => ({ ...(current || {}), ...live }));
+      return true;
+    } catch (error) {
+      console.warn('live location refresh failed:', error);
+      return false;
+    }
+  }, []);
+
+  useEffect(() => {
+    // Keep the feed location current while the app remains open.
+    // This is foreground-only; no background tracking is enabled.
+    let active = true;
+    const timer = setInterval(() => {
+      if (active) void refreshLiveLocation();
+    }, 5 * 60 * 1000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [refreshLiveLocation]);
+
   const load = useCallback(async () => {
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) return router.replace('/auth');
@@ -125,14 +164,18 @@ export default function Home() {
         };
         if (live.region && live.city && live.district) {
           await savePermanentMyLocation(live, true);
-          const { data: refreshed } = await supabase
+          setSelectedRegion(live.region);
+          setSelectedCity(live.city);
+          setSelectedDistrict(live.district);
+          profileData = { ...(profileData || {}), ...live };
+          const { data: refreshed, error: locationSaveError } = await supabase
             .from('profiles')
             .update(live)
             .eq('id', u.user.id)
             .select('*')
             .maybeSingle();
+          if (locationSaveError) console.warn('profile location save failed:', locationSaveError.message);
           if (refreshed) profileData = refreshed;
-          else profileData = { ...(profileData || {}), ...live };
         }
       }
     } catch (locationError) {
