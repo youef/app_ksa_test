@@ -6,11 +6,13 @@ export default function Landing3D() {
   useEffect(() => {
     let frame = 0;
     let cleanup = () => {};
+
     import('three').then((THREE) => {
       if (!host.current) return;
+
       const scene = new THREE.Scene();
-      const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
-      camera.position.set(0, 1.2, 8.5);
+      const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 100);
+      camera.position.set(0, 0.25, 8.5);
 
       const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.7));
@@ -18,67 +20,116 @@ export default function Landing3D() {
       renderer.outputColorSpace = THREE.SRGBColorSpace;
       host.current.appendChild(renderer.domElement);
 
-      const group = new THREE.Group();
-      scene.add(group);
+      const emblem = new THREE.Group();
+      emblem.rotation.x = -0.1;
+      scene.add(emblem);
 
-      const glow = new THREE.Mesh(
-        new THREE.SphereGeometry(2.25, 32, 32),
-        new THREE.MeshBasicMaterial({ color: 0x16a085, transparent: true, opacity: 0.045 })
+      // Stylized, faceted silhouette inspired by the outline of Saudi Arabia.
+      const shape = new THREE.Shape();
+      shape.moveTo(-1.72, 0.7);
+      shape.lineTo(-1.22, 1.1);
+      shape.lineTo(-0.4, 1.28);
+      shape.lineTo(0.22, 1.1);
+      shape.lineTo(0.92, 0.76);
+      shape.lineTo(1.55, 0.34);
+      shape.lineTo(1.4, -0.08);
+      shape.lineTo(1.12, -0.3);
+      shape.lineTo(0.86, -0.82);
+      shape.lineTo(0.34, -1.08);
+      shape.lineTo(-0.08, -1.32);
+      shape.lineTo(-0.54, -1.1);
+      shape.lineTo(-0.98, -1.0);
+      shape.lineTo(-1.25, -0.58);
+      shape.lineTo(-1.58, -0.34);
+      shape.lineTo(-1.48, 0.04);
+      shape.lineTo(-1.78, 0.34);
+      shape.closePath();
+
+      const mapGeo = new THREE.ExtrudeGeometry(shape, {
+        depth: 0.24,
+        bevelEnabled: true,
+        bevelSegments: 3,
+        bevelSize: 0.055,
+        bevelThickness: 0.045,
+        curveSegments: 3,
+      });
+      mapGeo.center();
+
+      const mapMat = new THREE.MeshPhysicalMaterial({
+        color: 0x38d9b0,
+        roughness: 0.22,
+        metalness: 0.5,
+        clearcoat: 1,
+        clearcoatRoughness: 0.1,
+        transparent: true,
+        opacity: 0.9,
+      });
+
+      const map = new THREE.Mesh(mapGeo, mapMat);
+      map.scale.set(1.15, 1.15, 1.15);
+      emblem.add(map);
+
+      const nodes = [
+        [-0.92, 0.38, 0.18], [-0.25, 0.72, 0.2], [0.42, 0.42, 0.19],
+        [0.9, 0.1, 0.2], [0.56, -0.42, 0.19], [0.02, -0.72, 0.2],
+        [-0.58, -0.5, 0.19], [-1.08, -0.04, 0.18],
+      ];
+
+      const edges = [[0,1],[1,2],[2,3],[2,4],[4,5],[5,6],[6,7],[7,0],[1,6],[0,2],[2,5]];
+      const positions: number[] = [];
+      edges.forEach(([a,b]) => positions.push(...nodes[a], ...nodes[b]));
+
+      const lineGeo = new THREE.BufferGeometry();
+      lineGeo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      const lines = new THREE.LineSegments(
+        lineGeo,
+        new THREE.LineBasicMaterial({ color: 0xe5fff8, transparent: true, opacity: 0.72 })
       );
-      group.add(glow);
+      lines.position.z = 0.2;
+      lines.scale.set(1.15, 1.15, 1.15);
+      emblem.add(lines);
 
-      const ring = new THREE.Mesh(
-        new THREE.TorusGeometry(2.65, 0.012, 8, 128),
-        new THREE.MeshBasicMaterial({ color: 0x63e6be, transparent: true, opacity: 0.22 })
+      const nodeGeo = new THREE.SphereGeometry(0.075, 12, 12);
+      const nodeMat = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        emissive: 0x63e6be,
+        emissiveIntensity: 3,
+        roughness: 0.2,
+        metalness: 0.25,
+      });
+
+      nodes.forEach(([x, y, z]) => {
+        const node = new THREE.Mesh(nodeGeo, nodeMat);
+        node.position.set(x * 1.15, y * 1.15, z);
+        emblem.add(node);
+      });
+
+      const halo = new THREE.Mesh(
+        new THREE.TorusGeometry(2.05, 0.018, 8, 160),
+        new THREE.MeshBasicMaterial({ color: 0x63e6be, transparent: true, opacity: 0.26 })
       );
-      ring.rotation.x = Math.PI / 2.35;
-      group.add(ring);
+      halo.rotation.x = Math.PI / 2.15;
+      emblem.add(halo);
 
-      const points = new THREE.Group();
-      const houseMat = new THREE.MeshStandardMaterial({ color: 0x5eead4, roughness: 0.7, metalness: 0.1 });
-      const roofMat = new THREE.MeshStandardMaterial({ color: 0x1f8f78, roughness: 0.8 });
-      const roadMat = new THREE.MeshBasicMaterial({ color: 0x78a99f, transparent: true, opacity: 0.18 });
+      scene.add(new THREE.AmbientLight(0xd8fff5, 2.1));
+      const keyLight = new THREE.PointLight(0x63e6be, 18, 10);
+      keyLight.position.set(2.2, 2.8, 3.8);
+      scene.add(keyLight);
 
-      for (let i = 0; i < 28; i++) {
-        const a = (i / 28) * Math.PI * 2;
-        const r = 1.2 + (i % 4) * 0.36;
-        const x = Math.cos(a) * r;
-        const z = Math.sin(a) * r;
-        const h = 0.22 + (i % 5) * 0.07;
-
-        const base = new THREE.Mesh(new THREE.BoxGeometry(0.34, h, 0.28), houseMat);
-        base.position.set(x, h / 2 - 0.25, z);
-        points.add(base);
-
-        const roof = new THREE.Mesh(new THREE.ConeGeometry(0.27, 0.18, 4), roofMat);
-        roof.position.set(x, h + 0.02 - 0.25, z);
-        roof.rotation.y = Math.PI / 4;
-        points.add(roof);
+      const particleGeo = new THREE.BufferGeometry();
+      const count = 420;
+      const particlePositions = new Float32Array(count * 3);
+      for (let i = 0; i < count; i++) {
+        particlePositions[i * 3] = (Math.random() - 0.5) * 9;
+        particlePositions[i * 3 + 1] = (Math.random() - 0.5) * 5.8;
+        particlePositions[i * 3 + 2] = (Math.random() - 0.5) * 5 - 1;
       }
-      group.add(points);
-
-      for (let i = 0; i < 9; i++) {
-        const road = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.012, 5.6), roadMat);
-        road.rotation.y = (i / 9) * Math.PI;
-        group.add(road);
-      }
-
-      const starGeo = new THREE.BufferGeometry();
-      const starCount = 500;
-      const pos = new Float32Array(starCount * 3);
-      for (let i = 0; i < starCount; i++) {
-        pos[i * 3] = (Math.random() - 0.5) * 10;
-        pos[i * 3 + 1] = (Math.random() - 0.5) * 6;
-        pos[i * 3 + 2] = (Math.random() - 0.5) * 8 - 1;
-      }
-      starGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-      const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0x9fffe5, size: 0.018, transparent: true, opacity: 0.65 }));
-      scene.add(stars);
-
-      scene.add(new THREE.AmbientLight(0xbfffee, 2.2));
-      const light = new THREE.PointLight(0x63e6be, 15, 12);
-      light.position.set(2, 4, 4);
-      scene.add(light);
+      particleGeo.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
+      const particles = new THREE.Points(
+        particleGeo,
+        new THREE.PointsMaterial({ color: 0x9fffe5, size: 0.015, transparent: true, opacity: 0.48 })
+      );
+      scene.add(particles);
 
       const resize = () => {
         if (!host.current) return;
@@ -92,9 +143,10 @@ export default function Landing3D() {
 
       const animate = () => {
         frame = requestAnimationFrame(animate);
-        group.rotation.y += 0.0028;
-        group.rotation.x = Math.sin(Date.now() * 0.00035) * 0.035;
-        stars.rotation.y -= 0.00025;
+        emblem.rotation.y += 0.0024;
+        emblem.rotation.x = -0.1 + Math.sin(Date.now() * 0.00035) * 0.035;
+        halo.rotation.z += 0.003;
+        particles.rotation.y -= 0.00018;
         renderer.render(scene, camera);
       };
       animate();
@@ -102,6 +154,16 @@ export default function Landing3D() {
       cleanup = () => {
         cancelAnimationFrame(frame);
         window.removeEventListener('resize', resize);
+        mapGeo.dispose();
+        mapMat.dispose();
+        lineGeo.dispose();
+        (lines.material as THREE.Material).dispose();
+        nodeGeo.dispose();
+        nodeMat.dispose();
+        (halo.geometry as THREE.BufferGeometry).dispose();
+        (halo.material as THREE.Material).dispose();
+        particleGeo.dispose();
+        (particles.material as THREE.Material).dispose();
         renderer.dispose();
         renderer.domElement.remove();
       };
