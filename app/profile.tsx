@@ -104,32 +104,62 @@ export default function Profile() {
     }
   }, []);
 
+  const syncCurrentLocation = useCallback(async (showAlert = false) => {
+    const location = await getCurrentDeviceLocation();
+    if (!location) {
+      if (showAlert) Alert.alert('تعذّر تحديد الموقع', 'اسمح لحيّنا باستخدام موقعك أثناء الاستخدام ثم حاول مرة أخرى.');
+      return false;
+    }
+
+    const place = await reverseGeocodeDeviceLocation(location);
+    const nextRegion = place?.region?.trim() || '';
+    const nextCity = place?.city?.trim() || '';
+    const nextDistrict = place?.district?.trim() || '';
+
+    if (!nextRegion || !nextCity || !nextDistrict) {
+      if (showAlert) Alert.alert('الموقع غير مكتمل', 'تم تحديد موقعك، لكن لم نستطع استخراج المنطقة والمدينة والحي بدقة. حاول مرة أخرى.');
+      return false;
+    }
+
+    const next = { region: nextRegion, city: nextCity, district: nextDistrict };
+    setRegion(nextRegion);
+    setCity(nextCity);
+    setDistrict(nextDistrict);
+
+    await savePermanentMyLocation(next, true);
+
+    const { data: auth } = await supabase.auth.getUser();
+    if (auth.user) {
+      const { error } = await supabase.from('profiles').update(next).eq('id', auth.user.id);
+      if (error) throw error;
+    }
+
+    setP((current: any) => ({ ...(current || {}), ...next }));
+    if (showAlert) {
+      Alert.alert('تم تحديث موقعك الحالي', 'حيّنا الآن يتبع موقعك الحالي: ' + nextRegion + ' · ' + nextCity + ' · حي ' + nextDistrict);
+    }
+    return true;
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
-      loadProfile();
-    }, [loadProfile])
+      void loadProfile();
+      void syncCurrentLocation(false);
+    }, [loadProfile, syncCurrentLocation])
   );
 
   async function useCurrentLocation() {
+    if (locating) return;
     setLocating(true);
     try {
-      const location = await getCurrentDeviceLocation();
-      if (!location) { Alert.alert('تعذّر تحديد الموقع', 'اسمح لحيّنا باستخدام موقعك أثناء استخدام التطبيق ثم حاول مرة أخرى.'); return; }
-      const place = await reverseGeocodeDeviceLocation(location);
-      if (!place?.city) { Alert.alert('تعذّر قراءة العنوان', 'تم تحديد موقعك، لكن تعذّر تحويله إلى مدينة وحي. جرّب مرة أخرى.'); return; }
-      const nextRegion = place.region || 'المملكة';
-      const nextCity = place.city;
-      const nextDistrict = place.district || '';
-      setRegion(nextRegion); setCity(nextCity); setDistrict(nextDistrict);
-      if (nextDistrict) {
-        await savePermanentMyLocation({ region: nextRegion, city: nextCity, district: nextDistrict }, true);
-        Alert.alert('تم تحديث الموقع', 'تم ربط موقعك الحالي بالمدينة والحي في ملفك الشخصي.');
-      } else {
-        Alert.alert('الموقع غير مكتمل', 'تم تحديد المدينة، لكن يجب تحديد الحي أيضاً حتى يكتمل موقع حسابك.');
-      }
-    } catch (error: any) { Alert.alert('تعذّر تحديد الموقع', error?.message || 'حاول مرة أخرى.'); }
-    finally { setLocating(false); }
+      await syncCurrentLocation(true);
+    } catch (error: any) {
+      Alert.alert('تعذّر حفظ الموقع', error?.message || 'حاول مرة أخرى.');
+    } finally {
+      setLocating(false);
+    }
   }
+
   async function logout() {
     await supabase.auth.signOut();
     router.replace('/auth');
@@ -177,9 +207,9 @@ export default function Profile() {
     };
 
     try {
-      const result = await supabase.from('profiles').update(payload).eq('id', uid).select('id').maybeSingle();
+      const result = await supabase.from('profiles').update(payload).eq('id', uid).select('*').maybeSingle();
       if (result.error) throw result.error;
-      if (!result.data) throw new Error('لم يُحدّث أي سجل. سجّل الخروج ثم الدخول وحاول مرة أخرى.');
+      if (!result.data) throw new Error('لم يُحدّث أي سجل في قاعدة البيانات. أعد فتح الصفحة وحاول مرة أخرى.');
 
       setP((current: any) => ({ ...current, ...payload }));
       await savePermanentMyLocation({
