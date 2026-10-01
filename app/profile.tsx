@@ -144,8 +144,21 @@ export default function Profile() {
 
   useFocusEffect(
     useCallback(() => {
-      void loadProfile();
-      void syncCurrentLocation(false);
+      let cancelled = false;
+      const refreshProfileAndLocation = async () => {
+        // Load the profile first so the user's name/bio can never be overwritten
+        // by a concurrent location refresh.
+        await loadProfile();
+        if (!cancelled) {
+          try {
+            await syncCurrentLocation(false);
+          } catch (error) {
+            console.warn('profile location refresh failed:', error);
+          }
+        }
+      };
+      void refreshProfileAndLocation();
+      return () => { cancelled = true; };
     }, [loadProfile, syncCurrentLocation])
   );
 
@@ -282,6 +295,40 @@ export default function Profile() {
     setBio(generated);
   }
 
+  async function applyManualLocation(reg: string, c: string, d: string) {
+    const nextRegion = reg === 'كل المملكة' ? '' : reg.trim();
+    const nextCity = c === 'كل المدن' ? '' : c.trim();
+    const nextDistrict = (d === 'كل أحياء المدينة' || d === 'كل الأحياء') ? '' : d.trim();
+
+    if (!nextRegion || !nextCity || !nextDistrict) {
+      Alert.alert('الموقع مطلوب', 'يجب تحديد المنطقة والمدينة والحي حتى يبقى حسابك مرتبطاً بموقعك الحالي.');
+      return;
+    }
+
+    setRegion(nextRegion);
+    setCity(nextCity);
+    setDistrict(nextDistrict);
+    try {
+      await savePermanentMyLocation(
+        { region: nextRegion, city: nextCity, district: nextDistrict },
+        true
+      );
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) return;
+      const { data: updated, error } = await supabase
+        .from('profiles')
+        .update({ region: nextRegion, city: nextCity, district: nextDistrict })
+        .eq('id', auth.user.id)
+        .select('*')
+        .maybeSingle();
+      if (error) throw error;
+      if (!updated) throw new Error('لم يتم تحديث موقع الحساب.');
+      setP((current: any) => ({ ...(current || {}), ...updated }));
+    } catch (error: any) {
+      Alert.alert('تعذّر حفظ الموقع', error?.message || 'حاول مرة أخرى.');
+    }
+  }
+
 
   return (
     <View style={styles.container}>
@@ -292,11 +339,11 @@ export default function Profile() {
         <LinearGradient colors={["#064e3b", "#059669", "#10b981"]} start={{x:0,y:0}} end={{x:1,y:1}} style={styles.profileHero}>
           <View style={styles.profileTopBar}>
             <Pressable onPress={() => router.back()} style={styles.profileTopButton}>
-              <ChevronRight size={22} color="#0f172a" />
+              <ChevronRight size={22} color="#fff" />
             </Pressable>
             <Text style={styles.profileTopTitle}>الملف الشخصي</Text>
             <Pressable onPress={() => router.push('/settings')} style={styles.profileTopButton}>
-              <Settings size={21} color="#0f172a" />
+              <Settings size={21} color="#fff" />
             </Pressable>
           </View>
 
@@ -521,11 +568,7 @@ export default function Profile() {
         selectedCity={city}
         selectedDistrict={district}
         onSelect={(reg, c, d) => {
-          const newCity = c === 'كل المدن' ? '' : c;
-          const newDist = (d === 'كل أحياء المدينة' || d === 'كل الأحياء') ? '' : d;
-          setRegion(reg === 'كل المملكة' ? '' : reg);
-          setCity(newCity);
-          setDistrict(newDist);
+          void applyManualLocation(reg, c, d);
         }}
       />
 
@@ -564,7 +607,7 @@ const styles = StyleSheet.create({
   twitterStats: { flexDirection: 'row-reverse', gap: 20, marginTop: 14, backgroundColor: 'rgba(0,0,0,0.16)', borderRadius: 18, paddingVertical: 10, paddingHorizontal: 14 },
   twitterStat: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4 },
   twitterStatNum: { color: '#fff', fontSize: 14, fontWeight: '900' },
-  twitterStatLabel: { color: '#64748b', fontSize: 13 },
+  twitterStatLabel: { color: 'rgba(255,255,255,0.78)', fontSize: 13 },
   editProfileCard: { backgroundColor: '#fff', borderBottomWidth: 1, borderColor: '#e2e8f0', padding: 16, gap: 8 },
   editProfileHeading: { fontSize: 17, color: '#0f172a', fontWeight: '900', textAlign: 'right', marginBottom: 6 },
   profileInput: { borderWidth: 1, borderColor: '#cbd5e1', backgroundColor: '#fff', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, color: '#0f172a', textAlign: 'right', fontSize: 14 },
