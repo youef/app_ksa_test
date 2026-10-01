@@ -190,7 +190,7 @@ export default function Admin() {
       const response = await fetch(asset.uri);
       const blob = await response.blob();
       const path = 'global/logo.png';
-      const { error: uploadError } = await supabase.storage.from('branding').upload(path, blob, { contentType: 'image/png', upsert: true, cacheControl: '0' });
+      const { error: uploadError } = await supabase.storage.from('branding').upload(path, blob, { contentType: asset.mimeType || 'image/png', upsert: true, cacheControl: '0' });
       if (uploadError) throw uploadError;
       const { data: publicData } = supabase.storage.from('branding').getPublicUrl(path);
       const logoUrl = publicData.publicUrl;
