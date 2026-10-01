@@ -49,13 +49,29 @@ export default function Index() {
     };
     getBrandingLogo().then(applyBranding);
     const unsubscribeBranding = subscribeBrandingLogo(applyBranding);
+    let sessionActive = true;
+    const sessionFallback = setTimeout(() => {
+      if (sessionActive) {
+        setSignedIn(false);
+        setCheckingSession(false);
+      }
+    }, 4000);
+
     supabase.auth.getSession().then(({ data }) => {
+      if (!sessionActive) return;
+      clearTimeout(sessionFallback);
       if (data.session?.user) {
         setSignedIn(true);
         setTimeout(() => router.replace('/home'), 300);
       } else {
+        setSignedIn(false);
         setCheckingSession(false);
       }
+    }).catch(() => {
+      if (!sessionActive) return;
+      clearTimeout(sessionFallback);
+      setSignedIn(false);
+      setCheckingSession(false);
     });
 
     Animated.loop(
@@ -82,7 +98,11 @@ export default function Index() {
         Animated.timing(rotate, { toValue: 0, duration: 9000, easing: Easing.linear, useNativeDriver: true }),
       ])
     ).start();
-    return unsubscribeBranding;
+    return () => {
+      sessionActive = false;
+      clearTimeout(sessionFallback);
+      unsubscribeBranding();
+    };
   }, [floatY, pulse, shine, rotate]);
 
   if (signedIn || checkingSession) {
