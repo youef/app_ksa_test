@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Platform, ActivityIndicator, Image } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Home, ArrowLeft } from 'lucide-react-native';
+import { ArrowLeft } from 'lucide-react-native';
 import Landing3D from '@/components/Landing3D';
+
+const LOGO_URI = '/assets/branding/HAYNA_LOGO.png';
 
 export default function Index() {
   const [checkingSession, setCheckingSession] = useState(true);
@@ -25,7 +27,9 @@ export default function Index() {
     return (
       <View style={styles.loading}>
         <LinearGradient colors={['#04110f', '#07352d', '#020908']} style={StyleSheet.absoluteFillObject} />
-        <View style={styles.loadingLogo}><Home size={30} color="#d7fff3" /></View>
+        <View style={styles.loadingLogo}>
+          <Image source={{ uri: LOGO_URI }} style={styles.loadingLogoImage} resizeMode="contain" />
+        </View>
         {signedIn ? null : <ActivityIndicator color="#63e6be" />}
       </View>
     );
@@ -45,11 +49,14 @@ export default function Index() {
         <Landing3D />
       </View>
 
-      <View style={styles.identity} pointerEvents="box-none">
-        <View style={styles.logo}>
-          <Home size={34} color="#eafff8" strokeWidth={2.2} />
+      <View style={styles.identity} pointerEvents="none">
+        <View style={styles.logoHalo}>
+          <View style={styles.logo}>
+            <Image source={{ uri: LOGO_URI }} style={styles.logoImage} resizeMode="contain" />
+          </View>
         </View>
         <Text style={styles.brand}>حيّنا</Text>
+        <Text style={styles.tagline}>بيوت تجمعنا • مجتمع ينتمي لنا</Text>
       </View>
 
       <View style={styles.actionWrap}>
@@ -78,31 +85,54 @@ const styles = StyleSheet.create({
   },
   identity: {
     position: 'absolute',
-    top: 34,
+    top: 28,
     left: 0,
     right: 0,
     alignItems: 'center',
     zIndex: 5,
   },
-  logo: {
-    width: 62,
-    height: 62,
-    borderRadius: 20,
+  logoHalo: {
+    width: 142,
+    height: 142,
+    borderRadius: 71,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(52,211,153,.12)',
+    backgroundColor: 'rgba(52,211,153,.07)',
     borderWidth: 1,
-    borderColor: 'rgba(120,255,218,.25)',
+    borderColor: 'rgba(215,181,109,.28)',
     shadowColor: '#34d399',
-    shadowOpacity: 0.25,
-    shadowRadius: 24,
+    shadowOpacity: 0.32,
+    shadowRadius: 34,
+  },
+  logo: {
+    width: 126,
+    height: 126,
+    borderRadius: 63,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(2,14,11,.42)',
+    borderWidth: 1,
+    borderColor: 'rgba(120,255,218,.18)',
+    overflow: 'hidden',
+  },
+  logoImage: {
+    width: 112,
+    height: 112,
   },
   brand: {
     color: '#effff9',
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: '900',
-    marginTop: 9,
+    marginTop: 10,
     letterSpacing: 0.5,
+    textShadowColor: 'rgba(52,211,153,.45)',
+    textShadowRadius: 14,
+  },
+  tagline: {
+    color: 'rgba(225,255,246,.72)',
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 4,
   },
   actionWrap: {
     position: 'absolute',
@@ -159,12 +189,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   loadingLogo: {
-    width: 62,
-    height: 62,
-    borderRadius: 20,
+    width: 94,
+    height: 94,
+    borderRadius: 47,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(52,211,153,.13)',
+    backgroundColor: 'rgba(52,211,153,.10)',
+    borderWidth: 1,
+    borderColor: 'rgba(215,181,109,.25)',
     marginBottom: 14,
+    overflow: 'hidden',
+  },
+  loadingLogoImage: {
+    width: 82,
+    height: 82,
   },
 });
