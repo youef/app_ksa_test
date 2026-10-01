@@ -92,9 +92,8 @@ export default function Auth() {
         >
           <View style={styles.heroContent}>
             <View style={styles.logoBox}>
-              <Image source={{ uri: 'logoUri' }} style={styles.logoImage} resizeMode="contain" />
+              <Image source={{ uri: logoUri }} style={styles.logoImage} resizeMode="contain" />
             </View>
-            <Text style={styles.title}>حيّنا</Text>
             <Text style={styles.subtitle}>الشبكة الاجتماعية لجيرانك ومجتمعك المحلي</Text>
           </View>
           <View style={styles.curveBottom} />
@@ -225,12 +224,6 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: '900',
     color: '#fff',
-  },
-  title: {
-    fontSize: 42,
-    fontWeight: '900',
-    color: '#ffffff',
-    marginBottom: 8,
   },
   subtitle: {
     fontSize: 15,
