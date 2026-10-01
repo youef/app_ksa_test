@@ -7,6 +7,7 @@ import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { C, S } from '@/lib/ui';
 import { isInsideSaudiArabia } from '@/lib/saudiLocations';
+import { getCurrentDeviceLocation, type DeviceLocation } from '@/lib/deviceLocation';
 
 const STYLE_URL = 'https://demotiles.maplibre.org/style.json';
 const DEFAULT_CENTER = [46.6753, 24.7136];
@@ -17,6 +18,15 @@ export default function MapScreen() {
   const [onlyOpen, setOnlyOpen] = useState(false);
   const [onlyVerified, setOnlyVerified] = useState(false);
   const [selected, setSelected] = useState<any | null>(null);
+  const [myLocation, setMyLocation] = useState<DeviceLocation | null>(null);
+  const [locating, setLocating] = useState(false);
+
+  const locateMe = async () => {
+    setLocating(true);
+    const location = await getCurrentDeviceLocation();
+    if (location) setMyLocation(location);
+    setLocating(false);
+  };
 
   useEffect(() => {
     (async () => {
@@ -51,6 +61,9 @@ export default function MapScreen() {
         <Text style={onlyVerified ? styles.filterTextActive : styles.filterText}>موثّق</Text>
       </Pressable>
       <Text style={styles.count}>{filteredPlaces.length} مكان</Text>
+      <Pressable style={[styles.locationButton, locating && styles.locationButtonBusy]} onPress={locateMe} disabled={locating}>
+        <Text style={styles.locationButtonText}>{locating ? 'جارٍ تحديد موقعي…' : 'موقعي'}</Text>
+      </Pressable>
     </View>
   );
 
@@ -97,7 +110,12 @@ export default function MapScreen() {
   return (
     <View style={styles.root}>
       <Map style={styles.map} mapStyle={STYLE_URL}>
-        <Camera defaultSettings={{ centerCoordinate: DEFAULT_CENTER, zoomLevel: 5 }} />
+        <Camera key={myLocation ? `${myLocation.latitude}:${myLocation.longitude}` : 'default'} defaultSettings={{ centerCoordinate: myLocation ? [myLocation.longitude, myLocation.latitude] : DEFAULT_CENTER, zoomLevel: myLocation ? 13 : 5 }} />
+        {myLocation ? (
+          <PointAnnotation id="my-location" coordinate={[myLocation.longitude, myLocation.latitude]} title="موقعي الحالي">
+            <View style={styles.myLocationDot}><View style={styles.myLocationInner} /></View>
+          </PointAnnotation>
+        ) : null}
         {filteredPlaces.map((p: any) => (
           <PointAnnotation key={p.id} id={p.id} coordinate={[Number(p.longitude), Number(p.latitude)]}
             title={p.name} onSelected={() => setSelected(p)} />
@@ -155,5 +173,9 @@ const styles = StyleSheet.create({
   secondaryActionText:{color:C.ink,fontWeight:'800'},
   empty:{textAlign:'center',color:C.muted,paddingVertical:30},
   close:{position:'absolute',bottom:25,right:18,backgroundColor:C.accent,borderRadius:14,paddingHorizontal:18,paddingVertical:12},
-  closeText:{color:'#fff',fontWeight:'800'}
+  closeText:{color:'#fff',fontWeight:'800'},
+  locationButton:{borderRadius:10,paddingHorizontal:10,paddingVertical:7,backgroundColor:'#eef6ff',borderWidth:1,borderColor:'#bfdbfe'},
+  locationButtonBusy:{opacity:0.65}, locationButtonText:{color:'#1769aa',fontSize:12,fontWeight:'800'},
+  myLocationDot:{width:24,height:24,borderRadius:12,backgroundColor:'rgba(37,99,235,0.22)',alignItems:'center',justifyContent:'center',borderWidth:2,borderColor:'#fff'},
+  myLocationInner:{width:10,height:10,borderRadius:5,backgroundColor:'#2563eb'}
 });
