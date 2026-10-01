@@ -1,5 +1,5 @@
 import { useCallback, useState, useEffect, useRef } from 'react'
-import { Pressable, RefreshControl, ScrollView, Text, View, Image, StyleSheet, Dimensions, Platform, Animated, TextInput, Alert } from 'react-native'
+import { Pressable, RefreshControl, ScrollView, Text, View, Image, StyleSheet, Dimensions, Platform, Animated, TextInput, Alert, Modal, ActivityIndicator } from 'react-native'
 import { router, useFocusEffect } from 'expo-router'
 import { supabase } from '@/lib/supabase'
 import { getBrandingLogo } from '@/lib/branding'
@@ -11,6 +11,8 @@ import { useDynamicIsland } from '@/context/DynamicIslandContext'
 import { getActiveLocation, setActiveLocation, savePermanentMyLocation, subscribeLocation, isExactDistrictMatching, isAllKingdom } from '@/lib/locationSync'
 import TwitterInquiryCard from '@/components/TwitterInquiryCard'
 import { CurrentWeather, describeWeatherCode, loadCurrentWeather } from '@/lib/weather'
+import { getCurrentDeviceLocation, reverseGeocodeDeviceLocation } from '@/lib/deviceLocation'
+import { registerPushToken } from '@/lib/notifications'
 
 const { width } = Dimensions.get('window');
 
@@ -36,6 +38,9 @@ export default function Home() {
   const [currentWeather, setCurrentWeather] = useState<CurrentWeather | null>(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
+  const [locationSetupOpen, setLocationSetupOpen] = useState(false);
+  const [locationSetupBusy, setLocationSetupBusy] = useState(false);
+  const [locationSetupMessage, setLocationSetupMessage] = useState('');
 
 
   // Unread badge count
@@ -106,6 +111,17 @@ export default function Home() {
     // Fetch profile
     const { data: profileData } = await supabase.from('profiles').select('*').eq('id', u.user.id).maybeSingle();
     setProfile(profileData);
+
+    // Every signed-in user must have a complete region/city/district before entering the app.
+    // The same gate also requests notifications immediately after location is saved.
+    const locationComplete = !!(profileData?.region && profileData?.city && profileData?.district);
+    if (!locationComplete) {
+      setLocationSetupOpen(true);
+      setLocationSetupMessage('حدد موقعك تلقائياً لنربط حسابك بالمنطقة والمدينة والحي.');
+    } else {
+      setLocationSetupOpen(false);
+    }
+
 
     // If user has a city in profile and selectedCity is still default, auto-populate globally
     if (profileData?.city) {
@@ -307,10 +323,108 @@ export default function Home() {
     q => q.is_tool_sharing || q.item_type === 'tool_sharing' || (q.title && (q.title.includes('إعارة') || q.title.includes('دريل') || q.title.includes('سلم')))
   );
 
+  async function setupRequiredLocation() {
+    if (locationSetupBusy) return;
+    setLocationSetupBusy(true);
+    setLocationSetupMessage('جارٍ تحديد موقعك وقراءة المنطقة والمدينة والحي…');
+    try {
+      const device = await getCurrentDeviceLocation();
+      if (!device) {
+        setLocationSetupMessage('لم نتمكن من الوصول إلى موقعك. فعّل إذن الموقع ثم اضغط المحاولة مرة أخرى.');
+        return;
+      }
+      const place = await reverseGeocodeDeviceLocation(device);
+      if (!place?.region || !place?.city || !place?.district) {
+        setLocationSetupMessage('تم تحديد موقعك، لكن لم نستطع استخراج المنطقة والمدينة والحي بدقة. حاول مرة أخرى.');
+        return;
+      }
+
+      await savePermanentMyLocation({
+        region: place.region,
+        city: place.city,
+        district: place.district,
+      }, true);
+
+      setSelectedRegion(place.region);
+      setSelectedCity(place.city);
+      setSelectedDistrict(place.district);
+      setProfile((current: any) => ({ ...(current || {}), region: place.region, city: place.city, district: place.district }));
+      setLocationSetupMessage('تم حفظ موقعك. نطلب الآن تفعيل الإشعارات حتى لا تفوتك تنبيهات الحي…');
+
+      const pushToken = await registerPushToken();
+      if (!pushToken) {
+        setLocationSetupMessage('الموقع محفوظ، لكن الإشعارات لم تُفعّل. فعّل الإشعارات ثم اضغط «تفعيل الإشعارات» للمتابعة.');
+        return;
+      }
+
+      setLocationSetupOpen(false);
+      showToast('تم ربط حسابك بموقعك وتفعيل الإشعارات ✓');
+    } catch (error: any) {
+      setLocationSetupMessage(error?.message || 'تعذر إكمال الإعداد. حاول مرة أخرى.');
+    } finally {
+      setLocationSetupBusy(false);
+    }
+  }
+
+  async function enableRequiredNotifications() {
+    if (locationSetupBusy) return;
+    setLocationSetupBusy(true);
+    setLocationSetupMessage('جارٍ طلب إذن الإشعارات…');
+    try {
+      const token = await registerPushToken();
+      if (!token) {
+        setLocationSetupMessage('لم يتم منح إذن الإشعارات. فعّل الإشعارات من إعدادات الجهاز/المتصفح ثم أعد المحاولة.');
+        return;
+      }
+      setLocationSetupOpen(false);
+      showToast('تم تفعيل إشعارات حيّك ✓');
+    } finally {
+      setLocationSetupBusy(false);
+    }
+  }
+
   return (
     <View style={styles.container}>
 
-      {/* Twitter-style new posts indicator */}
+      {/* Mandatory first-login setup: location + notifications */}
+      <Modal visible={locationSetupOpen} transparent animationType="fade" onRequestClose={() => {}}>
+        <View style={styles.locationGateOverlay}>
+          <View style={styles.locationGateCard}>
+            <View style={styles.locationGateIcon}><MapPin size={28} color="#059669" /></View>
+            <Text style={styles.locationGateTitle}>نحتاج موقعك قبل البدء</Text>
+            <Text style={styles.locationGateText}>
+              حدّد موقعك تلقائياً لربط حسابك بالمنطقة والمدينة والحي، ثم فعّل الإشعارات لتصلك أخبار وتنبيهات حيّك فوراً.
+            </Text>
+
+            <View style={styles.locationGateStatus}>
+              <View style={styles.locationGateStatusRow}>
+                <MapPin size={17} color="#059669" />
+                <Text style={styles.locationGateStatusText}>
+                  {selectedCity !== 'كل المدن' && selectedDistrict !== 'كل الأحياء'
+                    ? `الموقع: ${selectedRegion} · ${selectedCity} · حي ${selectedDistrict}`
+                    : 'الموقع غير مكتمل'}
+                </Text>
+              </View>
+            </View>
+
+            {!!locationSetupMessage && <Text style={styles.locationGateMessage}>{locationSetupMessage}</Text>}
+
+            {selectedCity !== 'كل المدن' && selectedDistrict !== 'كل الأحياء' ? (
+              <Pressable style={styles.locationGatePrimary} onPress={enableRequiredNotifications} disabled={locationSetupBusy}>
+                {locationSetupBusy ? <ActivityIndicator color="#fff" /> : <Text style={styles.locationGatePrimaryText}>تفعيل الإشعارات والمتابعة</Text>}
+              </Pressable>
+            ) : (
+              <Pressable style={styles.locationGatePrimary} onPress={setupRequiredLocation} disabled={locationSetupBusy}>
+                {locationSetupBusy ? <ActivityIndicator color="#fff" /> : <Text style={styles.locationGatePrimaryText}>تحديد موقعي تلقائياً</Text>}
+              </Pressable>
+            )}
+
+            <Text style={styles.locationGateRequired}>هذا الإعداد مطلوب لإكمال استخدام حيّنا.</Text>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Twitter-style new posts indicator */
       {newPostsCount > 0 && !refreshing && (
         <Pressable
           style={styles.newPostsBanner}
@@ -1568,6 +1682,98 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '900',
   },
+  locationGateOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(2, 6, 23, 0.62)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 22,
+  },
+  locationGateCard: {
+    width: '100%',
+    maxWidth: 430,
+    backgroundColor: '#fff',
+    borderRadius: 28,
+    padding: 24,
+    alignItems: 'stretch',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.2,
+    shadowRadius: 28,
+    elevation: 12,
+  },
+  locationGateIcon: {
+    alignSelf: 'center',
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    backgroundColor: '#ecfdf5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
+  locationGateTitle: {
+    color: '#0f172a',
+    fontSize: 22,
+    fontWeight: '900',
+    textAlign: 'center',
+    marginBottom: 9,
+  },
+  locationGateText: {
+    color: '#475569',
+    fontSize: 14,
+    lineHeight: 22,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  locationGateStatus: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 16,
+    padding: 13,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    marginBottom: 12,
+  },
+  locationGateStatusRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+  },
+  locationGateStatusText: {
+    flex: 1,
+    color: '#334155',
+    fontSize: 12,
+    fontWeight: '800',
+    textAlign: 'right',
+  },
+  locationGateMessage: {
+    color: '#64748b',
+    fontSize: 12,
+    lineHeight: 18,
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  locationGatePrimary: {
+    minHeight: 52,
+    borderRadius: 16,
+    backgroundColor: '#059669',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  locationGatePrimaryText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  locationGateRequired: {
+    color: '#94a3b8',
+    fontSize: 11,
+    textAlign: 'center',
+    marginTop: 11,
+  },
+
   bottomNavWrapper: {
     position: 'absolute',
     bottom: 0,
