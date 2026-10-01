@@ -21,6 +21,17 @@ export async function getBrandingLogo(): Promise<string> {
 }
 
 export function subscribeBrandingLogo(onChange: (logoUrl: string) => void) {
+  let lastUrl = '';
+  const refresh = async () => {
+    const next = await getBrandingLogo();
+    if (next !== lastUrl) {
+      lastUrl = next;
+      onChange(next);
+    }
+  };
+  void refresh();
+  const poll = setInterval(refresh, 8000);
+
   const channel = supabase
     .channel('global-branding-live')
     .on(
@@ -34,6 +45,7 @@ export function subscribeBrandingLogo(onChange: (logoUrl: string) => void) {
     .subscribe();
 
   return () => {
+    clearInterval(poll);
     void supabase.removeChannel(channel);
   };
 }
