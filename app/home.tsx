@@ -99,6 +99,9 @@ export default function Home() {
   // Unread badge count
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
 
+  // AI Pulse card expansion
+  const [pulseExpanded, setPulseExpanded] = useState(false);
+
   // Toast feedback state
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastAnim = useRef(new Animated.Value(0)).current;
