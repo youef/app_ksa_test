@@ -15,7 +15,7 @@ import { CurrentWeather, describeWeatherCode, loadCurrentWeather } from '@/lib/w
 const { width } = Dimensions.get('window');
 
 export default function Home() {
-  const [logoUri, setLogoUri] = useState('logoUri');
+  const [logoUri, setLogoUri] = useState('/assets/branding/HAYNA_LOGO.png?v=2');
   const { showIsland } = useDynamicIsland();
   const [profile, setProfile] = useState<any>(null);
   useEffect(() => { getBrandingLogo().then(setLogoUri); }, []);
