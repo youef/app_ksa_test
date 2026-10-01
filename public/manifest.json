@@ -10,7 +10,7 @@
   "lang": "ar",
   "icons": [
     {
-      "src": "https://vkeuyompnddqfvulalkk.supabase.co/storage/v1/object/public/branding/global/logo.png",
+      "src": "/assets/branding/HAYNA_LOGO.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
