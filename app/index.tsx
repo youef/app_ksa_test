@@ -2,20 +2,23 @@ import { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Platform, ActivityIndicator, Image, Animated, Easing } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
+import { getBrandingLogo, FALLBACK_logoUri } from '@/lib/branding';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft } from 'lucide-react-native';
 
-const LOGO_URI = '/assets/branding/HAYNA_LOGO.png?v=2';
+const logoUri = FALLBACK_logoUri;
 
 export default function Index() {
   const [checkingSession, setCheckingSession] = useState(true);
   const [signedIn, setSignedIn] = useState(false);
+  const [logoUri, setLogoUri] = useState(logoUri);
   const floatY = useRef(new Animated.Value(0)).current;
   const pulse = useRef(new Animated.Value(0.96)).current;
   const shine = useRef(new Animated.Value(-1)).current;
   const rotate = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    getBrandingLogo().then(setLogoUri);
     supabase.auth.getSession().then(({ data }) => {
       if (data.session?.user) {
         setSignedIn(true);
@@ -56,7 +59,7 @@ export default function Index() {
       <View style={styles.loading}>
         <LinearGradient colors={['#065f46', '#059669', '#10b981']} style={StyleSheet.absoluteFillObject} />
         <View style={styles.loadingGlass}>
-          <Image source={{ uri: LOGO_URI }} style={styles.loadingLogoImage} resizeMode="contain" />
+          <Image source={{ uri: logoUri }} style={styles.loadingLogoImage} resizeMode="contain" />
         </View>
         {signedIn ? null : <ActivityIndicator color="#ffffff" />}
       </View>
@@ -86,7 +89,7 @@ export default function Index() {
         <Animated.View style={[styles.logoStage, { transform: [{ translateY: floatY }, { scale: pulse }, { rotate: spin }] }]}>
           <View style={styles.outerGlass}>
             <View style={styles.innerGlass}>
-              <Image source={{ uri: LOGO_URI }} style={styles.logoImage} resizeMode="contain" />
+              <Image source={{ uri: logoUri }} style={styles.logoImage} resizeMode="contain" />
               <Animated.View style={[styles.shine, { transform: [{ translateX: shineX }, { rotate: '22deg' }] }]} />
             </View>
           </View>
