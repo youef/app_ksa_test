@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, Image, Pressable, RefreshControl, Dimensions, Animated } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import GlassHeader from '@/components/GlassHeader';
+import BottomNav from '@/components/BottomNav';
 import { ShoppingBag, Star, MapPin, Tag, Utensils, Scissors, Wrench, ShieldCheck, Plus } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 
@@ -41,7 +42,10 @@ export default function Market() {
   };
 
   const renderItem = ({ item }: { item: any }) => (
-    <Pressable style={styles.card} onPress={() => {}}>
+    <Pressable
+      style={styles.card}
+      onPress={() => router.push({ pathname: '/service', params: { id: item.id } })}
+    >
       <View style={styles.cardImagePlaceholder}>
         <ShoppingBag size={40} color="#cbd5e1" />
       </View>
@@ -83,7 +87,7 @@ export default function Market() {
       <GlassHeader 
         title="سوق الحي المصغر" 
         rightComponent={
-          <Pressable onPress={() => {}} style={styles.addButton}>
+          <Pressable onPress={() => router.push('/new-service')} style={styles.addButton}>
             <Plus size={20} color="#fff" />
           </Pressable>
         }
@@ -129,6 +133,11 @@ export default function Market() {
           )}
         </View>
       </Animated.ScrollView>
+
+      {/* Bottom Navigation */}
+      <View style={styles.bottomNavWrapper}>
+        <BottomNav />
+      </View>
     </View>
   );
 }
@@ -144,7 +153,13 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingTop: 100, // accommodate GlassHeader
     paddingHorizontal: 16,
-    paddingBottom: 40,
+    paddingBottom: 110,
+  },
+  bottomNavWrapper: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
   },
   addButton: {
     backgroundColor: '#059669',

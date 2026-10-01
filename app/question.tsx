@@ -141,7 +141,7 @@ export default function Question() {
               <View key={a.id} style={styles.answerCard}>
                 <View style={styles.answerHeader}>
                   <View style={styles.answerAvatar}>
-                    <User size={20} color="#0891b2" />
+                    <User size={20} color="#059669" />
                   </View>
                   <View style={styles.answerMeta}>
                     <Pressable onPress={() => router.push({ pathname: '/user', params: { id: a.author_id } })}>
@@ -383,7 +383,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 16,
-    backgroundColor: '#cffafe',
+    backgroundColor: '#ecfdf5',
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 16,
