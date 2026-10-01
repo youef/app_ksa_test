@@ -355,12 +355,12 @@ export default function Home() {
       setLocationSetupMessage('تم حفظ موقعك. نطلب الآن تفعيل الإشعارات حتى لا تفوتك تنبيهات الحي…');
 
       const pushToken = await registerPushToken();
+      setLocationSetupOpen(false);
       if (!pushToken) {
-        setLocationSetupMessage('الموقع محفوظ، لكن الإشعارات لم تُفعّل. فعّل الإشعارات ثم اضغط «تفعيل الإشعارات» للمتابعة.');
+        showToast('تم حفظ موقعك. يمكنك تفعيل الإشعارات لاحقاً من الإعدادات.');
         return;
       }
 
-      setLocationSetupOpen(false);
       showToast('تم ربط حسابك بموقعك وتفعيل الإشعارات ✓');
     } catch (error: any) {
       setLocationSetupMessage(error?.message || 'تعذر إكمال الإعداد. حاول مرة أخرى.');
@@ -375,11 +375,11 @@ export default function Home() {
     setLocationSetupMessage('جارٍ طلب إذن الإشعارات…');
     try {
       const token = await registerPushToken();
+      setLocationSetupOpen(false);
       if (!token) {
-        setLocationSetupMessage('لم يتم منح إذن الإشعارات. فعّل الإشعارات من إعدادات الجهاز/المتصفح ثم أعد المحاولة.');
+        showToast('تم الدخول. الإشعارات غير مفعلة ويمكن تفعيلها لاحقاً من الإعدادات.');
         return;
       }
-      setLocationSetupOpen(false);
       showToast('تم تفعيل إشعارات حيّك ✓');
     } finally {
       setLocationSetupBusy(false);
@@ -422,7 +422,7 @@ export default function Home() {
               </Pressable>
             )}
 
-            <Text style={styles.locationGateRequired}>هذا الإعداد مطلوب لإكمال استخدام حيّنا.</Text>
+            <Text style={styles.locationGateRequired}>تحديد الموقع مطلوب. الإشعارات يمكن تفعيلها الآن أو لاحقاً من الإعدادات.</Text>
           </View>
         </View>
       </Modal>
