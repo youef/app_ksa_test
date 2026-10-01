@@ -35,6 +35,7 @@ import BottomNav from '@/components/BottomNav';
 import ActionSheet from '@/components/ActionSheet';
 import LocationSelectorModal from '@/components/LocationSelectorModal';
 import { generateSmartBioAI } from '@/lib/aiAssistant';
+import { LinearGradient } from 'expo-linear-gradient';
 
 export default function Profile() {
   const [p, setP] = useState<any>({});
@@ -288,7 +289,7 @@ export default function Profile() {
         {/* ======================================================== */}
         {/* 1. PROFILE HERO HEADER & AVATAR                          */}
         {/* ======================================================== */}
-        <View style={styles.profileHero}>
+        <LinearGradient colors={["#064e3b", "#059669", "#10b981"]} start={{x:0,y:0}} end={{x:1,y:1}} style={styles.profileHero}>
           <View style={styles.profileTopBar}>
             <Pressable onPress={() => router.back()} style={styles.profileTopButton}>
               <ChevronRight size={22} color="#0f172a" />
@@ -538,7 +539,7 @@ export default function Profile() {
 
 const styles = StyleSheet.create({
   profileHero: {
-    backgroundColor: '#fff',
+    backgroundColor: '#059669',
     paddingTop: Platform.OS === 'ios' ? 52 : 28,
     paddingHorizontal: 18,
     paddingBottom: 16,
@@ -546,8 +547,8 @@ const styles = StyleSheet.create({
     borderBottomColor: '#e2e8f0',
   },
   profileTopBar: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', height: 42, marginBottom: 8 },
-  profileTopButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f1f5f9' },
-  profileTopTitle: { color: '#0f172a', fontSize: 18, fontWeight: '900' },
+  profileTopButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.16)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)' },
+  profileTopTitle: { color: '#fff', fontSize: 18, fontWeight: '900' },
   profileSummary: { flexDirection: 'row-reverse', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: 8, marginBottom: 12 },
   twitterAvatarWrap: { width: 84, height: 84, borderRadius: 42, position: 'relative' },
   twitterAvatar: { width: 84, height: 84, borderRadius: 42, backgroundColor: '#e2e8f0' },
@@ -555,14 +556,14 @@ const styles = StyleSheet.create({
   twitterAvatarEdit: { position: 'absolute', bottom: 0, left: 0, width: 28, height: 28, borderRadius: 14, backgroundColor: '#059669', borderWidth: 2, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   editProfileButton: { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 22, paddingVertical: 8, paddingHorizontal: 15, marginBottom: 4 },
   editProfileButtonText: { color: '#0f172a', fontSize: 13, fontWeight: '800' },
-  twitterDisplayName: { color: '#0f172a', fontSize: 21, fontWeight: '900', textAlign: 'right' },
-  twitterHandle: { color: '#64748b', fontSize: 14, textAlign: 'right', marginTop: 2 },
-  twitterBio: { color: '#1e293b', fontSize: 14, lineHeight: 22, textAlign: 'right', marginTop: 12 },
+  twitterDisplayName: { color: '#fff', fontSize: 21, fontWeight: '900', textAlign: 'right' },
+  twitterHandle: { color: 'rgba(255,255,255,0.72)', fontSize: 14, textAlign: 'right', marginTop: 2 },
+  twitterBio: { color: 'rgba(255,255,255,0.92)', fontSize: 14, lineHeight: 22, textAlign: 'right', marginTop: 12 },
   twitterLocation: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, marginTop: 9 },
-  twitterLocationText: { color: '#64748b', fontSize: 13 },
-  twitterStats: { flexDirection: 'row-reverse', gap: 20, marginTop: 14 },
+  twitterLocationText: { color: 'rgba(255,255,255,0.82)', fontSize: 13 },
+  twitterStats: { flexDirection: 'row-reverse', gap: 20, marginTop: 14, backgroundColor: 'rgba(0,0,0,0.16)', borderRadius: 18, paddingVertical: 10, paddingHorizontal: 14 },
   twitterStat: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4 },
-  twitterStatNum: { color: '#0f172a', fontSize: 14, fontWeight: '900' },
+  twitterStatNum: { color: '#fff', fontSize: 14, fontWeight: '900' },
   twitterStatLabel: { color: '#64748b', fontSize: 13 },
   editProfileCard: { backgroundColor: '#fff', borderBottomWidth: 1, borderColor: '#e2e8f0', padding: 16, gap: 8 },
   editProfileHeading: { fontSize: 17, color: '#0f172a', fontWeight: '900', textAlign: 'right', marginBottom: 6 },
