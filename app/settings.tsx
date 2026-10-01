@@ -39,6 +39,8 @@ import {
 } from 'lucide-react-native';
 import BottomNav from '@/components/BottomNav';
 import { verifyGPSInDistrict } from '@/lib/nationalAddress';
+import { getCurrentDeviceLocation, reverseGeocodeDeviceLocation } from '@/lib/deviceLocation';
+import { savePermanentMyLocation } from '@/lib/locationSync';
 import {
   DEFAULT_DND,
   DndSettings,
@@ -70,8 +72,10 @@ export default function SettingsScreen() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [accountSaving, setAccountSaving] = useState(false);
+  const [region, setRegion] = useState('');
   const [city, setCity] = useState('');
   const [district, setDistrict] = useState('');
+  const [locating, setLocating] = useState(false);
   const [geoVerified, setGeoVerified] = useState(false);
   const [geoChecking, setGeoChecking] = useState(false);
   const [verificationStatus, setVerificationStatus] = useState<'none' | 'pending' | 'verified' | 'rejected'>('none');
@@ -116,6 +120,7 @@ export default function SettingsScreen() {
         setAllowStoryReplies(prof.allow_story_replies || 'everyone');
         setHideName(prof.hide_name || false);
         setRole(prof.role || 'user');
+        setRegion(prof.region || '');
         setCity(prof.city || '');
         setDistrict(prof.district || '');
         if (prof.is_verified) setVerificationStatus('verified');
@@ -167,6 +172,38 @@ export default function SettingsScreen() {
       Alert.alert('تعذّر تغيير كلمة المرور', error?.message || 'حدث خطأ أثناء تحديث كلمة المرور.');
     } finally {
       setAccountSaving(false);
+    }
+  }
+
+  async function useCurrentLocation() {
+    if (locating) return;
+    setLocating(true);
+    try {
+      const location = await getCurrentDeviceLocation();
+      if (!location) {
+        Alert.alert('تعذّر تحديد الموقع', 'اسمح لحيّنا بالوصول إلى موقعك ثم حاول مرة أخرى.');
+        return;
+      }
+      const place = await reverseGeocodeDeviceLocation(location);
+      const nextRegion = place?.region || '';
+      const nextCity = place?.city || '';
+      const nextDistrict = place?.district || '';
+      if (!nextRegion || !nextCity || !nextDistrict) {
+        Alert.alert('الموقع غير مكتمل', 'يجب أن نستخرج المنطقة والمدينة والحي حتى يتم حفظ موقعك بشكل صحيح.');
+        return;
+      }
+      if (!userId) return;
+      const { error } = await supabase.from('profiles').update({ region: nextRegion, city: nextCity, district: nextDistrict }).eq('id', userId).select('id').maybeSingle();
+      if (error) throw error;
+      await savePermanentMyLocation({ region: nextRegion, city: nextCity, district: nextDistrict }, true);
+      setRegion(nextRegion);
+      setCity(nextCity);
+      setDistrict(nextDistrict);
+      Alert.alert('تم تحديث الموقع', 'تم حفظ المنطقة والمدينة والحي في ملفك الشخصي وسيتم استخدامهما في أنحاء التطبيق.');
+    } catch (error: any) {
+      Alert.alert('تعذّر تحديث الموقع', error?.message || 'حاول مرة أخرى.');
+    } finally {
+      setLocating(false);
     }
   }
 
@@ -689,6 +726,36 @@ export default function SettingsScreen() {
           </Text>
         </View>
 
+        <View style={styles.card}>
+          <View style={styles.sectionHeader}>
+            <View style={[styles.sectionIcon, { backgroundColor: '#ecfdf5' }]}><Compass size={18} color="#059669" /></View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.sectionTitle}>موقع حسابك</Text>
+              <Text style={styles.sectionDesc}>الموقع المحفوظ هنا ينعكس على ملفك والمحتوى المرتبط بحيك.</Text>
+            </View>
+          </View>
+          <View style={styles.locationSummaryRow}>
+            <Text style={styles.locationSummaryLabel}>المنطقة</Text>
+            <Text style={styles.locationSummaryValue}>{region || 'غير محددة'}</Text>
+          </View>
+          <View style={styles.locationSummaryRow}>
+            <Text style={styles.locationSummaryLabel}>المدينة</Text>
+            <Text style={styles.locationSummaryValue}>{city || 'غير محددة'}</Text>
+          </View>
+          <View style={styles.locationSummaryRow}>
+            <Text style={styles.locationSummaryLabel}>الحي</Text>
+            <Text style={styles.locationSummaryValue}>{district || 'غير محدد'}</Text>
+          </View>
+          <Pressable style={styles.actionBtn} onPress={useCurrentLocation} disabled={locating}>
+            {locating ? <ActivityIndicator size="small" color="#059669" /> : <MapPin size={20} color="#059669" />}
+            <Text style={styles.actionBtnText}>{locating ? 'جارٍ تحديد موقعك…' : 'تحديد موقعي تلقائياً وتحديثه'}</Text>
+          </Pressable>
+          <Pressable style={[styles.actionBtn, { borderBottomWidth: 0 }]} onPress={() => router.push('/profile')}>
+            <ChevronLeft size={20} color="#64748b" />
+            <Text style={styles.actionBtnText}>تعديل الموقع من الملف الشخصي</Text>
+          </Pressable>
+        </View>
+
         {/* 5. قائمة المحظورين */}
         <View style={styles.card}>
           <View style={styles.sectionHeader}>
@@ -1147,6 +1214,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
+
+  locationSummaryRow: {
+    flexDirection: 'row-reverse',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 9,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  locationSummaryLabel: { fontSize: 12, color: '#64748b', fontWeight: '700' },
+  locationSummaryValue: { fontSize: 14, color: '#0f172a', fontWeight: '900', maxWidth: '70%', textAlign: 'right' },
 
   // Blocked users
   emptyBlocked: {
