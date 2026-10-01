@@ -291,7 +291,7 @@ export default function SettingsScreen() {
         return;
       }
       setPushEnabled(true);
-      Alert.alert('تم التفعيل', 'تم منح الإذن وتسجيل هذا الجهاز لاستقبال الإشعارات.');
+      Alert.alert('تم التفعيل', 'تم تفعيل الإشعارات لهذا الحساب. ستظهر التنبيهات على شاشة الجهاز حتى عند مغادرة الموقع.');
     } catch (error: any) {
       Alert.alert('تعذّر التفعيل', error?.message || 'تعذر تسجيل هذا الجهاز.');
     }
