@@ -160,7 +160,9 @@ export default function Profile() {
 
   // Toggle Handlers with Instant Persistence
   async function save() {
-    if (!userId) return;
+    const { data: authData } = await supabase.auth.getUser();
+    const uid = authData.user?.id || userId;
+    if (!uid) return;
     if (!region.trim() || !city.trim() || !district.trim()) {
       return Alert.alert('الموقع مطلوب', 'لا يمكن حفظ الملف بدون المنطقة والمدينة والحي. استخدم «استخدام موقعي الحالي» للتعبئة تلقائياً.');
     }
@@ -175,7 +177,7 @@ export default function Profile() {
     };
 
     try {
-      const result = await supabase.from('profiles').update(payload).eq('id', userId).select('id').maybeSingle();
+      const result = await supabase.from('profiles').update(payload).eq('id', uid).select('id').maybeSingle();
       if (result.error) throw result.error;
       if (!result.data) throw new Error('لم يُحدّث أي سجل. سجّل الخروج ثم الدخول وحاول مرة أخرى.');
 
@@ -185,6 +187,16 @@ export default function Profile() {
         city: city.trim(),
         district: district.trim(),
       }, false);
+      // Reload from the database so the UI reflects the persisted values exactly.
+      const { data: freshProfile } = await supabase.from('profiles').select('*').eq('id', uid).maybeSingle();
+      if (freshProfile) {
+        setP(freshProfile);
+        setPersonalName(freshProfile.display_name || '');
+        setRegion(freshProfile.region || '');
+        setCity(freshProfile.city || '');
+        setDistrict(freshProfile.district || '');
+        setBio(freshProfile.bio || '');
+      }
       setEditingProfile(false);
       Alert.alert('تم الحفظ', 'تم تحديث الاسم والمدينة والحي والنبذة في حسابك.');
     } catch (error: any) {
