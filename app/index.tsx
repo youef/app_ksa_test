@@ -9,7 +9,7 @@ import { ArrowLeft } from 'lucide-react-native';
 const FALLBACK_URI = FALLBACK_LOGO_URI;
 
 export default function Index() {
-  const [checkingSession, setCheckingSession] = useState(true);
+  const [checkingSession, setCheckingSession] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
   const [logoUri, setLogoUri] = useState(FALLBACK_URI);
   const floatY = useRef(new Animated.Value(0)).current;
@@ -50,28 +50,15 @@ export default function Index() {
     getBrandingLogo().then(applyBranding);
     const unsubscribeBranding = subscribeBrandingLogo(applyBranding);
     let sessionActive = true;
-    const sessionFallback = setTimeout(() => {
-      if (sessionActive) {
-        setSignedIn(false);
-        setCheckingSession(false);
-      }
-    }, 4000);
-
     supabase.auth.getSession().then(({ data }) => {
       if (!sessionActive) return;
-      clearTimeout(sessionFallback);
       if (data.session?.user) {
         setSignedIn(true);
-        setTimeout(() => router.replace('/home'), 300);
-      } else {
-        setSignedIn(false);
-        setCheckingSession(false);
+        router.replace('/home');
       }
     }).catch(() => {
       if (!sessionActive) return;
-      clearTimeout(sessionFallback);
       setSignedIn(false);
-      setCheckingSession(false);
     });
 
     Animated.loop(
@@ -100,12 +87,11 @@ export default function Index() {
     ).start();
     return () => {
       sessionActive = false;
-      clearTimeout(sessionFallback);
       unsubscribeBranding();
     };
   }, [floatY, pulse, shine, rotate]);
 
-  if (signedIn || checkingSession) {
+  if (signedIn) {
     return (
       <View style={styles.loading}>
         <LinearGradient colors={['#065f46', '#059669', '#10b981']} style={StyleSheet.absoluteFillObject} />
@@ -151,7 +137,7 @@ export default function Index() {
       </View>
 
       <View style={styles.actionWrap}>
-        <Pressable onPress={() => router.push('/auth')} style={styles.button}>
+        <Pressable onPress={() => router.replace('/auth')} style={styles.button} accessibilityRole="button" hitSlop={8}>
           <LinearGradient colors={['#ffffff', '#d1fae5']} style={styles.buttonGradient}>
             <Text style={styles.buttonText}>دخول</Text>
             <ArrowLeft size={18} color="#065f46" strokeWidth={2.6} />
