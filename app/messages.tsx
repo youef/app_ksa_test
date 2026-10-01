@@ -163,7 +163,7 @@ export default function Messages() {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <LinearGradient colors={['#0891b2', '#0369a1']} style={styles.header}>
+      <LinearGradient colors={['#065f46', '#059669', '#10b981']} style={styles.header}>
         <View style={styles.headerContent}>
           <View style={styles.headerRight}>
             <Text style={styles.headerTitle}>الرسائل</Text>
@@ -180,7 +180,7 @@ export default function Messages() {
               style={[styles.dndHeaderBtn, dndEnabled && styles.dndHeaderBtnActive]}
               onPress={() => toggleDND(!dndEnabled)}
             >
-              {dndEnabled ? <BellOff size={16} color="#fff" /> : <Bell size={16} color="#cffafe" />}
+              {dndEnabled ? <BellOff size={16} color="#fff" /> : <Bell size={16} color="#a7f3d0" />}
               <Text style={[styles.dndHeaderText, dndEnabled && { color: '#fff' }]}>
                 {dndEnabled ? 'عدم الإزعاج مفعّل' : 'إشعارات عادية'}
               </Text>

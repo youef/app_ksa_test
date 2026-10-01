@@ -59,6 +59,7 @@ import { verifyGPSInDistrict } from '@/lib/nationalAddress';
 export default function Profile() {
   const [p, setP] = useState<any>({});
   const [userId, setUserId] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [city, setCity] = useState('');
   const [district, setDistrict] = useState('');
   const [bio, setBio] = useState('');
@@ -141,6 +142,8 @@ export default function Profile() {
 
     if (r.data) {
       const userEmail = (authData.user?.email || '').toLowerCase().trim();
+      const adminRole = userEmail === 'root@gmail.com' || userEmail.startsWith('root@') || r.data.role === 'admin';
+      setIsAdmin(adminRole);
       if (userEmail === 'root@gmail.com' || userEmail.startsWith('root@')) {
         if (r.data.role !== 'admin') {
           await supabase.from('profiles').update({ role: 'admin' }).eq('id', uid);
@@ -488,15 +491,13 @@ export default function Profile() {
         {/* 1. PROFILE HERO HEADER & AVATAR                          */}
         {/* ======================================================== */}
         <LinearGradient
-          colors={['#0891b2', '#0e7490', '#0f172a']}
+          colors={['#065f46', '#059669', '#10b981']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.headerHero}
         >
           <View style={styles.navBar}>
-            <Pressable onPress={() => router.back()} style={styles.backBtn}>
-              <ChevronRight size={28} color="#fff" />
-            </Pressable>
+            <View style={{ width: 40 }} />
             <Text style={styles.navTitle}>الملف الشخصي</Text>
             <Pressable onPress={() => router.push('/settings')} style={styles.settingsNavBtn}>
               <Settings size={22} color="#fff" />
@@ -513,7 +514,7 @@ export default function Profile() {
                 </View>
               )}
               <View style={styles.editIconWrapper}>
-                <Camera size={20} color="#0891b2" />
+                <Camera size={20} color="#059669" />
               </View>
             </Pressable>
 
@@ -825,12 +826,18 @@ export default function Profile() {
               <ChevronLeft size={18} color="#94a3b8" />
             </Pressable>
 
-            {p.role === 'admin' || p.username === 'root' ? (
+            {isAdmin && (
               <Pressable style={[styles.actionBtn, { borderBottomWidth: 0 }]} onPress={() => router.push('/admin')}>
-                <Shield size={20} color={C.accent} />
-                <Text style={[styles.actionBtnText, { color: C.accent }]}>لوحة تحكم مدير النظام 👑</Text>
+                <ShieldCheck size={20} color="#059669" />
+                <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                  <Text style={[styles.actionBtnText, { color: '#059669', fontWeight: '800' }]}>
+                    لوحة تحكم مدير النظام 🛡️
+                  </Text>
+                  <Text style={styles.actionBtnSub}>خاص بمسؤول المنصة والرقابة فقط</Text>
+                </View>
+                <ChevronLeft size={18} color="#059669" />
               </Pressable>
-            ) : null}
+            )}
           </View>
 
           {/* Save Button */}

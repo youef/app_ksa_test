@@ -213,7 +213,7 @@ export default function Notifications() {
       {/* ======================================================== */}
       {/* 1. TOP CURVED GRADIENT HEADER                            */}
       {/* ======================================================== */}
-      <LinearGradient colors={['#0c4a6e', '#0369a1', '#0891b2']} style={styles.headerHero}>
+      <LinearGradient colors={['#065f46', '#059669', '#10b981']} style={styles.headerHero}>
         <View style={styles.headerTopRow}>
           <Pressable onPress={() => router.back()} style={styles.headerBtn}>
             <ChevronRight size={26} color="#fff" />
@@ -253,7 +253,7 @@ export default function Notifications() {
           <View style={styles.headerRightButtons}>
             {unreadCount > 0 && (
               <Pressable style={styles.markAllBtn} onPress={markAllAsRead}>
-                <CheckCheck size={16} color="#38bdf8" />
+                <CheckCheck size={16} color="#6ee7b7" />
                 <Text style={styles.markAllText}>قراءة الكل</Text>
               </Pressable>
             )}

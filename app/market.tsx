@@ -97,7 +97,7 @@ export default function Market() {
           [{ nativeEvent: { contentOffset: { y: scrollY } } }],
           { useNativeDriver: true }
         )}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadMarketItems} tintColor="#0891b2" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadMarketItems} tintColor="#059669" />}
       >
         <Text style={styles.pageSubtitle}>ادعم الأسر المنتجة والمتاجر القريبة في حيك 🏘️</Text>
         
@@ -147,7 +147,7 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   addButton: {
-    backgroundColor: '#0891b2',
+    backgroundColor: '#059669',
     width: 32,
     height: 32,
     borderRadius: 16,

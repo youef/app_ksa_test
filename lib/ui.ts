@@ -1,5 +1,5 @@
 import { StyleSheet } from 'react-native';
-export const C={bg:'#F9FAFB',card:'#fff',ink:'#111827',muted:'#6b7280',line:'#f3f4f6',accent:'#0891b2',accentSoft:'#cffafe',success:'#10b981',danger:'#dc2626',warning:'#f59e0b'};
+export const C={bg:'#F9FAFB',card:'#fff',ink:'#111827',muted:'#6b7280',line:'#f3f4f6',accent:'#059669',accentSoft:'#ecfdf5',success:'#10b981',danger:'#dc2626',warning:'#f59e0b'};
 export const S=StyleSheet.create({
   page:{flexGrow:1,padding:18,paddingTop:58,backgroundColor:C.bg},
   title:{fontSize:30,fontWeight:'900',color:C.ink,textAlign:'right'},

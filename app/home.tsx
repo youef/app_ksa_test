@@ -339,7 +339,7 @@ export default function Home() {
               await load(); 
               setRefreshing(false); 
             }} 
-            tintColor="#0891b2" 
+            tintColor="#059669" 
           />
         }
       >
@@ -347,7 +347,7 @@ export default function Home() {
         {/* 1. ULTRA-SLEEK MODERN HEADER                            */}
         {/* ======================================================== */}
         <LinearGradient 
-          colors={['#0891b2', '#0284c7', '#0369a1']} 
+          colors={['#065f46', '#059669', '#10b981']} 
           start={{ x: 0, y: 0 }} 
           end={{ x: 1, y: 1 }}
           style={styles.hero}
@@ -393,13 +393,13 @@ export default function Home() {
                 style={styles.locationSelectorPill}
                 onPress={() => setShowLocationModal(true)}
               >
-                <ChevronDown size={14} color="#67e8f9" />
+                <ChevronDown size={14} color="#a7f3d0" />
                 <Text style={styles.locationSelectorText} numberOfLines={1}>
                   {selectedCity === 'كل المدن'
                     ? '🇸🇦 كل مناطق المملكة'
                     : `${selectedCity}${selectedDistrict !== 'كل الأحياء' ? ` · حي ${selectedDistrict}` : ''}`}
                 </Text>
-                <MapPin size={13} color="#38bdf8" />
+                <MapPin size={13} color="#6ee7b7" />
               </Pressable>
             </View>
           </View>
@@ -422,7 +422,7 @@ export default function Home() {
                 </Pressable>
               ) : (
                 <Pressable style={styles.micBtn} onPress={() => router.push('/questions')}>
-                  <Mic size={17} color="#0891b2" />
+                  <Mic size={17} color="#059669" />
                 </Pressable>
               )}
             </View>
@@ -436,9 +436,9 @@ export default function Home() {
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.storiesScroll}>
             {/* Add Story Button */}
             <Pressable style={styles.storyBox} onPress={() => router.push('/create-story')}>
-              <LinearGradient colors={['#0891b2', '#06b6d4']} style={styles.storyAddRing}>
+              <LinearGradient colors={['#059669', '#10b981']} style={styles.storyAddRing}>
                 <View style={styles.storyAddBtn}>
-                  <Plus size={22} color="#0891b2" />
+                  <Plus size={22} color="#059669" />
                 </View>
               </LinearGradient>
               <Text style={styles.storyName}>يومياتي</Text>
@@ -1241,7 +1241,7 @@ const styles = StyleSheet.create({
     paddingBottom: 22,
     borderBottomLeftRadius: 32,
     borderBottomRightRadius: 32,
-    shadowColor: '#0284c7',
+    shadowColor: '#059669',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.2,
     shadowRadius: 16,

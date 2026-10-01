@@ -21,7 +21,7 @@ export default function GlassHeader({ title, showBack = false, rightComponent }:
           <View style={styles.side}>
             {showBack && (
               <Pressable onPress={() => router.back()} style={styles.backButton}>
-                <ChevronRight size={28} color="#007AFF" />
+                <ChevronRight size={24} color="#059669" />
                 <Text style={styles.backText}>رجوع</Text>
               </Pressable>
             )}
@@ -54,8 +54,9 @@ const styles = StyleSheet.create({
   blurContainer: {
     paddingTop: Platform.OS === 'ios' ? 50 : 20, // Status bar padding
     paddingBottom: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(0,0,0,0.1)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(226, 232, 240, 0.8)',
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
   },
   content: {
     flexDirection: 'row-reverse',
@@ -77,17 +78,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   title: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: '#000',
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0f172a',
   },
   backButton: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
   },
   backText: {
-    fontSize: 17,
-    color: '#007AFF',
-    marginRight: -4,
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#059669',
+    marginRight: -2,
   },
 });

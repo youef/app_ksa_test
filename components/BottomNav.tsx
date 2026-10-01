@@ -31,18 +31,25 @@ export default function BottomNav() {
   }, []);
 
   async function checkAdmin() {
-    const { data: u } = await supabase.auth.getUser();
-    if (u?.user?.email === 'root@gmail.com') {
-      setIsAdmin(true);
-      return;
-    }
-    if (u?.user) {
+    try {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u?.user) {
+        setIsAdmin(false);
+        return;
+      }
+      const email = (u.user.email || '').toLowerCase().trim();
+      if (email === 'root@gmail.com') {
+        setIsAdmin(true);
+        return;
+      }
       const { data: profile } = await supabase
         .from('profiles')
         .select('role')
         .eq('id', u.user.id)
-        .single();
-      if (profile?.role === 'admin') setIsAdmin(true);
+        .maybeSingle();
+      setIsAdmin(profile?.role === 'admin');
+    } catch {
+      setIsAdmin(false);
     }
   }
 
@@ -94,7 +101,7 @@ export default function BottomNav() {
   return (
     <View style={styles.container}>
       <BlurView intensity={Platform.OS === 'ios' ? 85 : 100} tint="light" style={styles.blurContainer}>
-        {TABS.map((tab, index) => {
+        {TABS.map((tab) => {
           const isActive = pathname === tab.key;
           const IconComp = tab.icon;
           const badge = tab.key === '/messages' ? unreadMsgs
@@ -110,8 +117,8 @@ export default function BottomNav() {
               <View style={styles.iconWrap}>
                 <Animated.View style={[styles.iconInner, isActive && styles.iconInnerActive]}>
                   <IconComp
-                    size={26}
-                    color={isActive ? '#007AFF' : '#8E8E93'}
+                    size={24}
+                    color={isActive ? '#059669' : '#94a3b8'}
                     strokeWidth={isActive ? 2.5 : 2}
                   />
                 </Animated.View>
@@ -131,7 +138,7 @@ export default function BottomNav() {
           <Pressable style={styles.tab} onPress={() => router.push('/admin' as any)}>
              <View style={styles.iconWrap}>
                <Animated.View style={[styles.iconInner, pathname === '/admin' && styles.iconInnerActive]}>
-                 <LayoutDashboard size={26} color={pathname === '/admin' ? '#007AFF' : '#8E8E93'} strokeWidth={pathname === '/admin' ? 2.5 : 2} />
+                 <LayoutDashboard size={24} color={pathname === '/admin' ? '#059669' : '#94a3b8'} strokeWidth={pathname === '/admin' ? 2.5 : 2} />
                </Animated.View>
              </View>
              <Text style={[styles.label, pathname === '/admin' && styles.labelActive]}>لوحة التحكم</Text>
@@ -148,49 +155,51 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: '100%',
     backgroundColor: 'transparent',
+    zIndex: 999,
   },
   blurContainer: {
     flexDirection: 'row-reverse',
-    paddingBottom: Platform.OS === 'ios' ? 32 : 12,
-    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 30 : 12,
+    paddingTop: 10,
     paddingHorizontal: 8,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(0,0,0,0.1)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(226, 232, 240, 0.8)',
+    backgroundColor: 'rgba(255, 255, 255, 0.94)',
   },
   tab: {
     flex: 1,
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
   },
   iconWrap: {
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
     width: 44,
-    height: 36,
+    height: 32,
   },
   iconInner: {
-    width: 44,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
   iconInnerActive: {
-    // Optionally add a subtle background for active tab like iOS 18 tab bar
+    backgroundColor: 'rgba(5, 150, 105, 0.1)',
   },
   badge: {
     position: 'absolute',
-    top: -4,
-    right: -2,
-    backgroundColor: '#FF3B30',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
+    top: -2,
+    right: 2,
+    backgroundColor: '#ef4444',
+    borderRadius: 9,
+    minWidth: 18,
+    height: 18,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 4,
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderColor: '#fff',
   },
   badgeText: {
@@ -199,13 +208,12 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   label: {
-    fontSize: 10,
-    color: '#8E8E93',
-    fontWeight: '500',
-    marginTop: 2,
+    fontSize: 11,
+    color: '#94a3b8',
+    fontWeight: '600',
   },
   labelActive: {
-    color: '#007AFF',
-    fontWeight: '600',
+    color: '#059669',
+    fontWeight: '800',
   },
 });
