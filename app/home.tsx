@@ -325,6 +325,12 @@ export default function Home() {
   const toolQuestions = filteredQuestions.filter(
     q => q.is_tool_sharing || q.item_type === 'tool_sharing' || (q.title && (q.title.includes('إعارة') || q.title.includes('دريل') || q.title.includes('سلم')))
   );
+  // Dynamic AI Neighborhood Pulse
+  const neighborhoodPulse = generateNeighborhoodPulseAI(
+    selectedCity,
+    selectedDistrict,
+    filteredQuestions.length || 15
+  );
 
   return (
     <View style={styles.container}>
