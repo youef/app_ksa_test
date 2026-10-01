@@ -26,14 +26,18 @@ async function supabaseRest(path: string, init: RequestInit = {}) {
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   if (!PUSH_SECRET || req.headers['x-push-secret'] !== PUSH_SECRET) return res.status(401).json({ error: 'Unauthorized' });
-  if (!SERVICE_KEY || !VAPID_PRIVATE) return res.status(500).json({ error: 'Push server is not configured' });
+  if (!VAPID_PRIVATE) return res.status(500).json({ error: 'Push server is not configured' });
 
   const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
   const n: NotificationRow | undefined = body?.record ?? body;
   if (!n?.user_id || !n.title) return res.status(400).json({ error: 'Missing notification' });
 
-  const tokensRes = await supabaseRest(`push_tokens?select=token,platform&user_id=eq.${encodeURIComponent(n.user_id)}`);
-  const tokens: { token: string; platform: string }[] = tokensRes.ok ? await tokensRes.json() : [];
+  // The database trigger sends the recipient's tokens with the payload, so no service-role key is needed.
+  let tokens: { token: string; platform: string }[] = Array.isArray(body?.tokens) ? body.tokens : [];
+  if (!tokens.length && SERVICE_KEY) {
+    const tokensRes = await supabaseRest(`push_tokens?select=token,platform&user_id=eq.${encodeURIComponent(n.user_id)}`);
+    tokens = tokensRes.ok ? await tokensRes.json() : [];
+  }
 
   webpush.setVapidDetails('mailto:support@appksatest.vercel.app', VAPID_PUBLIC, VAPID_PRIVATE);
   const payload = { title: n.title, body: n.body, url: targetUrl(n), tag: n.target_id || undefined };
@@ -62,7 +66,7 @@ export default async function handler(req: any, res: any) {
     }),
   );
 
-  if (stale.length) {
+  if (stale.length && SERVICE_KEY) {
     const list = stale.map((t) => `"${t.replace(/"/g, '\\"')}"`).join(',');
     await supabaseRest(`push_tokens?token=in.(${encodeURIComponent(list)})`, { method: 'DELETE' });
   }
