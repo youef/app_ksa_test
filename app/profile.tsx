@@ -140,7 +140,7 @@ export default function Profile() {
     }
 
     if (r.data) {
-      const userEmail = (u.user?.email || '').toLowerCase().trim();
+      const userEmail = (authData.user?.email || '').toLowerCase().trim();
       if (userEmail === 'root@gmail.com' || userEmail.startsWith('root@')) {
         if (r.data.role !== 'admin') {
           await supabase.from('profiles').update({ role: 'admin' }).eq('id', uid);
