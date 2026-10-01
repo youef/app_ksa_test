@@ -384,6 +384,7 @@ export default function Home() {
             {/* Right side: App Brand & Location Selector */}
             <View style={styles.brandAndLocation}>
               <View style={styles.brandTitleRow}>
+                <Image source={{ uri: '/assets/branding/HAYNA_LOGO.png?v=2' }} style={styles.headerLogo} resizeMode="contain" />
                 <Text style={styles.heroBrandTitle}>حيّنا</Text>
               </View>
 
@@ -990,6 +991,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     marginBottom: 4,
+  },
+  headerLogo: {
+    width: 38,
+    height: 38,
+    marginLeft: 7,
   },
   heroBrandTitle: {
     fontSize: 26,
