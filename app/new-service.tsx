@@ -25,6 +25,7 @@ import {
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import LocationSelectorModal from '@/components/LocationSelectorModal';
+import { getPermanentMyLocation, savePermanentMyLocation, isAllKingdom } from '@/lib/locationSync';
 
 export default function NewService() {
   const [name, setName] = useState('');
@@ -48,18 +49,30 @@ export default function NewService() {
   ];
 
   useEffect(() => {
-    // Autofill city and district from profile
-    supabase.auth.getUser().then(async ({ data: u }) => {
+    (async () => {
+      const loc = await getPermanentMyLocation();
+      if (loc?.city && !isAllKingdom(loc.city)) {
+        setCity(loc.city);
+        if (loc.district && loc.district !== 'كل الأحياء' && loc.district !== 'كل أحياء المدينة') {
+          setDistrict(loc.district);
+        }
+      }
+
+      // Autofill city and district from profile if logged in
+      const { data: u } = await supabase.auth.getUser();
       if (u.user) {
         const { data: p } = await supabase
           .from('profiles')
           .select('city, district')
           .eq('id', u.user.id)
           .single();
-        if (p?.city) setCity(p.city);
-        if (p?.district) setDistrict(p.district);
+        if (p?.city) {
+          setCity(p.city);
+          if (p?.district) setDistrict(p.district);
+          await savePermanentMyLocation({ city: p.city, district: p.district || 'كل الأحياء' });
+        }
       }
-    });
+    })();
   }, []);
 
   async function save() {
@@ -161,7 +174,7 @@ export default function NewService() {
           <View style={styles.inputGroup}>
             <Text style={styles.label}>نطاق الخدمة والحي</Text>
             <Pressable style={styles.locationBtn} onPress={() => setShowLocationModal(true)}>
-              <MapPin size={18} color="#0891b2" />
+              <MapPin size={18} color="#059669" />
               <Text style={styles.locationBtnText}>
                 {city ? `${city}${district ? ` · حي ${district}` : ''}` : 'اختر مدينتك وحيك...'}
               </Text>
@@ -207,8 +220,8 @@ export default function NewService() {
             <Switch
               value={available}
               onValueChange={setAvailable}
-              trackColor={{ false: '#e2e8f0', true: '#bae6fd' }}
-              thumbColor={available ? '#0891b2' : '#9ca3af'}
+              trackColor={{ false: '#e2e8f0', true: '#a7f3d0' }}
+              thumbColor={available ? '#059669' : '#9ca3af'}
             />
           </View>
 
@@ -235,9 +248,18 @@ export default function NewService() {
         onClose={() => setShowLocationModal(false)}
         selectedCity={city}
         selectedDistrict={district}
-        onSelect={(reg, c, d) => {
-          setCity(c === 'كل المدن' ? '' : c);
-          setDistrict(d === 'كل أحياء المدينة' ? '' : d);
+        onSelect={async (reg, c, d) => {
+          const cleanCity = c === 'كل المدن' ? '' : c;
+          const cleanDist = (d === 'كل أحياء المدينة' || d === 'كل الأحياء') ? '' : d;
+          setCity(cleanCity);
+          setDistrict(cleanDist);
+          if (cleanCity) {
+            await savePermanentMyLocation({
+              region: reg,
+              city: cleanCity,
+              district: cleanDist || 'كل الأحياء',
+            });
+          }
         }}
       />
     </View>
@@ -330,8 +352,8 @@ const styles = StyleSheet.create({
     borderColor: '#e2e8f0',
   },
   chipActive: {
-    backgroundColor: '#0891b2',
-    borderColor: '#0891b2',
+    backgroundColor: '#059669',
+    borderColor: '#059669',
   },
   chipText: {
     color: '#64748b',

@@ -323,7 +323,7 @@ export default function Notifications() {
       {/* ======================================================== */}
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#0891b2" />
+          <ActivityIndicator size="large" color="#059669" />
           <Text style={styles.loadingText}>جاري مزامنة الإشعارات...</Text>
         </View>
       ) : (
@@ -372,7 +372,7 @@ export default function Notifications() {
                         }}
                         hitSlop={8}
                       >
-                        <CheckCheck size={16} color={isRead ? '#94a3b8' : '#0891b2'} />
+                        <CheckCheck size={16} color={isRead ? '#94a3b8' : '#059669'} />
                       </Pressable>
 
                       <Pressable
@@ -427,7 +427,7 @@ export default function Notifications() {
                       <Text style={styles.footerActionText}>
                         {getActionText(item.target_type)}
                       </Text>
-                      <ArrowLeft size={13} color="#0891b2" />
+                      <ArrowLeft size={13} color="#059669" />
                     </View>
                   )}
                 </Pressable>
@@ -475,7 +475,8 @@ export default function Notifications() {
                 <Switch
                   value={notifPrefAnswers}
                   onValueChange={setNotifPrefAnswers}
-                  trackColor={{ false: '#e2e8f0', true: '#0891b2' }}
+                  trackColor={{ false: '#e2e8f0', true: '#a7f3d0' }}
+                  thumbColor={notifPrefAnswers ? '#059669' : '#9ca3af'}
                 />
                 <View style={styles.settingInfo}>
                   <Text style={styles.settingLabel}>💬 إجابات وردود أهل الحي</Text>
@@ -488,7 +489,8 @@ export default function Notifications() {
                 <Switch
                   value={notifPrefCommunity}
                   onValueChange={setNotifPrefCommunity}
-                  trackColor={{ false: '#e2e8f0', true: '#0891b2' }}
+                  trackColor={{ false: '#e2e8f0', true: '#a7f3d0' }}
+                  thumbColor={notifPrefCommunity ? '#059669' : '#9ca3af'}
                 />
                 <View style={styles.settingInfo}>
                   <Text style={styles.settingLabel}>🤝 إعارة الأدوات ومساعدة الجيران</Text>
@@ -501,7 +503,8 @@ export default function Notifications() {
                 <Switch
                   value={notifPrefStories}
                   onValueChange={setNotifPrefStories}
-                  trackColor={{ false: '#e2e8f0', true: '#0891b2' }}
+                  trackColor={{ false: '#e2e8f0', true: '#a7f3d0' }}
+                  thumbColor={notifPrefStories ? '#059669' : '#9ca3af'}
                 />
                 <View style={styles.settingInfo}>
                   <Text style={styles.settingLabel}>📸 يوميات وقصص الجيران</Text>
@@ -545,9 +548,9 @@ function getTypeVisuals(item: NotificationItem) {
   if (item.type === 'answer' || item.target_type === 'question') {
     return {
       label: 'إجابة وتفاعل',
-      bgColor: '#e0f2fe',
-      textColor: '#0284c7',
-      gradColors: ['#0284c7', '#0369a1'] as [string, string],
+      bgColor: '#ecfdf5',
+      textColor: '#059669',
+      gradColors: ['#059669', '#065f46'] as [string, string],
       icon: <MessageCircle size={20} color="#fff" />,
     };
   }
@@ -703,7 +706,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.5)',
   },
   filterDotActive: {
-    backgroundColor: '#0891b2',
+    backgroundColor: '#059669',
   },
   quickPillText: {
     color: 'rgba(255,255,255,0.9)',
@@ -711,7 +714,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   quickPillTextActive: {
-    color: '#0891b2',
+    color: '#059669',
     fontWeight: '900',
   },
   headerRightButtons: {
@@ -761,8 +764,8 @@ const styles = StyleSheet.create({
     borderColor: '#e2e8f0',
   },
   tabItemActive: {
-    backgroundColor: '#0891b2',
-    borderColor: '#0891b2',
+    backgroundColor: '#059669',
+    borderColor: '#059669',
   },
   tabLabel: {
     color: '#64748b',
@@ -823,9 +826,9 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   notifCardUnread: {
-    borderColor: '#0891b2',
+    borderColor: '#059669',
     backgroundColor: '#ffffff',
-    shadowColor: '#0891b2',
+    shadowColor: '#059669',
     shadowOpacity: 0.08,
   },
   notifCardRead: {
@@ -901,7 +904,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#0891b2',
+    backgroundColor: '#059669',
   },
   cardTitle: {
     color: '#0f172a',
@@ -934,7 +937,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   footerActionText: {
-    color: '#0891b2',
+    color: '#059669',
     fontSize: 12,
     fontWeight: '800',
   },
@@ -1036,7 +1039,7 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   modalSaveBtn: {
-    backgroundColor: '#0891b2',
+    backgroundColor: '#059669',
     borderRadius: 16,
     paddingVertical: 14,
     alignItems: 'center',

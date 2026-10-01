@@ -26,12 +26,23 @@ import {
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import BottomNav from '@/components/BottomNav';
+import {
+  getActiveLocation,
+  subscribeLocation,
+  isExactDistrictMatching,
+  isAllKingdom,
+} from '@/lib/locationSync';
 
 export default function Services() {
   const [items, setItems] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState('الكل');
+  const [activeLoc, setActiveLoc] = useState({
+    region: 'كل المملكة',
+    city: 'كل المدن',
+    district: 'كل الأحياء',
+  });
 
   const categories = ['الكل', 'صيانة منزلية', 'كهرباء وسباكة', 'توصيل ونقل', 'تعليم ودروس', 'تصميم وبرمجة', 'أخرى'];
 
@@ -61,8 +72,15 @@ export default function Services() {
   }
 
   useEffect(() => {
+    getActiveLocation().then(setActiveLoc);
+    const unsub = subscribeLocation(setActiveLoc);
     load(search, activeCategory);
+    return unsub;
   }, [activeCategory]);
+
+  const displayedItems = items.filter((s) =>
+    isExactDistrictMatching(s, activeLoc.city, activeLoc.district)
+  );
 
   return (
     <View style={styles.container}>
@@ -127,21 +145,25 @@ export default function Services() {
         <View style={styles.content}>
           {loading ? (
             <View style={styles.loadingBox}>
-              <ActivityIndicator size="large" color="#0891b2" />
+              <ActivityIndicator size="large" color="#059669" />
               <Text style={styles.loadingText}>جاري تحميل الخدمات...</Text>
             </View>
-          ) : items.length === 0 ? (
+          ) : displayedItems.length === 0 ? (
             <View style={styles.emptyCard}>
               <Briefcase size={48} color="#cbd5e1" />
               <Text style={styles.emptyTitle}>لا توجد خدمات مطابقة حالياً</Text>
-              <Text style={styles.emptySub}>كن أول من يقدّم خدماته لأهالي الحي والمنطقة!</Text>
+              <Text style={styles.emptySub}>
+                {!isAllKingdom(activeLoc.city)
+                  ? `لا توجد خدمات مسجلة بعد في ${activeLoc.city}${activeLoc.district !== 'كل الأحياء' ? ` (حي ${activeLoc.district})` : ''}. كن أول من يقدّم خدماته!`
+                  : 'كن أول من يقدّم خدماته لأهالي الحي والمنطقة!'}
+              </Text>
               <Pressable style={styles.emptyAddBtn} onPress={() => router.push('/new-service')}>
                 <Plus size={18} color="#fff" />
                 <Text style={styles.emptyAddBtnText}>إضافة خدمة جديدة</Text>
               </Pressable>
             </View>
           ) : (
-            items.map(s => (
+            displayedItems.map(s => (
               <Pressable
                 key={s.id}
                 style={styles.serviceCard}
@@ -157,7 +179,7 @@ export default function Services() {
                     )}
                     {s.is_verified && (
                       <View style={styles.verifiedBadge}>
-                        <ShieldCheck size={12} color="#0284c7" />
+                        <ShieldCheck size={12} color="#059669" />
                         <Text style={styles.verifiedText}>موثّق</Text>
                       </View>
                     )}
@@ -336,7 +358,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#0891b2',
+    backgroundColor: '#059669',
     paddingHorizontal: 18,
     paddingVertical: 10,
     borderRadius: 14,
@@ -395,13 +417,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 3,
-    backgroundColor: '#e0f2fe',
+    backgroundColor: '#ecfdf5',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,
   },
   verifiedText: {
-    color: '#0284c7',
+    color: '#059669',
     fontSize: 11,
     fontWeight: '800',
   },
@@ -430,7 +452,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
   priceTag: {
-    color: '#0891b2',
+    color: '#059669',
     fontSize: 12,
     fontWeight: '700',
   },

@@ -34,6 +34,12 @@ import {
 } from 'lucide-react-native';
 import LocationSelectorModal from '@/components/LocationSelectorModal';
 import {
+  getPermanentMyLocation,
+  savePermanentMyLocation,
+  subscribeLocation,
+  isAllKingdom,
+} from '@/lib/locationSync';
+import {
   analyzeQuestionWithAI,
   enhanceQuestionContentAI,
   generateInstantResidentAnswerAI,
@@ -62,23 +68,66 @@ export default function AskScreen() {
   const [safetyCheck, setSafetyCheck] = useState<SafetyAndSpamCheck | null>(null);
   const [similarQuestions, setSimilarQuestions] = useState<any[]>([]);
 
-  // 1. Auto-link user profile location upon mounting
+  // 1. Auto-link location immediately from device permanent storage / settings, and sync with profile
   useEffect(() => {
-    (async () => {
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) return;
+    let isMounted = true;
 
-      const { data: prof } = await supabase
-        .from('profiles')
-        .select('city, district')
-        .eq('id', u.user.id)
-        .maybeSingle();
-
-      if (prof) {
-        if (prof.city) setCity(prof.city);
-        if (prof.district) setDistrict(prof.district);
+    async function initLocation() {
+      // 1. Load permanent location immediately from device (persists even if logged out)
+      const loc = await getPermanentMyLocation();
+      if (isMounted && loc?.city && !isAllKingdom(loc.city)) {
+        setCity(loc.city);
+        const d = (loc.district && loc.district !== 'كل الأحياء' && loc.district !== 'كل أحياء المدينة') ? loc.district : '';
+        setDistrict(d);
+        setRegion(loc.region || 'المملكة');
       }
-    })();
+
+      // 2. If logged in, check profile to keep everything in sync
+      try {
+        const { data: u } = await supabase.auth.getUser();
+        if (u?.user) {
+          const { data: prof } = await supabase
+            .from('profiles')
+            .select('city, district')
+            .eq('id', u.user.id)
+            .maybeSingle();
+
+          if (prof?.city && isMounted) {
+            const cleanCity = prof.city.trim();
+            const cleanDist = (prof.district && prof.district !== 'كل الأحياء' && prof.district !== 'كل أحياء المدينة')
+              ? prof.district.trim()
+              : '';
+            setCity(cleanCity);
+            setDistrict(cleanDist);
+            // Ensure stored on device so it persists even if the user logs out later
+            await savePermanentMyLocation({
+              region: 'المملكة',
+              city: cleanCity,
+              district: cleanDist || 'كل الأحياء',
+            });
+          }
+        }
+      } catch (err) {
+        // Silently preserve local location
+      }
+    }
+
+    initLocation();
+
+    // 3. Listen to real-time location changes across the app (Settings / Header / etc.)
+    const unsubscribe = subscribeLocation((newLoc) => {
+      if (isMounted && newLoc?.city && !isAllKingdom(newLoc.city)) {
+        setCity(newLoc.city);
+        const d = (newLoc.district && newLoc.district !== 'كل الأحياء' && newLoc.district !== 'كل أحياء المدينة') ? newLoc.district : '';
+        setDistrict(d);
+        if (newLoc.region) setRegion(newLoc.region);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
   }, []);
 
   // 2. Real-time AI Analysis & Safety Check on title/body change
@@ -180,6 +229,15 @@ export default function AskScreen() {
         district: district.trim() || null,
       };
 
+      // Save permanently to device so it stays remembered even after logout
+      if (city) {
+        savePermanentMyLocation({
+          region: region || 'المملكة',
+          city: city.trim(),
+          district: district.trim() || 'كل الأحياء',
+        });
+      }
+
       // Try inserting with extended columns, fallback gracefully if columns not yet run
       let insertedQuestionId: string | null = null;
       try {
@@ -241,7 +299,7 @@ export default function AskScreen() {
               style={[styles.typeTab, postType === 'inquiry' && styles.typeTabActive]}
               onPress={() => setPostType('inquiry')}
             >
-              <MessageSquare size={16} color={postType === 'inquiry' ? '#fff' : '#0891b2'} />
+              <MessageSquare size={16} color={postType === 'inquiry' ? '#fff' : '#059669'} />
               <Text style={[styles.typeTabText, postType === 'inquiry' && styles.typeTabTextActive]}>
                 استفسار للحي
               </Text>
@@ -292,17 +350,17 @@ export default function AskScreen() {
             style={styles.locationBtn}
             onPress={() => setShowLocationModal(true)}
           >
-            <ChevronDown size={18} color="#0891b2" />
+            <ChevronDown size={18} color="#059669" />
             <View style={{ flex: 1, alignItems: 'flex-end' }}>
               <Text style={styles.locationValue}>
                 {city ? `${city} ${district ? `· ${district}` : ''}` : 'اختر مدينتك وحيك...'}
               </Text>
               <Text style={styles.locationHint}>
-                {city ? 'اضغط لتغيير المنطقة أو الحي أو البحث بالرمز الوطني' : 'حدد موقعك ليصل السؤال لجيرانك فقط'}
+                {city ? 'مربوط تلقائياً بإعداداتك ومحفوظ بجهازك · اضغط للتغيير' : 'حدد موقعك ليصل السؤال لجيرانك فقط'}
               </Text>
             </View>
             <View style={styles.mapPinWrap}>
-              <MapPin size={20} color="#0891b2" />
+              <MapPin size={20} color="#059669" />
             </View>
           </Pressable>
         </View>
@@ -399,7 +457,7 @@ export default function AskScreen() {
               </View>
               <View style={styles.instantAnswerTitleRow}>
                 <Text style={styles.instantAnswerTitle}>إجابة فورية من أرشيف تجارب الجيران</Text>
-                <Bot size={20} color="#0891b2" />
+                <Bot size={20} color="#059669" />
               </View>
             </View>
             <Text style={styles.instantAnswerSub}>
@@ -429,7 +487,7 @@ export default function AskScreen() {
           <View style={styles.aiInsightCard}>
             <View style={styles.aiInsightHeader}>
               <View style={styles.aiBadge}>
-                <Sparkles size={14} color="#0891b2" />
+                <Sparkles size={14} color="#059669" />
                 <Text style={styles.aiBadgeText}>تصنيف الذكاء الاصطناعي</Text>
               </View>
               <Text style={styles.aiInsightCategory}>{aiAnalysis.category}</Text>
@@ -439,7 +497,7 @@ export default function AskScreen() {
             <View style={styles.tagsRow}>
               {aiAnalysis.tags.map((t, idx) => (
                 <View key={idx} style={styles.tagPill}>
-                  <Tag size={12} color="#0891b2" />
+                  <Tag size={12} color="#059669" />
                   <Text style={styles.tagPillText}>#{t}</Text>
                 </View>
               ))}
@@ -465,7 +523,7 @@ export default function AskScreen() {
                 style={styles.similarItem}
                 onPress={() => router.push({ pathname: '/question', params: { id: sq.id } })}
               >
-                <ExternalLink size={16} color="#0891b2" />
+                <ExternalLink size={16} color="#059669" />
                 <Text style={styles.similarItemText} numberOfLines={1}>
                   {sq.title}
                 </Text>
@@ -503,10 +561,21 @@ export default function AskScreen() {
         onClose={() => setShowLocationModal(false)}
         selectedCity={city || 'كل المدن'}
         selectedDistrict={district || 'كل الأحياء'}
-        onSelect={(r, c, d) => {
+        onSelect={async (r, c, d) => {
+          const cleanCity = c === 'كل المدن' ? '' : c;
+          const cleanDist = (d === 'كل الأحياء' || d === 'كل أحياء المدينة') ? '' : d;
           setRegion(r);
-          setCity(c === 'كل المدن' ? '' : c);
-          setDistrict(d === 'كل الأحياء' ? '' : d);
+          setCity(cleanCity);
+          setDistrict(cleanDist);
+
+          // Save permanently immediately (persists even if user logs out!)
+          if (cleanCity) {
+            await savePermanentMyLocation({
+              region: r || 'المملكة',
+              city: cleanCity,
+              district: cleanDist || 'كل الأحياء',
+            });
+          }
         }}
       />
     </View>
@@ -569,8 +638,8 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   typeTabActive: {
-    backgroundColor: '#0891b2',
-    borderColor: '#0891b2',
+    backgroundColor: '#059669',
+    borderColor: '#059669',
   },
   typeTabActiveGreen: {
     backgroundColor: '#16a34a',
@@ -612,7 +681,7 @@ const styles = StyleSheet.create({
     color: '#0f172a',
   },
   locationBadge: {
-    backgroundColor: '#ecfeff',
+    backgroundColor: '#ecfdf5',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
@@ -620,7 +689,7 @@ const styles = StyleSheet.create({
   locationBadgeText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#0891b2',
+    color: '#059669',
   },
   locationBtn: {
     flexDirection: 'row-reverse',
@@ -648,7 +717,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: '#ecfeff',
+    backgroundColor: '#ecfdf5',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -704,12 +773,12 @@ const styles = StyleSheet.create({
   aiBanner: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    backgroundColor: '#0891b2',
+    backgroundColor: '#059669',
     borderRadius: 16,
     padding: 14,
     marginBottom: 16,
     gap: 12,
-    shadowColor: '#0891b2',
+    shadowColor: '#059669',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
@@ -723,7 +792,7 @@ const styles = StyleSheet.create({
   },
   aiBannerSub: {
     fontSize: 11,
-    color: '#e0f2fe',
+    color: '#ecfdf5',
     textAlign: 'right',
     marginTop: 2,
   },
@@ -860,7 +929,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#ecfeff',
+    backgroundColor: '#ecfdf5',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 10,
@@ -868,7 +937,7 @@ const styles = StyleSheet.create({
   aiBadgeText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#0891b2',
+    color: '#059669',
   },
   aiInsightCategory: {
     fontSize: 13,

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Modal,
   View,
@@ -11,10 +11,15 @@ import {
 } from 'react-native';
 import {
   SAUDI_REGIONS,
+  buildSaudiLocations,
+  normalizeSaudiLocationName,
   Region,
   City,
   District,
+  CustomLocation,
+  LocationOverride,
 } from '@/lib/saudiLocations';
+import { supabase } from '@/lib/supabase';
 import {
   MapPin,
   X,
@@ -51,6 +56,24 @@ export default function LocationSelectorModal({
   const [selectedReg, setSelectedReg] = useState<Region | null>(null);
   const [selectedCit, setSelectedCit] = useState<City | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [locations, setLocations] = useState<Region[]>(SAUDI_REGIONS);
+  const [visibleCount, setVisibleCount] = useState(100);
+
+  useEffect(() => {
+    if (!visible) return;
+    let active = true;
+    Promise.all([
+      supabase.from('saudi_custom_locations').select('id,region_name,city_name,district_name,latitude,longitude').limit(5000),
+      supabase.from('saudi_location_overrides').select('source_id,new_name,is_deleted'),
+    ]).then(([customResult, overrideResult]) => {
+      if (!active) return;
+      const overrides = (overrideResult.data || []) as LocationOverride[];
+      setLocations(buildSaudiLocations((customResult.data || []) as CustomLocation[], overrides));
+    });
+    return () => { active = false; };
+  }, [visible]);
+
+  useEffect(() => { setVisibleCount(100); }, [step, searchQuery]);
 
   // National Address Short Code state
   const [shortCodeInput, setShortCodeInput] = useState('');
@@ -108,16 +131,15 @@ export default function LocationSelectorModal({
   }
 
   // Filtered lists
-  const filteredRegions = SAUDI_REGIONS.filter(r =>
-    r.name.includes(searchQuery.trim())
-  );
+  const queryKey = normalizeSaudiLocationName(searchQuery);
+  const filteredRegions = locations.filter(r => normalizeSaudiLocationName(r.name).includes(queryKey));
 
   const filteredCities = (selectedReg?.cities || []).filter(c =>
-    c.name.includes(searchQuery.trim())
+    normalizeSaudiLocationName(c.name).includes(queryKey)
   );
 
   const filteredDistricts = (selectedCit?.districts || []).filter(d =>
-    d.name.includes(searchQuery.trim())
+    normalizeSaudiLocationName(d.name).includes(queryKey)
   );
 
   return (
@@ -267,7 +289,7 @@ export default function LocationSelectorModal({
             {/* Step 2: Cities */}
             {step === 'city' && (
               <>
-                {filteredCities.map(cit => {
+                {filteredCities.slice(0, visibleCount).map(cit => {
                   const isCitySelected = selectedCity === cit.name;
                   return (
                     <Pressable
@@ -286,6 +308,7 @@ export default function LocationSelectorModal({
                     </Pressable>
                   );
                 })}
+                {filteredCities.length > visibleCount && <Pressable style={styles.loadMore} onPress={() => setVisibleCount(count => count + 100)}><Text style={styles.loadMoreText}>عرض ١٠٠ مدينة إضافية · المتبقي {filteredCities.length - visibleCount}</Text></Pressable>}
               </>
             )}
 
@@ -313,7 +336,7 @@ export default function LocationSelectorModal({
 
                 <View style={styles.divider} />
 
-                {filteredDistricts.map(dist => {
+                {filteredDistricts.slice(0, visibleCount).map(dist => {
                   const isSelected = selectedCity === selectedCit?.name && selectedDistrict === dist.name;
                   return (
                     <Pressable
@@ -333,6 +356,7 @@ export default function LocationSelectorModal({
                     </Pressable>
                   );
                 })}
+                {filteredDistricts.length > visibleCount && <Pressable style={styles.loadMore} onPress={() => setVisibleCount(count => count + 100)}><Text style={styles.loadMoreText}>عرض ١٠٠ حي إضافي · المتبقي {filteredDistricts.length - visibleCount}</Text></Pressable>}
               </>
             )}
           </ScrollView>
@@ -423,6 +447,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#f1f5f9',
     marginVertical: 6,
   },
+  loadMore: { alignItems: 'center', padding: 14, borderRadius: 14, backgroundColor: '#ecfdf5' },
+  loadMoreText: { color: '#047857', fontSize: 13, fontWeight: '800' },
   itemCard: {
     flexDirection: 'row-reverse',
     alignItems: 'center',

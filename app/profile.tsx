@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import {
   Alert,
   Image,
@@ -8,78 +8,50 @@ import {
   Text,
   TextInput,
   View,
-  Switch,
   Platform,
-  Modal,
   ActivityIndicator,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useFocusEffect } from 'expo-router';
 import { supabase } from '@/lib/supabase';
-import { registerPushToken } from '@/lib/notifications';
 import { C } from '@/lib/ui';
+import { savePermanentMyLocation } from '@/lib/locationSync';
 import {
   Camera,
   MapPin,
-  Bell,
-  Shield,
   LogOut,
   ChevronRight,
   User,
   Settings,
-  Info,
-  Lock,
-  ChevronLeft,
-  Sliders,
   Sparkles,
   ChevronDown,
-  Compass,
-  ShieldCheck,
-  Eye,
-  EyeOff,
-  BellOff,
-  UserX,
   Users,
-  UserCheck,
   X,
-  Trash2,
-  FileCheck,
-  CheckCircle2,
-  Clock,
+  Bookmark,
+  MessageCircle,
 } from 'lucide-react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import BottomNav from '@/components/BottomNav';
 import ActionSheet from '@/components/ActionSheet';
 import LocationSelectorModal from '@/components/LocationSelectorModal';
-import ResidentCard from '@/components/ResidentCard';
 import { generateSmartBioAI } from '@/lib/aiAssistant';
-import { verifyGPSInDistrict } from '@/lib/nationalAddress';
 
 export default function Profile() {
   const [p, setP] = useState<any>({});
   const [userId, setUserId] = useState<string | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [personalName, setPersonalName] = useState('');
+  const [region, setRegion] = useState('');
   const [city, setCity] = useState('');
   const [district, setDistrict] = useState('');
   const [bio, setBio] = useState('');
-  const [hideName, setHideName] = useState(false);
-  const [profilePrivacy, setProfilePrivacy] = useState<'public' | 'private'>('public');
-  const [dndEnabled, setDndEnabled] = useState(false);
-  const [pushEnabled, setPushEnabled] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
-  const [isGeoVerified, setIsGeoVerified] = useState(false);
-  const [geoChecking, setGeoChecking] = useState(false);
   const [saving, setSaving] = useState(false);
-
-  // Identity verification modal state
-  const [idModalOpen, setIdModalOpen] = useState(false);
-  const [idDocType, setIdDocType] = useState<'national_id' | 'iqama' | 'freelance'>('national_id');
-  const [idNumber, setIdNumber] = useState('');
-  const [idVerificationStatus, setIdVerificationStatus] = useState<'none' | 'pending' | 'verified'>('none');
-  const [idSubmitting, setIdSubmitting] = useState(false);
+  const [editingProfile, setEditingProfile] = useState(false);
 
   const [stats, setStats] = useState({ questions: 0, answers: 0, followers: 0, following: 0 });
+  const [savedQuestions, setSavedQuestions] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<'posts' | 'replies' | 'saved'>('posts');
+  const [myQuestions, setMyQuestions] = useState<any[]>([]);
+  const [myAnswers, setMyAnswers] = useState<any[]>([]);
 
   // Follows modal state
   const [followsModalOpen, setFollowsModalOpen] = useState(false);
@@ -87,10 +59,6 @@ export default function Profile() {
   const [followsList, setFollowsList] = useState<any[]>([]);
   const [followsLoading, setFollowsLoading] = useState(false);
 
-  // Blocked users modal state
-  const [blockedModalOpen, setBlockedModalOpen] = useState(false);
-  const [blockedList, setBlockedList] = useState<any[]>([]);
-  const [blockedLoading, setBlockedLoading] = useState(false);
 
   const loadProfile = useCallback(async () => {
     const { data: authData } = await supabase.auth.getUser();
@@ -98,34 +66,17 @@ export default function Profile() {
     const uid = authData.user.id;
     setUserId(uid);
 
-    // 1. Load cached settings from AsyncStorage
-    try {
-      const cached = await AsyncStorage.getItem(`@hayna_privacy_settings_${uid}`);
-      if (cached) {
-        const c = JSON.parse(cached);
-        if (typeof c.hide_name === 'boolean') setHideName(c.hide_name);
-        if (c.profile_privacy) setProfilePrivacy(c.profile_privacy);
-        if (typeof c.dnd_enabled === 'boolean') setDndEnabled(c.dnd_enabled);
-        if (typeof c.is_geoverified === 'boolean') setIsGeoVerified(c.is_geoverified);
-        if (c.id_verification_status) setIdVerificationStatus(c.id_verification_status);
-        if (typeof c.push_enabled === 'boolean') setPushEnabled(c.push_enabled);
-        if (c.bio && !bio) setBio(c.bio);
-        if (c.city && !city) setCity(c.city);
-        if (c.district && !district) setDistrict(c.district);
-      }
-    } catch (e) {
-      console.warn('AsyncStorage cache load error', e);
-    }
-
-    // 2. Fetch from Supabase
+    // Fetch the current profile and its activity from Supabase.
     const r = await supabase.from('profiles').select('*').eq('id', uid).single();
 
-    const [qCount, aCount, followersCount, followingCount, verifyReq] = await Promise.all([
+    const [qCount, aCount, followersCount, followingCount, savedRes, postsRes, repliesRes] = await Promise.all([
       supabase.from('questions').select('id', { count: 'exact', head: true }).eq('author_id', uid),
       supabase.from('answers').select('id', { count: 'exact', head: true }).eq('author_id', uid),
       supabase.from('follows').select('id', { count: 'exact', head: true }).eq('following_id', uid),
       supabase.from('follows').select('id', { count: 'exact', head: true }).eq('follower_id', uid),
-      supabase.from('verification_requests').select('*').eq('user_id', uid).order('created_at', { ascending: false }).limit(1),
+      supabase.from('saved_questions').select('*, questions(id, title, body, created_at, city, district, author_id)').eq('user_id', uid).order('created_at', { ascending: false }).limit(20),
+      supabase.from('questions').select('id, title, body, created_at, city, district').eq('author_id', uid).order('created_at', { ascending: false }).limit(50),
+      supabase.from('answers').select('id, body, created_at, question_id, questions(title)').eq('author_id', uid).order('created_at', { ascending: false }).limit(50),
     ]);
 
     setStats({
@@ -135,59 +86,27 @@ export default function Profile() {
       following: followingCount.count || 0,
     });
 
-    if (verifyReq.data && verifyReq.data.length > 0) {
-      const req = verifyReq.data[0];
-      setIdVerificationStatus(req.status === 'approved' ? 'verified' : 'pending');
-    }
+    // Load saved questions
+    const savedItems = (savedRes.data || []).map((s: any) => s.questions).filter(Boolean);
+    setSavedQuestions(savedItems);
+    setMyQuestions(postsRes.data || []);
+    setMyAnswers(repliesRes.data || []);
 
     if (r.data) {
-      const userEmail = (authData.user?.email || '').toLowerCase().trim();
-      const adminRole = userEmail === 'root@gmail.com' || userEmail.startsWith('root@') || r.data.role === 'admin';
-      setIsAdmin(adminRole);
-      if (userEmail === 'root@gmail.com' || userEmail.startsWith('root@')) {
-        if (r.data.role !== 'admin') {
-          await supabase.from('profiles').update({ role: 'admin' }).eq('id', uid);
-          r.data.role = 'admin';
-        }
-      }
       setP(r.data);
-      if (r.data.city) setCity(r.data.city);
-      if (r.data.district) setDistrict(r.data.district);
-      if (r.data.bio) setBio(r.data.bio);
-      if (typeof r.data.hide_name === 'boolean') setHideName(r.data.hide_name);
-      if (r.data.profile_privacy) setProfilePrivacy(r.data.profile_privacy);
-      if (typeof r.data.dnd_enabled === 'boolean') setDndEnabled(r.data.dnd_enabled);
-      if (typeof r.data.is_geoverified === 'boolean') setIsGeoVerified(r.data.is_geoverified);
-      if (r.data.is_verified) setIdVerificationStatus('verified');
+      setPersonalName(r.data.display_name || '');
+      setRegion(r.data.region || '');
+      setCity(r.data.city || '');
+      setDistrict(r.data.district || '');
+      setBio(r.data.bio || '');
     }
-  }, [bio, city, district]);
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
       loadProfile();
     }, [loadProfile])
   );
-
-  async function persistLocalSettings(overrides: Record<string, any> = {}) {
-    if (!userId) return;
-    try {
-      const current = {
-        hide_name: hideName,
-        profile_privacy: profilePrivacy,
-        dnd_enabled: dndEnabled,
-        is_geoverified: isGeoVerified,
-        id_verification_status: idVerificationStatus,
-        push_enabled: pushEnabled,
-        city,
-        district,
-        bio,
-        ...overrides,
-      };
-      await AsyncStorage.setItem(`@hayna_privacy_settings_${userId}`, JSON.stringify(current));
-    } catch (e) {
-      console.warn('AsyncStorage cache save error', e);
-    }
-  }
 
   async function logout() {
     await supabase.auth.signOut();
@@ -211,72 +130,45 @@ export default function Profile() {
     const up = await supabase.storage.from('avatars').upload(path, blob, { contentType: 'image/jpeg', upsert: true });
     if (up.error) return Alert.alert('خطأ', up.error.message);
     const { data } = supabase.storage.from('avatars').getPublicUrl(path);
-    await supabase.from('profiles').update({ avatar_url: data.publicUrl }).eq('id', u.user.id);
+    const saved = await supabase.from('profiles').update({ avatar_url: data.publicUrl }).eq('id', u.user.id).select('id').maybeSingle();
+    if (saved.error) return Alert.alert('تعذّر حفظ الصورة', saved.error.message);
+    if (!saved.data) return Alert.alert('تعذّر حفظ الصورة', 'لم يتم تحديث ملف الحساب. أعد تسجيل الدخول ثم حاول مجدداً.');
     setP({ ...p, avatar_url: data.publicUrl });
   }
 
   // Toggle Handlers with Instant Persistence
-  async function handlePrivacyToggle(isPrivate: boolean) {
-    const val = isPrivate ? 'private' : 'public';
-    setProfilePrivacy(val);
-    await persistLocalSettings({ profile_privacy: val });
-    if (userId) {
-      await supabase.from('profiles').update({ profile_privacy: val }).eq('id', userId);
-    }
-  }
-
-  async function handleHideNameToggle(val: boolean) {
-    setHideName(val);
-    await persistLocalSettings({ hide_name: val });
-    if (userId) {
-      await supabase.from('profiles').update({ hide_name: val }).eq('id', userId);
-    }
-  }
-
-  async function handleDndToggle(val: boolean) {
-    setDndEnabled(val);
-    await persistLocalSettings({ dnd_enabled: val });
-    if (userId) {
-      await supabase.from('profiles').update({ dnd_enabled: val }).eq('id', userId);
-    }
-  }
-
-  async function handlePushNotifications() {
-    try {
-      await registerPushToken();
-      setPushEnabled(true);
-      await persistLocalSettings({ push_enabled: true });
-      Alert.alert('تم التفعيل! 🔔', 'تم تفعيل التنبيهات الفورية لحسابك بنجاح لتصلك إشعارات وطلبات الحي.');
-    } catch (e: any) {
-      Alert.alert('تنبيه', 'تم حفظ رغبتك في استلام الإشعارات.');
-    }
-  }
-
   async function save() {
     if (!userId) return;
+    if ((region.trim() || city.trim() || district.trim()) && (!city.trim() || !district.trim())) {
+      return Alert.alert('أكمل بيانات الحي', 'لإظهار محتوى الحي وحماية الخصوصية، اختر مدينة وحيّاً محدداً. اترك الموقع كله فارغاً إذا كنت تريد حفظ الاسم فقط.');
+    }
     setSaving(true);
 
     const payload: any = {
+      display_name: personalName.trim() || null,
+      region: region.trim() || null,
       city: city.trim() || null,
       district: district.trim() || null,
       bio: bio.trim() || null,
-      hide_name: hideName,
-      profile_privacy: profilePrivacy,
-      dnd_enabled: dndEnabled,
-      is_geoverified: isGeoVerified,
     };
 
-    // Save locally immediately
-    await persistLocalSettings(payload);
+    try {
+      const result = await supabase.from('profiles').update(payload).eq('id', userId).select('id').maybeSingle();
+      if (result.error) throw result.error;
+      if (!result.data) throw new Error('لم يُحدّث أي سجل. سجّل الخروج ثم الدخول وحاول مرة أخرى.');
 
-    // Save to Supabase
-    const r = await supabase.from('profiles').update(payload).eq('id', userId);
-    setSaving(false);
-
-    if (r.error) {
-      Alert.alert('تم الحفظ محلياً! ✅', 'تم حفظ كافة بياناتك والخيارات في جهازك بنجاح.');
-    } else {
-      Alert.alert('تم بنجاح! ✅', 'تم حفظ جميع إعدادات ملفك الشخصي والخصوصية في حيّنا.');
+      setP((current: any) => ({ ...current, ...payload }));
+      await savePermanentMyLocation({
+        region: region.trim() || 'المملكة',
+        city: city.trim() || 'كل المدن',
+        district: district.trim() || 'كل الأحياء',
+      }, false);
+      setEditingProfile(false);
+      Alert.alert('تم الحفظ', 'تم تحديث الاسم والمدينة والحي والنبذة في حسابك.');
+    } catch (error: any) {
+      Alert.alert('تعذّر الحفظ', error?.message || 'لم يتم تحديث الملف. تحقق من الاتصال وإعدادات قاعدة البيانات ثم حاول مجدداً.');
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -320,169 +212,11 @@ export default function Profile() {
     setStats(s => ({ ...s, following: Math.max(0, s.following - 1) }));
   }
 
-  // Load blocked users list
-  async function openBlockedModal() {
-    if (!userId) return;
-    setBlockedModalOpen(true);
-    setBlockedLoading(true);
-
-    try {
-      const { data } = await supabase
-        .from('blocks')
-        .select('blocked_id, profiles:blocked_id(id, display_name, username, avatar_url, city, district)')
-        .eq('blocker_id', userId);
-
-      const list = (data || []).map((b: any) => b.profiles).filter(Boolean);
-      setBlockedList(list);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setBlockedLoading(false);
-    }
-  }
-
-  // Unblock user
-  async function unblockUser(targetId: string) {
-    if (!userId) return;
-    await supabase.from('blocks').delete().eq('blocker_id', userId).eq('blocked_id', targetId);
-    setBlockedList(prev => prev.filter(u => u.id !== targetId));
-    Alert.alert('تم إلغاء الحظر', 'تم رفع الحظر عن هذا المستخدم بنجاح.');
-  }
-
-  // Submit Identity Verification Request
-  async function submitIdVerification() {
-    if (!userId) return;
-    setIdSubmitting(true);
-    const docLabels: Record<string, string> = {
-      national_id: 'الهوية الوطنية 🇸🇦',
-      iqama: 'هوية مقيم 📄',
-      freelance: 'وثيقة العمل الحر / سجل تجاري 💼',
-    };
-    const noteText = `نوع الوثيقة: ${docLabels[idDocType]}${idNumber ? ` - رقم الوثيقة: ${idNumber}` : ''}`;
-
-    try {
-      await supabase.from('verification_requests').insert({
-        user_id: userId,
-        note: noteText,
-        status: 'pending',
-      });
-      setIdVerificationStatus('pending');
-      await persistLocalSettings({ id_verification_status: 'pending' });
-      setIdModalOpen(false);
-      Alert.alert(
-        'تم إرسال الطلب بنجاح! 🛡️',
-        'تم تسجيل طلب توثيق هويتك، وسيتم مراجعته ومنحك شارة التوثيق الرسمية خلال وقت وجيز.'
-      );
-    } catch (e: any) {
-      setIdVerificationStatus('pending');
-      await persistLocalSettings({ id_verification_status: 'pending' });
-      setIdModalOpen(false);
-      Alert.alert('تم الاستلام! 🛡️', 'تم تسجيل طلبك محلياً وجاري اعتماده.');
-    } finally {
-      setIdSubmitting(false);
-    }
-  }
-
   function handleGenerateAIBio() {
     const generated = generateSmartBioAI(city || 'الرياض', district || 'الياسمين');
     setBio(generated);
   }
 
-  async function verifyResidentGPS() {
-    if (!city || !district) {
-      return Alert.alert('تنبيه', 'يرجى اختيار مدينتك وحيك أولاً لتأكيد نطاق الحي.');
-    }
-
-    setGeoChecking(true);
-    try {
-      if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          async pos => {
-            const { latitude, longitude } = pos.coords;
-            const res = verifyGPSInDistrict(latitude, longitude, city, district);
-            // Grant verification either directly or with confirmed neighbor fallback
-            if (res.isVerified || res.distanceKm <= 50) {
-              if (userId) {
-                await supabase
-                  .from('profiles')
-                  .update({ is_geoverified: true, geoverified_at: new Date().toISOString() })
-                  .eq('id', userId);
-              }
-              setIsGeoVerified(true);
-              await persistLocalSettings({ is_geoverified: true });
-              Alert.alert('🎉 تم التحقق بنجاح!', `تم منحك شارة «ابن الحي الموثّق» لمطابقة تواجدك في حي ${district} بمدينة ${city}.`);
-            } else {
-              // Give option to confirm
-              Alert.alert(
-                'تأكيد التواجد الجغرافي 📍',
-                `موقعك الحالي يبعد حوالي ${res.distanceKm} كم عن المركز. هل تؤكد تواجدك وسكنك الفعلي في حي ${district}؟`,
-                [
-                  { text: 'إلغاء', style: 'cancel' },
-                  {
-                    text: 'نعم، أؤكد توثيقي بالحي',
-                    onPress: async () => {
-                      if (userId) {
-                        await supabase
-                          .from('profiles')
-                          .update({ is_geoverified: true, geoverified_at: new Date().toISOString() })
-                          .eq('id', userId);
-                      }
-                      setIsGeoVerified(true);
-                      await persistLocalSettings({ is_geoverified: true });
-                      Alert.alert('🎉 تم التوثيق!', `تم منحك شارة ابن الحي الموثّق في حي ${district} بنجاح.`);
-                    },
-                  },
-                ]
-              );
-            }
-            setGeoChecking(false);
-          },
-          async err => {
-            // Geolocation blocked or denied -> Allow resident self-confirmation
-            Alert.alert(
-              'التوثيق كساكن في الحي 🛡️',
-              `هل تؤكد تواجدك وسكنك الفعلي في حي ${district} بمدينة ${city} للحصول على شارة التوثيق؟`,
-              [
-                { text: 'إلغاء', style: 'cancel' },
-                {
-                  text: 'نعم، أؤكد تواصلي بالحي',
-                  onPress: async () => {
-                    if (userId) {
-                      await supabase
-                        .from('profiles')
-                        .update({ is_geoverified: true, geoverified_at: new Date().toISOString() })
-                        .eq('id', userId);
-                    }
-                    setIsGeoVerified(true);
-                    await persistLocalSettings({ is_geoverified: true });
-                    Alert.alert('🎉 تم التوثيق!', `تم منحك شارة ابن الحي الموثّق في حي ${district} بنجاح.`);
-                  },
-                },
-              ]
-            );
-            setGeoChecking(false);
-          },
-          { enableHighAccuracy: true, timeout: 8000 }
-        );
-      } else {
-        if (userId) {
-          await supabase
-            .from('profiles')
-            .update({ is_geoverified: true, geoverified_at: new Date().toISOString() })
-            .eq('id', userId);
-        }
-        setIsGeoVerified(true);
-        await persistLocalSettings({ is_geoverified: true });
-        Alert.alert('🎉 تم التحقق بنجاح!', `تم توثيق تواجدك الفعلي في حي ${district} بمدينة ${city}.`);
-        setGeoChecking(false);
-      }
-    } catch (e: any) {
-      setIsGeoVerified(true);
-      await persistLocalSettings({ is_geoverified: true });
-      Alert.alert('🎉 تم التوثيق!', `تم توثيق حسابك في حي ${district}.`);
-      setGeoChecking(false);
-    }
-  }
 
   return (
     <View style={styles.container}>
@@ -490,456 +224,142 @@ export default function Profile() {
         {/* ======================================================== */}
         {/* 1. PROFILE HERO HEADER & AVATAR                          */}
         {/* ======================================================== */}
-        <LinearGradient
-          colors={['#065f46', '#059669', '#10b981']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.headerHero}
-        >
-          <View style={styles.navBar}>
-            <View style={{ width: 40 }} />
-            <Text style={styles.navTitle}>الملف الشخصي</Text>
-            <Pressable onPress={() => router.push('/settings')} style={styles.settingsNavBtn}>
-              <Settings size={22} color="#fff" />
+        <View style={styles.profileHero}>
+          <View style={styles.profileTopBar}>
+            <Pressable onPress={() => router.back()} style={styles.profileTopButton}>
+              <ChevronRight size={22} color="#0f172a" />
+            </Pressable>
+            <Text style={styles.profileTopTitle}>الملف الشخصي</Text>
+            <Pressable onPress={() => router.push('/settings')} style={styles.profileTopButton}>
+              <Settings size={21} color="#0f172a" />
             </Pressable>
           </View>
 
-          <View style={styles.avatarSection}>
-            <Pressable onPress={pickAvatar} style={styles.avatarWrapper}>
-              {p.avatar_url ? (
-                <Image source={{ uri: p.avatar_url }} style={styles.avatarImage} />
-              ) : (
-                <View style={styles.avatarPlaceholder}>
-                  <User size={50} color="#fff" />
-                </View>
-              )}
-              <View style={styles.editIconWrapper}>
-                <Camera size={20} color="#059669" />
-              </View>
+          <View style={styles.profileSummary}>
+            <Pressable onPress={pickAvatar} style={styles.twitterAvatarWrap}>
+              {p.avatar_url ? <Image source={{ uri: p.avatar_url }} style={styles.twitterAvatar} /> :
+                <View style={styles.twitterAvatarFallback}><User size={38} color="#64748b" /></View>}
+              <View style={styles.twitterAvatarEdit}><Camera size={15} color="#fff" /></View>
             </Pressable>
-
-            {/* Display name with incognito badge if active */}
-            <View style={styles.nameRow}>
-              <Text style={styles.username}>
-                {hideName ? 'جار مجهول 🕶️' : p.display_name || `@${p.username || 'مستخدم'}`}
-                {idVerificationStatus === 'verified' || p.is_verified ? ' ✓' : ''}
-              </Text>
-            </View>
-
-            {/* Privacy & Verification Badges */}
-            <View style={styles.statusBadgesRow}>
-              {isGeoVerified && (
-                <View style={styles.verifiedResidentTag}>
-                  <ShieldCheck size={13} color="#15803d" />
-                  <Text style={styles.verifiedResidentTagText}>ابن الحي الموثّق 🛡️</Text>
-                </View>
-              )}
-
-              {idVerificationStatus === 'pending' && (
-                <View style={styles.pendingTag}>
-                  <Clock size={12} color="#f59e0b" />
-                  <Text style={styles.pendingTagText}>توثيق الهوية قيد المراجعة ⏳</Text>
-                </View>
-              )}
-
-              {idVerificationStatus === 'verified' && (
-                <View style={styles.verifiedIdTag}>
-                  <CheckCircle2 size={12} color="#0284c7" />
-                  <Text style={styles.verifiedIdTagText}>موثّق بالهوية الرسمية ✓</Text>
-                </View>
-              )}
-
-              {profilePrivacy === 'private' && (
-                <View style={styles.privateTag}>
-                  <Lock size={12} color="#e0f2fe" />
-                  <Text style={styles.privateTagText}>حساب مقفل 🔒</Text>
-                </View>
-              )}
-
-              {hideName && (
-                <View style={styles.incognitoTag}>
-                  <EyeOff size={12} color="#fef3c7" />
-                  <Text style={styles.incognitoTagText}>اسم مخفي 🕶️</Text>
-                </View>
-              )}
-
-              {dndEnabled && (
-                <View style={styles.dndTag}>
-                  <BellOff size={12} color="#fee2e2" />
-                  <Text style={styles.dndTagText}>عدم الإزعاج 🔕</Text>
-                </View>
-              )}
-            </View>
-
-            {/* ======================================================== */}
-            {/* STATS ROW (FOLLOWERS & FOLLOWING INTERACTIVE)            */}
-            {/* ======================================================== */}
-            <View style={styles.statsRow}>
-              <View style={styles.statBox}>
-                <Text style={styles.statNumber}>{stats.questions}</Text>
-                <Text style={styles.statLabel}>أسئلة</Text>
-              </View>
-
-              <View style={styles.statDivider} />
-
-              <View style={styles.statBox}>
-                <Text style={styles.statNumber}>{stats.answers}</Text>
-                <Text style={styles.statLabel}>مشاركات</Text>
-              </View>
-
-              <View style={styles.statDivider} />
-
-              {/* Followers Tap -> Modal */}
-              <Pressable style={styles.statBoxInteractive} onPress={() => openFollowsModal('followers')}>
-                <Text style={[styles.statNumber, { color: '#38bdf8' }]}>{stats.followers}</Text>
-                <Text style={styles.statLabel}>متابعون 👥</Text>
-              </Pressable>
-
-              <View style={styles.statDivider} />
-
-              {/* Following Tap -> Modal */}
-              <Pressable style={styles.statBoxInteractive} onPress={() => openFollowsModal('following')}>
-                <Text style={[styles.statNumber, { color: '#38bdf8' }]}>{stats.following}</Text>
-                <Text style={styles.statLabel}>يتابع 👈</Text>
-              </Pressable>
-            </View>
+            <Pressable style={styles.editProfileButton} onPress={() => setEditingProfile(v => !v)}>
+              <Text style={styles.editProfileButtonText}>{editingProfile ? 'إغلاق التعديل' : 'تعديل الملف الشخصي'}</Text>
+            </Pressable>
           </View>
-        </LinearGradient>
+
+          <Text style={styles.twitterDisplayName}>{personalName || 'أضف اسمك الشخصي'}</Text>
+          <Text style={styles.twitterHandle}>@{p.username || 'username'}</Text>
+          {!!bio.trim() && <Text style={styles.twitterBio}>{bio}</Text>}
+          {(city || district) ? (
+            <View style={styles.twitterLocation}><MapPin size={14} color="#64748b" />
+              <Text style={styles.twitterLocationText}>{[region, district && `حي ${district}`, city].filter(Boolean).join('، ')}</Text>
+            </View>
+          ) : null}
+
+          <View style={styles.twitterStats}>
+            <Pressable onPress={() => openFollowsModal('following')} style={styles.twitterStat}>
+              <Text style={styles.twitterStatNum}>{stats.following}</Text><Text style={styles.twitterStatLabel}>يتابع</Text>
+            </Pressable>
+            <Pressable onPress={() => openFollowsModal('followers')} style={styles.twitterStat}>
+              <Text style={styles.twitterStatNum}>{stats.followers}</Text><Text style={styles.twitterStatLabel}>متابع</Text>
+            </Pressable>
+            <Text style={styles.twitterStat}><Text style={styles.twitterStatNum}>{stats.questions + stats.answers}</Text><Text style={styles.twitterStatLabel}> منشور</Text></Text>
+          </View>
+        </View>
 
         <View style={styles.contentArea}>
-          <ResidentCard 
-            name={hideName ? 'جار مجهول' : p.display_name || 'مستخدم'} 
-            district={district} 
-            city={city} 
-            isVerified={isGeoVerified || idVerificationStatus === 'verified' || p.is_verified}
-            onPressQR={() => Alert.alert('QR Code', 'هذه الميزة قيد التطوير')}
-          />
-          {/* ======================================================== */}
-          {/* 2. ADVANCED PRIVACY & SECURITY CONTROLS                  */}
-          {/* ======================================================== */}
-          <View style={styles.card}>
-            <View style={styles.sectionHeader}>
-              <Lock size={20} color={C.accent} />
-              <Text style={styles.sectionTitle}>الخصوصية وقفل الحساب</Text>
-            </View>
-
-            {/* 1. قفل الملف الشخصي (Private Profile) */}
-            <View style={styles.settingRow}>
-              <View style={styles.settingText}>
-                <View style={styles.settingLabelWithBadge}>
-                  <Text style={styles.settingTitle}>قفل الملف الشخصي (حساب خاص)</Text>
-                  <Lock size={15} color="#0891b2" />
-                </View>
-                <Text style={styles.settingDesc}>
-                  لا يمكن للغرباء مشاهدة معلومات ملفك ونشاطاتك في الحي إلا بعد متابعتهم لك.
-                </Text>
-              </View>
-              <Switch
-                value={profilePrivacy === 'private'}
-                onValueChange={handlePrivacyToggle}
-                trackColor={{ false: '#e2e8f0', true: '#bae6fd' }}
-                thumbColor={profilePrivacy === 'private' ? C.accent : '#9ca3af'}
+          {editingProfile && (
+            <View style={styles.editProfileCard}>
+              <Text style={styles.editProfileHeading}>تعديل الملف الشخصي</Text>
+              <Text style={styles.label}>الاسم الشخصي</Text>
+              <TextInput
+                style={styles.profileInput}
+                value={personalName}
+                onChangeText={setPersonalName}
+                placeholder="اسمك الذي يظهر للناس"
+                placeholderTextColor="#94a3b8"
+                maxLength={60}
               />
-            </View>
-
-            {/* 2. إخفاء اسمي في الحي (Hide My Name) */}
-            <View style={styles.settingRow}>
-              <View style={styles.settingText}>
-                <View style={styles.settingLabelWithBadge}>
-                  <Text style={styles.settingTitle}>إخفاء اسمي (وضع الجار المجهول)</Text>
-                  <EyeOff size={15} color="#f59e0b" />
-                </View>
-                <Text style={styles.settingDesc}>
-                  يظهر اسمك كـ "جار مجهول 🕶️" عند طرح الأسئلة أو إضافة ردود ومشاركات بالحي.
-                </Text>
-              </View>
-              <Switch
-                value={hideName}
-                onValueChange={handleHideNameToggle}
-                trackColor={{ false: '#e2e8f0', true: '#bae6fd' }}
-                thumbColor={hideName ? C.accent : '#9ca3af'}
-              />
-            </View>
-
-            {/* 3. وضع عدم الإزعاج (Do Not Disturb / DND) */}
-            <View style={styles.settingRow}>
-              <View style={styles.settingText}>
-                <View style={styles.settingLabelWithBadge}>
-                  <Text style={styles.settingTitle}>وضع عدم الإزعاج (DND)</Text>
-                  <BellOff size={15} color="#ef4444" />
-                </View>
-                <Text style={styles.settingDesc}>
-                  كتم أصوات وتنبيهات الرسائل الخاصة والمحادثات مؤقتاً لراحتك.
-                </Text>
-              </View>
-              <Switch
-                value={dndEnabled}
-                onValueChange={handleDndToggle}
-                trackColor={{ false: '#e2e8f0', true: '#fca5a5' }}
-                thumbColor={dndEnabled ? '#ef4444' : '#9ca3af'}
-              />
-            </View>
-
-            {/* 4. قائمة المحظورين (Blocked Users Button) */}
-            <Pressable style={styles.actionBtn} onPress={openBlockedModal}>
-              <UserX size={20} color="#dc2626" />
-              <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                <Text style={[styles.actionBtnText, { color: '#dc2626' }]}>
-                  قائمة المحظورين (Block List) 🚫
-                </Text>
-                <Text style={styles.actionBtnSub}>إدارة المستخدمين المحظورين وإلغاء الحظر</Text>
-              </View>
-              <ChevronLeft size={18} color="#94a3b8" />
-            </Pressable>
-          </View>
-
-          {/* ======================================================== */}
-          {/* 3. BASIC INFO & GEOGRAPHIC SELECTION                     */}
-          {/* ======================================================== */}
-          <View style={styles.card}>
-            <View style={styles.sectionHeader}>
-              <Info size={20} color={C.accent} />
-              <Text style={styles.sectionTitle}>معلوماتك الأساسية والحي</Text>
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>المنطقة والمدينة والحي (تحديد دقيق)</Text>
-              <Pressable
-                style={styles.locationSelectorCard}
-                onPress={() => setShowLocationModal(true)}
-              >
+              <Text style={styles.label}>اسم المستخدم</Text>
+              <TextInput style={[styles.profileInput, styles.readOnlyInput]} value={`@${p.username || ''}`} editable={false} />
+              <Text style={styles.label}>المدينة والحي</Text>
+              <Pressable style={styles.locationSelectorCard} onPress={() => setShowLocationModal(true)}>
                 <View style={styles.locationSelectorContent}>
-                  <View style={styles.locationIconBox}>
-                    <MapPin size={22} color={C.accent} />
-                  </View>
-                  <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                    <Text style={styles.locationTitle}>
-                      {city
-                        ? `${city}${district && district !== 'كل أحياء المدينة' ? ` · حي ${district}` : ''}`
-                        : 'حدد منطقتك ومدينتك وحيك...'}
-                    </Text>
-                    <Text style={styles.locationSub}>
-                      {city ? 'اضغط لتغيير المنطقة أو الحي' : 'حدد الحي لربط حسابك وتلقي استفسارات وخدمات جيرانك'}
-                    </Text>
-                  </View>
-                  <ChevronDown size={20} color={C.muted} />
+                  <MapPin size={20} color={C.accent} />
+                  <Text style={[styles.twitterLocationText, { flex: 1, textAlign: 'right' }]}>
+                    {city ? `${region ? `${region} · ` : ''}${city}${district ? ` · حي ${district}` : ''}` : 'اختر المنطقة والمدينة والحي'}
+                  </Text>
+                  <ChevronDown size={18} color={C.muted} />
                 </View>
               </Pressable>
-            </View>
-
-            <View style={styles.inputGroup}>
-              <View style={styles.bioLabelRow}>
-                <Pressable style={styles.aiBioBtn} onPress={handleGenerateAIBio}>
-                  <Sparkles size={14} color="#0891b2" />
-                  <Text style={styles.aiBioBtnText}>توليد نبذة ذكية بالذكاء الاصطناعي ✨</Text>
-                </Pressable>
-                <Text style={styles.label}>نبذة عنك</Text>
-              </View>
-              <View style={[styles.inputContainer, { height: 100, alignItems: 'flex-start' }]}>
-                <TextInput
-                  style={[styles.input, { height: 90, textAlignVertical: 'top' }]}
-                  multiline
-                  value={bio}
-                  onChangeText={setBio}
-                  placeholder="اكتب نبذة عنك، مهاراتك، أو خدمات تقدمها لأهل حيك..."
-                  placeholderTextColor="#9ca3af"
-                />
-              </View>
-            </View>
-          </View>
-
-          {/* ======================================================== */}
-          {/* 4. VERIFICATION & SYSTEM ACTIONS                         */}
-          {/* ======================================================== */}
-          <View style={styles.card}>
-            <View style={styles.sectionHeader}>
-              <ShieldCheck size={20} color={C.accent} />
-              <Text style={styles.sectionTitle}>التوثيق وشارة ابن الحي</Text>
-            </View>
-
-            {/* GPS Neighborhood verification */}
-            <Pressable style={styles.actionBtn} onPress={verifyResidentGPS} disabled={geoChecking}>
-              <Compass size={20} color={isGeoVerified ? '#15803d' : '#0891b2'} />
-              <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-                  <Text style={[styles.actionBtnText, { color: isGeoVerified ? '#15803d' : C.ink }]}>
-                    {isGeoVerified ? 'أنت موثّق كساكن فعلي بالحي ✓' : 'التحقق الجغرافي ونيل شارة «ابن الحي الموثّق» 🛡️'}
-                  </Text>
-                  {isGeoVerified && (
-                    <View style={styles.smallVerifiedBadge}>
-                      <Text style={styles.smallVerifiedBadgeText}>موثّق</Text>
-                    </View>
-                  )}
-                </View>
-                <Text style={styles.actionBtnSub}>
-                  {isGeoVerified ? 'موقعك الجغرافي متطابق مع نطاق حيك' : 'فحص GPS لمطابقة تواجدك الفعلي داخل الحي'}
-                </Text>
-              </View>
-              <ChevronLeft size={18} color="#94a3b8" />
-            </Pressable>
-
-            {/* ID Verification Request */}
-            <Pressable style={styles.actionBtn} onPress={() => setIdModalOpen(true)}>
-              <Shield size={20} color={idVerificationStatus === 'verified' ? '#0284c7' : idVerificationStatus === 'pending' ? '#f59e0b' : C.ink} />
-              <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-                  <Text style={[styles.actionBtnText, { color: idVerificationStatus === 'verified' ? '#0284c7' : C.ink }]}>
-                    {idVerificationStatus === 'verified'
-                      ? 'حسابك موثّق بالهوية الرسمية ✓'
-                      : idVerificationStatus === 'pending'
-                      ? 'طلب توثيق الهوية قيد المراجعة ⏳'
-                      : 'طلب توثيق الحساب بالهوية ✓'}
-                  </Text>
-                  {idVerificationStatus === 'pending' && (
-                    <View style={styles.smallPendingBadge}>
-                      <Text style={styles.smallPendingBadgeText}>قيد الفحص</Text>
-                    </View>
-                  )}
-                </View>
-                <Text style={styles.actionBtnSub}>
-                  {idVerificationStatus === 'verified'
-                    ? 'تم اعتماد هويتك رسمياً بشارة الصح الأزرق'
-                    : 'تقديم طلب توثيق رسمي بالهوية الوطنية أو هوية مقيم'}
-                </Text>
-              </View>
-              <ChevronLeft size={18} color="#94a3b8" />
-            </Pressable>
-
-            {/* Push notifications activation */}
-            <Pressable style={styles.actionBtn} onPress={handlePushNotifications}>
-              <Bell size={20} color={pushEnabled ? '#15803d' : C.ink} />
-              <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-                  <Text style={[styles.actionBtnText, { color: pushEnabled ? '#15803d' : C.ink }]}>
-                    {pushEnabled ? 'تنبيهات الجوال الفورية مفعّلة ✓' : 'تفعيل إشعارات الجوال الفورية'}
-                  </Text>
-                  {pushEnabled && (
-                    <View style={styles.smallActiveBadge}>
-                      <Text style={styles.smallActiveBadgeText}>مفعل</Text>
-                    </View>
-                  )}
-                </View>
-                <Text style={styles.actionBtnSub}>
-                  {pushEnabled ? 'ستصلك كافة التنبيهات والطلبات فوراً' : 'تلقي إشعارات الحالات والمحادثات والأسئلة ببيتك'}
-                </Text>
-              </View>
-              <ChevronLeft size={18} color="#94a3b8" />
-            </Pressable>
-
-            {isAdmin && (
-              <Pressable style={[styles.actionBtn, { borderBottomWidth: 0 }]} onPress={() => router.push('/admin')}>
-                <ShieldCheck size={20} color="#059669" />
-                <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                  <Text style={[styles.actionBtnText, { color: '#059669', fontWeight: '800' }]}>
-                    لوحة تحكم مدير النظام 🛡️
-                  </Text>
-                  <Text style={styles.actionBtnSub}>خاص بمسؤول المنصة والرقابة فقط</Text>
-                </View>
-                <ChevronLeft size={18} color="#059669" />
+              <Text style={styles.label}>نبذة</Text>
+              <TextInput
+                style={[styles.profileInput, styles.bioInput]}
+                value={bio}
+                onChangeText={setBio}
+                placeholder="اكتب نبذة قصيرة عنك"
+                placeholderTextColor="#94a3b8"
+                multiline
+                maxLength={240}
+              />
+              <Pressable style={styles.saveProfileButton} onPress={save} disabled={saving}>
+                {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveProfileButtonText}>حفظ التغييرات</Text>}
               </Pressable>
-            )}
+            </View>
+          )}
+
+          <View style={styles.profileTabs}>
+            {([
+              ['posts', 'المنشورات'], ['replies', 'الردود'], ['saved', 'المحفوظات'],
+            ] as const).map(([key, label]) => (
+              <Pressable key={key} onPress={() => setActiveTab(key)} style={styles.profileTab}>
+                <Text style={[styles.profileTabText, activeTab === key && styles.profileTabTextActive]}>{label}</Text>
+                {activeTab === key && <View style={styles.profileTabIndicator} />}
+              </Pressable>
+            ))}
           </View>
 
-          {/* Save Button */}
-          <Pressable style={[styles.saveBtn, saving && { opacity: 0.6 }]} onPress={save} disabled={saving}>
-            {saving ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <Text style={styles.saveBtnText}>حفظ إعدادات الحساب والخصوصية ✨</Text>
-            )}
-          </Pressable>
+          {activeTab === 'posts' && (myQuestions.length ? myQuestions.map(item => (
+            <Pressable key={item.id} style={styles.feedItem} onPress={() => router.push({ pathname: '/question', params: { id: item.id } })}>
+              <View style={styles.feedAvatarSmall}>{p.avatar_url ? <Image source={{ uri: p.avatar_url }} style={styles.feedAvatarImage} /> : <User size={18} color="#64748b" />}</View>
+              <View style={styles.feedBody}>
+                <Text style={styles.feedAuthor}>{personalName || 'مستخدم'} <Text style={styles.feedHandle}>@{p.username || 'username'} · {new Date(item.created_at).toLocaleDateString('ar-SA')}</Text></Text>
+                <Text style={styles.feedTitle}>{item.title}</Text>
+                <Text style={styles.feedText} numberOfLines={4}>{item.body}</Text>
+                {(item.district || item.city) && <Text style={styles.feedMeta}>{[item.district && `حي ${item.district}`, item.city].filter(Boolean).join(' · ')}</Text>}
+              </View>
+            </Pressable>
+          )) : <Text style={styles.emptyFeed}>لا توجد منشورات بعد.</Text>)}
 
-          {/* Logout */}
+          {activeTab === 'replies' && (myAnswers.length ? myAnswers.map(item => (
+            <Pressable key={item.id} style={styles.feedItem} onPress={() => router.push({ pathname: '/question', params: { id: item.question_id } })}>
+              <View style={styles.feedAvatarSmall}>{p.avatar_url ? <Image source={{ uri: p.avatar_url }} style={styles.feedAvatarImage} /> : <User size={18} color="#64748b" />}</View>
+              <View style={styles.feedBody}>
+                <Text style={styles.feedAuthor}>{personalName || 'مستخدم'} <Text style={styles.feedHandle}>@{p.username || 'username'} · ردّ على</Text></Text>
+                <Text style={styles.feedTitle}>{item.questions?.title || 'سؤال من الحي'}</Text>
+                <Text style={styles.feedText}>{item.body}</Text>
+              </View>
+            </Pressable>
+          )) : <Text style={styles.emptyFeed}>لا توجد ردود بعد.</Text>)}
+
+          {activeTab === 'saved' && (savedQuestions.length ? savedQuestions.map(item => (
+            <Pressable key={item.id} style={styles.feedItem} onPress={() => router.push({ pathname: '/question', params: { id: item.id } })}>
+              <View style={styles.feedAvatarSmall}><Bookmark size={18} color="#059669" /></View>
+              <View style={styles.feedBody}>
+                <Text style={styles.feedAuthor}>استفسار محفوظ</Text>
+                <Text style={styles.feedTitle}>{item.title}</Text>
+                <Text style={styles.feedText} numberOfLines={3}>{item.body}</Text>
+              </View>
+            </Pressable>
+          )) : <Text style={styles.emptyFeed}>لا توجد عناصر محفوظة بعد.</Text>)}
+        </View>
+
           <Pressable style={styles.logoutBtn} onPress={logout}>
-            <LogOut size={20} color={C.danger} style={{ marginLeft: 8 }} />
+            <LogOut size={18} color={C.danger} style={{ marginLeft: 8 }} />
             <Text style={styles.logoutText}>تسجيل الخروج</Text>
           </Pressable>
 
           <View style={{ height: 90 }} />
-        </View>
       </ScrollView>
-
-      {/* ======================================================== */}
-      {/* 5. IDENTITY VERIFICATION MODAL                           */}
-      {/* ======================================================== */}
-      <ActionSheet visible={idModalOpen} onClose={() => setIdModalOpen(false)} height="65%">
-        <View style={{ flex: 1 }}>
-            <View style={styles.modalHeaderRow}>
-              <Pressable onPress={() => setIdModalOpen(false)} style={styles.modalCloseBtn}>
-                <X size={20} color="#64748b" />
-              </Pressable>
-              <Text style={styles.modalTitle}>طلب توثيق الحساب بالهوية ✓</Text>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 450 }}>
-              <Text style={styles.idModalNotice}>
-                التوثيق يمنحك شارة الصح الأزرق الرسمية ويزيد موثوقية حسابك ومشاركاتك بين أهالي الحي.
-              </Text>
-
-              <Text style={styles.idModalSectionTitle}>اختر نوع الوثيقة الرسمية:</Text>
-              
-              <View style={styles.idOptionsRow}>
-                <Pressable
-                  style={[styles.idOptionCard, idDocType === 'national_id' && styles.idOptionCardActive]}
-                  onPress={() => setIdDocType('national_id')}
-                >
-                  <Text style={[styles.idOptionText, idDocType === 'national_id' && styles.idOptionTextActive]}>
-                    الهوية الوطنية 🇸🇦
-                  </Text>
-                </Pressable>
-
-                <Pressable
-                  style={[styles.idOptionCard, idDocType === 'iqama' && styles.idOptionCardActive]}
-                  onPress={() => setIdDocType('iqama')}
-                >
-                  <Text style={[styles.idOptionText, idDocType === 'iqama' && styles.idOptionTextActive]}>
-                    هوية مقيم 📄
-                  </Text>
-                </Pressable>
-
-                <Pressable
-                  style={[styles.idOptionCard, idDocType === 'freelance' && styles.idOptionCardActive]}
-                  onPress={() => setIdDocType('freelance')}
-                >
-                  <Text style={[styles.idOptionText, idDocType === 'freelance' && styles.idOptionTextActive]}>
-                    العمل الحر / سجل 💼
-                  </Text>
-                </Pressable>
-              </View>
-
-              <Text style={styles.label}>رقم الهوية أو الوثيقة (اختياري للتحقق الفوري):</Text>
-              <View style={[styles.inputContainer, { marginBottom: 16 }]}>
-                <TextInput
-                  style={styles.input}
-                  placeholder="مثال: 10XXXXXXXX أو 2XXXXXXXX"
-                  placeholderTextColor="#9ca3af"
-                  value={idNumber}
-                  onChangeText={setIdNumber}
-                  keyboardType="numeric"
-                />
-              </View>
-
-              <View style={styles.securityNoticeBox}>
-                <ShieldCheck size={18} color="#15803d" />
-                <Text style={styles.securityNoticeText}>
-                  بياناتك مشفرة ومحمية وفق أنظمة حماية البيانات الشخصية بالمملكة، ولا تظهر للعامة أبداً.
-                </Text>
-              </View>
-
-              <Pressable
-                style={[styles.saveBtn, idSubmitting && { opacity: 0.6 }]}
-                onPress={submitIdVerification}
-                disabled={idSubmitting}
-              >
-                {idSubmitting ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Text style={styles.saveBtnText}>إرسال طلب التوثيق الرسمي ✓</Text>
-                )}
-              </Pressable>
-            </ScrollView>
-        </View>
-      </ActionSheet>
 
       {/* ======================================================== */}
       {/* 6. FOLLOWERS & FOLLOWING MODAL                           */}
@@ -957,7 +377,7 @@ export default function Profile() {
 
             {followsLoading ? (
               <View style={styles.modalLoadingBox}>
-                <ActivityIndicator size="large" color="#0891b2" />
+                <ActivityIndicator size="large" color="#059669" />
                 <Text style={styles.modalLoadingText}>جاري التحميل...</Text>
               </View>
             ) : followsList.length === 0 ? (
@@ -1014,66 +434,10 @@ export default function Profile() {
                         <Image source={{ uri: u.avatar_url }} style={styles.followAvatar} />
                       ) : (
                         <View style={styles.followAvatarFallback}>
-                          <User size={20} color="#0891b2" />
+                          <User size={20} color="#059669" />
                         </View>
                       )}
                     </Pressable>
-                  </View>
-                ))}
-              </ScrollView>
-            )}
-        </View>
-      </ActionSheet>
-
-      {/* ======================================================== */}
-      {/* 7. BLOCKED USERS MODAL                                   */}
-      {/* ======================================================== */}
-      <ActionSheet visible={blockedModalOpen} onClose={() => setBlockedModalOpen(false)} height="50%">
-        <View style={{ flex: 1 }}>
-            <View style={styles.modalHeaderRow}>
-              <Pressable onPress={() => setBlockedModalOpen(false)} style={styles.modalCloseBtn}>
-                <X size={20} color="#64748b" />
-              </Pressable>
-              <Text style={styles.modalTitle}>قائمة المحظورين (Block List) 🚫</Text>
-            </View>
-
-            {blockedLoading ? (
-              <View style={styles.modalLoadingBox}>
-                <ActivityIndicator size="large" color="#ef4444" />
-              </View>
-            ) : blockedList.length === 0 ? (
-              <View style={styles.modalEmptyBox}>
-                <UserCheck size={48} color="#cbd5e1" />
-                <Text style={styles.modalEmptyTitle}>لا يوجد مستخدمون محظورون</Text>
-                <Text style={styles.modalEmptySub}>قائمتك نظيفة ولا تحتوي على أي مستخدم محظور.</Text>
-              </View>
-            ) : (
-              <ScrollView style={styles.modalList} showsVerticalScrollIndicator={false}>
-                {blockedList.map(u => (
-                  <View key={u.id} style={styles.followUserCard}>
-                    <Pressable
-                      style={styles.unblockBtn}
-                      onPress={() => unblockUser(u.id)}
-                    >
-                      <Text style={styles.unblockBtnText}>إلغاء الحظر</Text>
-                    </Pressable>
-
-                    <View style={styles.followUserInfo}>
-                      <View style={{ alignItems: 'flex-end' }}>
-                        <Text style={styles.followUserName}>
-                          {u.display_name || `@${u.username}`}
-                        </Text>
-                        <Text style={styles.followUserLocation}>محظور من المراسلة والأنشطة</Text>
-                      </View>
-
-                      {u.avatar_url ? (
-                        <Image source={{ uri: u.avatar_url }} style={styles.followAvatar} />
-                      ) : (
-                        <View style={styles.followAvatarFallback}>
-                          <User size={20} color="#dc2626" />
-                        </View>
-                      )}
-                    </View>
                   </View>
                 ))}
               </ScrollView>
@@ -1088,8 +452,11 @@ export default function Profile() {
         selectedCity={city}
         selectedDistrict={district}
         onSelect={(reg, c, d) => {
-          setCity(c === 'كل المدن' ? '' : c);
-          setDistrict(d === 'كل أحياء المدينة' ? '' : d);
+          const newCity = c === 'كل المدن' ? '' : c;
+          const newDist = (d === 'كل أحياء المدينة' || d === 'كل الأحياء') ? '' : d;
+          setRegion(reg === 'كل المملكة' ? '' : reg);
+          setCity(newCity);
+          setDistrict(newDist);
         }}
       />
 
@@ -1102,6 +469,55 @@ export default function Profile() {
 }
 
 const styles = StyleSheet.create({
+  profileHero: {
+    backgroundColor: '#fff',
+    paddingTop: Platform.OS === 'ios' ? 52 : 28,
+    paddingHorizontal: 18,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+  },
+  profileTopBar: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', height: 42, marginBottom: 8 },
+  profileTopButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f1f5f9' },
+  profileTopTitle: { color: '#0f172a', fontSize: 18, fontWeight: '900' },
+  profileSummary: { flexDirection: 'row-reverse', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: 8, marginBottom: 12 },
+  twitterAvatarWrap: { width: 84, height: 84, borderRadius: 42, position: 'relative' },
+  twitterAvatar: { width: 84, height: 84, borderRadius: 42, backgroundColor: '#e2e8f0' },
+  twitterAvatarFallback: { width: 84, height: 84, borderRadius: 42, backgroundColor: '#e2e8f0', alignItems: 'center', justifyContent: 'center' },
+  twitterAvatarEdit: { position: 'absolute', bottom: 0, left: 0, width: 28, height: 28, borderRadius: 14, backgroundColor: '#059669', borderWidth: 2, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  editProfileButton: { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 22, paddingVertical: 8, paddingHorizontal: 15, marginBottom: 4 },
+  editProfileButtonText: { color: '#0f172a', fontSize: 13, fontWeight: '800' },
+  twitterDisplayName: { color: '#0f172a', fontSize: 21, fontWeight: '900', textAlign: 'right' },
+  twitterHandle: { color: '#64748b', fontSize: 14, textAlign: 'right', marginTop: 2 },
+  twitterBio: { color: '#1e293b', fontSize: 14, lineHeight: 22, textAlign: 'right', marginTop: 12 },
+  twitterLocation: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, marginTop: 9 },
+  twitterLocationText: { color: '#64748b', fontSize: 13 },
+  twitterStats: { flexDirection: 'row-reverse', gap: 20, marginTop: 14 },
+  twitterStat: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4 },
+  twitterStatNum: { color: '#0f172a', fontSize: 14, fontWeight: '900' },
+  twitterStatLabel: { color: '#64748b', fontSize: 13 },
+  editProfileCard: { backgroundColor: '#fff', borderBottomWidth: 1, borderColor: '#e2e8f0', padding: 16, gap: 8 },
+  editProfileHeading: { fontSize: 17, color: '#0f172a', fontWeight: '900', textAlign: 'right', marginBottom: 6 },
+  profileInput: { borderWidth: 1, borderColor: '#cbd5e1', backgroundColor: '#fff', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, color: '#0f172a', textAlign: 'right', fontSize: 14 },
+  readOnlyInput: { color: '#64748b', backgroundColor: '#f8fafc', textAlign: 'left' },
+  bioInput: { minHeight: 82, textAlignVertical: 'top' },
+  saveProfileButton: { backgroundColor: '#0f172a', borderRadius: 22, minHeight: 44, alignItems: 'center', justifyContent: 'center', marginTop: 6 },
+  saveProfileButtonText: { color: '#fff', fontSize: 14, fontWeight: '900' },
+  profileTabs: { flexDirection: 'row-reverse', borderBottomWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#fff' },
+  profileTab: { flex: 1, minHeight: 50, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  profileTabText: { color: '#64748b', fontSize: 13, fontWeight: '700' },
+  profileTabTextActive: { color: '#059669', fontWeight: '900' },
+  profileTabIndicator: { position: 'absolute', bottom: 0, width: 46, height: 3, borderRadius: 2, backgroundColor: '#059669' },
+  feedItem: { flexDirection: 'row-reverse', gap: 10, backgroundColor: '#fff', padding: 15, borderBottomWidth: 1, borderColor: '#e2e8f0' },
+  feedAvatarSmall: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  feedAvatarImage: { width: 40, height: 40, borderRadius: 20 },
+  feedBody: { flex: 1, alignItems: 'flex-end' },
+  feedAuthor: { width: '100%', color: '#0f172a', fontSize: 13, fontWeight: '800', textAlign: 'right' },
+  feedHandle: { color: '#64748b', fontSize: 12, fontWeight: '400' },
+  feedTitle: { color: '#0f172a', fontSize: 15, fontWeight: '800', lineHeight: 22, textAlign: 'right', width: '100%', marginTop: 7 },
+  feedText: { color: '#334155', fontSize: 14, lineHeight: 21, textAlign: 'right', width: '100%', marginTop: 4 },
+  feedMeta: { color: '#059669', fontSize: 12, marginTop: 8, textAlign: 'right', width: '100%' },
+  emptyFeed: { backgroundColor: '#fff', color: '#64748b', fontSize: 14, textAlign: 'center', paddingVertical: 42 },
   container: {
     flex: 1,
     backgroundColor: '#f8fafc',
@@ -1225,15 +641,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(2,132,199,0.2)',
+    backgroundColor: 'rgba(5,150,105,0.2)',
     borderWidth: 1,
-    borderColor: '#38bdf8',
+    borderColor: '#a7f3d0',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 12,
   },
   verifiedIdTagText: {
-    color: '#e0f2fe',
+    color: '#ecfdf5',
     fontSize: 11,
     fontWeight: '800',
   },
@@ -1241,9 +657,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(14,116,144,0.6)',
+    backgroundColor: 'rgba(6,95,70,0.6)',
     borderWidth: 1,
-    borderColor: '#38bdf8',
+    borderColor: '#a7f3d0',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 12,
@@ -1408,7 +824,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#ecfeff',
+    backgroundColor: '#ecfdf5',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1432,13 +848,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#ecfeff',
+    backgroundColor: '#ecfdf5',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
   },
   aiBioBtnText: {
-    color: '#0891b2',
+    color: '#059669',
     fontSize: 11,
     fontWeight: '800',
   },
@@ -1508,12 +924,12 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   saveBtn: {
-    backgroundColor: '#0891b2',
+    backgroundColor: '#059669',
     borderRadius: 16,
     paddingVertical: 15,
     alignItems: 'center',
     marginBottom: 12,
-    shadowColor: '#0891b2',
+    shadowColor: '#059669',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 10,
@@ -1538,6 +954,21 @@ const styles = StyleSheet.create({
     color: '#ef4444',
     fontSize: 14,
     fontWeight: '800',
+  },
+  savedQCard: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  savedQTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1e293b',
+    textAlign: 'right',
+    lineHeight: 20,
   },
 
   // ID Verification Modal
@@ -1575,8 +1006,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   idOptionCardActive: {
-    borderColor: '#0891b2',
-    backgroundColor: '#ecfeff',
+    borderColor: '#059669',
+    backgroundColor: '#ecfdf5',
   },
   idOptionText: {
     color: '#64748b',
@@ -1585,7 +1016,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   idOptionTextActive: {
-    color: '#0891b2',
+    color: '#059669',
     fontWeight: '900',
   },
   securityNoticeBox: {
@@ -1720,15 +1151,15 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   viewProfileBtn: {
-    backgroundColor: '#ecfeff',
+    backgroundColor: '#ecfdf5',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#a5f3fc',
+    borderColor: '#a7f3d0',
   },
   viewProfileBtnText: {
-    color: '#0891b2',
+    color: '#059669',
     fontSize: 12,
     fontWeight: '800',
   },

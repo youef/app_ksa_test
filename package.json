@@ -10,7 +10,7 @@
     "web": "expo start --web",
     "build": "expo export -p web",
     "export:web": "expo export -p web",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "node --stack-size=65000 ./node_modules/typescript/bin/tsc --noEmit"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",

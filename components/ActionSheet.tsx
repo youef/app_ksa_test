@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, Modal, Pressable, Platform, Dimensions } from 'react-native';
+import type { DimensionValue } from 'react-native';
 import Animated, { useAnimatedStyle, withSpring, useSharedValue, withTiming, runOnJS } from 'react-native-reanimated';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BlurView } from 'expo-blur';
@@ -8,7 +9,7 @@ interface ActionSheetProps {
   visible: boolean;
   onClose: () => void;
   children: React.ReactNode;
-  height?: number | string;
+  height?: DimensionValue;
 }
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');

@@ -134,8 +134,8 @@ export default function WebMap() {
           district: 'الياسمين',
           lat: 24.8192,
           lng: 46.6433,
-          color: '#3b82f6',
-          emoji: '🔵',
+          color: '#059669',
+          emoji: '🟢',
           typeLabel: 'سؤال استفساري نشط',
         },
         {
@@ -201,8 +201,8 @@ export default function WebMap() {
           district: 'الروضة',
           lat: 21.5642,
           lng: 39.1583,
-          color: '#3b82f6',
-          emoji: '🔵',
+          color: '#059669',
+          emoji: '🟢',
           typeLabel: 'سؤال استفساري نشط',
         },
         {
@@ -269,7 +269,7 @@ export default function WebMap() {
             ${item.typeLabel}
           </div>
           <strong style="font-size: 15px; color: #0f172a; display: block; margin-bottom: 4px; line-height: 1.3;">${item.title}</strong>
-          <div style="color: #0891b2; font-size: 12px; font-weight: 700;">🇸🇦 ${item.city} · حي ${item.district}</div>
+          <div style="color: #059669; font-size: 12px; font-weight: 700;">🇸🇦 ${item.city} · حي ${item.district}</div>
           <div style="margin-top: 6px; font-size: 12px; color: #475467; line-height: 1.4;">${item.desc}</div>
         </div>
       `);
@@ -468,8 +468,8 @@ const styles = StyleSheet.create({
     borderColor: '#0f172a',
   },
   catChipActiveBlue: {
-    backgroundColor: '#3b82f6',
-    borderColor: '#3b82f6',
+    backgroundColor: '#059669',
+    borderColor: '#059669',
   },
   catChipActiveGreen: {
     backgroundColor: '#16a34a',

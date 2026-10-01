@@ -1,90 +1,28 @@
-import { useCallback, useState, useEffect, useRef } from 'react';
-import {
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  Text,
-  View,
-  Image,
-  StyleSheet,
-  Dimensions,
-  Platform,
-  Animated,
-  TextInput,
-  Alert,
-  Share,
-} from 'react-native';
-import { router, useFocusEffect } from 'expo-router';
-import { supabase } from '@/lib/supabase';
-import { LinearGradient } from 'expo-linear-gradient';
-import {
-  MessageCircle,
-  Truck,
-  MapPin,
-  Briefcase,
-  Plus,
-  Sparkles,
-  Map,
-  AlertTriangle,
-  Bell,
-  Search,
-  Flame,
-  CloudSun,
-  Heart,
-  Share2,
-  MoreHorizontal,
-  User,
-  Mic,
-  ChevronLeft,
-  Zap,
-  ChevronDown,
-  ChevronUp,
-  Wrench,
-  ShieldCheck,
-  CheckCircle2,
-  HelpCircle,
-  ExternalLink,
-  Repeat,
-  Bookmark,
-  Send,
-  Eye,
-  CornerDownLeft,
-  Check,
-} from 'lucide-react-native';
-import { C } from '@/lib/ui';
-import BottomNav from '@/components/BottomNav';
-import LocationSelectorModal from '@/components/LocationSelectorModal';
-import { useDynamicIsland } from '@/context/DynamicIslandContext';
+import { useCallback, useState, useEffect, useRef } from 'react'
+import { Pressable, RefreshControl, ScrollView, Text, View, Image, StyleSheet, Dimensions, Platform, Animated, TextInput, Alert } from 'react-native'
+import { router, useFocusEffect } from 'expo-router'
+import { supabase } from '@/lib/supabase'
+import { LinearGradient } from 'expo-linear-gradient'
+import { MessageCircle, Truck, MapPin, Briefcase, Plus, Sparkles, Map, Bell, Search, Flame, CloudSun, User, Mic, ChevronDown, Wrench, ShieldCheck, Camera, RefreshCw, X } from 'lucide-react-native'
+import BottomNav from '@/components/BottomNav'
+import LocationSelectorModal from '@/components/LocationSelectorModal'
+import { useDynamicIsland } from '@/context/DynamicIslandContext'
+import { getActiveLocation, setActiveLocation, savePermanentMyLocation, subscribeLocation, isExactDistrictMatching, isAllKingdom } from '@/lib/locationSync'
+import TwitterInquiryCard from '@/components/TwitterInquiryCard'
+import { CurrentWeather, describeWeatherCode, loadCurrentWeather } from '@/lib/weather'
 
 const { width } = Dimensions.get('window');
-
-// Relative time in Arabic helper
-function formatArabicTimeAgo(dateStr: string): string {
-  if (!dateStr) return '';
-  const now = new Date();
-  const past = new Date(dateStr);
-  const diffMs = now.getTime() - past.getTime();
-  const diffSec = Math.max(0, Math.floor(diffMs / 1000));
-  const diffMin = Math.floor(diffSec / 60);
-  const diffHour = Math.floor(diffMin / 60);
-  const diffDay = Math.floor(diffHour / 24);
-
-  if (diffMin < 1) return 'الآن';
-  if (diffMin < 60) return `منذ ${diffMin} د`;
-  if (diffHour < 24) return `منذ ${diffHour} س`;
-  if (diffDay === 1) return 'أمس';
-  if (diffDay < 7) return `منذ ${diffDay} أيام`;
-  return past.toLocaleDateString('ar-SA', { day: 'numeric', month: 'short' });
-}
 
 export default function Home() {
   const { showIsland } = useDynamicIsland();
   const [profile, setProfile] = useState<any>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [questions, setQuestions] = useState<any[]>([]);
   const [requests, setRequests] = useState<any[]>([]);
   const [stories, setStories] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'all' | 'emergency' | 'tools' | 'questions' | 'requests'>('all');
+  const [newPostsCount, setNewPostsCount] = useState(0);
+  const [activeTab, setActiveTab] = useState<'all' | 'emergency' | 'tools' | 'questions' | 'requests' | 'mine'>('all');
   const [greeting, setGreeting] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -92,6 +30,8 @@ export default function Home() {
   const [selectedRegion, setSelectedRegion] = useState('كل المملكة');
   const [selectedCity, setSelectedCity] = useState('كل المدن');
   const [selectedDistrict, setSelectedDistrict] = useState('كل الأحياء');
+  const [currentWeather, setCurrentWeather] = useState<CurrentWeather | null>(null);
+  const [weatherLoading, setWeatherLoading] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
 
 
@@ -110,10 +50,39 @@ export default function Home() {
   }, [showIsland]);
 
   useEffect(() => {
+    let active = true;
+    const updateWeather = async () => {
+      setWeatherLoading(true);
+      try {
+        const weather = await loadCurrentWeather(selectedRegion, selectedCity, selectedDistrict);
+        if (active) setCurrentWeather(weather);
+      } catch (error) {
+        console.warn('Weather update failed', error);
+        if (active) setCurrentWeather(null);
+      } finally { if (active) setWeatherLoading(false); }
+    };
+    updateWeather();
+    const interval = setInterval(updateWeather, 30 * 60 * 1000);
+    return () => { active = false; clearInterval(interval); };
+  }, [selectedRegion, selectedCity, selectedDistrict]);
+
+  useEffect(() => {
     const hour = new Date().getHours();
-    if (hour < 12) setGreeting('صباح الخير ☀️');
-    else if (hour < 18) setGreeting('مساء الخير 🌤️');
-    else setGreeting('مساء الخير 🌙');
+    if (hour < 12) setGreeting('صباح الخير');
+    else setGreeting('مساء الخير');
+
+    // Subscribe to global location sync
+    getActiveLocation().then((loc) => {
+      setSelectedRegion(loc.region);
+      setSelectedCity(loc.city);
+      setSelectedDistrict(loc.district);
+    });
+
+    const unsub = subscribeLocation((loc) => {
+      setSelectedRegion(loc.region);
+      setSelectedCity(loc.city);
+      setSelectedDistrict(loc.district);
+    });
 
     // Start FAB Pulse
     Animated.loop(
@@ -122,20 +91,25 @@ export default function Home() {
         Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: true })
       ])
     ).start();
+
+    return unsub;
   }, []);
 
   const load = useCallback(async () => {
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) return router.replace('/auth');
+    setCurrentUserId(u.user.id);
 
     // Fetch profile
     const { data: profileData } = await supabase.from('profiles').select('*').eq('id', u.user.id).maybeSingle();
     setProfile(profileData);
 
-    // If user has a city in profile and selectedCity is still default, auto-populate
-    if (profileData?.city && selectedCity === 'كل المدن') {
-      setSelectedCity(profileData.city);
-      if (profileData.district) setSelectedDistrict(profileData.district);
+    // If user has a city in profile and selectedCity is still default, auto-populate globally
+    if (profileData?.city) {
+      const active = await getActiveLocation();
+      if (isAllKingdom(active.city)) {
+        await setActiveLocation('المملكة', profileData.city, profileData.district || 'كل الأحياء', false);
+      }
     }
 
     // Fetch unread notifications
@@ -146,17 +120,31 @@ export default function Home() {
       .is('read_at', null);
     setUnreadNotifCount(nc ?? 0);
 
-    // Fetch stories (active, last 24h) and deduplicate by author
-    const { data: storiesData } = await supabase
+    // Fetch stories (active, last 24h) filtered by same city/district and deduplicate by author
+    const loc = await getActiveLocation();
+    let storiesQuery = supabase
       .from('stories')
-      .select('*, profiles:author_id(id, display_name, username, avatar_url, is_verified, is_geoverified)')
+      .select('*, profiles:author_id(id, display_name, username, avatar_url, is_verified, is_geoverified, city, district)')
       .gt('expires_at', new Date().toISOString())
       .order('created_at', { ascending: false })
-      .limit(20);
+      .limit(30);
+
+    const { data: storiesData } = await storiesQuery;
 
     const seenStoryAuthors = new Set<string>();
     const uniqueStories = (storiesData ?? []).filter((s: any) => {
       if (!s.author_id || seenStoryAuthors.has(s.author_id)) return false;
+      // Filter by location: show stories from same district or city
+      const authorCity = s.profiles?.city || '';
+      const authorDistrict = s.profiles?.district || '';
+      const activeCity = loc.city;
+      const activeDistrict = loc.district;
+      // If location is set (not 'all kingdom'), filter by city at minimum
+      if (!isAllKingdom(activeCity)) {
+        if (activeCity && authorCity && authorCity !== activeCity) return false;
+        // If district is also set, filter by district too
+        if (activeDistrict && activeDistrict !== 'كل الأحياء' && authorDistrict && authorDistrict !== activeDistrict) return false;
+      }
       seenStoryAuthors.add(s.author_id);
       return true;
     });
@@ -284,37 +272,28 @@ export default function Home() {
       return q;
     }));
 
-    showToast('تم نشر ردك بنجاح في المحادثة ✨');
+    showToast('تم نشر ردك بنجاح في المحادثة');
   };
 
-  // Filter questions and requests by selected Saudi region / city / district & Proximity Radius
+  // Filter questions and requests by selected Saudi region / city / district strictly
+  const normalizedSearch = normalizeSearchText(searchQuery);
+  const matchesSearch = (values: unknown[]) => !normalizedSearch || values.some(value => normalizeSearchText(value).includes(normalizedSearch));
+
   const filteredQuestions = questions.filter(q => {
-    if (searchQuery.trim()) {
-      const match = (q.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-                    (q.body || '').toLowerCase().includes(searchQuery.toLowerCase());
-      if (!match) return false;
-    }
-    if (selectedCity === 'كل المدن') return true;
-    if (selectedDistrict !== 'كل الأحياء') {
-      if (q.district && !q.district.includes(selectedDistrict) && !selectedDistrict.includes(q.district)) return false;
-    }
-    if (q.city && !q.city.includes(selectedCity) && !selectedCity.includes(q.city)) return false;
-    return true;
+    if (!matchesSearch([q.title, q.body, q.profiles?.display_name, q.profiles?.username, q.city, q.district, q.category])) return false;
+    return isExactDistrictMatching(q, selectedCity, selectedDistrict);
   });
 
   const filteredRequests = requests.filter(r => {
-    if (searchQuery.trim()) {
-      const match = (r.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-                    (r.description || '').toLowerCase().includes(searchQuery.toLowerCase());
-      if (!match) return false;
-    }
-    if (selectedCity === 'كل المدن') return true;
-    if (selectedDistrict !== 'كل الأحياء') {
-      if (r.district && !r.district.includes(selectedDistrict) && !selectedDistrict.includes(r.district)) return false;
-    }
-    if (r.city && !r.city.includes(selectedCity) && !selectedCity.includes(r.city)) return false;
-    return true;
+    if (!matchesSearch([r.title, r.description, r.profiles?.display_name, r.profiles?.username, r.city, r.district, r.category])) return false;
+    return isExactDistrictMatching(r, selectedCity, selectedDistrict);
   });
+
+  // Mine filter: user's own questions and requests
+  const myQuestions = questions.filter(q => q.author_id === currentUserId);
+  const myRequests = requests.filter(r => r.requester_id === currentUserId);
+  const filteredMyQuestions = myQuestions.filter(q => matchesSearch([q.title, q.body, q.profiles?.display_name, q.profiles?.username, q.city, q.district, q.category]));
+  const filteredMyRequests = myRequests.filter(r => matchesSearch([r.title, r.description, r.profiles?.display_name, r.profiles?.username, r.city, r.district, r.category]));
 
   // Emergency & Tools categorization
   const emergencyQuestions = filteredQuestions.filter(
@@ -328,6 +307,24 @@ export default function Home() {
   return (
     <View style={styles.container}>
 
+      {/* Twitter-style new posts indicator */}
+      {newPostsCount > 0 && !refreshing && (
+        <Pressable
+          style={styles.newPostsBanner}
+          onPress={async () => {
+            setNewPostsCount(0);
+            setRefreshing(true);
+            await load();
+            setRefreshing(false);
+          }}
+        >
+          <RefreshCw size={14} color="#fff" />
+          <Text style={styles.newPostsBannerText}>
+            {newPostsCount} استفسار جديد · اسحب للتحديث
+          </Text>
+        </Pressable>
+      )}
+
       <ScrollView 
         style={styles.container}
         showsVerticalScrollIndicator={false}
@@ -335,11 +332,14 @@ export default function Home() {
           <RefreshControl 
             refreshing={refreshing} 
             onRefresh={async () => { 
-              setRefreshing(true); 
+              setRefreshing(true);
+              setNewPostsCount(0);
               await load(); 
               setRefreshing(false); 
             }} 
-            tintColor="#059669" 
+            tintColor="#059669"
+            colors={['#059669']}
+            progressBackgroundColor="#ecfdf5"
           />
         }
       >
@@ -385,7 +385,6 @@ export default function Home() {
             <View style={styles.brandAndLocation}>
               <View style={styles.brandTitleRow}>
                 <Text style={styles.heroBrandTitle}>حيّنا</Text>
-                <Text style={styles.brandKsaFlag}>🇸🇦</Text>
               </View>
 
               {/* Location Selector Pill */}
@@ -396,7 +395,7 @@ export default function Home() {
                 <ChevronDown size={14} color="#a7f3d0" />
                 <Text style={styles.locationSelectorText} numberOfLines={1}>
                   {selectedCity === 'كل المدن'
-                    ? '🇸🇦 كل مناطق المملكة'
+                    ? 'كل مناطق المملكة'
                     : `${selectedCity}${selectedDistrict !== 'كل الأحياء' ? ` · حي ${selectedDistrict}` : ''}`}
                 </Text>
                 <MapPin size={13} color="#6ee7b7" />
@@ -409,16 +408,17 @@ export default function Home() {
             <View style={styles.searchBar}>
               <Search size={20} color="#94a3b8" />
               <TextInput 
-                placeholder="ابحث عن استفسار، توصية، أو جار في حيك..." 
+                placeholder="ابحث عن استفسار أو طلب أو اسم جار..."
                 placeholderTextColor="#94a3b8"
                 style={styles.searchInput}
+                accessibilityLabel="البحث في الاستفسارات والطلبات وأسماء الجيران"
                 value={searchQuery}
                 onChangeText={setSearchQuery}
                 returnKeyType="search"
               />
               {searchQuery.length > 0 ? (
-                <Pressable onPress={() => setSearchQuery('')} style={styles.clearSearchBtn}>
-                  <Text style={styles.clearSearchText}>✕</Text>
+                <Pressable onPress={() => setSearchQuery('')} style={styles.clearSearchBtn} accessibilityRole="button" accessibilityLabel="مسح البحث">
+                  <X size={17} color="#64748b" />
                 </Pressable>
               ) : (
                 <Pressable style={styles.micBtn} onPress={() => router.push('/questions')}>
@@ -430,18 +430,74 @@ export default function Home() {
         </LinearGradient>
 
         {/* ======================================================== */}
-        {/* 2. NEIGHBORHOOD STORIES (يوميات الحي)                     */}
+        {/* 1.5 LIVE NEIGHBORHOOD ATMOSPHERE BAR (أجواء ونبض الحي)     */}
+        {/* ======================================================== */}
+        <View style={styles.atmosphereBar}>
+          <View style={styles.atmoItem}>
+            <CloudSun size={15} color="#059669" />
+            <Text style={styles.atmoText} numberOfLines={1}>
+              {currentWeather ? `${Math.round(currentWeather.temperature)}°C · ${describeWeatherCode(currentWeather.weatherCode)} · ${currentWeather.locationName}` : weatherLoading ? 'جارٍ جلب الطقس الحالي...' : 'الطقس غير متاح حالياً'}
+            </Text>
+          </View>
+          <View style={styles.atmoDivider} />
+          <View style={styles.atmoItem}>
+            <Flame size={15} color="#f59e0b" />
+            <Text style={styles.atmoText}>42 جار نشط الآن</Text>
+          </View>
+          <View style={styles.atmoDivider} />
+          <View style={styles.atmoItem}>
+            <ShieldCheck size={15} color="#059669" />
+            <Text style={styles.atmoText}>حي آمن ومترابط</Text>
+          </View>
+        </View>
+
+        {/* ======================================================== */}
+        {/* 2. NEIGHBORHOOD STORIES (يوميات ومحطات الحي الفخمة)        */}
         {/* ======================================================== */}
         <View style={styles.storiesContainer}>
+          {/* Stories Header Row */}
+          <View style={styles.storiesHeaderRow}>
+            <Pressable 
+              style={styles.publishStoryHeaderBtn} 
+              onPress={() => router.push('/create-story')}
+            >
+              <Plus size={14} color="#059669" />
+              <Text style={styles.publishStoryHeaderText}>نشر يوميات</Text>
+            </Pressable>
+
+            <View style={styles.storiesTitleRow}>
+              <View style={styles.storiesLiveBadge}>
+                <View style={styles.storiesLivePulseDot} />
+                <Text style={styles.storiesLiveText}>مباشر 24س</Text>
+              </View>
+              <Text style={styles.storiesSectionTitle}>يوميات الحي</Text>
+            </View>
+          </View>
+
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.storiesScroll}>
-            {/* Add Story Button */}
+            {/* User's Story Item */}
             <Pressable style={styles.storyBox} onPress={() => router.push('/create-story')}>
-              <LinearGradient colors={['#059669', '#10b981']} style={styles.storyAddRing}>
-                <View style={styles.storyAddBtn}>
-                  <Plus size={22} color="#059669" />
+              <LinearGradient 
+                colors={['#059669', '#10b981', '#34d399']} 
+                style={styles.storyAddRing} 
+                start={{ x: 0, y: 0 }} 
+                end={{ x: 1, y: 1 }}
+              >
+                <View style={styles.storyInnerBorder}>
+                  {profile?.avatar_url ? (
+                    <Image source={{ uri: profile.avatar_url }} style={styles.storyImg} />
+                  ) : (
+                    <View style={styles.storySelfPlaceholder}>
+                      <Camera size={20} color="#059669" />
+                    </View>
+                  )}
+                  <View style={styles.storySelfPlusBadge}>
+                    <Plus size={11} color="#fff" strokeWidth={3} />
+                  </View>
                 </View>
               </LinearGradient>
-              <Text style={styles.storyName}>يومياتي</Text>
+              <Text style={styles.storyName}>أضف يومياتك</Text>
+              <Text style={styles.storyDistrictSub}>قصتك أنت</Text>
             </Pressable>
 
             {/* Real Stories from DB */}
@@ -451,35 +507,48 @@ export default function Home() {
               const isVerified = story.profiles?.is_verified;
               const isGeoVerified = story.profiles?.is_geoverified;
               return (
-                <Pressable key={story.id} style={styles.storyBox} onPress={() => router.push({ pathname: '/story', params: { id: story.id } })}>
-                  <View style={[styles.storyRing, { borderColor: story.bg_color || '#0891b2' }]}>
-                    {story.type === 'text' ? (
-                      <View style={[styles.storyTextPreview, { backgroundColor: story.bg_color || '#0891b2' }]}>
-                        <Text style={styles.storyTextPreviewLetter} numberOfLines={1}>
-                          {story.content?.[0] || 'ق'}
-                        </Text>
-                      </View>
-                    ) : avatarUrl ? (
-                      <Image source={{ uri: avatarUrl }} style={styles.storyImg} />
-                    ) : (
-                      <View style={[styles.storyTextPreview, { backgroundColor: story.bg_color || '#0891b2' }]}>
-                        <Text style={styles.storyTextPreviewLetter}>{authorName[0]}</Text>
-                      </View>
-                    )}
+                <Pressable 
+                  key={story.id} 
+                  style={styles.storyBox} 
+                  onPress={() => router.push({ pathname: '/story', params: { id: story.id } })}
+                >
+                  <LinearGradient 
+                    colors={['#059669', '#10b981', '#3b82f6']} 
+                    style={styles.storyGradientRing}
+                    start={{ x: 0, y: 0 }} 
+                    end={{ x: 1, y: 1 }}
+                  >
+                    <View style={styles.storyInnerBorder}>
+                      {story.type === 'text' ? (
+                        <View style={[styles.storyTextPreview, { backgroundColor: story.bg_color || '#059669' }]}>
+                          <Text style={styles.storyTextPreviewLetter} numberOfLines={1}>
+                            {story.content?.[0] || 'ق'}
+                          </Text>
+                        </View>
+                      ) : avatarUrl ? (
+                        <Image source={{ uri: avatarUrl }} style={styles.storyImg} />
+                      ) : (
+                        <View style={[styles.storyTextPreview, { backgroundColor: story.bg_color || '#059669' }]}>
+                          <Text style={styles.storyTextPreviewLetter}>{authorName[0]}</Text>
+                        </View>
+                      )}
+                    </View>
                     {(isVerified || isGeoVerified) && (
                       <View style={styles.storyVerifiedTag}>
                         <ShieldCheck size={9} color="#fff" />
                       </View>
                     )}
-                  </View>
+                  </LinearGradient>
                   <Text style={styles.storyName} numberOfLines={1}>{authorName}</Text>
+                  <Text style={styles.storyDistrictSub} numberOfLines={1}>
+                    {selectedDistrict !== 'كل الأحياء' ? selectedDistrict : 'جار الحي'}
+                  </Text>
                 </Pressable>
               );
             })}
+
           </ScrollView>
         </View>
-
-
 
         {/* ======================================================== */}
         {/* 4. EMERGENCY SOS BANNER (Live Urgent Neighborhood Alert) */}
@@ -492,7 +561,7 @@ export default function Home() {
               </View>
               <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
                 <Flame size={18} color="#dc2626" />
-                <Text style={styles.emergencyHomeTitle}>تنبيه طارئ عاجل في الحي 🚨</Text>
+                <Text style={styles.emergencyHomeTitle}>تنبيه طارئ عاجل في الحي</Text>
               </View>
             </View>
             <Pressable
@@ -510,45 +579,54 @@ export default function Home() {
         {/* ======================================================== */}
         <View style={styles.servicesGrid}>
           <ServicePill 
-            icon={<MessageCircle size={22} color="#0284c7" />} 
-            bg="#f0f9ff" 
-            label="استفسارات" 
-            onPress={() => {
-              setActiveTab('questions');
-              showToast('عرض جميع استفسارات وتجارب الجيران 💬');
-            }} 
+            icon={<MessageCircle size={22} color="#059669" />} 
+            bg="#ecfdf5" 
+            label="اسأل الحي" 
+            badge="فوري"
+            badgeBg="#059669"
+            onPress={() => router.push('/ask')} 
+          />
+          <ServicePill 
+            icon={<Camera size={22} color="#8b5cf6" />} 
+            bg="#f5f3ff" 
+            label="يوميات الحي" 
+            badge="24 ساعة"
+            badgeBg="#7c3aed"
+            onPress={() => router.push('/create-story')} 
           />
           <ServicePill 
             icon={<Wrench size={22} color="#16a34a" />} 
             bg="#f0fdf4" 
             label="إعارة أدوات" 
+            badge="مجاني"
+            badgeBg="#16a34a"
             onPress={() => {
               setActiveTab('tools');
-              showToast('أدوات ومعدات متاحة للإعارة بين الجيران 🛠️');
+              showToast('أدوات ومعدات متاحة للإعارة بين الجيران');
             }} 
           />
           <ServicePill 
-            icon={<Briefcase size={22} color="#7c3aed" />} 
-            bg="#faf5ff" 
+            icon={<Briefcase size={22} color="#0284c7" />} 
+            bg="#f0f9ff" 
             label="خدمات الحي" 
+            badge="مهنيون"
+            badgeBg="#0284c7"
             onPress={() => router.push('/services')} 
           />
           <ServicePill 
             icon={<Truck size={22} color="#d97706" />} 
             bg="#fffbeb" 
             label="فزعة وطلبات" 
+            badge="تعاون"
+            badgeBg="#d97706"
             onPress={() => router.push('/requests')} 
           />
           <ServicePill 
-            icon={<MapPin size={22} color="#0d9488" />} 
-            bg="#f0fdfa" 
-            label="دليل المحلات" 
-            onPress={() => router.push('/directory')} 
-          />
-          <ServicePill 
-            icon={<Map size={22} color="#0891b2" />} 
-            bg="#ecfeff" 
-            label="رادار الخريطة" 
+            icon={<Map size={22} color="#059669" />} 
+            bg="#ecfdf5" 
+            label="خريطة الحي" 
+            badge="مباشر"
+            badgeBg="#059669"
             onPress={() => router.push('/map')} 
           />
         </View>
@@ -565,7 +643,21 @@ export default function Home() {
               style={[styles.fTab, activeTab === 'all' && styles.fTabActive]} 
               onPress={() => setActiveTab('all')}
             >
-              <Text style={[styles.fTabText, activeTab === 'all' && styles.fTabTextActive]}>الكل</Text>
+              <View style={styles.fTabLabelRow}>
+                <Map size={15} color={activeTab === 'all' ? '#fff' : '#475569'} />
+                <Text style={[styles.fTabText, activeTab === 'all' && styles.fTabTextActive]}>الكل</Text>
+              </View>
+            </Pressable>
+
+            {/* My posts filter */}
+            <Pressable 
+              style={[styles.fTab, activeTab === 'mine' && styles.fTabActiveMine]} 
+              onPress={() => setActiveTab('mine')}
+            >
+              <View style={styles.fTabLabelRow}>
+                <User size={15} color={activeTab === 'mine' ? '#fff' : '#475569'} />
+                <Text style={[styles.fTabText, activeTab === 'mine' && styles.fTabTextActive]}>منشوراتي ({myQuestions.length + myRequests.length})</Text>
+              </View>
             </Pressable>
 
             {emergencyQuestions.length > 0 && (
@@ -573,9 +665,10 @@ export default function Home() {
                 style={[styles.fTab, activeTab === 'emergency' && styles.fTabActiveRed]} 
                 onPress={() => setActiveTab('emergency')}
               >
-                <Text style={[styles.fTabText, activeTab === 'emergency' && styles.fTabTextActive]}>
-                  🚨 طوارئ ({emergencyQuestions.length})
-                </Text>
+                <View style={styles.fTabLabelRow}>
+                  <Flame size={15} color={activeTab === 'emergency' ? '#fff' : '#475569'} />
+                  <Text style={[styles.fTabText, activeTab === 'emergency' && styles.fTabTextActive]}>طوارئ ({emergencyQuestions.length})</Text>
+                </View>
               </Pressable>
             )}
 
@@ -583,27 +676,30 @@ export default function Home() {
               style={[styles.fTab, activeTab === 'tools' && styles.fTabActiveGreen]} 
               onPress={() => setActiveTab('tools')}
             >
-              <Text style={[styles.fTabText, activeTab === 'tools' && styles.fTabTextActive]}>
-                🛠️ إعارة أدوات ({toolQuestions.length})
-              </Text>
+              <View style={styles.fTabLabelRow}>
+                <Wrench size={15} color={activeTab === 'tools' ? '#fff' : '#475569'} />
+                <Text style={[styles.fTabText, activeTab === 'tools' && styles.fTabTextActive]}>إعارة ({toolQuestions.length})</Text>
+              </View>
             </Pressable>
 
             <Pressable 
               style={[styles.fTab, activeTab === 'questions' && styles.fTabActive]} 
               onPress={() => setActiveTab('questions')}
             >
-              <Text style={[styles.fTabText, activeTab === 'questions' && styles.fTabTextActive]}>
-                💬 استفسارات ({filteredQuestions.length})
-              </Text>
+              <View style={styles.fTabLabelRow}>
+                <MessageCircle size={15} color={activeTab === 'questions' ? '#fff' : '#475569'} />
+                <Text style={[styles.fTabText, activeTab === 'questions' && styles.fTabTextActive]}>استفسارات ({filteredQuestions.length})</Text>
+              </View>
             </Pressable>
 
             <Pressable 
               style={[styles.fTab, activeTab === 'requests' && styles.fTabActive]} 
               onPress={() => setActiveTab('requests')}
             >
-              <Text style={[styles.fTabText, activeTab === 'requests' && styles.fTabTextActive]}>
-                🤝 فزعة ({filteredRequests.length})
-              </Text>
+              <View style={styles.fTabLabelRow}>
+                <Truck size={15} color={activeTab === 'requests' ? '#fff' : '#475569'} />
+                <Text style={[styles.fTabText, activeTab === 'requests' && styles.fTabTextActive]}>فزعة ({filteredRequests.length})</Text>
+              </View>
             </Pressable>
           </ScrollView>
 
@@ -620,6 +716,7 @@ export default function Home() {
                   type={item.type} 
                   data={item.data} 
                   currentUserProfile={profile}
+                  currentUserId={currentUserId}
                   onQuickReply={handleQuickReplySubmit}
                   onToast={showToast}
                 />
@@ -632,6 +729,7 @@ export default function Home() {
               type="question" 
               data={q} 
               currentUserProfile={profile}
+              currentUserId={currentUserId}
               onQuickReply={handleQuickReplySubmit}
               onToast={showToast}
             />
@@ -643,6 +741,7 @@ export default function Home() {
               type="question" 
               data={q} 
               currentUserProfile={profile}
+              currentUserId={currentUserId}
               onQuickReply={handleQuickReplySubmit}
               onToast={showToast}
             />
@@ -654,6 +753,7 @@ export default function Home() {
               type="question" 
               data={q} 
               currentUserProfile={profile}
+              currentUserId={currentUserId}
               onQuickReply={handleQuickReplySubmit}
               onToast={showToast}
             />
@@ -665,25 +765,60 @@ export default function Home() {
               type="request" 
               data={r} 
               currentUserProfile={profile}
+              currentUserId={currentUserId}
               onQuickReply={handleQuickReplySubmit}
               onToast={showToast}
             />
           ))}
 
+          {/* My Posts Tab */}
+          {activeTab === 'mine' && (
+            [
+              ...filteredMyQuestions.map(q => ({ type: 'question' as const, data: q })),
+              ...filteredMyRequests.map(r => ({ type: 'request' as const, data: r }))
+            ]
+              .sort((a, b) => new Date(b.data.created_at).getTime() - new Date(a.data.created_at).getTime())
+              .map(item => (
+                <TwitterInquiryCard 
+                  key={`mine-${item.type}-${item.data.id}`} 
+                  type={item.type} 
+                  data={item.data} 
+                  currentUserProfile={profile}
+                  currentUserId={currentUserId}
+                  isMine={true}
+                  onQuickReply={handleQuickReplySubmit}
+                  onToast={showToast}
+                />
+              ))
+          )}
+
+          {activeTab === 'mine' && filteredMyQuestions.length === 0 && filteredMyRequests.length === 0 && (
+            <View style={styles.emptyContainer}>
+              <View style={styles.emptyIconBg}>
+                <User size={36} color="#059669" />
+              </View>
+              <Text style={styles.emptyTitle}>{normalizedSearch ? 'لا توجد منشورات تطابق البحث' : 'لا توجد منشورات بعد'}</Text>
+              <Text style={styles.emptySub}>{normalizedSearch ? 'جرّب كلمة أخرى أو امسح البحث.' : 'استفساراتك وطلباتك ستظهر هنا عند نشرها في الحي.'}</Text>
+              {!normalizedSearch && <Pressable style={styles.emptyAskBtn} onPress={() => router.push('/ask')}>
+                <Text style={styles.emptyAskBtnText}>انشر أول استفسار لك</Text>
+              </Pressable>}
+            </View>
+          )}
+
           {/* Empty States */}
           {activeTab === 'all' && filteredQuestions.length === 0 && filteredRequests.length === 0 && (
             <View style={styles.emptyContainer}>
               <View style={styles.emptyIconBg}>
-                <Sparkles size={36} color="#0891b2" />
+                <Sparkles size={36} color="#059669" />
               </View>
               <Text style={styles.emptyTitle}>
-                {selectedCity === 'كل المدن' ? 'لا توجد استفسارات حالياً' : `لا توجد استفسارات في ${selectedCity} حالياً`}
+                {normalizedSearch ? 'لا توجد نتائج مطابقة للبحث' : selectedCity === 'كل المدن' ? 'لا توجد استفسارات حالياً' : `لا توجد استفسارات في ${selectedCity} حالياً`}
               </Text>
               <Text style={styles.emptySub}>
-                كن المبادر الأول في حيك واطرح سؤالاً أو اعرض مساعدة لجيرانك بأسلوب خيط المحادثات.
+                {normalizedSearch ? 'جرّب كلمات أخرى أو امسح البحث لعرض جميع المنشورات.' : 'كن المبادر الأول في حيك واطرح سؤالاً أو اعرض مساعدة لجيرانك بأسلوب خيط المحادثات.'}
               </Text>
               <Pressable style={styles.emptyAskBtn} onPress={() => router.push('/ask')}>
-                <Text style={styles.emptyAskBtnText}>اسأل أهل حيك الآن ✨</Text>
+                <Text style={styles.emptyAskBtnText}>اسأل أهل حيك الآن</Text>
               </Pressable>
             </View>
           )}
@@ -693,8 +828,8 @@ export default function Home() {
               <View style={styles.emptyIconBg}>
                 <ShieldCheck size={36} color="#16a34a" />
               </View>
-              <Text style={styles.emptyTitle}>الحمد لله، لا توجد طوارئ</Text>
-              <Text style={styles.emptySub}>الحي آمن ومستقر بفضل الله.</Text>
+              <Text style={styles.emptyTitle}>{normalizedSearch ? 'لا توجد نتائج طوارئ مطابقة' : 'الحمد لله، لا توجد طوارئ'}</Text>
+              <Text style={styles.emptySub}>{normalizedSearch ? 'جرّب كلمات أخرى أو امسح البحث.' : 'الحي آمن ومستقر بفضل الله.'}</Text>
             </View>
           )}
 
@@ -703,24 +838,24 @@ export default function Home() {
               <View style={styles.emptyIconBg}>
                 <Wrench size={36} color="#16a34a" />
               </View>
-              <Text style={styles.emptyTitle}>لا توجد عروض إعارة حالياً</Text>
-              <Text style={styles.emptySub}>هل لديك سلم أو دريل أو أدوات ترغب بإعارتها لجيرانك؟</Text>
-              <Pressable style={[styles.emptyAskBtn, { backgroundColor: '#16a34a' }]} onPress={() => router.push('/ask')}>
-                <Text style={styles.emptyAskBtnText}>اعرض أداة للإعارة المجانية 🛠️</Text>
-              </Pressable>
+              <Text style={styles.emptyTitle}>{normalizedSearch ? 'لا توجد عروض إعارة مطابقة' : 'لا توجد عروض إعارة حالياً'}</Text>
+              <Text style={styles.emptySub}>{normalizedSearch ? 'جرّب كلمات أخرى أو امسح البحث.' : 'هل لديك سلم أو دريل أو أدوات ترغب بإعارتها لجيرانك؟'}</Text>
+              {!normalizedSearch && <Pressable style={[styles.emptyAskBtn, { backgroundColor: '#16a34a' }]} onPress={() => router.push('/ask')}>
+                <Text style={styles.emptyAskBtnText}>اعرض أداة للإعارة المجانية</Text>
+              </Pressable>}
             </View>
           )}
 
           {activeTab === 'questions' && filteredQuestions.length === 0 && (
             <View style={styles.emptyContainer}>
               <View style={styles.emptyIconBg}>
-                <MessageCircle size={36} color="#0891b2" />
+                <MessageCircle size={36} color="#059669" />
               </View>
-              <Text style={styles.emptyTitle}>لا توجد استفسارات حالياً</Text>
-              <Text style={styles.emptySub}>اطرح سؤالك الأول لأهل الحي وتلقى ردوداً وتوصيات مجربة.</Text>
-              <Pressable style={styles.emptyAskBtn} onPress={() => router.push('/ask')}>
-                <Text style={styles.emptyAskBtnText}>اطرح سؤالك الآن ✨</Text>
-              </Pressable>
+              <Text style={styles.emptyTitle}>{normalizedSearch ? 'لا توجد استفسارات مطابقة' : 'لا توجد استفسارات حالياً'}</Text>
+              <Text style={styles.emptySub}>{normalizedSearch ? 'جرّب كلمات أخرى أو امسح البحث.' : 'اطرح سؤالك الأول لأهل الحي وتلقى ردوداً وتوصيات مجربة.'}</Text>
+              {!normalizedSearch && <Pressable style={styles.emptyAskBtn} onPress={() => router.push('/ask')}>
+                <Text style={styles.emptyAskBtnText}>اطرح سؤالك الآن</Text>
+              </Pressable>}
             </View>
           )}
 
@@ -729,8 +864,8 @@ export default function Home() {
               <View style={styles.emptyIconBg}>
                 <Truck size={36} color="#d97706" />
               </View>
-              <Text style={styles.emptyTitle}>لا توجد طلبات فزعة حالياً</Text>
-              <Text style={styles.emptySub}>شارك جيرانك أي مساعدة تحتاجها وسيقف أهل حيك بجانبك.</Text>
+              <Text style={styles.emptyTitle}>{normalizedSearch ? 'لا توجد طلبات مطابقة' : 'لا توجد طلبات فزعة حالياً'}</Text>
+              <Text style={styles.emptySub}>{normalizedSearch ? 'جرّب كلمات أخرى أو امسح البحث.' : 'شارك جيرانك أي مساعدة تحتاجها وسيقف أهل حيك بجانبك.'}</Text>
             </View>
           )}
 
@@ -741,7 +876,7 @@ export default function Home() {
       {/* Floating Ask Button (above bottom nav) */}
       <Animated.View style={[styles.fabContainer, { transform: [{ scale: pulseAnim }] }]}>
         <Pressable style={styles.fabBtn} onPress={() => router.push('/ask')}>
-          <LinearGradient colors={['#0891b2', '#0284c7']} style={styles.fabGrad} start={{x:0, y:0}} end={{x:1, y:1}}>
+          <LinearGradient colors={['#065f46', '#059669', '#10b981']} style={styles.fabGrad} start={{x:0, y:0}} end={{x:1, y:1}}>
             <Plus size={20} color="#fff" />
             <Text style={styles.fabText}>اسأل أهل حيك</Text>
           </LinearGradient>
@@ -763,6 +898,11 @@ export default function Home() {
           setSelectedRegion(region);
           setSelectedCity(city);
           setSelectedDistrict(district);
+          savePermanentMyLocation({
+            region,
+            city,
+            district,
+          }, true);
         }}
       />
     </View>
@@ -773,434 +913,45 @@ export default function Home() {
 // HELPER COMPONENTS
 // ========================================================
 
-function ServicePill({ icon, bg, label, onPress }: { icon: any, bg: string, label: string, onPress?: () => void }) {
+function normalizeSearchText(value: unknown): string {
+  return String(value ?? '')
+    .normalize('NFKD')
+    .replace(/[\u064B-\u065F\u0670\u0640]/g, '')
+    .replace(/[أإآٱ]/g, 'ا')
+    .replace(/ى/g, 'ي')
+    .replace(/ة/g, 'ه')
+    .toLocaleLowerCase('ar')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+function ServicePill({
+  icon,
+  bg,
+  label,
+  badge,
+  badgeBg,
+  onPress,
+}: {
+  icon: any;
+  bg: string;
+  label: string;
+  badge?: string;
+  badgeBg?: string;
+  onPress?: () => void;
+}) {
   return (
     <Pressable style={styles.servicePill} onPress={onPress}>
       <View style={[styles.serviceIconBox, { backgroundColor: bg }]}>
         {icon}
+        {badge ? (
+          <View style={[styles.servicePillBadge, badgeBg ? { backgroundColor: badgeBg } : {}]}>
+            <Text style={styles.servicePillBadgeText}>{badge}</Text>
+          </View>
+        ) : null}
       </View>
       <Text style={styles.serviceLabel} numberOfLines={1}>{label}</Text>
     </Pressable>
-  );
-}
-
-// ========================================================
-// TWITTER / X STYLE PROGRESSIVE INQUIRY CARD COMPONENT
-// (استفسار تدريجي بتفاصيل وردود فورية تفاعلية)
-// ========================================================
-
-function TwitterInquiryCard({
-  type,
-  data,
-  currentUserProfile,
-  onQuickReply,
-  onToast,
-}: {
-  type: 'question' | 'request';
-  data: any;
-  currentUserProfile: any;
-  onQuickReply: (id: string, text: string) => Promise<void>;
-  onToast: (msg: string) => void;
-}) {
-  const isReq = type === 'request';
-  const name = data.profiles?.hide_name ? 'جار مجهول 🕶️' : (data.profiles?.display_name || data.profiles?.username || 'ابن الحي');
-  const username = data.profiles?.username || 'neighbor';
-  const avatar = data.profiles?.avatar_url;
-  const isVerifiedNeighbor = data.profiles?.is_geoverified;
-  const isIdVerified = data.profiles?.is_verified;
-  const isEmergency = data.is_emergency || data.urgency_level === 'emergency' || (data.title && (data.title.includes('مفقود') || data.title.includes('طارئ')));
-  const isToolSharing = data.is_tool_sharing || data.item_type === 'tool_sharing' || (data.title && (data.title.includes('إعارة') || data.title.includes('دريل')));
-
-  // Progressive thread expansion state
-  const [expanded, setExpanded] = useState(false);
-  const [quickReplyText, setQuickReplyText] = useState('');
-  const [replyLoading, setReplyLoading] = useState(false);
-
-  // Social interactions state
-  const [liked, setLiked] = useState(false);
-  const [likeCount, setLikeCount] = useState(Math.floor(Math.random() * 6) + 3);
-  const [reposted, setReposted] = useState(false);
-  const [repostCount, setRepostCount] = useState(Math.floor(Math.random() * 3));
-  const [bookmarked, setBookmarked] = useState(false);
-  const [viewsCount] = useState(Math.floor(Math.random() * 85) + 65);
-
-  const answers = data.answers || [];
-  const answersCount = data.answers_count !== undefined ? data.answers_count : answers.length;
-
-  // Like interaction
-  function handleLike() {
-    if (!liked) {
-      setLiked(true);
-      setLikeCount(prev => prev + 1);
-      onToast('أعجبك الاستفسار ❤️');
-    } else {
-      setLiked(false);
-      setLikeCount(prev => prev - 1);
-    }
-  }
-
-  // Repost interaction
-  function handleRepost() {
-    if (!reposted) {
-      setReposted(true);
-      setRepostCount(prev => prev + 1);
-      onToast('تمت إعادة نشر الاستفسار لجيرانك 🔁');
-    } else {
-      setReposted(false);
-      setRepostCount(prev => Math.max(0, prev - 1));
-      onToast('تم إلغاء إعادة النشر');
-    }
-  }
-
-  // Bookmark interaction
-  function handleBookmark() {
-    const nextState = !bookmarked;
-    setBookmarked(nextState);
-    if (nextState) {
-      onToast('تم حفظ الاستفسار في الإشارات المرجعية 🔖');
-    } else {
-      onToast('تمت إزالة الاستفسار من الإشارات المرجعية');
-    }
-  }
-
-  // Share interaction
-  async function handleShare() {
-    const pageUrl = (Platform.OS === 'web' && typeof window !== 'undefined')
-      ? `${window.location.origin}/question?id=${data.id}`
-      : `https://appksa-main.vercel.app/question?id=${data.id}`;
-
-    if (Platform.OS === 'web') {
-      if (typeof navigator !== 'undefined' && navigator.clipboard) {
-        try {
-          await navigator.clipboard.writeText(pageUrl);
-          onToast('تم نسخ رابط الاستفسار للمشاركة 🔗');
-          return;
-        } catch (e) {
-          // fallback
-        }
-      }
-    }
-    try {
-      await Share.share({
-        title: data.title,
-        message: `${data.title}\nشاهد التفاصيل وتفاعل مع جيرانك على منصة حيّنا:\n${pageUrl}`,
-        url: pageUrl,
-      });
-    } catch (e) {
-      onToast('تم نسخ الرابط بنجاح');
-    }
-  }
-
-  // More options menu
-  function handleMoreOptions() {
-    Alert.alert(
-      'خيارات الاستفسار',
-      data.title,
-      [
-        { text: 'نسخ رابط المنشور', onPress: handleShare },
-        { text: 'كتم إشعارات هذا المنشور', onPress: () => onToast('تم كتم إشعارات المنشور 🔕') },
-        { text: 'إبلاغ عن محتوى غير لائق', onPress: () => router.push({ pathname: '/report', params: { id: data.id, type: isReq ? 'request' : 'question' } }), style: 'destructive' },
-        { text: 'إلغاء', style: 'cancel' }
-      ]
-    );
-  }
-
-  // Quick reply submission
-  async function handleSendReply() {
-    if (!quickReplyText.trim()) return;
-    setReplyLoading(true);
-    try {
-      await onQuickReply(data.id, quickReplyText);
-      setQuickReplyText('');
-    } catch (err: any) {
-      Alert.alert('خطأ', err?.message || 'تعذر إرسال الرد');
-    } finally {
-      setReplyLoading(false);
-    }
-  }
-
-  // Navigate to full details page
-  function navigateToDetails() {
-    if (isReq) {
-      router.push({ pathname: '/request', params: { id: data.id } });
-    } else {
-      router.push({ pathname: '/question', params: { id: data.id } });
-    }
-  }
-
-  return (
-    <View style={[
-      styles.xCard,
-      isEmergency && styles.xCardEmergency,
-      isToolSharing && styles.xCardToolSharing,
-    ]}>
-      {/* ======================================================== */}
-      {/* 1. TWITTER HEADER (Author, Verified, Time & Menu)       */}
-      {/* ======================================================== */}
-      <View style={styles.xHeader}>
-        {/* Right side: Author Avatar with thread connector capability */}
-        <Pressable 
-          onPress={() => data.profiles?.id && router.push({ pathname: '/user', params: { id: data.profiles.id } })}
-          style={styles.xAvatarWrap}
-        >
-          {avatar ? (
-            <Image source={{ uri: avatar }} style={styles.xAvatarImg} />
-          ) : (
-            <View style={[styles.xAvatarFallback, isEmergency && { backgroundColor: '#dc2626' }]}>
-              <User size={20} color="#fff" />
-            </View>
-          )}
-          {isVerifiedNeighbor && (
-            <View style={styles.xGeoBadge}>
-              <ShieldCheck size={9} color="#fff" />
-            </View>
-          )}
-        </Pressable>
-
-        {/* Middle: Author Name, Handle, Time Ago & Neighborhood */}
-        <View style={styles.xAuthorMeta}>
-          <View style={styles.xAuthorRow}>
-            {/* Category tag */}
-            {isEmergency ? (
-              <View style={styles.xEmergencyBadge}>
-                <Flame size={11} color="#dc2626" />
-                <Text style={styles.xEmergencyBadgeText}>عاجل</Text>
-              </View>
-            ) : isToolSharing ? (
-              <View style={styles.xToolBadge}>
-                <Wrench size={11} color="#16a34a" />
-                <Text style={styles.xToolBadgeText}>إعارة</Text>
-              </View>
-            ) : isReq ? (
-              <View style={styles.xReqBadge}>
-                <Text style={styles.xReqBadgeText}>فزعة</Text>
-              </View>
-            ) : (
-              <View style={styles.xCategoryBadge}>
-                <Text style={styles.xCategoryBadgeText}>استفسار</Text>
-              </View>
-            )}
-
-            <Text style={styles.xTimeAgo}>{formatArabicTimeAgo(data.created_at)}</Text>
-            <Text style={styles.xDot}>·</Text>
-            <Text style={styles.xHandle} numberOfLines={1}>@{username}</Text>
-            {isIdVerified && (
-              <CheckCircle2 size={13} color="#0284c7" />
-            )}
-            <Pressable onPress={() => data.profiles?.id && router.push({ pathname: '/user', params: { id: data.profiles.id } })}>
-              <Text style={styles.xAuthorName} numberOfLines={1}>{name}</Text>
-            </Pressable>
-          </View>
-
-          {/* District & City location tag */}
-          <View style={styles.xLocationRow}>
-            <MapPin size={11} color="#0891b2" />
-            <Text style={styles.xLocationText}>
-              {data.district ? `حي ${data.district}` : 'الحي'}{data.city ? ` · ${data.city}` : ''}
-            </Text>
-          </View>
-        </View>
-
-        {/* Left side: Options menu button */}
-        <Pressable onPress={handleMoreOptions} style={styles.xMoreBtn}>
-          <MoreHorizontal size={18} color="#94a3b8" />
-        </Pressable>
-      </View>
-
-      {/* ======================================================== */}
-      {/* 2. INQUIRY CONTENT (Clickable to Expand / View Details)  */}
-      {/* ======================================================== */}
-      <Pressable onPress={() => setExpanded(!expanded)} style={styles.xContentArea}>
-        <Text style={[styles.xTitle, isEmergency && { color: '#991b1b' }]}>
-          {data.title}
-        </Text>
-        
-        {(data.body || data.description) && (
-          <Text style={styles.xBodyText} numberOfLines={expanded ? undefined : 3}>
-            {isReq ? data.description : data.body}
-          </Text>
-        )}
-
-        {/* Dynamic Hashtags Pill Row */}
-        <View style={styles.xHashtagRow}>
-          {data.district && (
-            <View style={styles.xHashPill}>
-              <Text style={styles.xHashText}>#{data.district.replace(/\s+/g, '_')}</Text>
-            </View>
-          )}
-          <View style={styles.xHashPill}>
-            <Text style={styles.xHashText}>#أهل_الحي</Text>
-          </View>
-          {isToolSharing && (
-            <View style={[styles.xHashPill, { backgroundColor: '#f0fdf4' }]}>
-              <Text style={[styles.xHashText, { color: '#16a34a' }]}>#إعارة_مجانية</Text>
-            </View>
-          )}
-        </View>
-      </Pressable>
-
-      {/* ======================================================== */}
-      {/* 3. TWITTER ACTION BAR (Interactive Twitter / X Bar)       */}
-      {/* ======================================================== */}
-      <View style={styles.xActionBar}>
-        {/* 1. Reply Button (Toggles Inline Expansion) */}
-        <Pressable 
-          style={[styles.xActionBtn, expanded && styles.xActionBtnActive]} 
-          onPress={() => setExpanded(!expanded)}
-        >
-          <MessageCircle size={17} color={expanded ? '#0891b2' : '#64748b'} />
-          <Text style={[styles.xActionCounter, expanded && { color: '#0891b2', fontWeight: '800' }]}>
-            {answersCount}
-          </Text>
-        </Pressable>
-
-        {/* 2. Repost / Retweet */}
-        <Pressable style={styles.xActionBtn} onPress={handleRepost}>
-          <Repeat size={17} color={reposted ? '#16a34a' : '#64748b'} />
-          <Text style={[styles.xActionCounter, reposted && { color: '#16a34a', fontWeight: '800' }]}>
-            {repostCount > 0 ? repostCount : ''}
-          </Text>
-        </Pressable>
-
-        {/* 3. Heart / Like */}
-        <Pressable style={styles.xActionBtn} onPress={handleLike}>
-          <Heart size={17} color={liked ? '#f43f5e' : '#64748b'} fill={liked ? '#f43f5e' : 'none'} />
-          <Text style={[styles.xActionCounter, liked && { color: '#f43f5e', fontWeight: '800' }]}>
-            {likeCount}
-          </Text>
-        </Pressable>
-
-        {/* 4. Bookmark */}
-        <Pressable style={styles.xActionBtn} onPress={handleBookmark}>
-          <Bookmark size={17} color={bookmarked ? '#f59e0b' : '#64748b'} fill={bookmarked ? '#f59e0b' : 'none'} />
-        </Pressable>
-
-        {/* 5. Share */}
-        <Pressable style={styles.xActionBtn} onPress={handleShare}>
-          <Share2 size={17} color="#64748b" />
-        </Pressable>
-
-        {/* 6. Views */}
-        <View style={styles.xActionBtn}>
-          <Eye size={16} color="#94a3b8" />
-          <Text style={styles.xActionViews}>{viewsCount}</Text>
-        </View>
-      </View>
-
-      {/* ======================================================== */}
-      {/* 4. PROGRESSIVE EXPANSION (خيط الردود والتفاصيل التدريجي) */}
-      {/* ======================================================== */}
-      {expanded && (
-        <View style={styles.xThreadContainer}>
-          {/* Thread Header */}
-          <View style={styles.xThreadHeader}>
-            <Pressable onPress={() => setExpanded(false)} style={styles.xThreadCloseBtn}>
-              <ChevronUp size={14} color="#0891b2" />
-              <Text style={styles.xThreadCloseText}>طي التفاصيل</Text>
-            </Pressable>
-            <View style={styles.xThreadTitleRow}>
-              <Text style={styles.xThreadTitle}>خيط الردود والتوصيات ({answersCount})</Text>
-              <Sparkles size={14} color="#0891b2" />
-            </View>
-          </View>
-
-          {/* List of answers */}
-          {answers.length > 0 ? (
-            <View style={styles.xAnswersList}>
-              {answers.map((ans: any, idx: number) => {
-                const ansName = ans.profiles?.hide_name ? 'جار مجهول 🕶️' : (ans.profiles?.display_name || ans.profiles?.username || 'ابن الحي');
-                const ansAvatar = ans.profiles?.avatar_url;
-                const isAccepted = ans.is_accepted || idx === 0;
-
-                return (
-                  <View key={ans.id || idx} style={styles.xAnswerItem}>
-                    {/* Thread Line Connector */}
-                    <View style={styles.xThreadLine} />
-
-                    {/* Answer Author Avatar */}
-                    <View style={styles.xAnswerAvatarWrap}>
-                      {ansAvatar ? (
-                        <Image source={{ uri: ansAvatar }} style={styles.xAnswerAvatar} />
-                      ) : (
-                        <View style={styles.xAnswerAvatarFallback}>
-                          <Text style={styles.xAnswerAvatarLetter}>{ansName[0]}</Text>
-                        </View>
-                      )}
-                    </View>
-
-                    {/* Answer Bubble */}
-                    <View style={[styles.xAnswerBubble, isAccepted && styles.xAnswerBubbleAccepted]}>
-                      <View style={styles.xAnswerHeaderRow}>
-                        <Text style={styles.xAnswerTime}>{formatArabicTimeAgo(ans.created_at)}</Text>
-                        <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 5 }}>
-                          <Text style={styles.xAnswerAuthorName}>{ansName}</Text>
-                          {ans.profiles?.is_geoverified && (
-                            <ShieldCheck size={11} color="#16a34a" />
-                          )}
-                          {isAccepted && (
-                            <View style={styles.xAcceptedBadge}>
-                              <Check size={10} color="#fff" />
-                              <Text style={styles.xAcceptedBadgeText}>توصية معتمدة</Text>
-                            </View>
-                          )}
-                        </View>
-                      </View>
-
-                      <Text style={styles.xAnswerBodyText}>{ans.body}</Text>
-                    </View>
-                  </View>
-                );
-              })}
-            </View>
-          ) : (
-            <View style={styles.xNoAnswersBox}>
-              <Text style={styles.xNoAnswersText}>
-                كن أول من يفيد جارك ويقدم توصية أو حلاً لهذا الاستفسار! 💡
-              </Text>
-            </View>
-          )}
-
-          {/* Inline Quick Reply Input */}
-          <View style={styles.xQuickReplyContainer}>
-            <View style={styles.xQuickReplyAvatar}>
-              {currentUserProfile?.avatar_url ? (
-                <Image source={{ uri: currentUserProfile.avatar_url }} style={styles.xMiniAvatar} />
-              ) : (
-                <View style={styles.xMiniAvatarFallback}>
-                  <Text style={styles.xMiniAvatarLetter}>{currentUserProfile?.display_name?.[0] || 'أ'}</Text>
-                </View>
-              )}
-            </View>
-
-            <TextInput 
-              style={styles.xQuickReplyInput}
-              placeholder="اكتب إجابتك أو إفادتك للجار..."
-              placeholderTextColor="#94a3b8"
-              value={quickReplyText}
-              onChangeText={setQuickReplyText}
-              multiline
-            />
-
-            <Pressable 
-              style={[styles.xQuickReplySendBtn, (!quickReplyText.trim() || replyLoading) && styles.xQuickReplySendBtnDisabled]}
-              onPress={handleSendReply}
-              disabled={!quickReplyText.trim() || replyLoading}
-            >
-              <Send size={15} color="#fff" />
-              <Text style={styles.xQuickReplySendText}>رد</Text>
-            </Pressable>
-          </View>
-
-          {/* Full Page Navigation Link */}
-          <Pressable style={styles.xOpenFullThreadBtn} onPress={navigateToDetails}>
-            <Text style={styles.xOpenFullThreadText}>
-              {isReq ? 'فتح صفحة طلب الفزعة بالكامل ←' : 'فتح صفحة الاستفسار الكاملة والمحادثات المباشرة ←'}
-            </Text>
-            <ExternalLink size={14} color="#0891b2" />
-          </Pressable>
-        </View>
-      )}
-    </View>
   );
 }
 
@@ -1212,29 +963,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8fafc',
-  },
-  toastBanner: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 56 : 42,
-    alignSelf: 'center',
-    zIndex: 999,
-    backgroundColor: '#0f172a',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 6,
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  toastBannerText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '800',
-    textAlign: 'center',
   },
   hero: {
     paddingTop: Platform.OS === 'ios' ? 52 : 38,
@@ -1268,9 +996,6 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#fff',
     letterSpacing: -0.5,
-  },
-  brandKsaFlag: {
-    fontSize: 20,
   },
   locationSelectorPill: {
     flexDirection: 'row-reverse',
@@ -1391,53 +1116,164 @@ const styles = StyleSheet.create({
   clearSearchBtn: {
     padding: 6,
   },
-  clearSearchText: {
-    color: '#94a3b8',
-    fontSize: 14,
-    fontWeight: '800',
+  // Atmosphere & Neighborhood Pulse Bar
+  atmosphereBar: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    backgroundColor: '#fff',
+    marginHorizontal: 16,
+    marginTop: -14,
+    marginBottom: 12,
+    borderRadius: 18,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+    zIndex: 10,
   },
+  atmoItem: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 6,
+  },
+  atmoText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#334155',
+  },
+  atmoDivider: {
+    width: 1,
+    height: 16,
+    backgroundColor: '#e2e8f0',
+  },
+
+  // Upgraded Stories Section
   storiesContainer: {
     paddingVertical: 14,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
   },
+  storiesHeaderRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+  storiesTitleRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 8,
+  },
+  storiesSectionTitle: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#0f172a',
+  },
+  storiesLiveBadge: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    backgroundColor: '#ecfdf5',
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+    gap: 4,
+  },
+  storiesLivePulseDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#10b981',
+  },
+  storiesLiveText: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    color: '#059669',
+  },
+  publishStoryHeaderBtn: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    backgroundColor: '#f0fdf4',
+    paddingHorizontal: 10,
+    paddingVertical: 4.5,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+    gap: 4,
+  },
+  publishStoryHeaderText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#059669',
+  },
   storiesScroll: {
     paddingHorizontal: 16,
     gap: 14,
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   storyBox: {
     alignItems: 'center',
-    width: 64,
+    width: 68,
   },
   storyAddRing: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
+    width: 66,
+    height: 66,
+    borderRadius: 33,
     padding: 2.5,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 5,
   },
-  storyAddBtn: {
+  storyGradientRing: {
+    width: 66,
+    height: 66,
+    borderRadius: 33,
+    padding: 2.5,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 5,
+    position: 'relative',
+  },
+  storyInnerBorder: {
     width: '100%',
     height: '100%',
-    borderRadius: 30,
-    backgroundColor: '#fff',
+    borderRadius: 31,
+    borderWidth: 2,
+    borderColor: '#fff',
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    position: 'relative',
+  },
+  storySelfPlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#ecfdf5',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  storyRing: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
-    borderWidth: 2.5,
-    padding: 2.5,
+  storySelfPlusBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: '#059669',
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 6,
-    position: 'relative',
+    borderWidth: 2,
+    borderColor: '#fff',
   },
   storyImg: {
     width: '100%',
@@ -1471,114 +1307,35 @@ const styles = StyleSheet.create({
   },
   storyName: {
     fontSize: 11,
-    fontWeight: '700',
-    color: '#334155',
+    fontWeight: '800',
+    color: '#0f172a',
     textAlign: 'center',
   },
-  hubCard: {
-    marginHorizontal: 16,
-    marginTop: 14,
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 14,
-    borderWidth: 1.5,
-    borderColor: '#e0f2fe',
-    shadowColor: '#0891b2',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 2,
+  storyDistrictSub: {
+    fontSize: 9.5,
+    color: '#64748b',
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: 1,
   },
-  hubHeader: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  hubTitleRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 6,
-  },
-  hubTitle: {
-    fontSize: 13,
-    fontWeight: '900',
-    color: '#0e7490',
-  },
-  hubSolvedBadge: {
-    backgroundColor: '#ecfeff',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#cffafe',
-  },
-  hubSolvedText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#0891b2',
-  },
-  hubExpandedBody: {
-    marginTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f9ff',
-    paddingTop: 10,
-  },
-  hubSummaryText: {
-    fontSize: 12,
-    color: '#155e75',
-    textAlign: 'right',
-    lineHeight: 18,
-    marginBottom: 8,
-  },
-  hubTopicsRow: {
-    flexDirection: 'row-reverse',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: 6,
-  },
-  hubTopicPill: {
-    backgroundColor: '#f0fdfa',
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#ccfbf1',
-  },
-  hubTopicText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#0d9488',
-  },
-  proximityBar: {
-    flexDirection: 'row-reverse',
-    justifyContent: 'space-between',
-    marginTop: 10,
-    gap: 6,
-  },
-  proxPill: {
-    flex: 1,
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 8,
+
+  // Service Pill Badges
+  servicePillBadge: {
+    position: 'absolute',
+    top: -5,
+    right: -6,
+    backgroundColor: '#059669',
     paddingHorizontal: 4,
-    borderRadius: 12,
-    backgroundColor: '#f8fafc',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    gap: 4,
+    paddingVertical: 1,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: '#fff',
+    zIndex: 5,
   },
-  proxPillActive: {
-    backgroundColor: '#0891b2',
-    borderColor: '#0891b2',
-  },
-  proxPillText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#0891b2',
-  },
-  proxPillTextActive: {
+  servicePillBadgeText: {
     color: '#fff',
+    fontSize: 7.5,
+    fontWeight: '900',
   },
   emergencyHomeCard: {
     marginHorizontal: 16,
@@ -1671,6 +1428,9 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   fTab: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 6,
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
@@ -1679,8 +1439,8 @@ const styles = StyleSheet.create({
     borderColor: '#e2e8f0',
   },
   fTabActive: {
-    backgroundColor: '#0891b2',
-    borderColor: '#0891b2',
+    backgroundColor: '#059669',
+    borderColor: '#059669',
   },
   fTabActiveRed: {
     backgroundColor: '#dc2626',
@@ -1690,447 +1450,45 @@ const styles = StyleSheet.create({
     backgroundColor: '#16a34a',
     borderColor: '#16a34a',
   },
+  fTabActiveMine: {
+    backgroundColor: '#7c3aed',
+    borderColor: '#7c3aed',
+  },
   fTabText: {
     fontSize: 12,
     fontWeight: '800',
     color: '#475569',
   },
+  fTabLabelRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 6,
+  },
   fTabTextActive: {
     color: '#fff',
   },
-
-  // ========================================================
-  // TWITTER / X CARD STYLES
-  // ========================================================
-  xCard: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  xCardEmergency: {
-    borderColor: '#fca5a5',
-    backgroundColor: '#fffafa',
-  },
-  xCardToolSharing: {
-    borderColor: '#bbf7d0',
-    backgroundColor: '#f0fdf4',
-  },
-  xHeader: {
-    flexDirection: 'row-reverse',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  xAvatarWrap: {
-    position: 'relative',
-    marginLeft: 10,
-  },
-  xAvatarImg: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    borderWidth: 1,
-    borderColor: '#f1f5f9',
-  },
-  xAvatarFallback: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#0891b2',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  xGeoBadge: {
+  newPostsBanner: {
     position: 'absolute',
-    bottom: -1,
-    right: -1,
-    backgroundColor: '#16a34a',
-    width: 15,
-    height: 15,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: '#fff',
-  },
-  xAuthorMeta: {
-    flex: 1,
-    alignItems: 'flex-end',
-  },
-  xAuthorRow: {
+    top: Platform.OS === 'ios' ? 54 : 40,
+    alignSelf: 'center',
+    zIndex: 9999,
+    backgroundColor: '#059669',
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 4,
+    gap: 6,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 30,
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 8,
   },
-  xAuthorName: {
-    fontSize: 14,
-    fontWeight: '900',
-    color: '#0f172a',
-  },
-  xHandle: {
-    fontSize: 12,
-    color: '#64748b',
-    fontWeight: '600',
-    maxWidth: 90,
-  },
-  xDot: {
-    fontSize: 12,
-    color: '#94a3b8',
-  },
-  xTimeAgo: {
-    fontSize: 11,
-    color: '#94a3b8',
-    fontWeight: '600',
-  },
-  xLocationRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 2,
-  },
-  xLocationText: {
-    fontSize: 11,
-    color: '#0891b2',
-    fontWeight: '700',
-  },
-  xMoreBtn: {
-    padding: 4,
-  },
-  xCategoryBadge: {
-    backgroundColor: '#ecfeff',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  xCategoryBadgeText: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#0891b2',
-  },
-  xEmergencyBadge: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 2,
-    backgroundColor: '#fee2e2',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  xEmergencyBadgeText: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#dc2626',
-  },
-  xToolBadge: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 2,
-    backgroundColor: '#dcfce7',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  xToolBadgeText: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#16a34a',
-  },
-  xReqBadge: {
-    backgroundColor: '#fffbeb',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  xReqBadgeText: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#d97706',
-  },
-  xContentArea: {
-    marginVertical: 4,
-  },
-  xTitle: {
-    fontSize: 15,
-    fontWeight: '900',
-    color: '#0f172a',
-    textAlign: 'right',
-    lineHeight: 23,
-    marginBottom: 4,
-  },
-  xBodyText: {
+  newPostsBannerText: {
+    color: '#fff',
     fontSize: 13,
-    color: '#334155',
-    textAlign: 'right',
-    lineHeight: 21,
-    marginBottom: 6,
-  },
-  xHashtagRow: {
-    flexDirection: 'row-reverse',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 2,
-  },
-  xHashPill: {
-    backgroundColor: '#f1f5f9',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  xHashText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#0284c7',
-  },
-  xActionBar: {
-    flexDirection: 'row-reverse',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
-    marginTop: 10,
-    paddingTop: 10,
-    paddingHorizontal: 4,
-  },
-  xActionBtn: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 5,
-    paddingVertical: 4,
-    paddingHorizontal: 6,
-    borderRadius: 8,
-  },
-  xActionBtnActive: {
-    backgroundColor: '#ecfeff',
-  },
-  xActionCounter: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#64748b',
-  },
-  xActionViews: {
-    fontSize: 11,
-    color: '#94a3b8',
-    fontWeight: '600',
-  },
-
-  // ========================================================
-  // PROGRESSIVE THREAD EXPANSION STYLES
-  // ========================================================
-  xThreadContainer: {
-    marginTop: 12,
-    backgroundColor: '#f8fafc',
-    borderRadius: 14,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  xThreadHeader: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-    marginBottom: 10,
-  },
-  xThreadTitleRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 5,
-  },
-  xThreadTitle: {
-    fontSize: 12,
-    fontWeight: '900',
-    color: '#0891b2',
-  },
-  xThreadCloseBtn: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 3,
-  },
-  xThreadCloseText: {
-    fontSize: 11,
-    color: '#0891b2',
-    fontWeight: '700',
-  },
-  xAnswersList: {
-    gap: 10,
-    marginBottom: 10,
-  },
-  xAnswerItem: {
-    flexDirection: 'row-reverse',
-    alignItems: 'flex-start',
-    position: 'relative',
-  },
-  xThreadLine: {
-    position: 'absolute',
-    top: 32,
-    right: 14,
-    bottom: -10,
-    width: 2,
-    backgroundColor: '#cbd5e1',
-    zIndex: 1,
-  },
-  xAnswerAvatarWrap: {
-    marginLeft: 8,
-    zIndex: 2,
-  },
-  xAnswerAvatar: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-  },
-  xAnswerAvatarFallback: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: '#0284c7',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  xAnswerAvatarLetter: {
-    color: '#fff',
-    fontSize: 12,
     fontWeight: '800',
-  },
-  xAnswerBubble: {
-    flex: 1,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  xAnswerBubbleAccepted: {
-    borderColor: '#86efac',
-    backgroundColor: '#f0fdf4',
-  },
-  xAnswerHeaderRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  xAnswerAuthorName: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#0f172a',
-  },
-  xAnswerTime: {
-    fontSize: 10,
-    color: '#94a3b8',
-  },
-  xAcceptedBadge: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: '#16a34a',
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 6,
-  },
-  xAcceptedBadgeText: {
-    color: '#fff',
-    fontSize: 9,
-    fontWeight: '800',
-  },
-  xAnswerBodyText: {
-    fontSize: 12,
-    color: '#334155',
-    lineHeight: 18,
-    textAlign: 'right',
-  },
-  xNoAnswersBox: {
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  xNoAnswersText: {
-    fontSize: 12,
-    color: '#64748b',
-    textAlign: 'center',
-  },
-  xQuickReplyContainer: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: '#cbd5e1',
-    gap: 8,
-    marginTop: 4,
-  },
-  xQuickReplyAvatar: {
-    width: 26,
-    height: 26,
-  },
-  xMiniAvatar: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-  },
-  xMiniAvatarFallback: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: '#0891b2',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  xMiniAvatarLetter: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  xQuickReplyInput: {
-    flex: 1,
-    fontSize: 12,
-    color: '#0f172a',
-    textAlign: 'right',
-    maxHeight: 60,
-    paddingVertical: 4,
-  },
-  xQuickReplySendBtn: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    backgroundColor: '#0891b2',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 10,
-    gap: 4,
-  },
-  xQuickReplySendBtnDisabled: {
-    backgroundColor: '#cbd5e1',
-  },
-  xQuickReplySendText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  xOpenFullThreadBtn: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 8,
-    paddingVertical: 8,
-    backgroundColor: '#ecfeff',
-    borderRadius: 10,
-    gap: 6,
-  },
-  xOpenFullThreadText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#0891b2',
   },
 
   // Empty state & FAB
@@ -2148,7 +1506,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#ecfeff',
+    backgroundColor: '#ecfdf5',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 14,
@@ -2168,7 +1526,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   emptyAskBtn: {
-    backgroundColor: '#0891b2',
+    backgroundColor: '#059669',
     paddingHorizontal: 18,
     paddingVertical: 10,
     borderRadius: 14,
@@ -2183,9 +1541,10 @@ const styles = StyleSheet.create({
     bottom: Platform.OS === 'ios' ? 95 : 82,
     left: 20,
     zIndex: 99,
-    shadowColor: '#0891b2',
+    borderRadius: 30,
+    shadowColor: '#059669',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
+    shadowOpacity: 0.35,
     shadowRadius: 12,
     elevation: 8,
   },
@@ -2213,5 +1572,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
   },
+
 
 });

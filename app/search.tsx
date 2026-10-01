@@ -30,16 +30,35 @@ export default function SearchPage() {
   const performSearch = async () => {
     setLoading(true);
     const searchTerm = `%${query.trim()}%`;
-    
+
     try {
-      const [u, q, r] = await Promise.all([
+      const [{ data: auth }, u, q, r] = await Promise.all([
+        supabase.auth.getUser(),
         supabase.from('profiles').select('*').or(`display_name.ilike.${searchTerm},username.ilike.${searchTerm},city.ilike.${searchTerm}`).limit(15),
         supabase.from('questions').select('*, profiles(*)').or(`title.ilike.${searchTerm},body.ilike.${searchTerm}`).limit(10),
         supabase.from('request_directory').select('*, profiles(*)').or(`title.ilike.${searchTerm},description.ilike.${searchTerm}`).limit(10)
       ]);
 
+      // Hide users I blocked (or who blocked me) from search results.
+      let visibleUsers = u.data || [];
+      const myId = auth?.user?.id;
+      if (myId) {
+        const { data: blocks } = await supabase
+          .from('blocks')
+          .select('blocker_id, blocked_id')
+          .or(`blocker_id.eq.${myId},blocked_id.eq.${myId}`);
+
+        const blocked = new Set<string>();
+        (blocks || []).forEach((b: any) => {
+          if (b.blocker_id === myId || b.blocked_id === myId) {
+            blocked.add(b.blocker_id === myId ? b.blocked_id : b.blocker_id);
+          }
+        });
+        visibleUsers = visibleUsers.filter((p: any) => !blocked.has(p.id));
+      }
+
       setResults({
-        users: u.data || [],
+        users: visibleUsers,
         questions: q.data || [],
         requests: r.data || []
       });
@@ -197,7 +216,7 @@ export default function SearchPage() {
         {!loading && query.length === 0 && (
           <View style={styles.empty}>
             <View style={styles.emptyIconBg}>
-              <SearchIcon size={40} color="#e0f2fe" />
+              <SearchIcon size={40} color="#a7f3d0" />
             </View>
             <Text style={styles.emptyText}>ابدأ البحث الآن</Text>
             <Text style={styles.emptySub}>ابحث عن جيرانك، الخدمات، أو أحدث الطلبات في حيك</Text>

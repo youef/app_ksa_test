@@ -190,8 +190,8 @@ export function calculateDistanceKm(
 }
 
 /**
- * Checks if a user's live GPS coordinates place them inside their declared neighborhood
- * Returns verification result with badge status
+ * Approximate location check against the configured city reference point.
+ * This cannot prove residence in a specific district because district coordinates are not configured.
  */
 export function verifyGPSInDistrict(
   userLat: number,
@@ -213,35 +213,47 @@ export function verifyGPSInDistrict(
     };
   }
 
-  // Look up district or city coordinates
-  let destLat = 24.7136;
-  let destLng = 46.6753;
+  // The location catalog currently contains city coordinates, not district boundaries.
+  let destLat = 0;
+  let destLng = 0;
+  let cityFound = false;
 
   for (const region of SAUDI_REGIONS) {
     const foundCity = region.cities.find((c) => c.name === targetCity);
     if (foundCity) {
+      if (foundCity.lat === undefined || foundCity.lng === undefined) continue;
       destLat = foundCity.lat;
       destLng = foundCity.lng;
+      cityFound = true;
       break;
     }
   }
 
+  if (!cityFound) {
+    return {
+      isVerified: false,
+      distanceKm: 9999,
+      message: 'تعذر العثور على إحداثيات هذه المدينة للتحقق من الموقع.',
+      badgeTitle: 'مدينة غير مدعومة',
+    };
+  }
+
   const distance = calculateDistanceKm(userLat, userLng, destLat, destLng);
 
-  // If within 7km of city/district center, qualify as verified resident
+  // Treat this as a city proximity signal only; it is not proof of residence.
   if (distance <= 7.0) {
     return {
       isVerified: true,
       distanceKm: distance,
-      message: `تم التحقق بنجاح! موقعك الجغرافي مطابق لنطاق حي ${targetDistrict} بمدينة ${targetCity}.`,
-      badgeTitle: 'ساكن موثّق بالحي ✓',
+      message: `موقعك ضمن 7 كم من نقطة المدينة المرجعية في ${targetCity}. هذا فحص تقريبي للموقع ولا يثبت السكن في حي محدد.`,
+      badgeTitle: 'موقع قريب من المدينة',
     };
   } else {
     return {
       isVerified: false,
       distanceKm: distance,
-      message: `أنت حالياً على بعد ${distance} كم من ${targetCity}. يرجى التواجد بالقرب من حيك للحصول على شارة التوثيق.`,
-      badgeTitle: 'يحتاج تواجد بالحي',
+      message: `موقعك يبعد ${distance} كم عن نقطة المدينة المرجعية في ${targetCity}. يتطلب الفحص التقريبي أن تكون المسافة 7 كم أو أقل.`,
+      badgeTitle: 'بعيد عن نقطة المدينة',
     };
   }
 }

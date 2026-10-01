@@ -26,10 +26,25 @@ import {
   UserX,
   UserCheck,
   Trash2,
+  Eraser,
   X,
   User,
-  ShieldAlert,
+  Lock,
+  Moon,
 } from 'lucide-react-native';
+import {
+  clearForMe,
+  deleteConversationForEveryone,
+  displayName,
+  isDndActiveNow,
+  loadConvSettings,
+  loadDnd,
+  markConversationRead,
+  saveDnd,
+  setBlock,
+  setMute,
+} from '@/lib/chatControls';
+import { syncDndWithNotifications } from '@/lib/notifications';
 
 export default function Conversation() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -40,92 +55,100 @@ export default function Conversation() {
   const [currentUserId, setCurrentUserId] = useState('');
   const [otherUser, setOtherUser] = useState<any>(null);
   const [isMuted, setIsMuted] = useState(false);
-  const [isBlockedByMe, setIsBlockedByMe] = useState(false);
+  const [isCleared, setIsCleared] = useState(false);
+  const [blockedByMe, setBlockedByMe] = useState(false);
+  const [blockedMe, setBlockedMe] = useState(false);
+  const [dndActive, setDndActive] = useState(false);
+  const [otherDnd, setOtherDnd] = useState(false);
   const [optionsOpen, setOptionsOpen] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
+
+  const convId = Array.isArray(id) ? id[0] : (id as string);
+  const otherName = displayName(otherUser, 'المحادثة');
+  const isAnonymous = otherUser?.hide_name === true;
+  const anyBlock = blockedByMe || blockedMe;
 
   const load = useCallback(async () => {
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) return router.replace('/auth');
     setCurrentUserId(u.user.id);
 
-    // 1. Get messages
+    // 1. Messages (RLS already hides blocked-party traffic and anything cleared)
     const { data: msgs } = await supabase
       .from('messages')
       .select('*')
-      .eq('conversation_id', id)
+      .eq('conversation_id', convId)
       .order('created_at', { ascending: true });
 
     setMessages(msgs ?? []);
 
-    // 2. Get other user
+    // 2. Other member + their profile
     const { data: members } = await supabase
       .from('conversation_members')
       .select('user_id')
-      .eq('conversation_id', id)
+      .eq('conversation_id', convId)
       .neq('user_id', u.user.id);
 
-    let otherId: string | null = null;
-    if (members && members.length > 0) {
-      otherId = members[0].user_id;
+    const otherId = members && members.length > 0 ? members[0].user_id : null;
+    if (otherId) {
       const { data: profile } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', otherId)
         .single();
       setOtherUser(profile);
+      setOtherDnd(await isDndActiveNow(await loadDnd(otherId)));
     }
 
-    // 3. Get my profile for mute list & check blocks
-    const { data: myProfile } = await supabase
-      .from('profiles')
-      .select('muted_conversations')
-      .eq('id', u.user.id)
-      .maybeSingle();
+    // 3. My per-conversation settings
+    const settings = await loadConvSettings(u.user.id, [convId]);
+    const mine = settings[convId];
+    setIsMuted(!!mine?.muted);
+    setIsCleared(!!mine?.clearedAt);
 
-    if (myProfile) {
-      setIsMuted((myProfile.muted_conversations || []).includes(id));
-    }
+    // 4. My DND state
+    const mine_dnd = await loadDnd(u.user.id);
+    setDndActive(isDndActiveNow(mine_dnd));
+    await syncDndWithNotifications(u.user.id);
 
+    // 5. Blocks in BOTH directions
     if (otherId) {
-      const { data: blockRecord } = await supabase
-        .from('blocks')
-        .select('id')
-        .eq('blocker_id', u.user.id)
-        .eq('blocked_id', otherId)
-        .maybeSingle();
-      setIsBlockedByMe(!!blockRecord);
+      const [{ data: mineBlocks }, { data: theirBlocks }] = await Promise.all([
+        supabase
+          .from('blocks')
+          .select('id')
+          .eq('blocker_id', u.user.id)
+          .eq('blocked_id', otherId)
+          .maybeSingle(),
+        supabase
+          .from('blocks')
+          .select('id')
+          .eq('blocker_id', otherId)
+          .eq('blocked_id', u.user.id)
+          .maybeSingle(),
+      ]);
+      setBlockedByMe(!!mineBlocks);
+      setBlockedMe(!!theirBlocks);
     }
 
     setLoading(false);
 
-    // Mark messages as read
+    // 6. Read receipts in one call
     if (msgs && msgs.length > 0) {
-      const unreadMsgIds = msgs
-        .filter(m => m.sender_id !== u.user.id && !(m.read_by || []).includes(u.user.id))
-        .map(m => m.id);
-      if (unreadMsgIds.length > 0) {
-        for (const msgId of unreadMsgIds) {
-          await supabase
-            .from('messages')
-            .update({
-              read_by: [...(msgs.find(m => m.id === msgId)?.read_by || []), u.user.id],
-            })
-            .eq('id', msgId);
-        }
-      }
+      void markConversationRead(convId, u.user.id);
     }
 
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: false }), 100);
-  }, [id]);
+  }, [convId]);
 
   useEffect(() => {
     load();
     const ch = supabase
-      .channel('chat-' + id)
+      .channel('chat-' + convId)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${id}` },
+        { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${convId}` },
         payload => {
           setMessages(prev => [...prev, payload.new]);
           setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
@@ -136,113 +159,136 @@ export default function Conversation() {
     return () => {
       supabase.removeChannel(ch);
     };
-  }, [id]);
+  }, [convId, load]);
+
+  // ------------------------------------------------------------ actions
 
   async function send() {
     if (!body.trim() || sending) return;
-    if (isBlockedByMe) {
-      return Alert.alert('تنبيه', 'قم بإلغاء حظر هذا المستخدم أولاً لتتمكن من المراسلة.');
+
+    if (anyBlock) {
+      return Alert.alert(
+        'غير مسموح',
+        blockedByMe
+          ? 'قم بإلغاء حظر هذا المستخدم أولاً لتتمكن من المراسلة.'
+          : 'هذا المستخدم حظرك. لا يمكنك إرسال رسائل إليه.'
+      );
     }
 
     setSending(true);
     const trimmed = body.trim();
     setBody('');
 
-    await supabase.from('messages').insert({
-      conversation_id: id,
+    const { error } = await supabase.from('messages').insert({
+      conversation_id: convId,
       sender_id: currentUserId,
       body: trimmed,
       read_by: [currentUserId],
     });
 
     setSending(false);
+
+    if (error) {
+      setBody(trimmed);
+      Alert.alert('تعذّر الإرسال', error.message);
+      return;
+    }
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
   }
 
-  // Toggle Mute / DND for this conversation
   async function toggleMute() {
-    if (!currentUserId) return;
     setOptionsOpen(false);
+    const next = !isMuted;
+    setIsMuted(next);
 
-    try {
-      const { data: myProfile } = await supabase
-        .from('profiles')
-        .select('muted_conversations')
-        .eq('id', currentUserId)
-        .single();
-
-      let currentMuted: string[] = myProfile?.muted_conversations || [];
-      let nextMuted: string[];
-
-      if (isMuted) {
-        nextMuted = currentMuted.filter(convId => convId !== id);
-        setIsMuted(false);
-        Alert.alert('تم! 🔔', 'تم إلغاء كتم إشعارات هذه المحادثة.');
-      } else {
-        nextMuted = [...new Set([...currentMuted, id])];
-        setIsMuted(true);
-        Alert.alert('تم! 🔕', 'تم تفعيل وضع عدم الإزعاج وكتم إشعارات هذه المحادثة.');
-      }
-
-      await supabase.from('profiles').update({ muted_conversations: nextMuted }).eq('id', currentUserId);
-    } catch (e: any) {
-      Alert.alert('خطأ', e.message);
+    const result = await setMute(currentUserId, convId, next);
+    if (!result.ok) {
+      setIsMuted(!next);
+      Alert.alert('تعذّر تغيير الكتم', result.error);
+      return;
     }
+    Alert.alert('تم ✓', next ? 'تم كتم إشعارات هذه المحادثة 🔕' : 'تم إلغاء الكتم 🔔');
   }
 
-  // Toggle Block / Unblock user
+  async function toggleMyDnd() {
+    setOptionsOpen(false);
+    const dnd = await loadDnd(currentUserId);
+    const next = !dnd.enabled;
+    setDndActive(next);
+    const result = await saveDnd(currentUserId, { ...dnd, enabled: next });
+    if (!result.ok) {
+      Alert.alert('تعذّر الحفظ', result.error);
+      return;
+    }
+    await syncDndWithNotifications(currentUserId);
+    Alert.alert('تم ✓', next ? 'عدم الإزعاج مفعّل — الإشعارات صامتة' : 'عادت الإشعارات الصوتية');
+  }
+
   function confirmToggleBlock() {
     if (!otherUser) return;
     setOptionsOpen(false);
 
-    if (isBlockedByMe) {
-      Alert.alert('إلغاء الحظر', `هل تريد بالتأكيد إلغاء حظر ${otherName}؟`, [
+    if (blockedByMe) {
+      Alert.alert('إلغاء الحظر', `هل تريد السماح لـ ${otherName} بمراسلتك مرة أخرى؟`, [
         { text: 'إلغاء', style: 'cancel' },
         {
           text: 'إلغاء الحظر',
           onPress: async () => {
-            await supabase.from('blocks').delete().eq('blocker_id', currentUserId).eq('blocked_id', otherUser.id);
-            setIsBlockedByMe(false);
-            Alert.alert('تم! ✅', 'تم رفع الحظر بنجاح.');
+            const result = await setBlock(currentUserId, otherUser.id, false);
+            if (!result.ok) return Alert.alert('خطأ', result.error);
+            setBlockedByMe(false);
+            Alert.alert('تم رفع الحظر ✓', 'يمكنك تبادل الرسائل مجدداً.');
           },
         },
       ]);
-    } else {
-      Alert.alert('حظر المستخدم 🚫', `هل تريد بالتأكيد حظر ${otherName}؟ لن يتمكن من مراسلتك ولن تظهر لك رسائله.`, [
+      return;
+    }
+
+    Alert.alert(
+      'حظر المستخدم 🚫',
+      `لن يتمكن ${otherName} من مراسلتك، وستُخفى رسائله من هذه المحادثة.`,
+      [
         { text: 'إلغاء', style: 'cancel' },
         {
           text: 'حظر الآن',
           style: 'destructive',
           onPress: async () => {
-            await supabase.from('blocks').insert({ blocker_id: currentUserId, blocked_id: otherUser.id });
-            setIsBlockedByMe(true);
-            Alert.alert('تم الحظر 🚫', 'تمت إضافة المستخدم لقائمة المحظورين.');
+            const result = await setBlock(currentUserId, otherUser.id, true);
+            if (!result.ok) return Alert.alert('خطأ', result.error);
+            setBlockedByMe(true);
+            setMessages(prev => prev.filter(m => m.sender_id === currentUserId));
+            Alert.alert('تم الحظر 🚫', 'أُضيف المستخدم إلى قائمة المحظورين.');
           },
         },
-      ]);
-    }
+      ]
+    );
   }
 
-  // Clear conversation history
-  function confirmClearChat() {
+  function openClearOptions() {
     setOptionsOpen(false);
-    Alert.alert('مسح المحادثة 🗑️', 'هل تريد بالتأكيد حذف جميع الرسائل في هذه المحادثة؟', [
-      { text: 'إلغاء', style: 'cancel' },
-      {
-        text: 'مسح الآن',
-        style: 'destructive',
-        onPress: async () => {
-          await supabase.from('messages').delete().eq('conversation_id', id);
-          setMessages([]);
-        },
-      },
+    setConfirmClear(true);
+  }
+
+  async function doClearMine() {
+    setConfirmClear(false);
+    const result = await clearForMe(currentUserId, convId);
+    if (!result.ok) return Alert.alert('تعذّر المسح', result.error);
+
+    setMessages([]);
+    setIsCleared(true);
+    Alert.alert('تم المسح ✓', 'حُذفت الرسائل من عندك فقط، وآخر رسالة لك محفوظة عند الطرف الآخر.');
+  }
+
+  async function doDeleteForEveryone() {
+    setConfirmClear(false);
+    const result = await deleteConversationForEveryone(convId);
+    if (!result.ok) return Alert.alert('تعذّر الحذف', result.error);
+    Alert.alert('تم الحذف ✓', 'حُذفت المحادثة من عند الطرفين.', [
+      { text: 'رجوع للقائمة', onPress: () => router.replace('/messages') },
     ]);
   }
 
-  const isOtherAnonymous = otherUser?.hide_name === true;
-  const otherName = isOtherAnonymous
-    ? 'جار مجهول 🕶️'
-    : otherUser?.display_name || otherUser?.username || 'المحادثة';
+  // ------------------------------------------------------------ render
 
   if (loading) {
     return (
@@ -254,7 +300,6 @@ export default function Conversation() {
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      {/* Header */}
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.backBtn}>
           <ChevronRight size={26} color="#059669" />
@@ -264,7 +309,7 @@ export default function Conversation() {
           style={styles.headerUser}
           onPress={() => otherUser && router.push({ pathname: '/user', params: { id: otherUser.id } })}
         >
-          {otherUser?.avatar_url && !isOtherAnonymous ? (
+          {otherUser?.avatar_url && !isAnonymous ? (
             <Image source={{ uri: otherUser.avatar_url }} style={styles.headerAvatar} />
           ) : (
             <View style={styles.headerAvatarFallback}>
@@ -274,14 +319,16 @@ export default function Conversation() {
 
           <View style={styles.headerInfo}>
             <View style={styles.headerNameRow}>
-              <Text style={styles.headerName}>{otherName}</Text>
-              {isMuted && <BellOff size={13} color="#94a3b8" />}
+              <Text style={styles.headerName} numberOfLines={1}>
+                {otherName}
+              </Text>
+              {isMuted && <BellOff size={13} color="#d97706" />}
             </View>
-            {otherUser?.city && !isOtherAnonymous && (
+            {otherUser?.city && !isAnonymous ? (
               <Text style={styles.headerCity}>
                 📍 {otherUser.city} {otherUser.district ? `· ${otherUser.district}` : ''}
               </Text>
-            )}
+            ) : null}
           </View>
         </Pressable>
 
@@ -292,34 +339,43 @@ export default function Conversation() {
         </View>
       </View>
 
-      {/* Blocked or Muted Notices Banner */}
-      {isBlockedByMe ? (
-        <View style={styles.noticeBannerBlocked}>
+      {/* Banners: block wins, then mute, then DND context */}
+      {blockedByMe ? (
+        <View style={styles.noticeBlocked}>
           <UserX size={16} color="#dc2626" />
-          <Text style={styles.noticeBannerBlockedText}>
-            لقد قمت بحظر هذا المستخدم. لا يمكن تبادل الرسائل.
+          <Text style={styles.noticeBlockedText}>
+            أنت حظرت {otherName} — الإرسال مغلق ورسائله مخفية عنك.
           </Text>
           <Pressable onPress={confirmToggleBlock} style={styles.unblockQuickBtn}>
             <Text style={styles.unblockQuickText}>إلغاء الحظر</Text>
           </Pressable>
         </View>
-      ) : isMuted ? (
-        <View style={styles.noticeBannerMuted}>
-          <BellOff size={14} color="#64748b" />
-          <Text style={styles.noticeBannerMutedText}>
-            تم كتم إشعارات هذه المحادثة (وضع عدم الإزعاج)
+      ) : blockedMe ? (
+        <View style={styles.noticeBlocked}>
+          <Lock size={16} color="#dc2626" />
+          <Text style={styles.noticeBlockedText}>
+            {otherName} حظرك — لا يمكنكما تبادل الرسائل.
           </Text>
         </View>
-      ) : otherUser?.dnd_enabled ? (
-        <View style={styles.noticeBannerMuted}>
-          <BellOff size={14} color="#64748b" />
-          <Text style={styles.noticeBannerMutedText}>
-            الجار في وضع عدم الإزعاج حالياً
-          </Text>
+      ) : isMuted ? (
+        <View style={styles.noticeMuted}>
+          <BellOff size={14} color="#b45309" />
+          <Text style={styles.noticeMutedText}>إشعارات هذه المحادثة مكتومة 🔕</Text>
+        </View>
+      ) : otherDnd ? (
+        <View style={styles.noticeMuted}>
+          <Moon size={14} color="#64748b" />
+          <Text style={styles.noticeMutedText}>{otherName} في وضع عدم الإزعاج</Text>
         </View>
       ) : null}
 
-      {/* Messages Feed */}
+      {isCleared && !blockedByMe && (
+        <View style={styles.noticeInfo}>
+          <Eraser size={13} color="#0369a1" />
+          <Text style={styles.noticeInfoText}>مسحت هذه المحادثة من عندك — الرسائل الجديدة ستظهر فقط.</Text>
+        </View>
+      )}
+
       <ScrollView
         ref={scrollRef}
         style={styles.messagesList}
@@ -330,7 +386,7 @@ export default function Conversation() {
         {messages.length === 0 ? (
           <View style={styles.emptyConv}>
             <View style={styles.emptyConvIcon}>
-              {otherUser?.avatar_url && !isOtherAnonymous ? (
+              {otherUser?.avatar_url && !isAnonymous ? (
                 <Image source={{ uri: otherUser.avatar_url }} style={styles.emptyConvAvatar} />
               ) : (
                 <View style={styles.emptyConvAvatarFallback}>
@@ -339,10 +395,14 @@ export default function Conversation() {
               )}
             </View>
             <Text style={styles.emptyConvName}>{otherName}</Text>
-            {otherUser?.bio && !isOtherAnonymous && (
-              <Text style={styles.emptyConvBio}>{otherUser.bio}</Text>
-            )}
-            <Text style={styles.emptyConvHint}>ابدأ محادثتك مع جارك بالحي 👋</Text>
+            {otherUser?.bio && !isAnonymous && <Text style={styles.emptyConvBio}>{otherUser.bio}</Text>}
+            <Text style={styles.emptyConvHint}>
+              {blockedByMe
+                ? 'المحادثة مغلقة بسبب الحظر'
+                : isCleared
+                ? 'ابدأ محادثة جديدة — سترى رسائلك الجديدة فقط'
+                : 'ابدأ محادثتك مع جارك بالحي 👋'}
+            </Text>
           </View>
         ) : (
           messages.map((msg, index) => {
@@ -350,17 +410,16 @@ export default function Conversation() {
             const isRead =
               isMine && (msg.read_by || []).filter((uid: string) => uid !== currentUserId).length > 0;
             const prevMsg = index > 0 ? messages[index - 1] : null;
-            const showDate = !prevMsg || !isSameDay(new Date(msg.created_at), new Date(prevMsg.created_at));
+            const showDate =
+              !prevMsg || !isSameDay(new Date(msg.created_at), new Date(prevMsg.created_at));
 
             return (
               <View key={msg.id}>
-                {showDate && (
-                  <Text style={styles.dateDivider}>{formatDateLabel(msg.created_at)}</Text>
-                )}
+                {showDate && <Text style={styles.dateDivider}>{formatDateLabel(msg.created_at)}</Text>}
                 <View style={[styles.msgRow, isMine && styles.msgRowMine]}>
                   {!isMine && (
                     <View style={styles.otherAvatar}>
-                      {otherUser?.avatar_url && !isOtherAnonymous ? (
+                      {otherUser?.avatar_url && !isAnonymous ? (
                         <Image source={{ uri: otherUser.avatar_url }} style={styles.otherAvatarImg} />
                       ) : (
                         <View style={styles.otherAvatarFallback}>
@@ -391,13 +450,18 @@ export default function Conversation() {
         <View style={{ height: 16 }} />
       </ScrollView>
 
-      {/* Input Area or Blocked Notice */}
-      {isBlockedByMe ? (
+      {anyBlock ? (
         <View style={styles.blockedInputArea}>
-          <Text style={styles.blockedInputText}>لا يمكنك إرسال رسائل لأنك قمت بحظر هذا المستخدم</Text>
-          <Pressable style={styles.unblockActionBtn} onPress={confirmToggleBlock}>
-            <Text style={styles.unblockActionBtnText}>إلغاء الحظر للمراسلة</Text>
-          </Pressable>
+          <Text style={styles.blockedInputText}>
+            {blockedByMe
+              ? 'لا يمكنك الإرسال لأنك حظرت هذا المستخدم'
+              : 'هذا المستخدم حظرك، الإرسال متوقف'}
+          </Text>
+          {blockedByMe && (
+            <Pressable style={styles.unblockActionBtn} onPress={confirmToggleBlock}>
+              <Text style={styles.unblockActionBtnText}>إلغاء الحظر للمراسلة</Text>
+            </Pressable>
+          )}
         </View>
       ) : (
         <View style={styles.inputArea}>
@@ -425,26 +489,39 @@ export default function Conversation() {
         </View>
       )}
 
-      {/* Options Menu Modal */}
-      <Modal visible={optionsOpen} transparent animationType="fade">
+      {/* Options menu */}
+      <Modal visible={optionsOpen} transparent animationType="fade" onRequestClose={() => setOptionsOpen(false)}>
         <Pressable style={styles.optionsOverlay} onPress={() => setOptionsOpen(false)}>
           <View style={styles.optionsSheet}>
             <View style={styles.optionsHeader}>
               <Pressable onPress={() => setOptionsOpen(false)} style={styles.optionsClose}>
                 <X size={18} color="#64748b" />
               </Pressable>
-              <Text style={styles.optionsTitle}>خيارات المحادثة</Text>
+              <Text style={styles.optionsTitle} numberOfLines={1}>
+                {otherName}
+              </Text>
             </View>
 
-            {/* Mute Conversation */}
             <Pressable style={styles.optionRow} onPress={toggleMute}>
-              {isMuted ? <Bell size={18} color="#0891b2" /> : <BellOff size={18} color="#d97706" />}
-              <Text style={styles.optionRowText}>
-                {isMuted ? 'إلغاء كتم الإشعارات 🔔' : 'كتم المحادثة (عدم الإزعاج) 🔕'}
-              </Text>
+              {isMuted ? <Bell size={18} color="#059669" /> : <BellOff size={18} color="#d97706" />}
+              <View style={{ flex: 1 }}>
+                <Text style={styles.optionRowText}>
+                  {isMuted ? 'إلغاء كتم إشعارات المحادثة 🔔' : 'كتم المحادثة 🔕'}
+                </Text>
+                <Text style={styles.optionRowSub}>يوقف التنبيهات لهذه المحادثة فقط</Text>
+              </View>
             </Pressable>
 
-            {/* View Profile */}
+            <Pressable style={styles.optionRow} onPress={toggleMyDnd}>
+              <Moon size={18} color="#d97706" />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.optionRowText}>
+                  {dndActive ? 'إلغاء عدم الإزعاج العام' : 'تفعيل عدم الإزعاج العام 🌙'}
+                </Text>
+                <Text style={styles.optionRowSub}>يصمت كل الإشعارات الواردة من كل المحادثات</Text>
+              </View>
+            </Pressable>
+
             {otherUser && (
               <Pressable
                 style={styles.optionRow}
@@ -453,23 +530,61 @@ export default function Conversation() {
                   router.push({ pathname: '/user', params: { id: otherUser.id } });
                 }}
               >
-                <User size={18} color="#0891b2" />
+                <User size={18} color="#059669" />
                 <Text style={styles.optionRowText}>عرض الملف الشخصي 👤</Text>
               </Pressable>
             )}
 
-            {/* Block / Unblock */}
             <Pressable style={styles.optionRow} onPress={confirmToggleBlock}>
-              <UserX size={18} color="#dc2626" />
-              <Text style={[styles.optionRowText, { color: '#dc2626' }]}>
-                {isBlockedByMe ? 'إلغاء حظر هذا المستخدم' : 'حظر هذا المستخدم 🚫'}
+              {blockedByMe ? <UserCheck size={18} color="#059669" /> : <UserX size={18} color="#dc2626" />}
+              <Text style={[styles.optionRowText, !blockedByMe && { color: '#dc2626' }]}>
+                {blockedByMe ? 'إلغاء حظر هذا المستخدم' : 'حظر هذا المستخدم 🚫'}
               </Text>
             </Pressable>
 
-            {/* Clear History */}
-            <Pressable style={[styles.optionRow, { borderBottomWidth: 0 }]} onPress={confirmClearChat}>
-              <Trash2 size={18} color="#64748b" />
-              <Text style={styles.optionRowText}>مسح رسائل المحادثة 🗑️</Text>
+            <Pressable style={styles.optionRow} onPress={openClearOptions}>
+              <Eraser size={18} color="#64748b" />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.optionRowText}>مسح المحادثة 🧹</Text>
+                <Text style={styles.optionRowSub}>اختر: من عندك فقط أو حذف للجميع</Text>
+              </View>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Clear / delete chooser */}
+      <Modal visible={confirmClear} transparent animationType="fade" onRequestClose={() => setConfirmClear(false)}>
+        <Pressable style={styles.optionsOverlay} onPress={() => setConfirmClear(false)}>
+          <View style={styles.optionsSheet}>
+            <View style={styles.optionsHeader}>
+              <Pressable onPress={() => setConfirmClear(false)} style={styles.optionsClose}>
+                <X size={18} color="#64748b" />
+              </Pressable>
+              <Text style={styles.optionsTitle}>مسح المحادثة</Text>
+            </View>
+
+            <Pressable style={styles.choiceCard} onPress={doClearMine}>
+              <Eraser size={20} color="#0369a1" />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.choiceTitle}>مسح المحادثة عندي 🧹</Text>
+                <Text style={styles.choiceSub}>
+                  تختفي كل الرسائل من شاشتك فقط. يحتفظ {otherName} بنسخته كاملة.
+                </Text>
+              </View>
+            </Pressable>
+
+            <Pressable
+              style={[styles.choiceCard, styles.choiceCardDanger, { borderBottomWidth: 0 }]}
+              onPress={doDeleteForEveryone}
+            >
+              <Trash2 size={20} color="#dc2626" />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.choiceTitle, { color: '#dc2626' }]}>حذف المحادثة للجميع ⚠️</Text>
+                <Text style={styles.choiceSub}>
+                  حذف نهائي للمحادثة وكل رسائلها، وتختفي أيضاً من عند {otherName}.
+                </Text>
+              </View>
             </Pressable>
           </View>
         </Pressable>
@@ -479,7 +594,11 @@ export default function Conversation() {
 }
 
 function isSameDay(d1: Date, d2: Date) {
-  return d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
+  return (
+    d1.getFullYear() === d2.getFullYear() &&
+    d1.getMonth() === d2.getMonth() &&
+    d1.getDate() === d2.getDate()
+  );
 }
 
 function formatDateLabel(dateStr: string) {
@@ -497,15 +616,8 @@ function formatMsgTime(dateStr: string) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8fafc',
-  },
-  center: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  container: { flex: 1, backgroundColor: '#f8fafc' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
@@ -517,70 +629,35 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
   },
-  backBtn: {
-    padding: 6,
-  },
-  headerUser: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    flex: 1,
-    marginRight: 10,
-    gap: 10,
-  },
-  headerAvatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-  },
+  backBtn: { padding: 6 },
+  headerUser: { flexDirection: 'row-reverse', alignItems: 'center', flex: 1, marginRight: 10, gap: 10 },
+  headerAvatar: { width: 42, height: 42, borderRadius: 21 },
   headerAvatarFallback: {
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: '#e0f2fe',
+    backgroundColor: '#ecfdf5',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerAvatarLetter: {
-    color: '#0891b2',
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  headerInfo: {
-    alignItems: 'flex-end',
-  },
-  headerNameRow: {
+  headerAvatarLetter: { color: '#059669', fontSize: 16, fontWeight: '800' },
+  headerInfo: { alignItems: 'flex-end', flex: 1 },
+  headerNameRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
+  headerName: { color: '#0f172a', fontSize: 15, fontWeight: '800' },
+  headerCity: { color: '#64748b', fontSize: 11, fontWeight: '600', marginTop: 1 },
+  headerActions: { flexDirection: 'row-reverse' },
+  headerActionBtn: { padding: 6 },
+
+  noticeBlocked: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    gap: 6,
-  },
-  headerName: {
-    color: '#0f172a',
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  headerCity: {
-    color: '#64748b',
-    fontSize: 11,
-    fontWeight: '600',
-    marginTop: 1,
-  },
-  headerActions: {
-    flexDirection: 'row-reverse',
-  },
-  headerActionBtn: {
-    padding: 6,
-  },
-  noticeBannerBlocked: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     backgroundColor: '#fef2f2',
     borderBottomWidth: 1,
     borderColor: '#fca5a5',
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
-  noticeBannerBlockedText: {
+  noticeBlockedText: {
     flex: 1,
     color: '#dc2626',
     fontSize: 12,
@@ -588,39 +665,34 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     marginRight: 6,
   },
-  unblockQuickBtn: {
-    backgroundColor: '#dc2626',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  unblockQuickText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  noticeBannerMuted: {
+  unblockQuickBtn: { backgroundColor: '#dc2626', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  unblockQuickText: { color: '#fff', fontSize: 11, fontWeight: '800' },
+  noticeMuted: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: '#fffbeb',
     borderBottomWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: '#fde68a',
     paddingVertical: 6,
     paddingHorizontal: 12,
   },
-  noticeBannerMutedText: {
-    color: '#64748b',
-    fontSize: 11,
-    fontWeight: '600',
+  noticeMutedText: { color: '#b45309', fontSize: 11, fontWeight: '700' },
+  noticeInfo: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#f0f9ff',
+    borderBottomWidth: 1,
+    borderColor: '#bae6fd',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
   },
-  messagesList: {
-    flex: 1,
-  },
-  messagesContent: {
-    padding: 16,
-  },
+  noticeInfoText: { color: '#0369a1', fontSize: 11, fontWeight: '700' },
+
+  messagesList: { flex: 1 },
+  messagesContent: { padding: 16 },
   dateDivider: {
     textAlign: 'center',
     color: '#94a3b8',
@@ -633,22 +705,10 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 10,
   },
-  msgRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'flex-end',
-    marginBottom: 8,
-  },
-  msgRowMine: {
-    flexDirection: 'row',
-  },
-  otherAvatar: {
-    marginRight: 8,
-  },
-  otherAvatarImg: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-  },
+  msgRow: { flexDirection: 'row-reverse', alignItems: 'flex-end', marginBottom: 8 },
+  msgRowMine: { flexDirection: 'row' },
+  otherAvatar: { marginRight: 8 },
+  otherAvatarImg: { width: 28, height: 28, borderRadius: 14 },
   otherAvatarFallback: {
     width: 28,
     height: 28,
@@ -657,56 +717,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  otherAvatarLetter: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#64748b',
-  },
-  msgBubble: {
-    maxWidth: '78%',
-    borderRadius: 18,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-  },
-  msgBubbleMine: {
-    backgroundColor: '#059669',
-    borderBottomLeftRadius: 4,
-  },
+  otherAvatarLetter: { fontSize: 12, fontWeight: '700', color: '#64748b' },
+  msgBubble: { maxWidth: '78%', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 9 },
+  msgBubbleMine: { backgroundColor: '#059669', borderBottomLeftRadius: 4 },
   msgBubbleOther: {
     backgroundColor: '#fff',
     borderBottomRightRadius: 4,
     borderWidth: 1,
     borderColor: '#e2e8f0',
   },
-  msgText: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: '#0f172a',
-    textAlign: 'right',
-  },
-  msgTextMine: {
-    color: '#fff',
-  },
-  msgMeta: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    marginTop: 3,
-  },
-  msgMetaMine: {
-    justifyContent: 'flex-end',
-  },
-  msgTime: {
-    fontSize: 10,
-    color: '#94a3b8',
-  },
-  msgTimeMine: {
-    color: 'rgba(255,255,255,0.7)',
-  },
-  emptyConv: {
-    alignItems: 'center',
-    paddingVertical: 50,
-  },
+  msgText: { fontSize: 14, lineHeight: 20, color: '#0f172a', textAlign: 'right' },
+  msgTextMine: { color: '#fff' },
+  msgMeta: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'flex-start', marginTop: 3 },
+  msgMetaMine: { justifyContent: 'flex-end' },
+  msgTime: { fontSize: 10, color: '#94a3b8' },
+  msgTimeMine: { color: 'rgba(255,255,255,0.7)' },
+
+  emptyConv: { alignItems: 'center', paddingVertical: 50 },
   emptyConvIcon: {
     width: 72,
     height: 72,
@@ -716,11 +743,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 12,
   },
-  emptyConvAvatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-  },
+  emptyConvAvatar: { width: 72, height: 72, borderRadius: 36 },
   emptyConvAvatarFallback: {
     width: 72,
     height: 72,
@@ -729,17 +752,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  emptyConvAvatarLetter: {
-    fontSize: 26,
-    fontWeight: '900',
-    color: '#059669',
-  },
-  emptyConvName: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#0f172a',
-    marginBottom: 4,
-  },
+  emptyConvAvatarLetter: { fontSize: 26, fontWeight: '900', color: '#059669' },
+  emptyConvName: { fontSize: 18, fontWeight: '900', color: '#0f172a', marginBottom: 4 },
   emptyConvBio: {
     fontSize: 13,
     color: '#64748b',
@@ -747,11 +761,8 @@ const styles = StyleSheet.create({
     marginHorizontal: 32,
     marginBottom: 10,
   },
-  emptyConvHint: {
-    fontSize: 12,
-    color: '#059669',
-    fontWeight: '700',
-  },
+  emptyConvHint: { fontSize: 12, color: '#059669', fontWeight: '700' },
+
   inputArea: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
@@ -781,9 +792,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sendButtonDisabled: {
-    opacity: 0.4,
-  },
+  sendButtonDisabled: { opacity: 0.4 },
   blockedInputArea: {
     backgroundColor: '#fff',
     borderTopWidth: 1,
@@ -792,32 +801,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
-  blockedInputText: {
-    color: '#dc2626',
-    fontSize: 13,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  unblockActionBtn: {
-    backgroundColor: '#dc2626',
-    paddingHorizontal: 20,
-    paddingVertical: 9,
-    borderRadius: 12,
-  },
-  unblockActionBtnText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '800',
-  },
+  blockedInputText: { color: '#dc2626', fontSize: 13, fontWeight: '700', textAlign: 'center' },
+  unblockActionBtn: { backgroundColor: '#dc2626', paddingHorizontal: 20, paddingVertical: 9, borderRadius: 12 },
+  unblockActionBtnText: { color: '#fff', fontSize: 12, fontWeight: '800' },
+
   optionsOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'rgba(0,0,0,0.45)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
   },
   optionsSheet: {
-    width: '90%',
+    width: '92%',
     backgroundColor: '#fff',
     borderRadius: 20,
     padding: 18,
@@ -831,30 +827,35 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 14,
+    marginBottom: 10,
     borderBottomWidth: 1,
     borderColor: '#f1f5f9',
     paddingBottom: 10,
   },
-  optionsTitle: {
-    fontSize: 16,
-    fontWeight: '900',
-    color: '#0f172a',
-  },
-  optionsClose: {
-    padding: 4,
-  },
+  optionsTitle: { fontSize: 16, fontWeight: '900', color: '#0f172a', flex: 1, textAlign: 'right' },
+  optionsClose: { padding: 4 },
   optionRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 12,
-    paddingVertical: 13,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderColor: '#f8fafc',
   },
-  optionRowText: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#334155',
+  optionRowText: { fontSize: 14, fontWeight: '800', color: '#334155', textAlign: 'right' },
+  optionRowSub: { fontSize: 11, color: '#94a3b8', marginTop: 2, fontWeight: '600' },
+  choiceCard: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    marginTop: 10,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#bae6fd',
+    backgroundColor: '#f0f9ff',
   },
+  choiceCardDanger: { borderColor: '#fecaca', backgroundColor: '#fef2f2' },
+  choiceTitle: { fontSize: 14, fontWeight: '900', color: '#0f172a', textAlign: 'right' },
+  choiceSub: { fontSize: 11, color: '#64748b', marginTop: 3, lineHeight: 16 },
 });

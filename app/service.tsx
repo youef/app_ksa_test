@@ -202,7 +202,7 @@ export default function Service() {
                   <Text style={styles.providerName}>
                     {provider.display_name || `@${provider.username || 'مقدّم الخدمة'}`}
                   </Text>
-                  {provider.is_verified && <ShieldCheck size={14} color="#0284c7" />}
+                  {provider.is_verified && <ShieldCheck size={14} color="#059669" />}
                 </View>
                 <Text style={styles.providerSub}>
                   {provider.district ? `ساكن في حي ${provider.district}` : 'صاحب الخدمة في حيّنا'}
@@ -301,7 +301,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   backBtnAction: {
-    backgroundColor: '#0891b2',
+    backgroundColor: '#059669',
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 12,

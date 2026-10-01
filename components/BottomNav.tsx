@@ -12,8 +12,6 @@ const TABS = [
   { key: '/home',          icon: Home,          label: 'الرئيسية' },
   { key: '/market',        icon: ShoppingBag,   label: 'السوق'    },
   { key: '/messages',      icon: MessageCircle, label: 'الرسائل'  },
-  { key: '/notifications', icon: Bell,          label: 'النشاط'   },
-  { key: '/profile',       icon: User,          label: 'حسابي'    },
 ];
 
 export default function BottomNav() {

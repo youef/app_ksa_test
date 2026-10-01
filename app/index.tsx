@@ -233,7 +233,7 @@ export default function Index() {
 
           {/* Feature 1: AI Instant resident archive */}
           <View style={styles.featureCard}>
-            <LinearGradient colors={['#0284c7', '#0369a1']} style={styles.featureIcon}>
+            <LinearGradient colors={['#065f46', '#059669']} style={styles.featureIcon}>
               <MessageCircle size={24} color="#fff" />
             </LinearGradient>
             <View style={styles.featureInfo}>
@@ -309,7 +309,7 @@ export default function Index() {
         {/* ======================================================== */}
         <View style={styles.finalCtaContainer}>
           <LinearGradient
-            colors={['#0f172a', '#1e293b', '#0891b2']}
+            colors={['#064e3b', '#065f46', '#059669']}
             style={styles.finalCtaCard}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}

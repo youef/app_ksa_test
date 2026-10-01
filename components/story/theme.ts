@@ -1,0 +1,17 @@
+export const SC = {
+  bg: '#0a0f1d',
+  panel: '#1e293b',
+  panelAlt: '#111827',
+  panelDeep: '#0f172a',
+  border: '#334155',
+  borderSoft: '#1f2937',
+  muted: '#94a3b8',
+  mutedSoft: '#64748b',
+  primary: '#059669',
+  mint: '#10b981',
+  mintSoft: '#a7f3d0',
+  danger: '#dc2626',
+  white: '#ffffff',
+  scrim: 'rgba(0,0,0,0.5)',
+  imageScrim: ['#0f172a', '#1e293b'] as [string, string],
+} as const;

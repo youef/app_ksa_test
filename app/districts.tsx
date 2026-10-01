@@ -16,6 +16,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ChevronRight, MapPin, Search, CheckCircle2 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import BottomNav from '@/components/BottomNav';
+import { savePermanentMyLocation } from '@/lib/locationSync';
 
 export default function Districts() {
   const { regionName, cityName } = useLocalSearchParams<{ regionName: string; cityName: string }>();
@@ -30,11 +31,18 @@ export default function Districts() {
   }, [cityName]);
 
   const districts = useMemo(() => {
-    return city.districts.filter(d => d.includes(search.trim()));
+    return city.districts.filter(d => d.name.includes(search.trim()));
   }, [city, search]);
 
   async function selectDistrict(districtName: string) {
     try {
+      // 1. Save permanent location to device immediately (persists even if user logs out!)
+      await savePermanentMyLocation({
+        region: regionName || 'المملكة',
+        city: city.name,
+        district: districtName,
+      }, true);
+
       const { data: u } = await supabase.auth.getUser();
       if (u.user) {
         await supabase
@@ -101,13 +109,13 @@ export default function Districts() {
         <View style={styles.content}>
           {districts.map(d => (
             <Pressable
-              key={d}
+              key={d.id}
               style={styles.districtCard}
-              onPress={() => selectDistrict(d)}
+              onPress={() => selectDistrict(d.name)}
             >
               <CheckCircle2 size={18} color="#059669" />
               <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                <Text style={styles.districtTitle}>حي {d}</Text>
+                <Text style={styles.districtTitle}>حي {d.name}</Text>
                 <Text style={styles.districtSub}>{city.name} · السعودية</Text>
               </View>
               <View style={styles.pinBox}>

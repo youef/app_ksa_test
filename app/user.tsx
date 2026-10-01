@@ -3,6 +3,8 @@ import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View
 import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
+import { getBlockStatus, setBlock } from '@/lib/chatControls';
+import { isExactDistrictMatching } from '@/lib/locationSync';
 import {
   ChevronRight,
   MessageCircle,
@@ -14,8 +16,6 @@ import {
   Lock,
   EyeOff,
   UserX,
-  BellOff,
-  MoreVertical,
 } from 'lucide-react-native';
 
 export default function UserProfile() {
@@ -25,54 +25,105 @@ export default function UserProfile() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isFollowing, setIsFollowing] = useState(false);
   const [isBlocked, setIsBlocked] = useState(false);
-  const [stats, setStats] = useState({ questions: 0, answers: 0, followers: 0, following: 0 });
+  const [blockedByOther, setBlockedByOther] = useState(false);
+  const [isFollowedBy, setIsFollowedBy] = useState(false);
+  const [followSaving, setFollowSaving] = useState(false);
+  const [blockSaving, setBlockSaving] = useState(false);
+  const [messageOpening, setMessageOpening] = useState(false);
+  const [sameNeighborhood, setSameNeighborhood] = useState(false);
+  const [activeTab, setActiveTab] = useState<'questions' | 'requests' | 'services' | 'answers'>('questions');
+  const [stats, setStats] = useState({ questions: 0, answers: 0, requests: 0, services: 0, followers: 0, following: 0 });
+  const [questions, setQuestions] = useState<any[]>([]);
+  const [answers, setAnswers] = useState<any[]>([]);
+  const [requests, setRequests] = useState<any[]>([]);
+  const [services, setServices] = useState<any[]>([]);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
+    let active = true;
     async function load() {
-      const { data: u } = await supabase.auth.getUser();
-      const myId = u.user?.id || null;
-      setCurrentUserId(myId);
+      setLoading(true);
+      try {
+        const [{ data: auth }, { data: profile, error: profileError }] = await Promise.all([
+          supabase.auth.getUser(),
+          supabase.from('profiles').select('*').eq('id', id).maybeSingle(),
+        ]);
+        if (profileError) throw profileError;
+        if (!active) return;
+        const myId = auth.user?.id || null;
+        setCurrentUserId(myId);
+        setP(profile);
+        if (!profile) return;
 
-      const { data: profile } = await supabase.from('profiles').select('*').eq('id', id).maybeSingle();
+        let neighborhoodMatch = myId === id;
+        if (myId && myId !== id) {
+          const { data: myProfile } = await supabase.from('profiles').select('city, district').eq('id', myId).maybeSingle();
+          neighborhoodMatch = !!myProfile && isExactDistrictMatching(profile, myProfile.city, myProfile.district);
+        }
+        setSameNeighborhood(neighborhoodMatch);
 
-      const [qCount, aCount, followersCount, followingCount] = await Promise.all([
-        supabase.from('questions').select('id', { count: 'exact', head: true }).eq('author_id', id),
-        supabase.from('answers').select('id', { count: 'exact', head: true }).eq('author_id', id),
-        supabase.from('follows').select('id', { count: 'exact', head: true }).eq('following_id', id),
-        supabase.from('follows').select('id', { count: 'exact', head: true }).eq('follower_id', id),
-      ]);
+        let following = false;
+        let followedBy = false;
+        let blocked = false;
+        let blockedMe = false;
+        if (myId && myId !== id) {
+          const [followingRes, followedByRes, blockStatus] = await Promise.all([
+            supabase.from('follows').select('id').eq('follower_id', myId).eq('following_id', id).maybeSingle(),
+            supabase.from('follows').select('id').eq('follower_id', id).eq('following_id', myId).maybeSingle(),
+            getBlockStatus(myId, id),
+          ]);
+          following = !!followingRes.data;
+          followedBy = !!followedByRes.data;
+          blocked = blockStatus.iBlocked;
+          blockedMe = blockStatus.blockedMe;
+        }
+        if (!active) return;
+        setIsFollowing(following);
+        setIsFollowedBy(followedBy);
+        setIsBlocked(blocked);
+        setBlockedByOther(blockedMe);
 
-      if (myId && id) {
-        // Follow status
-        const { data: followRecord } = await supabase
-          .from('follows')
-          .select('id')
-          .eq('follower_id', myId)
-          .eq('following_id', id)
-          .maybeSingle();
-        setIsFollowing(!!followRecord);
+        const locked = (profile.profile_privacy === 'private' && !following && myId !== id) || (myId !== id && !neighborhoodMatch);
+        const hiddenByBlock = blocked || blockedMe;
+        const hiddenByAnonymous = profile.hide_name === true && myId !== id;
+        if (locked || hiddenByBlock || hiddenByAnonymous) {
+          setQuestions([]); setAnswers([]); setRequests([]); setServices([]);
+          setStats({ questions: 0, answers: 0, requests: 0, services: 0, followers: 0, following: 0 });
+          return;
+        }
 
-        // Block status
-        const { data: blockRecord } = await supabase
-          .from('blocks')
-          .select('id')
-          .eq('blocker_id', myId)
-          .eq('blocked_id', id)
-          .maybeSingle();
-        setIsBlocked(!!blockRecord);
+        const [qCount, aCount, requestCount, serviceCount, followersCount, followingCount, questionRows, answerRows, requestRows, serviceRows] = await Promise.all([
+          supabase.from('questions').select('id', { count: 'exact', head: true }).eq('author_id', id),
+          supabase.from('answers').select('id', { count: 'exact', head: true }).eq('author_id', id),
+          supabase.from('requests').select('id', { count: 'exact', head: true }).eq('requester_id', id),
+          supabase.from('services').select('id', { count: 'exact', head: true }).eq('provider_id', id),
+          supabase.from('follows').select('id', { count: 'exact', head: true }).eq('following_id', id),
+          supabase.from('follows').select('id', { count: 'exact', head: true }).eq('follower_id', id),
+          supabase.from('questions').select('id, title, body, created_at, city, district, status').eq('author_id', id).order('created_at', { ascending: false }).limit(30),
+          supabase.from('answers').select('id, body, created_at, question_id, questions(title)').eq('author_id', id).order('created_at', { ascending: false }).limit(30),
+          supabase.from('requests').select('id, title, description, status, request_type, budget, is_urgent, city, district, created_at').eq('requester_id', id).order('created_at', { ascending: false }).limit(30),
+          supabase.from('services').select('id, name, description, category, city, district, price_from, price_to, available_now, is_verified, created_at').eq('provider_id', id).order('created_at', { ascending: false }).limit(30),
+        ]);
+        if (!active) return;
+        setStats({
+          questions: qCount.count || 0, answers: aCount.count || 0, requests: requestCount.count || 0,
+          services: serviceCount.count || 0, followers: followersCount.count || 0, following: followingCount.count || 0,
+        });
+        setQuestions(questionRows.data || []);
+        setAnswers(answerRows.data || []);
+        setRequests(requestRows.data || []);
+        setServices(serviceRows.data || []);
+      } catch (error) {
+        console.error('Public profile load failed:', error);
+        if (active) setP(null);
+      } finally {
+        if (active) setLoading(false);
       }
-
-      setP(profile);
-      setStats({
-        questions: qCount.count || 0,
-        answers: aCount.count || 0,
-        followers: followersCount.count || 0,
-        following: followingCount.count || 0,
-      });
-      setLoading(false);
     }
-    load();
-  }, [id]);
+    if (id) void load();
+    else setLoading(false);
+    return () => { active = false; };
+  }, [id, refreshKey]);
 
   async function toggleFollow() {
     if (!currentUserId) {
@@ -84,24 +135,32 @@ export default function UserProfile() {
       return Alert.alert('تنبيه', 'لا يمكنك متابعة مستخدم قمت بحظره. قم بإلغاء الحظر أولاً.');
     }
 
+    if (followSaving) return;
+    setFollowSaving(true);
     try {
       if (isFollowing) {
-        await supabase.from('follows').delete().eq('follower_id', currentUserId).eq('following_id', id);
+        const { error } = await supabase.from('follows').delete().eq('follower_id', currentUserId).eq('following_id', id);
+        if (error) throw error;
         setIsFollowing(false);
         setStats(s => ({ ...s, followers: Math.max(0, s.followers - 1) }));
+        setRefreshKey(value => value + 1);
       } else {
-        await supabase.from('follows').insert({ follower_id: currentUserId, following_id: id });
+        const { error } = await supabase.from('follows').insert({ follower_id: currentUserId, following_id: id });
+        if (error) throw error;
         setIsFollowing(true);
         setStats(s => ({ ...s, followers: s.followers + 1 }));
+        setRefreshKey(value => value + 1);
       }
     } catch (e: any) {
-      console.log('Follow error:', e);
+      Alert.alert('تعذّر تحديث المتابعة', e?.message || 'تحقق من الاتصال ثم أعد المحاولة.');
+    } finally {
+      setFollowSaving(false);
     }
   }
 
   // Toggle Block / Unblock user
   function confirmToggleBlock() {
-    if (!currentUserId || currentUserId === id) return;
+    if (!currentUserId || currentUserId === id || blockSaving) return;
 
     if (isBlocked) {
       Alert.alert('إلغاء الحظر', 'هل تريد بالتأكيد إلغاء حظر هذا المستخدم؟', [
@@ -109,9 +168,16 @@ export default function UserProfile() {
         {
           text: 'إلغاء الحظر',
           onPress: async () => {
-            await supabase.from('blocks').delete().eq('blocker_id', currentUserId).eq('blocked_id', id);
-            setIsBlocked(false);
-            Alert.alert('تم! ✅', 'تم رفع الحظر عن هذا المستخدم.');
+            setBlockSaving(true);
+            try {
+              const result = await setBlock(currentUserId, id, false);
+              if (!result.ok) return Alert.alert('تعذّر إلغاء الحظر', result.error);
+              setIsBlocked(false);
+              setRefreshKey(value => value + 1);
+              Alert.alert('تم! ✅', 'تم رفع الحظر عن هذا المستخدم.');
+            } finally {
+              setBlockSaving(false);
+            }
           },
         },
       ]);
@@ -122,14 +188,19 @@ export default function UserProfile() {
           text: 'حظر الآن',
           style: 'destructive',
           onPress: async () => {
-            await supabase.from('blocks').insert({ blocker_id: currentUserId, blocked_id: id });
-            // Also unfollow
-            if (isFollowing) {
-              await supabase.from('follows').delete().eq('follower_id', currentUserId).eq('following_id', id);
+            setBlockSaving(true);
+            try {
+              const result = await setBlock(currentUserId, id, true);
+              if (!result.ok) return Alert.alert('تعذّر الحظر', result.error);
+              setIsBlocked(true);
               setIsFollowing(false);
+              setStats(s => ({ ...s, followers: Math.max(0, s.followers - (isFollowing ? 1 : 0)), following: Math.max(0, s.following - (isFollowedBy ? 1 : 0)) }));
+              setQuestions([]); setAnswers([]); setRequests([]); setServices([]);
+              setRefreshKey(value => value + 1);
+              Alert.alert('تم الحظر 🚫', 'تمت إضافة هذا المستخدم إلى قائمة المحظورين وإزالة علاقات المتابعة بينكما.');
+            } finally {
+              setBlockSaving(false);
             }
-            setIsBlocked(true);
-            Alert.alert('تم الحظر 🚫', 'تمت إضافة هذا المستخدم إلى قائمة المحظورين.');
           },
         },
       ]);
@@ -151,6 +222,14 @@ export default function UserProfile() {
       return Alert.alert('تنبيه', 'لقد قمت بحظر هذا المستخدم، يرجى إلغاء الحظر أولاً للمراسلة.');
     }
 
+    if (blockedByOther) {
+      return Alert.alert('لا يمكن المراسلة', 'هذا المستخدم حظرك، لا يمكنك إرسال رسائل له.');
+    }
+
+    if (!sameNeighborhood) {
+      return Alert.alert('الحي غير مطابق', 'الرسائل الخاصة متاحة بين سكان الحي نفسه فقط. حدّد حيّك من إعدادات الموقع أولاً.');
+    }
+
     // Check target user's privacy settings
     if (p?.allow_dms === 'nobody') {
       return Alert.alert('الخاص مقفل', 'هذا المستخدم عطل استلام الرسائل الخاصة من الجميع.');
@@ -167,7 +246,8 @@ export default function UserProfile() {
       );
     }
 
-    setLoading(true);
+    if (messageOpening) return;
+    setMessageOpening(true);
 
     try {
       // 1. Fetch current user's conversations
@@ -201,439 +281,258 @@ export default function UserProfile() {
         if (convError) throw convError;
         targetConvId = newConv.id;
 
-        await supabase.from('conversation_members').insert([
+        const { error: memberError } = await supabase.from('conversation_members').insert([
           { conversation_id: targetConvId, user_id: currentUserId },
           { conversation_id: targetConvId, user_id: id },
         ]);
+        if (memberError) throw memberError;
       }
 
-      setLoading(false);
       router.push({ pathname: '/conversation', params: { id: targetConvId } });
     } catch (e: any) {
-      setLoading(false);
       Alert.alert('خطأ في بدء المحادثة', e.message || 'تعذر بدء المحادثة.');
+    } finally {
+      setMessageOpening(false);
     }
   }
 
   if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={C.accent} />
-      </View>
-    );
+    return <View style={styles.loadingContainer}><ActivityIndicator size="large" color={C.accent} /><Text style={styles.loadingText}>جاري تحميل الملف الشخصي…</Text></View>;
   }
 
   if (!p) {
     return (
       <View style={styles.loadingContainer}>
-        <Text style={{ fontSize: 16, color: C.muted, fontWeight: 'bold' }}>المستخدم غير موجود</Text>
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <Text style={{ color: '#fff', fontWeight: 'bold' }}>رجوع</Text>
-        </Pressable>
+        <Text style={styles.errorTitle}>تعذر العثور على هذا الحساب</Text>
+        <Pressable style={styles.backButton} onPress={() => router.back()}><Text style={styles.backButtonText}>رجوع</Text></Pressable>
       </View>
     );
   }
 
   const isAnonymous = p.hide_name === true;
-  const displayName = isAnonymous ? 'جار مجهول 🕶️' : p.display_name || p.username || 'مستخدم';
+  const displayName = isAnonymous ? 'جار مجهول' : p.display_name || p.username || 'مستخدم';
   const isPrivate = p.profile_privacy === 'private';
-  const isLocked = isPrivate && !isFollowing && currentUserId !== id;
+  const isOwnProfile = currentUserId === id;
+  const isLocked = isPrivate && !isFollowing && !isOwnProfile;
+  const restricted = isLocked || isBlocked || blockedByOther || (isAnonymous && !isOwnProfile);
+  const statusLabel: Record<string, string> = { open: 'مفتوح', accepted: 'تم قبول المساعدة', closed: 'مكتمل', pending: 'قيد المراجعة' };
+  const tabs = [
+    { key: 'questions' as const, label: 'الاستفسارات', count: stats.questions },
+    { key: 'requests' as const, label: 'الطلبات', count: stats.requests },
+    { key: 'services' as const, label: 'الخدمات', count: stats.services },
+    { key: 'answers' as const, label: 'الردود', count: stats.answers },
+  ];
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      {/* Top Header */}
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.iconBtn}>
-          <ChevronRight size={28} color="#059669" />
-        </Pressable>
-        <Text style={styles.title}>الملف الشخصي</Text>
-        {currentUserId !== id ? (
-          <Pressable onPress={confirmToggleBlock} style={styles.iconBtn}>
-            <UserX size={22} color={isBlocked ? '#dc2626' : '#94a3b8'} />
-          </Pressable>
-        ) : (
-          <View style={{ width: 28 }} />
+    <View style={styles.screen}>
+      <ScrollView contentContainerStyle={styles.page} showsVerticalScrollIndicator={false}>
+        <View style={styles.topBar}>
+          <Pressable onPress={() => router.back()} style={styles.topIconButton} accessibilityLabel="رجوع"><ChevronRight size={23} color="#0f172a" /></Pressable>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.topTitle}>الملف الشخصي</Text>
+            {!!p.username && <Text style={styles.topSubtitle}>@{p.username}</Text>}
+          </View>
+          {isOwnProfile ? (
+            <Pressable onPress={() => router.push('/profile')} style={styles.topIconButton} accessibilityLabel="إعدادات الملف"><UserIcon size={20} color="#0f172a" /></Pressable>
+          ) : currentUserId ? (
+            <Pressable onPress={isBlocked ? undefined : confirmToggleBlock} disabled={blockSaving || isBlocked} style={styles.topIconButton} accessibilityLabel={isBlocked ? 'هذا الحساب محظور' : 'حظر المستخدم'}>
+              {blockSaving ? <ActivityIndicator size="small" color="#dc2626" /> : <UserX size={20} color={isBlocked ? '#dc2626' : '#64748b'} />}
+            </Pressable>
+          ) : <View style={styles.topIconButton} />}
+        </View>
+
+        {isBlocked && (
+          <View style={[styles.noticeBanner, styles.blockedNotice]}>
+            <UserX size={18} color="#b91c1c" />
+            <Text style={styles.noticeText}>أنت حظرت هذا الحساب؛ نشاطه مخفي عنك.</Text>
+            <Pressable onPress={confirmToggleBlock} disabled={blockSaving} style={styles.noticeAction}><Text style={styles.noticeActionText}>إلغاء</Text></Pressable>
+          </View>
         )}
-      </View>
-
-      {/* Blocked banner if blocked */}
-      {isBlocked && (
-        <View style={styles.blockedBanner}>
-          <UserX size={18} color="#dc2626" />
-          <Text style={styles.blockedBannerText}>لقد قمت بحظر هذا المستخدم</Text>
-          <Pressable style={styles.unblockBannerBtn} onPress={confirmToggleBlock}>
-            <Text style={styles.unblockBannerBtnText}>إلغاء الحظر</Text>
-          </Pressable>
-        </View>
-      )}
-
-      {/* Profile Card */}
-      <View style={styles.card}>
-        <View style={styles.avatarContainer}>
-          {p.avatar_url && !isAnonymous ? (
-            <Image source={{ uri: p.avatar_url }} style={styles.avatarImage} />
-          ) : (
-            <View style={styles.avatarPlaceholder}>
-              <UserIcon size={40} color="#fff" />
-            </View>
-          )}
-
-          {p.is_verified && !isAnonymous && (
-            <View style={styles.verifiedBadge}>
-              <Shield size={16} color="#fff" />
-            </View>
-          )}
-        </View>
-
-        <Text style={styles.name}>{displayName}</Text>
-
-        {!isAnonymous && (p.city || p.district) && (
-          <View style={styles.locationRow}>
-            <MapPin size={16} color={C.muted} />
-            <Text style={styles.locationText}>
-              {p.city} {p.district ? `· ${p.district}` : ''}
-            </Text>
+        {blockedByOther && (
+          <View style={[styles.noticeBanner, styles.mutedNotice]}>
+            <Lock size={18} color="#475569" /><Text style={styles.noticeText}>هذا الحساب حظرك؛ النشاط والتواصل غير متاحين.</Text>
           </View>
         )}
 
-        {/* Status badges */}
-        <View style={styles.badgesRow}>
-          {isPrivate && (
-            <View style={styles.badgePill}>
-              <Lock size={12} color="#059669" />
-              <Text style={styles.badgePillText}>حساب خاص</Text>
+        <View style={styles.profileCard}>
+          <View style={styles.profileActionsTop}>
+            <View style={styles.avatarWrap}>
+              {p.avatar_url && !isAnonymous ? <Image source={{ uri: p.avatar_url }} style={styles.avatarImage} /> : <View style={styles.avatarPlaceholder}><UserIcon size={38} color="#64748b" /></View>}
+              {!isAnonymous && p.is_verified && <View style={styles.avatarVerified}><Shield size={14} color="#fff" /></View>}
             </View>
-          )}
-          {isAnonymous && (
-            <View style={[styles.badgePill, { backgroundColor: '#fef3c7' }]}>
-              <EyeOff size={12} color="#d97706" />
-              <Text style={[styles.badgePillText, { color: '#d97706' }]}>اسم مخفي</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Bio (hidden if locked profile) */}
-        {!isLocked && p.bio && !isAnonymous ? <Text style={styles.bio}>{p.bio}</Text> : null}
-
-        {/* Stats Row */}
-        <View style={styles.statsRow}>
-          <View style={styles.statBox}>
-            <Text style={styles.statNumber}>{stats.questions}</Text>
-            <Text style={styles.statLabel}>أسئلة</Text>
-          </View>
-
-          <View style={styles.statDivider} />
-
-          <View style={styles.statBox}>
-            <Text style={styles.statNumber}>{stats.answers}</Text>
-            <Text style={styles.statLabel}>مشاركات</Text>
-          </View>
-
-          <View style={styles.statDivider} />
-
-          <View style={styles.statBox}>
-            <Text style={styles.statNumber}>{stats.followers}</Text>
-            <Text style={styles.statLabel}>متابعون</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Locked Private Account Screen */}
-      {isLocked && !isBlocked && (
-        <View style={styles.privateCard}>
-          <View style={styles.privateIconCircle}>
-            <Lock size={32} color="#059669" />
-          </View>
-          <Text style={styles.privateTitle}>هذا الملف الشخصي مقفل 🔒</Text>
-          <Text style={styles.privateSubtitle}>
-            قام هذا الجار بقفل حسابه لحماية خصوصيته. اضغط على زر المتابعة لمشاهدة منشوراته وأنشطته في الحي.
-          </Text>
-        </View>
-      )}
-
-      {/* Action Buttons Row */}
-      {currentUserId !== id && !isBlocked && (
-        <View style={styles.actionButtonsRow}>
-          <Pressable
-            style={[styles.followBtn, isFollowing && styles.followingBtn]}
-            onPress={toggleFollow}
-          >
-            {isFollowing ? (
-              <>
-                <UserCheck size={20} color="#059669" style={{ marginLeft: 6 }} />
-                <Text style={styles.followingBtnText}>تتابعه ✓</Text>
-              </>
-            ) : (
-              <>
-                <UserPlus size={20} color="#fff" style={{ marginLeft: 6 }} />
-                <Text style={styles.followBtnText}>متابعة</Text>
-              </>
+            {currentUserId !== id && !isBlocked && !blockedByOther && (
+              <View style={styles.actionButtonsRow}>
+                <Pressable style={[styles.followButton, isFollowing && styles.followingButton]} onPress={toggleFollow} disabled={followSaving}>
+                  {followSaving ? <ActivityIndicator size="small" color={isFollowing ? '#059669' : '#fff'} /> : isFollowing ? <><UserCheck size={17} color="#059669" /><Text style={styles.followingButtonText}>تتابعه</Text></> : <><UserPlus size={17} color="#fff" /><Text style={styles.followButtonText}>متابعة</Text></>}
+                </Pressable>
+                <Pressable style={[styles.messageButton, (!sameNeighborhood || p.allow_dms === 'nobody' || messageOpening) && { opacity: 0.55 }]} onPress={handleMessage} disabled={messageOpening || !sameNeighborhood || p.allow_dms === 'nobody' || (p.allow_dms === 'followers' && !isFollowing)}>
+                  {messageOpening ? <ActivityIndicator size="small" color="#fff" /> : <MessageCircle size={17} color="#fff" />}
+                  <Text style={styles.messageButtonText}>{messageOpening ? 'جارٍ فتح المحادثة' : !sameNeighborhood ? 'حي غير مطابق' : p.allow_dms === 'nobody' ? 'الخاص مغلق' : p.allow_dms === 'followers' && !isFollowing ? 'للمتابعين فقط' : 'مراسلة'}</Text>
+                </Pressable>
+              </View>
             )}
-          </Pressable>
+            {isOwnProfile && <Pressable style={styles.editButton} onPress={() => router.push('/profile')}><Text style={styles.editButtonText}>إدارة ملفي</Text></Pressable>}
+          </View>
 
-          <Pressable
-            style={({ pressed }) => [styles.messageBtn, pressed && { opacity: 0.8 }]}
-            onPress={handleMessage}
-          >
-            <MessageCircle size={20} color="#fff" style={{ marginLeft: 6 }} />
-            <Text style={styles.messageBtnText}>مراسلة</Text>
-          </Pressable>
+          <Text style={styles.displayName}>{displayName}</Text>
+          {!isAnonymous && !!p.username && <Text style={styles.handle}>@{p.username}</Text>}
+          {!isAnonymous && (p.city || p.district) && (
+            <View style={styles.locationLine}><MapPin size={15} color="#64748b" /><Text style={styles.locationText}>{[p.district && `حي ${p.district}`, p.city].filter(Boolean).join('، ')}</Text></View>
+          )}
+          {!isLocked && !isAnonymous && !!p.bio && <Text style={styles.bio}>{p.bio}</Text>}
+
+          <View style={styles.badgesRow}>
+            {p.is_verified && !isAnonymous && <View style={[styles.badge, styles.officialBadge]}><Shield size={14} color="#2563eb" /><Text style={styles.officialBadgeText}>هوية معتمدة</Text></View>}
+            {p.is_geoverified && !isAnonymous && <View style={[styles.badge, styles.locationBadge]}><MapPin size={14} color="#047857" /><Text style={styles.locationBadgeText}>فحص قرب الموقع</Text></View>}
+            {p.role === 'admin' || p.role === 'moderator' ? <View style={[styles.badge, styles.staffBadge]}><Shield size={14} color="#7c3aed" /><Text style={styles.staffBadgeText}>إدارة المنصة</Text></View> : null}
+            {isPrivate && <View style={[styles.badge, styles.privateBadge]}><Lock size={13} color="#475569" /><Text style={styles.privateBadgeText}>حساب خاص</Text></View>}
+            {isAnonymous && <View style={[styles.badge, styles.anonymousBadge]}><EyeOff size={13} color="#b45309" /><Text style={styles.anonymousBadgeText}>الاسم مخفي</Text></View>}
+          </View>
+          {p.is_geoverified && !isAnonymous && <Text style={styles.badgeNote}>فحص الموقع تقريبي حول المدينة، ولا يثبت السكن في حي محدد.</Text>}
+
+          <View style={styles.statsGrid}>
+            {[
+              ['استفسار', stats.questions], ['طلب مساعدة', stats.requests], ['خدمة', stats.services],
+              ['رد', stats.answers], ['متابع', stats.followers], ['يتابع', stats.following],
+            ].map(([label, value]) => <View key={String(label)} style={styles.statCell}><Text style={styles.statValue}>{value}</Text><Text style={styles.statLabel}>{label}</Text></View>)}
+          </View>
+          {isFollowedBy && !isOwnProfile && !restricted && <Text style={styles.mutualNote}>يتابعك هذا الحساب أيضاً</Text>}
         </View>
-      )}
-    </ScrollView>
+
+        {isLocked && !isBlocked && !blockedByOther && (
+          <View style={styles.lockedCard}>
+            <View style={styles.lockIcon}><Lock size={25} color="#059669" /></View>
+            <Text style={styles.lockedTitle}>هذا الحساب خاص</Text>
+            <Text style={styles.lockedText}>تابع الحساب أولاً ليظهر لك نشاطه وطلباته وخدماته.</Text>
+          </View>
+        )}
+        {isAnonymous && !isOwnProfile && !isLocked && !isBlocked && !blockedByOther && (
+          <View style={styles.lockedCard}><View style={styles.lockIcon}><EyeOff size={24} color="#b45309" /></View><Text style={styles.lockedTitle}>نشاط هذا الحساب مجهول</Text><Text style={styles.lockedText}>لا نعرض منشورات أو طلبات مرتبطة بحساب يختار إخفاء اسمه.</Text></View>
+        )}
+
+        {!restricted && (
+          <>
+            <View style={styles.tabs}>
+              {tabs.map(tab => <Pressable key={tab.key} onPress={() => setActiveTab(tab.key)} style={styles.tab}>
+                <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]}>{tab.label}</Text>
+                <Text style={[styles.tabCount, activeTab === tab.key && styles.tabTextActive]}>{tab.count}</Text>
+                {activeTab === tab.key && <View style={styles.tabIndicator} />}
+              </Pressable>)}
+            </View>
+
+            {activeTab === 'questions' && (questions.length ? questions.map(item => (
+              <Pressable key={item.id} style={styles.contentItem} onPress={() => router.push({ pathname: '/question', params: { id: item.id } })}>
+                <View style={styles.itemIcon}><MessageCircle size={18} color="#059669" /></View>
+                <View style={styles.itemBody}><View style={styles.itemMetaRow}><Text style={styles.itemEyebrow}>استفسار</Text><Text style={styles.itemDate}>{new Date(item.created_at).toLocaleDateString('ar-SA')}</Text></View><Text style={styles.itemTitle}>{item.title}</Text><Text style={styles.itemDescription} numberOfLines={4}>{item.body}</Text><Text style={styles.itemFooter}>{statusLabel[item.status] || item.status || 'منشور'}{item.district ? ` · حي ${item.district}` : ''}</Text></View>
+              </Pressable>
+            )) : <Text style={styles.emptyState}>لا توجد استفسارات منشورة.</Text>)}
+
+            {activeTab === 'requests' && (requests.length ? requests.map(item => (
+              <Pressable key={item.id} style={styles.contentItem} onPress={() => router.push({ pathname: '/request', params: { id: item.id } })}>
+                <View style={[styles.itemIcon, item.is_urgent && styles.urgentIcon]}><UserX size={18} color={item.is_urgent ? '#dc2626' : '#059669'} /></View>
+                <View style={styles.itemBody}><View style={styles.itemMetaRow}><Text style={[styles.itemEyebrow, item.is_urgent && { color: '#dc2626' }]}>{item.is_urgent ? 'طلب عاجل' : 'طلب مساعدة'}</Text><Text style={styles.itemDate}>{new Date(item.created_at).toLocaleDateString('ar-SA')}</Text></View><Text style={styles.itemTitle}>{item.title}</Text><Text style={styles.itemDescription} numberOfLines={4}>{item.description}</Text><Text style={styles.itemFooter}>{statusLabel[item.status] || item.status}{item.district || item.city ? ` · ${[item.district && `حي ${item.district}`, item.city].filter(Boolean).join('، ')}` : ''}{item.budget ? ` · الميزانية ${item.budget} ر.س` : ''}</Text></View>
+              </Pressable>
+            )) : <Text style={styles.emptyState}>لا توجد طلبات مساعدة.</Text>)}
+
+            {activeTab === 'services' && (services.length ? services.map(item => (
+              <Pressable key={item.id} style={styles.contentItem} onPress={() => router.push({ pathname: '/service', params: { id: item.id } })}>
+                <View style={[styles.itemIcon, styles.serviceIcon]}><Shield size={18} color="#7c3aed" /></View>
+                <View style={styles.itemBody}><View style={styles.itemMetaRow}><Text style={styles.itemEyebrow}>خدمة {item.is_verified ? '· موثقة' : ''}</Text><Text style={[styles.availability, !item.available_now && styles.unavailable]}>{item.available_now ? 'متاح الآن' : 'غير متاح'}</Text></View><Text style={styles.itemTitle}>{item.name}</Text><Text style={styles.itemDescription} numberOfLines={4}>{item.description || item.category || 'خدمة محلية'}</Text><Text style={styles.itemFooter}>{[item.category, item.district && `حي ${item.district}`, item.city].filter(Boolean).join(' · ')}{item.price_from != null ? ` · ${item.price_from}${item.price_to != null ? `–${item.price_to}` : '+'} ر.س` : ''}</Text></View>
+              </Pressable>
+            )) : <Text style={styles.emptyState}>لا توجد خدمات معلنة.</Text>)}
+
+            {activeTab === 'answers' && (answers.length ? answers.map(item => (
+              <Pressable key={item.id} style={styles.contentItem} onPress={() => router.push({ pathname: '/question', params: { id: item.question_id } })}>
+                <View style={styles.itemIcon}><MessageCircle size={18} color="#2563eb" /></View>
+                <View style={styles.itemBody}><View style={styles.itemMetaRow}><Text style={styles.itemEyebrow}>رد على استفسار</Text><Text style={styles.itemDate}>{new Date(item.created_at).toLocaleDateString('ar-SA')}</Text></View><Text style={styles.itemTitle}>{item.questions?.title || 'استفسار من الحي'}</Text><Text style={styles.itemDescription}>{item.body}</Text></View>
+              </Pressable>
+            )) : <Text style={styles.emptyState}>لا توجد ردود بعد.</Text>)}
+          </>
+        )}
+        <View style={{ height: 48 }} />
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flexGrow: 1,
-    backgroundColor: C.bg,
-    padding: 20,
-    paddingTop: 55,
-  },
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: C.bg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  backButton: {
-    marginTop: 20,
-    backgroundColor: C.accent,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 12,
-  },
-  header: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  iconBtn: {
-    padding: 6,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: C.ink,
-  },
-  blockedBanner: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#fef2f2',
-    borderWidth: 1,
-    borderColor: '#fecaca',
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginBottom: 16,
-  },
-  blockedBannerText: {
-    color: '#dc2626',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  unblockBannerBtn: {
-    backgroundColor: '#dc2626',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-  },
-  unblockBannerBtnText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  card: {
-    backgroundColor: C.card,
-    borderRadius: 24,
-    padding: 24,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 15,
-    elevation: 3,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.02)',
-  },
-  avatarContainer: {
-    position: 'relative',
-    marginBottom: 14,
-  },
-  avatarImage: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-  },
-  avatarPlaceholder: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: '#8da698',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  verifiedBadge: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    backgroundColor: C.accent,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2.5,
-    borderColor: '#fff',
-  },
-  name: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: C.ink,
-    textAlign: 'center',
-    marginBottom: 6,
-  },
-  locationRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  locationText: {
-    fontSize: 13,
-    color: C.muted,
-    marginRight: 4,
-    fontWeight: '600',
-  },
-  badgesRow: {
-    flexDirection: 'row-reverse',
-    gap: 6,
-    marginBottom: 12,
-  },
-  badgePill: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#ecfdf5',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-  },
-  badgePillText: {
-    color: '#059669',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  bio: {
-    fontSize: 14,
-    color: '#4a5550',
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 16,
-    paddingHorizontal: 10,
-  },
-  statsRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '100%',
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: C.line,
-  },
-  statBox: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statDivider: {
-    width: 1,
-    height: 26,
-    backgroundColor: C.line,
-  },
-  statNumber: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: C.ink,
-    marginBottom: 3,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: C.muted,
-    fontWeight: '600',
-  },
-  privateCard: {
-    backgroundColor: '#fff',
-    borderRadius: 22,
-    padding: 24,
-    alignItems: 'center',
-    marginBottom: 20,
-    borderWidth: 1.5,
-    borderColor: '#e2e8f0',
-  },
-  privateIconCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#ecfdf5',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  privateTitle: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#0f172a',
-    marginBottom: 6,
-  },
-  privateSubtitle: {
-    fontSize: 13,
-    color: '#64748b',
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  actionButtonsRow: {
-    flexDirection: 'row-reverse',
-    gap: 12,
-  },
-  followBtn: {
-    flex: 1,
-    flexDirection: 'row-reverse',
-    backgroundColor: '#059669',
-    borderRadius: 16,
-    height: 52,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  followingBtn: {
-    backgroundColor: '#ecfdf5',
-    borderWidth: 1.5,
-    borderColor: '#059669',
-  },
-  followBtnText: {
-    color: '#fff',
-    fontWeight: '900',
-    fontSize: 15,
-  },
-  followingBtnText: {
-    color: '#059669',
-    fontWeight: '900',
-    fontSize: 15,
-  },
-  messageBtn: {
-    flex: 1,
-    flexDirection: 'row-reverse',
-    backgroundColor: '#0f172a',
-    borderRadius: 16,
-    height: 52,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  messageBtnText: {
-    color: '#fff',
-    fontWeight: '800',
-    fontSize: 15,
-  },
+  screen: { flex: 1, backgroundColor: '#f8fafc' },
+  page: { paddingHorizontal: 16, paddingTop: 42, paddingBottom: 24 },
+  loadingContainer: { flex: 1, backgroundColor: '#f8fafc', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  loadingText: { color: '#64748b', fontSize: 13, fontWeight: '700' },
+  errorTitle: { color: '#0f172a', fontSize: 17, fontWeight: '900', textAlign: 'center' },
+  backButton: { marginTop: 14, backgroundColor: C.accent, paddingHorizontal: 22, paddingVertical: 11, borderRadius: 12 },
+  backButtonText: { color: '#fff', fontWeight: '800' },
+  topBar: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, marginBottom: 16 },
+  topIconButton: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#e2e8f0' },
+  topTitle: { color: '#0f172a', fontSize: 17, fontWeight: '900', textAlign: 'right' },
+  topSubtitle: { color: '#64748b', fontSize: 12, textAlign: 'right', marginTop: 1 },
+  noticeBanner: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, borderRadius: 14, padding: 12, marginBottom: 12 },
+  blockedNotice: { backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fecaca' },
+  mutedNotice: { backgroundColor: '#f1f5f9', borderWidth: 1, borderColor: '#cbd5e1' },
+  noticeText: { flex: 1, color: '#334155', fontSize: 12, fontWeight: '700', textAlign: 'right' },
+  noticeAction: { backgroundColor: '#dc2626', borderRadius: 9, paddingHorizontal: 11, paddingVertical: 7 },
+  noticeActionText: { color: '#fff', fontSize: 11, fontWeight: '900' },
+  profileCard: { backgroundColor: '#fff', borderRadius: 22, padding: 18, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 14 },
+  profileActionsTop: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
+  avatarWrap: { width: 82, height: 82, borderRadius: 41, position: 'relative' },
+  avatarImage: { width: 82, height: 82, borderRadius: 41, backgroundColor: '#e2e8f0' },
+  avatarPlaceholder: { width: 82, height: 82, borderRadius: 41, backgroundColor: '#e2e8f0', alignItems: 'center', justifyContent: 'center' },
+  avatarVerified: { position: 'absolute', left: 0, bottom: 0, width: 25, height: 25, borderRadius: 13, backgroundColor: '#2563eb', borderWidth: 2, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  actionButtonsRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, flex: 1, justifyContent: 'flex-start', marginRight: 12 },
+  followButton: { minWidth: 106, height: 42, borderRadius: 22, backgroundColor: '#059669', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 14 },
+  followingButton: { backgroundColor: '#ecfdf5', borderWidth: 1, borderColor: '#a7f3d0' },
+  followButtonText: { color: '#fff', fontWeight: '900', fontSize: 13 },
+  followingButtonText: { color: '#047857', fontWeight: '900', fontSize: 13 },
+  messageButton: { minWidth: 94, height: 42, borderRadius: 22, backgroundColor: '#0f172a', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 13 },
+  messageButtonText: { color: '#fff', fontWeight: '800', fontSize: 12 },
+  editButton: { height: 40, borderRadius: 20, borderWidth: 1, borderColor: '#cbd5e1', justifyContent: 'center', paddingHorizontal: 13 },
+  editButtonText: { color: '#0f172a', fontWeight: '800', fontSize: 12 },
+  displayName: { color: '#0f172a', fontSize: 22, fontWeight: '900', textAlign: 'right' },
+  handle: { color: '#64748b', fontSize: 13, textAlign: 'right', marginTop: 2 },
+  locationLine: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, marginTop: 10 },
+  locationText: { color: '#64748b', fontSize: 13 },
+  bio: { color: '#334155', fontSize: 14, lineHeight: 22, textAlign: 'right', marginTop: 11 },
+  badgesRow: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 7, marginTop: 12 },
+  badge: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 10, borderWidth: 1 },
+  officialBadge: { backgroundColor: '#eff6ff', borderColor: '#bfdbfe' },
+  officialBadgeText: { color: '#1d4ed8', fontSize: 11, fontWeight: '800' },
+  locationBadge: { backgroundColor: '#ecfdf5', borderColor: '#a7f3d0' },
+  locationBadgeText: { color: '#047857', fontSize: 11, fontWeight: '800' },
+  staffBadge: { backgroundColor: '#f5f3ff', borderColor: '#ddd6fe' },
+  staffBadgeText: { color: '#6d28d9', fontSize: 11, fontWeight: '800' },
+  privateBadge: { backgroundColor: '#f8fafc', borderColor: '#e2e8f0' },
+  privateBadgeText: { color: '#475569', fontSize: 11, fontWeight: '800' },
+  anonymousBadge: { backgroundColor: '#fffbeb', borderColor: '#fde68a' },
+  anonymousBadgeText: { color: '#b45309', fontSize: 11, fontWeight: '800' },
+  badgeNote: { color: '#64748b', fontSize: 11, lineHeight: 16, textAlign: 'right', marginTop: 7 },
+  statsGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', borderTopWidth: 1, borderColor: '#f1f5f9', marginTop: 15, paddingTop: 9 },
+  statCell: { width: '33.333%', alignItems: 'center', paddingVertical: 9 },
+  statValue: { color: '#0f172a', fontSize: 16, fontWeight: '900' },
+  statLabel: { color: '#64748b', fontSize: 11, marginTop: 2 },
+  mutualNote: { textAlign: 'right', color: '#059669', fontSize: 11, fontWeight: '700', marginTop: 7 },
+  lockedCard: { backgroundColor: '#fff', borderRadius: 20, alignItems: 'center', padding: 24, marginBottom: 14, borderWidth: 1, borderColor: '#e2e8f0' },
+  lockIcon: { width: 54, height: 54, borderRadius: 27, backgroundColor: '#ecfdf5', alignItems: 'center', justifyContent: 'center', marginBottom: 11 },
+  lockedTitle: { color: '#0f172a', fontSize: 17, fontWeight: '900', textAlign: 'center' },
+  lockedText: { color: '#64748b', fontSize: 13, lineHeight: 20, textAlign: 'center', marginTop: 6 },
+  tabs: { flexDirection: 'row-reverse', backgroundColor: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16, borderBottomWidth: 1, borderColor: '#e2e8f0', overflow: 'hidden' },
+  tab: { flex: 1, minHeight: 54, alignItems: 'center', justifyContent: 'center', position: 'relative', gap: 2 },
+  tabText: { color: '#64748b', fontSize: 11, fontWeight: '700' },
+  tabTextActive: { color: '#047857', fontWeight: '900' },
+  tabCount: { color: '#94a3b8', fontSize: 10 },
+  tabIndicator: { position: 'absolute', bottom: 0, width: '56%', height: 3, backgroundColor: '#059669', borderTopLeftRadius: 3, borderTopRightRadius: 3 },
+  contentItem: { flexDirection: 'row-reverse', alignItems: 'flex-start', gap: 10, padding: 14, backgroundColor: '#fff', borderBottomWidth: 1, borderColor: '#e2e8f0' },
+  itemIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: '#ecfdf5', alignItems: 'center', justifyContent: 'center' },
+  urgentIcon: { backgroundColor: '#fef2f2' },
+  serviceIcon: { backgroundColor: '#f5f3ff' },
+  itemBody: { flex: 1, alignItems: 'flex-end' },
+  itemMetaRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: 8 },
+  itemEyebrow: { color: '#059669', fontSize: 11, fontWeight: '900' },
+  itemDate: { color: '#94a3b8', fontSize: 10 },
+  itemTitle: { color: '#0f172a', fontSize: 15, fontWeight: '900', textAlign: 'right', width: '100%', marginTop: 5 },
+  itemDescription: { color: '#475569', fontSize: 13, lineHeight: 20, textAlign: 'right', width: '100%', marginTop: 4 },
+  itemFooter: { color: '#64748b', fontSize: 11, textAlign: 'right', width: '100%', marginTop: 8 },
+  availability: { color: '#047857', fontSize: 10, fontWeight: '800' },
+  unavailable: { color: '#64748b' },
+  emptyState: { backgroundColor: '#fff', color: '#64748b', fontSize: 13, textAlign: 'center', paddingHorizontal: 15, paddingVertical: 34, borderBottomLeftRadius: 16, borderBottomRightRadius: 16 },
 });

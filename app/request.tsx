@@ -257,7 +257,7 @@ export default function Request() {
                 <Image source={{ uri: requester.avatar_url }} style={styles.requesterAvatar} />
               ) : (
                 <View style={styles.avatarPlaceholder}>
-                  <User size={22} color="#0891b2" />
+                  <User size={22} color="#059669" />
                 </View>
               )}
             </Pressable>
@@ -280,7 +280,7 @@ export default function Request() {
           <View style={styles.card}>
             <View style={styles.sectionHeaderRow}>
               <Text style={styles.sectionTitle}>عروض المساعدة المقدمة ({offers.length})</Text>
-              <HeartHandshake size={20} color="#0891b2" />
+              <HeartHandshake size={20} color="#059669" />
             </View>
 
             {offers.length === 0 ? (
@@ -387,7 +387,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   backBtnAction: {
-    backgroundColor: '#0891b2',
+    backgroundColor: '#059669',
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 12,
@@ -510,7 +510,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#ecfeff',
+    backgroundColor: '#ecfdf5',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -606,13 +606,13 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   offerStatusBadge: {
-    backgroundColor: '#e0f2fe',
+    backgroundColor: '#ecfdf5',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,
   },
   offerStatusText: {
-    color: '#0284c7',
+    color: '#059669',
     fontSize: 11,
     fontWeight: '800',
   },

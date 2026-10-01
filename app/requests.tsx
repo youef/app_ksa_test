@@ -25,14 +25,23 @@ import {
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import BottomNav from '@/components/BottomNav';
+import {
+  getActiveLocation,
+  subscribeLocation,
+  isExactDistrictMatching,
+  isAllKingdom,
+} from '@/lib/locationSync';
 
 export default function Requests() {
   const [items, setItems] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [filterUrgent, setFilterUrgent] = useState(false);
-  const [city, setCity] = useState<string | null>(null);
-  const [district, setDistrict] = useState<string | null>(null);
+  const [activeLoc, setActiveLoc] = useState({
+    region: 'كل المملكة',
+    city: 'كل المدن',
+    district: 'كل الأحياء',
+  });
 
   async function load(q = '', onlyUrgent = filterUrgent) {
     setLoading(true);
@@ -60,19 +69,15 @@ export default function Requests() {
   }
 
   useEffect(() => {
-    supabase.auth.getUser().then(async ({ data: u }) => {
-      if (u.user) {
-        const { data: p } = await supabase
-          .from('profiles')
-          .select('city, district')
-          .eq('id', u.user.id)
-          .single();
-        if (p?.city) setCity(p.city);
-        if (p?.district) setDistrict(p.district);
-      }
-    });
+    getActiveLocation().then(setActiveLoc);
+    const unsub = subscribeLocation(setActiveLoc);
     load(search, filterUrgent);
+    return unsub;
   }, [filterUrgent]);
+
+  const displayedItems = items.filter((r) =>
+    isExactDistrictMatching(r, activeLoc.city, activeLoc.district)
+  );
 
   return (
     <View style={styles.container}>
@@ -95,7 +100,9 @@ export default function Requests() {
             </Pressable>
           </View>
           <Text style={styles.heroSubtitle}>
-            {city ? `طلبات واحتياجات جيرانك في ${city}${district ? ` · حي ${district}` : ''}` : 'فزعات وطلبات التعاون بين أهالي الحي في السعودية'}
+            {!isAllKingdom(activeLoc.city)
+              ? `طلبات واحتياجات جيرانك في ${activeLoc.city}${activeLoc.district !== 'كل الأحياء' ? ` · حي ${activeLoc.district}` : ''}`
+              : 'فزعات وطلبات التعاون بين أهالي الحي في السعودية'}
           </Text>
 
           {/* Search Box */}
@@ -140,21 +147,25 @@ export default function Requests() {
         <View style={styles.content}>
           {loading ? (
             <View style={styles.loadingBox}>
-              <ActivityIndicator size="large" color="#0891b2" />
+              <ActivityIndicator size="large" color="#059669" />
               <Text style={styles.loadingText}>جاري تحميل الطلبات...</Text>
             </View>
-          ) : items.length === 0 ? (
+          ) : displayedItems.length === 0 ? (
             <View style={styles.emptyCard}>
               <HeartHandshake size={48} color="#cbd5e1" />
               <Text style={styles.emptyTitle}>لا توجد طلبات فزعة حالياً</Text>
-              <Text style={styles.emptySub}>تحتاج مساعدة أو توصيل أو غرض؟ اطلب وخل جيرانك يفزعون لك!</Text>
+              <Text style={styles.emptySub}>
+                {!isAllKingdom(activeLoc.city)
+                  ? `لا توجد طلبات فزعة مسجلة حالياً في ${activeLoc.city}${activeLoc.district !== 'كل الأحياء' ? ` (حي ${activeLoc.district})` : ''}. كن أول من يطلب مساعدة!`
+                  : 'تحتاج مساعدة أو توصيل أو غرض؟ اطلب وخل جيرانك يفزعون لك!'}
+              </Text>
               <Pressable style={styles.emptyAddBtn} onPress={() => router.push('/new-request')}>
                 <Plus size={18} color="#fff" />
                 <Text style={styles.emptyAddBtnText}>إضافة طلب جديد</Text>
               </Pressable>
             </View>
           ) : (
-            items.map(req => (
+            displayedItems.map(req => (
               <Pressable
                 key={req.id}
                 style={styles.card}
@@ -176,7 +187,7 @@ export default function Requests() {
 
                 <View style={styles.cardFooter}>
                   <View style={styles.metaRow}>
-                    <MapPin size={13} color="#64748b" />
+                    <MapPin size={13} color="#059669" />
                     <Text style={styles.metaText}>
                       {req.city || 'السعودية'}{req.district ? ` · حي ${req.district}` : ''}
                     </Text>
@@ -349,7 +360,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#0891b2',
+    backgroundColor: '#059669',
     paddingHorizontal: 18,
     paddingVertical: 10,
     borderRadius: 14,
@@ -439,7 +450,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   volunteerTag: {
-    color: '#0891b2',
+    color: '#059669',
     fontSize: 11,
     fontWeight: '800',
   },

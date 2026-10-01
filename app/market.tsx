@@ -1,30 +1,38 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, Image, Pressable, RefreshControl, Dimensions, Animated } from 'react-native';
+import { View, Text, StyleSheet, Image, Pressable, RefreshControl, TextInput } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import GlassHeader from '@/components/GlassHeader';
 import BottomNav from '@/components/BottomNav';
-import { ShoppingBag, Star, MapPin, Tag, Utensils, Scissors, Wrench, ShieldCheck, Plus } from 'lucide-react-native';
+import { ShoppingBag, MapPin, ShieldCheck, Plus, Search, Sparkles, SlidersHorizontal, Clock3, ChevronLeft } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 
-const { width } = Dimensions.get('window');
-
-const CATEGORIES = [
-  { id: 'food', label: 'طبخ منزلي', icon: Utensils, color: '#f97316' },
-  { id: 'handmade', label: 'إنتاج أسري', icon: ShoppingBag, color: '#ec4899' },
-  { id: 'services', label: 'خدمات وصيانة', icon: Wrench, color: '#0ea5e9' },
-  { id: 'beauty', label: 'عناية وتجميل', icon: Scissors, color: '#8b5cf6' },
-];
+import {
+  getActiveLocation,
+  subscribeLocation,
+  isExactDistrictMatching,
+  isAllKingdom,
+} from '@/lib/locationSync';
 
 export default function Market() {
   const router = useRouter();
   const [items, setItems] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeCategory, setActiveCategory] = useState<string>('food');
+  const [activeCategory, setActiveCategory] = useState<string>('الكل');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeLoc, setActiveLoc] = useState({
+    region: 'كل المملكة',
+    city: 'كل المدن',
+    district: 'كل الأحياء',
+  });
   const scrollY = React.useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    loadMarketItems();
-  }, [activeCategory]);
+    getActiveLocation().then(setActiveLoc);
+    const unsub = subscribeLocation(setActiveLoc);
+    return unsub;
+  }, []);
+
+  useEffect(() => { loadMarketItems(); }, []);
 
   const loadMarketItems = async () => {
     setRefreshing(true);
@@ -34,12 +42,25 @@ export default function Market() {
         *,
         profiles:provider_id(display_name, avatar_url, is_verified, district)
       `)
-      .eq('category', activeCategory)
       .order('created_at', { ascending: false });
     
     setItems(data || []);
     setRefreshing(false);
   };
+
+  const availableCategories = ['الكل', ...Array.from(new Set(items.map((item) => item.category).filter(Boolean)))];
+  const displayedItems = items.filter((item) => {
+    const locItem = {
+      city: item.city || item.profiles?.city || null,
+      district: item.district || item.profiles?.district || null,
+    };
+    const matchesLocation = isExactDistrictMatching(locItem, activeLoc.city, activeLoc.district);
+    const matchesCategory = activeCategory === 'الكل' || item.category === activeCategory;
+    const query = searchQuery.trim().toLocaleLowerCase('ar');
+    const matchesSearch = !query || [item.name, item.description, item.category, item.profiles?.display_name, item.district]
+      .some((value) => String(value || '').toLocaleLowerCase('ar').includes(query));
+    return matchesLocation && matchesCategory && matchesSearch;
+  });
 
   const renderItem = ({ item }: { item: any }) => (
     <Pressable
@@ -47,13 +68,14 @@ export default function Market() {
       onPress={() => router.push({ pathname: '/service', params: { id: item.id } })}
     >
       <View style={styles.cardImagePlaceholder}>
-        <ShoppingBag size={40} color="#cbd5e1" />
+        <View style={styles.cardArt}><Sparkles size={26} color="#059669" /><Text style={styles.cardArtLabel}>{item.category || 'خدمة محلية'}</Text></View>
+        {item.available_now && <View style={styles.availableBadge}><View style={styles.availableDot} /><Text style={styles.availableText}>متاح الآن</Text></View>}
       </View>
       <View style={styles.cardContent}>
         <View style={styles.cardHeader}>
           <Text style={styles.itemTitle}>{item.name}</Text>
           <View style={styles.priceTag}>
-            <Text style={styles.priceText}>{item.price_from} ر.س</Text>
+          <Text style={styles.priceText}>{item.price_from != null ? `${item.price_from} ر.س` : 'حسب الاتفاق'}</Text>
           </View>
         </View>
         <Text style={styles.itemDesc} numberOfLines={2}>{item.description}</Text>
@@ -71,10 +93,9 @@ export default function Market() {
               <Text style={styles.providerName}>{item.profiles?.display_name || 'بائع غير معروف'}</Text>
               {item.profiles?.is_verified && <ShieldCheck size={14} color="#10b981" style={{ marginRight: 4 }} />}
             </View>
-            <View style={{ flexDirection: 'row-reverse', alignItems: 'center', marginTop: 2 }}>
+            <View style={{ flexDirection: 'row-reverse', alignItems: 'center', marginTop: 3 }}>
               <MapPin size={12} color="#94a3b8" />
-              <Text style={styles.districtText}>حي {item.profiles?.district || 'غير محدد'}</Text>
-              <Text style={styles.ratingText}>• ⭐ 4.9</Text>
+              <Text style={styles.districtText}>{item.city || item.profiles?.city || 'داخل الحي'}{(item.district || item.profiles?.district) ? ` · حي ${item.district || item.profiles?.district}` : ''}</Text>
             </View>
           </View>
         </View>
@@ -103,24 +124,54 @@ export default function Market() {
         )}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadMarketItems} tintColor="#059669" />}
       >
-        <Text style={styles.pageSubtitle}>ادعم الأسر المنتجة والمتاجر القريبة في حيك 🏘️</Text>
+        <View style={styles.heroCard}>
+          <View style={styles.heroTop}><View style={styles.heroIcon}><ShoppingBag size={24} color="#d1fae5" /></View><Text style={styles.heroEyebrow}>سوق الجيران</Text></View>
+          <Text style={styles.heroTitle}>كل ما تحتاجه،{`\n`}من أهل حيك</Text>
+          <Text style={styles.heroSubtitle}>اكتشف خدمات ومنتجات محلية وادعم أصحاب المشاريع القريبة.</Text>
+          <View style={styles.heroStats}><View><Text style={styles.statValue}>{displayedItems.length}</Text><Text style={styles.statLabel}>عرض متاح</Text></View><View style={styles.statDivider} /><View><Text style={styles.statValue}>{activeLoc.city}</Text><Text style={styles.statLabel}>نطاق التصفح</Text></View></View>
+          <View style={styles.heroDecor}><Sparkles size={76} color="rgba(255,255,255,0.10)" /></View>
+        </View>
         
+        {/* Active location tag */}
+        <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+          <View style={{
+            flexDirection: 'row-reverse',
+            alignItems: 'center',
+            gap: 4,
+            backgroundColor: '#ecfdf5',
+            paddingHorizontal: 12,
+            paddingVertical: 5,
+            borderRadius: 20,
+            borderWidth: 1,
+            borderColor: '#a7f3d0',
+          }}>
+            <MapPin size={13} color="#059669" />
+            <Text style={{ color: '#059669', fontSize: 12, fontWeight: '800' }}>
+              {isAllKingdom(activeLoc.city)
+                ? 'كل مناطق المملكة 🇸🇦'
+                : `${activeLoc.city}${activeLoc.district && activeLoc.district !== 'كل الأحياء' ? ` · حي ${activeLoc.district}` : ''}`}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.searchBox}><Search size={19} color="#94a3b8" /><TextInput value={searchQuery} onChangeText={setSearchQuery} placeholder="ابحث عن خدمة أو منتج..." placeholderTextColor="#94a3b8" style={styles.searchInput} textAlign="right" /></View>
+        <View style={styles.sectionHeading}><View><Text style={styles.sectionTitle}>تصفّح السوق</Text><Text style={styles.sectionHint}>اختر القسم المناسب لك</Text></View><SlidersHorizontal size={18} color="#64748b" /></View>
         <View style={styles.categoriesRow}>
-          {CATEGORIES.map(cat => (
+          {availableCategories.map((category) => (
             <Pressable 
-              key={cat.id} 
-              style={[styles.categoryPill, activeCategory === cat.id && { backgroundColor: cat.color, borderColor: cat.color }]}
-              onPress={() => setActiveCategory(cat.id)}
+              key={category} 
+              style={[styles.categoryPill, activeCategory === category && styles.categoryPillActive]}
+              onPress={() => setActiveCategory(category)}
             >
-              <cat.icon size={16} color={activeCategory === cat.id ? '#fff' : cat.color} />
-              <Text style={[styles.categoryText, activeCategory === cat.id && { color: '#fff' }]}>{cat.label}</Text>
+              <Text style={[styles.categoryText, activeCategory === category && { color: '#fff' }]}>{category}</Text>
             </Pressable>
           ))}
         </View>
 
         <View style={styles.listContainer}>
-          {items.length > 0 ? (
-            items.map(item => (
+          <View style={styles.resultsHeader}><Text style={styles.resultCount}>{displayedItems.length} نتيجة</Text><View style={styles.latestLabel}><Clock3 size={13} color="#64748b" /><Text style={styles.latestText}>الأحدث</Text></View></View>
+          {displayedItems.length > 0 ? (
+            displayedItems.map(item => (
               <React.Fragment key={item.id}>
                 {renderItem({ item })}
               </React.Fragment>
@@ -128,7 +179,11 @@ export default function Market() {
           ) : (
             <View style={styles.emptyState}>
               <ShoppingBag size={48} color="#cbd5e1" />
-              <Text style={styles.emptyText}>لا توجد عروض في هذا القسم حالياً</Text>
+              <Text style={styles.emptyText}>
+                {!isAllKingdom(activeLoc.city)
+                  ? `لا توجد خدمات متاحة حالياً في ${activeLoc.city}${activeLoc.district !== 'كل الأحياء' ? ` (حي ${activeLoc.district})` : ''}`
+                  : 'لا توجد عروض في هذا القسم حالياً'}
+              </Text>
             </View>
           )}
         </View>

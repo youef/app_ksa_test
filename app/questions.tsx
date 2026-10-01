@@ -24,11 +24,22 @@ import {
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import BottomNav from '@/components/BottomNav';
+import {
+  getActiveLocation,
+  subscribeLocation,
+  isExactDistrictMatching,
+  isAllKingdom,
+} from '@/lib/locationSync';
 
 export default function Questions() {
   const [items, setItems] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [activeLoc, setActiveLoc] = useState({
+    region: 'كل المملكة',
+    city: 'كل المدن',
+    district: 'كل الأحياء',
+  });
 
   async function load(q = '') {
     setLoading(true);
@@ -53,8 +64,15 @@ export default function Questions() {
   }
 
   useEffect(() => {
+    getActiveLocation().then(setActiveLoc);
+    const unsub = subscribeLocation(setActiveLoc);
     load(search);
+    return unsub;
   }, []);
+
+  const displayedItems = items.filter((q) =>
+    isExactDistrictMatching(q, activeLoc.city, activeLoc.district)
+  );
 
   return (
     <View style={styles.container}>
@@ -80,6 +98,26 @@ export default function Questions() {
             استفسر عن أي شيء في حيك وتلقى إجابات موثوقة من جيرانك وسكان المنطقة.
           </Text>
 
+          {/* Active Location Filter Pill */}
+          <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6, marginTop: 8 }}>
+            <View style={{
+              flexDirection: 'row-reverse',
+              alignItems: 'center',
+              gap: 4,
+              backgroundColor: 'rgba(255,255,255,0.18)',
+              paddingHorizontal: 10,
+              paddingVertical: 4,
+              borderRadius: 20,
+            }}>
+              <MapPin size={12} color="#fff" />
+              <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>
+                {isAllKingdom(activeLoc.city)
+                  ? 'كل مناطق المملكة 🇸🇦'
+                  : `${activeLoc.city}${activeLoc.district && activeLoc.district !== 'كل الأحياء' ? ` · حي ${activeLoc.district}` : ''}`}
+              </Text>
+            </View>
+          </View>
+
           {/* Search Box */}
           <View style={styles.searchBar}>
             <TextInput
@@ -100,21 +138,25 @@ export default function Questions() {
         <View style={styles.content}>
           {loading ? (
             <View style={styles.loadingBox}>
-              <ActivityIndicator size="large" color="#0891b2" />
+              <ActivityIndicator size="large" color="#059669" />
               <Text style={styles.loadingText}>جاري تحميل الأسئلة...</Text>
             </View>
-          ) : items.length === 0 ? (
+          ) : displayedItems.length === 0 ? (
             <View style={styles.emptyCard}>
               <HelpCircle size={48} color="#cbd5e1" />
               <Text style={styles.emptyTitle}>لا توجد أسئلة مطابقة</Text>
-              <Text style={styles.emptySub}>عندك استفسار عن خدمات الحي أو أماكن؟ اطرح سؤالك الآن!</Text>
+              <Text style={styles.emptySub}>
+                {!isAllKingdom(activeLoc.city)
+                  ? `لم يتم طرح أسئلة بعد في ${activeLoc.city}${activeLoc.district !== 'كل الأحياء' ? ` (حي ${activeLoc.district})` : ''}. كن أول من يشارك!`
+                  : 'عندك استفسار عن خدمات الحي أو أماكن؟ اطرح سؤالك الآن!'}
+              </Text>
               <Pressable style={styles.emptyAddBtn} onPress={() => router.push('/ask')}>
                 <Plus size={18} color="#fff" />
                 <Text style={styles.emptyAddBtnText}>طرح سؤال جديد</Text>
               </Pressable>
             </View>
           ) : (
-            items.map(q => (
+            displayedItems.map(q => (
               <Pressable
                 key={q.id}
                 style={styles.card}
@@ -127,7 +169,7 @@ export default function Questions() {
 
                 <View style={styles.cardFooter}>
                   <View style={styles.metaRow}>
-                    <MapPin size={13} color="#64748b" />
+                    <MapPin size={13} color="#059669" />
                     <Text style={styles.metaText}>
                       {q.city || 'السعودية'}{q.district ? ` · حي ${q.district}` : ''}
                     </Text>
@@ -135,7 +177,7 @@ export default function Questions() {
 
                   <View style={styles.statsRow}>
                     <View style={styles.statItem}>
-                      <MessageCircle size={13} color="#0891b2" />
+                      <MessageCircle size={13} color="#059669" />
                       <Text style={styles.statText}>إجابات</Text>
                     </View>
                   </View>
@@ -328,7 +370,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   statText: {
-    color: '#0891b2',
+    color: '#059669',
     fontSize: 11,
     fontWeight: '800',
   },

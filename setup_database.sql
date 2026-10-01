@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     username TEXT UNIQUE,
     display_name TEXT,
     avatar_url TEXT,
+    region TEXT,
     city TEXT,
     district TEXT,
     bio TEXT,

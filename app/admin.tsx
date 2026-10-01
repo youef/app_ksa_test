@@ -67,7 +67,7 @@ const C = {
   card: '#FFFFFF',
   ink: '#0F172A',
   muted: '#64748B',
-  accent: '#0891B2',
+  accent: '#059669',
   danger: '#EF4444',
   success: '#10B981',
   warning: '#F59E0B',
@@ -94,7 +94,15 @@ export default function Admin() {
   
   // Navigation Tabs:
   // overview | users | verifications | reports | content | broadcast | logs
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'verifications' | 'reports' | 'content' | 'broadcast' | 'logs'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'verifications' | 'reports' | 'content' | 'broadcast' | 'logs' | 'locations'>('overview');
+  const [customLocations, setCustomLocations] = useState<any[]>([]);
+  const [locationKind, setLocationKind] = useState<'region' | 'city' | 'district'>('city');
+  const [locationName, setLocationName] = useState('');
+  const [locationRegion, setLocationRegion] = useState('');
+  const [locationCity, setLocationCity] = useState('');
+  const [locationLatitude, setLocationLatitude] = useState('');
+  const [locationLongitude, setLocationLongitude] = useState('');
+  const [savingLocation, setSavingLocation] = useState(false);
 
   // Core Data
   const [usersList, setUsersList] = useState<any[]>([]);
@@ -147,6 +155,40 @@ export default function Admin() {
       Animated.timing(toastAnim, { toValue: 0, duration: 250, useNativeDriver: true }),
     ]).start(() => setToastMsg(null));
   }, [toastAnim]);
+
+  const loadCustomLocations = useCallback(async () => {
+    const { data, error } = await supabase.from('saudi_custom_locations').select('*').order('created_at', { ascending: false }).limit(100);
+    if (error) { showToast('تعذر تحميل المواقع الإضافية'); return; }
+    setCustomLocations(data || []);
+  }, [showToast]);
+
+  useEffect(() => { if (activeTab === 'locations') loadCustomLocations(); }, [activeTab, loadCustomLocations]);
+
+  const saveCustomLocation = async () => {
+    const name = locationName.trim();
+    if (!name || (locationKind !== 'region' && !locationRegion.trim()) || (locationKind === 'district' && !locationCity.trim())) {
+      showToast('أكمل اسم الموقع والمنطقة والمدينة المطلوبة'); return;
+    }
+    const latitude = locationLatitude.trim() ? Number(locationLatitude) : null;
+    const longitude = locationLongitude.trim() ? Number(locationLongitude) : null;
+    if ((latitude === null) !== (longitude === null) || (latitude !== null && (!Number.isFinite(latitude) || latitude < 16 || latitude > 32.5 || longitude! < 34.5 || longitude! > 56))) {
+      showToast('أدخل إحداثيات سعودية صحيحة أو اتركها فارغة'); return;
+    }
+    setSavingLocation(true);
+    const row = {
+      region_name: locationKind === 'region' ? name : locationRegion.trim(),
+      city_name: locationKind === 'city' ? name : locationKind === 'district' ? locationCity.trim() : null,
+      district_name: locationKind === 'district' ? name : null,
+      latitude, longitude, created_by: profile?.id,
+    };
+    const { error } = await supabase.from('saudi_custom_locations').insert(row);
+    setSavingLocation(false);
+    if (error) { showToast(error.message.includes('duplicate') ? 'الموقع مضاف مسبقاً' : 'تعذر حفظ الموقع'); return; }
+    setLocationName(''); setLocationLatitude(''); setLocationLongitude('');
+    showToast('تمت إضافة الموقع');
+    await loadCustomLocations();
+    await addAuditLog('إضافة موقع جغرافي', name, 'location');
+  };
 
   // Log an admin operation to audit list
   const addAuditLog = useCallback(async (action: string, targetName: string, targetType?: string, targetId?: string) => {
@@ -675,7 +717,7 @@ export default function Admin() {
           </View>
 
           <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-            <Pressable onPress={handleExportData} style={styles.exportBtn} title="تصدير بيانات">
+            <Pressable onPress={handleExportData} style={styles.exportBtn} accessibilityLabel="تصدير بيانات">
               <Download size={16} color="#fff" />
             </Pressable>
             <Pressable onPress={onRefresh} style={styles.refreshBtn}>
@@ -724,6 +766,7 @@ export default function Admin() {
             active={activeTab === 'overview'}
             onPress={() => setActiveTab('overview')}
           />
+          <TabPill label="إدارة المواقع" icon={<MapPin size={15} color={activeTab === 'locations' ? '#fff' : '#64748b'} />} active={activeTab === 'locations'} onPress={() => setActiveTab('locations')} />
           <TabPill
             label={`ملف التوثيق (${stats.pendingVerif})`}
             icon={<Star size={15} color={activeTab === 'verifications' ? '#fff' : '#64748b'} />}
@@ -773,6 +816,29 @@ export default function Admin() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}
       >
+        {activeTab === 'locations' && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>إدارة المناطق والمدن والأحياء</Text>
+            <Text style={styles.sectionSubDesc}>أضف المواقع الناقصة يدوياً، ويمكن ربطها بإحداثيات دقيقة لعرض الطقس في موقعها.</Text>
+            <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+              {([['region', 'منطقة'], ['city', 'مدينة'], ['district', 'حي']] as const).map(([kind, label]) => <FilterPill key={kind} label={label} active={locationKind === kind} onPress={() => setLocationKind(kind)} />)}
+            </View>
+            {locationKind !== 'region' && <TextInput style={[styles.searchInput, styles.locationInput]} placeholder="اسم المنطقة" value={locationRegion} onChangeText={setLocationRegion} />}
+            {locationKind === 'district' && <TextInput style={[styles.searchInput, styles.locationInput]} placeholder="اسم المدينة" value={locationCity} onChangeText={setLocationCity} />}
+            <TextInput style={[styles.searchInput, styles.locationInput]} placeholder={locationKind === 'region' ? 'اسم المنطقة' : locationKind === 'city' ? 'اسم المدينة أو المحافظة' : 'اسم الحي'} value={locationName} onChangeText={setLocationName} />
+            <View style={{ flexDirection: 'row-reverse', gap: 8 }}>
+              <TextInput style={[styles.searchInput, styles.locationInput, { flex: 1 }]} placeholder="خط العرض (اختياري)" value={locationLatitude} onChangeText={setLocationLatitude} keyboardType="decimal-pad" />
+              <TextInput style={[styles.searchInput, styles.locationInput, { flex: 1 }]} placeholder="خط الطول (اختياري)" value={locationLongitude} onChangeText={setLocationLongitude} keyboardType="decimal-pad" />
+            </View>
+            <Pressable style={[styles.btnSendNotice, savingLocation && { opacity: 0.6 }]} onPress={saveCustomLocation} disabled={savingLocation}>
+              {savingLocation ? <ActivityIndicator color="#fff" /> : <MapPin size={16} color="#fff" />}
+              <Text style={styles.btnSendNoticeText}>{savingLocation ? 'جارٍ الحفظ...' : 'إضافة الموقع'}</Text>
+            </Pressable>
+            <Text style={[styles.subSectionTitle, { marginTop: 18 }]}>المواقع المضافة ({customLocations.length})</Text>
+            {customLocations.map(item => <View key={item.id} style={[styles.quickAction, { justifyContent: 'flex-start', gap: 10 }]}><MapPin size={17} color={C.accent} /><Text style={{ flex: 1, textAlign: 'right', color: C.ink, fontWeight: '700' }}>{[item.region_name, item.city_name, item.district_name].filter(Boolean).join(' · ')}</Text><Text style={{ color: C.muted, fontSize: 10 }}>{item.latitude != null ? 'محدد على الخريطة' : 'بلا إحداثيات'}</Text></View>)}
+            {!customLocations.length && <Text style={{ textAlign: 'right', color: C.muted }}>لا توجد مواقع يدوية بعد.</Text>}
+          </View>
+        )}
         {/* ======================================================== */}
         {/* TAB 1: OVERVIEW & REAL-TIME GEO ANALYTICS                */}
         {/* ======================================================== */}
@@ -784,7 +850,7 @@ export default function Admin() {
             <View style={styles.statsGrid}>
               <StatCard icon={<Users size={24} color="#0284c7" />} bg="#f0f9ff" value={stats.users} label="إجمالي السكان" sub={`${stats.admins} مدير · ${stats.users - stats.admins} مواطن`} />
               <StatCard icon={<Star size={24} color="#d97706" />} bg="#fffbeb" value={verifications.filter(v => v.status === 'approved').length} label="حسابات موثقة رسمياً" sub={`${stats.pendingVerif} قيد المراجعة`} />
-              <StatCard icon={<MessageCircle size={24} color="#0891b2" />} bg="#ecfeff" value={stats.questions} label="الاستفسارات والتوصيات" sub="خيوط تفاعلية حية" />
+              <StatCard icon={<MessageCircle size={24} color="#059669" />} bg="#ecfdf5" value={stats.questions} label="الاستفسارات والتوصيات" sub="خيوط تفاعلية حية" />
               <StatCard icon={<Truck size={24} color="#16a34a" />} bg="#f0fdf4" value={stats.requests} label="فزعات الجيران المفتوحة" sub="تكاتف اجتماعي" />
             </View>
 
@@ -792,7 +858,7 @@ export default function Admin() {
             <View style={styles.citiesCard}>
               <View style={styles.citiesCardHeader}>
                 <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-                  <MapPin size={16} color="#0891b2" />
+                  <MapPin size={16} color="#059669" />
                   <Text style={styles.citiesCardTitle}>توزيع نشاط أحياء مدن المملكة</Text>
                 </View>
                 <Text style={styles.citiesCardSub}>انقر على أي مدينة للتصفية</Text>
@@ -938,7 +1004,7 @@ export default function Admin() {
 
                       {/* Status Tag */}
                       <View style={[styles.verifStatusPill, isPending ? styles.verifPending : v.status === 'approved' ? styles.verifApproved : styles.verifRejected]}>
-                        <Text style={[styles.verifStatusPillText, isPending ? styles.verifPendingText : v.status === 'approved' ? styles.verifApprovedText : styles.verifRejectedText]}>
+                        <Text style={[isPending ? styles.verifPendingText : v.status === 'approved' ? styles.verifApprovedText : styles.verifRejectedText]}>
                           {isPending ? '⏳ قيد التدقيق' : v.status === 'approved' ? '✓ تم الاعتماد' : '✕ مرفوض'}
                         </Text>
                       </View>
@@ -1741,6 +1807,7 @@ const styles = StyleSheet.create({
   // User Management
   searchBar: { flexDirection: 'row-reverse', alignItems: 'center', backgroundColor: '#fff', borderRadius: 14, paddingHorizontal: 12, height: 44, borderWidth: 1, borderColor: '#E2E8F0', gap: 8, marginBottom: 10 },
   searchInput: { flex: 1, fontSize: 13, color: '#0F172A', textAlign: 'right' },
+  locationInput: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 8 },
   filterRow: { flexDirection: 'row-reverse', gap: 6, marginBottom: 12 },
   filterPill: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: '#F1F5F9', borderWidth: 1, borderColor: '#E2E8F0' },
   filterPillActive: { backgroundColor: '#0F172A', borderColor: '#0F172A' },

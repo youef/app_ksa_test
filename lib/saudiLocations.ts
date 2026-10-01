@@ -6,13 +6,17 @@
 export interface District {
   id: string;
   name: string;
+  lat?: number;
+  lng?: number;
+  sourceIds?: string[];
 }
 
 export interface City {
   id: string;
   name: string;
-  lat: number;
-  lng: number;
+  lat?: number;
+  lng?: number;
+  sourceIds?: string[];
   districts: District[];
 }
 
@@ -22,6 +26,189 @@ export interface Region {
   lat: number;
   lng: number;
   cities: City[];
+}
+
+export interface CustomLocation {
+  id: string;
+  region_name: string;
+  city_name: string | null;
+  district_name: string | null;
+  latitude: number | null;
+  longitude: number | null;
+}
+
+export interface LocationOverride {
+  source_id: string;
+  new_name: string | null;
+  is_deleted: boolean;
+}
+
+interface MunicipalityCity {
+  city_id: number;
+  region_id: number;
+  name_ar: string;
+}
+
+interface MunicipalityDistrict {
+  district_id: number;
+  city_id: number;
+  name_ar: string;
+}
+
+const municipalityCities = require('@/data/saudi-locations/cities.json') as MunicipalityCity[];
+const municipalityDistricts = require('@/data/saudi-locations/districts.json') as MunicipalityDistrict[];
+const regionKeyByMunicipalityId: Record<number, string> = {
+  1: 'riyadh', 2: 'makkah', 3: 'madinah', 4: 'qassim', 5: 'eastern', 6: 'asir',
+  7: 'tabuk', 8: 'hail', 9: 'northern_borders', 10: 'jazan', 11: 'najran', 12: 'baha', 13: 'jouf',
+};
+
+export function normalizeSaudiLocationName(value: string): string {
+  return value
+    .trim()
+    .replace(/^(مدينة|حي|منطقة)\s+/u, '')
+    .replace(/[\u064B-\u065F\u0670\u0640]/g, '')
+    .replace(/[أإآٱ]/g, 'ا')
+    .replace(/ة/g, 'ه')
+    .replace(/ى/g, 'ي')
+    .replace(/\s+/g, ' ')
+    .toLocaleLowerCase('ar');
+}
+
+function districtDisplayName(name: string): string {
+  const cleanName = name.trim();
+  return /^حي\s+/u.test(cleanName) ? cleanName : `حي ${cleanName}`;
+}
+
+export function buildSaudiLocations(customLocations: CustomLocation[] = [], overrides: LocationOverride[] = []): Region[] {
+  const regions = SAUDI_REGIONS.map(region => ({
+    ...region,
+    cities: region.cities.map(city => ({ ...city, districts: [...city.districts] })),
+  }));
+  const overrideBySourceId = new Map(overrides.map(override => [override.source_id, override]));
+  regions.forEach(region => {
+    const override = overrideBySourceId.get(`location:${region.id}`);
+    if (override && !override.is_deleted && override.new_name) region.name = override.new_name;
+  });
+  const regionById = new Map(regions.map(region => [region.id, region]));
+  const citiesByMunicipalityId = new Map<number, City>();
+  const staticCityByKey = new Map<string, City>();
+
+  regions.forEach(region => region.cities.forEach(city => {
+    staticCityByKey.set(`${region.id}:${normalizeSaudiLocationName(city.name)}`, city);
+  }));
+
+  municipalityCities.forEach(cityRecord => {
+    const region = regionById.get(regionKeyByMunicipalityId[cityRecord.region_id]);
+    if (!region) return;
+
+    const nameKey = `${region.id}:${normalizeSaudiLocationName(cityRecord.name_ar)}`;
+    let city = staticCityByKey.get(nameKey);
+    if (!city) {
+      city = {
+        id: `municipality-city-${cityRecord.city_id}`,
+        name: cityRecord.name_ar,
+        sourceIds: [],
+        districts: [],
+      };
+      region.cities.push(city);
+      staticCityByKey.set(nameKey, city);
+    }
+    city.sourceIds = [...(city.sourceIds || []), `municipality-city-${cityRecord.city_id}`];
+    citiesByMunicipalityId.set(cityRecord.city_id, city);
+  });
+
+  municipalityDistricts.forEach(districtRecord => {
+    const city = citiesByMunicipalityId.get(districtRecord.city_id);
+    if (!city) return;
+    const nameKey = normalizeSaudiLocationName(districtRecord.name_ar);
+    const existing = city.districts.find(district => normalizeSaudiLocationName(district.name) === nameKey);
+    if (existing) {
+      existing.sourceIds = [...(existing.sourceIds || []), `municipality-district-${districtRecord.district_id}`];
+      return;
+    }
+    city.districts.push({
+      id: `municipality-district-${districtRecord.district_id}`,
+      name: districtDisplayName(districtRecord.name_ar),
+      sourceIds: [`municipality-district-${districtRecord.district_id}`],
+    });
+  });
+
+  const applyOverride = (id: string, sourceIds: string[] | undefined, currentName: string) => {
+    const override = [id, ...(sourceIds || [])].map(sourceId => overrideBySourceId.get(`location:${sourceId}`)).find(Boolean);
+    return { deleted: override?.is_deleted || false, name: override && !override.is_deleted ? override.new_name || currentName : currentName };
+  };
+  regions.forEach(region => {
+    region.cities = region.cities.filter(city => {
+      const result = applyOverride(city.id, city.sourceIds, city.name);
+      city.name = result.name;
+      city.districts = city.districts.filter(district => {
+        const districtResult = applyOverride(district.id, district.sourceIds, district.name);
+        district.name = districtResult.name;
+        return !districtResult.deleted;
+      });
+      return !result.deleted;
+    });
+  });
+
+  customLocations.forEach(location => {
+    const regionNameKey = normalizeSaudiLocationName(location.region_name);
+    let region = regions.find(item => normalizeSaudiLocationName(item.name) === regionNameKey);
+    if (!region) {
+      const newRegion: Region = {
+        id: `custom-region-${location.id}`,
+        name: location.region_name.trim(),
+        lat: location.latitude ?? 0,
+        lng: location.longitude ?? 0,
+        cities: [],
+      };
+      regions.push(newRegion);
+      region = newRegion;
+    } else if (location.city_name === null && location.latitude !== null && location.longitude !== null) {
+      region.lat = location.latitude;
+      region.lng = location.longitude;
+    }
+
+    if (!location.city_name) return;
+    const cityNameKey = normalizeSaudiLocationName(location.city_name);
+    let city = region.cities.find(item => normalizeSaudiLocationName(item.name) === cityNameKey);
+    if (!city) {
+      const newCity: City = {
+        id: `custom-city-${location.id}`,
+        name: location.city_name.trim(),
+        lat: location.latitude ?? undefined,
+        lng: location.longitude ?? undefined,
+        districts: [],
+      };
+      region.cities.push(newCity);
+      city = newCity;
+    } else if (!location.district_name && location.latitude !== null && location.longitude !== null) {
+      city.lat = location.latitude;
+      city.lng = location.longitude;
+    }
+
+    if (!location.district_name) return;
+    const districtKey = normalizeSaudiLocationName(location.district_name);
+    const existingDistrict = city.districts.find(item => normalizeSaudiLocationName(item.name) === districtKey);
+    if (!existingDistrict) {
+      city.districts.push({
+        id: `custom-district-${location.id}`,
+        name: districtDisplayName(location.district_name),
+        lat: location.latitude ?? undefined,
+        lng: location.longitude ?? undefined,
+      });
+    } else if (location.latitude !== null && location.longitude !== null) {
+      existingDistrict.lat = location.latitude;
+      existingDistrict.lng = location.longitude;
+    }
+  });
+
+  const activeRegions = regions.filter(region => !applyOverride(region.id, undefined, region.name).deleted);
+
+  activeRegions.forEach(region => {
+    region.cities.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+    region.cities.forEach(city => city.districts.sort((a, b) => a.name.localeCompare(b.name, 'ar')));
+  });
+  return activeRegions;
 }
 
 // Bounding box strictly for Saudi Arabia

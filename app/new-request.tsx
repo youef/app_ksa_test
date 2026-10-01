@@ -24,6 +24,7 @@ import {
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import LocationSelectorModal from '@/components/LocationSelectorModal';
+import { getPermanentMyLocation, savePermanentMyLocation, isAllKingdom } from '@/lib/locationSync';
 
 export default function NewRequest() {
   const [title, setTitle] = useState('');
@@ -36,17 +37,29 @@ export default function NewRequest() {
   const [showLocationModal, setShowLocationModal] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getUser().then(async ({ data: u }) => {
+    (async () => {
+      const loc = await getPermanentMyLocation();
+      if (loc?.city && !isAllKingdom(loc.city)) {
+        setCity(loc.city);
+        if (loc.district && loc.district !== 'كل الأحياء' && loc.district !== 'كل أحياء المدينة') {
+          setDistrict(loc.district);
+        }
+      }
+
+      const { data: u } = await supabase.auth.getUser();
       if (u.user) {
         const { data: p } = await supabase
           .from('profiles')
           .select('city, district')
           .eq('id', u.user.id)
           .single();
-        if (p?.city) setCity(p.city);
-        if (p?.district) setDistrict(p.district);
+        if (p?.city) {
+          setCity(p.city);
+          if (p?.district) setDistrict(p.district);
+          await savePermanentMyLocation({ city: p.city, district: p.district || 'كل الأحياء' });
+        }
       }
-    });
+    })();
   }, []);
 
   async function save() {
@@ -133,7 +146,7 @@ export default function NewRequest() {
           <View style={styles.inputGroup}>
             <Text style={styles.label}>الحي والمدينة</Text>
             <Pressable style={styles.locationBtn} onPress={() => setShowLocationModal(true)}>
-              <MapPin size={18} color="#0891b2" />
+              <MapPin size={18} color="#059669" />
               <Text style={styles.locationBtnText}>
                 {city ? `${city}${district ? ` · حي ${district}` : ''}` : 'حدد الحي لتوجيه الطلب لجيرانك...'}
               </Text>
@@ -209,9 +222,18 @@ export default function NewRequest() {
         onClose={() => setShowLocationModal(false)}
         selectedCity={city}
         selectedDistrict={district}
-        onSelect={(reg, c, d) => {
-          setCity(c === 'كل المدن' ? '' : c);
-          setDistrict(d === 'كل أحياء المدينة' ? '' : d);
+        onSelect={async (reg, c, d) => {
+          const cleanCity = c === 'كل المدن' ? '' : c;
+          const cleanDist = (d === 'كل أحياء المدينة' || d === 'كل الأحياء') ? '' : d;
+          setCity(cleanCity);
+          setDistrict(cleanDist);
+          if (cleanCity) {
+            await savePermanentMyLocation({
+              region: reg,
+              city: cleanCity,
+              district: cleanDist || 'كل الأحياء',
+            });
+          }
         }}
       />
     </View>

@@ -9,7 +9,7 @@ import {
   RefreshControl,
   ActivityIndicator,
   TextInput,
-  Switch,
+  Modal,
   Alert,
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
@@ -24,47 +24,86 @@ import {
   BellOff,
   Bell,
   UserX,
+  UserCheck,
+  Trash2,
+  X,
+  Eraser,
+  ChevronLeft,
+  SlidersHorizontal,
   Lock,
 } from 'lucide-react-native';
 import BottomNav from '@/components/BottomNav';
+import { syncDndWithNotifications } from '@/lib/notifications';
+import {
+  DndSettings,
+  DEFAULT_DND,
+  clearForMe,
+  deleteConversationForEveryone,
+  displayName,
+  dndLabel,
+  formatArabicTime,
+  isDndActiveNow,
+  loadConvSettings,
+  loadDnd,
+  saveDnd,
+  setBlock,
+  setMute,
+} from '@/lib/chatControls';
+
+type Conv = {
+  id: string;
+  other: any;
+  lastMessage: any;
+  isUnread: boolean;
+  isBlocked: boolean;
+  iBlocked: boolean;
+  blockedMe: boolean;
+  isMuted: boolean;
+  isCleared: boolean;
+  otherUserId: string;
+  name: string;
+};
 
 export default function Messages() {
-  const [conversations, setConversations] = useState<any[]>([]);
+  const [conversations, setConversations] = useState<Conv[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [currentUserId, setCurrentUserId] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [dndEnabled, setDndEnabled] = useState(false);
-  const [mutedConvs, setMutedConvs] = useState<string[]>([]);
-  const [blockedUserIds, setBlockedUserIds] = useState<string[]>([]);
+  const [dnd, setDnd] = useState<DndSettings>(DEFAULT_DND);
+  const [blockedIds, setBlockedIds] = useState<string[]>([]);
+  const [blockerIds, setBlockerIds] = useState<string[]>([]);
+  const [dndSheet, setDndSheet] = useState(false);
+  const [customOpen, setCustomOpen] = useState(false);
+  const [draftStart, setDraftStart] = useState('22:00');
+  const [draftEnd, setDraftEnd] = useState('07:00');
+  const [target, setTarget] = useState<Conv | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const dndNow = isDndActiveNow(dnd);
 
   const load = useCallback(async () => {
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) return router.replace('/auth');
     setCurrentUserId(u.user.id);
 
-    // 1. Fetch user profile for DND & Muted convs
-    const { data: prof } = await supabase
-      .from('profiles')
-      .select('dnd_enabled, muted_conversations')
-      .eq('id', u.user.id)
-      .maybeSingle();
+    // 1. DND state (with schedule)
+    const dndSettings = await loadDnd(u.user.id);
+    setDnd(dndSettings);
+    await syncDndWithNotifications(u.user.id);
 
-    if (prof) {
-      setDndEnabled(!!prof.dnd_enabled);
-      setMutedConvs(prof.muted_conversations || []);
-    }
+    // 2. Blocked user IDs (both directions so the UI can explain a locked chat)
+    const [{ data: myBlocks }, { data: blockedBy }] = await Promise.all([
+      supabase.from('blocks').select('blocked_id').eq('blocker_id', u.user.id),
+      supabase.from('blocks').select('blocker_id').eq('blocked_id', u.user.id),
+    ]);
 
-    // 2. Fetch blocked user IDs
-    const { data: blocks } = await supabase
-      .from('blocks')
-      .select('blocked_id')
-      .eq('blocker_id', u.user.id);
+    const blockedIds = [...new Set((myBlocks || []).map((b: any) => b.blocked_id))] as string[];
+    const blockerIds = [...new Set((blockedBy || []).map((b: any) => b.blocker_id))] as string[];
+    setBlockedIds(blockedIds);
+    setBlockerIds(blockerIds);
 
-    const blockedIds = (blocks || []).map(b => b.blocked_id);
-    setBlockedUserIds(blockedIds);
-
-    // 3. Get all my conversations
+    // 3. My conversations
     const { data: myConvs } = await supabase
       .from('conversation_members')
       .select('conversation_id')
@@ -78,22 +117,25 @@ export default function Messages() {
 
     const convIds = myConvs.map(c => c.conversation_id);
 
-    // Get last message for each conversation
-    const { data: messages } = await supabase
-      .from('messages')
-      .select('*')
-      .in('conversation_id', convIds)
-      .order('created_at', { ascending: false });
+    const [messagesRes, allMembersRes, settings] = await Promise.all([
+      // RLS hides messages from anyone I blocked, and anything I cleared.
+      supabase
+        .from('messages')
+        .select('*')
+        .in('conversation_id', convIds)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('conversation_members')
+        .select('conversation_id, user_id')
+        .in('conversation_id', convIds)
+        .neq('user_id', u.user.id),
+      loadConvSettings(u.user.id, convIds),
+    ]);
 
-    // Get all members for these conversations
-    const { data: allMembers } = await supabase
-      .from('conversation_members')
-      .select('conversation_id, user_id')
-      .in('conversation_id', convIds)
-      .neq('user_id', u.user.id);
+    const messages = messagesRes.data || [];
+    const allMembers = allMembersRes.data || [];
 
-    // Get other users' profiles
-    const otherUserIds = [...new Set((allMembers || []).map(m => m.user_id))];
+    const otherUserIds = [...new Set(allMembers.map((m: any) => m.user_id))];
     const { data: profiles } =
       otherUserIds.length > 0
         ? await supabase.from('profiles').select('*').in('id', otherUserIds)
@@ -102,39 +144,40 @@ export default function Messages() {
     const profileMap = (profiles || []).reduce((acc: any, p: any) => ({ ...acc, [p.id]: p }), {});
 
     const convMap: Record<string, any> = {};
-    (messages || []).forEach(msg => {
-      if (!convMap[msg.conversation_id]) {
-        convMap[msg.conversation_id] = msg;
-      }
+    messages.forEach((msg: any) => {
+      if (!convMap[msg.conversation_id]) convMap[msg.conversation_id] = msg;
     });
 
-    const convList = convIds
+    const convList: Conv[] = convIds
       .map(convId => {
-        const otherMember = (allMembers || []).find(m => m.conversation_id === convId);
+        const otherMember = allMembers.find((m: any) => m.conversation_id === convId);
         const otherProfile = otherMember ? profileMap[otherMember.user_id] : null;
         const lastMsg = convMap[convId];
-        const isUnread =
-          lastMsg && lastMsg.sender_id !== u.user.id && !(lastMsg.read_by || []).includes(u.user.id);
-        const isBlocked = otherMember ? blockedIds.includes(otherMember.user_id) : false;
-        const isMuted = (prof?.muted_conversations || []).includes(convId);
+        const setting = settings[convId];
+        const otherId = otherMember?.user_id || '';
 
         return {
           id: convId,
           other: otherProfile,
           lastMessage: lastMsg,
-          isUnread,
-          isBlocked,
-          isMuted,
-          otherUserId: otherMember?.user_id,
+          isUnread:
+            !!lastMsg &&
+            lastMsg.sender_id !== u.user.id &&
+            !(lastMsg.read_by || []).includes(u.user.id),
+          isBlocked: otherId ? blockedIds.includes(otherId) || blockerIds.includes(otherId) : false,
+          iBlocked: otherId ? blockedIds.includes(otherId) : false,
+          blockedMe: otherId ? blockerIds.includes(otherId) : false,
+          isMuted: !!setting?.muted,
+          isCleared: !!setting?.clearedAt,
+          otherUserId: otherId,
+          name: displayName(otherProfile),
         };
       })
       .filter(c => c.other);
 
-    convList.sort((a, b) => {
-      const aTime = a.lastMessage?.created_at || '';
-      const bTime = b.lastMessage?.created_at || '';
-      return bTime.localeCompare(aTime);
-    });
+    convList.sort((a, b) =>
+      (b.lastMessage?.created_at || '').localeCompare(a.lastMessage?.created_at || '')
+    );
 
     setConversations(convList);
     setLoading(false);
@@ -146,23 +189,148 @@ export default function Messages() {
     }, [load])
   );
 
-  async function toggleDND(newVal: boolean) {
-    setDndEnabled(newVal);
-    if (!currentUserId) return;
-    await supabase.from('profiles').update({ dnd_enabled: newVal }).eq('id', currentUserId);
+  // Keep the silent state honest while the screen is open.
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setDnd(prev => ({ ...prev }));
+    }, 60_000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // ------------------------------------------------------------ actions
+
+  async function applyDnd(next: DndSettings) {
+    setDnd(next);
+    setDndSheet(false);
+    const result = await saveDnd(currentUserId, next);
+    if (!result.ok) {
+      Alert.alert('تعذّر الحفظ', result.error);
+      return;
+    }
+    await syncDndWithNotifications(currentUserId);
   }
 
-  const filtered = conversations.filter(c => {
-    if (!searchQuery.trim()) return true;
-    const name = c.other?.display_name || c.other?.username || '';
-    return name.includes(searchQuery);
-  });
+  function openDndSheet() {
+    setDndSheet(true);
+  }
 
-  const unreadCount = conversations.filter(c => c.isUnread).length;
+  function pickSchedule(schedule: DndSettings['schedule']) {
+    if (schedule === 'custom') {
+      setDndSheet(false);
+      setDraftStart(dnd.start || '22:00');
+      setDraftEnd(dnd.end || '07:00');
+      setCustomOpen(true);
+      return;
+    }
+    void applyDnd({ ...dnd, enabled: true, schedule });
+  }
+
+  function saveCustom() {
+    setCustomOpen(false);
+    void applyDnd({ enabled: true, schedule: 'custom', start: draftStart, end: draftEnd });
+  }
+
+  async function runAction(
+    successTitle: string,
+    action: () => Promise<{ ok: boolean; error?: string }>
+  ) {
+    setBusy(true);
+    const result = await action();
+    setBusy(false);
+    setTarget(null);
+
+    if (!result.ok) {
+      Alert.alert('تعذّر تنفيذ العملية', result.error || 'حدث خطأ غير متوقع.');
+      return;
+    }
+    await load();
+    Alert.alert('تم ✓', successTitle);
+  }
+
+  function confirmMute(conv: Conv) {
+    const next = !conv.isMuted;
+    runAction(next ? 'تم كتم المحادثة 🔕' : 'تم إلغاء الكتم 🔔', () =>
+      setMute(currentUserId, conv.id, next)
+    );
+  }
+
+  function confirmClearMine(conv: Conv) {
+    Alert.alert(
+      'مسح المحادثة عندي 🧹',
+      `سيتم حذف الرسائل من عندك فقط.\n\n${conv.name} سيحتفظ بنسخته من الرسائل.`,
+      [
+        { text: 'إلغاء', style: 'cancel' },
+        {
+          text: 'مسح عندي',
+          style: 'destructive',
+          onPress: () => runAction('تم مسح المحادثة من عندك ✓', () => clearForMe(currentUserId, conv.id)),
+        },
+      ]
+    );
+  }
+
+  function confirmDeleteAll(conv: Conv) {
+    Alert.alert(
+      'حذف المحادثة للجميع ⚠️',
+      `سيتم حذف المحادثة وكل رسائلها نهائياً، ولن تظهر لـ ${conv.name} أيضاً.\n\nلا يمكن التراجع عن هذه العملية.`,
+      [
+        { text: 'إلغاء', style: 'cancel' },
+        {
+          text: 'حذف نهائي للجميع',
+          style: 'destructive',
+          onPress: () =>
+            runAction('حُذفت المحادثة من قائمتك ومن عند الطرف الآخر.', () =>
+              deleteConversationForEveryone(conv.id)
+            ),
+        },
+      ]
+    );
+  }
+
+  function confirmBlock(conv: Conv) {
+    if (conv.blockedMe) {
+      setTarget(null);
+      Alert.alert('مُحظر من الطرف الآخر', `${conv.name} حظرك. لن تظهر رسائلك له ولا يمكنكم التواصل حتى يُزيل الحظر.`);
+      return;
+    }
+
+    if (conv.iBlocked) {
+      Alert.alert('إلغاء الحظر', `هل تريد السماح لـ ${conv.name} بمراسلتك مرة أخرى؟`, [
+        { text: 'إلغاء', style: 'cancel' },
+        {
+          text: 'إلغاء الحظر',
+          onPress: () => runAction('تم رفع الحظر ✓ يمكنك تبادل الرسائل مجدداً.', () =>
+            setBlock(currentUserId, conv.otherUserId, false)
+          ),
+        },
+      ]);
+      return;
+    }
+
+    Alert.alert('حظر المستخدم 🚫', `لن يتمكن ${conv.name} من مراسلتك، وستُخفى رسائله من المحادثة.`, [
+      { text: 'إلغاء', style: 'cancel' },
+      {
+        text: 'حظر الآن',
+        style: 'destructive',
+        onPress: () => runAction(`أضفنا ${conv.name} إلى قائمة المحظورين.`, () =>
+          setBlock(currentUserId, conv.otherUserId, true)
+        ),
+      },
+    ]);
+  }
+
+  // ------------------------------------------------------------ derived
+
+  const filtered = conversations.filter(c =>
+    !searchQuery.trim() ? true : c.name.includes(searchQuery.trim())
+  );
+
+  // Muted chats and chats inside an active DND window stay out of the badge.
+  const unreadCount = conversations.filter(c => c.isUnread && !c.isMuted && !dndNow).length;
+  const silentUnread = conversations.filter(c => c.isUnread && (c.isMuted || dndNow)).length;
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <LinearGradient colors={['#065f46', '#059669', '#10b981']} style={styles.header}>
         <View style={styles.headerContent}>
           <View style={styles.headerRight}>
@@ -172,17 +340,22 @@ export default function Messages() {
                 <Text style={styles.unreadBadgeText}>{unreadCount}</Text>
               </View>
             )}
+            {silentUnread > 0 && (
+              <View style={styles.silentBadge}>
+                <BellOff size={11} color="#a7f3d0" />
+                <Text style={styles.silentBadgeText}>{silentUnread}</Text>
+              </View>
+            )}
           </View>
 
           <View style={styles.headerLeftActions}>
-            {/* Quick DND Toggle button */}
             <Pressable
-              style={[styles.dndHeaderBtn, dndEnabled && styles.dndHeaderBtnActive]}
-              onPress={() => toggleDND(!dndEnabled)}
+              style={[styles.dndHeaderBtn, dndNow && styles.dndHeaderBtnActive]}
+              onPress={openDndSheet}
             >
-              {dndEnabled ? <BellOff size={16} color="#fff" /> : <Bell size={16} color="#a7f3d0" />}
-              <Text style={[styles.dndHeaderText, dndEnabled && { color: '#fff' }]}>
-                {dndEnabled ? 'عدم الإزعاج مفعّل' : 'إشعارات عادية'}
+              {dndNow ? <BellOff size={16} color="#fff" /> : <Bell size={16} color="#a7f3d0" />}
+              <Text style={[styles.dndHeaderText, dndNow && { color: '#fff' }]}>
+                {dndNow ? 'صامت' : 'الإشعارات'}
               </Text>
             </Pressable>
 
@@ -192,7 +365,6 @@ export default function Messages() {
           </View>
         </View>
 
-        {/* Search Bar */}
         <View style={styles.searchBar}>
           <Search size={18} color="#9ca3af" />
           <TextInput
@@ -205,22 +377,23 @@ export default function Messages() {
         </View>
       </LinearGradient>
 
-      {/* DND Alert Banner if enabled */}
-      {dndEnabled && (
+      {dndNow && (
         <View style={styles.dndBanner}>
-          <BellOff size={16} color="#b91c1c" />
-          <Text style={styles.dndBannerText}>
-            وضع عدم الإزعاج مفعّل 🔕 — التنبيهات الصوتية للرسائل في وضع صامت.
+          <BellOff size={16} color="#b45309" />
+          <Text style={styles.dndBannerText} numberOfLines={2}>
+            {dnd.schedule === 'off'
+              ? 'وضع عدم الإزعاج مفعّل — الإشعارات صامتة.'
+              : `صامت حتى ${formatArabicTime(dnd.schedule === 'nightly' ? '07:00' : dnd.end)}`}
           </Text>
-          <Pressable onPress={() => toggleDND(false)} style={styles.dndBannerAction}>
-            <Text style={styles.dndBannerActionText}>إلغاء</Text>
+          <Pressable onPress={openDndSheet} style={styles.dndBannerAction}>
+            <Text style={styles.dndBannerActionText}>تعديل</Text>
           </Pressable>
         </View>
       )}
 
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#0891b2" />
+          <ActivityIndicator size="large" color="#059669" />
         </View>
       ) : (
         <ScrollView
@@ -234,7 +407,7 @@ export default function Messages() {
                 await load();
                 setRefreshing(false);
               }}
-              tintColor="#0891b2"
+              tintColor="#059669"
             />
           }
         >
@@ -257,22 +430,33 @@ export default function Messages() {
             </View>
           ) : (
             <>
-              {/* Unread Section */}
-              {filtered.some(c => c.isUnread) && <Text style={styles.sectionLabel}>غير مقروء</Text>}
-              {filtered
-                .filter(c => c.isUnread)
-                .map(conv => (
-                  <ConvCard key={conv.id} conv={conv} currentUserId={currentUserId} />
-                ))}
-
-              {/* All Conversations */}
-              {filtered.some(c => c.isUnread) && filtered.some(c => !c.isUnread) && (
-                <Text style={styles.sectionLabel}>المحادثات</Text>
+              {filtered.some(c => c.isUnread && !c.isMuted && !dndNow) && (
+                <Text style={styles.sectionLabel}>غير مقروء</Text>
               )}
               {filtered
-                .filter(c => !c.isUnread)
+                .filter(c => c.isUnread && !c.isMuted && !dndNow)
                 .map(conv => (
-                  <ConvCard key={conv.id} conv={conv} currentUserId={currentUserId} />
+                  <ConvCard
+                    key={conv.id}
+                    conv={conv}
+                    currentUserId={currentUserId}
+                    onLongPress={() => setTarget(conv)}
+                  />
+                ))}
+
+              {filtered.some(c => c.isUnread && !c.isMuted && !dndNow) &&
+                filtered.some(c => !(c.isUnread && !c.isMuted && !dndNow)) && (
+                  <Text style={styles.sectionLabel}>المحادثات</Text>
+                )}
+              {filtered
+                .filter(c => !(c.isUnread && !c.isMuted && !dndNow))
+                .map(conv => (
+                  <ConvCard
+                    key={conv.id}
+                    conv={conv}
+                    currentUserId={currentUserId}
+                    onLongPress={() => setTarget(conv)}
+                  />
                 ))}
             </>
           )}
@@ -280,21 +464,237 @@ export default function Messages() {
         </ScrollView>
       )}
 
-      {/* Bottom Nav */}
       <View style={styles.bottomNav}>
         <BottomNav />
       </View>
+
+      {/* Conversation actions */}
+      <Modal visible={!!target} transparent animationType="fade" onRequestClose={() => setTarget(null)}>
+        <Pressable style={styles.overlay} onPress={() => setTarget(null)}>
+          <View style={styles.sheet}>
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle} numberOfLines={1}>
+                {target?.name}
+              </Text>
+              <Pressable onPress={() => setTarget(null)} style={styles.sheetClose}>
+                <X size={18} color="#64748b" />
+              </Pressable>
+            </View>
+
+            {busy && <ActivityIndicator style={{ marginBottom: 10 }} color="#059669" />}
+
+            <SheetRow
+              icon={target?.isMuted ? <Bell size={18} color="#059669" /> : <BellOff size={18} color="#d97706" />}
+              label={target?.isMuted ? 'إلغاء كتم الإشعارات 🔔' : 'كتم المحادثة 🔕'}
+              onPress={() => target && confirmMute(target)}
+            />
+            <SheetRow
+              icon={<Eraser size={18} color="#64748b" />}
+              label="مسح المحادثة عندي 🧹"
+              subtitle="يحذف الرسائل من عندك فقط"
+              onPress={() => target && confirmClearMine(target)}
+            />
+            <SheetRow
+              icon={<Trash2 size={18} color="#dc2626" />}
+              label="حذف المحادثة للجميع ⚠️"
+              subtitle="حذف نهائي للطرفين"
+              danger
+              onPress={() => target && confirmDeleteAll(target)}
+            />
+            <SheetRow
+              icon={
+                target?.iBlocked ? (
+                  <UserCheck size={18} color="#059669" />
+                ) : target?.blockedMe ? (
+                  <Lock size={18} color="#94a3b8" />
+                ) : (
+                  <UserX size={18} color="#dc2626" />
+                )
+              }
+              label={
+                target?.iBlocked
+                  ? 'إلغاء حظر المستخدم'
+                  : target?.blockedMe
+                  ? 'هذا المستخدم حظرك 🔒'
+                  : 'حظر المستخدم 🚫'
+              }
+              danger={!target?.iBlocked && !target?.blockedMe}
+              onPress={() => target && confirmBlock(target)}
+            />
+            <SheetRow
+              icon={<ChevronLeft size={18} color="#059669" />}
+              label="عرض الملف الشخصي 👤"
+              onPress={() => {
+                const t = target;
+                setTarget(null);
+                if (t) router.push({ pathname: '/user', params: { id: t.otherUserId } });
+              }}
+            />
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* DND sheet */}
+      <Modal visible={dndSheet} transparent animationType="fade" onRequestClose={() => setDndSheet(false)}>
+        <Pressable style={styles.overlay} onPress={() => setDndSheet(false)}>
+          <View style={styles.sheet}>
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>عدم الإزعاج 🔕</Text>
+              <Pressable onPress={() => setDndSheet(false)} style={styles.sheetClose}>
+                <X size={18} color="#64748b" />
+              </Pressable>
+            </View>
+
+            <Pressable
+              style={[styles.optionCard, !dnd.enabled && styles.optionCardActive]}
+              onPress={() => void applyDnd({ ...dnd, enabled: false })}
+            >
+              <Bell size={18} color={!dnd.enabled ? '#059669' : '#64748b'} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.optionCardTitle}>إشعارات عادية</Text>
+                <Text style={styles.optionCardSub}>صوت وتنبيهات لكل الرسائل</Text>
+              </View>
+            </Pressable>
+
+            <Pressable
+              style={[styles.optionCard, dnd.enabled && dnd.schedule === 'off' && styles.optionCardActive]}
+              onPress={() => pickSchedule('off')}
+            >
+              <BellOff size={18} color="#d97706" />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.optionCardTitle}>صامت دائماً</Text>
+                <Text style={styles.optionCardSub}>كل الإشعارات صامتة طوال اليوم</Text>
+              </View>
+            </Pressable>
+
+            <Pressable
+              style={[styles.optionCard, dnd.enabled && dnd.schedule === 'nightly' && styles.optionCardActive]}
+              onPress={() => pickSchedule('nightly')}
+            >
+              <SlidersHorizontal size={18} color="#d97706" />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.optionCardTitle}>صامت ليلاً 🌙</Text>
+                <Text style={styles.optionCardSub}>من 10:00 م حتى 7:00 ص</Text>
+              </View>
+            </Pressable>
+
+            <Pressable
+              style={[
+                styles.optionCard,
+                dnd.enabled && dnd.schedule === 'custom' && styles.optionCardActive,
+                { borderBottomWidth: 0 },
+              ]}
+              onPress={() => pickSchedule('custom')}
+            >
+              <SlidersHorizontal size={18} color="#d97706" />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.optionCardTitle}>وقت مخصص ⏱</Text>
+                <Text style={styles.optionCardSub}>
+                  {dnd.schedule === 'custom'
+                    ? `من ${formatArabicTime(dnd.start)} إلى ${formatArabicTime(dnd.end)}`
+                    : 'حدّد ساعات الكتم يدوياً'}
+                </Text>
+              </View>
+            </Pressable>
+
+            <Text style={styles.sheetNote}>
+              الحالة الحالية: {dndLabel(dnd)}
+            </Text>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Custom DND hours */}
+      <Modal visible={customOpen} transparent animationType="fade" onRequestClose={() => setCustomOpen(false)}>
+        <Pressable style={styles.overlay} onPress={() => setCustomOpen(false)}>
+          <View style={styles.sheet}>
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>وقت الكتم المخصص ⏱</Text>
+              <Pressable onPress={() => setCustomOpen(false)} style={styles.sheetClose}>
+                <X size={18} color="#64748b" />
+              </Pressable>
+            </View>
+
+            <Text style={styles.fieldLabel}>يبدأ الكتم من</Text>
+            <TextInput
+              style={styles.timeInput}
+              value={draftStart}
+              onChangeText={setDraftStart}
+              placeholder="22:00"
+              placeholderTextColor="#94a3b8"
+              keyboardType="numbers-and-punctuation"
+              maxLength={5}
+            />
+
+            <Text style={styles.fieldLabel}>ينتهي الكتم في</Text>
+            <TextInput
+              style={styles.timeInput}
+              value={draftEnd}
+              onChangeText={setDraftEnd}
+              placeholder="07:00"
+              placeholderTextColor="#94a3b8"
+              keyboardType="numbers-and-punctuation"
+              maxLength={5}
+            />
+
+            <Text style={styles.sheetNote}>الصيغة 24 ساعة — مثال: 22:00 تعني 10 مساءً.</Text>
+
+            <Pressable style={styles.saveTimeBtn} onPress={saveCustom}>
+              <Text style={styles.saveTimeBtnText}>حفظ الوقت</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
 
-function ConvCard({ conv, currentUserId }: { conv: any; currentUserId: string }) {
-  const { other, lastMessage, isUnread, isBlocked, isMuted, id } = conv;
-  const name = other?.display_name || other?.username || 'جار';
+function SheetRow({
+  icon,
+  label,
+  subtitle,
+  danger,
+  onPress,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  subtitle?: string;
+  danger?: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable style={styles.sheetRow} onPress={onPress}>
+      {icon}
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.sheetRowText, danger && { color: '#dc2626' }]}>{label}</Text>
+        {subtitle ? <Text style={styles.sheetRowSub}>{subtitle}</Text> : null}
+      </View>
+    </Pressable>
+  );
+}
+
+function ConvCard({
+  conv,
+  currentUserId,
+  onLongPress,
+}: {
+  conv: Conv;
+  currentUserId: string;
+  onLongPress: () => void;
+}) {
+  const { lastMessage, isUnread, isBlocked, isMuted, id, other, name } = conv;
   const avatar = other?.avatar_url;
   const isLastMine = lastMessage?.sender_id === currentUserId;
   const isRead = isLastMine ? true : (lastMessage?.read_by || []).includes(currentUserId);
   const timeStr = lastMessage?.created_at ? formatTime(lastMessage.created_at) : '';
+
+  const preview = isBlocked
+    ? conv.iBlocked
+      ? '🚫 محظور — الإرسال مغلق'
+      : '🔒 هذا المستخدم حظرك — لا يمكن التواصل'
+    : conv.isCleared && !lastMessage
+    ? '🧹 تم مسح المحادثة من عندك'
+    : `${isLastMine ? 'أنت: ' : ''}${lastMessage?.body || 'ابدأ المحادثة'}`;
 
   return (
     <Pressable
@@ -302,10 +702,12 @@ function ConvCard({ conv, currentUserId }: { conv: any; currentUserId: string })
         styles.convCard,
         isUnread && styles.convCardUnread,
         isBlocked && styles.convCardBlocked,
+        isMuted && styles.convCardMuted,
       ]}
       onPress={() => router.push({ pathname: '/conversation', params: { id } })}
+      onLongPress={onLongPress}
+      delayLongPress={280}
     >
-      {/* Avatar */}
       <View style={styles.avatarWrap}>
         {avatar ? (
           <Image source={{ uri: avatar }} style={styles.avatar} />
@@ -319,19 +721,24 @@ function ConvCard({ conv, currentUserId }: { conv: any; currentUserId: string })
             <Text style={{ fontSize: 8 }}>✓</Text>
           </View>
         )}
+        {isMuted && (
+          <View style={styles.mutedDot}>
+            <BellOff size={10} color="#fff" />
+          </View>
+        )}
       </View>
 
-      {/* Content */}
       <View style={styles.convContent}>
         <View style={styles.convTopRow}>
           <View style={styles.nameBadgesRow}>
-            <Text style={[styles.convName, isUnread && styles.convNameUnread]}>{name}</Text>
+            <Text style={[styles.convName, isUnread && styles.convNameUnread]} numberOfLines={1}>
+              {name}
+            </Text>
             {isBlocked && (
               <View style={styles.blockedPill}>
                 <Text style={styles.blockedPillText}>محظور</Text>
               </View>
             )}
-            {isMuted && <BellOff size={13} color="#94a3b8" style={{ marginRight: 4 }} />}
           </View>
           <Text style={[styles.convTime, isUnread && styles.convTimeUnread]}>{timeStr}</Text>
         </View>
@@ -340,17 +747,15 @@ function ConvCard({ conv, currentUserId }: { conv: any; currentUserId: string })
           <View style={styles.lastMsgRow}>
             {isLastMine &&
               (isRead ? (
-                <CheckCheck size={14} color="#0891b2" style={{ marginLeft: 4 }} />
+                <CheckCheck size={14} color="#059669" style={{ marginLeft: 4 }} />
               ) : (
                 <Check size={14} color="#94a3b8" style={{ marginLeft: 4 }} />
               ))}
             <Text style={[styles.lastMsg, isUnread && styles.lastMsgUnread]} numberOfLines={1}>
-              {isBlocked
-                ? '🚫 المستخدم محظور'
-                : `${isLastMine ? 'أنت: ' : ''}${lastMessage?.body || 'لا توجد رسائل'}`}
+              {preview}
             </Text>
           </View>
-          {isUnread && <View style={styles.unreadDot} />}
+          {isUnread && !isMuted && <View style={styles.unreadDot} />}
         </View>
       </View>
     </Pressable>
@@ -377,10 +782,7 @@ function formatTime(dateStr: string): string {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8fafc',
-  },
+  container: { flex: 1, backgroundColor: '#f8fafc' },
   header: {
     paddingTop: 54,
     paddingBottom: 20,
@@ -394,32 +796,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
-  headerRight: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 8,
-  },
-  headerLeftActions: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 8,
-  },
-  headerTitle: {
-    color: '#fff',
-    fontSize: 22,
-    fontWeight: '900',
-  },
+  headerRight: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
+  headerLeftActions: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
+  headerTitle: { color: '#fff', fontSize: 22, fontWeight: '900' },
   unreadBadge: {
     backgroundColor: '#ef4444',
     borderRadius: 12,
     paddingHorizontal: 8,
     paddingVertical: 2,
   },
-  unreadBadgeText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '800',
+  unreadBadgeText: { color: '#fff', fontSize: 12, fontWeight: '800' },
+  silentBadge: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
   },
+  silentBadgeText: { color: '#a7f3d0', fontSize: 11, fontWeight: '800' },
   dndHeaderBtn: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
@@ -431,15 +827,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.2)',
   },
-  dndHeaderBtnActive: {
-    backgroundColor: '#ef4444',
-    borderColor: '#f87171',
-  },
-  dndHeaderText: {
-    color: '#cffafe',
-    fontSize: 11,
-    fontWeight: '800',
-  },
+  dndHeaderBtnActive: { backgroundColor: '#d97706', borderColor: '#f59e0b' },
+  dndHeaderText: { color: '#ecfdf5', fontSize: 11, fontWeight: '800' },
   newChatBtn: {
     width: 36,
     height: 36,
@@ -457,25 +846,20 @@ const styles = StyleSheet.create({
     height: 44,
     gap: 8,
   },
-  searchInput: {
-    flex: 1,
-    fontSize: 13,
-    color: '#111827',
-    textAlign: 'right',
-  },
+  searchInput: { flex: 1, fontSize: 13, color: '#111827', textAlign: 'right' },
   dndBanner: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#fee2e2',
+    backgroundColor: '#fef3c7',
     borderBottomWidth: 1,
-    borderColor: '#fca5a5',
+    borderColor: '#fcd34d',
     paddingHorizontal: 16,
     paddingVertical: 8,
   },
   dndBannerText: {
     flex: 1,
-    color: '#991b1b',
+    color: '#92400e',
     fontSize: 12,
     fontWeight: '700',
     textAlign: 'right',
@@ -484,24 +868,12 @@ const styles = StyleSheet.create({
   dndBannerAction: {
     paddingHorizontal: 8,
     paddingVertical: 3,
-    backgroundColor: '#ef4444',
+    backgroundColor: '#d97706',
     borderRadius: 6,
   },
-  dndBannerActionText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  center: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  list: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 12,
-  },
+  dndBannerActionText: { color: '#fff', fontSize: 11, fontWeight: '800' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  list: { flex: 1, paddingHorizontal: 16, paddingTop: 12 },
   sectionLabel: {
     fontSize: 12,
     fontWeight: '800',
@@ -527,41 +899,25 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 1,
   },
-  convCardUnread: {
-    borderColor: '#bae6fd',
-    backgroundColor: '#f0f9ff',
-  },
-  convCardBlocked: {
-    opacity: 0.65,
-    backgroundColor: '#fef2f2',
-    borderColor: '#fee2e2',
-  },
-  avatarWrap: {
-    position: 'relative',
-  },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-  },
+  convCardUnread: { borderColor: '#a7f3d0', backgroundColor: '#f0fdf4' },
+  convCardBlocked: { opacity: 0.7, backgroundColor: '#fef2f2', borderColor: '#fee2e2' },
+  convCardMuted: { backgroundColor: '#f8fafc', borderColor: '#e2e8f0' },
+  avatarWrap: { position: 'relative' },
+  avatar: { width: 48, height: 48, borderRadius: 24 },
   avatarFallback: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#e0f2fe',
+    backgroundColor: '#ecfdf5',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarLetter: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#0891b2',
-  },
+  avatarLetter: { fontSize: 18, fontWeight: '900', color: '#059669' },
   verifiedDot: {
     position: 'absolute',
     bottom: 0,
     right: 0,
-    backgroundColor: '#0891b2',
+    backgroundColor: '#059669',
     width: 14,
     height: 14,
     borderRadius: 7,
@@ -570,82 +926,43 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#fff',
   },
-  convContent: {
-    flex: 1,
+  mutedDot: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    backgroundColor: '#64748b',
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#fff',
   },
+  convContent: { flex: 1 },
   convTopRow: {
     flexDirection: 'row-reverse',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 4,
   },
-  nameBadgesRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 6,
-  },
-  convName: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#0f172a',
-  },
-  convNameUnread: {
-    fontWeight: '900',
-    color: '#0369a1',
-  },
-  blockedPill: {
-    backgroundColor: '#fee2e2',
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 6,
-  },
-  blockedPillText: {
-    color: '#dc2626',
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  convTime: {
-    fontSize: 11,
-    color: '#94a3b8',
-    fontWeight: '600',
-  },
-  convTimeUnread: {
-    color: '#0891b2',
-    fontWeight: '800',
-  },
+  nameBadgesRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, flex: 1 },
+  convName: { fontSize: 14, fontWeight: '800', color: '#0f172a', flexShrink: 1 },
+  convNameUnread: { fontWeight: '900', color: '#059669' },
+  blockedPill: { backgroundColor: '#fee2e2', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6 },
+  blockedPillText: { color: '#dc2626', fontSize: 10, fontWeight: '800' },
+  convTime: { fontSize: 11, color: '#94a3b8', fontWeight: '600', marginRight: 6 },
+  convTimeUnread: { color: '#059669', fontWeight: '800' },
   convBottomRow: {
     flexDirection: 'row-reverse',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  lastMsgRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    flex: 1,
-  },
-  lastMsg: {
-    fontSize: 12,
-    color: '#64748b',
-    flex: 1,
-    textAlign: 'right',
-  },
-  lastMsgUnread: {
-    color: '#0f172a',
-    fontWeight: '700',
-  },
-  unreadDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#0891b2',
-    marginRight: 6,
-  },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 80,
-    paddingHorizontal: 24,
-  },
+  lastMsgRow: { flexDirection: 'row-reverse', alignItems: 'center', flex: 1 },
+  lastMsg: { fontSize: 12, color: '#64748b', flex: 1, textAlign: 'right' },
+  lastMsgUnread: { color: '#0f172a', fontWeight: '700' },
+  unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#059669', marginRight: 6 },
+  emptyState: { alignItems: 'center', justifyContent: 'center', paddingVertical: 80, paddingHorizontal: 24 },
   emptyIcon: {
     width: 80,
     height: 80,
@@ -655,34 +972,94 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 16,
   },
-  emptyTitle: {
-    fontSize: 17,
-    fontWeight: '900',
-    color: '#0f172a',
-    marginBottom: 6,
+  emptyTitle: { fontSize: 17, fontWeight: '900', color: '#0f172a', marginBottom: 6 },
+  emptySub: { fontSize: 13, color: '#64748b', textAlign: 'center', lineHeight: 18, marginBottom: 20 },
+  startChatBtn: { backgroundColor: '#059669', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 14 },
+  startChatBtnText: { color: '#fff', fontSize: 13, fontWeight: '800' },
+  bottomNav: { position: 'absolute', bottom: 0, left: 0, right: 0 },
+
+  // sheets
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
   },
-  emptySub: {
-    fontSize: 13,
-    color: '#64748b',
-    textAlign: 'center',
-    lineHeight: 18,
-    marginBottom: 20,
+  sheet: {
+    width: '92%',
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 18,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 8,
   },
-  startChatBtn: {
-    backgroundColor: '#0891b2',
-    paddingHorizontal: 20,
+  sheetHeader: {
+    flexDirection: 'row-reverse',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+    borderBottomWidth: 1,
+    borderColor: '#f1f5f9',
+    paddingBottom: 10,
+  },
+  sheetTitle: { fontSize: 16, fontWeight: '900', color: '#0f172a', flex: 1, textAlign: 'right' },
+  sheetClose: { padding: 4 },
+  sheetRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 12,
     paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderColor: '#f8fafc',
+  },
+  sheetRowText: { fontSize: 14, fontWeight: '800', color: '#334155', textAlign: 'right' },
+  sheetRowSub: { fontSize: 11, color: '#94a3b8', marginTop: 2 },
+  sheetNote: {
+    fontSize: 11,
+    color: '#94a3b8',
+    textAlign: 'center',
+    marginTop: 12,
+    fontWeight: '700',
+  },
+  optionCard: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
     borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#f1f5f9',
+    backgroundColor: '#f8fafc',
+    marginBottom: 8,
   },
-  startChatBtnText: {
-    color: '#fff',
-    fontSize: 13,
+  optionCardActive: { borderColor: '#059669', backgroundColor: '#ecfdf5' },
+  optionCardTitle: { fontSize: 14, fontWeight: '800', color: '#0f172a', textAlign: 'right' },
+  optionCardSub: { fontSize: 11, color: '#64748b', marginTop: 2 },
+  fieldLabel: { fontSize: 12, fontWeight: '800', color: '#475569', marginBottom: 6 },
+  timeInput: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    paddingHorizontal: 14,
+    height: 46,
+    fontSize: 16,
     fontWeight: '800',
+    color: '#0f172a',
+    textAlign: 'center',
+    marginBottom: 12,
   },
-  bottomNav: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+  saveTimeBtn: {
+    backgroundColor: '#059669',
+    borderRadius: 14,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 14,
   },
+  saveTimeBtnText: { color: '#fff', fontSize: 15, fontWeight: '900' },
 });

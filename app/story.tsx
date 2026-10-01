@@ -252,7 +252,7 @@ export default function StoryViewer() {
   if (loading) {
     return (
       <View style={styles.loadingScreen}>
-        <ActivityIndicator size="large" color="#0891b2" />
+        <ActivityIndicator size="large" color="#059669" />
       </View>
     );
   }
@@ -273,7 +273,7 @@ export default function StoryViewer() {
 
   const gradColors = currentStory.bg_color
     ? [currentStory.bg_color, shiftColor(currentStory.bg_color)] as [string, string]
-    : ['#0891b2', '#0369a1'] as [string, string];
+    : ['#065f46', '#059669'] as [string, string];
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -454,7 +454,7 @@ function shiftColor(hex: string): string {
     const b = Math.max(0, (num & 0xff) - 40);
     return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
   } catch {
-    return '#0369a1';
+    return '#065f46';
   }
 }
 

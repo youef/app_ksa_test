@@ -1,28 +1,50 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { supabase } from './supabase';
+import { isDndActiveNow, loadDnd } from './chatControls';
+
+// ---------------------------------------------------------------
+// Do Not Disturb: silences sound/vibration and hides the banner,
+// so a muted conversation or an active DND window stays quiet.
+// ---------------------------------------------------------------
+let dndActive = false;
+
+export function setNotificationDnd(active: boolean) {
+  dndActive = active;
+}
+
+export function isNotificationDnd(): boolean {
+  return dndActive;
+}
+
+/** Reads the profile and syncs the DND state into the notification handler. */
+export async function syncDndWithNotifications(userId?: string): Promise<boolean> {
+  try {
+    const uid = userId ?? (await supabase.auth.getUser()).data.user?.id;
+    if (!uid) return false;
+    const dnd = await loadDnd(uid);
+    const active = isDndActiveNow(dnd);
+    setNotificationDnd(active);
+    return active;
+  } catch (err) {
+    console.warn('syncDndWithNotifications error', err);
+    return false;
+  }
+}
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
+    shouldPlaySound: !dndActive,
+    shouldSetBadge: !dndActive,
+    shouldShowBanner: !dndActive,
+    shouldShowList: !dndActive,
   }),
 });
 
 export async function registerPushToken(): Promise<string | null> {
   if (Platform.OS === 'web') {
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      try {
-        const perm = await Notification.requestPermission();
-        if (perm === 'granted') {
-          return 'web-notifications-granted';
-        }
-      } catch (e) {
-        console.warn('Web notification request error', e);
-      }
-    }
+    // Browser permission alone is not a push subscription. The app currently
+    // registers Expo push tokens only, so do not report web push as enabled.
     return null;
   }
 
@@ -36,11 +58,12 @@ export async function registerPushToken(): Promise<string | null> {
 
     const token = (await Notifications.getExpoPushTokenAsync()).data;
     const { data: u } = await supabase.auth.getUser();
-    if (!u.user) return token;
+    if (!u.user) throw new Error('سجّل الدخول قبل تسجيل هذا الجهاز للإشعارات.');
 
-    await supabase
+    const { error } = await supabase
       .from('push_tokens')
       .upsert({ user_id: u.user.id, token, platform: Platform.OS }, { onConflict: 'token' });
+    if (error) throw new Error(error.message);
 
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync('default', {
