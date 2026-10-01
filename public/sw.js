@@ -5,8 +5,8 @@ self.addEventListener('push', event => {
   const body = data.body || 'لديك إشعار جديد';
   const options = {
     body,
-    icon: '/favicon.ico',
-    badge: '/favicon.ico',
+    icon: '/assets/branding/HAYNA_LOGO.png',
+    badge: '/assets/branding/HAYNA_LOGO.png',
     data: data.data || {},
     tag: data.tag || 'hayna-notification',
     renotify: true,
