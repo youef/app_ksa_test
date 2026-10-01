@@ -48,7 +48,7 @@ export default function Index() {
       }
     };
     getBrandingLogo().then(applyBranding);
-    return subscribeBrandingLogo(applyBranding);
+    const unsubscribeBranding = subscribeBrandingLogo(applyBranding);
     supabase.auth.getSession().then(({ data }) => {
       if (data.session?.user) {
         setSignedIn(true);
@@ -82,6 +82,7 @@ export default function Index() {
         Animated.timing(rotate, { toValue: 0, duration: 9000, easing: Easing.linear, useNativeDriver: true }),
       ])
     ).start();
+    return unsubscribeBranding;
   }, [floatY, pulse, shine, rotate]);
 
   if (signedIn || checkingSession) {
