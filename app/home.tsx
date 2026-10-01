@@ -111,12 +111,38 @@ export default function Home() {
     if (!u.user) return router.replace('/auth');
     setCurrentUserId(u.user.id);
 
-    // Fetch profile
-    const { data: profileData } = await supabase.from('profiles').select('*').eq('id', u.user.id).maybeSingle();
+    // Fetch profile first, then refresh the physical location on every home visit.
+    let { data: profileData } = await supabase.from('profiles').select('*').eq('id', u.user.id).maybeSingle();
+
+    try {
+      const device = await getCurrentDeviceLocation();
+      if (device) {
+        const place = await reverseGeocodeDeviceLocation(device);
+        const live = {
+          region: place?.region?.trim() || '',
+          city: place?.city?.trim() || '',
+          district: place?.district?.trim() || '',
+        };
+        if (live.region && live.city && live.district) {
+          await savePermanentMyLocation(live, true);
+          const { data: refreshed } = await supabase
+            .from('profiles')
+            .update(live)
+            .eq('id', u.user.id)
+            .select('*')
+            .maybeSingle();
+          if (refreshed) profileData = refreshed;
+          else profileData = { ...(profileData || {}), ...live };
+        }
+      }
+    } catch (locationError) {
+      console.warn('live location refresh failed:', locationError);
+    }
+
     setProfile(profileData);
 
     // Every signed-in user must have a complete region/city/district before entering the app.
-    // The same gate also requests notifications immediately after location is saved.
+    // Location is refreshed automatically, so moving cities/districts updates the feed.
     const locationComplete = !!(profileData?.region && profileData?.city && profileData?.district);
     if (!locationComplete) {
       setLocationSetupOpen(true);
