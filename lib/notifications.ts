@@ -34,19 +34,60 @@ export async function syncDndWithNotifications(userId?: string): Promise<boolean
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldPlaySound: !dndActive,
-    shouldSetBadge: !dndActive,
-    shouldShowBanner: !dndActive,
-    shouldShowList: !dndActive,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
   }),
 });
 
-export async function registerPushToken(): Promise<string | null> {
-  if (Platform.OS === 'web') {
-    // Browser permission alone is not a push subscription. The app currently
-    // registers Expo push tokens only, so do not report web push as enabled.
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = typeof globalThis.atob === 'function'
+    ? globalThis.atob(base64)
+    : '';
+  return Uint8Array.from(raw, char => char.charCodeAt(0));
+}
+
+async function registerWebPushToken(): Promise<string | null> {
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !('PushManager' in window)) {
     return null;
   }
+
+  const publicKey = process.env.EXPO_PUBLIC_VAPID_PUBLIC_KEY;
+  if (!publicKey) {
+    console.warn('Web push is not configured: EXPO_PUBLIC_VAPID_PUBLIC_KEY is missing.');
+    return null;
+  }
+
+  const { data: u } = await supabase.auth.getUser();
+  if (!u.user) throw new Error('سجّل الدخول قبل تفعيل الإشعارات.');
+
+  const permission = await Notification.requestPermission();
+  if (permission !== 'granted') return null;
+
+  const registration = await navigator.serviceWorker.register('/sw.js');
+  await navigator.serviceWorker.ready;
+
+  let subscription = await registration.pushManager.getSubscription();
+  if (!subscription) {
+    subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(publicKey),
+    });
+  }
+
+  const token = JSON.stringify(subscription.toJSON());
+  const { error } = await supabase
+    .from('push_tokens')
+    .upsert({ user_id: u.user.id, token, platform: 'web' }, { onConflict: 'token' });
+  if (error) throw new Error(error.message);
+  return token;
+}
+
+export async function registerPushToken(): Promise<string | null> {
+  if (Platform.OS === 'web') return registerWebPushToken();
 
   try {
     const perms = await Notifications.getPermissionsAsync();
