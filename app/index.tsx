@@ -18,7 +18,7 @@ export default function Index() {
   const rotate = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    getBrandingLogo().then((uri) => {
+    const applyBranding = (uri: string) => {
       setLogoUri(uri);
       if (Platform.OS === 'web' && typeof document !== 'undefined') {
         const icon = document.querySelector('link[rel="icon"]') || document.createElement('link');
@@ -46,7 +46,9 @@ export default function Index() {
         manifestLink.setAttribute('href', blobUrl);
         document.head.appendChild(manifestLink);
       }
-    });
+    };
+    getBrandingLogo().then(applyBranding);
+    return subscribeBrandingLogo(applyBranding);
     supabase.auth.getSession().then(({ data }) => {
       if (data.session?.user) {
         setSignedIn(true);
