@@ -387,8 +387,7 @@ export default function Home() {
             {/* Right side: App Brand & Location Selector */}
             <View style={styles.brandAndLocation}>
               <View style={styles.brandTitleRow}>
-                <Image source={{ uri: 'logoUri' }} style={styles.headerLogo} resizeMode="contain" />
-                <Text style={styles.heroBrandTitle}>حيّنا</Text>
+                <Image source={{ uri: logoUri }} style={styles.headerLogo} resizeMode="contain" />
               </View>
 
               {/* Location Selector Pill */}
@@ -999,12 +998,6 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     marginLeft: 7,
-  },
-  heroBrandTitle: {
-    fontSize: 26,
-    fontWeight: '900',
-    color: '#fff',
-    letterSpacing: -0.5,
   },
   locationSelectorPill: {
     flexDirection: 'row-reverse',
