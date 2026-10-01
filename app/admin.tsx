@@ -189,8 +189,8 @@ export default function Admin() {
       const asset = result.assets[0];
       const response = await fetch(asset.uri);
       const blob = await response.blob();
-      const path = 'global/logo-' + Date.now() + '.png';
-      const { error: uploadError } = await supabase.storage.from('branding').upload(path, blob, { contentType: 'image/png', upsert: true, cacheControl: '31536000' });
+      const path = 'global/logo.png';
+      const { error: uploadError } = await supabase.storage.from('branding').upload(path, blob, { contentType: 'image/png', upsert: true, cacheControl: '0' });
       if (uploadError) throw uploadError;
       const { data: publicData } = supabase.storage.from('branding').getPublicUrl(path);
       const logoUrl = publicData.publicUrl;
