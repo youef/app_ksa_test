@@ -1,0 +1,19 @@
+{
+  "name": "حيّنا",
+  "short_name": "حيّنا",
+  "description": "بيوت تجمعنا • مجتمع ينتمي لنا",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#065f46",
+  "theme_color": "#059669",
+  "dir": "rtl",
+  "lang": "ar",
+  "icons": [
+    {
+      "src": "/assets/branding/HAYNA_LOGO.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
