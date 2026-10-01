@@ -125,7 +125,7 @@ export default function Profile() {
         await savePermanentMyLocation({ region: nextRegion, city: nextCity, district: nextDistrict }, true);
         Alert.alert('تم تحديث الموقع', 'تم ربط موقعك الحالي بالمدينة والحي في ملفك الشخصي.');
       } else {
-        Alert.alert('تم تحديد المدينة', 'حدد الحي من القائمة ثم اضغط حفظ التغييرات لإكمال موقع البروفايل.');
+        Alert.alert('الموقع غير مكتمل', 'تم تحديد المدينة، لكن يجب تحديد الحي أيضاً حتى يكتمل موقع حسابك.');
       }
     } catch (error: any) { Alert.alert('تعذّر تحديد الموقع', error?.message || 'حاول مرة أخرى.'); }
     finally { setLocating(false); }
@@ -161,8 +161,8 @@ export default function Profile() {
   // Toggle Handlers with Instant Persistence
   async function save() {
     if (!userId) return;
-    if ((region.trim() || city.trim() || district.trim()) && (!city.trim() || !district.trim())) {
-      return Alert.alert('أكمل بيانات الحي', 'لإظهار محتوى الحي وحماية الخصوصية، اختر مدينة وحيّاً محدداً. اترك الموقع كله فارغاً إذا كنت تريد حفظ الاسم فقط.');
+    if (!region.trim() || !city.trim() || !district.trim()) {
+      return Alert.alert('الموقع مطلوب', 'لا يمكن حفظ الملف بدون المنطقة والمدينة والحي. استخدم «استخدام موقعي الحالي» للتعبئة تلقائياً.');
     }
     setSaving(true);
 
@@ -181,9 +181,9 @@ export default function Profile() {
 
       setP((current: any) => ({ ...current, ...payload }));
       await savePermanentMyLocation({
-        region: region.trim() || 'المملكة',
-        city: city.trim() || 'كل المدن',
-        district: district.trim() || 'كل الأحياء',
+        region: region.trim(),
+        city: city.trim(),
+        district: district.trim(),
       }, false);
       setEditingProfile(false);
       Alert.alert('تم الحفظ', 'تم تحديث الاسم والمدينة والحي والنبذة في حسابك.');
