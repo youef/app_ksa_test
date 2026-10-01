@@ -12,180 +12,213 @@ export default function Landing3D() {
 
       const scene = new THREE.Scene();
       const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
-      camera.position.set(0, 0.1, 9.2);
+      camera.position.set(0, 0.2, 8.8);
 
       const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       renderer.setSize(host.current.clientWidth, host.current.clientHeight);
       renderer.outputColorSpace = THREE.SRGBColorSpace;
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = 1.15;
+      renderer.toneMappingExposure = 1.1;
       host.current.appendChild(renderer.domElement);
 
       const emblem = new THREE.Group();
       scene.add(emblem);
 
-      // Premium faceted silhouette inspired by the Kingdom of Saudi Arabia.
-      const shape = new THREE.Shape();
-      [
-        [-1.82, 0.62], [-1.42, 0.98], [-0.78, 1.25], [-0.1, 1.18],
-        [0.48, 0.98], [1.02, 0.68], [1.62, 0.3], [1.48, -0.18],
-        [1.1, -0.4], [0.9, -0.86], [0.38, -1.08], [-0.04, -1.38],
-        [-0.52, -1.18], [-0.98, -1.02], [-1.24, -0.58], [-1.62, -0.34],
-        [-1.5, 0.02], [-1.84, 0.28]
-      ].forEach(([x, y], i) => i === 0 ? shape.moveTo(x, y) : shape.lineTo(x, y));
-      shape.closePath();
+      const green = 0x087f5b;
+      const brightGreen = 0x24c98a;
+      const gold = 0xd7b56d;
+      const ivory = 0xf5f0df;
 
-      const mapGeo = new THREE.ExtrudeGeometry(shape, {
-        depth: 0.3,
-        bevelEnabled: true,
-        bevelSegments: 4,
-        bevelSize: 0.07,
-        bevelThickness: 0.06,
-        curveSegments: 4,
-      });
-      mapGeo.center();
-
-      const mapMat = new THREE.MeshPhysicalMaterial({
-        color: 0x087f5b,
-        roughness: 0.16,
-        metalness: 0.72,
+      const houseMat = new THREE.MeshPhysicalMaterial({
+        color: green,
+        roughness: 0.2,
+        metalness: 0.62,
         clearcoat: 1,
         clearcoatRoughness: 0.08,
-        transparent: true,
-        opacity: 0.96,
       });
-      const map = new THREE.Mesh(mapGeo, mapMat);
-      map.scale.set(1.12, 1.12, 1.12);
-      emblem.add(map);
+      const roofMat = new THREE.MeshPhysicalMaterial({
+        color: 0x0b5f46,
+        roughness: 0.18,
+        metalness: 0.7,
+        clearcoat: 1,
+      });
+      const goldMat = new THREE.MeshStandardMaterial({
+        color: gold,
+        emissive: 0x60461a,
+        emissiveIntensity: 0.8,
+        metalness: 0.75,
+        roughness: 0.2,
+      });
+      const windowMat = new THREE.MeshStandardMaterial({
+        color: ivory,
+        emissive: 0x7ff0c2,
+        emissiveIntensity: 2.8,
+        metalness: 0.25,
+        roughness: 0.15,
+      });
 
-      // Fine golden inner border gives the mark a premium national-emblem feel.
-      const border = new THREE.LineLoop(
-        new THREE.BufferGeometry().setFromPoints([
-          new THREE.Vector3(-1.82, 0.62, 0.19), new THREE.Vector3(-1.42, 0.98, 0.19),
-          new THREE.Vector3(-0.78, 1.25, 0.19), new THREE.Vector3(-0.1, 1.18, 0.19),
-          new THREE.Vector3(0.48, 0.98, 0.19), new THREE.Vector3(1.02, 0.68, 0.19),
-          new THREE.Vector3(1.62, 0.3, 0.19), new THREE.Vector3(1.48, -0.18, 0.19),
-          new THREE.Vector3(1.1, -0.4, 0.19), new THREE.Vector3(0.9, -0.86, 0.19),
-          new THREE.Vector3(0.38, -1.08, 0.19), new THREE.Vector3(-0.04, -1.38, 0.19),
-          new THREE.Vector3(-0.52, -1.18, 0.19), new THREE.Vector3(-0.98, -1.02, 0.19),
-          new THREE.Vector3(-1.24, -0.58, 0.19), new THREE.Vector3(-1.62, -0.34, 0.19),
-          new THREE.Vector3(-1.5, 0.02, 0.19), new THREE.Vector3(-1.84, 0.28, 0.19)
-        ]),
-        new THREE.LineBasicMaterial({ color: 0xd7b56d, transparent: true, opacity: 0.95 })
-      );
-      border.scale.set(1.12, 1.12, 1.12);
-      emblem.add(border);
+      // A small 3D home: a place, a family, and a sense of belonging.
+      const createHouse = (scale: number, central = false) => {
+        const house = new THREE.Group();
+        const body = new THREE.Mesh(
+          new THREE.BoxGeometry(0.62, 0.55, 0.52),
+          houseMat
+        );
+        body.position.y = 0.05;
+        house.add(body);
 
-      // Relationship network: luminous nodes connected across the Kingdom.
-      const nodes = [
-        [-1.0, 0.42, 0.27], [-0.3, 0.73, 0.27], [0.42, 0.46, 0.27],
-        [0.92, 0.1, 0.27], [0.58, -0.4, 0.27], [0.02, -0.75, 0.27],
-        [-0.58, -0.5, 0.27], [-1.12, -0.03, 0.27]
+        const roof = new THREE.Mesh(
+          new THREE.ConeGeometry(0.49, 0.38, 4),
+          roofMat
+        );
+        roof.rotation.y = Math.PI / 4;
+        roof.position.y = 0.5;
+        house.add(roof);
+
+        const door = new THREE.Mesh(
+          new THREE.BoxGeometry(0.13, 0.24, 0.035),
+          goldMat
+        );
+        door.position.set(0, -0.12, 0.275);
+        house.add(door);
+
+        [-0.18, 0.18].forEach((x) => {
+          const window = new THREE.Mesh(
+            new THREE.BoxGeometry(0.11, 0.1, 0.035),
+            windowMat
+          );
+          window.position.set(x, 0.08, 0.275);
+          house.add(window);
+        });
+
+        if (central) {
+          const crown = new THREE.Mesh(
+            new THREE.SphereGeometry(0.07, 16, 16),
+            new THREE.MeshStandardMaterial({
+              color: ivory,
+              emissive: gold,
+              emissiveIntensity: 4,
+              metalness: 0.7,
+              roughness: 0.12,
+            })
+          );
+          crown.position.y = 0.83;
+          house.add(crown);
+        }
+
+        house.scale.setScalar(scale);
+        return house;
+      };
+
+      // Seven connected homes form one neighborhood.
+      const homes = [
+        { x: 0, y: 0.12, z: 0.38, s: 1.28, central: true },
+        { x: -1.05, y: 0.18, z: 0.1, s: 0.92 },
+        { x: 1.05, y: 0.18, z: 0.1, s: 0.92 },
+        { x: -0.72, y: -0.78, z: 0.02, s: 0.86 },
+        { x: 0.72, y: -0.78, z: 0.02, s: 0.86 },
+        { x: -1.48, y: -0.45, z: -0.05, s: 0.7 },
+        { x: 1.48, y: -0.45, z: -0.05, s: 0.7 },
       ];
-      const edges = [[0,1],[1,2],[2,3],[2,4],[4,5],[5,6],[6,7],[7,0],[1,6],[0,2],[2,5]];
-      const positions: number[] = [];
-      edges.forEach(([a, b]) => positions.push(...nodes[a], ...nodes[b]));
+
+      homes.forEach((h) => {
+        const house = createHouse(h.s, h.central);
+        house.position.set(h.x, h.y, h.z);
+        emblem.add(house);
+      });
+
+      // Glowing relationship network: every home belongs to the same community.
+      const centers = homes.map((h) => new THREE.Vector3(h.x, h.y + 0.15, h.z + 0.35));
+      const edgePairs = [
+        [0,1],[0,2],[0,3],[0,4],[1,3],[1,5],[2,4],[2,6],[3,4],[3,5],[4,6],[5,6]
+      ];
+      const linePositions: number[] = [];
+      edgePairs.forEach(([a,b]) => linePositions.push(
+        centers[a].x, centers[a].y, centers[a].z,
+        centers[b].x, centers[b].y, centers[b].z
+      ));
 
       const lineGeo = new THREE.BufferGeometry();
-      lineGeo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-      const lines = new THREE.LineSegments(
+      lineGeo.setAttribute('position', new THREE.Float32BufferAttribute(linePositions, 3));
+      const network = new THREE.LineSegments(
         lineGeo,
-        new THREE.LineBasicMaterial({ color: 0xf5e2b8, transparent: true, opacity: 0.82 })
+        new THREE.LineBasicMaterial({ color: 0xd7b56d, transparent: true, opacity: 0.62 })
       );
-      lines.scale.set(1.12, 1.12, 1.12);
-      emblem.add(lines);
+      emblem.add(network);
 
-      const nodeGeo = new THREE.SphereGeometry(0.065, 16, 16);
+      const nodeGeo = new THREE.SphereGeometry(0.055, 14, 14);
       const nodeMat = new THREE.MeshStandardMaterial({
-        color: 0xfff4d6,
-        emissive: 0xd7b56d,
-        emissiveIntensity: 5,
-        roughness: 0.12,
-        metalness: 0.65,
+        color: ivory,
+        emissive: brightGreen,
+        emissiveIntensity: 4,
+        metalness: 0.5,
+        roughness: 0.15,
       });
-      nodes.forEach(([x, y, z]) => {
+      centers.forEach((p) => {
         const node = new THREE.Mesh(nodeGeo, nodeMat);
-        node.position.set(x * 1.12, y * 1.12, z);
+        node.position.copy(p);
+        node.position.z += 0.03;
         emblem.add(node);
       });
 
-      // Abstract palm at the heart of the mark.
-      const palm = new THREE.Group();
-      palm.position.set(0.02, 0.03, 0.36);
+      // A luminous ring turns the neighborhood into a single identity mark.
+      const ring = new THREE.Mesh(
+        new THREE.TorusGeometry(2.15, 0.026, 12, 180),
+        new THREE.MeshBasicMaterial({ color: gold, transparent: true, opacity: 0.55 })
+      );
+      ring.rotation.x = Math.PI / 2.15;
+      ring.rotation.z = 0.18;
+      emblem.add(ring);
+
+      const ring2 = new THREE.Mesh(
+        new THREE.TorusGeometry(2.35, 0.009, 8, 180),
+        new THREE.MeshBasicMaterial({ color: brightGreen, transparent: true, opacity: 0.22 })
+      );
+      ring2.rotation.x = Math.PI / 2.2;
+      emblem.add(ring2);
+
+      // Subtle palm-like center mark: الوطن حوله والبيوت تحته.
       const trunk = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.045, 0.065, 0.72, 10),
-        new THREE.MeshStandardMaterial({ color: 0xd7b56d, metalness: 0.5, roughness: 0.25 })
+        new THREE.CylinderGeometry(0.018, 0.025, 0.38, 10),
+        goldMat
       );
-      palm.add(trunk);
+      trunk.position.set(0, 0.82, 0.42);
+      emblem.add(trunk);
 
-      const frondMat = new THREE.MeshStandardMaterial({
-        color: 0xf1d38d,
-        emissive: 0x5a3b12,
-        emissiveIntensity: 0.5,
-        metalness: 0.5,
-        roughness: 0.22,
-      });
-      for (let i = 0; i < 8; i++) {
-        const angle = (i / 8) * Math.PI * 2;
-        const frond = new THREE.Mesh(new THREE.CapsuleGeometry(0.028, 0.46, 3, 8), frondMat);
-        frond.position.set(Math.cos(angle) * 0.17, 0.38 + Math.sin(angle) * 0.12, 0);
+      for (let i = 0; i < 6; i++) {
+        const angle = (i / 6) * Math.PI * 2;
+        const frond = new THREE.Mesh(
+          new THREE.CapsuleGeometry(0.012, 0.2, 3, 8),
+          goldMat
+        );
+        frond.position.set(Math.cos(angle) * 0.075, 0.99 + Math.sin(angle) * 0.045, 0.42);
         frond.rotation.z = Math.PI / 2 - angle;
-        palm.add(frond);
+        emblem.add(frond);
       }
-      emblem.add(palm);
 
-      // Two elegant sweeping blades, an abstract reference to the Kingdom's emblem.
-      const bladeMat = new THREE.MeshStandardMaterial({
-        color: 0xe8edf0,
-        metalness: 0.92,
-        roughness: 0.12,
-        emissive: 0x173b31,
-        emissiveIntensity: 0.35,
-      });
-      [-1, 1].forEach((side) => {
-        const blade = new THREE.Mesh(new THREE.CapsuleGeometry(0.025, 1.15, 4, 10), bladeMat);
-        blade.position.set(0, -0.42, 0.39);
-        blade.rotation.z = side * 0.62;
-        emblem.add(blade);
-      });
-
-      const halo = new THREE.Mesh(
-        new THREE.TorusGeometry(2.15, 0.014, 10, 180),
-        new THREE.MeshBasicMaterial({ color: 0xd7b56d, transparent: true, opacity: 0.34 })
-      );
-      halo.rotation.x = Math.PI / 2.1;
-      emblem.add(halo);
-
-      const halo2 = new THREE.Mesh(
-        new THREE.TorusGeometry(2.38, 0.008, 8, 180),
-        new THREE.MeshBasicMaterial({ color: 0x19a974, transparent: true, opacity: 0.22 })
-      );
-      halo2.rotation.x = Math.PI / 2.25;
-      emblem.add(halo2);
-
-      scene.add(new THREE.AmbientLight(0xe9fff6, 1.8));
-      const greenLight = new THREE.PointLight(0x18b77d, 22, 11);
-      greenLight.position.set(-2.5, 2.5, 4.5);
-      scene.add(greenLight);
-      const goldLight = new THREE.PointLight(0xd7b56d, 16, 9);
-      goldLight.position.set(2.5, -1.5, 3.2);
-      scene.add(goldLight);
+      scene.add(new THREE.AmbientLight(0xe9fff6, 1.9));
+      const key = new THREE.PointLight(brightGreen, 22, 10);
+      key.position.set(-2.5, 3, 4.5);
+      scene.add(key);
+      const warm = new THREE.PointLight(gold, 14, 8);
+      warm.position.set(2.5, -1, 3.5);
+      scene.add(warm);
 
       const particleGeo = new THREE.BufferGeometry();
-      const count = 650;
-      const particlePositions = new Float32Array(count * 3);
+      const count = 520;
+      const particles = new Float32Array(count * 3);
       for (let i = 0; i < count; i++) {
-        particlePositions[i * 3] = (Math.random() - 0.5) * 10;
-        particlePositions[i * 3 + 1] = (Math.random() - 0.5) * 6.5;
-        particlePositions[i * 3 + 2] = (Math.random() - 0.5) * 5 - 1;
+        particles[i * 3] = (Math.random() - 0.5) * 9;
+        particles[i * 3 + 1] = (Math.random() - 0.5) * 6;
+        particles[i * 3 + 2] = (Math.random() - 0.5) * 4.5 - 1;
       }
-      particleGeo.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
-      const particles = new THREE.Points(
+      particleGeo.setAttribute('position', new THREE.BufferAttribute(particles, 3));
+      const particleSystem = new THREE.Points(
         particleGeo,
-        new THREE.PointsMaterial({ color: 0xd7b56d, size: 0.012, transparent: true, opacity: 0.5 })
+        new THREE.PointsMaterial({ color: gold, size: 0.012, transparent: true, opacity: 0.42 })
       );
-      scene.add(particles);
+      scene.add(particleSystem);
 
       const resize = () => {
         if (!host.current) return;
@@ -200,12 +233,12 @@ export default function Landing3D() {
       const animate = () => {
         frame = requestAnimationFrame(animate);
         const t = Date.now() * 0.001;
-        emblem.rotation.y += 0.0022;
-        emblem.rotation.x = Math.sin(t * 0.42) * 0.035;
-        emblem.position.y = Math.sin(t * 0.7) * 0.055;
-        halo.rotation.z += 0.0035;
-        halo2.rotation.z -= 0.0022;
-        particles.rotation.y -= 0.00015;
+        emblem.rotation.y += 0.002;
+        emblem.rotation.x = Math.sin(t * 0.45) * 0.028;
+        emblem.position.y = Math.sin(t * 0.72) * 0.045;
+        ring.rotation.z += 0.003;
+        ring2.rotation.z -= 0.0018;
+        particleSystem.rotation.y -= 0.00012;
         renderer.render(scene, camera);
       };
       animate();
@@ -213,20 +246,16 @@ export default function Landing3D() {
       cleanup = () => {
         cancelAnimationFrame(frame);
         window.removeEventListener('resize', resize);
-        mapGeo.dispose();
-        mapMat.dispose();
-        (border.geometry as THREE.BufferGeometry).dispose();
-        (border.material as THREE.Material).dispose();
         lineGeo.dispose();
-        (lines.material as THREE.Material).dispose();
+        (network.material as THREE.Material).dispose();
         nodeGeo.dispose();
         nodeMat.dispose();
-        (halo.geometry as THREE.BufferGeometry).dispose();
-        (halo.material as THREE.Material).dispose();
-        (halo2.geometry as THREE.BufferGeometry).dispose();
-        (halo2.material as THREE.Material).dispose();
+        (ring.geometry as THREE.BufferGeometry).dispose();
+        (ring.material as THREE.Material).dispose();
+        (ring2.geometry as THREE.BufferGeometry).dispose();
+        (ring2.material as THREE.Material).dispose();
         particleGeo.dispose();
-        (particles.material as THREE.Material).dispose();
+        (particleSystem.material as THREE.Material).dispose();
         renderer.dispose();
         renderer.domElement.remove();
       };
