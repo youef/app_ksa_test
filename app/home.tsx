@@ -127,7 +127,7 @@ export default function Home() {
     if (profileData?.city) {
       const active = await getActiveLocation();
       if (isAllKingdom(active.city)) {
-        await setActiveLocation('المملكة', profileData.city, profileData.district || 'كل الأحياء', false);
+        await setActiveLocation(profileData.region || 'المملكة', profileData.city, profileData.district || 'كل الأحياء', false);
       }
     }
 
@@ -1015,11 +1015,11 @@ export default function Home() {
           setSelectedRegion(region);
           setSelectedCity(city);
           setSelectedDistrict(district);
-          savePermanentMyLocation({
-            region,
-            city,
-            district,
-          }, true);
+          if (!region || !city || !district || city === 'كل المدن' || district === 'كل الأحياء' || district === 'كل أحياء المدينة') {
+            showToast('حدد المنطقة والمدينة والحي لإكمال موقعك');
+            return;
+          }
+          void savePermanentMyLocation({ region, city, district }, true);
         }}
       />
     </View>
