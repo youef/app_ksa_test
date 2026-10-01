@@ -1,771 +1,144 @@
 import { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-  ScrollView,
-  Dimensions,
-  Image,
-  Platform,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, StyleSheet, Pressable, Platform, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
-import {
-  Home,
-  Compass,
-  Sparkles,
-  ShieldCheck,
-  MapPin,
-  Users,
-  MessageCircle,
-  AlertTriangle,
-  Share2,
-  Layers,
-  ArrowLeft,
-  CheckCircle2,
-  ChevronLeft,
-  Heart,
-  Building2,
-  Radio,
-} from 'lucide-react-native';
-
-const { width, height } = Dimensions.get('window');
-
-const SAUDI_REGIONS_PREVIEWS = [
-  { city: 'الرياض', districts: 'الياسمين · النرجس · الملقا · حطين' },
-  { city: 'جدة', districts: 'الشاطئ · الروضة · أبحر الشمالية · الزهراء' },
-  { city: 'الدمام والخبر', districts: 'الشاطئ الشرقي · الحزام الذهبي · العقربية' },
-  { city: 'مكة المكرمة', districts: 'العوالي · الشوقية · بطحاء قريش' },
-  { city: 'المدينة المنورة', districts: 'سلطانة · قباء · العريض' },
-];
+import { ArrowLeft, Home, MapPin, Sparkles, Users } from 'lucide-react-native';
+import Landing3D from '@/components/Landing3D';
 
 export default function Index() {
   const [checkingSession, setCheckingSession] = useState(true);
-  const [signedInUser, setSignedInUser] = useState<any>(null);
-  const [selectedRegionIndex, setSelectedRegionIndex] = useState(0);
+  const [signedIn, setSignedIn] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session && data.session.user) {
-        setSignedInUser(data.session.user);
-        // Quick auto-redirect for existing authenticated neighbors
-        setTimeout(() => {
-          router.replace('/home');
-        }, 1200);
+      if (data.session?.user) {
+        setSignedIn(true);
+        setTimeout(() => router.replace('/home'), 500);
       } else {
         setCheckingSession(false);
       }
     });
   }, []);
 
-  // If already signed in: show a polished splash transition
-  if (signedInUser) {
+  if (signedIn || checkingSession) {
     return (
-      <View style={styles.splashContainer}>
-        <LinearGradient
-          colors={['#064e3b', '#065f46', '#059669']}
-          style={StyleSheet.absoluteFillObject}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        >
-        </LinearGradient>
-        <View style={styles.splashContent}>
-          <View style={styles.splashLogoCircle}>
-            <Home size={44} color="#fff" />
-          </View>
-          <Text style={styles.splashBrand}>حيّنا</Text>
-          <Text style={styles.splashSub}>مرحباً بك مجدداً بين أهل حيك 🇸🇦</Text>
-          <ActivityIndicator size="small" color="#5eead4" style={{ marginTop: 24 }} />
-        </View>
-      </View>
-    );
-  }
-
-  // If checking session initial flash
-  if (checkingSession) {
-    return (
-      <View style={[styles.splashContainer, { backgroundColor: '#042f2e' }]}>
-        <ActivityIndicator size="large" color="#059669" />
+      <View style={styles.loading}>
+        <LinearGradient colors={['#061a16', '#07352d', '#0a1715']} style={StyleSheet.absoluteFillObject} />
+        <View style={styles.loadingLogo}><Home size={30} color="#d7fff3" /></View>
+        {signedIn ? <Text style={styles.loadingText}>مرحباً بك مجدداً في حيّنا</Text> : <ActivityIndicator color="#63e6be" />}
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* ======================================================== */}
-        {/* 1. HERO SECTION WITH SAUDI CIVIC BRANDING               */}
-        {/* ======================================================== */}
-        <LinearGradient
-          colors={['#064e3b', '#065f46', '#059669', '#0f172a']}
-          style={styles.heroGradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        >
-          {/* Top Bar with Vision 2030 Badge */}
-          <View style={styles.heroTopBar}>
-            <View style={styles.visionBadge}>
-              <Text style={styles.visionBadgeText}>رؤية 2030 · جودة الحياة 🇸🇦</Text>
-            </View>
+    <View style={styles.page}>
+      <LinearGradient
+        colors={['#061a16', '#082c25', '#061514']}
+        style={StyleSheet.absoluteFillObject}
+      />
 
-            <Pressable style={styles.loginHeaderBtn} onPress={() => router.push('/auth')}>
-              <Text style={styles.loginHeaderBtnText}>تسجيل الدخول</Text>
-            </Pressable>
-          </View>
+      <View pointerEvents="none" style={styles.glowOne} />
+      <View pointerEvents="none" style={styles.glowTwo} />
 
-          {/* Main Hero Header */}
-          <View style={styles.heroCenter}>
-            <View style={styles.brandIconBox}>
-              <LinearGradient colors={['#10b981', '#06b6d4']} style={styles.brandIconGradient}>
-                <Home size={38} color="#fff" />
-              </LinearGradient>
-            </View>
-
-            <View style={styles.platformPill}>
-              <Sparkles size={14} color="#34d399" />
-              <Text style={styles.platformPillText}>المنصة الذكية الأولى لأحياء المملكة</Text>
-            </View>
-
-            <Text style={styles.heroHeadline}>
-              حيّـك، جيرانـك،{'\n'}وخدماتك في مكان واحد
-            </Text>
-
-            <Text style={styles.heroSubhead}>
-              انضم لأكثر من 500 ألف ساكن موثق في مختلف مناطق المملكة، استفسر عن خدمات حيك، شارك الأدوات، وكن في قلب الحدث.
-            </Text>
-
-            {/* Quick Action CTAs */}
-            <View style={styles.heroCtaGroup}>
-              <Pressable
-                style={styles.primaryCtaBtn}
-                onPress={() => router.push('/auth')}
-              >
-                <Text style={styles.primaryCtaText}>انضم لأهل حيك الآن 🚀</Text>
-                <ArrowLeft size={18} color="#fff" />
-              </Pressable>
-
-              <Pressable
-                style={styles.guestCtaBtn}
-                onPress={() => router.push('/home')}
-              >
-                <Compass size={17} color="#5eead4" />
-                <Text style={styles.guestCtaText}>استكشف حيّنا كزائر (بدون تسجيل)</Text>
-              </Pressable>
-            </View>
-          </View>
-
-          {/* Live Saudi Neighborhoods Radar Ticker */}
-          <View style={styles.radarCard}>
-            <View style={styles.radarCardHeader}>
-              <View style={styles.liveDot} />
-              <Text style={styles.radarCardTitle}>أحياء نشطة الآن في المملكة</Text>
-              <Radio size={14} color="#34d399" />
-            </View>
-
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.radarScroll}
-            >
-              {SAUDI_REGIONS_PREVIEWS.map((reg, idx) => (
-                <Pressable
-                  key={reg.city}
-                  style={[
-                    styles.radarPill,
-                    selectedRegionIndex === idx && styles.radarPillActive,
-                  ]}
-                  onPress={() => setSelectedRegionIndex(idx)}
-                >
-                  <MapPin size={12} color={selectedRegionIndex === idx ? '#fff' : '#5eead4'} />
-                  <Text
-                    style={[
-                      styles.radarPillCity,
-                      selectedRegionIndex === idx && styles.radarPillCityActive,
-                    ]}
-                  >
-                    {reg.city}
-                  </Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-
-            <Text style={styles.radarDistrictsText}>
-              الأحياء الأكثر تفاعلاً: {SAUDI_REGIONS_PREVIEWS[selectedRegionIndex].districts}
-            </Text>
-          </View>
-        </LinearGradient>
-
-        {/* ======================================================== */}
-        {/* 2. LIVE METRICS & SOCIAL PROOF                           */}
-        {/* ======================================================== */}
-        <View style={styles.statsSection}>
-          <View style={styles.statItem}>
-            <Text style={styles.statBigNum}>+500K</Text>
-            <Text style={styles.statSubText}>ساكن متفاعل 👥</Text>
-          </View>
-          <View style={styles.statItemDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statBigNum}>+850</Text>
-            <Text style={styles.statSubText}>حي سعودي 🏘️</Text>
-          </View>
-          <View style={styles.statItemDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statBigNum}>99.2%</Text>
-            <Text style={styles.statSubText}>إجابات موثقة ⚡</Text>
-          </View>
+      <View style={styles.nav}>
+        <View style={styles.brand}>
+          <View style={styles.logo}><Home size={22} color="#eafff8" /></View>
+          <Text style={styles.brandText}>حيّنا</Text>
         </View>
+        <Pressable onPress={() => router.push('/auth')} style={styles.navButton}>
+          <Text style={styles.navButtonText}>دخول</Text>
+        </Pressable>
+      </View>
 
-        {/* ======================================================== */}
-        {/* 3. KEY SMART PILLARS & FEATURES                          */}
-        {/* ======================================================== */}
-        <View style={styles.featuresSection}>
-          <Text style={styles.sectionHeading}>لماذا يعتمد الجيران على حيّنا؟</Text>
-          <Text style={styles.sectionSubtitle}>
-            حلول رقمية متقدمة مصممة خصيصاً لراحة أهل الحي وأمانهم
+      <View style={styles.hero}>
+        <View style={styles.copy}>
+          <View style={styles.eyebrow}>
+            <Sparkles size={14} color="#63e6be" />
+            <Text style={styles.eyebrowText}>مساحتك الرقمية في الحي</Text>
+          </View>
+
+          <Text style={styles.title}>
+            <Text style={styles.titleAccent}>حيّنا</Text>{'\n'}أقرب من مجرد تطبيق.
           </Text>
 
-          {/* Feature 1: AI Instant resident archive */}
-          <View style={styles.featureCard}>
-            <LinearGradient colors={['#065f46', '#059669']} style={styles.featureIcon}>
-              <MessageCircle size={24} color="#fff" />
-            </LinearGradient>
-            <View style={styles.featureInfo}>
-              <View style={styles.featureTitleRow}>
-                <View style={styles.featureBadge}>
-                  <Text style={styles.featureBadgeText}>ذكاء اصطناعي</Text>
-                </View>
-                <Text style={styles.featureTitle}>إجابات فورية من تجارب الجيران</Text>
-              </View>
-              <Text style={styles.featureBody}>
-                اسأل عن أفضل السباكين، أطباء الأسنان، الصيدليات، أو مدارس الحي، وتلقَّ فوراً ملخصاً دقيقاً من تجارب أهل حيك السابقة قبل أن يرد الجيران الفعليون.
-              </Text>
-            </View>
-          </View>
+          <Text style={styles.subtitle}>
+            تعرّف على جيرانك، اكتشف ما حولك، وابقَ على اتصال بكل ما يهم حيّك — ببساطة وخصوصية.
+          </Text>
 
-          {/* Feature 2: Emergency SOS Radar */}
-          <View style={styles.featureCard}>
-            <LinearGradient colors={['#dc2626', '#b91c1c']} style={styles.featureIcon}>
-              <AlertTriangle size={24} color="#fff" />
-            </LinearGradient>
-            <View style={styles.featureInfo}>
-              <View style={styles.featureTitleRow}>
-                <View style={[styles.featureBadge, { backgroundColor: '#fee2e2' }]}>
-                  <Text style={[styles.featureBadgeText, { color: '#dc2626' }]}>أمان فوري</Text>
-                </View>
-                <Text style={styles.featureTitle}>رادار طوارئ وبلاغات الحي (SOS)</Text>
-              </View>
-              <Text style={styles.featureBody}>
-                تنبيهات فورية بأعمال الطرق، انقطاع الخدمات، أو حالات الطوارئ في محيط 2 كم لتكون وعائلتك دائماً في أمان.
-              </Text>
-            </View>
-          </View>
-
-          {/* Feature 3: Tool Sharing & Community Lending */}
-          <View style={styles.featureCard}>
-            <LinearGradient colors={['#059669', '#047857']} style={styles.featureIcon}>
-              <Share2 size={24} color="#fff" />
-            </LinearGradient>
-            <View style={styles.featureInfo}>
-              <View style={styles.featureTitleRow}>
-                <View style={[styles.featureBadge, { backgroundColor: '#dcfce7' }]}>
-                  <Text style={[styles.featureBadgeText, { color: '#059669' }]}>توفير وتكافل</Text>
-                </View>
-                <Text style={styles.featureTitle}>إعارة الأدوات ومبادرات الجيران</Text>
-              </View>
-              <Text style={styles.featureBody}>
-                سلالم، معدات صيانة، كتب، أو أدوات حدائق. استعرها من جيرانك بسهولة دون الحاجة للشراء، وشارك بما لديك لدعم مجتمعك.
-              </Text>
-            </View>
-          </View>
-
-          {/* Feature 4: Verified Neighbor & National Address */}
-          <View style={styles.featureCard}>
-            <LinearGradient colors={['#7c3aed', '#6d28d9']} style={styles.featureIcon}>
-              <ShieldCheck size={24} color="#fff" />
-            </LinearGradient>
-            <View style={styles.featureInfo}>
-              <View style={styles.featureTitleRow}>
-                <View style={[styles.featureBadge, { backgroundColor: '#f3e8ff' }]}>
-                  <Text style={[styles.featureBadgeText, { color: '#7c3aed' }]}>توثيق رسمي</Text>
-                </View>
-                <Text style={styles.featureTitle}>شارة «ابن الحي الموثق» والعنوان الوطني</Text>
-              </View>
-              <Text style={styles.featureBody}>
-                ربط دقيق بالرمز المختصر للعنوان الوطني السعودي وفحص جغرافي GPS للتأكد من هوية وسكن كل جار في منطقته بكل موثوقية.
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* ======================================================== */}
-        {/* 4. FINAL CALL TO ACTION BANNER                           */}
-        {/* ======================================================== */}
-        <View style={styles.finalCtaContainer}>
-          <LinearGradient
-            colors={['#064e3b', '#065f46', '#059669']}
-            style={styles.finalCtaCard}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
-            <Building2 size={36} color="#5eead4" style={{ marginBottom: 12 }} />
-            <Text style={styles.finalCtaTitle}>جاهز لتكتشف أسرار حيك وتتواصل مع جيرانك؟</Text>
-            <Text style={styles.finalCtaSub}>
-              خطوة واحدة تفصلك عن مجتمعك المحلي في المملكة. التسجيل مجاني ويستغرق 30 ثانية فقط!
-            </Text>
-
-            <Pressable
-              style={styles.finalBigBtn}
-              onPress={() => router.push('/auth')}
-            >
-              <Text style={styles.finalBigBtnText}>أنشئ حسابك وانضم مجاناً ✨</Text>
-              <ArrowLeft size={18} color="#0f172a" />
+          <View style={styles.actions}>
+            <Pressable onPress={() => router.push('/auth')} style={styles.primary}>
+              <LinearGradient colors={['#34d399', '#14b8a6']} style={styles.primaryGradient}>
+                <Text style={styles.primaryText}>ابدأ مع حيّنا</Text>
+                <ArrowLeft size={18} color="#05251f" />
+              </LinearGradient>
             </Pressable>
-
-            <Pressable
-              style={styles.exploreLinkBtn}
-              onPress={() => router.push('/home')}
-            >
-              <Text style={styles.exploreLinkText}>أو تصفح التطبيق كزائر أولاً 👁️</Text>
+            <Pressable onPress={() => router.push('/home')} style={styles.secondary}>
+              <Text style={styles.secondaryText}>استكشف كزائر</Text>
             </Pressable>
-          </LinearGradient>
+          </View>
+
+          <View style={styles.trustRow}>
+            <View style={styles.trustIcon}><MapPin size={15} color="#8ff5d4" /></View>
+            <Text style={styles.trustText}>حيّك أولاً · مجتمع محلي · تجربة خفيفة</Text>
+          </View>
         </View>
 
-        {/* Footer */}
-        <View style={styles.footer}>
-          <Text style={styles.footerBrand}>حيّنا © 2026 — منصة الأحياء الذكية بالمملكة</Text>
-          <Text style={styles.footerVision}>معاً نحو أحياء حيوية ومترابطة وفق رؤية السعودية 2030 🇸🇦</Text>
+        <View style={styles.visual}>
+          <Landing3D />
+          <View style={styles.orbitLabel}>
+            <View style={styles.liveDot} />
+            <Text style={styles.orbitText}>حيّك حولك، الآن</Text>
+          </View>
         </View>
-      </ScrollView>
+      </View>
+
+      <View style={styles.bottom}>
+        <View style={styles.miniStat}>
+          <Users size={17} color="#63e6be" />
+          <Text style={styles.miniText}>جيرانك في مكان واحد</Text>
+        </View>
+        <Text style={styles.bottomHint}>صُمّم ليكون سريعاً وهادئاً على جهازك</Text>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0a0f1d',
-  },
-  splashContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  splashContent: {
-    alignItems: 'center',
-    paddingHorizontal: 24,
-  },
-  splashLogoCircle: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderWidth: 2,
-    borderColor: '#5eead4',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  splashBrand: {
-    color: '#fff',
-    fontSize: 34,
-    fontWeight: '900',
-    letterSpacing: 1,
-  },
-  splashSub: {
-    color: '#ccfbf1',
-    fontSize: 15,
-    fontWeight: '700',
-    marginTop: 6,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 40,
-  },
-  heroGradient: {
-    paddingTop: Platform.OS === 'ios' ? 52 : 36,
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-    borderBottomLeftRadius: 36,
-    borderBottomRightRadius: 36,
-  },
-  heroTopBar: {
-    flexDirection: 'row-reverse',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  visionBadge: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
-  },
-  visionBadgeText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  loginHeaderBtn: {
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 14,
-  },
-  loginHeaderBtnText: {
-    color: '#5eead4',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  heroCenter: {
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  brandIconBox: {
-    marginBottom: 14,
-  },
-  brandIconGradient: {
-    width: 74,
-    height: 74,
-    borderRadius: 37,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#10b981',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 14,
-    elevation: 8,
-  },
-  platformPill: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(16,185,129,0.2)',
-    borderWidth: 1,
-    borderColor: 'rgba(52,211,153,0.4)',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 20,
-    marginBottom: 16,
-  },
-  platformPillText: {
-    color: '#34d399',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  heroHeadline: {
-    color: '#fff',
-    fontSize: 32,
-    fontWeight: '900',
-    textAlign: 'center',
-    lineHeight: 44,
-    marginBottom: 14,
-  },
-  heroSubhead: {
-    color: '#e2e8f0',
-    fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 23,
-    paddingHorizontal: 12,
-    marginBottom: 26,
-    fontWeight: '500',
-  },
-  heroCtaGroup: {
-    width: '100%',
-    gap: 12,
-    alignItems: 'center',
-  },
-  primaryCtaBtn: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    backgroundColor: '#0891b2',
-    width: '100%',
-    paddingVertical: 16,
-    borderRadius: 18,
-    shadowColor: '#0891b2',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 14,
-    elevation: 6,
-  },
-  primaryCtaText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  guestCtaBtn: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(94,234,212,0.4)',
-    width: '100%',
-    paddingVertical: 14,
-    borderRadius: 18,
-  },
-  guestCtaText: {
-    color: '#5eead4',
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  radarCard: {
-    backgroundColor: 'rgba(15,23,42,0.7)',
-    borderRadius: 20,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-  },
-  radarCardHeader: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 10,
-  },
-  liveDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#10b981',
-  },
-  radarCardTitle: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '800',
-    flex: 1,
-    textAlign: 'right',
-  },
-  radarScroll: {
-    flexDirection: 'row-reverse',
-    gap: 8,
-    paddingBottom: 8,
-  },
-  radarPill: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-  },
-  radarPillActive: {
-    backgroundColor: '#0891b2',
-  },
-  radarPillCity: {
-    color: '#94a3b8',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  radarPillCityActive: {
-    color: '#fff',
-    fontWeight: '900',
-  },
-  radarDistrictsText: {
-    color: '#64748b',
-    fontSize: 11,
-    fontWeight: '600',
-    textAlign: 'right',
-    marginTop: 4,
-  },
-
-  // Stats Section
-  statsSection: {
-    flexDirection: 'row-reverse',
-    backgroundColor: '#111827',
-    marginHorizontal: 18,
-    marginTop: -20,
-    borderRadius: 22,
-    paddingVertical: 18,
-    paddingHorizontal: 12,
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#1f2937',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 5,
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statBigNum: {
-    color: '#38bdf8',
-    fontSize: 20,
-    fontWeight: '900',
-  },
-  statSubText: {
-    color: '#94a3b8',
-    fontSize: 11,
-    fontWeight: '700',
-    marginTop: 2,
-  },
-  statItemDivider: {
-    width: 1,
-    height: 32,
-    backgroundColor: '#1f2937',
-  },
-
-  // Features
-  featuresSection: {
-    paddingHorizontal: 18,
-    paddingTop: 36,
-  },
-  sectionHeading: {
-    color: '#fff',
-    fontSize: 22,
-    fontWeight: '900',
-    textAlign: 'center',
-    marginBottom: 6,
-  },
-  sectionSubtitle: {
-    color: '#94a3b8',
-    fontSize: 13,
-    textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 20,
-  },
-  featureCard: {
-    flexDirection: 'row-reverse',
-    backgroundColor: '#111827',
-    borderRadius: 22,
-    padding: 18,
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: '#1f2937',
-    gap: 14,
-  },
-  featureIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  featureInfo: {
-    flex: 1,
-    alignItems: 'flex-end',
-  },
-  featureTitleRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 6,
-    flexWrap: 'wrap',
-  },
-  featureTitle: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '800',
-    textAlign: 'right',
-  },
-  featureBadge: {
-    backgroundColor: '#e0f2fe',
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  featureBadgeText: {
-    color: '#0284c7',
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  featureBody: {
-    color: '#94a3b8',
-    fontSize: 12,
-    lineHeight: 19,
-    textAlign: 'right',
-    fontWeight: '500',
-  },
-
-  // Final CTA
-  finalCtaContainer: {
-    paddingHorizontal: 18,
-    marginTop: 20,
-  },
-  finalCtaCard: {
-    borderRadius: 28,
-    padding: 24,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
-  },
-  finalCtaTitle: {
-    color: '#fff',
-    fontSize: 19,
-    fontWeight: '900',
-    textAlign: 'center',
-    lineHeight: 28,
-    marginBottom: 8,
-  },
-  finalCtaSub: {
-    color: '#94a3b8',
-    fontSize: 12,
-    textAlign: 'center',
-    lineHeight: 18,
-    marginBottom: 20,
-    paddingHorizontal: 8,
-  },
-  finalBigBtn: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#5eead4',
-    width: '100%',
-    paddingVertical: 15,
-    borderRadius: 16,
-    marginBottom: 10,
-  },
-  finalBigBtnText: {
-    color: '#042f2e',
-    fontSize: 15,
-    fontWeight: '900',
-  },
-  exploreLinkBtn: {
-    paddingVertical: 8,
-  },
-  exploreLinkText: {
-    color: '#94a3b8',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-
-  // Footer
-  footer: {
-    marginTop: 30,
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 20,
-  },
-  footerBrand: {
-    color: '#64748b',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  footerVision: {
-    color: '#475569',
-    fontSize: 10,
-    textAlign: 'center',
-  },
+  page: { flex: 1, minHeight: Platform.OS === 'web' ? '100vh' as any : undefined, backgroundColor: '#061514', overflow: 'hidden' },
+  nav: { height: 82, paddingHorizontal: '6%', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', zIndex: 5 },
+  brand: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10 },
+  logo: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(52,211,153,.13)', borderWidth: 1, borderColor: 'rgba(99,230,190,.22)' },
+  brandText: { color: '#effff9', fontSize: 22, fontWeight: '800' },
+  navButton: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(180,255,232,.18)', backgroundColor: 'rgba(255,255,255,.035)' },
+  navButtonText: { color: '#d7fff3', fontWeight: '700', fontSize: 14 },
+  hero: { flex: 1, maxWidth: 1240, width: '88%', alignSelf: 'center', flexDirection: 'row-reverse', alignItems: 'center', gap: 24, zIndex: 2 },
+  copy: { flex: 1, alignItems: 'flex-end' },
+  visual: { flex: 1.05, height: 560, minHeight: 420, position: 'relative' },
+  eyebrow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 7, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, backgroundColor: 'rgba(52,211,153,.08)', borderWidth: 1, borderColor: 'rgba(99,230,190,.16)', marginBottom: 20 },
+  eyebrowText: { color: '#8ff5d4', fontSize: 13, fontWeight: '700' },
+  title: { color: '#f1fffb', fontSize: 58, lineHeight: 70, fontWeight: '900', textAlign: 'right', letterSpacing: -1 },
+  titleAccent: { color: '#63e6be' },
+  subtitle: { color: '#a7c3bc', fontSize: 17, lineHeight: 29, maxWidth: 570, textAlign: 'right', marginTop: 20 },
+  actions: { flexDirection: 'row-reverse', gap: 10, marginTop: 30 },
+  primary: { borderRadius: 15, overflow: 'hidden' },
+  primaryGradient: { minWidth: 160, paddingHorizontal: 20, height: 52, flexDirection: 'row-reverse', gap: 10, alignItems: 'center', justifyContent: 'center' },
+  primaryText: { color: '#05251f', fontSize: 15, fontWeight: '900' },
+  secondary: { height: 52, paddingHorizontal: 20, borderRadius: 15, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(180,255,232,.16)', backgroundColor: 'rgba(255,255,255,.035)' },
+  secondaryText: { color: '#d9f9ef', fontWeight: '800', fontSize: 14 },
+  trustRow: { marginTop: 22, flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
+  trustIcon: { width: 28, height: 28, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(99,230,190,.08)' },
+  trustText: { color: '#78958e', fontSize: 12 },
+  orbitLabel: { position: 'absolute', bottom: 55, left: 35, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 18, backgroundColor: 'rgba(5,25,21,.72)', borderWidth: 1, borderColor: 'rgba(99,230,190,.14)' },
+  liveDot: { width: 7, height: 7, borderRadius: 7, backgroundColor: '#63e6be' },
+  orbitText: { color: '#a8dcd0', fontSize: 11, fontWeight: '700' },
+  bottom: { height: 72, paddingHorizontal: '6%', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', zIndex: 3, borderTopWidth: 1, borderTopColor: 'rgba(180,255,232,.07)' },
+  miniStat: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
+  miniText: { color: '#a8c8c0', fontSize: 12, fontWeight: '700' },
+  bottomHint: { color: '#526e67', fontSize: 11 },
+  glowOne: { position: 'absolute', width: 520, height: 520, borderRadius: 520, backgroundColor: 'rgba(16,185,129,.09)', top: -250, left: -120 },
+  glowTwo: { position: 'absolute', width: 460, height: 460, borderRadius: 460, backgroundColor: 'rgba(20,184,166,.06)', bottom: -260, right: -130 },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  loadingLogo: { width: 62, height: 62, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(52,211,153,.13)', marginBottom: 14 },
+  loadingText: { color: '#d7fff3', fontSize: 16, fontWeight: '700' },
 });
