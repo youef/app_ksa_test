@@ -66,3 +66,5 @@ module.exports = async function handler(req, res) {
 };
 
 // Force a fresh production deployment so updated Vercel environment variables are loaded.
+
+// Force production redeploy after Vercel Production environment variables were updated.
