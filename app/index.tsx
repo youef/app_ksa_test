@@ -1,16 +1,19 @@
-import { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, Platform, ActivityIndicator, Image } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { View, Text, StyleSheet, Pressable, Platform, ActivityIndicator, Image, Animated, Easing } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft } from 'lucide-react-native';
-import Landing3D from '@/components/Landing3D';
 
 const LOGO_URI = '/assets/branding/HAYNA_LOGO.png';
 
 export default function Index() {
   const [checkingSession, setCheckingSession] = useState(true);
   const [signedIn, setSignedIn] = useState(false);
+  const floatY = useRef(new Animated.Value(0)).current;
+  const pulse = useRef(new Animated.Value(0.96)).current;
+  const shine = useRef(new Animated.Value(-1)).current;
+  const rotate = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -21,49 +24,85 @@ export default function Index() {
         setCheckingSession(false);
       }
     });
-  }, []);
+
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(floatY, { toValue: -10, duration: 2200, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(floatY, { toValue: 0, duration: 2200, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      ])
+    ).start();
+
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1.04, duration: 1800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0.96, duration: 1800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    ).start();
+
+    Animated.loop(
+      Animated.timing(shine, { toValue: 1, duration: 3000, easing: Easing.linear, useNativeDriver: true })
+    ).start();
+
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(rotate, { toValue: 1, duration: 9000, easing: Easing.linear, useNativeDriver: true }),
+        Animated.timing(rotate, { toValue: 0, duration: 9000, easing: Easing.linear, useNativeDriver: true }),
+      ])
+    ).start();
+  }, [floatY, pulse, shine, rotate]);
 
   if (signedIn || checkingSession) {
     return (
       <View style={styles.loading}>
-        <LinearGradient colors={['#04110f', '#07352d', '#020908']} style={StyleSheet.absoluteFillObject} />
-        <View style={styles.loadingLogo}>
+        <LinearGradient colors={['#065f46', '#059669', '#10b981']} style={StyleSheet.absoluteFillObject} />
+        <View style={styles.loadingGlass}>
           <Image source={{ uri: LOGO_URI }} style={styles.loadingLogoImage} resizeMode="contain" />
         </View>
-        {signedIn ? null : <ActivityIndicator color="#63e6be" />}
+        {signedIn ? null : <ActivityIndicator color="#ffffff" />}
       </View>
     );
   }
 
+  const spin = rotate.interpolate({ inputRange: [0, 1], outputRange: ['-2deg', '2deg'] });
+  const shineX = shine.interpolate({ inputRange: [-1, 1], outputRange: [-180, 180] });
+
   return (
     <View style={styles.page}>
       <LinearGradient
-        colors={['#04110f', '#06251f', '#020908']}
+        colors={['#065f46', '#059669', '#10b981']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFillObject}
       />
 
-      <View pointerEvents="none" style={styles.glowOne} />
-      <View pointerEvents="none" style={styles.glowTwo} />
+      <View pointerEvents="none" style={styles.glassGlow} />
+      <View pointerEvents="none" style={styles.glassGlowTwo} />
+      <View pointerEvents="none" style={styles.orbOne} />
+      <View pointerEvents="none" style={styles.orbTwo} />
 
-      <View style={styles.scene}>
-        <Landing3D />
-      </View>
+      <View style={styles.content}>
+        <Text style={styles.welcome}>أهلًا بك في</Text>
 
-      <View style={styles.identity} pointerEvents="none">
-        <View style={styles.logoHalo}>
-          <View style={styles.logo}>
-            <Image source={{ uri: LOGO_URI }} style={styles.logoImage} resizeMode="contain" />
+        <Animated.View style={[styles.logoStage, { transform: [{ translateY: floatY }, { scale: pulse }, { rotate: spin }] }]}>
+          <View style={styles.outerGlass}>
+            <View style={styles.innerGlass}>
+              <Image source={{ uri: LOGO_URI }} style={styles.logoImage} resizeMode="contain" />
+              <Animated.View style={[styles.shine, { transform: [{ translateX: shineX }, { rotate: '22deg' }] }]} />
+            </View>
           </View>
-        </View>
+          <View style={styles.glassReflection} />
+        </Animated.View>
+
         <Text style={styles.brand}>حيّنا</Text>
         <Text style={styles.tagline}>بيوت تجمعنا • مجتمع ينتمي لنا</Text>
+        <Text style={styles.description}>مكان يجمع أهل الحي، ويقرّب الجيران من بعض.</Text>
       </View>
 
       <View style={styles.actionWrap}>
         <Pressable onPress={() => router.push('/auth')} style={styles.button}>
-          <LinearGradient colors={['#4ade80', '#14b8a6']} style={styles.buttonGradient}>
+          <LinearGradient colors={['#ffffff', '#d1fae5']} style={styles.buttonGradient}>
             <Text style={styles.buttonText}>دخول</Text>
-            <ArrowLeft size={18} color="#04231d" strokeWidth={2.4} />
+            <ArrowLeft size={18} color="#065f46" strokeWidth={2.6} />
           </LinearGradient>
         </Pressable>
       </View>
@@ -75,64 +114,97 @@ const styles = StyleSheet.create({
   page: {
     flex: 1,
     minHeight: Platform.OS === 'web' ? '100vh' as any : undefined,
-    backgroundColor: '#020908',
+    backgroundColor: '#059669',
     overflow: 'hidden',
     position: 'relative',
   },
-  scene: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 1,
-  },
-  identity: {
-    position: 'absolute',
-    top: 28,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    zIndex: 5,
-  },
-  logoHalo: {
-    width: 142,
-    height: 142,
-    borderRadius: 71,
+  content: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(52,211,153,.07)',
-    borderWidth: 1,
-    borderColor: 'rgba(215,181,109,.28)',
-    shadowColor: '#34d399',
+    paddingHorizontal: 24,
+    paddingBottom: 110,
+  },
+  welcome: {
+    color: 'rgba(255,255,255,.82)',
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 18,
+  },
+  logoStage: {
+    width: 285,
+    height: 285,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  outerGlass: {
+    width: 258,
+    height: 258,
+    borderRadius: 129,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,.13)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,.48)',
+    shadowColor: '#022c22',
     shadowOpacity: 0.32,
-    shadowRadius: 34,
+    shadowRadius: 38,
+    shadowOffset: { width: 0, height: 18 },
+    elevation: 18,
+    overflow: 'hidden',
   },
-  logo: {
-    width: 126,
-    height: 126,
-    borderRadius: 63,
+  innerGlass: {
+    width: 226,
+    height: 226,
+    borderRadius: 113,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(2,14,11,.42)',
+    backgroundColor: 'rgba(255,255,255,.10)',
     borderWidth: 1,
-    borderColor: 'rgba(120,255,218,.18)',
+    borderColor: 'rgba(255,255,255,.28)',
     overflow: 'hidden',
   },
   logoImage: {
-    width: 112,
-    height: 112,
+    width: 205,
+    height: 205,
+  },
+  shine: {
+    position: 'absolute',
+    width: 34,
+    height: 310,
+    top: -20,
+    backgroundColor: 'rgba(255,255,255,.20)',
+    borderRadius: 30,
+  },
+  glassReflection: {
+    position: 'absolute',
+    top: 23,
+    left: 45,
+    width: 90,
+    height: 28,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255,255,255,.22)',
+    transform: [{ rotate: '-18deg' }],
   },
   brand: {
-    color: '#effff9',
-    fontSize: 26,
+    color: '#ffffff',
+    fontSize: 34,
     fontWeight: '900',
-    marginTop: 10,
-    letterSpacing: 0.5,
-    textShadowColor: 'rgba(52,211,153,.45)',
-    textShadowRadius: 14,
+    marginTop: 2,
+    textShadowColor: 'rgba(0,0,0,.16)',
+    textShadowRadius: 12,
   },
   tagline: {
-    color: 'rgba(225,255,246,.72)',
+    color: 'rgba(255,255,255,.92)',
+    fontSize: 14,
+    fontWeight: '800',
+    marginTop: 7,
+  },
+  description: {
+    color: 'rgba(236,253,245,.78)',
     fontSize: 12,
-    fontWeight: '700',
-    marginTop: 4,
+    fontWeight: '600',
+    marginTop: 6,
   },
   actionWrap: {
     position: 'absolute',
@@ -140,14 +212,15 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 42,
     alignItems: 'center',
-    zIndex: 6,
   },
   button: {
     borderRadius: 17,
     overflow: 'hidden',
-    shadowColor: '#34d399',
+    shadowColor: '#022c22',
     shadowOpacity: 0.25,
-    shadowRadius: 20,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 10,
   },
   buttonGradient: {
     minWidth: 170,
@@ -159,49 +232,65 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   buttonText: {
-    color: '#04231d',
+    color: '#065f46',
     fontSize: 15,
     fontWeight: '900',
   },
-  glowOne: {
+  glassGlow: {
     position: 'absolute',
     width: 520,
     height: 520,
-    borderRadius: 520,
-    backgroundColor: 'rgba(16,185,129,.10)',
+    borderRadius: 260,
+    backgroundColor: 'rgba(255,255,255,.08)',
     top: -260,
-    left: -160,
-    zIndex: 0,
+    right: -190,
   },
-  glowTwo: {
+  glassGlowTwo: {
     position: 'absolute',
-    width: 500,
-    height: 500,
-    borderRadius: 500,
-    backgroundColor: 'rgba(20,184,166,.07)',
-    bottom: -280,
-    right: -160,
-    zIndex: 0,
+    width: 440,
+    height: 440,
+    borderRadius: 220,
+    backgroundColor: 'rgba(6,95,70,.18)',
+    bottom: -230,
+    left: -170,
+  },
+  orbOne: {
+    position: 'absolute',
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: 'rgba(255,255,255,.35)',
+    top: '27%',
+    left: '14%',
+  },
+  orbTwo: {
+    position: 'absolute',
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: 'rgba(255,255,255,.45)',
+    top: '36%',
+    right: '16%',
   },
   loading: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  loadingLogo: {
-    width: 94,
-    height: 94,
-    borderRadius: 47,
+  loadingGlass: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(52,211,153,.10)',
-    borderWidth: 1,
-    borderColor: 'rgba(215,181,109,.25)',
-    marginBottom: 14,
+    backgroundColor: 'rgba(255,255,255,.16)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,.45)',
+    marginBottom: 16,
     overflow: 'hidden',
   },
   loadingLogoImage: {
-    width: 82,
-    height: 82,
+    width: 98,
+    height: 98,
   },
 });
