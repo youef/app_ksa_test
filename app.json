@@ -33,19 +33,26 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "sa.hayna.app"
+      "bundleIdentifier": "sa.hayna.app",
+      "icon": "./public/assets/branding/HAYNA_LOGO.png"
     },
     "android": {
-      "package": "sa.hayna.app"
+      "package": "sa.hayna.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./public/assets/branding/HAYNA_LOGO.png",
+        "backgroundColor": "#065f46"
+      }
     },
     "web": {
       "bundler": "metro",
-      "output": "single"
+      "output": "single",
+      "favicon": "./public/assets/branding/HAYNA_LOGO.png"
     },
     "extra": {
       "eas": {
         "projectId": "5228885c-729d-4f4a-935d-06662dfd4beb"
       }
-    }
+    },
+    "icon": "./public/assets/branding/HAYNA_LOGO.png"
   }
 }
