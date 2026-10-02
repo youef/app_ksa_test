@@ -4,6 +4,7 @@ import { Stack } from 'expo-router';
 import { DynamicIslandProvider } from '@/context/DynamicIslandContext';
 import { registerPushToken, syncDndWithNotifications } from '@/lib/notifications';
 import { supabase } from '@/lib/supabase';
+import { C } from '@/lib/ui';
 
 export default function RootLayout() {
   useEffect(() => {
@@ -19,7 +20,7 @@ export default function RootLayout() {
       if (session?.user) void registerPushToken();
     });
 
-    const timer = setInterval(() => void syncDndWithNotifications(), 60_000);
+    const timer = setInterval(() => void syncDndWithNotifications(), 5 * 60_000);
     return () => {
       clearInterval(timer);
       listener.subscription.unsubscribe();
@@ -34,7 +35,7 @@ export default function RootLayout() {
           // Native gets a short slide; web swaps screens without a blank animation frame.
           animation: Platform.OS === 'web' ? 'none' : 'slide_from_right',
           animationDuration: Platform.OS === 'web' ? 0 : 180,
-          contentStyle: { backgroundColor: '#f8fafc', flex: 1 },
+          contentStyle: { backgroundColor: C.bg, flex: 1 },
           freezeOnBlur: false,
           gestureEnabled: true,
         }}
