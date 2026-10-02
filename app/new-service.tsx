@@ -27,6 +27,7 @@ import {
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import LocationSelectorModal from '@/components/LocationSelectorModal';
+import ScreenState from '@/components/ScreenState';
 import { getPermanentMyLocation, savePermanentMyLocation, isAllKingdom } from '@/lib/locationSync';
 
 export default function NewService() {
