@@ -38,6 +38,8 @@ export default function Home() {
   const [selectedRegion, setSelectedRegion] = useState('كل المملكة');
   const [selectedCity, setSelectedCity] = useState('كل المدن');
   const [selectedDistrict, setSelectedDistrict] = useState('كل الأحياء');
+  const [locationReady, setLocationReady] = useState(false);
+  const [loadingHome, setLoadingHome] = useState(false);
   const [currentWeather, setCurrentWeather] = useState<CurrentWeather | null>(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
@@ -71,10 +73,11 @@ export default function Home() {
         if (active) setCurrentWeather(null);
       } finally { if (active) setWeatherLoading(false); }
     };
+    if (!locationReady) return;
     updateWeather();
     const interval = setInterval(updateWeather, 30 * 60 * 1000);
     return () => { active = false; clearInterval(interval); };
-  }, [selectedRegion, selectedCity, selectedDistrict]);
+  }, [locationReady, selectedRegion, selectedCity, selectedDistrict]);
 
   useEffect(() => {
     const hour = new Date().getHours();
@@ -86,6 +89,7 @@ export default function Home() {
       setSelectedRegion(loc.region);
       setSelectedCity(loc.city);
       setSelectedDistrict(loc.district);
+      setLocationReady(true);
     });
 
     const unsub = subscribeLocation((loc) => {
@@ -147,11 +151,19 @@ export default function Home() {
 
   const acceptWeeklyLocationCheck = useCallback(async () => {
     setLocationPromptVisible(false);
-    await AsyncStorage.setItem('@hayna_location_last_auto_check_v1', String(Date.now()));
-    await refreshLiveLocation();
-  }, [refreshLiveLocation]);
+    const updated = await refreshLiveLocation();
+    if (updated) {
+      await AsyncStorage.setItem('@hayna_location_last_auto_check_v1', String(Date.now()));
+    } else {
+      setLocationPromptVisible(true);
+      showToast('تعذر تحديد موقعك، حاول مرة أخرى');
+    }
+  }, [refreshLiveLocation, showToast]);
 
   const load = useCallback(async () => {
+    if (loadingHome) return;
+    setLoadingHome(true);
+    try {
     const { data: auth } = await supabase.auth.getUser();
     const user = auth.user;
     if (!user) {
@@ -168,8 +180,20 @@ export default function Home() {
     ]);
 
     const profileData = profileRes.data;
-    const loc = locationRes;
+    const savedLoc = locationRes;
+    const effectiveLoc = profileData?.city && isAllKingdom(savedLoc.city)
+      ? {
+          region: profileData.region || 'المملكة',
+          city: profileData.city,
+          district: profileData.district || 'كل الأحياء',
+        }
+      : savedLoc;
+    const loc = effectiveLoc;
     setProfile(profileData);
+    setSelectedRegion(loc.region);
+    setSelectedCity(loc.city);
+    setSelectedDistrict(loc.district);
+    setLocationReady(true);
 
     const locationComplete = !!(profileData?.region && profileData?.city && profileData?.district);
     setLocationSetupOpen(!locationComplete);
@@ -177,13 +201,8 @@ export default function Home() {
       setLocationSetupMessage('حدد موقعك تلقائياً لنربط حسابك بالمنطقة والمدينة والحي.');
     }
 
-    if (profileData?.city && isAllKingdom(loc.city)) {
-      await setActiveLocation(
-        profileData.region || 'المملكة',
-        profileData.city,
-        profileData.district || 'كل الأحياء',
-        false
-      );
+    if (profileData?.city && isAllKingdom(savedLoc.city)) {
+      void setActiveLocation(loc.region, loc.city, loc.district, false);
     }
 
     // Fetch the Home feed in parallel instead of waiting section-by-section.
@@ -288,7 +307,10 @@ export default function Home() {
     } else {
       setRequests([]);
     }
-  }, []);
+    } finally {
+      setLoadingHome(false);
+    }
+  }, [loadingHome]);
   useFocusEffect(useCallback(() => { load() }, [load]));
 
   // Inline Quick Reply Handler
