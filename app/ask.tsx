@@ -33,6 +33,7 @@ import {
   ShieldAlert,
 } from 'lucide-react-native';
 import LocationSelectorModal from '@/components/LocationSelectorModal';
+import { getCurrentDeviceLocation, reverseGeocodeDeviceLocation } from '@/lib/deviceLocation';
 import {
   getPermanentMyLocation,
   savePermanentMyLocation,
@@ -73,7 +74,25 @@ export default function AskScreen() {
     let isMounted = true;
 
     async function initLocation() {
-      // 1. Load permanent location immediately from device (persists even if logged out)
+      // Always prefer the user's real current device position; replace the previous location.
+      try {
+        const device = await getCurrentDeviceLocation();
+        if (device) {
+          const place = await reverseGeocodeDeviceLocation(device);
+          if (place?.region && place?.city && place?.district) {
+            await savePermanentMyLocation({ region: place.region, city: place.city, district: place.district }, true);
+            if (isMounted) {
+              setRegion(place.region);
+              setCity(place.city);
+              setDistrict(place.district);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('ask live location refresh failed:', e);
+      }
+
+      // 1. Load the latest saved location only if live detection was unavailable.
       const loc = await getPermanentMyLocation();
       if (isMounted && loc?.city && !isAllKingdom(loc.city)) {
         setCity(loc.city);
@@ -88,7 +107,7 @@ export default function AskScreen() {
         if (u?.user) {
           const { data: prof } = await supabase
             .from('profiles')
-            .select('city, district')
+            .select('region, city, district')
             .eq('id', u.user.id)
             .maybeSingle();
 
@@ -101,7 +120,7 @@ export default function AskScreen() {
             setDistrict(cleanDist);
             // Ensure stored on device so it persists even if the user logs out later
             await savePermanentMyLocation({
-              region: 'المملكة',
+              region: prof.region?.trim() || 'المملكة',
               city: cleanCity,
               district: cleanDist || 'كل الأحياء',
             });
@@ -229,13 +248,18 @@ export default function AskScreen() {
         district: district.trim() || null,
       };
 
-      // Save permanently to device so it stays remembered even after logout
+      // Persist the exact location attached to this question and replace any older location.
       if (city) {
-        savePermanentMyLocation({
+        await savePermanentMyLocation({
           region: region || 'المملكة',
           city: city.trim(),
           district: district.trim() || 'كل الأحياء',
-        });
+        }, true);
+        await supabase.from('profiles').update({
+          region: region || null,
+          city: city.trim(),
+          district: district.trim() || null,
+        }).eq('id', u.user.id);
       }
 
       // Try inserting with extended columns, fallback gracefully if columns not yet run
