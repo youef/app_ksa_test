@@ -248,10 +248,18 @@ export async function setActiveLocation(
             ? district.trim()
             : null;
         }
-        await supabase.from('profiles').update(updatePayload).eq('id', u.user.id);
+        const { data: updatedProfile, error } = await supabase
+          .from('profiles')
+          .update(updatePayload)
+          .eq('id', u.user.id)
+          .select('id, region, city, district')
+          .maybeSingle();
+        if (error) throw error;
+        if (!updatedProfile) throw new Error('لم يتم تحديث موقع الحساب في Supabase.');
       }
     } catch (e) {
       console.warn('Failed to sync location to profile:', e);
+      throw e;
     }
   }
 
