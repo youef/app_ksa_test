@@ -159,37 +159,10 @@ export default function Home() {
     if (!u.user) return router.replace('/auth');
     setCurrentUserId(u.user.id);
 
-    // Fetch profile first, then refresh the physical location on every home visit.
+    // Use the saved location. Automatic GPS refresh is limited to the weekly prompt.
     let { data: profileData } = await supabase.from('profiles').select('*').eq('id', u.user.id).maybeSingle();
 
-    try {
-      const device = await getCurrentDeviceLocation();
-      if (device) {
-        const place = await reverseGeocodeDeviceLocation(device);
-        const live = {
-          region: place?.region?.trim() || '',
-          city: place?.city?.trim() || '',
-          district: place?.district?.trim() || '',
-        };
-        if (live.region && live.city && live.district) {
-          await savePermanentMyLocation(live, true);
-          setSelectedRegion(live.region);
-          setSelectedCity(live.city);
-          setSelectedDistrict(live.district);
-          profileData = { ...(profileData || {}), ...live };
-          const { data: refreshed, error: locationSaveError } = await supabase
-            .from('profiles')
-            .update(live)
-            .eq('id', u.user.id)
-            .select('*')
-            .maybeSingle();
-          if (locationSaveError) console.warn('profile location save failed:', locationSaveError.message);
-          if (refreshed) profileData = refreshed;
-        }
-      }
-    } catch (locationError) {
-      console.warn('live location refresh failed:', locationError);
-    }
+
 
     setProfile(profileData);
 
