@@ -60,6 +60,12 @@ export default function Auth() {
       } else {
         const r = await supabase.auth.signInWithPassword({ email: email.trim(), password });
         if (r.error) throw r.error;
+
+        // Wait until Supabase has persisted the session before navigating.
+        // This prevents Expo Router from opening /home before auth state is available.
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) throw sessionError;
+        if (!sessionData.session?.user) throw new Error('تعذر حفظ جلسة الدخول، يرجى المحاولة مرة أخرى.');
         router.replace('/home');
       }
     } catch (e: any) {
