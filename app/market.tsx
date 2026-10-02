@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Image, Pressable, RefreshControl, TextInput, Sc
 import { supabase } from '@/lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
 import BottomNav from '@/components/BottomNav';
+import ScreenState from '@/components/shared/ScreenState';
 import { ShoppingBag, MapPin, ShieldCheck, Plus, Search, Sparkles, SlidersHorizontal, Clock3, Send, ChevronLeft, Bell, ChevronDown } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 
@@ -17,6 +18,8 @@ export default function Market() {
   const router = useRouter();
   const [items, setItems] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [activeCategory, setActiveCategory] = useState<string>('الكل');
   const [searchQuery, setSearchQuery] = useState('');
   const [profile, setProfile] = useState<any>(null);
@@ -46,7 +49,8 @@ export default function Market() {
 
   const loadMarketItems = async () => {
     setRefreshing(true);
-    const { data } = await supabase
+    setLoadError(false);
+    const { data, error } = await supabase
       .from('services')
       .select(`
         *,
@@ -54,7 +58,13 @@ export default function Market() {
       `)
       .order('created_at', { ascending: false });
     
-    setItems(data || []);
+    if (error) {
+      setLoadError(true);
+      setItems([]);
+    } else {
+      setItems(data || []);
+    }
+    setLoading(false);
     setRefreshing(false);
   };
 
@@ -171,6 +181,13 @@ export default function Market() {
         </LinearGradient>
 
         <View style={styles.marketBody}>
+          {loading ? (
+            <ScreenState type="loading" title="جاري تجهيز السوق" message="نرتب لك عروض الحي الأقرب إليك" />
+          ) : loadError ? (
+            <View style={styles.inlineState}>
+              <ScreenState type="error" title="تعذر تحميل السوق" message="اسحب للتحديث وحاول مرة أخرى" />
+            </View>
+          ) : (
           <View style={styles.heroCard}>
           <View style={styles.heroGlowOne} />
           <View style={styles.heroGlowTwo} />
@@ -219,6 +236,7 @@ export default function Market() {
             </View>
           )}
         </View>
+          )}
         </View>
       </ScrollView>
 
