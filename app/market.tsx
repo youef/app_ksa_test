@@ -10,7 +10,7 @@ import { useRouter } from 'expo-router';
 import {
   getActiveLocation,
   subscribeLocation,
-  isExactDistrictMatching,
+  isLocationMatching,
   isAllKingdom,
 } from '@/lib/locationSync';
 
@@ -74,7 +74,7 @@ export default function Market() {
       city: item.city || item.profiles?.city || null,
       district: item.district || item.profiles?.district || null,
     };
-    const matchesLocation = isExactDistrictMatching(locItem, activeLoc.city, activeLoc.district);
+    const matchesLocation = isLocationMatching(locItem, activeLoc.city, activeLoc.district);
     const matchesCategory = activeCategory === 'الكل' || item.category === activeCategory;
     const query = searchQuery.trim().toLocaleLowerCase('ar');
     const matchesSearch = !query || [item.name, item.description, item.category, item.profiles?.display_name, item.district]
