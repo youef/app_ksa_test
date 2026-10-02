@@ -116,6 +116,9 @@ with check ((select auth.uid())=follower_id and follower_id<>following_id and no
 ));
 create policy "follows delete authenticated own" on public.follows for delete to authenticated using ((select auth.uid())=follower_id);
 
+revoke all on function public.set_block(uuid,boolean) from public,anon; grant execute on function public.set_block(uuid,boolean) to authenticated;
+revoke all on function public.toggle_follow(uuid,boolean) from public,anon,authenticated;
+
 drop policy if exists "blocks_insert" on public.blocks;
 drop policy if exists "blocks_delete" on public.blocks;
 drop policy if exists "blocks_select" on public.blocks;
