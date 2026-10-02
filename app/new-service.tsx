@@ -37,6 +37,7 @@ export default function NewService() {
   const [city, setCity] = useState('');
   const [district, setDistrict] = useState('');
   const [authChecking, setAuthChecking] = useState(true);
+  const [userId, setUserId] = useState<string | null>(null);
   const [price, setPrice] = useState('');
   const [available, setAvailable] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -123,7 +124,7 @@ export default function NewService() {
       }
 
       const payload = {
-        provider_id: u.user.id,
+        provider_id: userId,
         name: name.trim(),
         description: description.trim(),
         category,
