@@ -13,7 +13,6 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
-import { C } from '@/lib/ui';
 import {
   ChevronRight,
   MapPin,
@@ -21,7 +20,7 @@ import {
   DollarSign,
   CheckCircle2,
   Sparkles,
-  BriefcaseBusiness,
+  Briefcase,
   Info,
   X,
 
@@ -176,7 +175,7 @@ export default function NewService() {
             <View style={{ width: 28 }} />
           </View>
           <View style={styles.heroIntroRow}>
-            <View style={styles.heroIcon}><BriefcaseBusiness size={20} color="#d1fae5" /></View>
+            <View style={styles.heroIcon}><Briefcase size={20} color="#d1fae5" /></View>
             <Text style={styles.heroSub}>
               اعرض خدماتك وخبراتك واستقبل طلبات واستفسارات جيرانك مباشرة.
             </Text>
@@ -212,7 +211,7 @@ export default function NewService() {
 
           {/* Category Picker */}
           <View style={styles.inputGroup}>
-            <View style={styles.labelRow}><BriefcaseBusiness size={15} color="#059669" /><Text style={styles.label}>التصنيف</Text></View>
+            <View style={styles.labelRow}><Briefcase size={15} color="#059669" /><Text style={styles.label}>التصنيف</Text></View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
               {categories.map(c => (
                 <Pressable
