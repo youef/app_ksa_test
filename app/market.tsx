@@ -171,6 +171,7 @@ export default function Market() {
         </LinearGradient>
 
         <View style={styles.marketBody}>
+          <View style={styles.heroCard}>
           <View style={styles.heroGlowOne} />
           <View style={styles.heroGlowTwo} />
           <View style={styles.heroTop}><View style={styles.heroIcon}><ShoppingBag size={24} color="#d1fae5" /></View><Text style={styles.heroEyebrow}>سوق الجيران</Text></View>
@@ -184,30 +185,8 @@ export default function Market() {
           </View>
           <View style={styles.heroStats}><View><Text style={styles.statValue}>{displayedItems.length}</Text><Text style={styles.statLabel}>عرض متاح</Text></View><View style={styles.statDivider} /><View><Text style={styles.statValue}>{activeLoc.city}</Text><Text style={styles.statLabel}>نطاق التصفح</Text></View></View>
           <View style={styles.heroDecor}><Sparkles size={76} color="rgba(255,255,255,0.10)" /></View>
-        </View>
-        
-        {/* Active location tag */}
-        <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
-          <View style={{
-            flexDirection: 'row-reverse',
-            alignItems: 'center',
-            gap: 4,
-            backgroundColor: '#ecfdf5',
-            paddingHorizontal: 12,
-            paddingVertical: 5,
-            borderRadius: 20,
-            borderWidth: 1,
-            borderColor: '#a7f3d0',
-          }}>
-            <MapPin size={13} color="#059669" />
-            <Text style={{ color: '#059669', fontSize: 12, fontWeight: '800' }}>
-              {isAllKingdom(activeLoc.city)
-                ? 'كل مناطق المملكة 🇸🇦'
-                : `${activeLoc.city}${activeLoc.district && activeLoc.district !== 'كل الأحياء' ? ` · حي ${activeLoc.district}` : ''}`}
-            </Text>
           </View>
-        </View>
-
+        
         <View style={styles.sectionHeading}><View><Text style={styles.sectionTitle}>تصفّح السوق</Text><Text style={styles.sectionHint}>اختر القسم المناسب لك</Text></View><SlidersHorizontal size={18} color="#64748b" /></View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesRow}>
           {availableCategories.map((category) => (
