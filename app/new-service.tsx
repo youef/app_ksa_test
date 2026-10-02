@@ -109,6 +109,7 @@ export default function NewService() {
       }
 
       const providerId = u.user.id;
+      if (!providerId) throw new Error('تعذر التحقق من حسابك، أعد تسجيل الدخول ثم حاول مرة أخرى.');
 
       if (city.trim() || district.trim() || region.trim()) {
         const { error: profileError } = await supabase
