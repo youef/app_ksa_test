@@ -50,6 +50,7 @@ import {
   setMute,
 } from '@/lib/chatControls';
 import { syncDndWithNotifications } from '@/lib/notifications';
+import * as ImagePicker from 'expo-image-picker';
 
 export default function Conversation() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -71,6 +72,8 @@ export default function Conversation() {
   const channelRef = useRef<any>(null);
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [stickersOpen, setStickersOpen] = useState(false);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
 
   const convId = Array.isArray(id) ? id[0] : (id as string);
@@ -219,6 +222,63 @@ export default function Conversation() {
     typingTimerRef.current = setTimeout(() => {
       void broadcastTyping(false);
     }, 900);
+  }
+
+  async function pickImages() {
+    if (anyBlock || uploadingMedia) return;
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('السماح بالصور', 'اسمح للتطبيق بالوصول إلى الصور لإرسالها.');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsMultipleSelection: true,
+        selectionLimit: 6,
+        quality: 0.86,
+        base64: true,
+      });
+      if (result.canceled || !result.assets?.length) return;
+      setUploadingMedia(true);
+      for (const asset of result.assets) {
+        if (!asset.base64) continue;
+        const ext = (asset.fileName?.split('.').pop() || 'jpg').replace(/[^a-zA-Z0-9]/g, '');
+        const path = currentUserId + '/' + Date.now() + '-' + Math.random().toString(36).slice(2) + '.' + ext;
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+        const clean = asset.base64.replace(/[^A-Za-z0-9+/=]/g, '');
+        const bytes = new Uint8Array(Math.floor(clean.length * 3 / 4) - (clean.endsWith('==') ? 2 : clean.endsWith('=') ? 1 : 0));
+        let buffer = 0, bits = 0, index = 0;
+        for (const ch of clean) {
+          if (ch === '=') break;
+          buffer = (buffer << 6) | chars.indexOf(ch); bits += 6;
+          if (bits >= 8) { bits -= 8; bytes[index++] = (buffer >> bits) & 255; }
+        }
+        const { error: uploadError } = await supabase.storage.from('chat-media').upload(path, bytes, {
+          contentType: asset.mimeType || 'image/jpeg', cacheControl: '3600', upsert: false,
+        });
+        if (uploadError) throw uploadError;
+        const { data: urlData } = supabase.storage.from('chat-media').getPublicUrl(path);
+        const { error } = await supabase.from('messages').insert({
+          conversation_id: convId, sender_id: currentUserId,
+          body: JSON.stringify({ type: 'image', url: urlData.publicUrl, name: asset.fileName || 'صورة' }),
+          read_by: [currentUserId],
+        });
+        if (error) throw error;
+      }
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
+    } catch (e: any) {
+      Alert.alert('تعذر إرسال الصورة', e?.message || 'حدث خطأ أثناء رفع الصورة');
+    } finally {
+      setUploadingMedia(false);
+    }
+  }
+
+  function parseImageMessage(value: string) {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed?.type === 'image' && parsed?.url ? parsed : null;
+    } catch { return null; }
   }
 
   async function send() {
@@ -494,7 +554,7 @@ export default function Conversation() {
                     </View>
                   )}
                   <View style={[styles.msgBubble, isMine ? styles.msgBubbleMine : styles.msgBubbleOther]}>
-                    <Text style={[styles.msgText, isMine && styles.msgTextMine]}>{msg.body}</Text>
+                    {(() => { const media = parseImageMessage(msg.body); return media ? <View><Image source={{ uri: media.url }} style={styles.messageImage} /><Text style={[styles.imageCaption, isMine && styles.msgTextMine]}>{media.name}</Text></View> : <Text style={[styles.msgText, isMine && styles.msgTextMine]}>{msg.body}</Text>; })()}
                     <View style={[styles.msgMeta, isMine && styles.msgMetaMine]}>
                       <Text style={[styles.msgTime, isMine && styles.msgTimeMine]}>
                         {formatMsgTime(msg.created_at)}
@@ -529,12 +589,14 @@ export default function Conversation() {
           )}
         </View>
       ) : (
+        <View style={styles.composerWrap}>
+          {stickersOpen && <View style={styles.stickerPanel}><Text style={styles.stickerTitle}>ملصقات وإيموجي</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stickerRow}>{['😀','😂','😍','🥰','😘','😎','🤍','❤️','💚','👏','🙌','🙏','🔥','✨','🎉','👍','💯','🌹','☕','🍕','🏠','🌙','☀️','🤣','🥹','🤝','💪','🎁','⭐'].map((emoji, i) => <Pressable key={i} style={styles.stickerItem} onPress={() => { handleBodyChange(body + emoji); setStickersOpen(false); }}><Text style={styles.stickerEmoji}>{emoji}</Text></Pressable>)}</ScrollView></View>}
         <View style={styles.inputArea}>
-          <Pressable style={styles.emojiButton} onPress={() => handleBodyChange(body + ' 😊')}>
+          <Pressable style={styles.emojiButton} onPress={() => setStickersOpen(v => !v)}>
             <Smile size={21} color="#64748b" />
           </Pressable>
 
-          <Pressable style={styles.attachButton} onPress={() => Alert.alert('إرفاق', 'يمكن إضافة الصور والملفات هنا في الخطوة التالية.')}>
+          <Pressable style={styles.attachButton} onPress={pickImages}>
             <Paperclip size={20} color="#64748b" />
           </Pressable>
 
@@ -543,7 +605,7 @@ export default function Conversation() {
             onPress={send}
             disabled={!body.trim() || sending}
           >
-            {sending ? (
+            {uploadingMedia ? <ActivityIndicator size="small" color="#059669" /> : sending ? (
               <ActivityIndicator size="small" color="#fff" />
             ) : (
               <Send size={18} color="#fff" style={{ transform: [{ rotate: '180deg' }] }} />
@@ -847,6 +909,14 @@ const styles = StyleSheet.create({
   },
   emptyConvHint: { fontSize: 12, color: '#059669', fontWeight: '700' },
 
+  composerWrap: { borderTopWidth: 1, borderTopColor: '#e2e8f0', backgroundColor: '#fff' },
+  stickerPanel: { paddingTop: 10, paddingBottom: 8, backgroundColor: '#f8fafc', borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
+  stickerTitle: { textAlign: 'right', paddingHorizontal: 14, color: '#334155', fontSize: 12, fontWeight: '800', marginBottom: 6 },
+  stickerRow: { flexDirection: 'row', paddingHorizontal: 10, gap: 5 },
+  stickerItem: { width: 42, height: 42, borderRadius: 12, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  stickerEmoji: { fontSize: 25 },
+  messageImage: { width: 230, height: 230, borderRadius: 14, marginBottom: 4 },
+  imageCaption: { fontSize: 9, color: '#64748b' },
   inputArea: {
     flexDirection: 'row-reverse',
     minHeight: 62,
