@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View, Alert } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
@@ -16,6 +17,9 @@ import {
   Lock,
   EyeOff,
   UserX,
+  Sparkles,
+  MoreHorizontal,
+  Star,
 } from 'lucide-react-native';
 
 export default function UserProfile() {
@@ -295,6 +299,8 @@ export default function UserProfile() {
 
   return (
     <View style={styles.screen}>
+      <View style={styles.ambientOrbOne} />
+      <View style={styles.ambientOrbTwo} />
       <ScrollView contentContainerStyle={styles.page} showsVerticalScrollIndicator={false}>
         <View style={styles.topBar}>
           <Pressable onPress={() => router.back()} style={styles.topIconButton} accessibilityLabel="رجوع"><ChevronRight size={23} color="#0f172a" /></Pressable>
@@ -320,6 +326,7 @@ export default function UserProfile() {
 
 
         <View style={styles.profileCard}>
+          <LinearGradient colors={["#064e3b", "#047857", "#059669"]} start={{x:0,y:0}} end={{x:1,y:1}} style={styles.profileHero}>
           <View style={styles.profileActionsTop}>
             <View style={styles.avatarWrap}>
               {p.avatar_url && !isAnonymous ? <Image source={{ uri: p.avatar_url }} style={styles.avatarImage} /> : <View style={styles.avatarPlaceholder}><UserIcon size={38} color="#64748b" /></View>}
@@ -339,8 +346,11 @@ export default function UserProfile() {
             {isOwnProfile && <Pressable style={styles.editButton} onPress={() => router.push('/profile')}><Text style={styles.editButtonText}>إدارة ملفي</Text></Pressable>}
           </View>
 
-          <Text style={styles.displayName}>{displayName}</Text>
+          <View style={styles.heroIdentity}>
+            <View style={styles.heroTitleRow}><Sparkles size={14} color="#a7f3d0" /><Text style={styles.heroEyebrow}>ملف من الحي</Text></View>
+            <Text style={styles.displayName}>{displayName}</Text>
           {!isAnonymous && !!p.username && <Text style={styles.handle}>@{p.username}</Text>}
+          </View>
           {!isAnonymous && (p.city || p.district) && (
             <View style={styles.locationLine}><MapPin size={15} color="#64748b" /><Text style={styles.locationText}>{[p.district && `حي ${p.district}`, p.city].filter(Boolean).join('، ')}</Text></View>
           )}
@@ -355,6 +365,7 @@ export default function UserProfile() {
           </View>
           {p.is_geoverified && !isAnonymous && <Text style={styles.badgeNote}>فحص الموقع تقريبي حول المدينة، ولا يثبت السكن في حي محدد.</Text>}
 
+          </LinearGradient>
           <View style={styles.statsGrid}>
             {[
               ['استفسار', stats.questions], ['طلب مساعدة', stats.requests], ['خدمة', stats.services],
@@ -382,6 +393,7 @@ export default function UserProfile() {
 
         {!restricted && (
           <>
+            <View style={styles.sectionHeading}><View><Text style={styles.sectionTitle}>نشاط الحي</Text><Text style={styles.sectionSubtitle}>ما يقدمه هذا العضو للمجتمع</Text></View><View style={styles.sectionIcon}><Star size={17} color="#047857" /></View></View>
             <View style={styles.tabs}>
               {tabs.map(tab => <Pressable key={tab.key} onPress={() => setActiveTab(tab.key)} style={styles.tab}>
                 <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]}>{tab.label}</Text>
@@ -426,8 +438,10 @@ export default function UserProfile() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#f8fafc' },
-  page: { paddingHorizontal: 16, paddingTop: 42, paddingBottom: 24 },
+  screen: { flex: 1, backgroundColor: '#f8fafc', overflow: 'hidden' },
+  ambientOrbOne: { position: 'absolute', width: 260, height: 260, borderRadius: 130, backgroundColor: 'rgba(16,185,129,0.07)', top: 120, left: -150 },
+  ambientOrbTwo: { position: 'absolute', width: 210, height: 210, borderRadius: 105, backgroundColor: 'rgba(6,95,70,0.05)', bottom: 100, right: -120 },
+  page: { paddingHorizontal: 16, paddingTop: 38, paddingBottom: 30 },
   loadingContainer: { flex: 1, backgroundColor: '#f8fafc', alignItems: 'center', justifyContent: 'center', gap: 10 },
   loadingText: { color: '#64748b', fontSize: 13, fontWeight: '700' },
   errorTitle: { color: '#0f172a', fontSize: 17, fontWeight: '900', textAlign: 'center' },
@@ -445,7 +459,11 @@ const styles = StyleSheet.create({
   noticeText: { flex: 1, color: '#334155', fontSize: 12, fontWeight: '700', textAlign: 'right' },
   noticeAction: { backgroundColor: '#dc2626', borderRadius: 9, paddingHorizontal: 11, paddingVertical: 7 },
   noticeActionText: { color: '#fff', fontSize: 11, fontWeight: '900' },
-  profileCard: { backgroundColor: '#fff', borderRadius: 22, padding: 18, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 14 },
+  profileCard: { backgroundColor: '#fff', borderRadius: 24, padding: 0, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 14, overflow: 'hidden', shadowColor: '#0f172a', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.07, shadowRadius: 20, elevation: 3 },
+  profileHero: { padding: 18, paddingBottom: 20 },
+  heroIdentity: { marginTop: 8, alignItems: 'flex-end' },
+  heroTitleRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, marginBottom: 4 },
+  heroEyebrow: { color: '#a7f3d0', fontSize: 10, fontWeight: '900' },
   profileActionsTop: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
   avatarWrap: { width: 82, height: 82, borderRadius: 41, position: 'relative' },
   avatarImage: { width: 82, height: 82, borderRadius: 41, backgroundColor: '#e2e8f0' },
@@ -460,12 +478,12 @@ const styles = StyleSheet.create({
   messageButtonText: { color: '#fff', fontWeight: '800', fontSize: 12 },
   editButton: { height: 40, borderRadius: 20, borderWidth: 1, borderColor: '#cbd5e1', justifyContent: 'center', paddingHorizontal: 13 },
   editButtonText: { color: '#0f172a', fontWeight: '800', fontSize: 12 },
-  displayName: { color: '#0f172a', fontSize: 22, fontWeight: '900', textAlign: 'right' },
-  handle: { color: '#64748b', fontSize: 13, textAlign: 'right', marginTop: 2 },
-  locationLine: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, marginTop: 10 },
+  displayName: { color: '#fff', fontSize: 25, fontWeight: '900', textAlign: 'right' },
+  handle: { color: '#d1fae5', fontSize: 12, textAlign: 'right', marginTop: 2 },
+  locationLine: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, marginTop: 10, paddingHorizontal: 18 },
   locationText: { color: '#64748b', fontSize: 13 },
-  bio: { color: '#334155', fontSize: 14, lineHeight: 22, textAlign: 'right', marginTop: 11 },
-  badgesRow: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 7, marginTop: 12 },
+  bio: { color: '#334155', fontSize: 14, lineHeight: 22, textAlign: 'right', marginTop: 11, paddingHorizontal: 18 },
+  badgesRow: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 7, marginTop: 12, paddingHorizontal: 18 },
   badge: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 10, borderWidth: 1 },
   officialBadge: { backgroundColor: '#eff6ff', borderColor: '#bfdbfe' },
   officialBadgeText: { color: '#1d4ed8', fontSize: 11, fontWeight: '800' },
@@ -478,7 +496,7 @@ const styles = StyleSheet.create({
   anonymousBadge: { backgroundColor: '#fffbeb', borderColor: '#fde68a' },
   anonymousBadgeText: { color: '#b45309', fontSize: 11, fontWeight: '800' },
   badgeNote: { color: '#64748b', fontSize: 11, lineHeight: 16, textAlign: 'right', marginTop: 7 },
-  statsGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', borderTopWidth: 1, borderColor: '#f1f5f9', marginTop: 15, paddingTop: 9 },
+  statsGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', borderTopWidth: 1, borderColor: '#f1f5f9', marginTop: 6, paddingTop: 9, paddingHorizontal: 10, paddingBottom: 5 },
   statCell: { width: '33.333%', alignItems: 'center', paddingVertical: 9 },
   statValue: { color: '#0f172a', fontSize: 16, fontWeight: '900' },
   statLabel: { color: '#64748b', fontSize: 11, marginTop: 2 },
@@ -496,7 +514,11 @@ const styles = StyleSheet.create({
   lockIcon: { width: 54, height: 54, borderRadius: 27, backgroundColor: '#ecfdf5', alignItems: 'center', justifyContent: 'center', marginBottom: 11 },
   lockedTitle: { color: '#0f172a', fontSize: 17, fontWeight: '900', textAlign: 'center' },
   lockedText: { color: '#64748b', fontSize: 13, lineHeight: 20, textAlign: 'center', marginTop: 6 },
-  tabs: { flexDirection: 'row-reverse', backgroundColor: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16, borderBottomWidth: 1, borderColor: '#e2e8f0', overflow: 'hidden' },
+  sectionHeading: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, paddingTop: 16, paddingBottom: 10 },
+  sectionTitle: { color: '#0f172a', fontSize: 17, fontWeight: '900', textAlign: 'right' },
+  sectionSubtitle: { color: '#94a3b8', fontSize: 10, fontWeight: '700', textAlign: 'right', marginTop: 2 },
+  sectionIcon: { width: 36, height: 36, borderRadius: 12, backgroundColor: '#ecfdf5', alignItems: 'center', justifyContent: 'center' },
+  tabs: { flexDirection: 'row-reverse', backgroundColor: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16, borderBottomWidth: 1, borderColor: '#e2e8f0', overflow: 'hidden', marginHorizontal: 0 },
   tab: { flex: 1, minHeight: 54, alignItems: 'center', justifyContent: 'center', position: 'relative', gap: 2 },
   tabText: { color: '#64748b', fontSize: 11, fontWeight: '700' },
   tabTextActive: { color: '#047857', fontWeight: '900' },
