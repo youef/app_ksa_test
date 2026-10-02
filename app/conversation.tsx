@@ -690,7 +690,7 @@ export default function Conversation() {
             onPress={send}
             disabled={!body.trim() || sending}
           >
-            {uploadingMedia ? <ActivityIndicator size="small" color="#059669" /> : sending ? (
+            {uploadingMedia ? <ActivityIndicator size="small" color="#fff" /> : sending ? (
               <ActivityIndicator size="small" color="#fff" />
             ) : (
               <Send size={18} color="#fff" style={{ transform: [{ rotate: '180deg' }] }} />
@@ -1037,6 +1037,8 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 20,
     backgroundColor: '#059669',
+    borderWidth: 2,
+    borderColor: '#d1fae5',
     alignItems: 'center',
     justifyContent: 'center',
   },
