@@ -106,35 +106,62 @@ export default function SettingsScreen() {
       setEmail(u.user.email || '');
       setEmailDraft(u.user.email || '');
 
-      const [profRes, dndRes, blockedRes, verificationRes] = await Promise.all([
-        supabase.from('profiles').select('*').eq('id', u.user.id).single(),
-        loadDnd(u.user.id),
-        loadBlockedUsers(u.user.id),
-        supabase.from('verification_requests').select('status').eq('user_id', u.user.id).order('created_at', { ascending: false }).limit(1),
-      ]);
-
+      // Load each settings source independently. A failure in chat controls or
+      // verification must never prevent the profile/settings screen from rendering.
+      const profRes = await supabase.from('profiles').select('*').eq('id', u.user.id).maybeSingle();
       const prof = profRes.data;
+      if (profRes.error) console.warn('settings profile load failed:', profRes.error.message);
       if (prof) {
         setProfilePrivacy(prof.profile_privacy || 'public');
         setAllowDms(prof.allow_dms || 'everyone');
         setAllowStoryReplies(prof.allow_story_replies || 'everyone');
-        setHideName(prof.hide_name || false);
+        setHideName(Boolean(prof.hide_name));
         setRole(prof.role || 'user');
         setRegion(prof.region || '');
         setCity(prof.city || '');
         setDistrict(prof.district || '');
+        setGeoVerified(Boolean(prof.is_geoverified));
         if (prof.is_verified) setVerificationStatus('verified');
       }
-      const latestRequest = verificationRes.data?.[0];
-      if (latestRequest && !profRes.data?.is_verified) {
-        setVerificationStatus(latestRequest.status === 'approved' ? 'verified' : latestRequest.status === 'rejected' ? 'rejected' : 'pending');
+
+      try {
+        const { data: verificationData, error: verificationError } = await supabase
+          .from('verification_requests')
+          .select('status')
+          .eq('user_id', u.user.id)
+          .order('created_at', { ascending: false })
+          .limit(1);
+        if (verificationError) console.warn('verification load failed:', verificationError.message);
+        const latestRequest = verificationData?.[0];
+        if (latestRequest && !prof?.is_verified) {
+          setVerificationStatus(latestRequest.status === 'approved' ? 'verified' : latestRequest.status === 'rejected' ? 'rejected' : 'pending');
+        }
+      } catch (error) {
+        console.warn('verification settings unavailable:', error);
       }
 
-      setDnd(dndRes);
-      setDraftStart(dndRes.start || '22:00');
-      setDraftEnd(dndRes.end || '07:00');
-      setBlockedUsers((blockedRes || []).filter(Boolean));
-      setControlsReady(await checkChatControlsReady());
+      try {
+        const dndRes = await loadDnd(u.user.id);
+        setDnd(dndRes);
+        setDraftStart(dndRes.start || '22:00');
+        setDraftEnd(dndRes.end || '07:00');
+      } catch (error) {
+        console.warn('DND settings unavailable:', error);
+      }
+
+      try {
+        const blockedRes = await loadBlockedUsers(u.user.id);
+        setBlockedUsers((blockedRes || []).filter(Boolean));
+      } catch (error) {
+        console.warn('blocked users unavailable:', error);
+      }
+
+      try {
+        setControlsReady(await checkChatControlsReady());
+      } catch (error) {
+        console.warn('chat controls check failed:', error);
+        setControlsReady(null);
+      }
     } catch (err) {
       console.log('Error loading settings:', err);
     } finally {
@@ -193,9 +220,15 @@ export default function SettingsScreen() {
         return;
       }
       if (!userId) return;
-      const { error } = await supabase.from('profiles').update({ region: nextRegion, city: nextCity, district: nextDistrict }).eq('id', userId).select('id').maybeSingle();
-      if (error) throw error;
       await savePermanentMyLocation({ region: nextRegion, city: nextCity, district: nextDistrict }, true);
+      const { data: updated, error } = await supabase
+        .from('profiles')
+        .update({ region: nextRegion, city: nextCity, district: nextDistrict })
+        .eq('id', userId)
+        .select('id, region, city, district')
+        .maybeSingle();
+      if (error) throw error;
+      if (!updated) throw new Error('لم يتم تحديث موقع الحساب في Supabase.');
       setRegion(nextRegion);
       setCity(nextCity);
       setDistrict(nextDistrict);
