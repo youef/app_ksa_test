@@ -329,7 +329,7 @@ export default function Profile() {
         {/* ======================================================== */}
         <LinearGradient colors={["#064e3b", "#059669", "#10b981"]} start={{x:0,y:0}} end={{x:1,y:1}} style={styles.profileHero}>
           <View style={styles.profileTopBar}>
-            <Pressable onPress={() => router.back()} style={styles.profileTopButton}>
+            <Pressable onPress={() => router.replace('/home')} style={styles.profileTopButton}>
               <ChevronRight size={22} color="#fff" />
             </Pressable>
             <Text style={styles.profileTopTitle}>الملف الشخصي</Text>
