@@ -16,12 +16,15 @@ import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
 import {
   ChevronRight,
-  Plus,
   MapPin,
   Tag,
   DollarSign,
   CheckCircle2,
   Sparkles,
+  BriefcaseBusiness,
+  Info,
+  X,
+
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import LocationSelectorModal from '@/components/LocationSelectorModal';
@@ -31,12 +34,15 @@ export default function NewService() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('صيانة منزلية');
+  const [region, setRegion] = useState('');
   const [city, setCity] = useState('');
   const [district, setDistrict] = useState('');
+  const [authChecking, setAuthChecking] = useState(true);
   const [price, setPrice] = useState('');
   const [available, setAvailable] = useState(true);
   const [busy, setBusy] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
+  const [showTips, setShowTips] = useState(false);
 
   const categories = [
     'صيانة منزلية',
@@ -50,8 +56,15 @@ export default function NewService() {
 
   useEffect(() => {
     (async () => {
+      const { data: authData } = await supabase.auth.getUser();
+      if (!authData.user) {
+        setAuthChecking(false);
+        router.replace('/auth');
+        return;
+      }
       const loc = await getPermanentMyLocation();
       if (loc?.city && !isAllKingdom(loc.city)) {
+        if (loc.region) setRegion(loc.region);
         setCity(loc.city);
         if (loc.district && loc.district !== 'كل الأحياء' && loc.district !== 'كل أحياء المدينة') {
           setDistrict(loc.district);
@@ -63,15 +76,17 @@ export default function NewService() {
       if (u.user) {
         const { data: p } = await supabase
           .from('profiles')
-          .select('city, district')
+          .select('region, city, district')
           .eq('id', u.user.id)
           .single();
+        if (p?.region) setRegion(p.region);
         if (p?.city) {
           setCity(p.city);
           if (p?.district) setDistrict(p.district);
           await savePermanentMyLocation({ city: p.city, district: p.district || 'كل الأحياء' });
         }
       }
+      setAuthChecking(false);
     })();
   }, []);
 
@@ -82,6 +97,9 @@ export default function NewService() {
     if (!description.trim()) {
       return Alert.alert('تنبيه', 'يرجى كتابة تفاصيل وما يشمله عرض خدمتك.');
     }
+    if (price && (!/^\d+(\.\d{1,2})?$/.test(price.trim()) || Number(price) < 0)) {
+      return Alert.alert('تنبيه', 'اكتب سعراً صحيحاً مثل 50 أو 75.50.');
+    }
 
     setBusy(true);
     try {
@@ -89,6 +107,20 @@ export default function NewService() {
       if (!u.user) {
         setBusy(false);
         return router.replace('/auth');
+      }
+
+      // Keep the selected service area aligned with the profile because the services RLS policy
+      // validates the provider's city/district against the profile location.
+      if (city.trim() || district.trim() || region.trim()) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update({
+            region: region.trim() || null,
+            city: city.trim() || null,
+            district: district.trim() || null,
+          })
+          .eq('id', u.user.id);
+        if (profileError) throw profileError;
       }
 
       const payload = {
@@ -106,7 +138,7 @@ export default function NewService() {
       setBusy(false);
 
       if (error) {
-        Alert.alert('خطأ', error.message);
+        Alert.alert('تعذر نشر الخدمة', error.message);
       } else {
         Alert.alert('تم بنجاح! 🎉', 'تم نشر خدمتك في دليل خدمات الحي.');
         router.replace({ pathname: '/service', params: { id: data.id } });
@@ -115,6 +147,15 @@ export default function NewService() {
       setBusy(false);
       Alert.alert('خطأ', e.message || 'حدث خطأ أثناء حفظ الخدمة.');
     }
+  }
+
+  if (authChecking) {
+    return (
+      <View style={styles.loadingScreen}>
+        <ActivityIndicator size="large" color="#059669" />
+        <Text style={styles.loadingText}>نجهز صفحة إضافة الخدمة…</Text>
+      </View>
+    );
   }
 
   return (
@@ -134,12 +175,26 @@ export default function NewService() {
             <Text style={styles.navTitle}>إضافة خدمة جديدة 🛠️</Text>
             <View style={{ width: 28 }} />
           </View>
-          <Text style={styles.heroSub}>
-            اعرض خدماتك وخبراتك واستقبل طلبات واستفسارات جيرانك مباشرة.
-          </Text>
+          <View style={styles.heroIntroRow}>
+            <View style={styles.heroIcon}><BriefcaseBusiness size={20} color="#d1fae5" /></View>
+            <Text style={styles.heroSub}>
+              اعرض خدماتك وخبراتك واستقبل طلبات واستفسارات جيرانك مباشرة.
+            </Text>
+          </View>
         </LinearGradient>
 
         <View style={styles.formCard}>
+          <View style={styles.formTopRow}>
+            <View style={styles.formBadge}><Sparkles size={15} color="#059669" /><Text style={styles.formBadgeText}>عرضك يظهر لجيرانك</Text></View>
+            <Pressable onPress={() => setShowTips(v => !v)} style={styles.tipBtn}>
+              {showTips ? <X size={17} color="#64748b" /> : <Info size={17} color="#64748b" />}
+            </Pressable>
+          </View>
+          {showTips && (
+            <View style={styles.tipsBox}>
+              <Text style={styles.tipText}>اكتب عنواناً واضحاً، حدّد نطاق خدمتك، وأضف تفاصيل عملية تساعد الجيران على التواصل معك.</Text>
+            </View>
+          )}
           {/* Service Title */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>عنوان الخدمة *</Text>
@@ -156,7 +211,7 @@ export default function NewService() {
 
           {/* Category Picker */}
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>التصنيف</Text>
+            <View style={styles.labelRow}><BriefcaseBusiness size={15} color="#059669" /><Text style={styles.label}>التصنيف</Text></View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
               {categories.map(c => (
                 <Pressable
@@ -172,7 +227,7 @@ export default function NewService() {
 
           {/* Location Picker */}
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>نطاق الخدمة والحي</Text>
+            <View style={styles.labelRow}><MapPin size={15} color="#059669" /><Text style={styles.label}>نطاق الخدمة والحي</Text></View>
             <Pressable style={styles.locationBtn} onPress={() => setShowLocationModal(true)}>
               <MapPin size={18} color="#059669" />
               <Text style={styles.locationBtnText}>
@@ -183,7 +238,7 @@ export default function NewService() {
 
           {/* Description */}
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>تفاصيل الخدمة *</Text>
+            <View style={styles.labelRow}><Info size={15} color="#059669" /><Text style={styles.label}>تفاصيل الخدمة *</Text></View>
             <View style={[styles.inputContainer, { height: 120, alignItems: 'flex-start' }]}>
               <TextInput
                 style={[styles.input, { height: 110, textAlignVertical: 'top' }]}
@@ -198,7 +253,7 @@ export default function NewService() {
 
           {/* Price */}
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>السعر المبدئي (ريال سعودي - اختياري)</Text>
+            <View style={styles.labelRow}><DollarSign size={15} color="#059669" /><Text style={styles.label}>السعر المبدئي (ريال سعودي - اختياري)</Text></View>
             <View style={styles.inputContainer}>
               <TextInput
                 style={styles.input}
@@ -207,8 +262,14 @@ export default function NewService() {
                 keyboardType="numeric"
                 placeholder="مثال: 50 (اتركه فارغاً إذا كان حسب الاتفاق)"
                 placeholderTextColor="#9ca3af"
+                maxLength={8}
               />
             </View>
+          </View>
+
+          <View style={styles.progressRow}>
+            <Text style={styles.progressText}>{name.trim().length}/80 عنوان</Text>
+            <Text style={styles.progressText}>{description.trim().length}/500 تفاصيل</Text>
           </View>
 
           {/* Availability Switch */}
@@ -251,6 +312,7 @@ export default function NewService() {
         onSelect={async (reg, c, d) => {
           const cleanCity = c === 'كل المدن' ? '' : c;
           const cleanDist = (d === 'كل أحياء المدينة' || d === 'كل الأحياء') ? '' : d;
+          setRegion(reg || '');
           setCity(cleanCity);
           setDistrict(cleanDist);
           if (cleanCity) {
@@ -259,6 +321,10 @@ export default function NewService() {
               city: cleanCity,
               district: cleanDist || 'كل الأحياء',
             });
+            const { data: u } = await supabase.auth.getUser();
+            if (u.user) {
+              await supabase.from('profiles').update({ region: reg || null, city: cleanCity, district: cleanDist || 'كل الأحياء' }).eq('id', u.user.id);
+            }
           }
         }}
       />
@@ -267,6 +333,18 @@ export default function NewService() {
 }
 
 const styles = StyleSheet.create({
+  loadingScreen: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f8fafc',
+    gap: 12,
+  },
+  loadingText: {
+    color: '#64748b',
+    fontSize: 13,
+    fontWeight: '700',
+  },
   container: {
     flex: 1,
     backgroundColor: '#f8fafc',
@@ -301,6 +379,19 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     lineHeight: 18,
   },
+  heroIntroRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 10,
+  },
+  heroIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   formCard: {
     backgroundColor: '#fff',
     borderRadius: 22,
@@ -315,8 +406,61 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
+  formTopRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  formBadge: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#ecfdf5',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 12,
+  },
+  formBadgeText: {
+    color: '#047857',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  tipBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    backgroundColor: '#f8fafc',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  tipsBox: {
+    backgroundColor: '#f0fdf4',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#dcfce7',
+  },
+  tipText: {
+    color: '#166534',
+    fontSize: 12,
+    lineHeight: 18,
+    textAlign: 'right',
+  },
   inputGroup: {
     marginBottom: 16,
+  },
+  labelRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  labelRow .label: {
+    marginBottom: 0,
   },
   label: {
     color: '#334155',
@@ -378,6 +522,18 @@ const styles = StyleSheet.create({
   locationBtnText: {
     color: '#0f172a',
     fontSize: 13,
+    fontWeight: '700',
+  },
+  progressRow: {
+    flexDirection: 'row-reverse',
+    justifyContent: 'space-between',
+    marginTop: -8,
+    marginBottom: 16,
+    paddingHorizontal: 2,
+  },
+  progressText: {
+    color: '#94a3b8',
+    fontSize: 10,
     fontWeight: '700',
   },
   switchRow: {
