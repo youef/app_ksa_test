@@ -70,7 +70,6 @@ export default function Conversation() {
   const [isOnline, setIsOnline] = useState(false);
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const channelRef = useRef<any>(null);
-  const pendingMessagesRef = useRef(new Set<string>());
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
   const [stickersOpen, setStickersOpen] = useState(false);
@@ -157,57 +156,110 @@ export default function Conversation() {
 
   useEffect(() => {
     let alive = true;
-    const ch = supabase
-      .channel('chat-' + convId, { config: { broadcast: { self: false }, presence: { key: currentUserId || undefined } } })
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${convId}` },
-        payload => {
-          setMessages(prev => {
-            const optimistic = prev.find(m => m._optimisticKey && m._optimisticKey === payload.new._optimisticKey);
-            if (optimistic) return prev.map(m => m === optimistic ? payload.new : m);
-            return prev.some(m => m.id === payload.new.id) ? prev : [...prev, payload.new];
-          });
-          setOtherTyping(false);
-          setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 40);
-          if (payload.new.sender_id !== currentUserId) {
-            void markConversationRead(convId, currentUserId);
+    let ch: any = null;
+
+    (async () => {
+      const { data: authData } = await supabase.auth.getUser();
+      const userId = authData.user?.id;
+      if (!userId) {
+        router.replace('/auth');
+        return;
+      }
+      if (!alive) return;
+      setCurrentUserId(userId);
+
+      ch = supabase
+        .channel('chat-' + convId + '-' + userId, {
+          config: {
+            broadcast: { self: false },
+            presence: { key: userId },
+          },
+        })
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages',
+            filter: `conversation_id=eq.${convId}`,
+          },
+          payload => {
+            if (!alive) return;
+            setMessages(prev => {
+              if (prev.some(m => m.id === payload.new.id)) return prev;
+              if (payload.new.sender_id === userId) {
+                const optimisticIndex = prev.findIndex(
+                  m =>
+                    String(m.id).startsWith('optimistic-') &&
+                    m.sender_id === userId &&
+                    m.body === payload.new.body &&
+                    Math.abs(new Date(m.created_at).getTime() - new Date(payload.new.created_at).getTime()) < 10000
+                );
+                if (optimisticIndex >= 0) {
+                  const next = [...prev];
+                  next[optimisticIndex] = payload.new;
+                  return next;
+                }
+              }
+              return [...prev, payload.new];
+            });
+            setOtherTyping(false);
+            requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
+            if (payload.new.sender_id !== userId) {
+              void markConversationRead(convId, userId);
+            }
           }
-        }
-      )
-      .on('broadcast', { event: 'typing' }, ({ payload }: any) => {
-        if (!alive || payload?.userId === currentUserId) return;
-        setOtherTyping(!!payload?.typing);
-      })
-      .on('presence', { event: 'sync' }, () => {
-        const state = ch.presenceState();
-        const someoneElse = Object.keys(state).some(key => key !== currentUserId);
-        setIsOnline(someoneElse);
-      })
-      .on('presence', { event: 'join' }, ({ key }: any) => {
-        if (key !== currentUserId) setIsOnline(true);
-      })
-      .on('presence', { event: 'leave' }, ({ key }: any) => {
-        if (key !== currentUserId) setIsOnline(false);
-      })
-      .subscribe(async status => {
-        if (status === 'SUBSCRIBED') {
-          await ch.track({ userId: currentUserId, onlineAt: new Date().toISOString() });
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'messages',
+            filter: `conversation_id=eq.${convId}`,
+          },
+          payload => {
+            if (!alive) return;
+            setMessages(prev => prev.map(m => m.id === payload.new.id ? payload.new : m));
+          }
+        )
+        .on('broadcast', { event: 'typing' }, ({ payload }: any) => {
+          if (!alive || payload?.userId === userId) return;
+          setOtherTyping(!!payload?.typing);
+        })
+        .on('presence', { event: 'sync' }, () => {
+          if (!alive) return;
+          const state = ch?.presenceState?.() || {};
+          setIsOnline(Object.keys(state).some(key => key !== userId));
+        })
+        .on('presence', { event: 'join' }, ({ key }: any) => {
+          if (key !== userId) setIsOnline(true);
+        })
+        .on('presence', { event: 'leave' }, ({ key }: any) => {
+          if (key !== userId) setIsOnline(false);
+        });
+
+      channelRef.current = ch;
+
+      ch.subscribe(async (status: string) => {
+        if (status === 'SUBSCRIBED' && alive) {
+          await ch.track({ userId, onlineAt: new Date().toISOString() });
         }
       });
 
-    channelRef.current = ch;
-    load();
+      await load();
+    })();
 
     return () => {
       alive = false;
       if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
       channelRef.current = null;
-      void ch.untrack();
-      supabase.removeChannel(ch);
+      if (ch) {
+        void ch.untrack();
+        void supabase.removeChannel(ch);
+      }
     };
-  }, [convId, load, currentUserId]);
-
+  }, [convId, load]);
   // ------------------------------------------------------------ actions
 
   async function broadcastTyping(typing: boolean) {
