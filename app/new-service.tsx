@@ -205,6 +205,7 @@ export default function NewService() {
                 onChangeText={setName}
                 placeholder="مثال: فني تكييف وكهرباء، معلم لغة إنجليزية..."
                 placeholderTextColor="#9ca3af"
+                maxLength={80}
               />
             </View>
           </View>
@@ -247,6 +248,7 @@ export default function NewService() {
                 onChangeText={setDescription}
                 placeholder="اشرح ما تقدمه، أوقات العمل، وخبراتك السابقة في الحي..."
                 placeholderTextColor="#9ca3af"
+                maxLength={500}
               />
             </View>
           </View>
@@ -459,15 +461,11 @@ const styles = StyleSheet.create({
     gap: 6,
     marginBottom: 8,
   },
-  labelRow .label: {
-    marginBottom: 0,
-  },
   label: {
     color: '#334155',
     fontSize: 13,
     fontWeight: '800',
     textAlign: 'right',
-    marginBottom: 8,
   },
   inputContainer: {
     backgroundColor: '#f8fafc',
