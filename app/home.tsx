@@ -468,7 +468,6 @@ export default function Home() {
             refreshing={refreshing} 
             onRefresh={async () => { 
               setRefreshing(true);
-              setNewPostsCount(0);
               await load(); 
               setRefreshing(false); 
             }} 
