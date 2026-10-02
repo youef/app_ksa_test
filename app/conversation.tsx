@@ -99,10 +99,10 @@ export default function Conversation() {
       const liveOnly = prev.filter(m => {
         if (!m.id || !String(m.id).startsWith('optimistic-')) return !loadedIds.has(m.id);
         const duplicate = loaded.some(
-          m =>
-            m.sender_id === u.user.id &&
-            m.body === m.body &&
-            Math.abs(new Date(m.created_at).getTime() - new Date(m.created_at).getTime()) < 10000
+          loadedMessage =>
+            loadedMessage.sender_id === m.sender_id &&
+            loadedMessage.body === m.body &&
+            Math.abs(new Date(loadedMessage.created_at).getTime() - new Date(m.created_at).getTime()) < 10000
         );
         return !duplicate;
       });
