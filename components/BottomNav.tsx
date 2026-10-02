@@ -1,12 +1,10 @@
-import { View, Text, Pressable, StyleSheet, Platform, Dimensions } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Platform } from 'react-native';
 import { router, usePathname } from 'expo-router';
 import { Home, MessageCircle, Map, Bell, User, LayoutDashboard, ShoppingBag } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { BlurView } from 'expo-blur';
-import Animated, { useAnimatedStyle, withSpring } from 'react-native-reanimated';
-
-const { width } = Dimensions.get('window');
+import Animated from 'react-native-reanimated';
 
 const TABS = [
   { key: '/home',          icon: Home,          label: 'الرئيسية' },
@@ -17,7 +15,6 @@ const TABS = [
 export default function BottomNav() {
   const pathname = usePathname();
   const [unreadMsgs, setUnreadMsgs]  = useState(0);
-  const [unreadNotif, setUnreadNotif] = useState(0);
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
@@ -55,14 +52,6 @@ export default function BottomNav() {
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) return;
 
-    // Unread notifications
-    const { count: nc } = await supabase
-      .from('notifications')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', u.user.id)
-      .is('read_at', null);
-    setUnreadNotif(nc ?? 0);
-
     // Unread messages
     const { data: myConvs } = await supabase
       .from('conversation_members')
@@ -93,7 +82,8 @@ export default function BottomNav() {
   }
 
   const handleTabPress = (key: string) => {
-    router.push(key as any);
+    if (pathname === key) return;
+    router.replace(key as any);
   };
 
   return (
@@ -103,7 +93,6 @@ export default function BottomNav() {
           const isActive = pathname === tab.key;
           const IconComp = tab.icon;
           const badge = tab.key === '/messages' ? unreadMsgs
-                      : tab.key === '/notifications' ? unreadNotif
                       : 0;
 
           return (
