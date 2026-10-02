@@ -3,7 +3,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View, Keyboa
 import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
-import { MapPin, MessageCircle, Send, ChevronRight, User, HelpCircle, Clock3, Reply, Sparkles } from 'lucide-react-native';
+import { MapPin, MessageCircle, Send, ChevronRight, User, Clock3, Reply, Sparkles, CheckCircle2, ThumbsUp, ThumbsDown, Lock, CircleCheck, Award } from 'lucide-react-native';
 
 export default function Question() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -11,11 +11,11 @@ export default function Question() {
   const [answers, setAnswers] = useState<any[]>([]);
   const [body, setBody] = useState('');
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
+  const [submitting, setSubmitting] = useState(false);\n  const [currentUserId, setCurrentUserId] = useState<string | null>(null);\n  const [voting, setVoting] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
-    const [a, b] = await Promise.all([
+    const { data: auth } = await supabase.auth.getUser();\n    setCurrentUserId(auth.user?.id ?? null);\n    const [a, b] = await Promise.all([
       supabase.from('questions').select('*').eq('id', id).single(),
       supabase.from('answers').select('*').eq('question_id', id).order('created_at')
     ]);
@@ -34,7 +34,7 @@ export default function Question() {
     }
 
     setQ(a.data);
-    setAnswers(b.data ?? []);
+    const answerIds = (b.data || []).map((x: any) => x.id);\n    let votes: any[] = [];\n    if (answerIds.length) {\n      const { data: vd } = await supabase.from('answer_votes').select('answer_id,voter_id,vote').in('answer_id', answerIds);\n      votes = vd || [];\n    }\n    const voteMap = votes.reduce((m: any, v: any) => { (m[v.answer_id] ||= []).push(v); return m; }, {});\n    (b.data || []).forEach((ans: any) => { ans.votes = voteMap[ans.id] || []; });\n    setAnswers(b.data ?? []);
     setLoading(false);
   }
 
@@ -49,7 +49,7 @@ export default function Question() {
       return Alert.alert('تنبيه', 'يجب تسجيل الدخول أولاً');
     }
 
-    const r = await supabase.from('answers').insert({
+    if (q.status !== 'open') { setSubmitting(false); return Alert.alert('الردود مغلقة', 'تم إغلاق النقاش بعد اختيار إجابة.'); }\n    const r = await supabase.from('answers').insert({
       question_id: id,
       author_id: u.user.id,
       body: body.trim()
@@ -70,6 +70,42 @@ export default function Question() {
         <ActivityIndicator size="large" color={C.accent} />
       </View>
     );
+  }
+
+  async function voteAnswer(answerId: string, vote: number) {
+    if (!currentUserId || voting) return;
+    setVoting(answerId + ':' + vote);
+    const existing = answers.find(a => a.id === answerId)?.votes?.find((v: any) => v.voter_id === currentUserId);
+    let error: any = null;
+    if (existing?.vote === vote) {
+      ({ error } = await supabase.from('answer_votes').delete().eq('answer_id', answerId).eq('voter_id', currentUserId));
+    } else if (existing) {
+      ({ error } = await supabase.from('answer_votes').update({ vote }).eq('answer_id', answerId).eq('voter_id', currentUserId));
+    } else {
+      ({ error } = await supabase.from('answer_votes').insert({ answer_id: answerId, voter_id: currentUserId, vote }));
+    }
+    setVoting(null);
+    if (error) Alert.alert('تعذر تسجيل التقييم', error.message);
+    else load();
+  }
+
+  async function chooseBest(answerId: string) {
+    if (!currentUserId || currentUserId !== q.author_id) return;
+    const ok = await new Promise<boolean>(resolve => Alert.alert('اختيار الإجابة الصحيحة', 'سيتم اعتماد هذه الإجابة وإغلاق الردود تلقائياً.', [
+      { text: 'إلغاء', style: 'cancel', onPress: () => resolve(false) },
+      { text: 'اعتماد وإغلاق', style: 'default', onPress: () => resolve(true) },
+    ]));
+    if (!ok) return;
+    const { error } = await supabase.from('questions').update({ best_answer_id: answerId, status: 'solved', solved_at: new Date().toISOString() }).eq('id', id).eq('author_id', currentUserId);
+    if (error) return Alert.alert('تعذر اعتماد الإجابة', error.message);
+    await supabase.from('notifications').insert({
+      user_id: answers.find(a => a.id === answerId)?.author_id,
+      type: 'best_answer',
+      title: 'تم اختيار إجابتك',
+      body: 'صاحب السؤال اعتمد إجابتك كأفضل إجابة وأغلق النقاش.',
+      data: { question_id: id, answer_id: answerId },
+    });
+    load();
   }
 
   if (!q) {
@@ -97,7 +133,7 @@ export default function Question() {
         <View style={styles.questionCard}>
           <View style={styles.qHeader}>
             <View style={styles.authorBadge}>
-              <Sparkles size={24} color="#fff" />
+              <User size={24} color="#fff" />
             </View>
             <View style={styles.qHeaderTexts}>
               <Text style={styles.qTitle}>{q.title}</Text>
@@ -138,7 +174,7 @@ export default function Question() {
             </View>
           ) : (
             answers.map(a => (
-              <View key={a.id} style={styles.answerCard}>
+              <View key={a.id} style={[styles.answerCard, q.best_answer_id === a.id && styles.bestAnswerCard]}>
                 <View style={styles.answerHeader}>
                   <View style={styles.answerAvatar}>
                     <User size={20} color="#059669" />
@@ -155,13 +191,19 @@ export default function Question() {
                   </View>
                 </View>
                 <Text style={styles.answerBody}>{a.body}</Text>
+                {q.best_answer_id === a.id ? <View style={styles.bestBanner}><Award size={16} color="#166534" /><Text style={styles.bestBannerText}>الإجابة المعتمدة</Text></View> : null}
+                <View style={styles.answerActions}>
+                  <Pressable onPress={() => voteAnswer(a.id, 1)} style={[styles.voteBtn, a.votes?.some((v: any) => v.voter_id === currentUserId && v.vote === 1) && styles.voteActive]}><ThumbsUp size={16} color={a.votes?.some((v: any) => v.voter_id === currentUserId && v.vote === 1) ? C.accent : '#64748b'} /><Text style={styles.voteText}>{a.votes?.filter((v: any) => v.vote === 1).length || 0}</Text></Pressable>
+                  <Pressable onPress={() => voteAnswer(a.id, -1)} style={[styles.voteBtn, a.votes?.some((v: any) => v.voter_id === currentUserId && v.vote === -1) && styles.voteDownActive]}><ThumbsDown size={16} color="#64748b" /><Text style={styles.voteText}>{a.votes?.filter((v: any) => v.vote === -1).length || 0}</Text></Pressable>
+                  {currentUserId === q.author_id && q.status === 'open' ? <Pressable onPress={() => chooseBest(a.id)} style={styles.bestBtn}><CircleCheck size={16} color="#fff" /><Text style={styles.bestBtnText}>اعتماد كأفضل إجابة</Text></Pressable> : null}
+                </View>
               </View>
             ))
           )}
         </View>
       </ScrollView>
 
-      <View style={styles.inputWrapper}><View style={styles.replyHint}><Reply size={15} color={C.accent} /><Text style={styles.replyHintText}>شارك رأيك مع أهل الحي</Text></View>
+      <View style={styles.inputWrapper}>{q.status !== 'open' ? <View style={styles.closedNotice}><Lock size={16} color="#64748b" /><Text style={styles.closedNoticeText}>تم إغلاق الردود بعد اعتماد الإجابة</Text></View> : null}<View style={styles.replyHint}><Reply size={15} color={C.accent} /><Text style={styles.replyHintText}>شارك رأيك مع أهل الحي</Text></View>
         <View style={styles.inputContainer}>
           <TextInput 
             style={styles.input} 
@@ -178,7 +220,7 @@ export default function Question() {
               pressed && {transform: [{scale: 0.95}]}
             ]} 
             onPress={answer}
-            disabled={!body.trim() || submitting}
+            disabled={!body.trim() || submitting || q.status !== 'open'}
           >
             {submitting ? (
               <ActivityIndicator size="small" color="#fff" />
@@ -322,7 +364,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: C.line,
   },
-  authorName: {
+  authorLine: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5 },\n  metaLine: { flexDirection: 'row-reverse', alignItems: 'center', gap: 7, marginTop: 4 },\n  openBadge: { color: '#047857', backgroundColor: '#d1fae5', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 9, fontSize: 10, fontWeight: '900' },\n  closedBadge: { color: '#475569', backgroundColor: '#e2e8f0', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 9, fontSize: 10, fontWeight: '900' },\n  authorName: {
     fontSize: 14,
     fontWeight: '900',
     color: C.accent,
@@ -395,7 +437,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     flex: 1,
   },
-  answerAuthor: {
+  avatarLetter: { color: '#047857', fontSize: 18, fontWeight: '900' },\n  bestAnswerCard: { borderColor: '#86efac', borderWidth: 2, backgroundColor: '#f0fdf4' },\n  bestBanner: { flexDirection: 'row-reverse', alignItems: 'center', alignSelf: 'flex-end', gap: 6, marginTop: 14, backgroundColor: '#dcfce7', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 12 },\n  bestBannerText: { color: '#166534', fontSize: 12, fontWeight: '900' },\n  answerActions: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginTop: 16, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#e5e7eb' },\n  voteBtn: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 12, backgroundColor: '#f8fafc' },\n  voteActive: { backgroundColor: '#dcfce7' },\n  voteDownActive: { backgroundColor: '#f1f5f9' },\n  voteText: { color: '#64748b', fontSize: 12, fontWeight: '800' },\n  bestBtn: { marginLeft: 'auto', flexDirection: 'row-reverse', alignItems: 'center', gap: 6, backgroundColor: '#059669', paddingHorizontal: 12, paddingVertical: 9, borderRadius: 12 },\n  bestBtnText: { color: '#fff', fontSize: 12, fontWeight: '900' },\n  closedNotice: { flexDirection: 'row-reverse', justifyContent: 'center', alignItems: 'center', gap: 7, paddingBottom: 9 },\n  closedNoticeText: { color: '#64748b', fontSize: 12, fontWeight: '800' },\n  answerAuthor: {
     fontSize: 16,
     fontWeight: '900',
     color: C.ink,
