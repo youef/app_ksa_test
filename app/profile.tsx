@@ -178,16 +178,15 @@ export default function Profile() {
       quality: 0.8,
     });
     if (result.canceled) return;
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) return;
+    if (!userId) return;
     const asset = result.assets[0];
     const response = await fetch(asset.uri);
     const blob = await response.arrayBuffer();
-    const path = u.user.id + '/avatar.jpg';
+    const path = userId + '/avatar.jpg';
     const up = await supabase.storage.from('avatars').upload(path, blob, { contentType: 'image/jpeg', upsert: true });
     if (up.error) return Alert.alert('خطأ', up.error.message);
     const { data } = supabase.storage.from('avatars').getPublicUrl(path);
-    const saved = await supabase.from('profiles').update({ avatar_url: data.publicUrl }).eq('id', u.user.id).select('id').maybeSingle();
+    const saved = await supabase.from('profiles').update({ avatar_url: data.publicUrl }).eq('id', userId).select('id').maybeSingle();
     if (saved.error) return Alert.alert('تعذّر حفظ الصورة', saved.error.message);
     if (!saved.data) return Alert.alert('تعذّر حفظ الصورة', 'لم يتم تحديث ملف الحساب. أعد تسجيل الدخول ثم حاول مجدداً.');
     setP({ ...p, avatar_url: data.publicUrl });
@@ -195,8 +194,7 @@ export default function Profile() {
 
   // Toggle Handlers with Instant Persistence
   async function save() {
-    const { data: authData } = await supabase.auth.getUser();
-    const uid = authData.user?.id || userId;
+    const uid = userId;
     if (!uid) return;
     if (!region.trim() || !city.trim() || !district.trim()) {
       return Alert.alert('الموقع مطلوب', 'لا يمكن حفظ الملف بدون المنطقة والمدينة والحي. استخدم «استخدام موقعي الحالي» للتعبئة تلقائياً.');
