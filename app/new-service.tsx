@@ -275,6 +275,11 @@ export default function NewService() {
           </View>
 
           {/* Availability Switch */}
+          <View style={styles.publishNote}>
+            <CheckCircle2 size={17} color="#059669" />
+            <Text style={styles.publishNoteText}>سيتم حفظ نطاق الخدمة مع ملفك ليظهر بشكل صحيح لجيرانك.</Text>
+          </View>
+
           <View style={styles.switchRow}>
             <View style={{ flex: 1, alignItems: 'flex-end' }}>
               <Text style={styles.switchTitle}>جاهز للعمل ومتاح حالياً</Text>
@@ -292,7 +297,9 @@ export default function NewService() {
           <Pressable
             style={[styles.submitBtn, busy && { opacity: 0.6 }]}
             onPress={save}
-            disabled={busy}
+            disabled={busy || authChecking}
+            accessibilityRole="button"
+            accessibilityLabel="نشر الخدمة في حيّنا"
           >
             {busy ? (
               <ActivityIndicator size="small" color="#fff" />
@@ -533,6 +540,24 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     fontSize: 10,
     fontWeight: '700',
+  },
+  publishNote: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#f0fdf4',
+    borderRadius: 13,
+    paddingHorizontal: 11,
+    paddingVertical: 10,
+    marginBottom: 14,
+  },
+  publishNoteText: {
+    flex: 1,
+    color: '#166534',
+    fontSize: 11,
+    fontWeight: '700',
+    textAlign: 'right',
+    lineHeight: 17,
   },
   switchRow: {
     flexDirection: 'row-reverse',
