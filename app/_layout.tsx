@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { Platform } from 'react-native';
 import { Stack } from 'expo-router';
 import { DynamicIslandProvider } from '@/context/DynamicIslandContext';
 import { registerPushToken, syncDndWithNotifications } from '@/lib/notifications';
@@ -30,9 +31,10 @@ export default function RootLayout() {
       <Stack
         screenOptions={{
           headerShown: false,
-          animation: 'slide_from_right',
-          animationDuration: 180,
-          contentStyle: { backgroundColor: '#f8fafc' },
+          // Native gets a short slide; web swaps screens without a blank animation frame.
+          animation: Platform.OS === 'web' ? 'none' : 'slide_from_right',
+          animationDuration: Platform.OS === 'web' ? 0 : 180,
+          contentStyle: { backgroundColor: '#f8fafc', flex: 1 },
           freezeOnBlur: false,
           gestureEnabled: true,
         }}
