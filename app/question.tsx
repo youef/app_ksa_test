@@ -91,6 +91,8 @@ export default function Question() {
 
   async function voteAnswer(answerId: string, vote: number) {
     if (!currentUserId || voting) return;
+    const { data: sessionCheck } = await supabase.auth.getSession();
+    if (!sessionCheck.session) return Alert.alert('تسجيل الدخول مطلوب', 'سجّل الدخول حتى تتمكن من التصويت.');
     setVoting(answerId + ':' + vote);
     const existing = answers.find(a => a.id === answerId)?.votes?.find((v: any) => v.voter_id === currentUserId);
     let error: any = null;
@@ -107,13 +109,15 @@ export default function Question() {
   }
 
   async function chooseBest(answerId: string) {
-    if (!currentUserId || currentUserId !== q.author_id) return;
+    if (!currentUserId) return Alert.alert('تسجيل الدخول مطلوب', 'سجّل الدخول أولاً.');
+    if (currentUserId !== q.author_id) return Alert.alert('غير مسموح', 'اعتماد الإجابة متاح لصاحب السؤال فقط.');
     const ok = await new Promise<boolean>(resolve => Alert.alert('اختيار الإجابة الصحيحة', 'سيتم اعتماد هذه الإجابة وإغلاق الردود تلقائياً.', [
       { text: 'إلغاء', style: 'cancel', onPress: () => resolve(false) },
       { text: 'اعتماد وإغلاق', style: 'default', onPress: () => resolve(true) },
     ]));
     if (!ok) return;
-    const { error } = await supabase.from('questions').update({ best_answer_id: answerId, status: 'solved', solved_at: new Date().toISOString() }).eq('id', id).eq('author_id', currentUserId);
+    const { data: updated, error } = await supabase.from('questions').update({ best_answer_id: answerId, status: 'solved', solved_at: new Date().toISOString() }).eq('id', id).eq('author_id', currentUserId).select('id, best_answer_id, status').maybeSingle();
+    if (!error && !updated) return Alert.alert('تعذر الاعتماد', 'لم يتم تعديل السؤال. تأكد أنك صاحب السؤال.');
     if (error) return Alert.alert('تعذر اعتماد الإجابة', error.message);
     load();
   }
@@ -205,7 +209,7 @@ export default function Question() {
                 {q.best_answer_id === a.id ? <View style={styles.bestBanner}><Award size={16} color="#166534" /><Text style={styles.bestBannerText}>الإجابة المعتمدة</Text></View> : null}
                 <View style={styles.answerActions}>
                   <Pressable onPress={() => setReplyTo(a)} style={styles.replyBtn}><Reply size={15} color="#475569" /><Text style={styles.replyBtnText}>رد</Text></Pressable>
-                  <Pressable onPress={() => voteAnswer(a.id, 1)} style={[styles.voteBtn, a.votes?.some((v: any) => v.voter_id === currentUserId && v.vote === 1) && styles.voteActive]}><ThumbsUp size={16} color={a.votes?.some((v: any) => v.voter_id === currentUserId && v.vote === 1) ? C.accent : '#64748b'} /><Text style={styles.voteText}>{a.votes?.filter((v: any) => v.vote === 1).length || 0}</Text></Pressable>
+                  <Pressable onPress={() => voteAnswer(a.id, 1)} style={[styles.voteBtn, { minHeight: 42 }, a.votes?.some((v: any) => v.voter_id === currentUserId && v.vote === 1) && styles.voteActive]}><ThumbsUp size={16} color={a.votes?.some((v: any) => v.voter_id === currentUserId && v.vote === 1) ? C.accent : '#64748b'} /><Text style={styles.voteText}>{a.votes?.filter((v: any) => v.vote === 1).length || 0}</Text></Pressable>
                   <Pressable onPress={() => voteAnswer(a.id, -1)} style={[styles.voteBtn, a.votes?.some((v: any) => v.voter_id === currentUserId && v.vote === -1) && styles.voteDownActive]}><ThumbsDown size={16} color="#64748b" /><Text style={styles.voteText}>{a.votes?.filter((v: any) => v.vote === -1).length || 0}</Text></Pressable>
                   {currentUserId === q.author_id && q.status === 'open' ? <Pressable onPress={() => chooseBest(a.id)} style={styles.bestBtn}><CircleCheck size={16} color="#fff" /><Text style={styles.bestBtnText}>اعتماد كأفضل إجابة</Text></Pressable> : null}
                 </View>
