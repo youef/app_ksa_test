@@ -506,7 +506,7 @@ export default function Conversation() {
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <LinearGradient colors={['#064e3b', '#047857', '#059669']} start={{x:0,y:0}} end={{x:1,y:1}} style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
+        <Pressable onPress={() => router.replace('/home')} style={styles.backBtn}>
           <ChevronRight size={26} color="#ffffff" />
         </Pressable>
 
