@@ -188,6 +188,7 @@ export default function Market() {
               <ScreenState type="error" title="تعذر تحميل السوق" message="اسحب للتحديث وحاول مرة أخرى" />
             </View>
           ) : (
+          <>
           <View style={styles.heroCard}>
           <View style={styles.heroGlowOne} />
           <View style={styles.heroGlowTwo} />
@@ -237,6 +238,7 @@ export default function Market() {
           )}
         </View>
           )}
+          </>
         </View>
       </ScrollView>
 
