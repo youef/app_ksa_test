@@ -27,7 +27,16 @@ export default function RootLayout() {
 
   return (
     <DynamicIslandProvider>
-      <Stack screenOptions={{ headerShown: false, animation: 'fade' }} />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          animation: 'slide_from_right',
+          animationDuration: 180,
+          contentStyle: { backgroundColor: '#f8fafc' },
+          freezeOnBlur: false,
+          gestureEnabled: true,
+        }}
+      />
     </DynamicIslandProvider>
   );
 }
