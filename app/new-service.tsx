@@ -63,6 +63,9 @@ export default function NewService() {
         router.replace('/auth');
         return;
       }
+
+      setUserId(authData.user.id);
+
       const loc = await getPermanentMyLocation();
       if (loc?.city && !isAllKingdom(loc.city)) {
         if (loc.region) setRegion(loc.region);
@@ -110,6 +113,9 @@ export default function NewService() {
         return router.replace('/auth');
       }
 
+      const providerId = u.user.id;
+      setUserId(providerId);
+
       // Keep the selected service area aligned with the profile because the services RLS policy
       // validates the provider's city/district against the profile location.
       if (city.trim() || district.trim() || region.trim()) {
@@ -120,12 +126,12 @@ export default function NewService() {
             city: city.trim() || null,
             district: district.trim() || null,
           })
-          .eq('id', u.user.id);
+          .eq('id', providerId);
         if (profileError) throw profileError;
       }
 
       const payload = {
-        provider_id: userId,
+        provider_id: providerId,
         name: name.trim(),
         description: description.trim(),
         category,
@@ -139,6 +145,7 @@ export default function NewService() {
       setBusy(false);
 
       if (error) {
+        console.error('services insert failed:', error);
         Alert.alert('تعذر نشر الخدمة', error.message);
       } else {
         Alert.alert('تم بنجاح! 🎉', 'تم نشر خدمتك في دليل خدمات الحي.');
@@ -146,6 +153,7 @@ export default function NewService() {
       }
     } catch (e: any) {
       setBusy(false);
+      console.error('new service save error:', e);
       Alert.alert('خطأ', e.message || 'حدث خطأ أثناء حفظ الخدمة.');
     }
   }
@@ -193,7 +201,7 @@ export default function NewService() {
           </View>
           {showTips && (
             <View style={styles.tipsBox}>
-              <Text style={styles.tipText}>اكتب عنواناً واضحاً، حدّد نطاق خدمتك، وأضف تفاصيل عملية تساعد الجيران على التواصل معك.</Text>
+              <Text style={styles.tipText}>اكتب عنواناً واضحاً، حدّد نطاق خدمتك، وأضف تفاصيل عملية تساعد الجيران على التواصل بسهولة. هذا يزيد فرص ظهور خدمتك في الحي.</Text>
             </View>
           )}
           {/* Service Title */}
