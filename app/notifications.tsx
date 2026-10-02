@@ -215,7 +215,7 @@ export default function Notifications() {
       {/* ======================================================== */}
       <LinearGradient colors={['#065f46', '#059669', '#10b981']} style={styles.headerHero}>
         <View style={styles.headerTopRow}>
-          <Pressable onPress={() => router.back()} style={styles.headerBtn}>
+          <Pressable onPress={() => router.replace('/home')} style={styles.headerBtn}>
             <ChevronRight size={26} color="#fff" />
           </Pressable>
 
