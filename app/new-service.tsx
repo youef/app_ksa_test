@@ -600,4 +600,4 @@ const styles = StyleSheet.create({
   },
 });
 
-// Vercel redeploy trigger: service publishing permissions fixed.
+// Production build trigger: service publishing permissions fixed.
