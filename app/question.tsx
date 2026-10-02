@@ -3,7 +3,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View, Keyboa
 import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
-import { MapPin, MessageCircle, Send, ChevronRight, User, HelpCircle } from 'lucide-react-native';
+import { MapPin, MessageCircle, Send, ChevronRight, User, HelpCircle, Clock3, Reply, Sparkles } from 'lucide-react-native';
 
 export default function Question() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -89,7 +89,7 @@ export default function Question() {
         <Pressable onPress={() => router.back()} style={({pressed}) => [styles.headerBtn, pressed && {opacity: 0.7}]}>
           <ChevronRight size={24} color="#059669" />
         </Pressable>
-        <Text style={styles.headerTitle}>تفاصيل السؤال</Text>
+        <View style={styles.headerCenter}><Text style={styles.headerEyebrow}>حيّنا • نقاش محلي</Text><Text style={styles.headerTitle}>تفاصيل السؤال</Text></View>
         <View style={{ width: 44 }} />
       </View>
 
@@ -97,7 +97,7 @@ export default function Question() {
         <View style={styles.questionCard}>
           <View style={styles.qHeader}>
             <View style={styles.authorBadge}>
-              <HelpCircle size={24} color={C.accent} />
+              <Sparkles size={24} color="#fff" />
             </View>
             <View style={styles.qHeaderTexts}>
               <Text style={styles.qTitle}>{q.title}</Text>
@@ -129,7 +129,7 @@ export default function Question() {
         <View style={styles.answersSection}>
           <View style={styles.answersHeader}>
             <MessageCircle size={22} color={C.ink} />
-            <Text style={styles.answersTitle}>الإجابات والردود ({answers.length})</Text>
+            <View><Text style={styles.answersTitle}>الإجابات والردود</Text><Text style={styles.answersSubtitle}>{answers.length === 0 ? "كن أول من يشارك في النقاش" : `${answers.length} ردود من المجتمع`}</Text></View>
           </View>
 
           {answers.length === 0 ? (
@@ -161,7 +161,7 @@ export default function Question() {
         </View>
       </ScrollView>
 
-      <View style={styles.inputWrapper}>
+      <View style={styles.inputWrapper}><View style={styles.replyHint}><Reply size={15} color={C.accent} /><Text style={styles.replyHintText}>شارك رأيك مع أهل الحي</Text></View>
         <View style={styles.inputContainer}>
           <TextInput 
             style={styles.input} 
@@ -231,6 +231,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: C.line,
   },
+  headerCenter: { flex: 1, alignItems: "center" },
+  headerEyebrow: { fontSize: 11, color: "#059669", fontWeight: "800", marginBottom: 3 },
   headerBtn: {
     padding: 8,
     backgroundColor: '#f3f4f6',
@@ -341,6 +343,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 20,
   },
+  answersSubtitle: { fontSize: 12, color: "#94a3b8", fontWeight: "700", textAlign: "right", marginTop: 3 },
   answersTitle: {
     fontSize: 20,
     fontWeight: '900',
@@ -411,6 +414,8 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     fontWeight: '500',
   },
+  replyHint: { flexDirection: "row-reverse", alignItems: "center", justifyContent: "center", gap: 6, marginBottom: 8 },
+  replyHintText: { fontSize: 12, color: "#64748b", fontWeight: "700" },
   inputWrapper: {
     padding: 16,
     backgroundColor: '#fff',
