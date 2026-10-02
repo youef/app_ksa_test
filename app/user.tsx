@@ -317,18 +317,7 @@ export default function UserProfile() {
         {blockedByOther && (
           <View style={styles.blockedNotice}><Lock size={16} color="#dc2626" /><Text style={styles.blockedNoticeText}>هذا المستخدم حظرك. يمكنك الاطلاع على منشوراته العامة فقط.</Text></View>
         )}
-        {blockedByOther && (
-          <View style={[styles.noticeBanner, styles.blockedNotice]}>
-            <UserX size={18} color="#b91c1c" />
-            <Text style={styles.noticeText}>أنت حظرت هذا الحساب؛ نشاطه مخفي عنك.</Text>
-            <Pressable onPress={confirmToggleBlock} disabled={blockSaving} style={styles.noticeAction}><Text style={styles.noticeActionText}>إلغاء</Text></Pressable>
-          </View>
-        )}
-        {blockedByOther && (
-          <View style={[styles.noticeBanner, styles.mutedNotice]}>
-            <Lock size={18} color="#475569" /><Text style={styles.noticeText}>هذا الحساب حظرك؛ النشاط والتواصل غير متاحين.</Text>
-          </View>
-        )}
+
 
         <View style={styles.profileCard}>
           <View style={styles.profileActionsTop}>
