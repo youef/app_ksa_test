@@ -190,8 +190,8 @@ export default function StoryViewer() {
       if (!replyErr) {
         setSending(false);
         Alert.alert('تم! ✅', 'وصل ردك لصاحب القصة في الرسائل الخاصة', [
-          { text: 'عرض الرسائل', onPress: () => router.push('/messages') },
-          { text: 'حسناً' },
+          { text: 'فتح الدردشة', onPress: () => router.replace('/messages') },
+          { text: 'لاحقاً' },
         ]);
         return;
       }
@@ -236,8 +236,8 @@ export default function StoryViewer() {
 
         setSending(false);
         Alert.alert('تم! ✅', 'وصل ردك في الرسائل الخاصة', [
-          { text: 'عرض الرسائل', onPress: () => router.push('/messages') },
-          { text: 'حسناً' },
+          { text: 'فتح الدردشة', onPress: () => router.replace('/messages') },
+          { text: 'لاحقاً' },
         ]);
       } else {
         setSending(false);
