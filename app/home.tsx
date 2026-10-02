@@ -30,7 +30,6 @@ export default function Home() {
   const [requests, setRequests] = useState<any[]>([]);
   const [stories, setStories] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
-  const [newPostsCount, setNewPostsCount] = useState(0);
   const [activeTab, setActiveTab] = useState<'all' | 'emergency' | 'tools' | 'questions' | 'requests' | 'mine'>('all');
   const [greeting, setGreeting] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -52,8 +51,6 @@ export default function Home() {
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
 
   // Toast feedback state
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const toastAnim = useRef(new Animated.Value(0)).current;
 
   // Animation for FAB
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -304,7 +301,7 @@ export default function Home() {
     } else {
       setRequests([]);
     }
-  }, [selectedCity]);
+  }, []);
 
   useFocusEffect(useCallback(() => { load() }, [load]));
 
@@ -1646,30 +1643,6 @@ const styles = StyleSheet.create({
   fTabTextActive: {
     color: '#fff',
   },
-  newPostsBanner: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 54 : 40,
-    alignSelf: 'center',
-    zIndex: 9999,
-    backgroundColor: '#059669',
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 30,
-    shadowColor: '#059669',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 8,
-  },
-  newPostsBannerText: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-
   // Empty state & FAB
   emptyContainer: {
     alignItems: 'center',
