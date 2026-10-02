@@ -363,7 +363,7 @@ export default function UserProfile() {
           <View style={styles.statsGrid}>
             {[
               ['استفسار', stats.questions], ['طلب مساعدة', stats.requests], ['خدمة', stats.services],
-              ['رد', stats.answers], ['متابع', stats.followers], ['يتابع', stats.following],
+              ['متابع', stats.followers], ['يتابع', stats.following],
             ].map(([label, value]) => <View key={String(label)} style={styles.statCell}><Text style={styles.statValue}>{value}</Text><Text style={styles.statLabel}>{label}</Text></View>)}
           </View>
           {isFollowedBy && !isOwnProfile && !restricted && <Text style={styles.mutualNote}>يتابعك هذا الحساب أيضاً</Text>}
