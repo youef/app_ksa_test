@@ -31,7 +31,9 @@ export default function UserProfile() {
   const [blockSaving, setBlockSaving] = useState(false);
   const [messageOpening, setMessageOpening] = useState(false);
   const [sameNeighborhood, setSameNeighborhood] = useState(false);
-  const [activeTab, setActiveTab] = useState<'questions' | 'requests' | 'services' | 'answers'>('questions');
+  const [activeTab, setActiveTab] = useState<'questions' | 'requests' | 'services'>('services');
+  const [reputation, setReputation] = useState<any>(null);
+  const [badges, setBadges] = useState<any[]>([]);
   const [stats, setStats] = useState({ questions: 0, answers: 0, requests: 0, services: 0, followers: 0, following: 0 });
   const [questions, setQuestions] = useState<any[]>([]);
   const [answers, setAnswers] = useState<any[]>([]);
@@ -92,7 +94,7 @@ export default function UserProfile() {
           return;
         }
 
-        const [qCount, aCount, requestCount, serviceCount, followersCount, followingCount, questionRows, answerRows, requestRows, serviceRows] = await Promise.all([
+        const [qCount, aCount, requestCount, serviceCount, followersCount, followingCount, questionRows, answerRows, requestRows, serviceRows, reputationRes, badgesRes] = await Promise.all([
           supabase.from('questions').select('id', { count: 'exact', head: true }).eq('author_id', id),
           supabase.from('answers').select('id', { count: 'exact', head: true }).eq('author_id', id),
           supabase.from('requests').select('id', { count: 'exact', head: true }).eq('requester_id', id),
@@ -103,6 +105,8 @@ export default function UserProfile() {
           supabase.from('answers').select('id, body, created_at, question_id, questions(title)').eq('author_id', id).order('created_at', { ascending: false }).limit(30),
           supabase.from('requests').select('id, title, description, status, request_type, budget, is_urgent, city, district, created_at').eq('requester_id', id).order('created_at', { ascending: false }).limit(30),
           supabase.from('services').select('id, name, description, category, city, district, price_from, price_to, available_now, is_verified, created_at').eq('provider_id', id).order('created_at', { ascending: false }).limit(30),
+          supabase.from('reputation').select('points, answers_count, helpful_votes, best_answers').eq('user_id', id).maybeSingle(),
+          supabase.from('profile_badges').select('badge_code, awarded_at, badge_definitions(code,name,icon,description)').eq('user_id', id).order('awarded_at', { ascending: false }).limit(8),
         ]);
         if (!active) return;
         setStats({
@@ -113,6 +117,8 @@ export default function UserProfile() {
         setAnswers(answerRows.data || []);
         setRequests(requestRows.data || []);
         setServices(serviceRows.data || []);
+        setReputation(reputationRes.data || null);
+        setBadges(badgesRes.data || []);
       } catch (error) {
         console.error('Public profile load failed:', error);
         if (active) setP(null);
@@ -139,16 +145,16 @@ export default function UserProfile() {
     setFollowSaving(true);
     try {
       if (isFollowing) {
-        const { error } = await supabase.from('follows').delete().eq('follower_id', currentUserId).eq('following_id', id);
+        const { error } = await supabase.rpc('hayna_toggle_follow', { p_target: id });
         if (error) throw error;
         setIsFollowing(false);
         setStats(s => ({ ...s, followers: Math.max(0, s.followers - 1) }));
         setRefreshKey(value => value + 1);
       } else {
-        const { error } = await supabase.from('follows').insert({ follower_id: currentUserId, following_id: id });
+        const { data: followed, error } = await supabase.rpc('hayna_toggle_follow', { p_target: id });
         if (error) throw error;
-        setIsFollowing(true);
-        setStats(s => ({ ...s, followers: s.followers + 1 }));
+        setIsFollowing(followed === true);
+        setStats(s => ({ ...s, followers: followed === true ? s.followers + 1 : s.followers }));
         setRefreshKey(value => value + 1);
       }
     } catch (e: any) {
@@ -250,44 +256,9 @@ export default function UserProfile() {
     setMessageOpening(true);
 
     try {
-      // 1. Fetch current user's conversations
-      const { data: myConvs } = await supabase
-        .from('conversation_members')
-        .select('conversation_id')
-        .eq('user_id', myId);
-
-      const myConvIds = (myConvs || []).map(c => c.conversation_id);
-      let targetConvId = null;
-
-      if (myConvIds.length > 0) {
-        const { data: sharedConvs } = await supabase
-          .from('conversation_members')
-          .select('conversation_id')
-          .eq('user_id', id)
-          .in('conversation_id', myConvIds);
-
-        if (sharedConvs && sharedConvs.length > 0) {
-          targetConvId = sharedConvs[0].conversation_id;
-        }
-      }
-
-      if (!targetConvId) {
-        const { data: newConv, error: convError } = await supabase
-          .from('conversations')
-          .insert({})
-          .select('id')
-          .single();
-
-        if (convError) throw convError;
-        targetConvId = newConv.id;
-
-        const { error: memberError } = await supabase.from('conversation_members').insert([
-          { conversation_id: targetConvId, user_id: currentUserId },
-          { conversation_id: targetConvId, user_id: id },
-        ]);
-        if (memberError) throw memberError;
-      }
-
+      const { data: targetConvId, error: convError } = await supabase.rpc('hayna_get_or_create_direct_conversation', { p_target: id });
+      if (convError) throw convError;
+      if (!targetConvId) throw new Error('تعذر إنشاء المحادثة');
       router.push({ pathname: '/conversation', params: { id: targetConvId } });
     } catch (e: any) {
       Alert.alert('خطأ في بدء المحادثة', e.message || 'تعذر بدء المحادثة.');
@@ -317,10 +288,9 @@ export default function UserProfile() {
   const restricted = isLocked || isBlocked || blockedByOther || (isAnonymous && !isOwnProfile);
   const statusLabel: Record<string, string> = { open: 'مفتوح', accepted: 'تم قبول المساعدة', closed: 'مكتمل', pending: 'قيد المراجعة' };
   const tabs = [
+    { key: 'services' as const, label: 'الخدمات', count: stats.services },
     { key: 'questions' as const, label: 'الاستفسارات', count: stats.questions },
     { key: 'requests' as const, label: 'الطلبات', count: stats.requests },
-    { key: 'services' as const, label: 'الخدمات', count: stats.services },
-    { key: 'answers' as const, label: 'الردود', count: stats.answers },
   ];
 
   return (
@@ -397,6 +367,11 @@ export default function UserProfile() {
             ].map(([label, value]) => <View key={String(label)} style={styles.statCell}><Text style={styles.statValue}>{value}</Text><Text style={styles.statLabel}>{label}</Text></View>)}
           </View>
           {isFollowedBy && !isOwnProfile && !restricted && <Text style={styles.mutualNote}>يتابعك هذا الحساب أيضاً</Text>}
+          {!restricted && (reputation || badges.length > 0) && <View style={styles.rewardCard}>
+            <View style={styles.rewardHeader}><Text style={styles.rewardTitle}>أثره في الحي</Text><Text style={styles.rewardPoints}>{reputation?.points || 0} نقطة</Text></View>
+            <View style={styles.rewardStats}><Text style={styles.rewardStat}>💡 {reputation?.answers_count || 0} ردود</Text><Text style={styles.rewardStat}>🏆 {reputation?.best_answers || 0} أفضل إجابة</Text><Text style={styles.rewardStat}>🤝 {reputation?.helpful_votes || 0} مفيدة</Text></View>
+            {badges.length > 0 && <View style={styles.badgesRow}>{badges.map((b:any) => <View key={b.badge_code} style={styles.rewardBadge}><Text style={styles.rewardBadgeIcon}>{b.badge_definitions?.icon || '🏅'}</Text><Text style={styles.rewardBadgeText}>{b.badge_definitions?.name || b.badge_code}</Text></View>)}</View>}
+          </View>}
         </View>
 
         {isLocked && !isBlocked && !blockedByOther && (
@@ -441,7 +416,7 @@ export default function UserProfile() {
               </Pressable>
             )) : <Text style={styles.emptyState}>لا توجد خدمات معلنة.</Text>)}
 
-            {activeTab === 'answers' && (answers.length ? answers.map(item => (
+            {false && activeTab === 'questions' && answers.length > 0 && (answers.length ? answers.map(item => (
               <Pressable key={item.id} style={styles.contentItem} onPress={() => router.push({ pathname: '/question', params: { id: item.question_id } })}>
                 <View style={styles.itemIcon}><MessageCircle size={18} color="#2563eb" /></View>
                 <View style={styles.itemBody}><View style={styles.itemMetaRow}><Text style={styles.itemEyebrow}>رد على استفسار</Text><Text style={styles.itemDate}>{new Date(item.created_at).toLocaleDateString('ar-SA')}</Text></View><Text style={styles.itemTitle}>{item.questions?.title || 'استفسار من الحي'}</Text><Text style={styles.itemDescription}>{item.body}</Text></View>
@@ -511,6 +486,15 @@ const styles = StyleSheet.create({
   statValue: { color: '#0f172a', fontSize: 16, fontWeight: '900' },
   statLabel: { color: '#64748b', fontSize: 11, marginTop: 2 },
   mutualNote: { textAlign: 'right', color: '#059669', fontSize: 11, fontWeight: '700', marginTop: 7 },
+  rewardCard: { marginTop: 14, padding: 14, borderRadius: 18, backgroundColor: '#f8fffb', borderWidth: 1, borderColor: '#d1fae5' },
+  rewardHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' },
+  rewardTitle: { color: '#064e3b', fontSize: 14, fontWeight: '900' },
+  rewardPoints: { color: '#047857', fontSize: 15, fontWeight: '900' },
+  rewardStats: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8, marginTop: 9 },
+  rewardStat: { color: '#475569', fontSize: 11, fontWeight: '800' },
+  rewardBadge: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: '#d1fae5', paddingHorizontal: 8, paddingVertical: 5 },
+  rewardBadgeIcon: { fontSize: 14 },
+  rewardBadgeText: { color: '#065f46', fontSize: 10, fontWeight: '900' },
   lockedCard: { backgroundColor: '#fff', borderRadius: 20, alignItems: 'center', padding: 24, marginBottom: 14, borderWidth: 1, borderColor: '#e2e8f0' },
   lockIcon: { width: 54, height: 54, borderRadius: 27, backgroundColor: '#ecfdf5', alignItems: 'center', justifyContent: 'center', marginBottom: 11 },
   lockedTitle: { color: '#0f172a', fontSize: 17, fontWeight: '900', textAlign: 'center' },
