@@ -31,6 +31,11 @@ import {
   User,
   Lock,
   Moon,
+  Paperclip,
+  Smile,
+  Wifi,
+  WifiOff,
+  MessageCircle,
 } from 'lucide-react-native';
 import {
   clearForMe,
@@ -60,6 +65,10 @@ export default function Conversation() {
   const [blockedMe, setBlockedMe] = useState(false);
   const [dndActive, setDndActive] = useState(false);
   const [otherDnd, setOtherDnd] = useState(false);
+  const [otherTyping, setOtherTyping] = useState(false);
+  const [isOnline, setIsOnline] = useState(false);
+  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const channelRef = useRef<any>(null);
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
@@ -143,25 +152,74 @@ export default function Conversation() {
   }, [convId]);
 
   useEffect(() => {
-    load();
+    let alive = true;
     const ch = supabase
-      .channel('chat-' + convId)
+      .channel('chat-' + convId, { config: { broadcast: { self: false }, presence: { key: currentUserId || undefined } } })
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${convId}` },
         payload => {
-          setMessages(prev => [...prev, payload.new]);
-          setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+          setMessages(prev => prev.some(m => m.id === payload.new.id) ? prev : [...prev, payload.new]);
+          setOtherTyping(false);
+          setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 40);
+          if (payload.new.sender_id !== currentUserId) {
+            void markConversationRead(convId, currentUserId);
+          }
         }
       )
-      .subscribe();
+      .on('broadcast', { event: 'typing' }, ({ payload }: any) => {
+        if (!alive || payload?.userId === currentUserId) return;
+        setOtherTyping(!!payload?.typing);
+      })
+      .on('presence', { event: 'sync' }, () => {
+        const state = ch.presenceState();
+        const someoneElse = Object.keys(state).some(key => key !== currentUserId);
+        setIsOnline(someoneElse);
+      })
+      .on('presence', { event: 'join' }, ({ key }: any) => {
+        if (key !== currentUserId) setIsOnline(true);
+      })
+      .on('presence', { event: 'leave' }, ({ key }: any) => {
+        if (key !== currentUserId) setIsOnline(false);
+      })
+      .subscribe(async status => {
+        if (status === 'SUBSCRIBED') {
+          await ch.track({ userId: currentUserId, onlineAt: new Date().toISOString() });
+        }
+      });
+
+    channelRef.current = ch;
+    load();
 
     return () => {
+      alive = false;
+      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+      channelRef.current = null;
+      void ch.untrack();
       supabase.removeChannel(ch);
     };
-  }, [convId, load]);
+  }, [convId, load, currentUserId]);
 
   // ------------------------------------------------------------ actions
+
+  async function broadcastTyping(typing: boolean) {
+    try {
+      await channelRef.current?.send({
+        type: 'broadcast',
+        event: 'typing',
+        payload: { userId: currentUserId, typing },
+      });
+    } catch {}
+  }
+
+  function handleBodyChange(value: string) {
+    setBody(value);
+    void broadcastTyping(true);
+    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+    typingTimerRef.current = setTimeout(() => {
+      void broadcastTyping(false);
+    }, 900);
+  }
 
   async function send() {
     if (!body.trim() || sending) return;
@@ -178,6 +236,8 @@ export default function Conversation() {
     setSending(true);
     const trimmed = body.trim();
     setBody('');
+    void broadcastTyping(false);
+    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
 
     const { error } = await supabase.from('messages').insert({
       conversation_id: convId,
@@ -332,6 +392,11 @@ export default function Conversation() {
           </View>
         </Pressable>
 
+        <View style={styles.headerStatusPill}>
+          {otherTyping ? <MessageCircle size={13} color="#059669" /> : isOnline ? <Wifi size={13} color="#059669" /> : <WifiOff size={13} color="#94a3b8" />}
+          <Text style={styles.headerStatusText}>{otherTyping ? 'يكتب الآن...' : isOnline ? 'متصل الآن' : 'غير متصل'}</Text>
+        </View>
+
         <View style={styles.headerActions}>
           <Pressable style={styles.headerActionBtn} onPress={() => setOptionsOpen(true)}>
             <MoreHorizontal size={22} color="#374151" />
@@ -465,6 +530,14 @@ export default function Conversation() {
         </View>
       ) : (
         <View style={styles.inputArea}>
+          <Pressable style={styles.emojiButton} onPress={() => handleBodyChange(body + ' 😊')}>
+            <Smile size={21} color="#64748b" />
+          </Pressable>
+
+          <Pressable style={styles.attachButton} onPress={() => Alert.alert('إرفاق', 'يمكن إضافة الصور والملفات هنا في الخطوة التالية.')}>
+            <Paperclip size={20} color="#64748b" />
+          </Pressable>
+
           <Pressable
             style={[styles.sendButton, !body.trim() && styles.sendButtonDisabled]}
             onPress={send}
@@ -480,7 +553,7 @@ export default function Conversation() {
           <TextInput
             style={styles.textInput}
             value={body}
-            onChangeText={setBody}
+            onChangeText={handleBodyChange}
             placeholder="اكتب رسالة لجيرانك..."
             placeholderTextColor="#9ca3af"
             multiline
@@ -645,6 +718,17 @@ const styles = StyleSheet.create({
   headerNameRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
   headerName: { color: '#0f172a', fontSize: 15, fontWeight: '800' },
   headerCity: { color: '#64748b', fontSize: 11, fontWeight: '600', marginTop: 1 },
+  headerStatusPill: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 12,
+    backgroundColor: '#f0fdf4',
+    marginLeft: 6,
+  },
+  headerStatusText: { color: '#059669', fontSize: 10, fontWeight: '800' },
   headerActions: { flexDirection: 'row-reverse' },
   headerActionBtn: { padding: 6 },
 
@@ -692,7 +776,7 @@ const styles = StyleSheet.create({
   noticeInfoText: { color: '#0369a1', fontSize: 11, fontWeight: '700' },
 
   messagesList: { flex: 1 },
-  messagesContent: { padding: 16 },
+  messagesContent: { paddingHorizontal: 12, paddingTop: 14, paddingBottom: 8, minHeight: '100%' },
   dateDivider: {
     textAlign: 'center',
     color: '#94a3b8',
@@ -718,7 +802,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   otherAvatarLetter: { fontSize: 12, fontWeight: '700', color: '#64748b' },
-  msgBubble: { maxWidth: '78%', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 9 },
+  msgBubble: { maxWidth: Platform.OS === 'web' ? 620 : '82%', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 9 },
   msgBubbleMine: { backgroundColor: '#059669', borderBottomLeftRadius: 4 },
   msgBubbleOther: {
     backgroundColor: '#fff',
@@ -765,14 +849,18 @@ const styles = StyleSheet.create({
 
   inputArea: {
     flexDirection: 'row-reverse',
+    minHeight: 62,
     alignItems: 'center',
     backgroundColor: '#fff',
     borderTopWidth: 1,
     borderTopColor: '#f1f5f9',
     paddingHorizontal: 12,
     paddingVertical: 8,
-    gap: 8,
+    gap: 6,
+    paddingBottom: Platform.OS === 'ios' ? 10 : 8,
   },
+  emojiButton: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f1f5f9' },
+  attachButton: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f1f5f9' },
   textInput: {
     flex: 1,
     backgroundColor: '#f8fafc',
@@ -792,7 +880,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sendButtonDisabled: { opacity: 0.4 },
+  sendButtonDisabled: { opacity: 0.35 },
   blockedInputArea: {
     backgroundColor: '#fff',
     borderTopWidth: 1,
