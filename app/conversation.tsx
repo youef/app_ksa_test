@@ -51,6 +51,7 @@ import {
 } from '@/lib/chatControls';
 import { syncDndWithNotifications } from '@/lib/notifications';
 import * as ImagePicker from 'expo-image-picker';
+import { LinearGradient } from 'expo-linear-gradient';
 
 export default function Conversation() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -504,9 +505,9 @@ export default function Conversation() {
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <View style={styles.header}>
+      <LinearGradient colors={['#064e3b', '#047857', '#059669']} start={{x:0,y:0}} end={{x:1,y:1}} style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <ChevronRight size={26} color="#059669" />
+          <ChevronRight size={26} color="#ffffff" />
         </Pressable>
 
         <Pressable
@@ -543,10 +544,10 @@ export default function Conversation() {
 
         <View style={styles.headerActions}>
           <Pressable style={styles.headerActionBtn} onPress={() => setOptionsOpen(true)}>
-            <MoreHorizontal size={22} color="#374151" />
+            <MoreHorizontal size={22} color="#ffffff" />
           </Pressable>
         </View>
-      </View>
+      </LinearGradient>
 
       {/* Banners: block wins, then mute, then DND context */}
       {blockedByMe ? (
@@ -845,9 +846,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: Platform.OS === 'ios' ? 52 : 36,
     paddingBottom: 14,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    backgroundColor: 'transparent',
+    borderBottomWidth: 0,
+    borderBottomColor: 'transparent',
   },
   backBtn: { padding: 6 },
   headerUser: { flexDirection: 'row-reverse', alignItems: 'center', flex: 1, marginRight: 10, gap: 10 },
@@ -856,15 +857,15 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: '#ecfdf5',
+    backgroundColor: 'rgba(255,255,255,0.16)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerAvatarLetter: { color: '#059669', fontSize: 16, fontWeight: '800' },
+  headerAvatarLetter: { color: '#fff', fontSize: 16, fontWeight: '900' },
   headerInfo: { alignItems: 'flex-end', flex: 1 },
   headerNameRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
-  headerName: { color: '#0f172a', fontSize: 15, fontWeight: '800' },
-  headerCity: { color: '#64748b', fontSize: 11, fontWeight: '600', marginTop: 1 },
+  headerName: { color: '#fff', fontSize: 16, fontWeight: '900' },
+  headerCity: { color: 'rgba(255,255,255,0.78)', fontSize: 11, fontWeight: '600', marginTop: 2 },
   headerStatusPill: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
@@ -872,10 +873,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 5,
     borderRadius: 12,
-    backgroundColor: '#f0fdf4',
+    backgroundColor: 'rgba(255,255,255,0.14)',
     marginLeft: 6,
   },
-  headerStatusText: { color: '#059669', fontSize: 10, fontWeight: '800' },
+  headerStatusText: { color: '#fff', fontSize: 10, fontWeight: '900' },
   headerActions: { flexDirection: 'row-reverse' },
   headerActionBtn: { padding: 6 },
 
@@ -922,8 +923,8 @@ const styles = StyleSheet.create({
   },
   noticeInfoText: { color: '#0369a1', fontSize: 11, fontWeight: '700' },
 
-  messagesList: { flex: 1, width: '100%' },
-  messagesContent: { paddingHorizontal: 12, paddingTop: 14, paddingBottom: 8, minHeight: '100%' },
+  messagesList: { flex: 1, width: '100%', backgroundColor: '#f8fafc' },
+  messagesContent: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 12, minHeight: '100%' },
   dateDivider: {
     textAlign: 'center',
     color: '#94a3b8',
@@ -950,9 +951,10 @@ const styles = StyleSheet.create({
   },
   otherAvatarLetter: { fontSize: 12, fontWeight: '700', color: '#64748b' },
   msgBubble: { maxWidth: Platform.OS === 'web' ? 620 : '82%', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 9 },
-  msgBubbleMine: { backgroundColor: '#059669', borderBottomLeftRadius: 4 },
+  msgBubbleMine: { backgroundColor: '#059669', borderBottomLeftRadius: 4, shadowColor: '#064e3b', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.10, shadowRadius: 6, elevation: 2 },
   msgBubbleOther: {
     backgroundColor: '#fff',
+    shadowColor: '#0f172a', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 5, elevation: 1,
     borderBottomRightRadius: 4,
     borderWidth: 1,
     borderColor: '#e2e8f0',
@@ -994,7 +996,7 @@ const styles = StyleSheet.create({
   },
   emptyConvHint: { fontSize: 12, color: '#059669', fontWeight: '700' },
 
-  composerWrap: { borderTopWidth: 1, borderTopColor: '#e2e8f0', backgroundColor: '#fff' },
+  composerWrap: { borderTopWidth: 1, borderTopColor: '#e2e8f0', backgroundColor: '#fff', paddingTop: 8, paddingBottom: Platform.OS === 'ios' ? 8 : 6 },
   stickerPanel: { paddingTop: 10, paddingBottom: 8, backgroundColor: '#f8fafc', borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
   stickerTitle: { textAlign: 'right', paddingHorizontal: 14, color: '#334155', fontSize: 12, fontWeight: '800', marginBottom: 6 },
   stickerRow: { flexDirection: 'row', paddingHorizontal: 10, gap: 5 },
@@ -1008,18 +1010,20 @@ const styles = StyleSheet.create({
     minHeight: 62,
     alignItems: 'center',
     backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
+    borderTopWidth: 0,
+    borderTopColor: 'transparent',
     paddingHorizontal: 12,
     paddingVertical: 8,
     gap: 6,
     paddingBottom: Platform.OS === 'ios' ? 10 : 8,
   },
-  emojiButton: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f1f5f9' },
-  attachButton: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f1f5f9' },
+  emojiButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: '#ecfdf5', borderWidth: 1, borderColor: '#d1fae5' },
+  attachButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0' },
   textInput: {
     flex: 1,
     backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -1029,8 +1033,8 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   sendButton: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     borderRadius: 20,
     backgroundColor: '#059669',
     alignItems: 'center',
