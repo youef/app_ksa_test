@@ -29,6 +29,7 @@ export default function Market() {
     city: 'كل المدن',
     district: 'كل الأحياء',
   });
+
   useEffect(() => {
     const loadHeader = async () => {
       const { data: u } = await supabase.auth.getUser();
@@ -57,7 +58,7 @@ export default function Market() {
         profiles:provider_id(display_name, avatar_url, is_verified)
       `)
       .order('created_at', { ascending: false });
-    
+
     if (error) {
       setLoadError(true);
       setItems([]);
@@ -105,11 +106,11 @@ export default function Market() {
         <View style={styles.cardHeader}>
           <Text style={styles.itemTitle}>{item.name}</Text>
           <View style={styles.priceTag}>
-          <Text style={styles.priceText}>{item.price_from != null ? `${item.price_from} ر.س` : 'حسب الاتفاق'}</Text>
+            <Text style={styles.priceText}>{item.price_from != null ? `${item.price_from} ر.س` : 'حسب الاتفاق'}</Text>
           </View>
         </View>
         <Text style={styles.itemDesc} numberOfLines={2}>{item.description}</Text>
-        
+
         <View style={styles.providerInfo}>
           {item.profiles?.avatar_url ? (
             <Image source={{ uri: item.profiles.avatar_url }} style={styles.avatar} />
@@ -188,57 +189,57 @@ export default function Market() {
               <ScreenState type="error" title="تعذر تحميل السوق" message="اسحب للتحديث وحاول مرة أخرى" />
             </View>
           ) : (
-          <>
-          <View style={styles.heroCard}>
-          <View style={styles.heroGlowOne} />
-          <View style={styles.heroGlowTwo} />
-          <View style={styles.heroTop}><View style={styles.heroIcon}><ShoppingBag size={24} color="#d1fae5" /></View><Text style={styles.heroEyebrow}>سوق الجيران</Text></View>
-          <Text style={styles.heroTitle}>كل ما تحتاجه،{`\n`}من أهل حيك</Text>
-          <Text style={styles.heroSubtitle}>اكتشف خدمات ومنتجات محلية وادعم أصحاب المشاريع القريبة.</Text>
-          <View style={styles.heroActions}>
-            <Pressable style={styles.heroAddButton} onPress={() => router.push('/new-service')}>
-              <Plus size={17} color="#065f46" />
-              <Text style={styles.heroAddText}>أضف عرضك</Text>
-            </Pressable>
-          </View>
-          <View style={styles.heroStats}><View><Text style={styles.statValue}>{displayedItems.length}</Text><Text style={styles.statLabel}>عرض متاح</Text></View><View style={styles.statDivider} /><View><Text style={styles.statValue}>{activeLoc.city}</Text><Text style={styles.statLabel}>نطاق التصفح</Text></View></View>
-          <View style={styles.heroDecor}><Sparkles size={76} color="rgba(255,255,255,0.10)" /></View>
-          </View>
-        
-        <View style={styles.sectionHeading}><View><Text style={styles.sectionTitle}>تصفّح السوق</Text><Text style={styles.sectionHint}>اختر القسم المناسب لك</Text></View><SlidersHorizontal size={18} color="#64748b" /></View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesRow}>
-          {availableCategories.map((category) => (
-            <Pressable 
-              key={category} 
-              style={[styles.categoryPill, activeCategory === category && styles.categoryPillActive]}
-              onPress={() => setActiveCategory(category)}
-            >
-              <Text style={[styles.categoryText, activeCategory === category && { color: '#fff' }]}>{category}</Text>
-            </Pressable>
-          ))}
-        </ScrollView>
+            <>
+              <View style={styles.heroCard}>
+                <View style={styles.heroGlowOne} />
+                <View style={styles.heroGlowTwo} />
+                <View style={styles.heroTop}><View style={styles.heroIcon}><ShoppingBag size={24} color="#d1fae5" /></View><Text style={styles.heroEyebrow}>سوق الجيران</Text></View>
+                <Text style={styles.heroTitle}>كل ما تحتاجه،{`\n`}من أهل حيك</Text>
+                <Text style={styles.heroSubtitle}>اكتشف خدمات ومنتجات محلية وادعم أصحاب المشاريع القريبة.</Text>
+                <View style={styles.heroActions}>
+                  <Pressable style={styles.heroAddButton} onPress={() => router.push('/new-service')}>
+                    <Plus size={17} color="#065f46" />
+                    <Text style={styles.heroAddText}>أضف عرضك</Text>
+                  </Pressable>
+                </View>
+                <View style={styles.heroStats}><View><Text style={styles.statValue}>{displayedItems.length}</Text><Text style={styles.statLabel}>عرض متاح</Text></View><View style={styles.statDivider} /><View><Text style={styles.statValue}>{activeLoc.city}</Text><Text style={styles.statLabel}>نطاق التصفح</Text></View></View>
+                <View style={styles.heroDecor}><Sparkles size={76} color="rgba(255,255,255,0.10)" /></View>
+              </View>
 
-        <View style={styles.listContainer}>
-          <View style={styles.resultsHeader}><Text style={styles.resultCount}>{displayedItems.length} نتيجة</Text><View style={styles.latestLabel}><Clock3 size={13} color="#64748b" /><Text style={styles.latestText}>الأحدث</Text></View></View>
-          {displayedItems.length > 0 ? (
-            displayedItems.map(item => (
-              <React.Fragment key={item.id}>
-                {renderItem({ item })}
-              </React.Fragment>
-            ))
-          ) : (
-            <View style={styles.emptyState}>
-              <ShoppingBag size={48} color="#cbd5e1" />
-              <Text style={styles.emptyText}>
-                {!isAllKingdom(activeLoc.city)
-                  ? `لا توجد خدمات متاحة حالياً في ${activeLoc.city}${activeLoc.district !== 'كل الأحياء' ? ` (حي ${activeLoc.district})` : ''}`
-                  : 'لا توجد عروض في هذا القسم حالياً'}
-              </Text>
-            </View>
+              <View style={styles.sectionHeading}><View><Text style={styles.sectionTitle}>تصفّح السوق</Text><Text style={styles.sectionHint}>اختر القسم المناسب لك</Text></View><SlidersHorizontal size={18} color="#64748b" /></View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesRow}>
+                {availableCategories.map((category) => (
+                  <Pressable
+                    key={category}
+                    style={[styles.categoryPill, activeCategory === category && styles.categoryPillActive]}
+                    onPress={() => setActiveCategory(category)}
+                  >
+                    <Text style={[styles.categoryText, activeCategory === category && { color: '#fff' }]}>{category}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+
+              <View style={styles.listContainer}>
+                <View style={styles.resultsHeader}><Text style={styles.resultCount}>{displayedItems.length} نتيجة</Text><View style={styles.latestLabel}><Clock3 size={13} color="#64748b" /><Text style={styles.latestText}>الأحدث</Text></View></View>
+                {displayedItems.length > 0 ? (
+                  displayedItems.map(item => (
+                    <React.Fragment key={item.id}>
+                      {renderItem({ item })}
+                    </React.Fragment>
+                  ))
+                ) : (
+                  <View style={styles.emptyState}>
+                    <ShoppingBag size={48} color="#cbd5e1" />
+                    <Text style={styles.emptyText}>
+                      {!isAllKingdom(activeLoc.city)
+                        ? `لا توجد خدمات متاحة حالياً في ${activeLoc.city}${activeLoc.district !== 'كل الأحياء' ? ` (حي ${activeLoc.district})` : ''}`
+                        : 'لا توجد عروض في هذا القسم حالياً'}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </>
           )}
-        </View>
-          )}
-          </>
         </View>
       </ScrollView>
 
