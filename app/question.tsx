@@ -3,6 +3,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View, Keyboa
 import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
+import BottomNav from '@/components/BottomNav';
 import { MapPin, MessageCircle, Send, ChevronRight, User, Clock3, Reply, Sparkles, CheckCircle2, ThumbsUp, ThumbsDown, Lock, CircleCheck, Award } from 'lucide-react-native';
 
 export default function Question() {
@@ -14,6 +15,7 @@ export default function Question() {
   const [submitting, setSubmitting] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [voting, setVoting] = useState<string | null>(null);
+  const [replyTo, setReplyTo] = useState<any | null>(null);
 
   async function load() {
     setLoading(true);
@@ -65,7 +67,8 @@ export default function Question() {
     const r = await supabase.from('answers').insert({
       question_id: id,
       author_id: u.user.id,
-      body: body.trim()
+      body: body.trim(),
+      parent_answer_id: replyTo?.id ?? null
     });
 
     setSubmitting(false);
@@ -73,6 +76,7 @@ export default function Question() {
       Alert.alert('خطأ', r.error.message);
     } else {
       setBody('');
+      setReplyTo(null);
       load();
     }
   }
@@ -129,10 +133,10 @@ export default function Question() {
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.container}>
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={({pressed}) => [styles.headerBtn, pressed && {opacity: 0.7}]}>
-          <ChevronRight size={24} color="#059669" />
+          <ChevronRight size={24} color="#fff" />
         </Pressable>
         <View style={styles.headerCenter}><Text style={styles.headerEyebrow}>حيّنا • نقاش محلي</Text><Text style={styles.headerTitle}>تفاصيل السؤال</Text></View>
-        <View style={{ width: 44 }} />
+        <Pressable onPress={() => router.push('/notifications')} style={styles.headerBtn}><MessageCircle size={21} color="#fff" /></Pressable>
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -197,8 +201,10 @@ export default function Question() {
                   </View>
                 </View>
                 <Text style={styles.answerBody}>{a.body}</Text>
+                {a.parent_answer_id ? <View style={styles.replyToPill}><Reply size={13} color="#059669" /><Text style={styles.replyToText}>رد على تعليق سابق</Text></View> : null}
                 {q.best_answer_id === a.id ? <View style={styles.bestBanner}><Award size={16} color="#166534" /><Text style={styles.bestBannerText}>الإجابة المعتمدة</Text></View> : null}
                 <View style={styles.answerActions}>
+                  <Pressable onPress={() => setReplyTo(a)} style={styles.replyBtn}><Reply size={15} color="#475569" /><Text style={styles.replyBtnText}>رد</Text></Pressable>
                   <Pressable onPress={() => voteAnswer(a.id, 1)} style={[styles.voteBtn, a.votes?.some((v: any) => v.voter_id === currentUserId && v.vote === 1) && styles.voteActive]}><ThumbsUp size={16} color={a.votes?.some((v: any) => v.voter_id === currentUserId && v.vote === 1) ? C.accent : '#64748b'} /><Text style={styles.voteText}>{a.votes?.filter((v: any) => v.vote === 1).length || 0}</Text></Pressable>
                   <Pressable onPress={() => voteAnswer(a.id, -1)} style={[styles.voteBtn, a.votes?.some((v: any) => v.voter_id === currentUserId && v.vote === -1) && styles.voteDownActive]}><ThumbsDown size={16} color="#64748b" /><Text style={styles.voteText}>{a.votes?.filter((v: any) => v.vote === -1).length || 0}</Text></Pressable>
                   {currentUserId === q.author_id && q.status === 'open' ? <Pressable onPress={() => chooseBest(a.id)} style={styles.bestBtn}><CircleCheck size={16} color="#fff" /><Text style={styles.bestBtnText}>اعتماد كأفضل إجابة</Text></Pressable> : null}
@@ -209,7 +215,7 @@ export default function Question() {
         </View>
       </ScrollView>
 
-      <View style={styles.inputWrapper}>{q.status !== 'open' ? <View style={styles.closedNotice}><Lock size={16} color="#64748b" /><Text style={styles.closedNoticeText}>تم إغلاق الردود بعد اعتماد الإجابة</Text></View> : null}<View style={styles.replyHint}><Reply size={15} color={C.accent} /><Text style={styles.replyHintText}>شارك رأيك مع أهل الحي</Text></View>
+      <View style={styles.inputWrapper}>{replyTo ? <View style={styles.replyingBar}><Reply size={15} color={C.accent} /><Text style={styles.replyingText}>الرد على {replyTo.profiles?.display_name || replyTo.profiles?.username || 'المستخدم'}</Text><Pressable onPress={() => setReplyTo(null)}><Text style={styles.cancelReply}>إلغاء</Text></Pressable></View> : null}{q.status !== 'open' ? <View style={styles.closedNotice}><Lock size={16} color="#64748b" /><Text style={styles.closedNoticeText}>تم إغلاق الردود بعد اعتماد الإجابة</Text></View> : null}<View style={styles.replyHint}><Reply size={15} color={C.accent} /><Text style={styles.replyHintText}>شارك رأيك مع أهل الحي</Text></View>
         <View style={styles.inputContainer}>
           <TextInput 
             style={styles.input} 
@@ -236,6 +242,7 @@ export default function Question() {
           </Pressable>
         </View>
       </View>
+      <BottomNav />
     </KeyboardAvoidingView>
   );
 }
@@ -275,26 +282,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 60,
     paddingBottom: 20,
-    backgroundColor: '#fff',
+    backgroundColor: '#064e3b',
     borderBottomWidth: 1,
     borderBottomColor: C.line,
   },
   headerCenter: { flex: 1, alignItems: "center" },
-  headerEyebrow: { fontSize: 11, color: "#059669", fontWeight: "800", marginBottom: 3 },
+  headerEyebrow: { fontSize: 11, color: "#a7f3d0", fontWeight: "800", marginBottom: 3 },
   headerBtn: {
     padding: 8,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: 'rgba(255,255,255,0.12)',
     borderRadius: 16,
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: '900',
-    color: C.ink,
+    color: '#fff',
   },
   scroll: {
     flexGrow: 1,
     padding: 24,
-    paddingBottom: 100,
+    paddingBottom: 180,
   },
   questionCard: {
     backgroundColor: C.card,
@@ -460,6 +467,13 @@ const styles = StyleSheet.create({
   bestBtnText: { color: '#fff', fontSize: 12, fontWeight: '900' },
   closedNotice: { flexDirection: 'row-reverse', justifyContent: 'center', alignItems: 'center', gap: 7, paddingBottom: 9 },
   closedNoticeText: { color: '#64748b', fontSize: 12, fontWeight: '800' },
+  replyBtn: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10, backgroundColor: '#f1f5f9', marginRight: 4 },
+  replyBtnText: { color: '#475569', fontSize: 12, fontWeight: '800' },
+  replyToPill: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, alignSelf: 'flex-end', marginTop: 10, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 10, backgroundColor: '#ecfdf5' },
+  replyToText: { color: '#047857', fontSize: 11, fontWeight: '800' },
+  replyingBar: { flexDirection: 'row-reverse', alignItems: 'center', gap: 7, marginBottom: 8, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, backgroundColor: '#ecfdf5' },
+  replyingText: { flex: 1, color: '#047857', fontSize: 12, fontWeight: '800', textAlign: 'right' },
+  cancelReply: { color: '#64748b', fontSize: 11, fontWeight: '800' },
   answerAuthor: {
     fontSize: 16,
     fontWeight: '900',
@@ -486,7 +500,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderTopWidth: 1,
     borderTopColor: C.line,
-    paddingBottom: Platform.OS === 'ios' ? 30 : 16,
+    paddingBottom: Platform.OS === 'ios' ? 92 : 76,
   },
   inputContainer: {
     flexDirection: 'row-reverse',
