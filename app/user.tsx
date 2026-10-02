@@ -279,7 +279,7 @@ export default function UserProfile() {
     return (
       <View style={styles.loadingContainer}>
         <Text style={styles.errorTitle}>تعذر العثور على هذا الحساب</Text>
-        <Pressable style={styles.backButton} onPress={() => router.back()}><Text style={styles.backButtonText}>رجوع</Text></Pressable>
+        <Pressable style={styles.backButton} onPress={() => router.replace('/home')}><Text style={styles.backButtonText}>رجوع</Text></Pressable>
       </View>
     );
   }
@@ -303,7 +303,7 @@ export default function UserProfile() {
       <View style={styles.ambientOrbTwo} />
       <ScrollView contentContainerStyle={styles.page} showsVerticalScrollIndicator={false}>
         <View style={styles.topBar}>
-          <Pressable onPress={() => router.back()} style={styles.topIconButton} accessibilityLabel="رجوع"><ChevronRight size={23} color="#0f172a" /></Pressable>
+          <Pressable onPress={() => router.replace('/home')} style={styles.topIconButton} accessibilityLabel="رجوع"><ChevronRight size={23} color="#0f172a" /></Pressable>
           <View style={{ flex: 1 }}>
             <Text style={styles.topTitle}>الملف الشخصي</Text>
             {!!p.username && <Text style={styles.topSubtitle}>@{p.username}</Text>}
