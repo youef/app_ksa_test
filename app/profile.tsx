@@ -145,21 +145,12 @@ export default function Profile() {
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
-      const refreshProfileAndLocation = async () => {
-        // Load the profile first so the user's name/bio can never be overwritten
-        // by a concurrent location refresh.
+      const refreshProfileOnly = async () => {
         await loadProfile();
-        if (!cancelled) {
-          try {
-            await syncCurrentLocation(false);
-          } catch (error) {
-            console.warn('profile location refresh failed:', error);
-          }
-        }
       };
-      void refreshProfileAndLocation();
+      void refreshProfileOnly();
       return () => { cancelled = true; };
-    }, [loadProfile, syncCurrentLocation])
+    }, [loadProfile])
   );
 
   async function useCurrentLocation() {
