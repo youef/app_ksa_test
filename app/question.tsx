@@ -98,13 +98,6 @@ export default function Question() {
     if (!ok) return;
     const { error } = await supabase.from('questions').update({ best_answer_id: answerId, status: 'solved', solved_at: new Date().toISOString() }).eq('id', id).eq('author_id', currentUserId);
     if (error) return Alert.alert('تعذر اعتماد الإجابة', error.message);
-    await supabase.from('notifications').insert({
-      user_id: answers.find(a => a.id === answerId)?.author_id,
-      type: 'best_answer',
-      title: 'تم اختيار إجابتك',
-      body: 'صاحب السؤال اعتمد إجابتك كأفضل إجابة وأغلق النقاش.',
-      data: { question_id: id, answer_id: answerId },
-    });
     load();
   }
 
