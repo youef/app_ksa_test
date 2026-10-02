@@ -27,7 +27,7 @@ export const R = {
 } as const;
 
 export const S = StyleSheet.create({
-  page: { flex: 1, width: '100%', backgroundColor: C.bg },
+  page: { flexGrow: 1, width: '100%', backgroundColor: C.bg },
   scrollContent: { padding: 18, paddingBottom: 110 },
   title: { fontSize: 30, fontWeight: '900', color: C.ink, textAlign: 'right' },
   subtitle: { fontSize: 15, color: C.muted, textAlign: 'right', lineHeight: 23, marginTop: 5 },
