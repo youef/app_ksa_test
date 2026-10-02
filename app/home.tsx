@@ -39,7 +39,7 @@ export default function Home() {
   const [selectedCity, setSelectedCity] = useState('كل المدن');
   const [selectedDistrict, setSelectedDistrict] = useState('كل الأحياء');
   const [locationReady, setLocationReady] = useState(false);
-  const [loadingHome, setLoadingHome] = useState(false);
+  const loadingHomeRef = useRef(false);
   const [currentWeather, setCurrentWeather] = useState<CurrentWeather | null>(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
@@ -161,8 +161,8 @@ export default function Home() {
   }, [refreshLiveLocation, showToast]);
 
   const load = useCallback(async () => {
-    if (loadingHome) return;
-    setLoadingHome(true);
+    if (loadingHomeRef.current) return;
+    loadingHomeRef.current = true;
     try {
     const { data: auth } = await supabase.auth.getUser();
     const user = auth.user;
@@ -308,9 +308,9 @@ export default function Home() {
       setRequests([]);
     }
     } finally {
-      setLoadingHome(false);
+      loadingHomeRef.current = false;
     }
-  }, [loadingHome]);
+  }, []);
   useFocusEffect(useCallback(() => { load() }, [load]));
 
   // Inline Quick Reply Handler
