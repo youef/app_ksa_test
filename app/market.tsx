@@ -170,7 +170,7 @@ export default function Market() {
           </View>
         </LinearGradient>
 
-        <View style={styles.heroCard}>
+        <View style={styles.marketBody}>
           <View style={styles.heroGlowOne} />
           <View style={styles.heroGlowTwo} />
           <View style={styles.heroTop}><View style={styles.heroIcon}><ShoppingBag size={24} color="#d1fae5" /></View><Text style={styles.heroEyebrow}>سوق الجيران</Text></View>
@@ -240,6 +240,7 @@ export default function Market() {
             </View>
           )}
         </View>
+        </View>
       </ScrollView>
 
       {/* Bottom Navigation */}
@@ -261,9 +262,13 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingTop: 0,
-    paddingHorizontal: 16,
+    paddingHorizontal: 0,
     width: '100%',
     paddingBottom: 110,
+  },
+  marketBody: {
+    paddingHorizontal: 16,
+    width: '100%',
   },
   bottomNavWrapper: {
     position: 'absolute',
@@ -287,14 +292,6 @@ const styles = StyleSheet.create({
   locationSelectorPill: { flexDirection: 'row', alignItems: 'center', gap: 4, maxWidth: 210 },
   locationSelectorText: { color: '#ecfdf5', fontSize: 11, fontWeight: '800', flexShrink: 1 },
   headerSearchWrap: { marginTop: 16 },
-  addButton: {
-    backgroundColor: '#059669',
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   heroCard: {
     backgroundColor: '#064e3b', borderRadius: 28, padding: 22, marginBottom: 20, overflow: 'hidden',
     minHeight: 235,
