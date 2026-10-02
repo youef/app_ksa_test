@@ -93,7 +93,12 @@ export default function Conversation() {
       .eq('conversation_id', convId)
       .order('created_at', { ascending: true });
 
-    setMessages(msgs ?? []);
+    setMessages(prev => {
+      const loaded = msgs ?? [];
+      const loadedIds = new Set(loaded.map(m => m.id));
+      const liveOnly = prev.filter(m => !m.id || String(m.id).startsWith('optimistic-') || !loadedIds.has(m.id));
+      return [...loaded, ...liveOnly].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    });
 
     // 2. Other member + their profile
     const { data: members } = await supabase
@@ -151,7 +156,7 @@ export default function Conversation() {
       void markConversationRead(convId, u.user.id);
     }
 
-    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: false }), 100);
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: false }), 50);
   }, [convId]);
 
   useEffect(() => {
