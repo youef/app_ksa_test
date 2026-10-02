@@ -11,11 +11,15 @@ export default function Question() {
   const [answers, setAnswers] = useState<any[]>([]);
   const [body, setBody] = useState('');
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);\n  const [currentUserId, setCurrentUserId] = useState<string | null>(null);\n  const [voting, setVoting] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [voting, setVoting] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
-    const { data: auth } = await supabase.auth.getUser();\n    setCurrentUserId(auth.user?.id ?? null);\n    const [a, b] = await Promise.all([
+    const { data: auth } = await supabase.auth.getUser();
+    setCurrentUserId(auth.user?.id ?? null);
+    const [a, b] = await Promise.all([
       supabase.from('questions').select('*').eq('id', id).single(),
       supabase.from('answers').select('*').eq('question_id', id).order('created_at')
     ]);
@@ -34,7 +38,15 @@ export default function Question() {
     }
 
     setQ(a.data);
-    const answerIds = (b.data || []).map((x: any) => x.id);\n    let votes: any[] = [];\n    if (answerIds.length) {\n      const { data: vd } = await supabase.from('answer_votes').select('answer_id,voter_id,vote').in('answer_id', answerIds);\n      votes = vd || [];\n    }\n    const voteMap = votes.reduce((m: any, v: any) => { (m[v.answer_id] ||= []).push(v); return m; }, {});\n    (b.data || []).forEach((ans: any) => { ans.votes = voteMap[ans.id] || []; });\n    setAnswers(b.data ?? []);
+    const answerIds = (b.data || []).map((x: any) => x.id);
+    let votes: any[] = [];
+    if (answerIds.length) {
+      const { data: vd } = await supabase.from('answer_votes').select('answer_id,voter_id,vote').in('answer_id', answerIds);
+      votes = vd || [];
+    }
+    const voteMap = votes.reduce((m: any, v: any) => { (m[v.answer_id] ||= []).push(v); return m; }, {});
+    (b.data || []).forEach((ans: any) => { ans.votes = voteMap[ans.id] || []; });
+    setAnswers(b.data ?? []);
     setLoading(false);
   }
 
@@ -49,7 +61,8 @@ export default function Question() {
       return Alert.alert('تنبيه', 'يجب تسجيل الدخول أولاً');
     }
 
-    if (q.status !== 'open') { setSubmitting(false); return Alert.alert('الردود مغلقة', 'تم إغلاق النقاش بعد اختيار إجابة.'); }\n    const r = await supabase.from('answers').insert({
+    if (q.status !== 'open') { setSubmitting(false); return Alert.alert('الردود مغلقة', 'تم إغلاق النقاش بعد اختيار إجابة.'); }
+    const r = await supabase.from('answers').insert({
       question_id: id,
       author_id: u.user.id,
       body: body.trim()
@@ -357,7 +370,11 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: C.line,
   },
-  authorLine: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5 },\n  metaLine: { flexDirection: 'row-reverse', alignItems: 'center', gap: 7, marginTop: 4 },\n  openBadge: { color: '#047857', backgroundColor: '#d1fae5', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 9, fontSize: 10, fontWeight: '900' },\n  closedBadge: { color: '#475569', backgroundColor: '#e2e8f0', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 9, fontSize: 10, fontWeight: '900' },\n  authorName: {
+  authorLine: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5 },
+  metaLine: { flexDirection: 'row-reverse', alignItems: 'center', gap: 7, marginTop: 4 },
+  openBadge: { color: '#047857', backgroundColor: '#d1fae5', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 9, fontSize: 10, fontWeight: '900' },
+  closedBadge: { color: '#475569', backgroundColor: '#e2e8f0', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 9, fontSize: 10, fontWeight: '900' },
+  authorName: {
     fontSize: 14,
     fontWeight: '900',
     color: C.accent,
@@ -430,7 +447,20 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     flex: 1,
   },
-  avatarLetter: { color: '#047857', fontSize: 18, fontWeight: '900' },\n  bestAnswerCard: { borderColor: '#86efac', borderWidth: 2, backgroundColor: '#f0fdf4' },\n  bestBanner: { flexDirection: 'row-reverse', alignItems: 'center', alignSelf: 'flex-end', gap: 6, marginTop: 14, backgroundColor: '#dcfce7', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 12 },\n  bestBannerText: { color: '#166534', fontSize: 12, fontWeight: '900' },\n  answerActions: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginTop: 16, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#e5e7eb' },\n  voteBtn: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 12, backgroundColor: '#f8fafc' },\n  voteActive: { backgroundColor: '#dcfce7' },\n  voteDownActive: { backgroundColor: '#f1f5f9' },\n  voteText: { color: '#64748b', fontSize: 12, fontWeight: '800' },\n  bestBtn: { marginLeft: 'auto', flexDirection: 'row-reverse', alignItems: 'center', gap: 6, backgroundColor: '#059669', paddingHorizontal: 12, paddingVertical: 9, borderRadius: 12 },\n  bestBtnText: { color: '#fff', fontSize: 12, fontWeight: '900' },\n  closedNotice: { flexDirection: 'row-reverse', justifyContent: 'center', alignItems: 'center', gap: 7, paddingBottom: 9 },\n  closedNoticeText: { color: '#64748b', fontSize: 12, fontWeight: '800' },\n  answerAuthor: {
+  avatarLetter: { color: '#047857', fontSize: 18, fontWeight: '900' },
+  bestAnswerCard: { borderColor: '#86efac', borderWidth: 2, backgroundColor: '#f0fdf4' },
+  bestBanner: { flexDirection: 'row-reverse', alignItems: 'center', alignSelf: 'flex-end', gap: 6, marginTop: 14, backgroundColor: '#dcfce7', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 12 },
+  bestBannerText: { color: '#166534', fontSize: 12, fontWeight: '900' },
+  answerActions: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginTop: 16, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#e5e7eb' },
+  voteBtn: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 12, backgroundColor: '#f8fafc' },
+  voteActive: { backgroundColor: '#dcfce7' },
+  voteDownActive: { backgroundColor: '#f1f5f9' },
+  voteText: { color: '#64748b', fontSize: 12, fontWeight: '800' },
+  bestBtn: { marginLeft: 'auto', flexDirection: 'row-reverse', alignItems: 'center', gap: 6, backgroundColor: '#059669', paddingHorizontal: 12, paddingVertical: 9, borderRadius: 12 },
+  bestBtnText: { color: '#fff', fontSize: 12, fontWeight: '900' },
+  closedNotice: { flexDirection: 'row-reverse', justifyContent: 'center', alignItems: 'center', gap: 7, paddingBottom: 9 },
+  closedNoticeText: { color: '#64748b', fontSize: 12, fontWeight: '800' },
+  answerAuthor: {
     fontSize: 16,
     fontWeight: '900',
     color: C.ink,
