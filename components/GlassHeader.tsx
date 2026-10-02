@@ -8,9 +8,10 @@ interface GlassHeaderProps {
   title: string;
   showBack?: boolean;
   rightComponent?: React.ReactNode;
+  backRoute?: string;
 }
 
-export default function GlassHeader({ title, showBack = false, rightComponent }: GlassHeaderProps) {
+export default function GlassHeader({ title, showBack = false, rightComponent, backRoute = '/home' }: GlassHeaderProps) {
   const router = useRouter();
 
   return (
@@ -20,7 +21,7 @@ export default function GlassHeader({ title, showBack = false, rightComponent }:
           {/* Left / Back Button */}
           <View style={styles.side}>
             {showBack && (
-              <Pressable onPress={() => router.back()} style={styles.backButton}>
+              <Pressable onPress={() => router.replace(backRoute as any)} style={styles.backButton}>
                 <ChevronRight size={24} color="#059669" />
                 <Text style={styles.backText}>رجوع</Text>
               </Pressable>
