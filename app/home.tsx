@@ -1,4 +1,5 @@
 import { useCallback, useState, useEffect, useRef } from 'react'
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Pressable, RefreshControl, ScrollView, Text, View, Image, StyleSheet, Dimensions, Platform, Animated, TextInput, Alert, Modal, ActivityIndicator } from 'react-native'
 import { router, useFocusEffect } from 'expo-router'
 import { supabase } from '@/lib/supabase'
@@ -44,6 +45,7 @@ export default function Home() {
   const [locationSetupOpen, setLocationSetupOpen] = useState(false);
   const [locationSetupBusy, setLocationSetupBusy] = useState(false);
   const [locationSetupMessage, setLocationSetupMessage] = useState('');
+  const [locationPromptVisible, setLocationPromptVisible] = useState(false);
 
 
   // Unread badge count
@@ -133,16 +135,23 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    // Keep the feed location current while the app remains open.
-    // This is foreground-only; no background tracking is enabled.
+    // Location is intentionally NOT refreshed on a timer.
+    // It is requested once per 7 days, or manually from Profile.
     let active = true;
-    const timer = setInterval(() => {
-      if (active) void refreshLiveLocation();
-    }, 5 * 60 * 1000);
-    return () => {
-      active = false;
-      clearInterval(timer);
+    const checkLocationAge = async () => {
+      const raw = await AsyncStorage.getItem('@hayna_location_last_auto_check_v1');
+      const last = raw ? Number(raw) : 0;
+      const due = !last || Date.now() - last >= 7 * 24 * 60 * 60 * 1000;
+      if (active && due) setLocationPromptVisible(true);
     };
+    void checkLocationAge();
+    return () => { active = false; };
+  }, []);
+
+  const acceptWeeklyLocationCheck = useCallback(async () => {
+    setLocationPromptVisible(false);
+    await AsyncStorage.setItem('@hayna_location_last_auto_check_v1', String(Date.now()));
+    await refreshLiveLocation();
   }, [refreshLiveLocation]);
 
   const load = useCallback(async () => {
@@ -1129,6 +1138,19 @@ function ServicePill({
   badgeBg?: string;
   onPress?: () => void;
 }) {
+      <Modal visible={locationPromptVisible} transparent animationType="fade" onRequestClose={() => setLocationPromptVisible(false)}>
+        <View style={styles.locationPromptBackdrop}>
+          <View style={styles.locationPromptCard}>
+            <MapPin size={30} color="#059669" />
+            <Text style={styles.locationPromptTitle}>تحديث نطاقك الجغرافي</Text>
+            <Text style={styles.locationPromptText}>نطلب تحديد موقعك مرة واحدة كل 7 أيام فقط. يمكنك تغييره يدويًا في الملف الشخصي في أي وقت.</Text>
+            <View style={styles.locationPromptActions}>
+              <Pressable onPress={() => setLocationPromptVisible(false)} style={styles.locationPromptLater}><Text style={styles.locationPromptLaterText}>لاحقًا</Text></Pressable>
+              <Pressable onPress={acceptWeeklyLocationCheck} style={styles.locationPromptAllow}><Text style={styles.locationPromptAllowText}>تحديد موقعي الآن</Text></Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
   return (
     <Pressable style={styles.servicePill} onPress={onPress}>
       <View style={[styles.serviceIconBox, { backgroundColor: bg }]}>
@@ -1149,6 +1171,15 @@ function ServicePill({
 // ========================================================
 
 const styles = StyleSheet.create({
+  locationPromptBackdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.48)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  locationPromptCard: { width: '100%', maxWidth: 420, backgroundColor: '#fff', borderRadius: 24, padding: 22, alignItems: 'center' },
+  locationPromptTitle: { marginTop: 10, fontSize: 18, fontWeight: '900', color: '#064e3b', textAlign: 'center' },
+  locationPromptText: { marginTop: 8, fontSize: 13, lineHeight: 21, color: '#475569', textAlign: 'center' },
+  locationPromptActions: { width: '100%', flexDirection: 'row-reverse', gap: 10, marginTop: 18 },
+  locationPromptAllow: { flex: 1, backgroundColor: '#059669', borderRadius: 14, padding: 13, alignItems: 'center' },
+  locationPromptAllowText: { color: '#fff', fontWeight: '900' },
+  locationPromptLater: { flex: 1, backgroundColor: '#f1f5f9', borderRadius: 14, padding: 13, alignItems: 'center' },
+  locationPromptLaterText: { color: '#475569', fontWeight: '900' },
   container: {
     flex: 1,
     backgroundColor: '#f8fafc',
