@@ -697,6 +697,7 @@ export default function Conversation() {
             maxLength={1000}
           />
         </View>
+        </View>
       )}
 
       {/* Options menu */}
