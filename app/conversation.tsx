@@ -70,6 +70,7 @@ export default function Conversation() {
   const [isOnline, setIsOnline] = useState(false);
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const channelRef = useRef<any>(null);
+  const pendingMessagesRef = useRef(new Set<string>());
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
   const [stickersOpen, setStickersOpen] = useState(false);
@@ -162,7 +163,11 @@ export default function Conversation() {
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${convId}` },
         payload => {
-          setMessages(prev => prev.some(m => m.id === payload.new.id) ? prev : [...prev, payload.new]);
+          setMessages(prev => {
+            const optimistic = prev.find(m => m._optimisticKey && m._optimisticKey === payload.new._optimisticKey);
+            if (optimistic) return prev.map(m => m === optimistic ? payload.new : m);
+            return prev.some(m => m.id === payload.new.id) ? prev : [...prev, payload.new];
+          });
           setOtherTyping(false);
           setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 40);
           if (payload.new.sender_id !== currentUserId) {
@@ -295,6 +300,18 @@ export default function Conversation() {
 
     setSending(true);
     const trimmed = body.trim();
+    const optimisticKey = `${currentUserId}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const optimisticMessage = {
+      id: `optimistic-${optimisticKey}`,
+      conversation_id: convId,
+      sender_id: currentUserId,
+      body: trimmed,
+      read_by: [currentUserId],
+      created_at: new Date().toISOString(),
+      _optimisticKey: optimisticKey,
+    };
+    setMessages(prev => [...prev, optimisticMessage]);
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 10);
     setBody('');
     void broadcastTyping(false);
     if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
@@ -309,11 +326,12 @@ export default function Conversation() {
     setSending(false);
 
     if (error) {
+      setMessages(prev => prev.filter(m => m._optimisticKey !== optimisticKey));
       setBody(trimmed);
       Alert.alert('تعذّر الإرسال', error.message);
       return;
     }
-    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 20);
   }
 
   async function toggleMute() {
@@ -751,7 +769,7 @@ function formatMsgTime(dateStr: string) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
+  container: { flex: 1, minHeight: Platform.OS === 'web' ? '100vh' : undefined, width: '100%', alignSelf: 'stretch', backgroundColor: '#f8fafc' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: {
     flexDirection: 'row-reverse',
@@ -837,7 +855,7 @@ const styles = StyleSheet.create({
   },
   noticeInfoText: { color: '#0369a1', fontSize: 11, fontWeight: '700' },
 
-  messagesList: { flex: 1 },
+  messagesList: { flex: 1, width: '100%' },
   messagesContent: { paddingHorizontal: 12, paddingTop: 14, paddingBottom: 8, minHeight: '100%' },
   dateDivider: {
     textAlign: 'center',
@@ -918,6 +936,7 @@ const styles = StyleSheet.create({
   messageImage: { width: 230, height: 230, borderRadius: 14, marginBottom: 4 },
   imageCaption: { fontSize: 9, color: '#64748b' },
   inputArea: {
+    width: '100%',
     flexDirection: 'row-reverse',
     minHeight: 62,
     alignItems: 'center',
