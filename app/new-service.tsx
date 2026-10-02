@@ -168,7 +168,7 @@ export default function NewService() {
           end={{ x: 1, y: 1 }}
         >
           <View style={styles.navBar}>
-            <Pressable onPress={() => router.back()} style={styles.iconBtn}>
+            <Pressable onPress={() => router.replace('/market')} style={styles.iconBtn}>
               <ChevronRight size={28} color="#fff" />
             </Pressable>
             <Text style={styles.navTitle}>إضافة خدمة جديدة 🛠️</Text>
