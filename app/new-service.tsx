@@ -16,18 +16,15 @@ import { supabase } from '@/lib/supabase';
 import {
   ChevronRight,
   MapPin,
-  Tag,
   DollarSign,
   CheckCircle2,
   Sparkles,
   Briefcase,
   Info,
   X,
-
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import LocationSelectorModal from '@/components/LocationSelectorModal';
-import ScreenState from '@/components/ScreenState';
 import { getPermanentMyLocation, savePermanentMyLocation, isAllKingdom } from '@/lib/locationSync';
 
 export default function NewService() {
@@ -38,7 +35,6 @@ export default function NewService() {
   const [city, setCity] = useState('');
   const [district, setDistrict] = useState('');
   const [authChecking, setAuthChecking] = useState(true);
-  const [userId, setUserId] = useState<string | null>(null);
   const [price, setPrice] = useState('');
   const [available, setAvailable] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -63,6 +59,7 @@ export default function NewService() {
         router.replace('/auth');
         return;
       }
+
       const loc = await getPermanentMyLocation();
       if (loc?.city && !isAllKingdom(loc.city)) {
         if (loc.region) setRegion(loc.region);
@@ -72,7 +69,6 @@ export default function NewService() {
         }
       }
 
-      // Autofill city and district from profile if logged in
       const { data: u } = await supabase.auth.getUser();
       if (u.user) {
         const { data: p } = await supabase
@@ -80,6 +76,7 @@ export default function NewService() {
           .select('region, city, district')
           .eq('id', u.user.id)
           .single();
+
         if (p?.region) setRegion(p.region);
         if (p?.city) {
           setCity(p.city);
@@ -87,6 +84,7 @@ export default function NewService() {
           await savePermanentMyLocation({ city: p.city, district: p.district || 'كل الأحياء' });
         }
       }
+
       setAuthChecking(false);
     })();
   }, []);
@@ -110,8 +108,8 @@ export default function NewService() {
         return router.replace('/auth');
       }
 
-      // Keep the selected service area aligned with the profile because the services RLS policy
-      // validates the provider's city/district against the profile location.
+      const providerId = u.user.id;
+
       if (city.trim() || district.trim() || region.trim()) {
         const { error: profileError } = await supabase
           .from('profiles')
@@ -120,12 +118,13 @@ export default function NewService() {
             city: city.trim() || null,
             district: district.trim() || null,
           })
-          .eq('id', u.user.id);
+          .eq('id', providerId);
+
         if (profileError) throw profileError;
       }
 
       const payload = {
-        provider_id: userId,
+        provider_id: providerId,
         name: name.trim(),
         description: description.trim(),
         category,
@@ -136,9 +135,11 @@ export default function NewService() {
       };
 
       const { data, error } = await supabase.from('services').insert(payload).select('id').single();
+
       setBusy(false);
 
       if (error) {
+        console.error('services insert failed:', error);
         Alert.alert('تعذر نشر الخدمة', error.message);
       } else {
         Alert.alert('تم بنجاح! 🎉', 'تم نشر خدمتك في دليل خدمات الحي.');
@@ -146,6 +147,7 @@ export default function NewService() {
       }
     } catch (e: any) {
       setBusy(false);
+      console.error('new service save error:', e);
       Alert.alert('خطأ', e.message || 'حدث خطأ أثناء حفظ الخدمة.');
     }
   }
@@ -162,7 +164,6 @@ export default function NewService() {
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {/* Header */}
         <LinearGradient
           colors={['#065f46', '#059669', '#10b981']}
           style={styles.hero}
@@ -171,7 +172,7 @@ export default function NewService() {
         >
           <View style={styles.navBar}>
             <Pressable onPress={() => router.replace('/market')} style={styles.iconBtn}>
-              <ChevronRight size={28} color="#fff" />
+              <Text style={styles.iconText}>←</Text>
             </Pressable>
             <Text style={styles.navTitle}>إضافة خدمة جديدة 🛠️</Text>
             <View style={{ width: 28 }} />
@@ -191,12 +192,13 @@ export default function NewService() {
               {showTips ? <X size={17} color="#64748b" /> : <Info size={17} color="#64748b" />}
             </Pressable>
           </View>
+
           {showTips && (
             <View style={styles.tipsBox}>
-              <Text style={styles.tipText}>اكتب عنواناً واضحاً، حدّد نطاق خدمتك، وأضف تفاصيل عملية تساعد الجيران على التواصل معك.</Text>
+              <Text style={styles.tipText}>اكتب عنواناً واضحاً، حدّد نطاق خدمتك، وأضف تفاصيل عملية تساعد الجيران على التواصل بسهولة. هذا يزيد فرص ظهور خدمتك في الحي.</Text>
             </View>
           )}
-          {/* Service Title */}
+
           <View style={styles.inputGroup}>
             <Text style={styles.label}>عنوان الخدمة *</Text>
             <View style={styles.inputContainer}>
@@ -211,7 +213,6 @@ export default function NewService() {
             </View>
           </View>
 
-          {/* Category Picker */}
           <View style={styles.inputGroup}>
             <View style={styles.labelRow}><Briefcase size={15} color="#059669" /><Text style={styles.label}>التصنيف</Text></View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
@@ -227,7 +228,6 @@ export default function NewService() {
             </ScrollView>
           </View>
 
-          {/* Location Picker */}
           <View style={styles.inputGroup}>
             <View style={styles.labelRow}><MapPin size={15} color="#059669" /><Text style={styles.label}>نطاق الخدمة والحي</Text></View>
             <Pressable style={styles.locationBtn} onPress={() => setShowLocationModal(true)}>
@@ -238,7 +238,6 @@ export default function NewService() {
             </Pressable>
           </View>
 
-          {/* Description */}
           <View style={styles.inputGroup}>
             <View style={styles.labelRow}><Info size={15} color="#059669" /><Text style={styles.label}>تفاصيل الخدمة *</Text></View>
             <View style={[styles.inputContainer, { height: 120, alignItems: 'flex-start' }]}>
@@ -254,7 +253,6 @@ export default function NewService() {
             </View>
           </View>
 
-          {/* Price */}
           <View style={styles.inputGroup}>
             <View style={styles.labelRow}><DollarSign size={15} color="#059669" /><Text style={styles.label}>السعر المبدئي (ريال سعودي - اختياري)</Text></View>
             <View style={styles.inputContainer}>
@@ -275,7 +273,6 @@ export default function NewService() {
             <Text style={styles.progressText}>{description.trim().length}/500 تفاصيل</Text>
           </View>
 
-          {/* Availability Switch */}
           <View style={styles.publishNote}>
             <CheckCircle2 size={17} color="#059669" />
             <Text style={styles.publishNoteText}>سيتم حفظ نطاق الخدمة مع ملفك ليظهر بشكل صحيح لجيرانك.</Text>
@@ -294,7 +291,6 @@ export default function NewService() {
             />
           </View>
 
-          {/* Submit Button */}
           <Pressable
             style={[styles.submitBtn, busy && { opacity: 0.6 }]}
             onPress={save}
@@ -313,7 +309,6 @@ export default function NewService() {
         <View style={{ height: 40 }} />
       </ScrollView>
 
-      {/* Location Modal */}
       <LocationSelectorModal
         visible={showLocationModal}
         onClose={() => setShowLocationModal(false)}
@@ -377,6 +372,11 @@ const styles = StyleSheet.create({
   },
   iconBtn: {
     padding: 6,
+  },
+  iconText: {
+    color: '#fff',
+    fontSize: 24,
+    fontWeight: '900',
   },
   navTitle: {
     color: '#fff',
@@ -600,5 +600,3 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
 });
-
-// Production build trigger: service publishing permissions fixed.
