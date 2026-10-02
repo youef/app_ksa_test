@@ -31,6 +31,8 @@ import {
   ChevronLeft,
   SlidersHorizontal,
   Lock,
+  Sparkles,
+  Filter,
 } from 'lucide-react-native';
 import BottomNav from '@/components/BottomNav';
 import { syncDndWithNotifications } from '@/lib/notifications';
@@ -79,6 +81,7 @@ export default function Messages() {
   const [draftEnd, setDraftEnd] = useState('07:00');
   const [target, setTarget] = useState<Conv | null>(null);
   const [busy, setBusy] = useState(false);
+  const [onlyUnread, setOnlyUnread] = useState(false);
 
   const dndNow = isDndActiveNow(dnd);
 
@@ -321,9 +324,10 @@ export default function Messages() {
 
   // ------------------------------------------------------------ derived
 
-  const filtered = conversations.filter(c =>
-    !searchQuery.trim() ? true : c.name.includes(searchQuery.trim())
-  );
+  const filtered = conversations.filter(c => {
+    const matchesSearch = !searchQuery.trim() || c.name.includes(searchQuery.trim());
+    return matchesSearch && (!onlyUnread || c.isUnread);
+  });
 
   // Muted chats and chats inside an active DND window stay out of the badge.
   const unreadCount = conversations.filter(c => c.isUnread && !c.isMuted && !dndNow).length;
@@ -331,15 +335,20 @@ export default function Messages() {
 
   return (
     <View style={styles.container}>
+      <View style={styles.ambientOrbOne} />
+      <View style={styles.ambientOrbTwo} />
       <LinearGradient colors={['#065f46', '#059669', '#10b981']} style={styles.header}>
         <View style={styles.headerContent}>
+          <View style={styles.heroEyebrow}><Sparkles size={13} color="#d1fae5" /><Text style={styles.heroEyebrowText}>تواصل حيّنا</Text></View>
           <View style={styles.headerRight}>
+            <View style={styles.heroTitleWrap}>
             <Text style={styles.headerTitle}>الرسائل</Text>
             {unreadCount > 0 && (
               <View style={styles.unreadBadge}>
                 <Text style={styles.unreadBadgeText}>{unreadCount}</Text>
               </View>
             )}
+            </View>
             {silentUnread > 0 && (
               <View style={styles.silentBadge}>
                 <BellOff size={11} color="#a7f3d0" />
@@ -374,6 +383,15 @@ export default function Messages() {
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
+        </View>
+        <View style={styles.quickFilters}>
+          <Pressable style={[styles.filterChip, !onlyUnread && styles.filterChipActive]} onPress={() => setOnlyUnread(false)}>
+            <MessageCircle size={14} color={!onlyUnread ? '#047857' : '#d1fae5'} /><Text style={[styles.filterChipText, !onlyUnread && styles.filterChipTextActive]}>الكل</Text>
+          </Pressable>
+          <Pressable style={[styles.filterChip, onlyUnread && styles.filterChipActive]} onPress={() => setOnlyUnread(true)}>
+            <Filter size={14} color={onlyUnread ? '#047857' : '#d1fae5'} /><Text style={[styles.filterChipText, onlyUnread && styles.filterChipTextActive]}>غير مقروء</Text>
+            {unreadCount > 0 && <View style={styles.filterCount}><Text style={styles.filterCountText}>{unreadCount}</Text></View>}
+          </Pressable>
         </View>
       </LinearGradient>
 
@@ -430,6 +448,12 @@ export default function Messages() {
             </View>
           ) : (
             <>
+              {filtered.length > 0 && !onlyUnread && (
+                <View style={styles.listIntro}>
+                  <View><Text style={styles.listTitle}>محادثاتك</Text><Text style={styles.listSub}>{filtered.length} محادثة</Text></View>
+                  <View style={styles.livePill}><View style={styles.liveDot} /><Text style={styles.liveText}>نشطة الآن</Text></View>
+                </View>
+              )}
               {filtered.some(c => c.isUnread && !c.isMuted && !dndNow) && (
                 <Text style={styles.sectionLabel}>غير مقروء</Text>
               )}
@@ -782,13 +806,16 @@ function formatTime(dateStr: string): string {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
+  container: { flex: 1, backgroundColor: '#f8fafc', overflow: 'hidden' },
+  ambientOrbOne: { position: 'absolute', width: 220, height: 220, borderRadius: 110, backgroundColor: 'rgba(16,185,129,0.07)', top: 150, left: -120 },
+  ambientOrbTwo: { position: 'absolute', width: 180, height: 180, borderRadius: 90, backgroundColor: 'rgba(6,95,70,0.05)', bottom: 100, right: -90 },
   header: {
-    paddingTop: 54,
+    paddingTop: 50,
     paddingBottom: 20,
     paddingHorizontal: 20,
     borderBottomLeftRadius: 28,
     borderBottomRightRadius: 28,
+    shadowColor: '#065f46', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.14, shadowRadius: 18, elevation: 8,
   },
   headerContent: {
     flexDirection: 'row-reverse',
@@ -798,7 +825,10 @@ const styles = StyleSheet.create({
   },
   headerRight: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
   headerLeftActions: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
-  headerTitle: { color: '#fff', fontSize: 22, fontWeight: '900' },
+  heroEyebrow: { position: 'absolute', top: -28, right: 0, flexDirection: 'row-reverse', alignItems: 'center', gap: 5 },
+  heroEyebrowText: { color: '#d1fae5', fontSize: 10, fontWeight: '800' },
+  heroTitleWrap: { flex: 1 },
+  headerTitle: { color: '#fff', fontSize: 27, fontWeight: '900', letterSpacing: -0.5 },
   unreadBadge: {
     backgroundColor: '#ef4444',
     borderRadius: 12,
@@ -845,8 +875,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     height: 44,
     gap: 8,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 3,
   },
   searchInput: { flex: 1, fontSize: 13, color: '#111827', textAlign: 'right' },
+  quickFilters: { flexDirection: 'row-reverse', gap: 8, marginTop: 12 },
+  filterChip: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.12)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)', borderRadius: 14, paddingHorizontal: 11, paddingVertical: 7 },
+  filterChipActive: { backgroundColor: '#ecfdf5', borderColor: '#a7f3d0' },
+  filterChipText: { color: '#d1fae5', fontSize: 11, fontWeight: '800' },
+  filterChipTextActive: { color: '#047857' },
+  filterCount: { minWidth: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: '#ef4444' },
+  filterCountText: { color: '#fff', fontSize: 9, fontWeight: '900' },
   dndBanner: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
@@ -873,7 +912,13 @@ const styles = StyleSheet.create({
   },
   dndBannerActionText: { color: '#fff', fontSize: 11, fontWeight: '800' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  list: { flex: 1, paddingHorizontal: 16, paddingTop: 12 },
+  list: { flex: 1, paddingHorizontal: 16, paddingTop: 10 },
+  listIntro: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 4, paddingVertical: 12 },
+  listTitle: { color: '#0f172a', fontSize: 18, fontWeight: '900', textAlign: 'right' },
+  listSub: { color: '#94a3b8', fontSize: 10, fontWeight: '700', marginTop: 2, textAlign: 'right' },
+  livePill: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, backgroundColor: '#ecfdf5', borderWidth: 1, borderColor: '#bbf7d0', paddingHorizontal: 9, paddingVertical: 6, borderRadius: 12 },
+  liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#10b981' },
+  liveText: { color: '#047857', fontSize: 10, fontWeight: '800' },
   sectionLabel: {
     fontSize: 12,
     fontWeight: '800',
@@ -889,15 +934,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 18,
     padding: 14,
-    marginBottom: 8,
+    marginBottom: 9,
     borderWidth: 1,
-    borderColor: '#f1f5f9',
+    borderColor: '#eef2f7',
     gap: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.03,
     shadowRadius: 4,
-    elevation: 1,
+    elevation: 2,
   },
   convCardUnread: { borderColor: '#a7f3d0', backgroundColor: '#f0fdf4' },
   convCardBlocked: { opacity: 0.7, backgroundColor: '#fef2f2', borderColor: '#fee2e2' },
