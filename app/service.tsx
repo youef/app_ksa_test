@@ -78,7 +78,7 @@ export default function Service() {
           if (r.error) Alert.alert('خطأ', r.error.message);
           else {
             Alert.alert('تم', 'تم حذف الخدمة بنجاح.');
-            router.back();
+            router.replace('/market');
           }
         },
       },
@@ -139,7 +139,7 @@ export default function Service() {
     return (
       <View style={styles.center}>
         <Text style={styles.errorText}>الخدمة غير موجودة أو تم حذفها.</Text>
-        <Pressable onPress={() => router.back()} style={styles.backBtnAction}>
+        <Pressable onPress={() => router.replace('/market')} style={styles.backBtnAction}>
           <Text style={styles.backBtnActionText}>العودة للخدمات</Text>
         </Pressable>
       </View>
@@ -159,7 +159,7 @@ export default function Service() {
           end={{ x: 1, y: 1 }}
         >
           <View style={styles.navBar}>
-            <Pressable onPress={() => router.back()} style={styles.iconBtn}>
+            <Pressable onPress={() => router.replace('/market')} style={styles.iconBtn}>
               <ChevronRight size={28} color="#fff" />
             </Pressable>
             <Text style={styles.navTitle}>تفاصيل الخدمة</Text>
