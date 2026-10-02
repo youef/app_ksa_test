@@ -1111,19 +1111,6 @@ function ServicePill({
   badgeBg?: string;
   onPress?: () => void;
 }) {
-      <Modal visible={locationPromptVisible} transparent animationType="fade" onRequestClose={() => setLocationPromptVisible(false)}>
-        <View style={styles.locationPromptBackdrop}>
-          <View style={styles.locationPromptCard}>
-            <MapPin size={30} color="#059669" />
-            <Text style={styles.locationPromptTitle}>تحديث نطاقك الجغرافي</Text>
-            <Text style={styles.locationPromptText}>نطلب تحديد موقعك مرة واحدة كل 7 أيام فقط. يمكنك تغييره يدويًا في الملف الشخصي في أي وقت.</Text>
-            <View style={styles.locationPromptActions}>
-              <Pressable onPress={() => setLocationPromptVisible(false)} style={styles.locationPromptLater}><Text style={styles.locationPromptLaterText}>لاحقًا</Text></Pressable>
-              <Pressable onPress={acceptWeeklyLocationCheck} style={styles.locationPromptAllow}><Text style={styles.locationPromptAllowText}>تحديد موقعي الآن</Text></Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
   return (
     <Pressable style={styles.servicePill} onPress={onPress}>
       <View style={[styles.serviceIconBox, { backgroundColor: bg }]}>
