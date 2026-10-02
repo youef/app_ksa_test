@@ -599,3 +599,5 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
 });
+
+// Vercel redeploy trigger: service publishing permissions fixed.
