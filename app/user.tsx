@@ -285,7 +285,7 @@ export default function UserProfile() {
   const isPrivate = p.profile_privacy === 'private';
   const isOwnProfile = currentUserId === id;
   const isLocked = isPrivate && !isFollowing && !isOwnProfile;
-  const restricted = isLocked || isBlocked || blockedByOther || (isAnonymous && !isOwnProfile);
+  const restricted = isLocked || (isAnonymous && !isOwnProfile);
   const statusLabel: Record<string, string> = { open: 'مفتوح', accepted: 'تم قبول المساعدة', closed: 'مكتمل', pending: 'قيد المراجعة' };
   const tabs = [
     { key: 'services' as const, label: 'الخدمات', count: stats.services },
@@ -312,6 +312,12 @@ export default function UserProfile() {
         </View>
 
         {isBlocked && (
+          <View style={styles.blockedNotice}><UserX size={16} color="#dc2626" /><Text style={styles.blockedNoticeText}>تم حظر هذا المستخدم. ستظهر منشوراته، لكن المتابعة والمراسلة متوقفتان.</Text><Pressable onPress={confirmToggleBlock} style={styles.noticeAction}><Text style={styles.noticeActionText}>إلغاء الحظر</Text></Pressable></View>
+        )}
+        {blockedByOther && (
+          <View style={styles.blockedNotice}><Lock size={16} color="#dc2626" /><Text style={styles.blockedNoticeText}>هذا المستخدم حظرك. يمكنك الاطلاع على منشوراته العامة فقط.</Text></View>
+        )}
+        {blockedByOther && (
           <View style={[styles.noticeBanner, styles.blockedNotice]}>
             <UserX size={18} color="#b91c1c" />
             <Text style={styles.noticeText}>أنت حظرت هذا الحساب؛ نشاطه مخفي عنك.</Text>
@@ -442,6 +448,8 @@ const styles = StyleSheet.create({
   topIconButton: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#e2e8f0' },
   topTitle: { color: '#0f172a', fontSize: 17, fontWeight: '900', textAlign: 'right' },
   topSubtitle: { color: '#64748b', fontSize: 12, textAlign: 'right', marginTop: 1 },
+  blockedNotice: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fecaca', borderRadius: 14, padding: 12, marginBottom: 12 },
+  blockedNoticeText: { flex: 1, color: '#991b1b', fontSize: 12, fontWeight: '800', textAlign: 'right', lineHeight: 18 },
   noticeBanner: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, borderRadius: 14, padding: 12, marginBottom: 12 },
   blockedNotice: { backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fecaca' },
   mutedNotice: { backgroundColor: '#f1f5f9', borderWidth: 1, borderColor: '#cbd5e1' },
