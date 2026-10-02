@@ -63,22 +63,35 @@ export default function Question() {
       return Alert.alert('تنبيه', 'يجب تسجيل الدخول أولاً');
     }
 
-    if (q.status !== 'open') { setSubmitting(false); return Alert.alert('الردود مغلقة', 'تم إغلاق النقاش بعد اختيار إجابة.'); }
-    const r = await supabase.from('answers').insert({
-      question_id: id,
-      author_id: u.user.id,
-      body: body.trim(),
-      parent_answer_id: replyTo?.id ?? null
+    if (q.status !== 'open') {
+      setSubmitting(false);
+      return Alert.alert('الردود مغلقة', 'تم إغلاق النقاش بعد اعتماد الإجابة.');
+    }
+
+    const { error } = await supabase.rpc('hayna_create_question_answer', {
+      p_question_id: id,
+      p_body: body.trim(),
+      p_parent_answer_id: replyTo?.id ?? null,
     });
 
     setSubmitting(false);
-    if (r.error) {
-      Alert.alert('خطأ', r.error.message);
-    } else {
-      setBody('');
-      setReplyTo(null);
-      load();
+    if (error) {
+      const code = error.message || '';
+      const message =
+        code.includes('AUTH_REQUIRED') ? 'انتهت جلسة الدخول. سجّل الدخول مرة أخرى.' :
+        code.includes('QUESTION_CLOSED') ? 'تم إغلاق الردود على هذا الموضوع.' :
+        code.includes('INVALID_PARENT') ? 'التعليق الذي تحاول الرد عليه غير صالح.' :
+        code.includes('QUESTION_NOT_FOUND') ? 'الموضوع غير موجود.' :
+        code.includes('EMPTY_BODY') ? 'اكتب الرد أولاً.' :
+        'تعذر إرسال الرد الآن. حاول مرة أخرى.';
+      Alert.alert('لم يتم إرسال الرد', message);
+      return;
     }
+
+    setBody('');
+    setReplyTo(null);
+    await load();
+    Alert.alert('تم الإرسال', 'تم نشر ردك بنجاح.');
   }
 
   if (loading) {
