@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Image, Pressable, RefreshControl, TextInput, ScrollView, Share, Platform } from 'react-native';
 import { supabase } from '@/lib/supabase';
-import GlassHeader from '@/components/GlassHeader';
+import { LinearGradient } from 'expo-linear-gradient';
 import BottomNav from '@/components/BottomNav';
-import { ShoppingBag, MapPin, ShieldCheck, Plus, Search, Sparkles, SlidersHorizontal, Clock3, Send, ChevronLeft } from 'lucide-react-native';
+import { ShoppingBag, MapPin, ShieldCheck, Plus, Search, Sparkles, SlidersHorizontal, Clock3, Send, ChevronLeft, Bell, ChevronDown } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 
 import {
@@ -19,12 +19,24 @@ export default function Market() {
   const [refreshing, setRefreshing] = useState(false);
   const [activeCategory, setActiveCategory] = useState<string>('الكل');
   const [searchQuery, setSearchQuery] = useState('');
+  const [profile, setProfile] = useState<any>(null);
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   const [activeLoc, setActiveLoc] = useState({
     region: 'كل المملكة',
     city: 'كل المدن',
     district: 'كل الأحياء',
   });
   useEffect(() => {
+    const loadHeader = async () => {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) return;
+      const [{ data: p }, { count }] = await Promise.all([
+        supabase.from('profiles').select('display_name, avatar_url, is_geoverified').eq('id', u.user.id).maybeSingle(),
+        supabase.from('notifications').select('id', { count: 'exact', head: true }).eq('user_id', u.user.id).is('read_at', null),
+      ]);
+      setProfile(p); setUnreadNotifCount(count ?? 0);
+    };
+    void loadHeader();
     getActiveLocation().then(setActiveLoc);
     const unsub = subscribeLocation(setActiveLoc);
     return unsub;
@@ -123,21 +135,41 @@ export default function Market() {
 
   return (
     <View style={styles.container}>
-      <GlassHeader 
-        title="سوق الحي المصغر" 
-        rightComponent={
-          <Pressable onPress={() => router.push('/new-service')} style={styles.addButton}>
-            <Plus size={20} color="#fff" />
-          </Pressable>
-        }
-      />
-      
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadMarketItems} tintColor="#059669" />}
       >
+        <LinearGradient colors={['#065f46', '#059669', '#10b981']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.homeHeader}>
+          <View style={styles.topNavRow}>
+            <View style={styles.leftActions}>
+              <Pressable onPress={() => router.push('/profile')} style={styles.avatarWrap}>
+                {profile?.avatar_url ? <Image source={{ uri: profile.avatar_url }} style={styles.avatarImg} /> : <View style={styles.avatarPlaceholder}><Text style={styles.avatarLetter}>{profile?.display_name?.[0] || 'ح'}</Text></View>}
+                {profile?.is_geoverified && <View style={styles.avatarVerifiedBadge}><ShieldCheck size={10} color="#fff" /></View>}
+              </Pressable>
+              <Pressable onPress={() => router.push('/notifications')} style={styles.iconCircleBtn}>
+                <Bell size={20} color="#fff" />
+                {unreadNotifCount > 0 && <View style={styles.notifBadge}><Text style={styles.notifBadgeText}>{unreadNotifCount > 9 ? '9+' : unreadNotifCount}</Text></View>}
+              </Pressable>
+            </View>
+            <View style={styles.brandAndLocation}>
+              <Image source={{ uri: '/assets/branding/HAYNA_LOGO.png?v=2' }} style={styles.headerLogo} resizeMode="contain" />
+              <View style={styles.locationSelectorPill}>
+                <ChevronDown size={14} color="#a7f3d0" />
+                <Text style={styles.locationSelectorText} numberOfLines={1}>{isAllKingdom(activeLoc.city) ? 'كل مناطق المملكة' : activeLoc.city + (activeLoc.district !== 'كل الأحياء' ? ' · حي ' + activeLoc.district : '')}</Text>
+                <MapPin size={13} color="#6ee7b7" />
+              </View>
+            </View>
+          </View>
+          <View style={styles.headerSearchWrap}>
+            <View style={styles.searchBox}>
+              <Search size={20} color="#94a3b8" />
+              <TextInput value={searchQuery} onChangeText={setSearchQuery} placeholder="ابحث عن خدمة أو منتج..." placeholderTextColor="#94a3b8" style={styles.searchInput} textAlign="right" />
+            </View>
+          </View>
+        </LinearGradient>
+
         <View style={styles.heroCard}>
           <View style={styles.heroGlowOne} />
           <View style={styles.heroGlowTwo} />
@@ -176,7 +208,6 @@ export default function Market() {
           </View>
         </View>
 
-        <View style={styles.searchBox}><Search size={19} color="#94a3b8" /><TextInput value={searchQuery} onChangeText={setSearchQuery} placeholder="ابحث عن خدمة أو منتج..." placeholderTextColor="#94a3b8" style={styles.searchInput} textAlign="right" /></View>
         <View style={styles.sectionHeading}><View><Text style={styles.sectionTitle}>تصفّح السوق</Text><Text style={styles.sectionHint}>اختر القسم المناسب لك</Text></View><SlidersHorizontal size={18} color="#64748b" /></View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesRow}>
           {availableCategories.map((category) => (
@@ -229,7 +260,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingTop: 96,
+    paddingTop: 0,
     paddingHorizontal: 16,
     width: '100%',
     paddingBottom: 110,
@@ -240,6 +271,22 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
   },
+  homeHeader: { paddingTop: 52, paddingHorizontal: 16, paddingBottom: 18, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 },
+  topNavRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' },
+  leftActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  avatarWrap: { width: 42, height: 42, borderRadius: 21, position: 'relative' },
+  avatarImg: { width: 42, height: 42, borderRadius: 21, borderWidth: 2, borderColor: 'rgba(255,255,255,.7)' },
+  avatarPlaceholder: { width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(255,255,255,.18)', alignItems: 'center', justifyContent: 'center' },
+  avatarLetter: { color: '#fff', fontSize: 17, fontWeight: '900' },
+  avatarVerifiedBadge: { position: 'absolute', right: -2, bottom: -1, width: 17, height: 17, borderRadius: 9, backgroundColor: '#059669', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
+  iconCircleBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(255,255,255,.14)', alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  notifBadge: { position: 'absolute', top: -3, right: -3, minWidth: 18, height: 18, borderRadius: 9, backgroundColor: '#ef4444', alignItems: 'center', justifyContent: 'center' },
+  notifBadgeText: { color: '#fff', fontSize: 9, fontWeight: '900' },
+  brandAndLocation: { alignItems: 'flex-end', flex: 1, marginLeft: 14 },
+  headerLogo: { width: 74, height: 32, marginBottom: 4 },
+  locationSelectorPill: { flexDirection: 'row', alignItems: 'center', gap: 4, maxWidth: 210 },
+  locationSelectorText: { color: '#ecfdf5', fontSize: 11, fontWeight: '800', flexShrink: 1 },
+  headerSearchWrap: { marginTop: 16 },
   addButton: {
     backgroundColor: '#059669',
     width: 32,
