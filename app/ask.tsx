@@ -305,7 +305,7 @@ export default function AskScreen() {
     <View style={styles.container}>
       {/* Top Header */}
       <LinearGradient colors={['#065f46', '#059669', '#10b981']} style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
+        <Pressable onPress={() => router.replace('/home')} style={styles.backBtn}>
           <ChevronRight size={26} color="#fff" />
         </Pressable>
         <View style={{ alignItems: 'center' }}>
