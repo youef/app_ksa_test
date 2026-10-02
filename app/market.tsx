@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Image, Pressable, RefreshControl, TextInput, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Image, Pressable, RefreshControl, TextInput, ScrollView, Share, Platform } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import GlassHeader from '@/components/GlassHeader';
 import BottomNav from '@/components/BottomNav';
-import { ShoppingBag, MapPin, ShieldCheck, Plus, Search, Sparkles, SlidersHorizontal, Clock3 } from 'lucide-react-native';
+import { ShoppingBag, MapPin, ShieldCheck, Plus, Search, Sparkles, SlidersHorizontal, Clock3, Send, ChevronLeft } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 
 import {
@@ -60,6 +60,16 @@ export default function Market() {
     return matchesLocation && matchesCategory && matchesSearch;
   });
 
+  const shareItem = async (item: any) => {
+    const text = `شوف هذا العرض في حيّنا: ${item.name}${item.price_from != null ? ` — ${item.price_from} ر.س` : ''}`;
+    try {
+      await Share.share({
+        message: Platform.OS === 'web' ? `${text} — ${window.location.origin}/service?id=${item.id}` : text,
+        title: item.name,
+      });
+    } catch {}
+  };
+
   const renderItem = ({ item }: { item: any }) => (
     <Pressable
       style={styles.card}
@@ -97,6 +107,16 @@ export default function Market() {
             </View>
           </View>
         </View>
+        <View style={styles.cardActions}>
+          <Pressable style={styles.detailsButton} onPress={() => router.push({ pathname: '/service', params: { id: item.id } })}>
+            <Text style={styles.detailsText}>عرض التفاصيل</Text>
+            <ChevronLeft size={16} color="#047857" />
+          </Pressable>
+          <Pressable style={styles.shareButton} onPress={() => void shareItem(item)}>
+            <Send size={15} color="#059669" />
+            <Text style={styles.shareText}>إرسال</Text>
+          </Pressable>
+        </View>
       </View>
     </Pressable>
   );
@@ -119,9 +139,17 @@ export default function Market() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadMarketItems} tintColor="#059669" />}
       >
         <View style={styles.heroCard}>
+          <View style={styles.heroGlowOne} />
+          <View style={styles.heroGlowTwo} />
           <View style={styles.heroTop}><View style={styles.heroIcon}><ShoppingBag size={24} color="#d1fae5" /></View><Text style={styles.heroEyebrow}>سوق الجيران</Text></View>
           <Text style={styles.heroTitle}>كل ما تحتاجه،{`\n`}من أهل حيك</Text>
           <Text style={styles.heroSubtitle}>اكتشف خدمات ومنتجات محلية وادعم أصحاب المشاريع القريبة.</Text>
+          <View style={styles.heroActions}>
+            <Pressable style={styles.heroAddButton} onPress={() => router.push('/new-service')}>
+              <Plus size={17} color="#065f46" />
+              <Text style={styles.heroAddText}>أضف عرضك</Text>
+            </Pressable>
+          </View>
           <View style={styles.heroStats}><View><Text style={styles.statValue}>{displayedItems.length}</Text><Text style={styles.statLabel}>عرض متاح</Text></View><View style={styles.statDivider} /><View><Text style={styles.statValue}>{activeLoc.city}</Text><Text style={styles.statLabel}>نطاق التصفح</Text></View></View>
           <View style={styles.heroDecor}><Sparkles size={76} color="rgba(255,255,255,0.10)" /></View>
         </View>
@@ -150,7 +178,7 @@ export default function Market() {
 
         <View style={styles.searchBox}><Search size={19} color="#94a3b8" /><TextInput value={searchQuery} onChangeText={setSearchQuery} placeholder="ابحث عن خدمة أو منتج..." placeholderTextColor="#94a3b8" style={styles.searchInput} textAlign="right" /></View>
         <View style={styles.sectionHeading}><View><Text style={styles.sectionTitle}>تصفّح السوق</Text><Text style={styles.sectionHint}>اختر القسم المناسب لك</Text></View><SlidersHorizontal size={18} color="#64748b" /></View>
-        <View style={styles.categoriesRow}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesRow}>
           {availableCategories.map((category) => (
             <Pressable 
               key={category} 
@@ -160,7 +188,7 @@ export default function Market() {
               <Text style={[styles.categoryText, activeCategory === category && { color: '#fff' }]}>{category}</Text>
             </Pressable>
           ))}
-        </View>
+        </ScrollView>
 
         <View style={styles.listContainer}>
           <View style={styles.resultsHeader}><Text style={styles.resultCount}>{displayedItems.length} نتيجة</Text><View style={styles.latestLabel}><Clock3 size={13} color="#64748b" /><Text style={styles.latestText}>الأحدث</Text></View></View>
@@ -195,6 +223,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8fafc',
+    width: '100%',
   },
   scrollView: {
     flex: 1,
@@ -202,6 +231,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingTop: 96,
     paddingHorizontal: 16,
+    width: '100%',
     paddingBottom: 110,
   },
   bottomNavWrapper: {
@@ -219,8 +249,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   heroCard: {
-    backgroundColor: '#064e3b', borderRadius: 26, padding: 22, marginBottom: 22, overflow: 'hidden',
+    backgroundColor: '#064e3b', borderRadius: 28, padding: 22, marginBottom: 20, overflow: 'hidden',
+    minHeight: 235,
+    shadowColor: '#064e3b', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.16, shadowRadius: 22, elevation: 6,
   },
+  heroGlowOne: { position: 'absolute', width: 180, height: 180, borderRadius: 90, backgroundColor: 'rgba(16,185,129,.16)', right: -70, top: -80 },
+  heroGlowTwo: { position: 'absolute', width: 120, height: 120, borderRadius: 60, backgroundColor: 'rgba(255,255,255,.08)', left: -45, bottom: -45 },
+  heroActions: { marginTop: 16, flexDirection: 'row-reverse' },
+  heroAddButton: { flexDirection: 'row-reverse', alignItems: 'center', gap: 7, backgroundColor: '#ecfdf5', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 15, alignSelf: 'flex-start' },
+  heroAddText: { color: '#065f46', fontSize: 13, fontWeight: '900' },
   heroTop: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10 },
   heroIcon: { width: 40, height: 40, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.13)', alignItems: 'center', justifyContent: 'center' },
   heroEyebrow: { color: '#a7f3d0', fontSize: 13, fontWeight: '800' },
@@ -246,12 +283,7 @@ const styles = StyleSheet.create({
   availableBadge: { position: 'absolute', top: 12, right: 12, flexDirection: 'row-reverse', alignItems: 'center', gap: 5, borderRadius: 20, backgroundColor: '#fff', paddingHorizontal: 10, paddingVertical: 6 },
   availableDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#10b981' },
   availableText: { fontSize: 11, color: '#047857', fontWeight: '800' },
-  categoriesRow: {
-    flexDirection: 'row-reverse',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 24,
-  },
+  categoriesRow: { flexDirection: 'row-reverse', gap: 10, paddingBottom: 4, marginBottom: 20 },
   categoryPill: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
@@ -268,9 +300,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#334155',
   },
-  listContainer: {
-    gap: 14,
-  },
+  listContainer: { gap: 14, paddingBottom: 8 },
+  cardActions: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, paddingTop: 13, borderTopWidth: 1, borderTopColor: '#f1f5f9' },
+  detailsButton: { flexDirection: 'row-reverse', alignItems: 'center', gap: 3, paddingVertical: 7 },
+  detailsText: { color: '#047857', fontSize: 13, fontWeight: '900' },
+  shareButton: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, backgroundColor: '#ecfdf5', borderWidth: 1, borderColor: '#d1fae5', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12 },
+  shareText: { color: '#059669', fontSize: 12, fontWeight: '900' },
   card: {
     backgroundColor: '#fff',
     borderRadius: 24,
