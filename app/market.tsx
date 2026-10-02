@@ -54,7 +54,7 @@ export default function Market() {
       .from('services')
       .select(`
         *,
-        profiles:provider_id(display_name, avatar_url, is_verified, district)
+        profiles:provider_id(display_name, avatar_url, is_verified)
       `)
       .order('created_at', { ascending: false });
     
