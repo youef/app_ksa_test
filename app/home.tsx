@@ -152,117 +152,112 @@ export default function Home() {
   }, [refreshLiveLocation]);
 
   const load = useCallback(async () => {
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) return router.replace('/auth');
-    setCurrentUserId(u.user.id);
+    const { data: auth } = await supabase.auth.getUser();
+    const user = auth.user;
+    if (!user) {
+      router.replace('/auth');
+      return;
+    }
 
-    // Use the saved location. Automatic GPS refresh is limited to the weekly prompt.
-    let { data: profileData } = await supabase.from('profiles').select('*').eq('id', u.user.id).maybeSingle();
+    setCurrentUserId(user.id);
 
+    // Load the stable location once, then reuse it for every Home query.
+    const [profileRes, locationRes] = await Promise.all([
+      supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
+      getActiveLocation(),
+    ]);
 
-
+    const profileData = profileRes.data;
+    const loc = locationRes;
     setProfile(profileData);
 
-    // Every signed-in user must have a complete region/city/district before entering the app.
-    // Location is refreshed automatically, so moving cities/districts updates the feed.
     const locationComplete = !!(profileData?.region && profileData?.city && profileData?.district);
+    setLocationSetupOpen(!locationComplete);
     if (!locationComplete) {
-      setLocationSetupOpen(true);
       setLocationSetupMessage('حدد موقعك تلقائياً لنربط حسابك بالمنطقة والمدينة والحي.');
-    } else {
-      setLocationSetupOpen(false);
     }
 
-
-    // If user has a city in profile and selectedCity is still default, auto-populate globally
-    if (profileData?.city) {
-      const active = await getActiveLocation();
-      if (isAllKingdom(active.city)) {
-        await setActiveLocation(profileData.region || 'المملكة', profileData.city, profileData.district || 'كل الأحياء', false);
-      }
+    if (profileData?.city && isAllKingdom(loc.city)) {
+      await setActiveLocation(
+        profileData.region || 'المملكة',
+        profileData.city,
+        profileData.district || 'كل الأحياء',
+        false
+      );
     }
 
-    // Fetch unread notifications
-    const { count: nc } = await supabase
-      .from('notifications')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', u.user.id)
-      .is('read_at', null);
-    setUnreadNotifCount(nc ?? 0);
+    // Fetch the Home feed in parallel instead of waiting section-by-section.
+    const [notificationsRes, storiesRes, questionsRes, requestsRes] = await Promise.all([
+      supabase
+        .from('notifications')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .is('read_at', null),
+      supabase
+        .from('stories')
+        .select('*, profiles:author_id(id, display_name, username, avatar_url, is_verified, is_geoverified, city, district)')
+        .gt('expires_at', new Date().toISOString())
+        .order('created_at', { ascending: false })
+        .limit(30),
+      supabase
+        .from('questions')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(30),
+      supabase
+        .from('requests')
+        .select('*')
+        .eq('status', 'open')
+        .order('created_at', { ascending: false })
+        .limit(25),
+    ]);
 
-    // Fetch stories (active, last 24h) filtered by same city/district and deduplicate by author
-    const loc = await getActiveLocation();
-    let storiesQuery = supabase
-      .from('stories')
-      .select('*, profiles:author_id(id, display_name, username, avatar_url, is_verified, is_geoverified, city, district)')
-      .gt('expires_at', new Date().toISOString())
-      .order('created_at', { ascending: false })
-      .limit(30);
-
-    const { data: storiesData } = await storiesQuery;
+    setUnreadNotifCount(notificationsRes.count ?? 0);
 
     const seenStoryAuthors = new Set<string>();
-    const uniqueStories = (storiesData ?? []).filter((s: any) => {
+    const uniqueStories = (storiesRes.data ?? []).filter((s: any) => {
       if (!s.author_id || seenStoryAuthors.has(s.author_id)) return false;
-      // Filter by location: show stories from same district or city
       const authorCity = s.profiles?.city || '';
       const authorDistrict = s.profiles?.district || '';
-      const activeCity = loc.city;
-      const activeDistrict = loc.district;
-      // If location is set (not 'all kingdom'), filter by city at minimum
-      if (!isAllKingdom(activeCity)) {
-        if (activeCity && authorCity && authorCity !== activeCity) return false;
-        // If district is also set, filter by district too
-        if (activeDistrict && activeDistrict !== 'كل الأحياء' && authorDistrict && authorDistrict !== activeDistrict) return false;
+      if (!isAllKingdom(loc.city)) {
+        if (loc.city && authorCity && authorCity !== loc.city) return false;
+        if (
+          loc.district &&
+          loc.district !== 'كل الأحياء' &&
+          authorDistrict &&
+          authorDistrict !== loc.district
+        ) return false;
       }
       seenStoryAuthors.add(s.author_id);
       return true;
     });
     setStories(uniqueStories);
 
-    // Fetch questions and deduplicate by title
-    const { data: qData, error: qErr } = await supabase
-      .from('questions')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(30);
+    if (questionsRes.error) console.log('questions error:', questionsRes.error.message);
+    const uniqueQData = (questionsRes.data ?? []).filter((q: any, index: number, arr: any[]) => {
+      const title = (q.title || '').trim().toLowerCase();
+      return arr.findIndex((item: any) => (item.title || '').trim().toLowerCase() === title) === index;
+    });
 
-    if (qErr) console.log('questions error:', qErr.message);
-
-    if (qData && qData.length > 0) {
-      const seenTitles = new Set<string>();
-      const uniqueQData = qData.filter((q: any) => {
-        const t = (q.title || '').trim().toLowerCase();
-        if (seenTitles.has(t)) return false;
-        seenTitles.add(t);
-        return true;
-      });
-
+    if (uniqueQData.length) {
       const authorIds = [...new Set(uniqueQData.map((q: any) => q.author_id).filter(Boolean))];
       const qIds = uniqueQData.map((q: any) => q.id);
-
-      // Fetch profiles of question authors and answers in parallel
       const [profilesRes, answersRes] = await Promise.all([
-        supabase.from('profiles').select('*').in('id', authorIds),
-        supabase.from('answers').select('*').in('question_id', qIds).order('created_at', { ascending: true })
+        authorIds.length ? supabase.from('profiles').select('*').in('id', authorIds) : Promise.resolve({ data: [] }),
+        qIds.length ? supabase.from('answers').select('*').in('question_id', qIds).order('created_at', { ascending: true }) : Promise.resolve({ data: [] }),
       ]);
 
       const profileMap = (profilesRes.data || []).reduce((acc: any, p: any) => ({ ...acc, [p.id]: p }), {});
-
-      // Fetch profiles of answer authors
       const answerAuthorIds = [...new Set((answersRes.data || []).map((a: any) => a.author_id).filter(Boolean))];
-      let ansProfileMap: Record<string, any> = {};
-      if (answerAuthorIds.length > 0) {
-        const { data: ansProfiles } = await supabase.from('profiles').select('*').in('id', answerAuthorIds);
-        ansProfileMap = (ansProfiles || []).reduce((acc: any, p: any) => ({ ...acc, [p.id]: p }), {});
-      }
+      const { data: answerProfiles } = answerAuthorIds.length
+        ? await supabase.from('profiles').select('*').in('id', answerAuthorIds)
+        : { data: [] };
+      const answerProfileMap = (answerProfiles || []).reduce((acc: any, p: any) => ({ ...acc, [p.id]: p }), {});
 
-      // Group answers by question_id
       const answersByQ: Record<string, any[]> = {};
-      (answersRes.data || []).forEach((ans: any) => {
-        ans.profiles = ansProfileMap[ans.author_id] || null;
-        if (!answersByQ[ans.question_id]) answersByQ[ans.question_id] = [];
-        answersByQ[ans.question_id].push(ans);
+      (answersRes.data || []).forEach((answer: any) => {
+        answer.profiles = answerProfileMap[answer.author_id] || null;
+        (answersByQ[answer.question_id] ||= []).push(answer);
       });
 
       setQuestions(uniqueQData.map((q: any) => ({
@@ -275,34 +270,25 @@ export default function Home() {
       setQuestions([]);
     }
 
-    // Fetch requests and deduplicate by title
-    const { data: rData, error: rErr } = await supabase
-      .from('requests')
-      .select('*')
-      .eq('status', 'open')
-      .order('created_at', { ascending: false })
-      .limit(25);
-
-    if (rErr) console.log('requests error:', rErr.message);
-
-    if (rData && rData.length > 0) {
-      const seenReqTitles = new Set<string>();
-      const uniqueRData = rData.filter((r: any) => {
-        const t = (r.title || '').trim().toLowerCase();
-        if (seenReqTitles.has(t)) return false;
-        seenReqTitles.add(t);
-        return true;
-      });
-
-      const requesterIds = [...new Set(uniqueRData.map((r: any) => r.requester_id).filter(Boolean))];
-      const { data: rProfiles } = await supabase.from('profiles').select('*').in('id', requesterIds);
-      const profileMap = (rProfiles || []).reduce((acc: any, p: any) => ({ ...acc, [p.id]: p }), {});
-      setRequests(uniqueRData.map((r: any) => ({ ...r, profiles: profileMap[r.requester_id] || null })));
+    if (requestsRes.error) console.log('requests error:', requestsRes.error.message);
+    const uniqueRData = (requestsRes.data ?? []).filter((item: any, index: number, arr: any[]) => {
+      const title = (item.title || '').trim().toLowerCase();
+      return arr.findIndex((candidate: any) => (candidate.title || '').trim().toLowerCase() === title) === index;
+    });
+    if (uniqueRData.length) {
+      const requesterIds = [...new Set(uniqueRData.map((item: any) => item.requester_id).filter(Boolean))];
+      const { data: requesterProfiles } = requesterIds.length
+        ? await supabase.from('profiles').select('*').in('id', requesterIds)
+        : { data: [] };
+      const requesterMap = (requesterProfiles || []).reduce((acc: any, p: any) => ({ ...acc, [p.id]: p }), {});
+      setRequests(uniqueRData.map((item: any) => ({
+        ...item,
+        profiles: requesterMap[item.requester_id] || null,
+      })));
     } else {
       setRequests([]);
     }
   }, []);
-
   useFocusEffect(useCallback(() => { load() }, [load]));
 
   // Inline Quick Reply Handler
