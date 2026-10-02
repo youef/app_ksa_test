@@ -96,7 +96,16 @@ export default function Conversation() {
     setMessages(prev => {
       const loaded = msgs ?? [];
       const loadedIds = new Set(loaded.map(m => m.id));
-      const liveOnly = prev.filter(m => !m.id || String(m.id).startsWith('optimistic-') || !loadedIds.has(m.id));
+      const liveOnly = prev.filter(m => {
+        if (!m.id || !String(m.id).startsWith('optimistic-')) return !loadedIds.has(m.id);
+        const duplicate = loaded.some(
+          m =>
+            m.sender_id === u.user.id &&
+            m.body === m.body &&
+            Math.abs(new Date(m.created_at).getTime() - new Date(m.created_at).getTime()) < 10000
+        );
+        return !duplicate;
+      });
       return [...loaded, ...liveOnly].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
     });
 
