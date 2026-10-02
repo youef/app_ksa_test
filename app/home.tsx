@@ -460,25 +460,6 @@ export default function Home() {
           </View>
         </View>
       </Modal>
-
-      {/* Twitter-style new posts indicator */}
-      {newPostsCount > 0 && !refreshing && (
-        <Pressable
-          style={styles.newPostsBanner}
-          onPress={async () => {
-            setNewPostsCount(0);
-            setRefreshing(true);
-            await load();
-            setRefreshing(false);
-          }}
-        >
-          <RefreshCw size={14} color="#fff" />
-          <Text style={styles.newPostsBannerText}>
-            {newPostsCount} استفسار جديد · اسحب للتحديث
-          </Text>
-        </Pressable>
-      )}
-
       <ScrollView 
         style={styles.container}
         showsVerticalScrollIndicator={false}
