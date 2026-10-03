@@ -515,7 +515,7 @@ export default function Conversation() {
           onPress={() => otherUser && router.push({ pathname: '/user', params: { id: otherUser.id } })}
         >
           {otherUser?.avatar_url && !isAnonymous ? (
-            <Image source={{ uri: otherUser.avatar_url }} style={styles.headerAvatar} />
+            <Image source={{ uri: otherUser.avatar_url }} style={styles.headerAvatar as any} />
           ) : (
             <View style={styles.headerAvatarFallback}>
               <Text style={styles.headerAvatarLetter}>{otherName[0]}</Text>
@@ -597,7 +597,7 @@ export default function Conversation() {
           <View style={styles.emptyConv}>
             <View style={styles.emptyConvIcon}>
               {otherUser?.avatar_url && !isAnonymous ? (
-                <Image source={{ uri: otherUser.avatar_url }} style={styles.emptyConvAvatar} />
+                <Image source={{ uri: otherUser.avatar_url }} style={styles.emptyConvAvatar as any} />
               ) : (
                 <View style={styles.emptyConvAvatarFallback}>
                   <Text style={styles.emptyConvAvatarLetter}>{otherName[0]}</Text>
@@ -630,7 +630,7 @@ export default function Conversation() {
                   {!isMine && (
                     <View style={styles.otherAvatar}>
                       {otherUser?.avatar_url && !isAnonymous ? (
-                        <Image source={{ uri: otherUser.avatar_url }} style={styles.otherAvatarImg} />
+                        <Image source={{ uri: otherUser.avatar_url }} style={styles.otherAvatarImg as any} />
                       ) : (
                         <View style={styles.otherAvatarFallback}>
                           <Text style={styles.otherAvatarLetter}>{otherName[0]}</Text>
@@ -639,7 +639,7 @@ export default function Conversation() {
                     </View>
                   )}
                   <View style={[styles.msgBubble, isMine ? styles.msgBubbleMine : styles.msgBubbleOther]}>
-                    {(() => { const media = parseImageMessage(msg.body); return media ? <View><Image source={{ uri: media.url }} style={styles.messageImage} /><Text style={[styles.imageCaption, isMine && styles.msgTextMine]}>{media.name}</Text></View> : <Text style={[styles.msgText, isMine && styles.msgTextMine]}>{msg.body}</Text>; })()}
+                    {(() => { const media = parseImageMessage(msg.body); return media ? <View><Image source={{ uri: media.url }} style={styles.messageImage as any} /><Text style={[styles.imageCaption, isMine && styles.msgTextMine]}>{media.name}</Text></View> : <Text style={[styles.msgText, isMine && styles.msgTextMine]}>{msg.body}</Text>; })()}
                     <View style={[styles.msgMeta, isMine && styles.msgMetaMine]}>
                       <Text style={[styles.msgTime, isMine && styles.msgTimeMine]}>
                         {formatMsgTime(msg.created_at)}
@@ -837,7 +837,7 @@ function formatMsgTime(dateStr: string) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, minHeight: Platform.OS === 'web' ? '100vh' : undefined, width: '100%', alignSelf: 'stretch', backgroundColor: '#f8fafc' },
+  container: { flex: 1, minHeight: Platform.OS === 'web' ? ('100vh' as any) : undefined, width: '100%', alignSelf: 'stretch', backgroundColor: '#f8fafc' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: {
     flexDirection: 'row-reverse',

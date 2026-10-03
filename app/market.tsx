@@ -115,8 +115,8 @@ export default function Market() {
           {item.profiles?.avatar_url ? (
             <Image source={{ uri: item.profiles.avatar_url }} style={styles.avatar} />
           ) : (
-            <View style={styles.avatarPlaceholder}>
-              <Text style={styles.avatarLetter}>{item.profiles?.display_name?.[0] || 'ح'}</Text>
+            <View style={styles.providerAvatarPlaceholder}>
+              <Text style={styles.providerAvatarLetter}>{item.profiles?.display_name?.[0] || 'ح'}</Text>
             </View>
           )}
           <View style={styles.providerMeta}>
@@ -270,6 +270,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     width: '100%',
   },
+  inlineState: {
+    paddingVertical: 24,
+  },
   bottomNavWrapper: {
     position: 'absolute',
     bottom: 0,
@@ -416,7 +419,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     marginLeft: 10,
   },
-  avatarPlaceholder: {
+  providerAvatarPlaceholder: {
     width: 36,
     height: 36,
     borderRadius: 18,
@@ -425,7 +428,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginLeft: 10,
   },
-  avatarLetter: {
+  providerAvatarLetter: {
     fontSize: 16,
     fontWeight: '800',
     color: '#64748b',

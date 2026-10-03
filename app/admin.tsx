@@ -59,6 +59,10 @@ import {
   ChevronDown,
   ChevronUp,
   Bell,
+  Building2,
+  CalendarDays,
+  Store,
+  Archive,
 } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
@@ -95,7 +99,7 @@ export default function Admin() {
   
   // Navigation Tabs:
   // overview | users | verifications | reports | content | broadcast | logs
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'verifications' | 'reports' | 'content' | 'broadcast' | 'logs' | 'locations' | 'branding'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'verifications' | 'reports' | 'content' | 'broadcast' | 'logs' | 'locations' | 'branding' | 'platform'>('overview');
   const [customLocations, setCustomLocations] = useState<any[]>([]);
   const [locationKind, setLocationKind] = useState<'region' | 'city' | 'district'>('city');
   const [locationName, setLocationName] = useState('');
@@ -113,6 +117,9 @@ export default function Admin() {
   const [verifications, setVerifications] = useState<any[]>([]);
   const [questionsList, setQuestionsList] = useState<any[]>([]);
   const [requestsList, setRequestsList] = useState<any[]>([]);
+  const [businessesList, setBusinessesList] = useState<any[]>([]);
+  const [marketplaceList, setMarketplaceList] = useState<any[]>([]);
+  const [eventsList, setEventsList] = useState<any[]>([]);
   
   // Relational Stats & Audit Logs
   const [stats, setStats] = useState({
@@ -123,6 +130,9 @@ export default function Admin() {
     services: 0,
     pendingReports: 0,
     pendingVerif: 0,
+    businesses: 0,
+    marketplace: 0,
+    events: 0,
   });
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
 
@@ -281,6 +291,9 @@ export default function Admin() {
       latestQRes,
       latestRRes,
       auditRes,
+      businessesRes,
+      marketplaceRes,
+      eventsRes,
     ] = await Promise.all([
       supabase.from('reports').select('*, reporter:reporter_id(display_name, username, avatar_url)').order('created_at', { ascending: false }).limit(60),
       supabase.from('verification_requests').select('*, user:user_id(id, display_name, username, city, district, avatar_url, bio, is_verified, is_geoverified, role, created_at)').order('created_at', { ascending: false }).limit(60),
@@ -291,6 +304,9 @@ export default function Admin() {
       supabase.from('questions').select('*, profiles:author_id(display_name, username, avatar_url)').order('created_at', { ascending: false }).limit(40),
       supabase.from('requests').select('*, profiles:requester_id(display_name, username, avatar_url)').order('created_at', { ascending: false }).limit(40),
       supabase.from('admin_activity_logs').select('*, actor:actor_id(display_name, username)').order('created_at', { ascending: false }).limit(100),
+      supabase.from('businesses').select('*, owner:owner_id(display_name, username)').order('created_at', { ascending: false }).limit(100),
+      supabase.from('marketplace_items').select('*, seller:seller_id(display_name, username)').order('created_at', { ascending: false }).limit(100),
+      supabase.from('events').select('*, organizer:organizer_id(display_name, username)').order('created_at', { ascending: false }).limit(100),
     ]);
 
     const allUsers = profilesRes.data ?? [];
@@ -311,6 +327,9 @@ export default function Admin() {
     setVerifications(allVerifs);
     setQuestionsList(latestQRes.data ?? []);
     setRequestsList(latestRRes.data ?? []);
+    setBusinessesList(businessesRes.data ?? []);
+    setMarketplaceList(marketplaceRes.data ?? []);
+    setEventsList(eventsRes.data ?? []);
 
     const adminCount = allUsers.filter((u: any) => u.role === 'admin').length;
     const pendingRep = allReports.filter((r: any) => r.status === 'pending').length;
@@ -324,12 +343,28 @@ export default function Admin() {
       services: sCountRes.count ?? 0,
       pendingReports: pendingRep,
       pendingVerif: pendingVer,
+      businesses: businessesRes.data?.length ?? 0,
+      marketplace: marketplaceRes.data?.length ?? 0,
+      events: eventsRes.data?.length ?? 0,
     });
 
     setLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const updatePlatformEntity = async (entity: 'business' | 'marketplace' | 'event', id: string, action: string) => {
+    try {
+      const { data, error } = await supabase.rpc('admin_update_platform_entity', { p_entity: entity, p_target_id: id, p_action: action });
+      if (error) throw error;
+      if (entity === 'business') setBusinessesList(prev => prev.map(item => item.id === id ? data : item));
+      if (entity === 'marketplace') setMarketplaceList(prev => prev.map(item => item.id === id ? data : item));
+      if (entity === 'event') setEventsList(prev => prev.map(item => item.id === id ? data : item));
+      showToast('تم تحديث مورد المنصة وتسجيل العملية بنجاح ✓');
+    } catch (e: any) {
+      Alert.alert('تعذر التحديث', e?.message || 'حدث خطأ غير متوقع');
+    }
+  };
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -778,6 +813,7 @@ export default function Admin() {
             active={activeTab === 'overview'}
             onPress={() => setActiveTab('overview')}
           />
+          <TabPill label="موارد المنصة" icon={<Store size={15} color={activeTab === 'platform' ? '#fff' : '#64748b'} />} active={activeTab === 'platform'} onPress={() => setActiveTab('platform')} />
           <TabPill label="إدارة المواقع" icon={<MapPin size={15} color={activeTab === 'locations' ? '#fff' : '#64748b'} />} active={activeTab === 'locations'} onPress={() => setActiveTab('locations')} />
           <TabPill label="الهوية والشعار" icon={<Sparkles size={15} color={activeTab === 'branding' ? '#fff' : '#64748b'} />} active={activeTab === 'branding'} onPress={() => setActiveTab('branding')} />
           <TabPill
@@ -829,6 +865,51 @@ export default function Admin() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}
       >
+        {activeTab === 'platform' && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeaderRow}>
+              <View>
+                <Text style={styles.sectionTitle}>موارد المنصة والتشغيل التجاري</Text>
+                <Text style={styles.sectionSubDesc}>إدارة الأعمال والسوق والفعاليات من مصدر واحد، مع حفظ كل إجراء في سجل التدقيق.</Text>
+              </View>
+              <View style={styles.countBadge}><Text style={styles.countBadgeText}>{businessesList.length + marketplaceList.length + eventsList.length} مورد</Text></View>
+            </View>
+
+            <View style={styles.statsGrid}>
+              <StatCard icon={<Building2 size={22} color="#0284c7" />} bg="#f0f9ff" value={businessesList.length} label="دليل الأعمال" sub="منشآت وخدمات محلية" />
+              <StatCard icon={<Store size={22} color="#059669" />} bg="#ecfdf5" value={marketplaceList.length} label="عروض السوق" sub="منتجات الجيران" />
+              <StatCard icon={<CalendarDays size={22} color="#7c3aed" />} bg="#f5f3ff" value={eventsList.length} label="الفعاليات" sub="أنشطة المجتمع" />
+            </View>
+
+            <Text style={styles.subSectionTitle}>دليل الأعمال</Text>
+            {businessesList.length === 0 ? <EmptyState icon={<Building2 size={36} color="#94a3b8" />} title="لا توجد أعمال مسجلة" sub="ستظهر الأعمال الجديدة هنا." /> : businessesList.slice(0, 30).map((item: any) => (
+              <View key={item.id} style={styles.quickAction}>
+                <Building2 size={18} color={item.is_verified ? C.accent : C.muted} />
+                <View style={{ flex: 1 }}><Text style={styles.quickActionText}>{item.name || 'عمل بلا اسم'}</Text><Text style={{ color: C.muted, fontSize: 11, textAlign: 'right' }}>{[item.city, item.district].filter(Boolean).join(' · ') || 'بلا موقع'} · {item.owner?.display_name || 'مالك غير معروف'}</Text></View>
+                <Pressable style={[styles.smallActionBtn, item.is_verified && { backgroundColor: '#dcfce7' }]} onPress={() => confirmAction('تحديث توثيق العمل', `تغيير حالة توثيق «${item.name}»؟`, () => updatePlatformEntity('business', item.id, 'toggle_verified'))}><CheckCircle2 size={16} color={item.is_verified ? '#16a34a' : '#64748b'} /><Text style={styles.smallActionText}>{item.is_verified ? 'موثق' : 'توثيق'}</Text></Pressable>
+              </View>
+            ))}
+
+            <Text style={styles.subSectionTitle}>سوق الجيران</Text>
+            {marketplaceList.length === 0 ? <EmptyState icon={<Store size={36} color="#94a3b8" />} title="لا توجد عروض سوق" sub="ستظهر العروض الجديدة هنا." /> : marketplaceList.slice(0, 30).map((item: any) => (
+              <View key={item.id} style={styles.quickAction}>
+                <Store size={18} color={item.status === 'available' ? C.accent : C.muted} />
+                <View style={{ flex: 1 }}><Text style={styles.quickActionText}>{item.title || 'عرض بلا عنوان'}</Text><Text style={{ color: C.muted, fontSize: 11, textAlign: 'right' }}>{item.price != null ? `${item.price} ر.س` : 'حسب الاتفاق'} · {item.seller?.display_name || 'بائع غير معروف'}</Text></View>
+                <Pressable style={styles.smallActionBtn} onPress={() => confirmAction('تغيير حالة العرض', `تغيير حالة «${item.title}»؟`, () => updatePlatformEntity('marketplace', item.id, item.status === 'available' ? 'archive' : 'restore'))}><Archive size={16} color="#64748b" /><Text style={styles.smallActionText}>{item.status === 'available' ? 'أرشفة' : 'استعادة'}</Text></Pressable>
+              </View>
+            ))}
+
+            <Text style={styles.subSectionTitle}>الفعاليات المجتمعية</Text>
+            {eventsList.length === 0 ? <EmptyState icon={<CalendarDays size={36} color="#94a3b8" />} title="لا توجد فعاليات" sub="ستظهر الفعاليات الجديدة هنا." /> : eventsList.slice(0, 30).map((item: any) => (
+              <View key={item.id} style={styles.quickAction}>
+                <CalendarDays size={18} color={item.status === 'published' ? '#7c3aed' : C.muted} />
+                <View style={{ flex: 1 }}><Text style={styles.quickActionText}>{item.title || 'فعالية بلا عنوان'}</Text><Text style={{ color: C.muted, fontSize: 11, textAlign: 'right' }}>{[item.city, item.district].filter(Boolean).join(' · ') || 'بلا موقع'} · {item.organizer?.display_name || 'منظم غير معروف'}</Text></View>
+                <Pressable style={styles.smallActionBtn} onPress={() => confirmAction('تغيير حالة الفعالية', `تغيير حالة «${item.title}»؟`, () => updatePlatformEntity('event', item.id, item.status === 'published' ? 'cancel' : 'publish'))}><Text style={styles.smallActionText}>{item.status === 'published' ? 'إلغاء النشر' : 'نشر'}</Text></Pressable>
+              </View>
+            ))}
+          </View>
+        )}
+
         {activeTab === 'branding' && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>الهوية البصرية والشعار</Text>
@@ -1795,6 +1876,8 @@ const styles = StyleSheet.create({
   healthLabel: { fontSize: 11, color: '#475569', fontWeight: '700' },
   healthValueActive: { fontSize: 11, color: '#10B981', fontWeight: '900' },
   healthValueRole: { fontSize: 10, color: '#0891B2', fontWeight: '800', backgroundColor: '#ECFEFF', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8 },
+  smallActionBtn: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, paddingHorizontal: 9, paddingVertical: 7, borderRadius: 10, backgroundColor: '#f1f5f9' },
+  smallActionText: { color: '#475569', fontSize: 11, fontWeight: '800' },
   quickAction: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#fff', padding: 14, borderRadius: 16, marginBottom: 8, borderWidth: 1, borderColor: '#E2E8F0' },
   quickActionLeft: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10 },
   quickActionText: { fontSize: 13, fontWeight: '800', color: '#0F172A' },

@@ -454,7 +454,6 @@ const styles = StyleSheet.create({
   blockedNotice: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fecaca', borderRadius: 14, padding: 12, marginBottom: 12 },
   blockedNoticeText: { flex: 1, color: '#991b1b', fontSize: 12, fontWeight: '800', textAlign: 'right', lineHeight: 18 },
   noticeBanner: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, borderRadius: 14, padding: 12, marginBottom: 12 },
-  blockedNotice: { backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fecaca' },
   mutedNotice: { backgroundColor: '#f1f5f9', borderWidth: 1, borderColor: '#cbd5e1' },
   noticeText: { flex: 1, color: '#334155', fontSize: 12, fontWeight: '700', textAlign: 'right' },
   noticeAction: { backgroundColor: '#dc2626', borderRadius: 9, paddingHorizontal: 11, paddingVertical: 7 },

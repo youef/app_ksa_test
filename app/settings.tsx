@@ -36,6 +36,7 @@ import {
   Moon,
   UserX,
   Compass,
+  MapPin,
 } from 'lucide-react-native';
 import BottomNav from '@/components/BottomNav';
 import { verifyGPSInDistrict } from '@/lib/nationalAddress';
