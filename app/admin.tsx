@@ -95,7 +95,7 @@ export default function Admin() {
   
   // Navigation Tabs:
   // overview | users | verifications | reports | content | broadcast | logs
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'verifications' | 'reports' | 'content' | 'broadcast' | 'logs' | 'locations'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'verifications' | 'reports' | 'content' | 'broadcast' | 'logs' | 'locations' | 'branding'>('overview');
   const [customLocations, setCustomLocations] = useState<any[]>([]);
   const [locationKind, setLocationKind] = useState<'region' | 'city' | 'district'>('city');
   const [locationName, setLocationName] = useState('');
@@ -348,8 +348,27 @@ export default function Admin() {
     setUserUserStats({ qCount: qC.count || 0, aCount: aC.count || 0 });
   };
 
-  // Self-promote to Admin (for owner)
-  // 1. Toggle User Role (Strictly admin or user)
+  const adminUpdateUser = async (targetUser: any, patch: { role?: 'admin' | 'user'; is_verified?: boolean; is_geoverified?: boolean; is_banned?: boolean }) => {
+    const next = {
+      role: patch.role ?? (targetUser.role === 'admin' ? 'admin' : 'user'),
+      is_verified: patch.is_verified ?? Boolean(targetUser.is_verified),
+      is_geoverified: patch.is_geoverified ?? Boolean(targetUser.is_geoverified),
+      is_banned: patch.is_banned ?? Boolean(targetUser.is_banned),
+    };
+    const { data, error } = await supabase.rpc('admin_update_user', {
+      p_target_user: targetUser.id,
+      p_role: next.role,
+      p_is_verified: next.is_verified,
+      p_is_geoverified: next.is_geoverified,
+      p_is_banned: next.is_banned,
+    });
+    if (error) throw error;
+    setUsersList(prev => prev.map(u => u.id === targetUser.id ? { ...u, ...data } : u));
+    setInspectedUser((prev: any) => prev?.id === targetUser.id ? { ...prev, ...data } : prev);
+    return data;
+  };
+
+  // User role is changed through a SECURITY DEFINER RPC with last-admin protection.
   const toggleUserRole = async (targetUser: any) => {
     const isCurrentAdmin = targetUser.role === 'admin';
     const newRole = isCurrentAdmin ? 'user' : 'admin';
@@ -359,20 +378,12 @@ export default function Admin() {
       'تغيير صلاحية المستخدم',
       `هل أنت متأكد من ${actionLabel} للمستخدم "${targetUser.display_name || targetUser.username}"؟`,
       async () => {
-        const { error } = await supabase
-          .from('profiles')
-          .update({ role: newRole })
-          .eq('id', targetUser.id);
-
-        if (error) {
-          Alert.alert('خطأ', 'تعذر تحديث الصلاحية: ' + error.message);
-        } else {
-          setUsersList(prev => prev.map(u => u.id === targetUser.id ? { ...u, role: newRole } : u));
-          if (inspectedUser?.id === targetUser.id) {
-            setInspectedUser((prev: any) => ({ ...prev, role: newRole }));
-          }
-          addAuditLog(`تغيير الصلاحية إلى ${newRole === 'admin' ? 'مدير' : 'مستخدم'}`, targetUser.display_name || targetUser.username);
+        try {
+          await adminUpdateUser(targetUser, { role: newRole });
+          await addAuditLog(`تغيير الصلاحية إلى ${newRole === 'admin' ? 'مدير' : 'مستخدم'}`, targetUser.display_name || targetUser.username, 'user', targetUser.id);
           showToast(`تم ${isCurrentAdmin ? 'خفض الصلاحية لمستخدم' : 'منح رتبة مدير النظام'} بنجاح ✨`);
+        } catch (e: any) {
+          Alert.alert('خطأ', 'تعذر تحديث الصلاحية: ' + (e?.message || 'خطأ غير متوقع'));
         }
       }
     );
@@ -381,44 +392,21 @@ export default function Admin() {
   // 2. Toggle Official Verification (الهوية الوطنية والشارة الرسمية)
   const toggleVerification = async (targetUser: any) => {
     const nextStatus = !targetUser.is_verified;
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        is_verified: nextStatus,
-        verification_status: nextStatus ? 'verified' : 'unverified'
-      })
-      .eq('id', targetUser.id);
-
-    if (error) {
-      Alert.alert('خطأ', error.message);
-    } else {
-      setUsersList(prev => prev.map(u => u.id === targetUser.id ? { ...u, is_verified: nextStatus } : u));
-      if (inspectedUser?.id === targetUser.id) {
-        setInspectedUser((prev: any) => ({ ...prev, is_verified: nextStatus }));
-      }
-      addAuditLog(nextStatus ? 'منح الشارة الزرقاء الرسمية' : 'إلغاء التوثيق الرسمي', targetUser.display_name || targetUser.username);
+    try {
+      await adminUpdateUser(targetUser, { is_verified: nextStatus });
+      await addAuditLog(nextStatus ? 'منح الشارة الزرقاء الرسمية' : 'إلغاء التوثيق الرسمي', targetUser.display_name || targetUser.username, 'user', targetUser.id);
       showToast(nextStatus ? 'تم توثيق الحساب بالشارة الرسمية ✓' : 'تم إلغاء توثيق الحساب');
-    }
+    } catch (e: any) { Alert.alert('خطأ', e?.message || 'تعذر تحديث التوثيق'); }
   };
 
   // 3. Toggle Geo Verification (ابن الحي الموثق)
   const toggleGeoVerification = async (targetUser: any) => {
     const nextStatus = !targetUser.is_geoverified;
-    const { error } = await supabase
-      .from('profiles')
-      .update({ is_geoverified: nextStatus })
-      .eq('id', targetUser.id);
-
-    if (error) {
-      Alert.alert('خطأ', error.message);
-    } else {
-      setUsersList(prev => prev.map(u => u.id === targetUser.id ? { ...u, is_geoverified: nextStatus } : u));
-      if (inspectedUser?.id === targetUser.id) {
-        setInspectedUser((prev: any) => ({ ...prev, is_geoverified: nextStatus }));
-      }
-      addAuditLog(nextStatus ? 'منح شارة ابن الحي الموثق' : 'إزالة شارة ابن الحي', targetUser.display_name || targetUser.username);
-      showToast(nextStatus ? 'تم منح شارة "ابن الحي الموثق" 🛡️' : 'تمت إزالة شارة السكن');
-    }
+    try {
+      await adminUpdateUser(targetUser, { is_geoverified: nextStatus });
+      await addAuditLog(nextStatus ? 'منح شارة ابن الحي الموثق' : 'إزالة شارة ابن الحي', targetUser.display_name || targetUser.username, 'user', targetUser.id);
+      showToast(nextStatus ? 'تم منح شارة ابن الحي الموثق 🛡️' : 'تمت إزالة شارة السكن');
+    } catch (e: any) { Alert.alert('خطأ', e?.message || 'تعذر تحديث إثبات السكن'); }
   };
 
   // 4. Toggle User Ban
@@ -430,21 +418,11 @@ export default function Admin() {
       actionLabel,
       `هل ترغب فعلاً في ${nextBan ? 'حظر' : 'إلغاء حظر'} "${targetUser.display_name || targetUser.username}"؟`,
       async () => {
-        const { error } = await supabase
-          .from('profiles')
-          .update({ is_banned: nextBan })
-          .eq('id', targetUser.id);
-
-        if (error) {
-          Alert.alert('خطأ', error.message);
-        } else {
-          setUsersList(prev => prev.map(u => u.id === targetUser.id ? { ...u, is_banned: nextBan } : u));
-          if (inspectedUser?.id === targetUser.id) {
-            setInspectedUser((prev: any) => ({ ...prev, is_banned: nextBan }));
-          }
-          addAuditLog(nextBan ? 'حظر حساب المستخدم' : 'رفع الحظر عن الحساب', targetUser.display_name || targetUser.username);
+        try {
+          await adminUpdateUser(targetUser, { is_banned: nextBan });
+          await addAuditLog(nextBan ? 'حظر حساب المستخدم' : 'رفع الحظر عن الحساب', targetUser.display_name || targetUser.username, 'user', targetUser.id);
           showToast(nextBan ? 'تم حظر المستخدم بنجاح 🚫' : 'تم رفع الحظر بنجاح 🟢');
-        }
+        } catch (e: any) { Alert.alert('خطأ', e?.message || 'تعذر تغيير حالة الحظر'); }
       }
     );
   };
@@ -476,19 +454,18 @@ export default function Admin() {
 
   // 6. Reports Actions
   const resolveReport = async (id: string, action: 'resolved' | 'dismissed') => {
-    const { data: u } = await supabase.auth.getUser();
-    const { error } = await supabase.from('reports').update({
-      status: action,
-      reviewed_by: u.user?.id,
-      reviewed_at: new Date().toISOString()
-    }).eq('id', id);
-    if (error) {
-      Alert.alert('خطأ', error.message);
-      return;
+    try {
+      const { data, error } = await supabase.rpc('admin_moderate_report', {
+        p_report_id: id,
+        p_action: action,
+        p_delete_content: false,
+      });
+      if (error) throw error;
+      setReports(prev => prev.map(r => r.id === id ? { ...r, ...data } : r));
+      showToast(action === 'resolved' ? 'تم حل وإغلاق البلاغ بنجاح ✓' : 'تم تجاهل البلاغ ✕');
+    } catch (e: any) {
+      Alert.alert('خطأ', e?.message || 'تعذر تحديث البلاغ');
     }
-    setReports(prev => prev.map(r => r.id === id ? { ...r, status: action } : r));
-    await addAuditLog(action === 'resolved' ? 'معالجة وإغلاق بلاغ' : 'تجاهل بلاغ', 'بلاغ #' + id.slice(0, 6), 'report', id);
-    showToast(action === 'resolved' ? 'تم حل وإغلاق البلاغ بنجاح ✓' : 'تم تجاهل البلاغ ✕');
   };
 
   // 7. Delete Offensive Content Reported
@@ -498,21 +475,14 @@ export default function Admin() {
       'هل أنت متأكد من حذف هذا المحتوى نهائياً من قاعدة البيانات وإغلاق البلاغ؟',
       async () => {
         try {
-          let error: any = null;
-          if (report.target_type === 'question' && report.target_id) {
-            ({ error } = await supabase.from('questions').delete().eq('id', report.target_id));
-          } else if (report.target_type === 'request' && report.target_id) {
-            ({ error } = await supabase.from('requests').delete().eq('id', report.target_id));
-          } else if (report.target_type === 'answer' && report.target_id) {
-            ({ error } = await supabase.from('answers').delete().eq('id', report.target_id));
-          } else if (report.target_type === 'service' && report.target_id) {
-            ({ error } = await supabase.from('services').delete().eq('id', report.target_id));
-          } else {
-            throw new Error('نوع المحتوى غير مدعوم للحذف من لوحة الإدارة.');
-          }
+          if (!report.target_type || !report.target_id) throw new Error('بلاغ غير مكتمل.');
+          const { data, error } = await supabase.rpc('admin_moderate_report', {
+            p_report_id: report.id,
+            p_action: 'resolved',
+            p_delete_content: true,
+          });
           if (error) throw error;
-          await resolveReport(report.id, 'resolved');
-          await addAuditLog('حذف محتوى مخالف', 'بلاغ #' + report.id.slice(0, 6), report.target_type, report.target_id);
+          setReports(prev => prev.map(r => r.id === report.id ? { ...r, ...data } : r));
           showToast('تم حذف المحتوى المخالف وإغلاق البلاغ 🗑️');
           await load();
         } catch (e: any) {
