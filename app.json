@@ -35,6 +35,9 @@
       "supportsTablet": true,
       "bundleIdentifier": "sa.hayna.app",
       "icon": "./public/brand/HAYNA_LOGO.png",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      },
       "config": {
         "googleMapsApiKey": "AIzaSyD3dbOJXEPgG1qyNi4Z_sLO46kj6c5bnY8"
       }
