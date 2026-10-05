@@ -24,6 +24,8 @@ const NESTED_ROUTES: Array<[string, string]> = [
   ['/requests', '/home'],
   ['/service', '/market'],
   ['/new-service', '/market'],
+  ['/directory', '/market'],
+  ['/business', '/market'],
   ['/conversation', '/messages'],
 ];
 
