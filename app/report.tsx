@@ -20,6 +20,7 @@ import {
   CheckCircle2,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import ScreenHeader from '@/components/shared/ScreenHeader';
 
 export default function Report() {
   const { type, id } = useLocalSearchParams<{ type: string; id: string }>();
@@ -77,13 +78,7 @@ export default function Report() {
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
         >
-          <View style={styles.navBar}>
-            <Pressable onPress={() => router.back()} style={styles.iconBtn}>
-              <ChevronRight size={28} color="#fff" />
-            </Pressable>
-            <Text style={styles.navTitle}>إبلاغ الإدارة 🛡️</Text>
-            <View style={{ width: 28 }} />
-          </View>
+          <ScreenHeader title="إبلاغ الإدارة 🛡️" fallbackRoute="/home" />
           <Text style={styles.heroSub}>
             حفاظاً على سلامة مجتمع الحي، يرجى توضيح سبب الإبلاغ بدقة.
           </Text>
@@ -149,7 +144,7 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   hero: {
-    paddingTop: Platform.OS === 'ios' ? 52 : 36,
+    paddingTop: Platform.OS === 'ios' ? 52 : 40,
     paddingHorizontal: 20,
     paddingBottom: 24,
     borderBottomLeftRadius: 28,

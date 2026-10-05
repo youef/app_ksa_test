@@ -23,12 +23,15 @@ import {
   HeartHandshake,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import ScreenHeader from '@/components/shared/ScreenHeader';
 import LocationSelectorModal from '@/components/LocationSelectorModal';
 import { getPermanentMyLocation, savePermanentMyLocation, isAllKingdom } from '@/lib/locationSync';
+import { getCurrentDeviceLocation } from '@/lib/deviceLocation';
 
 export default function NewRequest() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [requestType, setRequestType] = useState('help');
   const [city, setCity] = useState('');
   const [district, setDistrict] = useState('');
   const [budget, setBudget] = useState('');
@@ -78,23 +81,36 @@ export default function NewRequest() {
         return router.replace('/auth');
       }
 
+      // Attach the real GPS fix so the request appears on the neighbourhood map.
+      const deviceLocation = await getCurrentDeviceLocation();
+
       const payload = {
         requester_id: u.user.id,
         title: title.trim(),
         description: description.trim(),
-        request_type: 'help',
+        request_type: requestType,
         city: city.trim() || null,
         district: district.trim() || null,
         budget: budget ? Number(budget) : null,
         is_urgent: urgent,
         status: 'open',
+        lat: deviceLocation?.latitude ?? null,
+        lng: deviceLocation?.longitude ?? null,
       };
 
-      const { data, error } = await supabase.from('requests').insert(payload).select('id').single();
+      let { data, error } = await supabase.from('requests').insert(payload).select('id').single();
+
+      // Older databases do not have the geo columns yet — retry without them.
+      if (error && (error.code === 'PGRST204' || /column .* does not exist/i.test(error.message))) {
+        const { lat: _lat, lng: _lng, ...legacyPayload } = payload;
+        const retry = await supabase.from('requests').insert(legacyPayload).select('id').single();
+        data = retry.data;
+        error = retry.error;
+      }
       setBusy(false);
 
-      if (error) {
-        Alert.alert('خطأ', error.message);
+      if (error || !data) {
+        Alert.alert('خطأ', error?.message || 'تعذّر نشر الطلب.');
       } else {
         Alert.alert('تم بنجاح! 🤝', 'تم نشر طلبك لأهالي الحي وسيتواصل معك من يقدر على المساعدة.');
         router.replace({ pathname: '/request', params: { id: data.id } });
@@ -104,6 +120,13 @@ export default function NewRequest() {
       Alert.alert('خطأ', e.message || 'حدث خطأ أثناء نشر الطلب.');
     }
   }
+
+  const requestTypes = [
+    { id: 'help', label: '🤝 مساعدة عامة' },
+    { id: 'delivery', label: '🚗 توصيل وأغراض' },
+    { id: 'tool', label: '🧰 استعارة أداة' },
+    { id: 'maintenance', label: '🔧 صيانة وإصلاح' },
+  ];
 
   return (
     <View style={styles.container}>
@@ -115,19 +138,41 @@ export default function NewRequest() {
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
         >
-          <View style={styles.navBar}>
-            <Pressable onPress={() => router.back()} style={styles.iconBtn}>
-              <ChevronRight size={28} color="#fff" />
-            </Pressable>
-            <Text style={styles.navTitle}>إضافة طلب فزعة 🤝</Text>
-            <View style={{ width: 28 }} />
-          </View>
+          <ScreenHeader title="إضافة طلب فزعة 🤝" fallbackRoute="/requests" />
           <Text style={styles.heroSub}>
             اطلب مساعدة، توصيل، إعارة غرض، أو فزعة من أهل حيك.
           </Text>
         </LinearGradient>
 
         <View style={styles.formCard}>
+          {/* Request Type Selector */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>نوع الطلب *</Text>
+            <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
+              {requestTypes.map((t) => {
+                const active = requestType === t.id;
+                return (
+                  <Pressable
+                    key={t.id}
+                    onPress={() => setRequestType(t.id)}
+                    style={{
+                      paddingHorizontal: 12,
+                      paddingVertical: 8,
+                      borderRadius: 12,
+                      backgroundColor: active ? '#059669' : '#f1f5f9',
+                      borderWidth: 1,
+                      borderColor: active ? '#059669' : '#e2e8f0',
+                    }}
+                  >
+                    <Text style={{ fontSize: 12.5, fontWeight: '800', color: active ? '#fff' : '#475569' }}>
+                      {t.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+
           {/* Title */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>عنوان الطلب *</Text>
@@ -249,7 +294,7 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   hero: {
-    paddingTop: Platform.OS === 'ios' ? 52 : 36,
+    paddingTop: Platform.OS === 'ios' ? 52 : 40,
     paddingHorizontal: 20,
     paddingBottom: 24,
     borderBottomLeftRadius: 28,

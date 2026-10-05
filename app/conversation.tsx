@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   Modal,
   Alert,
+  Linking,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
@@ -31,6 +32,12 @@ import {
   User,
   Lock,
   Moon,
+  Paperclip,
+  Smile,
+  Wifi,
+  WifiOff,
+  MessageCircle,
+  MapPin,
 } from 'lucide-react-native';
 import {
   clearForMe,
@@ -45,6 +52,11 @@ import {
   setMute,
 } from '@/lib/chatControls';
 import { syncDndWithNotifications } from '@/lib/notifications';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as ImagePicker from 'expo-image-picker';
+import { LinearGradient } from 'expo-linear-gradient';
+import { getCurrentDeviceLocation, reverseGeocodeDeviceLocation } from '@/lib/deviceLocation';
+import { navigationUrl } from '@/lib/privacy';
 
 export default function Conversation() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -60,11 +72,20 @@ export default function Conversation() {
   const [blockedMe, setBlockedMe] = useState(false);
   const [dndActive, setDndActive] = useState(false);
   const [otherDnd, setOtherDnd] = useState(false);
+  const [otherTyping, setOtherTyping] = useState(false);
+  const [isOnline, setIsOnline] = useState(false);
+  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const channelRef = useRef<any>(null);
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [stickersOpen, setStickersOpen] = useState(false);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
+  const [sharingLocation, setSharingLocation] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
 
   const convId = Array.isArray(id) ? id[0] : (id as string);
+  const insets = useSafeAreaInsets();
+  const bottomSafe = Math.max(insets.bottom, 10);
   const otherName = displayName(otherUser, 'المحادثة');
   const isAnonymous = otherUser?.hide_name === true;
   const anyBlock = blockedByMe || blockedMe;
@@ -81,7 +102,21 @@ export default function Conversation() {
       .eq('conversation_id', convId)
       .order('created_at', { ascending: true });
 
-    setMessages(msgs ?? []);
+    setMessages(prev => {
+      const loaded = msgs ?? [];
+      const loadedIds = new Set(loaded.map(m => m.id));
+      const liveOnly = prev.filter(m => {
+        if (!m.id || !String(m.id).startsWith('optimistic-')) return !loadedIds.has(m.id);
+        const duplicate = loaded.some(
+          loadedMessage =>
+            loadedMessage.sender_id === m.sender_id &&
+            loadedMessage.body === m.body &&
+            Math.abs(new Date(loadedMessage.created_at).getTime() - new Date(m.created_at).getTime()) < 10000
+        );
+        return !duplicate;
+      });
+      return [...loaded, ...liveOnly].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    });
 
     // 2. Other member + their profile
     const { data: members } = await supabase
@@ -139,29 +174,244 @@ export default function Conversation() {
       void markConversationRead(convId, u.user.id);
     }
 
-    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: false }), 100);
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: false }), 50);
   }, [convId]);
 
   useEffect(() => {
-    load();
-    const ch = supabase
-      .channel('chat-' + convId)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${convId}` },
-        payload => {
-          setMessages(prev => [...prev, payload.new]);
-          setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+    let alive = true;
+    let ch: any = null;
+
+    (async () => {
+      const { data: authData } = await supabase.auth.getUser();
+      const userId = authData.user?.id;
+      if (!userId) {
+        router.replace('/auth');
+        return;
+      }
+      if (!alive) return;
+      setCurrentUserId(userId);
+
+      ch = supabase
+        .channel('chat-' + convId + '-' + userId + '-' + Math.random().toString(36).slice(2), {
+          config: {
+            broadcast: { self: false },
+            presence: { key: userId },
+          },
+        })
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages',
+            filter: `conversation_id=eq.${convId}`,
+          },
+          payload => {
+            if (!alive) return;
+            setMessages(prev => {
+              if (prev.some(m => m.id === payload.new.id)) return prev;
+              if (payload.new.sender_id === userId) {
+                const optimisticIndex = prev.findIndex(
+                  m =>
+                    String(m.id).startsWith('optimistic-') &&
+                    m.sender_id === userId &&
+                    m.body === payload.new.body &&
+                    Math.abs(new Date(m.created_at).getTime() - new Date(payload.new.created_at).getTime()) < 10000
+                );
+                if (optimisticIndex >= 0) {
+                  const next = [...prev];
+                  next[optimisticIndex] = payload.new;
+                  return next;
+                }
+              }
+              return [...prev, payload.new];
+            });
+            setOtherTyping(false);
+            requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
+            if (payload.new.sender_id !== userId) {
+              void markConversationRead(convId, userId);
+            }
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'messages',
+            filter: `conversation_id=eq.${convId}`,
+          },
+          payload => {
+            if (!alive) return;
+            setMessages(prev => prev.map(m => m.id === payload.new.id ? payload.new : m));
+          }
+        )
+        .on('broadcast', { event: 'typing' }, ({ payload }: any) => {
+          if (!alive || payload?.userId === userId) return;
+          setOtherTyping(!!payload?.typing);
+        })
+        .on('presence', { event: 'sync' }, () => {
+          if (!alive) return;
+          const state = ch?.presenceState?.() || {};
+          setIsOnline(Object.keys(state).some(key => key !== userId));
+        })
+        .on('presence', { event: 'join' }, ({ key }: any) => {
+          if (key !== userId) setIsOnline(true);
+        })
+        .on('presence', { event: 'leave' }, ({ key }: any) => {
+          if (key !== userId) setIsOnline(false);
+        });
+
+      channelRef.current = ch;
+
+      ch.subscribe(async (status: string) => {
+        if (status === 'SUBSCRIBED' && alive) {
+          await ch.track({ userId, onlineAt: new Date().toISOString() });
         }
-      )
-      .subscribe();
+      });
+
+      await load();
+    })();
 
     return () => {
-      supabase.removeChannel(ch);
+      alive = false;
+      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+      channelRef.current = null;
+      if (ch) {
+        void ch.untrack();
+        void supabase.removeChannel(ch);
+      }
     };
   }, [convId, load]);
-
   // ------------------------------------------------------------ actions
+
+  async function broadcastTyping(typing: boolean) {
+    try {
+      await channelRef.current?.send({
+        type: 'broadcast',
+        event: 'typing',
+        payload: { userId: currentUserId, typing },
+      });
+    } catch {}
+  }
+
+  function handleBodyChange(value: string) {
+    setBody(value);
+    void broadcastTyping(true);
+    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+    typingTimerRef.current = setTimeout(() => {
+      void broadcastTyping(false);
+    }, 900);
+  }
+
+  async function pickImages() {
+    if (anyBlock || uploadingMedia) return;
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('السماح بالصور', 'اسمح للتطبيق بالوصول إلى الصور لإرسالها.');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsMultipleSelection: true,
+        selectionLimit: 6,
+        quality: 0.86,
+        base64: true,
+      });
+      if (result.canceled || !result.assets?.length) return;
+      setUploadingMedia(true);
+      for (const asset of result.assets) {
+        if (!asset.base64) continue;
+        const ext = (asset.fileName?.split('.').pop() || 'jpg').replace(/[^a-zA-Z0-9]/g, '');
+        const path = currentUserId + '/' + Date.now() + '-' + Math.random().toString(36).slice(2) + '.' + ext;
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+        const clean = asset.base64.replace(/[^A-Za-z0-9+/=]/g, '');
+        const bytes = new Uint8Array(Math.floor(clean.length * 3 / 4) - (clean.endsWith('==') ? 2 : clean.endsWith('=') ? 1 : 0));
+        let buffer = 0, bits = 0, index = 0;
+        for (const ch of clean) {
+          if (ch === '=') break;
+          buffer = (buffer << 6) | chars.indexOf(ch); bits += 6;
+          if (bits >= 8) { bits -= 8; bytes[index++] = (buffer >> bits) & 255; }
+        }
+        const { error: uploadError } = await supabase.storage.from('chat-media').upload(path, bytes, {
+          contentType: asset.mimeType || 'image/jpeg', cacheControl: '3600', upsert: false,
+        });
+        if (uploadError) throw uploadError;
+        const { data: urlData } = supabase.storage.from('chat-media').getPublicUrl(path);
+        const { error } = await supabase.from('messages').insert({
+          conversation_id: convId, sender_id: currentUserId,
+          body: JSON.stringify({ type: 'image', url: urlData.publicUrl, name: asset.fileName || 'صورة' }),
+          read_by: [currentUserId],
+        });
+        if (error) throw error;
+      }
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
+    } catch (e: any) {
+      Alert.alert('تعذر إرسال الصورة', e?.message || 'حدث خطأ أثناء رفع الصورة');
+    } finally {
+      setUploadingMedia(false);
+    }
+  }
+
+  function parseImageMessage(value: string) {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed?.type === 'image' && parsed?.url ? parsed : null;
+    } catch { return null; }
+  }
+
+  function parseLocationMessage(value: string) {
+    try {
+      const parsed = JSON.parse(value);
+      if (parsed?.type !== 'location') return null;
+      const lat = Number(parsed.lat);
+      const lng = Number(parsed.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+      return { lat, lng, label: typeof parsed.label === 'string' ? parsed.label : '' };
+    } catch { return null; }
+  }
+
+  /** Sends the exact fix to the other member of this private chat only. */
+  async function shareExactLocation() {
+    if (sharingLocation) return;
+    if (anyBlock) {
+      return Alert.alert(
+        'غير مسموح',
+        blockedByMe
+          ? 'قم بإلغاء حظر هذا المستخدم أولاً لتتمكن من مشاركة الموقع.'
+          : 'هذا المستخدم حظرك. لا يمكنك مشاركة موقعك معه.'
+      );
+    }
+
+    setSharingLocation(true);
+    try {
+      const location = await getCurrentDeviceLocation();
+      if (!location) {
+        Alert.alert('تعذّر تحديد الموقع', 'اسمح للتطبيق بالوصول إلى الموقع ثم أعد المحاولة.');
+        return;
+      }
+      const place = await reverseGeocodeDeviceLocation(location);
+      const label = place?.district || place?.city || 'موقعي الحالي';
+      const { error } = await supabase.from('messages').insert({
+        conversation_id: convId,
+        sender_id: currentUserId,
+        body: JSON.stringify({
+          type: 'location',
+          lat: location.latitude,
+          lng: location.longitude,
+          label,
+        }),
+        read_by: [currentUserId],
+      });
+      if (error) throw error;
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
+    } catch (e: any) {
+      Alert.alert('تعذّر إرسال الموقع', e?.message || 'حدث خطأ أثناء إرسال الموقع');
+    } finally {
+      setSharingLocation(false);
+    }
+  }
 
   async function send() {
     if (!body.trim() || sending) return;
@@ -177,7 +427,21 @@ export default function Conversation() {
 
     setSending(true);
     const trimmed = body.trim();
+    const optimisticKey = `${currentUserId}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const optimisticMessage = {
+      id: `optimistic-${optimisticKey}`,
+      conversation_id: convId,
+      sender_id: currentUserId,
+      body: trimmed,
+      read_by: [currentUserId],
+      created_at: new Date().toISOString(),
+      _optimisticKey: optimisticKey,
+    };
+    setMessages(prev => [...prev, optimisticMessage]);
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 10);
     setBody('');
+    void broadcastTyping(false);
+    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
 
     const { error } = await supabase.from('messages').insert({
       conversation_id: convId,
@@ -189,11 +453,12 @@ export default function Conversation() {
     setSending(false);
 
     if (error) {
+      setMessages(prev => prev.filter(m => m._optimisticKey !== optimisticKey));
       setBody(trimmed);
       Alert.alert('تعذّر الإرسال', error.message);
       return;
     }
-    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 20);
   }
 
   async function toggleMute() {
@@ -300,9 +565,9 @@ export default function Conversation() {
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <ChevronRight size={26} color="#059669" />
+      <LinearGradient colors={['#064e3b', '#047857', '#059669']} start={{x:0,y:0}} end={{x:1,y:1}} style={styles.header}>
+        <Pressable onPress={() => router.replace('/home')} style={styles.backBtn}>
+          <ChevronRight size={26} color="#ffffff" />
         </Pressable>
 
         <Pressable
@@ -310,7 +575,7 @@ export default function Conversation() {
           onPress={() => otherUser && router.push({ pathname: '/user', params: { id: otherUser.id } })}
         >
           {otherUser?.avatar_url && !isAnonymous ? (
-            <Image source={{ uri: otherUser.avatar_url }} style={styles.headerAvatar} />
+            <Image source={{ uri: otherUser.avatar_url }} style={styles.headerAvatar as any} />
           ) : (
             <View style={styles.headerAvatarFallback}>
               <Text style={styles.headerAvatarLetter}>{otherName[0]}</Text>
@@ -332,12 +597,17 @@ export default function Conversation() {
           </View>
         </Pressable>
 
+        <View style={styles.headerStatusPill}>
+          {otherTyping ? <MessageCircle size={13} color="#059669" /> : isOnline ? <Wifi size={13} color="#059669" /> : <WifiOff size={13} color="#94a3b8" />}
+          <Text style={styles.headerStatusText}>{otherTyping ? 'يكتب الآن...' : isOnline ? 'متصل الآن' : 'غير متصل'}</Text>
+        </View>
+
         <View style={styles.headerActions}>
           <Pressable style={styles.headerActionBtn} onPress={() => setOptionsOpen(true)}>
-            <MoreHorizontal size={22} color="#374151" />
+            <MoreHorizontal size={22} color="#ffffff" />
           </Pressable>
         </View>
-      </View>
+      </LinearGradient>
 
       {/* Banners: block wins, then mute, then DND context */}
       {blockedByMe ? (
@@ -379,7 +649,7 @@ export default function Conversation() {
       <ScrollView
         ref={scrollRef}
         style={styles.messagesList}
-        contentContainerStyle={styles.messagesContent}
+        contentContainerStyle={[styles.messagesContent, { paddingBottom: 24 }]}
         showsVerticalScrollIndicator={false}
         onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}
       >
@@ -387,7 +657,7 @@ export default function Conversation() {
           <View style={styles.emptyConv}>
             <View style={styles.emptyConvIcon}>
               {otherUser?.avatar_url && !isAnonymous ? (
-                <Image source={{ uri: otherUser.avatar_url }} style={styles.emptyConvAvatar} />
+                <Image source={{ uri: otherUser.avatar_url }} style={styles.emptyConvAvatar as any} />
               ) : (
                 <View style={styles.emptyConvAvatarFallback}>
                   <Text style={styles.emptyConvAvatarLetter}>{otherName[0]}</Text>
@@ -420,7 +690,7 @@ export default function Conversation() {
                   {!isMine && (
                     <View style={styles.otherAvatar}>
                       {otherUser?.avatar_url && !isAnonymous ? (
-                        <Image source={{ uri: otherUser.avatar_url }} style={styles.otherAvatarImg} />
+                        <Image source={{ uri: otherUser.avatar_url }} style={styles.otherAvatarImg as any} />
                       ) : (
                         <View style={styles.otherAvatarFallback}>
                           <Text style={styles.otherAvatarLetter}>{otherName[0]}</Text>
@@ -429,7 +699,32 @@ export default function Conversation() {
                     </View>
                   )}
                   <View style={[styles.msgBubble, isMine ? styles.msgBubbleMine : styles.msgBubbleOther]}>
-                    <Text style={[styles.msgText, isMine && styles.msgTextMine]}>{msg.body}</Text>
+                    {(() => {
+                      const place = parseLocationMessage(msg.body);
+                      if (place) {
+                        return (
+                          <Pressable
+                            style={styles.locationCard}
+                            onPress={() => Linking.openURL(navigationUrl(place.lat, place.lng))}
+                          >
+                            <MapPin size={18} color={isMine ? '#ffffff' : '#0f766e'} />
+                            <View style={styles.locationBody}>
+                              <Text style={[styles.locationTitle, isMine && styles.msgTextMine]}>
+                                موقعي الدقيق
+                              </Text>
+                              <Text style={[styles.locationLabel, isMine && styles.locationLabelMine]} numberOfLines={1}>
+                                {place.label || 'موقعي'}
+                              </Text>
+                              <Text style={[styles.locationCta, isMine && styles.locationCtaMine]}>
+                                اضغط للفتح في الخرائط
+                              </Text>
+                            </View>
+                          </Pressable>
+                        );
+                      }
+                      const media = parseImageMessage(msg.body);
+                      return media ? <View><Image source={{ uri: media.url }} style={styles.messageImage as any} /><Text style={[styles.imageCaption, isMine && styles.msgTextMine]}>{media.name}</Text></View> : <Text style={[styles.msgText, isMine && styles.msgTextMine]}>{msg.body}</Text>;
+                    })()}
                     <View style={[styles.msgMeta, isMine && styles.msgMetaMine]}>
                       <Text style={[styles.msgTime, isMine && styles.msgTimeMine]}>
                         {formatMsgTime(msg.created_at)}
@@ -451,7 +746,7 @@ export default function Conversation() {
       </ScrollView>
 
       {anyBlock ? (
-        <View style={styles.blockedInputArea}>
+        <View style={[styles.blockedInputArea, { paddingBottom: bottomSafe + 8 }]}>
           <Text style={styles.blockedInputText}>
             {blockedByMe
               ? 'لا يمكنك الإرسال لأنك حظرت هذا المستخدم'
@@ -464,13 +759,35 @@ export default function Conversation() {
           )}
         </View>
       ) : (
+        <View style={[styles.composerWrap, { paddingBottom: bottomSafe }] }>
+          {stickersOpen && <View style={styles.stickerPanel}><Text style={styles.stickerTitle}>ملصقات وإيموجي</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stickerRow}>{['😀','😂','😍','🥰','😘','😎','🤍','❤️','💚','👏','🙌','🙏','🔥','✨','🎉','👍','💯','🌹','☕','🍕','🏠','🌙','☀️','🤣','🥹','🤝','💪','🎁','⭐'].map((emoji, i) => <Pressable key={i} style={styles.stickerItem} onPress={() => { handleBodyChange(body + emoji); setStickersOpen(false); }}><Text style={styles.stickerEmoji}>{emoji}</Text></Pressable>)}</ScrollView></View>}
         <View style={styles.inputArea}>
+          <Pressable style={styles.emojiButton} onPress={() => setStickersOpen(v => !v)}>
+            <Smile size={21} color="#64748b" />
+          </Pressable>
+
+          <Pressable style={styles.attachButton} onPress={pickImages}>
+            <Paperclip size={20} color="#64748b" />
+          </Pressable>
+
+          <Pressable
+            style={[styles.attachButton, sharingLocation && styles.attachButtonBusy]}
+            onPress={shareExactLocation}
+            disabled={sharingLocation}
+          >
+            {sharingLocation ? (
+              <ActivityIndicator size="small" color="#0f766e" />
+            ) : (
+              <MapPin size={20} color="#0f766e" />
+            )}
+          </Pressable>
+
           <Pressable
             style={[styles.sendButton, !body.trim() && styles.sendButtonDisabled]}
             onPress={send}
             disabled={!body.trim() || sending}
           >
-            {sending ? (
+            {uploadingMedia ? <ActivityIndicator size="small" color="#fff" /> : sending ? (
               <ActivityIndicator size="small" color="#fff" />
             ) : (
               <Send size={18} color="#fff" style={{ transform: [{ rotate: '180deg' }] }} />
@@ -480,12 +797,13 @@ export default function Conversation() {
           <TextInput
             style={styles.textInput}
             value={body}
-            onChangeText={setBody}
+            onChangeText={handleBodyChange}
             placeholder="اكتب رسالة لجيرانك..."
             placeholderTextColor="#9ca3af"
             multiline
             maxLength={1000}
           />
+        </View>
         </View>
       )}
 
@@ -616,18 +934,18 @@ function formatMsgTime(dateStr: string) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
+  container: { flex: 1, minHeight: Platform.OS === 'web' ? ('100vh' as any) : undefined, width: '100%', alignSelf: 'stretch', backgroundColor: '#f8fafc' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'ios' ? 52 : 36,
+    paddingTop: Platform.OS === 'ios' ? 52 : 40,
     paddingBottom: 14,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    backgroundColor: 'transparent',
+    borderBottomWidth: 0,
+    borderBottomColor: 'transparent',
   },
   backBtn: { padding: 6 },
   headerUser: { flexDirection: 'row-reverse', alignItems: 'center', flex: 1, marginRight: 10, gap: 10 },
@@ -636,15 +954,26 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: '#ecfdf5',
+    backgroundColor: 'rgba(255,255,255,0.16)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerAvatarLetter: { color: '#059669', fontSize: 16, fontWeight: '800' },
+  headerAvatarLetter: { color: '#fff', fontSize: 16, fontWeight: '900' },
   headerInfo: { alignItems: 'flex-end', flex: 1 },
   headerNameRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
-  headerName: { color: '#0f172a', fontSize: 15, fontWeight: '800' },
-  headerCity: { color: '#64748b', fontSize: 11, fontWeight: '600', marginTop: 1 },
+  headerName: { color: '#fff', fontSize: 16, fontWeight: '900' },
+  headerCity: { color: 'rgba(255,255,255,0.78)', fontSize: 11, fontWeight: '600', marginTop: 2 },
+  headerStatusPill: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    marginLeft: 6,
+  },
+  headerStatusText: { color: '#fff', fontSize: 10, fontWeight: '900' },
   headerActions: { flexDirection: 'row-reverse' },
   headerActionBtn: { padding: 6 },
 
@@ -691,8 +1020,8 @@ const styles = StyleSheet.create({
   },
   noticeInfoText: { color: '#0369a1', fontSize: 11, fontWeight: '700' },
 
-  messagesList: { flex: 1 },
-  messagesContent: { padding: 16 },
+  messagesList: { flex: 1, width: '100%', backgroundColor: '#f8fafc' },
+  messagesContent: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 12, minHeight: '100%' },
   dateDivider: {
     textAlign: 'center',
     color: '#94a3b8',
@@ -718,10 +1047,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   otherAvatarLetter: { fontSize: 12, fontWeight: '700', color: '#64748b' },
-  msgBubble: { maxWidth: '78%', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 9 },
-  msgBubbleMine: { backgroundColor: '#059669', borderBottomLeftRadius: 4 },
+  msgBubble: { maxWidth: Platform.OS === 'web' ? 620 : '82%', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 9 },
+  msgBubbleMine: { backgroundColor: '#059669', borderBottomLeftRadius: 4, shadowColor: '#064e3b', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.10, shadowRadius: 6, elevation: 2 },
   msgBubbleOther: {
     backgroundColor: '#fff',
+    shadowColor: '#0f172a', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 5, elevation: 1,
     borderBottomRightRadius: 4,
     borderWidth: 1,
     borderColor: '#e2e8f0',
@@ -763,19 +1093,49 @@ const styles = StyleSheet.create({
   },
   emptyConvHint: { fontSize: 12, color: '#059669', fontWeight: '700' },
 
+  composerWrap: { borderTopWidth: 1, borderTopColor: '#e2e8f0', backgroundColor: '#fff', paddingTop: 8, paddingBottom: Platform.OS === 'ios' ? 8 : 6 },
+  stickerPanel: { paddingTop: 10, paddingBottom: 8, backgroundColor: '#f8fafc', borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
+  stickerTitle: { textAlign: 'right', paddingHorizontal: 14, color: '#334155', fontSize: 12, fontWeight: '800', marginBottom: 6 },
+  stickerRow: { flexDirection: 'row', paddingHorizontal: 10, gap: 5 },
+  stickerItem: { width: 42, height: 42, borderRadius: 12, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  stickerEmoji: { fontSize: 25 },
+  messageImage: { width: 230, height: 230, borderRadius: 14, marginBottom: 4 },
+  imageCaption: { fontSize: 9, color: '#64748b' },
   inputArea: {
+    width: '100%',
     flexDirection: 'row-reverse',
+    minHeight: 62,
     alignItems: 'center',
     backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
+    borderTopWidth: 0,
+    borderTopColor: 'transparent',
     paddingHorizontal: 12,
     paddingVertical: 8,
-    gap: 8,
+    gap: 6,
+    paddingBottom: Platform.OS === 'ios' ? 10 : 8,
   },
+  emojiButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: '#ecfdf5', borderWidth: 1, borderColor: '#d1fae5' },
+  attachButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0' },
+  attachButtonBusy: { backgroundColor: '#ccfbf1', borderColor: '#5eead4' },
+  locationCard: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 8,
+    minWidth: 200,
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+  },
+  locationBody: { flex: 1, alignItems: 'flex-end' },
+  locationTitle: { fontSize: 14, fontWeight: '900', color: '#0f172a' },
+  locationLabel: { fontSize: 12, fontWeight: '700', color: '#64748b', marginTop: 2 },
+  locationLabelMine: { color: 'rgba(255,255,255,0.85)' },
+  locationCta: { fontSize: 10.5, fontWeight: '800', color: '#0f766e', marginTop: 4 },
+  locationCtaMine: { color: 'rgba(255,255,255,0.9)' },
   textInput: {
     flex: 1,
     backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -785,14 +1145,16 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   sendButton: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     borderRadius: 20,
     backgroundColor: '#059669',
+    borderWidth: 2,
+    borderColor: '#d1fae5',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sendButtonDisabled: { opacity: 0.4 },
+  sendButtonDisabled: { opacity: 0.35 },
   blockedInputArea: {
     backgroundColor: '#fff',
     borderTopWidth: 1,

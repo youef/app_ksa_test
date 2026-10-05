@@ -31,6 +31,7 @@ import {
   Sparkles,
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
+import { requireAccount } from '@/lib/authGate';
 
 export function formatArabicTimeAgo(dateStr: string): string {
   if (!dateStr) return '';
@@ -54,13 +55,14 @@ export interface TwitterInquiryCardProps {
   data: any;
   currentUserProfile: any;
   currentUserId: string | null;
+  isGuest?: boolean;
   isMine?: boolean;
   onQuickReply: (id: string, text: string) => Promise<void>;
   onToast: (msg: string) => void;
 }
 
 export default function TwitterInquiryCard({
-  type, data, currentUserProfile, currentUserId, isMine, onQuickReply, onToast,
+  type, data, currentUserProfile, currentUserId, isGuest = false, isMine, onQuickReply, onToast,
 }: TwitterInquiryCardProps) {
   const isReq = type === 'request';
   const name = data.profiles?.hide_name ? 'جار مجهول 🕶️' : (data.profiles?.display_name || data.profiles?.username || 'ابن الحي');
@@ -83,11 +85,13 @@ export default function TwitterInquiryCard({
   const answersCount = data.answers_count !== undefined ? data.answers_count : answers.length;
 
   function handleLike() {
+    if (isGuest) return requireAccount('سجّل الدخول أو أنشئ حساباً للإعجاب بمنشورات الحي.');
     if (!liked) { setLiked(true); setLikeCount(p => p + 1); onToast('أعجبك الاستفسار ❤️'); }
     else { setLiked(false); setLikeCount(p => p - 1); }
   }
 
   async function handleBookmark() {
+    if (isGuest) return requireAccount('سجّل الدخول أو أنشئ حساباً لحفظ المنشورات.');
     const next = !bookmarked;
     setBookmarked(next);
     if (next) {
@@ -113,6 +117,10 @@ export default function TwitterInquiryCard({
   }
 
   function handleMoreOptions() {
+    if (isGuest) {
+      Alert.alert('خيارات المنشور', data.title, [{ text: 'نسخ رابط المنشور', onPress: handleShare }, { text: 'إغلاق', style: 'cancel' }]);
+      return;
+    }
     Alert.alert('خيارات الاستفسار', data.title, [
       { text: 'نسخ رابط المنشور', onPress: handleShare },
       { text: 'كتم إشعارات هذا المنشور', onPress: () => onToast('تم كتم الإشعارات 🔕') },
@@ -122,6 +130,7 @@ export default function TwitterInquiryCard({
   }
 
   async function handleSendReply() {
+    if (isGuest) return requireAccount('سجّل الدخول أو أنشئ حساباً للرد على جيرانك.');
     if (!quickReplyText.trim()) return;
     setReplyLoading(true);
     try { await onQuickReply(data.id, quickReplyText); setQuickReplyText(''); }
@@ -137,7 +146,7 @@ export default function TwitterInquiryCard({
   return (
     <View style={[s.xCard, isEmergency && s.xCardEmergency, isToolSharing && s.xCardToolSharing]}>
       <View style={s.xHeader}>
-        <Pressable onPress={() => data.profiles?.id && router.push({ pathname: '/user', params: { id: data.profiles.id } })} style={s.xAvatarWrap}>
+        <Pressable onPress={() => isGuest ? requireAccount() : data.profiles?.id && router.push({ pathname: '/user', params: { id: data.profiles.id } })} style={s.xAvatarWrap}>
           {avatar ? <Image source={{ uri: avatar }} style={s.xAvatarImg} /> : (
             <View style={[s.xAvatarFallback, isEmergency && { backgroundColor: '#dc2626' }]}>
               <User size={20} color="#fff" />
@@ -160,7 +169,7 @@ export default function TwitterInquiryCard({
             <Text style={s.xDot}>·</Text>
             <Text style={s.xHandle} numberOfLines={1}>@{username}</Text>
             {isIdVerified && <CheckCircle2 size={13} color="#059669" />}
-            <Pressable onPress={() => data.profiles?.id && router.push({ pathname: '/user', params: { id: data.profiles.id } })}>
+            <Pressable onPress={() => isGuest ? requireAccount() : data.profiles?.id && router.push({ pathname: '/user', params: { id: data.profiles.id } })}>
               <Text style={s.xAuthorName} numberOfLines={1}>{name}</Text>
             </Pressable>
           </View>
@@ -199,10 +208,10 @@ export default function TwitterInquiryCard({
           <Heart size={17} color={liked ? '#f43f5e' : '#64748b'} fill={liked ? '#f43f5e' : 'none'} />
           <Text style={[s.xActionCounter, liked && { color: '#f43f5e', fontWeight: '800' }]}>{likeCount}</Text>
         </Pressable>
-        <Pressable style={s.xActionBtn} onPress={handleBookmark}>
+        {!isGuest && <Pressable style={s.xActionBtn} onPress={handleBookmark}>
           <Bookmark size={17} color={bookmarked ? '#f59e0b' : '#64748b'} fill={bookmarked ? '#f59e0b' : 'none'} />
           {bookmarked && <Text style={[s.xActionCounter, { color: '#f59e0b', fontSize: 10 }]}>محفوظ</Text>}
-        </Pressable>
+        </Pressable>}
         <Pressable style={s.xActionBtn} onPress={handleShare}>
           <Share2 size={17} color="#64748b" />
         </Pressable>
@@ -265,7 +274,12 @@ export default function TwitterInquiryCard({
             </View>
           )}
 
-          <View style={s.xQuickReplyContainer}>
+          {isGuest ? (
+            <Pressable style={s.xGuestReplyPrompt} onPress={() => requireAccount('سجّل الدخول أو أنشئ حساباً للرد على جيرانك.')}>
+              <Text style={s.xGuestReplyText}>سجّل الدخول للمشاركة في النقاش</Text>
+              <MessageCircle size={16} color="#059669" />
+            </Pressable>
+          ) : <View style={s.xQuickReplyContainer}>
             <View style={s.xQuickReplyAvatar}>
               {currentUserProfile?.avatar_url ? (
                 <Image source={{ uri: currentUserProfile.avatar_url }} style={s.xMiniAvatar} />
@@ -291,7 +305,7 @@ export default function TwitterInquiryCard({
               <Send size={15} color="#fff" />
               <Text style={s.xQuickReplySendText}>رد</Text>
             </Pressable>
-          </View>
+          </View>}
 
           <Pressable style={s.xOpenFullThreadBtn} onPress={navigateToDetails}>
             <Text style={s.xOpenFullThreadText}>
@@ -366,6 +380,8 @@ const s = StyleSheet.create({
   xNoAnswersBox: { backgroundColor: '#f8fafc', borderRadius: 12, padding: 14, alignItems: 'center' },
   xNoAnswersText: { fontSize: 12, color: '#94a3b8', textAlign: 'center' },
   xQuickReplyContainer: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#f1f5f9' },
+  xGuestReplyPrompt: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 12, padding: 12, borderRadius: 12, backgroundColor: '#ecfdf5' },
+  xGuestReplyText: { color: '#047857', fontSize: 13, fontWeight: '800' },
   xQuickReplyAvatar: { width: 32, height: 32 },
   xMiniAvatar: { width: 32, height: 32, borderRadius: 16 },
   xMiniAvatarFallback: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#059669', alignItems: 'center', justifyContent: 'center' },

@@ -17,6 +17,7 @@ import {
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as ImagePicker from 'expo-image-picker';
 import {
   Shield,
   Users,
@@ -58,6 +59,10 @@ import {
   ChevronDown,
   ChevronUp,
   Bell,
+  Building2,
+  CalendarDays,
+  Store,
+  Archive,
 } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
@@ -94,7 +99,7 @@ export default function Admin() {
   
   // Navigation Tabs:
   // overview | users | verifications | reports | content | broadcast | logs
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'verifications' | 'reports' | 'content' | 'broadcast' | 'logs' | 'locations'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'verifications' | 'reports' | 'content' | 'broadcast' | 'logs' | 'locations' | 'branding' | 'platform'>('overview');
   const [customLocations, setCustomLocations] = useState<any[]>([]);
   const [locationKind, setLocationKind] = useState<'region' | 'city' | 'district'>('city');
   const [locationName, setLocationName] = useState('');
@@ -103,6 +108,8 @@ export default function Admin() {
   const [locationLatitude, setLocationLatitude] = useState('');
   const [locationLongitude, setLocationLongitude] = useState('');
   const [savingLocation, setSavingLocation] = useState(false);
+  const [brandingLogo, setBrandingLogo] = useState('/brand/HAYNA_LOGO.png?v=2');
+  const [brandingUploading, setBrandingUploading] = useState(false);
 
   // Core Data
   const [usersList, setUsersList] = useState<any[]>([]);
@@ -110,6 +117,9 @@ export default function Admin() {
   const [verifications, setVerifications] = useState<any[]>([]);
   const [questionsList, setQuestionsList] = useState<any[]>([]);
   const [requestsList, setRequestsList] = useState<any[]>([]);
+  const [businessesList, setBusinessesList] = useState<any[]>([]);
+  const [marketplaceList, setMarketplaceList] = useState<any[]>([]);
+  const [eventsList, setEventsList] = useState<any[]>([]);
   
   // Relational Stats & Audit Logs
   const [stats, setStats] = useState({
@@ -120,6 +130,9 @@ export default function Admin() {
     services: 0,
     pendingReports: 0,
     pendingVerif: 0,
+    businesses: 0,
+    marketplace: 0,
+    events: 0,
   });
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
 
@@ -163,6 +176,45 @@ export default function Admin() {
   }, [showToast]);
 
   useEffect(() => { if (activeTab === 'locations') loadCustomLocations(); }, [activeTab, loadCustomLocations]);
+
+  const loadBranding = useCallback(async () => {
+    const { data } = await supabase.from('app_branding').select('logo_url, updated_at').eq('id', 'global').maybeSingle();
+    if (data?.logo_url) setBrandingLogo(data.logo_url + (data.logo_url.includes('?') ? '&' : '?') + 'v=' + encodeURIComponent(data.updated_at || Date.now()));
+  }, []);
+
+  useEffect(() => { if (activeTab === 'branding') loadBranding(); }, [activeTab, loadBranding]);
+
+  const changeGlobalLogo = async () => {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) { showToast('اسمح بالوصول للصور لاختيار الشعار'); return; }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 1,
+      });
+      if (result.canceled || !result.assets?.[0]?.uri) return;
+      setBrandingUploading(true);
+      const asset = result.assets[0];
+      const response = await fetch(asset.uri);
+      const blob = await response.blob();
+      const path = 'global/logo.png';
+      const { error: uploadError } = await supabase.storage.from('branding').upload(path, blob, { contentType: asset.mimeType || 'image/png', upsert: true, cacheControl: '0' });
+      if (uploadError) throw uploadError;
+      const { data: publicData } = supabase.storage.from('branding').getPublicUrl(path);
+      const logoUrl = publicData.publicUrl;
+      const { data: me } = await supabase.auth.getUser();
+      const { error: dbError } = await supabase.from('app_branding').upsert({ id: 'global', logo_url: logoUrl, updated_at: new Date().toISOString(), updated_by: me.user?.id || null });
+      if (dbError) throw dbError;
+      setBrandingLogo(logoUrl + '?v=' + Date.now());
+      await addAuditLog('تغيير شعار حيّنا بالكامل', 'الهوية البصرية', 'branding');
+      showToast('تم تغيير الشعار في النظام بالكامل ✓');
+    } catch (e: any) {
+      showToast('تعذر تغيير الشعار: ' + (e?.message || 'خطأ غير متوقع'));
+    } finally { setBrandingUploading(false); }
+  };
+
 
   const saveCustomLocation = async () => {
     const name = locationName.trim();
@@ -239,6 +291,9 @@ export default function Admin() {
       latestQRes,
       latestRRes,
       auditRes,
+      businessesRes,
+      marketplaceRes,
+      eventsRes,
     ] = await Promise.all([
       supabase.from('reports').select('*, reporter:reporter_id(display_name, username, avatar_url)').order('created_at', { ascending: false }).limit(60),
       supabase.from('verification_requests').select('*, user:user_id(id, display_name, username, city, district, avatar_url, bio, is_verified, is_geoverified, role, created_at)').order('created_at', { ascending: false }).limit(60),
@@ -249,6 +304,9 @@ export default function Admin() {
       supabase.from('questions').select('*, profiles:author_id(display_name, username, avatar_url)').order('created_at', { ascending: false }).limit(40),
       supabase.from('requests').select('*, profiles:requester_id(display_name, username, avatar_url)').order('created_at', { ascending: false }).limit(40),
       supabase.from('admin_activity_logs').select('*, actor:actor_id(display_name, username)').order('created_at', { ascending: false }).limit(100),
+      supabase.from('businesses').select('*, owner:owner_id(display_name, username)').order('created_at', { ascending: false }).limit(100),
+      supabase.from('marketplace_items').select('*, seller:seller_id(display_name, username)').order('created_at', { ascending: false }).limit(100),
+      supabase.from('events').select('*, organizer:organizer_id(display_name, username)').order('created_at', { ascending: false }).limit(100),
     ]);
 
     const allUsers = profilesRes.data ?? [];
@@ -269,6 +327,9 @@ export default function Admin() {
     setVerifications(allVerifs);
     setQuestionsList(latestQRes.data ?? []);
     setRequestsList(latestRRes.data ?? []);
+    setBusinessesList(businessesRes.data ?? []);
+    setMarketplaceList(marketplaceRes.data ?? []);
+    setEventsList(eventsRes.data ?? []);
 
     const adminCount = allUsers.filter((u: any) => u.role === 'admin').length;
     const pendingRep = allReports.filter((r: any) => r.status === 'pending').length;
@@ -282,12 +343,28 @@ export default function Admin() {
       services: sCountRes.count ?? 0,
       pendingReports: pendingRep,
       pendingVerif: pendingVer,
+      businesses: businessesRes.data?.length ?? 0,
+      marketplace: marketplaceRes.data?.length ?? 0,
+      events: eventsRes.data?.length ?? 0,
     });
 
     setLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const updatePlatformEntity = async (entity: 'business' | 'marketplace' | 'event', id: string, action: string) => {
+    try {
+      const { data, error } = await supabase.rpc('admin_update_platform_entity', { p_entity: entity, p_target_id: id, p_action: action });
+      if (error) throw error;
+      if (entity === 'business') setBusinessesList(prev => prev.map(item => item.id === id ? data : item));
+      if (entity === 'marketplace') setMarketplaceList(prev => prev.map(item => item.id === id ? data : item));
+      if (entity === 'event') setEventsList(prev => prev.map(item => item.id === id ? data : item));
+      showToast('تم تحديث مورد المنصة وتسجيل العملية بنجاح ✓');
+    } catch (e: any) {
+      Alert.alert('تعذر التحديث', e?.message || 'حدث خطأ غير متوقع');
+    }
+  };
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -306,8 +383,27 @@ export default function Admin() {
     setUserUserStats({ qCount: qC.count || 0, aCount: aC.count || 0 });
   };
 
-  // Self-promote to Admin (for owner)
-  // 1. Toggle User Role (Strictly admin or user)
+  const adminUpdateUser = async (targetUser: any, patch: { role?: 'admin' | 'user'; is_verified?: boolean; is_geoverified?: boolean; is_banned?: boolean }) => {
+    const next = {
+      role: patch.role ?? (targetUser.role === 'admin' ? 'admin' : 'user'),
+      is_verified: patch.is_verified ?? Boolean(targetUser.is_verified),
+      is_geoverified: patch.is_geoverified ?? Boolean(targetUser.is_geoverified),
+      is_banned: patch.is_banned ?? Boolean(targetUser.is_banned),
+    };
+    const { data, error } = await supabase.rpc('admin_update_user', {
+      p_target_user: targetUser.id,
+      p_role: next.role,
+      p_is_verified: next.is_verified,
+      p_is_geoverified: next.is_geoverified,
+      p_is_banned: next.is_banned,
+    });
+    if (error) throw error;
+    setUsersList(prev => prev.map(u => u.id === targetUser.id ? { ...u, ...data } : u));
+    setInspectedUser((prev: any) => prev?.id === targetUser.id ? { ...prev, ...data } : prev);
+    return data;
+  };
+
+  // User role is changed through a SECURITY DEFINER RPC with last-admin protection.
   const toggleUserRole = async (targetUser: any) => {
     const isCurrentAdmin = targetUser.role === 'admin';
     const newRole = isCurrentAdmin ? 'user' : 'admin';
@@ -317,20 +413,12 @@ export default function Admin() {
       'تغيير صلاحية المستخدم',
       `هل أنت متأكد من ${actionLabel} للمستخدم "${targetUser.display_name || targetUser.username}"؟`,
       async () => {
-        const { error } = await supabase
-          .from('profiles')
-          .update({ role: newRole })
-          .eq('id', targetUser.id);
-
-        if (error) {
-          Alert.alert('خطأ', 'تعذر تحديث الصلاحية: ' + error.message);
-        } else {
-          setUsersList(prev => prev.map(u => u.id === targetUser.id ? { ...u, role: newRole } : u));
-          if (inspectedUser?.id === targetUser.id) {
-            setInspectedUser((prev: any) => ({ ...prev, role: newRole }));
-          }
-          addAuditLog(`تغيير الصلاحية إلى ${newRole === 'admin' ? 'مدير' : 'مستخدم'}`, targetUser.display_name || targetUser.username);
+        try {
+          await adminUpdateUser(targetUser, { role: newRole });
+          await addAuditLog(`تغيير الصلاحية إلى ${newRole === 'admin' ? 'مدير' : 'مستخدم'}`, targetUser.display_name || targetUser.username, 'user', targetUser.id);
           showToast(`تم ${isCurrentAdmin ? 'خفض الصلاحية لمستخدم' : 'منح رتبة مدير النظام'} بنجاح ✨`);
+        } catch (e: any) {
+          Alert.alert('خطأ', 'تعذر تحديث الصلاحية: ' + (e?.message || 'خطأ غير متوقع'));
         }
       }
     );
@@ -339,44 +427,21 @@ export default function Admin() {
   // 2. Toggle Official Verification (الهوية الوطنية والشارة الرسمية)
   const toggleVerification = async (targetUser: any) => {
     const nextStatus = !targetUser.is_verified;
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        is_verified: nextStatus,
-        verification_status: nextStatus ? 'verified' : 'unverified'
-      })
-      .eq('id', targetUser.id);
-
-    if (error) {
-      Alert.alert('خطأ', error.message);
-    } else {
-      setUsersList(prev => prev.map(u => u.id === targetUser.id ? { ...u, is_verified: nextStatus } : u));
-      if (inspectedUser?.id === targetUser.id) {
-        setInspectedUser((prev: any) => ({ ...prev, is_verified: nextStatus }));
-      }
-      addAuditLog(nextStatus ? 'منح الشارة الزرقاء الرسمية' : 'إلغاء التوثيق الرسمي', targetUser.display_name || targetUser.username);
+    try {
+      await adminUpdateUser(targetUser, { is_verified: nextStatus });
+      await addAuditLog(nextStatus ? 'منح الشارة الزرقاء الرسمية' : 'إلغاء التوثيق الرسمي', targetUser.display_name || targetUser.username, 'user', targetUser.id);
       showToast(nextStatus ? 'تم توثيق الحساب بالشارة الرسمية ✓' : 'تم إلغاء توثيق الحساب');
-    }
+    } catch (e: any) { Alert.alert('خطأ', e?.message || 'تعذر تحديث التوثيق'); }
   };
 
   // 3. Toggle Geo Verification (ابن الحي الموثق)
   const toggleGeoVerification = async (targetUser: any) => {
     const nextStatus = !targetUser.is_geoverified;
-    const { error } = await supabase
-      .from('profiles')
-      .update({ is_geoverified: nextStatus })
-      .eq('id', targetUser.id);
-
-    if (error) {
-      Alert.alert('خطأ', error.message);
-    } else {
-      setUsersList(prev => prev.map(u => u.id === targetUser.id ? { ...u, is_geoverified: nextStatus } : u));
-      if (inspectedUser?.id === targetUser.id) {
-        setInspectedUser((prev: any) => ({ ...prev, is_geoverified: nextStatus }));
-      }
-      addAuditLog(nextStatus ? 'منح شارة ابن الحي الموثق' : 'إزالة شارة ابن الحي', targetUser.display_name || targetUser.username);
-      showToast(nextStatus ? 'تم منح شارة "ابن الحي الموثق" 🛡️' : 'تمت إزالة شارة السكن');
-    }
+    try {
+      await adminUpdateUser(targetUser, { is_geoverified: nextStatus });
+      await addAuditLog(nextStatus ? 'منح شارة ابن الحي الموثق' : 'إزالة شارة ابن الحي', targetUser.display_name || targetUser.username, 'user', targetUser.id);
+      showToast(nextStatus ? 'تم منح شارة ابن الحي الموثق 🛡️' : 'تمت إزالة شارة السكن');
+    } catch (e: any) { Alert.alert('خطأ', e?.message || 'تعذر تحديث إثبات السكن'); }
   };
 
   // 4. Toggle User Ban
@@ -388,21 +453,11 @@ export default function Admin() {
       actionLabel,
       `هل ترغب فعلاً في ${nextBan ? 'حظر' : 'إلغاء حظر'} "${targetUser.display_name || targetUser.username}"؟`,
       async () => {
-        const { error } = await supabase
-          .from('profiles')
-          .update({ is_banned: nextBan })
-          .eq('id', targetUser.id);
-
-        if (error) {
-          Alert.alert('خطأ', error.message);
-        } else {
-          setUsersList(prev => prev.map(u => u.id === targetUser.id ? { ...u, is_banned: nextBan } : u));
-          if (inspectedUser?.id === targetUser.id) {
-            setInspectedUser((prev: any) => ({ ...prev, is_banned: nextBan }));
-          }
-          addAuditLog(nextBan ? 'حظر حساب المستخدم' : 'رفع الحظر عن الحساب', targetUser.display_name || targetUser.username);
+        try {
+          await adminUpdateUser(targetUser, { is_banned: nextBan });
+          await addAuditLog(nextBan ? 'حظر حساب المستخدم' : 'رفع الحظر عن الحساب', targetUser.display_name || targetUser.username, 'user', targetUser.id);
           showToast(nextBan ? 'تم حظر المستخدم بنجاح 🚫' : 'تم رفع الحظر بنجاح 🟢');
-        }
+        } catch (e: any) { Alert.alert('خطأ', e?.message || 'تعذر تغيير حالة الحظر'); }
       }
     );
   };
@@ -434,19 +489,18 @@ export default function Admin() {
 
   // 6. Reports Actions
   const resolveReport = async (id: string, action: 'resolved' | 'dismissed') => {
-    const { data: u } = await supabase.auth.getUser();
-    const { error } = await supabase.from('reports').update({
-      status: action,
-      reviewed_by: u.user?.id,
-      reviewed_at: new Date().toISOString()
-    }).eq('id', id);
-    if (error) {
-      Alert.alert('خطأ', error.message);
-      return;
+    try {
+      const { data, error } = await supabase.rpc('admin_moderate_report', {
+        p_report_id: id,
+        p_action: action,
+        p_delete_content: false,
+      });
+      if (error) throw error;
+      setReports(prev => prev.map(r => r.id === id ? { ...r, ...data } : r));
+      showToast(action === 'resolved' ? 'تم حل وإغلاق البلاغ بنجاح ✓' : 'تم تجاهل البلاغ ✕');
+    } catch (e: any) {
+      Alert.alert('خطأ', e?.message || 'تعذر تحديث البلاغ');
     }
-    setReports(prev => prev.map(r => r.id === id ? { ...r, status: action } : r));
-    await addAuditLog(action === 'resolved' ? 'معالجة وإغلاق بلاغ' : 'تجاهل بلاغ', 'بلاغ #' + id.slice(0, 6), 'report', id);
-    showToast(action === 'resolved' ? 'تم حل وإغلاق البلاغ بنجاح ✓' : 'تم تجاهل البلاغ ✕');
   };
 
   // 7. Delete Offensive Content Reported
@@ -456,21 +510,14 @@ export default function Admin() {
       'هل أنت متأكد من حذف هذا المحتوى نهائياً من قاعدة البيانات وإغلاق البلاغ؟',
       async () => {
         try {
-          let error: any = null;
-          if (report.target_type === 'question' && report.target_id) {
-            ({ error } = await supabase.from('questions').delete().eq('id', report.target_id));
-          } else if (report.target_type === 'request' && report.target_id) {
-            ({ error } = await supabase.from('requests').delete().eq('id', report.target_id));
-          } else if (report.target_type === 'answer' && report.target_id) {
-            ({ error } = await supabase.from('answers').delete().eq('id', report.target_id));
-          } else if (report.target_type === 'service' && report.target_id) {
-            ({ error } = await supabase.from('services').delete().eq('id', report.target_id));
-          } else {
-            throw new Error('نوع المحتوى غير مدعوم للحذف من لوحة الإدارة.');
-          }
+          if (!report.target_type || !report.target_id) throw new Error('بلاغ غير مكتمل.');
+          const { data, error } = await supabase.rpc('admin_moderate_report', {
+            p_report_id: report.id,
+            p_action: 'resolved',
+            p_delete_content: true,
+          });
           if (error) throw error;
-          await resolveReport(report.id, 'resolved');
-          await addAuditLog('حذف محتوى مخالف', 'بلاغ #' + report.id.slice(0, 6), report.target_type, report.target_id);
+          setReports(prev => prev.map(r => r.id === report.id ? { ...r, ...data } : r));
           showToast('تم حذف المحتوى المخالف وإغلاق البلاغ 🗑️');
           await load();
         } catch (e: any) {
@@ -766,7 +813,9 @@ export default function Admin() {
             active={activeTab === 'overview'}
             onPress={() => setActiveTab('overview')}
           />
+          <TabPill label="موارد المنصة" icon={<Store size={15} color={activeTab === 'platform' ? '#fff' : '#64748b'} />} active={activeTab === 'platform'} onPress={() => setActiveTab('platform')} />
           <TabPill label="إدارة المواقع" icon={<MapPin size={15} color={activeTab === 'locations' ? '#fff' : '#64748b'} />} active={activeTab === 'locations'} onPress={() => setActiveTab('locations')} />
+          <TabPill label="الهوية والشعار" icon={<Sparkles size={15} color={activeTab === 'branding' ? '#fff' : '#64748b'} />} active={activeTab === 'branding'} onPress={() => setActiveTab('branding')} />
           <TabPill
             label={`ملف التوثيق (${stats.pendingVerif})`}
             icon={<Star size={15} color={activeTab === 'verifications' ? '#fff' : '#64748b'} />}
@@ -816,6 +865,70 @@ export default function Admin() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}
       >
+        {activeTab === 'platform' && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeaderRow}>
+              <View>
+                <Text style={styles.sectionTitle}>موارد المنصة والتشغيل التجاري</Text>
+                <Text style={styles.sectionSubDesc}>إدارة الأعمال والسوق والفعاليات من مصدر واحد، مع حفظ كل إجراء في سجل التدقيق.</Text>
+              </View>
+              <View style={styles.countBadge}><Text style={styles.countBadgeText}>{businessesList.length + marketplaceList.length + eventsList.length} مورد</Text></View>
+            </View>
+
+            <View style={styles.statsGrid}>
+              <StatCard icon={<Building2 size={22} color="#0284c7" />} bg="#f0f9ff" value={businessesList.length} label="دليل الأعمال" sub="منشآت وخدمات محلية" />
+              <StatCard icon={<Store size={22} color="#059669" />} bg="#ecfdf5" value={marketplaceList.length} label="عروض السوق" sub="منتجات الجيران" />
+              <StatCard icon={<CalendarDays size={22} color="#7c3aed" />} bg="#f5f3ff" value={eventsList.length} label="الفعاليات" sub="أنشطة المجتمع" />
+            </View>
+
+            <Text style={styles.subSectionTitle}>دليل الأعمال</Text>
+            {businessesList.length === 0 ? <EmptyState icon={<Building2 size={36} color="#94a3b8" />} title="لا توجد أعمال مسجلة" sub="ستظهر الأعمال الجديدة هنا." /> : businessesList.slice(0, 30).map((item: any) => (
+              <View key={item.id} style={styles.quickAction}>
+                <Building2 size={18} color={item.is_verified ? C.accent : C.muted} />
+                <View style={{ flex: 1 }}><Text style={styles.quickActionText}>{item.name || 'عمل بلا اسم'}</Text><Text style={{ color: C.muted, fontSize: 11, textAlign: 'right' }}>{[item.city, item.district].filter(Boolean).join(' · ') || 'بلا موقع'} · {item.owner?.display_name || 'مالك غير معروف'}</Text></View>
+                <Pressable style={[styles.smallActionBtn, item.is_verified && { backgroundColor: '#dcfce7' }]} onPress={() => confirmAction('تحديث توثيق العمل', `تغيير حالة توثيق «${item.name}»؟`, () => updatePlatformEntity('business', item.id, 'toggle_verified'))}><CheckCircle2 size={16} color={item.is_verified ? '#16a34a' : '#64748b'} /><Text style={styles.smallActionText}>{item.is_verified ? 'موثق' : 'توثيق'}</Text></Pressable>
+              </View>
+            ))}
+
+            <Text style={styles.subSectionTitle}>سوق الجيران</Text>
+            {marketplaceList.length === 0 ? <EmptyState icon={<Store size={36} color="#94a3b8" />} title="لا توجد عروض سوق" sub="ستظهر العروض الجديدة هنا." /> : marketplaceList.slice(0, 30).map((item: any) => (
+              <View key={item.id} style={styles.quickAction}>
+                <Store size={18} color={item.status === 'available' ? C.accent : C.muted} />
+                <View style={{ flex: 1 }}><Text style={styles.quickActionText}>{item.title || 'عرض بلا عنوان'}</Text><Text style={{ color: C.muted, fontSize: 11, textAlign: 'right' }}>{item.price != null ? `${item.price} ر.س` : 'حسب الاتفاق'} · {item.seller?.display_name || 'بائع غير معروف'}</Text></View>
+                <Pressable style={styles.smallActionBtn} onPress={() => confirmAction('تغيير حالة العرض', `تغيير حالة «${item.title}»؟`, () => updatePlatformEntity('marketplace', item.id, item.status === 'available' ? 'archive' : 'restore'))}><Archive size={16} color="#64748b" /><Text style={styles.smallActionText}>{item.status === 'available' ? 'أرشفة' : 'استعادة'}</Text></Pressable>
+              </View>
+            ))}
+
+            <Text style={styles.subSectionTitle}>الفعاليات المجتمعية</Text>
+            {eventsList.length === 0 ? <EmptyState icon={<CalendarDays size={36} color="#94a3b8" />} title="لا توجد فعاليات" sub="ستظهر الفعاليات الجديدة هنا." /> : eventsList.slice(0, 30).map((item: any) => (
+              <View key={item.id} style={styles.quickAction}>
+                <CalendarDays size={18} color={item.status === 'published' ? '#7c3aed' : C.muted} />
+                <View style={{ flex: 1 }}><Text style={styles.quickActionText}>{item.title || 'فعالية بلا عنوان'}</Text><Text style={{ color: C.muted, fontSize: 11, textAlign: 'right' }}>{[item.city, item.district].filter(Boolean).join(' · ') || 'بلا موقع'} · {item.organizer?.display_name || 'منظم غير معروف'}</Text></View>
+                <Pressable style={styles.smallActionBtn} onPress={() => confirmAction('تغيير حالة الفعالية', `تغيير حالة «${item.title}»؟`, () => updatePlatformEntity('event', item.id, item.status === 'published' ? 'cancel' : 'publish'))}><Text style={styles.smallActionText}>{item.status === 'published' ? 'إلغاء النشر' : 'نشر'}</Text></Pressable>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {activeTab === 'branding' && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>الهوية البصرية والشعار</Text>
+            <Text style={styles.sectionSubDesc}>غيّر الشعار من هنا ليصبح الشعار المركزي المستخدم في شاشة الترحيب وتسجيل الدخول وهيدر التطبيق وأيقونة الويب.</Text>
+            <View style={{ alignItems: 'center', backgroundColor: '#065f46', borderRadius: 24, padding: 28, marginTop: 12, marginBottom: 14 }}>
+              <View style={{ width: 150, height: 150, borderRadius: 28, backgroundColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.28)' }}>
+                <Image source={{ uri: brandingLogo }} style={{ width: 125, height: 125 }} resizeMode="contain" />
+              </View>
+              <Text style={{ color: '#fff', fontSize: 18, fontWeight: '900', marginTop: 14 }}>شعار حيّنا الحالي</Text>
+              <Text style={{ color: '#a7f3d0', fontSize: 11, fontWeight: '700', marginTop: 4, textAlign: 'center' }}>تغيير واحد ← ينعكس على واجهات الهوية المرتبطة بالشعار</Text>
+            </View>
+            <Pressable style={[styles.btnSendNotice, brandingUploading && { opacity: 0.6 }]} onPress={changeGlobalLogo} disabled={brandingUploading}>
+              {brandingUploading ? <ActivityIndicator color="#fff" /> : <Sparkles size={17} color="#fff" />}
+              <Text style={styles.btnSendNoticeText}>{brandingUploading ? 'جارٍ رفع الشعار...' : 'تغيير الشعار الآن'}</Text>
+            </Pressable>
+            <Text style={{ marginTop: 12, color: C.muted, fontSize: 11, textAlign: 'right', lineHeight: 18 }}>اختر صورة PNG أو صورة مربعة من جهازك. سيتم حفظها في تخزين آمن مخصص للهوية وربطها مركزياً، مع الاحتفاظ بالشعار الحالي كخيار احتياطي داخل التطبيق.</Text>
+          </View>
+        )}
+
         {activeTab === 'locations' && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>إدارة المناطق والمدن والأحياء</Text>
@@ -1763,6 +1876,8 @@ const styles = StyleSheet.create({
   healthLabel: { fontSize: 11, color: '#475569', fontWeight: '700' },
   healthValueActive: { fontSize: 11, color: '#10B981', fontWeight: '900' },
   healthValueRole: { fontSize: 10, color: '#0891B2', fontWeight: '800', backgroundColor: '#ECFEFF', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8 },
+  smallActionBtn: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, paddingHorizontal: 9, paddingVertical: 7, borderRadius: 10, backgroundColor: '#f1f5f9' },
+  smallActionText: { color: '#475569', fontSize: 11, fontWeight: '800' },
   quickAction: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#fff', padding: 14, borderRadius: 16, marginBottom: 8, borderWidth: 1, borderColor: '#E2E8F0' },
   quickActionLeft: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10 },
   quickActionText: { fontSize: 13, fontWeight: '800', color: '#0F172A' },

@@ -26,3 +26,9 @@
 Supabase Project URL: https://vkeuyompnddqfvulalkk.supabase.co
 
 لا تضع service_role أو أي secret في التطبيق أو GitHub.
+
+
+## الموقع والإشعارات
+- الموقع الحالي يعمل على iOS وAndroid عبر `expo-location` بعد منح صلاحية الموقع.
+- إشعارات الدفع تستخدم Expo Push Service وتُسجّل أجهزة المستخدم في Supabase.
+- بناء نسخة iOS/Android النهائية يحتاج EAS Build وبيانات Apple/Google الخاصة بالتطبيق.

@@ -25,6 +25,7 @@ import {
   Flag,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import ScreenHeader from '@/components/shared/ScreenHeader';
 
 export default function Business() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -47,7 +48,13 @@ export default function Business() {
           .eq('business_id', id)
           .order('created_at', { ascending: false }),
       ]);
-      setBusiness(bData.data);
+      if (bData.error || !bData.data) {
+        // Some listings come from the `businesses` table (e.g. map pins).
+        const alt = await supabase.from('businesses').select('*').eq('id', id).maybeSingle();
+        setBusiness(alt.data ?? null);
+      } else {
+        setBusiness(bData.data);
+      }
       setReviews(rData.data ?? []);
     } catch (e) {
       console.warn('Load business error', e);
@@ -118,18 +125,18 @@ export default function Business() {
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
         >
-          <View style={styles.navBar}>
-            <Pressable onPress={() => router.back()} style={styles.iconBtn}>
-              <ChevronRight size={28} color="#fff" />
-            </Pressable>
-            <Text style={styles.navTitle}>دليل المحلات</Text>
-            <Pressable
-              onPress={() => router.push({ pathname: '/report', params: { type: 'business', id: business.id } })}
-              style={styles.iconBtn}
-            >
-              <Flag size={20} color="#fff" />
-            </Pressable>
-          </View>
+          <ScreenHeader
+            title="دليل المحلات"
+            fallbackRoute="/directory"
+            rightAction={(
+              <Pressable
+                onPress={() => router.push({ pathname: '/report', params: { type: 'business', id: business.id } })}
+                style={styles.iconBtn}
+              >
+                <Flag size={20} color="#fff" />
+              </Pressable>
+            )}
+          />
 
           <View style={styles.heroContent}>
             <View style={styles.ratingBadge}>
@@ -287,7 +294,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   hero: {
-    paddingTop: Platform.OS === 'ios' ? 52 : 36,
+    paddingTop: Platform.OS === 'ios' ? 52 : 40,
     paddingHorizontal: 20,
     paddingBottom: 28,
     borderBottomLeftRadius: 30,

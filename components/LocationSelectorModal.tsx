@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   Modal,
   View,
   Text,
@@ -34,6 +36,7 @@ import {
 } from 'lucide-react-native';
 import { C } from '@/lib/ui';
 import { resolveShortNationalAddress, NationalAddressResolution } from '@/lib/nationalAddress';
+import { getCurrentDeviceLocation, reverseGeocodeDeviceLocation } from '@/lib/deviceLocation';
 import ActionSheet from '@/components/ActionSheet';
 
 interface Props {
@@ -58,6 +61,7 @@ export default function LocationSelectorModal({
   const [searchQuery, setSearchQuery] = useState('');
   const [locations, setLocations] = useState<Region[]>(SAUDI_REGIONS);
   const [visibleCount, setVisibleCount] = useState(100);
+  const [locating, setLocating] = useState(false);
 
   useEffect(() => {
     if (!visible) return;
@@ -104,6 +108,32 @@ export default function LocationSelectorModal({
   function handleSelectAllKSA() {
     onSelect('كل المملكة', 'كل المدن', 'كل الأحياء');
     resetAndClose();
+  }
+
+  async function handleUseCurrentLocation() {
+    if (locating) return;
+    setLocating(true);
+    try {
+      const location = await getCurrentDeviceLocation();
+      if (!location) {
+        Alert.alert('تعذّر تحديد الموقع', 'اسمح للمتصفح أو التطبيق باستخدام موقعك ثم حاول مرة أخرى.');
+        return;
+      }
+      const place = await reverseGeocodeDeviceLocation(location);
+      const region = place?.region?.trim() || '';
+      const city = place?.city?.trim() || '';
+      const district = place?.district?.trim() || '';
+      if (!region || !city || !district) {
+        Alert.alert('الموقع غير مكتمل', 'لم نتمكن من استخراج المنطقة والمدينة والحي بدقة. اخترها يدوياً من القائمة.');
+        return;
+      }
+      onSelect(region, city, district);
+      resetAndClose();
+    } catch (error: any) {
+      Alert.alert('تعذّر تحديد الموقع', error?.message || 'اختر المنطقة والمدينة والحي يدوياً.');
+    } finally {
+      setLocating(false);
+    }
   }
 
   function handleChooseRegion(reg: Region) {
@@ -207,6 +237,19 @@ export default function LocationSelectorModal({
             {/* Step 1: Regions */}
             {step === 'region' && (
               <>
+                <Pressable
+                  style={styles.currentLocationButton}
+                  onPress={handleUseCurrentLocation}
+                  disabled={locating}
+                  accessibilityRole="button"
+                  accessibilityLabel="تحديد موقعي تلقائياً"
+                >
+                  {locating ? <ActivityIndicator size="small" color="#fff" /> : <Compass size={18} color="#fff" />}
+                  <Text style={styles.currentLocationButtonText}>
+                    {locating ? 'جارٍ تحديد موقعك…' : 'تحديد موقعي تلقائياً'}
+                  </Text>
+                </Pressable>
+
                 {/* National Address Short Code Entry Box */}
                 <View style={styles.nationalAddressCard}>
                   <View style={styles.naHeaderRow}>
@@ -492,6 +535,17 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     marginTop: 2,
   },
+  currentLocationButton: {
+    minHeight: 46,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 8,
+    borderRadius: 14,
+    backgroundColor: '#059669',
+  },
+  currentLocationButtonText: { color: '#fff', fontSize: 13, fontWeight: '900' },
   nationalAddressCard: {
     backgroundColor: '#ecfdf5',
     borderWidth: 1.5,

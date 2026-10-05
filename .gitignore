@@ -12,3 +12,6 @@ expo-skills-temp/
 .agents/
 .vercel
 .env*
+local_tests_and_docs/
+.vscode/settings.json
+.vscode/

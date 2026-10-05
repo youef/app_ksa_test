@@ -1,3 +1,4 @@
+import { useBottomNavInset } from '@/lib/bottomNav';
 import { useEffect, useState } from 'react';
 import {
   Pressable,
@@ -23,60 +24,84 @@ import {
   Sparkles,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import BottomNav from '@/components/BottomNav';
+import ScreenHeader from '@/components/shared/ScreenHeader';
 import {
   getActiveLocation,
   subscribeLocation,
   isExactDistrictMatching,
+  isLocationMatching,
   isAllKingdom,
 } from '@/lib/locationSync';
 
 export default function Questions() {
+  const bottomNavInset = useBottomNavInset();
   const [items, setItems] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [hasSession, setHasSession] = useState(false);
+  const [loadError, setLoadError] = useState('');
   const [activeLoc, setActiveLoc] = useState({
     region: 'كل المملكة',
     city: 'كل المدن',
     district: 'كل الأحياء',
   });
 
-  async function load(q = '') {
+  async function load(q = '', location = activeLoc) {
     setLoading(true);
+    setLoadError('');
     try {
-      let query = supabase
-        .from('questions')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(60);
-
-      if (q.trim()) {
-        query = query.or(`title.ilike.%${q.trim()}%,body.ilike.%${q.trim()}%`);
+      const { data: session } = await supabase.auth.getSession();
+      if (session.session?.user) {
+        let query = supabase.from('questions').select('*').order('created_at', { ascending: false }).limit(60);
+        if (q.trim()) query = query.or(`title.ilike.%${q.trim()}%,body.ilike.%${q.trim()}%`);
+        const result = await query;
+        setItems(result.data ?? []);
+      } else {
+        const result = await supabase.rpc('hayna_guest_questions', {
+          p_city: location.city,
+          p_district: location.district,
+          p_limit: 60,
+        });
+        if (result.error) throw result.error;
+        const searchTerm = q.trim().toLocaleLowerCase('ar');
+        setItems((result.data ?? []).filter((item: any) => !searchTerm || `${item.title} ${item.body}`.toLocaleLowerCase('ar').includes(searchTerm)));
       }
-
-      const r = await query;
-      setItems(r.data ?? []);
     } catch (e) {
       console.warn('Load questions error', e);
+      setLoadError((e as any)?.code === 'PGRST202' ? 'يلزم تحديث قاعدة البيانات لعرض أسئلة الحي للزوار.' : 'تعذر تحميل الأسئلة. حاول مرة أخرى.');
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    getActiveLocation().then(setActiveLoc);
-    const unsub = subscribeLocation(setActiveLoc);
-    load(search);
-    return unsub;
+    supabase.auth.getSession().then(({ data }) => setHasSession(Boolean(data.session?.user)));
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setHasSession(Boolean(session?.user));
+      if (session?.user) void load(search, activeLoc);
+    });
+    getActiveLocation().then(location => {
+      setActiveLoc(location);
+      void load(search, location);
+    });
+    const unsub = subscribeLocation(location => {
+      setActiveLoc(location);
+      void load(search, location);
+    });
+    return () => {
+      unsub();
+      authListener.subscription.unsubscribe();
+    };
   }, []);
 
-  const displayedItems = items.filter((q) =>
-    isExactDistrictMatching(q, activeLoc.city, activeLoc.district)
+  const displayedItems = items.filter(q => hasSession
+    ? isExactDistrictMatching(q, activeLoc.city, activeLoc.district)
+    : isLocationMatching(q, activeLoc.city, activeLoc.district)
   );
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: bottomNavInset }]} showsVerticalScrollIndicator={false}>
         {/* Header Hero */}
         <LinearGradient
           colors={['#065f46', '#059669', '#10b981']}
@@ -84,16 +109,16 @@ export default function Questions() {
           end={{ x: 1, y: 1 }}
           style={styles.hero}
         >
-          <View style={styles.navBar}>
-            <Pressable onPress={() => router.back()} style={styles.iconBtn}>
-              <ChevronRight size={26} color="#fff" />
-            </Pressable>
-            <Text style={styles.navTitle}>أسئلة واستفسارات الحي ❓</Text>
-            <Pressable onPress={() => router.push('/ask')} style={styles.addBtn}>
-              <Plus size={18} color="#059669" />
-              <Text style={styles.addBtnText}>اسأل جارك</Text>
-            </Pressable>
-          </View>
+          <ScreenHeader
+            title="أسئلة واستفسارات الحي ❓"
+            fallbackRoute="/home"
+            rightAction={hasSession ? (
+              <Pressable onPress={() => router.push('/ask')} style={styles.addBtn}>
+                <Plus size={18} color="#059669" />
+                <Text style={styles.addBtnText}>اسأل جارك</Text>
+              </Pressable>
+            ) : undefined}
+          />
           <Text style={styles.heroSubtitle}>
             استفسر عن أي شيء في حيك وتلقى إجابات موثوقة من جيرانك وسكان المنطقة.
           </Text>
@@ -141,6 +166,14 @@ export default function Questions() {
               <ActivityIndicator size="large" color="#059669" />
               <Text style={styles.loadingText}>جاري تحميل الأسئلة...</Text>
             </View>
+          ) : loadError ? (
+            <View style={styles.emptyCard}>
+              <HelpCircle size={40} color="#f59e0b" />
+              <Text style={styles.emptyTitle}>{loadError}</Text>
+              <Pressable style={styles.emptyAddBtn} onPress={() => load(search)}>
+                <Text style={styles.emptyAddBtnText}>إعادة المحاولة</Text>
+              </Pressable>
+            </View>
           ) : displayedItems.length === 0 ? (
             <View style={styles.emptyCard}>
               <HelpCircle size={48} color="#cbd5e1" />
@@ -150,10 +183,10 @@ export default function Questions() {
                   ? `لم يتم طرح أسئلة بعد في ${activeLoc.city}${activeLoc.district !== 'كل الأحياء' ? ` (حي ${activeLoc.district})` : ''}. كن أول من يشارك!`
                   : 'عندك استفسار عن خدمات الحي أو أماكن؟ اطرح سؤالك الآن!'}
               </Text>
-              <Pressable style={styles.emptyAddBtn} onPress={() => router.push('/ask')}>
+              {hasSession && <Pressable style={styles.emptyAddBtn} onPress={() => router.push('/ask')}>
                 <Plus size={18} color="#fff" />
                 <Text style={styles.emptyAddBtnText}>طرح سؤال جديد</Text>
-              </Pressable>
+              </Pressable>}
             </View>
           ) : (
             displayedItems.map(q => (
@@ -190,9 +223,7 @@ export default function Questions() {
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      <View style={styles.bottomNavWrapper}>
-        <BottomNav />
-      </View>
+      
     </View>
   );
 }
@@ -206,7 +237,7 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   hero: {
-    paddingTop: Platform.OS === 'ios' ? 52 : 36,
+    paddingTop: Platform.OS === 'ios' ? 52 : 40,
     paddingHorizontal: 20,
     paddingBottom: 24,
     borderBottomLeftRadius: 28,

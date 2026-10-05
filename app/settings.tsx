@@ -1,3 +1,5 @@
+﻿import { useBottomNavInset } from '@/lib/bottomNav';
+import ScreenHeader from '@/components/shared/ScreenHeader';
 import { useEffect, useState } from 'react';
 import {
   Alert,
@@ -36,9 +38,11 @@ import {
   Moon,
   UserX,
   Compass,
+  MapPin,
 } from 'lucide-react-native';
-import BottomNav from '@/components/BottomNav';
 import { verifyGPSInDistrict } from '@/lib/nationalAddress';
+import { getCurrentDeviceLocation, reverseGeocodeDeviceLocation } from '@/lib/deviceLocation';
+import { savePermanentMyLocation } from '@/lib/locationSync';
 import {
   DEFAULT_DND,
   DndSettings,
@@ -54,6 +58,7 @@ import {
 } from '@/lib/chatControls';
 
 export default function SettingsScreen() {
+  const bottomNavInset = useBottomNavInset();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
@@ -70,8 +75,10 @@ export default function SettingsScreen() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [accountSaving, setAccountSaving] = useState(false);
+  const [region, setRegion] = useState('');
   const [city, setCity] = useState('');
   const [district, setDistrict] = useState('');
+  const [locating, setLocating] = useState(false);
   const [geoVerified, setGeoVerified] = useState(false);
   const [geoChecking, setGeoChecking] = useState(false);
   const [verificationStatus, setVerificationStatus] = useState<'none' | 'pending' | 'verified' | 'rejected'>('none');
@@ -102,34 +109,62 @@ export default function SettingsScreen() {
       setEmail(u.user.email || '');
       setEmailDraft(u.user.email || '');
 
-      const [profRes, dndRes, blockedRes, verificationRes] = await Promise.all([
-        supabase.from('profiles').select('*').eq('id', u.user.id).single(),
-        loadDnd(u.user.id),
-        loadBlockedUsers(u.user.id),
-        supabase.from('verification_requests').select('status').eq('user_id', u.user.id).order('created_at', { ascending: false }).limit(1),
-      ]);
-
+      // Load each settings source independently. A failure in chat controls or
+      // verification must never prevent the profile/settings screen from rendering.
+      const profRes = await supabase.from('profiles').select('*').eq('id', u.user.id).maybeSingle();
       const prof = profRes.data;
+      if (profRes.error) console.warn('settings profile load failed:', profRes.error.message);
       if (prof) {
         setProfilePrivacy(prof.profile_privacy || 'public');
         setAllowDms(prof.allow_dms || 'everyone');
         setAllowStoryReplies(prof.allow_story_replies || 'everyone');
-        setHideName(prof.hide_name || false);
+        setHideName(Boolean(prof.hide_name));
         setRole(prof.role || 'user');
+        setRegion(prof.region || '');
         setCity(prof.city || '');
         setDistrict(prof.district || '');
+        setGeoVerified(Boolean(prof.is_geoverified));
         if (prof.is_verified) setVerificationStatus('verified');
       }
-      const latestRequest = verificationRes.data?.[0];
-      if (latestRequest && !profRes.data?.is_verified) {
-        setVerificationStatus(latestRequest.status === 'approved' ? 'verified' : latestRequest.status === 'rejected' ? 'rejected' : 'pending');
+
+      try {
+        const { data: verificationData, error: verificationError } = await supabase
+          .from('verification_requests')
+          .select('status')
+          .eq('user_id', u.user.id)
+          .order('created_at', { ascending: false })
+          .limit(1);
+        if (verificationError) console.warn('verification load failed:', verificationError.message);
+        const latestRequest = verificationData?.[0];
+        if (latestRequest && !prof?.is_verified) {
+          setVerificationStatus(latestRequest.status === 'approved' ? 'verified' : latestRequest.status === 'rejected' ? 'rejected' : 'pending');
+        }
+      } catch (error) {
+        console.warn('verification settings unavailable:', error);
       }
 
-      setDnd(dndRes);
-      setDraftStart(dndRes.start || '22:00');
-      setDraftEnd(dndRes.end || '07:00');
-      setBlockedUsers((blockedRes || []).filter(Boolean));
-      setControlsReady(await checkChatControlsReady());
+      try {
+        const dndRes = await loadDnd(u.user.id);
+        setDnd(dndRes);
+        setDraftStart(dndRes.start || '22:00');
+        setDraftEnd(dndRes.end || '07:00');
+      } catch (error) {
+        console.warn('DND settings unavailable:', error);
+      }
+
+      try {
+        const blockedRes = await loadBlockedUsers(u.user.id);
+        setBlockedUsers((blockedRes || []).filter(Boolean));
+      } catch (error) {
+        console.warn('blocked users unavailable:', error);
+      }
+
+      try {
+        setControlsReady(await checkChatControlsReady());
+      } catch (error) {
+        console.warn('chat controls check failed:', error);
+        setControlsReady(null);
+      }
     } catch (err) {
       console.log('Error loading settings:', err);
     } finally {
@@ -167,6 +202,44 @@ export default function SettingsScreen() {
       Alert.alert('تعذّر تغيير كلمة المرور', error?.message || 'حدث خطأ أثناء تحديث كلمة المرور.');
     } finally {
       setAccountSaving(false);
+    }
+  }
+
+  async function useCurrentLocation() {
+    if (locating) return;
+    setLocating(true);
+    try {
+      const location = await getCurrentDeviceLocation();
+      if (!location) {
+        Alert.alert('تعذّر تحديد الموقع', 'اسمح لحيّنا بالوصول إلى موقعك ثم حاول مرة أخرى.');
+        return;
+      }
+      const place = await reverseGeocodeDeviceLocation(location);
+      const nextRegion = place?.region || '';
+      const nextCity = place?.city || '';
+      const nextDistrict = place?.district || '';
+      if (!nextRegion || !nextCity || !nextDistrict) {
+        Alert.alert('الموقع غير مكتمل', 'يجب أن نستخرج المنطقة والمدينة والحي حتى يتم حفظ موقعك بشكل صحيح.');
+        return;
+      }
+      if (!userId) return;
+      await savePermanentMyLocation({ region: nextRegion, city: nextCity, district: nextDistrict }, true);
+      const { data: updated, error } = await supabase
+        .from('profiles')
+        .update({ region: nextRegion, city: nextCity, district: nextDistrict })
+        .eq('id', userId)
+        .select('id, region, city, district')
+        .maybeSingle();
+      if (error) throw error;
+      if (!updated) throw new Error('لم يتم تحديث موقع الحساب في Supabase.');
+      setRegion(nextRegion);
+      setCity(nextCity);
+      setDistrict(nextDistrict);
+      Alert.alert('تم تحديث الموقع', 'تم حفظ المنطقة والمدينة والحي في ملفك الشخصي وسيتم استخدامهما في أنحاء التطبيق.');
+    } catch (error: any) {
+      Alert.alert('تعذّر تحديث الموقع', error?.message || 'حاول مرة أخرى.');
+    } finally {
+      setLocating(false);
     }
   }
 
@@ -291,7 +364,7 @@ export default function SettingsScreen() {
         return;
       }
       setPushEnabled(true);
-      Alert.alert('تم التفعيل', 'تم منح الإذن وتسجيل هذا الجهاز لاستقبال الإشعارات.');
+      Alert.alert('تم التفعيل', 'تم تفعيل الإشعارات لهذا الحساب. ستظهر التنبيهات على شاشة الجهاز حتى عند مغادرة الموقع.');
     } catch (error: any) {
       Alert.alert('تعذّر التفعيل', error?.message || 'تعذر تسجيل هذا الجهاز.');
     }
@@ -347,19 +420,16 @@ export default function SettingsScreen() {
     <View style={styles.screen}>
       {/* Top Header */}
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <ChevronRight size={26} color="#059669" />
-        </Pressable>
-        <View style={styles.headerTitleWrap}>
-          <Text style={styles.headerTitle}>الإعدادات والمميزات</Text>
-          <Text style={styles.headerSubtitle}>الخصوصية، الرسائل، والميزات الحصرية</Text>
-        </View>
-        <View style={styles.headerIconWrap}>
-          <Sliders size={22} color="#059669" />
-        </View>
+        <ScreenHeader
+          title="الإعدادات والمميزات"
+          subtitle="الخصوصية، الرسائل، والميزات الحصرية"
+          fallbackRoute="/profile"
+          variant="plain"
+          rightAction={<View style={styles.headerIconWrap}><Sliders size={22} color="#059669" /></View>}
+        />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomNavInset }]} showsVerticalScrollIndicator={false}>
         {saving && (
           <View style={styles.savingBanner}>
             <ActivityIndicator size="small" color="#059669" />
@@ -689,6 +759,36 @@ export default function SettingsScreen() {
           </Text>
         </View>
 
+        <View style={styles.card}>
+          <View style={styles.sectionHeader}>
+            <View style={[styles.sectionIcon, { backgroundColor: '#ecfdf5' }]}><Compass size={18} color="#059669" /></View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.sectionTitle}>موقع حسابك</Text>
+              <Text style={styles.sectionDesc}>الموقع المحفوظ هنا ينعكس على ملفك والمحتوى المرتبط بحيك.</Text>
+            </View>
+          </View>
+          <View style={styles.locationSummaryRow}>
+            <Text style={styles.locationSummaryLabel}>المنطقة</Text>
+            <Text style={styles.locationSummaryValue}>{region || 'غير محددة'}</Text>
+          </View>
+          <View style={styles.locationSummaryRow}>
+            <Text style={styles.locationSummaryLabel}>المدينة</Text>
+            <Text style={styles.locationSummaryValue}>{city || 'غير محددة'}</Text>
+          </View>
+          <View style={styles.locationSummaryRow}>
+            <Text style={styles.locationSummaryLabel}>الحي</Text>
+            <Text style={styles.locationSummaryValue}>{district || 'غير محدد'}</Text>
+          </View>
+          <Pressable style={styles.actionBtn} onPress={useCurrentLocation} disabled={locating}>
+            {locating ? <ActivityIndicator size="small" color="#059669" /> : <MapPin size={20} color="#059669" />}
+            <Text style={styles.actionBtnText}>{locating ? 'جارٍ تحديد موقعك…' : 'تحديد موقعي تلقائياً وتحديثه'}</Text>
+          </Pressable>
+          <Pressable style={[styles.actionBtn, { borderBottomWidth: 0 }]} onPress={() => router.push('/profile')}>
+            <ChevronLeft size={20} color="#64748b" />
+            <Text style={styles.actionBtnText}>تعديل الموقع من الملف الشخصي</Text>
+          </Pressable>
+        </View>
+
         {/* 5. قائمة المحظورين */}
         <View style={styles.card}>
           <View style={styles.sectionHeader}>
@@ -819,9 +919,7 @@ export default function SettingsScreen() {
       </Modal>
 
       {/* شريط التنقل السفلي */}
-      <View style={styles.bottomNavWrapper}>
-        <BottomNav />
-      </View>
+      
     </View>
   );
 }
@@ -1147,6 +1245,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
+
+  locationSummaryRow: {
+    flexDirection: 'row-reverse',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 9,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  locationSummaryLabel: { fontSize: 12, color: '#64748b', fontWeight: '700' },
+  locationSummaryValue: { fontSize: 14, color: '#0f172a', fontWeight: '900', maxWidth: '70%', textAlign: 'right' },
 
   // Blocked users
   emptyBlocked: {

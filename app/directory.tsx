@@ -1,3 +1,4 @@
+import { useBottomNavInset } from '@/lib/bottomNav';
 import { useEffect, useState } from 'react';
 import {
   Pressable,
@@ -23,9 +24,10 @@ import {
   ExternalLink,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import BottomNav from '@/components/BottomNav';
+import ScreenHeader from '@/components/shared/ScreenHeader';
 
 export default function Directory() {
+  const bottomNavInset = useBottomNavInset();
   const [items, setItems] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -66,7 +68,7 @@ export default function Directory() {
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: bottomNavInset }]} showsVerticalScrollIndicator={false}>
         {/* Header Hero */}
         <LinearGradient
           colors={['#065f46', '#059669', '#10b981']}
@@ -74,13 +76,7 @@ export default function Directory() {
           end={{ x: 1, y: 1 }}
           style={styles.hero}
         >
-          <View style={styles.navBar}>
-            <Pressable onPress={() => router.back()} style={styles.iconBtn}>
-              <ChevronRight size={26} color="#fff" />
-            </Pressable>
-            <Text style={styles.navTitle}>دليل ومحلات الحي 🏪</Text>
-            <View style={{ width: 26 }} />
-          </View>
+          <ScreenHeader title="دليل ومحلات الحي 🏪" fallbackRoute="/home" />
           <Text style={styles.heroSubtitle}>
             اكتشف المتاجر، الصيدليات، المقاهي، والأنشطة التجارية القريبة في حيك.
           </Text>
@@ -153,9 +149,7 @@ export default function Directory() {
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      <View style={styles.bottomNavWrapper}>
-        <BottomNav />
-      </View>
+      
     </View>
   );
 }
@@ -169,7 +163,7 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   hero: {
-    paddingTop: Platform.OS === 'ios' ? 52 : 36,
+    paddingTop: Platform.OS === 'ios' ? 52 : 40,
     paddingHorizontal: 20,
     paddingBottom: 24,
     borderBottomLeftRadius: 28,

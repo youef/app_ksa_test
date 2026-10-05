@@ -1,30 +1,61 @@
-import { useState, useCallback, useEffect } from 'react';
-import { View, Text, TextInput, StyleSheet, ScrollView, Pressable, ActivityIndicator, Image, Platform } from 'react-native';
+import { useState, useEffect } from 'react';
+import { View, Text, TextInput, StyleSheet, ScrollView, Pressable, ActivityIndicator, Image, Platform, Linking } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
-import { C } from '@/lib/ui';
-import { Search as SearchIcon, ArrowRight, User, MessageCircle, Truck, Plus } from 'lucide-react-native';
+import { Search as SearchIcon, ArrowRight, MessageCircle, Truck, Plus, Store } from 'lucide-react-native';
+import { areaLabel } from '@/lib/privacy';
+import { relativeTime } from '@/lib/mapPins';
+
+type Row = Record<string, any>;
+type Tab = 'all' | 'users' | 'questions' | 'requests' | 'shops';
+
+/** RLS and column names drift between deployments, so every query degrades instead of throwing. */
+async function searchRows(
+  table: string,
+  term: string,
+  columns: string[],
+  fallbacks: string[],
+  limit = 10,
+): Promise<Row[]> {
+  const run = async (order: boolean, cols: string[]) => {
+    let query = supabase.from(table).select('*');
+    if (order) query = query.order('created_at', { ascending: false });
+    return query.or(cols.map((c) => `${c}.ilike.${term}`).join(',')).limit(limit);
+  };
+
+  const attempts: Array<() => PromiseLike<{ data: unknown; error: unknown }>> = [
+    () => run(true, columns),
+    () => run(false, columns),
+    ...fallbacks.map((col) => () => run(false, [col])),
+  ];
+
+  for (const attempt of attempts) {
+    const { data, error } = await attempt();
+    if (!error) return (data as Row[]) ?? [];
+  }
+  return [];
+}
 
 export default function SearchPage() {
   const [query, setQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'all' | 'users' | 'questions' | 'requests'>('all');
+  const [activeTab, setActiveTab] = useState<Tab>('all');
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<{
-    users: any[];
-    questions: any[];
-    requests: any[];
-  }>({ users: [], questions: [], requests: [] });
+    users: Row[];
+    questions: Row[];
+    requests: Row[];
+    shops: Row[];
+  }>({ users: [], questions: [], requests: [], shops: [] });
 
-  // Debounce search
   useEffect(() => {
-    const delayDebounceFn = setTimeout(() => {
+    const timer = setTimeout(() => {
       if (query.trim().length > 0) {
         performSearch();
       } else {
-        setResults({ users: [], questions: [], requests: [] });
+        setResults({ users: [], questions: [], requests: [], shops: [] });
       }
     }, 400);
-    return () => clearTimeout(delayDebounceFn);
+    return () => clearTimeout(timer);
   }, [query]);
 
   const performSearch = async () => {
@@ -32,15 +63,17 @@ export default function SearchPage() {
     const searchTerm = `%${query.trim()}%`;
 
     try {
-      const [{ data: auth }, u, q, r] = await Promise.all([
+      const [auth, u, q, r, shopsA, shopsB] = await Promise.all([
         supabase.auth.getUser(),
         supabase.from('profiles').select('*').or(`display_name.ilike.${searchTerm},username.ilike.${searchTerm},city.ilike.${searchTerm}`).limit(15),
-        supabase.from('questions').select('*, profiles(*)').or(`title.ilike.${searchTerm},body.ilike.${searchTerm}`).limit(10),
-        supabase.from('request_directory').select('*, profiles(*)').or(`title.ilike.${searchTerm},description.ilike.${searchTerm}`).limit(10)
+        searchRows('questions', searchTerm, ['title', 'body', 'district', 'city'], ['title']),
+        searchRows('requests', searchTerm, ['title', 'description', 'request_type', 'district', 'city'], ['title']),
+        searchRows('businesses', searchTerm, ['name', 'description', 'category', 'district', 'city'], ['name']),
+        searchRows('business_directory', searchTerm, ['name', 'description', 'category', 'district', 'city'], ['name']),
       ]);
 
       // Hide users I blocked (or who blocked me) from search results.
-      let visibleUsers = u.data || [];
+      let visibleUsers = (u.data as Row[]) || [];
       const myId = auth?.user?.id;
       if (myId) {
         const { data: blocks } = await supabase
@@ -49,24 +82,35 @@ export default function SearchPage() {
           .or(`blocker_id.eq.${myId},blocked_id.eq.${myId}`);
 
         const blocked = new Set<string>();
-        (blocks || []).forEach((b: any) => {
+        (blocks || []).forEach((b: Row) => {
           if (b.blocker_id === myId || b.blocked_id === myId) {
             blocked.add(b.blocker_id === myId ? b.blocked_id : b.blocker_id);
           }
         });
-        visibleUsers = visibleUsers.filter((p: any) => !blocked.has(p.id));
+        visibleUsers = visibleUsers.filter((p: Row) => !blocked.has(p.id));
       }
 
+      const shopIds = new Set(shopsA.map((s) => `${s.id}`));
       setResults({
         users: visibleUsers,
-        questions: q.data || [],
-        requests: r.data || []
+        questions: q,
+        requests: r,
+        shops: [...shopsA, ...shopsB.filter((s) => !shopIds.has(`${s.id}`))],
       });
     } catch (e) {
       console.log('Search error:', e);
     } finally {
       setLoading(false);
     }
+  };
+
+  const timeText = (createdAt?: string) => (createdAt ? relativeTime(createdAt) : '');
+
+  const metaText = (row: Row) => {
+    const parts = [areaLabel({ district: row.district, city: row.city })];
+    const when = timeText(row.created_at);
+    if (when) parts.push(when);
+    return parts.join(' · ');
   };
 
   const renderUser = (u: any) => (
@@ -90,7 +134,7 @@ export default function SearchPage() {
     </Pressable>
   );
 
-  const renderQuestion = (q: any) => (
+  const renderQuestion = (q: Row) => (
     <Pressable key={`q-${q.id}`} style={styles.postCard} onPress={() => router.push({ pathname: '/question', params: { id: q.id } })}>
       <View style={styles.cardHeader}>
         <View style={styles.iconBoxBlue}>
@@ -98,13 +142,17 @@ export default function SearchPage() {
         </View>
         <View style={styles.cardHeaderText}>
           <Text style={styles.cardTitle} numberOfLines={1}>{q.title}</Text>
-          <Text style={styles.cardAuthor}>الكاتب: {q.profiles?.display_name || 'مستخدم'}</Text>
+          <Text style={styles.cardAuthor} numberOfLines={1}>من {q.profiles?.display_name || 'جيران حيك'}</Text>
         </View>
+      </View>
+      <View style={styles.cardFooter}>
+        <Text style={styles.areaTag} numberOfLines={1}>{metaText(q)}</Text>
+        <Text style={styles.privacyTag}>موقع تقريبي — الحي فقط</Text>
       </View>
     </Pressable>
   );
 
-  const renderRequest = (r: any) => (
+  const renderRequest = (r: Row) => (
     <Pressable key={`r-${r.id}`} style={styles.postCard} onPress={() => router.push({ pathname: '/request', params: { id: r.id } })}>
       <View style={styles.cardHeader}>
         <View style={styles.iconBoxOrange}>
@@ -112,11 +160,47 @@ export default function SearchPage() {
         </View>
         <View style={styles.cardHeaderText}>
           <Text style={styles.cardTitle} numberOfLines={1}>{r.title}</Text>
-          <Text style={styles.cardAuthor}>بواسطة: {r.profiles?.display_name || 'مستخدم'}</Text>
+          <Text style={styles.cardAuthor} numberOfLines={1}>
+            {r.request_type || 'طلب مساعدة'} · {r.status === 'open' ? 'مفتوح' : r.status === 'accepted' ? 'تم القبول' : 'مغلق'}
+          </Text>
         </View>
+      </View>
+      <View style={styles.cardFooter}>
+        <Text style={styles.areaTag} numberOfLines={1}>{metaText(r)}</Text>
+        <Text style={styles.privacyTag}>موقع تقريبي — الحي فقط</Text>
       </View>
     </Pressable>
   );
+
+  const renderShop = (s: Row) => (
+    <Pressable key={`s-${s.id}`} style={styles.postCard} onPress={() => router.push({ pathname: '/business', params: { id: s.id } })}>
+      <View style={styles.cardHeader}>
+        <View style={styles.iconBoxTeal}>
+          <Store size={18} color="#0f766e" />
+        </View>
+        <View style={styles.cardHeaderText}>
+          <Text style={styles.cardTitle} numberOfLines={1}>{s.name || 'محل مسجّل'}</Text>
+          <Text style={styles.cardAuthor} numberOfLines={1}>
+            {[s.category, s.description].filter(Boolean).join(' · ') || 'محل وخدمات'}
+          </Text>
+        </View>
+      </View>
+      <View style={styles.cardFooter}>
+        <Text style={styles.areaTag} numberOfLines={1}>{metaText(s)}</Text>
+        {s.rating != null ? <Text style={styles.miniChip}>★ {Number(s.rating).toFixed(1)}</Text> : null}
+        {s.phone ? (
+          <Pressable
+            style={[styles.miniChip, { color: '#1d4ed8', backgroundColor: '#eff6ff' }]}
+            onPress={() => Linking.openURL(`tel:${s.phone}`)}
+          >
+            <Text style={[styles.miniChipText, { color: '#1d4ed8' }]}>{s.phone}</Text>
+          </Pressable>
+        ) : null}
+      </View>
+    </Pressable>
+  );
+
+  const total = results.users.length + results.questions.length + results.requests.length + results.shops.length;
 
   return (
     <View style={styles.container}>
@@ -158,6 +242,9 @@ export default function SearchPage() {
           </Pressable>
           <Pressable style={[styles.tab, activeTab === 'requests' && styles.tabActive]} onPress={() => setActiveTab('requests')}>
             <Text style={[styles.tabText, activeTab === 'requests' && styles.tabTextActive]}>طلبات</Text>
+          </Pressable>
+          <Pressable style={[styles.tab, activeTab === 'shops' && styles.tabActive]} onPress={() => setActiveTab('shops')}>
+            <Text style={[styles.tabText, activeTab === 'shops' && styles.tabTextActive]}>محلات</Text>
           </Pressable>
         </View>
       </View>
@@ -201,7 +288,18 @@ export default function SearchPage() {
               </View>
             )}
 
-            {results.users.length === 0 && results.questions.length === 0 && results.requests.length === 0 && (
+            {/* Shops Section */}
+            {(activeTab === 'all' || activeTab === 'shops') && results.shops.length > 0 && (
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>محلات وخدمات</Text>
+                  <View style={styles.badgeCount}><Text style={styles.badgeText}>{results.shops.length}</Text></View>
+                </View>
+                {results.shops.map(renderShop)}
+              </View>
+            )}
+
+            {total === 0 && (
               <View style={styles.empty}>
                 <View style={styles.emptyIconBg}>
                   <SearchIcon size={40} color="#cbd5e1" />
@@ -433,6 +531,53 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 16,
     marginLeft: 16,
+  },
+  iconBoxTeal: {
+    backgroundColor: '#ccfbf1',
+    padding: 12,
+    borderRadius: 16,
+    marginLeft: 16,
+  },
+  cardFooter: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+  },
+  areaTag: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#0f766e',
+    textAlign: 'right',
+  },
+  privacyTag: {
+    fontSize: 10.5,
+    fontWeight: '800',
+    color: '#b45309',
+    backgroundColor: '#fef3c7',
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    overflow: 'hidden',
+  },
+  miniChip: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#6b7280',
+    backgroundColor: '#f1f5f9',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    overflow: 'hidden',
+  },
+  miniChipText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#1d4ed8',
   },
   cardHeaderText: {
     flex: 1,

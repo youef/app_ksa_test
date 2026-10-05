@@ -1,17 +1,24 @@
-import { useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, TextInput, View, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { useState, useEffect } from 'react';
+import { Alert, Pressable, StyleSheet, Text, TextInput, View, KeyboardAvoidingView, Platform, ScrollView, Image } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
+import { getBrandingLogo, FALLBACK_LOGO_URI, subscribeBrandingLogo } from '@/lib/branding';
 import { C } from '@/lib/ui';
-import { Mail, Lock, User, ArrowRight } from 'lucide-react-native';
+import { Mail, Lock, User, ArrowRight, Compass } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 export default function Auth() {
+  const [logoUri, setLogoUri] = useState(FALLBACK_LOGO_URI);
   const [isLogin, setIsLogin] = useState(true);
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    getBrandingLogo().then(setLogoUri);
+    return subscribeBrandingLogo(setLogoUri);
+  }, []);
 
   async function submit() {
     if (!email.trim()) {
@@ -53,6 +60,12 @@ export default function Auth() {
       } else {
         const r = await supabase.auth.signInWithPassword({ email: email.trim(), password });
         if (r.error) throw r.error;
+
+        // Wait until Supabase has persisted the session before navigating.
+        // This prevents Expo Router from opening /home before auth state is available.
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) throw sessionError;
+        if (!sessionData.session?.user) throw new Error('تعذر حفظ جلسة الدخول، يرجى المحاولة مرة أخرى.');
         router.replace('/home');
       }
     } catch (e: any) {
@@ -88,9 +101,8 @@ export default function Auth() {
         >
           <View style={styles.heroContent}>
             <View style={styles.logoBox}>
-              <Text style={styles.logoText}>ح</Text>
+              <Image source={{ uri: logoUri }} style={styles.logoImage} resizeMode="contain" />
             </View>
-            <Text style={styles.title}>حيّنا</Text>
             <Text style={styles.subtitle}>الشبكة الاجتماعية لجيرانك ومجتمعك المحلي</Text>
           </View>
           <View style={styles.curveBottom} />
@@ -160,6 +172,15 @@ export default function Auth() {
             {!loading && <ArrowRight size={20} color="#fff" style={{ marginRight: 8 }} />}
           </Pressable>
 
+          <Pressable
+            style={styles.guestBtn}
+            onPress={() => router.replace('/home')}
+            accessibilityRole="button"
+          >
+            <Compass size={18} color={C.accent} />
+            <Text style={styles.guestBtnText}>الدخول كزائر</Text>
+          </Pressable>
+
           <View style={styles.switchWrapper}>
             <Text style={styles.switchLabel}>
               {isLogin ? 'ليس لديك حساب؟ ' : 'لديك حساب بالفعل؟ '}
@@ -213,16 +234,14 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'rgba(255,255,255,0.4)',
   },
+  logoImage: {
+    width: 62,
+    height: 62,
+  },
   logoText: {
     fontSize: 32,
     fontWeight: '900',
     color: '#fff',
-  },
-  title: {
-    fontSize: 42,
-    fontWeight: '900',
-    color: '#ffffff',
-    marginBottom: 8,
   },
   subtitle: {
     fontSize: 15,
@@ -312,6 +331,23 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '900',
     fontSize: 18,
+  },
+  guestBtn: {
+    minHeight: 48,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+    borderRadius: 14,
+    backgroundColor: '#f0fdf4',
+  },
+  guestBtnText: {
+    color: '#047857',
+    fontSize: 14,
+    fontWeight: '900',
   },
   switchWrapper: {
     flexDirection: 'row-reverse',

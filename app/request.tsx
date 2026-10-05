@@ -28,6 +28,11 @@ import {
   Clock,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import ScreenHeader from '@/components/shared/ScreenHeader';
+import { requireAccount } from '@/lib/authGate';
+import { getActiveLocation } from '@/lib/locationSync';
+import { areaLabel } from '@/lib/privacy';
+import { getCurrentDeviceLocation, reverseGeocodeDeviceLocation } from '@/lib/deviceLocation';
 
 export default function Request() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -38,16 +43,26 @@ export default function Request() {
   const [me, setMe] = useState('');
   const [loading, setLoading] = useState(true);
   const [submittingOffer, setSubmittingOffer] = useState(false);
+  const [sharingLocation, setSharingLocation] = useState(false);
+  const [convId, setConvId] = useState('');
 
   async function load() {
     if (!id) return;
     setLoading(true);
     try {
-      const { data: u } = await supabase.auth.getUser();
-      setMe(u.user?.id || '');
+      const { data: auth } = await supabase.auth.getSession();
+      const user = auth.session?.user ?? null;
+      setMe(user?.id || '');
 
-      const [rData, oData] = await Promise.all([
-        supabase.from('requests').select('*').eq('id', id).single(),
+      const requestPromise = user
+        ? supabase.from('requests').select('*').eq('id', id).maybeSingle()
+        : getActiveLocation().then(location => supabase.rpc('hayna_guest_request', {
+            p_id: id,
+            p_city: location.city,
+            p_district: location.district,
+          }));
+      const [requestResult, oData] = await Promise.all([
+        requestPromise,
         supabase
           .from('help_matches')
           .select('id, helper_id, message, status, created_at, profiles:helper_id(id, display_name, username, avatar_url, is_verified, district)')
@@ -55,18 +70,27 @@ export default function Request() {
           .order('created_at', { ascending: false }),
       ]);
 
-      if (rData.data) {
-        setRequest(rData.data);
-        if (rData.data.requester_id) {
+      const requestData = Array.isArray(requestResult.data) ? requestResult.data[0] : requestResult.data;
+      if (requestData) {
+        setRequest(requestData);
+        if (requestData.requester_id) {
           const { data: p } = await supabase
             .from('profiles')
             .select('id, display_name, username, avatar_url, is_verified, is_geoverified, city, district')
-            .eq('id', rData.data.requester_id)
+            .eq('id', requestData.requester_id)
             .single();
           setRequester(p);
         }
       }
       setOffers(oData.data ?? []);
+
+      const { data: conv } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('request_id', id)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      setConvId(conv?.[0]?.id || '');
     } catch (e) {
       console.warn('Load request error', e);
     } finally {
@@ -79,7 +103,7 @@ export default function Request() {
   }, [id]);
 
   async function sendOffer() {
-    if (!me) return router.push('/auth');
+    if (!me) return requireAccount('سجّل الدخول أو أنشئ حساباً لتقديم المساعدة.');
     if (me === request?.requester_id) return Alert.alert('تنبيه', 'أنت صاحب هذا الطلب.');
 
     setSubmittingOffer(true);
@@ -142,6 +166,34 @@ export default function Request() {
     }
   }
 
+  async function shareExactLocation() {
+    if (sharingLocation || !me) return;
+    if (!convId) return Alert.alert('لا توجد محادثة', 'اقبل عرض المساعدة أولاً لتتمكن من إرسال موقعك بالخاص.');
+
+    setSharingLocation(true);
+    try {
+      const location = await getCurrentDeviceLocation();
+      if (!location) {
+        Alert.alert('تعذّر تحديد الموقع', 'اسمح للتطبيق بالوصول إلى الموقع ثم أعد المحاولة.');
+        return;
+      }
+      const place = await reverseGeocodeDeviceLocation(location);
+      const label = place?.district || place?.city || 'موقعي الحالي';
+      const { error } = await supabase.from('messages').insert({
+        conversation_id: convId,
+        sender_id: me,
+        body: JSON.stringify({ type: 'location', lat: location.latitude, lng: location.longitude, label }),
+        read_by: [me],
+      });
+      if (error) throw error;
+      router.push({ pathname: '/conversation', params: { id: convId } });
+    } catch (e: any) {
+      Alert.alert('تعذّر إرسال الموقع', e?.message || 'حدث خطأ أثناء إرسال الموقع');
+    } finally {
+      setSharingLocation(false);
+    }
+  }
+
   async function deleteRequest() {
     if (me !== request?.requester_id) return;
     Alert.alert('تأكيد الحذف', 'هل أنت متأكد من حذف هذا الطلب؟', [
@@ -193,18 +245,18 @@ export default function Request() {
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
         >
-          <View style={styles.navBar}>
-            <Pressable onPress={() => router.back()} style={styles.iconBtn}>
-              <ChevronRight size={28} color="#fff" />
-            </Pressable>
-            <Text style={styles.navTitle}>تفاصيل طلب الفزعة</Text>
-            <Pressable
-              onPress={() => router.push({ pathname: '/report', params: { type: 'request', id: request.id } })}
-              style={styles.iconBtn}
-            >
-              <Flag size={20} color="#fff" />
-            </Pressable>
-          </View>
+          <ScreenHeader
+            title="تفاصيل طلب الفزعة"
+            fallbackRoute="/requests"
+            rightAction={(
+              <Pressable
+                onPress={() => router.push({ pathname: '/report', params: { type: 'request', id: request.id } })}
+                style={styles.iconBtn}
+              >
+                <Flag size={20} color="#fff" />
+              </Pressable>
+            )}
+          />
 
           <View style={styles.heroContent}>
             <View style={styles.heroBadgeRow}>
@@ -231,9 +283,12 @@ export default function Request() {
             <View style={styles.metaRow}>
               <MapPin size={13} color="#fff" />
               <Text style={styles.metaText}>
-                {request.city || 'السعودية'}{request.district ? ` · حي ${request.district}` : ''}
+                {areaLabel({ district: request.district, city: request.city })}
               </Text>
             </View>
+            <Text style={styles.heroPrivacy}>
+              الموقع معروض على مستوى الحي فقط · الإحداثي الدقيق يُرسل بالمحادثة الخاصة
+            </Text>
           </View>
         </LinearGradient>
 
@@ -309,13 +364,35 @@ export default function Request() {
                       <Text style={styles.acceptBtnText}>قبول العرض وفتح المحادثة 💬</Text>
                     </Pressable>
                   )}
+                  {o.status === 'accepted' && convId && (
+                    <View style={styles.offerActionsRow}>
+                      <Pressable style={styles.openChatBtn} onPress={() => router.push({ pathname: '/conversation', params: { id: convId } })}>
+                        <MessageSquare size={15} color="#047857" />
+                        <Text style={styles.openChatBtnText}>فتح المحادثة</Text>
+                      </Pressable>
+                      {isOwner && (
+                        <Pressable
+                          style={[styles.shareLocationBtn, sharingLocation && { opacity: 0.6 }]}
+                          onPress={shareExactLocation}
+                          disabled={sharingLocation}
+                        >
+                          {sharingLocation ? (
+                            <ActivityIndicator size="small" color="#fff" />
+                          ) : (
+                            <MapPin size={15} color="#fff" />
+                          )}
+                          <Text style={styles.shareLocationBtnText}>إرسال موقعي الدقيق (خاص)</Text>
+                        </Pressable>
+                      )}
+                    </View>
+                  )}
                 </View>
               ))
             )}
           </View>
 
           {/* Help Form (For non-owners if request is open) */}
-          {!isOwner && request.status === 'open' && (
+          {!isOwner && request.status === 'open' && me && (
             <View style={styles.offerFormCard}>
               <Text style={styles.offerFormTitle}>تقديم فزعة ومساعدة 🤝</Text>
               <Text style={styles.offerFormSub}>اكتب رسالة سريعة لصاحب الطلب لتخبره كيف تقدر تساعده.</Text>
@@ -345,6 +422,13 @@ export default function Request() {
             </View>
           )}
 
+          {!me && request.status === 'open' && (
+            <Pressable style={styles.guestOfferPrompt} onPress={() => requireAccount('سجّل الدخول أو أنشئ حساباً لتقديم المساعدة لأهل الحي.')}>
+              <Text style={styles.guestOfferPromptText}>سجّل الدخول لتقديم المساعدة</Text>
+              <HeartHandshake size={18} color="#047857" />
+            </Pressable>
+          )}
+
           {/* Owner Delete Button */}
           {isOwner && (
             <Pressable style={styles.deleteBtn} onPress={deleteRequest}>
@@ -361,6 +445,14 @@ export default function Request() {
 }
 
 const styles = StyleSheet.create({
+  heroPrivacy: { color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: '700', marginTop: 6, textAlign: 'right' },
+  offerActionsRow: { flexDirection: 'row-reverse', gap: 8, marginTop: 10 },
+  openChatBtn: { flex: 1, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#ecfdf5', borderRadius: 12, paddingVertical: 10 },
+  openChatBtnText: { color: '#047857', fontWeight: '800', fontSize: 12.5 },
+  shareLocationBtn: { flex: 1, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#0f766e', borderRadius: 12, paddingVertical: 10 },
+  shareLocationBtnText: { color: '#fff', fontWeight: '800', fontSize: 12.5 },
+  guestOfferPrompt: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 48, padding: 12, marginTop: 12, borderRadius: 12, backgroundColor: '#ecfdf5' },
+  guestOfferPromptText: { color: '#047857', fontSize: 13, fontWeight: '900' },
   container: {
     flex: 1,
     backgroundColor: '#f8fafc',
@@ -397,7 +489,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   hero: {
-    paddingTop: Platform.OS === 'ios' ? 52 : 36,
+    paddingTop: Platform.OS === 'ios' ? 52 : 40,
     paddingHorizontal: 20,
     paddingBottom: 28,
     borderBottomLeftRadius: 30,

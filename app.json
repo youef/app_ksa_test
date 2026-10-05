@@ -10,29 +10,54 @@
     "plugins": [
       "expo-router",
       "@maplibre/maplibre-react-native",
-      ["expo-image-picker", {
-        "photosPermission": "يحتاج حيّنا الوصول إلى صورك لاختيار صورة الملف الشخصي.",
-        "cameraPermission": "يحتاج حيّنا الكاميرا لالتقاط صورة الملف الشخصي.",
-        "microphonePermission": false
-      }],
-      ["expo-notifications", {
-        "defaultChannel": "default"
-      }]
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "يحتاج حيّنا الوصول إلى صورك لاختيار صورة الملف الشخصي.",
+          "cameraPermission": "يحتاج حيّنا الكاميرا لالتقاط صورة الملف الشخصي.",
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "defaultChannel": "default"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "يحتاج حيّنا إلى موقعك لإظهار موقعك على الخريطة وتخصيص الحي."
+        }
+      ]
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "sa.hayna.app"
+      "bundleIdentifier": "sa.hayna.app",
+      "icon": "./public/brand/HAYNA_LOGO.png"
     },
     "android": {
-      "package": "sa.hayna.app"
+      "package": "sa.hayna.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./public/brand/HAYNA_LOGO.png",
+        "backgroundColor": "#065f46"
+      },
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "bundler": "metro",
-      "output": "single"
+      "output": "single",
+      "favicon": "./public/brand/HAYNA_LOGO.png"
     },
+    "owner": "yousefalhazmi",
+    "icon": "./public/brand/HAYNA_LOGO.png",
     "extra": {
+      "router": {},
       "eas": {
-        "projectId": "5228885c-729d-4f4a-935d-06662dfd4beb"
+        "projectId": "f8205dc7-21de-46d3-aa97-57f2249a81ed"
       }
     }
   }

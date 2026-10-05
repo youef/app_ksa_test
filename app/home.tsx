@@ -1,1577 +1,376 @@
-import { useCallback, useState, useEffect, useRef } from 'react'
-import { Pressable, RefreshControl, ScrollView, Text, View, Image, StyleSheet, Dimensions, Platform, Animated, TextInput, Alert } from 'react-native'
-import { router, useFocusEffect } from 'expo-router'
-import { supabase } from '@/lib/supabase'
-import { LinearGradient } from 'expo-linear-gradient'
-import { MessageCircle, Truck, MapPin, Briefcase, Plus, Sparkles, Map, Bell, Search, Flame, CloudSun, User, Mic, ChevronDown, Wrench, ShieldCheck, Camera, RefreshCw, X } from 'lucide-react-native'
-import BottomNav from '@/components/BottomNav'
-import LocationSelectorModal from '@/components/LocationSelectorModal'
-import { useDynamicIsland } from '@/context/DynamicIslandContext'
-import { getActiveLocation, setActiveLocation, savePermanentMyLocation, subscribeLocation, isExactDistrictMatching, isAllKingdom } from '@/lib/locationSync'
-import TwitterInquiryCard from '@/components/TwitterInquiryCard'
-import { CurrentWeather, describeWeatherCode, loadCurrentWeather } from '@/lib/weather'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Animated, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { router } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Flame, Plus } from 'lucide-react-native';
 
-const { width } = Dimensions.get('window');
+import { supabase } from '@/lib/supabase';
+import { getBrandingLogo, subscribeBrandingLogo } from '@/lib/branding';
+import { isLocationMatching, savePermanentMyLocation, type HaynaLocation } from '@/lib/locationSync';
+import {
+  getGreeting,
+  isEmergencyQuestion,
+  isToolQuestion,
+  normalizeSearchText,
+  toFeed,
+  type FeedItem,
+  type HomeTab,
+} from '@/lib/homeUtils';
+import { useDynamicIsland } from '@/context/DynamicIslandContext';
+import { useHomeFeed } from '@/hooks/useHomeFeed';
+import { useHomeLocation } from '@/hooks/useHomeLocation';
+import { useBottomNavInset } from '@/lib/bottomNav';
+import LocationSelectorModal from '@/components/LocationSelectorModal';
+import TwitterInquiryCard from '@/components/TwitterInquiryCard';
+import HomeHero from '@/components/home/HomeHero';
+import AtmosphereBar from '@/components/home/AtmosphereBar';
+import StoriesRow from '@/components/home/StoriesRow';
+import ServicesGrid from '@/components/home/ServicesGrid';
+import FeedTabs from '@/components/home/FeedTabs';
+import EmptyState from '@/components/home/EmptyState';
+import { FeedSkeleton, ErrorBanner } from '@/components/home/HomeStates';
+import { LocationGateModal, WeeklyLocationPrompt } from '@/components/home/LocationModals';
+import { styles } from '@/components/home/homeStyles';
+import { requireAccount } from '@/lib/authGate';
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 export default function Home() {
+  const bottomNavInset = useBottomNavInset();
   const { showIsland } = useDynamicIsland();
-  const [profile, setProfile] = useState<any>(null);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [questions, setQuestions] = useState<any[]>([]);
-  const [requests, setRequests] = useState<any[]>([]);
-  const [stories, setStories] = useState<any[]>([]);
-  const [refreshing, setRefreshing] = useState(false);
-  const [newPostsCount, setNewPostsCount] = useState(0);
-  const [activeTab, setActiveTab] = useState<'all' | 'emergency' | 'tools' | 'questions' | 'requests' | 'mine'>('all');
-  const [greeting, setGreeting] = useState('');
+  const showToast = useCallback((msg: string) => showIsland(msg, undefined, 'success'), [showIsland]);
+
+  const [logoUri, setLogoUri] = useState('/brand/HAYNA_LOGO.png?v=2');
+  const [activeTab, setActiveTab] = useState<HomeTab>('all');
   const [searchQuery, setSearchQuery] = useState('');
-
-  // Location filter state
-  const [selectedRegion, setSelectedRegion] = useState('كل المملكة');
-  const [selectedCity, setSelectedCity] = useState('كل المدن');
-  const [selectedDistrict, setSelectedDistrict] = useState('كل الأحياء');
-  const [currentWeather, setCurrentWeather] = useState<CurrentWeather | null>(null);
-  const [weatherLoading, setWeatherLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
+  const [greeting] = useState(() => getGreeting());
 
+  // The feed hook resolves the saved location; the location hook owns it.
+  // A ref breaks the circular dependency between the two hooks.
+  const applyLocationRef = useRef<(loc: HaynaLocation) => void>(() => {});
+  const feed = useHomeFeed({ onLocation: loc => applyLocationRef.current(loc) });
+  const loc = useHomeLocation({ setProfile: feed.setProfile, showToast });
+  applyLocationRef.current = loc.apply;
 
-  // Unread badge count
-  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
-
-  // Toast feedback state
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const toastAnim = useRef(new Animated.Value(0)).current;
-
-  // Animation for FAB
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-
-  const showToast = useCallback((msg: string) => {
-    showIsland(msg, undefined, 'success');
-  }, [showIsland]);
+  const { setSetupOpen } = loc;
+  useEffect(() => {
+    setSetupOpen(feed.locationIncomplete);
+  }, [feed.locationIncomplete, setSetupOpen]);
 
   useEffect(() => {
-    let active = true;
-    const updateWeather = async () => {
-      setWeatherLoading(true);
-      try {
-        const weather = await loadCurrentWeather(selectedRegion, selectedCity, selectedDistrict);
-        if (active) setCurrentWeather(weather);
-      } catch (error) {
-        console.warn('Weather update failed', error);
-        if (active) setCurrentWeather(null);
-      } finally { if (active) setWeatherLoading(false); }
-    };
-    updateWeather();
-    const interval = setInterval(updateWeather, 30 * 60 * 1000);
-    return () => { active = false; clearInterval(interval); };
-  }, [selectedRegion, selectedCity, selectedDistrict]);
-
-  useEffect(() => {
-    const hour = new Date().getHours();
-    if (hour < 12) setGreeting('صباح الخير');
-    else setGreeting('مساء الخير');
-
-    // Subscribe to global location sync
-    getActiveLocation().then((loc) => {
-      setSelectedRegion(loc.region);
-      setSelectedCity(loc.city);
-      setSelectedDistrict(loc.district);
-    });
-
-    const unsub = subscribeLocation((loc) => {
-      setSelectedRegion(loc.region);
-      setSelectedCity(loc.city);
-      setSelectedDistrict(loc.district);
-    });
-
-    // Start FAB Pulse
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.05, duration: 1000, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: true })
-      ])
-    ).start();
-
-    return unsub;
+    getBrandingLogo().then(setLogoUri);
+    return subscribeBrandingLogo(setLogoUri);
   }, []);
 
-  const load = useCallback(async () => {
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) return router.replace('/auth');
-    setCurrentUserId(u.user.id);
+  // FAB pulse (stopped on unmount)
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.05, duration: 1000, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulseAnim]);
 
-    // Fetch profile
-    const { data: profileData } = await supabase.from('profiles').select('*').eq('id', u.user.id).maybeSingle();
-    setProfile(profileData);
-
-    // If user has a city in profile and selectedCity is still default, auto-populate globally
-    if (profileData?.city) {
-      const active = await getActiveLocation();
-      if (isAllKingdom(active.city)) {
-        await setActiveLocation('المملكة', profileData.city, profileData.district || 'كل الأحياء', false);
-      }
-    }
-
-    // Fetch unread notifications
-    const { count: nc } = await supabase
-      .from('notifications')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', u.user.id)
-      .is('read_at', null);
-    setUnreadNotifCount(nc ?? 0);
-
-    // Fetch stories (active, last 24h) filtered by same city/district and deduplicate by author
-    const loc = await getActiveLocation();
-    let storiesQuery = supabase
-      .from('stories')
-      .select('*, profiles:author_id(id, display_name, username, avatar_url, is_verified, is_geoverified, city, district)')
-      .gt('expires_at', new Date().toISOString())
-      .order('created_at', { ascending: false })
-      .limit(30);
-
-    const { data: storiesData } = await storiesQuery;
-
-    const seenStoryAuthors = new Set<string>();
-    const uniqueStories = (storiesData ?? []).filter((s: any) => {
-      if (!s.author_id || seenStoryAuthors.has(s.author_id)) return false;
-      // Filter by location: show stories from same district or city
-      const authorCity = s.profiles?.city || '';
-      const authorDistrict = s.profiles?.district || '';
-      const activeCity = loc.city;
-      const activeDistrict = loc.district;
-      // If location is set (not 'all kingdom'), filter by city at minimum
-      if (!isAllKingdom(activeCity)) {
-        if (activeCity && authorCity && authorCity !== activeCity) return false;
-        // If district is also set, filter by district too
-        if (activeDistrict && activeDistrict !== 'كل الأحياء' && authorDistrict && authorDistrict !== activeDistrict) return false;
-      }
-      seenStoryAuthors.add(s.author_id);
-      return true;
-    });
-    setStories(uniqueStories);
-
-    // Fetch questions and deduplicate by title
-    const { data: qData, error: qErr } = await supabase
-      .from('questions')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(30);
-
-    if (qErr) console.log('questions error:', qErr.message);
-
-    if (qData && qData.length > 0) {
-      const seenTitles = new Set<string>();
-      const uniqueQData = qData.filter((q: any) => {
-        const t = (q.title || '').trim().toLowerCase();
-        if (seenTitles.has(t)) return false;
-        seenTitles.add(t);
-        return true;
-      });
-
-      const authorIds = [...new Set(uniqueQData.map((q: any) => q.author_id).filter(Boolean))];
-      const qIds = uniqueQData.map((q: any) => q.id);
-
-      // Fetch profiles of question authors and answers in parallel
-      const [profilesRes, answersRes] = await Promise.all([
-        supabase.from('profiles').select('*').in('id', authorIds),
-        supabase.from('answers').select('*').in('question_id', qIds).order('created_at', { ascending: true })
-      ]);
-
-      const profileMap = (profilesRes.data || []).reduce((acc: any, p: any) => ({ ...acc, [p.id]: p }), {});
-
-      // Fetch profiles of answer authors
-      const answerAuthorIds = [...new Set((answersRes.data || []).map((a: any) => a.author_id).filter(Boolean))];
-      let ansProfileMap: Record<string, any> = {};
-      if (answerAuthorIds.length > 0) {
-        const { data: ansProfiles } = await supabase.from('profiles').select('*').in('id', answerAuthorIds);
-        ansProfileMap = (ansProfiles || []).reduce((acc: any, p: any) => ({ ...acc, [p.id]: p }), {});
+  // ---------- Quick reply ----------
+  const handleQuickReply = useCallback(
+    async (questionId: string, text: string) => {
+      const body = text.trim();
+      if (!body) return;
+      if (!feed.currentUserId) {
+        requireAccount('سجّل الدخول أو أنشئ حساباً للمشاركة بالرد في مجتمع حيك.');
+        return;
       }
 
-      // Group answers by question_id
-      const answersByQ: Record<string, any[]> = {};
-      (answersRes.data || []).forEach((ans: any) => {
-        ans.profiles = ansProfileMap[ans.author_id] || null;
-        if (!answersByQ[ans.question_id]) answersByQ[ans.question_id] = [];
-        answersByQ[ans.question_id].push(ans);
-      });
+      const { data: auth } = await supabase.auth.getSession();
+      const user = auth.session?.user;
+      if (!user) return requireAccount('انتهت الجلسة. يرجى تسجيل الدخول مجدداً.');
 
-      setQuestions(uniqueQData.map((q: any) => ({
-        ...q,
-        profiles: profileMap[q.author_id] || null,
-        answers: answersByQ[q.id] || [],
-        answers_count: (answersByQ[q.id] || []).length,
-      })));
-    } else {
-      setQuestions([]);
-    }
+      const { data: newAns, error } = await supabase
+        .from('answers')
+        .insert({ question_id: questionId, author_id: user.id, body })
+        .select('*')
+        .single();
 
-    // Fetch requests and deduplicate by title
-    const { data: rData, error: rErr } = await supabase
-      .from('requests')
-      .select('*')
-      .eq('status', 'open')
-      .order('created_at', { ascending: false })
-      .limit(25);
-
-    if (rErr) console.log('requests error:', rErr.message);
-
-    if (rData && rData.length > 0) {
-      const seenReqTitles = new Set<string>();
-      const uniqueRData = rData.filter((r: any) => {
-        const t = (r.title || '').trim().toLowerCase();
-        if (seenReqTitles.has(t)) return false;
-        seenReqTitles.add(t);
-        return true;
-      });
-
-      const requesterIds = [...new Set(uniqueRData.map((r: any) => r.requester_id).filter(Boolean))];
-      const { data: rProfiles } = await supabase.from('profiles').select('*').in('id', requesterIds);
-      const profileMap = (rProfiles || []).reduce((acc: any, p: any) => ({ ...acc, [p.id]: p }), {});
-      setRequests(uniqueRData.map((r: any) => ({ ...r, profiles: profileMap[r.requester_id] || null })));
-    } else {
-      setRequests([]);
-    }
-  }, [selectedCity]);
-
-  useFocusEffect(useCallback(() => { load() }, [load]));
-
-  // Inline Quick Reply Handler
-  const handleQuickReplySubmit = async (questionId: string, text: string) => {
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) {
-      Alert.alert('تنبيه', 'يرجى تسجيل الدخول أولاً للرد');
-      return;
-    }
-
-    const { data: newAns, error } = await supabase
-      .from('answers')
-      .insert({
-        question_id: questionId,
-        author_id: u.user.id,
-        body: text.trim()
-      })
-      .select('*')
-      .single();
-
-    if (error) {
-      Alert.alert('خطأ', 'تعذر إرسال الرد: ' + error.message);
-      return;
-    }
-
-    // Optimistic local state update
-    newAns.profiles = profile;
-    setQuestions(prev => prev.map(q => {
-      if (q.id === questionId) {
-        const updatedAnswers = [...(q.answers || []), newAns];
-        return {
-          ...q,
-          answers: updatedAnswers,
-          answers_count: updatedAnswers.length,
-        };
+      if (error || !newAns) {
+        Alert.alert('خطأ', 'تعذر إضافة الرد: ' + (error?.message ?? 'حدث خطأ غير متوقع'));
+        return;
       }
-      return q;
-    }));
 
-    showToast('تم نشر ردك بنجاح في المحادثة');
-  };
-
-  // Filter questions and requests by selected Saudi region / city / district strictly
-  const normalizedSearch = normalizeSearchText(searchQuery);
-  const matchesSearch = (values: unknown[]) => !normalizedSearch || values.some(value => normalizeSearchText(value).includes(normalizedSearch));
-
-  const filteredQuestions = questions.filter(q => {
-    if (!matchesSearch([q.title, q.body, q.profiles?.display_name, q.profiles?.username, q.city, q.district, q.category])) return false;
-    return isExactDistrictMatching(q, selectedCity, selectedDistrict);
-  });
-
-  const filteredRequests = requests.filter(r => {
-    if (!matchesSearch([r.title, r.description, r.profiles?.display_name, r.profiles?.username, r.city, r.district, r.category])) return false;
-    return isExactDistrictMatching(r, selectedCity, selectedDistrict);
-  });
-
-  // Mine filter: user's own questions and requests
-  const myQuestions = questions.filter(q => q.author_id === currentUserId);
-  const myRequests = requests.filter(r => r.requester_id === currentUserId);
-  const filteredMyQuestions = myQuestions.filter(q => matchesSearch([q.title, q.body, q.profiles?.display_name, q.profiles?.username, q.city, q.district, q.category]));
-  const filteredMyRequests = myRequests.filter(r => matchesSearch([r.title, r.description, r.profiles?.display_name, r.profiles?.username, r.city, r.district, r.category]));
-
-  // Emergency & Tools categorization
-  const emergencyQuestions = filteredQuestions.filter(
-    q => q.is_emergency || q.urgency_level === 'emergency' || (q.title && (q.title.includes('مفقود') || q.title.includes('طارئ') || q.title.includes('حادث')))
+      const answer = { ...newAns, profiles: feed.profile };
+      feed.setQuestions(prev =>
+        prev.map(q => {
+          if (q.id !== questionId) return q;
+          const answers = [...(q.answers || []), answer];
+          return { ...q, answers, answers_count: answers.length };
+        }),
+      );
+      showToast('تم نشر الرد بنجاح في المحادثة');
+    },
+    [feed.profile, feed.setQuestions, showToast],
   );
 
-  const toolQuestions = filteredQuestions.filter(
-    q => q.is_tool_sharing || q.item_type === 'tool_sharing' || (q.title && (q.title.includes('إعارة') || q.title.includes('دريل') || q.title.includes('سلم')))
+  // ---------- Filtering ----------
+  const q = normalizeSearchText(searchQuery);
+  const searching = q.length > 0;
+  const { matchesLocation } = loc;
+
+  const matches = useCallback(
+    (values: unknown[]) => !q || values.some(v => normalizeSearchText(v).includes(q)),
+    [q],
   );
+  const matchesVisibleLocation = useCallback(
+    (item: { city?: string | null; district?: string | null }) => feed.currentUserId
+      ? matchesLocation(item)
+      : isLocationMatching(item, loc.city, loc.district),
+    [feed.currentUserId, loc.city, loc.district, matchesLocation],
+  );
+
+  const { questions, requests, currentUserId } = feed;
+
+  const derived = useMemo(() => {
+    const qSearch = (x: any) =>
+      matches([x.title, x.body, x.profiles?.display_name, x.profiles?.username, x.city, x.district, x.category]);
+    const rSearch = (x: any) =>
+      matches([x.title, x.description, x.profiles?.display_name, x.profiles?.username, x.city, x.district, x.category]);
+
+    const filteredQuestions = questions.filter(x => qSearch(x) && matchesVisibleLocation(x));
+    const filteredRequests = requests.filter(x => rSearch(x) && matchesVisibleLocation(x));
+    const myQuestions = questions.filter(x => x.author_id === currentUserId);
+    const myRequests = requests.filter(x => x.requester_id === currentUserId);
+
+    return {
+      filteredQuestions,
+      filteredRequests,
+      myCount: myQuestions.length + myRequests.length,
+      filteredMyQuestions: myQuestions.filter(qSearch),
+      filteredMyRequests: myRequests.filter(rSearch),
+      emergency: filteredQuestions.filter(isEmergencyQuestion),
+      tools: filteredQuestions.filter(isToolQuestion),
+    };
+  }, [questions, requests, currentUserId, matches, matchesVisibleLocation]);
+
+  const items: FeedItem[] = useMemo(() => {
+    switch (activeTab) {
+      case 'emergency': return toFeed(derived.emergency, []);
+      case 'tools': return toFeed(derived.tools, []);
+      case 'questions': return toFeed(derived.filteredQuestions, []);
+      case 'requests': return toFeed([], derived.filteredRequests);
+      case 'mine': return toFeed(derived.filteredMyQuestions, derived.filteredMyRequests);
+      default: return toFeed(derived.filteredQuestions, derived.filteredRequests);
+    }
+  }, [activeTab, derived]);
+
+  // Real activity: distinct neighbours who posted in the visible area during the last 24h.
+  const activeNeighbors = useMemo(() => {
+    const since = Date.now() - DAY_MS;
+    const ids = new Set<string>();
+    derived.filteredQuestions.forEach(x => new Date(x.created_at).getTime() > since && ids.add(x.author_id));
+    derived.filteredRequests.forEach(x => new Date(x.created_at).getTime() > since && ids.add(x.requester_id));
+    feed.stories.forEach(s => s.author_id && ids.add(s.author_id));
+    return ids.size;
+  }, [derived.filteredQuestions, derived.filteredRequests, feed.stories]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await feed.reload();
+    setRefreshing(false);
+  }, [feed.reload]);
+
+  const handleLocationSelect = useCallback(
+    (region: string, city: string, district: string) => {
+      const selection = { region, city, district };
+      loc.apply(selection);
+      const incomplete =
+        !region || !city || !district ||
+        city === 'كل المدن' || district === 'كل الأحياء' || district === 'كل أحياء المدينة';
+      void savePermanentMyLocation(selection, Boolean(feed.currentUserId && !incomplete));
+      if (incomplete) {
+        showToast('تم حفظ موقعك بنجاح. تصفح أخبار وخدمات حيك الآن');
+        return;
+      }
+    },
+    [feed.currentUserId, loc.apply, showToast],
+  );
+
+  const emergencyTop = derived.emergency[0];
 
   return (
     <View style={styles.container}>
+      <LocationGateModal
+        visible={loc.setupOpen}
+        busy={loc.setupBusy}
+        message={loc.setupMessage}
+        region={loc.region}
+        city={loc.city}
+        district={loc.district}
+        hasExactLocation={loc.hasExactLocation}
+        onSetupLocation={loc.setupRequiredLocation}
+        onEnableNotifications={loc.enableNotifications}
+      />
 
-      {/* Twitter-style new posts indicator */}
-      {newPostsCount > 0 && !refreshing && (
-        <Pressable
-          style={styles.newPostsBanner}
-          onPress={async () => {
-            setNewPostsCount(0);
-            setRefreshing(true);
-            await load();
-            setRefreshing(false);
-          }}
-        >
-          <RefreshCw size={14} color="#fff" />
-          <Text style={styles.newPostsBannerText}>
-            {newPostsCount} استفسار جديد · اسحب للتحديث
-          </Text>
-        </Pressable>
-      )}
+      <WeeklyLocationPrompt
+        visible={Boolean(feed.currentUserId && loc.promptVisible && !loc.setupOpen)}
+        onAllow={loc.acceptWeeklyCheck}
+        onLater={loc.snoozePrompt}
+      />
 
-      <ScrollView 
+      <ScrollView
         style={styles.container}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
         refreshControl={
-          <RefreshControl 
-            refreshing={refreshing} 
-            onRefresh={async () => { 
-              setRefreshing(true);
-              setNewPostsCount(0);
-              await load(); 
-              setRefreshing(false); 
-            }} 
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
             tintColor="#059669"
             colors={['#059669']}
             progressBackgroundColor="#ecfdf5"
           />
         }
       >
-        {/* ======================================================== */}
-        {/* 1. ULTRA-SLEEK MODERN HEADER                            */}
-        {/* ======================================================== */}
-        <LinearGradient 
-          colors={['#065f46', '#059669', '#10b981']} 
-          start={{ x: 0, y: 0 }} 
-          end={{ x: 1, y: 1 }}
-          style={styles.hero}
-        >
-          {/* Top Bar: Brand, Location Select, Weather & Notification + Avatar */}
-          <View style={styles.topNavRow}>
-            {/* Left side actions (Notifications & Profile Avatar) */}
-            <View style={styles.leftActions}>
-              <Pressable onPress={() => router.push('/profile')} style={styles.avatarWrap}>
-                {profile?.avatar_url ? (
-                  <Image source={{ uri: profile.avatar_url }} style={styles.avatarImg} />
-                ) : (
-                  <View style={styles.avatarPlaceholder}>
-                    <Text style={styles.avatarLetter}>{profile?.display_name?.[0] || 'ح'}</Text>
-                  </View>
-                )}
-                {profile?.is_geoverified && (
-                  <View style={styles.avatarVerifiedBadge}>
-                    <ShieldCheck size={10} color="#fff" />
-                  </View>
-                )}
-              </Pressable>
+        <HomeHero
+          profile={feed.profile}
+          isGuest={!feed.currentUserId}
+          logoUri={logoUri}
+          greeting={greeting}
+          unreadCount={feed.unreadNotifCount}
+          city={loc.city}
+          district={loc.district}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          onOpenLocation={() => setShowLocationModal(true)}
+        />
 
-              <Pressable onPress={() => router.push('/notifications')} style={styles.iconCircleBtn}>
-                <Bell size={20} color="#fff" />
-                {unreadNotifCount > 0 && (
-                  <View style={styles.notifBadge}>
-                    <Text style={styles.notifBadgeText}>{unreadNotifCount > 9 ? '9+' : unreadNotifCount}</Text>
-                  </View>
-                )}
-              </Pressable>
-            </View>
+        <AtmosphereBar
+          weather={loc.weather}
+          weatherLoading={loc.weatherLoading}
+          activeNeighbors={activeNeighbors}
+          emergencyCount={derived.emergency.length}
+        />
 
-            {/* Right side: App Brand & Location Selector */}
-            <View style={styles.brandAndLocation}>
-              <View style={styles.brandTitleRow}>
-                <Text style={styles.heroBrandTitle}>حيّنا</Text>
-              </View>
+        {feed.currentUserId && <StoriesRow profile={feed.profile} stories={feed.stories} selectedDistrict={loc.district} />}
 
-              {/* Location Selector Pill */}
-              <Pressable
-                style={styles.locationSelectorPill}
-                onPress={() => setShowLocationModal(true)}
-              >
-                <ChevronDown size={14} color="#a7f3d0" />
-                <Text style={styles.locationSelectorText} numberOfLines={1}>
-                  {selectedCity === 'كل المدن'
-                    ? 'كل مناطق المملكة'
-                    : `${selectedCity}${selectedDistrict !== 'كل الأحياء' ? ` · حي ${selectedDistrict}` : ''}`}
-                </Text>
-                <MapPin size={13} color="#6ee7b7" />
-              </Pressable>
-            </View>
-          </View>
-
-          {/* Search Bar */}
-          <View style={styles.searchBarContainer}>
-            <View style={styles.searchBar}>
-              <Search size={20} color="#94a3b8" />
-              <TextInput 
-                placeholder="ابحث عن استفسار أو طلب أو اسم جار..."
-                placeholderTextColor="#94a3b8"
-                style={styles.searchInput}
-                accessibilityLabel="البحث في الاستفسارات والطلبات وأسماء الجيران"
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                returnKeyType="search"
-              />
-              {searchQuery.length > 0 ? (
-                <Pressable onPress={() => setSearchQuery('')} style={styles.clearSearchBtn} accessibilityRole="button" accessibilityLabel="مسح البحث">
-                  <X size={17} color="#64748b" />
-                </Pressable>
-              ) : (
-                <Pressable style={styles.micBtn} onPress={() => router.push('/questions')}>
-                  <Mic size={17} color="#059669" />
-                </Pressable>
-              )}
-            </View>
-          </View>
-        </LinearGradient>
-
-        {/* ======================================================== */}
-        {/* 1.5 LIVE NEIGHBORHOOD ATMOSPHERE BAR (أجواء ونبض الحي)     */}
-        {/* ======================================================== */}
-        <View style={styles.atmosphereBar}>
-          <View style={styles.atmoItem}>
-            <CloudSun size={15} color="#059669" />
-            <Text style={styles.atmoText} numberOfLines={1}>
-              {currentWeather ? `${Math.round(currentWeather.temperature)}°C · ${describeWeatherCode(currentWeather.weatherCode)} · ${currentWeather.locationName}` : weatherLoading ? 'جارٍ جلب الطقس الحالي...' : 'الطقس غير متاح حالياً'}
-            </Text>
-          </View>
-          <View style={styles.atmoDivider} />
-          <View style={styles.atmoItem}>
-            <Flame size={15} color="#f59e0b" />
-            <Text style={styles.atmoText}>42 جار نشط الآن</Text>
-          </View>
-          <View style={styles.atmoDivider} />
-          <View style={styles.atmoItem}>
-            <ShieldCheck size={15} color="#059669" />
-            <Text style={styles.atmoText}>حي آمن ومترابط</Text>
-          </View>
-        </View>
-
-        {/* ======================================================== */}
-        {/* 2. NEIGHBORHOOD STORIES (يوميات ومحطات الحي الفخمة)        */}
-        {/* ======================================================== */}
-        <View style={styles.storiesContainer}>
-          {/* Stories Header Row */}
-          <View style={styles.storiesHeaderRow}>
-            <Pressable 
-              style={styles.publishStoryHeaderBtn} 
-              onPress={() => router.push('/create-story')}
-            >
-              <Plus size={14} color="#059669" />
-              <Text style={styles.publishStoryHeaderText}>نشر يوميات</Text>
-            </Pressable>
-
-            <View style={styles.storiesTitleRow}>
-              <View style={styles.storiesLiveBadge}>
-                <View style={styles.storiesLivePulseDot} />
-                <Text style={styles.storiesLiveText}>مباشر 24س</Text>
-              </View>
-              <Text style={styles.storiesSectionTitle}>يوميات الحي</Text>
-            </View>
-          </View>
-
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.storiesScroll}>
-            {/* User's Story Item */}
-            <Pressable style={styles.storyBox} onPress={() => router.push('/create-story')}>
-              <LinearGradient 
-                colors={['#059669', '#10b981', '#34d399']} 
-                style={styles.storyAddRing} 
-                start={{ x: 0, y: 0 }} 
-                end={{ x: 1, y: 1 }}
-              >
-                <View style={styles.storyInnerBorder}>
-                  {profile?.avatar_url ? (
-                    <Image source={{ uri: profile.avatar_url }} style={styles.storyImg} />
-                  ) : (
-                    <View style={styles.storySelfPlaceholder}>
-                      <Camera size={20} color="#059669" />
-                    </View>
-                  )}
-                  <View style={styles.storySelfPlusBadge}>
-                    <Plus size={11} color="#fff" strokeWidth={3} />
-                  </View>
-                </View>
-              </LinearGradient>
-              <Text style={styles.storyName}>أضف يومياتك</Text>
-              <Text style={styles.storyDistrictSub}>قصتك أنت</Text>
-            </Pressable>
-
-            {/* Real Stories from DB */}
-            {stories.map((story) => {
-              const authorName = story.profiles?.display_name || story.profiles?.username || 'جار';
-              const avatarUrl = story.profiles?.avatar_url;
-              const isVerified = story.profiles?.is_verified;
-              const isGeoVerified = story.profiles?.is_geoverified;
-              return (
-                <Pressable 
-                  key={story.id} 
-                  style={styles.storyBox} 
-                  onPress={() => router.push({ pathname: '/story', params: { id: story.id } })}
-                >
-                  <LinearGradient 
-                    colors={['#059669', '#10b981', '#3b82f6']} 
-                    style={styles.storyGradientRing}
-                    start={{ x: 0, y: 0 }} 
-                    end={{ x: 1, y: 1 }}
-                  >
-                    <View style={styles.storyInnerBorder}>
-                      {story.type === 'text' ? (
-                        <View style={[styles.storyTextPreview, { backgroundColor: story.bg_color || '#059669' }]}>
-                          <Text style={styles.storyTextPreviewLetter} numberOfLines={1}>
-                            {story.content?.[0] || 'ق'}
-                          </Text>
-                        </View>
-                      ) : avatarUrl ? (
-                        <Image source={{ uri: avatarUrl }} style={styles.storyImg} />
-                      ) : (
-                        <View style={[styles.storyTextPreview, { backgroundColor: story.bg_color || '#059669' }]}>
-                          <Text style={styles.storyTextPreviewLetter}>{authorName[0]}</Text>
-                        </View>
-                      )}
-                    </View>
-                    {(isVerified || isGeoVerified) && (
-                      <View style={styles.storyVerifiedTag}>
-                        <ShieldCheck size={9} color="#fff" />
-                      </View>
-                    )}
-                  </LinearGradient>
-                  <Text style={styles.storyName} numberOfLines={1}>{authorName}</Text>
-                  <Text style={styles.storyDistrictSub} numberOfLines={1}>
-                    {selectedDistrict !== 'كل الأحياء' ? selectedDistrict : 'جار الحي'}
-                  </Text>
-                </Pressable>
-              );
-            })}
-
-          </ScrollView>
-        </View>
-
-        {/* ======================================================== */}
-        {/* 4. EMERGENCY SOS BANNER (Live Urgent Neighborhood Alert) */}
-        {/* ======================================================== */}
-        {emergencyQuestions.length > 0 && (
+        {emergencyTop && (
           <View style={styles.emergencyHomeCard}>
             <View style={styles.emergencyHomeHeader}>
               <View style={styles.emergencyLiveBadge}>
-                <Text style={styles.emergencyLiveText}>مباشر الآن</Text>
+                <Text style={styles.emergencyLiveText}>تنبيه مباشر</Text>
               </View>
               <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
                 <Flame size={18} color="#dc2626" />
-                <Text style={styles.emergencyHomeTitle}>تنبيه طارئ عاجل في الحي</Text>
+                <Text style={styles.emergencyHomeTitle}>تنبيه طارئ عاجل في حيك</Text>
               </View>
             </View>
             <Pressable
-              onPress={() => router.push({ pathname: '/question', params: { id: emergencyQuestions[0].id } })}
+              onPress={() => router.push({ pathname: '/question', params: { id: emergencyTop.id } })}
               style={styles.emergencyContentBox}
+              accessibilityRole="button"
+              accessibilityLabel={`تنبيه طارئ: ${emergencyTop.title}`}
             >
-              <Text style={styles.emergencyQuestionTitle}>{emergencyQuestions[0].title}</Text>
-              <Text style={styles.emergencyQuestionSub}>اضغط للتفاصيل والمساعدة الفورية من أهل الحي ←</Text>
+              <Text style={styles.emergencyQuestionTitle}>{emergencyTop.title}</Text>
+              <Text style={styles.emergencyQuestionSub}>تكاتف الجيران واستجابتهم السريعة تصنع الفرق 🤝</Text>
             </Pressable>
           </View>
         )}
 
-        {/* ======================================================== */}
-        {/* 5. QUICK SERVICES GRID (خدمات وفزعة الحي)                */}
-        {/* ======================================================== */}
-        <View style={styles.servicesGrid}>
-          <ServicePill 
-            icon={<MessageCircle size={22} color="#059669" />} 
-            bg="#ecfdf5" 
-            label="اسأل الحي" 
-            badge="فوري"
-            badgeBg="#059669"
-            onPress={() => router.push('/ask')} 
-          />
-          <ServicePill 
-            icon={<Camera size={22} color="#8b5cf6" />} 
-            bg="#f5f3ff" 
-            label="يوميات الحي" 
-            badge="24 ساعة"
-            badgeBg="#7c3aed"
-            onPress={() => router.push('/create-story')} 
-          />
-          <ServicePill 
-            icon={<Wrench size={22} color="#16a34a" />} 
-            bg="#f0fdf4" 
-            label="إعارة أدوات" 
-            badge="مجاني"
-            badgeBg="#16a34a"
-            onPress={() => {
-              setActiveTab('tools');
-              showToast('أدوات ومعدات متاحة للإعارة بين الجيران');
-            }} 
-          />
-          <ServicePill 
-            icon={<Briefcase size={22} color="#0284c7" />} 
-            bg="#f0f9ff" 
-            label="خدمات الحي" 
-            badge="مهنيون"
-            badgeBg="#0284c7"
-            onPress={() => router.push('/services')} 
-          />
-          <ServicePill 
-            icon={<Truck size={22} color="#d97706" />} 
-            bg="#fffbeb" 
-            label="فزعة وطلبات" 
-            badge="تعاون"
-            badgeBg="#d97706"
-            onPress={() => router.push('/requests')} 
-          />
-          <ServicePill 
-            icon={<Map size={22} color="#059669" />} 
-            bg="#ecfdf5" 
-            label="خريطة الحي" 
-            badge="مباشر"
-            badgeBg="#059669"
-            onPress={() => router.push('/map')} 
-          />
-        </View>
+        <ServicesGrid
+          isGuest={!feed.currentUserId}
+          onTools={() => {
+            setActiveTab('tools');
+            showToast('تمت تصفية المنشورات لعرض أدوات الحي');
+          }}
+        />
 
-
-
-        {/* ======================================================== */}
-        {/* 6. COMMUNITY FEED SECTION & TABS                        */}
-        {/* ======================================================== */}
         <View style={styles.feedSection}>
-          {/* Twitter-style Filter Pills */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.floatingTabs}>
-            <Pressable 
-              style={[styles.fTab, activeTab === 'all' && styles.fTabActive]} 
-              onPress={() => setActiveTab('all')}
+          <FeedTabs
+            activeTab={activeTab}
+            onChange={setActiveTab}
+            isGuest={!feed.currentUserId}
+            counts={{
+              mine: derived.myCount,
+              emergency: derived.emergency.length,
+              tools: derived.tools.length,
+              questions: derived.filteredQuestions.length,
+              requests: derived.filteredRequests.length,
+            }}
+          />
+
+          {feed.error && <ErrorBanner message={feed.error} onRetry={feed.reload} />}
+
+          {feed.loading ? (
+            <FeedSkeleton />
+          ) : items.length === 0 ? (
+            <EmptyState tab={activeTab} searching={searching} city={loc.city} hasExactLocation={loc.hasExactLocation} />
+          ) : (
+            items.map(item => (
+              <TwitterInquiryCard
+                key={`${activeTab}-${item.type}-${item.data.id}`}
+                type={item.type}
+                data={item.data}
+                currentUserProfile={feed.profile}
+                currentUserId={feed.currentUserId}
+                isGuest={!feed.currentUserId}
+                isMine={activeTab === 'mine' ? true : undefined}
+                onQuickReply={handleQuickReply}
+                onToast={showToast}
+              />
+            ))
+          )}
+
+          {!feed.loading && feed.hasMore && items.length > 0 && (
+            <Pressable
+              style={styles.loadMoreBtn}
+              onPress={feed.loadMore}
+              disabled={feed.loadingMore}
+              accessibilityRole="button"
+              accessibilityLabel="تحميل المزيد"
             >
-              <View style={styles.fTabLabelRow}>
-                <Map size={15} color={activeTab === 'all' ? '#fff' : '#475569'} />
-                <Text style={[styles.fTabText, activeTab === 'all' && styles.fTabTextActive]}>الكل</Text>
-              </View>
+              {feed.loadingMore ? (
+                <ActivityIndicator color="#059669" />
+              ) : (
+                <Text style={styles.loadMoreText}>حمّل المزيد</Text>
+              )}
             </Pressable>
-
-            {/* My posts filter */}
-            <Pressable 
-              style={[styles.fTab, activeTab === 'mine' && styles.fTabActiveMine]} 
-              onPress={() => setActiveTab('mine')}
-            >
-              <View style={styles.fTabLabelRow}>
-                <User size={15} color={activeTab === 'mine' ? '#fff' : '#475569'} />
-                <Text style={[styles.fTabText, activeTab === 'mine' && styles.fTabTextActive]}>منشوراتي ({myQuestions.length + myRequests.length})</Text>
-              </View>
-            </Pressable>
-
-            {emergencyQuestions.length > 0 && (
-              <Pressable 
-                style={[styles.fTab, activeTab === 'emergency' && styles.fTabActiveRed]} 
-                onPress={() => setActiveTab('emergency')}
-              >
-                <View style={styles.fTabLabelRow}>
-                  <Flame size={15} color={activeTab === 'emergency' ? '#fff' : '#475569'} />
-                  <Text style={[styles.fTabText, activeTab === 'emergency' && styles.fTabTextActive]}>طوارئ ({emergencyQuestions.length})</Text>
-                </View>
-              </Pressable>
-            )}
-
-            <Pressable 
-              style={[styles.fTab, activeTab === 'tools' && styles.fTabActiveGreen]} 
-              onPress={() => setActiveTab('tools')}
-            >
-              <View style={styles.fTabLabelRow}>
-                <Wrench size={15} color={activeTab === 'tools' ? '#fff' : '#475569'} />
-                <Text style={[styles.fTabText, activeTab === 'tools' && styles.fTabTextActive]}>إعارة ({toolQuestions.length})</Text>
-              </View>
-            </Pressable>
-
-            <Pressable 
-              style={[styles.fTab, activeTab === 'questions' && styles.fTabActive]} 
-              onPress={() => setActiveTab('questions')}
-            >
-              <View style={styles.fTabLabelRow}>
-                <MessageCircle size={15} color={activeTab === 'questions' ? '#fff' : '#475569'} />
-                <Text style={[styles.fTabText, activeTab === 'questions' && styles.fTabTextActive]}>استفسارات ({filteredQuestions.length})</Text>
-              </View>
-            </Pressable>
-
-            <Pressable 
-              style={[styles.fTab, activeTab === 'requests' && styles.fTabActive]} 
-              onPress={() => setActiveTab('requests')}
-            >
-              <View style={styles.fTabLabelRow}>
-                <Truck size={15} color={activeTab === 'requests' ? '#fff' : '#475569'} />
-                <Text style={[styles.fTabText, activeTab === 'requests' && styles.fTabTextActive]}>فزعة ({filteredRequests.length})</Text>
-              </View>
-            </Pressable>
-          </ScrollView>
-
-          {/* Render Twitter-Style Progressive Feed */}
-          {activeTab === 'all' && (
-            [
-              ...filteredQuestions.map(q => ({ type: 'question' as const, data: q })),
-              ...filteredRequests.map(r => ({ type: 'request' as const, data: r }))
-            ]
-              .sort((a, b) => new Date(b.data.created_at).getTime() - new Date(a.data.created_at).getTime())
-              .map(item => (
-                <TwitterInquiryCard 
-                  key={`${item.type}-${item.data.id}`} 
-                  type={item.type} 
-                  data={item.data} 
-                  currentUserProfile={profile}
-                  currentUserId={currentUserId}
-                  onQuickReply={handleQuickReplySubmit}
-                  onToast={showToast}
-                />
-              ))
           )}
 
-          {activeTab === 'emergency' && emergencyQuestions.map(q => (
-            <TwitterInquiryCard 
-              key={`em-${q.id}`} 
-              type="question" 
-              data={q} 
-              currentUserProfile={profile}
-              currentUserId={currentUserId}
-              onQuickReply={handleQuickReplySubmit}
-              onToast={showToast}
-            />
-          ))}
-
-          {activeTab === 'tools' && toolQuestions.map(q => (
-            <TwitterInquiryCard 
-              key={`tool-${q.id}`} 
-              type="question" 
-              data={q} 
-              currentUserProfile={profile}
-              currentUserId={currentUserId}
-              onQuickReply={handleQuickReplySubmit}
-              onToast={showToast}
-            />
-          ))}
-
-          {activeTab === 'questions' && filteredQuestions.map(q => (
-            <TwitterInquiryCard 
-              key={`q-${q.id}`} 
-              type="question" 
-              data={q} 
-              currentUserProfile={profile}
-              currentUserId={currentUserId}
-              onQuickReply={handleQuickReplySubmit}
-              onToast={showToast}
-            />
-          ))}
-
-          {activeTab === 'requests' && filteredRequests.map(r => (
-            <TwitterInquiryCard 
-              key={`r-${r.id}`} 
-              type="request" 
-              data={r} 
-              currentUserProfile={profile}
-              currentUserId={currentUserId}
-              onQuickReply={handleQuickReplySubmit}
-              onToast={showToast}
-            />
-          ))}
-
-          {/* My Posts Tab */}
-          {activeTab === 'mine' && (
-            [
-              ...filteredMyQuestions.map(q => ({ type: 'question' as const, data: q })),
-              ...filteredMyRequests.map(r => ({ type: 'request' as const, data: r }))
-            ]
-              .sort((a, b) => new Date(b.data.created_at).getTime() - new Date(a.data.created_at).getTime())
-              .map(item => (
-                <TwitterInquiryCard 
-                  key={`mine-${item.type}-${item.data.id}`} 
-                  type={item.type} 
-                  data={item.data} 
-                  currentUserProfile={profile}
-                  currentUserId={currentUserId}
-                  isMine={true}
-                  onQuickReply={handleQuickReplySubmit}
-                  onToast={showToast}
-                />
-              ))
-          )}
-
-          {activeTab === 'mine' && filteredMyQuestions.length === 0 && filteredMyRequests.length === 0 && (
-            <View style={styles.emptyContainer}>
-              <View style={styles.emptyIconBg}>
-                <User size={36} color="#059669" />
-              </View>
-              <Text style={styles.emptyTitle}>{normalizedSearch ? 'لا توجد منشورات تطابق البحث' : 'لا توجد منشورات بعد'}</Text>
-              <Text style={styles.emptySub}>{normalizedSearch ? 'جرّب كلمة أخرى أو امسح البحث.' : 'استفساراتك وطلباتك ستظهر هنا عند نشرها في الحي.'}</Text>
-              {!normalizedSearch && <Pressable style={styles.emptyAskBtn} onPress={() => router.push('/ask')}>
-                <Text style={styles.emptyAskBtnText}>انشر أول استفسار لك</Text>
-              </Pressable>}
-            </View>
-          )}
-
-          {/* Empty States */}
-          {activeTab === 'all' && filteredQuestions.length === 0 && filteredRequests.length === 0 && (
-            <View style={styles.emptyContainer}>
-              <View style={styles.emptyIconBg}>
-                <Sparkles size={36} color="#059669" />
-              </View>
-              <Text style={styles.emptyTitle}>
-                {normalizedSearch ? 'لا توجد نتائج مطابقة للبحث' : selectedCity === 'كل المدن' ? 'لا توجد استفسارات حالياً' : `لا توجد استفسارات في ${selectedCity} حالياً`}
-              </Text>
-              <Text style={styles.emptySub}>
-                {normalizedSearch ? 'جرّب كلمات أخرى أو امسح البحث لعرض جميع المنشورات.' : 'كن المبادر الأول في حيك واطرح سؤالاً أو اعرض مساعدة لجيرانك بأسلوب خيط المحادثات.'}
-              </Text>
-              <Pressable style={styles.emptyAskBtn} onPress={() => router.push('/ask')}>
-                <Text style={styles.emptyAskBtnText}>اسأل أهل حيك الآن</Text>
-              </Pressable>
-            </View>
-          )}
-
-          {activeTab === 'emergency' && emergencyQuestions.length === 0 && (
-            <View style={styles.emptyContainer}>
-              <View style={styles.emptyIconBg}>
-                <ShieldCheck size={36} color="#16a34a" />
-              </View>
-              <Text style={styles.emptyTitle}>{normalizedSearch ? 'لا توجد نتائج طوارئ مطابقة' : 'الحمد لله، لا توجد طوارئ'}</Text>
-              <Text style={styles.emptySub}>{normalizedSearch ? 'جرّب كلمات أخرى أو امسح البحث.' : 'الحي آمن ومستقر بفضل الله.'}</Text>
-            </View>
-          )}
-
-          {activeTab === 'tools' && toolQuestions.length === 0 && (
-            <View style={styles.emptyContainer}>
-              <View style={styles.emptyIconBg}>
-                <Wrench size={36} color="#16a34a" />
-              </View>
-              <Text style={styles.emptyTitle}>{normalizedSearch ? 'لا توجد عروض إعارة مطابقة' : 'لا توجد عروض إعارة حالياً'}</Text>
-              <Text style={styles.emptySub}>{normalizedSearch ? 'جرّب كلمات أخرى أو امسح البحث.' : 'هل لديك سلم أو دريل أو أدوات ترغب بإعارتها لجيرانك؟'}</Text>
-              {!normalizedSearch && <Pressable style={[styles.emptyAskBtn, { backgroundColor: '#16a34a' }]} onPress={() => router.push('/ask')}>
-                <Text style={styles.emptyAskBtnText}>اعرض أداة للإعارة المجانية</Text>
-              </Pressable>}
-            </View>
-          )}
-
-          {activeTab === 'questions' && filteredQuestions.length === 0 && (
-            <View style={styles.emptyContainer}>
-              <View style={styles.emptyIconBg}>
-                <MessageCircle size={36} color="#059669" />
-              </View>
-              <Text style={styles.emptyTitle}>{normalizedSearch ? 'لا توجد استفسارات مطابقة' : 'لا توجد استفسارات حالياً'}</Text>
-              <Text style={styles.emptySub}>{normalizedSearch ? 'جرّب كلمات أخرى أو امسح البحث.' : 'اطرح سؤالك الأول لأهل الحي وتلقى ردوداً وتوصيات مجربة.'}</Text>
-              {!normalizedSearch && <Pressable style={styles.emptyAskBtn} onPress={() => router.push('/ask')}>
-                <Text style={styles.emptyAskBtnText}>اطرح سؤالك الآن</Text>
-              </Pressable>}
-            </View>
-          )}
-
-          {activeTab === 'requests' && filteredRequests.length === 0 && (
-            <View style={styles.emptyContainer}>
-              <View style={styles.emptyIconBg}>
-                <Truck size={36} color="#d97706" />
-              </View>
-              <Text style={styles.emptyTitle}>{normalizedSearch ? 'لا توجد طلبات مطابقة' : 'لا توجد طلبات فزعة حالياً'}</Text>
-              <Text style={styles.emptySub}>{normalizedSearch ? 'جرّب كلمات أخرى أو امسح البحث.' : 'شارك جيرانك أي مساعدة تحتاجها وسيقف أهل حيك بجانبك.'}</Text>
-            </View>
-          )}
-
-          <View style={{ height: 130 }} />
+          <View style={{ height: bottomNavInset }} />
         </View>
       </ScrollView>
 
-      {/* Floating Ask Button (above bottom nav) */}
       <Animated.View style={[styles.fabContainer, { transform: [{ scale: pulseAnim }] }]}>
-        <Pressable style={styles.fabBtn} onPress={() => router.push('/ask')}>
-          <LinearGradient colors={['#065f46', '#059669', '#10b981']} style={styles.fabGrad} start={{x:0, y:0}} end={{x:1, y:1}}>
+        <Pressable
+          style={styles.fabBtn}
+          onPress={() => feed.currentUserId ? router.push('/ask') : requireAccount('سجّل الدخول أو أنشئ حساباً لنشر سؤالك في الحي.')}
+          accessibilityRole="button"
+          accessibilityLabel="اسأل أهل حيك"
+        >
+          <LinearGradient
+            colors={['#065f46', '#059669', '#10b981']}
+            style={styles.fabGrad}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
             <Plus size={20} color="#fff" />
             <Text style={styles.fabText}>اسأل أهل حيك</Text>
           </LinearGradient>
         </Pressable>
       </Animated.View>
 
-      {/* Bottom Navigation */}
-      <View style={styles.bottomNavWrapper}>
-        <BottomNav />
-      </View>
+      
 
-      {/* Saudi Regions & Districts Selector Modal */}
       <LocationSelectorModal
         visible={showLocationModal}
         onClose={() => setShowLocationModal(false)}
-        selectedCity={selectedCity}
-        selectedDistrict={selectedDistrict}
-        onSelect={(region, city, district) => {
-          setSelectedRegion(region);
-          setSelectedCity(city);
-          setSelectedDistrict(district);
-          savePermanentMyLocation({
-            region,
-            city,
-            district,
-          }, true);
-        }}
+        selectedCity={loc.city}
+        selectedDistrict={loc.district}
+        onSelect={handleLocationSelect}
       />
     </View>
   );
 }
-
-// ========================================================
-// HELPER COMPONENTS
-// ========================================================
-
-function normalizeSearchText(value: unknown): string {
-  return String(value ?? '')
-    .normalize('NFKD')
-    .replace(/[\u064B-\u065F\u0670\u0640]/g, '')
-    .replace(/[أإآٱ]/g, 'ا')
-    .replace(/ى/g, 'ي')
-    .replace(/ة/g, 'ه')
-    .toLocaleLowerCase('ar')
-    .trim()
-    .replace(/\s+/g, ' ');
-}
-
-function ServicePill({
-  icon,
-  bg,
-  label,
-  badge,
-  badgeBg,
-  onPress,
-}: {
-  icon: any;
-  bg: string;
-  label: string;
-  badge?: string;
-  badgeBg?: string;
-  onPress?: () => void;
-}) {
-  return (
-    <Pressable style={styles.servicePill} onPress={onPress}>
-      <View style={[styles.serviceIconBox, { backgroundColor: bg }]}>
-        {icon}
-        {badge ? (
-          <View style={[styles.servicePillBadge, badgeBg ? { backgroundColor: badgeBg } : {}]}>
-            <Text style={styles.servicePillBadgeText}>{badge}</Text>
-          </View>
-        ) : null}
-      </View>
-      <Text style={styles.serviceLabel} numberOfLines={1}>{label}</Text>
-    </Pressable>
-  );
-}
-
-// ========================================================
-// STYLESHEET
-// ========================================================
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8fafc',
-  },
-  hero: {
-    paddingTop: Platform.OS === 'ios' ? 52 : 38,
-    paddingBottom: 22,
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
-    shadowColor: '#059669',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  topNavRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    marginBottom: 16,
-  },
-  brandAndLocation: {
-    alignItems: 'flex-end',
-  },
-  brandTitleRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 4,
-  },
-  heroBrandTitle: {
-    fontSize: 26,
-    fontWeight: '900',
-    color: '#fff',
-    letterSpacing: -0.5,
-  },
-  locationSelectorPill: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.22)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 20,
-    gap: 5,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.35)',
-  },
-  locationSelectorText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '800',
-    maxWidth: 200,
-  },
-  leftActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  avatarWrap: {
-    position: 'relative',
-  },
-  avatarImg: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 2,
-    borderColor: '#fff',
-  },
-  avatarPlaceholder: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#fff',
-  },
-  avatarLetter: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '900',
-  },
-  avatarVerifiedBadge: {
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: '#16a34a',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: '#fff',
-  },
-  iconCircleBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
-    position: 'relative',
-  },
-  notifBadge: {
-    position: 'absolute',
-    top: -2,
-    right: -2,
-    backgroundColor: '#ef4444',
-    borderRadius: 10,
-    minWidth: 18,
-    height: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 3,
-    borderWidth: 1.5,
-    borderColor: '#fff',
-  },
-  notifBadgeText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '900',
-  },
-  searchBarContainer: {
-    paddingHorizontal: 20,
-  },
-  searchBar: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    height: 48,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 3,
-    gap: 8,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 13,
-    color: '#0f172a',
-    textAlign: 'right',
-  },
-  micBtn: {
-    padding: 6,
-  },
-  clearSearchBtn: {
-    padding: 6,
-  },
-  // Atmosphere & Neighborhood Pulse Bar
-  atmosphereBar: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    backgroundColor: '#fff',
-    marginHorizontal: 16,
-    marginTop: -14,
-    marginBottom: 12,
-    borderRadius: 18,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: '#f1f5f9',
-    zIndex: 10,
-  },
-  atmoItem: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 6,
-  },
-  atmoText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#334155',
-  },
-  atmoDivider: {
-    width: 1,
-    height: 16,
-    backgroundColor: '#e2e8f0',
-  },
-
-  // Upgraded Stories Section
-  storiesContainer: {
-    paddingVertical: 14,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-  },
-  storiesHeaderRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    marginBottom: 12,
-  },
-  storiesTitleRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 8,
-  },
-  storiesSectionTitle: {
-    fontSize: 14,
-    fontWeight: '900',
-    color: '#0f172a',
-  },
-  storiesLiveBadge: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    backgroundColor: '#ecfdf5',
-    paddingHorizontal: 7,
-    paddingVertical: 2.5,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#a7f3d0',
-    gap: 4,
-  },
-  storiesLivePulseDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#10b981',
-  },
-  storiesLiveText: {
-    fontSize: 9.5,
-    fontWeight: '800',
-    color: '#059669',
-  },
-  publishStoryHeaderBtn: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    backgroundColor: '#f0fdf4',
-    paddingHorizontal: 10,
-    paddingVertical: 4.5,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#bbf7d0',
-    gap: 4,
-  },
-  publishStoryHeaderText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#059669',
-  },
-  storiesScroll: {
-    paddingHorizontal: 16,
-    gap: 14,
-    alignItems: 'flex-start',
-  },
-  storyBox: {
-    alignItems: 'center',
-    width: 68,
-  },
-  storyAddRing: {
-    width: 66,
-    height: 66,
-    borderRadius: 33,
-    padding: 2.5,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 5,
-  },
-  storyGradientRing: {
-    width: 66,
-    height: 66,
-    borderRadius: 33,
-    padding: 2.5,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 5,
-    position: 'relative',
-  },
-  storyInnerBorder: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 31,
-    borderWidth: 2,
-    borderColor: '#fff',
-    overflow: 'hidden',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f8fafc',
-    position: 'relative',
-  },
-  storySelfPlaceholder: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#ecfdf5',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  storySelfPlusBadge: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    backgroundColor: '#059669',
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#fff',
-  },
-  storyImg: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 30,
-  },
-  storyTextPreview: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  storyTextPreviewLetter: {
-    color: '#fff',
-    fontSize: 22,
-    fontWeight: '900',
-  },
-  storyVerifiedTag: {
-    position: 'absolute',
-    bottom: -1,
-    right: -1,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: '#16a34a',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: '#fff',
-  },
-  storyName: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#0f172a',
-    textAlign: 'center',
-  },
-  storyDistrictSub: {
-    fontSize: 9.5,
-    color: '#64748b',
-    fontWeight: '600',
-    textAlign: 'center',
-    marginTop: 1,
-  },
-
-  // Service Pill Badges
-  servicePillBadge: {
-    position: 'absolute',
-    top: -5,
-    right: -6,
-    backgroundColor: '#059669',
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    borderRadius: 8,
-    borderWidth: 1.5,
-    borderColor: '#fff',
-    zIndex: 5,
-  },
-  servicePillBadgeText: {
-    color: '#fff',
-    fontSize: 7.5,
-    fontWeight: '900',
-  },
-  emergencyHomeCard: {
-    marginHorizontal: 16,
-    marginTop: 12,
-    backgroundColor: '#fef2f2',
-    borderRadius: 18,
-    padding: 14,
-    borderWidth: 2,
-    borderColor: '#fca5a5',
-  },
-  emergencyHomeHeader: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  emergencyHomeTitle: {
-    fontSize: 13,
-    fontWeight: '900',
-    color: '#dc2626',
-  },
-  emergencyLiveBadge: {
-    backgroundColor: '#dc2626',
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  emergencyLiveText: {
-    color: '#fff',
-    fontSize: 9,
-    fontWeight: '900',
-  },
-  emergencyContentBox: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: '#fecaca',
-  },
-  emergencyQuestionTitle: {
-    fontSize: 13,
-    fontWeight: '900',
-    color: '#991b1b',
-    textAlign: 'right',
-  },
-  emergencyQuestionSub: {
-    fontSize: 11,
-    color: '#dc2626',
-    textAlign: 'right',
-    marginTop: 3,
-  },
-  servicesGrid: {
-    flexDirection: 'row-reverse',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    marginTop: 14,
-    marginBottom: 8,
-  },
-  servicePill: {
-    alignItems: 'center',
-    width: (width - 48) / 6,
-  },
-  serviceIconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  serviceLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#334155',
-    textAlign: 'center',
-  },
-  feedSection: {
-    marginTop: 12,
-    paddingHorizontal: 16,
-  },
-  floatingTabs: {
-    flexDirection: 'row-reverse',
-    gap: 8,
-    marginBottom: 14,
-    paddingVertical: 4,
-  },
-  fTab: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#fff',
-    borderWidth: 1.5,
-    borderColor: '#e2e8f0',
-  },
-  fTabActive: {
-    backgroundColor: '#059669',
-    borderColor: '#059669',
-  },
-  fTabActiveRed: {
-    backgroundColor: '#dc2626',
-    borderColor: '#dc2626',
-  },
-  fTabActiveGreen: {
-    backgroundColor: '#16a34a',
-    borderColor: '#16a34a',
-  },
-  fTabActiveMine: {
-    backgroundColor: '#7c3aed',
-    borderColor: '#7c3aed',
-  },
-  fTabText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#475569',
-  },
-  fTabLabelRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 6,
-  },
-  fTabTextActive: {
-    color: '#fff',
-  },
-  newPostsBanner: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 54 : 40,
-    alignSelf: 'center',
-    zIndex: 9999,
-    backgroundColor: '#059669',
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 30,
-    shadowColor: '#059669',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 8,
-  },
-  newPostsBannerText: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-
-  // Empty state & FAB
-  emptyContainer: {
-    alignItems: 'center',
-    paddingVertical: 40,
-    paddingHorizontal: 20,
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    marginTop: 10,
-    borderWidth: 1,
-    borderColor: '#f1f5f9',
-  },
-  emptyIconBg: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#ecfdf5',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  emptyTitle: {
-    fontSize: 16,
-    fontWeight: '900',
-    color: '#1e293b',
-    marginBottom: 6,
-    textAlign: 'center',
-  },
-  emptySub: {
-    fontSize: 13,
-    color: '#64748b',
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 16,
-  },
-  emptyAskBtn: {
-    backgroundColor: '#059669',
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 14,
-  },
-  emptyAskBtnText: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  fabContainer: {
-    position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 95 : 82,
-    left: 20,
-    zIndex: 99,
-    borderRadius: 30,
-    shadowColor: '#059669',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  fabBtn: {
-    borderRadius: 30,
-  },
-  fabGrad: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    borderRadius: 30,
-    gap: 8,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.4)',
-  },
-  fabText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  bottomNavWrapper: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-  },
-
-
-});

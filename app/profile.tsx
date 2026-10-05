@@ -1,3 +1,5 @@
+import { useBottomNavInset } from '@/lib/bottomNav';
+import ScreenHeader from '@/components/shared/ScreenHeader';
 import { useState, useCallback } from 'react';
 import {
   Alert,
@@ -16,6 +18,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
 import { savePermanentMyLocation } from '@/lib/locationSync';
+import { getCurrentDeviceLocation, reverseGeocodeDeviceLocation } from '@/lib/deviceLocation';
 import {
   Camera,
   MapPin,
@@ -30,15 +33,36 @@ import {
   Bookmark,
   MessageCircle,
 } from 'lucide-react-native';
-import BottomNav from '@/components/BottomNav';
 import ActionSheet from '@/components/ActionSheet';
 import LocationSelectorModal from '@/components/LocationSelectorModal';
 import { generateSmartBioAI } from '@/lib/aiAssistant';
+import { LinearGradient } from 'expo-linear-gradient';
+
+function formatDistrictLabel(value: string) {
+  const districtName = value.trim();
+  return /^حي(?:\s|$)/u.test(districtName) ? districtName : `حي ${districtName}`;
+}
+
+function nextMonthDate(value: string) {
+  const date = new Date(value);
+  const day = date.getDate();
+  date.setDate(1);
+  date.setMonth(date.getMonth() + 1);
+  const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  date.setDate(Math.min(day, lastDay));
+  return date;
+}
 
 export default function Profile() {
+  const bottomNavInset = useBottomNavInset();
   const [p, setP] = useState<any>({});
   const [userId, setUserId] = useState<string | null>(null);
   const [personalName, setPersonalName] = useState('');
+  const [usernameDraft, setUsernameDraft] = useState('');
+  const [usernameSaving, setUsernameSaving] = useState(false);
+  const [usernameChangedAt, setUsernameChangedAt] = useState<string | null>(null);
+  const usernameNextChangeAt = usernameChangedAt ? nextMonthDate(usernameChangedAt) : null;
+  const usernameChangeLocked = Boolean(usernameNextChangeAt && usernameNextChangeAt.getTime() > Date.now());
   const [region, setRegion] = useState('');
   const [city, setCity] = useState('');
   const [district, setDistrict] = useState('');
@@ -46,9 +70,17 @@ export default function Profile() {
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editingProfile, setEditingProfile] = useState(false);
+  const [locating, setLocating] = useState(false);
 
   const [stats, setStats] = useState({ questions: 0, answers: 0, followers: 0, following: 0 });
   const [savedQuestions, setSavedQuestions] = useState<any[]>([]);
+  const profileCompletion = Math.round(([
+    Boolean(p.avatar_url),
+    Boolean(personalName.trim()),
+    Boolean(p.username),
+    Boolean(region.trim() && city.trim() && district.trim()),
+    Boolean(bio.trim()),
+  ].filter(Boolean).length / 5) * 100);
   const [activeTab, setActiveTab] = useState<'posts' | 'replies' | 'saved'>('posts');
   const [myQuestions, setMyQuestions] = useState<any[]>([]);
   const [myAnswers, setMyAnswers] = useState<any[]>([]);
@@ -95,6 +127,8 @@ export default function Profile() {
     if (r.data) {
       setP(r.data);
       setPersonalName(r.data.display_name || '');
+      setUsernameDraft(r.data.username || '');
+      setUsernameChangedAt(r.data.username_last_changed_at || null);
       setRegion(r.data.region || '');
       setCity(r.data.city || '');
       setDistrict(r.data.district || '');
@@ -102,11 +136,65 @@ export default function Profile() {
     }
   }, []);
 
+  const syncCurrentLocation = useCallback(async (showAlert = false) => {
+    const location = await getCurrentDeviceLocation();
+    if (!location) {
+      if (showAlert) Alert.alert('تعذّر تحديد الموقع', 'اسمح لحيّنا باستخدام موقعك أثناء الاستخدام ثم حاول مرة أخرى.');
+      return false;
+    }
+
+    const place = await reverseGeocodeDeviceLocation(location);
+    const nextRegion = place?.region?.trim() || '';
+    const nextCity = place?.city?.trim() || '';
+    const nextDistrict = place?.district?.trim() || '';
+
+    if (!nextRegion || !nextCity || !nextDistrict) {
+      if (showAlert) Alert.alert('الموقع غير مكتمل', 'تم تحديد موقعك، لكن لم نستطع استخراج المنطقة والمدينة والحي بدقة. حاول مرة أخرى.');
+      return false;
+    }
+
+    const next = { region: nextRegion, city: nextCity, district: nextDistrict };
+    setRegion(nextRegion);
+    setCity(nextCity);
+    setDistrict(nextDistrict);
+
+    await savePermanentMyLocation(next, true);
+
+    const { data: auth } = await supabase.auth.getUser();
+    if (auth.user) {
+      const { error } = await supabase.from('profiles').update(next).eq('id', auth.user.id);
+      if (error) throw error;
+    }
+
+    setP((current: any) => ({ ...(current || {}), ...next }));
+    if (showAlert) {
+      Alert.alert('تم تحديث موقعك الحالي', 'حيّنا الآن يتبع موقعك الحالي: ' + nextRegion + ' · ' + nextCity + ' · حي ' + nextDistrict);
+    }
+    return true;
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
-      loadProfile();
+      let cancelled = false;
+      const refreshProfileOnly = async () => {
+        await loadProfile();
+      };
+      void refreshProfileOnly();
+      return () => { cancelled = true; };
     }, [loadProfile])
   );
+
+  async function useCurrentLocation() {
+    if (locating) return;
+    setLocating(true);
+    try {
+      await syncCurrentLocation(true);
+    } catch (error: any) {
+      Alert.alert('تعذّر حفظ الموقع', error?.message || 'حاول مرة أخرى.');
+    } finally {
+      setLocating(false);
+    }
+  }
 
   async function logout() {
     await supabase.auth.signOut();
@@ -121,16 +209,15 @@ export default function Profile() {
       quality: 0.8,
     });
     if (result.canceled) return;
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) return;
+    if (!userId) return;
     const asset = result.assets[0];
     const response = await fetch(asset.uri);
     const blob = await response.arrayBuffer();
-    const path = u.user.id + '/avatar.jpg';
+    const path = userId + '/avatar.jpg';
     const up = await supabase.storage.from('avatars').upload(path, blob, { contentType: 'image/jpeg', upsert: true });
     if (up.error) return Alert.alert('خطأ', up.error.message);
     const { data } = supabase.storage.from('avatars').getPublicUrl(path);
-    const saved = await supabase.from('profiles').update({ avatar_url: data.publicUrl }).eq('id', u.user.id).select('id').maybeSingle();
+    const saved = await supabase.from('profiles').update({ avatar_url: data.publicUrl }).eq('id', userId).select('id').maybeSingle();
     if (saved.error) return Alert.alert('تعذّر حفظ الصورة', saved.error.message);
     if (!saved.data) return Alert.alert('تعذّر حفظ الصورة', 'لم يتم تحديث ملف الحساب. أعد تسجيل الدخول ثم حاول مجدداً.');
     setP({ ...p, avatar_url: data.publicUrl });
@@ -138,9 +225,10 @@ export default function Profile() {
 
   // Toggle Handlers with Instant Persistence
   async function save() {
-    if (!userId) return;
-    if ((region.trim() || city.trim() || district.trim()) && (!city.trim() || !district.trim())) {
-      return Alert.alert('أكمل بيانات الحي', 'لإظهار محتوى الحي وحماية الخصوصية، اختر مدينة وحيّاً محدداً. اترك الموقع كله فارغاً إذا كنت تريد حفظ الاسم فقط.');
+    const uid = userId;
+    if (!uid) return;
+    if (!region.trim() || !city.trim() || !district.trim()) {
+      return Alert.alert('الموقع مطلوب', 'لا يمكن حفظ الملف بدون المنطقة والمدينة والحي. استخدم «استخدام موقعي الحالي» للتعبئة تلقائياً.');
     }
     setSaving(true);
 
@@ -153,22 +241,65 @@ export default function Profile() {
     };
 
     try {
-      const result = await supabase.from('profiles').update(payload).eq('id', userId).select('id').maybeSingle();
+      const result = await supabase.from('profiles').update(payload).eq('id', uid).select('*').maybeSingle();
       if (result.error) throw result.error;
-      if (!result.data) throw new Error('لم يُحدّث أي سجل. سجّل الخروج ثم الدخول وحاول مرة أخرى.');
+      if (!result.data) throw new Error('لم يُحدّث أي سجل في قاعدة البيانات. أعد فتح الصفحة وحاول مرة أخرى.');
 
       setP((current: any) => ({ ...current, ...payload }));
       await savePermanentMyLocation({
-        region: region.trim() || 'المملكة',
-        city: city.trim() || 'كل المدن',
-        district: district.trim() || 'كل الأحياء',
+        region: region.trim(),
+        city: city.trim(),
+        district: district.trim(),
       }, false);
+      // Reload from the database so the UI reflects the persisted values exactly.
+      const { data: freshProfile } = await supabase.from('profiles').select('*').eq('id', uid).maybeSingle();
+      if (freshProfile) {
+        setP(freshProfile);
+        setPersonalName(freshProfile.display_name || '');
+        setRegion(freshProfile.region || '');
+        setCity(freshProfile.city || '');
+        setDistrict(freshProfile.district || '');
+        setBio(freshProfile.bio || '');
+      }
       setEditingProfile(false);
       Alert.alert('تم الحفظ', 'تم تحديث الاسم والمدينة والحي والنبذة في حسابك.');
     } catch (error: any) {
       Alert.alert('تعذّر الحفظ', error?.message || 'لم يتم تحديث الملف. تحقق من الاتصال وإعدادات قاعدة البيانات ثم حاول مجدداً.');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function changeUsername() {
+    const nextUsername = usernameDraft.trim().toLowerCase();
+    if (!/^[a-zA-Z0-9_]{3,30}$/.test(nextUsername)) {
+      return Alert.alert('اسم المستخدم غير صالح', 'استخدم من 3 إلى 30 حرفاً إنجليزياً أو رقماً أو شرطة سفلية.');
+    }
+    if (nextUsername === String(p.username || '').toLowerCase()) {
+      return Alert.alert('لا يوجد تغيير', 'هذا هو اسم المستخدم الحالي.');
+    }
+
+    setUsernameSaving(true);
+    try {
+      const { data, error } = await supabase.rpc('change_my_username', { p_username: nextUsername });
+      if (error) throw error;
+      const changedAt = typeof data === 'string' ? data : new Date().toISOString();
+      setP((current: any) => ({ ...current, username: nextUsername, username_last_changed_at: changedAt }));
+      setUsernameDraft(nextUsername);
+      setUsernameChangedAt(changedAt);
+      Alert.alert('تم تغيير اسم المستخدم', 'يمكنك تغييره مرة أخرى بعد شهر.');
+    } catch (error: any) {
+      const message = error?.message || '';
+      const userMessage = message.includes('username_change_cooldown')
+        ? 'لا يمكن تغيير اسم المستخدم إلا مرة واحدة كل شهر.'
+        : message.includes('username_taken') || message.includes('duplicate key')
+          ? 'اسم المستخدم مستخدم بالفعل، اختر اسماً آخر.'
+          : message.includes('invalid_username')
+            ? 'استخدم من 3 إلى 30 حرفاً إنجليزياً أو رقماً أو شرطة سفلية.'
+            : message || 'تعذر تغيير اسم المستخدم.';
+      Alert.alert('تعذّر تغيير الاسم', userMessage);
+    } finally {
+      setUsernameSaving(false);
     }
   }
 
@@ -217,23 +348,58 @@ export default function Profile() {
     setBio(generated);
   }
 
+  async function applyManualLocation(reg: string, c: string, d: string) {
+    const nextRegion = reg === 'كل المملكة' ? '' : reg.trim();
+    const nextCity = c === 'كل المدن' ? '' : c.trim();
+    const nextDistrict = (d === 'كل أحياء المدينة' || d === 'كل الأحياء') ? '' : d.trim();
+
+    if (!nextRegion || !nextCity || !nextDistrict) {
+      Alert.alert('الموقع مطلوب', 'يجب تحديد المنطقة والمدينة والحي حتى يبقى حسابك مرتبطاً بموقعك الحالي.');
+      return;
+    }
+
+    setRegion(nextRegion);
+    setCity(nextCity);
+    setDistrict(nextDistrict);
+    try {
+      await savePermanentMyLocation(
+        { region: nextRegion, city: nextCity, district: nextDistrict },
+        true
+      );
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) return;
+      const { data: updated, error } = await supabase
+        .from('profiles')
+        .update({ region: nextRegion, city: nextCity, district: nextDistrict })
+        .eq('id', auth.user.id)
+        .select('*')
+        .maybeSingle();
+      if (error) throw error;
+      if (!updated) throw new Error('لم يتم تحديث موقع الحساب.');
+      setP((current: any) => ({ ...(current || {}), ...updated }));
+    } catch (error: any) {
+      Alert.alert('تعذّر حفظ الموقع', error?.message || 'حاول مرة أخرى.');
+    }
+  }
+
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: bottomNavInset }]} showsVerticalScrollIndicator={false}>
         {/* ======================================================== */}
         {/* 1. PROFILE HERO HEADER & AVATAR                          */}
         {/* ======================================================== */}
-        <View style={styles.profileHero}>
-          <View style={styles.profileTopBar}>
-            <Pressable onPress={() => router.back()} style={styles.profileTopButton}>
-              <ChevronRight size={22} color="#0f172a" />
-            </Pressable>
-            <Text style={styles.profileTopTitle}>الملف الشخصي</Text>
-            <Pressable onPress={() => router.push('/settings')} style={styles.profileTopButton}>
-              <Settings size={21} color="#0f172a" />
-            </Pressable>
-          </View>
+        <LinearGradient colors={["#064e3b", "#059669", "#10b981"]} start={{x:0,y:0}} end={{x:1,y:1}} style={styles.profileHero}>
+          <View style={styles.profileHeroInner}>
+          <ScreenHeader
+            title="الملف الشخصي"
+            fallbackRoute="/home"
+            rightAction={(
+              <Pressable onPress={() => router.push('/settings')} style={styles.profileTopButton}>
+                <Settings size={21} color="#fff" />
+              </Pressable>
+            )}
+          />
 
           <View style={styles.profileSummary}>
             <Pressable onPress={pickAvatar} style={styles.twitterAvatarWrap}>
@@ -251,9 +417,32 @@ export default function Profile() {
           {!!bio.trim() && <Text style={styles.twitterBio}>{bio}</Text>}
           {(city || district) ? (
             <View style={styles.twitterLocation}><MapPin size={14} color="#64748b" />
-              <Text style={styles.twitterLocationText}>{[region, district && `حي ${district}`, city].filter(Boolean).join('، ')}</Text>
+              <Text style={styles.twitterLocationText}>{[region, district && formatDistrictLabel(district), city].filter(Boolean).join('، ')}</Text>
             </View>
           ) : null}
+
+          <View style={styles.profileCompletion}>
+            <View style={styles.profileCompletionHeading}>
+              <Text style={styles.profileCompletionPercent}>{profileCompletion}%</Text>
+              <Text style={styles.profileCompletionTitle}>
+                {profileCompletion === 100 ? 'ملفك مكتمل' : 'اكتمال الملف الشخصي'}
+              </Text>
+            </View>
+            <View style={styles.profileCompletionTrack}>
+              <View style={[styles.profileCompletionFill, { width: `${profileCompletion}%` }]} />
+            </View>
+            {profileCompletion < 100 && (
+              <Pressable
+                onPress={() => setEditingProfile(true)}
+                style={styles.profileCompletionAction}
+                accessibilityRole="button"
+                accessibilityLabel="أكمل بيانات ملفك الشخصي"
+              >
+                <Text style={styles.profileCompletionActionText}>أكمل بياناتك ليعرفك الجيران</Text>
+                <ChevronRight size={15} color="#d1fae5" />
+              </Pressable>
+            )}
+          </View>
 
           <View style={styles.twitterStats}>
             <Pressable onPress={() => openFollowsModal('following')} style={styles.twitterStat}>
@@ -264,7 +453,8 @@ export default function Profile() {
             </Pressable>
             <Text style={styles.twitterStat}><Text style={styles.twitterStatNum}>{stats.questions + stats.answers}</Text><Text style={styles.twitterStatLabel}> منشور</Text></Text>
           </View>
-        </View>
+          </View>
+        </LinearGradient>
 
         <View style={styles.contentArea}>
           {editingProfile && (
@@ -280,16 +470,44 @@ export default function Profile() {
                 maxLength={60}
               />
               <Text style={styles.label}>اسم المستخدم</Text>
-              <TextInput style={[styles.profileInput, styles.readOnlyInput]} value={`@${p.username || ''}`} editable={false} />
+              <View style={styles.usernameInputRow}>
+                <Text style={styles.usernameAt}>@</Text>
+                <TextInput
+                  style={[styles.profileInput, styles.usernameInput]}
+                  value={usernameDraft}
+                  onChangeText={setUsernameDraft}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  maxLength={30}
+                  placeholder="username"
+                  placeholderTextColor="#94a3b8"
+                />
+              </View>
+              <Text style={styles.usernameHint}>
+                {usernameChangeLocked
+                  ? `يمكنك التغيير بعد ${usernameNextChangeAt?.toLocaleDateString('ar-SA')}`
+                  : 'يمكن تغيير اسم المستخدم مرة واحدة كل شهر.'}
+              </Text>
+              <Pressable
+                style={[styles.usernameChangeButton, usernameChangeLocked && styles.usernameChangeButtonDisabled]}
+                onPress={changeUsername}
+                disabled={usernameSaving || usernameChangeLocked || usernameDraft.trim().toLowerCase() === String(p.username || '').toLowerCase()}
+              >
+                {usernameSaving ? <ActivityIndicator color="#047857" /> : <Text style={styles.usernameChangeButtonText}>تغيير اسم المستخدم</Text>}
+              </Pressable>
               <Text style={styles.label}>المدينة والحي</Text>
               <Pressable style={styles.locationSelectorCard} onPress={() => setShowLocationModal(true)}>
                 <View style={styles.locationSelectorContent}>
                   <MapPin size={20} color={C.accent} />
-                  <Text style={[styles.twitterLocationText, { flex: 1, textAlign: 'right' }]}>
-                    {city ? `${region ? `${region} · ` : ''}${city}${district ? ` · حي ${district}` : ''}` : 'اختر المنطقة والمدينة والحي'}
+                  <Text style={styles.locationSelectorValue} numberOfLines={2}>
+                    {city ? `${region ? `${region} · ` : ''}${city}${district ? ` · ${formatDistrictLabel(district)}` : ''}` : 'اختر المنطقة والمدينة والحي'}
                   </Text>
                   <ChevronDown size={18} color={C.muted} />
                 </View>
+              </Pressable>
+              <Pressable style={styles.currentLocationButton} onPress={useCurrentLocation} disabled={locating}>
+                <MapPin size={17} color={C.accent} />
+                <Text style={styles.currentLocationButtonText}>{locating ? 'جارٍ تحديد موقعك…' : 'استخدام موقعي الحالي'}</Text>
               </Pressable>
               <Text style={styles.label}>نبذة</Text>
               <TextInput
@@ -312,7 +530,9 @@ export default function Profile() {
               ['posts', 'المنشورات'], ['replies', 'الردود'], ['saved', 'المحفوظات'],
             ] as const).map(([key, label]) => (
               <Pressable key={key} onPress={() => setActiveTab(key)} style={styles.profileTab}>
-                <Text style={[styles.profileTabText, activeTab === key && styles.profileTabTextActive]}>{label}</Text>
+                  <Text style={[styles.profileTabText, activeTab === key && styles.profileTabTextActive]}>
+                    {label} <Text style={styles.profileTabCount}>{key === 'posts' ? myQuestions.length : key === 'replies' ? myAnswers.length : savedQuestions.length}</Text>
+                  </Text>
                 {activeTab === key && <View style={styles.profileTabIndicator} />}
               </Pressable>
             ))}
@@ -452,34 +672,33 @@ export default function Profile() {
         selectedCity={city}
         selectedDistrict={district}
         onSelect={(reg, c, d) => {
-          const newCity = c === 'كل المدن' ? '' : c;
-          const newDist = (d === 'كل أحياء المدينة' || d === 'كل الأحياء') ? '' : d;
-          setRegion(reg === 'كل المملكة' ? '' : reg);
-          setCity(newCity);
-          setDistrict(newDist);
+          void applyManualLocation(reg, c, d);
         }}
       />
 
       {/* Bottom Navigation */}
-      <View style={styles.bottomNavWrapper}>
-        <BottomNav />
-      </View>
+      
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   profileHero: {
-    backgroundColor: '#fff',
-    paddingTop: Platform.OS === 'ios' ? 52 : 28,
+    backgroundColor: '#059669',
+    paddingTop: Platform.OS === 'ios' ? 52 : 32,
     paddingHorizontal: 18,
     paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
   },
+  profileHeroInner: {
+    width: '100%',
+    maxWidth: 960,
+    alignSelf: 'center',
+  },
   profileTopBar: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', height: 42, marginBottom: 8 },
-  profileTopButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f1f5f9' },
-  profileTopTitle: { color: '#0f172a', fontSize: 18, fontWeight: '900' },
+  profileTopButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.16)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)' },
+  profileTopTitle: { color: '#fff', fontSize: 18, fontWeight: '900' },
   profileSummary: { flexDirection: 'row-reverse', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: 8, marginBottom: 12 },
   twitterAvatarWrap: { width: 84, height: 84, borderRadius: 42, position: 'relative' },
   twitterAvatar: { width: 84, height: 84, borderRadius: 42, backgroundColor: '#e2e8f0' },
@@ -487,18 +706,33 @@ const styles = StyleSheet.create({
   twitterAvatarEdit: { position: 'absolute', bottom: 0, left: 0, width: 28, height: 28, borderRadius: 14, backgroundColor: '#059669', borderWidth: 2, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   editProfileButton: { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 22, paddingVertical: 8, paddingHorizontal: 15, marginBottom: 4 },
   editProfileButtonText: { color: '#0f172a', fontSize: 13, fontWeight: '800' },
-  twitterDisplayName: { color: '#0f172a', fontSize: 21, fontWeight: '900', textAlign: 'right' },
-  twitterHandle: { color: '#64748b', fontSize: 14, textAlign: 'right', marginTop: 2 },
-  twitterBio: { color: '#1e293b', fontSize: 14, lineHeight: 22, textAlign: 'right', marginTop: 12 },
+  twitterDisplayName: { color: '#fff', fontSize: 21, fontWeight: '900', textAlign: 'right' },
+  twitterHandle: { color: 'rgba(255,255,255,0.72)', fontSize: 14, textAlign: 'right', marginTop: 2 },
+  twitterBio: { color: 'rgba(255,255,255,0.92)', fontSize: 14, lineHeight: 22, textAlign: 'right', marginTop: 12 },
   twitterLocation: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, marginTop: 9 },
-  twitterLocationText: { color: '#64748b', fontSize: 13 },
-  twitterStats: { flexDirection: 'row-reverse', gap: 20, marginTop: 14 },
+  twitterLocationText: { color: 'rgba(255,255,255,0.82)', fontSize: 13 },
+  twitterStats: { flexDirection: 'row-reverse', gap: 20, marginTop: 14, backgroundColor: 'rgba(0,0,0,0.16)', borderRadius: 18, paddingVertical: 10, paddingHorizontal: 14 },
   twitterStat: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4 },
-  twitterStatNum: { color: '#0f172a', fontSize: 14, fontWeight: '900' },
-  twitterStatLabel: { color: '#64748b', fontSize: 13 },
+  twitterStatNum: { color: '#fff', fontSize: 14, fontWeight: '900' },
+  twitterStatLabel: { color: 'rgba(255,255,255,0.78)', fontSize: 13 },
+  profileCompletion: { marginTop: 13, marginBottom: 2 },
+  profileCompletionHeading: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 7 },
+  profileCompletionTitle: { color: 'rgba(255,255,255,0.88)', fontSize: 12, fontWeight: '700' },
+  profileCompletionPercent: { color: '#fff', fontSize: 12, fontWeight: '900' },
+  profileCompletionTrack: { height: 5, borderRadius: 3, overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.24)' },
+  profileCompletionFill: { height: '100%', borderRadius: 3, backgroundColor: '#d1fae5' },
+  profileCompletionAction: { alignSelf: 'flex-start', flexDirection: 'row-reverse', alignItems: 'center', gap: 4, paddingVertical: 6 },
+  profileCompletionActionText: { color: '#d1fae5', fontSize: 12, fontWeight: '800' },
   editProfileCard: { backgroundColor: '#fff', borderBottomWidth: 1, borderColor: '#e2e8f0', padding: 16, gap: 8 },
   editProfileHeading: { fontSize: 17, color: '#0f172a', fontWeight: '900', textAlign: 'right', marginBottom: 6 },
   profileInput: { borderWidth: 1, borderColor: '#cbd5e1', backgroundColor: '#fff', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, color: '#0f172a', textAlign: 'right', fontSize: 14 },
+  usernameInputRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#cbd5e1', backgroundColor: '#fff', borderRadius: 12, paddingHorizontal: 12 },
+  usernameAt: { color: '#64748b', fontSize: 14, fontWeight: '800' },
+  usernameInput: { flex: 1, borderWidth: 0, textAlign: 'left' },
+  usernameHint: { color: '#64748b', fontSize: 12, textAlign: 'right' },
+  usernameChangeButton: { minHeight: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#ecfdf5', borderWidth: 1, borderColor: '#a7f3d0' },
+  usernameChangeButtonDisabled: { opacity: 0.5 },
+  usernameChangeButtonText: { color: '#047857', fontSize: 13, fontWeight: '900' },
   readOnlyInput: { color: '#64748b', backgroundColor: '#f8fafc', textAlign: 'left' },
   bioInput: { minHeight: 82, textAlignVertical: 'top' },
   saveProfileButton: { backgroundColor: '#0f172a', borderRadius: 22, minHeight: 44, alignItems: 'center', justifyContent: 'center', marginTop: 6 },
@@ -507,6 +741,7 @@ const styles = StyleSheet.create({
   profileTab: { flex: 1, minHeight: 50, alignItems: 'center', justifyContent: 'center', position: 'relative' },
   profileTabText: { color: '#64748b', fontSize: 13, fontWeight: '700' },
   profileTabTextActive: { color: '#059669', fontWeight: '900' },
+  profileTabCount: { color: '#94a3b8', fontSize: 11, fontWeight: '700' },
   profileTabIndicator: { position: 'absolute', bottom: 0, width: 46, height: 3, borderRadius: 2, backgroundColor: '#059669' },
   feedItem: { flexDirection: 'row-reverse', gap: 10, backgroundColor: '#fff', padding: 15, borderBottomWidth: 1, borderColor: '#e2e8f0' },
   feedAvatarSmall: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
@@ -526,7 +761,7 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   headerHero: {
-    paddingTop: Platform.OS === 'ios' ? 52 : 36,
+    paddingTop: Platform.OS === 'ios' ? 52 : 40,
     paddingHorizontal: 20,
     paddingBottom: 28,
     borderBottomLeftRadius: 32,
@@ -739,6 +974,9 @@ const styles = StyleSheet.create({
   contentArea: {
     padding: 18,
     marginTop: -8,
+    width: '100%',
+    maxWidth: 960,
+    alignSelf: 'center',
   },
   card: {
     backgroundColor: '#fff',
@@ -815,10 +1053,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e2e8f0',
   },
+  currentLocationButton: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 7, backgroundColor: '#ecfdf5', borderWidth: 1, borderColor: '#a7f3d0', borderRadius: 12, paddingVertical: 10, marginTop: 2 },
+  currentLocationButtonText: { color: C.accent, fontSize: 13, fontWeight: '900' },
   locationSelectorContent: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 10,
+  },
+  locationSelectorValue: {
+    flex: 1,
+    color: '#334155',
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 19,
+    textAlign: 'right',
   },
   locationIconBox: {
     width: 40,

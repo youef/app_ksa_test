@@ -1,3 +1,4 @@
+import { useBottomNavInset } from '@/lib/bottomNav';
 import { useEffect, useState } from 'react';
 import {
   Pressable,
@@ -24,18 +25,23 @@ import {
   Sparkles,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import BottomNav from '@/components/BottomNav';
+import ScreenHeader from '@/components/shared/ScreenHeader';
 import {
   getActiveLocation,
   subscribeLocation,
   isExactDistrictMatching,
+  isLocationMatching,
   isAllKingdom,
 } from '@/lib/locationSync';
+import { relativeTime } from '@/lib/mapPins';
 
 export default function Requests() {
+  const bottomNavInset = useBottomNavInset();
   const [items, setItems] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [hasSession, setHasSession] = useState(false);
+  const [loadError, setLoadError] = useState('');
   const [filterUrgent, setFilterUrgent] = useState(false);
   const [activeLoc, setActiveLoc] = useState({
     region: 'كل المملكة',
@@ -43,45 +49,65 @@ export default function Requests() {
     district: 'كل الأحياء',
   });
 
-  async function load(q = '', onlyUrgent = filterUrgent) {
+  async function load(q = '', onlyUrgent = filterUrgent, location = activeLoc) {
     setLoading(true);
+    setLoadError('');
     try {
-      let query = supabase
-        .from('requests')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(60);
-
-      if (q.trim()) {
-        query = query.or(`title.ilike.%${q.trim()}%,description.ilike.%${q.trim()}%`);
+      const { data: session } = await supabase.auth.getSession();
+      if (session.session?.user) {
+        let query = supabase.from('requests').select('*').order('created_at', { ascending: false }).limit(60);
+        if (q.trim()) query = query.or(`title.ilike.%${q.trim()}%,description.ilike.%${q.trim()}%`);
+        if (onlyUrgent) query = query.eq('is_urgent', true);
+        const result = await query;
+        setItems(result.data ?? []);
+      } else {
+        const result = await supabase.rpc('hayna_guest_requests', {
+          p_city: location.city,
+          p_district: location.district,
+          p_limit: 60,
+        });
+        if (result.error) throw result.error;
+        const searchTerm = q.trim().toLocaleLowerCase('ar');
+        setItems((result.data ?? []).filter((item: any) =>
+          (!onlyUrgent || item.is_urgent) && (!searchTerm || `${item.title} ${item.description}`.toLocaleLowerCase('ar').includes(searchTerm))
+        ));
       }
-      if (onlyUrgent) {
-        query = query.eq('is_urgent', true);
-      }
-
-      const r = await query;
-      setItems(r.data ?? []);
     } catch (e) {
       console.warn('Load requests error', e);
+      setLoadError((e as any)?.code === 'PGRST202' ? 'يلزم تحديث قاعدة البيانات لعرض طلبات الحي للزوار.' : 'تعذر تحميل الطلبات. حاول مرة أخرى.');
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    getActiveLocation().then(setActiveLoc);
-    const unsub = subscribeLocation(setActiveLoc);
-    load(search, filterUrgent);
-    return unsub;
+    supabase.auth.getSession().then(({ data }) => setHasSession(Boolean(data.session?.user)));
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setHasSession(Boolean(session?.user));
+      if (session?.user) void load(search, filterUrgent, activeLoc);
+    });
+    getActiveLocation().then(location => {
+      setActiveLoc(location);
+      void load(search, filterUrgent, location);
+    });
+    const unsub = subscribeLocation(location => {
+      setActiveLoc(location);
+      void load(search, filterUrgent, location);
+    });
+    return () => {
+      unsub();
+      authListener.subscription.unsubscribe();
+    };
   }, [filterUrgent]);
 
-  const displayedItems = items.filter((r) =>
-    isExactDistrictMatching(r, activeLoc.city, activeLoc.district)
+  const displayedItems = items.filter(r => hasSession
+    ? isExactDistrictMatching(r, activeLoc.city, activeLoc.district)
+    : isLocationMatching(r, activeLoc.city, activeLoc.district)
   );
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: bottomNavInset }]} showsVerticalScrollIndicator={false}>
         {/* Header Hero */}
         <LinearGradient
           colors={['#065f46', '#059669', '#10b981']}
@@ -89,16 +115,16 @@ export default function Requests() {
           end={{ x: 1, y: 1 }}
           style={styles.hero}
         >
-          <View style={styles.navBar}>
-            <Pressable onPress={() => router.back()} style={styles.iconBtn}>
-              <ChevronRight size={26} color="#fff" />
-            </Pressable>
-            <Text style={styles.navTitle}>فزعة وطلبات الحي 🤝</Text>
-            <Pressable onPress={() => router.push('/new-request')} style={styles.addBtn}>
-              <Plus size={18} color="#059669" />
-              <Text style={styles.addBtnText}>طلب جديد</Text>
-            </Pressable>
-          </View>
+          <ScreenHeader
+            title="فزعة وطلبات الحي 🤝"
+            fallbackRoute="/home"
+            rightAction={hasSession ? (
+              <Pressable onPress={() => router.push('/new-request')} style={styles.addBtn}>
+                <Plus size={18} color="#059669" />
+                <Text style={styles.addBtnText}>طلب جديد</Text>
+              </Pressable>
+            ) : undefined}
+          />
           <Text style={styles.heroSubtitle}>
             {!isAllKingdom(activeLoc.city)
               ? `طلبات واحتياجات جيرانك في ${activeLoc.city}${activeLoc.district !== 'كل الأحياء' ? ` · حي ${activeLoc.district}` : ''}`
@@ -150,6 +176,14 @@ export default function Requests() {
               <ActivityIndicator size="large" color="#059669" />
               <Text style={styles.loadingText}>جاري تحميل الطلبات...</Text>
             </View>
+          ) : loadError ? (
+            <View style={styles.emptyCard}>
+              <HeartHandshake size={40} color="#f59e0b" />
+              <Text style={styles.emptyTitle}>{loadError}</Text>
+              <Pressable style={styles.emptyAddBtn} onPress={() => load(search, filterUrgent)}>
+                <Text style={styles.emptyAddBtnText}>إعادة المحاولة</Text>
+              </Pressable>
+            </View>
           ) : displayedItems.length === 0 ? (
             <View style={styles.emptyCard}>
               <HeartHandshake size={48} color="#cbd5e1" />
@@ -159,10 +193,10 @@ export default function Requests() {
                   ? `لا توجد طلبات فزعة مسجلة حالياً في ${activeLoc.city}${activeLoc.district !== 'كل الأحياء' ? ` (حي ${activeLoc.district})` : ''}. كن أول من يطلب مساعدة!`
                   : 'تحتاج مساعدة أو توصيل أو غرض؟ اطلب وخل جيرانك يفزعون لك!'}
               </Text>
-              <Pressable style={styles.emptyAddBtn} onPress={() => router.push('/new-request')}>
+              {hasSession && <Pressable style={styles.emptyAddBtn} onPress={() => router.push('/new-request')}>
                 <Plus size={18} color="#fff" />
                 <Text style={styles.emptyAddBtnText}>إضافة طلب جديد</Text>
-              </Pressable>
+              </Pressable>}
             </View>
           ) : (
             displayedItems.map(req => (
@@ -187,10 +221,16 @@ export default function Requests() {
 
                 <View style={styles.cardFooter}>
                   <View style={styles.metaRow}>
-                    <MapPin size={13} color="#059669" />
+                    <MapPin size={12} color="#059669" />
                     <Text style={styles.metaText}>
                       {req.city || 'السعودية'}{req.district ? ` · حي ${req.district}` : ''}
                     </Text>
+                    {Boolean(req.created_at) && (
+                      <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 3, marginRight: 6 }}>
+                        <Clock size={11} color="#94a3b8" />
+                        <Text style={{ fontSize: 11, color: '#94a3b8', fontWeight: '600' }}>{relativeTime(req.created_at)}</Text>
+                      </View>
+                    )}
                   </View>
 
                   {req.budget ? (
@@ -199,7 +239,7 @@ export default function Requests() {
                       <Text style={styles.budgetText}>مكافأة: {req.budget} ر.س</Text>
                     </View>
                   ) : (
-                    <Text style={styles.volunteerTag}>فزعة وتطوع</Text>
+                    <Text style={styles.volunteerTag}>🤝 فزعة وتطوع</Text>
                   )}
                 </View>
               </Pressable>
@@ -210,9 +250,7 @@ export default function Requests() {
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      <View style={styles.bottomNavWrapper}>
-        <BottomNav />
-      </View>
+      
     </View>
   );
 }
@@ -226,7 +264,7 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   hero: {
-    paddingTop: Platform.OS === 'ios' ? 52 : 36,
+    paddingTop: Platform.OS === 'ios' ? 52 : 40,
     paddingHorizontal: 20,
     paddingBottom: 24,
     borderBottomLeftRadius: 28,

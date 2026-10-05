@@ -1,3 +1,4 @@
+import { useBottomNavInset } from '@/lib/bottomNav';
 import { useState, useMemo } from 'react';
 import {
   Pressable,
@@ -12,9 +13,10 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { SAUDI_REGIONS } from '@/lib/saudiLocations';
 import { ChevronRight, MapPin, Search, ChevronLeft, Building2 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import BottomNav from '@/components/BottomNav';
+import ScreenHeader from '@/components/shared/ScreenHeader';
 
 export default function Cities() {
+  const bottomNavInset = useBottomNavInset();
   const { regionName } = useLocalSearchParams<{ regionName: string }>();
   const [search, setSearch] = useState('');
 
@@ -28,7 +30,7 @@ export default function Cities() {
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: bottomNavInset }]} showsVerticalScrollIndicator={false}>
         {/* Header Hero */}
         <LinearGradient
           colors={['#065f46', '#059669', '#10b981']}
@@ -36,13 +38,7 @@ export default function Cities() {
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
         >
-          <View style={styles.navBar}>
-            <Pressable onPress={() => router.back()} style={styles.iconBtn}>
-              <ChevronRight size={28} color="#fff" />
-            </Pressable>
-            <Text style={styles.navTitle}>{region.name}</Text>
-            <View style={{ width: 28 }} />
-          </View>
+          <ScreenHeader title={region.name} fallbackRoute="/locations" />
           <Text style={styles.heroSub}>
             اختر مدينتك لتصفح الأحياء وربط حسابك بمجتمع الحي.
           </Text>
@@ -86,9 +82,7 @@ export default function Cities() {
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      <View style={styles.bottomNavWrapper}>
-        <BottomNav />
-      </View>
+      
     </View>
   );
 }
@@ -102,7 +96,7 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   hero: {
-    paddingTop: Platform.OS === 'ios' ? 52 : 36,
+    paddingTop: Platform.OS === 'ios' ? 52 : 40,
     paddingHorizontal: 20,
     paddingBottom: 24,
     borderBottomLeftRadius: 28,

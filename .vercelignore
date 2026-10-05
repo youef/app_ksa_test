@@ -6,3 +6,5 @@ Expo-Go-57.0.9
 expo-skills-temp
 .agents
 *.log
+local_tests_and_docs
+.vscode

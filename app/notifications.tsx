@@ -31,6 +31,8 @@ import {
   RefreshCw,
   SlidersHorizontal,
 } from 'lucide-react-native';
+import { useBottomNavInset } from '@/lib/bottomNav';
+import ScreenHeader from '@/components/shared/ScreenHeader';
 
 type NotificationCategory = 'all' | 'emergency' | 'answers' | 'community' | 'stories';
 
@@ -47,6 +49,7 @@ interface NotificationItem {
 }
 
 export default function Notifications() {
+  const bottomNavInset = useBottomNavInset();
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -92,7 +95,7 @@ export default function Notifications() {
     load();
 
     const ch = supabase
-      .channel('notifications-live')
+      .channel(`notifications-live-${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'notifications' },
@@ -165,14 +168,18 @@ export default function Notifications() {
     }
 
     if (n.target_type === 'question' && n.target_id) {
-      router.push(`/question/${n.target_id}` as any);
+      router.push({ pathname: '/question', params: { id: n.target_id } });
     } else if (n.target_type === 'request' && n.target_id) {
-      router.push(`/request/${n.target_id}` as any);
-    } else if (n.target_type === 'conversation' && n.target_id) {
-      router.push(`/messages/${n.target_id}` as any);
+      router.push({ pathname: '/request', params: { id: n.target_id } });
+    } else if (n.target_type === 'service' && n.target_id) {
+      router.push({ pathname: '/service', params: { id: n.target_id } });
+    } else if ((n.target_type === 'conversation' || n.target_type === 'message') && n.target_id) {
+      router.push({ pathname: '/conversation', params: { id: n.target_id } });
     } else if (n.target_type === 'story' && n.target_id) {
       router.push({ pathname: '/story', params: { id: n.target_id } });
     } else if (n.type === 'emergency') {
+      router.push('/home');
+    } else {
       router.push('/home');
     }
   }
@@ -197,7 +204,7 @@ export default function Notifications() {
         return n.type === 'answer' || n.target_type === 'question' || n.type === 'message';
       }
       if (activeTab === 'community') {
-        return n.type === 'request' || n.target_type === 'request' || (n.title && n.title.includes('إعارة'));
+        return n.type === 'request' || n.target_type === 'request' || n.type === 'service' || n.target_type === 'service' || (n.title && n.title.includes('إعارة'));
       }
       if (activeTab === 'stories') {
         return n.type === 'story' || n.target_type === 'story' || (n.title && n.title.includes('يوميات'));
@@ -214,29 +221,16 @@ export default function Notifications() {
       {/* 1. TOP CURVED GRADIENT HEADER                            */}
       {/* ======================================================== */}
       <LinearGradient colors={['#065f46', '#059669', '#10b981']} style={styles.headerHero}>
-        <View style={styles.headerTopRow}>
-          <Pressable onPress={() => router.back()} style={styles.headerBtn}>
-            <ChevronRight size={26} color="#fff" />
-          </Pressable>
-
-          <View style={styles.headerTitleContainer}>
-            <View style={styles.titleBadgeRow}>
-              <Text style={styles.headerTitle}>مركز الإشعارات</Text>
-              {unreadCount > 0 && (
-                <View style={styles.unreadCounterBadge}>
-                  <Text style={styles.unreadCounterText}>{unreadCount} جديدة</Text>
-                </View>
-              )}
-            </View>
-            <Text style={styles.headerSubtitle}>تنبيهات وتفاعلات أهالي حيك والخدمات</Text>
-          </View>
-
-          <View style={styles.headerActions}>
+        <ScreenHeader
+          title="مركز الإشعارات"
+          fallbackRoute="/home"
+          subtitle={unreadCount > 0 ? `${unreadCount} جديدة · تنبيهات وتفاعلات أهالي حيك والخدمات` : 'تنبيهات وتفاعلات أهالي حيك والخدمات'}
+          rightAction={(
             <Pressable onPress={() => setSettingsOpen(true)} style={styles.headerBtn}>
               <SlidersHorizontal size={20} color="#fff" />
             </Pressable>
-          </View>
-        </View>
+          )}
+        />
 
         {/* Action bar inside header */}
         <View style={styles.quickBar}>
@@ -329,7 +323,7 @@ export default function Notifications() {
       ) : (
         <ScrollView
           style={styles.feed}
-          contentContainerStyle={styles.feedContent}
+          contentContainerStyle={[styles.feedContent, { paddingBottom: bottomNavInset + 16 }]}
           showsVerticalScrollIndicator={false}
         >
           {filteredItems.length === 0 ? (
@@ -618,7 +612,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
   },
   headerHero: {
-    paddingTop: Platform.OS === 'ios' ? 52 : 36,
+    paddingTop: Platform.OS === 'ios' ? 52 : 40,
     paddingHorizontal: 20,
     paddingBottom: 20,
     borderBottomLeftRadius: 28,
