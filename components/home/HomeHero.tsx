@@ -29,12 +29,7 @@ export default function HomeHero({
       : `${city}${district !== 'كل الأحياء' ? ` · حي ${district}` : ''}`;
 
   return (
-    <LinearGradient
-      colors={['#065f46', '#059669', '#10b981']}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={styles.hero}
-    >
+    <View style={styles.hero}>
       <View style={styles.topNavRow}>
         <View style={styles.leftActions}>
           {isGuest ? (
@@ -132,6 +127,6 @@ export default function HomeHero({
           )}
         </View>
       </View>
-    </LinearGradient>
+    </View>
   );
 }
