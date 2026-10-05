@@ -3,6 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
+
 jobs:
   web:
     runs-on: ubuntu-latest
@@ -11,21 +12,46 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
       - run: npm install
       - run: npx expo export -p web
       - uses: actions/upload-artifact@v4
         with:
           name: hayna-web
           path: dist
+
   eas:
-    if: ${{ secrets.EXPO_TOKEN != '' }}
     runs-on: ubuntu-latest
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
       - run: npm install
-      - run: npx eas-cli@latest build --platform all --non-interactive
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      - name: Build Android APK with EAS
+        if: ${{ env.EXPO_TOKEN != '' }}
+        run: |
+          set -e
+          npx eas-cli@latest build --platform android --profile development --non-interactive --wait > eas-build.log 2>&1
+          cat eas-build.log
+          APK_URL="$(grep -Eo 'https://expo\.dev/artifacts/eas/[^[:space:]]+\.apk' eas-build.log | tail -1)"
+          if [ -z "$APK_URL" ]; then
+            echo "Could not find the APK URL in the EAS build output."
+            exit 1
+          fi
+          echo "APK_URL=$APK_URL"
+          curl -fL "$APK_URL" -o hayna-development.apk
+      - name: Upload APK artifact
+        if: ${{ env.EXPO_TOKEN != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: hayna-android-apk
+          path: hayna-development.apk
+      - name: Explain missing EAS token
+        if: ${{ env.EXPO_TOKEN == '' }}
+        run: |
+          echo "::error::EXPO_TOKEN is not configured in GitHub repository secrets. Add EXPO_TOKEN and rerun this workflow."
+          exit 1
