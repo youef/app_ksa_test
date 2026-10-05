@@ -7,7 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
   ArrowRight, BadgeCheck, BriefcaseBusiness, ChevronLeft, Heart,
-  Lock, MapPin, MessageCircle, MoreHorizontal, Package, Plus,
+Lock, MapPin, MessageCircle, MoreHorizontal, Package, Plus,
   Search, ShieldCheck, ShoppingBag, Sparkles, Star, UserCheck,
   UserPlus, UserRound, UserRoundX, Users, Wrench, Zap,
 } from 'lucide-react-native';
@@ -34,10 +34,7 @@ export default function UserProfile() {
   const [services, setServices] = useState<any[]>([]);
   const [requests, setRequests] = useState<any[]>([]);
   const [questions, setQuestions] = useState<any[]>([]);
-  const [badges, setBadges] = useState<any[]>([]);
-  const [skills, setSkills] = useState<any[]>([]);
-  const [reputation, setReputation] = useState<any>(null);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [following, setFollowing] = useState(false);
   const [followedBy, setFollowedBy] = useState(false);
   const [blocked, setBlocked] = useState(false);
@@ -103,7 +100,7 @@ export default function UserProfile() {
       const [
         marketCount, serviceCount, requestCount, questionCount, followerCount,
         followingCount, answerCount, itemRows, serviceRows, requestRows,
-        questionRows, rep, badgeRows, skillRows,
+        questionRows,
       ] = await Promise.all([
         supabase.from('marketplace_items').select('id', { count: 'exact', head: true }).eq('seller_id', id),
         supabase.from('services').select('id', { count: 'exact', head: true }).eq('provider_id', id),
@@ -116,9 +113,6 @@ export default function UserProfile() {
         supabase.from('services').select('id,name,description,category,district,price_from,price_to,available_now,is_verified,cover_url,created_at').eq('provider_id', id).order('created_at', { ascending: false }).limit(18),
         supabase.from('requests').select('id,title,description,status,request_type,budget,is_urgent,district,created_at').eq('requester_id', id).order('created_at', { ascending: false }).limit(18),
         supabase.from('questions').select('id,title,body,status,category,district,created_at,view_count').eq('author_id', id).order('created_at', { ascending: false }).limit(18),
-        supabase.from('reputation').select('points,answers_count,helpful_votes,best_answers').eq('user_id', id).maybeSingle(),
-        supabase.from('profile_badges').select('badge_code,awarded_at,badge_definitions(code,name,icon,description)').eq('user_id', id).order('awarded_at', { ascending: false }).limit(8),
-        supabase.from('user_skills').select('*').eq('user_id', id).limit(12),
       ]);
       setStats({
         market: marketCount.count || 0, services: serviceCount.count || 0,
@@ -130,9 +124,6 @@ export default function UserProfile() {
       setServices(serviceRows.data || []);
       setRequests(requestRows.data || []);
       setQuestions(questionRows.data || []);
-      setReputation(rep.data || null);
-      setBadges(badgeRows.data || []);
-      setSkills(skillRows.data || []);
     } catch (e) {
       console.error('profile load', e);
       setProfile(null);
@@ -210,8 +201,6 @@ export default function UserProfile() {
   const anonymous = profile.hide_name === true && !own;
   const displayName = anonymous ? 'جار مجهول' : profile.display_name || profile.username || 'مستخدم';
   const locked = (profile.profile_privacy === 'private' && !following && !own) || blocked || blockedByOther;
-  const rating = reputation?.points ? Math.min(5, 3.8 + Math.min(1.2, reputation.points / 500)) : 4.8;
-  const totalActivity = stats.market + stats.services + stats.requests + stats.questions + stats.answers;
 
   const currentData = tab === 'market' ? items : tab === 'services' ? services : tab === 'requests' ? requests : questions;
 
@@ -249,34 +238,14 @@ export default function UserProfile() {
             </View>
             {!anonymous && profile.bio && <Text style={styles.bio}>{profile.bio}</Text>}
             <View style={styles.trustRow}>
-              <View style={styles.trustPill}><Star size={14} color="#fde68a" fill="#fde68a" /><Text style={styles.trustText}>{rating.toFixed(1)}</Text></View>
               <View style={styles.trustPill}><ShieldCheck size={14} color="#a7f3d0" /><Text style={styles.trustText}>{profile.is_geoverified ? 'موثق بالحي' : 'عضو في الحي'}</Text></View>
-              <View style={styles.trustPill}><Zap size={14} color="#fde68a" /><Text style={styles.trustText}>{reputation?.points || 0} نقطة</Text></View>
             </View>
           </LinearGradient>
 
           <View style={styles.statsCard}>
             <Stat label="متابع" value={stats.followers} />
             <Stat label="يتابع" value={stats.following} />
-            <Stat label="إجابة" value={stats.answers} />
-            <Stat label="نشاط" value={totalActivity} />
           </View>
-
-          {!!badges.length && (
-            <View style={styles.card}>
-              <View style={styles.sectionHead}><Text style={styles.sectionTitle}>الإنجازات</Text><Sparkles size={18} color={C.accent} /></View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.badgesRow}>
-                {badges.map((b, i) => <View key={b.badge_code + i} style={styles.badgeCard}><Text style={styles.badgeIcon}>{b.badge_definitions?.icon || '🏅'}</Text><Text style={styles.badgeName} numberOfLines={1}>{b.badge_definitions?.name || b.badge_code}</Text></View>)}
-              </ScrollView>
-            </View>
-          )}
-
-          {!!skills.length && !locked && (
-            <View style={styles.card}>
-              <View style={styles.sectionHead}><Text style={styles.sectionTitle}>مهارات وخبرات</Text><BriefcaseBusiness size={18} color={C.accent} /></View>
-              <View style={styles.chips}>{skills.map((s, i) => <View style={styles.chip} key={i}><Text style={styles.chipText}>{s.skill || s.name || s.title || 'مهارة'}</Text></View>)}</View>
-            </View>
-          )}
 
           <View style={styles.tabsCard}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
