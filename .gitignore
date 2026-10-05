@@ -2,16 +2,13 @@ node_modules/
 .expo/
 dist/
 web-build/
-.env
-.env.*
-!.env.example
+.env.local
 *.log
 .DS_Store
 Expo-Go-57.0.9*
 expo-skills-temp/
 .agents/
 .vercel
-.env*
 local_tests_and_docs/
 .vscode/settings.json
 .vscode/

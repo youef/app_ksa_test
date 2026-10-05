@@ -34,7 +34,10 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "sa.hayna.app",
-      "icon": "./public/brand/HAYNA_LOGO.png"
+      "icon": "./public/brand/HAYNA_LOGO.png",
+      "config": {
+        "googleMapsApiKey": "AIzaSyD3dbOJXEPgG1qyNi4Z_sLO46kj6c5bnY8"
+      }
     },
     "android": {
       "package": "sa.hayna.app",
@@ -45,7 +48,12 @@
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION"
-      ]
+      ],
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyD3dbOJXEPgG1qyNi4Z_sLO46kj6c5bnY8"
+        }
+      }
     },
     "web": {
       "bundler": "metro",
@@ -58,7 +66,10 @@
       "router": {},
       "eas": {
         "projectId": "f8205dc7-21de-46d3-aa97-57f2249a81ed"
-      }
+      },
+      "EXPO_PUBLIC_SUPABASE_URL": "https://vkeuyompnddqfvulalkk.supabase.co",
+      "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_MASvVnmIu2nN28cY0hqa-A_7kWRo0u_",
+      "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyD3dbOJXEPgG1qyNi4Z_sLO46kj6c5bnY8"
     }
   }
 }
