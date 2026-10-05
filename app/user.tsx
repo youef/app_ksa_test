@@ -1,540 +1,457 @@
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View, Alert } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator, Alert, Image, Platform, Pressable, RefreshControl,
+  ScrollView, StyleSheet, Text, View, useWindowDimensions,
+} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
+import {
+  ArrowRight, BadgeCheck, BriefcaseBusiness, ChevronLeft, Heart,
+  Lock, MapPin, MessageCircle, MoreHorizontal, Package, Plus,
+  Search, ShieldCheck, ShoppingBag, Sparkles, Star, UserCheck,
+  UserPlus, UserRound, UserRoundX, Users, Wrench, Zap,
+} from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
 import { getBlockStatus, setBlock } from '@/lib/chatControls';
 import { isExactDistrictMatching } from '@/lib/locationSync';
-import {
-  ChevronRight,
-  MessageCircle,
-  MapPin,
-  Shield,
-  User as UserIcon,
-  UserPlus,
-  UserCheck,
-  Lock,
-  EyeOff,
-  UserX,
-  Sparkles,
-  MoreHorizontal,
-  Star,
-} from 'lucide-react-native';
+
+type Tab = 'market' | 'services' | 'requests' | 'questions';
+
+const TABS: { id: Tab; label: string; icon: any }[] = [
+  { id: 'market', label: 'السوق', icon: ShoppingBag },
+  { id: 'services', label: 'الخدمات', icon: Wrench },
+  { id: 'requests', label: 'الطلبات', icon: Package },
+  { id: 'questions', label: 'الاستفسارات', icon: Search },
+];
 
 export default function UserProfile() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const [p, setP] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [isFollowing, setIsFollowing] = useState(false);
-  const [isBlocked, setIsBlocked] = useState(false);
-  const [blockedByOther, setBlockedByOther] = useState(false);
-  const [isFollowedBy, setIsFollowedBy] = useState(false);
-  const [followSaving, setFollowSaving] = useState(false);
-  const [blockSaving, setBlockSaving] = useState(false);
-  const [messageOpening, setMessageOpening] = useState(false);
-  const [sameNeighborhood, setSameNeighborhood] = useState(false);
-  const [activeTab, setActiveTab] = useState<'questions' | 'requests' | 'services'>('services');
-  const [reputation, setReputation] = useState<any>(null);
-  const [badges, setBadges] = useState<any[]>([]);
-  const [stats, setStats] = useState({ questions: 0, answers: 0, requests: 0, services: 0, followers: 0, following: 0 });
-  const [questions, setQuestions] = useState<any[]>([]);
-  const [answers, setAnswers] = useState<any[]>([]);
-  const [requests, setRequests] = useState<any[]>([]);
+  const { width } = useWindowDimensions();
+  const [profile, setProfile] = useState<any>(null);
+  const [stats, setStats] = useState({ market: 0, services: 0, requests: 0, questions: 0, followers: 0, following: 0, answers: 0 });
+  const [items, setItems] = useState<any[]>([]);
   const [services, setServices] = useState<any[]>([]);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [requests, setRequests] = useState<any[]>([]);
+  const [questions, setQuestions] = useState<any[]>([]);
+  const [badges, setBadges] = useState<any[]>([]);
+  const [skills, setSkills] = useState<any[]>([]);
+  const [reputation, setReputation] = useState<any>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [following, setFollowing] = useState(false);
+  const [followedBy, setFollowedBy] = useState(false);
+  const [blocked, setBlocked] = useState(false);
+  const [blockedByOther, setBlockedByOther] = useState(false);
+  const [sameDistrict, setSameDistrict] = useState(true);
+  const [tab, setTab] = useState<Tab>('market');
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    let active = true;
-    async function load() {
-      setLoading(true);
-      try {
-        const [{ data: auth }, { data: profile, error: profileError }] = await Promise.all([
-          supabase.auth.getUser(),
-          supabase.from('profiles').select('*').eq('id', id).maybeSingle(),
+  const cardWidth = useMemo(() => {
+    const max = Math.min(width - 32, 1080);
+    if (max >= 900) return (max - 32) / 3;
+    if (max >= 620) return (max - 16) / 2;
+    return max;
+  }, [width]);
+
+  const load = async (silent = false) => {
+    if (!id) return;
+    if (!silent) setLoading(true);
+    try {
+      const [{ data: auth }, { data: p, error }] = await Promise.all([
+        supabase.auth.getUser(),
+        supabase.from('profiles').select('*').eq('id', id).maybeSingle(),
+      ]);
+      if (error) throw error;
+      const me = auth.user?.id || null;
+      setCurrentUserId(me);
+      setProfile(p);
+      if (!p) return;
+
+      let isFollowing = false;
+      let isFollowedBy = false;
+      let iBlocked = false;
+      let blockedMe = false;
+      if (me && me !== id) {
+        const [a, b, c] = await Promise.all([
+          supabase.from('follows').select('id').eq('follower_id', me).eq('following_id', id).maybeSingle(),
+          supabase.from('follows').select('id').eq('follower_id', id).eq('following_id', me).maybeSingle(),
+          getBlockStatus(me, id),
         ]);
-        if (profileError) throw profileError;
-        if (!active) return;
-        const myId = auth.user?.id || null;
-        setCurrentUserId(myId);
-        setP(profile);
-        if (!profile) return;
-
-        let neighborhoodMatch = myId === id;
-        if (myId && myId !== id) {
-          const { data: myProfile } = await supabase.from('profiles').select('city, district').eq('id', myId).maybeSingle();
-          neighborhoodMatch = !!myProfile && isExactDistrictMatching(profile, myProfile.city, myProfile.district);
-        }
-        setSameNeighborhood(neighborhoodMatch);
-
-        let following = false;
-        let followedBy = false;
-        let blocked = false;
-        let blockedMe = false;
-        if (myId && myId !== id) {
-          const [followingRes, followedByRes, blockStatus] = await Promise.all([
-            supabase.from('follows').select('id').eq('follower_id', myId).eq('following_id', id).maybeSingle(),
-            supabase.from('follows').select('id').eq('follower_id', id).eq('following_id', myId).maybeSingle(),
-            getBlockStatus(myId, id),
-          ]);
-          following = !!followingRes.data;
-          followedBy = !!followedByRes.data;
-          blocked = blockStatus.iBlocked;
-          blockedMe = blockStatus.blockedMe;
-        }
-        if (!active) return;
-        setIsFollowing(following);
-        setIsFollowedBy(followedBy);
-        setIsBlocked(blocked);
-        setBlockedByOther(blockedMe);
-
-        const locked = (profile.profile_privacy === 'private' && !following && myId !== id) || (myId !== id && !neighborhoodMatch);
-        const hiddenByBlock = blocked || blockedMe;
-        const hiddenByAnonymous = profile.hide_name === true && myId !== id;
-        if (locked || hiddenByBlock || hiddenByAnonymous) {
-          setQuestions([]); setAnswers([]); setRequests([]); setServices([]);
-          setStats({ questions: 0, answers: 0, requests: 0, services: 0, followers: 0, following: 0 });
-          return;
-        }
-
-        const [qCount, aCount, requestCount, serviceCount, followersCount, followingCount, questionRows, answerRows, requestRows, serviceRows, reputationRes, badgesRes] = await Promise.all([
-          supabase.from('questions').select('id', { count: 'exact', head: true }).eq('author_id', id),
-          supabase.from('answers').select('id', { count: 'exact', head: true }).eq('author_id', id),
-          supabase.from('requests').select('id', { count: 'exact', head: true }).eq('requester_id', id),
-          supabase.from('services').select('id', { count: 'exact', head: true }).eq('provider_id', id),
-          supabase.from('follows').select('id', { count: 'exact', head: true }).eq('following_id', id),
-          supabase.from('follows').select('id', { count: 'exact', head: true }).eq('follower_id', id),
-          supabase.from('questions').select('id, title, body, created_at, city, district, status').eq('author_id', id).order('created_at', { ascending: false }).limit(30),
-          supabase.from('answers').select('id, body, created_at, question_id, questions(title)').eq('author_id', id).order('created_at', { ascending: false }).limit(30),
-          supabase.from('requests').select('id, title, description, status, request_type, budget, is_urgent, city, district, created_at').eq('requester_id', id).order('created_at', { ascending: false }).limit(30),
-          supabase.from('services').select('id, name, description, category, city, district, price_from, price_to, available_now, is_verified, created_at').eq('provider_id', id).order('created_at', { ascending: false }).limit(30),
-          supabase.from('reputation').select('points, answers_count, helpful_votes, best_answers').eq('user_id', id).maybeSingle(),
-          supabase.from('profile_badges').select('badge_code, awarded_at, badge_definitions(code,name,icon,description)').eq('user_id', id).order('awarded_at', { ascending: false }).limit(8),
-        ]);
-        if (!active) return;
-        setStats({
-          questions: qCount.count || 0, answers: aCount.count || 0, requests: requestCount.count || 0,
-          services: serviceCount.count || 0, followers: followersCount.count || 0, following: followingCount.count || 0,
-        });
-        setQuestions(questionRows.data || []);
-        setAnswers(answerRows.data || []);
-        setRequests(requestRows.data || []);
-        setServices(serviceRows.data || []);
-        setReputation(reputationRes.data || null);
-        setBadges(badgesRes.data || []);
-      } catch (error) {
-        console.error('Public profile load failed:', error);
-        if (active) setP(null);
-      } finally {
-        if (active) setLoading(false);
+        isFollowing = !!a.data;
+        isFollowedBy = !!b.data;
+        iBlocked = c.iBlocked;
+        blockedMe = c.blockedMe;
+        const { data: mine } = await supabase.from('profiles').select('city,district').eq('id', me).maybeSingle();
+        setSameDistrict(!!mine && isExactDistrictMatching(p, mine.city, mine.district));
+      } else {
+        setSameDistrict(true);
       }
+      setFollowing(isFollowing);
+      setFollowedBy(isFollowedBy);
+      setBlocked(iBlocked);
+      setBlockedByOther(blockedMe);
+
+      const locked = (p.profile_privacy === 'private' && !isFollowing && me !== id) || iBlocked || blockedMe || (p.hide_name === true && me !== id);
+      if (locked) {
+        setItems([]); setServices([]); setRequests([]); setQuestions([]);
+        setStats({ market: 0, services: 0, requests: 0, questions: 0, followers: 0, following: 0, answers: 0 });
+        return;
+      }
+
+      const [
+        marketCount, serviceCount, requestCount, questionCount, followerCount,
+        followingCount, answerCount, itemRows, serviceRows, requestRows,
+        questionRows, rep, badgeRows, skillRows,
+      ] = await Promise.all([
+        supabase.from('marketplace_items').select('id', { count: 'exact', head: true }).eq('seller_id', id),
+        supabase.from('services').select('id', { count: 'exact', head: true }).eq('provider_id', id),
+        supabase.from('requests').select('id', { count: 'exact', head: true }).eq('requester_id', id),
+        supabase.from('questions').select('id', { count: 'exact', head: true }).eq('author_id', id),
+        supabase.from('follows').select('id', { count: 'exact', head: true }).eq('following_id', id),
+        supabase.from('follows').select('id', { count: 'exact', head: true }).eq('follower_id', id),
+        supabase.from('answers').select('id', { count: 'exact', head: true }).eq('author_id', id),
+        supabase.from('marketplace_items').select('id,title,description,price,item_type,district,image_url,status,created_at').eq('seller_id', id).order('created_at', { ascending: false }).limit(18),
+        supabase.from('services').select('id,name,description,category,district,price_from,price_to,available_now,is_verified,cover_url,created_at').eq('provider_id', id).order('created_at', { ascending: false }).limit(18),
+        supabase.from('requests').select('id,title,description,status,request_type,budget,is_urgent,district,created_at').eq('requester_id', id).order('created_at', { ascending: false }).limit(18),
+        supabase.from('questions').select('id,title,body,status,category,district,created_at,view_count').eq('author_id', id).order('created_at', { ascending: false }).limit(18),
+        supabase.from('reputation').select('points,answers_count,helpful_votes,best_answers').eq('user_id', id).maybeSingle(),
+        supabase.from('profile_badges').select('badge_code,awarded_at,badge_definitions(code,name,icon,description)').eq('user_id', id).order('awarded_at', { ascending: false }).limit(8),
+        supabase.from('user_skills').select('*').eq('user_id', id).limit(12),
+      ]);
+      setStats({
+        market: marketCount.count || 0, services: serviceCount.count || 0,
+        requests: requestCount.count || 0, questions: questionCount.count || 0,
+        followers: followerCount.count || 0, following: followingCount.count || 0,
+        answers: answerCount.count || 0,
+      });
+      setItems(itemRows.data || []);
+      setServices(serviceRows.data || []);
+      setRequests(requestRows.data || []);
+      setQuestions(questionRows.data || []);
+      setReputation(rep.data || null);
+      setBadges(badgeRows.data || []);
+      setSkills(skillRows.data || []);
+    } catch (e) {
+      console.error('profile load', e);
+      setProfile(null);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
-    if (id) void load();
-    else setLoading(false);
-    return () => { active = false; };
-  }, [id, refreshKey]);
+  };
+
+  useEffect(() => { void load(); }, [id]);
 
   async function toggleFollow() {
-    if (!currentUserId) {
-      return Alert.alert('تنبيه', 'يجب تسجيل الدخول لمتابعة المستخدمين.');
-    }
+    if (!currentUserId) return Alert.alert('تسجيل الدخول مطلوب', 'سجّل دخولك أولاً لمتابعة المستخدمين.');
+    if (currentUserId === id || blocked || blockedByOther || busy) return;
+    setBusy(true);
+    try {
+      const { data, error } = await supabase.rpc('hayna_toggle_follow', { p_target: id });
+      if (error) throw error;
+      setFollowing(data === true);
+      setStats(s => ({ ...s, followers: data === true ? s.followers + 1 : Math.max(0, s.followers - 1) }));
+    } catch (e: any) {
+      Alert.alert('تعذر تحديث المتابعة', e?.message || 'حاول مرة أخرى.');
+    } finally { setBusy(false); }
+  }
+
+  async function openMessage() {
+    if (!currentUserId) return Alert.alert('تسجيل الدخول مطلوب', 'سجّل دخولك أولاً للمراسلة.');
     if (currentUserId === id) return;
-
-    if (isBlocked) {
-      return Alert.alert('تنبيه', 'لا يمكنك متابعة مستخدم قمت بحظره. قم بإلغاء الحظر أولاً.');
-    }
-
-    if (followSaving) return;
-    setFollowSaving(true);
+    if (blocked) return Alert.alert('الحساب محظور', 'ألغِ الحظر أولاً.');
+    if (blockedByOther) return Alert.alert('لا يمكن المراسلة', 'هذا المستخدم حظرك.');
+    if (!sameDistrict) return Alert.alert('المراسلة داخل الحي', 'المراسلة الخاصة متاحة بين سكان الحي نفسه.');
+    if (profile?.allow_dms === 'nobody') return Alert.alert('الخاص مغلق', 'هذا المستخدم لا يستقبل رسائل خاصة.');
+    if (profile?.allow_dms === 'followers' && !following) return Alert.alert('للمتابعين فقط', 'تابع المستخدم أولاً حتى تتمكن من مراسلته.');
+    setBusy(true);
     try {
-      if (isFollowing) {
-        const { error } = await supabase.rpc('hayna_toggle_follow', { p_target: id });
-        if (error) throw error;
-        setIsFollowing(false);
-        setStats(s => ({ ...s, followers: Math.max(0, s.followers - 1) }));
-        setRefreshKey(value => value + 1);
-      } else {
-        const { data: followed, error } = await supabase.rpc('hayna_toggle_follow', { p_target: id });
-        if (error) throw error;
-        setIsFollowing(followed === true);
-        setStats(s => ({ ...s, followers: followed === true ? s.followers + 1 : s.followers }));
-        setRefreshKey(value => value + 1);
-      }
+      const { data, error } = await supabase.rpc('hayna_get_or_create_direct_conversation', { p_target: id });
+      if (error) throw error;
+      if (data) router.push({ pathname: '/conversation', params: { id: data } });
     } catch (e: any) {
-      Alert.alert('تعذّر تحديث المتابعة', e?.message || 'تحقق من الاتصال ثم أعد المحاولة.');
-    } finally {
-      setFollowSaving(false);
-    }
+      Alert.alert('تعذر فتح المحادثة', e?.message || 'حاول مرة أخرى.');
+    } finally { setBusy(false); }
   }
 
-  // Toggle Block / Unblock user
-  function confirmToggleBlock() {
-    if (!currentUserId || currentUserId === id || blockSaving) return;
-
-    if (isBlocked) {
-      Alert.alert('إلغاء الحظر', 'هل تريد بالتأكيد إلغاء حظر هذا المستخدم؟', [
+  function toggleBlock() {
+    if (!currentUserId || currentUserId === id || busy) return;
+    Alert.alert(
+      blocked ? 'إلغاء الحظر' : 'حظر المستخدم',
+      blocked ? 'هل تريد إلغاء حظر هذا المستخدم؟' : 'لن يتمكن المستخدم من مراسلتك أو متابعة حسابك.',
+      [
         { text: 'إلغاء', style: 'cancel' },
         {
-          text: 'إلغاء الحظر',
+          text: blocked ? 'إلغاء الحظر' : 'حظر',
+          style: blocked ? 'default' : 'destructive',
           onPress: async () => {
-            setBlockSaving(true);
+            setBusy(true);
             try {
-              const result = await setBlock(currentUserId, id, false);
-              if (!result.ok) return Alert.alert('تعذّر إلغاء الحظر', result.error);
-              setIsBlocked(false);
-              setRefreshKey(value => value + 1);
-              Alert.alert('تم! ✅', 'تم رفع الحظر عن هذا المستخدم.');
-            } finally {
-              setBlockSaving(false);
-            }
+              const r = await setBlock(currentUserId, id, !blocked);
+              if (!r.ok) throw new Error(r.error);
+              setBlocked(!blocked);
+              if (!blocked) setFollowing(false);
+              await load(true);
+            } catch (e: any) {
+              Alert.alert('تعذر تنفيذ العملية', e?.message || 'حاول مرة أخرى.');
+            } finally { setBusy(false); }
           },
         },
-      ]);
-    } else {
-      Alert.alert('حظر المستخدم 🚫', 'لن يتمكن هذا المستخدم من مراسلتك أو التفاعل معك، ولن تظهر رسائله لك.', [
-        { text: 'إلغاء', style: 'cancel' },
-        {
-          text: 'حظر الآن',
-          style: 'destructive',
-          onPress: async () => {
-            setBlockSaving(true);
-            try {
-              const result = await setBlock(currentUserId, id, true);
-              if (!result.ok) return Alert.alert('تعذّر الحظر', result.error);
-              setIsBlocked(true);
-              setIsFollowing(false);
-              setStats(s => ({ ...s, followers: Math.max(0, s.followers - (isFollowing ? 1 : 0)), following: Math.max(0, s.following - (isFollowedBy ? 1 : 0)) }));
-              setQuestions([]); setAnswers([]); setRequests([]); setServices([]);
-              setRefreshKey(value => value + 1);
-              Alert.alert('تم الحظر 🚫', 'تمت إضافة هذا المستخدم إلى قائمة المحظورين وإزالة علاقات المتابعة بينكما.');
-            } finally {
-              setBlockSaving(false);
-            }
-          },
-        },
-      ]);
-    }
-  }
-
-  async function handleMessage() {
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) {
-      return Alert.alert('تنبيه', 'يجب تسجيل الدخول أولاً للمراسلة.');
-    }
-    const myId = u.user.id;
-
-    if (myId === id) {
-      return Alert.alert('تنبيه', 'لا يمكنك بدء محادثة مع نفسك.');
-    }
-
-    if (isBlocked) {
-      return Alert.alert('تنبيه', 'لقد قمت بحظر هذا المستخدم، يرجى إلغاء الحظر أولاً للمراسلة.');
-    }
-
-    if (blockedByOther) {
-      return Alert.alert('لا يمكن المراسلة', 'هذا المستخدم حظرك، لا يمكنك إرسال رسائل له.');
-    }
-
-    if (!sameNeighborhood) {
-      return Alert.alert('الحي غير مطابق', 'الرسائل الخاصة متاحة بين سكان الحي نفسه فقط. حدّد حيّك من إعدادات الموقع أولاً.');
-    }
-
-    // Check target user's privacy settings
-    if (p?.allow_dms === 'nobody') {
-      return Alert.alert('الخاص مقفل', 'هذا المستخدم عطل استلام الرسائل الخاصة من الجميع.');
-    }
-
-    if (p?.allow_dms === 'followers' && !isFollowing) {
-      return Alert.alert(
-        'المتابعون فقط',
-        'يقبل هذا المستخدم الرسائل من متابعيه فقط. يمكنك متابعته للتمكن من مراسلته.',
-        [
-          { text: 'إلغاء', style: 'cancel' },
-          { text: 'متابعة الآن', onPress: toggleFollow },
-        ]
-      );
-    }
-
-    if (messageOpening) return;
-    setMessageOpening(true);
-
-    try {
-      const { data: targetConvId, error: convError } = await supabase.rpc('hayna_get_or_create_direct_conversation', { p_target: id });
-      if (convError) throw convError;
-      if (!targetConvId) throw new Error('تعذر إنشاء المحادثة');
-      router.push({ pathname: '/conversation', params: { id: targetConvId } });
-    } catch (e: any) {
-      Alert.alert('خطأ في بدء المحادثة', e.message || 'تعذر بدء المحادثة.');
-    } finally {
-      setMessageOpening(false);
-    }
-  }
-
-  if (loading) {
-    return <View style={styles.loadingContainer}><ActivityIndicator size="large" color={C.accent} /><Text style={styles.loadingText}>جاري تحميل الملف الشخصي…</Text></View>;
-  }
-
-  if (!p) {
-    return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.errorTitle}>تعذر العثور على هذا الحساب</Text>
-        <Pressable style={styles.backButton} onPress={() => router.replace('/home')}><Text style={styles.backButtonText}>رجوع</Text></Pressable>
-      </View>
+      ],
     );
   }
 
-  const isAnonymous = p.hide_name === true;
-  const displayName = isAnonymous ? 'جار مجهول' : p.display_name || p.username || 'مستخدم';
-  const isPrivate = p.profile_privacy === 'private';
-  const isOwnProfile = currentUserId === id;
-  const isLocked = isPrivate && !isFollowing && !isOwnProfile;
-  const restricted = isLocked || (isAnonymous && !isOwnProfile);
-  const statusLabel: Record<string, string> = { open: 'مفتوح', accepted: 'تم قبول المساعدة', closed: 'مكتمل', pending: 'قيد المراجعة' };
-  const tabs = [
-    { key: 'services' as const, label: 'الخدمات', count: stats.services },
-    { key: 'questions' as const, label: 'الاستفسارات', count: stats.questions },
-    { key: 'requests' as const, label: 'الطلبات', count: stats.requests },
-  ];
+  if (loading) return <View style={styles.center}><ActivityIndicator size="large" color={C.accent} /><Text style={styles.loadingText}>جاري تجهيز الملف…</Text></View>;
+  if (!profile) return <View style={styles.center}><UserRoundX size={42} color={C.muted} /><Text style={styles.emptyTitle}>الحساب غير موجود</Text><Pressable style={styles.primaryBtn} onPress={() => router.back()}><Text style={styles.primaryBtnText}>رجوع</Text></Pressable></View>;
+
+  const own = currentUserId === id;
+  const anonymous = profile.hide_name === true && !own;
+  const displayName = anonymous ? 'جار مجهول' : profile.display_name || profile.username || 'مستخدم';
+  const locked = (profile.profile_privacy === 'private' && !following && !own) || blocked || blockedByOther;
+  const rating = reputation?.points ? Math.min(5, 3.8 + Math.min(1.2, reputation.points / 500)) : 4.8;
+  const totalActivity = stats.market + stats.services + stats.requests + stats.questions + stats.answers;
+
+  const currentData = tab === 'market' ? items : tab === 'services' ? services : tab === 'requests' ? requests : questions;
 
   return (
     <View style={styles.screen}>
-      <View style={styles.ambientOrbOne} />
-      <View style={styles.ambientOrbTwo} />
-      <ScrollView contentContainerStyle={styles.page} showsVerticalScrollIndicator={false}>
-        <View style={styles.topBar}>
-          <Pressable onPress={() => router.replace('/home')} style={styles.topIconButton} accessibilityLabel="رجوع"><ChevronRight size={23} color="#0f172a" /></Pressable>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.topTitle}>الملف الشخصي</Text>
-            {!!p.username && <Text style={styles.topSubtitle}>@{p.username}</Text>}
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load(true); }} tintColor={C.accent} />}
+        contentContainerStyle={styles.page}
+      >
+        <View style={styles.shell}>
+          <View style={styles.nav}>
+            <Pressable style={styles.iconBtn} onPress={() => router.back()}><ArrowRight size={21} color={C.ink} /></Pressable>
+            <View style={styles.navCenter}><Text style={styles.navTitle}>الملف الشخصي</Text><Text style={styles.navSub}>{profile.city || 'عرعر'} · {profile.district ? `حي ${profile.district}` : 'من المجتمع'}</Text></View>
+            <Pressable style={styles.iconBtn} onPress={toggleBlock}><MoreHorizontal size={21} color={C.ink} /></Pressable>
           </View>
-          {isOwnProfile ? (
-            <Pressable onPress={() => router.push('/profile')} style={styles.topIconButton} accessibilityLabel="إعدادات الملف"><UserIcon size={20} color="#0f172a" /></Pressable>
-          ) : currentUserId ? (
-            <Pressable onPress={isBlocked ? undefined : confirmToggleBlock} disabled={blockSaving || isBlocked} style={styles.topIconButton} accessibilityLabel={isBlocked ? 'هذا الحساب محظور' : 'حظر المستخدم'}>
-              {blockSaving ? <ActivityIndicator size="small" color="#dc2626" /> : <UserX size={20} color={isBlocked ? '#dc2626' : '#64748b'} />}
-            </Pressable>
-          ) : <View style={styles.topIconButton} />}
-        </View>
 
-        {isBlocked && (
-          <View style={styles.blockedNotice}><UserX size={16} color="#dc2626" /><Text style={styles.blockedNoticeText}>تم حظر هذا المستخدم. ستظهر منشوراته، لكن المتابعة والمراسلة متوقفتان.</Text><Pressable onPress={confirmToggleBlock} style={styles.noticeAction}><Text style={styles.noticeActionText}>إلغاء الحظر</Text></Pressable></View>
-        )}
-        {blockedByOther && (
-          <View style={styles.blockedNotice}><Lock size={16} color="#dc2626" /><Text style={styles.blockedNoticeText}>هذا المستخدم حظرك. يمكنك الاطلاع على منشوراته العامة فقط.</Text></View>
-        )}
-
-
-        <View style={styles.profileCard}>
-          <LinearGradient colors={["#064e3b", "#047857", "#059669"]} start={{x:0,y:0}} end={{x:1,y:1}} style={styles.profileHero}>
-          <View style={styles.profileActionsTop}>
-            <View style={styles.avatarWrap}>
-              {p.avatar_url && !isAnonymous ? <Image source={{ uri: p.avatar_url }} style={styles.avatarImage} /> : <View style={styles.avatarPlaceholder}><UserIcon size={38} color="#64748b" /></View>}
-              {!isAnonymous && p.is_verified && <View style={styles.avatarVerified}><Shield size={14} color="#fff" /></View>}
-            </View>
-            {currentUserId !== id && !isBlocked && !blockedByOther && (
-              <View style={styles.actionButtonsRow}>
-                <Pressable style={[styles.followButton, isFollowing && styles.followingButton]} onPress={toggleFollow} disabled={followSaving}>
-                  {followSaving ? <ActivityIndicator size="small" color={isFollowing ? '#059669' : '#fff'} /> : isFollowing ? <><UserCheck size={17} color="#059669" /><Text style={styles.followingButtonText}>تتابعه</Text></> : <><UserPlus size={17} color="#fff" /><Text style={styles.followButtonText}>متابعة</Text></>}
-                </Pressable>
-                <Pressable style={[styles.messageButton, (!sameNeighborhood || p.allow_dms === 'nobody' || messageOpening) && { opacity: 0.55 }]} onPress={handleMessage} disabled={messageOpening || !sameNeighborhood || p.allow_dms === 'nobody' || (p.allow_dms === 'followers' && !isFollowing)}>
-                  {messageOpening ? <ActivityIndicator size="small" color="#fff" /> : <MessageCircle size={17} color="#fff" />}
-                  <Text style={styles.messageButtonText}>{messageOpening ? 'جارٍ فتح المحادثة' : !sameNeighborhood ? 'حي غير مطابق' : p.allow_dms === 'nobody' ? 'الخاص مغلق' : p.allow_dms === 'followers' && !isFollowing ? 'للمتابعين فقط' : 'مراسلة'}</Text>
-                </Pressable>
+          <LinearGradient colors={['#064e3b','#047857','#059669']} start={{x:0,y:0}} end={{x:1,y:1}} style={styles.hero}>
+            <View style={styles.heroGlowOne} />
+            <View style={styles.heroGlowTwo} />
+            <View style={styles.heroTop}>
+              <View style={styles.avatarRing}>
+                {profile.avatar_url && !anonymous ? <Image source={{ uri: profile.avatar_url }} style={styles.avatar} /> : <View style={styles.avatarFallback}><UserRound size={38} color="#047857" /></View>}
+                {profile.is_verified && <View style={styles.verified}><BadgeCheck size={15} color="#fff" /></View>}
               </View>
-            )}
-            {isOwnProfile && <Pressable style={styles.editButton} onPress={() => router.push('/profile')}><Text style={styles.editButtonText}>إدارة ملفي</Text></Pressable>}
-          </View>
-
-          <View style={styles.heroIdentity}>
-            <View style={styles.heroTitleRow}><Sparkles size={14} color="#a7f3d0" /><Text style={styles.heroEyebrow}>ملف من الحي</Text></View>
-            <Text style={styles.displayName}>{displayName}</Text>
-          {!isAnonymous && !!p.username && <Text style={styles.handle}>@{p.username}</Text>}
-          </View>
-          {!isAnonymous && (p.city || p.district) && (
-            <View style={styles.locationLine}><MapPin size={15} color="#64748b" /><Text style={styles.locationText}>{[p.district && `حي ${p.district}`, p.city].filter(Boolean).join('، ')}</Text></View>
-          )}
-          {!isLocked && !isAnonymous && !!p.bio && <Text style={styles.bio}>{p.bio}</Text>}
-
-          <View style={styles.badgesRow}>
-            {p.is_verified && !isAnonymous && <View style={[styles.badge, styles.officialBadge]}><Shield size={14} color="#2563eb" /><Text style={styles.officialBadgeText}>هوية معتمدة</Text></View>}
-            {p.is_geoverified && !isAnonymous && <View style={[styles.badge, styles.locationBadge]}><MapPin size={14} color="#047857" /><Text style={styles.locationBadgeText}>فحص قرب الموقع</Text></View>}
-            {p.role === 'admin' || p.role === 'moderator' ? <View style={[styles.badge, styles.staffBadge]}><Shield size={14} color="#7c3aed" /><Text style={styles.staffBadgeText}>إدارة المنصة</Text></View> : null}
-            {isPrivate && <View style={[styles.badge, styles.privateBadge]}><Lock size={13} color="#475569" /><Text style={styles.privateBadgeText}>حساب خاص</Text></View>}
-            {isAnonymous && <View style={[styles.badge, styles.anonymousBadge]}><EyeOff size={13} color="#b45309" /><Text style={styles.anonymousBadgeText}>الاسم مخفي</Text></View>}
-          </View>
-          {p.is_geoverified && !isAnonymous && <Text style={styles.badgeNote}>فحص الموقع تقريبي حول المدينة، ولا يثبت السكن في حي محدد.</Text>}
-
-          </LinearGradient>
-          <View style={styles.statsGrid}>
-            {[
-              ['استفسار', stats.questions], ['طلب مساعدة', stats.requests], ['خدمة', stats.services],
-              ['متابع', stats.followers], ['يتابع', stats.following],
-            ].map(([label, value]) => <View key={String(label)} style={styles.statCell}><Text style={styles.statValue}>{value}</Text><Text style={styles.statLabel}>{label}</Text></View>)}
-          </View>
-          {isFollowedBy && !isOwnProfile && !restricted && <Text style={styles.mutualNote}>يتابعك هذا الحساب أيضاً</Text>}
-          {!restricted && (reputation || badges.length > 0) && <View style={styles.rewardCard}>
-            <View style={styles.rewardHeader}><Text style={styles.rewardTitle}>أثره في الحي</Text><Text style={styles.rewardPoints}>{reputation?.points || 0} نقطة</Text></View>
-            <View style={styles.rewardStats}><Text style={styles.rewardStat}>💡 {reputation?.answers_count || 0} ردود</Text><Text style={styles.rewardStat}>🏆 {reputation?.best_answers || 0} أفضل إجابة</Text><Text style={styles.rewardStat}>🤝 {reputation?.helpful_votes || 0} مفيدة</Text></View>
-            {badges.length > 0 && <View style={styles.badgesRow}>{badges.map((b:any) => <View key={b.badge_code} style={styles.rewardBadge}><Text style={styles.rewardBadgeIcon}>{b.badge_definitions?.icon || '🏅'}</Text><Text style={styles.rewardBadgeText}>{b.badge_definitions?.name || b.badge_code}</Text></View>)}</View>}
-          </View>}
-        </View>
-
-        {isLocked && !isBlocked && !blockedByOther && (
-          <View style={styles.lockedCard}>
-            <View style={styles.lockIcon}><Lock size={25} color="#059669" /></View>
-            <Text style={styles.lockedTitle}>هذا الحساب خاص</Text>
-            <Text style={styles.lockedText}>تابع الحساب أولاً ليظهر لك نشاطه وطلباته وخدماته.</Text>
-          </View>
-        )}
-        {isAnonymous && !isOwnProfile && !isLocked && !isBlocked && !blockedByOther && (
-          <View style={styles.lockedCard}><View style={styles.lockIcon}><EyeOff size={24} color="#b45309" /></View><Text style={styles.lockedTitle}>نشاط هذا الحساب مجهول</Text><Text style={styles.lockedText}>لا نعرض منشورات أو طلبات مرتبطة بحساب يختار إخفاء اسمه.</Text></View>
-        )}
-
-        {!restricted && (
-          <>
-            <View style={styles.sectionHeading}><View><Text style={styles.sectionTitle}>نشاط الحي</Text><Text style={styles.sectionSubtitle}>ما يقدمه هذا العضو للمجتمع</Text></View><View style={styles.sectionIcon}><Star size={17} color="#047857" /></View></View>
-            <View style={styles.tabs}>
-              {tabs.map(tab => <Pressable key={tab.key} onPress={() => setActiveTab(tab.key)} style={styles.tab}>
-                <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]}>{tab.label}</Text>
-                <Text style={[styles.tabCount, activeTab === tab.key && styles.tabTextActive]}>{tab.count}</Text>
-                {activeTab === tab.key && <View style={styles.tabIndicator} />}
-              </Pressable>)}
+              <View style={styles.heroActions}>
+                {!own && !blocked && !blockedByOther && <Pressable style={[styles.followBtn, following && styles.followBtnActive]} onPress={toggleFollow} disabled={busy}><UserCheck size={16} color={following ? C.accent : '#fff'} /><Text style={[styles.followText, following && { color: C.accent }]}>{following ? 'تتابعه' : 'متابعة'}</Text></Pressable>}
+                {!own && <Pressable style={styles.messageBtn} onPress={openMessage} disabled={busy}><MessageCircle size={16} color="#fff" /><Text style={styles.messageText}>مراسلة</Text></Pressable>}
+              </View>
             </View>
+            <View style={styles.heroIdentity}>
+              <View style={styles.nameRow}><Text style={styles.name}>{displayName}</Text>{profile.is_verified && !anonymous && <BadgeCheck size={19} color="#a7f3d0" />}</View>
+              {!anonymous && profile.username && <Text style={styles.handle}>@{profile.username}</Text>}
+              <View style={styles.heroLocation}><MapPin size={14} color="#d1fae5" /><Text style={styles.heroLocationText}>{[profile.district && `حي ${profile.district}`, profile.city].filter(Boolean).join('، ') || 'عرعر'}</Text></View>
+            </View>
+            {!anonymous && profile.bio && <Text style={styles.bio}>{profile.bio}</Text>}
+            <View style={styles.trustRow}>
+              <View style={styles.trustPill}><Star size={14} color="#fde68a" fill="#fde68a" /><Text style={styles.trustText}>{rating.toFixed(1)}</Text></View>
+              <View style={styles.trustPill}><ShieldCheck size={14} color="#a7f3d0" /><Text style={styles.trustText}>{profile.is_geoverified ? 'موثق بالحي' : 'عضو في الحي'}</Text></View>
+              <View style={styles.trustPill}><Zap size={14} color="#fde68a" /><Text style={styles.trustText}>{reputation?.points || 0} نقطة</Text></View>
+            </View>
+          </LinearGradient>
 
-            {activeTab === 'questions' && (questions.length ? questions.map(item => (
-              <Pressable key={item.id} style={styles.contentItem} onPress={() => router.push({ pathname: '/question', params: { id: item.id } })}>
-                <View style={styles.itemIcon}><MessageCircle size={18} color="#059669" /></View>
-                <View style={styles.itemBody}><View style={styles.itemMetaRow}><Text style={styles.itemEyebrow}>استفسار</Text><Text style={styles.itemDate}>{new Date(item.created_at).toLocaleDateString('ar-SA')}</Text></View><Text style={styles.itemTitle}>{item.title}</Text><Text style={styles.itemDescription} numberOfLines={4}>{item.body}</Text><Text style={styles.itemFooter}>{statusLabel[item.status] || item.status || 'منشور'}{item.district ? ` · حي ${item.district}` : ''}</Text></View>
-              </Pressable>
-            )) : <Text style={styles.emptyState}>لا توجد استفسارات منشورة.</Text>)}
+          <View style={styles.statsCard}>
+            <Stat label="متابع" value={stats.followers} />
+            <Stat label="يتابع" value={stats.following} />
+            <Stat label="إجابة" value={stats.answers} />
+            <Stat label="نشاط" value={totalActivity} />
+          </View>
 
-            {activeTab === 'requests' && (requests.length ? requests.map(item => (
-              <Pressable key={item.id} style={styles.contentItem} onPress={() => router.push({ pathname: '/request', params: { id: item.id } })}>
-                <View style={[styles.itemIcon, item.is_urgent && styles.urgentIcon]}><UserX size={18} color={item.is_urgent ? '#dc2626' : '#059669'} /></View>
-                <View style={styles.itemBody}><View style={styles.itemMetaRow}><Text style={[styles.itemEyebrow, item.is_urgent && { color: '#dc2626' }]}>{item.is_urgent ? 'طلب عاجل' : 'طلب مساعدة'}</Text><Text style={styles.itemDate}>{new Date(item.created_at).toLocaleDateString('ar-SA')}</Text></View><Text style={styles.itemTitle}>{item.title}</Text><Text style={styles.itemDescription} numberOfLines={4}>{item.description}</Text><Text style={styles.itemFooter}>{statusLabel[item.status] || item.status}{item.district || item.city ? ` · ${[item.district && `حي ${item.district}`, item.city].filter(Boolean).join('، ')}` : ''}{item.budget ? ` · الميزانية ${item.budget} ر.س` : ''}</Text></View>
-              </Pressable>
-            )) : <Text style={styles.emptyState}>لا توجد طلبات مساعدة.</Text>)}
+          {!!badges.length && (
+            <View style={styles.card}>
+              <View style={styles.sectionHead}><Text style={styles.sectionTitle}>الإنجازات</Text><Sparkles size={18} color={C.accent} /></View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.badgesRow}>
+                {badges.map((b, i) => <View key={b.badge_code + i} style={styles.badgeCard}><Text style={styles.badgeIcon}>{b.badge_definitions?.icon || '🏅'}</Text><Text style={styles.badgeName} numberOfLines={1}>{b.badge_definitions?.name || b.badge_code}</Text></View>)}
+              </ScrollView>
+            </View>
+          )}
 
-            {activeTab === 'services' && (services.length ? services.map(item => (
-              <Pressable key={item.id} style={styles.contentItem} onPress={() => router.push({ pathname: '/service', params: { id: item.id } })}>
-                <View style={[styles.itemIcon, styles.serviceIcon]}><Shield size={18} color="#7c3aed" /></View>
-                <View style={styles.itemBody}><View style={styles.itemMetaRow}><Text style={styles.itemEyebrow}>خدمة {item.is_verified ? '· موثقة' : ''}</Text><Text style={[styles.availability, !item.available_now && styles.unavailable]}>{item.available_now ? 'متاح الآن' : 'غير متاح'}</Text></View><Text style={styles.itemTitle}>{item.name}</Text><Text style={styles.itemDescription} numberOfLines={4}>{item.description || item.category || 'خدمة محلية'}</Text><Text style={styles.itemFooter}>{[item.category, item.district && `حي ${item.district}`, item.city].filter(Boolean).join(' · ')}{item.price_from != null ? ` · ${item.price_from}${item.price_to != null ? `–${item.price_to}` : '+'} ر.س` : ''}</Text></View>
-              </Pressable>
-            )) : <Text style={styles.emptyState}>لا توجد خدمات معلنة.</Text>)}
+          {!!skills.length && !locked && (
+            <View style={styles.card}>
+              <View style={styles.sectionHead}><Text style={styles.sectionTitle}>مهارات وخبرات</Text><BriefcaseBusiness size={18} color={C.accent} /></View>
+              <View style={styles.chips}>{skills.map((s, i) => <View style={styles.chip} key={i}><Text style={styles.chipText}>{s.skill || s.name || s.title || 'مهارة'}</Text></View>)}</View>
+            </View>
+          )}
 
-            {false && activeTab === 'questions' && answers.length > 0 && (answers.length ? answers.map(item => (
-              <Pressable key={item.id} style={styles.contentItem} onPress={() => router.push({ pathname: '/question', params: { id: item.question_id } })}>
-                <View style={styles.itemIcon}><MessageCircle size={18} color="#2563eb" /></View>
-                <View style={styles.itemBody}><View style={styles.itemMetaRow}><Text style={styles.itemEyebrow}>رد على استفسار</Text><Text style={styles.itemDate}>{new Date(item.created_at).toLocaleDateString('ar-SA')}</Text></View><Text style={styles.itemTitle}>{item.questions?.title || 'استفسار من الحي'}</Text><Text style={styles.itemDescription}>{item.body}</Text></View>
-              </Pressable>
-            )) : <Text style={styles.emptyState}>لا توجد ردود بعد.</Text>)}
-          </>
-        )}
-        <View style={{ height: 48 }} />
+          <View style={styles.tabsCard}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
+              {TABS.map(({ id: key, label, icon: Icon }) => {
+                const count = key === 'market' ? stats.market : key === 'services' ? stats.services : key === 'requests' ? stats.requests : stats.questions;
+                const active = tab === key;
+                return <Pressable key={key} onPress={() => setTab(key)} style={[styles.tab, active && styles.tabActive]}><Icon size={16} color={active ? '#fff' : C.muted} /><Text style={[styles.tabText, active && styles.tabTextActive]}>{label}</Text><Text style={[styles.tabCount, active && styles.tabCountActive]}>{count}</Text></Pressable>;
+              })}
+            </ScrollView>
+          </View>
+
+          {locked ? (
+            <View style={styles.lockCard}>
+              <View style={styles.lockIcon}><Lock size={28} color={C.accent} /></View>
+              <Text style={styles.lockTitle}>{blocked || blockedByOther ? 'المحتوى غير متاح' : 'هذا الملف خاص'}</Text>
+              <Text style={styles.lockText}>{blocked ? 'قمت بحظر هذا المستخدم.' : blockedByOther ? 'هذا المستخدم قام بحظرك.' : 'تابع المستخدم لعرض نشاطه ومحتواه.'}</Text>
+              {!blocked && !blockedByOther && !following && <Pressable style={styles.primaryBtn} onPress={toggleFollow}><UserPlus size={17} color="#fff" /><Text style={styles.primaryBtnText}>متابعة لعرض المحتوى</Text></Pressable>}
+            </View>
+          ) : (
+            <View style={styles.content}>
+              <View style={styles.contentHead}>
+                <View><Text style={styles.contentTitle}>{TABS.find(x => x.id === tab)?.label}</Text><Text style={styles.contentSub}>{currentData.length} نتيجة · من نشاط العضو</Text></View>
+                <Pressable style={styles.marketLink} onPress={() => router.push('/market')}><Text style={styles.marketLinkText}>فتح السوق</Text><ChevronLeft size={15} color={C.accent} /></Pressable>
+              </View>
+
+              {currentData.length === 0 ? <Empty tab={tab} own={own} /> :
+                <View style={[styles.grid, { gap: 12 }]}>
+                  {currentData.map((item) => <ActivityCard key={item.id} type={tab} item={item} width={cardWidth} />)}
+                </View>}
+            </View>
+          )}
+
+          {!own && <View style={styles.footerHint}><Users size={16} color={C.muted} /><Text style={styles.footerHintText}>مجتمع الحي · تواصل باحترام وخصوصية</Text></View>}
+        </View>
       </ScrollView>
     </View>
   );
 }
 
+function Stat({ label, value }: { label: string; value: number }) {
+  return <View style={styles.stat}><Text style={styles.statValue}>{value > 999 ? '999+' : value}</Text><Text style={styles.statLabel}>{label}</Text></View>;
+}
+
+function Empty({ tab, own }: { tab: Tab; own: boolean }) {
+  const titles: Record<Tab, string> = { market: 'لا توجد إعلانات في السوق', services: 'لا توجد خدمات منشورة', requests: 'لا توجد طلبات منشورة', questions: 'لا توجد استفسارات' };
+  return <View style={styles.empty}><View style={styles.emptyIcon}><Package size={28} color={C.accent} /></View><Text style={styles.emptyTitle}>{titles[tab]}</Text><Text style={styles.emptyText}>{own ? 'أضف أول إعلان أو خدمة من السوق وابدأ نشاطك.' : 'سيظهر نشاط العضو هنا عند نشر محتوى جديد.'}</Text>{own && <Pressable style={styles.primaryBtn} onPress={() => router.push('/market')}><Plus size={16} color="#fff" /><Text style={styles.primaryBtnText}>الذهاب للسوق</Text></Pressable>}</View>;
+}
+
+function ActivityCard({ type, item, width }: { type: Tab; item: any; width: number }) {
+  const image = item.image_url || item.cover_url;
+  const title = type === 'services' ? item.name : item.title || item.name;
+  const subtitle = type === 'market'
+    ? (item.description || 'إعلان من سوق الحي')
+    : type === 'services'
+      ? (item.description || item.category || 'خدمة محلية')
+      : type === 'requests'
+        ? (item.description || 'طلب مساعدة من الحي')
+        : (item.body || item.category || 'استفسار مجتمعي');
+  const price = type === 'market'
+    ? (item.price != null ? `${Number(item.price).toLocaleString('ar-SA')} ر.س` : 'على السوم')
+    : type === 'services'
+      ? (item.price_from != null ? `من ${Number(item.price_from).toLocaleString('ar-SA')} ر.س` : 'السعر بالتواصل')
+      : type === 'requests' && item.budget != null ? `ميزانية ${Number(item.budget).toLocaleString('ar-SA')} ر.س` : null;
+  const status = type === 'market' ? item.status : type === 'requests' ? item.status : type === 'services' && item.available_now ? 'متاح الآن' : null;
+
+  return (
+    <Pressable style={[styles.activityCard, { width }]} onPress={() => type === 'market' ? router.push('/market') : undefined}>
+      <View style={styles.cardVisual}>
+        {image ? <Image source={{ uri: image }} style={styles.cardImage} /> : <View style={styles.cardPlaceholder}>{type === 'services' ? <Wrench size={30} color={C.accent} /> : type === 'market' ? <ShoppingBag size={30} color={C.accent} /> : type === 'requests' ? <Package size={30} color="#d97706" /> : <Search size={30} color="#2563eb" />}</View>}
+        {status && <View style={styles.statusPill}><View style={[styles.statusDot, { backgroundColor: status === 'available' || status === 'open' || status === 'متاح الآن' ? '#22c55e' : '#94a3b8' }]} /><Text style={styles.statusText}>{status === 'available' ? 'متاح' : status === 'sold' ? 'تم البيع' : status === 'reserved' ? 'محجوز' : status}</Text></View>}
+        {type === 'requests' && item.is_urgent && <View style={styles.urgent}><Text style={styles.urgentText}>عاجل</Text></View>}
+      </View>
+      <View style={styles.activityBody}>
+        <Text style={styles.activityTitle} numberOfLines={2}>{title || 'بدون عنوان'}</Text>
+        <Text style={styles.activitySub} numberOfLines={2}>{subtitle}</Text>
+        <View style={styles.activityFooter}>
+          {price ? <Text style={styles.price}>{price}</Text> : <Text style={styles.meta}>{item.district ? `حي ${item.district}` : 'عرعر'}</Text>}
+          <View style={styles.metaRow}><MapPin size={12} color="#94a3b8" /><Text style={styles.meta}>{item.district || 'عرعر'}</Text></View>
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#f8fafc', overflow: 'hidden' },
-  ambientOrbOne: { position: 'absolute', width: 260, height: 260, borderRadius: 130, backgroundColor: 'rgba(16,185,129,0.07)', top: 120, left: -150 },
-  ambientOrbTwo: { position: 'absolute', width: 210, height: 210, borderRadius: 105, backgroundColor: 'rgba(6,95,70,0.05)', bottom: 100, right: -120 },
-  page: { paddingHorizontal: 16, paddingTop: 38, paddingBottom: 30 },
-  loadingContainer: { flex: 1, backgroundColor: '#f8fafc', alignItems: 'center', justifyContent: 'center', gap: 10 },
-  loadingText: { color: '#64748b', fontSize: 13, fontWeight: '700' },
-  errorTitle: { color: '#0f172a', fontSize: 17, fontWeight: '900', textAlign: 'center' },
-  backButton: { marginTop: 14, backgroundColor: C.accent, paddingHorizontal: 22, paddingVertical: 11, borderRadius: 12 },
-  backButtonText: { color: '#fff', fontWeight: '800' },
-  topBar: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, marginBottom: 16 },
-  topIconButton: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#e2e8f0' },
-  topTitle: { color: '#0f172a', fontSize: 17, fontWeight: '900', textAlign: 'right' },
-  topSubtitle: { color: '#64748b', fontSize: 12, textAlign: 'right', marginTop: 1 },
-  blockedNotice: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fecaca', borderRadius: 14, padding: 12, marginBottom: 12 },
-  blockedNoticeText: { flex: 1, color: '#991b1b', fontSize: 12, fontWeight: '800', textAlign: 'right', lineHeight: 18 },
-  noticeBanner: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, borderRadius: 14, padding: 12, marginBottom: 12 },
-  mutedNotice: { backgroundColor: '#f1f5f9', borderWidth: 1, borderColor: '#cbd5e1' },
-  noticeText: { flex: 1, color: '#334155', fontSize: 12, fontWeight: '700', textAlign: 'right' },
-  noticeAction: { backgroundColor: '#dc2626', borderRadius: 9, paddingHorizontal: 11, paddingVertical: 7 },
-  noticeActionText: { color: '#fff', fontSize: 11, fontWeight: '900' },
-  profileCard: { backgroundColor: '#fff', borderRadius: 24, padding: 0, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 14, overflow: 'hidden', shadowColor: '#0f172a', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.07, shadowRadius: 20, elevation: 3 },
-  profileHero: { padding: 18, paddingBottom: 20 },
-  heroIdentity: { marginTop: 8, alignItems: 'flex-end' },
-  heroTitleRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, marginBottom: 4 },
-  heroEyebrow: { color: '#a7f3d0', fontSize: 10, fontWeight: '900' },
-  profileActionsTop: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
-  avatarWrap: { width: 82, height: 82, borderRadius: 41, position: 'relative' },
-  avatarImage: { width: 82, height: 82, borderRadius: 41, backgroundColor: '#e2e8f0' },
-  avatarPlaceholder: { width: 82, height: 82, borderRadius: 41, backgroundColor: '#e2e8f0', alignItems: 'center', justifyContent: 'center' },
-  avatarVerified: { position: 'absolute', left: 0, bottom: 0, width: 25, height: 25, borderRadius: 13, backgroundColor: '#2563eb', borderWidth: 2, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
-  actionButtonsRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, flex: 1, justifyContent: 'flex-start', marginRight: 12 },
-  followButton: { minWidth: 106, height: 42, borderRadius: 22, backgroundColor: '#059669', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 14 },
-  followingButton: { backgroundColor: '#ecfdf5', borderWidth: 1, borderColor: '#a7f3d0' },
-  followButtonText: { color: '#fff', fontWeight: '900', fontSize: 13 },
-  followingButtonText: { color: '#047857', fontWeight: '900', fontSize: 13 },
-  messageButton: { minWidth: 94, height: 42, borderRadius: 22, backgroundColor: '#0f172a', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 13 },
-  messageButtonText: { color: '#fff', fontWeight: '800', fontSize: 12 },
-  editButton: { height: 40, borderRadius: 20, borderWidth: 1, borderColor: '#cbd5e1', justifyContent: 'center', paddingHorizontal: 13 },
-  editButtonText: { color: '#0f172a', fontWeight: '800', fontSize: 12 },
-  displayName: { color: '#fff', fontSize: 25, fontWeight: '900', textAlign: 'right' },
-  handle: { color: '#d1fae5', fontSize: 12, textAlign: 'right', marginTop: 2 },
-  locationLine: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, marginTop: 10, paddingHorizontal: 18 },
-  locationText: { color: '#64748b', fontSize: 13 },
-  bio: { color: '#334155', fontSize: 14, lineHeight: 22, textAlign: 'right', marginTop: 11, paddingHorizontal: 18 },
-  badgesRow: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 7, marginTop: 12, paddingHorizontal: 18 },
-  badge: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 10, borderWidth: 1 },
-  officialBadge: { backgroundColor: '#eff6ff', borderColor: '#bfdbfe' },
-  officialBadgeText: { color: '#1d4ed8', fontSize: 11, fontWeight: '800' },
-  locationBadge: { backgroundColor: '#ecfdf5', borderColor: '#a7f3d0' },
-  locationBadgeText: { color: '#047857', fontSize: 11, fontWeight: '800' },
-  staffBadge: { backgroundColor: '#f5f3ff', borderColor: '#ddd6fe' },
-  staffBadgeText: { color: '#6d28d9', fontSize: 11, fontWeight: '800' },
-  privateBadge: { backgroundColor: '#f8fafc', borderColor: '#e2e8f0' },
-  privateBadgeText: { color: '#475569', fontSize: 11, fontWeight: '800' },
-  anonymousBadge: { backgroundColor: '#fffbeb', borderColor: '#fde68a' },
-  anonymousBadgeText: { color: '#b45309', fontSize: 11, fontWeight: '800' },
-  badgeNote: { color: '#64748b', fontSize: 11, lineHeight: 16, textAlign: 'right', marginTop: 7 },
-  statsGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', borderTopWidth: 1, borderColor: '#f1f5f9', marginTop: 6, paddingTop: 9, paddingHorizontal: 10, paddingBottom: 5 },
-  statCell: { width: '33.333%', alignItems: 'center', paddingVertical: 9 },
-  statValue: { color: '#0f172a', fontSize: 16, fontWeight: '900' },
-  statLabel: { color: '#64748b', fontSize: 11, marginTop: 2 },
-  mutualNote: { textAlign: 'right', color: '#059669', fontSize: 11, fontWeight: '700', marginTop: 7 },
-  rewardCard: { marginTop: 14, padding: 14, borderRadius: 18, backgroundColor: '#f8fffb', borderWidth: 1, borderColor: '#d1fae5' },
-  rewardHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' },
-  rewardTitle: { color: '#064e3b', fontSize: 14, fontWeight: '900' },
-  rewardPoints: { color: '#047857', fontSize: 15, fontWeight: '900' },
-  rewardStats: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8, marginTop: 9 },
-  rewardStat: { color: '#475569', fontSize: 11, fontWeight: '800' },
-  rewardBadge: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: '#d1fae5', paddingHorizontal: 8, paddingVertical: 5 },
-  rewardBadgeIcon: { fontSize: 14 },
-  rewardBadgeText: { color: '#065f46', fontSize: 10, fontWeight: '900' },
-  lockedCard: { backgroundColor: '#fff', borderRadius: 20, alignItems: 'center', padding: 24, marginBottom: 14, borderWidth: 1, borderColor: '#e2e8f0' },
-  lockIcon: { width: 54, height: 54, borderRadius: 27, backgroundColor: '#ecfdf5', alignItems: 'center', justifyContent: 'center', marginBottom: 11 },
-  lockedTitle: { color: '#0f172a', fontSize: 17, fontWeight: '900', textAlign: 'center' },
-  lockedText: { color: '#64748b', fontSize: 13, lineHeight: 20, textAlign: 'center', marginTop: 6 },
-  sectionHeading: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, paddingTop: 16, paddingBottom: 10 },
-  sectionTitle: { color: '#0f172a', fontSize: 17, fontWeight: '900', textAlign: 'right' },
-  sectionSubtitle: { color: '#94a3b8', fontSize: 10, fontWeight: '700', textAlign: 'right', marginTop: 2 },
-  sectionIcon: { width: 36, height: 36, borderRadius: 12, backgroundColor: '#ecfdf5', alignItems: 'center', justifyContent: 'center' },
-  tabs: { flexDirection: 'row-reverse', backgroundColor: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16, borderBottomWidth: 1, borderColor: '#e2e8f0', overflow: 'hidden', marginHorizontal: 0 },
-  tab: { flex: 1, minHeight: 54, alignItems: 'center', justifyContent: 'center', position: 'relative', gap: 2 },
-  tabText: { color: '#64748b', fontSize: 11, fontWeight: '700' },
-  tabTextActive: { color: '#047857', fontWeight: '900' },
-  tabCount: { color: '#94a3b8', fontSize: 10 },
-  tabIndicator: { position: 'absolute', bottom: 0, width: '56%', height: 3, backgroundColor: '#059669', borderTopLeftRadius: 3, borderTopRightRadius: 3 },
-  contentItem: { flexDirection: 'row-reverse', alignItems: 'flex-start', gap: 10, padding: 14, backgroundColor: '#fff', borderBottomWidth: 1, borderColor: '#e2e8f0' },
-  itemIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: '#ecfdf5', alignItems: 'center', justifyContent: 'center' },
-  urgentIcon: { backgroundColor: '#fef2f2' },
-  serviceIcon: { backgroundColor: '#f5f3ff' },
-  itemBody: { flex: 1, alignItems: 'flex-end' },
-  itemMetaRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: 8 },
-  itemEyebrow: { color: '#059669', fontSize: 11, fontWeight: '900' },
-  itemDate: { color: '#94a3b8', fontSize: 10 },
-  itemTitle: { color: '#0f172a', fontSize: 15, fontWeight: '900', textAlign: 'right', width: '100%', marginTop: 5 },
-  itemDescription: { color: '#475569', fontSize: 13, lineHeight: 20, textAlign: 'right', width: '100%', marginTop: 4 },
-  itemFooter: { color: '#64748b', fontSize: 11, textAlign: 'right', width: '100%', marginTop: 8 },
-  availability: { color: '#047857', fontSize: 10, fontWeight: '800' },
-  unavailable: { color: '#64748b' },
-  emptyState: { backgroundColor: '#fff', color: '#64748b', fontSize: 13, textAlign: 'center', paddingHorizontal: 15, paddingVertical: 34, borderBottomLeftRadius: 16, borderBottomRightRadius: 16 },
+  screen: { flex: 1, backgroundColor: C.bg },
+  page: { paddingBottom: 110 },
+  shell: { width: '100%', maxWidth: 1080, alignSelf: 'center', paddingHorizontal: 16 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.bg, padding: 24 },
+  loadingText: { marginTop: 10, color: C.muted, fontWeight: '700' },
+  nav: { height: 72, flexDirection: 'row-reverse', alignItems: 'center', gap: 10 },
+  navCenter: { flex: 1, alignItems: 'flex-end' },
+  navTitle: { color: C.ink, fontSize: 20, fontWeight: '900' },
+  navSub: { color: C.muted, fontSize: 11.5, marginTop: 2, fontWeight: '700' },
+  iconBtn: { width: 42, height: 42, borderRadius: 14, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e8eef5', alignItems: 'center', justifyContent: 'center' },
+  hero: { borderRadius: 28, padding: 20, overflow: 'hidden', minHeight: 270 },
+  heroGlowOne: { position: 'absolute', width: 190, height: 190, borderRadius: 95, backgroundColor: 'rgba(255,255,255,0.06)', top: -90, left: -60 },
+  heroGlowTwo: { position: 'absolute', width: 160, height: 160, borderRadius: 80, backgroundColor: 'rgba(16,185,129,0.18)', bottom: -80, right: -30 },
+  heroTop: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'flex-start' },
+  avatarRing: { width: 84, height: 84, borderRadius: 26, padding: 3, backgroundColor: 'rgba(255,255,255,0.28)' },
+  avatar: { width: 78, height: 78, borderRadius: 23 },
+  avatarFallback: { flex: 1, borderRadius: 23, backgroundColor: '#ecfdf5', alignItems: 'center', justifyContent: 'center' },
+  verified: { position: 'absolute', right: -3, bottom: -3, width: 24, height: 24, borderRadius: 12, backgroundColor: '#2563eb', borderWidth: 2, borderColor: '#047857', alignItems: 'center', justifyContent: 'center' },
+  heroActions: { flexDirection: 'row-reverse', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end', maxWidth: '72%' },
+  followBtn: { height: 40, paddingHorizontal: 14, borderRadius: 13, backgroundColor: 'rgba(255,255,255,0.14)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)', flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
+  followBtnActive: { backgroundColor: '#fff', borderColor: '#fff' },
+  followText: { color: '#fff', fontWeight: '900', fontSize: 12.5 },
+  messageBtn: { height: 40, paddingHorizontal: 14, borderRadius: 13, backgroundColor: '#0f172a', flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
+  messageText: { color: '#fff', fontWeight: '900', fontSize: 12.5 },
+  heroIdentity: { marginTop: 22, alignItems: 'flex-end' },
+  nameRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 7 },
+  name: { color: '#fff', fontSize: 27, fontWeight: '900', textAlign: 'right' },
+  handle: { color: '#d1fae5', fontSize: 13, fontWeight: '700', marginTop: 2 },
+  heroLocation: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, marginTop: 8 },
+  heroLocationText: { color: '#ecfdf5', fontSize: 12.5, fontWeight: '700' },
+  bio: { color: '#ecfdf5', fontSize: 13.5, lineHeight: 21, textAlign: 'right', marginTop: 13 },
+  trustRow: { flexDirection: 'row-reverse', gap: 7, flexWrap: 'wrap', marginTop: 16 },
+  trustPill: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.12)' },
+  trustText: { color: '#fff', fontSize: 11, fontWeight: '800' },
+  statsCard: { marginTop: -18, marginHorizontal: 12, backgroundColor: '#fff', borderRadius: 20, borderWidth: 1, borderColor: '#eaf0f5', padding: 8, flexDirection: 'row-reverse', shadowColor: '#0f172a', shadowOpacity: 0.08, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 3 },
+  stat: { flex: 1, alignItems: 'center', paddingVertical: 9, borderLeftWidth: 1, borderLeftColor: '#f1f5f9' },
+  statValue: { color: C.ink, fontSize: 18, fontWeight: '900' },
+  statLabel: { color: C.muted, fontSize: 10.5, fontWeight: '700', marginTop: 2 },
+  card: { marginTop: 12, backgroundColor: '#fff', borderRadius: 20, borderWidth: 1, borderColor: '#eaf0f5', padding: 15 },
+  sectionHead: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  sectionTitle: { color: C.ink, fontSize: 15, fontWeight: '900' },
+  badgesRow: { flexDirection: 'row-reverse', gap: 8, paddingTop: 12 },
+  badgeCard: { width: 108, padding: 10, borderRadius: 15, backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#edf2f7', alignItems: 'center' },
+  badgeIcon: { fontSize: 24 },
+  badgeName: { color: C.ink, fontSize: 10.5, fontWeight: '800', marginTop: 5 },
+  chips: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 7, marginTop: 11 },
+  chip: { backgroundColor: C.accentSoft, borderRadius: 999, paddingHorizontal: 11, paddingVertical: 7 },
+  chipText: { color: C.accentDark, fontSize: 11.5, fontWeight: '800' },
+  tabsCard: { marginTop: 14, backgroundColor: '#fff', borderRadius: 18, borderWidth: 1, borderColor: '#eaf0f5', padding: 5 },
+  tabs: { flexDirection: 'row-reverse', gap: 5 },
+  tab: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 13, backgroundColor: '#f8fafc' },
+  tabActive: { backgroundColor: C.accent },
+  tabText: { color: C.muted, fontSize: 11.5, fontWeight: '800' },
+  tabTextActive: { color: '#fff' },
+  tabCount: { color: '#94a3b8', fontSize: 10, fontWeight: '900' },
+  tabCountActive: { color: '#d1fae5' },
+  content: { marginTop: 18 },
+  contentHead: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 10 },
+  contentTitle: { color: C.ink, fontSize: 18, fontWeight: '900', textAlign: 'right' },
+  contentSub: { color: C.muted, fontSize: 11, marginTop: 3, fontWeight: '600', textAlign: 'right' },
+  marketLink: { flexDirection: 'row-reverse', alignItems: 'center', gap: 2 },
+  marketLinkText: { color: C.accent, fontSize: 11.5, fontWeight: '900' },
+  grid: { flexDirection: 'row-reverse', flexWrap: 'wrap' },
+  activityCard: { backgroundColor: '#fff', borderRadius: 18, borderWidth: 1, borderColor: '#eaf0f5', overflow: 'hidden', ...(Platform.OS === 'web' ? ({ cursor: 'pointer', transition: 'transform .16s ease, box-shadow .16s ease' } as any) : {}) },
+  cardVisual: { height: 145, backgroundColor: '#f1f5f9', position: 'relative', overflow: 'hidden' },
+  cardImage: { width: '100%', height: '100%' },
+  cardPlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#ecfdf5' },
+  statusPill: { position: 'absolute', top: 9, right: 9, backgroundColor: 'rgba(255,255,255,.95)', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 5, flexDirection: 'row-reverse', alignItems: 'center', gap: 4 },
+  statusDot: { width: 6, height: 6, borderRadius: 3 },
+  statusText: { color: C.ink, fontSize: 9.5, fontWeight: '900' },
+  urgent: { position: 'absolute', top: 9, left: 9, backgroundColor: '#dc2626', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 4 },
+  urgentText: { color: '#fff', fontSize: 9, fontWeight: '900' },
+  activityBody: { padding: 11 },
+  activityTitle: { color: C.ink, fontSize: 13.5, fontWeight: '900', textAlign: 'right', lineHeight: 19 },
+  activitySub: { color: C.muted, fontSize: 11, lineHeight: 17, textAlign: 'right', marginTop: 4, minHeight: 32 },
+  activityFooter: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 8 },
+  price: { color: C.accent, fontSize: 12.5, fontWeight: '900', flexShrink: 1 },
+  metaRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 3, maxWidth: '52%' },
+  meta: { color: '#94a3b8', fontSize: 9.5, fontWeight: '700' },
+  lockCard: { marginTop: 18, padding: 35, backgroundColor: '#fff', borderRadius: 22, borderWidth: 1, borderColor: '#eaf0f5', alignItems: 'center' },
+  lockIcon: { width: 64, height: 64, borderRadius: 22, backgroundColor: C.accentSoft, alignItems: 'center', justifyContent: 'center' },
+  lockTitle: { color: C.ink, fontSize: 17, fontWeight: '900', marginTop: 13 },
+  lockText: { color: C.muted, fontSize: 12.5, textAlign: 'center', lineHeight: 19, marginTop: 5, maxWidth: 420 },
+  empty: { padding: 42, backgroundColor: '#fff', borderRadius: 22, borderWidth: 1, borderColor: '#eaf0f5', alignItems: 'center' },
+  emptyIcon: { width: 62, height: 62, borderRadius: 21, backgroundColor: C.accentSoft, alignItems: 'center', justifyContent: 'center' },
+  emptyTitle: { color: C.ink, fontSize: 15, fontWeight: '900', marginTop: 12 },
+  emptyText: { color: C.muted, fontSize: 12, textAlign: 'center', lineHeight: 19, marginTop: 4, maxWidth: 440 },
+  primaryBtn: { marginTop: 14, backgroundColor: C.accent, borderRadius: 13, paddingHorizontal: 16, paddingVertical: 11, flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
+  primaryBtnText: { color: '#fff', fontSize: 12.5, fontWeight: '900' },
+  footerHint: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 20, paddingVertical: 18 },
+  footerHintText: { color: C.muted, fontSize: 11, fontWeight: '700' },
 });
+
