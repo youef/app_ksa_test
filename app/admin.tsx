@@ -12,7 +12,7 @@ import {
   TextInput,
   Image,
   Animated,
-  Dimensions,
+  useWindowDimensions,
 } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
@@ -65,8 +65,6 @@ import {
   Archive,
 } from 'lucide-react-native';
 
-const { width } = Dimensions.get('window');
-
 const C = {
   bg: '#F8FAFC',
   card: '#FFFFFF',
@@ -93,6 +91,11 @@ function confirmAction(title: string, message: string, onConfirm: () => void | P
 }
 
 export default function Admin() {
+  const { width, height } = useWindowDimensions();
+  const isMobile = width < 768;
+  const isSmallPhone = width < 400;
+  const statCardWidth = isSmallPhone ? '100%' : isMobile ? '48%' : '23.5%';
+
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [profile, setProfile] = useState<any>(null);
@@ -240,6 +243,16 @@ export default function Admin() {
     showToast('تمت إضافة الموقع');
     await loadCustomLocations();
     await addAuditLog('إضافة موقع جغرافي', name, 'location');
+  };
+
+  const deleteCustomLocation = async (id: string, name: string) => {
+    confirmAction('حذف الموقع', `هل تريد حذف «${name}» نهائياً من دليل المواقع؟`, async () => {
+      const { error } = await supabase.from('saudi_custom_locations').delete().eq('id', id);
+      if (error) { showToast('تعذر حذف الموقع'); return; }
+      showToast('تم حذف الموقع بنجاح');
+      await loadCustomLocations();
+      await addAuditLog('حذف موقع جغرافي', name, 'location', id);
+    });
   };
 
   // Log an admin operation to audit list
@@ -747,7 +760,7 @@ export default function Admin() {
       {/* ======================================================== */}
       {/* 1. EXECUTIVE COMMAND HEADER (Dark Modern Theme)          */}
       {/* ======================================================== */}
-      <LinearGradient colors={['#090d16', '#0f172a', '#1e293b']} style={styles.headerGrad}>
+      <LinearGradient colors={['#090d16', '#0f172a', '#1e293b']} style={[styles.headerGrad, isMobile && { paddingHorizontal: 14, paddingTop: Platform.OS === 'ios' ? 48 : 34 }]}>
         <View style={styles.headerContent}>
           <Pressable onPress={() => router.replace('/home')} style={styles.backIconBtn}>
             <ChevronRight size={22} color="#fff" />
@@ -755,10 +768,10 @@ export default function Admin() {
 
           <View style={styles.headerTexts}>
             <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-              <Text style={styles.headerTitle}>مركز عمليات حيّنا 🇸🇦</Text>
-              <Crown size={20} color="#f59e0b" />
+              <Text style={[styles.headerTitle, isMobile && { fontSize: 17 }]} numberOfLines={1}>مركز عمليات حيّنا 🇸🇦</Text>
+              <Crown size={isMobile ? 17 : 20} color="#f59e0b" />
             </View>
-            <Text style={styles.headerSub}>
+            <Text style={[styles.headerSub, isMobile && { fontSize: 10 }]} numberOfLines={1}>
               لوحة الإدارة والرقابة الشاملة · {profile.display_name || profile.username} (Super Admin)
             </Text>
           </View>
@@ -876,9 +889,9 @@ export default function Admin() {
             </View>
 
             <View style={styles.statsGrid}>
-              <StatCard icon={<Building2 size={22} color="#0284c7" />} bg="#f0f9ff" value={businessesList.length} label="دليل الأعمال" sub="منشآت وخدمات محلية" />
-              <StatCard icon={<Store size={22} color="#059669" />} bg="#ecfdf5" value={marketplaceList.length} label="عروض السوق" sub="منتجات الجيران" />
-              <StatCard icon={<CalendarDays size={22} color="#7c3aed" />} bg="#f5f3ff" value={eventsList.length} label="الفعاليات" sub="أنشطة المجتمع" />
+              <StatCard icon={<Building2 size={22} color="#0284c7" />} bg="#f0f9ff" value={businessesList.length} label="دليل الأعمال" sub="منشآت وخدمات محلية" style={{ width: statCardWidth }} />
+              <StatCard icon={<Store size={22} color="#059669" />} bg="#ecfdf5" value={marketplaceList.length} label="عروض السوق" sub="منتجات الجيران" style={{ width: statCardWidth }} />
+              <StatCard icon={<CalendarDays size={22} color="#7c3aed" />} bg="#f5f3ff" value={eventsList.length} label="الفعاليات" sub="أنشطة المجتمع" style={{ width: statCardWidth }} />
             </View>
 
             <Text style={styles.subSectionTitle}>دليل الأعمال</Text>
@@ -948,7 +961,23 @@ export default function Admin() {
               <Text style={styles.btnSendNoticeText}>{savingLocation ? 'جارٍ الحفظ...' : 'إضافة الموقع'}</Text>
             </Pressable>
             <Text style={[styles.subSectionTitle, { marginTop: 18 }]}>المواقع المضافة ({customLocations.length})</Text>
-            {customLocations.map(item => <View key={item.id} style={[styles.quickAction, { justifyContent: 'flex-start', gap: 10 }]}><MapPin size={17} color={C.accent} /><Text style={{ flex: 1, textAlign: 'right', color: C.ink, fontWeight: '700' }}>{[item.region_name, item.city_name, item.district_name].filter(Boolean).join(' · ')}</Text><Text style={{ color: C.muted, fontSize: 10 }}>{item.latitude != null ? 'محدد على الخريطة' : 'بلا إحداثيات'}</Text></View>)}
+            {customLocations.map(item => {
+              const locTitle = [item.region_name, item.city_name, item.district_name].filter(Boolean).join(' · ');
+              return (
+                <View key={item.id} style={[styles.quickAction, { justifyContent: 'space-between', gap: 10 }]}>
+                  <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 10, flex: 1 }}>
+                    <MapPin size={17} color={C.accent} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ textAlign: 'right', color: C.ink, fontWeight: '800', fontSize: 13 }}>{locTitle}</Text>
+                      <Text style={{ color: C.muted, fontSize: 10, textAlign: 'right', marginTop: 2 }}>{item.latitude != null ? `📍 ${item.latitude.toFixed(3)}, ${item.longitude.toFixed(3)}` : 'بدون إحداثيات'}</Text>
+                    </View>
+                  </View>
+                  <Pressable style={styles.trashActionBtn} onPress={() => deleteCustomLocation(item.id, locTitle)}>
+                    <Trash size={15} color="#ef4444" />
+                  </Pressable>
+                </View>
+              );
+            })}
             {!customLocations.length && <Text style={{ textAlign: 'right', color: C.muted }}>لا توجد مواقع يدوية بعد.</Text>}
           </View>
         )}
@@ -961,10 +990,10 @@ export default function Admin() {
             <Text style={styles.sectionTitle}>مؤشرات الأداء اللحظية 📈</Text>
             
             <View style={styles.statsGrid}>
-              <StatCard icon={<Users size={24} color="#0284c7" />} bg="#f0f9ff" value={stats.users} label="إجمالي السكان" sub={`${stats.admins} مدير · ${stats.users - stats.admins} مواطن`} />
-              <StatCard icon={<Star size={24} color="#d97706" />} bg="#fffbeb" value={verifications.filter(v => v.status === 'approved').length} label="حسابات موثقة رسمياً" sub={`${stats.pendingVerif} قيد المراجعة`} />
-              <StatCard icon={<MessageCircle size={24} color="#059669" />} bg="#ecfdf5" value={stats.questions} label="الاستفسارات والتوصيات" sub="خيوط تفاعلية حية" />
-              <StatCard icon={<Truck size={24} color="#16a34a" />} bg="#f0fdf4" value={stats.requests} label="فزعات الجيران المفتوحة" sub="تكاتف اجتماعي" />
+              <StatCard icon={<Users size={24} color="#0284c7" />} bg="#f0f9ff" value={stats.users} label="إجمالي السكان" sub={`${stats.admins} مدير · ${stats.users - stats.admins} مواطن`} style={{ width: statCardWidth }} />
+              <StatCard icon={<Star size={24} color="#d97706" />} bg="#fffbeb" value={verifications.filter(v => v.status === 'approved').length} label="حسابات موثقة رسمياً" sub={`${stats.pendingVerif} قيد المراجعة`} style={{ width: statCardWidth }} />
+              <StatCard icon={<MessageCircle size={24} color="#059669" />} bg="#ecfdf5" value={stats.questions} label="الاستفسارات والتوصيات" sub="خيوط تفاعلية حية" style={{ width: statCardWidth }} />
+              <StatCard icon={<Truck size={24} color="#16a34a" />} bg="#f0fdf4" value={stats.requests} label="فزعات الجيران المفتوحة" sub="تكاتف اجتماعي" style={{ width: statCardWidth }} />
             </View>
 
             {/* Saudi Cities Breakdown Map Widget */}
@@ -1779,13 +1808,13 @@ function FilterPill({ label, active, onPress }: { label: string; active: boolean
   );
 }
 
-function StatCard({ icon, bg, value, label, sub }: { icon: any; bg: string; value: number; label: string; sub?: string }) {
+function StatCard({ icon, bg, value, label, sub, style }: { icon: any; bg: string; value: number; label: string; sub?: string; style?: any }) {
   return (
-    <View style={styles.statCard}>
+    <View style={[styles.statCard, style]}>
       <View style={[styles.statIconBox, { backgroundColor: bg }]}>{icon}</View>
       <Text style={styles.statValue}>{value.toLocaleString('ar-SA')}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
-      {sub && <Text style={styles.statSub}>{sub}</Text>}
+      <Text style={styles.statLabel} numberOfLines={1}>{label}</Text>
+      {sub && <Text style={styles.statSub} numberOfLines={1}>{sub}</Text>}
     </View>
   );
 }
@@ -1849,7 +1878,8 @@ const styles = StyleSheet.create({
   countBadgeText: { fontSize: 11, fontWeight: '800', color: '#0891B2' },
   subSectionTitle: { fontSize: 14, fontWeight: '900', color: '#334155', textAlign: 'right', marginBottom: 10 },
   statsGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 10 },
-  statCard: { width: '48%', backgroundColor: '#fff', borderRadius: 20, padding: 14, alignItems: 'flex-end', borderWidth: 1, borderColor: '#E2E8F0', elevation: 1 },
+  statCard: { minWidth: 140, backgroundColor: '#fff', borderRadius: 20, padding: 14, alignItems: 'flex-end', borderWidth: 1, borderColor: '#E2E8F0', elevation: 1 },
+  trashActionBtn: { width: 34, height: 34, borderRadius: 10, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#FECACA' },
   statIconBox: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
   statValue: { fontSize: 22, fontWeight: '900', color: '#0F172A' },
   statLabel: { fontSize: 12, color: '#64748B', fontWeight: '800', marginTop: 2 },
