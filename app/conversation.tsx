@@ -566,6 +566,7 @@ export default function Conversation() {
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <LinearGradient colors={['#064e3b', '#047857', '#059669']} start={{x:0,y:0}} end={{x:1,y:1}} style={styles.header}>
+        <View style={styles.inner}>
         <Pressable onPress={() => router.replace('/home')} style={styles.backBtn}>
           <ChevronRight size={26} color="#ffffff" />
         </Pressable>
@@ -606,6 +607,7 @@ export default function Conversation() {
           <Pressable style={styles.headerActionBtn} onPress={() => setOptionsOpen(true)}>
             <MoreHorizontal size={22} color="#ffffff" />
           </Pressable>
+        </View>
         </View>
       </LinearGradient>
 
@@ -935,6 +937,7 @@ function formatMsgTime(dateStr: string) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, minHeight: Platform.OS === 'web' ? ('100vh' as any) : undefined, width: '100%', alignSelf: 'stretch', backgroundColor: '#f8fafc' },
+  inner: { width: '100%', maxWidth: 1100, alignSelf: 'center', paddingHorizontal: 16 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: {
     flexDirection: 'row-reverse',
@@ -1021,7 +1024,7 @@ const styles = StyleSheet.create({
   noticeInfoText: { color: '#0369a1', fontSize: 11, fontWeight: '700' },
 
   messagesList: { flex: 1, width: '100%', backgroundColor: '#f8fafc' },
-  messagesContent: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 12, minHeight: '100%' },
+  messagesContent: { width: '100%', maxWidth: 1100, alignSelf: 'center', paddingHorizontal: 16, paddingTop: 18, paddingBottom: 12, minHeight: '100%' },
   dateDivider: {
     textAlign: 'center',
     color: '#94a3b8',
@@ -1093,7 +1096,7 @@ const styles = StyleSheet.create({
   },
   emptyConvHint: { fontSize: 12, color: '#059669', fontWeight: '700' },
 
-  composerWrap: { borderTopWidth: 1, borderTopColor: '#e2e8f0', backgroundColor: '#fff', paddingTop: 8, paddingBottom: Platform.OS === 'ios' ? 8 : 6 },
+  composerWrap: { alignItems: 'center', borderTopWidth: 1, borderTopColor: '#e2e8f0', backgroundColor: '#fff', paddingTop: 8, paddingBottom: Platform.OS === 'ios' ? 8 : 6 },
   stickerPanel: { paddingTop: 10, paddingBottom: 8, backgroundColor: '#f8fafc', borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
   stickerTitle: { textAlign: 'right', paddingHorizontal: 14, color: '#334155', fontSize: 12, fontWeight: '800', marginBottom: 6 },
   stickerRow: { flexDirection: 'row', paddingHorizontal: 10, gap: 5 },
@@ -1103,6 +1106,7 @@ const styles = StyleSheet.create({
   imageCaption: { fontSize: 9, color: '#64748b' },
   inputArea: {
     width: '100%',
+    maxWidth: 1100,
     flexDirection: 'row-reverse',
     minHeight: 62,
     alignItems: 'center',
