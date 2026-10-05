@@ -565,7 +565,7 @@ export default function Conversation() {
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <LinearGradient colors={['#064e3b', '#047857', '#059669']} start={{x:0,y:0}} end={{x:1,y:1}} style={styles.header}>
+      <LinearGradient colors={['#ffffff', '#ffffff']} start={{x:0,y:0}} end={{x:1,y:1}} style={styles.header}>
         <View style={styles.inner}>
         <Pressable onPress={() => router.replace('/home')} style={styles.backBtn}>
           <ChevronRight size={26} color="#ffffff" />
@@ -943,29 +943,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'space-between',
+    width: '100%',
+    maxWidth: 1100,
+    alignSelf: 'center',
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'ios' ? 52 : 40,
-    paddingBottom: 14,
-    backgroundColor: 'transparent',
-    borderBottomWidth: 0,
-    borderBottomColor: 'transparent',
+    paddingTop: Platform.OS === 'ios' ? 52 : 14,
+    paddingBottom: 12,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
   },
-  backBtn: { padding: 6 },
+  backBtn: { width: 40, height: 40, borderRadius: 13, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' },
   headerUser: { flexDirection: 'row-reverse', alignItems: 'center', flex: 1, marginRight: 10, gap: 10 },
-  headerAvatar: { width: 42, height: 42, borderRadius: 21 },
+  headerAvatar: { width: 46, height: 46, borderRadius: 15 },
   headerAvatarFallback: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 46,
+    height: 46,
+    borderRadius: 15,
     backgroundColor: 'rgba(255,255,255,0.16)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerAvatarLetter: { color: '#fff', fontSize: 16, fontWeight: '900' },
+  headerAvatarLetter: { color: '#047857', fontSize: 17, fontWeight: '900' },
   headerInfo: { alignItems: 'flex-end', flex: 1 },
   headerNameRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
-  headerName: { color: '#fff', fontSize: 16, fontWeight: '900' },
-  headerCity: { color: 'rgba(255,255,255,0.78)', fontSize: 11, fontWeight: '600', marginTop: 2 },
+  headerName: { color: '#0f172a', fontSize: 16, fontWeight: '900' },
+  headerCity: { color: '#64748b', fontSize: 11, fontWeight: '600', marginTop: 2 },
   headerStatusPill: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
@@ -973,12 +976,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 5,
     borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: '#ecfdf5',
     marginLeft: 6,
   },
-  headerStatusText: { color: '#fff', fontSize: 10, fontWeight: '900' },
+  headerStatusText: { color: '#047857', fontSize: 10, fontWeight: '900' },
   headerActions: { flexDirection: 'row-reverse' },
-  headerActionBtn: { padding: 6 },
+  headerActionBtn: { width: 40, height: 40, borderRadius: 13, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' },
 
   noticeBlocked: {
     flexDirection: 'row-reverse',
@@ -1024,7 +1027,7 @@ const styles = StyleSheet.create({
   noticeInfoText: { color: '#0369a1', fontSize: 11, fontWeight: '700' },
 
   messagesList: { flex: 1, width: '100%', backgroundColor: '#f8fafc' },
-  messagesContent: { width: '100%', maxWidth: 1100, alignSelf: 'center', paddingHorizontal: 16, paddingTop: 18, paddingBottom: 12, minHeight: '100%' },
+  messagesContent: { width: '100%', maxWidth: 1100, alignSelf: 'center', paddingHorizontal: 18, paddingTop: 22, paddingBottom: 12, minHeight: '100%' },
   dateDivider: {
     textAlign: 'center',
     color: '#94a3b8',
@@ -1050,7 +1053,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   otherAvatarLetter: { fontSize: 12, fontWeight: '700', color: '#64748b' },
-  msgBubble: { maxWidth: Platform.OS === 'web' ? 620 : '82%', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 9 },
+  msgBubble: { maxWidth: Platform.OS === 'web' ? 620 : '84%', borderRadius: 20, paddingHorizontal: 15, paddingVertical: 10 },
   msgBubbleMine: { backgroundColor: '#059669', borderBottomLeftRadius: 4, shadowColor: '#064e3b', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.10, shadowRadius: 6, elevation: 2 },
   msgBubbleOther: {
     backgroundColor: '#fff',
@@ -1096,7 +1099,7 @@ const styles = StyleSheet.create({
   },
   emptyConvHint: { fontSize: 12, color: '#059669', fontWeight: '700' },
 
-  composerWrap: { alignItems: 'center', borderTopWidth: 1, borderTopColor: '#e2e8f0', backgroundColor: '#fff', paddingTop: 8, paddingBottom: Platform.OS === 'ios' ? 8 : 6 },
+  composerWrap: { alignItems: 'center', borderTopWidth: 1, borderTopColor: '#e2e8f0', backgroundColor: '#fff', paddingTop: 10, paddingBottom: Platform.OS === 'ios' ? 10 : 8 },
   stickerPanel: { paddingTop: 10, paddingBottom: 8, backgroundColor: '#f8fafc', borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
   stickerTitle: { textAlign: 'right', paddingHorizontal: 14, color: '#334155', fontSize: 12, fontWeight: '800', marginBottom: 6 },
   stickerRow: { flexDirection: 'row', paddingHorizontal: 10, gap: 5 },
@@ -1137,10 +1140,10 @@ const styles = StyleSheet.create({
   locationCtaMine: { color: 'rgba(255,255,255,0.9)' },
   textInput: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f1f5f9',
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    borderRadius: 20,
+    borderRadius: 15,
     paddingHorizontal: 16,
     paddingVertical: 8,
     fontSize: 14,
@@ -1149,9 +1152,9 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   sendButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 20,
+    width: 46,
+    height: 46,
+    borderRadius: 15,
     backgroundColor: '#059669',
     borderWidth: 2,
     borderColor: '#d1fae5',
