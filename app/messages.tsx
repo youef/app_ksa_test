@@ -341,6 +341,7 @@ export default function Messages() {
       <View style={styles.ambientOrbOne} />
       <View style={styles.ambientOrbTwo} />
       <LinearGradient colors={['#065f46', '#059669', '#10b981']} style={styles.header}>
+        <View style={styles.inner}>
         <ScreenHeader
           title="الرسائل"
           fallbackRoute="/home"
@@ -388,6 +389,7 @@ export default function Messages() {
             {unreadCount > 0 && <View style={styles.filterCount}><Text style={styles.filterCountText}>{unreadCount}</Text></View>}
           </Pressable>
         </View>
+        </View>
       </LinearGradient>
 
       {dndNow && (
@@ -424,6 +426,7 @@ export default function Messages() {
             />
           }
         >
+          <View style={styles.inner}>
           {filtered.length === 0 ? (
             <View style={styles.emptyState}>
               <View style={styles.emptyIcon}>
@@ -480,6 +483,7 @@ export default function Messages() {
             </>
           )}
           <View style={{ height: 100 }} />
+          </View>
         </ScrollView>
       )}
 
