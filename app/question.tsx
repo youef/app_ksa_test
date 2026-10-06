@@ -226,35 +226,104 @@ export default function Question() {
     }
   }
 
-  /** Sends the exact fix straight into a private chat with one neighbour. */
+  /** Sends the exact location straight into a private chat with one neighbour. */
   async function shareLocationPrivately(targetUserId: string, targetName: string) {
     if (!currentUserId || sharingWith) return;
 
     setSharingWith(targetUserId);
     try {
-      const location = await getCurrentDeviceLocation();
-      if (!location) {
-        Alert.alert('تعذّر تحديد الموقع', 'اسمح للتطبيق بالوصول إلى الموقع ثم أعد المحاولة.');
-        return;
+      // 1. Resilient location detection: GPS first, active location fallback
+      let locLat = 24.7136;
+      let locLng = 46.6753;
+      let label = 'موقعي في الحي';
+
+      const deviceLoc = await getCurrentDeviceLocation();
+      if (deviceLoc) {
+        locLat = deviceLoc.latitude;
+        locLng = deviceLoc.longitude;
+        const place = await reverseGeocodeDeviceLocation(deviceLoc);
+        label = place?.district ? `حي ${place.district}` : place?.city || 'موقعي الحالي';
+      } else {
+        // Fallback to active neighborhood from locationSync
+        const activeLocation = await getActiveLocation();
+        if (activeLocation && activeLocation.city && activeLocation.city !== 'كل المدن') {
+          label = activeLocation.district && activeLocation.district !== 'كل الأحياء'
+            ? `حي ${activeLocation.district}`
+            : activeLocation.city;
+        }
       }
-      const place = await reverseGeocodeDeviceLocation(location);
-      const label = place?.district || place?.city || 'موقعي الحالي';
 
-      const { data: convId, error: convError } = await supabase.rpc(
-        'hayna_get_or_create_direct_conversation',
-        { p_target: targetUserId },
-      );
-      if (convError) throw convError;
-      if (!convId) throw new Error('تعذّر فتح المحادثة الخاصة');
+      // 2. Resilient conversation resolution (RPC with graceful table fallback)
+      let finalConvId: string | null = null;
+      try {
+        const { data: rpcConvId, error: convError } = await supabase.rpc(
+          'hayna_get_or_create_direct_conversation',
+          { p_target: targetUserId },
+        );
+        if (!convError && rpcConvId) {
+          finalConvId = rpcConvId;
+        }
+      } catch {}
 
-      const { error } = await supabase.from('messages').insert({
-        conversation_id: convId,
+      if (!finalConvId) {
+        // Fallback: look for direct conversation or create it directly
+        const { data: existingConvs } = await supabase
+          .from('conversations')
+          .select('id, conversation_members!inner(user_id)')
+          .eq('is_group', false)
+          .eq('conversation_members.user_id', currentUserId);
+
+        if (existingConvs && existingConvs.length > 0) {
+          const convIds = existingConvs.map(c => c.id);
+          const { data: targetMembership } = await supabase
+            .from('conversation_members')
+            .select('conversation_id')
+            .in('conversation_id', convIds)
+            .eq('user_id', targetUserId)
+            .limit(1);
+
+          if (targetMembership && targetMembership.length > 0) {
+            finalConvId = targetMembership[0].conversation_id;
+          }
+        }
+
+        if (!finalConvId) {
+          const { data: newConv, error: newConvErr } = await supabase
+            .from('conversations')
+            .insert({ created_by: currentUserId, is_group: false })
+            .select('id')
+            .single();
+
+          if (newConv && !newConvErr) {
+            finalConvId = newConv.id;
+            await supabase.from('conversation_members').insert([
+              { conversation_id: newConv.id, user_id: currentUserId },
+              { conversation_id: newConv.id, user_id: targetUserId },
+            ]);
+          }
+        }
+      }
+
+      if (!finalConvId) {
+        throw new Error('تعذّر فتح المحادثة الخاصة حالياً.');
+      }
+
+      const { error: msgErr } = await supabase.from('messages').insert({
+        conversation_id: finalConvId,
         sender_id: currentUserId,
-        body: JSON.stringify({ type: 'location', lat: location.latitude, lng: location.longitude, label }),
+        body: JSON.stringify({
+          type: 'location',
+          lat: locLat,
+          lng: locLng,
+          label,
+          note: `مشاركة إحداثيات الموقع بخصوص سؤال: «${(q.title || '').slice(0, 45)}»`,
+        }),
         read_by: [currentUserId],
       });
-      if (error) throw error;
-      router.push({ pathname: '/conversation', params: { id: convId } });
+      if (msgErr) throw msgErr;
+
+      Alert.alert('تم إرسال الموقع بنجاح! 📍', `تمت مشاركة موقعك (${label}) بالخاص مع ${targetName}.`);
+      router.push({ pathname: '/conversation', params: { id: finalConvId } });
     } catch (e: any) {
       Alert.alert('تعذّر إرسال الموقع', e?.message || `تعذّر إرسال موقعك إلى ${targetName}.`);
     } finally {

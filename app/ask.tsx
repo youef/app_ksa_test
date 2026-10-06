@@ -85,34 +85,28 @@ export default function AskScreen() {
     let isMounted = true;
 
     async function initLocation() {
-      // Always prefer the user's real current device position; replace the previous location.
+      // 1. Immediately populate from active location / permanent storage (Zero wait)
       try {
-        const device = await getCurrentDeviceLocation();
-        if (device) {
-          const place = await reverseGeocodeDeviceLocation(device);
-          if (place?.region && place?.city && place?.district) {
-            await savePermanentMyLocation({ region: place.region, city: place.city, district: place.district }, true);
-            if (isMounted) {
-              setRegion(place.region);
-              setCity(place.city);
-              setDistrict(place.district);
-            }
+        const active = await getActiveLocation();
+        if (isMounted && active?.city && !isAllKingdom(active.city)) {
+          setCity(active.city);
+          const d = (active.district && active.district !== 'كل الأحياء' && active.district !== 'كل أحياء المدينة') ? active.district : '';
+          setDistrict(d);
+          setRegion(active.region || 'المملكة');
+        } else {
+          const loc = await getPermanentMyLocation();
+          if (isMounted && loc?.city && !isAllKingdom(loc.city)) {
+            setCity(loc.city);
+            const d = (loc.district && loc.district !== 'كل الأحياء' && loc.district !== 'كل أحياء المدينة') ? loc.district : '';
+            setDistrict(d);
+            setRegion(loc.region || 'المملكة');
           }
         }
       } catch (e) {
-        console.warn('ask live location refresh failed:', e);
+        console.warn('init location read error', e);
       }
 
-      // 1. Load the latest saved location only if live detection was unavailable.
-      const loc = await getPermanentMyLocation();
-      if (isMounted && loc?.city && !isAllKingdom(loc.city)) {
-        setCity(loc.city);
-        const d = (loc.district && loc.district !== 'كل الأحياء' && loc.district !== 'كل أحياء المدينة') ? loc.district : '';
-        setDistrict(d);
-        setRegion(loc.region || 'المملكة');
-      }
-
-      // 2. If logged in, check profile to keep everything in sync
+      // 2. Synchronize with profile if user is logged in
       try {
         const { data: u } = await supabase.auth.getUser();
         if (u?.user) {
@@ -129,7 +123,6 @@ export default function AskScreen() {
               : '';
             setCity(cleanCity);
             setDistrict(cleanDist);
-            // Ensure stored on device so it persists even if the user logs out later
             await savePermanentMyLocation({
               region: prof.region?.trim() || 'المملكة',
               city: cleanCity,
@@ -137,9 +130,23 @@ export default function AskScreen() {
             });
           }
         }
-      } catch (err) {
-        // Silently preserve local location
-      }
+      } catch (err) {}
+
+      // 3. Fast non-blocking GPS refinement in background
+      try {
+        const device = await Promise.race([
+          getCurrentDeviceLocation(),
+          new Promise((res) => setTimeout(() => res(null), 2000)),
+        ]);
+        if (device && isMounted) {
+          const place = await reverseGeocodeDeviceLocation(device as any);
+          if (place?.region && place?.city && place?.district) {
+            setRegion(place.region);
+            setCity(place.city);
+            setDistrict(place.district);
+          }
+        }
+      } catch (e) {}
     }
 
     initLocation();
@@ -251,8 +258,14 @@ export default function AskScreen() {
       const isEmergency = safetyCheck?.isEmergency || postType === 'emergency';
       const isToolSharing = postType === 'tool_sharing';
 
-      // Attach the real GPS fix so the post lands on the neighbourhood map.
-      const deviceLocation = await getCurrentDeviceLocation();
+      // Attach the GPS fix if available quickly (non-blocking)
+      let deviceLocation: any = null;
+      try {
+        deviceLocation = await Promise.race([
+          getCurrentDeviceLocation(),
+          new Promise((res) => setTimeout(() => res(null), 1200)),
+        ]);
+      } catch {}
 
       // Persist the exact location attached to this post
       if (city) {
@@ -351,11 +364,11 @@ export default function AskScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Top Header */}
-      <LinearGradient colors={['#065f46', '#059669', '#10b981']} style={styles.header}>
+      {/* Unified Luxury Header (matching home) */}
+      <LinearGradient colors={['#064e3b', '#065f46', '#047857']} style={styles.header}>
         <ScreenHeader
           title="اسأل أهل حيك 🇸🇦"
-          subtitle="مربوط بموقعك مع خوارزميات ذكاء اصطناعي فورية"
+          subtitle="مجتمع حيّنا • تواصل الجيران"
           fallbackRoute="/home"
         />
       </LinearGradient>

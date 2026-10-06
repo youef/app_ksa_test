@@ -19,6 +19,7 @@ const TABS = [
 
 const NESTED_ROUTES: Array<[string, string]> = [
   ['/question', '/home'],
+  ['/questions', '/home'],
   ['/ask', '/home'],
   ['/create-story', '/home'],
   ['/notifications', '/home'],

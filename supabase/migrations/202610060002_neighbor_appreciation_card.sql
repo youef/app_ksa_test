@@ -283,4 +283,53 @@ grant execute on function public.complete_neighbor_request(uuid, uuid, text) to 
 revoke all on function public.award_best_answer(uuid, uuid) from public, anon;
 grant execute on function public.award_best_answer(uuid, uuid) to authenticated;
 
+-- Permissive direct message permission check for neighbors
+create or replace function public.hayna_can_dm(p_sender uuid, p_recipient uuid)
+returns boolean language sql stable security definer set search_path=public,pg_catalog
+as $$
+  select p_sender is not null and p_recipient is not null and p_sender <> p_recipient
+    and not exists (
+      select 1 from public.blocks b
+      where (b.blocker_id = p_sender and b.blocked_id = p_recipient)
+         or (b.blocker_id = p_recipient and b.blocked_id = p_sender)
+    );
+$$;
+
+-- Resilient get or create direct conversation between two users
+create or replace function public.hayna_get_or_create_direct_conversation(p_target uuid)
+returns uuid language plpgsql security definer set search_path=public,pg_catalog
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_conv uuid;
+begin
+  if v_uid is null then raise exception 'not_authenticated'; end if;
+  if p_target is null or p_target = v_uid then raise exception 'invalid_target'; end if;
+  if not exists (select 1 from public.profiles where id = p_target) then raise exception 'user_not_found'; end if;
+  if not public.hayna_can_dm(v_uid, p_target) then raise exception 'dm_not_allowed'; end if;
+
+  select c.id into v_conv
+  from public.conversations c
+  join public.conversation_members a on a.conversation_id = c.id and a.user_id = v_uid
+  join public.conversation_members b on b.conversation_id = c.id and b.user_id = p_target
+  where c.is_group is false
+  order by c.created_at asc limit 1;
+
+  if v_conv is null then
+    insert into public.conversations(created_by, is_group)
+    values(v_uid, false)
+    returning id into v_conv;
+
+    insert into public.conversation_members(conversation_id, user_id)
+    values(v_conv, v_uid), (v_conv, p_target)
+    on conflict do nothing;
+  end if;
+
+  return v_conv;
+end $$;
+
+grant execute on function public.hayna_can_dm(uuid, uuid) to authenticated;
+grant execute on function public.hayna_get_or_create_direct_conversation(uuid) to authenticated;
+
 notify pgrst, 'reload schema';
+
