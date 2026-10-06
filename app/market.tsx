@@ -44,6 +44,14 @@ import {
   Share2,
   Heart,
   Navigation,
+  Truck,
+  Award,
+  Info,
+  CheckCircle2,
+  ThumbsUp,
+  SlidersHorizontal,
+  Flame,
+  ArrowRight,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { relativeTime } from '@/lib/mapPins';
@@ -112,8 +120,18 @@ const DEFAULT_BUSINESSES = [
     icon: '🛒',
     color: '#059669',
     bg: '#ecfdf5',
-    hours: 'مفتوح · حتى 12:00 ص',
-    description: 'تموينات حي متكاملة، خضار وفواكه طازجة وتوصيل سريع لسكان الحي.',
+    hours: 'مفتوح · 6:00 ص – 12:30 ص',
+    description: 'تموينات حي متكاملة، خضار وفواكه طازجة يومياً، لحوم مبردة، مياه ومشروبات، وتوصيل سريع ومجاني لجميع عمائر الحي.',
+    features: ['توصيل فوري مجاني لسكان الحي', 'دفع إلكتروني مدى و Apple Pay', 'مياه معبأة بأسعار الجملة', 'خضار وفواكه طازجة يومياً'],
+    servicesList: [
+      { name: 'توصيل طلبات المنازل', desc: 'خلال 15 دقيقة فقط لأهل الحي' },
+      { name: 'طلبات المناسبات والمياه', desc: 'كراتين مياه وعصائر مع التوصيل' },
+      { name: 'قسم الألبان والخضار الطازج', desc: 'توريد يومي من مزارع الخرج' },
+    ],
+    reviewsList: [
+      { user: 'أبو فهد', text: 'ما شاء الله سرعة بالتوصيل وأسعار طيبة جداً.', rating: 5, time: 'منذ يومين' },
+      { user: 'أم عبد العزيز', text: 'الخضار دايماً طازج والتعامل راقي جداً.', rating: 5, time: 'منذ أسبوع' },
+    ],
   },
   {
     id: 'b-2',
@@ -131,8 +149,17 @@ const DEFAULT_BUSINESSES = [
     icon: '🧺',
     color: '#0284c7',
     bg: '#f0f9ff',
-    hours: 'مفتوح · حتى 11:30 م',
-    description: 'غسيل وكي بالبخار، استلام وتسليم من المنازل مع خصم خاص لأهل الحي.',
+    hours: 'مفتوح · 8:00 ص – 11:30 م',
+    description: 'غسيل وكي بالبخار بأحدث الأجهزة الإيطالية، تنظيف جاف، استلام وتسليم مجاني من باب المنزل مع خصم خاص 15% لأهل الحي.',
+    features: ['استلام وتسليم مجاني من المنزل', 'كي بالبخار فائق الدقة', 'تنظيف جاف للبدل والفساتين', 'خصم 15% لسكان الحي'],
+    servicesList: [
+      { name: 'غسيل وكي الثياب والملابس', desc: 'تعطير وتغليف فاخر' },
+      { name: 'غسيل المفارش والبطانيات', desc: 'أجهزة تعقيم بالبخار الحار' },
+      { name: 'خدمة التوصيل السريع (المستعجل)', desc: 'خلال ساعتين فقط' },
+    ],
+    reviewsList: [
+      { user: 'م. خالد الدوسري', text: 'كي الثياب عندهم ممتاز جداً بدون أثر ويسلمون بالوقت.', rating: 5, time: 'منذ 3 أيام' },
+    ],
   },
   {
     id: 'b-3',
@@ -151,7 +178,16 @@ const DEFAULT_BUSINESSES = [
     color: '#d97706',
     bg: '#fffbeb',
     hours: 'مفتوح · 6:00 ص – 11:00 م',
-    description: 'خبز طازج على مدار اليوم، فطائر صاج، ومعمول تمر فاخر بيتي.',
+    description: 'خبز صامولي وتميس ومفرود طازج على مدار اليوم، فطائر صاج، ومعمول تمر فاخر بيتي وموالح طازجة لضيافة الجيران.',
+    features: ['أفران حجرية طازجة', 'فطائر ومعجنات صباحية', 'حلويات ومعمول بيتي فاخر', 'خصم للطلبيات الكبيرة'],
+    servicesList: [
+      { name: 'معجنات وفطائر الصباح', desc: 'جبن، زعتر، لحم، سبانخ طازجة' },
+      { name: 'خبز صحي ونخالة وبر', desc: 'بدون سكر مضاف ومناسب للحمية' },
+      { name: 'ضيافة الجيران والمناسبات', desc: 'صواني مشكلة مجهزة بعناية' },
+    ],
+    reviewsList: [
+      { user: 'سلطان القحطاني', text: 'المعجنات لذيذة والخبز ساخن دائماً.', rating: 5, time: 'أمس' },
+    ],
   },
   {
     id: 'b-4',
@@ -169,8 +205,17 @@ const DEFAULT_BUSINESSES = [
     icon: '💊',
     color: '#dc2626',
     bg: '#fef2f2',
-    hours: 'مفتوح · خدمة 24 ساعة',
-    description: 'كافة الأدوية والمستلزمات الطبية مع استشارات صيدلانية مجانية.',
+    hours: 'مفتوح · خدمة 24 ساعة طوال الأسبوع',
+    description: 'كافة الأدوية والمستلزمات الطبية وأجهزة قياس السكر والضغط مع استشارات صيدلانية مجانية وتوصيل فوري للحالات الطارئة.',
+    features: ['خدمة على مدار 24 ساعة', 'استشارات صيدلانية مجانية', 'قياس الضغط والسكر مجاناً', 'توصيل فوري للمنازل'],
+    servicesList: [
+      { name: 'صرف الوصفات والأدوية', desc: 'توفر كامل لجميع بدائل الأدوية' },
+      { name: 'أجهزة الرعاية المنزلية', desc: 'أجهزة قياس الضغط، السكر، والحرارة' },
+      { name: 'عناية الأطفال والمكملات', desc: 'حليب وحفاضات ومكملات غذائية' },
+    ],
+    reviewsList: [
+      { user: 'د. فيصل الشهري', text: 'الدكتور الصيدلي متعاون وناصح وخدمتهم 24 ساعة تريح البال.', rating: 5, time: 'منذ يومين' },
+    ],
   },
   {
     id: 'b-5',
@@ -189,7 +234,15 @@ const DEFAULT_BUSINESSES = [
     color: '#7c3aed',
     bg: '#f5f3ff',
     hours: 'مفتوح · 7:00 ص – 12:30 ص',
-    description: 'قهوة مختصة وجلسات هادئة ملائمة لعمل الجيران ولقاءاتهم المجتمعية.',
+    description: 'قهوة مختصة محمصة محلياً، شاي كرك ومشروبات باردة، جلسات هادئة ملائمة لعمل الجيران عن بُعد ولقاءاتهم المجتمعية.',
+    features: ['إنترنت عالي السرعة مجاني', 'قهوة مختصة v60 وإسبريسو', 'جلسات داخلية هادئة للعمل', 'ركن مخصص للكتب والمطالعة'],
+    servicesList: [
+      { name: 'المشروبات الساخنة والباردة', desc: 'بن برازيلي وإثيوبي محمص طازج' },
+      { name: 'ساندوتشات وحلويات خفيفة', desc: 'كوكيز وتيراميسو وكرواسون' },
+    ],
+    reviewsList: [
+      { user: 'ريان بن محفوظ', text: 'مكان رايق وشرح والقهوة مضبوطة جداً.', rating: 5, time: 'منذ أسبوع' },
+    ],
   },
   {
     id: 'b-6',
@@ -207,8 +260,17 @@ const DEFAULT_BUSINESSES = [
     icon: '🔧',
     color: '#c2410c',
     bg: '#fff7ed',
-    hours: 'مفتوح · استجابة سريعة',
-    description: 'فنيون معتمدون لصيانة التكييف والمنازل مع ضمان للخدمات داخل الحي.',
+    hours: 'مفتوح · استجابة سريعة على مدار اليوم',
+    description: 'فنيون محترفون ومعتمدون لصيانة التكييف، السباكة، والكهرباء المنزلية مع ضمان معتمد وقطع غيار أصلية لسكان الحي.',
+    features: ['ضمان 30 يوماً على الصيانة', 'فنيون مدربون ذوو خبرة', 'استجابة سريعة خلال نصف ساعة', 'أسعار معلنة ومناسبة'],
+    servicesList: [
+      { name: 'صيانة وغسيل المكيفات', desc: 'سبليت وشباك وتعبئة فريون أصلي' },
+      { name: 'إصلاح السباكة وتسريب المياه', desc: 'كشف وإصلاح مع الضمان' },
+      { name: 'أعمال الكهرباء والإنارة', desc: 'تأسيس وصيانة وفحص القواطع' },
+    ],
+    reviewsList: [
+      { user: 'أحمد الغامدي', text: 'جاني الفني وصلح دينمو الماء خلال نص ساعة، شغل نظيف وأمين.', rating: 5, time: 'منذ 4 أيام' },
+    ],
   },
   {
     id: 'b-7',
@@ -227,7 +289,16 @@ const DEFAULT_BUSINESSES = [
     color: '#4338ca',
     bg: '#eef2ff',
     hours: 'مفتوح · 10:00 ص – 11:30 م',
-    description: 'تصفيف وقص شعر وعناية باللحية بأدوات معقمة وطاقم محترف.',
+    description: 'تصفيف وقص شعر وعناية باللحية بأدوات معقمة ذات استخدام واحد، طاقم محترف وجلسات مريحة وتكييف ممتاز.',
+    features: ['أدوات ذات استخدام واحد معقمة', 'طاقم محترف ذو خبرة عالية', 'عناية بالبشرة وتنظيف ومساج', 'حجز مواعيد مسبق بدون انتظار'],
+    servicesList: [
+      { name: 'قص الشعر وتصفيفه', desc: 'أحدث القصات والستايلات الكلاسيكية' },
+      { name: 'تهذيب وتحديد اللحية', desc: 'حلاقة ناعمة وماسكات ترطيب' },
+      { name: 'حلاقة أطفال لطيفة', desc: 'كراسي مخصصة وأسلوب صبور' },
+    ],
+    reviewsList: [
+      { user: 'عبد الله السبيعي', text: 'شغل ممتاز ونظافة فائقة والأسعار ممتازة.', rating: 5, time: 'منذ 5 أيام' },
+    ],
   },
 ];
 
@@ -240,15 +311,21 @@ const DEFAULT_EVENTS = [
     categoryLabel: 'ملتقيات الجيران',
     city: 'الرياض',
     district: 'العليا',
-    dateLabel: 'كل سبت · بعد صلاة المغرب',
-    location: 'حديقة الحي المركزية',
+    dateLabel: 'كل سبت · بعد صلاة المغرب (6:30 م)',
+    location: 'حديقة الحي المركزية - بجوار الممشى',
     organizer: 'لجنة أهالي الحي',
     attendeesCount: 38,
     isFree: true,
     icon: '☕',
     color: '#d97706',
     bg: '#fffbeb',
-    description: 'جلسة تعارف وتبادل الأفكار لتطوير خدمات الحي وقهوة ومخبوزات بدعم من أهل الحي.',
+    description: 'جلسة تعارف وتبادل الأفكار لتطوير خدمات الحي، قهوة ومخبوزات بدعم من أهل الحي، ونقاش مفتوح لتعزيز الروابط بين الجيران.',
+    agenda: [
+      '6:30 م - استقبال الجيران والضيافة (قهوة وشاي وتمر)',
+      '7:00 م - استعراض مبادرات الحي واحتياجاته',
+      '7:30 م - نقاش مفتوح واقتراحات السكان',
+    ],
+    guidelines: 'الحضور متاح لجميع سكان الحي وعائلاتهم، الدعوة عامة والدخول مجاني.',
   },
   {
     id: 'ev-2',
@@ -258,48 +335,66 @@ const DEFAULT_EVENTS = [
     city: 'الرياض',
     district: 'النرجس',
     dateLabel: 'الجمعة القادمة · 4:30 عصراً',
-    location: 'ممشى وحديقة الحي',
-    organizer: 'فريق متطوعي حيّنا',
+    location: 'حديقة النرجس الجنوبية',
+    organizer: 'فريق بصمة جار التطوعي',
     attendeesCount: 52,
     isFree: true,
     icon: '🌿',
     color: '#059669',
     bg: '#ecfdf5',
-    description: 'زراعة 100 شتلة صديقة للبيئة وتجميل المرافق. الشتلات والأدوات موفرة مجاناً.',
+    description: 'مبادرة تشاركية لزراعة شتلات محلية مقاومة وتجميل مداخل الحي وممشى الحديقة بمشاركة الأسر والأطفال لغرس قيمة العناية بالبيئة.',
+    agenda: [
+      '4:30 م - تجمع المتطوعين وتوزيع أدوات الزراعة والشتلات',
+      '5:00 م - زراعة الشتلات وسقيا الأشجار القائمة',
+      '6:00 م - تكريم المشاركين الصغار وتوزيع هدايا تذكارية',
+    ],
+    guidelines: 'يتم توفير القفازات والأدوات والشتلات مجاناً لجميع الحاضرين.',
   },
   {
     id: 'ev-3',
     title: 'دوري كرة القدم لشباب الحي ⚽',
     category: 'sports',
     categoryLabel: 'رياضية وشبابية',
-    city: 'الرياض',
-    district: 'الياسمين',
-    dateLabel: 'مساء الخميس والجمعة · 8:00 م',
-    location: 'ملاعب بلدية الحي',
-    organizer: 'شباب الحي الرياضي',
+    city: 'جدة',
+    district: 'الروضة',
+    dateLabel: 'الخميس والجمعة · بعد صلاة العشاء',
+    location: 'ملعب البلدية الرياضي بالحي',
+    organizer: 'شباب حي الروضة الرياضي',
     attendeesCount: 64,
     isFree: true,
     icon: '⚽',
     color: '#0284c7',
     bg: '#f0f9ff',
-    description: 'بطولة كروية ودية لتعزيز الروح الرياضية والتعارف بين شباب حارات الحي مع كؤوس وميداليات.',
+    description: 'بطولة كروية ودية لفرق شباب الحي لتشجيع الرياضة وبناء روح الصداقة والتعارف مع جوائز وميداليات للفائزين.',
+    agenda: [
+      '8:30 م - مباريات الدور التمهيدي',
+      '9:45 م - نصف النهائي والمباراة الختامية',
+      '10:30 م - تسليم الكأس والميداليات',
+    ],
+    guidelines: 'يرجى الحضور بالزي الرياضي، الدخول والتشجيع مجاني ومتاح للجميع.',
   },
   {
     id: 'ev-4',
-    title: 'معرض الأسر المنتجة والحرف اليدوية 🛍️',
+    title: 'بازار الأسر المنتجة والحرفيين 🛍️',
     category: 'family',
     categoryLabel: 'عائلية وأطفال',
-    city: 'جدة',
-    district: 'الروضة',
-    dateLabel: 'نهاية الشهر (الخميس والجمعة) · 5:00 م',
-    location: 'الساحة المجتمعية بالحي',
-    organizer: 'أسر حيّنا المنتجة',
-    attendeesCount: 95,
+    city: 'الرياض',
+    district: 'الياسمين',
+    dateLabel: 'نهاية الأسبوع · 4:00 م إلى 10:00 م',
+    location: 'ساحة جامع الياسمين',
+    organizer: 'ملتقى رائدات الحي',
+    attendeesCount: 87,
     isFree: true,
     icon: '🛍️',
     color: '#be185d',
     bg: '#fdf2f8',
-    description: 'أكشاك للأطعمة المنزلية والحلويات والعبايات والمشغولات وركن ألعاب مخصص للأطفال.',
+    description: 'أكشاك متنوعة للأطعمة المنزلية، الحلويات، المخبوزات، العبايات والمشغولات اليدوية وركن ألعاب ورسم مخصص للأطفال.',
+    agenda: [
+      '4:00 م - افتتاح أركان الأسر المنتجة',
+      '5:30 م - عروض ومسابقات حركية للأطفال',
+      '8:00 م - سحوبات وهدايا قيمة للزوار',
+    ],
+    guidelines: 'مناسب لجميع أفراد العائلة، تتوفر جلسات مريحة وضيافة لأهل الحي.',
   },
   {
     id: 'ev-5',
@@ -316,7 +411,13 @@ const DEFAULT_EVENTS = [
     icon: '🩺',
     color: '#dc2626',
     bg: '#fef2f2',
-    description: 'دورة تطبيقية عملية للتعامل مع الحالات الطارئة للأطفال وكبار السن في المنزل.',
+    description: 'دورة تطبيقية عملية للتعامل مع الحالات الطارئة للأطفال وكبار السن في المنزل، تشمل إنعاش القلب والتعامل مع الحروق والاختناق.',
+    agenda: [
+      '7:00 م - شرح نظري لأهم الحوادث المنزلية',
+      '7:40 م - تدريب عملي بالدمى على الإنعاش القلبي والشرقة',
+      '8:30 م - إجابة استفسارات الحضور وتوزيع شهادات حضور',
+    ],
+    guidelines: 'شهادة حضور رمزية معتمدة، الدورة مجانية بالكامل.',
   },
 ];
 
@@ -352,6 +453,11 @@ export default function Market() {
     city: 'كل المدن',
     district: 'كل الأحياء',
   });
+
+  // Selected Detail Modal States (Full Details for everything!)
+  const [selectedBusiness, setSelectedBusiness] = useState<any | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<any | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
 
   // Event Creation Modal State
   const [showEventModal, setShowEventModal] = useState(false);
@@ -398,7 +504,7 @@ export default function Market() {
       const [servicesRes, businessRes, eventsRes] = await Promise.all([
         supabase
           .from('services')
-          .select('*, profiles:provider_id(display_name, avatar_url, is_verified)')
+          .select('*, profiles:provider_id(display_name, avatar_url, is_verified, phone)')
           .order('created_at', { ascending: false }),
         supabase
           .from('businesses')
@@ -436,7 +542,8 @@ export default function Market() {
         color: '#0284c7',
         bg: '#f0f9ff',
         hours: b.working_hours || 'مفتوح للخدمة',
-        description: b.description || 'منشأة محلية تخدم سكان الحي.',
+        description: b.description || 'منشأة محلية تخدم سكان الحي بأعلى معايير الجودة.',
+        features: ['خدمة سكان الحي', 'استجابة سريعة', 'جودة مضمونة'],
       }));
       setBusinesses([...dbBusinesses, ...DEFAULT_BUSINESSES]);
 
@@ -456,7 +563,7 @@ export default function Market() {
         icon: '🌟',
         color: '#059669',
         bg: '#ecfdf5',
-        description: ev.description || 'نشاط مجتمعي يجمع الجيران.',
+        description: ev.description || 'نشاط مجتمعي يجمع الجيران في أجواء مميزة.',
       }));
       setEvents([...dbEvents, ...DEFAULT_EVENTS]);
     } catch {
@@ -528,7 +635,7 @@ export default function Market() {
   }, [events, activeLoc, eventCategory, query]);
 
   const shareItem = async (item: any) => {
-    const text = `شوف هذا العرض في حيّنا: ${item.name} — ${formatServicePrice(item)}`;
+    const text = `شوف هذا العرض في سوق حيّنا: ${item.name} — ${formatServicePrice(item)}`;
     try {
       await Share.share({
         message: Platform.OS === 'web' ? `${text} — ${window.location.origin}/service?id=${item.id}` : text,
@@ -538,14 +645,14 @@ export default function Market() {
   };
 
   const shareBusiness = async (b: any) => {
-    const text = `دليل الأعمال بحيّنا: «${b.name}» (${b.categoryLabel}) في حي ${b.district || b.city}`;
+    const text = `دليل الأعمال بحيّنا: «${b.name}» (${b.categoryLabel}) في حي ${b.district || b.city}\nهاتف: ${b.phone || 'متوفر بالتطبيق'}`;
     try {
       await Share.share({ message: text, title: b.name });
     } catch {}
   };
 
   const shareEvent = async (ev: any) => {
-    const text = `دعوة لحضور «${ev.title}» بحيّنا!\n📍 المكان: ${ev.location}\n🗓️ الموعد: ${ev.dateLabel}`;
+    const text = `دعوة لحضور «${ev.title}» بحيّنا!\n📍 المكان: ${ev.location}\n🗓️ الموعد: ${ev.dateLabel}\nالدعوة عامة والدخول مجاني 🎉`;
     try {
       await Share.share({ message: text, title: ev.title });
     } catch {}
@@ -555,7 +662,7 @@ export default function Market() {
     setRsvpList((prev) => {
       const next = !prev[eventId];
       if (next) {
-        Alert.alert('تم تسجيل حضورك! 🎉', 'يسعدنا تواجدك مع جيرانك في الفعالية.');
+        Alert.alert('تم تسجيل حضورك بنجاح! 🎉', 'يسعدنا تواجدك مع جيرانك في الفعالية، ونتمنى لكم وقتاً ممتعاً.');
       }
       return { ...prev, [eventId]: next };
     });
@@ -579,7 +686,10 @@ export default function Market() {
     Linking.openURL(url).catch(() => {});
   };
 
-  const openItem = (id: string) => router.push({ pathname: '/service', params: { id } });
+  const openItem = (item: any) => {
+    // Open product modal with option to navigate to full page
+    setSelectedProduct(item);
+  };
 
   // Handle Event Creation
   const handleCreateEvent = async () => {
@@ -601,7 +711,7 @@ export default function Market() {
         created_at: new Date().toISOString(),
       };
 
-      const { data, error } = await supabase.from('events').insert(newEv).select().maybeSingle();
+      const { data } = await supabase.from('events').insert(newEv).select().maybeSingle();
 
       const created = data || {
         ...newEv,
@@ -640,8 +750,13 @@ export default function Market() {
       <Pressable
         key={item.id}
         id={`market-item-${item.id}`}
-        onPress={() => openItem(item.id)}
-        style={({ pressed, hovered }: any) => [styles.card, { width: w }, hovered && styles.cardHover, pressed && { transform: [{ scale: 0.98 }] }]}
+        onPress={() => openItem(item)}
+        style={({ pressed, hovered }: any) => [
+          styles.card,
+          { width: w },
+          hovered && styles.cardHover,
+          pressed && { transform: [{ scale: 0.98 }] },
+        ]}
       >
         <View style={[styles.cardImage, { height: w * 0.78, backgroundColor: type?.bg || '#f1f5f9' }]}>
           {cover ? (
@@ -663,11 +778,25 @@ export default function Market() {
             </View>
           )}
           <View style={styles.cardTopActions}>
-            <Pressable hitSlop={8} style={styles.shareFab} onPress={(e: any) => { e?.stopPropagation?.(); void shareItem(item); }}>
+            <Pressable
+              hitSlop={8}
+              style={styles.shareFab}
+              onPress={(e: any) => {
+                e?.stopPropagation?.();
+                void shareItem(item);
+              }}
+            >
               <Send size={12} color="#334155" />
             </Pressable>
-            {Boolean(item.whatsapp) && (
-              <Pressable hitSlop={8} style={[styles.shareFab, { backgroundColor: '#25D366' }]} onPress={(e: any) => { e?.stopPropagation?.(); openWhatsApp(item.whatsapp, `مرحباً، شفت عرضك «${item.name}» في سوق الحي بحيّنا وحاب أستفسر`); }}>
+            {Boolean(item.whatsapp || item.phone) && (
+              <Pressable
+                hitSlop={8}
+                style={[styles.shareFab, { backgroundColor: '#25D366' }]}
+                onPress={(e: any) => {
+                  e?.stopPropagation?.();
+                  openWhatsApp(item.whatsapp || item.phone, `مرحباً، شفت عرضك «${item.name}» في سوق الحي بحيّنا وحاب أستفسر`);
+                }}
+              >
                 <MessageCircle size={13} color="#fff" />
               </Pressable>
             )}
@@ -690,6 +819,11 @@ export default function Market() {
             </Text>
             {Boolean(timeAgo) && <Text style={styles.cardTimeText}>· {timeAgo}</Text>}
           </View>
+
+          <View style={styles.cardDetailsHintRow}>
+            <Text style={styles.cardDetailsHintText}>عرض التفاصيل الكاملة</Text>
+            <ArrowRight size={11} color="#059669" />
+          </View>
         </View>
       </Pressable>
     );
@@ -698,9 +832,15 @@ export default function Market() {
   // Render Card: Local Business / Store Directory
   const renderBusinessCard = (b: any, w: number) => {
     return (
-      <View
+      <Pressable
         key={b.id}
-        style={[styles.card, { width: w }]}
+        onPress={() => setSelectedBusiness(b)}
+        style={({ pressed, hovered }: any) => [
+          styles.card,
+          { width: w },
+          hovered && styles.cardHover,
+          pressed && { transform: [{ scale: 0.98 }] },
+        ]}
       >
         <View style={[styles.cardImage, { height: w * 0.58, backgroundColor: b.bg || '#f0f9ff' }]}>
           <Text style={{ fontSize: Math.min(38, w * 0.22) }}>{b.icon || '🏬'}</Text>
@@ -714,7 +854,14 @@ export default function Market() {
             </View>
           )}
           <View style={styles.cardTopActions}>
-            <Pressable hitSlop={8} style={styles.shareFab} onPress={() => shareBusiness(b)}>
+            <Pressable
+              hitSlop={8}
+              style={styles.shareFab}
+              onPress={(e: any) => {
+                e?.stopPropagation?.();
+                void shareBusiness(b);
+              }}
+            >
               <Share2 size={12} color="#334155" />
             </Pressable>
           </View>
@@ -745,24 +892,47 @@ export default function Market() {
           {/* Quick Contact & Action Buttons */}
           <View style={styles.businessActionsRow}>
             {Boolean(b.phone) && (
-              <Pressable style={styles.bizBtnCall} onPress={() => openPhone(b.phone)}>
+              <Pressable
+                style={styles.bizBtnCall}
+                onPress={(e: any) => {
+                  e?.stopPropagation?.();
+                  openPhone(b.phone);
+                }}
+              >
                 <Phone size={12} color="#0284c7" />
                 <Text style={styles.bizBtnCallText}>اتصال</Text>
               </Pressable>
             )}
             {Boolean(b.whatsapp) && (
-              <Pressable style={styles.bizBtnWa} onPress={() => openWhatsApp(b.whatsapp, `مرحباً «${b.name}»، شفت دليلكم في تطبيق حيّنا`)}>
+              <Pressable
+                style={styles.bizBtnWa}
+                onPress={(e: any) => {
+                  e?.stopPropagation?.();
+                  openWhatsApp(b.whatsapp, `مرحباً «${b.name}»، شفت دليلكم في تطبيق حيّنا وحاب أستفسر`);
+                }}
+              >
                 <MessageCircle size={12} color="#15803d" />
                 <Text style={styles.bizBtnWaText}>واتساب</Text>
               </Pressable>
             )}
-            <Pressable style={styles.bizBtnMap} onPress={() => openMaps(`${b.name} ${b.district || ''} ${b.city || ''}`)}>
+            <Pressable
+              style={styles.bizBtnMap}
+              onPress={(e: any) => {
+                e?.stopPropagation?.();
+                openMaps(`${b.name} ${b.district || ''} ${b.city || ''}`);
+              }}
+            >
               <Navigation size={12} color="#475569" />
               <Text style={styles.bizBtnMapText}>الخريطة</Text>
             </Pressable>
           </View>
+
+          <View style={styles.cardDetailsHintRow}>
+            <Text style={[styles.cardDetailsHintText, { color: '#0284c7' }]}>عرض بطاقة المحل والخدمات</Text>
+            <ArrowRight size={11} color="#0284c7" />
+          </View>
         </View>
-      </View>
+      </Pressable>
     );
   };
 
@@ -772,9 +942,15 @@ export default function Market() {
     const currentCount = ev.attendeesCount + (isAttending ? 1 : 0);
 
     return (
-      <View
+      <Pressable
         key={ev.id}
-        style={[styles.card, { width: w }]}
+        onPress={() => setSelectedEvent(ev)}
+        style={({ pressed, hovered }: any) => [
+          styles.card,
+          { width: w },
+          hovered && styles.cardHover,
+          pressed && { transform: [{ scale: 0.98 }] },
+        ]}
       >
         <View style={[styles.cardImage, { height: w * 0.58, backgroundColor: ev.bg || '#ecfdf5' }]}>
           <Text style={{ fontSize: Math.min(38, w * 0.22) }}>{ev.icon || '🗓️'}</Text>
@@ -785,7 +961,14 @@ export default function Market() {
             <Text style={[styles.availableBadgeText, { color: '#047857' }]}>{ev.isFree ? 'مجاني 🎟️' : 'تسجيل'}</Text>
           </View>
           <View style={styles.cardTopActions}>
-            <Pressable hitSlop={8} style={styles.shareFab} onPress={() => shareEvent(ev)}>
+            <Pressable
+              hitSlop={8}
+              style={styles.shareFab}
+              onPress={(e: any) => {
+                e?.stopPropagation?.();
+                void shareEvent(ev);
+              }}
+            >
               <Share2 size={12} color="#334155" />
             </Pressable>
           </View>
@@ -816,7 +999,10 @@ export default function Market() {
 
             <Pressable
               style={[styles.rsvpBtn, isAttending && styles.rsvpBtnActive]}
-              onPress={() => toggleRsvp(ev.id)}
+              onPress={(e: any) => {
+                e?.stopPropagation?.();
+                toggleRsvp(ev.id);
+              }}
             >
               {isAttending ? <Check size={12} color="#fff" /> : <Sparkles size={12} color="#059669" />}
               <Text style={[styles.rsvpBtnText, isAttending && { color: '#fff' }]}>
@@ -824,8 +1010,13 @@ export default function Market() {
               </Text>
             </Pressable>
           </View>
+
+          <View style={styles.cardDetailsHintRow}>
+            <Text style={[styles.cardDetailsHintText, { color: '#059669' }]}>عرض تفاصيل الفعالية والبرنامج</Text>
+            <ArrowRight size={11} color="#059669" />
+          </View>
         </View>
-      </View>
+      </Pressable>
     );
   };
 
@@ -860,12 +1051,18 @@ export default function Market() {
           <View style={styles.inner}>
             <View style={styles.topRow}>
               <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                <Text style={styles.headerTitle}>سوق وخدمات الحي</Text>
-                <View style={styles.locRow}>
+                <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
+                  <Text style={styles.headerTitle}>سوق وخدمات الحي</Text>
+                  <View style={styles.proTag}>
+                    <Sparkles size={11} color="#059669" />
+                    <Text style={styles.proTagText}>المطوّر</Text>
+                  </View>
+                </View>
+                <Pressable onPress={() => router.push('/locations')} style={styles.locRow}>
                   <MapPin size={12} color="#059669" />
                   <Text style={styles.locText} numberOfLines={1}>{locationLabel}</Text>
                   <ChevronDown size={12} color="#94a3b8" />
-                </View>
+                </Pressable>
               </View>
               <View style={styles.headerActions}>
                 <Pressable onPress={() => router.push('/notifications')} style={styles.iconBtn}>
@@ -906,6 +1103,11 @@ export default function Market() {
               >
                 <ShoppingBag size={14} color={section === 'market' ? '#fff' : '#64748b'} />
                 <Text style={[styles.segmentText, section === 'market' && styles.segmentTextActive]}>سوق الحي والأسر</Text>
+                <View style={[styles.segmentCount, section === 'market' && styles.segmentCountActive]}>
+                  <Text style={[styles.segmentCountText, section === 'market' && styles.segmentCountTextActive]}>
+                    {inAreaMarket.length}
+                  </Text>
+                </View>
               </Pressable>
 
               <Pressable
@@ -914,6 +1116,11 @@ export default function Market() {
               >
                 <Building2 size={14} color={section === 'businesses' ? '#fff' : '#64748b'} />
                 <Text style={[styles.segmentText, section === 'businesses' && styles.segmentTextActive]}>دليل الأعمال والخدمات</Text>
+                <View style={[styles.segmentCount, section === 'businesses' && styles.segmentCountActive]}>
+                  <Text style={[styles.segmentCountText, section === 'businesses' && styles.segmentCountTextActive]}>
+                    {displayedBusinesses.length}
+                  </Text>
+                </View>
               </Pressable>
 
               <Pressable
@@ -922,6 +1129,11 @@ export default function Market() {
               >
                 <Calendar size={14} color={section === 'events' ? '#fff' : '#64748b'} />
                 <Text style={[styles.segmentText, section === 'events' && styles.segmentTextActive]}>فعاليات الحي</Text>
+                <View style={[styles.segmentCount, section === 'events' && styles.segmentCountActive]}>
+                  <Text style={[styles.segmentCountText, section === 'events' && styles.segmentCountTextActive]}>
+                    {displayedEvents.length}
+                  </Text>
+                </View>
               </Pressable>
             </View>
 
@@ -968,6 +1180,14 @@ export default function Market() {
             </View>
           ) : (
             <>
+              {/* Neighborhood Live Hub Banner (Pulse) */}
+              <View style={styles.pulseBanner}>
+                <View style={styles.pulseDot} />
+                <Text style={styles.pulseText}>
+                  نشاط حيّنا المباشر: {inAreaMarket.length} عرض وسلعة · {businesses.length} محل وخدمة مسجلة · {events.length} فعالية قادمة
+                </Text>
+              </View>
+
               {/* ======================================================== */}
               {/* SECTION 1: MARKET & FAMILY BUSINESSES                    */}
               {/* ======================================================== */}
@@ -1130,7 +1350,447 @@ export default function Market() {
       </ScrollView>
 
       {/* ======================================================== */}
-      {/* MODAL: ADD COMMUNITY EVENT                               */}
+      {/* MODAL 1: FULL BUSINESS & STORE DETAILS                   */}
+      {/* ======================================================== */}
+      {selectedBusiness && (
+        <Modal visible={!!selectedBusiness} animationType="slide" transparent onRequestClose={() => setSelectedBusiness(null)}>
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { maxHeight: '90%' }]}>
+              <View style={styles.modalHeader}>
+                <Pressable onPress={() => setSelectedBusiness(null)} style={styles.modalCloseBtn}>
+                  <X size={18} color="#0f172a" />
+                </Pressable>
+                <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
+                  <Store size={18} color="#0284c7" />
+                  <Text style={styles.modalTitle}>تفاصيل المحل والخدمة 🏬</Text>
+                </View>
+              </View>
+
+              <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
+                {/* Hero Card Head */}
+                <View style={[styles.detailHeroBox, { backgroundColor: selectedBusiness.bg || '#f0f9ff' }]}>
+                  <View style={styles.detailHeroIconCircle}>
+                    <Text style={{ fontSize: 36 }}>{selectedBusiness.icon || '🏬'}</Text>
+                  </View>
+                  <View style={{ alignItems: 'center', marginTop: 10, gap: 4 }}>
+                    <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
+                      <Text style={styles.detailHeroTitle}>{selectedBusiness.name}</Text>
+                      {selectedBusiness.is_verified && <ShieldCheck size={18} color="#059669" />}
+                    </View>
+                    <View style={styles.detailBadgeRow}>
+                      <Text style={[styles.detailCatPill, { color: selectedBusiness.color || '#0284c7' }]}>
+                        {selectedBusiness.categoryLabel}
+                      </Text>
+                      <View style={styles.detailRatingPill}>
+                        <Star size={13} color="#f59e0b" fill="#f59e0b" />
+                        <Text style={{ fontSize: 12, fontWeight: '900', color: '#0f172a' }}>{selectedBusiness.rating}</Text>
+                        <Text style={{ fontSize: 11, color: '#64748b' }}>({selectedBusiness.reviews} تقييم)</Text>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Status & Timing Banner */}
+                <View style={styles.detailStatusBanner}>
+                  <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
+                    <Clock size={16} color="#059669" />
+                    <Text style={{ fontSize: 13, fontWeight: '800', color: '#0f172a' }}>
+                      {selectedBusiness.hours || 'متاح لخدمة الحي'}
+                    </Text>
+                  </View>
+                  <View style={[styles.statusTag, selectedBusiness.openNow ? styles.statusTagOpen : styles.statusTagClosed]}>
+                    <Text style={[styles.statusTagText, selectedBusiness.openNow ? { color: '#15803d' } : { color: '#b91c1c' }]}>
+                      {selectedBusiness.openNow ? 'مفتوح الآن 🟢' : 'مغلق حالياً 🔴'}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Location Bar */}
+                <View style={styles.detailLocationBanner}>
+                  <MapPin size={16} color="#059669" />
+                  <Text style={styles.detailLocationText}>
+                    الموقع: {selectedBusiness.district ? `حي ${selectedBusiness.district}` : ''} {selectedBusiness.city ? `· مدينة ${selectedBusiness.city}` : ''}
+                  </Text>
+                </View>
+
+                {/* Quick Action Grid */}
+                <View style={styles.detailActionsGrid}>
+                  {Boolean(selectedBusiness.phone) && (
+                    <Pressable style={styles.detailActionBtnCall} onPress={() => openPhone(selectedBusiness.phone)}>
+                      <Phone size={16} color="#0284c7" />
+                      <Text style={styles.detailActionBtnCallText}>اتصال مباشر</Text>
+                    </Pressable>
+                  )}
+                  {Boolean(selectedBusiness.whatsapp) && (
+                    <Pressable
+                      style={styles.detailActionBtnWa}
+                      onPress={() => openWhatsApp(selectedBusiness.whatsapp, `مرحباً «${selectedBusiness.name}»، شفت بطاقة محلكم في تطبيق حيّنا وحاب أستفسر عن الخدمات`)}
+                    >
+                      <MessageCircle size={16} color="#15803d" />
+                      <Text style={styles.detailActionBtnWaText}>محادثة واتساب</Text>
+                    </Pressable>
+                  )}
+                  <Pressable
+                    style={styles.detailActionBtnMap}
+                    onPress={() => openMaps(`${selectedBusiness.name} ${selectedBusiness.district || ''} ${selectedBusiness.city || ''}`)}
+                  >
+                    <Navigation size={16} color="#059669" />
+                    <Text style={styles.detailActionBtnMapText}>خرائط Google</Text>
+                  </Pressable>
+                  <Pressable style={styles.detailActionBtnShare} onPress={() => void shareBusiness(selectedBusiness)}>
+                    <Share2 size={16} color="#475569" />
+                    <Text style={styles.detailActionBtnShareText}>مشاركة</Text>
+                  </Pressable>
+                </View>
+
+                {/* About & Description */}
+                <View style={styles.detailSectionBox}>
+                  <Text style={styles.detailSectionTitle}>نبذة عن المنشأة ℹ️</Text>
+                  <Text style={styles.detailSectionDesc}>
+                    {selectedBusiness.description || 'منشأة تجارية معتمدة تقدم خدماتها المتميزة لسكان الحي مع التزام بأعلى معايير الجودة والمصداقية.'}
+                  </Text>
+                </View>
+
+                {/* Features & Advantages */}
+                {selectedBusiness.features && selectedBusiness.features.length > 0 && (
+                  <View style={styles.detailSectionBox}>
+                    <Text style={styles.detailSectionTitle}>المميزات والخدمات المقدمة ⭐</Text>
+                    <View style={{ gap: 8, marginTop: 6 }}>
+                      {selectedBusiness.features.map((feat: string, idx: number) => (
+                        <View key={idx} style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8 }}>
+                          <CheckCircle2 size={16} color="#059669" />
+                          <Text style={{ fontSize: 13, color: '#334155', fontWeight: '700' }}>{feat}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                {/* Services List if available */}
+                {selectedBusiness.servicesList && (
+                  <View style={styles.detailSectionBox}>
+                    <Text style={styles.detailSectionTitle}>قائمة الخدمات المتاحة 📋</Text>
+                    <View style={{ gap: 10, marginTop: 8 }}>
+                      {selectedBusiness.servicesList.map((svc: any, idx: number) => (
+                        <View key={idx} style={styles.detailServiceRow}>
+                          <Text style={{ fontSize: 13.5, fontWeight: '800', color: '#0f172a' }}>{svc.name}</Text>
+                          <Text style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{svc.desc}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                {/* Neighbor Reviews */}
+                {selectedBusiness.reviewsList && selectedBusiness.reviewsList.length > 0 && (
+                  <View style={styles.detailSectionBox}>
+                    <Text style={styles.detailSectionTitle}>آراء الجيران وتقييماتهم 💬</Text>
+                    <View style={{ gap: 10, marginTop: 8 }}>
+                      {selectedBusiness.reviewsList.map((rev: any, idx: number) => (
+                        <View key={idx} style={styles.detailReviewRow}>
+                          <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#0f172a' }}>{rev.user}</Text>
+                            <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 2 }}>
+                              <Star size={11} color="#f59e0b" fill="#f59e0b" />
+                              <Text style={{ fontSize: 11, fontWeight: '800', color: '#0f172a' }}>{rev.rating}</Text>
+                              <Text style={{ fontSize: 10, color: '#94a3b8' }}>· {rev.time}</Text>
+                            </View>
+                          </View>
+                          <Text style={{ fontSize: 12.5, color: '#475569', marginTop: 4, lineHeight: 18 }}>{rev.text}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                <View style={{ height: 20 }} />
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL 2: FULL COMMUNITY EVENT DETAILS                    */}
+      {/* ======================================================== */}
+      {selectedEvent && (
+        <Modal visible={!!selectedEvent} animationType="slide" transparent onRequestClose={() => setSelectedEvent(null)}>
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { maxHeight: '90%' }]}>
+              <View style={styles.modalHeader}>
+                <Pressable onPress={() => setSelectedEvent(null)} style={styles.modalCloseBtn}>
+                  <X size={18} color="#0f172a" />
+                </Pressable>
+                <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
+                  <Calendar size={18} color="#059669" />
+                  <Text style={styles.modalTitle}>تفاصيل الفعالية والنشاط 🗓️</Text>
+                </View>
+              </View>
+
+              <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
+                {/* Event Hero Box */}
+                <View style={[styles.detailHeroBox, { backgroundColor: selectedEvent.bg || '#ecfdf5' }]}>
+                  <View style={styles.detailHeroIconCircle}>
+                    <Text style={{ fontSize: 36 }}>{selectedEvent.icon || '🗓️'}</Text>
+                  </View>
+                  <View style={{ alignItems: 'center', marginTop: 10, gap: 4 }}>
+                    <Text style={styles.detailHeroTitle}>{selectedEvent.title}</Text>
+                    <View style={styles.detailBadgeRow}>
+                      <Text style={[styles.detailCatPill, { color: selectedEvent.color || '#059669' }]}>
+                        {selectedEvent.categoryLabel}
+                      </Text>
+                      <View style={[styles.detailRatingPill, { backgroundColor: '#ecfdf5', borderColor: '#a7f3d0' }]}>
+                        <Award size={13} color="#059669" />
+                        <Text style={{ fontSize: 12, fontWeight: '800', color: '#047857' }}>
+                          {selectedEvent.isFree ? 'دخول مجاني 🎟️' : 'تسجيل مسبق'}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Organizer Info */}
+                <View style={styles.detailStatusBanner}>
+                  <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8 }}>
+                    <Users size={16} color="#059669" />
+                    <View>
+                      <Text style={{ fontSize: 11, color: '#64748b' }}>الجهة المنظمة</Text>
+                      <Text style={{ fontSize: 13, fontWeight: '800', color: '#0f172a' }}>{selectedEvent.organizer || 'أحد سكان الحي'}</Text>
+                    </View>
+                  </View>
+                  <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}>
+                    <Users size={14} color="#059669" />
+                    <Text style={{ fontSize: 12.5, fontWeight: '900', color: '#059669' }}>
+                      {selectedEvent.attendeesCount + (rsvpList[selectedEvent.id] ? 1 : 0)} جار مسجل
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Timing & Schedule */}
+                <View style={styles.detailLocationBanner}>
+                  <Clock size={16} color="#d97706" />
+                  <Text style={[styles.detailLocationText, { color: '#92400e' }]}>
+                    الموعد: {selectedEvent.dateLabel}
+                  </Text>
+                </View>
+
+                {/* Exact Location */}
+                <View style={styles.detailLocationBanner}>
+                  <MapPin size={16} color="#059669" />
+                  <Text style={styles.detailLocationText}>
+                    نقطة التجمع: {selectedEvent.location} ({selectedEvent.district ? `حي ${selectedEvent.district}` : selectedEvent.city || ''})
+                  </Text>
+                </View>
+
+                {/* RSVP Interactive Button */}
+                <View style={{ marginVertical: 12 }}>
+                  <Pressable
+                    style={[styles.bigRsvpBtn, rsvpList[selectedEvent.id] && styles.bigRsvpBtnActive]}
+                    onPress={() => toggleRsvp(selectedEvent.id)}
+                  >
+                    {rsvpList[selectedEvent.id] ? (
+                      <>
+                        <Check size={20} color="#fff" />
+                        <Text style={styles.bigRsvpBtnText}>تم تسجيل حضورك بنجاح ✓ (انقر للإلغاء)</Text>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles size={20} color="#fff" />
+                        <Text style={styles.bigRsvpBtnText}>تسجيل الحضور في الفعالية (سأحضر 🎉)</Text>
+                      </>
+                    )}
+                  </Pressable>
+                </View>
+
+                {/* Actions: Map & Share */}
+                <View style={styles.detailActionsGrid}>
+                  <Pressable
+                    style={styles.detailActionBtnMap}
+                    onPress={() => openMaps(`${selectedEvent.location} ${selectedEvent.district || ''} ${selectedEvent.city || ''}`)}
+                  >
+                    <Navigation size={16} color="#059669" />
+                    <Text style={styles.detailActionBtnMapText}>عرض موقع الفعالية بالخريطة</Text>
+                  </Pressable>
+                  <Pressable style={styles.detailActionBtnShare} onPress={() => void shareEvent(selectedEvent)}>
+                    <Share2 size={16} color="#475569" />
+                    <Text style={styles.detailActionBtnShareText}>مشاركة الدعوة مع الجيران</Text>
+                  </Pressable>
+                </View>
+
+                {/* Description */}
+                <View style={styles.detailSectionBox}>
+                  <Text style={styles.detailSectionTitle}>عن الفعالية والنشاط ℹ️</Text>
+                  <Text style={styles.detailSectionDesc}>{selectedEvent.description}</Text>
+                </View>
+
+                {/* Agenda if available */}
+                {selectedEvent.agenda && (
+                  <View style={styles.detailSectionBox}>
+                    <Text style={styles.detailSectionTitle}>برنامج الفعالية والجدول ⏱️</Text>
+                    <View style={{ gap: 8, marginTop: 8 }}>
+                      {selectedEvent.agenda.map((item: string, idx: number) => (
+                        <View key={idx} style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8 }}>
+                          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#059669' }} />
+                          <Text style={{ fontSize: 13, color: '#334155', fontWeight: '700' }}>{item}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                {/* Guidelines */}
+                <View style={styles.detailSectionBox}>
+                  <Text style={styles.detailSectionTitle}>إرشادات وتعليمات الحضور 📌</Text>
+                  <Text style={styles.detailSectionDesc}>
+                    {selectedEvent.guidelines || 'مرحباً بجميع أهالي الحي، الفعالية مجانية، والدعوة عامة لك ولأسرتك.'}
+                  </Text>
+                </View>
+
+                <View style={{ height: 20 }} />
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL 3: QUICK PRODUCT / SERVICE PREVIEW                 */}
+      {/* ======================================================== */}
+      {selectedProduct && (
+        <Modal visible={!!selectedProduct} animationType="slide" transparent onRequestClose={() => setSelectedProduct(null)}>
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { maxHeight: '90%' }]}>
+              <View style={styles.modalHeader}>
+                <Pressable onPress={() => setSelectedProduct(null)} style={styles.modalCloseBtn}>
+                  <X size={18} color="#0f172a" />
+                </Pressable>
+                <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
+                  <ShoppingBag size={18} color="#059669" />
+                  <Text style={styles.modalTitle}>تفاصيل العرض والسلعة 🛍️</Text>
+                </View>
+              </View>
+
+              <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
+                {/* Product Cover Image */}
+                {getServiceCover(selectedProduct) ? (
+                  <View style={styles.productModalImgWrap}>
+                    <Image source={{ uri: getServiceCover(selectedProduct) }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+                  </View>
+                ) : null}
+
+                <View style={{ paddingVertical: 12 }}>
+                  <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={styles.productModalTitle}>{selectedProduct.name}</Text>
+                    <Text style={styles.productModalPrice}>{formatServicePrice(selectedProduct)}</Text>
+                  </View>
+
+                  <Text style={styles.productModalSub}>
+                    {selectedProduct.shop_name ? `🏪 ${selectedProduct.shop_name}` : selectedProduct.subcategory || selectedProduct.category || 'عرض محلي'}
+                  </Text>
+
+                  {/* Delivery & Status row */}
+                  <View style={{ flexDirection: 'row-reverse', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                    {selectedProduct.available_now && (
+                      <View style={[styles.statusTag, styles.statusTagOpen]}>
+                        <Text style={[styles.statusTagText, { color: '#15803d' }]}>متاح الآن للتسليم 🟢</Text>
+                      </View>
+                    )}
+                    {(selectedProduct.delivery_modes || []).map((m: string) => {
+                      const dm = getDeliveryMode(m);
+                      return dm ? (
+                        <View key={m} style={styles.deliveryPill}>
+                          <Text style={{ fontSize: 12 }}>{dm.emoji}</Text>
+                          <Text style={styles.deliveryPillText}>{dm.label}</Text>
+                        </View>
+                      ) : null;
+                    })}
+                  </View>
+
+                  {/* Location Info */}
+                  <View style={[styles.detailLocationBanner, { marginTop: 12 }]}>
+                    <MapPin size={16} color="#059669" />
+                    <Text style={styles.detailLocationText}>
+                      الموقع: {selectedProduct.district ? `حي ${selectedProduct.district}` : ''} {selectedProduct.city ? `· ${selectedProduct.city}` : 'داخل الحي'}
+                    </Text>
+                  </View>
+
+                  {/* Description */}
+                  <View style={styles.detailSectionBox}>
+                    <Text style={styles.detailSectionTitle}>وصف السلعة والتفاصيل 📝</Text>
+                    <Text style={styles.detailSectionDesc}>
+                      {selectedProduct.description || 'عرض متاح من أحد سكان أو أسر الحي، تم فحصه لضمان أفضل تجربة.'}
+                    </Text>
+                  </View>
+
+                  {/* Provider Info */}
+                  {selectedProduct.profiles && (
+                    <View style={styles.detailStatusBanner}>
+                      <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 10 }}>
+                        {selectedProduct.profiles.avatar_url ? (
+                          <Image source={{ uri: selectedProduct.profiles.avatar_url }} style={{ width: 36, height: 36, borderRadius: 18 }} />
+                        ) : (
+                          <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#d1fae5', alignItems: 'center', justifyContent: 'center' }}>
+                            <Text style={{ fontSize: 14, fontWeight: '900', color: '#047857' }}>
+                              {selectedProduct.profiles.display_name?.[0] || 'ج'}
+                            </Text>
+                          </View>
+                        )}
+                        <View>
+                          <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}>
+                            <Text style={{ fontSize: 13, fontWeight: '800', color: '#0f172a' }}>
+                              {selectedProduct.profiles.display_name || 'أحد الجيران'}
+                            </Text>
+                            {selectedProduct.profiles.is_verified && <ShieldCheck size={14} color="#059669" />}
+                          </View>
+                          <Text style={{ fontSize: 11, color: '#64748b' }}>معلن موثق بالحي</Text>
+                        </View>
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Direct Contact Buttons */}
+                  <View style={styles.detailActionsGrid}>
+                    {Boolean(selectedProduct.whatsapp || selectedProduct.phone) && (
+                      <Pressable
+                        style={styles.detailActionBtnWa}
+                        onPress={() => openWhatsApp(selectedProduct.whatsapp || selectedProduct.phone, `مرحباً، بخصوص إعلانك «${selectedProduct.name}» في سوق الحي بحيّنا، هل هو متاح؟`)}
+                      >
+                        <MessageCircle size={16} color="#15803d" />
+                        <Text style={styles.detailActionBtnWaText}>محادثة واتساب</Text>
+                      </Pressable>
+                    )}
+                    {Boolean(selectedProduct.phone) && (
+                      <Pressable style={styles.detailActionBtnCall} onPress={() => openPhone(selectedProduct.phone)}>
+                        <Phone size={16} color="#0284c7" />
+                        <Text style={styles.detailActionBtnCallText}>اتصال</Text>
+                      </Pressable>
+                    )}
+                    <Pressable style={styles.detailActionBtnShare} onPress={() => void shareItem(selectedProduct)}>
+                      <Share2 size={16} color="#475569" />
+                      <Text style={styles.detailActionBtnShareText}>مشاركة</Text>
+                    </Pressable>
+                  </View>
+
+                  {/* Open Full Dedicated Page Button */}
+                  <Pressable
+                    style={styles.fullPageBtn}
+                    onPress={() => {
+                      setSelectedProduct(null);
+                      router.push({ pathname: '/service', params: { id: selectedProduct.id } });
+                    }}
+                  >
+                    <ExternalLink size={16} color="#fff" />
+                    <Text style={styles.fullPageBtnText}>فتح صفحة العرض المخصصة كاملة</Text>
+                  </Pressable>
+                </View>
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL 4: ADD COMMUNITY EVENT                             */}
       {/* ======================================================== */}
       <Modal visible={showEventModal} animationType="slide" transparent onRequestClose={() => setShowEventModal(false)}>
         <View style={styles.modalOverlay}>
@@ -1242,6 +1902,18 @@ const styles = StyleSheet.create({
   header: { backgroundColor: '#fff', paddingTop: Platform.OS === 'ios' ? 52 : 18, paddingBottom: 10 },
   topRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between' },
   headerTitle: { fontSize: 22, fontWeight: '900', color: '#0f172a' },
+  proTag: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  proTagText: { fontSize: 10.5, fontWeight: '900', color: '#059669' },
   locRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, marginTop: 2, maxWidth: 240 },
   locText: { fontSize: 12, color: '#475569', fontWeight: '700', flexShrink: 1 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -1270,7 +1942,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 5,
     paddingVertical: 8,
     borderRadius: 11,
   },
@@ -1290,12 +1962,46 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '900',
   },
+  segmentCount: {
+    backgroundColor: '#e2e8f0',
+    borderRadius: 10,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
+  segmentCountActive: {
+    backgroundColor: 'rgba(255,255,255,0.25)',
+  },
+  segmentCountText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#475569',
+  },
+  segmentCountTextActive: {
+    color: '#fff',
+  },
 
   searchRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
   searchBox: { flex: 1, height: 46, borderRadius: 14, backgroundColor: '#f1f5f9', flexDirection: 'row-reverse', alignItems: 'center', paddingHorizontal: 14, gap: 8 },
   searchInput: { flex: 1, color: '#0f172a', fontSize: 14, paddingVertical: 0, ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}) },
   addBtn: { height: 46, minWidth: 46, paddingHorizontal: 14, borderRadius: 14, backgroundColor: '#059669', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 5 },
   addBtnText: { color: '#fff', fontSize: 13, fontWeight: '900' },
+
+  // Live Pulse Banner
+  pulseBanner: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  pulseDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#10b981' },
+  pulseText: { fontSize: 11.5, fontWeight: '800', color: '#047857', flex: 1, textAlign: 'right' },
 
   typesScroll: { marginTop: 14 },
   typesRow: { flexDirection: 'row-reverse', gap: 14, paddingBottom: 4 },
@@ -1320,7 +2026,7 @@ const styles = StyleSheet.create({
   grid: { flexDirection: 'row-reverse', flexWrap: 'wrap' },
   card: {
     backgroundColor: '#fff', borderRadius: 18, overflow: 'hidden', borderWidth: 1, borderColor: '#eef2f7',
-    ...(Platform.OS === 'web' ? ({ transition: 'transform 160ms ease, box-shadow 160ms ease' } as any) : {}),
+    ...(Platform.OS === 'web' ? ({ transition: 'transform 160ms ease, box-shadow 160ms ease', cursor: 'pointer' } as any) : {}),
   },
   cardHover: { transform: [{ translateY: -3 }], shadowColor: '#0f172a', shadowOpacity: 0.08, shadowRadius: 16, shadowOffset: { width: 0, height: 8 } },
   cardImage: { alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative' },
@@ -1340,6 +2046,17 @@ const styles = StyleSheet.create({
   cardTimeText: { fontSize: 10, color: '#94a3b8', fontWeight: '600' },
   cardMeta: { flexDirection: 'row-reverse', alignItems: 'center', gap: 3, marginTop: 6 },
   cardMetaText: { fontSize: 10.5, color: '#94a3b8', fontWeight: '600', flexShrink: 1 },
+  cardDetailsHintRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    gap: 4,
+    marginTop: 8,
+    paddingTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: '#f8fafc',
+  },
+  cardDetailsHintText: { fontSize: 11, fontWeight: '800', color: '#059669' },
 
   // Business Card Action Buttons
   businessActionsRow: {
@@ -1425,8 +2142,8 @@ const styles = StyleSheet.create({
   emptyBtn: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, backgroundColor: '#059669', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, marginTop: 14 },
   emptyBtnText: { color: '#fff', fontSize: 13, fontWeight: '900' },
 
-  // Modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.6)', justifyContent: 'flex-end' },
+  // Modals Core
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.65)', justifyContent: 'flex-end' },
   modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 18, paddingBottom: 32 },
   modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#f1f5f9', paddingBottom: 14, marginBottom: 14 },
   modalTitle: { fontSize: 16, fontWeight: '900', color: '#0f172a' },
@@ -1435,4 +2152,135 @@ const styles = StyleSheet.create({
   modalInput: { backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9, fontSize: 13, color: '#0f172a', textAlign: 'right' },
   submitEventBtn: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#059669', borderRadius: 14, paddingVertical: 13, marginTop: 18 },
   submitEventBtnText: { color: '#fff', fontSize: 13, fontWeight: '900' },
+
+  // Detailed Modals Rich Elements
+  detailHeroBox: { borderRadius: 20, padding: 18, alignItems: 'center', marginBottom: 14 },
+  detailHeroIconCircle: { width: 68, height: 68, borderRadius: 34, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 8, elevation: 3 },
+  detailHeroTitle: { fontSize: 19, fontWeight: '900', color: '#0f172a', textAlign: 'center' },
+  detailBadgeRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginTop: 6 },
+  detailCatPill: { fontSize: 12, fontWeight: '800', backgroundColor: 'rgba(255,255,255,0.9)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  detailRatingPill: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, backgroundColor: '#fff', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, borderWidth: 1, borderColor: '#fef3c7' },
+
+  detailStatusBanner: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f8fafc',
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    marginBottom: 10,
+  },
+  statusTag: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  statusTagOpen: { backgroundColor: '#dcfce7' },
+  statusTagClosed: { backgroundColor: '#fee2e2' },
+  statusTagText: { fontSize: 11, fontWeight: '800' },
+
+  detailLocationBanner: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#f8fafc',
+    padding: 11,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  detailLocationText: { fontSize: 12.5, fontWeight: '700', color: '#334155', flex: 1, textAlign: 'right' },
+
+  detailActionsGrid: { flexDirection: 'row-reverse', gap: 8, marginBottom: 14 },
+  detailActionBtnCall: {
+    flex: 1,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    borderRadius: 12,
+    paddingVertical: 10,
+  },
+  detailActionBtnCallText: { fontSize: 12, fontWeight: '800', color: '#0284c7' },
+  detailActionBtnWa: {
+    flex: 1.2,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+    borderRadius: 12,
+    paddingVertical: 10,
+  },
+  detailActionBtnWaText: { fontSize: 12, fontWeight: '800', color: '#059669' },
+  detailActionBtnMap: {
+    flex: 1,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 12,
+    paddingVertical: 10,
+  },
+  detailActionBtnMapText: { fontSize: 12, fontWeight: '800', color: '#059669' },
+  detailActionBtnShare: {
+    flex: 0.8,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    backgroundColor: '#f1f5f9',
+    borderRadius: 12,
+    paddingVertical: 10,
+  },
+  detailActionBtnShareText: { fontSize: 12, fontWeight: '800', color: '#475569' },
+
+  detailSectionBox: { backgroundColor: '#f8fafc', borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#f1f5f9' },
+  detailSectionTitle: { fontSize: 14, fontWeight: '900', color: '#0f172a', textAlign: 'right', marginBottom: 6 },
+  detailSectionDesc: { fontSize: 13, color: '#475569', lineHeight: 20, textAlign: 'right' },
+  detailServiceRow: { backgroundColor: '#fff', padding: 10, borderRadius: 10, borderWidth: 1, borderColor: '#f1f5f9' },
+  detailReviewRow: { backgroundColor: '#fff', padding: 10, borderRadius: 10, borderWidth: 1, borderColor: '#f1f5f9' },
+
+  // Big RSVP button
+  bigRsvpBtn: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#059669',
+    paddingVertical: 14,
+    borderRadius: 14,
+    shadowColor: '#059669',
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  bigRsvpBtnActive: {
+    backgroundColor: '#047857',
+  },
+  bigRsvpBtnText: { color: '#fff', fontSize: 14, fontWeight: '900' },
+
+  // Product Preview Modal Elements
+  productModalImgWrap: { width: '100%', height: 210, borderRadius: 18, overflow: 'hidden', marginBottom: 10, backgroundColor: '#f1f5f9' },
+  productModalTitle: { fontSize: 18, fontWeight: '900', color: '#0f172a', textAlign: 'right', flex: 1 },
+  productModalPrice: { fontSize: 18, fontWeight: '900', color: '#059669' },
+  productModalSub: { fontSize: 13, color: '#64748b', textAlign: 'right', marginTop: 4 },
+  deliveryPill: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, backgroundColor: '#f1f5f9', paddingHorizontal: 9, paddingVertical: 4, borderRadius: 10 },
+  deliveryPillText: { fontSize: 11, fontWeight: '700', color: '#334155' },
+  fullPageBtn: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#0f172a',
+    borderRadius: 14,
+    paddingVertical: 13,
+    marginTop: 14,
+  },
+  fullPageBtnText: { color: '#fff', fontSize: 13, fontWeight: '900' },
 });
