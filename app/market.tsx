@@ -1051,13 +1051,7 @@ export default function Market() {
           <View style={styles.inner}>
             <View style={styles.topRow}>
               <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-                  <Text style={styles.headerTitle}>سوق وخدمات الحي</Text>
-                  <View style={styles.proTag}>
-                    <Sparkles size={11} color="#059669" />
-                    <Text style={styles.proTagText}>المطوّر</Text>
-                  </View>
-                </View>
+                <Text style={styles.headerTitle}>سوق وخدمات الحي</Text>
                 <Pressable onPress={() => router.push('/locations')} style={styles.locRow}>
                   <MapPin size={12} color="#059669" />
                   <Text style={styles.locText} numberOfLines={1}>{locationLabel}</Text>
@@ -1180,13 +1174,6 @@ export default function Market() {
             </View>
           ) : (
             <>
-              {/* Neighborhood Live Hub Banner (Pulse) */}
-              <View style={styles.pulseBanner}>
-                <View style={styles.pulseDot} />
-                <Text style={styles.pulseText}>
-                  نشاط حيّنا المباشر: {inAreaMarket.length} عرض وسلعة · {businesses.length} محل وخدمة مسجلة · {events.length} فعالية قادمة
-                </Text>
-              </View>
 
               {/* ======================================================== */}
               {/* SECTION 1: MARKET & FAMILY BUSINESSES                    */}
