@@ -12,6 +12,8 @@ import {
 import { router } from 'expo-router';
 import {
   Flame,
+  Globe,
+  Layers,
   MapPin as MapPinIcon,
   Navigation,
   Phone,
@@ -45,7 +47,7 @@ import {
 } from '@/lib/places';
 import { formatDistance, navigationUrl } from '@/lib/privacy';
 
-const KSA_CENTER = { lat: 23.9, lng: 45.5 };
+const KSA_CENTER = { lat: 24.7136, lng: 46.6753 };
 const KSA_BOUNDS = { north: 32.6, south: 15.9, east: 56.1, west: 34.4 };
 const MAP_ID = process.env.EXPO_PUBLIC_GOOGLE_MAPS_MAP_ID || '';
 
@@ -62,11 +64,68 @@ const MAP_STYLES: any[] = [
 ];
 
 type KindFilter = MapPinKind | 'all';
+type MapEngine = 'leaflet' | 'google';
 
 interface RenderedMarker {
   id: string;
   advanced: boolean;
   marker: any;
+}
+
+function injectLeafletAssets() {
+  if (typeof document === 'undefined') return;
+  if (!document.getElementById('leaflet-css')) {
+    const link = document.createElement('link');
+    link.id = 'leaflet-css';
+    link.rel = 'stylesheet';
+    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    document.head.appendChild(link);
+  }
+  if (!document.getElementById('hayna-leaflet-custom-style')) {
+    const style = document.createElement('style');
+    style.id = 'hayna-leaflet-custom-style';
+    style.textContent = `
+      .leaflet-popup-content-wrapper {
+        border-radius: 16px !important;
+        box-shadow: 0 12px 30px -6px rgba(15, 23, 42, 0.2) !important;
+        padding: 4px !important;
+        direction: rtl !important;
+      }
+      .leaflet-popup-content {
+        margin: 8px 12px !important;
+        line-height: 1.4 !important;
+      }
+      .leaflet-container {
+        font-family: inherit !important;
+      }
+      .leaflet-div-icon {
+        background: transparent !important;
+        border: none !important;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+}
+
+async function getLeafletModule(): Promise<any> {
+  if (typeof window === 'undefined') return null;
+  const scope = window as any;
+  if (scope.L && typeof scope.L.map === 'function') return scope.L;
+  try {
+    const mod = require('leaflet');
+    const L = mod.default || mod;
+    if (L && typeof L.map === 'function') {
+      scope.L = L;
+      return L;
+    }
+  } catch {}
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    script.onload = () => resolve((window as any).L);
+    script.onerror = () => reject(new Error('تعذّر تحميل مكتبة الخرائط.'));
+    document.head.appendChild(script);
+  });
 }
 
 /** Info window for a community post: neighbourhood only, never an exact fix. */
@@ -93,7 +152,7 @@ function buildPinInfoWindow(pin: MapPin, onOpen: () => void, onClose: () => void
   area.style.cssText = 'font-size:12px;font-weight:700;color:#059669;';
   wrap.appendChild(area);
 
-if (pin.approximate) {
+  if (pin.approximate) {
     const hint = document.createElement('div');
     hint.textContent = 'موقع تقريبي على الخريطة — يُعرض الحي فقط حفاظاً على الخصوصية.';
     hint.style.cssText = 'font-size:10px;color:#b45309;font-weight:700;margin-top:3px;';
@@ -252,15 +311,19 @@ export default function WebMap() {
   const isWide = width >= 980;
 
   const mapElRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<any>(null);
-  const apiRef = useRef<any>(null);
-  const pinMarkersRef = useRef<RenderedMarker[]>([]);
-  const placeMarkersRef = useRef<RenderedMarker[]>([]);
-  const openInfoRef = useRef<((pin: MapPin) => void) | null>(null);
-  const heatRef = useRef<any>(null);
-  const infoRef = useRef<any>(null);
-  const myMarkerRef = useRef<any>(null);
+  const leafletInstanceRef = useRef<any>(null);
+  const leafletPinLayerRef = useRef<any>(null);
+  const leafletPlaceLayerRef = useRef<any>(null);
+  const leafletMyMarkerRef = useRef<any>(null);
 
+  const googleMapRef = useRef<any>(null);
+  const googleApiRef = useRef<any>(null);
+  const googlePinMarkersRef = useRef<RenderedMarker[]>([]);
+  const googlePlaceMarkersRef = useRef<RenderedMarker[]>([]);
+  const googleInfoRef = useRef<any>(null);
+  const googleMyMarkerRef = useRef<any>(null);
+
+  const [engine, setEngine] = useState<MapEngine>('leaflet');
   const [pins, setPins] = useState<MapPin[]>([]);
   const [kind, setKind] = useState<KindFilter>('all');
   const [city, setCity] = useState<string>('all');
@@ -270,7 +333,7 @@ export default function WebMap() {
   const [myLocation, setMyLocation] = useState<DeviceLocation | null>(null);
   const [loading, setLoading] = useState(true);
   const [mapReady, setMapReady] = useState(false);
-  const [mapError, setMapError] = useState<string | null>(null);
+  const [mapNotice, setMapNotice] = useState<string | null>(null);
 
   const [places, setPlaces] = useState<NearbyPlace[]>([]);
   const [placeCategory, setPlaceCategory] = useState<string>(ALL_PLACES_KEY);
@@ -288,47 +351,97 @@ export default function WebMap() {
     }
   }, []);
 
-  // ---------------------------------------------------------------- map bootstrap
-  useEffect(() => {
-    let cancelled = false;
+  // ---------------------------------------------------------------- Leaflet Engine Setup
+  const initLeafletMap = useCallback(async () => {
+    if (!mapElRef.current) return;
+    injectLeafletAssets();
+    const L = await getLeafletModule();
+    if (!L || !mapElRef.current) return;
 
-    loadGoogleMaps()
-      .then((api) => {
-        if (cancelled || !mapElRef.current) return;
-        apiRef.current = api;
-        const map = new api.Map(mapElRef.current, {
-          center: KSA_CENTER,
-          zoom: 6,
-          minZoom: 5,
-          maxZoom: 18,
-          restriction: { latLngBounds: KSA_BOUNDS },
-          clickableIcons: false,
-          streetViewControl: false,
-          fullscreenControl: false,
-          gestureHandling: 'greedy',
-          styles: MAP_ID ? undefined : MAP_STYLES,
-          mapTypeControl: false,
-          zoomControl: true,
-          ...(MAP_ID ? { mapId: MAP_ID } : {}),
-        });
-        mapRef.current = map;
-        infoRef.current = new api.InfoWindow({ disableAutoPan: false });
-        setMapReady(true);
-        map.addListener('idle', () => {
-          const center = map.getCenter();
-          if (center && !isInsideSaudi(center.lat(), center.lng())) {
-            map.panTo(KSA_CENTER);
-          }
-        });
-      })
-      .catch((error: any) => {
-        if (!cancelled) setMapError(error?.message || 'تعذّر تحميل الخريطة.');
+    // Cleanup previous map if exists
+    if (leafletInstanceRef.current) {
+      try { leafletInstanceRef.current.remove(); } catch {}
+      leafletInstanceRef.current = null;
+    }
+
+    mapElRef.current.innerHTML = '';
+    const map = L.map(mapElRef.current, {
+      center: [KSA_CENTER.lat, KSA_CENTER.lng],
+      zoom: 6,
+      minZoom: 5,
+      maxZoom: 19,
+      zoomControl: false,
+    });
+
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© خريطة حيّنا · OpenStreetMap',
+      maxZoom: 19,
+    }).addTo(map);
+
+    leafletPinLayerRef.current = L.layerGroup().addTo(map);
+    leafletPlaceLayerRef.current = L.layerGroup().addTo(map);
+    leafletInstanceRef.current = map;
+    setMapReady(true);
+  }, []);
+
+  // ---------------------------------------------------------------- Google Maps Engine Setup
+  const initGoogleMap = useCallback(async () => {
+    if (!mapElRef.current) return;
+
+    // Handle Google auth failures gracefully
+    if (typeof window !== 'undefined') {
+      (window as any).gm_authFailure = () => {
+        setMapNotice('تعذّر تفعيل خرائط Google (تحتاج تفعيل Maps API والفوترة في Google Cloud). تم التبديل تلقائياً لخريطة حيّنا المباشرة.');
+        setEngine('leaflet');
+      };
+    }
+
+    try {
+      mapElRef.current.innerHTML = '';
+      const api = await loadGoogleMaps();
+      googleApiRef.current = api;
+      const map = new api.Map(mapElRef.current, {
+        center: KSA_CENTER,
+        zoom: 6,
+        minZoom: 5,
+        maxZoom: 18,
+        restriction: { latLngBounds: KSA_BOUNDS },
+        clickableIcons: false,
+        streetViewControl: false,
+        fullscreenControl: false,
+        gestureHandling: 'greedy',
+        styles: MAP_ID ? undefined : MAP_STYLES,
+        mapTypeControl: false,
+        zoomControl: true,
+        ...(MAP_ID ? { mapId: MAP_ID } : {}),
       });
+      googleMapRef.current = map;
+      googleInfoRef.current = new api.InfoWindow({ disableAutoPan: false });
+      setMapReady(true);
+    } catch (err: any) {
+      setMapNotice('تعذّر الاتصال بخوادم خرائط Google. تم الرجوع لخريطة حيّنا المباشرة.');
+      setEngine('leaflet');
+    }
+  }, []);
+
+  // ---------------------------------------------------------------- Bootstrap Map Engine
+  useEffect(() => {
+    setMapReady(false);
+    if (engine === 'leaflet') {
+      void initLeafletMap();
+    } else {
+      void initGoogleMap();
+    }
 
     return () => {
-      cancelled = true;
+      if (leafletInstanceRef.current) {
+        try { leafletInstanceRef.current.remove(); } catch {}
+        leafletInstanceRef.current = null;
+      }
     };
-  }, []);
+  }, [engine, initLeafletMap, initGoogleMap]);
 
   useEffect(() => {
     void refreshPins();
@@ -360,164 +473,145 @@ export default function WebMap() {
   const kindCounts = useMemo(() => countByKind(pins), [pins]);
   const cityCounts = useMemo(() => countByCity(pins).slice(0, 8), [pins]);
 
-  // ---------------------------------------------------------------- marker plumbing
-  const clearGroup = useCallback((group: 'pin' | 'place') => {
-    const api = apiRef.current;
-    const list = group === 'pin' ? pinMarkersRef.current : placeMarkersRef.current;
-    list.forEach((entry) => {
-      if (!api) return;
-      if (entry.advanced) entry.marker.map = null;
-      else entry.marker.setMap(null);
-    });
-    if (group === 'pin') pinMarkersRef.current = [];
-    else placeMarkersRef.current = [];
-  }, []);
-
-  const makeMarker = useCallback(
-    (position: { lat: number; lng: number }, title: string, color: string, emoji: string, onClick: () => void) => {
-      const api = apiRef.current;
-      const map = mapRef.current;
-      if (!api || !map) return null;
-      const useAdvanced = Boolean(MAP_ID) && Boolean(api.marker?.AdvancedMarkerElement);
-      if (useAdvanced) {
-        const marker = new api.marker.AdvancedMarkerElement({
-          map,
-          position,
-          title,
-          zIndex: 20,
-          content: pinElement(color, emoji, false),
-        });
-        marker.addListener('click', onClick);
-        return { advanced: true, marker } as Omit<RenderedMarker, 'id'>;
-      }
-      const marker = new api.Marker({
-        map,
-        position,
-        title,
-        icon: {
-          url: pinSvg(color, emoji),
-          scaledSize: new api.Size(38, 50),
-          anchor: new api.Point(19, 48),
-        },
-        zIndex: 20,
-      });
-      marker.addListener('click', onClick);
-      return { advanced: false, marker } as Omit<RenderedMarker, 'id'>;
-    },
-    [],
-  );
-
+  // ---------------------------------------------------------------- Update Pins on Active Engine
   useEffect(() => {
     if (!mapReady) return;
-    clearGroup('pin');
 
-    const openPin = (pin: MapPin) => {
-      if (infoRef.current) {
-        const { content, anchor } = buildPinInfoWindow(
+    if (engine === 'leaflet') {
+      const L = (window as any).L;
+      const pinLayer = leafletPinLayerRef.current;
+      if (!L || !pinLayer) return;
+
+      pinLayer.clearLayers();
+      visiblePins.forEach((pin) => {
+        const kindMeta = MAP_PIN_KINDS[pin.kind];
+        const icon = L.divIcon({
+          className: 'hayna-custom-pin',
+          html: pinElement(kindMeta.color, kindMeta.emoji, pin.urgent).outerHTML,
+          iconSize: [40, 52],
+          iconAnchor: [20, 50],
+          popupAnchor: [0, -45],
+        });
+        const marker = L.marker([pin.lat, pin.lng], { icon });
+        const { content } = buildPinInfoWindow(
           pin,
           () => router.push(pin.href as never),
-          () => infoRef.current?.close(),
+          () => marker.closePopup(),
         );
-        infoRef.current.setContent(content);
-        infoRef.current.open({ map: mapRef.current, anchor });
-      }
-    };
-    openInfoRef.current = openPin;
+        marker.bindPopup(content, { maxWidth: 300, minWidth: 230 });
+        marker.addTo(pinLayer);
+      });
+    } else {
+      // Google Maps pin rendering
+      const api = googleApiRef.current;
+      const map = googleMapRef.current;
+      if (!api || !map) return;
 
-    visiblePins.forEach((pin) => {
-      const kindMeta = MAP_PIN_KINDS[pin.kind];
-      const entry = makeMarker(
-        { lat: pin.lat, lng: pin.lng },
-        pin.title,
-        kindMeta.color,
-        kindMeta.emoji,
-        () => openPin(pin),
-      );
-      if (entry) pinMarkersRef.current.push({ id: pin.id, ...entry });
-    });
+      googlePinMarkersRef.current.forEach((m) => {
+        if (m.advanced) m.marker.map = null;
+        else m.marker.setMap(null);
+      });
+      googlePinMarkersRef.current = [];
 
-    return () => {
-      openInfoRef.current = null;
-    };
-  }, [visiblePins, clearGroup, mapReady, makeMarker]);
+      visiblePins.forEach((pin) => {
+        const kindMeta = MAP_PIN_KINDS[pin.kind];
+        const marker = new api.Marker({
+          map,
+          position: { lat: pin.lat, lng: pin.lng },
+          title: pin.title,
+          icon: {
+            url: pinSvg(kindMeta.color, kindMeta.emoji),
+            scaledSize: new api.Size(38, 50),
+            anchor: new api.Point(19, 48),
+          },
+        });
+        marker.addListener('click', () => {
+          if (googleInfoRef.current) {
+            const { content, anchor } = buildPinInfoWindow(
+              pin,
+              () => router.push(pin.href as never),
+              () => googleInfoRef.current?.close(),
+            );
+            googleInfoRef.current.setContent(content);
+            googleInfoRef.current.open({ map, anchor });
+          }
+        });
+        googlePinMarkersRef.current.push({ id: pin.id, advanced: false, marker });
+      });
+    }
+  }, [visiblePins, mapReady, engine]);
 
+  // ---------------------------------------------------------------- Update Places on Active Engine
   useEffect(() => {
     if (!mapReady) return;
-    clearGroup('place');
 
-    places.forEach((place) => {
-      const entry = makeMarker(
-        { lat: place.lat, lng: place.lng },
-        place.name,
-        '#0F766E',
-        '🏬',
-        () => {
-          if (infoRef.current) {
-            const { content, anchor } = buildPlaceInfoWindow(place, () =>
-              infoRef.current?.close(),
-            );
-            infoRef.current.setContent(content);
-            infoRef.current.open({ map: mapRef.current, anchor });
-          }
-        },
-      );
-      if (entry) placeMarkersRef.current.push({ id: place.id, ...entry });
-    });
-  }, [places, clearGroup, mapReady, makeMarker]);
+    if (engine === 'leaflet') {
+      const L = (window as any).L;
+      const placeLayer = leafletPlaceLayerRef.current;
+      if (!L || !placeLayer) return;
 
-  useEffect(
-    () => () => {
-      clearGroup('pin');
-      clearGroup('place');
-    },
-    [clearGroup],
-  );
-
-  // ---------------------------------------------------------------- heatmap
-  useEffect(() => {
-    const api = apiRef.current;
-    const map = mapRef.current;
-    if (!api || !map || !mapReady) return;
-
-    if (heatRef.current) {
-      heatRef.current.setMap(null);
-      heatRef.current = null;
-    }
-    if (!heatOn) return;
-
-    let cancelled = false;
-    const build = api.visualization
-      ? Promise.resolve(api.visualization)
-      : api.importLibrary('visualization');
-
-    build
-      .then((visualization: any) => {
-        if (cancelled || !visualization?.HeatmapLayer) return;
-        heatRef.current = new visualization.HeatmapLayer({
-          data: visiblePins.map((pin) => ({ location: { lat: pin.lat, lng: pin.lng } })),
-          radius: 42,
-          opacity: 0.5,
-          dissipating: true,
-          gradient: ['rgba(5,150,105,0)', '#34d399', '#059669', '#065f46'],
+      placeLayer.clearLayers();
+      places.forEach((place) => {
+        const icon = L.divIcon({
+          className: 'hayna-custom-place',
+          html: pinElement('#0F766E', '🏬', false).outerHTML,
+          iconSize: [40, 52],
+          iconAnchor: [20, 50],
+          popupAnchor: [0, -45],
         });
-        heatRef.current.setMap(map);
-      })
-      .catch(() => undefined);
+        const marker = L.marker([place.lat, place.lng], { icon });
+        const { content } = buildPlaceInfoWindow(place, () => marker.closePopup());
+        marker.bindPopup(content, { maxWidth: 310, minWidth: 240 });
+        marker.addTo(placeLayer);
+      });
+    } else {
+      const api = googleApiRef.current;
+      const map = googleMapRef.current;
+      if (!api || !map) return;
 
-    return () => {
-      cancelled = true;
-    };
-  }, [heatOn, visiblePins, mapReady]);
+      googlePlaceMarkersRef.current.forEach((m) => {
+        if (m.advanced) m.marker.map = null;
+        else m.marker.setMap(null);
+      });
+      googlePlaceMarkersRef.current = [];
 
-  // ---------------------------------------------------------------- nearby places
+      places.forEach((place) => {
+        const marker = new api.Marker({
+          map,
+          position: { lat: place.lat, lng: place.lng },
+          title: place.name,
+          icon: {
+            url: pinSvg('#0F766E', '🏬'),
+            scaledSize: new api.Size(38, 50),
+            anchor: new api.Point(19, 48),
+          },
+        });
+        marker.addListener('click', () => {
+          if (googleInfoRef.current) {
+            const { content, anchor } = buildPlaceInfoWindow(place, () =>
+              googleInfoRef.current?.close(),
+            );
+            googleInfoRef.current.setContent(content);
+            googleInfoRef.current.open({ map, anchor });
+          }
+        });
+        googlePlaceMarkersRef.current.push({ id: place.id, advanced: false, marker });
+      });
+    }
+  }, [places, mapReady, engine]);
+
+  // ---------------------------------------------------------------- Nearby Places Search
   const runPlaceSearch = useCallback(
     async (nextCategory: string, nextQuery: string) => {
-      const origin = myLocation ?? (await getCurrentDeviceLocation());
-      if (!origin) {
-        setSheetOpen(true);
-        return;
+      let origin: { latitude: number; longitude: number };
+      if (myLocation) {
+        origin = myLocation;
+      } else {
+        const device = await getCurrentDeviceLocation();
+        origin = device ?? { latitude: KSA_CENTER.lat, longitude: KSA_CENTER.lng };
+        setMyLocation(origin);
       }
-      if (!myLocation) setMyLocation(origin);
+
       setPlacesLoading(true);
       setSheetOpen(true);
       const results = await searchNearbyPlaces({
@@ -536,34 +630,37 @@ export default function WebMap() {
     const timer = setTimeout(() => {
       if (places.length || placesLoading) return;
       void runPlaceSearch(placeCategory, query);
-    }, 900);
+    }, 600);
     return () => clearTimeout(timer);
-    // Auto-runs once on first load so the map is useful immediately.
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ---------------------------------------------------------------- actions
+  // ---------------------------------------------------------------- Actions
   const focusCity = useCallback(
     (targetCity: string) => {
-      const map = mapRef.current;
-      const api = apiRef.current;
-      if (!map || !api) return;
       if (targetCity === 'all') {
-        if (pins.length) {
-          const bounds = new api.LatLngBounds();
-          pins.forEach((pin) => bounds.extend({ lat: pin.lat, lng: pin.lng }));
-          map.fitBounds(bounds, 60);
-        } else {
-          map.setZoom(6);
+        if (engine === 'leaflet' && leafletInstanceRef.current) {
+          leafletInstanceRef.current.setView([KSA_CENTER.lat, KSA_CENTER.lng], 6);
+        } else if (googleMapRef.current) {
+          googleMapRef.current.setCenter(KSA_CENTER);
+          googleMapRef.current.setZoom(6);
         }
         return;
       }
+
       const target = pins.filter((pin) => pin.city === targetCity);
       if (!target.length) return;
-      const bounds = new api.LatLngBounds();
-      target.forEach((pin) => bounds.extend({ lat: pin.lat, lng: pin.lng }));
-      map.fitBounds(bounds, 70);
+
+      if (engine === 'leaflet' && leafletInstanceRef.current) {
+        const L = (window as any).L;
+        const bounds = L.latLngBounds(target.map((p) => [p.lat, p.lng]));
+        leafletInstanceRef.current.fitBounds(bounds, { padding: [50, 50] });
+      } else if (googleMapRef.current && googleApiRef.current) {
+        const bounds = new googleApiRef.current.LatLngBounds();
+        target.forEach((p) => bounds.extend({ lat: p.lat, lng: p.lng }));
+        googleMapRef.current.fitBounds(bounds, 70);
+      }
     },
-    [pins],
+    [pins, engine],
   );
 
   const locateMe = useCallback(async () => {
@@ -573,40 +670,55 @@ export default function WebMap() {
     if (!location) return;
     setMyLocation(location);
 
-    const api = apiRef.current;
-    const map = mapRef.current;
-    if (!api || !map || !mapReady) return;
-    if (myMarkerRef.current) {
-      if (myMarkerRef.current.setMap) myMarkerRef.current.setMap(null);
-      else myMarkerRef.current.map = null;
-      myMarkerRef.current = null;
+    if (engine === 'leaflet' && leafletInstanceRef.current) {
+      const L = (window as any).L;
+      if (leafletMyMarkerRef.current) {
+        leafletMyMarkerRef.current.remove();
+      }
+      const myIcon = L.divIcon({
+        className: 'hayna-my-pin',
+        html: pinElement('#2563EB', '📍', true).outerHTML,
+        iconSize: [40, 52],
+        iconAnchor: [20, 50],
+      });
+      leafletMyMarkerRef.current = L.marker([location.latitude, location.longitude], { icon: myIcon }).addTo(
+        leafletInstanceRef.current,
+      );
+      leafletInstanceRef.current.flyTo([location.latitude, location.longitude], 15, { duration: 1.2 });
+    } else if (googleMapRef.current && googleApiRef.current) {
+      if (googleMyMarkerRef.current) {
+        googleMyMarkerRef.current.setMap(null);
+      }
+      googleMyMarkerRef.current = new googleApiRef.current.Marker({
+        map: googleMapRef.current,
+        position: { lat: location.latitude, lng: location.longitude },
+        title: 'موقعي',
+        icon: {
+          url: pinSvg('#2563EB', '📍'),
+          scaledSize: new googleApiRef.current.Size(38, 50),
+          anchor: new googleApiRef.current.Point(19, 48),
+        },
+      });
+      googleMapRef.current.panTo({ lat: location.latitude, lng: location.longitude });
+      googleMapRef.current.setZoom(15);
     }
-    const entry = makeMarker(
-      { lat: location.latitude, lng: location.longitude },
-      'موقعي',
-      '#2563EB',
-      '📍',
-      () => undefined,
-    );
-    if (entry) myMarkerRef.current = entry.marker;
-    map.panTo({ lat: location.latitude, lng: location.longitude });
-    map.setZoom(14);
+
     void runPlaceSearch(placeCategory, query);
-  }, [mapReady, makeMarker, placeCategory, query, runPlaceSearch]);
+  }, [engine, placeCategory, query, runPlaceSearch]);
 
-  const focusPlace = useCallback((place: NearbyPlace) => {
-    const map = mapRef.current;
-    if (!map) return;
-    map.panTo({ lat: place.lat, lng: place.lng });
-    map.setZoom(16);
-    if (infoRef.current) {
-      const { content, anchor } = buildPlaceInfoWindow(place, () => infoRef.current?.close());
-      infoRef.current.setContent(content);
-      infoRef.current.open({ map, anchor });
-    }
-  }, []);
+  const focusPlace = useCallback(
+    (place: NearbyPlace) => {
+      if (engine === 'leaflet' && leafletInstanceRef.current) {
+        leafletInstanceRef.current.flyTo([place.lat, place.lng], 16, { duration: 1 });
+      } else if (googleMapRef.current) {
+        googleMapRef.current.panTo({ lat: place.lat, lng: place.lng });
+        googleMapRef.current.setZoom(16);
+      }
+    },
+    [engine],
+  );
 
-  // ---------------------------------------------------------------- render
+  // ---------------------------------------------------------------- Render Helpers
   const kindChip = (value: KindFilter, label: string, color: string, count: number) => {
     const active = kind === value;
     return (
@@ -719,10 +831,15 @@ export default function WebMap() {
 
   return (
     <View style={styles.root}>
-      {/* @ts-ignore raw div hosts the Google Maps canvas */}
-      <div ref={(node) => { mapElRef.current = node; }} style={{ width: '100%', height: '100%' }} />
+      {/* Map DOM Canvas */}
+      <div
+        ref={(node) => {
+          mapElRef.current = node;
+        }}
+        style={{ width: '100%', height: '100%' }}
+      />
 
-      {/* Top bar */}
+      {/* Top Bar */}
       <View style={styles.topBar}>
         <View style={styles.topRow}>
           <Pressable onPress={() => router.back()} style={styles.iconBtn}>
@@ -734,6 +851,28 @@ export default function WebMap() {
               {visiblePins.length} نشاط · {places.length} محل قريب
             </Text>
           </View>
+
+          {/* Engine Toggle Pill */}
+          <Pressable
+            onPress={() => {
+              setMapNotice(null);
+              setEngine((prev) => (prev === 'leaflet' ? 'google' : 'leaflet'));
+            }}
+            style={[styles.engineBtn, engine === 'google' && styles.engineBtnGoogle]}
+          >
+            {engine === 'leaflet' ? (
+              <>
+                <Layers size={13} color="#059669" />
+                <Text style={styles.engineBtnText}>خريطة حيّنا</Text>
+              </>
+            ) : (
+              <>
+                <Globe size={13} color="#2563eb" />
+                <Text style={[styles.engineBtnText, { color: '#2563eb' }]}>Google</Text>
+              </>
+            )}
+          </Pressable>
+
           <Pressable
             onPress={() => setHeatOn((value) => !value)}
             style={[styles.iconBtn, heatOn && styles.iconBtnActive]}
@@ -748,13 +887,14 @@ export default function WebMap() {
           </Pressable>
         </View>
 
+        {/* Search Input */}
         <View style={styles.searchRow}>
           <Search size={17} color={C.muted} />
           <TextInput
             value={query}
             onChangeText={setQuery}
             onSubmitEditing={() => void runPlaceSearch(placeCategory, query)}
-            placeholder="ابحث عن بقالة، صيدلية، حلاق، سباك..."
+            placeholder="ابحث عن بقالة، صيدلية، حلاق، سباك، مطعم..."
             placeholderTextColor={C.muted}
             style={styles.search}
             returnKeyType="search"
@@ -766,6 +906,7 @@ export default function WebMap() {
           ) : null}
         </View>
 
+        {/* Categories Bar */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -803,20 +944,26 @@ export default function WebMap() {
                 placeCategory === category.key && styles.placeChipActive,
               ]}
             >
-              <Text style={styles.placeChipText}>
+              <Text
+                style={[
+                  styles.placeChipText,
+                  placeCategory === category.key && styles.placeChipTextActive,
+                ]}
+              >
                 {category.emoji} {category.label}
               </Text>
             </Pressable>
           ))}
         </ScrollView>
 
+        {/* Pins Kind & City Filter Bar */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.chipScroll}
           style={styles.chipBar}
         >
-          {kindChip('all', 'كل النشاط', C.ink, kindCounts.all || 0)}
+          {kindChip('all', 'جميع الأنشطة', C.ink, pins.length)}
           {MAP_PIN_ORDER.map((value) => {
             const meta = MAP_PIN_KINDS[value];
             return kindChip(value, `${meta.emoji} ${meta.short}`, meta.color, kindCounts[value] || 0);
@@ -850,16 +997,17 @@ export default function WebMap() {
         </ScrollView>
       </View>
 
-      {mapError ? (
-        <View style={styles.mapError}>
-          <Text style={styles.mapErrorText}>{mapError}</Text>
-          <Text style={styles.mapErrorHint}>
-            تأكد من تفعيل Maps JavaScript API للمفتاح في Google Cloud Console.
-          </Text>
+      {/* Engine Notice banner if Google fails */}
+      {mapNotice ? (
+        <View style={styles.mapNotice}>
+          <Text style={styles.mapNoticeText}>{mapNotice}</Text>
+          <Pressable onPress={() => setMapNotice(null)} hitSlop={8}>
+            <X size={15} color="#b45309" />
+          </Pressable>
         </View>
       ) : null}
 
-      {!loading && !pins.length && !mapError && !sheetOpen ? (
+      {!loading && !pins.length && !sheetOpen ? (
         <View style={styles.mapHint}>
           <Text style={styles.mapHintText}>
             لا يوجد نشاط مسجّل بعد — أنشئ سؤالاً أو طلب مساعدة وسيظهر هنا.
@@ -867,17 +1015,27 @@ export default function WebMap() {
         </View>
       ) : null}
 
+      {/* Floating Button to Re-open Nearby Places */}
+      {!sheetOpen && (
+        <Pressable
+          style={styles.openSheetBtn}
+          onPress={() => setSheetOpen(true)}
+          accessibilityRole="button"
+        >
+          <Store size={18} color="#fff" />
+          <Text style={styles.openSheetBtnText}>
+            أقرب المحلات ({places.length})
+          </Text>
+        </Pressable>
+      )}
+
       {sheetOpen ? placesSheet : null}
 
       <View style={styles.legend}>
-        <Text style={styles.legendText}>📍лощаيات الحي فقط — الموقع الدقيق بالخاص</Text>
+        <Text style={styles.legendText}>📍 نطاق الحي فقط — الموقع الدقيق بالخاص</Text>
       </View>
     </View>
   );
-}
-
-function isInsideSaudi(lat: number, lng: number): boolean {
-  return lat >= KSA_BOUNDS.south && lat <= KSA_BOUNDS.north && lng >= KSA_BOUNDS.west && lng <= KSA_BOUNDS.east;
 }
 
 const styles = StyleSheet.create({
@@ -894,11 +1052,32 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
     paddingHorizontal: 14,
     gap: 8,
+    zIndex: 999,
   },
   topRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
   topTitleWrap: { flex: 1, alignItems: 'center' },
   topTitle: { fontSize: 16, fontWeight: '900', color: C.ink },
   topSubtitle: { fontSize: 11, fontWeight: '700', color: C.accent },
+  engineBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 10,
+  },
+  engineBtnGoogle: {
+    backgroundColor: '#eff6ff',
+    borderColor: '#bfdbfe',
+  },
+  engineBtnText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#059669',
+  },
   iconBtn: {
     width: 38,
     height: 38,
@@ -948,133 +1127,156 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: 14,
     backgroundColor: C.accentSoft,
-    borderWidth: 1,
-    borderColor: '#a7f3d0',
   },
-  cityChipActive: { backgroundColor: C.accent, borderColor: C.accent },
-  cityChipText: { fontSize: 11.5, fontWeight: '800', color: C.accent },
+  cityChipActive: { backgroundColor: C.accent },
+  cityChipText: { fontSize: 11, fontWeight: '800', color: C.accent },
   cityChipTextActive: { color: '#fff' },
-  divider: { width: 1, height: 18, backgroundColor: C.line, alignSelf: 'center' },
-  mapError: {
-    position: 'absolute',
-    top: 180,
-    left: 24,
-    right: 24,
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#fecaca',
-    padding: 16,
-    alignItems: 'center',
-    gap: 6,
-  },
-  mapErrorText: { color: C.danger, fontWeight: '800', textAlign: 'center' },
-  mapErrorHint: { color: C.muted, fontSize: 12, textAlign: 'center' },
-  mapHint: {
-    position: 'absolute',
-    top: 210,
-    left: 20,
-    right: 20,
-    backgroundColor: 'rgba(255,255,255,0.95)',
-    borderRadius: 14,
-    padding: 12,
-  },
-  mapHintText: { color: C.ink, fontSize: 12.5, fontWeight: '700', textAlign: 'center' },
+  divider: { width: 1, height: 20, backgroundColor: C.line, alignSelf: 'center', marginHorizontal: 2 },
   sheet: {
-    backgroundColor: '#fff',
-    borderColor: C.line,
-    overflow: 'hidden',
-  },
-  sheetWide: {
     position: 'absolute',
-    top: 200,
-    left: 12,
-    bottom: 12,
-    width: 340,
-    borderRadius: 18,
-    borderWidth: 1,
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    elevation: 12,
+    zIndex: 998,
   },
   sheetMobile: {
-    position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    maxHeight: '52%',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    borderTopWidth: 1,
+    maxHeight: '44%',
+  },
+  sheetWide: {
+    left: 20,
+    bottom: 20,
+    width: 380,
+    maxHeight: '65%',
+    borderRadius: 24,
   },
   sheetHandle: {
-    alignSelf: 'center',
-    width: 40,
+    width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: C.line,
+    backgroundColor: '#cbd5e1',
+    alignSelf: 'center',
     marginTop: 8,
+    marginBottom: 4,
   },
   sheetHead: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 8,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: C.line,
+    borderBottomColor: '#f1f5f9',
   },
-  sheetTitle: { flex: 1, fontSize: 13, fontWeight: '900', color: C.ink },
+  sheetTitle: { flex: 1, fontSize: 14, fontWeight: '800', color: C.ink, textAlign: 'right' },
   sheetScroll: { flex: 1 },
-  sheetContent: { padding: 10, paddingBottom: 24, gap: 8 },
+  sheetContent: { padding: 12, gap: 10 },
   placeRow: {
     flexDirection: 'row-reverse',
+    alignItems: 'center',
     gap: 10,
     padding: 10,
-    borderRadius: 14,
+    borderRadius: 16,
+    backgroundColor: '#f8fafc',
     borderWidth: 1,
-    borderColor: C.line,
-    backgroundColor: '#fff',
+    borderColor: '#e2e8f0',
   },
   placeBadge: {
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: C.accentSoft,
+    backgroundColor: '#ecfdf5',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  placeBody: { flex: 1 },
-  placeName: { fontSize: 13.5, fontWeight: '800', color: C.ink },
-  placeMeta: { fontSize: 11, color: C.muted, marginTop: 2, fontWeight: '600' },
-  placeChips: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 5, marginTop: 6 },
-  placeActions: { justifyContent: 'center', gap: 8 },
-  placeActionBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 10,
-    backgroundColor: C.accentSoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  placeBody: { flex: 1, gap: 2 },
+  placeName: { fontSize: 13.5, fontWeight: '800', color: C.ink, textAlign: 'right' },
+  placeMeta: { fontSize: 11, color: C.muted, fontWeight: '600', textAlign: 'right' },
+  placeChips: { flexDirection: 'row-reverse', gap: 5, flexWrap: 'wrap', marginTop: 4 },
   miniChip: {
     fontSize: 10,
     fontWeight: '800',
-    color: C.muted,
-    backgroundColor: C.bg,
-    borderRadius: 8,
     paddingHorizontal: 6,
     paddingVertical: 2,
-    overflow: 'hidden',
+    borderRadius: 6,
   },
-  emptyText: { textAlign: 'center', color: C.muted, paddingVertical: 26, fontSize: 12.5 },
+  placeActions: { flexDirection: 'row', gap: 6 },
+  placeActionBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: '#ecfdf5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyText: { textAlign: 'center', fontSize: 12, color: C.muted, fontWeight: '700', paddingVertical: 20 },
+  openSheetBtn: {
+    position: 'absolute',
+    bottom: 30,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: C.accent,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 30,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 8,
+    zIndex: 997,
+  },
+  openSheetBtnText: {
+    color: '#fff',
+    fontWeight: '800',
+    fontSize: 13,
+  },
   legend: {
     position: 'absolute',
-    bottom: 12,
-    right: 12,
-    backgroundColor: 'rgba(255,255,255,0.94)',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: C.line,
+    bottom: 6,
+    left: 12,
+    backgroundColor: 'rgba(255,255,255,0.85)',
     paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingVertical: 4,
+    borderRadius: 10,
+    zIndex: 996,
   },
-  legendText: { fontSize: 10.5, fontWeight: '800', color: C.muted },
+  legendText: { fontSize: 10, color: C.muted, fontWeight: '700' },
+  mapNotice: {
+    position: 'absolute',
+    top: 185,
+    left: 14,
+    right: 14,
+    backgroundColor: '#fffbeb',
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 8,
+    zIndex: 1000,
+  },
+  mapNoticeText: { flex: 1, fontSize: 11.5, color: '#92400e', fontWeight: '700', textAlign: 'right' },
+  mapHint: {
+    position: 'absolute',
+    bottom: 80,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(15,23,42,0.8)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    zIndex: 995,
+  },
+  mapHintText: { color: '#fff', fontSize: 12, fontWeight: '700' },
 });
