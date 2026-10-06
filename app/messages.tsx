@@ -941,7 +941,7 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 2,
   },
-  convCardUnread: { borderColor: '#a7f3d0', backgroundColor: '#f0fdf4' },
+  convCardUnread: { borderColor: '#6ee7b7', backgroundColor: '#f0fdf4', shadowColor: '#059669', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 10, elevation: 3 },
   convCardBlocked: { opacity: 0.7, backgroundColor: '#fef2f2', borderColor: '#fee2e2' },
   convCardMuted: { backgroundColor: '#f8fafc', borderColor: '#e2e8f0' },
   avatarWrap: { position: 'relative' },
