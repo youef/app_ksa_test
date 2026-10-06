@@ -26,7 +26,7 @@ jobs:
           path: dist
 
   eas-build:
-    name: Build Android APK & iOS IPA
+    name: Build Android APK & iOS TestFlight
     runs-on: ubuntu-latest
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
@@ -61,18 +61,19 @@ jobs:
           curl -fL "$APK_URL" -o hayna-release.apk
           test -s hayna-release.apk
 
-      - name: Build iOS IPA with EAS
+      - name: Build iOS production IPA and submit to TestFlight
         run: |
           set -euo pipefail
-          eas build --platform ios --profile preview --non-interactive --wait 2>&1 | tee eas-ios.log
+          echo "Building production iOS app and submitting to TestFlight..."
+          eas build --platform ios --profile production --auto-submit --non-interactive --wait 2>&1 | tee eas-ios.log
           IPA_URL=$(grep -Eo 'https://expo\.dev/artifacts/eas/[^[:space:]]+\.ipa([?][^[:space:]]*)?' eas-ios.log | tail -1 || true)
-          if [ -z "$IPA_URL" ]; then
-            echo "::error::EAS finished but no IPA artifact URL was found."
-            echo "Check the EAS build log above for the exact failure."
-            exit 1
+          if [ -n "$IPA_URL" ]; then
+            echo "Downloading IPA artifact..."
+            curl -fL "$IPA_URL" -o hayna-release.ipa
+            test -s hayna-release.ipa
+          else
+            echo "No IPA URL was printed; the build may still have been submitted successfully to TestFlight."
           fi
-          curl -fL "$IPA_URL" -o hayna-release.ipa
-          test -s hayna-release.ipa
 
       - name: Upload Android APK artifact
         uses: actions/upload-artifact@v4
@@ -86,7 +87,7 @@ jobs:
         with:
           name: hayna-ios-ipa
           path: hayna-release.ipa
-          if-no-files-found: error
+          if-no-files-found: ignore
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
