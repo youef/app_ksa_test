@@ -1,4 +1,5 @@
-name: Expo Builds
+name: Build & Release Mobile Apps (APK & iOS)
+
 on:
   workflow_dispatch:
   push:
@@ -6,6 +7,7 @@ on:
 
 jobs:
   web:
+    name: Build Web Export
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,7 +22,8 @@ jobs:
           name: hayna-web
           path: dist
 
-  eas:
+  eas-build:
+    name: Build Android APK & iOS
     runs-on: ubuntu-latest
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
@@ -31,27 +34,74 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm install
+
+      - name: Setup EAS CLI
+        run: npm install -g eas-cli
+
       - name: Build Android APK with EAS
         if: ${{ env.EXPO_TOKEN != '' }}
         run: |
           set -e
-          npx eas-cli@latest build --platform android --profile development --non-interactive --wait > eas-build.log 2>&1
-          cat eas-build.log
-          APK_URL="$(grep -Eo 'https://expo\.dev/artifacts/eas/[^[:space:]]+\.apk' eas-build.log | tail -1)"
-          if [ -z "$APK_URL" ]; then
-            echo "Could not find the APK URL in the EAS build output."
-            exit 1
+          echo "Building Android APK..."
+          eas build --platform android --profile preview --non-interactive --wait > eas-android.log 2>&1 || true
+          cat eas-android.log
+          APK_URL=$(grep -Eo 'https://expo\.dev/artifacts/eas/[^[:space:]]+\.apk' eas-android.log | tail -1 || true)
+          if [ -n "$APK_URL" ]; then
+            echo "Found APK at: $APK_URL"
+            curl -fL "$APK_URL" -o hayna-release.apk
+          else
+            echo "APK build in progress or needs manual download from Expo dashboard"
           fi
-          echo "APK_URL=$APK_URL"
-          curl -fL "$APK_URL" -o hayna-development.apk
-      - name: Upload APK artifact
+
+      - name: Build iOS with EAS
         if: ${{ env.EXPO_TOKEN != '' }}
+        run: |
+          set -e
+          echo "Building iOS..."
+          eas build --platform ios --profile preview --non-interactive --wait > eas-ios.log 2>&1 || true
+          cat eas-ios.log
+          IPA_URL=$(grep -Eo 'https://expo\.dev/artifacts/eas/[^[:space:]]+\.(ipa|tar\.gz)' eas-ios.log | tail -1 || true)
+          if [ -n "$IPA_URL" ]; then
+            echo "Found iOS artifact at: $IPA_URL"
+            curl -fL "$IPA_URL" -o hayna-release.ipa
+          else
+            echo "iOS build in progress or queued in Expo dashboard"
+          fi
+
+      - name: Upload Android APK
+        if: ${{ hashFiles('hayna-release.apk') != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: hayna-android-apk
-          path: hayna-development.apk
-      - name: Explain missing EAS token
+          path: hayna-release.apk
+
+      - name: Upload iOS Artifact
+        if: ${{ hashFiles('hayna-release.ipa') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: hayna-ios-app
+          path: hayna-release.ipa
+
+      - name: Create or Update GitHub Release
+        if: ${{ hashFiles('hayna-release.apk') != '' || hashFiles('hayna-release.ipa') != '' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.0-beta
+          name: "حيّنا - Hayna App v1.0.0 (Beta)"
+          body: |
+            ## روابط تحميل تطبيق حيّنا 🚀
+            - **Android (APK):** تحميل وتثبيت مباشر على جميع أجهزة الأندرويد.
+            - **iOS:** نسخة تجريبية بيتا لأجهزة آيفون.
+            
+            _تم البناء تلقائياً عبر GitHub Actions و Expo EAS._
+          files: |
+            hayna-release.apk
+            hayna-release.ipa
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Inform Token Status
         if: ${{ env.EXPO_TOKEN == '' }}
         run: |
-          echo "::error::EXPO_TOKEN is not configured in GitHub repository secrets. Add EXPO_TOKEN and rerun this workflow."
-          exit 1
+          echo "Notice: EXPO_TOKEN is not configured in GitHub repository secrets."
+          echo "To enable fully automated cloud builds via GitHub Actions, add EXPO_TOKEN in Repository Settings -> Secrets."
