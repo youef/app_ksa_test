@@ -1022,7 +1022,7 @@ const styles = StyleSheet.create({
   noticeInfoText: { color: '#0369a1', fontSize: 11, fontWeight: '700' },
 
   messagesList: { flex: 1, width: '100%', backgroundColor: '#f4f7f5' },
-  messagesContent: { width: '100%', maxWidth: 1100, alignSelf: 'center', paddingHorizontal: 18, paddingTop: 22, paddingBottom: 12, minHeight: '100%' },
+  messagesContent: { width: '100%', maxWidth: 900, alignSelf: 'center', paddingHorizontal: 18, paddingTop: 16, paddingBottom: 12, minHeight: '100%' },
   dateDivider: {
     textAlign: 'center',
     color: '#94a3b8',
@@ -1048,7 +1048,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   otherAvatarLetter: { fontSize: 12, fontWeight: '700', color: '#64748b' },
-  msgBubble: { maxWidth: Platform.OS === 'web' ? 620 : '84%', borderRadius: 20, paddingHorizontal: 15, paddingVertical: 10 },
+  msgBubble: { maxWidth: Platform.OS === 'web' ? 560 : '82%', borderRadius: 18, paddingHorizontal: 15, paddingVertical: 10 },
   msgBubbleMine: { backgroundColor: '#059669', borderBottomLeftRadius: 4, shadowColor: '#064e3b', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.10, shadowRadius: 6, elevation: 2 },
   msgBubbleOther: {
     backgroundColor: '#fff',
@@ -1094,7 +1094,7 @@ const styles = StyleSheet.create({
   },
   emptyConvHint: { fontSize: 12, color: '#059669', fontWeight: '700' },
 
-  composerWrap: { alignItems: 'center', borderTopWidth: 1, borderTopColor: '#dbe7e1', backgroundColor: '#fff', paddingTop: 10, paddingBottom: Platform.OS === 'ios' ? 10 : 8 },
+  composerWrap: { alignItems: 'center', borderTopWidth: 1, borderTopColor: '#dbe7e1', backgroundColor: '#fff', paddingTop: 8, paddingBottom: Platform.OS === 'ios' ? 10 : 8 },
   stickerPanel: { paddingTop: 10, paddingBottom: 8, backgroundColor: '#f8fafc', borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
   stickerTitle: { textAlign: 'right', paddingHorizontal: 14, color: '#334155', fontSize: 12, fontWeight: '800', marginBottom: 6 },
   stickerRow: { flexDirection: 'row', paddingHorizontal: 10, gap: 5 },
@@ -1104,7 +1104,7 @@ const styles = StyleSheet.create({
   imageCaption: { fontSize: 9, color: '#64748b' },
   inputArea: {
     width: '100%',
-    maxWidth: 1100,
+    maxWidth: 900,
     flexDirection: 'row-reverse',
     minHeight: 62,
     alignItems: 'center',
