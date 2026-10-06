@@ -5,6 +5,9 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: write
+
 jobs:
   web:
     name: Build Web Export
@@ -23,85 +26,76 @@ jobs:
           path: dist
 
   eas-build:
-    name: Build Android APK & iOS
+    name: Build Android APK & iOS IPA
     runs-on: ubuntu-latest
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
-      - run: npm install
 
+      - run: npm install
       - name: Setup EAS CLI
         run: npm install -g eas-cli
 
+      - name: Check EAS authentication
+        if: ${{ env.EXPO_TOKEN == '' }}
+        run: |
+          echo "::error::EXPO_TOKEN is not configured in GitHub repository secrets."
+          echo "Add EXPO_TOKEN under Settings -> Secrets and variables -> Actions."
+          exit 1
+
       - name: Build Android APK with EAS
-        if: ${{ env.EXPO_TOKEN != '' }}
         run: |
-          set -e
-          echo "Building Android APK..."
-          eas build --platform android --profile preview --non-interactive --wait > eas-android.log 2>&1 || true
-          cat eas-android.log
-          APK_URL=$(grep -Eo 'https://expo\.dev/artifacts/eas/[^[:space:]]+\.apk' eas-android.log | tail -1 || true)
-          if [ -n "$APK_URL" ]; then
-            echo "Found APK at: $APK_URL"
-            curl -fL "$APK_URL" -o hayna-release.apk
-          else
-            echo "APK build in progress or needs manual download from Expo dashboard"
+          set -euo pipefail
+          eas build --platform android --profile preview --non-interactive --wait 2>&1 | tee eas-android.log
+          APK_URL=$(grep -Eo 'https://expo\.dev/artifacts/eas/[^[:space:]]+\.apk([?][^[:space:]]*)?' eas-android.log | tail -1 || true)
+          if [ -z "$APK_URL" ]; then
+            echo "::error::EAS finished but no APK artifact URL was found."
+            exit 1
           fi
+          curl -fL "$APK_URL" -o hayna-release.apk
+          test -s hayna-release.apk
 
-      - name: Build iOS with EAS
-        if: ${{ env.EXPO_TOKEN != '' }}
+      - name: Build iOS IPA with EAS
         run: |
-          set -e
-          echo "Building iOS..."
-          eas build --platform ios --profile preview --non-interactive --wait > eas-ios.log 2>&1 || true
-          cat eas-ios.log
-          IPA_URL=$(grep -Eo 'https://expo\.dev/artifacts/eas/[^[:space:]]+\.(ipa|tar\.gz)' eas-ios.log | tail -1 || true)
-          if [ -n "$IPA_URL" ]; then
-            echo "Found iOS artifact at: $IPA_URL"
-            curl -fL "$IPA_URL" -o hayna-release.ipa
-          else
-            echo "iOS build in progress or queued in Expo dashboard"
+          set -euo pipefail
+          eas build --platform ios --profile preview --non-interactive --wait 2>&1 | tee eas-ios.log
+          IPA_URL=$(grep -Eo 'https://expo\.dev/artifacts/eas/[^[:space:]]+\.ipa([?][^[:space:]]*)?' eas-ios.log | tail -1 || true)
+          if [ -z "$IPA_URL" ]; then
+            echo "::error::EAS finished but no IPA artifact URL was found."
+            echo "Check the EAS build log above for the exact failure."
+            exit 1
           fi
+          curl -fL "$IPA_URL" -o hayna-release.ipa
+          test -s hayna-release.ipa
 
-      - name: Upload Android APK
-        if: ${{ hashFiles('hayna-release.apk') != '' }}
+      - name: Upload Android APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: hayna-android-apk
           path: hayna-release.apk
+          if-no-files-found: error
 
-      - name: Upload iOS Artifact
-        if: ${{ hashFiles('hayna-release.ipa') != '' }}
+      - name: Upload iOS IPA artifact
         uses: actions/upload-artifact@v4
         with:
-          name: hayna-ios-app
+          name: hayna-ios-ipa
           path: hayna-release.ipa
+          if-no-files-found: error
 
-      - name: Create or Update GitHub Release
-        if: ${{ hashFiles('hayna-release.apk') != '' || hashFiles('hayna-release.ipa') != '' }}
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.0-beta
-          name: "حيّنا - Hayna App v1.0.0 (Beta)"
-          body: |
-            ## روابط تحميل تطبيق حيّنا 🚀
-            - **Android (APK):** تحميل وتثبيت مباشر على جميع أجهزة الأندرويد.
-            - **iOS:** نسخة تجريبية بيتا لأجهزة آيفون.
-            
-            _تم البناء تلقائياً عبر GitHub Actions و Expo EAS._
+          tag_name: v1.0.0-beta.${{ github.run_number }}
+          name: "حيّنا - Hayna App v1.0.0 Beta #${{ github.run_number }}"
+          generate_release_notes: true
           files: |
             hayna-release.apk
             hayna-release.ipa
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Inform Token Status
-        if: ${{ env.EXPO_TOKEN == '' }}
-        run: |
-          echo "Notice: EXPO_TOKEN is not configured in GitHub repository secrets."
-          echo "To enable fully automated cloud builds via GitHub Actions, add EXPO_TOKEN in Repository Settings -> Secrets."
