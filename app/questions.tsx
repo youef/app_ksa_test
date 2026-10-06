@@ -31,7 +31,6 @@ import {
 
 import { supabase } from '@/lib/supabase';
 import { useBottomNavInset } from '@/lib/bottomNav';
-import BottomNav from '@/components/BottomNav';
 import ScreenHeader from '@/components/shared/ScreenHeader';
 import LocationSelectorModal from '@/components/LocationSelectorModal';
 import {
@@ -436,9 +435,6 @@ export default function Questions() {
           )}
         </View>
       </ScrollView>
-
-      {/* Persistent Bottom Nav (matching home) */}
-      <BottomNav />
 
       {/* Location Selector Modal */}
       <LocationSelectorModal

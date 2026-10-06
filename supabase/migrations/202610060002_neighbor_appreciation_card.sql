@@ -337,13 +337,27 @@ begin
   from public.conversations c
   join public.conversation_members a on a.conversation_id = c.id and a.user_id = v_uid
   join public.conversation_members b on b.conversation_id = c.id and b.user_id = p_target
-  where c.is_group is false
+  where not exists (
+    select 1 from public.conversation_members x
+    where x.conversation_id = c.id and x.user_id not in (v_uid, p_target)
+  )
   order by c.created_at asc limit 1;
 
   if v_conv is null then
-    insert into public.conversations(created_by, is_group)
-    values(v_uid, false)
-    returning id into v_conv;
+    begin
+      insert into public.conversations default values
+      returning id into v_conv;
+    exception when others then
+      begin
+        insert into public.conversations (id)
+        values (gen_random_uuid())
+        returning id into v_conv;
+      exception when others then
+        insert into public.conversations (created_by)
+        values (v_uid)
+        returning id into v_conv;
+      end;
+    end;
 
     insert into public.conversation_members(conversation_id, user_id)
     values(v_conv, v_uid), (v_conv, p_target)

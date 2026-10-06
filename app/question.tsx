@@ -289,74 +289,92 @@ export default function Question() {
         }
       }
 
-      // 2. Resilient conversation resolution (RPC with graceful table fallback)
+      // 2. Resilient conversation resolution (Lookup -> RPC -> Fallback Creation)
       let finalConvId: string | null = null;
+
+      // Step A: Check existing direct conversation via conversation_members
       try {
-        const { data: rpcConvId, error: convError } = await supabase.rpc(
-          'hayna_get_or_create_direct_conversation',
-          { p_target: targetUserId },
-        );
-        if (!convError && rpcConvId) {
-          finalConvId = rpcConvId;
+        const { data: myMemberships } = await supabase
+          .from('conversation_members')
+          .select('conversation_id')
+          .eq('user_id', currentUserId);
+
+        if (myMemberships && myMemberships.length > 0) {
+          const myConvIds = myMemberships.map((m: any) => m.conversation_id);
+          const { data: partnerMatch } = await supabase
+            .from('conversation_members')
+            .select('conversation_id')
+            .in('conversation_id', myConvIds)
+            .eq('user_id', targetUserId)
+            .limit(1)
+            .maybeSingle();
+
+          if (partnerMatch?.conversation_id) {
+            finalConvId = partnerMatch.conversation_id;
+          }
         }
       } catch {}
 
+      // Step B: Try RPC if not found
       if (!finalConvId) {
-        // Fallback: look for direct conversation or create it directly
-        const { data: existingConvs } = await supabase
-          .from('conversations')
-          .select('id, conversation_members!inner(user_id)')
-          .eq('is_group', false)
-          .eq('conversation_members.user_id', currentUserId);
-
-        if (existingConvs && existingConvs.length > 0) {
-          const convIds = existingConvs.map(c => c.id);
-          const { data: targetMembership } = await supabase
-            .from('conversation_members')
-            .select('conversation_id')
-            .in('conversation_id', convIds)
-            .eq('user_id', targetUserId)
-            .limit(1);
-
-          if (targetMembership && targetMembership.length > 0) {
-            finalConvId = targetMembership[0].conversation_id;
+        try {
+          const { data: rpcConvId, error: convError } = await supabase.rpc(
+            'hayna_get_or_create_direct_conversation',
+            { p_target: targetUserId },
+          );
+          if (!convError && rpcConvId) {
+            finalConvId = rpcConvId;
           }
-        }
+        } catch {}
+      }
 
-        if (!finalConvId) {
-          const { data: newConv, error: newConvErr } = await supabase
-            .from('conversations')
-            .insert({ created_by: currentUserId, is_group: false })
-            .select('id')
-            .single();
+      // Step C: Create new conversation directly (permissive fallback)
+      if (!finalConvId) {
+        try {
+          let convRes = await supabase.from('conversations').insert({}).select('id').single();
+          if (convRes.error) {
+            convRes = await supabase.from('conversations').insert({ created_by: currentUserId }).select('id').single();
+          }
 
-          if (newConv && !newConvErr) {
-            finalConvId = newConv.id;
+          if (convRes.data?.id) {
+            finalConvId = convRes.data.id;
             await supabase.from('conversation_members').insert([
-              { conversation_id: newConv.id, user_id: currentUserId },
-              { conversation_id: newConv.id, user_id: targetUserId },
+              { conversation_id: finalConvId, user_id: currentUserId },
+              { conversation_id: finalConvId, user_id: targetUserId },
             ]);
           }
-        }
+        } catch {}
       }
 
       if (!finalConvId) {
-        throw new Error('تعذّر فتح المحادثة الخاصة حالياً.');
+        throw new Error('تعذّر فتح المحادثة الخاصة حالياً. يرجى المحاولة لاحقاً.');
       }
+
+      // Step D: Insert location message
+      const locationPayload = {
+        type: 'location',
+        lat: locLat,
+        lng: locLng,
+        label,
+        note: `مشاركة إحداثيات الموقع بخصوص سؤال: «${(q.title || '').slice(0, 45)}»`,
+      };
 
       const { error: msgErr } = await supabase.from('messages').insert({
         conversation_id: finalConvId,
         sender_id: currentUserId,
-        body: JSON.stringify({
-          type: 'location',
-          lat: locLat,
-          lng: locLng,
-          label,
-          note: `مشاركة إحداثيات الموقع بخصوص سؤال: «${(q.title || '').slice(0, 45)}»`,
-        }),
+        body: JSON.stringify(locationPayload),
         read_by: [currentUserId],
       });
-      if (msgErr) throw msgErr;
+
+      if (msgErr) {
+        // Fallback without read_by column if not present in schema
+        const retry = await supabase.from('messages').insert({
+          conversation_id: finalConvId,
+          sender_id: currentUserId,
+          body: JSON.stringify(locationPayload),
+        });
+        if (retry.error) throw retry.error;
+      }
 
       Alert.alert('تم إرسال الموقع بنجاح! 📍', `تمت مشاركة موقعك (${label}) بالخاص مع ${targetName}.`);
       router.push({ pathname: '/conversation', params: { id: finalConvId } });
