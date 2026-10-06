@@ -29,7 +29,7 @@ export default function UserProfile() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { width } = useWindowDimensions();
   const [profile, setProfile] = useState<any>(null);
-  const [stats, setStats] = useState({ market: 0, services: 0, requests: 0, questions: 0, followers: 0, following: 0, answers: 0 });
+  const [stats, setStats] = useState({ market: 0, services: 0, requests: 0, questions: 0, followers: 0, following: 0, answers: 0, reputation: 0 });
   const [items, setItems] = useState<any[]>([]);
   const [services, setServices] = useState<any[]>([]);
   const [requests, setRequests] = useState<any[]>([]);
@@ -93,13 +93,13 @@ export default function UserProfile() {
       const locked = (p.profile_privacy === 'private' && !isFollowing && me !== id) || iBlocked || blockedMe || (p.hide_name === true && me !== id);
       if (locked) {
         setItems([]); setServices([]); setRequests([]); setQuestions([]);
-        setStats({ market: 0, services: 0, requests: 0, questions: 0, followers: 0, following: 0, answers: 0 });
+        setStats({ market: 0, services: 0, requests: 0, questions: 0, followers: 0, following: 0, answers: 0, reputation: 0 });
         return;
       }
 
       const [
         marketCount, serviceCount, requestCount, questionCount, followerCount,
-        followingCount, answerCount, itemRows, serviceRows, requestRows,
+        followingCount, answerCount, repRes, itemRows, serviceRows, requestRows,
         questionRows,
       ] = await Promise.all([
         supabase.from('marketplace_items').select('id', { count: 'exact', head: true }).eq('seller_id', id),
@@ -109,6 +109,7 @@ export default function UserProfile() {
         supabase.from('follows').select('id', { count: 'exact', head: true }).eq('following_id', id),
         supabase.from('follows').select('id', { count: 'exact', head: true }).eq('follower_id', id),
         supabase.from('answers').select('id', { count: 'exact', head: true }).eq('author_id', id),
+        supabase.from('reputation').select('points').eq('user_id', id).maybeSingle(),
         supabase.from('marketplace_items').select('id,title,description,price,item_type,district,image_url,status,created_at').eq('seller_id', id).order('created_at', { ascending: false }).limit(18),
         supabase.from('services').select('id,name,description,category,district,price_from,price_to,available_now,is_verified,cover_url,created_at').eq('provider_id', id).order('created_at', { ascending: false }).limit(18),
         supabase.from('requests').select('id,title,description,status,request_type,budget,is_urgent,district,created_at').eq('requester_id', id).order('created_at', { ascending: false }).limit(18),
@@ -119,6 +120,7 @@ export default function UserProfile() {
         requests: requestCount.count || 0, questions: questionCount.count || 0,
         followers: followerCount.count || 0, following: followingCount.count || 0,
         answers: answerCount.count || 0,
+        reputation: repRes?.data?.points || 0,
       });
       setItems(itemRows.data || []);
       setServices(serviceRows.data || []);
@@ -239,10 +241,15 @@ export default function UserProfile() {
             {!anonymous && profile.bio && <Text style={styles.bio}>{profile.bio}</Text>}
             <View style={styles.trustRow}>
               <View style={styles.trustPill}><ShieldCheck size={14} color="#a7f3d0" /><Text style={styles.trustText}>{profile.is_geoverified ? 'موثق بالحي' : 'عضو في الحي'}</Text></View>
+              <View style={[styles.trustPill, { backgroundColor: 'rgba(253, 230, 138, 0.22)', borderColor: 'rgba(253, 230, 138, 0.45)' }]}>
+                <Sparkles size={14} color="#fde68a" />
+                <Text style={[styles.trustText, { color: '#fde68a' }]}>{stats.reputation || 0} نقطة سمعة ⭐</Text>
+              </View>
             </View>
           </LinearGradient>
 
           <View style={styles.statsCard}>
+            <Stat label="سمعة الجوار ⭐" value={stats.reputation} />
             <Stat label="متابع" value={stats.followers} />
             <Stat label="يتابع" value={stats.following} />
           </View>

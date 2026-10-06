@@ -38,6 +38,10 @@ import {
   WifiOff,
   MessageCircle,
   MapPin,
+  ExternalLink,
+  Coffee,
+  Award,
+  Sparkles,
 } from 'lucide-react-native';
 import {
   clearForMe,
@@ -81,7 +85,20 @@ export default function Conversation() {
   const [stickersOpen, setStickersOpen] = useState(false);
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const [sharingLocation, setSharingLocation] = useState(false);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+  const [myProfile, setMyProfile] = useState<any>(null);
+  const [appreciationModalOpen, setAppreciationModalOpen] = useState(false);
+  const [appreciationNote, setAppreciationNote] = useState('كفو يا جارنا، بيض الله وجهك 🤍');
+  const [sendingAppreciation, setSendingAppreciation] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
+
+  const APPRECIATION_TEMPLATES = [
+    'كفو يا جارنا، بيض الله وجهك 🤍',
+    'تسلم وما قصرت على فزعتك الكريمة 🤝',
+    'شكراً على حسن تعاملك وأمانتك ⭐',
+    'وصل الغرض بالسلامة، جزاك الله خيراً 📦',
+    'حيّاك الله يا جار الهنا، تسلم الأيادي ☕',
+  ];
 
   const convId = Array.isArray(id) ? id[0] : (id as string);
   const insets = useSafeAreaInsets();
@@ -94,6 +111,13 @@ export default function Conversation() {
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) return router.replace('/auth');
     setCurrentUserId(u.user.id);
+
+    const { data: myProf } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', u.user.id)
+      .maybeSingle();
+    setMyProfile(myProf);
 
     // 1. Messages (RLS already hides blocked-party traffic and anything cleared)
     const { data: msgs } = await supabase
@@ -341,7 +365,7 @@ export default function Conversation() {
         const { data: urlData } = supabase.storage.from('chat-media').getPublicUrl(path);
         const { error } = await supabase.from('messages').insert({
           conversation_id: convId, sender_id: currentUserId,
-          body: JSON.stringify({ type: 'image', url: urlData.publicUrl, name: asset.fileName || 'صورة' }),
+          body: JSON.stringify({ type: 'image', url: urlData.publicUrl, name: 'صورة' }),
           read_by: [currentUserId],
         });
         if (error) throw error;
@@ -361,6 +385,15 @@ export default function Conversation() {
     } catch { return null; }
   }
 
+  function isUserFriendlyCaption(name?: string): boolean {
+    if (!name) return false;
+    const trimmed = name.trim();
+    if (!trimmed || trimmed === 'صورة' || trimmed === 'image') return false;
+    if (/\.(webp|jpg|jpeg|png|gif|heic|svg)$/i.test(trimmed)) return false;
+    if (/^[0-9a-fA-F-]{20,}/.test(trimmed)) return false;
+    return true;
+  }
+
   function parseLocationMessage(value: string) {
     try {
       const parsed = JSON.parse(value);
@@ -370,6 +403,95 @@ export default function Conversation() {
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
       return { lat, lng, label: typeof parsed.label === 'string' ? parsed.label : '' };
     } catch { return null; }
+  }
+
+  interface AppreciationPayload {
+    type: 'appreciation';
+    title?: string;
+    note: string;
+    points?: number;
+    giver_name?: string;
+  }
+
+  function parseAppreciationMessage(value: string): AppreciationPayload | null {
+    try {
+      const parsed = JSON.parse(value);
+      if (parsed?.type !== 'appreciation') return null;
+      return {
+        type: 'appreciation',
+        title: parsed.title || '☕ بطاقة شكر وقهوة الجيران',
+        note: parsed.note || 'كفو يا جارنا، بيض الله وجهك 🤍',
+        points: Number(parsed.points) || 10,
+        giver_name: parsed.giver_name || '',
+      };
+    } catch { return null; }
+  }
+
+  async function sendAppreciation(noteToSend?: string) {
+    if (sendingAppreciation || !otherUser) return;
+    if (anyBlock) {
+      return Alert.alert('غير مسموح', 'لا يمكن إرسال بطاقات تقدير أثناء الحظر.');
+    }
+
+    setSendingAppreciation(true);
+    const finalNote = (noteToSend || appreciationNote || 'كفو يا جارنا، بيض الله وجهك 🤍').trim();
+    const pts = 10;
+
+    try {
+      // 1. Try secure RPC first
+      const { data: rpcRes, error: rpcErr } = await supabase.rpc('send_neighbor_appreciation', {
+        p_conversation_id: convId,
+        p_recipient_id: otherUser.id,
+        p_note: finalNote,
+      });
+
+      if (rpcErr) {
+        // Fallback: direct insert to messages and award reputation
+        const senderName = displayName(myProfile) || 'جارك';
+        const payload = JSON.stringify({
+          type: 'appreciation',
+          title: '☕ بطاقة شكر وقهوة الجيران',
+          note: finalNote,
+          points: pts,
+          giver_name: senderName,
+        });
+
+        const { error: msgErr } = await supabase.from('messages').insert({
+          conversation_id: convId,
+          sender_id: currentUserId,
+          body: payload,
+          read_by: [currentUserId],
+        });
+        if (msgErr) throw msgErr;
+
+        try {
+          const { data: curRep } = await supabase
+            .from('reputation')
+            .select('points')
+            .eq('user_id', otherUser.id)
+            .maybeSingle();
+          const nextPts = (curRep?.points || 0) + pts;
+          await supabase.from('reputation').upsert({
+            user_id: otherUser.id,
+            points: nextPts,
+            updated_at: new Date().toISOString(),
+          });
+        } catch {
+          // ignore fallback reputation error
+        }
+      }
+
+      setAppreciationModalOpen(false);
+      Alert.alert(
+        'تم الإهداء بنجاح ☕',
+        `أرسلت بطاقة شكر وقهوة لـ ${otherName}، وتمت إضافة +10 نقاط لسمعته ⭐`
+      );
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+    } catch (e: any) {
+      Alert.alert('تعذّر الإرسال', e?.message || 'حدث خطأ أثناء إرسال بطاقة التقدير.');
+    } finally {
+      setSendingAppreciation(false);
+    }
   }
 
   /** Sends the exact fix to the other member of this private chat only. */
@@ -565,11 +687,11 @@ export default function Conversation() {
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <LinearGradient colors={['#ffffff', '#ffffff']} start={{x:0,y:0}} end={{x:1,y:1}} style={styles.header}>
+      <LinearGradient colors={['#064e3b', '#065f46', '#047857']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
         <View style={styles.inner}>
           <View style={styles.headerTop}>
-            <Pressable onPress={() => router.replace('/messages')} style={styles.backBtn}>
-              <ChevronRight size={24} color="#d1fae5" />
+            <Pressable onPress={() => router.replace('/messages')} style={styles.backBtn} accessibilityRole="button" accessibilityLabel="رجوع للرسائل">
+              <ChevronRight size={22} color="#ffffff" />
             </Pressable>
             <Pressable style={styles.headerUser} onPress={() => otherUser && router.push({ pathname: '/user', params: { id: otherUser.id } })}>
               {otherUser?.avatar_url && !isAnonymous ? (
@@ -580,17 +702,26 @@ export default function Conversation() {
               <View style={styles.headerInfo}>
                 <View style={styles.headerNameRow}>
                   <Text style={styles.headerName} numberOfLines={1}>{otherName}</Text>
-                  {isMuted && <BellOff size={13} color="#fbbf24" />}
+                  {isMuted && <BellOff size={13} color="#fde68a" />}
                 </View>
-                {otherUser?.city && !isAnonymous ? <Text style={styles.headerCity}>📍 {otherUser.city}{otherUser.district ? ' · ' + otherUser.district : ''}</Text> : null}
+                {otherUser?.city && !isAnonymous ? (
+                  <Text style={styles.headerCity}>{otherUser.city}{otherUser.district ? ' · ' + otherUser.district : ''}</Text>
+                ) : null}
               </View>
             </Pressable>
-            <Pressable style={styles.headerActionBtn} onPress={() => setOptionsOpen(true)}><MoreHorizontal size={22} color="#d1fae5" /></Pressable>
+            <Pressable
+              style={styles.headerActionBtn}
+              onPress={() => setOptionsOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel="خيارات المحادثة"
+            >
+              <MoreHorizontal size={19} color="#ffffff" />
+            </Pressable>
           </View>
           <View style={styles.headerStatusRow}>
             <View style={[styles.statusDot, isOnline && styles.statusDotOnline]} />
             <Text style={styles.headerStatusText}>{otherTyping ? 'يكتب الآن...' : isOnline ? 'متصل الآن' : 'غير متصل'}</Text>
-            {otherTyping && <MessageCircle size={13} color="#a7f3d0" />}
+            {otherTyping && <MessageCircle size={12} color="#a7f3d0" />}
           </View>
         </View>
       </LinearGradient>
@@ -689,27 +820,97 @@ export default function Conversation() {
                       const place = parseLocationMessage(msg.body);
                       if (place) {
                         return (
-                          <Pressable
-                            style={styles.locationCard}
-                            onPress={() => Linking.openURL(navigationUrl(place.lat, place.lng))}
-                          >
-                            <MapPin size={18} color={isMine ? '#ffffff' : '#0f766e'} />
-                            <View style={styles.locationBody}>
-                              <Text style={[styles.locationTitle, isMine && styles.msgTextMine]}>
-                                موقعي الدقيق
-                              </Text>
-                              <Text style={[styles.locationLabel, isMine && styles.locationLabelMine]} numberOfLines={1}>
-                                {place.label || 'موقعي'}
-                              </Text>
-                              <Text style={[styles.locationCta, isMine && styles.locationCtaMine]}>
-                                اضغط للفتح في الخرائط
-                              </Text>
+                          <View style={[styles.locationCardOuter, isMine && styles.locationCardOuterMine]}>
+                            <View style={styles.locationCardHeader}>
+                              <View style={[styles.locationPinIconWrap, isMine && styles.locationPinIconWrapMine]}>
+                                <MapPin size={18} color="#059669" />
+                              </View>
+                              <View style={styles.locationInfoCol}>
+                                <Text style={styles.locationHeaderTitle}>
+                                  {isMine ? '📍 موقعي الدقيق المشترك' : '📍 موقع الجار المشترك'}
+                                </Text>
+                                <Text style={styles.locationDistrictTitle} numberOfLines={1}>
+                                  {place.label ? `حي ${place.label}` : 'موقع على الخريطة'}
+                                </Text>
+                              </View>
                             </View>
-                          </Pressable>
+
+                            <Pressable
+                              style={styles.locationNavBtn}
+                              onPress={() => Linking.openURL(navigationUrl(place.lat, place.lng))}
+                              accessibilityRole="button"
+                              accessibilityLabel="فتح في خرائط Google"
+                            >
+                              <ExternalLink size={13} color="#ffffff" />
+                              <Text style={styles.locationNavBtnText}>فتح في خرائط Google</Text>
+                            </Pressable>
+                          </View>
                         );
                       }
                       const media = parseImageMessage(msg.body);
-                      return media ? <View><Image source={{ uri: media.url }} style={styles.messageImage as any} /><Text style={[styles.imageCaption, isMine && styles.msgTextMine]}>{media.name}</Text></View> : <Text style={[styles.msgText, isMine && styles.msgTextMine]}>{msg.body}</Text>;
+                      if (media) {
+                        const hasRealCaption = isUserFriendlyCaption(media.name);
+                        return (
+                          <View style={styles.imageMsgContainer}>
+                            <Pressable
+                              onPress={() => setPreviewImageUrl(media.url)}
+                              style={styles.imagePressable}
+                              accessibilityRole="button"
+                              accessibilityLabel="عرض الصورة بالحجم الكامل"
+                            >
+                              <Image
+                                source={{ uri: media.url }}
+                                style={styles.messageImage}
+                                resizeMode="cover"
+                              />
+                            </Pressable>
+                            {hasRealCaption && (
+                              <Text style={[styles.imageCaption, isMine && styles.msgTextMine]}>
+                                {media.name}
+                              </Text>
+                            )}
+                          </View>
+                        );
+                      }
+                      const appreciation = parseAppreciationMessage(msg.body);
+                      if (appreciation) {
+                        return (
+                          <View style={[styles.appreciationCardOuter, isMine && styles.appreciationCardOuterMine]}>
+                            <LinearGradient
+                              colors={['#fffbeb', '#fef3c7', '#fde68a']}
+                              start={{ x: 0, y: 0 }}
+                              end={{ x: 1, y: 1 }}
+                              style={styles.appreciationGrad}
+                            >
+                              <View style={styles.appreciationTopRow}>
+                                <View style={styles.appreciationBadge}>
+                                  <Award size={12} color="#92400e" />
+                                  <Text style={styles.appreciationBadgeText}>+{appreciation.points || 10} نقاط سمعة ⭐</Text>
+                                </View>
+                                <View style={styles.appreciationCoffeeIconWrap}>
+                                  <Coffee size={20} color="#78350f" />
+                                </View>
+                              </View>
+
+                              <Text style={styles.appreciationTitle}>{appreciation.title || 'بطاقة شكر وقهوة الجيران'}</Text>
+                              <Text style={styles.appreciationNoteText}>"{appreciation.note}"</Text>
+
+                              <View style={styles.appreciationDivider} />
+
+                              <View style={styles.appreciationFooterRow}>
+                                <Sparkles size={13} color="#92400e" />
+                                <Text style={styles.appreciationFooterText}>
+                                  {isMine
+                                    ? 'أرسلت قهوة وشكراً لجيرانك ☕'
+                                    : `أهداك ${appreciation.giver_name || otherName} قهوة وشكراً لحسن جوارك ☕`}
+                                </Text>
+                              </View>
+                            </LinearGradient>
+                          </View>
+                        );
+                      }
+
+                      return <Text style={[styles.msgText, isMine && styles.msgTextMine]}>{msg.body}</Text>;
                     })()}
                     <View style={[styles.msgMeta, isMine && styles.msgMetaMine]}>
                       <Text style={[styles.msgTime, isMine && styles.msgTimeMine]}>
@@ -745,51 +946,132 @@ export default function Conversation() {
           )}
         </View>
       ) : (
-        <View style={[styles.composerWrap, { paddingBottom: bottomSafe }] }>
-          {stickersOpen && <View style={styles.stickerPanel}><Text style={styles.stickerTitle}>ملصقات وإيموجي</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stickerRow}>{['😀','😂','😍','🥰','😘','😎','🤍','❤️','💚','👏','🙌','🙏','🔥','✨','🎉','👍','💯','🌹','☕','🍕','🏠','🌙','☀️','🤣','🥹','🤝','💪','🎁','⭐'].map((emoji, i) => <Pressable key={i} style={styles.stickerItem} onPress={() => { handleBodyChange(body + emoji); setStickersOpen(false); }}><Text style={styles.stickerEmoji}>{emoji}</Text></Pressable>)}</ScrollView></View>}
-        <View style={styles.inputArea}>
-          <Pressable style={styles.emojiButton} onPress={() => setStickersOpen(v => !v)}>
-            <Smile size={21} color="#64748b" />
-          </Pressable>
-
-          <Pressable style={styles.attachButton} onPress={pickImages}>
-            <Paperclip size={20} color="#64748b" />
-          </Pressable>
-
-          <Pressable
-            style={[styles.attachButton, sharingLocation && styles.attachButtonBusy]}
-            onPress={shareExactLocation}
-            disabled={sharingLocation}
+        <View style={[styles.composerWrap, { paddingBottom: Math.max(bottomSafe, 8) }]}>
+          {/* Smart Neighbor Quick Prompts */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.quickPromptsRow}
           >
-            {sharingLocation ? (
-              <ActivityIndicator size="small" color="#0f766e" />
-            ) : (
-              <MapPin size={20} color="#0f766e" />
-            )}
-          </Pressable>
+            <Pressable
+              style={[styles.quickPromptPill, styles.quickPromptPillCoffee]}
+              onPress={() => setAppreciationModalOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel="إهداء قهوة وشكر"
+            >
+              <Text style={styles.quickPromptTextCoffee}>☕ إهداء قهوة وشكر (+10)</Text>
+            </Pressable>
+            {['👋 السلام عليكم', '🤝 أقدر أساعدك', '📍 شارك موقعك', '👍 تم، أبشر', '☕ حيّاك الله يا جارنا'].map((prompt, idx) => (
+              <Pressable
+                key={idx}
+                style={styles.quickPromptPill}
+                onPress={() => handleBodyChange(body ? `${body} ${prompt}` : prompt)}
+                accessibilityRole="button"
+                accessibilityLabel={prompt}
+              >
+                <Text style={styles.quickPromptText}>{prompt}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
 
-          <Pressable
-            style={[styles.sendButton, !body.trim() && styles.sendButtonDisabled]}
-            onPress={send}
-            disabled={!body.trim() || sending}
-          >
-            {uploadingMedia ? <ActivityIndicator size="small" color="#fff" /> : sending ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <Send size={18} color="#fff" style={{ transform: [{ rotate: '180deg' }] }} />
-            )}
-          </Pressable>
+          {stickersOpen && (
+            <View style={styles.stickerPanel}>
+              <Text style={styles.stickerTitle}>ملصقات وإيموجي الجيران</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.stickerRow}
+              >
+                {['😀','😂','😍','🥰','😘','😎','🤍','❤️','💚','👏','🙌','🙏','🔥','✨','🎉','👍','💯','🌹','☕','🍕','🏠','🌙','☀️','🤣','🥹','🤝','💪','🎁','⭐'].map((emoji, i) => (
+                  <Pressable
+                    key={i}
+                    style={styles.stickerItem}
+                    onPress={() => {
+                      handleBodyChange(body + emoji);
+                      setStickersOpen(false);
+                    }}
+                  >
+                    <Text style={styles.stickerEmoji}>{emoji}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          )}
 
-          <TextInput
-            style={styles.textInput}
-            value={body}
-            onChangeText={handleBodyChange}
-            placeholder="اكتب رسالة لجيرانك..."
-            placeholderTextColor="#9ca3af"
-            multiline
-            maxLength={1000}
-          />
-        </View>
+          <View style={styles.inputArea}>
+            {/* Right in RTL: Media attachments & Location & Coffee Appreciation */}
+            <Pressable
+              style={styles.attachCircleBtn}
+              onPress={pickImages}
+              accessibilityRole="button"
+              accessibilityLabel="إرفاق صورة"
+            >
+              <Paperclip size={18} color="#64748b" />
+            </Pressable>
+
+            <Pressable
+              style={[styles.attachCircleBtn, sharingLocation && styles.attachCircleBtnBusy]}
+              onPress={shareExactLocation}
+              disabled={sharingLocation}
+              accessibilityRole="button"
+              accessibilityLabel="مشاركة موقعي"
+            >
+              {sharingLocation ? (
+                <ActivityIndicator size="small" color="#059669" />
+              ) : (
+                <MapPin size={18} color="#059669" />
+              )}
+            </Pressable>
+
+            <Pressable
+              style={[styles.attachCircleBtn, styles.coffeeCircleBtn]}
+              onPress={() => setAppreciationModalOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel="إهداء قهوة وشكر"
+            >
+              <Coffee size={18} color="#b45309" />
+            </Pressable>
+
+            {/* Center in RTL: Input capsule with integrated emoji picker */}
+            <View style={styles.inputCapsule}>
+              <TextInput
+                style={styles.textInput}
+                value={body}
+                onChangeText={handleBodyChange}
+                placeholder="اكتب رسالة لجيرانك..."
+                placeholderTextColor="#9ca3af"
+                multiline
+                maxLength={1000}
+              />
+              <Pressable
+                style={styles.emojiInsideBtn}
+                onPress={() => setStickersOpen(v => !v)}
+                accessibilityRole="button"
+                accessibilityLabel="إيموجي وملصقات"
+              >
+                <Smile size={19} color={stickersOpen ? '#059669' : '#94a3b8'} />
+              </Pressable>
+            </View>
+
+            {/* Left in RTL: Circular Send Button with crisp white icon */}
+            <Pressable
+              style={({ pressed }) => [
+                styles.sendButton,
+                !body.trim() && !uploadingMedia && styles.sendButtonDisabled,
+                pressed && { transform: [{ scale: 0.94 }] },
+              ]}
+              onPress={send}
+              disabled={(!body.trim() && !uploadingMedia) || sending}
+              accessibilityRole="button"
+              accessibilityLabel="إرسال الرسالة"
+            >
+              {uploadingMedia || sending ? (
+                <ActivityIndicator size="small" color="#ffffff" />
+              ) : (
+                <Send size={18} color="#ffffff" style={{ marginLeft: 2 }} />
+              )}
+            </Pressable>
+          </View>
         </View>
       )}
 
@@ -836,6 +1118,22 @@ export default function Conversation() {
               >
                 <User size={18} color="#059669" />
                 <Text style={styles.optionRowText}>عرض الملف الشخصي 👤</Text>
+              </Pressable>
+            )}
+
+            {otherUser && (
+              <Pressable
+                style={styles.optionRow}
+                onPress={() => {
+                  setOptionsOpen(false);
+                  setAppreciationModalOpen(true);
+                }}
+              >
+                <Coffee size={18} color="#b45309" />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.optionRowText}>إهداء بطاقة شكر وقهوة ☕</Text>
+                  <Text style={styles.optionRowSub}>يمنح الجار +10 نقاط سمعة إيجابية في الحي ⭐</Text>
+                </View>
               </Pressable>
             )}
 
@@ -893,6 +1191,117 @@ export default function Conversation() {
           </View>
         </Pressable>
       </Modal>
+
+      {/* Fullscreen Image Preview Lightbox */}
+      <Modal
+        visible={Boolean(previewImageUrl)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPreviewImageUrl(null)}
+      >
+        <View style={styles.lightboxBackdrop}>
+          <Pressable
+            style={styles.lightboxCloseBtn}
+            onPress={() => setPreviewImageUrl(null)}
+            accessibilityRole="button"
+            accessibilityLabel="إغلاق الصورة"
+          >
+            <X size={24} color="#ffffff" />
+          </Pressable>
+          {previewImageUrl && (
+            <Image
+              source={{ uri: previewImageUrl }}
+              style={styles.lightboxImage}
+              resizeMode="contain"
+            />
+          )}
+        </View>
+      </Modal>
+
+      {/* Appreciation & Coffee Modal */}
+      <Modal
+        visible={appreciationModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAppreciationModalOpen(false)}
+      >
+        <Pressable
+          style={styles.optionsOverlay}
+          onPress={() => setAppreciationModalOpen(false)}
+        >
+          <Pressable style={styles.appreciationModalCard} onPress={e => e.stopPropagation?.()}>
+            <View style={styles.appreciationModalHeader}>
+              <Pressable
+                onPress={() => setAppreciationModalOpen(false)}
+                style={styles.optionsClose}
+                accessibilityRole="button"
+                accessibilityLabel="إغلاق"
+              >
+                <X size={18} color="#64748b" />
+              </Pressable>
+              <View style={styles.appreciationModalTitleCol}>
+                <View style={styles.appreciationModalIconCircle}>
+                  <Coffee size={24} color="#78350f" />
+                </View>
+                <Text style={styles.appreciationModalTitle}>إهداء بطاقة شكر وقهوة ☕</Text>
+                <Text style={styles.appreciationModalSub}>
+                  أظهر تقديرك لـ {otherName} على فزعته وحسن تعامله، وسيتم إضافة +10 نقاط سمعة إيجابية لحسابه في الحي ⭐
+                </Text>
+              </View>
+            </View>
+
+            <Text style={styles.appreciationSectionLabel}>اختر عبارة جاهزة أو اكتب عبارتك:</Text>
+            <View style={styles.appreciationChipsWrap}>
+              {APPRECIATION_TEMPLATES.map((tmpl, idx) => {
+                const isSelected = appreciationNote === tmpl;
+                return (
+                  <Pressable
+                    key={idx}
+                    style={[styles.appreciationChip, isSelected && styles.appreciationChipSelected]}
+                    onPress={() => setAppreciationNote(tmpl)}
+                    accessibilityRole="button"
+                  >
+                    <Text
+                      style={[styles.appreciationChipText, isSelected && styles.appreciationChipTextSelected]}
+                    >
+                      {tmpl}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <TextInput
+              style={styles.appreciationInput}
+              value={appreciationNote}
+              onChangeText={setAppreciationNote}
+              placeholder="اكتب رسالة شكر خاصة لجارك..."
+              placeholderTextColor="#94a3b8"
+              multiline
+              maxLength={200}
+            />
+
+            <View style={styles.appreciationActionRow}>
+              <Pressable
+                style={[styles.appreciationSendBtn, sendingAppreciation && { opacity: 0.7 }]}
+                onPress={() => sendAppreciation()}
+                disabled={sendingAppreciation}
+                accessibilityRole="button"
+                accessibilityLabel="إرسال بطاقة الشكر والقهوة"
+              >
+                {sendingAppreciation ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <>
+                    <Coffee size={18} color="#ffffff" />
+                    <Text style={styles.appreciationSendBtnText}>إرسال القهوة والتقدير (+10 نقاط) ☕</Text>
+                  </>
+                )}
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -926,13 +1335,20 @@ const styles = StyleSheet.create({
   header: {
     width: '100%',
     backgroundColor: '#064e3b',
-    paddingTop: Platform.OS === 'ios' ? 52 : 14,
-    paddingBottom: 10,
+    paddingTop: Platform.OS === 'ios' ? 44 : 10,
+    paddingBottom: 8,
+    borderBottomLeftRadius: 18,
+    borderBottomRightRadius: 18,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
   },
   headerTop: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
   },
   headerLegacy: {
     flexDirection: 'row-reverse',
@@ -941,42 +1357,62 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 1100,
     alignSelf: 'center',
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'ios' ? 52 : 14,
-    paddingBottom: 12,
+    paddingHorizontal: 14,
+    paddingTop: Platform.OS === 'ios' ? 44 : 10,
+    paddingBottom: 8,
   },
-  backBtn: { width: 42, height: 42, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center' },
-  headerUser: { flexDirection: 'row-reverse', alignItems: 'center', flex: 1, marginRight: 10, gap: 10 },
-  headerAvatar: { width: 46, height: 46, borderRadius: 15 },
-  headerAvatarFallback: {
-    width: 46,
-    height: 46,
-    borderRadius: 15,
-    backgroundColor: 'rgba(255,255,255,0.16)',
+  backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.14)',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
   },
-  headerAvatarLetter: { color: '#047857', fontSize: 17, fontWeight: '900' },
+  headerUser: { flexDirection: 'row-reverse', alignItems: 'center', flex: 1, marginRight: 6, gap: 10 },
+  headerAvatar: { width: 40, height: 40, borderRadius: 13, borderWidth: 1.5, borderColor: '#fff' },
+  headerAvatarFallback: {
+    width: 40,
+    height: 40,
+    borderRadius: 13,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  headerAvatarLetter: { color: '#ffffff', fontSize: 16, fontWeight: '900' },
   headerInfo: { alignItems: 'flex-end', flex: 1 },
   headerNameRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
-  headerName: { color: '#fff', fontSize: 16, fontWeight: '900' },
-  headerCity: { color: '#a7f3d0', fontSize: 11, fontWeight: '600', marginTop: 2 },
+  headerName: { color: '#fff', fontSize: 15, fontWeight: '900' },
+  headerCity: { color: '#a7f3d0', fontSize: 11, fontWeight: '600', marginTop: 1 },
   headerStatusPill: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 4,
     paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 12,
-    backgroundColor: '#ecfdf5',
+    paddingVertical: 4,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.15)',
     marginLeft: 6,
   },
-  headerStatusText: { color: '#047857', fontSize: 10, fontWeight: '900' },
-  headerStatusRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'flex-end', gap: 5, marginTop: 4, paddingRight: 58 },
-  statusDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#64748b' },
+  headerStatusText: { color: '#a7f3d0', fontSize: 11, fontWeight: '800' },
+  headerStatusRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'flex-end', gap: 5, marginTop: 2, paddingRight: 48 },
+  statusDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.4)' },
   statusDotOnline: { backgroundColor: '#34d399' },
   headerActions: { flexDirection: 'row-reverse' },
-  headerActionBtn: { width: 42, height: 42, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center' },
+  headerActionBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
 
   noticeBlocked: {
     flexDirection: 'row-reverse',
@@ -1094,69 +1530,184 @@ const styles = StyleSheet.create({
   },
   emptyConvHint: { fontSize: 12, color: '#059669', fontWeight: '700' },
 
-  composerWrap: { alignItems: 'center', borderTopWidth: 1, borderTopColor: '#dbe7e1', backgroundColor: '#fff', paddingTop: 8, paddingBottom: Platform.OS === 'ios' ? 10 : 8 },
+  composerWrap: {
+    backgroundColor: '#ffffff',
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
+    paddingTop: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  quickPromptsRow: {
+    flexDirection: 'row-reverse',
+    paddingHorizontal: 12,
+    gap: 8,
+    paddingBottom: 8,
+  },
+  quickPromptPill: {
+    backgroundColor: '#f0fdf4',
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  quickPromptText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#065f46',
+  },
   stickerPanel: { paddingTop: 10, paddingBottom: 8, backgroundColor: '#f8fafc', borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
   stickerTitle: { textAlign: 'right', paddingHorizontal: 14, color: '#334155', fontSize: 12, fontWeight: '800', marginBottom: 6 },
   stickerRow: { flexDirection: 'row', paddingHorizontal: 10, gap: 5 },
   stickerItem: { width: 42, height: 42, borderRadius: 12, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   stickerEmoji: { fontSize: 25 },
-  messageImage: { width: 230, height: 230, borderRadius: 14, marginBottom: 4 },
-  imageCaption: { fontSize: 9, color: '#64748b' },
-  inputArea: {
-    width: '100%',
-    maxWidth: 900,
-    flexDirection: 'row-reverse',
-    minHeight: 62,
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderTopWidth: 0,
-    borderTopColor: 'transparent',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 6,
-    paddingBottom: Platform.OS === 'ios' ? 10 : 8,
+  messageImage: { width: 240, height: 220, borderRadius: 16, backgroundColor: '#f1f5f9' },
+  imageCaption: { fontSize: 13, color: '#334155', textAlign: 'right', marginTop: 6, fontWeight: '700' },
+  imageMsgContainer: { marginBottom: 2 },
+  imagePressable: { borderRadius: 16, overflow: 'hidden' },
+  lightboxBackdrop: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.94)', alignItems: 'center', justifyContent: 'center', padding: 16 },
+  lightboxCloseBtn: { position: 'absolute', top: Platform.OS === 'ios' ? 56 : 28, left: 20, width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255, 255, 255, 0.2)', alignItems: 'center', justifyContent: 'center', zIndex: 10 },
+  lightboxImage: { width: '100%', height: '80%' },
+  locationCardOuter: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 12,
+    minWidth: 220,
+    maxWidth: 290,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+    marginBottom: 4,
   },
-  emojiButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: '#ecfdf5', borderWidth: 1, borderColor: '#d1fae5' },
-  attachButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0' },
-  attachButtonBusy: { backgroundColor: '#ccfbf1', borderColor: '#5eead4' },
-  locationCard: {
+  locationCardOuterMine: {
+    backgroundColor: '#ffffff',
+    borderColor: '#a7f3d0',
+  },
+  locationCardHeader: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 10,
+  },
+  locationPinIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#ecfdf5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+  },
+  locationPinIconWrapMine: {
+    backgroundColor: '#ecfdf5',
+  },
+  locationInfoCol: {
+    flex: 1,
+    alignItems: 'flex-end',
+  },
+  locationHeaderTitle: {
+    fontSize: 11,
+    color: '#059669',
+    fontWeight: '800',
+    marginBottom: 2,
+    textAlign: 'right',
+  },
+  locationDistrictTitle: {
+    fontSize: 15,
+    color: '#0f172a',
+    fontWeight: '900',
+    textAlign: 'right',
+  },
+  locationNavBtn: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#059669',
+    borderRadius: 12,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+  },
+  locationNavBtnText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  inputArea: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 8,
-    minWidth: 200,
-    paddingVertical: 6,
-    paddingHorizontal: 4,
+    paddingHorizontal: 12,
+    paddingTop: 4,
+    paddingBottom: 4,
   },
-  locationBody: { flex: 1, alignItems: 'flex-end' },
-  locationTitle: { fontSize: 14, fontWeight: '900', color: '#0f172a' },
-  locationLabel: { fontSize: 12, fontWeight: '700', color: '#64748b', marginTop: 2 },
-  locationLabelMine: { color: 'rgba(255,255,255,0.85)' },
-  locationCta: { fontSize: 10.5, fontWeight: '800', color: '#0f766e', marginTop: 4 },
-  locationCtaMine: { color: 'rgba(255,255,255,0.9)' },
-  textInput: {
-    flex: 1,
-    backgroundColor: '#f3f7f5',
+  attachCircleBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f8fafc',
     borderWidth: 1,
-    borderColor: '#dbe7e1',
-    borderRadius: 17,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    fontSize: 14,
-    color: '#0f172a',
-    maxHeight: 100,
-    textAlign: 'right',
-  },
-  sendButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
-    backgroundColor: '#047857',
-    borderWidth: 2,
-    borderColor: '#d1fae5',
+    borderColor: '#e2e8f0',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sendButtonDisabled: { opacity: 0.35 },
+  attachCircleBtnBusy: {
+    backgroundColor: '#ecfdf5',
+    borderColor: '#a7f3d0',
+  },
+  inputCapsule: {
+    flex: 1,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    borderRadius: 22,
+    paddingHorizontal: 10,
+    minHeight: 44,
+  },
+  textInput: {
+    flex: 1,
+    fontSize: 14,
+    color: '#0f172a',
+    textAlign: 'right',
+    maxHeight: 100,
+    paddingVertical: 6,
+    paddingHorizontal: 6,
+  },
+  emojiInsideBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sendButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#059669',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  sendButtonDisabled: {
+    backgroundColor: '#059669',
+    opacity: 0.55,
+  },
   blockedInputArea: {
     backgroundColor: '#fff',
     borderTopWidth: 1,
@@ -1222,4 +1773,217 @@ const styles = StyleSheet.create({
   choiceCardDanger: { borderColor: '#fecaca', backgroundColor: '#fef2f2' },
   choiceTitle: { fontSize: 14, fontWeight: '900', color: '#0f172a', textAlign: 'right' },
   choiceSub: { fontSize: 11, color: '#64748b', marginTop: 3, lineHeight: 16 },
+
+  coffeeCircleBtn: {
+    backgroundColor: '#fffbeb',
+    borderColor: '#fde68a',
+  },
+  quickPromptPillCoffee: {
+    backgroundColor: '#fffbeb',
+    borderColor: '#fde68a',
+  },
+  quickPromptTextCoffee: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#92400e',
+  },
+  appreciationCardOuter: {
+    borderRadius: 18,
+    overflow: 'hidden',
+    minWidth: 230,
+    maxWidth: 320,
+    borderWidth: 1.5,
+    borderColor: '#fde68a',
+    shadowColor: '#b45309',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 3,
+    marginBottom: 4,
+  },
+  appreciationCardOuterMine: {
+    borderColor: '#fbbf24',
+  },
+  appreciationGrad: {
+    padding: 13,
+    borderRadius: 16,
+  },
+  appreciationTopRow: {
+    flexDirection: 'row-reverse',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  appreciationBadge: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#fef3c7',
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  appreciationBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#92400e',
+  },
+  appreciationCoffeeIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#fffbeb',
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  appreciationTitle: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#78350f',
+    textAlign: 'right',
+    marginBottom: 4,
+  },
+  appreciationNoteText: {
+    fontSize: 13,
+    lineHeight: 20,
+    fontWeight: '700',
+    color: '#451a03',
+    textAlign: 'right',
+    marginBottom: 8,
+  },
+  appreciationDivider: {
+    height: 1,
+    backgroundColor: 'rgba(180, 83, 9, 0.15)',
+    marginBottom: 6,
+  },
+  appreciationFooterRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 5,
+  },
+  appreciationFooterText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#92400e',
+    textAlign: 'right',
+  },
+
+  /* Modal */
+  appreciationModalCard: {
+    width: '92%',
+    maxWidth: 480,
+    backgroundColor: '#ffffff',
+    borderRadius: 22,
+    padding: 18,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.22,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  appreciationModalHeader: {
+    marginBottom: 12,
+  },
+  appreciationModalTitleCol: {
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  appreciationModalIconCircle: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: '#fef3c7',
+    borderWidth: 2,
+    borderColor: '#fde68a',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  appreciationModalTitle: {
+    fontSize: 17,
+    fontWeight: '900',
+    color: '#78350f',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  appreciationModalSub: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: '#64748b',
+    textAlign: 'center',
+    paddingHorizontal: 8,
+  },
+  appreciationSectionLabel: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#334155',
+    textAlign: 'right',
+    marginBottom: 8,
+  },
+  appreciationChipsWrap: {
+    flexDirection: 'row-reverse',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 12,
+  },
+  appreciationChip: {
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 14,
+  },
+  appreciationChipSelected: {
+    backgroundColor: '#fef3c7',
+    borderColor: '#f59e0b',
+  },
+  appreciationChipText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  appreciationChipTextSelected: {
+    color: '#92400e',
+    fontWeight: '900',
+  },
+  appreciationInput: {
+    backgroundColor: '#f8fafc',
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    borderRadius: 14,
+    padding: 10,
+    fontSize: 13,
+    color: '#0f172a',
+    textAlign: 'right',
+    minHeight: 60,
+    maxHeight: 100,
+    marginBottom: 12,
+  },
+  appreciationActionRow: {
+    marginTop: 2,
+  },
+  appreciationSendBtn: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#059669',
+    paddingVertical: 12,
+    borderRadius: 14,
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  appreciationSendBtnText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '900',
+  },
 });

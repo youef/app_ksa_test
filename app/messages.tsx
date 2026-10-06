@@ -340,12 +340,12 @@ export default function Messages() {
     <View style={styles.container}>
       <View style={styles.ambientOrbOne} />
       <View style={styles.ambientOrbTwo} />
-      <LinearGradient colors={['#064e3b', '#047857']} style={styles.header}>
+      <LinearGradient colors={['#064e3b', '#065f46', '#047857']} style={styles.header}>
         <View style={styles.inner}>
         <ScreenHeader
-          title="الرسائل"
+          title="الرسائل 💬"
           fallbackRoute="/home"
-          subtitle={unreadCount > 0 ? `${unreadCount} غير مقروءة · تواصل حيّنا` : 'تواصل حيّنا'}
+          subtitle={unreadCount > 0 ? `${unreadCount} غير مقروءة · تواصل حيّنا` : 'تواصل حيّنا ومجتمع الجيران'}
           rightAction={(
             <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
               {silentUnread > 0 && (
@@ -694,6 +694,51 @@ function SheetRow({
   );
 }
 
+function formatMessagePreview(bodyStr?: string | null, isMine = false): string {
+  if (!bodyStr) return 'ابدأ المحادثة';
+  const trimmed = bodyStr.trim();
+  if (!trimmed) return 'ابدأ المحادثة';
+
+  // Check if payload is a JSON object (e.g. location, image, sticker, file)
+  if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (parsed && typeof parsed === 'object') {
+        const type = parsed.type;
+        if (type === 'location') {
+          const locName = parsed.label ? ` (${parsed.label})` : '';
+          return isMine ? `📍 تم إرسال موقعك${locName}` : `📍 أرسل موقعه${locName}`;
+        }
+        if (type === 'image' || type === 'photo') {
+          return isMine ? '📷 تم إرسال صورة' : '📷 أرسل صورة';
+        }
+        if (type === 'sticker') {
+          return isMine ? '✨ تم إرسال ملصق' : '✨ أرسل ملصقاً';
+        }
+        if (type === 'file' || type === 'document') {
+          const fileName = parsed.name ? ` (${parsed.name})` : '';
+          return isMine ? `📎 تم إرسال ملف${fileName}` : `📎 أرسل ملفاً${fileName}`;
+        }
+        if (type === 'audio' || type === 'voice') {
+          return isMine ? '🎤 تم إرسال تسجيل صوتي' : '🎤 أرسل تسجيلاً صوتياً';
+        }
+        if (type === 'video') {
+          return isMine ? '📹 تم إرسال مقطع فيديو' : '📹 أرسل مقطع فيديو';
+        }
+        if (type === 'appreciation') {
+          return isMine
+            ? '☕ أرسلت بطاقة شكر وقهوة (+10 نقاط)'
+            : '☕ وصلتك بطاقة شكر وقهوة (+10 نقاط)';
+        }
+      }
+    } catch {
+      // Not JSON or parse error, fallback to text
+    }
+  }
+
+  return isMine ? `أنت: ${trimmed}` : trimmed;
+}
+
 function ConvCard({
   conv,
   currentUserId,
@@ -715,7 +760,7 @@ function ConvCard({
       : '🔒 هذا المستخدم حظرك — لا يمكن التواصل'
     : conv.isCleared && !lastMessage
     ? '🧹 تم مسح المحادثة من عندك'
-    : `${isLastMine ? 'أنت: ' : ''}${lastMessage?.body || 'ابدأ المحادثة'}`;
+    : formatMessagePreview(lastMessage?.body, isLastMine);
 
   return (
     <Pressable
@@ -807,13 +852,15 @@ const styles = StyleSheet.create({
   ambientOrbOne: { position: 'absolute', width: 220, height: 220, borderRadius: 110, backgroundColor: 'rgba(16,185,129,0.07)', top: 150, left: -120 },
   ambientOrbTwo: { position: 'absolute', width: 180, height: 180, borderRadius: 90, backgroundColor: 'rgba(6,95,70,0.05)', bottom: 100, right: -90 },
   header: {
-    paddingTop: Platform.OS === 'ios' ? 52 : 18,
-    paddingBottom: 16,
+    paddingTop: Platform.OS === 'ios' ? 52 : 36,
+    paddingBottom: 18,
     paddingHorizontal: 0,
     backgroundColor: '#064e3b',
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
     borderBottomWidth: 0,
     borderBottomColor: 'transparent',
-    shadowColor: '#0f172a', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.04, shadowRadius: 12, elevation: 2,
+    shadowColor: '#0f172a', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 3,
   },
   headerContent: {
     flexDirection: 'row-reverse',
@@ -856,7 +903,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.2)',
   },
   dndHeaderBtnActive: { backgroundColor: '#d97706', borderColor: '#f59e0b' },
-  dndHeaderText: { color: '#047857', fontSize: 11, fontWeight: '800' },
+  dndHeaderText: { color: '#ecfdf5', fontSize: 11, fontWeight: '800' },
   newChatBtn: {
     width: 40,
     height: 40,

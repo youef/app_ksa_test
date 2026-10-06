@@ -30,6 +30,7 @@ import {
   X,
   RefreshCw,
   SlidersHorizontal,
+  Coffee,
 } from 'lucide-react-native';
 import { useBottomNavInset } from '@/lib/bottomNav';
 import ScreenHeader from '@/components/shared/ScreenHeader';
@@ -536,6 +537,20 @@ function getTypeVisuals(item: NotificationItem) {
       textColor: '#dc2626',
       gradColors: ['#ef4444', '#b91c1c'] as [string, string],
       icon: <AlertTriangle size={20} color="#fff" />,
+    };
+  }
+
+  if (
+    item.type === 'appreciation' ||
+    item.title?.includes('قهوة') ||
+    item.title?.includes('شكر')
+  ) {
+    return {
+      label: 'شكر وقهوة ☕',
+      bgColor: '#fef3c7',
+      textColor: '#92400e',
+      gradColors: ['#d97706', '#92400e'] as [string, string],
+      icon: <Coffee size={20} color="#fff" />,
     };
   }
 
