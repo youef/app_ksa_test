@@ -370,5 +370,32 @@ end $$;
 grant execute on function public.hayna_can_dm(uuid, uuid) to authenticated;
 grant execute on function public.hayna_get_or_create_direct_conversation(uuid) to authenticated;
 
+-- Real views count tracking for community questions and help requests
+alter table public.questions add column if not exists views_count integer default 0;
+alter table public.requests add column if not exists views_count integer default 0;
+
+create or replace function public.increment_view_count(p_table text, p_id uuid)
+returns integer language plpgsql security definer set search_path=public,pg_catalog
+as $$
+declare
+  v_count integer := 0;
+begin
+  if p_table = 'questions' then
+    update public.questions
+    set views_count = coalesce(views_count, 0) + 1
+    where id = p_id
+    returning views_count into v_count;
+  elsif p_table = 'requests' then
+    update public.requests
+    set views_count = coalesce(views_count, 0) + 1
+    where id = p_id
+    returning views_count into v_count;
+  end if;
+  return coalesce(v_count, 1);
+end $$;
+
+grant execute on function public.increment_view_count(text, uuid) to anon, authenticated;
+
 notify pgrst, 'reload schema';
+
 

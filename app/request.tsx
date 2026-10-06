@@ -158,34 +158,116 @@ export default function Request() {
     if (me !== request?.requester_id) return;
 
     try {
+      // 1. Update request to 'accepted' and current match to 'accepted'
       await supabase.from('requests').update({ accepted_by: match.helper_id, status: 'accepted' }).eq('id', id);
       await supabase.from('help_matches').update({ status: 'accepted' }).eq('id', match.id);
 
-      const { data: conv } = await supabase
-        .from('conversations')
-        .insert({ is_group: false, request_id: id })
-        .select('id')
-        .single();
+      // 2. Decline other pending matches so the request is exclusively handled
+      try {
+        await supabase
+          .from('help_matches')
+          .update({ status: 'declined' })
+          .eq('request_id', id)
+          .neq('id', match.id);
+      } catch {}
 
-      if (conv) {
-        await supabase.from('conversation_members').insert([
-          { conversation_id: conv.id, user_id: me },
-          { conversation_id: conv.id, user_id: match.helper_id },
-        ]);
+      // 3. Resolve or create direct conversation with the helper
+      let finalConvId: string | null = null;
 
-        await supabase.from('messages').insert({
-          conversation_id: conv.id,
+      // Step A: Check existing direct conversation via conversation_members
+      try {
+        const { data: myMemberships } = await supabase
+          .from('conversation_members')
+          .select('conversation_id')
+          .eq('user_id', me);
+
+        if (myMemberships && myMemberships.length > 0) {
+          const myConvIds = myMemberships.map((m: any) => m.conversation_id);
+          const { data: partnerMatch } = await supabase
+            .from('conversation_members')
+            .select('conversation_id')
+            .in('conversation_id', myConvIds)
+            .eq('user_id', match.helper_id)
+            .limit(1)
+            .maybeSingle();
+
+          if (partnerMatch?.conversation_id) {
+            finalConvId = partnerMatch.conversation_id;
+          }
+        }
+      } catch {}
+
+      // Step B: Try RPC if not found
+      if (!finalConvId) {
+        try {
+          const { data: rpcConvId, error: convError } = await supabase.rpc(
+            'hayna_get_or_create_direct_conversation',
+            { p_target: match.helper_id },
+          );
+          if (!convError && rpcConvId) {
+            finalConvId = rpcConvId;
+          }
+        } catch {}
+      }
+
+      // Step C: Fallback creation
+      if (!finalConvId) {
+        try {
+          let convRes = await supabase.from('conversations').insert({}).select('id').single();
+          if (convRes.error) {
+            convRes = await supabase.from('conversations').insert({ created_by: me }).select('id').single();
+          }
+
+          if (convRes.data?.id) {
+            finalConvId = convRes.data.id;
+            await supabase.from('conversation_members').insert([
+              { conversation_id: finalConvId, user_id: me },
+              { conversation_id: finalConvId, user_id: match.helper_id },
+            ]);
+          }
+        } catch {}
+      }
+
+      // Step D: Send message directly in private chat to the helper
+      if (finalConvId) {
+        const welcomeMessage = `أهلاً بك يا جارنا العزيز! 🤝\nتم قبول عرض مساعدتك بخصوص: «${request.title}».\nشكراً لك، وبإمكاننا ترتيب موعد وتفاصيل الفزعة هنا في الخاص.`;
+
+        let { error: msgErr } = await supabase.from('messages').insert({
+          conversation_id: finalConvId,
           sender_id: me,
-          content: `تم قبول عرض مساعدتك بخصوص طلب: «${request.title}». شكراً لك وجزاك الله خيراً!`,
+          body: welcomeMessage,
+          read_by: [me],
         });
 
-        Alert.alert('تم قبول العرض! 🎉', 'تم فتح المحادثة الخاصة للاتفاق على التفاصيل.');
-        router.push({ pathname: '/conversation', params: { id: conv.id } });
+        if (msgErr) {
+          await supabase.from('messages').insert({
+            conversation_id: finalConvId,
+            sender_id: me,
+            body: welcomeMessage,
+          });
+        }
+
+        // Notify helper
+        try {
+          await supabase.from('notifications').insert({
+            user_id: match.helper_id,
+            type: 'request',
+            title: '🎉 تم قبول عرضك للفزعة!',
+            body: `قبل جارك عرضك بخصوص: «${(request.title || '').slice(0, 40)}»، وتم فتح المحادثة الخاصة للاتفاق.`,
+            target_type: 'conversation',
+            target_id: finalConvId,
+          });
+        } catch {}
+
+        Alert.alert('تم قبول العرض! 🎉', 'تم إرسال رسالة ترحيبية للجار بالخاص وتحويلك للمحادثة.');
+        router.push({ pathname: '/conversation', params: { id: finalConvId } });
       } else {
         router.push('/messages');
       }
+
       load();
-    } catch (e) {
+    } catch (e: any) {
+      console.warn('acceptOffer error:', e);
       router.push('/messages');
     }
   }

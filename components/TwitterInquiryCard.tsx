@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Alert,
   Image,
@@ -89,9 +89,40 @@ export default function TwitterInquiryCard({
   const [quickReplyText, setQuickReplyText] = useState('');
   const [replyLoading, setReplyLoading] = useState(false);
   const [liked, setLiked] = useState(false);
-  const [likeCount, setLikeCount] = useState(Math.floor(Math.random() * 6) + 3);
+  const [likeCount, setLikeCount] = useState<number>(() => {
+    return Number(data.likes_count ?? data.likes ?? 0);
+  });
   const [bookmarked, setBookmarked] = useState(false);
-  const [viewsCount] = useState(Math.floor(Math.random() * 85) + 65);
+  const [viewsCount, setViewsCount] = useState<number>(() => {
+    return Number(data.views_count ?? data.views ?? 0);
+  });
+
+  // Track real view count on mount
+  useEffect(() => {
+    let isMounted = true;
+    const viewKey = `viewed_${type}_${data.id}`;
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      if (!window.sessionStorage.getItem(viewKey)) {
+        window.sessionStorage.setItem(viewKey, '1');
+        const tableName = type === 'request' ? 'requests' : 'questions';
+        supabase
+          .rpc('increment_view_count', { p_table: tableName, p_id: data.id })
+          .then(({ data: nextVal, error }) => {
+            if (!error && typeof nextVal === 'number' && isMounted) {
+              setViewsCount(nextVal);
+            } else if (isMounted) {
+              setViewsCount(prev => prev + 1);
+            }
+          })
+          .catch(() => {
+            if (isMounted) setViewsCount(prev => prev + 1);
+          });
+      }
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [data.id, type]);
 
   const answers = data.answers || [];
   const answersCount = data.answers_count !== undefined ? data.answers_count : answers.length;

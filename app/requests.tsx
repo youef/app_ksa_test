@@ -66,10 +66,15 @@ export default function Requests() {
     try {
       const { data: session } = await supabase.auth.getSession();
       if (session.session?.user) {
+        const currentUid = session.session.user.id;
         let query = supabase.from('requests').select('*').order('created_at', { ascending: false }).limit(60);
         if (q.trim()) query = query.or(`title.ilike.%${q.trim()}%,description.ilike.%${q.trim()}%`);
         const result = await query;
-        setItems(result.data ?? []);
+        // Hide requests that are accepted or completed from other users
+        const visibleRequests = (result.data ?? []).filter((r: any) =>
+          r.status === 'open' || r.requester_id === currentUid || r.accepted_by === currentUid
+        );
+        setItems(visibleRequests);
       } else {
         const result = await supabase.rpc('hayna_guest_requests', {
           p_city: location.city,
