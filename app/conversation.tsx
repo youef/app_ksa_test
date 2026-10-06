@@ -567,47 +567,31 @@ export default function Conversation() {
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <LinearGradient colors={['#ffffff', '#ffffff']} start={{x:0,y:0}} end={{x:1,y:1}} style={styles.header}>
         <View style={styles.inner}>
-        <Pressable onPress={() => router.replace('/home')} style={styles.backBtn}>
-          <ChevronRight size={26} color="#ffffff" />
-        </Pressable>
-
-        <Pressable
-          style={styles.headerUser}
-          onPress={() => otherUser && router.push({ pathname: '/user', params: { id: otherUser.id } })}
-        >
-          {otherUser?.avatar_url && !isAnonymous ? (
-            <Image source={{ uri: otherUser.avatar_url }} style={styles.headerAvatar as any} />
-          ) : (
-            <View style={styles.headerAvatarFallback}>
-              <Text style={styles.headerAvatarLetter}>{otherName[0]}</Text>
-            </View>
-          )}
-
-          <View style={styles.headerInfo}>
-            <View style={styles.headerNameRow}>
-              <Text style={styles.headerName} numberOfLines={1}>
-                {otherName}
-              </Text>
-              {isMuted && <BellOff size={13} color="#d97706" />}
-            </View>
-            {otherUser?.city && !isAnonymous ? (
-              <Text style={styles.headerCity}>
-                📍 {otherUser.city} {otherUser.district ? `· ${otherUser.district}` : ''}
-              </Text>
-            ) : null}
+          <View style={styles.headerTop}>
+            <Pressable onPress={() => router.replace('/messages')} style={styles.backBtn}>
+              <ChevronRight size={24} color="#d1fae5" />
+            </Pressable>
+            <Pressable style={styles.headerUser} onPress={() => otherUser && router.push({ pathname: '/user', params: { id: otherUser.id } })}>
+              {otherUser?.avatar_url && !isAnonymous ? (
+                <Image source={{ uri: otherUser.avatar_url }} style={styles.headerAvatar as any} />
+              ) : (
+                <View style={styles.headerAvatarFallback}><Text style={styles.headerAvatarLetter}>{otherName[0]}</Text></View>
+              )}
+              <View style={styles.headerInfo}>
+                <View style={styles.headerNameRow}>
+                  <Text style={styles.headerName} numberOfLines={1}>{otherName}</Text>
+                  {isMuted && <BellOff size={13} color="#fbbf24" />}
+                </View>
+                {otherUser?.city && !isAnonymous ? <Text style={styles.headerCity}>📍 {otherUser.city}{otherUser.district ? ' · ' + otherUser.district : ''}</Text> : null}
+              </View>
+            </Pressable>
+            <Pressable style={styles.headerActionBtn} onPress={() => setOptionsOpen(true)}><MoreHorizontal size={22} color="#d1fae5" /></Pressable>
           </View>
-        </Pressable>
-
-        <View style={styles.headerStatusPill}>
-          {otherTyping ? <MessageCircle size={13} color="#059669" /> : isOnline ? <Wifi size={13} color="#059669" /> : <WifiOff size={13} color="#94a3b8" />}
-          <Text style={styles.headerStatusText}>{otherTyping ? 'يكتب الآن...' : isOnline ? 'متصل الآن' : 'غير متصل'}</Text>
-        </View>
-
-        <View style={styles.headerActions}>
-          <Pressable style={styles.headerActionBtn} onPress={() => setOptionsOpen(true)}>
-            <MoreHorizontal size={22} color="#ffffff" />
-          </Pressable>
-        </View>
+          <View style={styles.headerStatusRow}>
+            <View style={[styles.statusDot, isOnline && styles.statusDotOnline]} />
+            <Text style={styles.headerStatusText}>{otherTyping ? 'يكتب الآن...' : isOnline ? 'متصل الآن' : 'غير متصل'}</Text>
+            {otherTyping && <MessageCircle size={13} color="#a7f3d0" />}
+          </View>
         </View>
       </LinearGradient>
 
@@ -940,6 +924,17 @@ const styles = StyleSheet.create({
   inner: { width: '100%', maxWidth: 1100, alignSelf: 'center', paddingHorizontal: 16 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: {
+    width: '100%',
+    backgroundColor: '#064e3b',
+    paddingTop: Platform.OS === 'ios' ? 52 : 14,
+    paddingBottom: 10,
+  },
+  headerTop: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 10,
+  },
+  headerLegacy: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -949,9 +944,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: Platform.OS === 'ios' ? 52 : 14,
     paddingBottom: 12,
-    backgroundColor: '#064e3b',
-    borderBottomWidth: 0,
-    borderBottomColor: 'transparent',
   },
   backBtn: { width: 42, height: 42, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center' },
   headerUser: { flexDirection: 'row-reverse', alignItems: 'center', flex: 1, marginRight: 10, gap: 10 },
@@ -980,6 +972,9 @@ const styles = StyleSheet.create({
     marginLeft: 6,
   },
   headerStatusText: { color: '#047857', fontSize: 10, fontWeight: '900' },
+  headerStatusRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'flex-end', gap: 5, marginTop: 4, paddingRight: 58 },
+  statusDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#64748b' },
+  statusDotOnline: { backgroundColor: '#34d399' },
   headerActions: { flexDirection: 'row-reverse' },
   headerActionBtn: { width: 42, height: 42, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center' },
 
