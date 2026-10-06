@@ -74,7 +74,7 @@ export default function SearchPage() {
 
       // Hide users I blocked (or who blocked me) from search results.
       let visibleUsers = (u.data as Row[]) || [];
-      const myId = auth?.user?.id;
+      const myId = auth?.data?.user?.id;
       if (myId) {
         const { data: blocks } = await supabase
           .from('blocks')
@@ -190,7 +190,7 @@ export default function SearchPage() {
         {s.rating != null ? <Text style={styles.miniChip}>★ {Number(s.rating).toFixed(1)}</Text> : null}
         {s.phone ? (
           <Pressable
-            style={[styles.miniChip, { color: '#1d4ed8', backgroundColor: '#eff6ff' }]}
+            style={[styles.miniChip, { backgroundColor: '#eff6ff' }]}
             onPress={() => Linking.openURL(`tel:${s.phone}`)}
           >
             <Text style={[styles.miniChipText, { color: '#1d4ed8' }]}>{s.phone}</Text>

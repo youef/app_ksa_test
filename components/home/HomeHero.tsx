@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Image, Pressable, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -5,6 +6,7 @@ import { Bell, ChevronDown, LogIn, Map, MapPin, Mic, Search, ShieldCheck, X } fr
 import { styles } from './homeStyles';
 import type { Profile } from '@/lib/homeUtils';
 import { requireAccount } from '@/lib/authGate';
+import { FALLBACK_LOGO_URI } from '@/lib/branding';
 
 type Props = {
   profile: Profile | null;
@@ -23,6 +25,11 @@ export default function HomeHero({
   profile, logoUri, greeting, unreadCount, city, district,
   searchQuery, onSearchChange, onOpenLocation, isGuest,
 }: Props) {
+  const [imgError, setImgError] = useState(false);
+  useEffect(() => {
+    setImgError(false);
+  }, [logoUri]);
+
   const locationLabel =
     city === 'كل المدن'
       ? 'كل مناطق المملكة'
@@ -75,7 +82,12 @@ export default function HomeHero({
 
         <View style={styles.brandAndLocation}>
           <View style={styles.brandTitleRow}>
-            <Image source={{ uri: logoUri }} style={styles.headerLogo} resizeMode="contain" />
+            <Image
+              source={{ uri: imgError ? FALLBACK_LOGO_URI : logoUri }}
+              style={styles.headerLogo}
+              resizeMode="contain"
+              onError={() => setImgError(true)}
+            />
           </View>
           <Pressable
             style={styles.locationSelectorPill}

@@ -19,6 +19,13 @@ import { supabase } from '@/lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import {
+  getBrandingLogo,
+  broadcastLogoUpdate,
+  withVersion,
+  getCachedBrandingLogo,
+  subscribeBrandingLogo,
+} from '@/lib/branding';
+import {
   Shield,
   Users,
   MessageCircle,
@@ -111,7 +118,7 @@ export default function Admin() {
   const [locationLatitude, setLocationLatitude] = useState('');
   const [locationLongitude, setLocationLongitude] = useState('');
   const [savingLocation, setSavingLocation] = useState(false);
-  const [brandingLogo, setBrandingLogo] = useState('/brand/HAYNA_LOGO.png?v=2');
+  const [brandingLogo, setBrandingLogo] = useState(getCachedBrandingLogo());
   const [brandingUploading, setBrandingUploading] = useState(false);
 
   // Core Data
@@ -181,11 +188,16 @@ export default function Admin() {
   useEffect(() => { if (activeTab === 'locations') loadCustomLocations(); }, [activeTab, loadCustomLocations]);
 
   const loadBranding = useCallback(async () => {
-    const { data } = await supabase.from('app_branding').select('logo_url, updated_at').eq('id', 'global').maybeSingle();
-    if (data?.logo_url) setBrandingLogo(data.logo_url + (data.logo_url.includes('?') ? '&' : '?') + 'v=' + encodeURIComponent(data.updated_at || Date.now()));
+    const url = await getBrandingLogo();
+    if (url) setBrandingLogo(url);
   }, []);
 
-  useEffect(() => { if (activeTab === 'branding') loadBranding(); }, [activeTab, loadBranding]);
+  useEffect(() => {
+    if (activeTab === 'branding') {
+      loadBranding();
+      return subscribeBrandingLogo(setBrandingLogo);
+    }
+  }, [activeTab, loadBranding]);
 
   const changeGlobalLogo = async () => {
     try {
@@ -203,19 +215,42 @@ export default function Admin() {
       const response = await fetch(asset.uri);
       const blob = await response.blob();
       const path = 'global/logo.png';
-      const { error: uploadError } = await supabase.storage.from('branding').upload(path, blob, { contentType: asset.mimeType || 'image/png', upsert: true, cacheControl: '0' });
+      const { error: uploadError } = await supabase.storage.from('branding').upload(path, blob, {
+        contentType: asset.mimeType || 'image/png',
+        upsert: true,
+        cacheControl: '0',
+      });
       if (uploadError) throw uploadError;
+
       const { data: publicData } = supabase.storage.from('branding').getPublicUrl(path);
       const logoUrl = publicData.publicUrl;
-      const { data: me } = await supabase.auth.getUser();
-      const { error: dbError } = await supabase.from('app_branding').upsert({ id: 'global', logo_url: logoUrl, updated_at: new Date().toISOString(), updated_by: me.user?.id || null });
-      if (dbError) throw dbError;
-      setBrandingLogo(logoUrl + '?v=' + Date.now());
+      const versionedUrl = withVersion(logoUrl, Date.now());
+
+      // Attempt DB upsert (if permissions/table exist)
+      try {
+        const { data: me } = await supabase.auth.getUser();
+        const { error: dbError } = await supabase.from('app_branding').upsert({
+          id: 'global',
+          logo_url: logoUrl,
+          updated_at: new Date().toISOString(),
+          updated_by: me.user?.id || null,
+        });
+        if (dbError) {
+          console.warn('app_branding table update warning:', dbError.message);
+        }
+      } catch (err) {
+        console.warn('DB upsert exception:', err);
+      }
+
+      await broadcastLogoUpdate(versionedUrl);
+      setBrandingLogo(versionedUrl);
       await addAuditLog('تغيير شعار حيّنا بالكامل', 'الهوية البصرية', 'branding');
       showToast('تم تغيير الشعار في النظام بالكامل ✓');
     } catch (e: any) {
       showToast('تعذر تغيير الشعار: ' + (e?.message || 'خطأ غير متوقع'));
-    } finally { setBrandingUploading(false); }
+    } finally {
+      setBrandingUploading(false);
+    }
   };
 
 

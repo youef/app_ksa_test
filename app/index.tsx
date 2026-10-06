@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Platform, ActivityIndicator, Image, Animated, Easing } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
-import { getBrandingLogo, FALLBACK_LOGO_URI, subscribeBrandingLogo } from '@/lib/branding';
+import { getBrandingLogo, FALLBACK_LOGO_URI, subscribeBrandingLogo, getCachedBrandingLogo } from '@/lib/branding';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft } from 'lucide-react-native';
 
@@ -11,7 +11,7 @@ const FALLBACK_URI = FALLBACK_LOGO_URI;
 export default function Index() {
   const [checkingSession, setCheckingSession] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
-  const [logoUri, setLogoUri] = useState(FALLBACK_URI);
+  const [logoUri, setLogoUri] = useState(getCachedBrandingLogo());
   const floatY = useRef(new Animated.Value(0)).current;
   const pulse = useRef(new Animated.Value(0.96)).current;
   const shine = useRef(new Animated.Value(-1)).current;

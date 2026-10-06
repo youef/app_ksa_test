@@ -5,7 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Flame, Plus } from 'lucide-react-native';
 
 import { supabase } from '@/lib/supabase';
-import { getBrandingLogo, subscribeBrandingLogo } from '@/lib/branding';
+import { getBrandingLogo, subscribeBrandingLogo, getCachedBrandingLogo } from '@/lib/branding';
 import { isLocationMatching, savePermanentMyLocation, type HaynaLocation } from '@/lib/locationSync';
 import {
   getGreeting,
@@ -40,7 +40,7 @@ export default function Home() {
   const { showIsland } = useDynamicIsland();
   const showToast = useCallback((msg: string) => showIsland(msg, undefined, 'success'), [showIsland]);
 
-  const [logoUri, setLogoUri] = useState('/brand/HAYNA_LOGO.png?v=2');
+  const [logoUri, setLogoUri] = useState(getCachedBrandingLogo());
   const [activeTab, setActiveTab] = useState<HomeTab>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
