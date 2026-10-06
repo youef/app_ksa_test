@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Animated, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Flame, Plus } from 'lucide-react-native';
+import { ChevronLeft, Flame, Plus, Sparkles } from 'lucide-react-native';
 
 import { supabase } from '@/lib/supabase';
 import { getBrandingLogo, subscribeBrandingLogo, getCachedBrandingLogo } from '@/lib/branding';
@@ -286,6 +286,33 @@ export default function Home() {
             showToast('تمت تصفية المنشورات لعرض أدوات الحي');
           }}
         />
+
+        <Pressable
+          style={styles.moreBannerCard}
+          onPress={() => router.push('/more')}
+          accessibilityRole="button"
+          accessibilityLabel="استكشف المزيد من خدمات حيك الذكية"
+        >
+          <LinearGradient
+            colors={['#064e3b', '#047857']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.moreBannerGrad}
+          >
+            <View style={styles.moreBannerContent}>
+              <View style={styles.moreBannerBadge}>
+                <Sparkles size={12} color="#fef08a" />
+                <Text style={styles.moreBannerBadgeText}>جديد التطوير</Text>
+              </View>
+              <Text style={styles.moreBannerTitle}>استكشف المزيد من خدمات حيك الذكية</Text>
+              <Text style={styles.moreBannerSub}>دليل المحلات، مجلس العمارة، إعارة الأدوات، والميزات القادمة</Text>
+            </View>
+            <View style={styles.moreBannerBtn}>
+              <Text style={styles.moreBannerBtnText}>فتح المزيد</Text>
+              <ChevronLeft size={16} color="#064e3b" />
+            </View>
+          </LinearGradient>
+        </Pressable>
 
         <View style={styles.feedSection}>
           <FeedTabs

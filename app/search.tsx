@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { View, Text, TextInput, StyleSheet, ScrollView, Pressable, ActivityIndicator, Image, Platform, Linking } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { Search as SearchIcon, ArrowRight, MessageCircle, Truck, Plus, Store } from 'lucide-react-native';
 import { areaLabel } from '@/lib/privacy';
 import { relativeTime } from '@/lib/mapPins';
+import { useBottomNavInset } from '@/lib/bottomNav';
 
 type Row = Record<string, any>;
 type Tab = 'all' | 'users' | 'questions' | 'requests' | 'shops';
@@ -37,8 +38,10 @@ async function searchRows(
 }
 
 export default function SearchPage() {
-  const [query, setQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<Tab>('all');
+  const params = useLocalSearchParams<{ q?: string; tab?: Tab }>();
+  const bottomNavInset = useBottomNavInset();
+  const [query, setQuery] = useState(params.q || '');
+  const [activeTab, setActiveTab] = useState<Tab>(params.tab || 'all');
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<{
     users: Row[];
@@ -46,6 +49,13 @@ export default function SearchPage() {
     requests: Row[];
     shops: Row[];
   }>({ users: [], questions: [], requests: [], shops: [] });
+
+  // Update query if params change
+  useEffect(() => {
+    if (params.q !== undefined && params.q !== query) {
+      setQuery(params.q);
+    }
+  }, [params.q]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -206,7 +216,17 @@ export default function SearchPage() {
     <View style={styles.container}>
       {/* Modern Search Header */}
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
+        <Pressable
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/home');
+            }
+          }}
+          style={styles.backBtn}
+          accessibilityLabel="العودة"
+        >
           <ArrowRight size={24} color="#059669" />
         </Pressable>
         <View style={styles.searchBox}>
@@ -217,7 +237,7 @@ export default function SearchPage() {
             placeholderTextColor="#9ca3af"
             value={query}
             onChangeText={setQuery}
-            autoFocus
+            autoFocus={!params.q}
             selectionColor="#059669"
           />
           {query.length > 0 && (
@@ -249,7 +269,12 @@ export default function SearchPage() {
         </View>
       </View>
 
-      <ScrollView style={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={{ paddingBottom: bottomNavInset + 40 }}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
         {loading && <ActivityIndicator size="large" color="#059669" style={{ marginTop: 40 }} />}
         
         {!loading && query.length > 0 && (

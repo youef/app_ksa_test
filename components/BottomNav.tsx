@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Home, LayoutDashboard, MessageCircle, ShoppingBag } from 'lucide-react-native';
+import { Home, MessageCircle, ShoppingBag, Search, LayoutGrid } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
 import { supabase } from '@/lib/supabase';
 import { BOTTOM_NAV_HEIGHT } from '@/lib/bottomNav';
@@ -12,7 +12,9 @@ export { BOTTOM_NAV_HEIGHT };
 const TABS = [
   { key: '/home', icon: Home, label: 'الرئيسية' },
   { key: '/market', icon: ShoppingBag, label: 'السوق' },
+  { key: '/search', icon: Search, label: 'البحث' },
   { key: '/messages', icon: MessageCircle, label: 'الرسائل' },
+  { key: '/more', icon: LayoutGrid, label: 'المزيد' },
 ];
 
 const NESTED_ROUTES: Array<[string, string]> = [
@@ -27,6 +29,10 @@ const NESTED_ROUTES: Array<[string, string]> = [
   ['/directory', '/market'],
   ['/business', '/market'],
   ['/conversation', '/messages'],
+  ['/settings', '/more'],
+  ['/locations', '/more'],
+  ['/map', '/more'],
+  ['/admin', '/more'],
 ];
 
 // Full-screen routes: the chat owns the whole viewport, the tab bar must not show.
@@ -172,7 +178,7 @@ export default function BottomNav() {
         style={styles.surface}
       >
         <View style={contentStyle}>
-          {TABS.filter(tab => hasSession || tab.key === '/home').map(tab => {
+          {TABS.filter(tab => hasSession || tab.key !== '/messages').map(tab => {
             const isActive = isTabActive(pathname, tab.key);
             const Icon = tab.icon;
             const badge = tab.key === '/messages' ? unreadMsgs : 0;
@@ -205,31 +211,6 @@ export default function BottomNav() {
               </Pressable>
             );
           })}
-
-          {isAdmin && (
-            <Pressable
-              onPress={() => router.navigate('/admin' as never)}
-              style={styles.tab}
-              hitSlop={6}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: normalize(pathname) === '/admin' }}
-              accessibilityLabel="لوحة التحكم"
-            >
-              <View style={[styles.iconWrap, normalize(pathname) === '/admin' && styles.iconWrapActive]}>
-                <LayoutDashboard
-                  size={22}
-                  color={normalize(pathname) === '/admin' ? '#059669' : '#94a3b8'}
-                  strokeWidth={normalize(pathname) === '/admin' ? 2.5 : 2}
-                />
-              </View>
-              <Text
-                style={[styles.label, normalize(pathname) === '/admin' && styles.labelActive]}
-                numberOfLines={1}
-              >
-                لوحة التحكم
-              </Text>
-            </Pressable>
-          )}
         </View>
       </BlurView>
     </View>

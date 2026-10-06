@@ -108,7 +108,19 @@ export default function HomeHero({
 
       <View style={styles.searchBarContainer}>
         <View style={styles.searchBar}>
-          <Search size={20} color="#94a3b8" />
+          <Pressable
+            onPress={() => {
+              if (searchQuery.trim()) {
+                router.push({ pathname: '/search', params: { q: searchQuery.trim() } });
+              } else {
+                router.push('/search');
+              }
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="انتقال للبحث الشامل"
+          >
+            <Search size={20} color="#059669" />
+          </Pressable>
           <TextInput
             placeholder="ابحث عن استفسار أو طلب أو اسم جار..."
             placeholderTextColor="#94a3b8"
@@ -116,27 +128,75 @@ export default function HomeHero({
             accessibilityLabel="البحث في الاستفسارات والطلبات وأسماء الجيران"
             value={searchQuery}
             onChangeText={onSearchChange}
+            onSubmitEditing={() => {
+              if (searchQuery.trim()) {
+                router.push({ pathname: '/search', params: { q: searchQuery.trim() } });
+              }
+            }}
             returnKeyType="search"
           />
           {searchQuery.length > 0 ? (
-            <Pressable
-              onPress={() => onSearchChange('')}
-              style={styles.clearSearchBtn}
-              accessibilityRole="button"
-              accessibilityLabel="مسح البحث"
-            >
-              <X size={17} color="#64748b" />
-            </Pressable>
+            <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
+              <Pressable
+                onPress={() => onSearchChange('')}
+                style={styles.clearSearchBtn}
+                accessibilityRole="button"
+                accessibilityLabel="مسح البحث"
+              >
+                <X size={17} color="#64748b" />
+              </Pressable>
+              <Pressable
+                onPress={() => router.push({ pathname: '/search', params: { q: searchQuery.trim() } })}
+                style={styles.fullSearchMiniBtn}
+                accessibilityRole="button"
+                accessibilityLabel="بحث شامل"
+              >
+                <Text style={styles.fullSearchMiniText}>بحث شامل</Text>
+              </Pressable>
+            </View>
           ) : (
             <Pressable
-              style={styles.micBtn}
-              onPress={() => router.push('/questions')}
+              style={styles.fullSearchTriggerBtn}
+              onPress={() => router.push('/search')}
               accessibilityRole="button"
-              accessibilityLabel="كل الاستفسارات"
+              accessibilityLabel="فتح صفحة البحث"
             >
-              <Mic size={17} color="#059669" />
+              <Text style={styles.fullSearchTriggerText}>البحث الشامل</Text>
             </Pressable>
           )}
+        </View>
+
+        {/* Quick Search Tags */}
+        <View style={styles.quickTagsRow}>
+          <Pressable
+            style={styles.quickTagPillActive}
+            onPress={() => router.push('/search')}
+            accessibilityRole="button"
+          >
+            <Search size={12} color="#047857" />
+            <Text style={styles.quickTagTextActive}>بحث شامل</Text>
+          </Pressable>
+          <Pressable
+            style={styles.quickTagPill}
+            onPress={() => router.push('/market')}
+            accessibilityRole="button"
+          >
+            <Text style={styles.quickTagText}>🏪 محلات الحي</Text>
+          </Pressable>
+          <Pressable
+            style={styles.quickTagPill}
+            onPress={() => router.push('/requests')}
+            accessibilityRole="button"
+          >
+            <Text style={styles.quickTagText}>🤝 فزعة وطلبات</Text>
+          </Pressable>
+          <Pressable
+            style={styles.quickTagPill}
+            onPress={() => router.push('/map')}
+            accessibilityRole="button"
+          >
+            <Text style={styles.quickTagText}>🗺️ خريطة الحي</Text>
+          </Pressable>
         </View>
       </View>
     </View>
