@@ -34,8 +34,8 @@ export default function HomeHero({
         <View style={styles.leftActions}>
           {isGuest ? (
             <Pressable onPress={() => router.push('/auth')} style={[styles.iconCircleBtn, { flexDirection: 'row', width: 'auto', paddingHorizontal: 12, gap: 6 }]} accessibilityRole="button">
-              <LogIn size={17} color="#fff" />
-              <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800' }}>دخول</Text>
+              <LogIn size={17} color="#d1fae5" />
+              <Text style={{ color: '#ecfdf5', fontSize: 12, fontWeight: '800' }}>دخول</Text>
             </Pressable>
           ) : <Pressable
             onPress={() => router.push('/profile')}
@@ -55,7 +55,7 @@ export default function HomeHero({
             accessibilityRole="button"
             accessibilityLabel="الخريطة"
           >
-            <Map size={20} color="#fff" />
+            <Map size={20} color="#d1fae5" />
           </Pressable>
 
           {!isGuest && <Pressable
@@ -64,7 +64,7 @@ export default function HomeHero({
             accessibilityRole="button"
             accessibilityLabel={unreadCount > 0 ? `الإشعارات، ${unreadCount} غير مقروء` : 'الإشعارات'}
           >
-            <Bell size={20} color="#fff" />
+            <Bell size={20} color="#d1fae5" />
             {unreadCount > 0 && (
               <View style={styles.notifBadge}>
                 <Text style={styles.notifBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
