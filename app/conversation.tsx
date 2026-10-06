@@ -949,11 +949,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: Platform.OS === 'ios' ? 52 : 14,
     paddingBottom: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    backgroundColor: '#064e3b',
+    borderBottomWidth: 0,
+    borderBottomColor: 'transparent',
   },
-  backBtn: { width: 40, height: 40, borderRadius: 13, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' },
+  backBtn: { width: 42, height: 42, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center' },
   headerUser: { flexDirection: 'row-reverse', alignItems: 'center', flex: 1, marginRight: 10, gap: 10 },
   headerAvatar: { width: 46, height: 46, borderRadius: 15 },
   headerAvatarFallback: {
@@ -967,8 +967,8 @@ const styles = StyleSheet.create({
   headerAvatarLetter: { color: '#047857', fontSize: 17, fontWeight: '900' },
   headerInfo: { alignItems: 'flex-end', flex: 1 },
   headerNameRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
-  headerName: { color: '#0f172a', fontSize: 16, fontWeight: '900' },
-  headerCity: { color: '#64748b', fontSize: 11, fontWeight: '600', marginTop: 2 },
+  headerName: { color: '#fff', fontSize: 16, fontWeight: '900' },
+  headerCity: { color: '#a7f3d0', fontSize: 11, fontWeight: '600', marginTop: 2 },
   headerStatusPill: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
@@ -981,7 +981,7 @@ const styles = StyleSheet.create({
   },
   headerStatusText: { color: '#047857', fontSize: 10, fontWeight: '900' },
   headerActions: { flexDirection: 'row-reverse' },
-  headerActionBtn: { width: 40, height: 40, borderRadius: 13, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' },
+  headerActionBtn: { width: 42, height: 42, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center' },
 
   noticeBlocked: {
     flexDirection: 'row-reverse',
@@ -1026,7 +1026,7 @@ const styles = StyleSheet.create({
   },
   noticeInfoText: { color: '#0369a1', fontSize: 11, fontWeight: '700' },
 
-  messagesList: { flex: 1, width: '100%', backgroundColor: '#f8fafc' },
+  messagesList: { flex: 1, width: '100%', backgroundColor: '#f4f7f5' },
   messagesContent: { width: '100%', maxWidth: 1100, alignSelf: 'center', paddingHorizontal: 18, paddingTop: 22, paddingBottom: 12, minHeight: '100%' },
   dateDivider: {
     textAlign: 'center',
@@ -1099,7 +1099,7 @@ const styles = StyleSheet.create({
   },
   emptyConvHint: { fontSize: 12, color: '#059669', fontWeight: '700' },
 
-  composerWrap: { alignItems: 'center', borderTopWidth: 1, borderTopColor: '#e2e8f0', backgroundColor: '#fff', paddingTop: 10, paddingBottom: Platform.OS === 'ios' ? 10 : 8 },
+  composerWrap: { alignItems: 'center', borderTopWidth: 1, borderTopColor: '#dbe7e1', backgroundColor: '#fff', paddingTop: 10, paddingBottom: Platform.OS === 'ios' ? 10 : 8 },
   stickerPanel: { paddingTop: 10, paddingBottom: 8, backgroundColor: '#f8fafc', borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
   stickerTitle: { textAlign: 'right', paddingHorizontal: 14, color: '#334155', fontSize: 12, fontWeight: '800', marginBottom: 6 },
   stickerRow: { flexDirection: 'row', paddingHorizontal: 10, gap: 5 },
