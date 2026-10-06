@@ -170,7 +170,7 @@ const s = StyleSheet.create({
   priorityCount:{flexDirection:'row-reverse',alignItems:'center',gap:4,paddingHorizontal:8,paddingVertical:6,borderRadius:10,backgroundColor:'#F8FAFC'},
   clear:{flexDirection:'row-reverse',alignItems:'center',gap:10,paddingVertical:10},
   twoCol:{flexDirection:'row-reverse',gap:12},flexCard:{flex:1,minWidth:280},
-  barRow:{marginBottom:10},barMeta:{flexDirection:'row-reverse',justifyContent:'space-between',marginBottom:5},barLabel:{fontSize:10,color:'#475569',fontWeight:'800'}.barValue:{fontSize:10,color:'#0F172A',fontWeight:'900'},
+  barRow:{marginBottom:10},barMeta:{flexDirection:'row-reverse',justifyContent:'space-between',marginBottom:5},barLabel:{fontSize:10,color:'#475569',fontWeight:'800'},barValue:{fontSize:10,color:'#0F172A',fontWeight:'900'},
   barTrack:{height:7,backgroundColor:'#F1F5F9',borderRadius:7,overflow:'hidden'},barFill:{height:7,backgroundColor:'#0EA5A4',borderRadius:7},
   empty:{color:'#94A3B8',fontSize:11,textAlign:'right',paddingVertical:10},
   opsGrid:{flexDirection:'row-reverse',flexWrap:'wrap',gap:8},
