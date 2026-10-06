@@ -133,18 +133,28 @@ export function useHomeFeed({ onLocation }: Options) {
       const rRows = dedupe((requestsRes.data ?? []) as HelpRequest[], 'requester_id');
       setHasMore((questionsRes.data?.length ?? 0) >= limit || (requestsRes.data?.length ?? 0) >= limit);
 
-      // Stage 2: answers + ONE profiles query for every author involved.
+      // Stage 2: answers for questions + help_matches for requests + ONE profiles query for every author involved.
       const qIds = qRows.map(q => q.id);
-      const answersRes = qIds.length
-        ? await supabase.from('answers').select('*').in('question_id', qIds).order('created_at', { ascending: true })
-        : { data: [] as any[], error: null };
+      const rIds = rRows.map(r => r.id);
+
+      const [answersRes, matchesRes] = await Promise.all([
+        qIds.length
+          ? supabase.from('answers').select('*').in('question_id', qIds).order('created_at', { ascending: true })
+          : Promise.resolve({ data: [] as any[], error: null }),
+        rIds.length
+          ? supabase.from('help_matches').select('*').in('request_id', rIds).order('created_at', { ascending: true })
+          : Promise.resolve({ data: [] as any[], error: null }),
+      ]);
+
       const answers = (answersRes.data ?? []) as any[];
+      const matches = (matchesRes.data ?? []) as any[];
 
       const profileIds = [
         ...new Set([
           ...qRows.map(q => q.author_id),
           ...rRows.map(r => r.requester_id),
           ...answers.map(a => a.author_id),
+          ...matches.map(m => m.helper_id),
         ].filter(Boolean)),
       ] as string[];
 
@@ -159,6 +169,19 @@ export function useHomeFeed({ onLocation }: Options) {
         (answersByQ[a.question_id] ||= []).push({ ...a, profiles: profileMap[a.author_id] || null });
       });
 
+      const matchesByR: Record<string, any[]> = {};
+      matches.forEach(m => {
+        (matchesByR[m.request_id] ||= []).push({
+          id: m.id,
+          request_id: m.request_id,
+          author_id: m.helper_id,
+          body: m.message || 'أبشر بالفزعة يا جارنا 🤝',
+          created_at: m.created_at,
+          status: m.status,
+          profiles: profileMap[m.helper_id] || null,
+        });
+      });
+
       setQuestions(
         qRows.map(q => ({
           ...q,
@@ -167,7 +190,14 @@ export function useHomeFeed({ onLocation }: Options) {
           answers_count: (answersByQ[q.id] || []).length,
         })),
       );
-      setRequests(rRows.map(r => ({ ...r, profiles: profileMap[r.requester_id] || null })));
+      setRequests(
+        rRows.map(r => ({
+          ...r,
+          profiles: profileMap[r.requester_id] || null,
+          answers: matchesByR[r.id] || [],
+          answers_count: (matchesByR[r.id] || []).length,
+        })),
+      );
       setError(null);
     } catch (e: any) {
       console.warn('home load failed:', e);

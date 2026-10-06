@@ -179,7 +179,11 @@ export default function Question() {
 
       if (rpcErr) {
         // Fallback: direct update + reputation + notification
-        const { data: updated, error } = await supabase
+        let updated: any = null;
+        let updateErr: any = null;
+
+        // Try 'solved' status first
+        const resSolved = await supabase
           .from('questions')
           .update({ best_answer_id: answerId, status: 'solved', solved_at: new Date().toISOString() })
           .eq('id', id)
@@ -187,7 +191,39 @@ export default function Question() {
           .select('id, best_answer_id, status')
           .maybeSingle();
 
-        if (error) throw error;
+        if (!resSolved.error) {
+          updated = resSolved.data;
+        } else {
+          // If check constraint violates 'solved', try 'closed'
+          const resClosed = await supabase
+            .from('questions')
+            .update({ best_answer_id: answerId, status: 'closed', solved_at: new Date().toISOString() })
+            .eq('id', id)
+            .eq('author_id', currentUserId)
+            .select('id, best_answer_id, status')
+            .maybeSingle();
+
+          if (!resClosed.error) {
+            updated = resClosed.data;
+          } else {
+            // If status check fails both, update only best_answer_id and solved_at
+            const resMinimal = await supabase
+              .from('questions')
+              .update({ best_answer_id: answerId, solved_at: new Date().toISOString() })
+              .eq('id', id)
+              .eq('author_id', currentUserId)
+              .select('id, best_answer_id, status')
+              .maybeSingle();
+
+            if (!resMinimal.error) {
+              updated = resMinimal.data;
+            } else {
+              updateErr = resMinimal.error;
+            }
+          }
+        }
+
+        if (updateErr) throw updateErr;
         if (!updated) return Alert.alert('تعذر الاعتماد', 'لم يتم تعديل السؤال. تأكد أنك صاحب السؤال.');
 
         const targetAns = answers.find(x => x.id === answerId);
@@ -363,7 +399,7 @@ export default function Question() {
 
   const authorName = q.profiles?.hide_name ? 'مستخدم مجهول' : (q.profiles?.display_name || q.profiles?.username || 'أحد سكان الحي');
   const isAuthor = currentUserId === q.author_id;
-  const isSolved = q.status === 'solved';
+  const isSolved = q.status === 'solved' || q.status === 'closed' || Boolean(q.best_answer_id);
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.container}>
@@ -557,7 +593,7 @@ export default function Question() {
                     </View>
 
                     {/* Best Answer Button for question owner */}
-                    {isAuthor && q.status === 'open' && (
+                    {isAuthor && !isSolved && (
                       <Pressable onPress={() => chooseBest(a.id)} style={styles.bestBtn}>
                         <Check size={14} color="#fff" />
                         <Text style={styles.bestBtnText}>اعتماد</Text>
@@ -612,7 +648,7 @@ export default function Question() {
             </View>
           )}
 
-          {q.status !== 'open' ? (
+          {isSolved ? (
             <View style={styles.closedNotice}>
               <Lock size={15} color="#64748b" />
               <Text style={styles.closedNoticeText}>تم إغلاق الردود بعد اعتماد الإجابة الصحيحة</Text>
@@ -635,7 +671,7 @@ export default function Question() {
                   pressed && { transform: [{ scale: 0.95 }] },
                 ]}
                 onPress={answer}
-                disabled={!body.trim() || submitting || q.status !== 'open'}
+                disabled={!body.trim() || submitting || isSolved}
               >
                 {submitting ? (
                   <ActivityIndicator size="small" color="#fff" />

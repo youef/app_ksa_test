@@ -201,6 +201,16 @@ begin
   );
 end $$;
 
+-- Ensure public.questions constraint allows 'solved' status
+do $$
+begin
+  alter table public.questions drop constraint if exists questions_status_check;
+  alter table public.questions add constraint questions_status_check
+    check (status in ('open', 'solved', 'closed', 'resolved', 'archived'));
+exception when others then
+  null;
+end $$;
+
 -- Award best answer with reputation & notification
 create or replace function public.award_best_answer(
   p_question_id uuid,
@@ -235,12 +245,27 @@ begin
     raise exception 'answer_not_found';
   end if;
 
-  -- Mark question as solved
-  update public.questions
-  set best_answer_id = p_answer_id,
-      status = 'solved',
-      solved_at = now()
-  where id = p_question_id;
+  -- Mark question as solved (with fallback for status check constraint)
+  begin
+    update public.questions
+    set best_answer_id = p_answer_id,
+        status = 'solved',
+        solved_at = now()
+    where id = p_question_id;
+  exception when check_violation then
+    begin
+      update public.questions
+      set best_answer_id = p_answer_id,
+          status = 'closed',
+          solved_at = now()
+      where id = p_question_id;
+    exception when others then
+      update public.questions
+      set best_answer_id = p_answer_id,
+          solved_at = now()
+      where id = p_question_id;
+    end;
+  end;
 
   -- Award reputation if not answering own question
   if v_ans_author_id <> v_sender then
