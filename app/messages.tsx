@@ -340,7 +340,7 @@ export default function Messages() {
     <View style={styles.container}>
       <View style={styles.ambientOrbOne} />
       <View style={styles.ambientOrbTwo} />
-      <LinearGradient colors={['#ffffff', '#ffffff']} style={styles.header}>
+      <LinearGradient colors={['#064e3b', '#047857']} style={styles.header}>
         <View style={styles.inner}>
         <ScreenHeader
           title="الرسائل"
@@ -810,9 +810,9 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'ios' ? 52 : 18,
     paddingBottom: 16,
     paddingHorizontal: 0,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    backgroundColor: '#064e3b',
+    borderBottomWidth: 0,
+    borderBottomColor: 'transparent',
     shadowColor: '#0f172a', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.04, shadowRadius: 12, elevation: 2,
   },
   headerContent: {
@@ -868,10 +868,10 @@ const styles = StyleSheet.create({
   searchBar: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    backgroundColor: '#f1f5f9',
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    height: 44,
+    backgroundColor: 'rgba(255,255,255,0.98)',
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    height: 48,
     gap: 8,
     borderWidth: 1, borderColor: '#e2e8f0',
   },
