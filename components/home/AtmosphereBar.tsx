@@ -1,4 +1,5 @@
-import { Text, View } from 'react-native';
+import { Text, View, Pressable } from 'react-native';
+import { router } from 'expo-router';
 import { CloudSun, Flame, ShieldCheck } from 'lucide-react-native';
 import { styles } from './homeStyles';
 import { describeWeatherCode, type CurrentWeather } from '@/lib/weather';
@@ -31,12 +32,17 @@ export default function AtmosphereBar({ weather, weatherLoading, activeNeighbors
         </Text>
       </View>
       <View style={styles.atmoDivider} />
-      <View style={styles.atmoItem}>
+      <Pressable
+        style={styles.atmoItem}
+        onPress={() => router.push('/emergency-alert')}
+        accessibilityRole="button"
+        accessibilityLabel="تنبيه الحي العاجل"
+      >
         <ShieldCheck size={15} color={emergencyCount > 0 ? '#dc2626' : '#059669'} />
         <Text style={styles.atmoText}>
-          {emergencyCount > 0 ? `${emergencyCount} بلاغ طارئ` : 'لا بلاغات طارئة'}
+          {emergencyCount > 0 ? `${emergencyCount} بلاغ طارئ` : 'تنبيه طارئ 🚨'}
         </Text>
-      </View>
+      </Pressable>
     </View>
   );
 }

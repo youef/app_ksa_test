@@ -1,9 +1,8 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import {
   Alert,
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   View,
   RefreshControl,
@@ -25,12 +24,13 @@ import {
   getCachedBrandingLogo,
   subscribeBrandingLogo,
 } from '@/lib/branding';
+import { sendPushToMultipleUsers, sendPushToUser } from '@/lib/pushSender';
 import {
   Shield,
   Users,
   MessageCircle,
   Truck,
-  Briefcase,
+  Wrench,
   Flag,
   CheckCircle2,
   XCircle,
@@ -47,43 +47,33 @@ import {
   Megaphone,
   Check,
   X,
-  Lock,
-  Unlock,
-  ExternalLink,
   ShieldCheck,
   Ban,
-  UserCheck,
   UserX,
-  SlidersHorizontal,
-  User,
   Download,
-  Copy,
-  FileText,
   Sparkles,
   Clock,
   MapPin,
   Activity,
-  ChevronDown,
-  ChevronUp,
-  Bell,
-  Building2,
-  CalendarDays,
-  Store,
   Archive,
+  Phone,
 } from 'lucide-react-native';
 
-const C = {
-  bg: '#F8FAFC',
-  card: '#FFFFFF',
-  ink: '#0F172A',
-  muted: '#64748B',
-  accent: '#059669',
-  danger: '#EF4444',
-  success: '#10B981',
-  warning: '#F59E0B',
-};
+import {
+  AdminProfile,
+  AdminVerificationRequest,
+  AdminReport,
+  AdminService,
+  AdminBorrowItem,
+  AdminUrgentAlert,
+  AdminQuestion,
+  AdminRequest,
+  AdminActivityLog,
+  AdminStats,
+} from '@/components/admin/adminTypes';
+import { adminStyles as styles, ADMIN_COLORS as C } from '@/components/admin/adminStyles';
 
-// Cross-platform confirmation dialog helper
+// Cross-platform alert confirmation
 function confirmAction(title: string, message: string, onConfirm: () => void | Promise<void>) {
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
     if (window.confirm(`${title}\n\n${message}`)) {
@@ -97,362 +87,327 @@ function confirmAction(title: string, message: string, onConfirm: () => void | P
   }
 }
 
-export default function Admin() {
-  const { width, height } = useWindowDimensions();
+export default function AdminScreen() {
+  const { width } = useWindowDimensions();
   const isMobile = width < 768;
   const isSmallPhone = width < 400;
   const statCardWidth = isSmallPhone ? '100%' : isMobile ? '48%' : '23.5%';
 
+  // Auth and loading state
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [profile, setProfile] = useState<any>(null);
-  
-  // Navigation Tabs:
-  // overview | users | verifications | reports | content | broadcast | logs
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'verifications' | 'reports' | 'content' | 'broadcast' | 'logs' | 'locations' | 'branding' | 'platform'>('overview');
-  const [customLocations, setCustomLocations] = useState<any[]>([]);
-  const [locationKind, setLocationKind] = useState<'region' | 'city' | 'district'>('city');
-  const [locationName, setLocationName] = useState('');
-  const [locationRegion, setLocationRegion] = useState('');
-  const [locationCity, setLocationCity] = useState('');
-  const [locationLatitude, setLocationLatitude] = useState('');
-  const [locationLongitude, setLocationLongitude] = useState('');
-  const [savingLocation, setSavingLocation] = useState(false);
-  const [brandingLogo, setBrandingLogo] = useState(getCachedBrandingLogo());
-  const [brandingUploading, setBrandingUploading] = useState(false);
+  const [currentAdmin, setCurrentAdmin] = useState<AdminProfile | null>(null);
 
-  // Core Data
-  const [usersList, setUsersList] = useState<any[]>([]);
-  const [reports, setReports] = useState<any[]>([]);
-  const [verifications, setVerifications] = useState<any[]>([]);
-  const [questionsList, setQuestionsList] = useState<any[]>([]);
-  const [requestsList, setRequestsList] = useState<any[]>([]);
-  const [businessesList, setBusinessesList] = useState<any[]>([]);
-  const [marketplaceList, setMarketplaceList] = useState<any[]>([]);
-  const [eventsList, setEventsList] = useState<any[]>([]);
-  
-  // Relational Stats & Audit Logs
-  const [stats, setStats] = useState({
+  // Active navigation tab
+  const [activeTab, setActiveTab] = useState<
+    'overview' | 'users' | 'verifications' | 'reports' | 'platform' | 'content' | 'broadcast' | 'logs' | 'locations' | 'branding'
+  >('overview');
+
+  // Core relational data sets
+  const [usersList, setUsersList] = useState<AdminProfile[]>([]);
+  const [verifications, setVerifications] = useState<AdminVerificationRequest[]>([]);
+  const [reports, setReports] = useState<AdminReport[]>([]);
+  const [servicesList, setServicesList] = useState<AdminService[]>([]);
+  const [borrowItemsList, setBorrowItemsList] = useState<AdminBorrowItem[]>([]);
+  const [urgentAlertsList, setUrgentAlertsList] = useState<AdminUrgentAlert[]>([]);
+  const [questionsList, setQuestionsList] = useState<AdminQuestion[]>([]);
+  const [requestsList, setRequestsList] = useState<AdminRequest[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AdminActivityLog[]>([]);
+  const [customLocations, setCustomLocations] = useState<any[]>([]);
+
+  // Platform statistics
+  const [stats, setStats] = useState<AdminStats>({
     users: 0,
     admins: 0,
+    verifiedUsers: 0,
+    geoverifiedUsers: 0,
+    bannedUsers: 0,
+    pendingVerifications: 0,
+    pendingReports: 0,
+    services: 0,
+    borrowItems: 0,
+    urgentAlerts: 0,
     questions: 0,
     requests: 0,
-    services: 0,
-    pendingReports: 0,
-    pendingVerif: 0,
-    businesses: 0,
-    marketplace: 0,
-    events: 0,
   });
-  const [auditLogs, setAuditLogs] = useState<any[]>([]);
 
-  // Selected User Inspector Drawer / Modal
-  const [inspectedUser, setInspectedUser] = useState<any | null>(null);
-  const [userUserStats, setUserUserStats] = useState<{ qCount: number; aCount: number }>({ qCount: 0, aCount: 0 });
-  const [directMsgText, setDirectMsgText] = useState('');
-  const [sendingDirectMsg, setSendingDirectMsg] = useState(false);
+  // Selected User Inspector Modal State
+  const [inspectedUser, setInspectedUser] = useState<AdminProfile | null>(null);
+  const [userActivityStats, setUserActivityStats] = useState<{ qCount: number; aCount: number; reqCount: number }>({
+    qCount: 0,
+    aCount: 0,
+    reqCount: 0,
+  });
+  const [directNoticeText, setDirectNoticeText] = useState('');
+  const [sendingDirectNotice, setSendingDirectNotice] = useState(false);
 
-  // Filters & Searches
+  // Filters & Search
   const [userSearch, setUserSearch] = useState('');
   const [userRoleFilter, setUserRoleFilter] = useState<'all' | 'admin' | 'user' | 'verified' | 'geoverified' | 'banned'>('all');
   const [selectedCityFilter, setSelectedCityFilter] = useState<string>('all');
+  const [platformTabSub, setPlatformTabSub] = useState<'services' | 'borrow' | 'urgent'>('services');
   const [contentFilter, setContentFilter] = useState<'all' | 'questions' | 'requests'>('all');
   const [reportStatusFilter, setReportStatusFilter] = useState<'all' | 'pending' | 'resolved' | 'dismissed'>('pending');
 
-  // Broadcast Form
+  // Broadcast Center State
   const [broadcastTitle, setBroadcastTitle] = useState('');
   const [broadcastBody, setBroadcastBody] = useState('');
-  const [broadcastTarget, setBroadcastTarget] = useState<'all' | 'riyadh' | 'jeddah' | 'dammam' | 'makkah' | 'madinah'>('all');
+  const [broadcastTarget, setBroadcastTarget] = useState<'all' | 'الرياض' | 'جدة' | 'الدمام' | 'مكة' | 'المدينة'>('all');
   const [broadcastType, setBroadcastType] = useState<'official' | 'emergency' | 'weather' | 'maintenance'>('official');
   const [sendingBroadcast, setSendingBroadcast] = useState(false);
+
+  // Custom Locations Form
+  const [locationName, setLocationName] = useState('');
+  const [locationCity, setLocationCity] = useState('');
+  const [locationRegion, setLocationRegion] = useState('');
+  const [savingLocation, setSavingLocation] = useState(false);
+
+  // Branding Logo State
+  const [brandingLogo, setBrandingLogo] = useState(getCachedBrandingLogo());
+  const [brandingUploading, setBrandingUploading] = useState(false);
 
   // Toast feedback
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const toastAnim = useRef(new Animated.Value(0)).current;
 
-  const showToast = useCallback((msg: string) => {
-    setToastMsg(msg);
-    Animated.sequence([
-      Animated.timing(toastAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
-      Animated.delay(2300),
-      Animated.timing(toastAnim, { toValue: 0, duration: 250, useNativeDriver: true }),
-    ]).start(() => setToastMsg(null));
-  }, [toastAnim]);
+  const showToast = useCallback(
+    (msg: string) => {
+      setToastMsg(msg);
+      Animated.sequence([
+        Animated.timing(toastAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
+        Animated.delay(2400),
+        Animated.timing(toastAnim, { toValue: 0, duration: 250, useNativeDriver: true }),
+      ]).start(() => setToastMsg(null));
+    },
+    [toastAnim]
+  );
 
-  const loadCustomLocations = useCallback(async () => {
-    const { data, error } = await supabase.from('saudi_custom_locations').select('*').order('created_at', { ascending: false }).limit(100);
-    if (error) { showToast('تعذر تحميل المواقع الإضافية'); return; }
-    setCustomLocations(data || []);
-  }, [showToast]);
-
-  useEffect(() => { if (activeTab === 'locations') loadCustomLocations(); }, [activeTab, loadCustomLocations]);
-
-  const loadBranding = useCallback(async () => {
-    const url = await getBrandingLogo();
-    if (url) setBrandingLogo(url);
-  }, []);
-
-  useEffect(() => {
-    if (activeTab === 'branding') {
-      loadBranding();
-      return subscribeBrandingLogo(setBrandingLogo);
-    }
-  }, [activeTab, loadBranding]);
-
-  const changeGlobalLogo = async () => {
-    try {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permission.granted) { showToast('اسمح بالوصول للصور لاختيار الشعار'); return; }
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 1,
-      });
-      if (result.canceled || !result.assets?.[0]?.uri) return;
-      setBrandingUploading(true);
-      const asset = result.assets[0];
-      const response = await fetch(asset.uri);
-      const blob = await response.blob();
-      const path = 'global/logo.png';
-      const { error: uploadError } = await supabase.storage.from('branding').upload(path, blob, {
-        contentType: asset.mimeType || 'image/png',
-        upsert: true,
-        cacheControl: '0',
-      });
-      if (uploadError) throw uploadError;
-
-      const { data: publicData } = supabase.storage.from('branding').getPublicUrl(path);
-      const logoUrl = publicData.publicUrl;
-      const versionedUrl = withVersion(logoUrl, Date.now());
-
-      // Attempt DB upsert (if permissions/table exist)
+  // Audit Log Recorder
+  const recordAuditLog = useCallback(
+    async (action: string, targetName: string, targetType?: string, targetId?: string) => {
       try {
-        const { data: me } = await supabase.auth.getUser();
-        const { error: dbError } = await supabase.from('app_branding').upsert({
-          id: 'global',
-          logo_url: logoUrl,
-          updated_at: new Date().toISOString(),
-          updated_by: me.user?.id || null,
+        const { data: u } = await supabase.auth.getUser();
+        if (!u.user) return;
+        await supabase.from('admin_activity_logs').insert({
+          actor_id: u.user.id,
+          action,
+          target_type: targetType || null,
+          target_id: targetId || null,
+          metadata: { target_name: targetName },
         });
-        if (dbError) {
-          console.warn('app_branding table update warning:', dbError.message);
-        }
-      } catch (err) {
-        console.warn('DB upsert exception:', err);
+      } catch (err: any) {
+        console.warn('Audit record warning:', err?.message);
+      }
+    },
+    []
+  );
+
+  // Core Data Fetcher
+  const loadDashboardData = useCallback(async () => {
+    try {
+      const { data: authData } = await supabase.auth.getUser();
+      if (!authData.user) {
+        router.replace('/auth');
+        return;
       }
 
-      await broadcastLogoUpdate(versionedUrl);
-      setBrandingLogo(versionedUrl);
-      await addAuditLog('تغيير شعار حيّنا بالكامل', 'الهوية البصرية', 'branding');
-      showToast('تم تغيير الشعار في النظام بالكامل ✓');
-    } catch (e: any) {
-      showToast('تعذر تغيير الشعار: ' + (e?.message || 'خطأ غير متوقع'));
+      // 1. Strict database role check - NO MOCK OR HARDCODED EMAIL BYPASS
+      const { data: profileData, error: profileErr } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', authData.user.id)
+        .maybeSingle();
+
+      if (profileErr) throw profileErr;
+
+      const isAdmin = profileData?.role === 'admin';
+      if (!isAdmin) {
+        setLoading(false);
+        router.replace('/home');
+        return;
+      }
+
+      setCurrentAdmin(profileData as AdminProfile);
+
+      // 2. Parallel relational fetching with explicit Foreign Keys
+      const [
+        profilesRes,
+        verifRes,
+        reportsRes,
+        servicesRes,
+        borrowRes,
+        urgentRes,
+        questionsRes,
+        requestsRes,
+        auditRes,
+        locationsRes,
+        qCountRes,
+        rCountRes,
+        sCountRes,
+        bCountRes,
+        uCountRes,
+      ] = await Promise.all([
+        supabase.from('profiles').select('*').order('created_at', { ascending: false }).limit(100),
+        supabase
+          .from('verification_requests')
+          .select('*, user:user_id(id, display_name, username, city, district, avatar_url, bio, is_verified, is_geoverified, role, created_at)')
+          .order('created_at', { ascending: false })
+          .limit(60),
+        supabase
+          .from('reports')
+          .select('*, reporter:reporter_id(id, display_name, username, avatar_url, city, district)')
+          .order('created_at', { ascending: false })
+          .limit(60),
+        supabase
+          .from('services')
+          .select('*, provider:provider_id(id, display_name, username, avatar_url, phone)')
+          .order('created_at', { ascending: false })
+          .limit(60),
+        supabase
+          .from('borrow_items')
+          .select('*, owner:owner_id(id, display_name, username, avatar_url)')
+          .order('created_at', { ascending: false })
+          .limit(60),
+        supabase
+          .from('urgent_alerts')
+          .select('*, user:user_id(id, display_name, username, avatar_url, city, district)')
+          .order('created_at', { ascending: false })
+          .limit(60),
+        supabase
+          .from('questions')
+          .select('*, author:author_id(id, display_name, username, avatar_url)')
+          .order('created_at', { ascending: false })
+          .limit(40),
+        supabase
+          .from('requests')
+          .select('*, requester:requester_id(id, display_name, username, avatar_url)')
+          .order('created_at', { ascending: false })
+          .limit(40),
+        supabase
+          .from('admin_activity_logs')
+          .select('*, actor:actor_id(id, display_name, username)')
+          .order('created_at', { ascending: false })
+          .limit(80),
+        supabase.from('saudi_custom_locations').select('*').order('created_at', { ascending: false }).limit(60),
+        supabase.from('questions').select('id', { count: 'exact', head: true }),
+        supabase.from('requests').select('id', { count: 'exact', head: true }),
+        supabase.from('services').select('id', { count: 'exact', head: true }),
+        supabase.from('borrow_items').select('id', { count: 'exact', head: true }),
+        supabase.from('urgent_alerts').select('id', { count: 'exact', head: true }).eq('status', 'active'),
+      ]);
+
+      const allUsers = (profilesRes.data || []) as AdminProfile[];
+      const allVerifs = (verifRes.data || []) as AdminVerificationRequest[];
+      const allReports = (reportsRes.data || []) as AdminReport[];
+      const allServices = (servicesRes.data || []) as AdminService[];
+      const allBorrow = (borrowRes.data || []) as AdminBorrowItem[];
+      const allUrgent = (urgentRes.data || []) as AdminUrgentAlert[];
+      const allQuestions = (questionsRes.data || []) as AdminQuestion[];
+      const allRequests = (requestsRes.data || []) as AdminRequest[];
+      const allLogs = (auditRes.data || []) as AdminActivityLog[];
+      const allLocations = locationsRes.data || [];
+
+      setUsersList(allUsers);
+      setVerifications(allVerifs);
+      setReports(allReports);
+      setServicesList(allServices);
+      setBorrowItemsList(allBorrow);
+      setUrgentAlertsList(allUrgent);
+      setQuestionsList(allQuestions);
+      setRequestsList(allRequests);
+      setAuditLogs(allLogs);
+      setCustomLocations(allLocations);
+
+      // Calculate KPI metrics
+      const adminsCount = allUsers.filter(u => u.role === 'admin').length;
+      const verifiedCount = allUsers.filter(u => u.is_verified).length;
+      const geoCount = allUsers.filter(u => u.is_geoverified).length;
+      const bannedCount = allUsers.filter(u => u.is_banned).length;
+      const pendingVerifsCount = allVerifs.filter(v => v.status === 'pending').length;
+      const pendingReportsCount = allReports.filter(r => r.status === 'pending').length;
+
+      setStats({
+        users: allUsers.length,
+        admins: adminsCount,
+        verifiedUsers: verifiedCount,
+        geoverifiedUsers: geoCount,
+        bannedUsers: bannedCount,
+        pendingVerifications: pendingVerifsCount,
+        pendingReports: pendingReportsCount,
+        services: sCountRes.count ?? allServices.length,
+        borrowItems: bCountRes.count ?? allBorrow.length,
+        urgentAlerts: uCountRes.count ?? allUrgent.length,
+        questions: qCountRes.count ?? allQuestions.length,
+        requests: rCountRes.count ?? allRequests.length,
+      });
+    } catch (err: any) {
+      console.error('Error loading admin dashboard:', err);
+      showToast('تعذر تحميل بيانات لوحة التحكم: ' + (err?.message || 'خطأ في الاتصال'));
     } finally {
-      setBrandingUploading(false);
-    }
-  };
-
-
-  const saveCustomLocation = async () => {
-    const name = locationName.trim();
-    if (!name || (locationKind !== 'region' && !locationRegion.trim()) || (locationKind === 'district' && !locationCity.trim())) {
-      showToast('أكمل اسم الموقع والمنطقة والمدينة المطلوبة'); return;
-    }
-    const latitude = locationLatitude.trim() ? Number(locationLatitude) : null;
-    const longitude = locationLongitude.trim() ? Number(locationLongitude) : null;
-    if ((latitude === null) !== (longitude === null) || (latitude !== null && (!Number.isFinite(latitude) || latitude < 16 || latitude > 32.5 || longitude! < 34.5 || longitude! > 56))) {
-      showToast('أدخل إحداثيات سعودية صحيحة أو اتركها فارغة'); return;
-    }
-    setSavingLocation(true);
-    const row = {
-      region_name: locationKind === 'region' ? name : locationRegion.trim(),
-      city_name: locationKind === 'city' ? name : locationKind === 'district' ? locationCity.trim() : null,
-      district_name: locationKind === 'district' ? name : null,
-      latitude, longitude, created_by: profile?.id,
-    };
-    const { error } = await supabase.from('saudi_custom_locations').insert(row);
-    setSavingLocation(false);
-    if (error) { showToast(error.message.includes('duplicate') ? 'الموقع مضاف مسبقاً' : 'تعذر حفظ الموقع'); return; }
-    setLocationName(''); setLocationLatitude(''); setLocationLongitude('');
-    showToast('تمت إضافة الموقع');
-    await loadCustomLocations();
-    await addAuditLog('إضافة موقع جغرافي', name, 'location');
-  };
-
-  const deleteCustomLocation = async (id: string, name: string) => {
-    confirmAction('حذف الموقع', `هل تريد حذف «${name}» نهائياً من دليل المواقع؟`, async () => {
-      const { error } = await supabase.from('saudi_custom_locations').delete().eq('id', id);
-      if (error) { showToast('تعذر حذف الموقع'); return; }
-      showToast('تم حذف الموقع بنجاح');
-      await loadCustomLocations();
-      await addAuditLog('حذف موقع جغرافي', name, 'location', id);
-    });
-  };
-
-  // Log an admin operation to audit list
-  const addAuditLog = useCallback(async (action: string, targetName: string, targetType?: string, targetId?: string) => {
-    const { data: me } = await supabase.auth.getUser();
-    if (!me.user) return;
-    const { error } = await supabase.from('admin_activity_logs').insert({
-      actor_id: me.user.id,
-      action,
-      target_type: targetType || null,
-      target_id: targetId || null,
-      metadata: { target_name: targetName },
-    });
-    if (error) console.warn('Audit log failed:', error.message);
-    else setAuditLogs(prev => [{
-      id: String(Date.now()),
-      action,
-      target: targetName,
-      time: new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-      date: new Date().toLocaleDateString('ar-SA'),
-    }, ...prev.slice(0, 99)]);
-  }, []);
-
-  const load = useCallback(async () => {
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) return router.replace('/auth');
-
-    // Admin authorization is database-backed only. Email/username never grants privileges.
-    const { data: pr, error: profileError } = await supabase.from('profiles').select('*').eq('id', u.user.id).maybeSingle();
-    if (profileError) throw profileError;
-    setProfile(pr);
-    const userEmail = (u.user?.email || '').toLowerCase().trim();
-    const isAdmin = pr?.role === 'admin' || userEmail === 'root@gmail.com';
-
-    // If not admin, redirect immediately to home
-    if (!isAdmin) {
       setLoading(false);
-      return router.replace('/home');
     }
+  }, [showToast]);
 
-    // Parallel fetch for deep relational administration
-    const [
-      repRes,
-      verifRes,
-      profilesRes,
-      qCountRes,
-      rCountRes,
-      sCountRes,
-      latestQRes,
-      latestRRes,
-      auditRes,
-      businessesRes,
-      marketplaceRes,
-      eventsRes,
-    ] = await Promise.all([
-      supabase.from('reports').select('*, reporter:reporter_id(display_name, username, avatar_url)').order('created_at', { ascending: false }).limit(60),
-      supabase.from('verification_requests').select('*, user:user_id(id, display_name, username, city, district, avatar_url, bio, is_verified, is_geoverified, role, created_at)').order('created_at', { ascending: false }).limit(60),
-      supabase.from('profiles').select('*').order('created_at', { ascending: false }).limit(100),
-      supabase.from('questions').select('id', { count: 'exact', head: true }),
-      supabase.from('requests').select('id', { count: 'exact', head: true }),
-      supabase.from('services').select('id', { count: 'exact', head: true }),
-      supabase.from('questions').select('*, profiles:author_id(display_name, username, avatar_url)').order('created_at', { ascending: false }).limit(40),
-      supabase.from('requests').select('*, profiles:requester_id(display_name, username, avatar_url)').order('created_at', { ascending: false }).limit(40),
-      supabase.from('admin_activity_logs').select('*, actor:actor_id(display_name, username)').order('created_at', { ascending: false }).limit(100),
-      supabase.from('businesses').select('*, owner:owner_id(display_name, username)').order('created_at', { ascending: false }).limit(100),
-      supabase.from('marketplace_items').select('*, seller:seller_id(display_name, username)').order('created_at', { ascending: false }).limit(100),
-      supabase.from('events').select('*, organizer:organizer_id(display_name, username)').order('created_at', { ascending: false }).limit(100),
-    ]);
+  useEffect(() => {
+    loadDashboardData();
+  }, [loadDashboardData]);
 
-    const allUsers = profilesRes.data ?? [];
-    const persistedLogs = auditRes.data ?? [];
-    setAuditLogs(persistedLogs.map((l: any) => ({
-      id: l.id,
-      action: l.action,
-      target: l.metadata?.target_name || l.target_type || 'النظام',
-      time: new Date(l.created_at).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-      date: new Date(l.created_at).toLocaleDateString('ar-SA'),
-      actor: l.actor?.display_name || l.actor?.username || 'مدير',
-    })));
-    const allReports = repRes.data ?? [];
-    const allVerifs = verifRes.data ?? [];
-
-    setUsersList(allUsers);
-    setReports(allReports);
-    setVerifications(allVerifs);
-    setQuestionsList(latestQRes.data ?? []);
-    setRequestsList(latestRRes.data ?? []);
-    setBusinessesList(businessesRes.data ?? []);
-    setMarketplaceList(marketplaceRes.data ?? []);
-    setEventsList(eventsRes.data ?? []);
-
-    const adminCount = allUsers.filter((u: any) => u.role === 'admin').length;
-    const pendingRep = allReports.filter((r: any) => r.status === 'pending').length;
-    const pendingVer = allVerifs.filter((v: any) => v.status === 'pending').length;
-
-    setStats({
-      users: allUsers.length,
-      admins: adminCount,
-      questions: qCountRes.count ?? 0,
-      requests: rCountRes.count ?? 0,
-      services: sCountRes.count ?? 0,
-      pendingReports: pendingRep,
-      pendingVerif: pendingVer,
-      businesses: businessesRes.data?.length ?? 0,
-      marketplace: marketplaceRes.data?.length ?? 0,
-      events: eventsRes.data?.length ?? 0,
-    });
-
-    setLoading(false);
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
-
-  const updatePlatformEntity = async (entity: 'business' | 'marketplace' | 'event', id: string, action: string) => {
-    try {
-      const { data, error } = await supabase.rpc('admin_update_platform_entity', { p_entity: entity, p_target_id: id, p_action: action });
-      if (error) throw error;
-      if (entity === 'business') setBusinessesList(prev => prev.map(item => item.id === id ? data : item));
-      if (entity === 'marketplace') setMarketplaceList(prev => prev.map(item => item.id === id ? data : item));
-      if (entity === 'event') setEventsList(prev => prev.map(item => item.id === id ? data : item));
-      showToast('تم تحديث مورد المنصة وتسجيل العملية بنجاح ✓');
-    } catch (e: any) {
-      Alert.alert('تعذر التحديث', e?.message || 'حدث خطأ غير متوقع');
-    }
-  };
-
+  // Handle Pull-to-Refresh
   const onRefresh = async () => {
     setRefreshing(true);
-    await load();
+    await loadDashboardData();
     setRefreshing(false);
   };
 
-  // Inspect User Relations
-  const inspectUser = async (targetUser: any) => {
-    setInspectedUser(targetUser);
-    // Fetch live question and answer counts for user
-    const [qC, aC] = await Promise.all([
-      supabase.from('questions').select('id', { count: 'exact', head: true }).eq('author_id', targetUser.id),
-      supabase.from('answers').select('id', { count: 'exact', head: true }).eq('author_id', targetUser.id),
-    ]);
-    setUserUserStats({ qCount: qC.count || 0, aCount: aC.count || 0 });
+  // Inspect User Relations and Activity
+  const inspectUser = async (target: AdminProfile) => {
+    setInspectedUser(target);
+    try {
+      const [qRes, aRes, rRes] = await Promise.all([
+        supabase.from('questions').select('id', { count: 'exact', head: true }).eq('author_id', target.id),
+        supabase.from('answers').select('id', { count: 'exact', head: true }).eq('author_id', target.id),
+        supabase.from('requests').select('id', { count: 'exact', head: true }).eq('requester_id', target.id),
+      ]);
+      setUserActivityStats({
+        qCount: qRes.count || 0,
+        aCount: aRes.count || 0,
+        reqCount: rRes.count || 0,
+      });
+    } catch (e) {
+      console.warn('Could not inspect user stats:', e);
+    }
   };
 
-  const adminUpdateUser = async (targetUser: any, patch: { role?: 'admin' | 'user'; is_verified?: boolean; is_geoverified?: boolean; is_banned?: boolean }) => {
-    const next = {
-      role: patch.role ?? (targetUser.role === 'admin' ? 'admin' : 'user'),
-      is_verified: patch.is_verified ?? Boolean(targetUser.is_verified),
-      is_geoverified: patch.is_geoverified ?? Boolean(targetUser.is_geoverified),
-      is_banned: patch.is_banned ?? Boolean(targetUser.is_banned),
-    };
+  // User Administration RPC
+  const adminUpdateUser = async (
+    targetUser: AdminProfile,
+    patch: { role?: 'admin' | 'user'; is_verified?: boolean; is_geoverified?: boolean; is_banned?: boolean }
+  ) => {
+    const nextRole = patch.role ?? targetUser.role;
+    const nextVerified = patch.is_verified ?? Boolean(targetUser.is_verified);
+    const nextGeo = patch.is_geoverified ?? Boolean(targetUser.is_geoverified);
+    const nextBanned = patch.is_banned ?? Boolean(targetUser.is_banned);
+
     const { data, error } = await supabase.rpc('admin_update_user', {
       p_target_user: targetUser.id,
-      p_role: next.role,
-      p_is_verified: next.is_verified,
-      p_is_geoverified: next.is_geoverified,
-      p_is_banned: next.is_banned,
+      p_role: nextRole,
+      p_is_verified: nextVerified,
+      p_is_geoverified: nextGeo,
+      p_is_banned: nextBanned,
     });
+
     if (error) throw error;
-    setUsersList(prev => prev.map(u => u.id === targetUser.id ? { ...u, ...data } : u));
-    setInspectedUser((prev: any) => prev?.id === targetUser.id ? { ...prev, ...data } : prev);
+
+    // Update in local state
+    setUsersList(prev => prev.map(u => (u.id === targetUser.id ? { ...u, ...data } : u)));
+    if (inspectedUser?.id === targetUser.id) {
+      setInspectedUser(prev => (prev ? { ...prev, ...data } : null));
+    }
     return data;
   };
 
-  // User role is changed through a SECURITY DEFINER RPC with last-admin protection.
-  const toggleUserRole = async (targetUser: any) => {
+  // Action 1: Toggle Admin / User Role
+  const toggleUserRole = (targetUser: AdminProfile) => {
     const isCurrentAdmin = targetUser.role === 'admin';
     const newRole = isCurrentAdmin ? 'user' : 'admin';
     const actionLabel = isCurrentAdmin ? 'خفض إلى مستخدم عادي 👤' : 'ترقية إلى مدير النظام 👑';
@@ -463,37 +418,56 @@ export default function Admin() {
       async () => {
         try {
           await adminUpdateUser(targetUser, { role: newRole });
-          await addAuditLog(`تغيير الصلاحية إلى ${newRole === 'admin' ? 'مدير' : 'مستخدم'}`, targetUser.display_name || targetUser.username, 'user', targetUser.id);
+          await recordAuditLog(
+            `تغيير الصلاحية إلى ${newRole === 'admin' ? 'مدير' : 'مستخدم'}`,
+            targetUser.display_name || targetUser.username || targetUser.id,
+            'user',
+            targetUser.id
+          );
           showToast(`تم ${isCurrentAdmin ? 'خفض الصلاحية لمستخدم' : 'منح رتبة مدير النظام'} بنجاح ✨`);
         } catch (e: any) {
-          Alert.alert('خطأ', 'تعذر تحديث الصلاحية: ' + (e?.message || 'خطأ غير متوقع'));
+          Alert.alert('خطأ في الترقية', e?.message || 'تعذر تغيير الصلاحية');
         }
       }
     );
   };
 
-  // 2. Toggle Official Verification (الهوية الوطنية والشارة الرسمية)
-  const toggleVerification = async (targetUser: any) => {
+  // Action 2: Toggle Official Verification Badge
+  const toggleVerification = async (targetUser: AdminProfile) => {
     const nextStatus = !targetUser.is_verified;
     try {
       await adminUpdateUser(targetUser, { is_verified: nextStatus });
-      await addAuditLog(nextStatus ? 'منح الشارة الزرقاء الرسمية' : 'إلغاء التوثيق الرسمي', targetUser.display_name || targetUser.username, 'user', targetUser.id);
+      await recordAuditLog(
+        nextStatus ? 'منح الشارة الزرقاء الرسمية' : 'إلغاء التوثيق الرسمي',
+        targetUser.display_name || targetUser.username || targetUser.id,
+        'user',
+        targetUser.id
+      );
       showToast(nextStatus ? 'تم توثيق الحساب بالشارة الرسمية ✓' : 'تم إلغاء توثيق الحساب');
-    } catch (e: any) { Alert.alert('خطأ', e?.message || 'تعذر تحديث التوثيق'); }
+    } catch (e: any) {
+      Alert.alert('خطأ', e?.message || 'تعذر تحديث التوثيق');
+    }
   };
 
-  // 3. Toggle Geo Verification (ابن الحي الموثق)
-  const toggleGeoVerification = async (targetUser: any) => {
+  // Action 3: Toggle Geo Verification Badge (ابن الحي)
+  const toggleGeoVerification = async (targetUser: AdminProfile) => {
     const nextStatus = !targetUser.is_geoverified;
     try {
       await adminUpdateUser(targetUser, { is_geoverified: nextStatus });
-      await addAuditLog(nextStatus ? 'منح شارة ابن الحي الموثق' : 'إزالة شارة ابن الحي', targetUser.display_name || targetUser.username, 'user', targetUser.id);
+      await recordAuditLog(
+        nextStatus ? 'منح شارة ابن الحي الموثق' : 'إزالة شارة ابن الحي',
+        targetUser.display_name || targetUser.username || targetUser.id,
+        'user',
+        targetUser.id
+      );
       showToast(nextStatus ? 'تم منح شارة ابن الحي الموثق 🛡️' : 'تمت إزالة شارة السكن');
-    } catch (e: any) { Alert.alert('خطأ', e?.message || 'تعذر تحديث إثبات السكن'); }
+    } catch (e: any) {
+      Alert.alert('خطأ', e?.message || 'تعذر تحديث إثبات السكن');
+    }
   };
 
-  // 4. Toggle User Ban
-  const toggleBanUser = async (targetUser: any) => {
+  // Action 4: Ban / Unban User
+  const toggleBanUser = (targetUser: AdminProfile) => {
     const nextBan = !targetUser.is_banned;
     const actionLabel = nextBan ? 'حظر الحساب نهائياً 🚫' : 'إلغاء حظر الحساب 🟢';
 
@@ -503,196 +477,306 @@ export default function Admin() {
       async () => {
         try {
           await adminUpdateUser(targetUser, { is_banned: nextBan });
-          await addAuditLog(nextBan ? 'حظر حساب المستخدم' : 'رفع الحظر عن الحساب', targetUser.display_name || targetUser.username, 'user', targetUser.id);
+          await recordAuditLog(
+            nextBan ? 'حظر حساب المستخدم' : 'رفع الحظر عن الحساب',
+            targetUser.display_name || targetUser.username || targetUser.id,
+            'user',
+            targetUser.id
+          );
           showToast(nextBan ? 'تم حظر المستخدم بنجاح 🚫' : 'تم رفع الحظر بنجاح 🟢');
-        } catch (e: any) { Alert.alert('خطأ', e?.message || 'تعذر تغيير حالة الحظر'); }
-      }
-    );
-  };
-
-  // 5. Send Direct Admin Notice using the canonical notifications schema.
-  const handleSendDirectNotice = async () => {
-    if (!inspectedUser || !directMsgText.trim()) return;
-    setSendingDirectMsg(true);
-    try {
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) throw new Error('انتهت جلسة الدخول.');
-      const { error } = await supabase.from('notifications').insert({
-        user_id: inspectedUser.id,
-        type: 'admin_notice',
-        title: 'إشعار من إدارة حيّنا',
-        body: directMsgText.trim(),
-        data: { actor_id: u.user.id },
-      });
-      if (error) throw error;
-      await addAuditLog('إرسال تنبيه إداري خاص', inspectedUser.display_name || inspectedUser.username, 'user', inspectedUser.id);
-      showToast('تم إرسال التنبيه الإداري للمستخدم بنجاح 📨');
-      setDirectMsgText('');
-    } catch (e: any) {
-      Alert.alert('خطأ', e.message || 'تعذر إرسال الإشعار');
-    } finally {
-      setSendingDirectMsg(false);
-    }
-  };
-
-  // 6. Reports Actions
-  const resolveReport = async (id: string, action: 'resolved' | 'dismissed') => {
-    try {
-      const { data, error } = await supabase.rpc('admin_moderate_report', {
-        p_report_id: id,
-        p_action: action,
-        p_delete_content: false,
-      });
-      if (error) throw error;
-      setReports(prev => prev.map(r => r.id === id ? { ...r, ...data } : r));
-      showToast(action === 'resolved' ? 'تم حل وإغلاق البلاغ بنجاح ✓' : 'تم تجاهل البلاغ ✕');
-    } catch (e: any) {
-      Alert.alert('خطأ', e?.message || 'تعذر تحديث البلاغ');
-    }
-  };
-
-  // 7. Delete Offensive Content Reported
-  const deleteReportedContent = async (report: any) => {
-    confirmAction(
-      'حذف المحتوى المخالف',
-      'هل أنت متأكد من حذف هذا المحتوى نهائياً من قاعدة البيانات وإغلاق البلاغ؟',
-      async () => {
-        try {
-          if (!report.target_type || !report.target_id) throw new Error('بلاغ غير مكتمل.');
-          const { data, error } = await supabase.rpc('admin_moderate_report', {
-            p_report_id: report.id,
-            p_action: 'resolved',
-            p_delete_content: true,
-          });
-          if (error) throw error;
-          setReports(prev => prev.map(r => r.id === report.id ? { ...r, ...data } : r));
-          showToast('تم حذف المحتوى المخالف وإغلاق البلاغ 🗑️');
-          await load();
         } catch (e: any) {
-          Alert.alert('خطأ', e.message || 'تعذر حذف المحتوى');
+          Alert.alert('خطأ', e?.message || 'تعذر تغيير حالة الحظر');
         }
       }
     );
   };
 
-  // 8. Relational Verification Desk Decision with Citizen Notification
-  const handleVerificationDecision = async (id: string, userId: string, action: 'approved' | 'rejected', userName: string) => {
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) return;
+  // Action 5: Send Direct Admin Notice to Inspecting User
+  const handleSendDirectNotice = async () => {
+    if (!inspectedUser || !directNoticeText.trim()) return;
+    setSendingDirectNotice(true);
     try {
-      const { error: requestError } = await supabase.from('verification_requests').update({
-        status: action,
-        reviewed_by: u.user.id,
-        reviewed_at: new Date().toISOString()
-      }).eq('id', id);
-      if (requestError) throw requestError;
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) throw new Error('انتهت جلسة تسجيل الدخول.');
 
-      if (action === 'approved') {
-        const { error: profileError } = await supabase.from('profiles').update({
-          is_verified: true,
-          verification_status: 'verified'
-        }).eq('id', userId);
-        if (profileError) throw profileError;
-      }
+      const text = directNoticeText.trim();
 
-      const { error: notificationError } = await supabase.from('notifications').insert({
-        user_id: userId,
-        type: 'verification',
-        title: action === 'approved' ? 'تم اعتماد التوثيق' : 'تحديث طلب التوثيق',
-        body: action === 'approved'
-          ? 'تم اعتماد طلب توثيق حسابك في منصة حيّنا.'
-          : 'تمت مراجعة طلب توثيق حسابك. يمكنك التقديم مجدداً بعد تحديث البيانات.',
-        data: { actor_id: u.user.id, request_id: id, status: action }
+      // 1. In-app notification
+      const { error: notifErr } = await supabase.from('notifications').insert({
+        user_id: inspectedUser.id,
+        type: 'admin_notice',
+        title: 'إشعار من إدارة حيّنا 🇸🇦',
+        body: text,
+        data: { actor_id: u.user.id },
       });
-      if (notificationError) throw notificationError;
+      if (notifErr) throw notifErr;
 
-      await addAuditLog(action === 'approved' ? 'اعتماد طلب توثيق رسمي' : 'رفض طلب توثيق رسمي', userName, 'verification', id);
-      setVerifications(prev => prev.map(v => v.id === id ? { ...v, status: action } : v));
-      showToast(action === 'approved' ? 'تم اعتماد التوثيق وإرسال الإشعار ✓' : 'تم رفض الطلب وإرسال الإشعار');
+      // 2. Real Push notification dispatch
+      await sendPushToUser(inspectedUser.id, {
+        title: 'إشعار من إدارة حيّنا 🇸🇦',
+        body: text,
+        data: { type: 'admin_notice' },
+      });
+
+      await recordAuditLog(
+        'إرسال تنبيه إداري خاص للمواطن',
+        inspectedUser.display_name || inspectedUser.username || inspectedUser.id,
+        'user',
+        inspectedUser.id
+      );
+
+      showToast('تم إرسال التنبيه الإداري للمواطن بنجاح 📨');
+      setDirectNoticeText('');
     } catch (e: any) {
-      Alert.alert('خطأ', e.message || 'تعذر معالجة طلب التوثيق');
+      Alert.alert('خطأ', e?.message || 'تعذر إرسال التنبيه');
+    } finally {
+      setSendingDirectNotice(false);
     }
   };
 
-  // 9. Delete Inappropriate Content Item
-  const deleteContentItem = async (id: string, type: 'question' | 'request', title: string) => {
+  // Action 6: Verification Request Decision (Approve / Reject)
+  const handleVerificationDecision = async (
+    reqId: string,
+    userId: string,
+    action: 'approved' | 'rejected',
+    userName: string
+  ) => {
+    try {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) return;
+
+      const { error: reqErr } = await supabase
+        .from('verification_requests')
+        .update({
+          status: action,
+          reviewed_by: u.user.id,
+          reviewed_at: new Date().toISOString(),
+        })
+        .eq('id', reqId);
+
+      if (reqErr) throw reqErr;
+
+      if (action === 'approved') {
+        const { error: profErr } = await supabase
+          .from('profiles')
+          .update({
+            is_verified: true,
+            verification_status: 'verified',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', userId);
+
+        if (profErr) throw profErr;
+
+        setUsersList(prev => prev.map(usr => (usr.id === userId ? { ...usr, is_verified: true, verification_status: 'verified' } : usr)));
+      }
+
+      // Dispatch in-app notification
+      const notifTitle = action === 'approved' ? 'تهانينا! تم اعتماد توثيق حسابك 🎉' : 'تحديث بشأن طلب التوثيق';
+      const notifBody =
+        action === 'approved'
+          ? 'تم اعتماد هويتك في حيّنا ومنحك الشارة الزرقاء الرسمية.'
+          : 'تمت مراجعة طلب التوثيق الخاص بك، يرجى استيفاء البيانات والتقديم مجدداً.';
+
+      await supabase.from('notifications').insert({
+        user_id: userId,
+        type: 'verification',
+        title: notifTitle,
+        body: notifBody,
+        data: { actor_id: u.user.id, request_id: reqId, status: action },
+      });
+
+      // Dispatch push notification
+      await sendPushToUser(userId, {
+        title: notifTitle,
+        body: notifBody,
+        data: { type: 'verification', status: action },
+      });
+
+      await recordAuditLog(
+        action === 'approved' ? 'اعتماد طلب توثيق رسمي' : 'رفض طلب توثيق رسمي',
+        userName,
+        'verification',
+        reqId
+      );
+
+      setVerifications(prev => prev.map(v => (v.id === reqId ? { ...v, status: action } : v)));
+      showToast(action === 'approved' ? 'تم اعتماد التوثيق ومنح الشارة الزرقاء ✓' : 'تم رفض طلب التوثيق');
+    } catch (e: any) {
+      Alert.alert('خطأ', e?.message || 'تعذر البت في طلب التوثيق');
+    }
+  };
+
+  // Action 7: Moderate Reports (Resolve / Dismiss / Delete Offensive Content)
+  const handleModerateReport = async (report: AdminReport, action: 'resolved' | 'dismissed', deleteContent: boolean) => {
+    try {
+      const { data, error } = await supabase.rpc('admin_moderate_report', {
+        p_report_id: report.id,
+        p_action: action,
+        p_delete_content: deleteContent,
+      });
+
+      if (error) throw error;
+
+      setReports(prev => prev.map(r => (r.id === report.id ? { ...r, ...data } : r)));
+
+      if (deleteContent) {
+        showToast('تم حذف المحتوى المخالف وإغلاق البلاغ 🗑️');
+        // Refresh live resources
+        loadDashboardData();
+      } else {
+        showToast(action === 'resolved' ? 'تم حل وإغلاق البلاغ بنجاح ✓' : 'تم تجاهل البلاغ ✕');
+      }
+    } catch (e: any) {
+      Alert.alert('خطأ', e?.message || 'تعذر معالجة البلاغ');
+    }
+  };
+
+  // Action 8: Platform Resources Control (Services, Borrow Items, Urgent Alerts)
+  const updatePlatformEntity = async (
+    entity: 'service' | 'borrow_item' | 'urgent_alert' | 'request' | 'question',
+    targetId: string,
+    action: string,
+    entityName: string
+  ) => {
+    try {
+      const { data, error } = await supabase.rpc('admin_update_platform_entity', {
+        p_entity: entity,
+        p_target_id: targetId,
+        p_action: action,
+      });
+
+      if (error) throw error;
+
+      if (entity === 'service') {
+        setServicesList(prev => prev.map(s => (s.id === targetId ? { ...s, ...data } : s)));
+      } else if (entity === 'borrow_item') {
+        setBorrowItemsList(prev => prev.map(b => (b.id === targetId ? { ...b, ...data } : b)));
+      } else if (entity === 'urgent_alert') {
+        if (action === 'delete') {
+          setUrgentAlertsList(prev => prev.filter(u => u.id !== targetId));
+        } else {
+          setUrgentAlertsList(prev => prev.map(u => (u.id === targetId ? { ...u, ...data } : u)));
+        }
+      }
+
+      await recordAuditLog(`تعديل مورد المنصة (${action})`, entityName, entity, targetId);
+      showToast('تم تحديث مورد المنصة بنجاح ✓');
+    } catch (e: any) {
+      Alert.alert('خطأ', e?.message || 'تعذر تحديث المورد');
+    }
+  };
+
+  // Action 9: Delete Inappropriate Community Content
+  const deleteContentItem = (id: string, type: 'question' | 'request', title: string) => {
     confirmAction(
-      'حذف المنشور',
-      'هل ترغب في حذف "' + title + '" نهائياً من منصة حيّنا؟',
+      'حذف المنشور المخالف',
+      `هل أنت متأكد من حذف منشور «${title}» نهائياً من منصة حيّنا؟`,
       async () => {
         try {
           const table = type === 'question' ? 'questions' : 'requests';
           const { error } = await supabase.from(table).delete().eq('id', id);
           if (error) throw error;
+
           if (type === 'question') setQuestionsList(prev => prev.filter(q => q.id !== id));
           else setRequestsList(prev => prev.filter(r => r.id !== id));
-          await addAuditLog('حذف منشور', title, type, id);
+
+          await recordAuditLog('حذف منشور مخالف من المجتمع', title, type, id);
           showToast('تم حذف المنشور بنجاح 🗑️');
         } catch (e: any) {
-          Alert.alert('خطأ', e.message || 'تعذر حذف المنشور');
+          Alert.alert('خطأ', e?.message || 'تعذر حذف المنشور');
         }
       }
     );
   };
 
-  // 10. Send Broadcast Announcement to actual recipients.
+  // Action 10: Broadcast Official Announcement
   const handleSendBroadcast = async () => {
     if (!broadcastTitle.trim() || !broadcastBody.trim()) {
-      Alert.alert('تنبيه', 'يرجى كتابة عنوان وتفاصيل التعميم');
+      Alert.alert('تنبيه', 'يرجى كتابة عنوان وتفاصيل التعميم الإداري');
       return;
     }
 
     setSendingBroadcast(true);
     try {
       const { data: u } = await supabase.auth.getUser();
-      if (!u.user) throw new Error('انتهت جلسة الدخول.');
-      const badgeIcon = broadcastType === 'emergency' ? '🚨' : broadcastType === 'weather' ? '⛈️' : broadcastType === 'maintenance' ? '🔧' : '📢';
-      const recipients = usersList.map((user: any) => user.id).filter(Boolean);
-      if (!recipients.length) throw new Error('لا يوجد مستخدمون مستلمون.');
-      const rows = recipients.map((userId: string) => ({
-        user_id: userId,
+      if (!u.user) throw new Error('انتهت جلسة تسجيل الدخول.');
+
+      const badgeIcon =
+        broadcastType === 'emergency'
+          ? '🚨'
+          : broadcastType === 'weather'
+          ? '⛈️'
+          : broadcastType === 'maintenance'
+          ? '🔧'
+          : '📢';
+
+      // Filter recipients by target city
+      const targetUsers = usersList.filter(user => {
+        if (broadcastTarget === 'all') return true;
+        return (user.city || '').includes(broadcastTarget);
+      });
+
+      const recipientIds = targetUsers.map(usr => usr.id).filter(Boolean);
+      if (!recipientIds.length) throw new Error('لا يوجد مستخدمون مطابقون للمدينة المستهدفة.');
+
+      const fullTitle = `${badgeIcon} ${broadcastTitle.trim()}`;
+      const fullBody = broadcastBody.trim();
+
+      // 1. Bulk insert in-app notifications
+      const rows = recipientIds.map(usrId => ({
+        user_id: usrId,
         type: 'broadcast',
-        title: badgeIcon + ' ' + broadcastTitle.trim(),
-        body: broadcastBody.trim(),
-        data: { actor_id: u.user.id, broadcast_type: broadcastType },
+        title: fullTitle,
+        body: fullBody,
+        data: { actor_id: u.user.id, broadcast_type: broadcastType, target: broadcastTarget },
       }));
-      for (let i = 0; i < rows.length; i += 500) {
-        const { error } = await supabase.from('notifications').insert(rows.slice(i, i + 500));
-        if (error) throw error;
+
+      for (let i = 0; i < rows.length; i += 400) {
+        const { error: batchErr } = await supabase.from('notifications').insert(rows.slice(i, i + 400));
+        if (batchErr) throw batchErr;
       }
-      await addAuditLog('نشر تعميم وبث رسمي للجيران', broadcastTitle.trim(), 'broadcast');
-      showToast('تم إرسال ونشر التعميم إلى ' + recipients.length + ' مستخدم 📢');
+
+      // 2. Real Push notification dispatch
+      await sendPushToMultipleUsers(recipientIds, {
+        title: fullTitle,
+        body: fullBody,
+        data: { type: 'broadcast', broadcast_type: broadcastType },
+      });
+
+      await recordAuditLog('بث تعميم رسمي لسكان الحي', broadcastTitle.trim(), 'broadcast');
+      showToast(`تم نشر وإرسال التعميم إلى ${recipientIds.length} مستخدم 📢`);
       setBroadcastTitle('');
       setBroadcastBody('');
     } catch (e: any) {
-      Alert.alert('خطأ', e.message || 'تعذر إرسال التعميم');
+      Alert.alert('خطأ في البث', e?.message || 'تعذر إرسال التعميم');
     } finally {
       setSendingBroadcast(false);
     }
   };
 
-  // 11. Quick Template for Broadcast
+  // Broadcast Template Presets
   const applyBroadcastTemplate = (type: 'emergency' | 'weather' | 'maintenance' | 'welcome') => {
     if (type === 'emergency') {
       setBroadcastTitle('تنبيه أمني وإرشادي عاجل لسكان الحي');
-      setBroadcastBody('يرجى أخذ الحيطة والحذر والتعاون مع الجهات المختصة في إخلاء الممرات الرئيسية وتسهيل حركة مركبات الطوارئ.');
+      setBroadcastBody('يرجى أخذ الحيطة والتعاون مع الجهات المختصة في إخلاء الممرات وتسهيل حركة مركبات الطوارئ.');
       setBroadcastType('emergency');
     } else if (type === 'weather') {
-      setBroadcastTitle('تنبيه بشأن تقلبات الطقس وهطول الأمطار');
-      setBroadcastBody('وفقاً لتحذيرات المركز الوطني للأرصاد، يرجى تجنب مجاري السيول وتوخي الحذر أثناء القيادة وتأمين الممتلكات الخارجية.');
+      setBroadcastTitle('تنبيه بشأن الحالة المطرية وتقلبات الطقس');
+      setBroadcastBody('وفقاً لتحذيرات الأرصاد، يرجى تجنب مجاري السيول وتوخي الحذر أثناء القيادة وتأمين الممتلكات.');
       setBroadcastType('weather');
     } else if (type === 'maintenance') {
       setBroadcastTitle('إشعار بأعمال صيانة وتطوير البنية التحتية');
-      setBroadcastBody('تعلن إدارة خدمات الحي عن بدء أعمال صيانة شبكة المياه والإنارة في الشوارع الفرعية اعتباراً من صباح الغد.');
+      setBroadcastBody('تعلن إدارة الحي عن بدء أعمال صيانة شبكة المياه والإنارة في الشوارع الفرعية اعتباراً من الغد.');
       setBroadcastType('maintenance');
     } else {
       setBroadcastTitle('أهلاً بكم في حيّنا - مجتمع الجيران الرقمي');
-      setBroadcastBody('نرحب بجميع السكان الجدد المنضمين إلينا وندعوكم لتوثيق السكن والمشاركة في إعارة الأدوات والخدمات المتبادلة.');
+      setBroadcastBody('نرحب بجميع السكان الجدد وندعوكم لتوثيق السكن والمشاركة في تبادل الخدمات وإعارة الأدوات.');
       setBroadcastType('official');
     }
   };
 
-  // Export Data as JSON
+  // Action 11: Export Data as JSON Report
   const handleExportData = () => {
     const exportPayload = {
       exportedAt: new Date().toISOString(),
@@ -705,9 +789,13 @@ export default function Admin() {
         username: u.username,
         role: u.role,
         is_verified: u.is_verified,
+        is_geoverified: u.is_geoverified,
         city: u.city,
         district: u.district,
       })),
+      servicesCount: servicesList.length,
+      borrowItemsCount: borrowItemsList.length,
+      urgentAlertsCount: urgentAlertsList.length,
       reportsCount: reports.length,
       verificationsCount: verifications.length,
     };
@@ -716,39 +804,173 @@ export default function Admin() {
       const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(exportPayload, null, 2));
       const downloadAnchor = document.createElement('a');
       downloadAnchor.setAttribute('href', dataStr);
-      downloadAnchor.setAttribute('download', `hayna_admin_export_${Date.now()}.json`);
+      downloadAnchor.setAttribute('download', `hayna_admin_report_${Date.now()}.json`);
       document.body.appendChild(downloadAnchor);
       downloadAnchor.click();
       downloadAnchor.remove();
       showToast('تم تصدير وحفظ تقرير المنصة بنجاح 📥');
     } else {
-      showToast('تم تجهيز وتوليد تقرير المنصة');
+      showToast('تم توليد التقرير بنجاح');
     }
   };
 
-  // Loading state
+  // Action 12: Custom Saudi Location Manager
+  const handleAddLocation = async () => {
+    if (!locationName.trim() || !locationCity.trim()) {
+      Alert.alert('تنبيه', 'يرجى كتابة اسم الحي والمدينة');
+      return;
+    }
+    setSavingLocation(true);
+    try {
+      const { data: u } = await supabase.auth.getUser();
+      const { data, error } = await supabase
+        .from('saudi_custom_locations')
+        .insert({
+          region_name: locationRegion.trim() || 'منطقة الرياض',
+          city_name: locationCity.trim(),
+          district_name: locationName.trim(),
+          created_by: u.user?.id || null,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      setCustomLocations(prev => [data, ...prev]);
+      setLocationName('');
+      setLocationCity('');
+      setLocationRegion('');
+      await recordAuditLog('إضافة موقع جغرافي جديد', locationName.trim(), 'location');
+      showToast('تمت إضافة الحي إلى قاعدة المواقع بنجاح 📍');
+    } catch (e: any) {
+      Alert.alert('خطأ', e?.message || 'تعذر إضافة الموقع');
+    } finally {
+      setSavingLocation(false);
+    }
+  };
+
+  const handleDeleteLocation = async (id: string, name: string) => {
+    confirmAction('حذف الموقع', `هل ترغب في حذف «${name}» من قائمة المواقع المخصصة؟`, async () => {
+      try {
+        const { error } = await supabase.from('saudi_custom_locations').delete().eq('id', id);
+        if (error) throw error;
+        setCustomLocations(prev => prev.filter(l => l.id !== id));
+        await recordAuditLog('حذف موقع جغرافي', name, 'location', id);
+        showToast('تم حذف الموقع بنجاح 🗑️');
+      } catch (e: any) {
+        Alert.alert('خطأ', e?.message || 'تعذر حذف الموقع');
+      }
+    });
+  };
+
+  // Action 13: Branding Logo Central Manager
+  const changeGlobalLogo = async () => {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        showToast('اسمح بالوصول للصور لاختيار الشعار');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 1,
+      });
+      if (result.canceled || !result.assets?.[0]?.uri) return;
+
+      setBrandingUploading(true);
+      const asset = result.assets[0];
+      const response = await fetch(asset.uri);
+      const blob = await response.blob();
+      const path = 'global/logo.png';
+
+      const { error: uploadError } = await supabase.storage.from('branding').upload(path, blob, {
+        contentType: asset.mimeType || 'image/png',
+        upsert: true,
+        cacheControl: '0',
+      });
+      if (uploadError) throw uploadError;
+
+      const { data: publicData } = supabase.storage.from('branding').getPublicUrl(path);
+      const logoUrl = publicData.publicUrl;
+      const versionedUrl = withVersion(logoUrl, Date.now());
+
+      try {
+        const { data: me } = await supabase.auth.getUser();
+        await supabase.from('app_branding').upsert({
+          id: 'global',
+          logo_url: logoUrl,
+          updated_at: new Date().toISOString(),
+          updated_by: me.user?.id || null,
+        });
+      } catch (err) {
+        console.warn('DB upsert exception:', err);
+      }
+
+      await broadcastLogoUpdate(versionedUrl);
+      setBrandingLogo(versionedUrl);
+      await recordAuditLog('تحديث شعار المنصة الرسمي', 'الهوية البصرية', 'branding');
+      showToast('تم تحديث الشعار وتعميمه على المنصة بالكامل ✨');
+    } catch (e: any) {
+      showToast('تعذر تغيير الشعار: ' + (e?.message || 'خطأ غير متوقع'));
+    } finally {
+      setBrandingUploading(false);
+    }
+  };
+
+  // Filtered Users computation
+  const filteredUsers = useMemo(() => {
+    return usersList.filter(u => {
+      if (userSearch.trim()) {
+        const q = userSearch.toLowerCase();
+        const match =
+          (u.display_name || '').toLowerCase().includes(q) ||
+          (u.username || '').toLowerCase().includes(q) ||
+          (u.city || '').toLowerCase().includes(q) ||
+          (u.district || '').toLowerCase().includes(q);
+        if (!match) return false;
+      }
+      if (selectedCityFilter !== 'all') {
+        if (!u.city || !u.city.includes(selectedCityFilter)) return false;
+      }
+      if (userRoleFilter === 'admin') return u.role === 'admin';
+      if (userRoleFilter === 'user') return u.role === 'user';
+      if (userRoleFilter === 'verified') return u.is_verified;
+      if (userRoleFilter === 'geoverified') return u.is_geoverified;
+      if (userRoleFilter === 'banned') return u.is_banned;
+      return true;
+    });
+  }, [usersList, userSearch, selectedCityFilter, userRoleFilter]);
+
+  // Filtered Reports computation
+  const filteredReports = useMemo(() => {
+    return reports.filter(r => {
+      if (reportStatusFilter === 'all') return true;
+      return r.status === reportStatusFilter;
+    });
+  }, [reports, reportStatusFilter]);
+
+  // Loading Screen
   if (loading) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color={C.accent} />
-        <Text style={styles.loadingText}>جاري تحميل مركز عمليات إدارة حيّنا...</Text>
+        <Text style={styles.loadingText}>جاري فتح مركز العمليات والرقابة الشاملة...</Text>
       </View>
     );
   }
 
-  // Strictly check role === 'admin' or root email
-  const isAuthorizedAdmin = profile?.role === 'admin';
-  if (!profile || !isAuthorizedAdmin) {
+  // Unauthorized Fallback
+  if (!currentAdmin || currentAdmin.role !== 'admin') {
     return (
       <View style={styles.center}>
-        <LinearGradient colors={['#fee2e2', '#fecaca']} style={styles.unauthorizedIconWrap}>
-          <Shield size={54} color={C.danger} />
+        <LinearGradient colors={['#FEE2E2', '#FECACA']} style={styles.unauthorizedIconWrap}>
+          <Shield size={50} color={C.danger} />
         </LinearGradient>
         <Text style={styles.unauthorizedTitle}>صلاحية مدير النظام مطلوبة 👑</Text>
         <Text style={styles.unauthorizedSub}>
-          لوحة التحكم مخصصة حصرياً لمدير النظام (Admin). الصلاحيات المعتمدة في المنصة هي: مدير النظام (Admin) ومستخدم عادي (User).
+          لوحة التحكم مخصصة حصرياً للمدراء المعتمدين في قاعدة البيانات. صلاحيات المنصة محصورة في: مدير (Admin) ومستخدم عادي (User).
         </Text>
-
         <Pressable style={styles.backBtn} onPress={() => router.replace('/home')}>
           <Text style={styles.backBtnText}>العودة للرئيسية</Text>
         </Pressable>
@@ -756,36 +978,9 @@ export default function Admin() {
     );
   }
 
-  // Filtered Users List
-  const filteredUsers = usersList.filter(u => {
-    if (userSearch.trim()) {
-      const q = userSearch.toLowerCase();
-      const match = (u.display_name || '').toLowerCase().includes(q) ||
-                    (u.username || '').toLowerCase().includes(q) ||
-                    (u.city || '').toLowerCase().includes(q) ||
-                    (u.district || '').toLowerCase().includes(q);
-      if (!match) return false;
-    }
-    if (selectedCityFilter !== 'all') {
-      if (!u.city || !u.city.includes(selectedCityFilter)) return false;
-    }
-    if (userRoleFilter === 'admin') return u.role === 'admin';
-    if (userRoleFilter === 'user') return u.role === 'user' || !u.role;
-    if (userRoleFilter === 'verified') return u.is_verified;
-    if (userRoleFilter === 'geoverified') return u.is_geoverified;
-    if (userRoleFilter === 'banned') return u.is_banned;
-    return true;
-  });
-
-  // Filtered Reports
-  const filteredReports = reports.filter(r => {
-    if (reportStatusFilter === 'all') return true;
-    return r.status === reportStatusFilter;
-  });
-
   return (
     <View style={styles.container}>
-      {/* Toast Feedback */}
+      {/* Toast Banner */}
       {toastMsg && (
         <Animated.View style={[styles.toastBanner, { opacity: toastAnim }]}>
           <Text style={styles.toastBannerText}>{toastMsg}</Text>
@@ -793,114 +988,138 @@ export default function Admin() {
       )}
 
       {/* ======================================================== */}
-      {/* 1. EXECUTIVE COMMAND HEADER (Dark Modern Theme)          */}
+      {/* 1. EXECUTIVE COMMAND HEADER (Dark Modern Royal Green)    */}
       {/* ======================================================== */}
-      <LinearGradient colors={['#090d16', '#0f172a', '#1e293b']} style={[styles.headerGrad, isMobile && { paddingHorizontal: 14, paddingTop: Platform.OS === 'ios' ? 48 : 34 }]}>
+      <LinearGradient
+        colors={[C.navyDark, C.navyMid, C.navyLight]}
+        style={[styles.headerGrad, isMobile && { paddingHorizontal: 14, paddingTop: Platform.OS === 'ios' ? 48 : 34 }]}
+      >
         <View style={styles.headerContent}>
           <Pressable onPress={() => router.replace('/home')} style={styles.backIconBtn}>
-            <ChevronRight size={22} color="#fff" />
+            <ChevronRight size={22} color="#FFFFFF" />
           </Pressable>
 
           <View style={styles.headerTexts}>
             <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-              <Text style={[styles.headerTitle, isMobile && { fontSize: 17 }]} numberOfLines={1}>مركز عمليات حيّنا 🇸🇦</Text>
-              <Crown size={isMobile ? 17 : 20} color="#f59e0b" />
+              <Text style={[styles.headerTitle, isMobile && { fontSize: 17 }]} numberOfLines={1}>
+                مركز عمليات حيّنا 🇸🇦
+              </Text>
+              <Crown size={isMobile ? 16 : 19} color="#F59E0B" />
             </View>
             <Text style={[styles.headerSub, isMobile && { fontSize: 10 }]} numberOfLines={1}>
-              لوحة الإدارة والرقابة الشاملة · {profile.display_name || profile.username} (Super Admin)
+              لوحة الإدارة والرقابة الشاملة · {currentAdmin.display_name || currentAdmin.username} (مدير النظام)
             </Text>
           </View>
 
           <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-            <Pressable onPress={handleExportData} style={styles.exportBtn} accessibilityLabel="تصدير بيانات">
-              <Download size={16} color="#fff" />
+            <Pressable onPress={handleExportData} style={styles.headerActionBtn}>
+              <Download size={16} color="#FFFFFF" />
             </Pressable>
-            <Pressable onPress={onRefresh} style={styles.refreshBtn}>
-              <RefreshCw size={17} color="#fff" />
+            <Pressable onPress={onRefresh} style={styles.headerActionBtn}>
+              <RefreshCw size={16} color="#FFFFFF" />
             </Pressable>
           </View>
         </View>
 
-        {/* Live Operational Ribbon */}
+        {/* Live Operational Status Ribbon */}
         <View style={styles.alertsRow}>
           <View style={[styles.alertPill, { backgroundColor: 'rgba(2,132,199,0.85)' }]}>
-            <ShieldCheck size={12} color="#fff" />
+            <ShieldCheck size={12} color="#FFFFFF" />
             <Text style={styles.alertPillText}>الصلاحيات: مدير (Admin) · مستخدم (User)</Text>
           </View>
 
           {stats.pendingReports > 0 && (
-            <Pressable 
-              style={[styles.alertPill, { backgroundColor: '#dc2626' }]}
-              onPress={() => setActiveTab('reports')}
-            >
-              <Flag size={12} color="#fff" />
+            <Pressable style={[styles.alertPill, { backgroundColor: C.danger }]} onPress={() => setActiveTab('reports')}>
+              <Flag size={12} color="#FFFFFF" />
               <Text style={styles.alertPillText}>{stats.pendingReports} بلاغ معلق 🚨</Text>
             </Pressable>
           )}
 
-          {stats.pendingVerif > 0 && (
-            <Pressable 
-              style={[styles.alertPill, { backgroundColor: '#d97706' }]}
+          {stats.pendingVerifications > 0 && (
+            <Pressable
+              style={[styles.alertPill, { backgroundColor: C.warning }]}
               onPress={() => setActiveTab('verifications')}
             >
-              <Star size={12} color="#fff" />
-              <Text style={styles.alertPillText}>{stats.pendingVerif} توثيق بانتظار الاعتماد 🌟</Text>
+              <Star size={12} color="#FFFFFF" />
+              <Text style={styles.alertPillText}>{stats.pendingVerifications} توثيق بانتظار الاعتماد 🌟</Text>
+            </Pressable>
+          )}
+
+          {stats.urgentAlerts > 0 && (
+            <Pressable style={[styles.alertPill, { backgroundColor: '#B91C1C' }]} onPress={() => setActiveTab('platform')}>
+              <AlertTriangle size={12} color="#FFFFFF" />
+              <Text style={styles.alertPillText}>{stats.urgentAlerts} طارئ نشط ⚠️</Text>
             </Pressable>
           )}
         </View>
       </LinearGradient>
 
       {/* ======================================================== */}
-      {/* 2. ADVANCED NAVIGATION TABS                              */}
+      {/* 2. ADVANCED HORIZONTAL NAVIGATION TABS                   */}
       {/* ======================================================== */}
       <View style={styles.tabBarWrapper}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabBarScroll}>
           <TabPill
             label="التحليلات والمؤشرات"
-            icon={<BarChart3 size={15} color={activeTab === 'overview' ? '#fff' : '#64748b'} />}
+            icon={<BarChart3 size={15} color={activeTab === 'overview' ? '#FFFFFF' : '#64748B'} />}
             active={activeTab === 'overview'}
             onPress={() => setActiveTab('overview')}
           />
-          <TabPill label="موارد المنصة" icon={<Store size={15} color={activeTab === 'platform' ? '#fff' : '#64748b'} />} active={activeTab === 'platform'} onPress={() => setActiveTab('platform')} />
-          <TabPill label="إدارة المواقع" icon={<MapPin size={15} color={activeTab === 'locations' ? '#fff' : '#64748b'} />} active={activeTab === 'locations'} onPress={() => setActiveTab('locations')} />
-          <TabPill label="الهوية والشعار" icon={<Sparkles size={15} color={activeTab === 'branding' ? '#fff' : '#64748b'} />} active={activeTab === 'branding'} onPress={() => setActiveTab('branding')} />
           <TabPill
-            label={`ملف التوثيق (${stats.pendingVerif})`}
-            icon={<Star size={15} color={activeTab === 'verifications' ? '#fff' : '#64748b'} />}
-            active={activeTab === 'verifications'}
-            badge={stats.pendingVerif > 0 ? stats.pendingVerif : undefined}
-            onPress={() => setActiveTab('verifications')}
-          />
-          <TabPill
-            label={`إدارة المستخدمين (${usersList.length})`}
-            icon={<Users size={15} color={activeTab === 'users' ? '#fff' : '#64748b'} />}
+            label={`المستخدمون (${usersList.length})`}
+            icon={<Users size={15} color={activeTab === 'users' ? '#FFFFFF' : '#64748B'} />}
             active={activeTab === 'users'}
             onPress={() => setActiveTab('users')}
           />
           <TabPill
+            label={`مكتب التوثيق (${stats.pendingVerifications})`}
+            icon={<Star size={15} color={activeTab === 'verifications' ? '#FFFFFF' : '#64748B'} />}
+            active={activeTab === 'verifications'}
+            badge={stats.pendingVerifications > 0 ? stats.pendingVerifications : undefined}
+            onPress={() => setActiveTab('verifications')}
+          />
+          <TabPill
             label={`مركز البلاغات (${stats.pendingReports})`}
-            icon={<Flag size={15} color={activeTab === 'reports' ? '#fff' : '#64748b'} />}
+            icon={<Flag size={15} color={activeTab === 'reports' ? '#FFFFFF' : '#64748B'} />}
             active={activeTab === 'reports'}
             badge={stats.pendingReports > 0 ? stats.pendingReports : undefined}
             onPress={() => setActiveTab('reports')}
           />
           <TabPill
+            label="موارد المنصة والخدمات"
+            icon={<Truck size={15} color={activeTab === 'platform' ? '#FFFFFF' : '#64748B'} />}
+            active={activeTab === 'platform'}
+            onPress={() => setActiveTab('platform')}
+          />
+          <TabPill
             label="مراقبة المحتوى"
-            icon={<MessageCircle size={15} color={activeTab === 'content' ? '#fff' : '#64748b'} />}
+            icon={<MessageCircle size={15} color={activeTab === 'content' ? '#FFFFFF' : '#64748B'} />}
             active={activeTab === 'content'}
             onPress={() => setActiveTab('content')}
           />
           <TabPill
             label="بث تعميم للحي 📢"
-            icon={<Megaphone size={15} color={activeTab === 'broadcast' ? '#fff' : '#64748b'} />}
+            icon={<Megaphone size={15} color={activeTab === 'broadcast' ? '#FFFFFF' : '#64748B'} />}
             active={activeTab === 'broadcast'}
             onPress={() => setActiveTab('broadcast')}
           />
           <TabPill
-            label="سجل العمليات 📜"
-            icon={<Clock size={15} color={activeTab === 'logs' ? '#fff' : '#64748b'} />}
+            label="سجل العمليات والتدقيق"
+            icon={<Clock size={15} color={activeTab === 'logs' ? '#FFFFFF' : '#64748B'} />}
             active={activeTab === 'logs'}
             onPress={() => setActiveTab('logs')}
+          />
+          <TabPill
+            label="إدارة المواقع"
+            icon={<MapPin size={15} color={activeTab === 'locations' ? '#FFFFFF' : '#64748B'} />}
+            active={activeTab === 'locations'}
+            onPress={() => setActiveTab('locations')}
+          />
+          <TabPill
+            label="الهوية والشعار"
+            icon={<Sparkles size={15} color={activeTab === 'branding' ? '#FFFFFF' : '#64748B'} />}
+            active={activeTab === 'branding'}
+            onPress={() => setActiveTab('branding')}
           />
         </ScrollView>
       </View>
@@ -913,132 +1132,56 @@ export default function Admin() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}
       >
-        {activeTab === 'platform' && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeaderRow}>
-              <View>
-                <Text style={styles.sectionTitle}>موارد المنصة والتشغيل التجاري</Text>
-                <Text style={styles.sectionSubDesc}>إدارة الأعمال والسوق والفعاليات من مصدر واحد، مع حفظ كل إجراء في سجل التدقيق.</Text>
-              </View>
-              <View style={styles.countBadge}><Text style={styles.countBadgeText}>{businessesList.length + marketplaceList.length + eventsList.length} مورد</Text></View>
-            </View>
-
-            <View style={styles.statsGrid}>
-              <StatCard icon={<Building2 size={22} color="#0284c7" />} bg="#f0f9ff" value={businessesList.length} label="دليل الأعمال" sub="منشآت وخدمات محلية" style={{ width: statCardWidth }} />
-              <StatCard icon={<Store size={22} color="#059669" />} bg="#ecfdf5" value={marketplaceList.length} label="عروض السوق" sub="منتجات الجيران" style={{ width: statCardWidth }} />
-              <StatCard icon={<CalendarDays size={22} color="#7c3aed" />} bg="#f5f3ff" value={eventsList.length} label="الفعاليات" sub="أنشطة المجتمع" style={{ width: statCardWidth }} />
-            </View>
-
-            <Text style={styles.subSectionTitle}>دليل الأعمال</Text>
-            {businessesList.length === 0 ? <EmptyState icon={<Building2 size={36} color="#94a3b8" />} title="لا توجد أعمال مسجلة" sub="ستظهر الأعمال الجديدة هنا." /> : businessesList.slice(0, 30).map((item: any) => (
-              <View key={item.id} style={styles.quickAction}>
-                <Building2 size={18} color={item.is_verified ? C.accent : C.muted} />
-                <View style={{ flex: 1 }}><Text style={styles.quickActionText}>{item.name || 'عمل بلا اسم'}</Text><Text style={{ color: C.muted, fontSize: 11, textAlign: 'right' }}>{[item.city, item.district].filter(Boolean).join(' · ') || 'بلا موقع'} · {item.owner?.display_name || 'مالك غير معروف'}</Text></View>
-                <Pressable style={[styles.smallActionBtn, item.is_verified && { backgroundColor: '#dcfce7' }]} onPress={() => confirmAction('تحديث توثيق العمل', `تغيير حالة توثيق «${item.name}»؟`, () => updatePlatformEntity('business', item.id, 'toggle_verified'))}><CheckCircle2 size={16} color={item.is_verified ? '#16a34a' : '#64748b'} /><Text style={styles.smallActionText}>{item.is_verified ? 'موثق' : 'توثيق'}</Text></Pressable>
-              </View>
-            ))}
-
-            <Text style={styles.subSectionTitle}>سوق الجيران</Text>
-            {marketplaceList.length === 0 ? <EmptyState icon={<Store size={36} color="#94a3b8" />} title="لا توجد عروض سوق" sub="ستظهر العروض الجديدة هنا." /> : marketplaceList.slice(0, 30).map((item: any) => (
-              <View key={item.id} style={styles.quickAction}>
-                <Store size={18} color={item.status === 'available' ? C.accent : C.muted} />
-                <View style={{ flex: 1 }}><Text style={styles.quickActionText}>{item.title || 'عرض بلا عنوان'}</Text><Text style={{ color: C.muted, fontSize: 11, textAlign: 'right' }}>{item.price != null ? `${item.price} ر.س` : 'حسب الاتفاق'} · {item.seller?.display_name || 'بائع غير معروف'}</Text></View>
-                <Pressable style={styles.smallActionBtn} onPress={() => confirmAction('تغيير حالة العرض', `تغيير حالة «${item.title}»؟`, () => updatePlatformEntity('marketplace', item.id, item.status === 'available' ? 'archive' : 'restore'))}><Archive size={16} color="#64748b" /><Text style={styles.smallActionText}>{item.status === 'available' ? 'أرشفة' : 'استعادة'}</Text></Pressable>
-              </View>
-            ))}
-
-            <Text style={styles.subSectionTitle}>الفعاليات المجتمعية</Text>
-            {eventsList.length === 0 ? <EmptyState icon={<CalendarDays size={36} color="#94a3b8" />} title="لا توجد فعاليات" sub="ستظهر الفعاليات الجديدة هنا." /> : eventsList.slice(0, 30).map((item: any) => (
-              <View key={item.id} style={styles.quickAction}>
-                <CalendarDays size={18} color={item.status === 'published' ? '#7c3aed' : C.muted} />
-                <View style={{ flex: 1 }}><Text style={styles.quickActionText}>{item.title || 'فعالية بلا عنوان'}</Text><Text style={{ color: C.muted, fontSize: 11, textAlign: 'right' }}>{[item.city, item.district].filter(Boolean).join(' · ') || 'بلا موقع'} · {item.organizer?.display_name || 'منظم غير معروف'}</Text></View>
-                <Pressable style={styles.smallActionBtn} onPress={() => confirmAction('تغيير حالة الفعالية', `تغيير حالة «${item.title}»؟`, () => updatePlatformEntity('event', item.id, item.status === 'published' ? 'cancel' : 'publish'))}><Text style={styles.smallActionText}>{item.status === 'published' ? 'إلغاء النشر' : 'نشر'}</Text></Pressable>
-              </View>
-            ))}
-          </View>
-        )}
-
-        {activeTab === 'branding' && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>الهوية البصرية والشعار</Text>
-            <Text style={styles.sectionSubDesc}>غيّر الشعار من هنا ليصبح الشعار المركزي المستخدم في شاشة الترحيب وتسجيل الدخول وهيدر التطبيق وأيقونة الويب.</Text>
-            <View style={{ alignItems: 'center', backgroundColor: '#065f46', borderRadius: 24, padding: 28, marginTop: 12, marginBottom: 14 }}>
-              <View style={{ width: 150, height: 150, borderRadius: 28, backgroundColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.28)' }}>
-                <Image source={{ uri: brandingLogo }} style={{ width: 125, height: 125 }} resizeMode="contain" />
-              </View>
-              <Text style={{ color: '#fff', fontSize: 18, fontWeight: '900', marginTop: 14 }}>شعار حيّنا الحالي</Text>
-              <Text style={{ color: '#a7f3d0', fontSize: 11, fontWeight: '700', marginTop: 4, textAlign: 'center' }}>تغيير واحد ← ينعكس على واجهات الهوية المرتبطة بالشعار</Text>
-            </View>
-            <Pressable style={[styles.btnSendNotice, brandingUploading && { opacity: 0.6 }]} onPress={changeGlobalLogo} disabled={brandingUploading}>
-              {brandingUploading ? <ActivityIndicator color="#fff" /> : <Sparkles size={17} color="#fff" />}
-              <Text style={styles.btnSendNoticeText}>{brandingUploading ? 'جارٍ رفع الشعار...' : 'تغيير الشعار الآن'}</Text>
-            </Pressable>
-            <Text style={{ marginTop: 12, color: C.muted, fontSize: 11, textAlign: 'right', lineHeight: 18 }}>اختر صورة PNG أو صورة مربعة من جهازك. سيتم حفظها في تخزين آمن مخصص للهوية وربطها مركزياً، مع الاحتفاظ بالشعار الحالي كخيار احتياطي داخل التطبيق.</Text>
-          </View>
-        )}
-
-        {activeTab === 'locations' && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>إدارة المناطق والمدن والأحياء</Text>
-            <Text style={styles.sectionSubDesc}>أضف المواقع الناقصة يدوياً، ويمكن ربطها بإحداثيات دقيقة لعرض الطقس في موقعها.</Text>
-            <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
-              {([['region', 'منطقة'], ['city', 'مدينة'], ['district', 'حي']] as const).map(([kind, label]) => <FilterPill key={kind} label={label} active={locationKind === kind} onPress={() => setLocationKind(kind)} />)}
-            </View>
-            {locationKind !== 'region' && <TextInput style={[styles.searchInput, styles.locationInput]} placeholder="اسم المنطقة" value={locationRegion} onChangeText={setLocationRegion} />}
-            {locationKind === 'district' && <TextInput style={[styles.searchInput, styles.locationInput]} placeholder="اسم المدينة" value={locationCity} onChangeText={setLocationCity} />}
-            <TextInput style={[styles.searchInput, styles.locationInput]} placeholder={locationKind === 'region' ? 'اسم المنطقة' : locationKind === 'city' ? 'اسم المدينة أو المحافظة' : 'اسم الحي'} value={locationName} onChangeText={setLocationName} />
-            <View style={{ flexDirection: 'row-reverse', gap: 8 }}>
-              <TextInput style={[styles.searchInput, styles.locationInput, { flex: 1 }]} placeholder="خط العرض (اختياري)" value={locationLatitude} onChangeText={setLocationLatitude} keyboardType="decimal-pad" />
-              <TextInput style={[styles.searchInput, styles.locationInput, { flex: 1 }]} placeholder="خط الطول (اختياري)" value={locationLongitude} onChangeText={setLocationLongitude} keyboardType="decimal-pad" />
-            </View>
-            <Pressable style={[styles.btnSendNotice, savingLocation && { opacity: 0.6 }]} onPress={saveCustomLocation} disabled={savingLocation}>
-              {savingLocation ? <ActivityIndicator color="#fff" /> : <MapPin size={16} color="#fff" />}
-              <Text style={styles.btnSendNoticeText}>{savingLocation ? 'جارٍ الحفظ...' : 'إضافة الموقع'}</Text>
-            </Pressable>
-            <Text style={[styles.subSectionTitle, { marginTop: 18 }]}>المواقع المضافة ({customLocations.length})</Text>
-            {customLocations.map(item => {
-              const locTitle = [item.region_name, item.city_name, item.district_name].filter(Boolean).join(' · ');
-              return (
-                <View key={item.id} style={[styles.quickAction, { justifyContent: 'space-between', gap: 10 }]}>
-                  <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 10, flex: 1 }}>
-                    <MapPin size={17} color={C.accent} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ textAlign: 'right', color: C.ink, fontWeight: '800', fontSize: 13 }}>{locTitle}</Text>
-                      <Text style={{ color: C.muted, fontSize: 10, textAlign: 'right', marginTop: 2 }}>{item.latitude != null ? `📍 ${item.latitude.toFixed(3)}, ${item.longitude.toFixed(3)}` : 'بدون إحداثيات'}</Text>
-                    </View>
-                  </View>
-                  <Pressable style={styles.trashActionBtn} onPress={() => deleteCustomLocation(item.id, locTitle)}>
-                    <Trash size={15} color="#ef4444" />
-                  </Pressable>
-                </View>
-              );
-            })}
-            {!customLocations.length && <Text style={{ textAlign: 'right', color: C.muted }}>لا توجد مواقع يدوية بعد.</Text>}
-          </View>
-        )}
-        {/* ======================================================== */}
-        {/* TAB 1: OVERVIEW & REAL-TIME GEO ANALYTICS                */}
-        {/* ======================================================== */}
+        {/* TAB 1: OVERVIEW & ANALYTICS */}
         {activeTab === 'overview' && (
           <View style={styles.section}>
-            {/* Executive KPI Grid */}
             <Text style={styles.sectionTitle}>مؤشرات الأداء اللحظية 📈</Text>
-            
+            <Text style={styles.sectionSubDesc}>نظرة شاملة ومحدثة على حركة ونشاط مجتمع الجيران في المملكة.</Text>
+
+            {/* KPI Cards Grid */}
             <View style={styles.statsGrid}>
-              <StatCard icon={<Users size={24} color="#0284c7" />} bg="#f0f9ff" value={stats.users} label="إجمالي السكان" sub={`${stats.admins} مدير · ${stats.users - stats.admins} مواطن`} style={{ width: statCardWidth }} />
-              <StatCard icon={<Star size={24} color="#d97706" />} bg="#fffbeb" value={verifications.filter(v => v.status === 'approved').length} label="حسابات موثقة رسمياً" sub={`${stats.pendingVerif} قيد المراجعة`} style={{ width: statCardWidth }} />
-              <StatCard icon={<MessageCircle size={24} color="#059669" />} bg="#ecfdf5" value={stats.questions} label="الاستفسارات والتوصيات" sub="خيوط تفاعلية حية" style={{ width: statCardWidth }} />
-              <StatCard icon={<Truck size={24} color="#16a34a" />} bg="#f0fdf4" value={stats.requests} label="فزعات الجيران المفتوحة" sub="تكاتف اجتماعي" style={{ width: statCardWidth }} />
+              <StatCard
+                icon={<Users size={22} color="#0284C7" />}
+                bg="#F0F9FF"
+                value={stats.users}
+                label="إجمالي السكان"
+                sub={`${stats.admins} مدير · ${stats.users - stats.admins} مواطن`}
+                style={{ width: statCardWidth }}
+              />
+              <StatCard
+                icon={<Star size={22} color="#D97706" />}
+                bg="#FFFBEB"
+                value={stats.verifiedUsers}
+                label="حسابات موثقة رسمياً"
+                sub={`${stats.pendingVerifications} طلب معلق`}
+                style={{ width: statCardWidth }}
+              />
+              <StatCard
+                icon={<Truck size={22} color="#059669" />}
+                bg="#ECFDF5"
+                value={stats.services}
+                label="خدمات وحرفيو الحي"
+                sub="عروض عمل معتمدة"
+                style={{ width: statCardWidth }}
+              />
+              <StatCard
+                icon={<Wrench size={22} color="#7C3AED" />}
+                bg="#F5F3FF"
+                value={stats.borrowItems}
+                label="أدوات الإعارة المتاحة"
+                sub="تكاتف وتشارك الجيران"
+                style={{ width: statCardWidth }}
+              />
             </View>
 
-            {/* Saudi Cities Breakdown Map Widget */}
+            {/* Cities Distribution */}
             <View style={styles.citiesCard}>
               <View style={styles.citiesCardHeader}>
                 <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-                  <MapPin size={16} color="#059669" />
-                  <Text style={styles.citiesCardTitle}>توزيع نشاط أحياء مدن المملكة</Text>
+                  <MapPin size={16} color={C.accent} />
+                  <Text style={styles.citiesCardTitle}>توزيع نشاط مدن المملكة</Text>
                 </View>
-                <Text style={styles.citiesCardSub}>انقر على أي مدينة للتصفية</Text>
+                <Text style={styles.citiesCardSub}>انقر على أي مدينة للتصفية الفورية</Text>
               </View>
 
               <View style={styles.cityPillsRow}>
@@ -1066,91 +1209,231 @@ export default function Admin() {
               </View>
             </View>
 
-            {/* Server & Engine Health */}
+            {/* Platform Infrastructure Health */}
             <View style={styles.healthCard}>
               <View style={styles.healthHeader}>
                 <View style={styles.healthStatusBadge}>
                   <View style={styles.healthDot} />
                   <Text style={styles.healthStatusText}>الخوادم والبنية التحتية نشطة بنسبة 100%</Text>
                 </View>
-                <Activity size={16} color="#10b981" />
+                <Activity size={16} color="#10B981" />
               </View>
 
               <View style={styles.healthRow}>
                 <Text style={styles.healthLabel}>قاعدة البيانات الموزعة (Supabase PostgreSQL + RLS)</Text>
-                <Text style={styles.healthValueActive}>متصلة ومؤمّنة 🟢</Text>
+                <Text style={styles.healthValueActive}>متصلة ومحمية بالسياسات 🟢</Text>
               </View>
               <View style={styles.healthRow}>
-                <Text style={styles.healthLabel}>استضافة Vercel Edge Global Network</Text>
-                <Text style={styles.healthValueActive}>نشطة (Latency: 18ms) ⚡</Text>
+                <Text style={styles.healthLabel}>بوابة الإشعارات الفورية (Push Notification Gateway)</Text>
+                <Text style={styles.healthValueActive}>نشطة (Expo API) ⚡</Text>
               </View>
               <View style={styles.healthRow}>
-                <Text style={styles.healthLabel}>الصلاحيات المفعلة</Text>
+                <Text style={styles.healthLabel}>مستويات الصلاحيات المعتمدة</Text>
                 <Text style={styles.healthValueRole}>مدير (Admin) · مستخدم (User)</Text>
               </View>
             </View>
 
-            {/* Fast Action Shortcuts */}
-            <Text style={[styles.sectionTitle, { marginTop: 20 }]}>إجراءات سريعة لمدير النظام ⚡</Text>
-            
+            {/* Quick Action Shortcuts */}
+            <Text style={[styles.sectionTitle, { marginTop: 14 }]}>إجراءات سريعة لمدير النظام ⚡</Text>
+
             <Pressable style={styles.quickAction} onPress={() => setActiveTab('verifications')}>
               <View style={styles.quickActionLeft}>
-                <Star size={18} color="#d97706" />
-                <Text style={styles.quickActionText}>مراجعة واعتماد ملفات التوثيق المعلقة</Text>
+                <Star size={18} color="#D97706" />
+                <Text style={styles.quickActionText}>مراجعة واعتماد ملفات التوثيق الرسمية المعلقة</Text>
               </View>
-              {stats.pendingVerif > 0 ? (
-                <View style={[styles.qBadge, { backgroundColor: '#fef3c7' }]}><Text style={[styles.qBadgeText, { color: '#d97706' }]}>{stats.pendingVerif} بانتظارك</Text></View>
+              {stats.pendingVerifications > 0 ? (
+                <View style={[styles.qBadge, { backgroundColor: '#FEF3C7' }]}>
+                  <Text style={[styles.qBadgeText, { color: '#D97706' }]}>{stats.pendingVerifications} بانتظارك</Text>
+                </View>
               ) : (
-                <ChevronRight size={18} color="#94a3b8" />
+                <ChevronRight size={18} color="#94A3B8" />
               )}
             </Pressable>
 
-            <Pressable style={styles.quickAction} onPress={() => setActiveTab('users')}>
+            <Pressable style={styles.quickAction} onPress={() => setActiveTab('reports')}>
               <View style={styles.quickActionLeft}>
-                <Users size={18} color="#0284c7" />
-                <Text style={styles.quickActionText}>إدارة المستخدمين وترقية المدراء الجدد</Text>
+                <Flag size={18} color={C.danger} />
+                <Text style={styles.quickActionText}>معالجة بلاغات المحتوى المخالف والبت فيها</Text>
               </View>
-              <ChevronRight size={18} color="#94a3b8" />
+              {stats.pendingReports > 0 ? (
+                <View style={[styles.qBadge, { backgroundColor: '#FEE2E2' }]}>
+                  <Text style={[styles.qBadgeText, { color: '#DC2626' }]}>{stats.pendingReports} بلاغ</Text>
+                </View>
+              ) : (
+                <ChevronRight size={18} color="#94A3B8" />
+              )}
             </Pressable>
 
             <Pressable style={styles.quickAction} onPress={() => setActiveTab('broadcast')}>
               <View style={styles.quickActionLeft}>
-                <Megaphone size={18} color="#dc2626" />
+                <Megaphone size={18} color="#0284C7" />
                 <Text style={styles.quickActionText}>إرسال تعميم أو تنبيه عاجل لأهل الحي</Text>
               </View>
-              <ChevronRight size={18} color="#94a3b8" />
+              <ChevronRight size={18} color="#94A3B8" />
             </Pressable>
           </View>
         )}
 
-        {/* ======================================================== */}
-        {/* TAB 2: RELATIONAL VERIFICATIONS DESK (ملف التوثيق الشامل) */}
-        {/* ======================================================== */}
+        {/* TAB 2: USERS MANAGEMENT & SECURITY */}
+        {activeTab === 'users' && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionTitle}>إدارة المستخدمين والصلاحيات 👥</Text>
+              <Text style={styles.countBadgeText}>
+                {filteredUsers.length} من {usersList.length}
+              </Text>
+            </View>
+            <Text style={styles.sectionSubDesc}>
+              إدارة حسابات السكان، ترقية المدراء، توثيق الهوية الوطنية والسكن، وحظر الحسابات المخالفة.
+            </Text>
+
+            {/* Search Input */}
+            <View style={styles.searchBar}>
+              <Search size={18} color="#94A3B8" />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="ابحث بالاسم، المعرف، المدينة أو الحي..."
+                placeholderTextColor="#94A3B8"
+                value={userSearch}
+                onChangeText={setUserSearch}
+              />
+              {userSearch.length > 0 && (
+                <Pressable onPress={() => setUserSearch('')}>
+                  <Text style={{ color: '#94A3B8', fontSize: 13 }}>✕</Text>
+                </Pressable>
+              )}
+            </View>
+
+            {/* Filter Pills */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+              <FilterPill label={`الكل (${usersList.length})`} active={userRoleFilter === 'all'} onPress={() => setUserRoleFilter('all')} />
+              <FilterPill label={`مدراء (${stats.admins}) 👑`} active={userRoleFilter === 'admin'} onPress={() => setUserRoleFilter('admin')} />
+              <FilterPill label="مستخدمون (User) 👤" active={userRoleFilter === 'user'} onPress={() => setUserRoleFilter('user')} />
+              <FilterPill label={`موثقون (${stats.verifiedUsers}) ✓`} active={userRoleFilter === 'verified'} onPress={() => setUserRoleFilter('verified')} />
+              <FilterPill label={`أبناء الحي (${stats.geoverifiedUsers}) 🛡️`} active={userRoleFilter === 'geoverified'} onPress={() => setUserRoleFilter('geoverified')} />
+              <FilterPill label={`محظورون (${stats.bannedUsers}) 🚫`} active={userRoleFilter === 'banned'} onPress={() => setUserRoleFilter('banned')} />
+            </ScrollView>
+
+            {/* User Cards List */}
+            {filteredUsers.length === 0 ? (
+              <EmptyState icon={<Users size={38} color="#94A3B8" />} title="لا يوجد مستخدمون مطابقون" sub="جرب تغيير معايير البحث أو التصفية" />
+            ) : (
+              filteredUsers.map(u => {
+                const isAdmin = u.role === 'admin';
+                return (
+                  <View key={u.id} style={[styles.userCard, isAdmin && styles.userCardAdmin, u.is_banned && styles.userCardBanned]}>
+                    <Pressable style={styles.userCardHeader} onPress={() => inspectUser(u)}>
+                      <View style={styles.userAvatarWrap}>
+                        {u.avatar_url ? (
+                          <Image source={{ uri: u.avatar_url }} style={styles.userAvatarImg} />
+                        ) : (
+                          <View style={[styles.userAvatarFallback, isAdmin && { backgroundColor: C.navyMid }]}>
+                            <Text style={styles.userAvatarLetter}>{u.display_name?.[0] || 'م'}</Text>
+                          </View>
+                        )}
+                        {isAdmin && (
+                          <View style={styles.adminCrownBadge}>
+                            <Crown size={10} color="#FFFFFF" />
+                          </View>
+                        )}
+                      </View>
+
+                      <View style={styles.userMeta}>
+                        <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
+                          <Text style={styles.userName}>{u.display_name || 'بدون اسم'}</Text>
+                          {u.is_verified && <CheckCircle2 size={14} color="#0284C7" />}
+                          {u.is_geoverified && <ShieldCheck size={14} color="#16A34A" />}
+                        </View>
+                        <Text style={styles.userHandle}>@{u.username || 'user'}</Text>
+                        <Text style={styles.userLocation}>
+                          📍 {u.district ? `حي ${u.district} · ` : ''}
+                          {u.city || 'الرياض'}
+                        </Text>
+                      </View>
+
+                      <View style={[styles.roleBadge, isAdmin ? styles.roleBadgeAdmin : styles.roleBadgeUser]}>
+                        <Text style={[styles.roleBadgeText, isAdmin ? styles.roleBadgeTextAdmin : styles.roleBadgeTextUser]}>
+                          {isAdmin ? '👑 مدير النظام' : '👤 مستخدم'}
+                        </Text>
+                      </View>
+                    </Pressable>
+
+                    {/* Admin Actions Bar */}
+                    <View style={styles.userActionsRow}>
+                      <Pressable
+                        style={[styles.userActionBtn, isAdmin ? styles.btnDemote : styles.btnPromote]}
+                        onPress={() => toggleUserRole(u)}
+                      >
+                        {isAdmin ? <UserX size={14} color="#D97706" /> : <Crown size={14} color="#0284C7" />}
+                        <Text style={[styles.userActionBtnText, isAdmin ? { color: '#D97706' } : { color: '#0284C7' }]}>
+                          {isAdmin ? 'خفض لمستخدم' : 'ترقية لمدير 👑'}
+                        </Text>
+                      </Pressable>
+
+                      <Pressable
+                        style={[styles.userActionBtn, u.is_verified && styles.btnActiveSuccess]}
+                        onPress={() => toggleVerification(u)}
+                      >
+                        <CheckCircle2 size={14} color={u.is_verified ? '#16A34A' : '#64748B'} />
+                        <Text style={[styles.userActionBtnText, u.is_verified && { color: '#16A34A' }]}>
+                          {u.is_verified ? 'شارة موثقة' : 'توثيق رسمي'}
+                        </Text>
+                      </Pressable>
+
+                      <Pressable
+                        style={[styles.userActionBtn, u.is_geoverified && styles.btnActiveSuccess]}
+                        onPress={() => toggleGeoVerification(u)}
+                      >
+                        <ShieldCheck size={14} color={u.is_geoverified ? '#16A34A' : '#64748B'} />
+                        <Text style={[styles.userActionBtnText, u.is_geoverified && { color: '#16A34A' }]}>
+                          {u.is_geoverified ? 'ابن الحي ✓' : 'توثيق السكن'}
+                        </Text>
+                      </Pressable>
+
+                      <Pressable
+                        style={[styles.userActionBtn, u.is_banned ? styles.btnBannedActive : styles.btnBan]}
+                        onPress={() => toggleBanUser(u)}
+                      >
+                        <Ban size={14} color={u.is_banned ? '#FFFFFF' : '#DC2626'} />
+                        <Text style={[styles.userActionBtnText, u.is_banned ? { color: '#FFFFFF' } : { color: '#DC2626' }]}>
+                          {u.is_banned ? 'فك الحظر' : 'حظر'}
+                        </Text>
+                      </Pressable>
+
+                      <Pressable style={styles.userActionBtn} onPress={() => inspectUser(u)}>
+                        <Eye size={14} color="#0891B2" />
+                        <Text style={[styles.userActionBtnText, { color: '#0891B2' }]}>الملف الكامل</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                );
+              })
+            )}
+          </View>
+        )}
+
+        {/* TAB 3: RELATIONAL VERIFICATION DESK */}
         {activeTab === 'verifications' && (
           <View style={styles.section}>
             <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>مكتب التوثيق الرسمي والعلاقات 🌟</Text>
+              <Text style={styles.sectionTitle}>مكتب التوثيق الرسمي والشارة الزرقاء 🌟</Text>
               <View style={styles.countBadge}>
-                <Text style={styles.countBadgeText}>{stats.pendingVerif} طلب معلق</Text>
+                <Text style={styles.countBadgeText}>{stats.pendingVerifications} طلب معلق</Text>
               </View>
             </View>
-
             <Text style={styles.sectionSubDesc}>
-              مراجعة طلبات التوثيق بالشارة الزرقاء وتدقيق معلومات المواطنين ونشاطهم بالحي مع إرسال إشعارات فورية بنتائج الاعتماد.
+              مراجعة طلبات التوثيق وتدقيق السكن مع إرسال إشعارات فورية وتنبيهات push تلقائية للمواطنين.
             </Text>
 
             {verifications.length === 0 ? (
-              <EmptyState icon={<Star size={42} color="#f59e0b" />} title="لا توجد طلبات توثيق معلقة" sub="تمت مراجعة واعتماد جميع الطلبات السابقة بنجاح ✅" />
+              <EmptyState icon={<Star size={42} color="#F59E0B" />} title="لا توجد طلبات توثيق معلقة" sub="تم فحص واعتماد كافة الطلبات المقدمة سابقاً بنجاح ✅" />
             ) : (
               verifications.map(v => {
                 const u = v.user || {};
                 const isPending = v.status === 'pending';
-
                 return (
-                  <View key={v.id} style={[styles.verifCardDossier, !isPending && { borderColor: '#e2e8f0', opacity: 0.8 }]}>
-                    {/* Top Dossier Header */}
+                  <View key={v.id} style={[styles.verifCardDossier, !isPending && { borderColor: '#E2E8F0', opacity: 0.8 }]}>
                     <View style={styles.dossierTop}>
-                      {/* Avatar */}
                       <View style={styles.dossierAvatarWrap}>
                         {u.avatar_url ? (
                           <Image source={{ uri: u.avatar_url }} style={styles.dossierAvatarImg} />
@@ -1161,17 +1444,16 @@ export default function Admin() {
                         )}
                         {u.is_verified && (
                           <View style={styles.verifiedCheckBadge}>
-                            <Check size={9} color="#fff" />
+                            <Check size={9} color="#FFFFFF" />
                           </View>
                         )}
                       </View>
 
-                      {/* User Info & Identity */}
                       <View style={styles.dossierUserMeta}>
                         <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
                           <Text style={styles.dossierUserName}>{u.display_name || 'بدون اسم'}</Text>
-                          {u.is_verified && <CheckCircle2 size={14} color="#0284c7" />}
-                          {u.is_geoverified && <ShieldCheck size={14} color="#16a34a" />}
+                          {u.is_verified && <CheckCircle2 size={14} color="#0284C7" />}
+                          {u.is_geoverified && <ShieldCheck size={14} color="#16A34A" />}
                         </View>
                         <Text style={styles.dossierHandle}>@{u.username || 'citizen'}</Text>
                         <Text style={styles.dossierLocation}>
@@ -1179,15 +1461,13 @@ export default function Admin() {
                         </Text>
                       </View>
 
-                      {/* Status Tag */}
                       <View style={[styles.verifStatusPill, isPending ? styles.verifPending : v.status === 'approved' ? styles.verifApproved : styles.verifRejected]}>
                         <Text style={[isPending ? styles.verifPendingText : v.status === 'approved' ? styles.verifApprovedText : styles.verifRejectedText]}>
-                          {isPending ? '⏳ قيد التدقيق' : v.status === 'approved' ? '✓ تم الاعتماد' : '✕ مرفوض'}
+                          {isPending ? '⏳ قيد المراجعة' : v.status === 'approved' ? '✓ تم الاعتماد' : '✕ مرفوض'}
                         </Text>
                       </View>
                     </View>
 
-                    {/* Citizen Note & Reason */}
                     {v.note ? (
                       <View style={styles.dossierNoteBox}>
                         <Text style={styles.dossierNoteTitle}>ملاحظة المتقدم للتوثيق:</Text>
@@ -1195,54 +1475,49 @@ export default function Admin() {
                       </View>
                     ) : null}
 
-                    {/* Quick Citizen Activity Footprint */}
                     <View style={styles.dossierFootprintRow}>
                       <View style={styles.footprintItem}>
-                        <Text style={styles.footprintLabel}>تاريخ تقديم الطلب</Text>
+                        <Text style={styles.footprintLabel}>تاريخ التقديم</Text>
                         <Text style={styles.footprintVal}>{new Date(v.created_at).toLocaleDateString('ar-SA')}</Text>
                       </View>
                       <View style={styles.footprintItem}>
-                        <Text style={styles.footprintLabel}>حالة إثبات السكن</Text>
-                        <Text style={[styles.footprintVal, { color: u.is_geoverified ? '#16a34a' : '#d97706' }]}>
+                        <Text style={styles.footprintLabel}>إثبات السكن</Text>
+                        <Text style={[styles.footprintVal, { color: u.is_geoverified ? '#16A34A' : '#D97706' }]}>
                           {u.is_geoverified ? 'ابن الحي موثق 🛡️' : 'غير مثبت'}
                         </Text>
                       </View>
                       <View style={styles.footprintItem}>
-                        <Text style={styles.footprintLabel}>الصلاحية</Text>
+                        <Text style={styles.footprintLabel}>الرتبة</Text>
                         <Text style={styles.footprintVal}>{u.role === 'admin' ? 'مدير 👑' : 'مستخدم 👤'}</Text>
                       </View>
                     </View>
 
-                    {/* Relational Action Decision Buttons */}
                     {isPending ? (
                       <View style={styles.dossierActionsRow}>
-                        <Pressable 
-                          style={styles.btnApproveVerif} 
-                          onPress={() => handleVerificationDecision(v.id, v.user_id, 'approved', u.display_name || u.username)}
+                        <Pressable
+                          style={styles.btnApproveVerif}
+                          onPress={() => handleVerificationDecision(v.id, v.user_id, 'approved', u.display_name || u.username || 'مواطن')}
                         >
-                          <Check size={16} color="#fff" />
+                          <Check size={16} color="#FFFFFF" />
                           <Text style={styles.btnApproveVerifText}>اعتماد ومنح الشارة الزرقاء ✓</Text>
                         </Pressable>
 
-                        <Pressable 
-                          style={styles.btnRejectVerif} 
-                          onPress={() => handleVerificationDecision(v.id, v.user_id, 'rejected', u.display_name || u.username)}
+                        <Pressable
+                          style={styles.btnRejectVerif}
+                          onPress={() => handleVerificationDecision(v.id, v.user_id, 'rejected', u.display_name || u.username || 'مواطن')}
                         >
-                          <X size={15} color="#dc2626" />
+                          <X size={15} color="#DC2626" />
                           <Text style={styles.btnRejectVerifText}>رفض الطلب ✕</Text>
                         </Pressable>
 
-                        <Pressable 
-                          style={styles.btnInspectCitizen} 
-                          onPress={() => inspectUser(u)}
-                        >
-                          <Eye size={15} color="#0891b2" />
+                        <Pressable style={styles.btnInspectCitizen} onPress={() => inspectUser(u as AdminProfile)}>
+                          <Eye size={15} color="#0891B2" />
                         </Pressable>
                       </View>
                     ) : (
                       <View style={styles.dossierCompletedFooter}>
                         <Text style={styles.dossierCompletedText}>
-                          تمت المراجعة والبت في الطلب بتاريخ {new Date(v.reviewed_at || v.created_at).toLocaleDateString('ar-SA')}
+                          تمت المراجعة والبت بتاريخ {new Date(v.reviewed_at || v.created_at).toLocaleDateString('ar-SA')}
                         </Text>
                       </View>
                     )}
@@ -1253,173 +1528,32 @@ export default function Admin() {
           </View>
         )}
 
-        {/* ======================================================== */}
-        {/* TAB 3: USER MANAGEMENT & INSPECTION                      */}
-        {/* ======================================================== */}
-        {activeTab === 'users' && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>إدارة المستخدمين والصلاحيات 👥</Text>
-              <Text style={styles.countBadgeText}>{filteredUsers.length} من {usersList.length}</Text>
-            </View>
-
-            {/* Search Input */}
-            <View style={styles.searchBar}>
-              <Search size={18} color="#94a3b8" />
-              <TextInput
-                style={styles.searchInput}
-                placeholder="ابحث بالاسم، المعرف، المدينة أو الحي..."
-                placeholderTextColor="#94a3b8"
-                value={userSearch}
-                onChangeText={setUserSearch}
-              />
-              {userSearch.length > 0 && (
-                <Pressable onPress={() => setUserSearch('')}>
-                  <Text style={{ color: '#94a3b8', fontSize: 13 }}>✕</Text>
-                </Pressable>
-              )}
-            </View>
-
-            {/* Filter Pills */}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
-              <FilterPill label={`الكل (${usersList.length})`} active={userRoleFilter === 'all'} onPress={() => setUserRoleFilter('all')} />
-              <FilterPill label="مدراء (Admin) 👑" active={userRoleFilter === 'admin'} onPress={() => setUserRoleFilter('admin')} />
-              <FilterPill label="مستخدمون (User) 👤" active={userRoleFilter === 'user'} onPress={() => setUserRoleFilter('user')} />
-              <FilterPill label="موثقون رسمياً ✓" active={userRoleFilter === 'verified'} onPress={() => setUserRoleFilter('verified')} />
-              <FilterPill label="أبناء الحي 🛡️" active={userRoleFilter === 'geoverified'} onPress={() => setUserRoleFilter('geoverified')} />
-              <FilterPill label="محظورون 🚫" active={userRoleFilter === 'banned'} onPress={() => setUserRoleFilter('banned')} />
-            </ScrollView>
-
-            {/* User List */}
-            {filteredUsers.length === 0 ? (
-              <EmptyState icon={<Users size={38} color="#94a3b8" />} title="لا يوجد مستخدمون مطابقون" sub="جرب تغيير كلمات البحث أو التصفية" />
-            ) : (
-              filteredUsers.map(u => {
-                const isAdmin = u.role === 'admin';
-                return (
-                  <View key={u.id} style={[styles.userCard, isAdmin && styles.userCardAdmin, u.is_banned && styles.userCardBanned]}>
-                    <Pressable style={styles.userCardHeader} onPress={() => inspectUser(u)}>
-                      {/* Avatar */}
-                      <View style={styles.userAvatarWrap}>
-                        {u.avatar_url ? (
-                          <Image source={{ uri: u.avatar_url }} style={styles.userAvatarImg} />
-                        ) : (
-                          <View style={[styles.userAvatarFallback, isAdmin && { backgroundColor: '#0f172a' }]}>
-                            <Text style={styles.userAvatarLetter}>{u.display_name?.[0] || 'م'}</Text>
-                          </View>
-                        )}
-                        {isAdmin && (
-                          <View style={styles.adminCrownBadge}>
-                            <Crown size={10} color="#fff" />
-                          </View>
-                        )}
-                      </View>
-
-                      {/* Info */}
-                      <View style={styles.userMeta}>
-                        <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-                          <Text style={styles.userName}>{u.display_name || 'بدون اسم'}</Text>
-                          {u.is_verified && <CheckCircle2 size={14} color="#0284c7" />}
-                          {u.is_geoverified && <ShieldCheck size={14} color="#16a34a" />}
-                        </View>
-                        <Text style={styles.userHandle}>@{u.username || 'user'}</Text>
-                        <Text style={styles.userLocation}>
-                          📍 {u.district ? `حي ${u.district}` : 'الحي غير محدد'} · {u.city || 'الرياض'}
-                        </Text>
-                      </View>
-
-                      {/* Role Badge */}
-                      <View style={[styles.roleBadge, isAdmin ? styles.roleBadgeAdmin : styles.roleBadgeUser]}>
-                        <Text style={[styles.roleBadgeText, isAdmin ? styles.roleBadgeTextAdmin : styles.roleBadgeTextUser]}>
-                          {isAdmin ? '👑 مدير النظام' : '👤 مستخدم'}
-                        </Text>
-                      </View>
-                    </Pressable>
-
-                    {/* Admin Action Buttons */}
-                    <View style={styles.userActionsRow}>
-                      {/* 1. Toggle Admin Role (Strictly admin / user) */}
-                      <Pressable 
-                        style={[styles.userActionBtn, isAdmin ? styles.btnDemote : styles.btnPromote]} 
-                        onPress={() => toggleUserRole(u)}
-                      >
-                        {isAdmin ? <UserX size={14} color="#d97706" /> : <Crown size={14} color="#0284c7" />}
-                        <Text style={[styles.userActionBtnText, isAdmin ? { color: '#d97706' } : { color: '#0284c7' }]}>
-                          {isAdmin ? 'خفض لمستخدم' : 'ترقية لمدير 👑'}
-                        </Text>
-                      </Pressable>
-
-                      {/* 2. Official Verification */}
-                      <Pressable 
-                        style={[styles.userActionBtn, u.is_verified && styles.btnActiveSuccess]} 
-                        onPress={() => toggleVerification(u)}
-                      >
-                        <CheckCircle2 size={14} color={u.is_verified ? '#16a34a' : '#64748b'} />
-                        <Text style={[styles.userActionBtnText, u.is_verified && { color: '#16a34a' }]}>
-                          {u.is_verified ? 'شارة موثقة' : 'توثيق رسمي'}
-                        </Text>
-                      </Pressable>
-
-                      {/* 3. Geo Verification */}
-                      <Pressable 
-                        style={[styles.userActionBtn, u.is_geoverified && styles.btnActiveSuccess]} 
-                        onPress={() => toggleGeoVerification(u)}
-                      >
-                        <ShieldCheck size={14} color={u.is_geoverified ? '#16a34a' : '#64748b'} />
-                        <Text style={[styles.userActionBtnText, u.is_geoverified && { color: '#16a34a' }]}>
-                          {u.is_geoverified ? 'ابن الحي ✓' : 'توثيق السكن'}
-                        </Text>
-                      </Pressable>
-
-                      {/* 4. Ban / Unban */}
-                      <Pressable 
-                        style={[styles.userActionBtn, u.is_banned ? styles.btnBannedActive : styles.btnBan]} 
-                        onPress={() => toggleBanUser(u)}
-                      >
-                        <Ban size={14} color={u.is_banned ? '#fff' : '#dc2626'} />
-                        <Text style={[styles.userActionBtnText, u.is_banned ? { color: '#fff' } : { color: '#dc2626' }]}>
-                          {u.is_banned ? 'فك الحظر' : 'حظر'}
-                        </Text>
-                      </Pressable>
-
-                      {/* 5. Open Full Dossier */}
-                      <Pressable style={styles.userActionBtn} onPress={() => inspectUser(u)}>
-                        <Eye size={14} color="#0891b2" />
-                        <Text style={[styles.userActionBtnText, { color: '#0891b2' }]}>الملف الكامل</Text>
-                      </Pressable>
-                    </View>
-                  </View>
-                );
-              })
-            )}
-          </View>
-        )}
-
-        {/* ======================================================== */}
-        {/* TAB 4: REPORTS & CONTENT MODERATION                     */}
-        {/* ======================================================== */}
+        {/* TAB 4: REPORTS MODERATION */}
         {activeTab === 'reports' && (
           <View style={styles.section}>
             <View style={styles.sectionHeaderRow}>
               <Text style={styles.sectionTitle}>مركز البلاغات والمراقبة 🚨</Text>
-              <View style={[styles.countBadge, { backgroundColor: '#fee2e2' }]}>
-                <Text style={[styles.countBadgeText, { color: '#dc2626' }]}>{stats.pendingReports} بلاغ معلق</Text>
+              <View style={[styles.countBadge, { backgroundColor: '#FEE2E2' }]}>
+                <Text style={[styles.countBadgeText, { color: '#DC2626' }]}>{stats.pendingReports} بلاغ معلق</Text>
               </View>
             </View>
+            <Text style={styles.sectionSubDesc}>
+              مراقبة البلاغات المقدمة من الجيران والتعامل مع المحتوى المخالف فوراً عبر الحذف الذري أو الإغلاق.
+            </Text>
 
-            {/* Filter Pills */}
+            {/* Status Filter Pills */}
             <View style={styles.filterRow}>
-              <FilterPill label="معلقة (بحاجة لاتخاذ إجراء)" active={reportStatusFilter === 'pending'} onPress={() => setReportStatusFilter('pending')} />
+              <FilterPill label="معلقة (بحاجة لإجراء)" active={reportStatusFilter === 'pending'} onPress={() => setReportStatusFilter('pending')} />
               <FilterPill label="تم الحل ✓" active={reportStatusFilter === 'resolved'} onPress={() => setReportStatusFilter('resolved')} />
               <FilterPill label="تم التجاهل ✕" active={reportStatusFilter === 'dismissed'} onPress={() => setReportStatusFilter('dismissed')} />
               <FilterPill label="الكل" active={reportStatusFilter === 'all'} onPress={() => setReportStatusFilter('all')} />
             </View>
 
             {filteredReports.length === 0 ? (
-              <EmptyState icon={<Flag size={40} color="#10b981" />} title="لا توجد بلاغات في هذا التبويب" sub="المجتمع آمن ومستقر بفضل الله 🎉" />
+              <EmptyState icon={<Flag size={40} color="#10B981" />} title="لا توجد بلاغات في هذا التبويب" sub="مجتمع الجيران آمن ومستقر بإذن الله 🎉" />
             ) : (
               filteredReports.map(r => (
-                <View key={r.id} style={[styles.reportCard, r.status !== 'pending' && { borderColor: '#e2e8f0', opacity: 0.75 }]}>
+                <View key={r.id} style={[styles.reportCard, r.status !== 'pending' && { borderColor: '#E2E8F0', opacity: 0.75 }]}>
                   <View style={styles.reportHeader}>
                     <View style={[styles.reportStatusTag, r.status === 'pending' ? styles.repPendingTag : styles.repDoneTag]}>
                       <Text style={[styles.reportStatusText, r.status === 'pending' ? styles.repPendingText : styles.repDoneText]}>
@@ -1429,14 +1563,14 @@ export default function Admin() {
 
                     <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
                       <Flag size={16} color={C.danger} />
-                      <Text style={styles.reportType}>نوع المحتوى المبلغ عنه: {r.target_type || 'منشور'}</Text>
+                      <Text style={styles.reportType}>نوع المحتوى: {r.target_type}</Text>
                     </View>
                   </View>
 
                   <Text style={styles.reportReason}>سبب البلاغ: "{r.reason || 'محتوى مخالف لقواعد الحي'}"</Text>
-                  
+
                   <View style={styles.reportMetaRow}>
-                    <Text style={styles.reportDate}>تاريخ البلاغ: {new Date(r.created_at).toLocaleDateString('ar-SA')}</Text>
+                    <Text style={styles.reportDate}>التاريخ: {new Date(r.created_at).toLocaleDateString('ar-SA')}</Text>
                     <Text style={styles.reportFrom}>
                       مقدم البلاغ: {r.reporter?.display_name || r.reporter?.username || 'مستخدم مجهول'}
                     </Text>
@@ -1444,19 +1578,19 @@ export default function Admin() {
 
                   {r.status === 'pending' && (
                     <View style={styles.reportActionsGrid}>
-                      <Pressable style={styles.btnDeleteContent} onPress={() => deleteReportedContent(r)}>
-                        <Trash size={15} color="#fff" />
-                        <Text style={styles.btnActionTextWhite}>حذف المحتوى المخالف فوراً من المنصة 🗑️</Text>
+                      <Pressable style={styles.btnDeleteContent} onPress={() => handleModerateReport(r, 'resolved', true)}>
+                        <Trash size={15} color="#FFFFFF" />
+                        <Text style={styles.btnActionTextWhite}>حذف المحتوى المخالف فوراً وإغلاق البلاغ 🗑️</Text>
                       </Pressable>
 
                       <View style={{ flexDirection: 'row-reverse', gap: 8, marginTop: 8 }}>
-                        <Pressable style={styles.resolveBtn} onPress={() => resolveReport(r.id, 'resolved')}>
-                          <CheckCircle2 size={16} color="#fff" />
+                        <Pressable style={styles.resolveBtn} onPress={() => handleModerateReport(r, 'resolved', false)}>
+                          <CheckCircle2 size={16} color="#FFFFFF" />
                           <Text style={styles.resolveBtnText}>إغلاق البلاغ كمعالج ✓</Text>
                         </Pressable>
 
-                        <Pressable style={styles.dismissBtn} onPress={() => resolveReport(r.id, 'dismissed')}>
-                          <XCircle size={16} color="#64748b" />
+                        <Pressable style={styles.dismissBtn} onPress={() => handleModerateReport(r, 'dismissed', false)}>
+                          <XCircle size={16} color="#64748B" />
                           <Text style={styles.dismissBtnText}>تجاهل كيدي ✕</Text>
                         </Pressable>
                       </View>
@@ -1468,42 +1602,205 @@ export default function Admin() {
           </View>
         )}
 
-        {/* ======================================================== */}
-        {/* TAB 5: COMMUNITY CONTENT MODERATION                     */}
-        {/* ======================================================== */}
+        {/* TAB 5: REAL PLATFORM RESOURCES (Services, Borrow Items, Urgent Alerts) */}
+        {activeTab === 'platform' && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionTitle}>موارد المنصة والخدمات الحقيقية 🏢</Text>
+              <View style={styles.countBadge}>
+                <Text style={styles.countBadgeText}>{servicesList.length + borrowItemsList.length + urgentAlertsList.length} مورد</Text>
+              </View>
+            </View>
+            <Text style={styles.sectionSubDesc}>
+              إدارة خدمات الحي المحلية، خزانة إعارة الأدوات، وتنبيهات الطوارئ النشطة من مصدر موحد.
+            </Text>
+
+            {/* Platform Sub-tabs */}
+            <View style={styles.filterRow}>
+              <FilterPill label={`دليل الخدمات (${servicesList.length})`} active={platformTabSub === 'services'} onPress={() => setPlatformTabSub('services')} />
+              <FilterPill label={`خزانة الأدوات (${borrowItemsList.length})`} active={platformTabSub === 'borrow'} onPress={() => setPlatformTabSub('borrow')} />
+              <FilterPill label={`تنبيهات الطوارئ (${urgentAlertsList.length})`} active={platformTabSub === 'urgent'} onPress={() => setPlatformTabSub('urgent')} />
+            </View>
+
+            {/* Sub-tab 1: Services */}
+            {platformTabSub === 'services' && (
+              <View>
+                <Text style={styles.subSectionTitle}>دليل خدمات وحرفيي الحي</Text>
+                {servicesList.length === 0 ? (
+                  <EmptyState icon={<Truck size={36} color="#94A3B8" />} title="لا توجد خدمات مسجلة" sub="ستظهر الخدمات التي يقدمها الجيران هنا." />
+                ) : (
+                  servicesList.map(s => (
+                    <View key={s.id} style={styles.platformItemCard}>
+                      <View style={styles.platformItemTop}>
+                        <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8, flex: 1 }}>
+                          <Truck size={18} color={s.is_verified ? C.accent : C.muted} />
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.platformItemTitle}>{s.title}</Text>
+                            <Text style={styles.platformItemSub}>
+                              {[s.city, s.district].filter(Boolean).join(' · ') || 'الموقع غير محدد'} · المقدم: {s.provider?.display_name || s.provider?.username || 'جار'}
+                            </Text>
+                          </View>
+                        </View>
+                        {s.price != null && (
+                          <Text style={{ fontWeight: '800', color: C.accent, fontSize: 12 }}>{s.price} ر.س</Text>
+                        )}
+                      </View>
+
+                      <View style={styles.platformItemActions}>
+                        <Pressable
+                          style={[styles.smallActionBtn, s.is_verified && { backgroundColor: '#DCFCE7' }]}
+                          onPress={() => updatePlatformEntity('service', s.id, 'toggle_verified', s.title)}
+                        >
+                          <CheckCircle2 size={15} color={s.is_verified ? '#16A34A' : '#64748B'} />
+                          <Text style={[styles.smallActionText, s.is_verified && { color: '#16A34A' }]}>
+                            {s.is_verified ? 'خدمة معتمدة ✓' : 'اعتماد وتوثيق'}
+                          </Text>
+                        </Pressable>
+
+                        <Pressable
+                          style={styles.smallActionBtn}
+                          onPress={() => updatePlatformEntity('service', s.id, 'toggle_available', s.title)}
+                        >
+                          <Activity size={15} color={s.available_now ? '#0284C7' : '#64748B'} />
+                          <Text style={styles.smallActionText}>{s.available_now ? 'متاح الآن' : 'غير متفرغ'}</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  ))
+                )}
+              </View>
+            )}
+
+            {/* Sub-tab 2: Borrow Items */}
+            {platformTabSub === 'borrow' && (
+              <View>
+                <Text style={styles.subSectionTitle}>خزانة إعارة أدوات الجيران</Text>
+                {borrowItemsList.length === 0 ? (
+                  <EmptyState icon={<Wrench size={36} color="#94A3B8" />} title="لا توجد أدوات معروضة للإعارة" sub="ستظهر الأدوات المتاحة للإعارة هنا." />
+                ) : (
+                  borrowItemsList.map(item => (
+                    <View key={item.id} style={styles.platformItemCard}>
+                      <View style={styles.platformItemTop}>
+                        <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8, flex: 1 }}>
+                          <Wrench size={18} color={item.status === 'available' ? C.accent : C.muted} />
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.platformItemTitle}>{item.title}</Text>
+                            <Text style={styles.platformItemSub}>
+                              المالك: {item.owner?.display_name || item.owner?.username || 'جار'} · الحالة: {item.status === 'available' ? 'جاهزة للإعارة 🟢' : item.status === 'borrowed' ? 'مستعارة حالياً ⏳' : 'غير متاحة 🔴'}
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+
+                      <View style={styles.platformItemActions}>
+                        <Pressable
+                          style={styles.smallActionBtn}
+                          onPress={() => updatePlatformEntity('borrow_item', item.id, 'toggle_status', item.title)}
+                        >
+                          <Archive size={15} color="#64748B" />
+                          <Text style={styles.smallActionText}>
+                            {item.status === 'available' ? 'تعطيل الإتاحة' : 'تفعيل الإتاحة'}
+                          </Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  ))
+                )}
+              </View>
+            )}
+
+            {/* Sub-tab 3: Urgent Alerts */}
+            {platformTabSub === 'urgent' && (
+              <View>
+                <Text style={styles.subSectionTitle}>تنبيهات الطوارئ والفزعات العاجلة</Text>
+                {urgentAlertsList.length === 0 ? (
+                  <EmptyState icon={<AlertTriangle size={36} color="#10B981" />} title="لا توجد تنبيهات طوارئ نشطة" sub="الحي يعيش في أمان وسلام تام 🛡️" />
+                ) : (
+                  urgentAlertsList.map(alert => (
+                    <View key={alert.id} style={[styles.platformItemCard, { borderColor: alert.status === 'active' ? '#FECACA' : '#E2E8F0' }]}>
+                      <View style={styles.platformItemTop}>
+                        <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8, flex: 1 }}>
+                          <AlertTriangle size={18} color={alert.status === 'active' ? '#DC2626' : '#10B981'} />
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.platformItemTitle}>{alert.title}</Text>
+                            <Text style={styles.platformItemSub}>
+                              {[alert.city, alert.district].filter(Boolean).join(' · ') || 'حي غير محدد'} · صاحب التنبيه: {alert.user?.display_name || 'مواطن'}
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+
+                      <View style={styles.platformItemActions}>
+                        {alert.status === 'active' && (
+                          <Pressable
+                            style={[styles.smallActionBtn, { backgroundColor: '#DCFCE7' }]}
+                            onPress={() => updatePlatformEntity('urgent_alert', alert.id, 'resolve', alert.title)}
+                          >
+                            <CheckCircle2 size={15} color="#16A34A" />
+                            <Text style={[styles.smallActionText, { color: '#16A34A' }]}>تمت الاستجابة وحل الطارئ ✓</Text>
+                          </Pressable>
+                        )}
+
+                        <Pressable
+                          style={[styles.smallActionBtn, { backgroundColor: '#FEE2E2' }]}
+                          onPress={() => updatePlatformEntity('urgent_alert', alert.id, 'delete', alert.title)}
+                        >
+                          <Trash size={15} color="#DC2626" />
+                          <Text style={[styles.smallActionText, { color: '#DC2626' }]}>حذف التنبيه</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  ))
+                )}
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* TAB 6: COMMUNITY CONTENT MODERATION */}
         {activeTab === 'content' && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>مراقبة الاستفسارات ومنشورات الحي 💬</Text>
+            <Text style={styles.sectionTitle}>مراقبة الاستفسارات والطلبات المجتمعية 💬</Text>
+            <Text style={styles.sectionSubDesc}>متابعة منشورات الجيران والاستفسارات وحذف أي محتوى يخالف معايير الحي.</Text>
 
-            {/* Filter Pills */}
             <View style={styles.filterRow}>
               <FilterPill label="جميع المنشورات" active={contentFilter === 'all'} onPress={() => setContentFilter('all')} />
               <FilterPill label={`الاستفسارات (${questionsList.length})`} active={contentFilter === 'questions'} onPress={() => setContentFilter('questions')} />
               <FilterPill label={`طلبات الفزعة (${requestsList.length})`} active={contentFilter === 'requests'} onPress={() => setContentFilter('requests')} />
             </View>
 
-            {/* Questions list */}
+            {/* Questions List */}
             {(contentFilter === 'all' || contentFilter === 'questions') && (
               <View style={{ marginBottom: 16 }}>
                 <Text style={styles.subSectionTitle}>💬 استفسارات الجيران</Text>
                 {questionsList.map(q => (
                   <View key={`q-${q.id}`} style={styles.contentItemCard}>
                     <View style={styles.contentItemHeader}>
-                      <Text style={styles.contentAuthorName}>{q.profiles?.display_name || 'ابن الحي'}</Text>
-                      <Text style={styles.contentItemCity}>📍 {q.district ? `حي ${q.district} · ` : ''}{q.city || 'الرياض'}</Text>
+                      <Text style={styles.contentAuthorName}>{q.author?.display_name || 'ابن الحي'}</Text>
+                      <Text style={styles.contentItemCity}>
+                        📍 {q.district ? `حي ${q.district} · ` : ''}
+                        {q.city || 'الرياض'}
+                      </Text>
                     </View>
 
                     <Text style={styles.contentItemTitle}>{q.title}</Text>
-                    {q.body && <Text style={styles.contentItemBody} numberOfLines={2}>{q.body}</Text>}
+                    {q.body && (
+                      <Text style={styles.contentItemBody} numberOfLines={2}>
+                        {q.body}
+                      </Text>
+                    )}
 
                     <View style={styles.contentItemFooter}>
                       <Pressable style={styles.btnDeleteSm} onPress={() => deleteContentItem(q.id, 'question', q.title)}>
-                        <Trash size={14} color="#dc2626" />
+                        <Trash size={14} color="#DC2626" />
                         <Text style={styles.btnDeleteSmText}>حذف المنشور 🗑️</Text>
                       </Pressable>
 
-                      <Pressable style={styles.btnViewSm} onPress={() => router.push({ pathname: '/question', params: { id: q.id } })}>
-                        <Eye size={14} color="#0891b2" />
+                      <Pressable
+                        style={styles.btnViewSm}
+                        onPress={() => router.push({ pathname: '/question', params: { id: q.id } })}
+                      >
+                        <Eye size={14} color="#0891B2" />
                         <Text style={styles.btnViewSmText}>معاينة الاستفسار</Text>
                       </Pressable>
                     </View>
@@ -1512,28 +1809,38 @@ export default function Admin() {
               </View>
             )}
 
-            {/* Requests list */}
+            {/* Requests List */}
             {(contentFilter === 'all' || contentFilter === 'requests') && (
               <View>
-                <Text style={styles.subSectionTitle}>🚚 طلبات الفزعة المفتوحة</Text>
+                <Text style={styles.subSectionTitle}>🚚 طلبات الفزعة والمساعدة</Text>
                 {requestsList.map(r => (
                   <View key={`r-${r.id}`} style={styles.contentItemCard}>
                     <View style={styles.contentItemHeader}>
-                      <Text style={styles.contentAuthorName}>{r.profiles?.display_name || 'طالب المساعدة'}</Text>
-                      <Text style={styles.contentItemCity}>📍 {r.district ? `حي ${r.district} · ` : ''}{r.city || 'الرياض'}</Text>
+                      <Text style={styles.contentAuthorName}>{r.requester?.display_name || 'طالب المساعدة'}</Text>
+                      <Text style={styles.contentItemCity}>
+                        📍 {r.district ? `حي ${r.district} · ` : ''}
+                        {r.city || 'الرياض'}
+                      </Text>
                     </View>
 
                     <Text style={styles.contentItemTitle}>{r.title}</Text>
-                    {r.description && <Text style={styles.contentItemBody} numberOfLines={2}>{r.description}</Text>}
+                    {r.description && (
+                      <Text style={styles.contentItemBody} numberOfLines={2}>
+                        {r.description}
+                      </Text>
+                    )}
 
                     <View style={styles.contentItemFooter}>
                       <Pressable style={styles.btnDeleteSm} onPress={() => deleteContentItem(r.id, 'request', r.title)}>
-                        <Trash size={14} color="#dc2626" />
+                        <Trash size={14} color="#DC2626" />
                         <Text style={styles.btnDeleteSmText}>حذف الطلب 🗑️</Text>
                       </Pressable>
 
-                      <Pressable style={styles.btnViewSm} onPress={() => router.push({ pathname: '/request', params: { id: r.id } })}>
-                        <Eye size={14} color="#0891b2" />
+                      <Pressable
+                        style={styles.btnViewSm}
+                        onPress={() => router.push({ pathname: '/request', params: { id: r.id } })}
+                      >
+                        <Eye size={14} color="#0891B2" />
                         <Text style={styles.btnViewSmText}>معاينة الطلب</Text>
                       </Pressable>
                     </View>
@@ -1544,14 +1851,15 @@ export default function Admin() {
           </View>
         )}
 
-        {/* ======================================================== */}
-        {/* TAB 6: BROADCAST HUB & NOTIFICATIONS                      */}
-        {/* ======================================================== */}
+        {/* TAB 7: BROADCAST HUB */}
         {activeTab === 'broadcast' && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>مركز البث والتعاميم الإدارية 📢</Text>
+            <Text style={styles.sectionSubDesc}>
+              إرسال تعميم رسمي يصل كتنبيهات داخل التطبيق وإشعارات push حقيقية لجميع السكان في الحي أو المملكة.
+            </Text>
 
-            {/* Fast Templates */}
+            {/* Quick Presets */}
             <Text style={styles.inputLabel}>نماذج سريعة جاهزة للتعميم:</Text>
             <View style={styles.templatePillsRow}>
               <Pressable style={styles.templatePill} onPress={() => applyBroadcastTemplate('emergency')}>
@@ -1567,22 +1875,22 @@ export default function Admin() {
                 <Text style={styles.templatePillText}>✨ ترحيب بالسكان</Text>
               </Pressable>
             </View>
-            
+
             <View style={styles.broadcastBox}>
               <Text style={styles.inputLabel}>عنوان التعميم الإداري</Text>
               <TextInput
                 style={styles.formInput}
                 placeholder="مثال: تنبيه هام بشأن أعمال صيانة شبكة الحي..."
-                placeholderTextColor="#94a3b8"
+                placeholderTextColor="#94A3B8"
                 value={broadcastTitle}
                 onChangeText={setBroadcastTitle}
               />
 
               <Text style={[styles.inputLabel, { marginTop: 12 }]}>نص التعميم والتوجيهات</Text>
               <TextInput
-                style={[styles.formInput, { height: 100, textAlignVertical: 'top' }]}
+                style={[styles.formInput, { height: 95, textAlignVertical: 'top' }]}
                 placeholder="اكتب التوجيهات أو التعليمات الرسمية لأهل الحي..."
-                placeholderTextColor="#94a3b8"
+                placeholderTextColor="#94A3B8"
                 value={broadcastBody}
                 onChangeText={setBroadcastBody}
                 multiline
@@ -1591,38 +1899,39 @@ export default function Admin() {
               <Text style={[styles.inputLabel, { marginTop: 12 }]}>نطاق الإرسال المستهدف</Text>
               <View style={styles.filterRow}>
                 <FilterPill label="🇸🇦 كل المملكة" active={broadcastTarget === 'all'} onPress={() => setBroadcastTarget('all')} />
-                <FilterPill label="الرياض" active={broadcastTarget === 'riyadh'} onPress={() => setBroadcastTarget('riyadh')} />
-                <FilterPill label="جدة" active={broadcastTarget === 'jeddah'} onPress={() => setBroadcastTarget('jeddah')} />
-                <FilterPill label="الدمام" active={broadcastTarget === 'dammam'} onPress={() => setBroadcastTarget('dammam')} />
+                <FilterPill label="الرياض" active={broadcastTarget === 'الرياض'} onPress={() => setBroadcastTarget('الرياض')} />
+                <FilterPill label="جدة" active={broadcastTarget === 'جدة'} onPress={() => setBroadcastTarget('جدة')} />
+                <FilterPill label="الدمام" active={broadcastTarget === 'الدمام'} onPress={() => setBroadcastTarget('الدمام')} />
               </View>
 
               {/* Live Preview Notification Card */}
               {broadcastTitle.length > 0 && (
                 <View style={styles.previewBox}>
-                  <Text style={styles.previewHeading}>معاينة الإشعار كما سيصل للمواطنين 🔔</Text>
+                  <Text style={styles.previewHeading}>معاينة الإشعار كما سيصل للجيران 🔔</Text>
                   <View style={styles.previewNotificationCard}>
                     <View style={styles.previewCardHeader}>
                       <Text style={styles.previewAppName}>منصة حيّنا · الآن</Text>
-                      <Crown size={12} color="#f59e0b" />
+                      <Crown size={12} color="#F59E0B" />
                     </View>
                     <Text style={styles.previewTitleText}>
-                      {broadcastType === 'emergency' ? '🚨 ' : broadcastType === 'weather' ? '⛈️ ' : '📢 '}{broadcastTitle}
+                      {broadcastType === 'emergency' ? '🚨 ' : broadcastType === 'weather' ? '⛈️ ' : '📢 '}
+                      {broadcastTitle}
                     </Text>
                     <Text style={styles.previewBodyText}>{broadcastBody || 'تفاصيل التعميم الإداري...'}</Text>
                   </View>
                 </View>
               )}
 
-              <Pressable 
-                style={[styles.btnSendBroadcast, sendingBroadcast && { opacity: 0.6 }]} 
+              <Pressable
+                style={[styles.btnSendBroadcast, sendingBroadcast && { opacity: 0.6 }]}
                 onPress={handleSendBroadcast}
                 disabled={sendingBroadcast}
               >
                 {sendingBroadcast ? (
-                  <ActivityIndicator size="small" color="#fff" />
+                  <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
                   <>
-                    <Send size={18} color="#fff" />
+                    <Send size={18} color="#FFFFFF" />
                     <Text style={styles.btnSendBroadcastText}>نشر وبث التعميم الآن 📢</Text>
                   </>
                 )}
@@ -1631,36 +1940,145 @@ export default function Admin() {
           </View>
         )}
 
-        {/* ======================================================== */}
-        {/* TAB 7: ADMINISTRATIVE AUDIT LOGS (سجل العمليات الإدارية) */}
-        {/* ======================================================== */}
+        {/* TAB 8: AUDIT LOGS */}
         {activeTab === 'logs' && (
           <View style={styles.section}>
             <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>سجل العمليات والرقابة الإدارية 📜</Text>
+              <Text style={styles.sectionTitle}>سجل العمليات والتدقيق الإداري 📜</Text>
               <Text style={styles.countBadgeText}>{auditLogs.length} عملية مسجلة</Text>
             </View>
-
             <Text style={styles.sectionSubDesc}>
-              سجل تدقيق رقابي لحظي يوثق كافة إجراءات الترقية والتوثيق وحذف المحتوى المخالف التي ينفذها مدير النظام.
+              سجل رقابي لحظي يوثق كافة القرارات الإدارية، الترقيات، التوثيق، وحذف المحتوى من قبل المدراء.
             </Text>
 
             {auditLogs.length === 0 ? (
-              <EmptyState icon={<Clock size={40} color="#94a3b8" />} title="لا توجد عمليات مسجلة في الجلسة الحالية" sub="سيتم توثيق أي إجراء تتخذه كمدير للنظام تلقائياً هنا." />
+              <EmptyState icon={<Clock size={40} color="#94A3B8" />} title="لا توجد عمليات مسجلة حتى الآن" sub="سيتم توثيق أي إجراء رقابي تتخذه كمدير للنظام تلقائياً هنا." />
             ) : (
-              auditLogs.map((log) => (
+              auditLogs.map(log => (
                 <View key={log.id} style={styles.auditLogCard}>
                   <View style={styles.auditLogIconBox}>
-                    <ShieldCheck size={18} color="#0891b2" />
+                    <ShieldCheck size={18} color="#0891B2" />
                   </View>
                   <View style={styles.auditLogMeta}>
                     <Text style={styles.auditLogAction}>{log.action}</Text>
-                    <Text style={styles.auditLogTarget}>الهدف: {log.target}</Text>
+                    <Text style={styles.auditLogTarget}>
+                      الهدف: {log.metadata?.target_name || log.target_type || 'النظام'} · المنفذ: {log.actor?.display_name || log.actor?.username || 'مدير'}
+                    </Text>
                   </View>
-                  <Text style={styles.auditLogTime}>{log.time}</Text>
+                  <Text style={styles.auditLogTime}>{new Date(log.created_at).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })}</Text>
                 </View>
               ))
             )}
+          </View>
+        )}
+
+        {/* TAB 9: SAUDI CUSTOM LOCATIONS */}
+        {activeTab === 'locations' && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>إدارة المواقع والأحياء السعودية 📍</Text>
+            <Text style={styles.sectionSubDesc}>إضافة أحياء ومدن جديدة تظهر في قوائم التسجيل وتصفية الجيران.</Text>
+
+            <View style={styles.broadcastBox}>
+              <Text style={styles.inputLabel}>اسم الحي</Text>
+              <TextInput
+                style={styles.formInput}
+                placeholder="مثال: حي النرجس، حي الملقا، حي الياسمين..."
+                placeholderTextColor="#94A3B8"
+                value={locationName}
+                onChangeText={setLocationName}
+              />
+
+              <Text style={[styles.inputLabel, { marginTop: 10 }]}>المدينة</Text>
+              <TextInput
+                style={styles.formInput}
+                placeholder="مثال: الرياض، جدة، الدمام، الخبر..."
+                placeholderTextColor="#94A3B8"
+                value={locationCity}
+                onChangeText={setLocationCity}
+              />
+
+              <Text style={[styles.inputLabel, { marginTop: 10 }]}>المنطقة (اختياري)</Text>
+              <TextInput
+                style={styles.formInput}
+                placeholder="مثال: منطقة الرياض، المنطقة الشرقية، منطقة مكة المكرمة..."
+                placeholderTextColor="#94A3B8"
+                value={locationRegion}
+                onChangeText={setLocationRegion}
+              />
+
+              <Pressable
+                style={[styles.btnSendBroadcast, savingLocation && { opacity: 0.6 }]}
+                onPress={handleAddLocation}
+                disabled={savingLocation}
+              >
+                {savingLocation ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <>
+                    <MapPin size={18} color="#FFFFFF" />
+                    <Text style={styles.btnSendBroadcastText}>حفظ وإضافة الحي للقاعدة 📍</Text>
+                  </>
+                )}
+              </Pressable>
+            </View>
+
+            <Text style={[styles.subSectionTitle, { marginTop: 16 }]}>الأحياء المضافة ({customLocations.length})</Text>
+            {customLocations.map(loc => {
+              const fullLocName = [loc.region_name, loc.city_name, loc.district_name].filter(Boolean).join(' · ');
+              return (
+                <View key={loc.id} style={styles.quickAction}>
+                  <View style={styles.quickActionLeft}>
+                    <MapPin size={16} color={C.accent} />
+                    <Text style={styles.quickActionText}>{fullLocName}</Text>
+                  </View>
+                  <Pressable style={styles.trashActionBtn} onPress={() => handleDeleteLocation(loc.id, fullLocName)}>
+                    <Trash size={14} color="#EF4444" />
+                  </Pressable>
+                </View>
+              );
+            })}
+          </View>
+        )}
+
+        {/* TAB 10: BRANDING LOGO */}
+        {activeTab === 'branding' && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>الهوية البصرية والشعار الرسمي 🇸🇦</Text>
+            <Text style={styles.sectionSubDesc}>
+              تحديث الشعار المركزي للمنصة؛ ينعكس فورياً في شاشات تسجيل الدخول، هيدر التطبيق، وأيقونة الويب.
+            </Text>
+
+            <View style={{ alignItems: 'center', backgroundColor: '#065F46', borderRadius: 24, padding: 26, marginVertical: 12 }}>
+              <View
+                style={{
+                  width: 140,
+                  height: 140,
+                  borderRadius: 28,
+                  backgroundColor: 'rgba(255,255,255,0.14)',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderWidth: 1,
+                  borderColor: 'rgba(255,255,255,0.28)',
+                }}
+              >
+                <Image source={{ uri: brandingLogo }} style={{ width: 115, height: 115 }} resizeMode="contain" />
+              </View>
+              <Text style={{ color: '#FFFFFF', fontSize: 17, fontWeight: '900', marginTop: 12 }}>شعار حيّنا المعتمد</Text>
+              <Text style={{ color: '#A7F3D0', fontSize: 11, fontWeight: '700', marginTop: 4 }}>
+                تحديث الشعار يطبق مركزياً في النظام بالكامل
+              </Text>
+            </View>
+
+            <Pressable
+              style={[styles.btnSendBroadcast, brandingUploading && { opacity: 0.6 }]}
+              onPress={changeGlobalLogo}
+              disabled={brandingUploading}
+            >
+              {brandingUploading ? <ActivityIndicator color="#FFFFFF" /> : <Sparkles size={18} color="#FFFFFF" />}
+              <Text style={styles.btnSendBroadcastText}>
+                {brandingUploading ? 'جارٍ رفع الشعار...' : 'اختيار ورفع شعار جديد'}
+              </Text>
+            </Pressable>
           </View>
         )}
 
@@ -1668,21 +2086,19 @@ export default function Admin() {
       </ScrollView>
 
       {/* ======================================================== */}
-      {/* 4. USER DOSSIER INSPECTOR MODAL / DRAWER                 */}
+      {/* 4. USER DOSSIER INSPECTOR MODAL                          */}
       {/* ======================================================== */}
       {inspectedUser && (
         <View style={styles.modalOverlay}>
           <View style={styles.modalDossierBox}>
-            {/* Modal Header */}
             <View style={styles.modalDossierHeader}>
               <Pressable onPress={() => setInspectedUser(null)} style={styles.modalCloseBtn}>
-                <X size={18} color="#0f172a" />
+                <X size={18} color={C.ink} />
               </Pressable>
               <Text style={styles.modalDossierTitle}>الملف الإداري الشامل للمواطن 📁</Text>
             </View>
 
             <ScrollView style={styles.modalDossierScroll} showsVerticalScrollIndicator={false}>
-              {/* Profile Card */}
               <View style={styles.modalProfileCard}>
                 <View style={styles.modalAvatarWrap}>
                   {inspectedUser.avatar_url ? (
@@ -1693,121 +2109,133 @@ export default function Admin() {
                     </View>
                   )}
                   {inspectedUser.role === 'admin' && (
-                    <View style={styles.modalAdminBadge}><Crown size={12} color="#fff" /></View>
+                    <View style={styles.modalAdminBadge}>
+                      <Crown size={12} color="#FFFFFF" />
+                    </View>
                   )}
                 </View>
 
                 <View style={styles.modalUserInfo}>
                   <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
                     <Text style={styles.modalName}>{inspectedUser.display_name || 'بدون اسم'}</Text>
-                    {inspectedUser.is_verified && <CheckCircle2 size={16} color="#0284c7" />}
-                    {inspectedUser.is_geoverified && <ShieldCheck size={16} color="#16a34a" />}
+                    {inspectedUser.is_verified && <CheckCircle2 size={16} color="#0284C7" />}
+                    {inspectedUser.is_geoverified && <ShieldCheck size={16} color="#16A34A" />}
                   </View>
                   <Text style={styles.modalHandle}>@{inspectedUser.username || 'user'}</Text>
                   <Text style={styles.modalCity}>
-                    📍 {inspectedUser.district ? `حي ${inspectedUser.district} · ` : ''}{inspectedUser.city || 'الرياض'}
+                    📍 {inspectedUser.district ? `حي ${inspectedUser.district} · ` : ''}
+                    {inspectedUser.city || 'الرياض'}
                   </Text>
                 </View>
               </View>
 
-              {/* Metrics Footprint */}
+              {/* Activity metrics */}
               <View style={styles.modalFootprintRow}>
                 <View style={styles.modalFootprintBox}>
-                  <Text style={styles.modalFootprintNum}>{userUserStats.qCount}</Text>
+                  <Text style={styles.modalFootprintNum}>{userActivityStats.qCount}</Text>
                   <Text style={styles.modalFootprintLabel}>الاستفسارات</Text>
                 </View>
                 <View style={styles.modalFootprintBox}>
-                  <Text style={styles.modalFootprintNum}>{userUserStats.aCount}</Text>
-                  <Text style={styles.modalFootprintLabel}>الإجابات والحلول</Text>
+                  <Text style={styles.modalFootprintNum}>{userActivityStats.aCount}</Text>
+                  <Text style={styles.modalFootprintLabel}>الإجابات</Text>
                 </View>
                 <View style={styles.modalFootprintBox}>
-                  <Text style={[styles.modalFootprintNum, { color: inspectedUser.role === 'admin' ? '#f59e0b' : '#0284c7' }]}>
+                  <Text style={styles.modalFootprintNum}>{userActivityStats.reqCount}</Text>
+                  <Text style={styles.modalFootprintLabel}>الفزعات</Text>
+                </View>
+                <View style={styles.modalFootprintBox}>
+                  <Text style={[styles.modalFootprintNum, { color: inspectedUser.role === 'admin' ? '#F59E0B' : '#0284C7' }]}>
                     {inspectedUser.role === 'admin' ? 'مدير 👑' : 'مستخدم 👤'}
                   </Text>
                   <Text style={styles.modalFootprintLabel}>الرتبة</Text>
                 </View>
               </View>
 
-              {/* Direct Management Actions */}
               <Text style={styles.modalSectionLabel}>إجراءات الإدارة المباشرة:</Text>
 
-              {/* 1. Toggle Role (Admin vs User) */}
-              <Pressable 
-                style={[styles.modalActionItem, inspectedUser.role === 'admin' ? styles.itemDemote : styles.itemPromote]} 
+              {/* Toggle Role */}
+              <Pressable
+                style={[styles.modalActionItem, inspectedUser.role === 'admin' ? styles.itemDemote : styles.itemPromote]}
                 onPress={() => toggleUserRole(inspectedUser)}
               >
-                <Crown size={18} color={inspectedUser.role === 'admin' ? '#d97706' : '#0284c7'} />
+                <Crown size={18} color={inspectedUser.role === 'admin' ? '#D97706' : '#0284C7'} />
                 <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                  <Text style={[styles.modalActionTitle, inspectedUser.role === 'admin' ? { color: '#d97706' } : { color: '#0284c7' }]}>
+                  <Text style={[styles.modalActionTitle, inspectedUser.role === 'admin' ? { color: '#D97706' } : { color: '#0284C7' }]}>
                     {inspectedUser.role === 'admin' ? 'خفض الرتبة إلى مستخدم عادي 👤' : 'ترقية إلى مدير النظام (Admin) 👑'}
                   </Text>
                   <Text style={styles.modalActionSub}>
-                    {inspectedUser.role === 'admin' ? 'سحب صلاحيات لوحة التحكم والرقابة' : 'منح صلاحية إدارة المنصة والمحتوى'}
+                    {inspectedUser.role === 'admin' ? 'سحب صلاحية لوحة التحكم' : 'منح صلاحيات الإدارة والرقابة'}
                   </Text>
                 </View>
               </Pressable>
 
-              {/* 2. Official Blue Checkmark */}
-              <Pressable 
-                style={[styles.modalActionItem, inspectedUser.is_verified && styles.itemSuccess]} 
+              {/* Toggle Blue Badge */}
+              <Pressable
+                style={[styles.modalActionItem, inspectedUser.is_verified && styles.itemSuccess]}
                 onPress={() => toggleVerification(inspectedUser)}
               >
-                <CheckCircle2 size={18} color={inspectedUser.is_verified ? '#16a34a' : '#64748b'} />
+                <CheckCircle2 size={18} color={inspectedUser.is_verified ? '#16A34A' : '#64748B'} />
                 <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                  <Text style={[styles.modalActionTitle, inspectedUser.is_verified && { color: '#16a34a' }]}>
-                    {inspectedUser.is_verified ? 'سحب الشارة الزرقاء الرسمية' : 'منح التوثيق الرسمي بالشارة الزرقاء ✓'}
+                  <Text style={[styles.modalActionTitle, inspectedUser.is_verified && { color: '#16A34A' }]}>
+                    {inspectedUser.is_verified ? 'سحب التوثيق الرسمي' : 'منح التوثيق الرسمي بالشارة الزرقاء ✓'}
                   </Text>
-                  <Text style={styles.modalActionSub}>إثبات الهوية الوطنية والاعتماد الحكومي في حيّنا</Text>
+                  <Text style={styles.modalActionSub}>اعتماد الهوية الوطنية والاسم الحقيقي في حيّنا</Text>
                 </View>
               </Pressable>
 
-              {/* 3. Geo Verification Shield */}
-              <Pressable 
-                style={[styles.modalActionItem, inspectedUser.is_geoverified && styles.itemSuccess]} 
+              {/* Toggle Geo Badge */}
+              <Pressable
+                style={[styles.modalActionItem, inspectedUser.is_geoverified && styles.itemSuccess]}
                 onPress={() => toggleGeoVerification(inspectedUser)}
               >
-                <ShieldCheck size={18} color={inspectedUser.is_geoverified ? '#16a34a' : '#64748b'} />
+                <ShieldCheck size={18} color={inspectedUser.is_geoverified ? '#16A34A' : '#64748B'} />
                 <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                  <Text style={[styles.modalActionTitle, inspectedUser.is_geoverified && { color: '#16a34a' }]}>
-                    {inspectedUser.is_geoverified ? 'إلغاء توثيق السكن' : 'توثيق السكن "ابن الحي الموثق" 🛡️'}
+                  <Text style={[styles.modalActionTitle, inspectedUser.is_geoverified && { color: '#16A34A' }]}>
+                    {inspectedUser.is_geoverified ? 'إلغاء إثبات السكن' : 'توثيق السكن "ابن الحي الموثق" 🛡️'}
                   </Text>
-                  <Text style={styles.modalActionSub}>تأكيد العنوان الوطني وإقامة المواطن في حيه</Text>
+                  <Text style={styles.modalActionSub}>تأكيد إقامة المواطن وسكنه الفعلي داخل الحي</Text>
                 </View>
               </Pressable>
 
-              {/* 4. Ban / Unban */}
-              <Pressable 
-                style={[styles.modalActionItem, inspectedUser.is_banned ? styles.itemBanned : styles.itemBan]} 
+              {/* Toggle Ban */}
+              <Pressable
+                style={[styles.modalActionItem, inspectedUser.is_banned ? styles.itemBanned : styles.itemBan]}
                 onPress={() => toggleBanUser(inspectedUser)}
               >
-                <Ban size={18} color={inspectedUser.is_banned ? '#fff' : '#dc2626'} />
+                <Ban size={18} color={inspectedUser.is_banned ? '#FFFFFF' : '#DC2626'} />
                 <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                  <Text style={[styles.modalActionTitle, inspectedUser.is_banned ? { color: '#fff' } : { color: '#dc2626' }]}>
+                  <Text style={[styles.modalActionTitle, inspectedUser.is_banned ? { color: '#FFFFFF' } : { color: '#DC2626' }]}>
                     {inspectedUser.is_banned ? 'رفع الحظر عن الحساب 🟢' : 'حظر الحساب نهائياً 🚫'}
                   </Text>
-                  <Text style={[styles.modalActionSub, inspectedUser.is_banned && { color: '#fee2e2' }]}>
-                    منع المستخدم من النشر والتفاعل في الحي
+                  <Text style={[styles.modalActionSub, inspectedUser.is_banned && { color: '#FEE2E2' }]}>
+                    منع المستخدم من التفاعل والنشر داخل المنصة
                   </Text>
                 </View>
               </Pressable>
 
-              {/* Send Direct Admin Notice */}
+              {/* Send Direct Notice */}
               <Text style={[styles.modalSectionLabel, { marginTop: 14 }]}>إرسال تنبيه إداري خاص للمواطن:</Text>
               <TextInput
                 style={styles.modalDirectMsgInput}
-                placeholder="اكتب رسالة أو تنبيهاً خاصاً للمواطن يصله في الإشعارات..."
-                placeholderTextColor="#94a3b8"
-                value={directMsgText}
-                onChangeText={setDirectMsgText}
+                placeholder="اكتب التنبيه الإداري الخاص بالمواطن..."
+                placeholderTextColor="#94A3B8"
+                value={directNoticeText}
+                onChangeText={setDirectNoticeText}
                 multiline
               />
-              <Pressable 
-                style={[styles.btnSendNotice, (!directMsgText.trim() || sendingDirectMsg) && { opacity: 0.5 }]}
+              <Pressable
+                style={[styles.btnSendNotice, (!directNoticeText.trim() || sendingDirectNotice) && { opacity: 0.5 }]}
                 onPress={handleSendDirectNotice}
-                disabled={!directMsgText.trim() || sendingDirectMsg}
+                disabled={!directNoticeText.trim() || sendingDirectNotice}
               >
-                <Send size={15} color="#fff" />
-                <Text style={styles.btnSendNoticeText}>إرسال التنبيه الآن</Text>
+                {sendingDirectNotice ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Send size={15} color="#FFFFFF" />
+                    <Text style={styles.btnSendNoticeText}>إرسال التنبيه الآن</Text>
+                  </>
+                )}
               </Pressable>
             </ScrollView>
           </View>
@@ -1817,11 +2245,20 @@ export default function Admin() {
   );
 }
 
-// ========================================================
-// HELPER COMPONENTS
-// ========================================================
-
-function TabPill({ label, icon, active, badge, onPress }: { label: string; icon: any; active: boolean; badge?: number; onPress: () => void }) {
+// Helper Subcomponents
+function TabPill({
+  label,
+  icon,
+  active,
+  badge,
+  onPress,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  active: boolean;
+  badge?: number;
+  onPress: () => void;
+}) {
   return (
     <Pressable style={[styles.navTabPill, active && styles.navTabPillActive]} onPress={onPress}>
       {icon}
@@ -1843,288 +2280,37 @@ function FilterPill({ label, active, onPress }: { label: string; active: boolean
   );
 }
 
-function StatCard({ icon, bg, value, label, sub, style }: { icon: any; bg: string; value: number; label: string; sub?: string; style?: any }) {
+function StatCard({
+  icon,
+  bg,
+  value,
+  label,
+  sub,
+  style,
+}: {
+  icon: React.ReactNode;
+  bg: string;
+  value: number;
+  label: string;
+  sub?: string;
+  style?: any;
+}) {
   return (
     <View style={[styles.statCard, style]}>
       <View style={[styles.statIconBox, { backgroundColor: bg }]}>{icon}</View>
       <Text style={styles.statValue}>{value.toLocaleString('ar-SA')}</Text>
-      <Text style={styles.statLabel} numberOfLines={1}>{label}</Text>
-      {sub && <Text style={styles.statSub} numberOfLines={1}>{sub}</Text>}
+      <Text style={styles.statLabel}>{label}</Text>
+      {sub ? <Text style={styles.statSub}>{sub}</Text> : null}
     </View>
   );
 }
 
-function EmptyState({ icon, title, sub }: { icon: any; title: string; sub: string }) {
+function EmptyState({ icon, title, sub }: { icon: React.ReactNode; title: string; sub?: string }) {
   return (
     <View style={styles.emptyState}>
-      <View style={styles.emptyIcon}>{icon}</View>
+      {icon}
       <Text style={styles.emptyTitle}>{title}</Text>
-      <Text style={styles.emptySub}>{sub}</Text>
+      {sub ? <Text style={styles.emptySub}>{sub}</Text> : null}
     </View>
   );
 }
-
-// ========================================================
-// STYLESHEET
-// ========================================================
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8FAFC', padding: 24 },
-  loadingText: { marginTop: 16, fontSize: 15, color: '#64748B', fontWeight: '800' },
-  toastBanner: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 56 : 42,
-    alignSelf: 'center',
-    zIndex: 999,
-    backgroundColor: '#0F172A',
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  toastBannerText: { color: '#fff', fontSize: 12, fontWeight: '800' },
-  headerGrad: { paddingTop: Platform.OS === 'ios' ? 54 : 40, paddingBottom: 18, paddingHorizontal: 20 },
-  headerContent: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  headerTexts: { flex: 1, alignItems: 'flex-end', marginHorizontal: 10 },
-  headerTitle: { fontSize: 20, fontWeight: '900', color: '#fff' },
-  headerSub: { fontSize: 11, color: '#94A3B8', fontWeight: '700', marginTop: 2 },
-  backIconBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
-  refreshBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
-  exportBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(2,132,199,0.3)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(2,132,199,0.5)' },
-  alertsRow: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 6 },
-  alertPill: { flexDirection: 'row-reverse', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 14, gap: 5 },
-  alertPillText: { color: '#fff', fontSize: 11, fontWeight: '800' },
-  tabBarWrapper: { backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#E2E8F0' },
-  tabBarScroll: { paddingHorizontal: 14, paddingVertical: 10, gap: 8, flexDirection: 'row-reverse' },
-  navTabPill: { flexDirection: 'row-reverse', alignItems: 'center', backgroundColor: '#F1F5F9', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, gap: 6 },
-  navTabPillActive: { backgroundColor: '#0891B2' },
-  navTabPillText: { fontSize: 12, fontWeight: '700', color: '#64748B' },
-  navTabPillTextActive: { color: '#fff', fontWeight: '900' },
-  navTabBadge: { backgroundColor: '#EF4444', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1 },
-  navTabBadgeText: { color: '#fff', fontSize: 10, fontWeight: '900' },
-  scroll: { flex: 1 },
-  section: { padding: 16 },
-  sectionHeaderRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
-  sectionTitle: { fontSize: 18, fontWeight: '900', color: '#0F172A', textAlign: 'right', marginBottom: 4 },
-  sectionSubDesc: { fontSize: 12, color: '#64748B', textAlign: 'right', marginBottom: 14, lineHeight: 18 },
-  countBadge: { backgroundColor: '#ECFEFF', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
-  countBadgeText: { fontSize: 11, fontWeight: '800', color: '#0891B2' },
-  subSectionTitle: { fontSize: 14, fontWeight: '900', color: '#334155', textAlign: 'right', marginBottom: 10 },
-  statsGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 10 },
-  statCard: { minWidth: 140, backgroundColor: '#fff', borderRadius: 20, padding: 14, alignItems: 'flex-end', borderWidth: 1, borderColor: '#E2E8F0', elevation: 1 },
-  trashActionBtn: { width: 34, height: 34, borderRadius: 10, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#FECACA' },
-  statIconBox: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
-  statValue: { fontSize: 22, fontWeight: '900', color: '#0F172A' },
-  statLabel: { fontSize: 12, color: '#64748B', fontWeight: '800', marginTop: 2 },
-  statSub: { fontSize: 10, color: '#94A3B8', marginTop: 2 },
-  
-  // Cities Geo Breakdown
-  citiesCard: { backgroundColor: '#fff', borderRadius: 18, padding: 14, marginTop: 12, borderWidth: 1, borderColor: '#E2E8F0' },
-  citiesCardHeader: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
-  citiesCardTitle: { fontSize: 13, fontWeight: '900', color: '#0F172A' },
-  citiesCardSub: { fontSize: 10, color: '#94A3B8' },
-  cityPillsRow: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 6 },
-  cityPill: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0' },
-  cityPillActive: { backgroundColor: '#0891B2', borderColor: '#0891B2' },
-  cityPillText: { fontSize: 11, fontWeight: '700', color: '#475569' },
-  cityPillTextActive: { color: '#fff' },
-
-  // System Health
-  healthCard: { marginTop: 12, backgroundColor: '#fff', borderRadius: 18, padding: 14, borderWidth: 1, borderColor: '#E2E8F0' },
-  healthHeader: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, borderBottomWidth: 1, borderBottomColor: '#F1F5F9', paddingBottom: 8 },
-  healthStatusBadge: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
-  healthDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#10B981' },
-  healthStatusText: { fontSize: 11, fontWeight: '800', color: '#10B981' },
-  healthRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 5 },
-  healthLabel: { fontSize: 11, color: '#475569', fontWeight: '700' },
-  healthValueActive: { fontSize: 11, color: '#10B981', fontWeight: '900' },
-  healthValueRole: { fontSize: 10, color: '#0891B2', fontWeight: '800', backgroundColor: '#ECFEFF', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8 },
-  smallActionBtn: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, paddingHorizontal: 9, paddingVertical: 7, borderRadius: 10, backgroundColor: '#f1f5f9' },
-  smallActionText: { color: '#475569', fontSize: 11, fontWeight: '800' },
-  quickAction: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#fff', padding: 14, borderRadius: 16, marginBottom: 8, borderWidth: 1, borderColor: '#E2E8F0' },
-  quickActionLeft: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10 },
-  quickActionText: { fontSize: 13, fontWeight: '800', color: '#0F172A' },
-  qBadge: { backgroundColor: '#FEE2E2', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
-  qBadgeText: { color: '#EF4444', fontSize: 11, fontWeight: '900' },
-
-  // Relational Verifications Dossier
-  verifCardDossier: { backgroundColor: '#fff', borderRadius: 20, padding: 16, marginBottom: 14, borderWidth: 1.5, borderColor: '#FDE68A', shadowColor: '#f59e0b', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 2 },
-  dossierTop: { flexDirection: 'row-reverse', alignItems: 'center', marginBottom: 10 },
-  dossierAvatarWrap: { position: 'relative', marginLeft: 12 },
-  dossierAvatarImg: { width: 48, height: 48, borderRadius: 24 },
-  dossierAvatarFallback: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#0284C7', justifyContent: 'center', alignItems: 'center' },
-  dossierAvatarLetter: { color: '#fff', fontSize: 18, fontWeight: '900' },
-  verifiedCheckBadge: { position: 'absolute', bottom: -1, right: -1, width: 16, height: 16, borderRadius: 8, backgroundColor: '#0284c7', justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: '#fff' },
-  dossierUserMeta: { flex: 1, alignItems: 'flex-end' },
-  dossierUserName: { fontSize: 15, fontWeight: '900', color: '#0F172A' },
-  dossierHandle: { fontSize: 11, color: '#64748B', fontWeight: '600' },
-  dossierLocation: { fontSize: 11, color: '#0891B2', fontWeight: '700', marginTop: 2 },
-  verifStatusPill: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 10 },
-  verifPending: { backgroundColor: '#FEF3C7' },
-  verifPendingText: { color: '#D97706', fontSize: 11, fontWeight: '900' },
-  verifApproved: { backgroundColor: '#DCFCE7' },
-  verifApprovedText: { color: '#16A34A', fontSize: 11, fontWeight: '900' },
-  verifRejected: { backgroundColor: '#FEE2E2' },
-  verifRejectedText: { color: '#DC2626', fontSize: 11, fontWeight: '900' },
-  dossierNoteBox: { backgroundColor: '#FFFBEB', borderRadius: 12, padding: 10, borderWidth: 1, borderColor: '#FEF3C7', marginBottom: 10 },
-  dossierNoteTitle: { fontSize: 11, fontWeight: '800', color: '#92400E', textAlign: 'right', marginBottom: 2 },
-  dossierNoteText: { fontSize: 12, color: '#78350F', textAlign: 'right', lineHeight: 18 },
-  dossierFootprintRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', backgroundColor: '#F8FAFC', borderRadius: 12, padding: 10, marginBottom: 12 },
-  footprintItem: { alignItems: 'center', flex: 1 },
-  footprintLabel: { fontSize: 10, color: '#94A3B8', marginBottom: 2 },
-  footprintVal: { fontSize: 11, fontWeight: '800', color: '#334155' },
-  dossierActionsRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
-  btnApproveVerif: { flex: 1, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', backgroundColor: '#10B981', paddingVertical: 10, borderRadius: 12, gap: 5 },
-  btnApproveVerifText: { color: '#fff', fontSize: 12, fontWeight: '900' },
-  btnRejectVerif: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, backgroundColor: '#FEE2E2', borderWidth: 1, borderColor: '#FECACA' },
-  btnRejectVerifText: { color: '#DC2626', fontSize: 12, fontWeight: '800' },
-  btnInspectCitizen: { width: 38, height: 38, borderRadius: 12, backgroundColor: '#ECFEFF', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#CFFAFE' },
-  dossierCompletedFooter: { borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 8, alignItems: 'center' },
-  dossierCompletedText: { fontSize: 11, color: '#94A3B8' },
-
-  // User Management
-  searchBar: { flexDirection: 'row-reverse', alignItems: 'center', backgroundColor: '#fff', borderRadius: 14, paddingHorizontal: 12, height: 44, borderWidth: 1, borderColor: '#E2E8F0', gap: 8, marginBottom: 10 },
-  searchInput: { flex: 1, fontSize: 13, color: '#0F172A', textAlign: 'right' },
-  locationInput: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 8 },
-  filterRow: { flexDirection: 'row-reverse', gap: 6, marginBottom: 12 },
-  filterPill: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: '#F1F5F9', borderWidth: 1, borderColor: '#E2E8F0' },
-  filterPillActive: { backgroundColor: '#0F172A', borderColor: '#0F172A' },
-  filterPillText: { fontSize: 11, fontWeight: '800', color: '#64748B' },
-  filterPillTextActive: { color: '#fff' },
-  userCard: { backgroundColor: '#fff', borderRadius: 18, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#E2E8F0' },
-  userCardAdmin: { borderColor: '#BAE6FD', backgroundColor: '#F0F9FF' },
-  userCardBanned: { borderColor: '#FECACA', backgroundColor: '#FEF2F2' },
-  userCardHeader: { flexDirection: 'row-reverse', alignItems: 'center' },
-  userAvatarWrap: { position: 'relative', marginLeft: 10 },
-  userAvatarImg: { width: 44, height: 44, borderRadius: 22 },
-  userAvatarFallback: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#0284C7', justifyContent: 'center', alignItems: 'center' },
-  userAvatarLetter: { color: '#fff', fontSize: 16, fontWeight: '900' },
-  adminCrownBadge: { position: 'absolute', bottom: -2, right: -2, width: 16, height: 16, borderRadius: 8, backgroundColor: '#F59E0B', justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: '#fff' },
-  userMeta: { flex: 1, alignItems: 'flex-end' },
-  userName: { fontSize: 14, fontWeight: '900', color: '#0F172A' },
-  userHandle: { fontSize: 11, color: '#64748B', fontWeight: '600' },
-  userLocation: { fontSize: 11, color: '#0891B2', fontWeight: '700', marginTop: 2 },
-  roleBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
-  roleBadgeAdmin: { backgroundColor: '#0F172A' },
-  roleBadgeUser: { backgroundColor: '#F1F5F9' },
-  roleBadgeText: { fontSize: 10, fontWeight: '900' },
-  roleBadgeTextAdmin: { color: '#F59E0B' },
-  roleBadgeTextUser: { color: '#64748B' },
-  userActionsRow: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 6, marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
-  userActionBtn: { flexDirection: 'row-reverse', alignItems: 'center', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 10, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', gap: 4 },
-  userActionBtnText: { fontSize: 10, fontWeight: '800' },
-  btnPromote: { borderColor: '#BAE6FD', backgroundColor: '#F0F9FF' },
-  btnDemote: { borderColor: '#FED7AA', backgroundColor: '#FFFBEB' },
-  btnActiveSuccess: { borderColor: '#86EFAC', backgroundColor: '#F0FDF4' },
-  btnBan: { borderColor: '#FECACA' },
-  btnBannedActive: { backgroundColor: '#DC2626', borderColor: '#DC2626' },
-
-  // Reports
-  reportCard: { backgroundColor: '#fff', borderRadius: 18, padding: 14, marginBottom: 12, borderWidth: 1.5, borderColor: '#FCA5A5' },
-  reportHeader: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-  reportType: { fontSize: 12, fontWeight: '800', color: '#334155' },
-  reportStatusTag: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
-  repPendingTag: { backgroundColor: '#FEE2E2' },
-  repDoneTag: { backgroundColor: '#F1F5F9' },
-  reportStatusText: { fontSize: 10, fontWeight: '900' },
-  repPendingText: { color: '#DC2626' },
-  repDoneText: { color: '#64748B' },
-  reportReason: { fontSize: 14, fontWeight: '800', color: '#0F172A', textAlign: 'right', marginBottom: 6 },
-  reportMetaRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  reportFrom: { fontSize: 11, color: '#64748B', fontWeight: '700' },
-  reportDate: { fontSize: 11, color: '#94A3B8' },
-  reportActionsGrid: { borderTopWidth: 1, borderTopColor: '#FEE2E2', paddingTop: 10 },
-  btnDeleteContent: { backgroundColor: '#DC2626', paddingVertical: 8, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexDirection: 'row-reverse', gap: 6 },
-  btnActionTextWhite: { color: '#fff', fontSize: 11, fontWeight: '900' },
-  resolveBtn: { flex: 1, flexDirection: 'row-reverse', backgroundColor: '#10B981', paddingVertical: 8, borderRadius: 10, alignItems: 'center', justifyContent: 'center', gap: 5 },
-  resolveBtnText: { color: '#fff', fontWeight: '800', fontSize: 11 },
-  dismissBtn: { flex: 1, flexDirection: 'row-reverse', backgroundColor: '#F1F5F9', paddingVertical: 8, borderRadius: 10, alignItems: 'center', justifyContent: 'center', gap: 5 },
-  dismissBtnText: { color: '#64748B', fontWeight: '800', fontSize: 11 },
-
-  // Content Moderation
-  contentItemCard: { backgroundColor: '#fff', borderRadius: 16, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: '#E2E8F0' },
-  contentItemHeader: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
-  contentAuthorName: { fontSize: 12, fontWeight: '800', color: '#0F172A' },
-  contentItemCity: { fontSize: 11, color: '#0891B2', fontWeight: '700' },
-  contentItemTitle: { fontSize: 13, fontWeight: '900', color: '#0F172A', textAlign: 'right', marginBottom: 4 },
-  contentItemBody: { fontSize: 11, color: '#475569', textAlign: 'right', marginBottom: 8 },
-  contentItemFooter: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#F8FAFC', paddingTop: 8 },
-  btnDeleteSm: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, backgroundColor: '#FEF2F2', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  btnDeleteSmText: { fontSize: 10, fontWeight: '800', color: '#DC2626' },
-  btnViewSm: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, backgroundColor: '#ECFEFF', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  btnViewSmText: { fontSize: 10, fontWeight: '800', color: '#0891B2' },
-
-  // Broadcast Hub
-  templatePillsRow: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 6, marginBottom: 10 },
-  templatePill: { backgroundColor: '#F1F5F9', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0' },
-  templatePillText: { fontSize: 11, fontWeight: '800', color: '#334155' },
-  broadcastBox: { backgroundColor: '#fff', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: '#E2E8F0' },
-  inputLabel: { fontSize: 12, fontWeight: '800', color: '#334155', textAlign: 'right', marginBottom: 6 },
-  formInput: { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, fontSize: 13, color: '#0F172A', textAlign: 'right' },
-  previewBox: { marginTop: 14, backgroundColor: '#F8FAFC', borderRadius: 14, padding: 12, borderWidth: 1, borderColor: '#E2E8F0' },
-  previewHeading: { fontSize: 11, fontWeight: '800', color: '#64748B', textAlign: 'right', marginBottom: 8 },
-  previewNotificationCard: { backgroundColor: '#fff', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#CBD5E1', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 },
-  previewCardHeader: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
-  previewAppName: { fontSize: 10, fontWeight: '700', color: '#0891B2' },
-  previewTitleText: { fontSize: 13, fontWeight: '900', color: '#0F172A', textAlign: 'right', marginBottom: 2 },
-  previewBodyText: { fontSize: 11, color: '#475569', textAlign: 'right' },
-  btnSendBroadcast: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', backgroundColor: '#0891B2', borderRadius: 14, paddingVertical: 12, marginTop: 14, gap: 8 },
-  btnSendBroadcastText: { color: '#fff', fontSize: 13, fontWeight: '900' },
-
-  // Audit Logs
-  auditLogCard: { flexDirection: 'row-reverse', alignItems: 'center', backgroundColor: '#fff', borderRadius: 14, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: '#E2E8F0' },
-  auditLogIconBox: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#ECFEFF', alignItems: 'center', justifyContent: 'center', marginLeft: 10 },
-  auditLogMeta: { flex: 1, alignItems: 'flex-end' },
-  auditLogAction: { fontSize: 12, fontWeight: '800', color: '#0F172A' },
-  auditLogTarget: { fontSize: 11, color: '#64748B', marginTop: 2 },
-  auditLogTime: { fontSize: 10, color: '#94A3B8' },
-
-  // User Inspector Modal Drawer
-  modalOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.6)', zIndex: 1000, justifyContent: 'flex-end' },
-  modalDossierBox: { backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24, maxHeight: '88%' },
-  modalDossierHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#F1F5F9', paddingBottom: 12, marginBottom: 12 },
-  modalDossierTitle: { fontSize: 16, fontWeight: '900', color: '#0F172A' },
-  modalCloseBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' },
-  modalDossierScroll: { maxHeight: 520 },
-  modalProfileCard: { flexDirection: 'row-reverse', alignItems: 'center', backgroundColor: '#F8FAFC', borderRadius: 18, padding: 14, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 12 },
-  modalAvatarWrap: { position: 'relative', marginLeft: 12 },
-  modalAvatarImg: { width: 56, height: 56, borderRadius: 28 },
-  modalAvatarFallback: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#0284C7', justifyContent: 'center', alignItems: 'center' },
-  modalAvatarLetter: { color: '#fff', fontSize: 22, fontWeight: '900' },
-  modalAdminBadge: { position: 'absolute', bottom: -2, right: -2, width: 20, height: 20, borderRadius: 10, backgroundColor: '#F59E0B', justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#fff' },
-  modalUserInfo: { flex: 1, alignItems: 'flex-end' },
-  modalName: { fontSize: 16, fontWeight: '900', color: '#0F172A' },
-  modalHandle: { fontSize: 12, color: '#64748B', fontWeight: '600' },
-  modalCity: { fontSize: 12, color: '#0891B2', fontWeight: '700', marginTop: 2 },
-  modalFootprintRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', gap: 8, marginBottom: 14 },
-  modalFootprintBox: { flex: 1, backgroundColor: '#F8FAFC', borderRadius: 14, padding: 10, alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0' },
-  modalFootprintNum: { fontSize: 16, fontWeight: '900', color: '#0F172A' },
-  modalFootprintLabel: { fontSize: 10, color: '#64748B', marginTop: 2 },
-  modalSectionLabel: { fontSize: 13, fontWeight: '900', color: '#0F172A', textAlign: 'right', marginBottom: 8 },
-  modalActionItem: { flexDirection: 'row-reverse', alignItems: 'center', backgroundColor: '#F8FAFC', borderRadius: 14, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: '#E2E8F0', gap: 10 },
-  itemPromote: { borderColor: '#BAE6FD', backgroundColor: '#F0F9FF' },
-  itemDemote: { borderColor: '#FED7AA', backgroundColor: '#FFFBEB' },
-  itemSuccess: { borderColor: '#86EFAC', backgroundColor: '#F0FDF4' },
-  itemBan: { borderColor: '#FECACA', backgroundColor: '#FEF2F2' },
-  itemBanned: { backgroundColor: '#DC2626', borderColor: '#DC2626' },
-  modalActionTitle: { fontSize: 13, fontWeight: '900', color: '#0F172A' },
-  modalActionSub: { fontSize: 10, color: '#64748B', marginTop: 1 },
-  modalDirectMsgInput: { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, fontSize: 12, color: '#0F172A', textAlign: 'right', height: 60, textAlignVertical: 'top' },
-  btnSendNotice: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', backgroundColor: '#0F172A', paddingVertical: 10, borderRadius: 12, gap: 6, marginTop: 8 },
-  btnSendNoticeText: { color: '#fff', fontSize: 12, fontWeight: '900' },
-
-  // Empty & Unauthorized
-  emptyState: { alignItems: 'center', paddingVertical: 40 },
-  emptyIcon: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
-  emptyTitle: { fontSize: 15, fontWeight: '900', color: '#64748B', marginBottom: 4 },
-  emptySub: { fontSize: 12, color: '#94A3B8' },
-  unauthorizedIconWrap: { width: 90, height: 90, borderRadius: 45, alignItems: 'center', justifyContent: 'center', marginBottom: 18 },
-  unauthorizedTitle: { fontSize: 20, fontWeight: '900', color: '#0F172A', marginBottom: 8 },
-  unauthorizedSub: { fontSize: 13, color: '#64748B', textAlign: 'center', lineHeight: 20, marginBottom: 20, paddingHorizontal: 20 },
-  claimAdminBtn: { flexDirection: 'row-reverse', alignItems: 'center', backgroundColor: '#0F172A', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 16, gap: 8, marginBottom: 10 },
-  claimAdminBtnText: { color: '#fff', fontSize: 13, fontWeight: '900' },
-  backBtn: { backgroundColor: '#F1F5F9', paddingHorizontal: 28, paddingVertical: 12, borderRadius: 16 },
-  backBtnText: { color: '#475569', fontWeight: '800', fontSize: 13 },
-});

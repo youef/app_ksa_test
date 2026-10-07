@@ -1151,4 +1151,5 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   saveTimeBtnText: { color: '#fff', fontSize: 15, fontWeight: '900' },
+  inner: { width: '100%', maxWidth: 640, alignSelf: 'center' },
 });

@@ -37,6 +37,7 @@ import LocationSelectorModal from '@/components/LocationSelectorModal';
 import ScreenHeader from '@/components/shared/ScreenHeader';
 import { getCurrentDeviceLocation, reverseGeocodeDeviceLocation } from '@/lib/deviceLocation';
 import {
+  getActiveLocation,
   getPermanentMyLocation,
   savePermanentMyLocation,
   subscribeLocation,

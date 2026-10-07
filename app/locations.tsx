@@ -88,9 +88,9 @@ export default function Locations() {
       }
 
       const geo = await reverseGeocodeDeviceLocation(devLoc);
-      const targetCity = geo.city || 'الرياض';
-      const targetDistrict = geo.district || 'كل الأحياء';
-      const targetRegion = geo.region || 'المملكة';
+      const targetCity = geo?.city || 'الرياض';
+      const targetDistrict = geo?.district || 'كل الأحياء';
+      const targetRegion = geo?.region || 'المملكة';
 
       await savePermanentMyLocation({
         region: targetRegion,

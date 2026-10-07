@@ -15,6 +15,7 @@ import {
 import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
+import { sendPushToUser } from '@/lib/pushSender';
 import {
   ChevronRight,
   MapPin,
@@ -257,6 +258,14 @@ export default function Request() {
             target_type: 'conversation',
             target_id: finalConvId,
           });
+
+          if (match.helper_id) {
+            void sendPushToUser(match.helper_id, {
+              title: '🎉 تم قبول عرضك للفزعة!',
+              body: `قبل جارك عرضك بخصوص: «${(request.title || '').slice(0, 40)}»، اضغط للاتفاق بالخاص.`,
+              data: { url: `/conversation?id=${finalConvId}` },
+            });
+          }
         } catch {}
 
         Alert.alert('تم قبول العرض! 🎉', 'تم إرسال رسالة ترحيبية للجار بالخاص وتحويلك للمحادثة.');

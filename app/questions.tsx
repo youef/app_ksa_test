@@ -178,7 +178,8 @@ export default function Questions() {
     ? `${activeLoc.city}${activeLoc.district && activeLoc.district !== 'كل الأحياء' ? ` · حي ${activeLoc.district}` : ''}`
     : 'كل مناطق المملكة';
 
-  const onSelectLocation = async (loc: HaynaLocation) => {
+  const onSelectLocation = async (region: string, city: string, district: string) => {
+    const loc: HaynaLocation = { region, city, district };
     await savePermanentMyLocation(loc, true);
     setActiveLoc(loc);
     setShowLocationModal(false);
@@ -439,7 +440,8 @@ export default function Questions() {
       {/* Location Selector Modal */}
       <LocationSelectorModal
         visible={showLocationModal}
-        currentLocation={activeLoc}
+        selectedCity={activeLoc.city}
+        selectedDistrict={activeLoc.district}
         onSelect={onSelectLocation}
         onClose={() => setShowLocationModal(false)}
       />

@@ -43,7 +43,7 @@ import {
 } from '@/lib/locationSync';
 import { relativeTime } from '@/lib/mapPins';
 
-type FilterType = 'all' | 'urgent' | 'volunteer' | 'reward';
+type FilterType = 'all' | 'urgent' | 'volunteer' | 'reward' | 'completed';
 
 export default function Requests() {
   const bottomNavInset = useBottomNavInset();

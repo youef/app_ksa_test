@@ -105,8 +105,9 @@ export default function TwitterInquiryCard({
       if (!window.sessionStorage.getItem(viewKey)) {
         window.sessionStorage.setItem(viewKey, '1');
         const tableName = type === 'request' ? 'requests' : 'questions';
-        supabase
-          .rpc('increment_view_count', { p_table: tableName, p_id: data.id })
+        Promise.resolve(
+          supabase.rpc('increment_view_count', { p_table: tableName, p_id: data.id })
+        )
           .then(({ data: nextVal, error }) => {
             if (!error && typeof nextVal === 'number' && isMounted) {
               setViewsCount(nextVal);

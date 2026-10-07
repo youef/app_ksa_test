@@ -1661,7 +1661,7 @@ export default function Market() {
                 {/* Product Cover Image */}
                 {getServiceCover(selectedProduct) ? (
                   <View style={styles.productModalImgWrap}>
-                    <Image source={{ uri: getServiceCover(selectedProduct) }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+                    <Image source={{ uri: getServiceCover(selectedProduct)! }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
                   </View>
                 ) : null}
 

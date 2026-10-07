@@ -45,6 +45,9 @@ import {
   Send,
   X,
   Compass,
+  Wrench,
+  Car,
+  Flame,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { requireAccount } from '@/lib/authGate';
@@ -133,7 +136,7 @@ export default function MoreScreen() {
         reason: 'اقتراح ميزة مستقبلية: ' + ideaText.trim(),
         reporter_id: profile?.id || null,
         target_type: 'idea',
-      }).catch(() => {});
+      });
 
       setShowIdeaModal(false);
       setIdeaText('');
@@ -265,6 +268,33 @@ export default function MoreScreen() {
               title="فزعة وطلبات المساعدة"
               sub="طلب مساعدة عاجلة أو إعارة أدوات بين الجيران"
               onPress={() => router.push('/requests')}
+            />
+            <MenuItem
+              icon={<Wrench size={20} color="#16a34a" />}
+              iconBg="#f0fdf4"
+              title="سلفني بالحي (إعارة أدوات 🔧)"
+              sub="استعر وأعِر الدريل، السلالم، ومعدات الصيانة مجاناً"
+              badge="جديد"
+              badgeColor="#16a34a"
+              onPress={() => router.push('/tools')}
+            />
+            <MenuItem
+              icon={<Car size={20} color="#059669" />}
+              iconBg="#ecfdf5"
+              title="توصيل مدارس الحي 🚗"
+              sub="مشاركة المقاعد بين أولياء الأمور وتخفيف الزحام"
+              badge="جديد"
+              badgeColor="#059669"
+              onPress={() => router.push('/carpooling')}
+            />
+            <MenuItem
+              icon={<Flame size={20} color="#dc2626" />}
+              iconBg="#fef2f2"
+              title="تنبيه الحي العاجل 🚨"
+              sub="بث حالات الطوارئ والمساعدة الفورية في الحي"
+              badge="عاجل"
+              badgeColor="#dc2626"
+              onPress={() => router.push('/emergency-alert')}
             />
             <MenuItem
               icon={<MessageCircle size={20} color="#059669" />}

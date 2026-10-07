@@ -19,6 +19,7 @@ import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
 import { savePermanentMyLocation } from '@/lib/locationSync';
 import { getCurrentDeviceLocation, reverseGeocodeDeviceLocation } from '@/lib/deviceLocation';
+import { NeighborBadgesCard } from '@/components/profile/NeighborBadgesCard';
 import {
   Camera,
   MapPin,
@@ -92,6 +93,8 @@ export default function Profile() {
   const [followsLoading, setFollowsLoading] = useState(false);
 
 
+  const [reputationPoints, setReputationPoints] = useState(15);
+
   const loadProfile = useCallback(async () => {
     const { data: authData } = await supabase.auth.getUser();
     if (!authData.user) return;
@@ -101,7 +104,7 @@ export default function Profile() {
     // Fetch the current profile and its activity from Supabase.
     const r = await supabase.from('profiles').select('*').eq('id', uid).single();
 
-    const [qCount, aCount, followersCount, followingCount, savedRes, postsRes, repliesRes] = await Promise.all([
+    const [qCount, aCount, followersCount, followingCount, savedRes, postsRes, repliesRes, repRes] = await Promise.all([
       supabase.from('questions').select('id', { count: 'exact', head: true }).eq('author_id', uid),
       supabase.from('answers').select('id', { count: 'exact', head: true }).eq('author_id', uid),
       supabase.from('follows').select('id', { count: 'exact', head: true }).eq('following_id', uid),
@@ -109,7 +112,10 @@ export default function Profile() {
       supabase.from('saved_questions').select('*, questions(id, title, body, created_at, city, district, author_id)').eq('user_id', uid).order('created_at', { ascending: false }).limit(20),
       supabase.from('questions').select('id, title, body, created_at, city, district').eq('author_id', uid).order('created_at', { ascending: false }).limit(50),
       supabase.from('answers').select('id, body, created_at, question_id, questions(title)').eq('author_id', uid).order('created_at', { ascending: false }).limit(50),
+      supabase.from('reputation').select('points').eq('user_id', uid).maybeSingle(),
     ]);
+
+    setReputationPoints(repRes.data?.points || 15);
 
     setStats({
       questions: qCount.count || 0,
@@ -455,6 +461,16 @@ export default function Profile() {
           </View>
           </View>
         </LinearGradient>
+
+        <NeighborBadgesCard
+          userId={userId || p?.id || ''}
+          isVerifiedNeighbor={Boolean(p.is_verified_neighbor || p.is_geoverified)}
+          city={city}
+          district={district}
+          reputationPoints={reputationPoints}
+          badges={Array.isArray(p.badges) ? p.badges : ['جار جديد 👋', 'صاحب الفزعات 🤝']}
+          onVerifiedSuccess={loadProfile}
+        />
 
         <View style={styles.contentArea}>
           {editingProfile && (

@@ -218,33 +218,33 @@ async function searchOsmPlaces(
     const items = await res.json();
     if (!Array.isArray(items) || items.length === 0) return [];
 
-    return items
-      .map((item: any, i: number) => {
-        const pLat = Number(item.lat);
-        const pLng = Number(item.lon);
-        if (isNaN(pLat) || isNaN(pLng)) return null;
-        const name = item.name || item.display_name?.split(',')[0] || queryTerm;
-        const dist = distanceMeters({ lat, lng }, { lat: pLat, lng: pLng });
-        return {
-          id: `osm-${item.place_id || i}`,
-          name,
-          categoryKey: category?.key || 'market',
-          categoryLabel: category?.label || 'محل',
-          address: (item.display_name || '').split(',').slice(0, 3).join('، '),
-          lat: pLat,
-          lng: pLng,
-          phone: '',
-          rating: 4.6,
-          reviews: 18,
-          openNow: true,
-          hoursText: 'مفتوح · يخدم الحي',
-          distance: dist,
-          mapsUrl: `https://www.google.com/maps/search/?api=1&query=${pLat},${pLng}`,
-          permanent: true,
-        };
-      })
-      .filter((p): p is NearbyPlace => p !== null)
-      .sort((a, b) => a.distance - b.distance);
+    const results: NearbyPlace[] = [];
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      const pLat = Number(item.lat);
+      const pLng = Number(item.lon);
+      if (isNaN(pLat) || isNaN(pLng)) continue;
+      const name = item.name || item.display_name?.split(',')[0] || queryTerm;
+      const dist = distanceMeters({ lat, lng }, { lat: pLat, lng: pLng });
+      results.push({
+        id: `osm-${item.place_id || i}`,
+        name,
+        categoryKey: category?.key || 'market',
+        categoryLabel: category?.label || 'محل',
+        address: (item.display_name || '').split(',').slice(0, 3).join('، '),
+        lat: pLat,
+        lng: pLng,
+        phone: '',
+        rating: 4.6,
+        reviews: 18,
+        openNow: true,
+        hoursText: 'مفتوح · يخدم الحي',
+        distance: dist,
+        mapsUrl: `https://www.google.com/maps/search/?api=1&query=${pLat},${pLng}`,
+        permanent: true,
+      });
+    }
+    return results.sort((a, b) => a.distance - b.distance);
   } catch {
     return [];
   }
