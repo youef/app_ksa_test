@@ -19,6 +19,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import { useBottomNavInset } from '@/lib/bottomNav';
 import ScreenState from '@/components/shared/ScreenState';
+import { LinearGradient } from 'expo-linear-gradient';
 import {
   ShoppingBag,
   MapPin,
@@ -52,6 +53,16 @@ import {
   SlidersHorizontal,
   Flame,
   ArrowRight,
+  TrendingUp,
+  BadgeCheck,
+  Bookmark,
+  CheckCheck,
+  Compass,
+  ArrowUpDown,
+  Sliders,
+  DollarSign,
+  PackageCheck,
+  Layers,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { relativeTime } from '@/lib/mapPins';
@@ -72,12 +83,21 @@ import {
 
 export type MarketSection = 'market' | 'businesses' | 'events';
 
-type QuickFilter = 'all' | 'available' | 'delivery' | 'images';
+export type SortOption = 'newest' | 'rating' | 'price_asc' | 'price_desc';
+const SORT_OPTIONS: { id: SortOption; label: string; icon: string }[] = [
+  { id: 'newest', label: 'الأحدث', icon: '⚡' },
+  { id: 'rating', label: 'الأعلى تقييماً', icon: '⭐' },
+  { id: 'price_asc', label: 'الأقل سعراً', icon: '🏷️' },
+  { id: 'price_desc', label: 'الأعلى سعراً', icon: '💎' },
+];
+
+type QuickFilter = 'all' | 'available' | 'delivery' | 'images' | 'verified';
 const QUICK_FILTERS: { id: QuickFilter; label: string }[] = [
   { id: 'all', label: 'الكل' },
   { id: 'available', label: '🟢 متاح الآن' },
   { id: 'delivery', label: '🚗 توصيل' },
   { id: 'images', label: '📷 بالصور' },
+  { id: 'verified', label: '🛡️ موثق' },
 ];
 
 type BusinessCategory = 'all' | 'grocery' | 'restaurant' | 'pharmacy' | 'laundry' | 'salon' | 'repair' | 'bakery';
@@ -444,6 +464,8 @@ export default function Market() {
   const [businessCategory, setBusinessCategory] = useState<BusinessCategory>('all');
   const [eventCategory, setEventCategory] = useState<EventCategory>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<SortOption>('newest');
+  const [savedItems, setSavedItems] = useState<Record<string, boolean>>({});
 
   // User Header & Location State
   const [profile, setProfile] = useState<any>(null);
@@ -475,6 +497,13 @@ export default function Market() {
   const columns = contentWidth > 900 ? 4 : contentWidth > 600 ? 3 : 2;
   const gap = 12;
   const cardWidth = (contentWidth - gap * (columns - 1)) / columns;
+
+  const toggleSaveItem = (itemId: string) => {
+    setSavedItems((prev) => {
+      const next = !prev[itemId];
+      return { ...prev, [itemId]: next };
+    });
+  };
 
   useEffect(() => {
     const loadHeader = async () => {
@@ -595,32 +624,62 @@ export default function Market() {
 
   const query = searchQuery.trim().toLocaleLowerCase('ar');
 
-  // Filtered Market Items
-  const displayedMarket = inAreaMarket.filter(({ item, type }) => {
-    if (activeType !== 'all' && type?.id !== activeType) return false;
-    if (quick === 'available' && !item.available_now) return false;
-    if (quick === 'delivery' && !(item.delivery_modes || []).includes('delivery')) return false;
-    if (quick === 'images' && !getServiceCover(item)) return false;
-    if (!query) return true;
-    return [item.name, item.description, item.category, item.subcategory, item.shop_name, item.profiles?.display_name, item.district, type?.label]
-      .some((v) => String(v || '').toLocaleLowerCase('ar').includes(query));
-  });
+  // Filtered & Sorted Market Items
+  const displayedMarket = useMemo(() => {
+    const filtered = inAreaMarket.filter(({ item, type }) => {
+      if (activeType !== 'all' && type?.id !== activeType) return false;
+      if (quick === 'available' && !item.available_now) return false;
+      if (quick === 'delivery' && !(item.delivery_modes || []).includes('delivery')) return false;
+      if (quick === 'images' && !getServiceCover(item)) return false;
+      if (quick === 'verified' && !item.profiles?.is_verified) return false;
+      if (!query) return true;
+      return [item.name, item.description, item.category, item.subcategory, item.shop_name, item.profiles?.display_name, item.district, type?.label]
+        .some((v) => String(v || '').toLocaleLowerCase('ar').includes(query));
+    });
+
+    return filtered.sort((a, b) => {
+      if (sortBy === 'price_asc') {
+        const pA = a.item.price_from ?? a.item.price ?? 999999;
+        const pB = b.item.price_from ?? b.item.price ?? 999999;
+        return pA - pB;
+      }
+      if (sortBy === 'price_desc') {
+        const pA = a.item.price_from ?? a.item.price ?? 0;
+        const pB = b.item.price_from ?? b.item.price ?? 0;
+        return pB - pA;
+      }
+      if (sortBy === 'rating') {
+        const rA = a.item.rating ?? (a.item.profiles?.is_verified ? 4.9 : 4.5);
+        const rB = b.item.rating ?? (b.item.profiles?.is_verified ? 4.9 : 4.5);
+        return rB - rA;
+      }
+      // default: newest
+      return new Date(b.item.created_at || 0).getTime() - new Date(a.item.created_at || 0).getTime();
+    });
+  }, [inAreaMarket, activeType, quick, query, sortBy]);
 
   const families = activeType === 'all' && quick === 'all' && !query
     ? inAreaMarket.filter((e) => e.type?.id === 'home_family').slice(0, 10)
     : [];
 
-  // Filtered Businesses
+  // Filtered & Sorted Businesses
   const displayedBusinesses = useMemo(() => {
-    return businesses.filter((b) => {
+    const filtered = businesses.filter((b) => {
       const matchLoc = isAllKingdom(activeLoc.city) || (b.city && b.city.includes(activeLoc.city));
       if (!matchLoc) return false;
       if (businessCategory !== 'all' && b.category !== businessCategory) return false;
+      if (quick === 'available' && !b.openNow) return false;
+      if (quick === 'verified' && !b.is_verified) return false;
       if (!query) return true;
       return [b.name, b.categoryLabel, b.description, b.district, b.city]
         .some((v) => String(v || '').toLocaleLowerCase('ar').includes(query));
     });
-  }, [businesses, activeLoc, businessCategory, query]);
+
+    return filtered.sort((a, b) => {
+      if (sortBy === 'rating') return (b.rating || 0) - (a.rating || 0);
+      return (b.reviews || 0) - (a.reviews || 0);
+    });
+  }, [businesses, activeLoc, businessCategory, quick, query, sortBy]);
 
   // Filtered Events
   const displayedEvents = useMemo(() => {
@@ -745,6 +804,7 @@ export default function Market() {
     const cover = getServiceCover(item);
     const modes: string[] = (item.delivery_modes || []).slice(0, 3);
     const timeAgo = relativeTime(item.created_at);
+    const isSaved = Boolean(savedItems[item.id]);
 
     return (
       <Pressable
@@ -766,18 +826,33 @@ export default function Market() {
           ) : (
             <ShoppingBag size={36} color="#94a3b8" strokeWidth={1.6} />
           )}
+
+          {/* Top Badges */}
           {type && (
             <View style={[styles.typeBadge, { backgroundColor: 'rgba(255,255,255,0.95)' }]}>
               <Text style={[styles.typeBadgeText, { color: type.color }]}>{type.short}</Text>
             </View>
           )}
+
           {item.available_now && (
             <View style={styles.availableBadgePill}>
               <View style={styles.availableDot} />
               <Text style={styles.availableBadgeText}>متاح</Text>
             </View>
           )}
+
+          {/* Action FABs (Bookmark & WhatsApp & Share) */}
           <View style={styles.cardTopActions}>
+            <Pressable
+              hitSlop={8}
+              style={[styles.shareFab, isSaved && { backgroundColor: '#fef2f2' }]}
+              onPress={(e: any) => {
+                e?.stopPropagation?.();
+                toggleSaveItem(item.id);
+              }}
+            >
+              <Heart size={13} color={isSaved ? '#ef4444' : '#475569'} fill={isSaved ? '#ef4444' : 'none'} />
+            </Pressable>
             <Pressable
               hitSlop={8}
               style={styles.shareFab}
@@ -802,17 +877,20 @@ export default function Market() {
             )}
           </View>
         </View>
+
         <View style={styles.cardBody}>
           <Text style={styles.cardTitle} numberOfLines={1}>{item.name}</Text>
           <Text style={styles.cardSub} numberOfLines={1}>
             {item.shop_name ? `🏪 ${item.shop_name}` : (item.subcategory || item.profiles?.display_name || item.category || 'عرض محلي')}
           </Text>
+
           <View style={styles.cardFooter}>
             <Text style={styles.cardPrice} numberOfLines={1}>{formatServicePrice(item)}</Text>
             {modes.length > 0 && <Text style={styles.cardModes}>{modes.map((m) => getDeliveryMode(m)?.emoji).join('')}</Text>}
           </View>
+
           <View style={styles.cardMeta}>
-            {item.profiles?.is_verified && <ShieldCheck size={11} color="#10b981" />}
+            {item.profiles?.is_verified && <ShieldCheck size={12} color="#10b981" />}
             <MapPin size={10} color="#94a3b8" />
             <Text style={styles.cardMetaText} numberOfLines={1}>
               {type?.nationwide ? 'عن بُعد' : (item.district || item.profiles?.district) ? `حي ${item.district || item.profiles?.district}` : (item.city || 'داخل الحي')}
@@ -831,6 +909,8 @@ export default function Market() {
 
   // Render Card: Local Business / Store Directory
   const renderBusinessCard = (b: any, w: number) => {
+    const isSaved = Boolean(savedItems[b.id]);
+
     return (
       <Pressable
         key={b.id}
@@ -854,6 +934,16 @@ export default function Market() {
             </View>
           )}
           <View style={styles.cardTopActions}>
+            <Pressable
+              hitSlop={8}
+              style={[styles.shareFab, isSaved && { backgroundColor: '#fef2f2' }]}
+              onPress={(e: any) => {
+                e?.stopPropagation?.();
+                toggleSaveItem(b.id);
+              }}
+            >
+              <Heart size={13} color={isSaved ? '#ef4444' : '#475569'} fill={isSaved ? '#ef4444' : 'none'} />
+            </Pressable>
             <Pressable
               hitSlop={8}
               style={styles.shareFab}
@@ -1046,21 +1136,33 @@ export default function Market() {
         stickyHeaderIndices={[1]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadAllData} tintColor="#059669" />}
       >
-        {/* Compact executive header */}
-        <View style={styles.header}>
+        {/* Premium Executive Hero Header */}
+        <LinearGradient
+          colors={['#064e3b', '#065f46', '#047857']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.heroHeader}
+        >
           <View style={styles.inner}>
             <View style={styles.topRow}>
               <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                <Text style={styles.headerTitle}>سوق وخدمات الحي</Text>
+                <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
+                  <Text style={styles.headerTitle}>سوق وخدمات الحي</Text>
+                  <View style={styles.proBadge}>
+                    <Sparkles size={11} color="#fef08a" />
+                    <Text style={styles.proBadgeText}>موثّق</Text>
+                  </View>
+                </View>
                 <Pressable onPress={() => router.push('/locations')} style={styles.locRow}>
-                  <MapPin size={12} color="#059669" />
+                  <MapPin size={13} color="#6ee7b7" />
                   <Text style={styles.locText} numberOfLines={1}>{locationLabel}</Text>
-                  <ChevronDown size={12} color="#94a3b8" />
+                  <ChevronDown size={12} color="#a7f3d0" />
                 </Pressable>
               </View>
+
               <View style={styles.headerActions}>
                 <Pressable onPress={() => router.push('/notifications')} style={styles.iconBtn}>
-                  <Bell size={19} color="#334155" />
+                  <Bell size={18} color="#fff" />
                   {unreadNotifCount > 0 && (
                     <View style={styles.notifBadge}>
                       <Text style={styles.notifBadgeText}>{unreadNotifCount > 9 ? '9+' : unreadNotifCount}</Text>
@@ -1083,8 +1185,35 @@ export default function Market() {
                 </Pressable>
               </View>
             </View>
+
+            {/* Live Neighborhood KPI Strip */}
+            <View style={styles.kpiRow}>
+              <View style={styles.kpiItem}>
+                <ShoppingBag size={14} color="#6ee7b7" />
+                <Text style={styles.kpiVal}>{inAreaMarket.length}</Text>
+                <Text style={styles.kpiLbl}>عروض نشطة</Text>
+              </View>
+              <View style={styles.kpiDivider} />
+              <View style={styles.kpiItem}>
+                <Store size={14} color="#6ee7b7" />
+                <Text style={styles.kpiVal}>{displayedBusinesses.length}</Text>
+                <Text style={styles.kpiLbl}>محلات ومتاجر</Text>
+              </View>
+              <View style={styles.kpiDivider} />
+              <View style={styles.kpiItem}>
+                <Calendar size={14} color="#6ee7b7" />
+                <Text style={styles.kpiVal}>{displayedEvents.length}</Text>
+                <Text style={styles.kpiLbl}>فعاليات قادمة</Text>
+              </View>
+              <View style={styles.kpiDivider} />
+              <View style={styles.kpiItem}>
+                <ShieldCheck size={14} color="#6ee7b7" />
+                <Text style={styles.kpiVal}>100%</Text>
+                <Text style={styles.kpiLbl}>مجتمع موثوق</Text>
+              </View>
+            </View>
           </View>
-        </View>
+        </LinearGradient>
 
         {/* Sticky Search & Section Segment Switcher */}
         <View style={styles.stickyWrap}>
@@ -1109,7 +1238,7 @@ export default function Market() {
                 style={[styles.segmentBtn, section === 'businesses' && styles.segmentBtnActive]}
               >
                 <Building2 size={14} color={section === 'businesses' ? '#fff' : '#64748b'} />
-                <Text style={[styles.segmentText, section === 'businesses' && styles.segmentTextActive]}>دليل الأعمال والخدمات</Text>
+                <Text style={[styles.segmentText, section === 'businesses' && styles.segmentTextActive]}>دليل المحلات والأنشطة</Text>
                 <View style={[styles.segmentCount, section === 'businesses' && styles.segmentCountActive]}>
                   <Text style={[styles.segmentCountText, section === 'businesses' && styles.segmentCountTextActive]}>
                     {displayedBusinesses.length}
@@ -1122,7 +1251,7 @@ export default function Market() {
                 style={[styles.segmentBtn, section === 'events' && styles.segmentBtnActive]}
               >
                 <Calendar size={14} color={section === 'events' ? '#fff' : '#64748b'} />
-                <Text style={[styles.segmentText, section === 'events' && styles.segmentTextActive]}>فعاليات الحي</Text>
+                <Text style={[styles.segmentText, section === 'events' && styles.segmentTextActive]}>ملتقيات وفعاليات</Text>
                 <View style={[styles.segmentCount, section === 'events' && styles.segmentCountActive]}>
                   <Text style={[styles.segmentCountText, section === 'events' && styles.segmentCountTextActive]}>
                     {displayedEvents.length}
@@ -1161,6 +1290,28 @@ export default function Market() {
                 <Plus size={18} color="#fff" />
                 {width > 360 && <Text style={styles.addBtnText}>{addBtnLabel}</Text>}
               </Pressable>
+            </View>
+
+            {/* Smart Sorting Bar */}
+            <View style={styles.sortBar}>
+              <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}>
+                <ArrowUpDown size={12} color="#64748b" />
+                <Text style={styles.sortBarLabel}>ترتيب:</Text>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row-reverse', gap: 6 }}>
+                {SORT_OPTIONS.map((opt) => (
+                  <Pressable
+                    key={opt.id}
+                    onPress={() => setSortBy(opt.id)}
+                    style={[styles.sortChip, sortBy === opt.id && styles.sortChipActive]}
+                  >
+                    <Text style={{ fontSize: 10 }}>{opt.icon}</Text>
+                    <Text style={[styles.sortChipText, sortBy === opt.id && styles.sortChipTextActive]}>
+                      {opt.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
             </View>
           </View>
         </View>
@@ -1886,34 +2037,86 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc', width: '100%' },
   inner: { width: '100%', maxWidth: 1100, alignSelf: 'center', paddingHorizontal: 16 },
 
-  header: { backgroundColor: '#fff', paddingTop: Platform.OS === 'ios' ? 52 : 18, paddingBottom: 10 },
+  heroHeader: {
+    paddingTop: Platform.OS === 'ios' ? 52 : 18,
+    paddingBottom: 16,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+  },
   topRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between' },
-  headerTitle: { fontSize: 22, fontWeight: '900', color: '#0f172a' },
-  proTag: {
+  headerTitle: { fontSize: 22, fontWeight: '900', color: '#fff' },
+  proBadge: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 3,
-    backgroundColor: '#ecfdf5',
-    borderWidth: 1,
-    borderColor: '#a7f3d0',
+    backgroundColor: 'rgba(255,255,255,0.2)',
     paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
   },
-  proTagText: { fontSize: 10.5, fontWeight: '900', color: '#059669' },
-  locRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, marginTop: 2, maxWidth: 240 },
-  locText: { fontSize: 12, color: '#475569', fontWeight: '700', flexShrink: 1 },
+  proBadgeText: { fontSize: 10, fontWeight: '900', color: '#fef08a' },
+  locRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, marginTop: 4, maxWidth: 240 },
+  locText: { fontSize: 12.5, color: '#d1fae5', fontWeight: '700', flexShrink: 1 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  iconBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' },
+  iconBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
   notifBadge: { position: 'absolute', top: -2, right: -2, minWidth: 17, height: 17, borderRadius: 9, backgroundColor: '#ef4444', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
   notifBadgeText: { color: '#fff', fontSize: 8.5, fontWeight: '900' },
   avatarWrap: { width: 40, height: 40 },
-  avatarImg: { width: 40, height: 40, borderRadius: 20 },
-  avatarPlaceholder: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#d1fae5', alignItems: 'center', justifyContent: 'center' },
-  avatarLetter: { color: '#047857', fontSize: 16, fontWeight: '900' },
-  avatarVerified: { position: 'absolute', right: -2, bottom: -1, width: 16, height: 16, borderRadius: 8, backgroundColor: '#059669', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
+  avatarImg: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, borderColor: '#6ee7b7' },
+  avatarPlaceholder: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#6ee7b7' },
+  avatarLetter: { color: '#fff', fontSize: 16, fontWeight: '900' },
+  avatarVerified: { position: 'absolute', right: -2, bottom: -1, width: 16, height: 16, borderRadius: 8, backgroundColor: '#10b981', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
 
-  stickyWrap: { backgroundColor: '#fff', paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#f1f5f9', borderBottomLeftRadius: 20, borderBottomRightRadius: 20 },
+  // Live Neighborhood KPI Strip
+  kpiRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(0,0,0,0.18)',
+    borderRadius: 14,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginTop: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  kpiItem: { flex: 1, alignItems: 'center', gap: 2 },
+  kpiVal: { fontSize: 13.5, fontWeight: '900', color: '#fff' },
+  kpiLbl: { fontSize: 9.5, color: '#a7f3d0', fontWeight: '700' },
+  kpiDivider: { width: 1, height: 20, backgroundColor: 'rgba(255,255,255,0.15)' },
+
+  stickyWrap: { backgroundColor: '#fff', paddingBottom: 10, paddingTop: 10, borderBottomWidth: 1, borderBottomColor: '#f1f5f9', borderBottomLeftRadius: 20, borderBottomRightRadius: 20, shadowColor: '#0f172a', shadowOpacity: 0.04, shadowRadius: 10, elevation: 3 },
+
+  // Sort Bar
+  sortBar: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+  },
+  sortBarLabel: { fontSize: 11, fontWeight: '800', color: '#64748b' },
+  sortChip: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  sortChipActive: {
+    backgroundColor: '#059669',
+    borderColor: '#059669',
+  },
+  sortChipText: { fontSize: 11, fontWeight: '700', color: '#475569' },
+  sortChipTextActive: { color: '#fff', fontWeight: '800' },
 
   // Segment Controller
   segmentWrap: {
