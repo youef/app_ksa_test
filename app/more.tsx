@@ -12,6 +12,7 @@ import {
   Modal,
   TextInput,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
@@ -48,6 +49,16 @@ import {
   Wrench,
   Car,
   Flame,
+  Search,
+  Users,
+  MessageSquare,
+  Mail,
+  Star,
+  Rocket,
+  Globe,
+  FileText,
+  HeartHandshake,
+  ClipboardList,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { requireAccount } from '@/lib/authGate';
@@ -70,10 +81,45 @@ export default function MoreScreen() {
   const [ideaText, setIdeaText] = useState('');
   const [sendingIdea, setSendingIdea] = useState(false);
 
+  // Live community statistics
+  const [stats, setStats] = useState({
+    openRequests: 0,
+    members: 0,
+    services: 0,
+    questions: 0,
+  });
+  const [statsLoading, setStatsLoading] = useState(true);
+
+  // FAQ accordion
+  const [openFaq, setOpenFaq] = useState<number | null>(null);
+
   useEffect(() => {
     loadUserData();
+    loadStats();
     getActiveLocation().then(setLocation);
   }, []);
+
+  const loadStats = async () => {
+    setStatsLoading(true);
+    try {
+      const [reqRes, membersRes, servicesRes, questionsRes] = await Promise.all([
+        supabase.from('requests').select('id', { count: 'exact', head: true }).eq('status', 'open'),
+        supabase.from('profiles').select('id', { count: 'exact', head: true }),
+        supabase.from('services').select('id', { count: 'exact', head: true }),
+        supabase.from('questions').select('id', { count: 'exact', head: true }),
+      ]);
+      setStats({
+        openRequests: reqRes.count ?? 0,
+        members: membersRes.count ?? 0,
+        services: servicesRes.count ?? 0,
+        questions: questionsRes.count ?? 0,
+      });
+    } catch {
+      // Statistics are optional; ignore failures silently.
+    } finally {
+      setStatsLoading(false);
+    }
+  };
 
   const loadUserData = async () => {
     try {
@@ -108,6 +154,22 @@ export default function MoreScreen() {
     try {
       await Share.share({ message: text, title: 'حيّنا' });
     } catch {}
+  };
+
+  const openExternal = async (url: string) => {
+    try {
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert('تعذّر الفتح', 'لا يمكن فتح الرابط على هذا الجهاز.');
+    }
+  };
+
+  const handleContactSupport = () => {
+    openExternal('mailto:support@hayna.app?subject=' + encodeURIComponent('الدعم - تطبيق حيّنا'));
+  };
+
+  const handleOpenPolicy = () => {
+    openExternal('https://appksatest.vercel.app/privacy');
   };
 
   const handleSignOut = () => {
@@ -153,18 +215,142 @@ export default function MoreScreen() {
       ? 'كل مناطق المملكة'
       : `${location.city}${location.district !== 'كل الأحياء' ? ` · حي ${location.district}` : ''}`;
 
+  const routeGuarded = (route: string) => {
+    const needsAccount = route === '/new-request' || route === '/ask';
+    if (needsAccount && !hasSession) {
+      requireAccount('سجّل الدخول أو أنشئ حساباً للاستفادة من خدمات الحي.');
+      return;
+    }
+    router.push(route as any);
+  };
+
+  const QUICK_ACTIONS = [
+    {
+      icon: <HeartHandshake size={20} color="#fff" />,
+      label: 'اطلب فزعة',
+      sub: 'مساعدة من جيرانك',
+      color: '#059669',
+      route: '/new-request',
+    },
+    {
+      icon: <HelpCircle size={20} color="#fff" />,
+      label: 'اسأل الحي',
+      sub: 'استفسارات وأسئلة',
+      color: '#0284c7',
+      route: '/ask',
+    },
+    {
+      icon: <Compass size={20} color="#fff" />,
+      label: 'خريطة الحي',
+      sub: 'كل شيء حولك',
+      color: '#7c3aed',
+      route: '/map',
+    },
+    {
+      icon: <ShoppingBag size={20} color="#fff" />,
+      label: 'سوق الحي',
+      sub: 'تسوّق من الجيران',
+      color: '#d97706',
+      route: '/market',
+    },
+  ];
+
+  const HOW_IT_WORKS = [
+    { step: '١', title: 'حدّد موقعك', desc: 'اختر منطقتك وحيّك ليصلك كل ما يخص جيرانك فقط.' },
+    { step: '٢', title: 'اطلب أو اسأل', desc: 'انشر طلب فزعة، سؤالاً، أو عرض خدمة بنقرة واحدة.' },
+    { step: '٣', title: 'يتفاعل الجيران', desc: 'يقدّم الجيران عروضهم بنفسهم — لا عروض آلية ولا وهمية.' },
+    { step: '٤', title: 'أتمّ الفزعة', desc: 'اتفقوا بالخاص، أنجزوا المهمة، وامنحوا نقاط السمعة ☕.' },
+  ];
+
+  const FAQS = [
+    {
+      q: 'هل تُرسل طلبات أو عروض مساعدة تلقائياً؟',
+      a: 'لا. لا يرسل التطبيق أي طلب أو عرض مساعدة نيابةً عنك. جميع الطلبات والعروض تُنشأ فقط عندما يضغط المستخدم الحقيقي على زر الإرسال بنفسه.',
+    },
+    {
+      q: 'كيف أطلب فزعة أو مساعدة من جيراني؟',
+      a: 'من قسم «فزعة وطلبات المساعدة» اضغط «طلب جديد»، اكتب التفاصيل وحدّد حيّك ثم انشر. سيصل طلبك لجيرانك القريبين منك.',
+    },
+    {
+      q: 'هل موقعي الدقيق ظاهر للجميع؟',
+      a: 'لا. يُعرض موقعك على مستوى الحي فقط لحماية خصوصيتك، ويتم تبادل الموقع الدقيق بالخاص وبموافقتك فقط.',
+    },
+    {
+      q: 'ما فائدة نقاط السمعة وشارات الجار الفاعل؟',
+      a: 'تُمنح نقاط السمعة للجيران المتعاونين عند إتمام الفزعات والإجابات المفيدة، وتظهر كشارات تميّز في ملفك الشخصي.',
+    },
+  ];
+
+  const APP_VERSION = '2.5.0';
+
   return (
     <View style={styles.container}>
-      {/* Top Header */}
-      <View style={styles.topNavbar}>
-        <Text style={styles.navTitle}>المزيد والخدمات 🌟</Text>
-      </View>
+      {/* Hero Header with live stats */}
+      <LinearGradient
+        colors={['#064e3b', '#065f46', '#047857']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.hero}
+      >
+        <View style={styles.heroTopRow}>
+          <View style={styles.heroVersionPill}>
+            <Sparkles size={12} color="#a7f3d0" />
+            <Text style={styles.heroVersionText}>الإصدار {APP_VERSION}</Text>
+          </View>
+          <View style={{ flex: 1, alignItems: 'flex-end' }}>
+            <Text style={styles.heroTitle}>المزيد والخدمات 🌟</Text>
+            <Text style={styles.heroSubtitle}>كل خدمات حيّك في مكان واحد — مجتمع، سوق، وفزعة 🇸🇦</Text>
+          </View>
+        </View>
+
+        <View style={styles.statsRow}>
+          <StatBox
+            icon={<ClipboardList size={15} color="#6ee7b7" />}
+            value={statsLoading ? '…' : String(stats.openRequests)}
+            label="طلبات مفتوحة"
+          />
+          <StatBox
+            icon={<Users size={15} color="#6ee7b7" />}
+            value={statsLoading ? '…' : String(stats.members)}
+            label="سكان الحي"
+          />
+          <StatBox
+            icon={<Wrench size={15} color="#6ee7b7" />}
+            value={statsLoading ? '…' : String(stats.services)}
+            label="خدمات"
+          />
+          <StatBox
+            icon={<MessageSquare size={15} color="#6ee7b7" />}
+            value={statsLoading ? '…' : String(stats.questions)}
+            label="أسئلة واستفسارات"
+          />
+        </View>
+      </LinearGradient>
 
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingBottom: bottomNavInset + 24 }]}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.contentWrap}>
+          {/* 0. QUICK ACTIONS GRID */}
+          <View style={styles.quickGrid}>
+            {QUICK_ACTIONS.map(action => (
+              <Pressable
+                key={action.label}
+                style={({ pressed }) => [
+                  styles.quickCard,
+                  { backgroundColor: action.color },
+                  pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] },
+                ]}
+                onPress={() => routeGuarded(action.route)}
+              >
+                <View style={styles.quickIconCircle}>{action.icon}</View>
+                <Text style={styles.quickLabel}>{action.label}</Text>
+                <Text style={styles.quickSub}>{action.sub}</Text>
+              </Pressable>
+            ))}
+          </View>
+
           {/* 1. USER PROFILE GLANCE CARD */}
           {hasSession ? (
             <Pressable
@@ -303,6 +489,45 @@ export default function MoreScreen() {
               sub="اسأل أهل حيك واستفد من تجاربهم ومعرفتهم"
               onPress={() => router.push('/questions')}
             />
+            <MenuItem
+              icon={<Search size={20} color="#0f766e" />}
+              iconBg="#f0fdfa"
+              title="البحث الذكي في الحي"
+              sub="ابحث في الطلبات والخدمات والأسئلة والجيران"
+              badge="جديد"
+              badgeColor="#0f766e"
+              onPress={() => router.push('/search')}
+            />
+            <MenuItem
+              icon={<MapPin size={20} color="#0891b2" />}
+              iconBg="#ecfeff"
+              title="أحياء ومدن المملكة"
+              sub="استعرض الأحياء والمدن واختر نطاق حيّك"
+              onPress={() => router.push('/locations')}
+            />
+          </View>
+
+          {/* 3.5 HOW HAYNA WORKS */}
+          <Text style={styles.sectionHeader}>كيف تعمل منصة حيّنا؟ 🧭</Text>
+          <View style={styles.howCard}>
+            {HOW_IT_WORKS.map((step, idx) => (
+              <View key={step.step} style={styles.howRow}>
+                <View style={styles.howStepCircle}>
+                  <Text style={styles.howStepText}>{step.step}</Text>
+                </View>
+                <View style={{ flex: 1, alignItems: 'flex-end', gap: 2 }}>
+                  <Text style={styles.howTitle}>{step.title}</Text>
+                  <Text style={styles.howDesc}>{step.desc}</Text>
+                </View>
+                {idx < HOW_IT_WORKS.length - 1 && <View style={styles.howConnector} />}
+              </View>
+            ))}
+            <View style={styles.honestyNote}>
+              <ShieldCheck size={15} color="#047857" />
+              <Text style={styles.honestyNoteText}>
+                التزاماً بالشفافية: لا يرسل «حيّنا» أي عروض أو طلبات مساعدة تلقائياً نيابةً عن المستخدمين. كل عرض يأتي من جار حقيقي ضغط زر الإرسال بنفسه.
+              </Text>
+            </View>
           </View>
 
           {/* 4. FUTURE EXPANSIONS & UPGRADES BOX (MODULAR SECTION) */}
@@ -387,7 +612,7 @@ export default function MoreScreen() {
               iconBg="#f1f5f9"
               title="إعدادات الحساب والخصوصية"
               sub="إدارة بياناتك والتوثيق والمظهر"
-              onPress={() => isGuest ? requireAccount() : router.push('/settings')}
+              onPress={() => (hasSession ? router.push('/settings') : requireAccount())}
             />
             <MenuItem
               icon={<Share2 size={20} color="#0284c7" />}
@@ -395,6 +620,64 @@ export default function MoreScreen() {
               title="شارك تطبيق حيّنا مع جيرانك"
               sub="ادعُ جيرانك في الحي والعمارة للانضمام"
               onPress={handleShareApp}
+            />
+            <MenuItem
+              icon={<Star size={20} color="#d97706" />}
+              iconBg="#fffbeb"
+              title="قيّم تجربتك في حيّنا"
+              sub="رأيك يساعدنا على تطوير المنصة لخدمة حيّك"
+              onPress={() => openExternal('https://appksatest.vercel.app')}
+            />
+          </View>
+
+          {/* 6.5 FREQUENTLY ASKED QUESTIONS */}
+          <Text style={styles.sectionHeader}>أسئلة شائعة 💬</Text>
+          <View style={styles.faqCard}>
+            {FAQS.map((item, idx) => {
+              const isOpen = openFaq === idx;
+              return (
+                <View key={idx} style={styles.faqItem}>
+                  <Pressable
+                    style={styles.faqQuestionRow}
+                    onPress={() => setOpenFaq(isOpen ? null : idx)}
+                    accessibilityRole="button"
+                  >
+                    <ChevronRight
+                      size={16}
+                      color="#059669"
+                      style={{ transform: [{ rotate: isOpen ? '90deg' : '0deg' }] }}
+                    />
+                    <Text style={styles.faqQuestion}>{item.q}</Text>
+                  </Pressable>
+                  {isOpen && <Text style={styles.faqAnswer}>{item.a}</Text>}
+                </View>
+              );
+            })}
+          </View>
+
+          {/* 6.6 SUPPORT & CONTACT */}
+          <Text style={styles.sectionHeader}>الدعم والتواصل 📞</Text>
+          <View style={styles.menuGroup}>
+            <MenuItem
+              icon={<Mail size={20} color="#0284c7" />}
+              iconBg="#f0f9ff"
+              title="تواصل مع فريق الدعم"
+              sub="support@hayna.app — نسعد بخدمتك ومساعدتك"
+              onPress={handleContactSupport}
+            />
+            <MenuItem
+              icon={<FileText size={20} color="#7c3aed" />}
+              iconBg="#f5f3ff"
+              title="سياسة الخصوصية والشروط"
+              sub="نحمي بياناتك ونحترم خصوصية حيّك"
+              onPress={handleOpenPolicy}
+            />
+            <MenuItem
+              icon={<Globe size={20} color="#059669" />}
+              iconBg="#ecfdf5"
+              title="زيارة موقع حيّنا"
+              sub="appksatest.vercel.app"
+              onPress={() => openExternal('https://appksatest.vercel.app')}
             />
           </View>
 
@@ -410,7 +693,17 @@ export default function MoreScreen() {
           <View style={styles.footerBox}>
             <Text style={styles.footerTitle}>حيّنا — Hayna</Text>
             <Text style={styles.footerSub}>المنصة المجتمعية الرقمية لتعزيز الترابط والخدمات بين الجيران 🇸🇦</Text>
-            <Text style={styles.footerVersion}>الإصدار 2.4.0 · التحديث المطور</Text>
+            <View style={styles.footerBadgeRow}>
+              <View style={styles.footerBadge}>
+                <ShieldCheck size={12} color="#047857" />
+                <Text style={styles.footerBadgeText}>بيانات حقيقية بلا طلبات تجريبية</Text>
+              </View>
+              <View style={styles.footerBadge}>
+                <Rocket size={12} color="#0369a1" />
+                <Text style={styles.footerBadgeText}>تحديثات مستمرة</Text>
+              </View>
+            </View>
+            <Text style={styles.footerVersion}>الإصدار {APP_VERSION} · التحديث المطور</Text>
           </View>
         </View>
       </ScrollView>
@@ -506,28 +799,169 @@ function MenuItem({
   );
 }
 
-const isGuest = false;
+function StatBox({ icon, value, label }: { icon: any; value: string; label: string }) {
+  return (
+    <View style={styles.statBox}>
+      <View style={styles.statIconRow}>
+        {icon}
+        <Text style={styles.statValue}>{value}</Text>
+      </View>
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  );
+}
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
 
-  // Navbar
-  topNavbar: {
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-    paddingTop: Platform.OS === 'ios' ? 48 : 16,
-    paddingBottom: 12,
+  // Hero Header
+  hero: {
+    paddingTop: Platform.OS === 'ios' ? 54 : 40,
     paddingHorizontal: 16,
+    paddingBottom: 20,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+    gap: 16,
   },
-  navTitle: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: '#0f172a',
+  heroTopRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 10,
+  },
+  heroTitle: { fontSize: 22, fontWeight: '900', color: '#fff', textAlign: 'right' },
+  heroSubtitle: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.9)',
     textAlign: 'right',
-    maxWidth: 800,
-    width: '100%',
-    alignSelf: 'center',
+    marginTop: 4,
+    lineHeight: 17,
+    fontWeight: '600',
+  },
+  heroVersionPill: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+  },
+  heroVersionText: { color: '#a7f3d0', fontSize: 10.5, fontWeight: '800' },
+  statsRow: {
+    flexDirection: 'row-reverse',
+    gap: 8,
+  },
+  statBox: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.16)',
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    alignItems: 'center',
+    gap: 3,
+  },
+  statIconRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4 },
+  statValue: { color: '#fff', fontSize: 17, fontWeight: '900' },
+  statLabel: { color: 'rgba(255,255,255,0.85)', fontSize: 10, fontWeight: '700' },
+
+  // Quick Actions
+  quickGrid: {
+    flexDirection: 'row-reverse',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  quickCard: {
+    width: '48%',
+    borderRadius: 18,
+    padding: 14,
+    minHeight: 108,
+    justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  quickIconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quickLabel: { color: '#fff', fontSize: 14, fontWeight: '900', textAlign: 'right' },
+  quickSub: { color: 'rgba(255,255,255,0.85)', fontSize: 10.5, textAlign: 'right', fontWeight: '600' },
+
+  // How it works
+  howCard: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    padding: 16,
+    gap: 14,
+  },
+  howRow: { flexDirection: 'row-reverse', alignItems: 'flex-start', gap: 10 },
+  howStepCircle: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  howStepText: { color: '#047857', fontSize: 14, fontWeight: '900' },
+  howTitle: { fontSize: 14, fontWeight: '900', color: '#0f172a', textAlign: 'right' },
+  howDesc: { fontSize: 11.5, color: '#64748b', textAlign: 'right', lineHeight: 17 },
+  howConnector: { display: 'none' },
+  honestyNote: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+    borderRadius: 14,
+    padding: 12,
+  },
+  honestyNoteText: {
+    flex: 1,
+    color: '#047857',
+    fontSize: 11.5,
+    lineHeight: 17,
+    fontWeight: '700',
+    textAlign: 'right',
+  },
+
+  // FAQ
+  faqCard: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    overflow: 'hidden',
+  },
+  faqItem: { borderBottomWidth: 1, borderBottomColor: '#f1f5f9', paddingHorizontal: 14 },
+  faqQuestionRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 14,
+  },
+  faqQuestion: { flex: 1, fontSize: 13, fontWeight: '800', color: '#0f172a', textAlign: 'right' },
+  faqAnswer: {
+    fontSize: 12,
+    color: '#475569',
+    textAlign: 'right',
+    lineHeight: 19,
+    paddingBottom: 14,
+    paddingRight: 24,
   },
 
   scroll: { paddingTop: 14 },
@@ -734,7 +1168,26 @@ const styles = StyleSheet.create({
   },
   footerTitle: { fontSize: 14, fontWeight: '900', color: '#059669' },
   footerSub: { fontSize: 11.5, color: '#64748b', textAlign: 'center' },
-  footerVersion: { fontSize: 10.5, color: '#94a3b8', marginTop: 4 },
+  footerBadgeRow: {
+    flexDirection: 'row-reverse',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 8,
+  },
+  footerBadge: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 10,
+  },
+  footerBadgeText: { fontSize: 10, fontWeight: '700', color: '#475569' },
+  footerVersion: { fontSize: 10.5, color: '#94a3b8', marginTop: 8 },
 
   // Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.65)', justifyContent: 'flex-end' },

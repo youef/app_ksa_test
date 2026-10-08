@@ -48,12 +48,23 @@ import { getCurrentDeviceLocation, reverseGeocodeDeviceLocation } from '@/lib/de
 import { relativeTime } from '@/lib/mapPins';
 import { useBottomNavInset } from '@/lib/bottomNav';
 
+// Auto-generated "اقتراح تلقائي" offers are produced by a server-side matcher and
+// must never be treated as real neighbour offers. Only a genuine authenticated user
+// who deliberately sends an offer counts (see migration 202610080001).
+const AUTO_SUGGESTION_MARKERS = ['اقتراح تلقائي', 'اقتراح تلقائى'];
+function isAutoSuggestedOffer(match: any): boolean {
+  const msg = typeof match?.message === 'string' ? match.message.trim() : '';
+  if (!msg) return false;
+  return AUTO_SUGGESTION_MARKERS.some(marker => msg.startsWith(marker));
+}
+
 export default function Request() {
   const bottomNavInset = useBottomNavInset();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [request, setRequest] = useState<any>(null);
   const [requester, setRequester] = useState<any>(null);
   const [offers, setOffers] = useState<any[]>([]);
+  const [autoSuggestedCount, setAutoSuggestedCount] = useState(0);
   const [message, setMessage] = useState('');
   const [me, setMe] = useState('');
   const [loading, setLoading] = useState(true);
@@ -108,7 +119,11 @@ export default function Request() {
           setRequester(p);
         }
       }
-      setOffers(oData.data ?? []);
+      // Only real neighbour offers are shown. Auto-generated matcher rows are ignored.
+      const allMatches = oData.data ?? [];
+      const realOffers = allMatches.filter((o: any) => !isAutoSuggestedOffer(o));
+      setAutoSuggestedCount(allMatches.length - realOffers.length);
+      setOffers(realOffers);
 
       const { data: conv } = await supabase
         .from('conversations')
@@ -604,10 +619,19 @@ export default function Request() {
             <View style={styles.cardHeaderRow}>
               <View style={styles.sectionTitleWithCount}>
                 <Text style={styles.countBadgePill}>{offers.length}</Text>
-                <Text style={styles.cardTitle}>عروض المساعدة المقدمة</Text>
+                <Text style={styles.cardTitle}>عروض المساعدة من الجيران</Text>
               </View>
               <MessageSquare size={18} color="#059669" />
             </View>
+
+            {autoSuggestedCount > 0 && (
+              <View style={styles.autoSuggestionNote}>
+                <Info size={14} color="#0369a1" />
+                <Text style={styles.autoSuggestionNoteText}>
+                  تم تجاهل {autoSuggestedCount} مطابقة آلية — لا تُرسل العروض تلقائياً، ويظهر هنا فقط من أرسل فزعته بنفسه من الجيران الحقيقيين.
+                </Text>
+              </View>
+            )}
 
             {offers.length === 0 ? (
               <View style={styles.noOffersBox}>
@@ -1155,6 +1179,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 32,
     gap: 6,
+  },
+  autoSuggestionNote: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#f0f9ff',
+    borderWidth: 1,
+    borderColor: '#bae6fd',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 12,
+  },
+  autoSuggestionNoteText: {
+    flex: 1,
+    color: '#0369a1',
+    fontSize: 11.5,
+    lineHeight: 17,
+    fontWeight: '700',
+    textAlign: 'right',
   },
   noOffersTitle: {
     color: '#0f172a',
