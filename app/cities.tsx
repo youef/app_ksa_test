@@ -11,10 +11,11 @@ import {
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { buildSaudiLocations } from '@/lib/saudiLocations';
-const ALL_SAUDI_REGIONS = buildSaudiLocations();
 import { ChevronRight, MapPin, Search, ChevronLeft, Building2 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import ScreenHeader from '@/components/shared/ScreenHeader';
+
+const ALL_SAUDI_REGIONS = buildSaudiLocations();
 
 export default function Cities() {
   const bottomNavInset = useBottomNavInset();
