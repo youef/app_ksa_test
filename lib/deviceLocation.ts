@@ -50,19 +50,17 @@ export async function reverseGeocodeDeviceLocation(location: DeviceLocation) {
         aa.Region, aa.RegionAbbr,
       );
       const city = pick(
-        na.city, na.town, na.village, na.municipality, na.county, na.city_district,
-        aa.City, aa.Subregion,
+        na.city, na.town, na.village, na.municipality, aa.City, aa.Subregion,
       );
       const district = pick(
         na.neighbourhood, na.suburb, na.quarter, na.residential, na.hamlet,
-        na.city_district, na.district,
-        aa.Neighborhood, aa.District, aa.Subregion,
+        na.city_district, na.district, aa.Neighborhood, aa.District,
       );
 
       return {
         region,
-        city: city || district,
-        district: district || city,
+        city,
+        district,
       };
     }
 
