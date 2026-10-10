@@ -139,21 +139,37 @@ export default function Index() {
 
         <Text style={[styles.welcome, compact && styles.welcomeCompact]}>حيّنا… أقرب لبعض</Text>
 
-        <Animated.View style={[
-          styles.logoStage,
-          compact && styles.logoStageCompact,
-          { transform: [{ translateY: floatY }, { scale: pulse }, { rotate: spin }] },
-        ]}>
-          <View style={styles.logoShadow} />
-          <View style={styles.outerGlass}>
-            <View style={styles.innerGlass}>
-              <Image source={{ uri: logoUri }} style={[styles.logoImage, compact && styles.logoImageCompact]} resizeMode="contain" />
-              <Animated.View style={[styles.shine, { transform: [{ translateX: shineX }, { rotate: '22deg' }] }]} />
-            </View>
+        <View style={[styles.scene3D, compact && styles.scene3DCompact]}>
+          <View pointerEvents="none" style={[styles.floatCard, styles.floatCardTopLeft, { transform: [{ perspective: 700 }, { rotateY: '16deg' }, { rotateX: '-8deg' }] }]}>
+            <View style={[styles.floatIcon, styles.floatIconMint]}><UsersRound size={18} color="#d1fae5" strokeWidth={2.4} /></View>
+            <View style={styles.floatCardCopy}><Text style={styles.floatCardTitle}>جيرانك</Text><Text style={styles.floatCardSub}>قريبين منك</Text></View>
           </View>
-          <View style={styles.glassReflection} />
-          <View style={styles.logoOrbit} />
-        </Animated.View>
+          <View pointerEvents="none" style={[styles.floatCard, styles.floatCardTopRight, { transform: [{ perspective: 700 }, { rotateY: '-18deg' }, { rotateX: '-7deg' }] }]}>
+            <View style={[styles.floatIcon, styles.floatIconGold]}><Store size={18} color="#fef3c7" strokeWidth={2.4} /></View>
+            <View style={styles.floatCardCopy}><Text style={styles.floatCardTitle}>سوق الحي</Text><Text style={styles.floatCardSub}>كل شيء حولك</Text></View>
+          </View>
+          <Animated.View style={[
+            styles.logoStage,
+            compact && styles.logoStageCompact,
+            { transform: [{ translateY: floatY }, { scale: pulse }, { rotate: spin }] },
+          ]}>
+            <View style={styles.logoShadow} />
+            <View style={styles.outerGlass}>
+              <View style={styles.innerGlass}>
+                <Image source={{ uri: logoUri }} style={[styles.logoImage, compact && styles.logoImageCompact]} resizeMode="contain" />
+                <Animated.View style={[styles.shine, { transform: [{ translateX: shineX }, { rotate: '22deg' }] }]} />
+              </View>
+            </View>
+            <View style={styles.glassReflection} />
+            <View style={styles.logoOrbit} />
+          </Animated.View>
+          <View pointerEvents="none" style={[styles.floatCard, styles.floatCardBottom, { transform: [{ perspective: 700 }, { rotateY: '12deg' }, { rotateX: '8deg' }] }]}>
+            <View style={[styles.floatIcon, styles.floatIconBlue]}><House size={18} color="#dbeafe" strokeWidth={2.4} /></View>
+            <View style={styles.floatCardCopy}><Text style={styles.floatCardTitle}>خدمات قريبة</Text><Text style={styles.floatCardSub}>حيّك في مكان واحد</Text></View>
+            <View style={styles.cardLiveDot} />
+          </View>
+          <View pointerEvents="none" style={styles.sceneFloor} />
+        </View>
 
         <Text style={styles.tagline}>بيوت تجمعنا • مجتمع ينتمي لنا</Text>
         <Text style={[styles.description, compact && styles.descriptionCompact]}>مكان يجمع أهل الحي، ويقرّب الجيران من بعض.</Text>
@@ -255,6 +271,56 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   logoStageCompact: { width: 225, height: 225 },
+  scene3D: {
+    width: 340,
+    maxWidth: '100%',
+    height: 310,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: -3,
+    marginBottom: 1,
+    position: 'relative',
+  },
+  scene3DCompact: { height: 255, marginTop: -5 },
+  floatCard: {
+    position: 'absolute',
+    zIndex: 4,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 9,
+    minWidth: 132,
+    paddingHorizontal: 11,
+    paddingVertical: 10,
+    borderRadius: 17,
+    backgroundColor: 'rgba(4, 55, 43, .82)',
+    borderWidth: 1,
+    borderColor: 'rgba(236,253,245,.28)',
+    shadowColor: '#022c22',
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 12,
+  },
+  floatCardTopLeft: { top: 24, left: 0 },
+  floatCardTopRight: { top: 54, right: 0 },
+  floatCardBottom: { bottom: 9, left: 42, minWidth: 194, paddingVertical: 9 },
+  floatIcon: { width: 35, height: 35, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,.2)' },
+  floatIconMint: { backgroundColor: 'rgba(16,185,129,.32)' },
+  floatIconGold: { backgroundColor: 'rgba(245,158,11,.24)' },
+  floatIconBlue: { backgroundColor: 'rgba(59,130,246,.25)' },
+  floatCardCopy: { alignItems: 'flex-end', gap: 2 },
+  floatCardTitle: { color: '#ffffff', fontSize: 11, fontWeight: '900' },
+  floatCardSub: { color: 'rgba(236,253,245,.72)', fontSize: 9, fontWeight: '600' },
+  cardLiveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#6ee7b7', marginLeft: 1 },
+  sceneFloor: {
+    position: 'absolute',
+    width: 205,
+    height: 40,
+    bottom: 18,
+    borderRadius: 100,
+    backgroundColor: 'rgba(2,44,34,.19)',
+    transform: [{ perspective: 500 }, { rotateX: '62deg' }, { scaleX: 1.4 }],
+  },
   logoShadow: {
     position: 'absolute',
     width: 180,
