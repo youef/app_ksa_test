@@ -21,15 +21,12 @@ import {
   User,
   ShieldCheck,
   ChevronLeft,
-  MapPin,
-  Map,
   Truck,
   Settings,
   Bell,
   Share2,
   LogOut,
   LogIn,
-  LayoutDashboard,
   Sparkles,
   CreditCard,
   Building,
@@ -40,28 +37,23 @@ import {
   ChevronRight,
   Send,
   X,
-  Compass,
   Wrench,
   Car,
   Flame,
   Users,
-  MessageSquare,
   Mail,
   Star,
   Rocket,
   Globe,
   FileText,
-  ClipboardList,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { requireAccount } from '@/lib/authGate';
-import { getActiveLocation, type HaynaLocation } from '@/lib/locationSync';
 
 export default function MoreScreen() {
   const bottomNavInset = useBottomNavInset();
   const [profile, setProfile] = useState<any>(null);
   const [hasSession, setHasSession] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [unreadNotif, setUnreadNotif] = useState(0);
   // Suggestion Modal State
   const [showIdeaModal, setShowIdeaModal] = useState(false);
@@ -74,28 +66,6 @@ export default function MoreScreen() {
   useEffect(() => {
     loadUserData();
   }, []);
-
-  const loadStats = async () => {
-    setStatsLoading(true);
-    try {
-      const [reqRes, membersRes, servicesRes, questionsRes] = await Promise.all([
-        supabase.from('requests').select('id', { count: 'exact', head: true }).eq('status', 'open'),
-        supabase.from('profiles').select('id', { count: 'exact', head: true }),
-        supabase.from('services').select('id', { count: 'exact', head: true }),
-        supabase.from('questions').select('id', { count: 'exact', head: true }),
-      ]);
-      setStats({
-        openRequests: reqRes.count ?? 0,
-        members: membersRes.count ?? 0,
-        services: servicesRes.count ?? 0,
-        questions: questionsRes.count ?? 0,
-      });
-    } catch {
-      // Statistics are optional; ignore failures silently.
-    } finally {
-      setStatsLoading(false);
-    }
-  };
 
   const loadUserData = async () => {
     try {
@@ -120,8 +90,6 @@ export default function MoreScreen() {
       setProfile(p);
       setUnreadNotif(count ?? 0);
 
-      const isRoot = (user.email || '').toLowerCase().trim() === 'root@gmail.com';
-      setIsAdmin(isRoot || p?.role === 'admin');
     } catch {}
   };
 
@@ -209,7 +177,7 @@ export default function MoreScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Hero Header with live stats */}
+      {/* Compact Hero Header */}
       <LinearGradient
         colors={['#064e3b', '#065f46', '#047857']}
         start={{ x: 0, y: 0 }}
