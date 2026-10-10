@@ -10,7 +10,8 @@ import {
   Platform,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { SAUDI_REGIONS } from '@/lib/saudiLocations';
+import { buildSaudiLocations } from '@/lib/saudiLocations';
+const ALL_SAUDI_REGIONS = buildSaudiLocations();
 import { ChevronRight, MapPin, Search, ChevronLeft, Building2 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import ScreenHeader from '@/components/shared/ScreenHeader';
@@ -21,7 +22,7 @@ export default function Cities() {
   const [search, setSearch] = useState('');
 
   const region = useMemo(() => {
-    return SAUDI_REGIONS.find(r => r.name === regionName) || SAUDI_REGIONS[0];
+    return ALL_SAUDI_REGIONS.find(r => r.name === regionName) || ALL_SAUDI_REGIONS[0];
   }, [regionName]);
 
   const cities = useMemo(() => {
