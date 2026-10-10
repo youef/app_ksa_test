@@ -194,8 +194,6 @@ export default function MoreScreen() {
             <Text style={styles.heroSubtitle}>كل خدمات حيّك في مكان واحد — مجتمع، سوق، وفزعة 🇸🇦</Text>
           </View>
         </View>
-
-        </View>
       </LinearGradient>
 
       <ScrollView
