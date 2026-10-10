@@ -78,10 +78,12 @@ export default function Locations() {
       }
 
       const normalizedRegion = normalizeSaudiLocationName(geo.region || '');
-      const region = ALL_SAUDI_REGIONS.find((item) => {
-        const name = normalizeSaudiLocationName(item.name);
-        return name === normalizedRegion || name.includes(normalizedRegion) || normalizedRegion.includes(name);
-      });
+      const region = normalizedRegion
+        ? ALL_SAUDI_REGIONS.find((item) => {
+            const name = normalizeSaudiLocationName(item.name);
+            return name === normalizedRegion || name.includes(normalizedRegion) || normalizedRegion.includes(name);
+          })
+        : undefined;
 
       const normalizedCity = normalizeSaudiLocationName(geo.city || '');
       let cityMatch = region?.cities.find((item) => {
@@ -197,7 +199,7 @@ export default function Locations() {
     const q = query.toLowerCase();
     const hits: Array<{ type: 'city' | 'region' | 'district'; name: string; region: string; city?: string }> = [];
 
-    SAUDI_REGIONS.forEach((reg) => {
+    ALL_SAUDI_REGIONS.forEach((reg) => {
       if (reg.name.toLowerCase().includes(q)) {
         hits.push({ type: 'region', name: reg.name, region: reg.name });
       }
