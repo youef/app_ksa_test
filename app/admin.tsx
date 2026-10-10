@@ -737,15 +737,22 @@ export default function AdminScreen() {
         if (batchErr) throw batchErr;
       }
 
-      // 2. Real Push notification dispatch
-      await sendPushToMultipleUsers(recipientIds, {
+      // 2. Deliver a real push to every registered mobile/browser device.
+      const pushResult = await sendPushToMultipleUsers(recipientIds, {
         title: fullTitle,
         body: fullBody,
-        data: { type: 'broadcast', broadcast_type: broadcastType },
+        data: { type: 'broadcast', broadcast_type: broadcastType, target: broadcastTarget },
       });
 
       await recordAuditLog('بث تعميم رسمي لسكان الحي', broadcastTitle.trim(), 'broadcast');
-      showToast(`تم نشر وإرسال التعميم إلى ${recipientIds.length} مستخدم 📢`);
+      if (pushResult.success && pushResult.sentCount > 0) {
+        showToast(`تم حفظ التعميم وإرسال إشعار فوري إلى ${pushResult.sentCount} جهاز 📢`);
+      } else {
+        Alert.alert(
+          'تم حفظ التعميم',
+          `تم حفظ التعميم داخل التطبيق وإظهاره في صفحة الإشعارات، لكن لم يصل إشعار فوري لأي جهاز مسجّل. ${pushResult.error || 'تحقق من إعدادات مفاتيح الإشعارات في Vercel ومن تسجيل الأجهزة.'}`
+        );
+      }
       setBroadcastTitle('');
       setBroadcastBody('');
     } catch (e: any) {
