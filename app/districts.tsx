@@ -12,13 +12,14 @@ import {
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { buildSaudiLocations } from '@/lib/saudiLocations';
-const ALL_SAUDI_REGIONS = buildSaudiLocations();
 import { supabase } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ChevronRight, MapPin, Search, CheckCircle2 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import ScreenHeader from '@/components/shared/ScreenHeader';
 import { savePermanentMyLocation } from '@/lib/locationSync';
+
+const ALL_SAUDI_REGIONS = buildSaudiLocations();
 
 export default function Districts() {
   const bottomNavInset = useBottomNavInset();
