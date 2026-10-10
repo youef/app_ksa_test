@@ -63,33 +63,16 @@ export default function MoreScreen() {
   const [hasSession, setHasSession] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [unreadNotif, setUnreadNotif] = useState(0);
-  const [location, setLocation] = useState<HaynaLocation>({
-    region: 'كل المملكة',
-    city: 'كل المدن',
-    district: 'كل الأحياء',
-  });
-
   // Suggestion Modal State
   const [showIdeaModal, setShowIdeaModal] = useState(false);
   const [ideaText, setIdeaText] = useState('');
   const [sendingIdea, setSendingIdea] = useState(false);
-
-  // Live community statistics
-  const [stats, setStats] = useState({
-    openRequests: 0,
-    members: 0,
-    services: 0,
-    questions: 0,
-  });
-  const [statsLoading, setStatsLoading] = useState(true);
 
   // FAQ accordion
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   useEffect(() => {
     loadUserData();
-    loadStats();
-    getActiveLocation().then(setLocation);
   }, []);
 
   const loadStats = async () => {
@@ -203,27 +186,6 @@ export default function MoreScreen() {
     }
   };
 
-  const locLabel =
-    location.city === 'كل المدن'
-      ? 'كل مناطق المملكة'
-      : `${location.city}${location.district !== 'كل الأحياء' ? ` · حي ${location.district}` : ''}`;
-
-  const routeGuarded = (route: string) => {
-    const needsAccount = route === '/new-request' || route === '/ask';
-    if (needsAccount && !hasSession) {
-      requireAccount('سجّل الدخول أو أنشئ حساباً للاستفادة من خدمات الحي.');
-      return;
-    }
-    router.push(route as any);
-  };
-
-  const HOW_IT_WORKS = [
-    { step: '١', title: 'حدّد موقعك', desc: 'اختر منطقتك وحيّك ليصلك كل ما يخص جيرانك فقط.' },
-    { step: '٢', title: 'اطلب أو اسأل', desc: 'انشر طلب فزعة، سؤالاً، أو عرض خدمة بنقرة واحدة.' },
-    { step: '٣', title: 'يتفاعل الجيران', desc: 'يقدّم الجيران عروضهم بنفسهم — لا عروض آلية ولا وهمية.' },
-    { step: '٤', title: 'أتمّ الفزعة', desc: 'اتفقوا بالخاص، أنجزوا المهمة، وامنحوا نقاط السمعة ☕.' },
-  ];
-
   const FAQS = [
     {
       q: 'هل تُرسل طلبات أو عروض مساعدة تلقائياً؟',
@@ -265,27 +227,6 @@ export default function MoreScreen() {
           </View>
         </View>
 
-        <View style={styles.statsRow}>
-          <StatBox
-            icon={<ClipboardList size={15} color="#6ee7b7" />}
-            value={statsLoading ? '…' : String(stats.openRequests)}
-            label="طلبات مفتوحة"
-          />
-          <StatBox
-            icon={<Users size={15} color="#6ee7b7" />}
-            value={statsLoading ? '…' : String(stats.members)}
-            label="سكان الحي"
-          />
-          <StatBox
-            icon={<Wrench size={15} color="#6ee7b7" />}
-            value={statsLoading ? '…' : String(stats.services)}
-            label="خدمات"
-          />
-          <StatBox
-            icon={<MessageSquare size={15} color="#6ee7b7" />}
-            value={statsLoading ? '…' : String(stats.questions)}
-            label="أسئلة واستفسارات"
-          />
         </View>
       </LinearGradient>
 
@@ -294,36 +235,7 @@ export default function MoreScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.contentWrap}>
-          {/* 1. USER PROFILE GLANCE CARD */}
-          {hasSession ? (
-            <Pressable
-              style={styles.profileCard}
-              onPress={() => router.push('/profile')}
-            >
-              <View style={styles.profileEditPill}>
-                <Text style={styles.profileEditPillText}>عرض الملف</Text>
-                <ChevronLeft size={14} color="#059669" />
-              </View>
-
-              <View style={{ flex: 1, alignItems: 'flex-end', gap: 3 }}>
-                <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-                  <Text style={styles.profileName}>{profile?.display_name || 'الجار'}</Text>
-                  {profile?.is_geoverified && <ShieldCheck size={16} color="#059669" />}
-                </View>
-                <Text style={styles.profileSub}>
-                  {profile?.district ? `حي ${profile.district}` : ''} {profile?.city ? `· ${profile.city}` : 'أحد سكان الحي'}
-                </Text>
-              </View>
-
-              {profile?.avatar_url ? (
-                <Image source={{ uri: profile.avatar_url }} style={styles.avatarImg} />
-              ) : (
-                <View style={styles.avatarPlaceholder}>
-                  <Text style={styles.avatarLetter}>{profile?.display_name?.[0] || 'ح'}</Text>
-                </View>
-              )}
-            </Pressable>
-          ) : (
+          {!hasSession && (
             <View style={styles.guestBanner}>
               <View style={styles.guestIconCircle}>
                 <User size={24} color="#059669" />
@@ -339,37 +251,9 @@ export default function MoreScreen() {
             </View>
           )}
 
-          {/* 2. ACTIVE LOCATION BAR */}
-          <Pressable
-            style={styles.locBar}
-            onPress={() => router.push('/locations')}
-          >
-            <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}>
-              <Text style={styles.locChangeText}>تغيير</Text>
-              <ChevronLeft size={14} color="#059669" />
-            </View>
-
-            <View style={{ flex: 1, alignItems: 'flex-end', gap: 2 }}>
-              <Text style={styles.locBarLabel}>الموقع المختار حالياً</Text>
-              <Text style={styles.locBarValue} numberOfLines={1}>📍 {locLabel}</Text>
-            </View>
-
-            <View style={styles.locIconBox}>
-              <Compass size={20} color="#059669" />
-            </View>
-          </Pressable>
-
           {/* 3. CORE NEIGHBORHOOD SERVICES — unique destinations only */}
           <Text style={styles.sectionHeader}>خدمات إضافية للحي 🏬</Text>
           <View style={styles.menuGroup}>
-            <MenuItem
-              icon={<Map size={20} color="#059669" />}
-              iconBg="#ecfdf5"
-              title="خريطة الحي التفاعلية"
-              sub="استعرض الأنشطة والخدمات على الخريطة"
-              badge="مباشر"
-              onPress={() => router.push('/map')}
-            />
             <MenuItem
               icon={<Truck size={20} color="#ea580c" />}
               iconBg="#fff7ed"
@@ -404,36 +288,6 @@ export default function MoreScreen() {
               badgeColor="#dc2626"
               onPress={() => router.push('/emergency-alert')}
             />
-            <MenuItem
-              icon={<MapPin size={20} color="#0891b2" />}
-              iconBg="#ecfeff"
-              title="أحياء ومدن المملكة"
-              sub="إدارة نطاق المدينة والحي المختار"
-              onPress={() => router.push('/locations')}
-            />
-          </View>
-
-          {/* 3.5 HOW HAYNA WORKS */}
-          <Text style={styles.sectionHeader}>كيف تعمل منصة حيّنا؟ 🧭</Text>
-          <View style={styles.howCard}>
-            {HOW_IT_WORKS.map((step, idx) => (
-              <View key={step.step} style={styles.howRow}>
-                <View style={styles.howStepCircle}>
-                  <Text style={styles.howStepText}>{step.step}</Text>
-                </View>
-                <View style={{ flex: 1, alignItems: 'flex-end', gap: 2 }}>
-                  <Text style={styles.howTitle}>{step.title}</Text>
-                  <Text style={styles.howDesc}>{step.desc}</Text>
-                </View>
-                {idx < HOW_IT_WORKS.length - 1 && <View style={styles.howConnector} />}
-              </View>
-            ))}
-            <View style={styles.honestyNote}>
-              <ShieldCheck size={15} color="#047857" />
-              <Text style={styles.honestyNoteText}>
-                التزاماً بالشفافية: لا يرسل «حيّنا» أي عروض أو طلبات مساعدة تلقائياً نيابةً عن المستخدمين. كل عرض يأتي من جار حقيقي ضغط زر الإرسال بنفسه.
-              </Text>
-            </View>
           </View>
 
           {/* 4. FUTURE EXPANSIONS & UPGRADES BOX (MODULAR SECTION) */}
@@ -480,24 +334,6 @@ export default function MoreScreen() {
               <Text style={styles.suggestBtnText}>اقترح فكرة أو خدمة جديدة للمطورين 💡</Text>
             </Pressable>
           </View>
-
-          {/* 5. ADMIN CONTROLS (ONLY IF ADMIN) */}
-          {isAdmin && (
-            <>
-              <Text style={styles.sectionHeader}>لوحة إدارة وتحكم المشرف 🛠️</Text>
-              <View style={styles.menuGroup}>
-                <MenuItem
-                  icon={<LayoutDashboard size={20} color="#dc2626" />}
-                  iconBg="#fef2f2"
-                  title="لوحة تحكم الإدارة (Admin Dashboard)"
-                  sub="إدارة المستخدمين، التوثيق، البلاغات، والشعارات"
-                  badge="مشرف"
-                  badgeColor="#dc2626"
-                  onPress={() => router.push('/admin')}
-                />
-              </View>
-            </>
-          )}
 
           {/* 6. SETTINGS & APP ACTIONS */}
           <Text style={styles.sectionHeader}>الإعدادات والتطبيق ⚙️</Text>
@@ -702,18 +538,6 @@ function MenuItem({
       </View>
       <View style={[styles.menuIconBox, { backgroundColor: iconBg }]}>{icon}</View>
     </Pressable>
-  );
-}
-
-function StatBox({ icon, value, label }: { icon: any; value: string; label: string }) {
-  return (
-    <View style={styles.statBox}>
-      <View style={styles.statIconRow}>
-        {icon}
-        <Text style={styles.statValue}>{value}</Text>
-      </View>
-      <Text style={styles.statLabel}>{label}</Text>
-    </View>
   );
 }
 
