@@ -86,10 +86,12 @@ export default function Locations() {
         : undefined;
 
       const normalizedCity = normalizeSaudiLocationName(geo.city || '');
-      let cityMatch = region?.cities.find((item) => {
-        const name = normalizeSaudiLocationName(item.name);
-        return name === normalizedCity || name.includes(normalizedCity) || normalizedCity.includes(name);
-      });
+      let cityMatch = normalizedCity
+        ? region?.cities.find((item) => {
+            const name = normalizeSaudiLocationName(item.name);
+            return name === normalizedCity || name.includes(normalizedCity) || normalizedCity.includes(name);
+          })
+        : undefined;
       let cityRegion = region;
       if (!cityMatch && normalizedCity) {
         for (const candidateRegion of ALL_SAUDI_REGIONS) {
