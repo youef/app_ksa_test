@@ -224,37 +224,6 @@ export default function MoreScreen() {
     router.push(route as any);
   };
 
-  const QUICK_ACTIONS = [
-    {
-      icon: <HeartHandshake size={20} color="#fff" />,
-      label: 'اطلب فزعة',
-      sub: 'مساعدة من جيرانك',
-      color: '#059669',
-      route: '/new-request',
-    },
-    {
-      icon: <HelpCircle size={20} color="#fff" />,
-      label: 'اسأل الحي',
-      sub: 'استفسارات وأسئلة',
-      color: '#0284c7',
-      route: '/ask',
-    },
-    {
-      icon: <Compass size={20} color="#fff" />,
-      label: 'خريطة الحي',
-      sub: 'كل شيء حولك',
-      color: '#7c3aed',
-      route: '/map',
-    },
-    {
-      icon: <ShoppingBag size={20} color="#fff" />,
-      label: 'سوق الحي',
-      sub: 'تسوّق من الجيران',
-      color: '#d97706',
-      route: '/market',
-    },
-  ];
-
   const HOW_IT_WORKS = [
     { step: '١', title: 'حدّد موقعك', desc: 'اختر منطقتك وحيّك ليصلك كل ما يخص جيرانك فقط.' },
     { step: '٢', title: 'اطلب أو اسأل', desc: 'انشر طلب فزعة، سؤالاً، أو عرض خدمة بنقرة واحدة.' },
@@ -332,25 +301,6 @@ export default function MoreScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.contentWrap}>
-          {/* 0. QUICK ACTIONS GRID */}
-          <View style={styles.quickGrid}>
-            {QUICK_ACTIONS.map(action => (
-              <Pressable
-                key={action.label}
-                style={({ pressed }) => [
-                  styles.quickCard,
-                  { backgroundColor: action.color },
-                  pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] },
-                ]}
-                onPress={() => routeGuarded(action.route)}
-              >
-                <View style={styles.quickIconCircle}>{action.icon}</View>
-                <Text style={styles.quickLabel}>{action.label}</Text>
-                <Text style={styles.quickSub}>{action.sub}</Text>
-              </Pressable>
-            ))}
-          </View>
-
           {/* 1. USER PROFILE GLANCE CARD */}
           {hasSession ? (
             <Pressable
@@ -416,50 +366,29 @@ export default function MoreScreen() {
             </View>
           </Pressable>
 
-          {/* 3. CORE NEIGHBORHOOD SERVICES */}
-          <Text style={styles.sectionHeader}>خدمات وأقسام الحي 🏬</Text>
+          {/* 3. CORE NEIGHBORHOOD SERVICES — unique destinations only */}
+          <Text style={styles.sectionHeader}>خدمات إضافية للحي 🏬</Text>
           <View style={styles.menuGroup}>
             <MenuItem
               icon={<Map size={20} color="#059669" />}
               iconBg="#ecfdf5"
               title="خريطة الحي التفاعلية"
-              sub="استعراض الأنشطة والخدمات والمحلات مباشرة على الخريطة"
+              sub="استعرض الأنشطة والخدمات على الخريطة"
               badge="مباشر"
               onPress={() => router.push('/map')}
-            />
-            <MenuItem
-              icon={<ShoppingBag size={20} color="#0284c7" />}
-              iconBg="#f0f9ff"
-              title="سوق الحي والأسر المنتجة"
-              sub="عروض، منتجات، سلع، وأطعمة منزلية من أهل الحي"
-              onPress={() => router.push('/market')}
-            />
-            <MenuItem
-              icon={<Building2 size={20} color="#7c3aed" />}
-              iconBg="#f5f3ff"
-              title="دليل المحلات والمنشآت"
-              sub="تموينات، صيدليات، مخابز، ورش، ومغاسل حيك"
-              onPress={() => router.push('/market')}
-            />
-            <MenuItem
-              icon={<Calendar size={20} color="#d97706" />}
-              iconBg="#fffbeb"
-              title="فعاليات وملتقيات الحي"
-              sub="أنشطة اجتماعية ومبادرات تطوعية ورياضية"
-              onPress={() => router.push('/market')}
             />
             <MenuItem
               icon={<Truck size={20} color="#ea580c" />}
               iconBg="#fff7ed"
               title="فزعة وطلبات المساعدة"
-              sub="طلب مساعدة عاجلة أو إعارة أدوات بين الجيران"
+              sub="طلبات المساعدة وإعارة الأدوات بين الجيران"
               onPress={() => router.push('/requests')}
             />
             <MenuItem
               icon={<Wrench size={20} color="#16a34a" />}
               iconBg="#f0fdf4"
-              title="سلفني بالحي (إعارة أدوات 🔧)"
-              sub="استعر وأعِر الدريل، السلالم، ومعدات الصيانة مجاناً"
+              title="سلفني بالحي"
+              sub="استعر وأعِر أدوات ومعدات الصيانة"
               badge="جديد"
               badgeColor="#16a34a"
               onPress={() => router.push('/tools')}
@@ -467,8 +396,8 @@ export default function MoreScreen() {
             <MenuItem
               icon={<Car size={20} color="#059669" />}
               iconBg="#ecfdf5"
-              title="توصيل مدارس الحي 🚗"
-              sub="مشاركة المقاعد بين أولياء الأمور وتخفيف الزحام"
+              title="توصيل مدارس الحي"
+              sub="مشاركة المقاعد بين أولياء الأمور"
               badge="جديد"
               badgeColor="#059669"
               onPress={() => router.push('/carpooling')}
@@ -476,33 +405,17 @@ export default function MoreScreen() {
             <MenuItem
               icon={<Flame size={20} color="#dc2626" />}
               iconBg="#fef2f2"
-              title="تنبيه الحي العاجل 🚨"
-              sub="بث حالات الطوارئ والمساعدة الفورية في الحي"
+              title="تنبيه الحي العاجل"
+              sub="تنبيهات الطوارئ وطلبات المساعدة الفورية"
               badge="عاجل"
               badgeColor="#dc2626"
               onPress={() => router.push('/emergency-alert')}
             />
             <MenuItem
-              icon={<MessageCircle size={20} color="#059669" />}
-              iconBg="#ecfdf5"
-              title="استفسارات وأسئلة الجيران"
-              sub="اسأل أهل حيك واستفد من تجاربهم ومعرفتهم"
-              onPress={() => router.push('/questions')}
-            />
-            <MenuItem
-              icon={<Search size={20} color="#0f766e" />}
-              iconBg="#f0fdfa"
-              title="البحث الذكي في الحي"
-              sub="ابحث في الطلبات والخدمات والأسئلة والجيران"
-              badge="جديد"
-              badgeColor="#0f766e"
-              onPress={() => router.push('/search')}
-            />
-            <MenuItem
               icon={<MapPin size={20} color="#0891b2" />}
               iconBg="#ecfeff"
               title="أحياء ومدن المملكة"
-              sub="استعرض الأحياء والمدن واختر نطاق حيّك"
+              sub="إدارة نطاق المدينة والحي المختار"
               onPress={() => router.push('/locations')}
             />
           </View>
