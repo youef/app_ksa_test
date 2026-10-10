@@ -31,6 +31,22 @@ export default function Index() {
         apple.setAttribute('rel', 'apple-touch-icon');
         apple.setAttribute('href', uri);
         document.head.appendChild(apple);
+        const manifest = {
+          name: 'حيّنا',
+          short_name: 'حيّنا',
+          start_url: '/',
+          display: 'standalone',
+          background_color: '#064e3b',
+          theme_color: '#047857',
+          dir: 'rtl',
+          lang: 'ar',
+          icons: [{ src: uri, sizes: '512x512', type: 'image/png', purpose: 'any maskable' }],
+        };
+        const blobUrl = URL.createObjectURL(new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' }));
+        const manifestLink = document.querySelector('link[rel="manifest"]') || document.createElement('link');
+        manifestLink.setAttribute('rel', 'manifest');
+        manifestLink.setAttribute('href', blobUrl);
+        document.head.appendChild(manifestLink);
       }
     };
 
