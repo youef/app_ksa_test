@@ -24,7 +24,7 @@ import {
   getCachedBrandingLogo,
   subscribeBrandingLogo,
 } from '@/lib/branding';
-import { sendPushToMultipleUsers, sendPushToUser } from '@/lib/pushSender';
+import { sendAdminBroadcastPush, sendPushToMultipleUsers, sendPushToUser } from '@/lib/pushSender';
 import {
   Shield,
   Users,
@@ -738,7 +738,7 @@ export default function AdminScreen() {
       }
 
       // 2. Deliver a real push to every registered mobile/browser device.
-      const pushResult = await sendPushToMultipleUsers(recipientIds, {
+      const pushResult = await sendAdminBroadcastPush(recipientIds, {
         title: fullTitle,
         body: fullBody,
         data: { type: 'broadcast', broadcast_type: broadcastType, target: broadcastTarget },
