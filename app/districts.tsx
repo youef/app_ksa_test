@@ -11,7 +11,8 @@ import {
   Platform,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { SAUDI_REGIONS } from '@/lib/saudiLocations';
+import { buildSaudiLocations } from '@/lib/saudiLocations';
+const ALL_SAUDI_REGIONS = buildSaudiLocations();
 import { supabase } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ChevronRight, MapPin, Search, CheckCircle2 } from 'lucide-react-native';
@@ -25,11 +26,11 @@ export default function Districts() {
   const [search, setSearch] = useState('');
 
   const city = useMemo(() => {
-    for (const r of SAUDI_REGIONS) {
+    for (const r of ALL_SAUDI_REGIONS) {
       const found = r.cities.find(c => c.name === cityName);
       if (found) return found;
     }
-    return SAUDI_REGIONS[0].cities[0];
+    return ALL_SAUDI_REGIONS[0].cities[0];
   }, [cityName]);
 
   const districts = useMemo(() => {
