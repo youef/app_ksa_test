@@ -71,7 +71,7 @@ export async function reverseGeocodeDeviceLocation(location: DeviceLocation) {
     const place: any = rows[0];
     if (!place) return null;
     const region = pick(place.region, place.subregion);
-    const city = pick(place.city, place.subregion, place.district);
+    const city = pick(place.city, place.subregion);
     const district = pick(place.district, place.suburb, place.name, place.street);
     return { region, city, district };
   } catch (error) {
