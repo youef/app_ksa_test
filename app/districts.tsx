@@ -11,7 +11,7 @@ import {
   Platform,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { SAUDI_REGIONS } from '@/lib/saudiLocations';
+import { buildSaudiLocations } from '@/lib/saudiLocations';
 import { supabase } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ChevronRight, MapPin, Search, CheckCircle2 } from 'lucide-react-native';
@@ -19,17 +19,19 @@ import { LinearGradient } from 'expo-linear-gradient';
 import ScreenHeader from '@/components/shared/ScreenHeader';
 import { savePermanentMyLocation } from '@/lib/locationSync';
 
+const ALL_SAUDI_REGIONS = buildSaudiLocations();
+
 export default function Districts() {
   const bottomNavInset = useBottomNavInset();
   const { regionName, cityName } = useLocalSearchParams<{ regionName: string; cityName: string }>();
   const [search, setSearch] = useState('');
 
   const city = useMemo(() => {
-    for (const r of SAUDI_REGIONS) {
+    for (const r of ALL_SAUDI_REGIONS) {
       const found = r.cities.find(c => c.name === cityName);
       if (found) return found;
     }
-    return SAUDI_REGIONS[0].cities[0];
+    return ALL_SAUDI_REGIONS[0].cities[0];
   }, [cityName]);
 
   const districts = useMemo(() => {
