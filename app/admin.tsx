@@ -24,7 +24,7 @@ import {
   getCachedBrandingLogo,
   subscribeBrandingLogo,
 } from '@/lib/branding';
-import { sendAdminBroadcastPush, sendPushToMultipleUsers, sendPushToUser } from '@/lib/pushSender';
+import { sendAdminBroadcastPush } from '@/lib/pushSender';
 import {
   Shield,
   Users,
@@ -512,7 +512,7 @@ export default function AdminScreen() {
       if (notifErr) throw notifErr;
 
       // 2. Real Push notification dispatch
-      await sendPushToUser(inspectedUser.id, {
+      await sendAdminBroadcastPush([inspectedUser.id], {
         title: 'إشعار من إدارة حيّنا 🇸🇦',
         body: text,
         data: { type: 'admin_notice' },
@@ -587,7 +587,7 @@ export default function AdminScreen() {
       });
 
       // Dispatch push notification
-      await sendPushToUser(userId, {
+      await sendAdminBroadcastPush([userId], {
         title: notifTitle,
         body: notifBody,
         data: { type: 'verification', status: action },
