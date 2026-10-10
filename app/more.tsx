@@ -224,37 +224,6 @@ export default function MoreScreen() {
     router.push(route as any);
   };
 
-  const QUICK_ACTIONS = [
-    {
-      icon: <HeartHandshake size={20} color="#fff" />,
-      label: 'اطلب فزعة',
-      sub: 'مساعدة من جيرانك',
-      color: '#059669',
-      route: '/new-request',
-    },
-    {
-      icon: <HelpCircle size={20} color="#fff" />,
-      label: 'اسأل الحي',
-      sub: 'استفسارات وأسئلة',
-      color: '#0284c7',
-      route: '/ask',
-    },
-    {
-      icon: <Compass size={20} color="#fff" />,
-      label: 'خريطة الحي',
-      sub: 'كل شيء حولك',
-      color: '#7c3aed',
-      route: '/map',
-    },
-    {
-      icon: <ShoppingBag size={20} color="#fff" />,
-      label: 'سوق الحي',
-      sub: 'تسوّق من الجيران',
-      color: '#d97706',
-      route: '/market',
-    },
-  ];
-
   const HOW_IT_WORKS = [
     { step: '١', title: 'حدّد موقعك', desc: 'اختر منطقتك وحيّك ليصلك كل ما يخص جيرانك فقط.' },
     { step: '٢', title: 'اطلب أو اسأل', desc: 'انشر طلب فزعة، سؤالاً، أو عرض خدمة بنقرة واحدة.' },
@@ -332,25 +301,6 @@ export default function MoreScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.contentWrap}>
-          {/* 0. QUICK ACTIONS GRID */}
-          <View style={styles.quickGrid}>
-            {QUICK_ACTIONS.map(action => (
-              <Pressable
-                key={action.label}
-                style={({ pressed }) => [
-                  styles.quickCard,
-                  { backgroundColor: action.color },
-                  pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] },
-                ]}
-                onPress={() => routeGuarded(action.route)}
-              >
-                <View style={styles.quickIconCircle}>{action.icon}</View>
-                <Text style={styles.quickLabel}>{action.label}</Text>
-                <Text style={styles.quickSub}>{action.sub}</Text>
-              </Pressable>
-            ))}
-          </View>
-
           {/* 1. USER PROFILE GLANCE CARD */}
           {hasSession ? (
             <Pressable
@@ -427,22 +377,19 @@ export default function MoreScreen() {
               badge="مباشر"
               onPress={() => router.push('/map')}
             />
-            <MenuItem
-              icon={<ShoppingBag size={20} color="#0284c7" />}
+}
               iconBg="#f0f9ff"
               title="سوق الحي والأسر المنتجة"
               sub="عروض، منتجات، سلع، وأطعمة منزلية من أهل الحي"
               onPress={() => router.push('/market')}
             />
-            <MenuItem
-              icon={<Building2 size={20} color="#7c3aed" />}
+}
               iconBg="#f5f3ff"
               title="دليل المحلات والمنشآت"
               sub="تموينات، صيدليات، مخابز، ورش، ومغاسل حيك"
               onPress={() => router.push('/market')}
             />
-            <MenuItem
-              icon={<Calendar size={20} color="#d97706" />}
+}
               iconBg="#fffbeb"
               title="فعاليات وملتقيات الحي"
               sub="أنشطة اجتماعية ومبادرات تطوعية ورياضية"
@@ -482,15 +429,13 @@ export default function MoreScreen() {
               badgeColor="#dc2626"
               onPress={() => router.push('/emergency-alert')}
             />
-            <MenuItem
-              icon={<MessageCircle size={20} color="#059669" />}
+}
               iconBg="#ecfdf5"
               title="استفسارات وأسئلة الجيران"
               sub="اسأل أهل حيك واستفد من تجاربهم ومعرفتهم"
               onPress={() => router.push('/questions')}
             />
-            <MenuItem
-              icon={<Search size={20} color="#0f766e" />}
+}
               iconBg="#f0fdfa"
               title="البحث الذكي في الحي"
               sub="ابحث في الطلبات والخدمات والأسئلة والجيران"
