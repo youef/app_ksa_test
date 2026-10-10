@@ -12,7 +12,7 @@ import {
   Modal,
 } from 'react-native';
 import { router } from 'expo-router';
-import { SAUDI_REGIONS, City, District } from '@/lib/saudiLocations';
+import { buildSaudiLocations, normalizeSaudiLocationName } from '@/lib/saudiLocations';
 import {
   MapPin,
   Search,
@@ -40,23 +40,7 @@ import {
   reverseGeocodeDeviceLocation,
 } from '@/lib/deviceLocation';
 
-// Curated top active cities in Saudi Arabia for fast access
-const TOP_CITIES = [
-  { name: 'الرياض', region: 'منطقة الرياض', icon: '🏙️', desc: 'العاصمة والحي الأكثر نشاطاً' },
-  { name: 'جدة', region: 'منطقة مكة المكرمة', icon: '🌊', desc: 'عروس البحر الأحمر' },
-  { name: 'مكة المكرمة', region: 'منطقة مكة المكرمة', icon: '🕋', desc: 'العاصمة المقدسة' },
-  { name: 'المدينة المنورة', region: 'منطقة المدينة المنورة', icon: '🕌', desc: 'طيبة الطيبة' },
-  { name: 'الدمام', region: 'المنطقة الشرقية', icon: '🌴', desc: 'حاضرة الشرقية' },
-  { name: 'الخبر', region: 'المنطقة الشرقية', icon: '🏖️', desc: 'الواجهة البحرية' },
-  { name: 'بريدة', region: 'منطقة القصيم', icon: '🌾', desc: 'حاضرة القصيم' },
-  { name: 'أبها', region: 'منطقة عسير', icon: '🏔️', desc: 'عروس الجبل والضباب' },
-  { name: 'الطائف', region: 'منطقة مكة المكرمة', icon: '🌸', desc: 'مدينة الورد' },
-  { name: 'تبوك', region: 'منطقة تبوك', icon: '🌿', desc: 'بوابة الشمال' },
-  { name: 'حائل', region: 'منطقة حائل', icon: '🏜️', desc: 'عروس الشمال والكرم' },
-  { name: 'عرعر', region: 'منطقة الحدود الشمالية', icon: '❄️', desc: 'الحدود الشمالية' },
-  { name: 'الهفوف', region: 'المنطقة الشرقية', icon: '🌴', desc: 'واحة الأحساء' },
-  { name: 'نجران', region: 'منطقة نجران', icon: '🌄', desc: 'جنوب المملكة' },
-];
+const ALL_SAUDI_REGIONS = buildSaudiLocations();
 
 export default function Locations() {
   const bottomNavInset = useBottomNavInset();
@@ -88,21 +72,56 @@ export default function Locations() {
       }
 
       const geo = await reverseGeocodeDeviceLocation(devLoc);
-      const targetCity = geo?.city || 'الرياض';
-      const targetDistrict = geo?.district || 'كل الأحياء';
-      const targetRegion = geo?.region || 'المملكة';
+      if (!geo) {
+        Alert.alert('تعذر تحديد الموقع', 'لم نستطع قراءة اسم المدينة من موقعك. ابحث عن مدينتك يدويًا أو أعد المحاولة.');
+        return;
+      }
 
-      await savePermanentMyLocation({
-        region: targetRegion,
-        city: targetCity,
-        district: targetDistrict,
+      const normalizedRegion = normalizeSaudiLocationName(geo.region || '');
+      const region = ALL_SAUDI_REGIONS.find((item) => {
+        const name = normalizeSaudiLocationName(item.name);
+        return name === normalizedRegion || name.includes(normalizedRegion) || normalizedRegion.includes(name);
       });
 
-      setCurrentLoc({
-        region: targetRegion,
-        city: targetCity,
-        district: targetDistrict,
+      const normalizedCity = normalizeSaudiLocationName(geo.city || '');
+      let cityMatch = region?.cities.find((item) => {
+        const name = normalizeSaudiLocationName(item.name);
+        return name === normalizedCity || name.includes(normalizedCity) || normalizedCity.includes(name);
       });
+      let cityRegion = region;
+      if (!cityMatch && normalizedCity) {
+        for (const candidateRegion of ALL_SAUDI_REGIONS) {
+          const found = candidateRegion.cities.find((item) => {
+            const name = normalizeSaudiLocationName(item.name);
+            return name === normalizedCity || name.includes(normalizedCity) || normalizedCity.includes(name);
+          });
+          if (found) {
+            cityMatch = found;
+            cityRegion = candidateRegion;
+            break;
+          }
+        }
+      }
+
+      if (!cityMatch || !cityRegion) {
+        Alert.alert(
+          'لم يتم التعرف على المدينة',
+          'تم الحصول على إحداثيات موقعك، لكن اسم المدينة لم يطابق بيانات المدن السعودية. ابحث عن المدينة يدويًا بدل اختيار مدينة غير صحيحة.'
+        );
+        return;
+      }
+
+      const normalizedDistrict = normalizeSaudiLocationName(geo.district || '');
+      const districtMatch = cityMatch.districts.find((item) => {
+        const name = normalizeSaudiLocationName(item.name);
+        return normalizedDistrict && (name === normalizedDistrict || name.includes(normalizedDistrict) || normalizedDistrict.includes(name));
+      });
+      const targetRegion = cityRegion.name;
+      const targetCity = cityMatch.name;
+      const targetDistrict = districtMatch?.name || 'كل الأحياء';
+
+      await savePermanentMyLocation({ region: targetRegion, city: targetCity, district: targetDistrict });
+      setCurrentLoc({ region: targetRegion, city: targetCity, district: targetDistrict });
 
       Alert.alert(
         'تم تحديد موقعك بنجاح! 📍',
@@ -134,7 +153,7 @@ export default function Locations() {
   const handleOpenCity = (cityName: string, regionName: string) => {
     // Find districts for this city from SAUDI_REGIONS database
     let districtsList: string[] = [];
-    for (const reg of SAUDI_REGIONS) {
+    for (const reg of ALL_SAUDI_REGIONS) {
       const c = reg.cities.find((item) => item.name === cityName);
       if (c && c.districts && c.districts.length > 0) {
         districtsList = c.districts.map((d) => d.name);
@@ -176,7 +195,7 @@ export default function Locations() {
   const searchResults = useMemo(() => {
     if (!query) return null;
     const q = query.toLowerCase();
-    const hits: Array<{ type: 'city' | 'region'; name: string; region: string; parent?: string }> = [];
+    const hits: Array<{ type: 'city' | 'region' | 'district'; name: string; region: string; city?: string }> = [];
 
     SAUDI_REGIONS.forEach((reg) => {
       if (reg.name.toLowerCase().includes(q)) {
@@ -186,10 +205,15 @@ export default function Locations() {
         if (c.name.toLowerCase().includes(q)) {
           hits.push({ type: 'city', name: c.name, region: reg.name });
         }
+        c.districts.forEach((district) => {
+          if (district.name.toLowerCase().includes(q)) {
+            hits.push({ type: 'district', name: district.name, region: reg.name, city: c.name });
+          }
+        });
       });
     });
 
-    return hits.slice(0, 20);
+    return hits.slice(0, 30);
   }, [query]);
 
   // Filtered districts inside modal
@@ -291,7 +315,9 @@ export default function Locations() {
                     key={idx}
                     style={styles.searchResultRow}
                     onPress={() => {
-                      if (item.type === 'city') {
+                      if (item.type === 'district' && item.city) {
+                        void handleApplyLocation(item.region, item.city, item.name);
+                      } else if (item.type === 'city') {
                         handleOpenCity(item.name, item.region);
                       } else {
                         router.push({ pathname: '/cities', params: { regionName: item.name } });
@@ -314,45 +340,15 @@ export default function Locations() {
             </View>
           )}
 
-          {/* 5. TOP ACTIVE CITIES (QUICK SELECTOR) */}
-          <View style={styles.sectionHeader}>
-            <Compass size={18} color="#059669" />
-            <Text style={styles.sectionTitle}>المدن الرئيسية والأكثر نشاطاً 🏙️</Text>
-          </View>
-
-          <View style={styles.topCitiesGrid}>
-            {TOP_CITIES.map((c) => {
-              const isActive = currentLoc.city === c.name;
-              return (
-                <Pressable
-                  key={c.name}
-                  style={[styles.cityCard, isActive && styles.cityCardActive]}
-                  onPress={() => handleOpenCity(c.name, c.region)}
-                >
-                  <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                    <Text style={{ fontSize: 24 }}>{c.icon}</Text>
-                    {isActive && (
-                      <View style={styles.activeCheckPill}>
-                        <Check size={12} color="#fff" />
-                        <Text style={styles.activeCheckText}>مفعل</Text>
-                      </View>
-                    )}
-                  </View>
-                  <Text style={[styles.cityName, isActive && styles.cityNameActive]}>{c.name}</Text>
-                  <Text style={styles.cityDesc} numberOfLines={1}>{c.desc}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          {/* 6. BROWSE BY 13 ADMINISTRATIVE REGIONS */}
+          {/* Browse all cities, municipalities and districts from the full dataset */}
+          {/* BROWSE ALL ADMINISTRATIVE REGIONS */}
           <View style={[styles.sectionHeader, { marginTop: 14 }]}>
             <Building2 size={18} color="#0284c7" />
-            <Text style={styles.sectionTitle}>تصفح حسب مناطق المملكة (13 منطقة)</Text>
+            <Text style={styles.sectionTitle}>جميع مناطق ومدن ومحافظات المملكة</Text>
           </View>
 
           <View style={styles.regionsList}>
-            {SAUDI_REGIONS.map((r) => {
+            {ALL_SAUDI_REGIONS.map((r) => {
               const isCurrentRegion = currentLoc.region === r.name;
               return (
                 <Pressable
@@ -364,7 +360,7 @@ export default function Locations() {
                   <View style={{ flex: 1, alignItems: 'flex-end' }}>
                     <Text style={styles.regionTitle}>{r.name}</Text>
                     <Text style={styles.regionSub}>
-                      {r.cities.length} مدينة ومحافظة رئيسية
+                      {r.cities.length} مدينة ومحافظة · {r.cities.reduce((total, city) => total + city.districts.length, 0)} حي
                     </Text>
                   </View>
                   <View style={[styles.regionIconBox, isCurrentRegion && { backgroundColor: '#ecfdf5' }]}>
