@@ -24,7 +24,7 @@ import {
   getCachedBrandingLogo,
   subscribeBrandingLogo,
 } from '@/lib/branding';
-import { sendPushToMultipleUsers, sendPushToUser } from '@/lib/pushSender';
+import { sendAdminBroadcastPush } from '@/lib/pushSender';
 import {
   Shield,
   Users,
@@ -512,7 +512,7 @@ export default function AdminScreen() {
       if (notifErr) throw notifErr;
 
       // 2. Real Push notification dispatch
-      await sendPushToUser(inspectedUser.id, {
+      await sendAdminBroadcastPush([inspectedUser.id], {
         title: 'إشعار من إدارة حيّنا 🇸🇦',
         body: text,
         data: { type: 'admin_notice' },
@@ -587,7 +587,7 @@ export default function AdminScreen() {
       });
 
       // Dispatch push notification
-      await sendPushToUser(userId, {
+      await sendAdminBroadcastPush([userId], {
         title: notifTitle,
         body: notifBody,
         data: { type: 'verification', status: action },
@@ -737,15 +737,22 @@ export default function AdminScreen() {
         if (batchErr) throw batchErr;
       }
 
-      // 2. Real Push notification dispatch
-      await sendPushToMultipleUsers(recipientIds, {
+      // 2. Deliver a real push to every registered mobile/browser device.
+      const pushResult = await sendAdminBroadcastPush(recipientIds, {
         title: fullTitle,
         body: fullBody,
-        data: { type: 'broadcast', broadcast_type: broadcastType },
+        data: { type: 'broadcast', broadcast_type: broadcastType, target: broadcastTarget },
       });
 
       await recordAuditLog('بث تعميم رسمي لسكان الحي', broadcastTitle.trim(), 'broadcast');
-      showToast(`تم نشر وإرسال التعميم إلى ${recipientIds.length} مستخدم 📢`);
+      if (pushResult.success && pushResult.sentCount > 0) {
+        showToast(`تم حفظ التعميم وإرسال إشعار فوري إلى ${pushResult.sentCount} جهاز 📢`);
+      } else {
+        Alert.alert(
+          'تم حفظ التعميم',
+          `تم حفظ التعميم داخل التطبيق وإظهاره في صفحة الإشعارات، لكن لم يصل إشعار فوري لأي جهاز مسجّل. ${pushResult.error || 'تحقق من إعدادات مفاتيح الإشعارات في Vercel ومن تسجيل الأجهزة.'}`
+        );
+      }
       setBroadcastTitle('');
       setBroadcastBody('');
     } catch (e: any) {
