@@ -46,11 +46,10 @@ import {
   Rocket,
   Globe,
   FileText,
+  CloudSun,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { requireAccount } from '@/lib/authGate';
-import * as Location from 'expo-location';
-import { MapPin, RefreshCw, Sun, Cloud, CloudRain, CloudSun, CloudFog, Wind, Droplets, Thermometer, Sunrise, Sunset, Search } from 'lucide-react-native';
 
 export default function MoreScreen() {
   const bottomNavInset = useBottomNavInset();
