@@ -139,7 +139,10 @@ export async function sendAdminBroadcastPush(
     const { data, error: sessionError } = await supabase.auth.getSession();
     const accessToken = data.session?.access_token;
     if (sessionError || !accessToken) return { success: false, sentCount: 0, error: 'انتهت جلسة تسجيل الدخول.' };
-    const response = await fetch('https://appksatest.vercel.app/api/push-dispatch', {
+    const endpoint = typeof window !== 'undefined' && window.location?.origin
+      ? `${window.location.origin}/api/push-dispatch`
+      : 'https://appksatest.vercel.app/api/push-dispatch';
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
       body: JSON.stringify({ recipientUserIds: recipients, title: payload.title, body: payload.body, data: payload.data ?? {}, sound: payload.sound ?? 'default', badge: payload.badge }),

@@ -247,10 +247,10 @@ export default function AdminScreen() {
         bCountRes,
         uCountRes,
       ] = await Promise.all([
-        supabase.from('profiles').select('*').order('created_at', { ascending: false }).limit(100),
+        supabase.from('profiles').select('*').order('created_at', { ascending: false }).limit(200),
         supabase
           .from('verification_requests')
-          .select('*, user:user_id(id, display_name, username, city, district, avatar_url, bio, is_verified, is_geoverified, role, created_at)')
+          .select('*')
           .order('created_at', { ascending: false })
           .limit(60),
         supabase
@@ -270,14 +270,14 @@ export default function AdminScreen() {
           .limit(60),
         supabase
           .from('urgent_alerts')
-          .select('*, user:user_id(id, display_name, username, avatar_url, city, district)')
+          .select('*')
           .order('created_at', { ascending: false })
           .limit(60),
         supabase
           .from('questions')
           .select('*, author:author_id(id, display_name, username, avatar_url)')
           .order('created_at', { ascending: false })
-          .limit(40),
+          .limit(60),
         supabase
           .from('requests')
           .select('*, requester:requester_id(id, display_name, username, avatar_url)')
@@ -297,11 +297,29 @@ export default function AdminScreen() {
       ]);
 
       const allUsers = (profilesRes.data || []) as AdminProfile[];
-      const allVerifs = (verifRes.data || []) as AdminVerificationRequest[];
+      const userMap = new Map<string, AdminProfile>();
+      allUsers.forEach(u => userMap.set(u.id, u));
+
+      const allVerifs = ((verifRes.data || []) as any[]).map(v => ({
+        ...v,
+        user: v.user || userMap.get(v.user_id) || { id: v.user_id, display_name: 'مواطن' },
+      })) as AdminVerificationRequest[];
+
       const allReports = (reportsRes.data || []) as AdminReport[];
-      const allServices = (servicesRes.data || []) as AdminService[];
+
+      const allServices = ((servicesRes.data || []) as any[]).map(s => ({
+        ...s,
+        title: s.title || s.name || 'خدمة محلية',
+        price: s.price ?? s.price_from ?? null,
+      })) as AdminService[];
+
       const allBorrow = (borrowRes.data || []) as AdminBorrowItem[];
-      const allUrgent = (urgentRes.data || []) as AdminUrgentAlert[];
+
+      const allUrgent = ((urgentRes.data || []) as any[]).map(u => ({
+        ...u,
+        user: u.user || userMap.get(u.creator_id || u.user_id) || { id: u.creator_id || u.user_id, display_name: 'أحد الجيران' },
+      })) as AdminUrgentAlert[];
+
       const allQuestions = (questionsRes.data || []) as AdminQuestion[];
       const allRequests = (requestsRes.data || []) as AdminRequest[];
       const allLogs = (auditRes.data || []) as AdminActivityLog[];
