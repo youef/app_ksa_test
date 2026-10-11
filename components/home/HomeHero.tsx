@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Image, Pressable, Text, View } from 'react-native';
+import { Image, Pressable, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Bell, LogIn, ShieldCheck } from 'lucide-react-native';
+import { Bell, LogIn, ShieldCheck, MapPin, ChevronDown, Search, X } from 'lucide-react-native';
 import { styles } from './homeStyles';
 import type { Profile } from '@/lib/homeUtils';
 import { requireAccount } from '@/lib/authGate';
@@ -23,12 +23,21 @@ type Props = {
 
 export default function HomeHero({
   profile, logoUri, greeting, unreadCount,
+  city = 'الرياض',
+  district,
+  searchQuery = '',
+  onSearchChange,
+  onOpenLocation,
   isGuest,
 }: Props) {
   const [imgError, setImgError] = useState(false);
   useEffect(() => {
     setImgError(false);
   }, [logoUri]);
+
+  const locationDisplay = district && district !== 'كل الأحياء' && district !== 'كل أحياء المدينة'
+    ? `${city} · حي ${district}`
+    : city || 'المملكة العربية السعودية';
 
   return (
     <LinearGradient
@@ -121,6 +130,76 @@ export default function HomeHero({
           </Pressable>
         </View>
       </View>
+
+      {/* Location Selector Pill */}
+      {onOpenLocation && (
+        <View style={{ marginTop: 12, marginBottom: 8, paddingHorizontal: 4 }}>
+          <Pressable
+            onPress={onOpenLocation}
+            style={{
+              flexDirection: 'row-reverse',
+              alignItems: 'center',
+              backgroundColor: 'rgba(255,255,255,0.14)',
+              borderWidth: 1,
+              borderColor: 'rgba(255,255,255,0.22)',
+              borderRadius: 14,
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+              gap: 8,
+            }}
+          >
+            <MapPin size={16} color="#6ee7b7" />
+            <Text style={{ flex: 1, color: '#ffffff', fontSize: 13, fontWeight: '800', textAlign: 'right' }} numberOfLines={1}>
+              {locationDisplay}
+            </Text>
+            <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}>
+              <Text style={{ color: '#a7f3d0', fontSize: 11, fontWeight: '700' }}>تغيير الحي</Text>
+              <ChevronDown size={14} color="#a7f3d0" />
+            </View>
+          </Pressable>
+        </View>
+      )}
+
+      {/* Fast In-Feed Search Input */}
+      {onSearchChange && (
+        <View style={{ marginTop: 4, paddingHorizontal: 4 }}>
+          <View style={{
+            flexDirection: 'row-reverse',
+            alignItems: 'center',
+            backgroundColor: '#ffffff',
+            borderRadius: 14,
+            paddingHorizontal: 12,
+            height: 46,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.12,
+            shadowRadius: 6,
+            elevation: 2,
+            gap: 8,
+          }}>
+            <Search size={18} color="#059669" />
+            <TextInput
+              style={{
+                flex: 1,
+                fontSize: 13,
+                color: '#0f172a',
+                textAlign: 'right',
+                height: 40,
+                padding: 0,
+              }}
+              value={searchQuery}
+              onChangeText={onSearchChange}
+              placeholder="ابحث عن سؤال، أداة، أو فزعة في حيك..."
+              placeholderTextColor="#94a3b8"
+            />
+            {searchQuery.length > 0 && (
+              <Pressable onPress={() => onSearchChange('')} style={{ padding: 4 }}>
+                <X size={16} color="#94a3b8" />
+              </Pressable>
+            )}
+          </View>
+        </View>
+      )}
     </LinearGradient>
   );
 }
