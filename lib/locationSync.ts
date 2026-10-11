@@ -94,6 +94,45 @@ export function isExactDistrictMatching(
 }
 
 export const PERMANENT_MY_LOCATION_KEY = '@hayna_permanent_my_location';
+export const LOCKED_CITY_KEY = '@hayna_gps_locked_city_v1';
+
+export interface LockedCity {
+  region: string;
+  city: string;
+}
+
+/**
+ * The GPS-verified city. Once a real device location pins a city, the active
+ * city is locked to it and cannot be switched manually from any screen.
+ * Only a fresh GPS reading (allowCityChange) may move the lock.
+ */
+export async function getLockedCity(): Promise<LockedCity | null> {
+  try {
+    const raw = await AsyncStorage.getItem(LOCKED_CITY_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && parsed.city && !isAllKingdom(parsed.city)) {
+      return { region: parsed.region || 'المملكة', city: parsed.city };
+    }
+  } catch {}
+  return null;
+}
+
+export async function setLockedCity(region: string, city: string): Promise<void> {
+  if (!city || isAllKingdom(city)) return;
+  try {
+    await AsyncStorage.setItem(
+      LOCKED_CITY_KEY,
+      JSON.stringify({ region: region?.trim() || 'المملكة', city: city.trim() }),
+    );
+  } catch {}
+}
+
+export async function clearLockedCity(): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(LOCKED_CITY_KEY);
+  } catch {}
+}
 
 /**
  * Retrieve permanent user location (survives logout and app restarts)
@@ -151,7 +190,11 @@ export async function getPermanentMyLocation(): Promise<HaynaLocation> {
 }
 
 /**
- * Save permanent user location across logout and update global state
+ * Save permanent user location across logout and update global state.
+ *
+ * City locking: once a GPS reading pins a city (allowCityChange = true), every
+ * later manual save must stay inside that locked city. A manual attempt to
+ * switch to another city is silently ignored and the locked city is kept.
  */
 export async function savePermanentMyLocation(
   loc: {
@@ -159,13 +202,43 @@ export async function savePermanentMyLocation(
     city?: string | null;
     district?: string | null;
   },
-  syncRemote = true
+  syncRemote = true,
+  opts?: { allowCityChange?: boolean }
 ): Promise<void> {
   const current = await getPermanentMyLocation();
+  const lock = await getLockedCity();
+
+  let region = loc.region || current?.region || 'المملكة';
+  let city = loc.city || current?.city || 'كل المدن';
+  let district = loc.district || current?.district || 'كل الأحياء';
+
+  const requestedCity = (loc.city || '').trim();
+  const hasSpecificCity = Boolean(requestedCity) && !isAllKingdom(requestedCity);
+  const cityMatchesLock = Boolean(lock) && hasSpecificCity
+    && normalizeLoc(requestedCity) === normalizeLoc(lock!.city);
+
+  if (hasSpecificCity) {
+    if (lock && !opts?.allowCityChange && !cityMatchesLock) {
+      // Manual attempt to switch city: keep the GPS-locked city and drop the
+      // foreign district so city/district never contradict each other.
+      region = lock.region;
+      city = lock.city;
+      district = 'كل الأحياء';
+    } else if (opts?.allowCityChange) {
+      // Only a real GPS reading may pin (or move) the locked city.
+      await setLockedCity(region, city);
+    }
+  } else if (lock && !opts?.allowCityChange) {
+    // Manual attempt to reset to "all cities" while a city is locked: stay locked.
+    region = lock.region;
+    city = lock.city;
+    district = loc.district || current?.district || 'كل الأحياء';
+  }
+
   const updated: HaynaLocation = {
-    region: loc.region || current?.region || 'المملكة',
-    city: loc.city || current?.city || 'كل المدن',
-    district: loc.district || current?.district || 'كل الأحياء',
+    region,
+    city,
+    district,
   };
 
   try {

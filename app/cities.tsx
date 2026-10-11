@@ -42,7 +42,7 @@ export default function Cities() {
         >
           <ScreenHeader title={region.name} fallbackRoute="/locations" />
           <Text style={styles.heroSub}>
-            اختر مدينتك لتصفح الأحياء وربط حسابك بمجتمع الحي.
+            تصفّح مدن ومحافظات المنطقة (عرض فقط). لتفعيل مدينتك استخدم تحديث الموقع عبر GPS من صفحة موقعك.
           </Text>
 
           <View style={styles.searchBar}>

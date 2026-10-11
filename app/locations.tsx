@@ -9,7 +9,6 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
-  Modal,
 } from 'react-native';
 import { router } from 'expo-router';
 import { buildSaudiLocations, normalizeSaudiLocationName } from '@/lib/saudiLocations';
@@ -20,20 +19,19 @@ import {
   Crosshair,
   Check,
   Building2,
-  Sparkles,
   Globe,
   X,
-  Compass,
-  ArrowRight,
+  Lock,
+  Eye,
 } from 'lucide-react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import ScreenHeader from '@/components/shared/ScreenHeader';
 import { useBottomNavInset } from '@/lib/bottomNav';
 import {
   getActiveLocation,
   savePermanentMyLocation,
+  getLockedCity,
   isAllKingdom,
   type HaynaLocation,
+  type LockedCity,
 } from '@/lib/locationSync';
 import {
   getCurrentDeviceLocation,
@@ -44,42 +42,65 @@ const ALL_SAUDI_REGIONS = buildSaudiLocations();
 
 export default function Locations() {
   const bottomNavInset = useBottomNavInset();
-  const [search, setSearch] = useState('');
   const [currentLoc, setCurrentLoc] = useState<HaynaLocation>({
     region: 'كل المملكة',
     city: 'كل المدن',
     district: 'كل الأحياء',
   });
+  const [locked, setLocked] = useState<LockedCity | null>(null);
   const [detectingGps, setDetectingGps] = useState(false);
-
-  // Selected city for picking a district
-  const [selectedCityObj, setSelectedCityObj] = useState<{ city: string; region: string; districts: string[] } | null>(null);
+  const [applyingDistrict, setApplyingDistrict] = useState(false);
   const [districtSearch, setDistrictSearch] = useState('');
 
   useEffect(() => {
-    getActiveLocation().then(setCurrentLoc);
+    (async () => {
+      const [loc, lock] = await Promise.all([getActiveLocation(), getLockedCity()]);
+      setCurrentLoc(loc);
+      setLocked(lock);
+    })();
   }, []);
 
-  // Handle GPS location auto-detect
+  const hasLock = Boolean(locked && locked.city && !isAllKingdom(locked.city));
+
+  // Districts of the GPS-locked city only.
+  const lockedDistricts = useMemo(() => {
+    if (!locked) return [] as string[];
+    const target = normalizeSaudiLocationName(locked.city);
+    for (const reg of ALL_SAUDI_REGIONS) {
+      const city = reg.cities.find(item => normalizeSaudiLocationName(item.name) === target);
+      if (city) return city.districts.map(d => d.name);
+    }
+    return [];
+  }, [locked]);
+
+  const filteredDistricts = useMemo(() => {
+    if (!districtSearch.trim()) return lockedDistricts;
+    const q = normalizeSaudiLocationName(districtSearch);
+    return lockedDistricts.filter(d => normalizeSaudiLocationName(d).includes(q));
+  }, [lockedDistricts, districtSearch]);
+
+  // Mandatory GPS detection. This is the ONLY way to set/refresh the city.
   const handleAutoDetectGPS = async () => {
     setDetectingGps(true);
     try {
       const devLoc = await getCurrentDeviceLocation();
       if (!devLoc) {
-        Alert.alert('تنبيه الموقع', 'يرجى السماح بالوصول للموقع لتحديد حيك تلقائياً.');
-        setDetectingGps(false);
+        Alert.alert(
+          'إذن الموقع مطلوب',
+          'لا يمكن تثبيت مدينتك بدون إذن الموقع. اسمح للتطبيق أو المتصفح بالوصول إلى موقعك ثم أعد المحاولة.',
+        );
         return;
       }
 
       const geo = await reverseGeocodeDeviceLocation(devLoc);
       if (!geo) {
-        Alert.alert('تعذر تحديد الموقع', 'لم نستطع قراءة اسم المدينة من موقعك. ابحث عن مدينتك يدويًا أو أعد المحاولة.');
+        Alert.alert('تعذّر تحديد الموقع', 'لم نستطع قراءة اسم المدينة من موقعك. أعد المحاولة وتأكد من تفعيل خدمة الموقع.');
         return;
       }
 
       const normalizedRegion = normalizeSaudiLocationName(geo.region || '');
       const region = normalizedRegion
-        ? ALL_SAUDI_REGIONS.find((item) => {
+        ? ALL_SAUDI_REGIONS.find(item => {
             const name = normalizeSaudiLocationName(item.name);
             return name === normalizedRegion || name.includes(normalizedRegion) || normalizedRegion.includes(name);
           })
@@ -87,7 +108,7 @@ export default function Locations() {
 
       const normalizedCity = normalizeSaudiLocationName(geo.city || '');
       let cityMatch = normalizedCity
-        ? region?.cities.find((item) => {
+        ? region?.cities.find(item => {
             const name = normalizeSaudiLocationName(item.name);
             return name === normalizedCity || name.includes(normalizedCity) || normalizedCity.includes(name);
           })
@@ -95,7 +116,7 @@ export default function Locations() {
       let cityRegion = region;
       if (!cityMatch && normalizedCity) {
         for (const candidateRegion of ALL_SAUDI_REGIONS) {
-          const found = candidateRegion.cities.find((item) => {
+          const found = candidateRegion.cities.find(item => {
             const name = normalizeSaudiLocationName(item.name);
             return name === normalizedCity || name.includes(normalizedCity) || normalizedCity.includes(name);
           });
@@ -110,13 +131,13 @@ export default function Locations() {
       if (!cityMatch || !cityRegion) {
         Alert.alert(
           'لم يتم التعرف على المدينة',
-          'تم الحصول على إحداثيات موقعك، لكن اسم المدينة لم يطابق بيانات المدن السعودية. ابحث عن المدينة يدويًا بدل اختيار مدينة غير صحيحة.'
+          'تم الحصول على إحداثيات موقعك، لكن اسم المدينة لم يطابق بيانات المدن السعودية. أعد المحاولة من مكان يسمح بتحديد أدق.',
         );
         return;
       }
 
       const normalizedDistrict = normalizeSaudiLocationName(geo.district || '');
-      const districtMatch = cityMatch.districts.find((item) => {
+      const districtMatch = cityMatch.districts.find(item => {
         const name = normalizeSaudiLocationName(item.name);
         return normalizedDistrict && (name === normalizedDistrict || name.includes(normalizedDistrict) || normalizedDistrict.includes(name));
       });
@@ -124,111 +145,50 @@ export default function Locations() {
       const targetCity = cityMatch.name;
       const targetDistrict = districtMatch?.name || 'كل الأحياء';
 
-      await savePermanentMyLocation({ region: targetRegion, city: targetCity, district: targetDistrict });
-      setCurrentLoc({ region: targetRegion, city: targetCity, district: targetDistrict });
+      await savePermanentMyLocation(
+        { region: targetRegion, city: targetCity, district: targetDistrict },
+        true,
+        { allowCityChange: true },
+      );
+      const nextLoc: HaynaLocation = { region: targetRegion, city: targetCity, district: targetDistrict };
+      setCurrentLoc(nextLoc);
+      setLocked({ region: targetRegion, city: targetCity });
+      setDistrictSearch('');
 
       Alert.alert(
-        'تم تحديد موقعك بنجاح! 📍',
-        `تم ضبط الموقع على: مدينة ${targetCity}${targetDistrict !== 'كل الأحياء' ? ` · حي ${targetDistrict}` : ''}.`,
-        [{ text: 'حسناً', onPress: () => router.back() }]
+        'تم تثبيت مدينتك عبر GPS 📍',
+        `تم ضبط موقعك على: مدينة ${targetCity}${targetDistrict !== 'كل الأحياء' ? ` · حي ${targetDistrict}` : ''}.\n\nمدينتك الآن مُقفلة ولا يمكن تغييرها يدوياً، ويمكنك اختيار أي حي بداخلها.`,
+        [{ text: 'حسناً' }],
       );
     } catch {
-      Alert.alert('خطأ', 'تعذر جلب الموقع تلقائياً. يمكنك اختيار مدينتك يدوياً.');
+      Alert.alert('خطأ', 'تعذّر جلب الموقع تلقائياً. تأكد من تفعيل خدمة الموقع ثم حاول مجدداً.');
     } finally {
       setDetectingGps(false);
     }
   };
 
-  // Set All Kingdom (Nationwide)
-  const handleSetAllKingdom = async () => {
-    const loc: HaynaLocation = {
-      region: 'كل المملكة',
-      city: 'كل المدن',
-      district: 'كل الأحياء',
-    };
-    await savePermanentMyLocation(loc);
-    setCurrentLoc(loc);
-    Alert.alert('تم التحديث 🇸🇦', 'أنت الآن تتصفح جميع مدن ومناطق المملكة.', [
-      { text: 'حسناً', onPress: () => router.back() },
-    ]);
-  };
-
-  // Select a City and open district picker
-  const handleOpenCity = (cityName: string, regionName: string) => {
-    // Find districts for this city from SAUDI_REGIONS database
-    let districtsList: string[] = [];
-    for (const reg of ALL_SAUDI_REGIONS) {
-      const c = reg.cities.find((item) => item.name === cityName);
-      if (c && c.districts && c.districts.length > 0) {
-        districtsList = c.districts.map((d) => d.name);
-        break;
-      }
-    }
-
-    if (districtsList.length === 0) {
-      // Direct apply if no specific districts defined
-      void handleApplyLocation(regionName, cityName, 'كل الأحياء');
-    } else {
-      setSelectedCityObj({
-        city: cityName,
-        region: regionName,
-        districts: districtsList,
-      });
-      setDistrictSearch('');
+  // Inside the locked city the user may only choose a district (or all of them).
+  const handlePickDistrict = async (district: string) => {
+    if (!locked) return;
+    setApplyingDistrict(true);
+    try {
+      await savePermanentMyLocation({ region: locked.region, city: locked.city, district }, true);
+      setCurrentLoc({ region: locked.region, city: locked.city, district });
+      Alert.alert(
+        'تم تحديث حيّك 🏡',
+        district === 'كل الأحياء'
+          ? `تتصفح الآن كل أحياء ${locked.city}.`
+          : `تتصفح الآن: ${locked.city} · حي ${district}.`,
+        [{ text: 'تم' }],
+      );
+    } catch (e: any) {
+      Alert.alert('تعذّر الحفظ', e?.message || 'حاول مرة أخرى.');
+    } finally {
+      setApplyingDistrict(false);
     }
   };
 
-  // Apply chosen location
-  const handleApplyLocation = async (region: string, city: string, district: string) => {
-    const loc: HaynaLocation = {
-      region,
-      city,
-      district,
-    };
-    await savePermanentMyLocation(loc);
-    setCurrentLoc(loc);
-    setSelectedCityObj(null);
-    Alert.alert('تم ضبط الموقع بنجاح 📍', `تتصفح الآن: ${city}${district && district !== 'كل الأحياء' ? ` · حي ${district}` : ''}.`, [
-      { text: 'تم', onPress: () => router.back() },
-    ]);
-  };
-
-  const query = search.trim();
-
-  // Search results across regions and cities
-  const searchResults = useMemo(() => {
-    if (!query) return null;
-    const q = query.toLowerCase();
-    const hits: Array<{ type: 'city' | 'region' | 'district'; name: string; region: string; city?: string }> = [];
-
-    ALL_SAUDI_REGIONS.forEach((reg) => {
-      if (reg.name.toLowerCase().includes(q)) {
-        hits.push({ type: 'region', name: reg.name, region: reg.name });
-      }
-      reg.cities.forEach((c) => {
-        if (c.name.toLowerCase().includes(q)) {
-          hits.push({ type: 'city', name: c.name, region: reg.name });
-        }
-        c.districts.forEach((district) => {
-          if (district.name.toLowerCase().includes(q)) {
-            hits.push({ type: 'district', name: district.name, region: reg.name, city: c.name });
-          }
-        });
-      });
-    });
-
-    return hits.slice(0, 30);
-  }, [query]);
-
-  // Filtered districts inside modal
-  const filteredDistricts = useMemo(() => {
-    if (!selectedCityObj) return [];
-    if (!districtSearch.trim()) return selectedCityObj.districts;
-    const dq = districtSearch.trim().toLowerCase();
-    return selectedCityObj.districts.filter((d) => d.toLowerCase().includes(dq));
-  }, [selectedCityObj, districtSearch]);
-
-  const isKingdomActive = isAllKingdom(currentLoc.city);
+  const isAllDistricts = currentLoc.district === 'كل الأحياء' || currentLoc.district === 'كل أحياء المدينة';
 
   return (
     <View style={styles.container}>
@@ -238,7 +198,7 @@ export default function Locations() {
           <Pressable onPress={() => router.back()} style={styles.navBackBtn} hitSlop={8}>
             <ChevronLeft size={22} color="#0f172a" />
           </Pressable>
-          <Text style={styles.navTitle}>تحديد واختيار الموقع 🇸🇦</Text>
+          <Text style={styles.navTitle}>موقعك المُوثَّق عبر GPS 📍</Text>
           <View style={{ width: 38 }} />
         </View>
       </View>
@@ -250,110 +210,129 @@ export default function Locations() {
         <View style={styles.contentWrap}>
           {/* 1. CURRENT ACTIVE LOCATION CARD */}
           <View style={styles.currentLocCard}>
-            <View style={styles.currentLocIconBox}>
-              <MapPin size={22} color="#059669" />
+            <View style={[styles.currentLocIconBox, hasLock && { backgroundColor: '#fef3c7' }]}>
+              {hasLock ? <Lock size={20} color="#b45309" /> : <MapPin size={22} color="#059669" />}
             </View>
             <View style={{ flex: 1, alignItems: 'flex-end', gap: 2 }}>
-              <Text style={styles.currentLocLabel}>موقعك المختار حالياً للتصفح</Text>
+              <Text style={styles.currentLocLabel}>موقعك الحالي للتصفح</Text>
               <Text style={styles.currentLocValue}>
-                {isKingdomActive
-                  ? '🇸🇦 كل مناطق ومدن المملكة'
-                  : `📍 ${currentLoc.city}${currentLoc.district && currentLoc.district !== 'كل الأحياء' ? ` · حي ${currentLoc.district}` : ''}`}
+                {hasLock
+                  ? `📍 ${currentLoc.city}${!isAllDistricts ? ` · حي ${currentLoc.district}` : ' · كل الأحياء'}`
+                  : 'لم يتم تثبيت مدينتك بعد'}
               </Text>
             </View>
           </View>
 
-          {/* 2. INSTANT ACTION BUTTONS: GPS & ALL KINGDOM */}
-          <View style={styles.actionRow}>
+          {/* 2. MANDATORY GPS BUTTON */}
+          <View style={styles.mandatoryCard}>
+            <View style={styles.mandatoryHeader}>
+              <Crosshair size={17} color="#b91c1c" />
+              <Text style={styles.mandatoryTitle}>تحديد موقعك الحقيقي إلزامي</Text>
+            </View>
+            <Text style={styles.mandatoryText}>
+              نقرأ موقعك الفعلي عبر GPS لتثبيت مدينتك تلقائياً. لا يمكن تغيير المدينة يدوياً لاحقاً، وهذا يضمن
+              وصول منشورات وتنبيهات جيرانك الحقيقيين إليك بدقة.
+            </Text>
             <Pressable
               style={[styles.gpsBtn, detectingGps && { opacity: 0.6 }]}
               onPress={handleAutoDetectGPS}
               disabled={detectingGps}
+              accessibilityRole="button"
             >
               {detectingGps ? (
                 <ActivityIndicator size="small" color="#fff" />
               ) : (
                 <>
                   <Crosshair size={18} color="#fff" />
-                  <Text style={styles.gpsBtnText}>موقعي الحالي عبر GPS 📍</Text>
+                  <Text style={styles.gpsBtnText}>
+                    {hasLock ? 'تحديث موقعي الحقيقي عبر GPS' : 'تثبيت موقعي عبر GPS الآن'}
+                  </Text>
                 </>
               )}
             </Pressable>
-
-            <Pressable
-              style={[styles.allKingdomBtn, isKingdomActive && styles.allKingdomBtnActive]}
-              onPress={handleSetAllKingdom}
-            >
-              <Globe size={18} color={isKingdomActive ? '#fff' : '#047857'} />
-              <Text style={[styles.allKingdomBtnText, isKingdomActive && { color: '#fff' }]}>
-                كل المملكة 🇸🇦
-              </Text>
-            </Pressable>
           </View>
 
-          {/* 3. SEARCH INPUT */}
-          <View style={styles.searchBar}>
-            <Search size={18} color="#94a3b8" />
-            <TextInput
-              style={styles.searchInput}
-              value={search}
-              onChangeText={setSearch}
-              placeholder="ابحث عن مدينة، منطقة، أو محافظة..."
-              placeholderTextColor="#94a3b8"
-              textAlign="right"
-            />
-            {Boolean(search) && (
-              <Pressable onPress={() => setSearch('')} hitSlop={8}>
-                <X size={16} color="#94a3b8" />
-              </Pressable>
-            )}
-          </View>
-
-          {/* 4. SEARCH RESULTS (IF SEARCHING) */}
-          {searchResults && searchResults.length > 0 && (
-            <View style={styles.searchResultsBox}>
-              <Text style={styles.searchResultTitle}>نتائج البحث ({searchResults.length})</Text>
-              <View style={{ gap: 6 }}>
-                {searchResults.map((item, idx) => (
-                  <Pressable
-                    key={idx}
-                    style={styles.searchResultRow}
-                    onPress={() => {
-                      if (item.type === 'district' && item.city) {
-                        void handleApplyLocation(item.region, item.city, item.name);
-                      } else if (item.type === 'city') {
-                        handleOpenCity(item.name, item.region);
-                      } else {
-                        router.push({ pathname: '/cities', params: { regionName: item.name } });
-                      }
-                    }}
-                  >
-                    <ChevronLeft size={16} color="#94a3b8" />
-                    <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                      <Text style={styles.searchResultName}>{item.name}</Text>
-                      <Text style={styles.searchResultSub}>
-                        {item.type === 'city' ? `مدينة · ${item.region}` : 'منطقة إدارية بالمملكة'}
-                      </Text>
-                    </View>
-                    <View style={styles.searchResultIconBox}>
-                      <MapPin size={16} color="#059669" />
-                    </View>
-                  </Pressable>
-                ))}
+          {/* 3. DISTRICT PICKER INSIDE THE LOCKED CITY */}
+          {hasLock && (
+            <>
+              <View style={styles.sectionHeader}>
+                <Building2 size={18} color="#0284c7" />
+                <Text style={styles.sectionTitle}>تصفّح داخل مدينة {locked?.city}</Text>
               </View>
-            </View>
+
+              <Pressable
+                style={[styles.allDistrictsRow, isAllDistricts && styles.allDistrictsRowActive]}
+                onPress={() => handlePickDistrict('كل الأحياء')}
+                disabled={applyingDistrict}
+                accessibilityRole="button"
+              >
+                <Globe size={18} color="#059669" />
+                <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                  <Text style={styles.allDistrictsTitle}>كل أحياء {locked?.city} 🏙️</Text>
+                  <Text style={styles.allDistrictsSub}>عرض شامل لكافة المنشورات والخدمات في مدينتك</Text>
+                </View>
+                {isAllDistricts && <Check size={18} color="#059669" />}
+              </Pressable>
+
+              {lockedDistricts.length > 0 && (
+                <>
+                  <View style={styles.searchBar}>
+                    <Search size={18} color="#94a3b8" />
+                    <TextInput
+                      style={styles.searchInput}
+                      value={districtSearch}
+                      onChangeText={setDistrictSearch}
+                      placeholder={`ابحث في أحياء ${locked?.city}...`}
+                      placeholderTextColor="#94a3b8"
+                      textAlign="right"
+                    />
+                    {Boolean(districtSearch) && (
+                      <Pressable onPress={() => setDistrictSearch('')} hitSlop={8}>
+                        <X size={16} color="#94a3b8" />
+                      </Pressable>
+                    )}
+                  </View>
+
+                  <View style={styles.districtsList}>
+                    {filteredDistricts.map(dName => {
+                      const isSelected = currentLoc.city === locked?.city && currentLoc.district === dName;
+                      return (
+                        <Pressable
+                          key={dName}
+                          style={[styles.districtRow, isSelected && styles.districtRowActive]}
+                          onPress={() => handlePickDistrict(dName)}
+                          disabled={applyingDistrict}
+                          accessibilityRole="button"
+                        >
+                          {isSelected ? <Check size={16} color="#059669" /> : <ChevronLeft size={16} color="#94a3b8" />}
+                          <Text style={[styles.districtName, isSelected && styles.districtNameActive]}>
+                            حي {dName}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                    {filteredDistricts.length === 0 && (
+                      <Text style={styles.noDistrictsText}>لا توجد نتائج مطابقة لاسم هذا الحي داخل مدينتك.</Text>
+                    )}
+                  </View>
+                </>
+              )}
+            </>
           )}
 
-          {/* Browse all cities, municipalities and districts from the full dataset */}
-          {/* BROWSE ALL ADMINISTRATIVE REGIONS */}
+          {/* 4. BROWSE OTHER CITIES (READ-ONLY) */}
           <View style={[styles.sectionHeader, { marginTop: 14 }]}>
-            <Building2 size={18} color="#0284c7" />
-            <Text style={styles.sectionTitle}>جميع مناطق ومدن ومحافظات المملكة</Text>
+            <Eye size={18} color="#64748b" />
+            <Text style={styles.sectionTitle}>تصفّح باقي مناطق ومدن المملكة (عرض فقط)</Text>
           </View>
+          <Text style={styles.browseHint}>
+            يمكنك استعراض محتوى باقي المدن للتعرّف عليه، لكن لا يمكن تفعيلها أو الانتقال إليها — موقعك يبقى مثبتاً على
+            مدينتك.
+          </Text>
 
           <View style={styles.regionsList}>
-            {ALL_SAUDI_REGIONS.map((r) => {
-              const isCurrentRegion = currentLoc.region === r.name;
+            {ALL_SAUDI_REGIONS.map(r => {
+              const isCurrentRegion = hasLock && currentLoc.region === r.name;
               return (
                 <Pressable
                   key={r.name}
@@ -368,7 +347,7 @@ export default function Locations() {
                     </Text>
                   </View>
                   <View style={[styles.regionIconBox, isCurrentRegion && { backgroundColor: '#ecfdf5' }]}>
-                    <MapPin size={18} color={isCurrentRegion ? '#059669' : '#64748b'} />
+                    {isCurrentRegion ? <MapPin size={18} color="#059669" /> : <Eye size={18} color="#94a3b8" />}
                   </View>
                 </Pressable>
               );
@@ -376,88 +355,6 @@ export default function Locations() {
           </View>
         </View>
       </ScrollView>
-
-      {/* ======================================================== */}
-      {/* MODAL: DISTRICT / NEIGHBORHOOD SELECTOR SHEET            */}
-      {/* ======================================================== */}
-      {selectedCityObj && (
-        <Modal
-          visible={!!selectedCityObj}
-          animationType="slide"
-          transparent
-          onRequestClose={() => setSelectedCityObj(null)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Pressable onPress={() => setSelectedCityObj(null)} style={styles.modalCloseBtn} hitSlop={8}>
-                  <X size={18} color="#0f172a" />
-                </Pressable>
-                <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={styles.modalTitle}>مدينة {selectedCityObj.city}</Text>
-                  <Text style={styles.modalSub}>{selectedCityObj.region} · اختر حيك المفضل</Text>
-                </View>
-              </View>
-
-              {/* Option 1: All neighborhoods in this city */}
-              <Pressable
-                style={styles.allDistrictsRow}
-                onPress={() => handleApplyLocation(selectedCityObj.region, selectedCityObj.city, 'كل الأحياء')}
-              >
-                <ArrowRight size={16} color="#059669" />
-                <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                  <Text style={styles.allDistrictsTitle}>تصفح كل أحياء {selectedCityObj.city} 🏙️</Text>
-                  <Text style={styles.allDistrictsSub}>عرض شامل لكافة العروض والخدمات في المدينة</Text>
-                </View>
-                <View style={styles.allDistrictsIconBox}>
-                  <Building2 size={18} color="#059669" />
-                </View>
-              </Pressable>
-
-              {/* District Filter Input */}
-              <View style={styles.districtSearchBox}>
-                <Search size={16} color="#94a3b8" />
-                <TextInput
-                  style={styles.districtSearchInput}
-                  value={districtSearch}
-                  onChangeText={setDistrictSearch}
-                  placeholder={`ابحث في أحياء ${selectedCityObj.city}...`}
-                  placeholderTextColor="#94a3b8"
-                  textAlign="right"
-                />
-              </View>
-
-              {/* Districts List */}
-              <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 360, marginTop: 8 }}>
-                <View style={{ gap: 6, paddingBottom: 20 }}>
-                  {filteredDistricts.map((dName) => {
-                    const isSelected = currentLoc.city === selectedCityObj.city && currentLoc.district === dName;
-                    return (
-                      <Pressable
-                        key={dName}
-                        style={[styles.districtRow, isSelected && styles.districtRowActive]}
-                        onPress={() => handleApplyLocation(selectedCityObj.region, selectedCityObj.city, dName)}
-                      >
-                        {isSelected ? (
-                          <Check size={16} color="#059669" />
-                        ) : (
-                          <ChevronLeft size={16} color="#94a3b8" />
-                        )}
-                        <Text style={[styles.districtName, isSelected && styles.districtNameActive]}>
-                          حي {dName}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                  {filteredDistricts.length === 0 && (
-                    <Text style={styles.noDistrictsText}>لا توجد نتائج مطابقة لاسم هذا الحي.</Text>
-                  )}
-                </View>
-              </ScrollView>
-            </View>
-          </View>
-        </Modal>
-      )}
     </View>
   );
 }
@@ -491,7 +388,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   navTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '900',
     color: '#0f172a',
   },
@@ -532,45 +429,63 @@ const styles = StyleSheet.create({
   currentLocLabel: { fontSize: 11.5, color: '#64748b', fontWeight: '700' },
   currentLocValue: { fontSize: 16, fontWeight: '900', color: '#0f172a' },
 
-  // Action Row
-  actionRow: {
-    flexDirection: 'row-reverse',
+  // Mandatory GPS card
+  mandatoryCard: {
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: '#fecaca',
+    padding: 16,
     gap: 10,
   },
+  mandatoryHeader: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 8,
+  },
+  mandatoryTitle: { fontSize: 14.5, fontWeight: '900', color: '#b91c1c' },
+  mandatoryText: { fontSize: 12.5, lineHeight: 20, color: '#475569', textAlign: 'right' },
   gpsBtn: {
-    flex: 1.2,
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 8,
     backgroundColor: '#059669',
-    paddingVertical: 13,
+    paddingVertical: 14,
     borderRadius: 14,
     shadowColor: '#059669',
     shadowOpacity: 0.25,
     shadowRadius: 6,
     elevation: 3,
   },
-  gpsBtnText: { color: '#fff', fontSize: 13, fontWeight: '900' },
-  allKingdomBtn: {
-    flex: 1,
+  gpsBtnText: { color: '#fff', fontSize: 13.5, fontWeight: '900' },
+
+  // Section headers
+  sectionHeader: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#ecfdf5',
-    borderWidth: 1.5,
-    borderColor: '#a7f3d0',
-    paddingVertical: 13,
-    borderRadius: 14,
+    marginTop: 6,
   },
-  allKingdomBtnActive: {
-    backgroundColor: '#047857',
-    borderColor: '#047857',
-  },
-  allKingdomBtnText: { color: '#047857', fontSize: 13, fontWeight: '900' },
+  sectionTitle: { fontSize: 15, fontWeight: '900', color: '#0f172a', flex: 1, textAlign: 'right' },
+  browseHint: { fontSize: 11.5, lineHeight: 18, color: '#94a3b8', textAlign: 'right', marginTop: -4 },
 
-  // Search Bar
+  // All districts row
+  allDistrictsRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+    borderRadius: 16,
+    padding: 14,
+  },
+  allDistrictsRowActive: { borderColor: '#059669', borderWidth: 1.5 },
+  allDistrictsTitle: { fontSize: 14, fontWeight: '900', color: '#047857' },
+  allDistrictsSub: { fontSize: 11, color: '#059669', marginTop: 1 },
+
+  // Search
   searchBar: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
@@ -590,84 +505,30 @@ const styles = StyleSheet.create({
     ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}),
   },
 
-  // Search Results Box
-  searchResultsBox: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    gap: 8,
-  },
-  searchResultTitle: { fontSize: 13, fontWeight: '900', color: '#0f172a', textAlign: 'right' },
-  searchResultRow: {
+  // Districts
+  districtsList: { gap: 6 },
+  districtRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 9,
-    paddingHorizontal: 10,
-    borderRadius: 10,
-    backgroundColor: '#f8fafc',
-  },
-  searchResultName: { fontSize: 13.5, fontWeight: '800', color: '#0f172a' },
-  searchResultSub: { fontSize: 11, color: '#64748b' },
-  searchResultIconBox: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    backgroundColor: '#ecfdf5',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  // Section Headers
-  sectionHeader: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 6,
-  },
-  sectionTitle: { fontSize: 15, fontWeight: '900', color: '#0f172a' },
-
-  // Top Cities Grid
-  topCitiesGrid: {
-    flexDirection: 'row-reverse',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  cityCard: {
-    width: '48%',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
     backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 14,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    alignItems: 'flex-end',
-    gap: 4,
-    ...(Platform.OS === 'web' ? ({ cursor: 'pointer' } as any) : {}),
+    borderColor: '#f1f5f9',
   },
-  cityCardActive: {
-    borderColor: '#059669',
-    backgroundColor: '#f0fdf4',
+  districtRowActive: {
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
   },
-  activeCheckPill: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 2,
-    backgroundColor: '#059669',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  activeCheckText: { color: '#fff', fontSize: 9.5, fontWeight: '900' },
-  cityName: { fontSize: 15, fontWeight: '900', color: '#0f172a' },
-  cityNameActive: { color: '#059669' },
-  cityDesc: { fontSize: 11, color: '#64748b' },
+  districtName: { fontSize: 13.5, fontWeight: '800', color: '#0f172a', flex: 1, textAlign: 'right' },
+  districtNameActive: { color: '#059669', fontWeight: '900' },
+  noDistrictsText: { textAlign: 'center', color: '#94a3b8', fontSize: 12.5, paddingVertical: 16 },
 
-  // Regions List
-  regionsList: {
-    gap: 8,
-  },
+  // Regions list
+  regionsList: { gap: 8 },
   regionCard: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
@@ -692,94 +553,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-
-  // Modal Sheet
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.65)', justifyContent: 'flex-end' },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 32,
-    maxHeight: '85%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-    paddingBottom: 14,
-    marginBottom: 12,
-  },
-  modalTitle: { fontSize: 18, fontWeight: '900', color: '#0f172a' },
-  modalSub: { fontSize: 11.5, color: '#64748b', marginTop: 2 },
-  modalCloseBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: '#f1f5f9',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  allDistrictsRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: '#ecfdf5',
-    borderWidth: 1,
-    borderColor: '#a7f3d0',
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 12,
-  },
-  allDistrictsIconBox: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: '#d1fae5',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  allDistrictsTitle: { fontSize: 14, fontWeight: '900', color: '#047857' },
-  allDistrictsSub: { fontSize: 11, color: '#059669', marginTop: 1 },
-
-  districtSearchBox: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#f8fafc',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    height: 42,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  districtSearchInput: {
-    flex: 1,
-    color: '#0f172a',
-    fontSize: 13,
-    paddingVertical: 0,
-    ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}),
-  },
-
-  districtRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    backgroundColor: '#f8fafc',
-  },
-  districtRowActive: {
-    backgroundColor: '#ecfdf5',
-    borderWidth: 1,
-    borderColor: '#a7f3d0',
-  },
-  districtName: { fontSize: 13.5, fontWeight: '800', color: '#0f172a' },
-  districtNameActive: { color: '#059669', fontWeight: '900' },
-  noDistrictsText: { textAlign: 'center', color: '#94a3b8', fontSize: 12.5, paddingVertical: 16 },
 });

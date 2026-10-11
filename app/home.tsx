@@ -216,8 +216,19 @@ export default function Home() {
 
       <WeeklyLocationPrompt
         visible={Boolean(feed.currentUserId && loc.promptVisible && !loc.setupOpen)}
-        onAllow={loc.acceptWeeklyCheck}
-        onLater={loc.snoozePrompt}
+        busy={loc.weeklyBusy}
+        message={loc.weeklyMessage}
+        region={loc.region}
+        city={loc.city}
+        district={loc.district}
+        onUpdate={loc.acceptWeeklyCheck}
+        onOpenSettings={() =>
+          Alert.alert(
+            'كيف أفعّل الموقع؟',
+            'من المتصفح: اضغط أيقونة القفل بجانب عنوان الموقع ثم اسمح بالوصول إلى الموقع، ثم أعد المحاولة.\n\nمن التطبيق: الإعدادات ← التطبيقات ← حيّنا ← الأذونات ← الموقع ← السماح.',
+            [{ text: 'حسناً' }],
+          )
+        }
       />
 
       <ScrollView
@@ -432,6 +443,7 @@ export default function Home() {
         onClose={() => setShowLocationModal(false)}
         selectedCity={loc.city}
         selectedDistrict={loc.district}
+        lockedCity={loc.lockedCity}
         onSelect={handleLocationSelect}
       />
     </View>

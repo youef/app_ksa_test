@@ -6,7 +6,9 @@ import {
   savePermanentMyLocation,
   subscribeLocation,
   isExactDistrictMatching,
+  getLockedCity,
   type HaynaLocation,
+  type LockedCity,
 } from '@/lib/locationSync';
 import { CurrentWeather, loadCurrentWeather } from '@/lib/weather';
 import { getCurrentDeviceLocation, reverseGeocodeDeviceLocation } from '@/lib/deviceLocation';
@@ -14,9 +16,7 @@ import { registerPushToken } from '@/lib/notifications';
 import type { Profile } from '@/lib/homeUtils';
 
 const LAST_CHECK_KEY = '@hayna_location_last_auto_check_v1';
-const SNOOZE_KEY = '@hayna_location_prompt_snooze_v1';
 const WEEK = 7 * 24 * 60 * 60 * 1000;
-const DAY = 24 * 60 * 60 * 1000;
 const WEATHER_REFRESH = 30 * 60 * 1000;
 
 type Options = {
@@ -37,6 +37,13 @@ export function useHomeLocation({ setProfile, showToast }: Options) {
   const [setupBusy, setSetupBusy] = useState(false);
   const [setupMessage, setSetupMessage] = useState('');
   const [promptVisible, setPromptVisible] = useState(false);
+  const [weeklyBusy, setWeeklyBusy] = useState(false);
+  const [weeklyMessage, setWeeklyMessage] = useState('');
+  const [lockedCity, setLockedCityState] = useState<LockedCity | null>(null);
+
+  const refreshLockedCity = useCallback(async () => {
+    setLockedCityState(await getLockedCity());
+  }, []);
 
   const apply = useCallback((loc: HaynaLocation) => {
     setRegion(loc.region);
@@ -52,9 +59,10 @@ export function useHomeLocation({ setProfile, showToast }: Options) {
       apply(loc);
       setReady(true);
     });
+    void refreshLockedCity();
     const unsub = subscribeLocation(apply);
     return () => { active = false; unsub(); };
-  }, [apply]);
+  }, [apply, refreshLockedCity]);
 
   // Weather: refresh on location change and every 30 min
   useEffect(() => {
@@ -77,18 +85,15 @@ export function useHomeLocation({ setProfile, showToast }: Options) {
     return () => { active = false; clearInterval(id); };
   }, [ready, region, city, district]);
 
-  // Weekly location check (with a 24h snooze so the prompt never loops)
+  // Mandatory weekly location check. The prompt stays until the real GPS
+  // location is confirmed, so it can never be skipped or snoozed away.
   useEffect(() => {
     let active = true;
     (async () => {
-      const [lastRaw, snoozeRaw] = await Promise.all([
-        AsyncStorage.getItem(LAST_CHECK_KEY),
-        AsyncStorage.getItem(SNOOZE_KEY),
-      ]);
+      const lastRaw = await AsyncStorage.getItem(LAST_CHECK_KEY);
       const last = Number(lastRaw) || 0;
-      const snoozedUntil = Number(snoozeRaw) || 0;
       const due = !last || Date.now() - last >= WEEK;
-      if (active && due && Date.now() > snoozedUntil) setPromptVisible(true);
+      if (active && due) setPromptVisible(true);
     })();
     return () => { active = false; };
   }, []);
@@ -106,32 +111,41 @@ export function useHomeLocation({ setProfile, showToast }: Options) {
   }, []);
 
   const persistLocation = useCallback(async (live: HaynaLocation) => {
-    await savePermanentMyLocation(live, true);
+    await savePermanentMyLocation(live, true, { allowCityChange: true });
     apply(live);
     setProfile(current => ({ ...(current || ({} as Profile)), ...live }));
-  }, [apply, setProfile]);
-
-  const snoozePrompt = useCallback(async () => {
-    setPromptVisible(false);
-    await AsyncStorage.setItem(SNOOZE_KEY, String(Date.now() + DAY));
-  }, []);
+    await refreshLockedCity();
+  }, [apply, refreshLockedCity, setProfile]);
 
   const acceptWeeklyCheck = useCallback(async () => {
-    setPromptVisible(false);
+    if (weeklyBusy) return;
+    setWeeklyBusy(true);
+    setWeeklyMessage('جارٍ التحقق من موقعك الحقيقي عبر GPS…');
     try {
       const { data } = await supabase.auth.getUser();
-      if (!data.user) return;
+      if (!data.user) {
+        setWeeklyMessage('سجّل الدخول أو أنشئ حساباً لتأكيد موقعك ومتابعة حيّك.');
+        return;
+      }
       const live = await resolveLiveLocation();
-      if (!live) throw new Error('no-location');
+      if (!live) {
+        setWeeklyMessage(
+          'لم نتمكن من قراءة موقعك الحقيقي. اسمح للتطبيق أو المتصفح بالوصول إلى الموقع، ثم اضغط «تحديث الآن» مرة أخرى.'
+        );
+        return;
+      }
       await persistLocation(live);
       await AsyncStorage.setItem(LAST_CHECK_KEY, String(Date.now()));
-      showToast('تم تحديث موقعك ✓');
+      setWeeklyMessage('');
+      setPromptVisible(false);
+      showToast('تم تثبيت موقعك الحقيقي ✓');
     } catch (e) {
       console.warn('weekly location check failed:', e);
-      await AsyncStorage.setItem(SNOOZE_KEY, String(Date.now() + DAY));
-      showToast('تعذر تحديد موقعك، سنحاول لاحقاً. يمكنك التحديث من الملف الشخصي.');
+      setWeeklyMessage('تعذّر تحديث موقعك الآن. تحقّق من إذن الموقع ثم أعد المحاولة.');
+    } finally {
+      setWeeklyBusy(false);
     }
-  }, [persistLocation, resolveLiveLocation, showToast]);
+  }, [weeklyBusy, persistLocation, resolveLiveLocation, showToast]);
 
   const setupRequiredLocation = useCallback(async () => {
     if (setupBusy) return;
@@ -189,9 +203,9 @@ export function useHomeLocation({ setProfile, showToast }: Options) {
     region, city, district, ready, apply,
     weather, weatherLoading,
     setupOpen, setSetupOpen, setupBusy, setupMessage,
-    promptVisible, snoozePrompt, acceptWeeklyCheck,
+    promptVisible, weeklyBusy, weeklyMessage, acceptWeeklyCheck,
     setupRequiredLocation, enableNotifications,
-    hasExactLocation, matchesLocation,
+    hasExactLocation, matchesLocation, lockedCity,
     persistLocation,
   };
 }

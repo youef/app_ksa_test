@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -22,6 +22,7 @@ import {
   LocationOverride,
 } from '@/lib/saudiLocations';
 import { supabase } from '@/lib/supabase';
+import { getLockedCity } from '@/lib/locationSync';
 import {
   MapPin,
   X,
@@ -44,6 +45,8 @@ interface Props {
   onClose: () => void;
   selectedCity: string;
   selectedDistrict: string;
+  /** GPS-verified city. When set, the city cannot be changed from this modal. */
+  lockedCity?: { region: string; city: string } | null;
   onSelect: (region: string, city: string, district: string) => void;
 }
 
@@ -52,6 +55,7 @@ export default function LocationSelectorModal({
   onClose,
   selectedCity,
   selectedDistrict,
+  lockedCity,
   onSelect,
 }: Props) {
   // Step 1: Region -> Step 2: City -> Step 3: District
@@ -62,6 +66,21 @@ export default function LocationSelectorModal({
   const [locations, setLocations] = useState<Region[]>(SAUDI_REGIONS);
   const [visibleCount, setVisibleCount] = useState(100);
   const [locating, setLocating] = useState(false);
+  const [ownLocked, setOwnLocked] = useState<{ region: string; city: string } | null>(null);
+
+  // Self-load the GPS lock so every screen that opens this modal respects it,
+  // even if the caller does not pass `lockedCity` explicitly.
+  useEffect(() => {
+    if (!visible) return;
+    let active = true;
+    getLockedCity().then(lock => {
+      if (!active) return;
+      setOwnLocked(lock ? { region: lock.region, city: lock.city } : null);
+    });
+    return () => { active = false; };
+  }, [visible]);
+
+  const activeLock = lockedCity ?? ownLocked;
 
   useEffect(() => {
     if (!visible) return;
@@ -79,6 +98,26 @@ export default function LocationSelectorModal({
 
   useEffect(() => { setVisibleCount(100); }, [step, searchQuery]);
 
+  // When a GPS-verified city exists, the user may only pick a district inside it.
+  const lockActive = Boolean(activeLock && activeLock.city && activeLock.city !== 'كل المدن');
+  const lockedResolved = useMemo(() => {
+    if (!lockActive || !activeLock) return null;
+    const target = normalizeSaudiLocationName(activeLock.city);
+    for (const reg of locations) {
+      const cit = reg.cities.find(c => normalizeSaudiLocationName(c.name) === target);
+      if (cit) return { region: reg, city: cit };
+    }
+    return null;
+  }, [lockActive, activeLock, locations]);
+
+  useEffect(() => {
+    if (!visible || !lockedResolved) return;
+    setSelectedReg(lockedResolved.region);
+    setSelectedCit(lockedResolved.city);
+    setStep('district');
+    setSearchQuery('');
+  }, [visible, lockedResolved]);
+
   // National Address Short Code state
   const [shortCodeInput, setShortCodeInput] = useState('');
   const [resolvedAddress, setResolvedAddress] = useState<NationalAddressResolution | null>(null);
@@ -91,6 +130,10 @@ export default function LocationSelectorModal({
 
   function handleApplyResolvedAddress() {
     if (!resolvedAddress) return;
+    if (lockActive && activeLock && normalizeSaudiLocationName(resolvedAddress.city) !== normalizeSaudiLocationName(activeLock.city)) {
+      Alert.alert('المدينة مقفلة', `موقعك مُثبّت عبر GPS على مدينة ${activeLock.city}. لا يمكنك الانتقال إلى مدينة أخرى.`);
+      return;
+    }
     onSelect(resolvedAddress.region, resolvedAddress.city, resolvedAddress.district);
     resetAndClose();
   }
@@ -106,6 +149,10 @@ export default function LocationSelectorModal({
   }
 
   function handleSelectAllKSA() {
+    if (lockActive && activeLock) {
+      Alert.alert('المدينة مقفلة', `موقعك مُثبّت عبر GPS على مدينة ${activeLock.city}. يمكنك تصفح باقي المدن للعرض فقط دون تفعيلها.`);
+      return;
+    }
     onSelect('كل المملكة', 'كل المدن', 'كل الأحياء');
     resetAndClose();
   }
@@ -137,12 +184,20 @@ export default function LocationSelectorModal({
   }
 
   function handleChooseRegion(reg: Region) {
+    if (lockActive && activeLock) {
+      Alert.alert('التصفح فقط', `موقعك مُثبّت عبر GPS على مدينة ${activeLock.city}. يمكنك تصفح باقي المناطق والمدن دون تفعيلها.`);
+      return;
+    }
     setSelectedReg(reg);
     setStep('city');
     setSearchQuery('');
   }
 
   function handleChooseCity(cit: City) {
+    if (lockActive && activeLock && normalizeSaudiLocationName(cit.name) !== normalizeSaudiLocationName(activeLock.city)) {
+      Alert.alert('التصفح فقط', `لا يمكنك الانتقال إلى مدينة أخرى. موقعك مُثبّت على ${activeLock.city}، ويمكنك اختيار حي بداخلها فقط.`);
+      return;
+    }
     setSelectedCit(cit);
     setStep('district');
     setSearchQuery('');
@@ -198,7 +253,7 @@ export default function LocationSelectorModal({
               </Text>
             </View>
 
-            {step !== 'region' ? (
+            {step !== 'region' && !lockActive ? (
               <Pressable
                 onPress={() => setStep(step === 'district' ? 'city' : 'region')}
                 style={styles.backBtn}
@@ -209,6 +264,15 @@ export default function LocationSelectorModal({
               <View style={{ width: 40 }} />
             )}
           </View>
+
+          {lockActive && activeLock && (
+            <View style={styles.lockBanner}>
+              <MapPin size={16} color="#b45309" />
+              <Text style={styles.lockBannerText}>
+                مدينة {activeLock.city} مُثبّتة عبر GPS. يمكنك اختيار «كل الأحياء» أو حي واحد فقط داخلها.
+              </Text>
+            </View>
+          )}
 
           {/* Search Bar */}
           <View style={styles.searchBar}>
@@ -489,6 +553,27 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: '#f1f5f9',
     marginVertical: 6,
+  },
+  lockBanner: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: 20,
+    marginTop: 12,
+    backgroundColor: '#fffbeb',
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  lockBannerText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 18,
+    color: '#b45309',
+    fontWeight: '800',
+    textAlign: 'right',
   },
   loadMore: { alignItems: 'center', padding: 14, borderRadius: 14, backgroundColor: '#ecfdf5' },
   loadMoreText: { color: '#047857', fontSize: 13, fontWeight: '800' },

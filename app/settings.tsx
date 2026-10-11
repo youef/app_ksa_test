@@ -223,7 +223,7 @@ export default function SettingsScreen() {
         return;
       }
       if (!userId) return;
-      await savePermanentMyLocation({ region: nextRegion, city: nextCity, district: nextDistrict }, true);
+      await savePermanentMyLocation({ region: nextRegion, city: nextCity, district: nextDistrict }, true, { allowCityChange: true });
       const { data: updated, error } = await supabase
         .from('profiles')
         .update({ region: nextRegion, city: nextCity, district: nextDistrict })
@@ -763,8 +763,8 @@ export default function SettingsScreen() {
           <View style={styles.sectionHeader}>
             <View style={[styles.sectionIcon, { backgroundColor: '#ecfdf5' }]}><Compass size={18} color="#059669" /></View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.sectionTitle}>موقع حسابك</Text>
-              <Text style={styles.sectionDesc}>الموقع المحفوظ هنا ينعكس على ملفك والمحتوى المرتبط بحيك.</Text>
+              <Text style={styles.sectionTitle}>موقع حسابك المُوثَّق</Text>
+              <Text style={styles.sectionDesc}>موقعك مُثبّت تلقائياً عبر GPS. لا يمكن تعديل المدينة يدوياً — يمكنك فقط تحديث موقعك الحقيقي.</Text>
             </View>
           </View>
           <View style={styles.locationSummaryRow}>
@@ -779,13 +779,9 @@ export default function SettingsScreen() {
             <Text style={styles.locationSummaryLabel}>الحي</Text>
             <Text style={styles.locationSummaryValue}>{district || 'غير محدد'}</Text>
           </View>
-          <Pressable style={styles.actionBtn} onPress={useCurrentLocation} disabled={locating}>
+          <Pressable style={[styles.actionBtn, { borderBottomWidth: 0 }]} onPress={useCurrentLocation} disabled={locating}>
             {locating ? <ActivityIndicator size="small" color="#059669" /> : <MapPin size={20} color="#059669" />}
-            <Text style={styles.actionBtnText}>{locating ? 'جارٍ تحديد موقعك…' : 'تحديد موقعي تلقائياً وتحديثه'}</Text>
-          </Pressable>
-          <Pressable style={[styles.actionBtn, { borderBottomWidth: 0 }]} onPress={() => router.push('/profile')}>
-            <ChevronLeft size={20} color="#64748b" />
-            <Text style={styles.actionBtnText}>تعديل الموقع من الملف الشخصي</Text>
+            <Text style={styles.actionBtnText}>{locating ? 'جارٍ تحديد موقعك…' : 'تحديث موقعي الحقيقي عبر GPS'}</Text>
           </Pressable>
         </View>
 

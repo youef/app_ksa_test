@@ -1,6 +1,6 @@
 import { useBottomNavInset } from '@/lib/bottomNav';
 import ScreenHeader from '@/components/shared/ScreenHeader';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   Alert,
   Image,
@@ -17,7 +17,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { router, useFocusEffect } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
-import { savePermanentMyLocation } from '@/lib/locationSync';
+import { savePermanentMyLocation, getLockedCity, type LockedCity } from '@/lib/locationSync';
 import { getCurrentDeviceLocation, reverseGeocodeDeviceLocation } from '@/lib/deviceLocation';
 import { NeighborBadgesCard } from '@/components/profile/NeighborBadgesCard';
 import {
@@ -72,6 +72,7 @@ export default function Profile() {
   const [saving, setSaving] = useState(false);
   const [editingProfile, setEditingProfile] = useState(false);
   const [locating, setLocating] = useState(false);
+  const [lockedCity, setLockedCity] = useState<LockedCity | null>(null);
 
   const [stats, setStats] = useState({ questions: 0, answers: 0, followers: 0, following: 0 });
   const [savedQuestions, setSavedQuestions] = useState<any[]>([]);
@@ -142,6 +143,10 @@ export default function Profile() {
     }
   }, []);
 
+  useEffect(() => {
+    void getLockedCity().then(setLockedCity);
+  }, []);
+
   const syncCurrentLocation = useCallback(async (showAlert = false) => {
     const location = await getCurrentDeviceLocation();
     if (!location) {
@@ -164,7 +169,8 @@ export default function Profile() {
     setCity(nextCity);
     setDistrict(nextDistrict);
 
-    await savePermanentMyLocation(next, true);
+    await savePermanentMyLocation(next, true, { allowCityChange: true });
+    setLockedCity({ region: nextRegion, city: nextCity });
 
     const { data: auth } = await supabase.auth.getUser();
     if (auth.user) {
@@ -364,6 +370,14 @@ export default function Profile() {
       return;
     }
 
+    if (lockedCity && nextCity !== lockedCity.city) {
+      Alert.alert(
+        'المدينة مقفلة',
+        `موقعك مُثبّت عبر GPS على مدينة ${lockedCity.city}. لا يمكن تغيير المدينة، لكن يمكنك اختيار أي حي داخل مدينتك.`,
+      );
+      return;
+    }
+
     setRegion(nextRegion);
     setCity(nextCity);
     setDistrict(nextDistrict);
@@ -511,12 +525,12 @@ export default function Profile() {
               >
                 {usernameSaving ? <ActivityIndicator color="#047857" /> : <Text style={styles.usernameChangeButtonText}>تغيير اسم المستخدم</Text>}
               </Pressable>
-              <Text style={styles.label}>المدينة والحي</Text>
+              <Text style={styles.label}>{lockedCity ? `الحي داخل ${lockedCity.city}` : 'المدينة والحي'}</Text>
               <Pressable style={styles.locationSelectorCard} onPress={() => setShowLocationModal(true)}>
                 <View style={styles.locationSelectorContent}>
                   <MapPin size={20} color={C.accent} />
                   <Text style={styles.locationSelectorValue} numberOfLines={2}>
-                    {city ? `${region ? `${region} · ` : ''}${city}${district ? ` · ${formatDistrictLabel(district)}` : ''}` : 'اختر المنطقة والمدينة والحي'}
+                    {city ? `${region ? `${region} · ` : ''}${city}${district ? ` · ${formatDistrictLabel(district)}` : ''}` : (lockedCity ? 'اختر حياً داخل مدينتك' : 'اختر المنطقة والمدينة والحي')}
                   </Text>
                   <ChevronDown size={18} color={C.muted} />
                 </View>
@@ -687,6 +701,7 @@ export default function Profile() {
         onClose={() => setShowLocationModal(false)}
         selectedCity={city}
         selectedDistrict={district}
+        lockedCity={lockedCity}
         onSelect={(reg, c, d) => {
           void applyManualLocation(reg, c, d);
         }}

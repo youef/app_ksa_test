@@ -11,13 +11,13 @@ import {
   Platform,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { buildSaudiLocations } from '@/lib/saudiLocations';
+import { buildSaudiLocations, normalizeSaudiLocationName } from '@/lib/saudiLocations';
 import { supabase } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ChevronRight, MapPin, Search, CheckCircle2 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import ScreenHeader from '@/components/shared/ScreenHeader';
-import { savePermanentMyLocation } from '@/lib/locationSync';
+import { savePermanentMyLocation, getLockedCity } from '@/lib/locationSync';
 
 const ALL_SAUDI_REGIONS = buildSaudiLocations();
 
@@ -40,6 +40,18 @@ export default function Districts() {
 
   async function selectDistrict(districtName: string) {
     try {
+      // A GPS-verified city cannot be switched from here. Districts of another
+      // city are browse-only, so the active location stays locked.
+      const lock = await getLockedCity();
+      if (lock && normalizeSaudiLocationName(city.name) !== normalizeSaudiLocationName(lock.city)) {
+        Alert.alert(
+          'هذه المدينة للعرض فقط',
+          `موقعك مُثبّت عبر GPS على مدينة ${lock.city}. يمكنك تصفح محتوى ${city.name} دون تفعيله أو الانتقال إليه.`,
+          [{ text: 'حسناً' }],
+        );
+        return;
+      }
+
       // 1. Save permanent location to device immediately (persists even if user logs out!)
       await savePermanentMyLocation({
         region: regionName || 'المملكة',
