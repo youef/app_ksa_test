@@ -4,10 +4,10 @@
 
 create table if not exists public.weekly_report_log (
   id bigserial primary key,
-  report_week date not null unique, -- Monday of the week
-  payload jsonb not null,           -- full report data
-  sent_to uuid[] not null default '{}', -- admin user IDs who received it
-  status text not null default 'sent', -- 'sent', 'failed', 'partial'
+  report_week date not null unique,
+  payload jsonb not null,
+  sent_to uuid[] not null default '{}',
+  status text not null default 'sent',
   error_message text,
   created_at timestamptz not null default now()
 );
@@ -26,7 +26,55 @@ create policy weekly_report_log_admin_write on public.weekly_report_log
   using (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'))
   with check (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'));
 
+-- Helper: safe count for verification_requests (table may not exist yet)
+create or replace function public.get_verification_pending_count()
+returns int
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  begin
+    return (select count(*) from public.verification_requests where status = 'pending');
+  exception when undefined_table then
+    return 0;
+  end;
+end;
+$$;
+
+-- Helper: safe sum for requests price/budget (column may not exist)
+create or replace function public.get_requests_revenue(v_week date)
+returns numeric
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_sum numeric := 0;
+begin
+  begin
+    select coalesce(sum(price), 0) into v_sum
+    from public.requests
+    where created_at >= v_week and created_at < v_week + interval '7 days';
+  exception when undefined_column then
+    begin
+      select coalesce(sum(budget), 0) into v_sum
+      from public.requests
+      where created_at >= v_week and created_at < v_week + interval '7 days';
+    exception when undefined_column then
+      v_sum := 0;
+    end;
+  end;
+  return v_sum;
+end;
+$$;
+
+grant execute on function public.get_verification_pending_count() to anon, authenticated, service_role;
+grant execute on function public.get_requests_revenue(date) to anon, authenticated, service_role;
+
+-- ============================================================
 -- RPC to generate and store weekly report
+-- ============================================================
 create or replace function public.generate_weekly_report(p_week_monday date default null)
 returns jsonb
 language plpgsql
@@ -43,7 +91,7 @@ begin
   from public.profiles
   where role = 'admin' and is_banned = false;
 
-  -- Build report JSON
+  -- Build report JSON using helper functions for safety
   v_report := jsonb_build_object(
     'week', to_char(v_week, 'YYYY-"W"WW'),
     'week_start', v_week,
@@ -55,13 +103,7 @@ begin
       'active_users_7d', (select count(distinct user_id) from public.analytics_events where created_at >= v_week and created_at < v_week + interval '7 days' and user_id is not null),
       'reports_total', (select count(*) from public.reports where created_at >= v_week and created_at < v_week + interval '7 days'),
       'reports_pending', (select count(*) from public.reports where status = 'pending'),
-      'verifications_pending', (
-        begin
-          select count(*) from public.verification_requests where status = 'pending';
-        exception when undefined_table then
-          0;
-        end
-      ),
+      'verifications_pending', public.get_verification_pending_count(),
       'services_new', (select count(*) from public.services where created_at >= v_week and created_at < v_week + interval '7 days'),
       'requests_new', (select count(*) from public.requests where created_at >= v_week and created_at < v_week + interval '7 days'),
       'questions_new', (select count(*) from public.questions where created_at >= v_week and created_at < v_week + interval '7 days')
@@ -79,13 +121,7 @@ begin
     ),
     'revenue_estimate', jsonb_build_object(
       'services', (select coalesce(sum(price_from), 0) from public.services where created_at >= v_week and created_at < v_week + interval '7 days'),
-      'requests', (
-        begin
-          select coalesce(sum(price), 0) from public.requests where created_at >= v_week and created_at < v_week + interval '7 days';
-        exception when undefined_column then
-          0;
-        end
-      )
+      'requests', public.get_requests_revenue(v_week)
     ),
     'funnel', (
       select jsonb_agg(jsonb_build_object('step', step, 'count', count) order by

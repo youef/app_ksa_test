@@ -71,29 +71,53 @@ on conflict (key) do update set
   is_active = excluded.is_active,
   updated_at = now();
 
--- Seed Level 2 categories (children) - using subqueries for parent_id
--- These run after Level 1 is committed, so parent IDs exist
-insert into public.categories (key, label, description, icon, color, sort_order, entity_types, parent_id) values
-  ('ac_repair', 'صيانة تكييف', 'تركيب وصيانة المكيفات', 'Snowflake', '#2563EB', 10, '{"services","requests"}', (select id from public.categories where key = 'home_maintenance')),
-  ('plumbing', 'سباكة', 'إصلاح التسريبات وتركيب الأدوات الصحية', 'Droplets', '#2563EB', 20, '{"services","requests"}', (select id from public.categories where key = 'home_maintenance')),
-  ('electrical', 'كهرباء', 'تمديدات، مفاتيح، إضاءة', 'Zap', '#2563EB', 30, '{"services","requests"}', (select id from public.categories where key = 'home_maintenance')),
-  ('carpentry', 'نجارة', 'أبواب، نوافذ، أثاث مخصص', 'Hammer', '#2563EB', 40, '{"services","requests"}', (select id from public.categories where key = 'home_maintenance')),
-  ('painting', 'دهانات وديكور', 'دهان داخلي/خارجي، ورق جدران', 'Brush', '#2563EB', 50, '{"services","requests"}', (select id from public.categories where key = 'home_maintenance')),
-  ('phone_repair', 'إصلاح جوالات', 'شاشات، بطاريات، منافذ شحن', 'Smartphone', '#7C3AED', 10, '{"services","market","requests"}', (select id from public.categories where key = 'electronics')),
-  ('computer_repair', 'إصلاح حواسيب', 'صيانة لابتوب/ديسكتوب', 'Monitor', '#7C3AED', 20, '{"services","requests"}', (select id from public.categories where key = 'electronics')),
-  ('accessories', 'إكسسوارات', 'سماعات، شواحن، جرابات', 'Headphones', '#7C3AED', 30, '{"market","requests"}', (select id from public.categories where key = 'electronics')),
-  ('delivery', 'توصيل طلبات', 'طعام، مستلزمات، وثائق', 'Package', '#059669', 10, '{"services","requests","carpooling"}', (select id from public.categories where key = 'transport')),
-  ('moving', 'نقل أثاث', 'نقل منزلي/مكتبي مع تغليف', 'Package', '#059669', 20, '{"services","requests"}', (select id from public.categories where key = 'transport')),
-  ('carpooling_cat', 'ركوب مشترك', 'تنقل يومي بين الأحياء', 'Users', '#059669', 30, '{"carpooling","requests"}', (select id from public.categories where key = 'transport'))
-on conflict (key) do update set
-  label = excluded.label,
-  description = excluded.description,
-  icon = excluded.icon,
-  color = excluded.color,
-  sort_order = excluded.sort_order,
-  entity_types = excluded.entity_types,
-  parent_id = excluded.parent_id,
-  updated_at = now();
+-- Seed Level 2 categories - use DO block to ensure parent IDs exist
+do $$
+declare
+  v_home uuid;
+  v_electronics uuid;
+  v_transport uuid;
+begin
+  select id into v_home from public.categories where key = 'home_maintenance';
+  select id into v_electronics from public.categories where key = 'electronics';
+  select id into v_transport from public.categories where key = 'transport';
+
+  if v_home is not null then
+    insert into public.categories (key, label, description, icon, color, sort_order, entity_types, parent_id) values
+      ('ac_repair', 'صيانة تكييف', 'تركيب وصيانة المكيفات', 'Snowflake', '#2563EB', 10, '{"services","requests"}', v_home),
+      ('plumbing', 'سباكة', 'إصلاح التسريبات وتركيب الأدوات الصحية', 'Droplets', '#2563EB', 20, '{"services","requests"}', v_home),
+      ('electrical', 'كهرباء', 'تمديدات، مفاتيح، إضاءة', 'Zap', '#2563EB', 30, '{"services","requests"}', v_home),
+      ('carpentry', 'نجارة', 'أبواب، نوافذ، أثاث مخصص', 'Hammer', '#2563EB', 40, '{"services","requests"}', v_home),
+      ('painting', 'دهانات وديكور', 'دهان داخلي/خارجي، ورق جدران', 'Brush', '#2563EB', 50, '{"services","requests"}', v_home)
+    on conflict (key) do update set
+      label = excluded.label, description = excluded.description, icon = excluded.icon,
+      color = excluded.color, sort_order = excluded.sort_order, entity_types = excluded.entity_types,
+      parent_id = excluded.parent_id, updated_at = now();
+  end if;
+
+  if v_electronics is not null then
+    insert into public.categories (key, label, description, icon, color, sort_order, entity_types, parent_id) values
+      ('phone_repair', 'إصلاح جوالات', 'شاشات، بطاريات، منافذ شحن', 'Smartphone', '#7C3AED', 10, '{"services","market","requests"}', v_electronics),
+      ('computer_repair', 'إصلاح حواسيب', 'صيانة لابتوب/ديسكتوب', 'Monitor', '#7C3AED', 20, '{"services","requests"}', v_electronics),
+      ('accessories', 'إكسسوارات', 'سماعات، شواحن، جرابات', 'Headphones', '#7C3AED', 30, '{"market","requests"}', v_electronics)
+    on conflict (key) do update set
+      label = excluded.label, description = excluded.description, icon = excluded.icon,
+      color = excluded.color, sort_order = excluded.sort_order, entity_types = excluded.entity_types,
+      parent_id = excluded.parent_id, updated_at = now();
+  end if;
+
+  if v_transport is not null then
+    insert into public.categories (key, label, description, icon, color, sort_order, entity_types, parent_id) values
+      ('delivery', 'توصيل طلبات', 'طعام، مستلزمات، وثائق', 'Package', '#059669', 10, '{"services","requests","carpooling"}', v_transport),
+      ('moving', 'نقل أثاث', 'نقل منزلي/مكتبي مع تغليف', 'Package', '#059669', 20, '{"services","requests"}', v_transport),
+      ('carpooling_cat', 'ركوب مشترك', 'تنقل يومي بين الأحياء', 'Users', '#059669', 30, '{"carpooling","requests"}', v_transport)
+    on conflict (key) do update set
+      label = excluded.label, description = excluded.description, icon = excluded.icon,
+      color = excluded.color, sort_order = excluded.sort_order, entity_types = excluded.entity_types,
+      parent_id = excluded.parent_id, updated_at = now();
+  end if;
+end;
+$$;
 
 -- RPC to get full category tree (for admin UI)
 create or replace function public.get_category_tree(p_entity_type text default null)
