@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, Pressable, Platform, ActivityIndica
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
-import { ChevronRight, MapPin, RefreshCw, Sun, Cloud, CloudRain, CloudSun, CloudFog, Wind, Droplets, Thermometer, Sunrise, Sunset, Search } from 'lucide-react-native';
+import { ChevronRight, MapPin, RefreshCw, Sun, Cloud, CloudRain, CloudSun, CloudFog, Wind, Droplets, Thermometer, Sunrise, Sunset, Search, Gauge, Activity, Info } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useBottomNavInset } from '@/lib/bottomNav';
 
@@ -50,7 +50,7 @@ export default function WeatherScreen() {
   );
 }
 
-type WeatherData = { city: string; current: any; hourly: any; daily: any };
+type WeatherData = { city: string; current: any; hourly: any; daily: any; air?: any | null };
 
 function weatherDescription(code: number) {
   if (code === 0) return 'سماء صافية';
@@ -90,13 +90,18 @@ function WeatherSection({ initialCity }: { initialCity: string }) {
     const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + latitude +
       '&longitude=' + longitude +
       '&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,wind_speed_10m' +
-      '&hourly=temperature_2m,precipitation_probability,weather_code' +
-      '&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max&forecast_days=5&timezone=auto';
+      '&hourly=temperature_2m,precipitation_probability,weather_code,wind_speed_10m,relative_humidity_2m' +
+      '&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max,precipitation_sum,wind_speed_10m_max&forecast_days=7&timezone=auto';
     const response = await fetch(url);
     if (!response.ok) throw new Error('خدمة الطقس غير متاحة حالياً.');
     const data = await response.json();
     if (!data.current || !data.daily) throw new Error('وصلت بيانات طقس غير مكتملة.');
-    setWeather({ city: city, current: data.current, hourly: data.hourly, daily: data.daily });
+    let air: any = null;
+    try {
+      const airResponse = await fetch('https://air-quality-api.open-meteo.com/v1/air-quality?latitude=' + latitude + '&longitude=' + longitude + '&current=us_aqi,pm10,pm2_5,dust,uv_index&timezone=auto');
+      if (airResponse.ok) { const airData = await airResponse.json(); air = airData.current || null; }
+    } catch {}
+    setWeather({ city: city, current: data.current, hourly: data.hourly, daily: data.daily, air });
     setLastUpdated(new Date());
     setWeatherError('');
   };
@@ -151,7 +156,7 @@ function WeatherSection({ initialCity }: { initialCity: string }) {
     const now = new Date();
     let start = weather.hourly.time.findIndex((time: string) => new Date(time).getTime() >= now.getTime() - 3600000);
     if (start < 0) start = 0;
-    return Array.from({ length: 6 }, (_, i) => start + i).filter((index) => index < weather.hourly.time.length);
+    return Array.from({ length: 12 }, (_, i) => start + i).filter((index) => index < weather.hourly.time.length);
   })();
 
   const dayLabel = (value: string, index: number) => {
@@ -234,7 +239,7 @@ function WeatherSection({ initialCity }: { initialCity: string }) {
                 </View>
               ))}
             </ScrollView>
-            <View style={weatherStyles.forecastHeader}><Text style={weatherStyles.forecastTitle}>توقعات 5 أيام</Text><Text style={weatherStyles.forecastHint}>العظمى / الصغرى</Text></View>
+            <View style={weatherStyles.forecastHeader}><Text style={weatherStyles.forecastTitle}>توقعات 7 أيام</Text><Text style={weatherStyles.forecastHint}>العظمى / الصغرى</Text></View>
             {weather.daily.time.map((date: string, index: number) => (
               <View key={date} style={weatherStyles.dayRow}>
                 <Text style={weatherStyles.dayLow}>{Math.round(weather.daily.temperature_2m_min[index])}°</Text>
@@ -243,6 +248,29 @@ function WeatherSection({ initialCity }: { initialCity: string }) {
                 <Text style={weatherStyles.dayName}>{dayLabel(date, index)}</Text>
               </View>
             ))}
+            <View style={weatherStyles.sectionDivider} />
+            <View style={weatherStyles.forecastHeader}><Text style={weatherStyles.forecastTitle}>جودة الهواء والغبار</Text><View style={weatherStyles.sectionTag}><Activity size={12} color="#0f766e" /><Text style={weatherStyles.sectionTagText}>بيانات تقديرية</Text></View></View>
+            {weather.air ? <>
+              <View style={weatherStyles.airSummary}>
+                <View style={[weatherStyles.aqiBadge, { backgroundColor: (weather.air.us_aqi ?? 0) <= 50 ? '#dcfce7' : (weather.air.us_aqi ?? 0) <= 100 ? '#fef3c7' : '#fee2e2' }]}>
+                  <Text style={weatherStyles.aqiNumber}>{Math.round(weather.air.us_aqi ?? 0)}</Text><Text style={weatherStyles.aqiLabel}>US AQI</Text>
+                </View>
+                <View style={weatherStyles.airCopy}><Text style={weatherStyles.airTitle}>{(weather.air.us_aqi ?? 0) <= 50 ? 'جودة الهواء جيدة' : (weather.air.us_aqi ?? 0) <= 100 ? 'جودة الهواء متوسطة' : 'قد تتأثر الفئات الحساسة'}</Text><Text style={weatherStyles.airDescription}>مؤشر تقديري لجودة الهواء، وليس تنبيهاً رسمياً.</Text></View>
+                <Gauge size={22} color="#0f766e" />
+              </View>
+              <View style={weatherStyles.metricsGrid}>
+                <View style={weatherStyles.metricCard}><Text style={weatherStyles.metricLabel}>PM2.5 · جسيمات دقيقة</Text><Text style={weatherStyles.metricValue}>{weather.air.pm2_5 == null ? '--' : Number(weather.air.pm2_5).toFixed(1)}</Text><Text style={weatherStyles.metricUnit}>µg/m³</Text></View>
+                <View style={weatherStyles.metricCard}><Text style={weatherStyles.metricLabel}>PM10 · جسيمات عالقة</Text><Text style={weatherStyles.metricValue}>{weather.air.pm10 == null ? '--' : Number(weather.air.pm10).toFixed(1)}</Text><Text style={weatherStyles.metricUnit}>µg/m³</Text></View>
+                <View style={weatherStyles.metricCard}><Text style={weatherStyles.metricLabel}>الغبار</Text><Text style={weatherStyles.metricValue}>{weather.air.dust == null ? '--' : Number(weather.air.dust).toFixed(1)}</Text><Text style={weatherStyles.metricUnit}>µg/m³</Text></View>
+                <View style={weatherStyles.metricCard}><Text style={weatherStyles.metricLabel}>مؤشر UV الحالي</Text><Text style={weatherStyles.metricValue}>{weather.air.uv_index == null ? '--' : Number(weather.air.uv_index).toFixed(1)}</Text></View>
+              </View>
+            </> : <View style={weatherStyles.airUnavailable}><Info size={17} color="#64748b" /><Text style={weatherStyles.airDescription}>بيانات جودة الهواء غير متاحة حالياً لهذا الموقع.</Text></View>}
+            <View style={weatherStyles.tipsCard}><Text style={weatherStyles.tipsTitle}>إرشادات عامة</Text>
+              {(weather.daily.uv_index_max?.[0] ?? 0) >= 6 ? <Text style={weatherStyles.tipText}>• الأشعة فوق البنفسجية مرتفعة؛ استخدم الوقاية من الشمس.</Text> : null}
+              {weather.current.wind_speed_10m >= 30 ? <Text style={weatherStyles.tipText}>• الرياح نشطة؛ توخّ الحذر أثناء القيادة.</Text> : null}
+              {(weather.air?.us_aqi ?? 0) > 100 ? <Text style={weatherStyles.tipText}>• جودة الهواء قد تؤثر على الفئات الحساسة؛ راجع الإرشادات المحلية.</Text> : null}
+              <Text style={weatherStyles.disclaimer}>البيانات والإرشادات تقديرية ولا تغني عن التنبيهات الرسمية.</Text>
+            </View>
             <View style={weatherStyles.weatherFooter}>
               <Text style={weatherStyles.sourceText}>المصدر: Open-Meteo · آخر تحديث {lastUpdated ? lastUpdated.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }) : ''}</Text>
               <Text style={weatherStyles.uvText}>مؤشر الأشعة فوق البنفسجية: {weather.daily.uv_index_max?.[0] ?? '--'}</Text>
@@ -311,6 +339,21 @@ const weatherStyles = StyleSheet.create({
   dayConditionText: { color: '#64748b', fontSize: 11 },
   dayHigh: { color: '#0f172a', fontSize: 12, fontWeight: '900', width: 28, textAlign: 'center' },
   dayLow: { color: '#94a3b8', fontSize: 12, fontWeight: '700', width: 28, textAlign: 'center' },
+  sectionDivider: { height: 1, backgroundColor: '#e2e8f0', marginTop: 6, marginBottom: 4 },
+  sectionTag: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, backgroundColor: '#f0fdfa', paddingHorizontal: 8, paddingVertical: 5, borderRadius: 10 },
+  sectionTagText: { color: '#0f766e', fontSize: 9.5, fontWeight: '800' },
+  airSummary: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, marginHorizontal: 12, marginBottom: 4, padding: 12, borderRadius: 16, backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0' },
+  aqiBadge: { width: 60, height: 60, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  aqiNumber: { color: '#0f172a', fontSize: 22, fontWeight: '900' },
+  aqiLabel: { color: '#64748b', fontSize: 9, fontWeight: '800' },
+  airCopy: { flex: 1, alignItems: 'flex-end', gap: 4 },
+  airTitle: { color: '#0f172a', fontSize: 12.5, fontWeight: '900', textAlign: 'right' },
+  airDescription: { color: '#64748b', fontSize: 10.5, lineHeight: 17, textAlign: 'right', flex: 1 },
+  airUnavailable: { flexDirection: 'row-reverse', alignItems: 'center', gap: 9, padding: 14, marginHorizontal: 12, backgroundColor: '#f8fafc', borderRadius: 13 },
+  tipsCard: { marginHorizontal: 12, marginTop: 8, marginBottom: 12, padding: 13, backgroundColor: '#f0fdf4', borderRadius: 15, borderWidth: 1, borderColor: '#dcfce7', gap: 8 },
+  tipsTitle: { color: '#065f46', fontSize: 12.5, fontWeight: '900', textAlign: 'right' },
+  tipText: { color: '#334155', fontSize: 11.5, textAlign: 'right', lineHeight: 18 },
+  disclaimer: { color: '#64748b', fontSize: 9.5, textAlign: 'right', lineHeight: 16, borderTopWidth: 1, borderTopColor: '#bbf7d0', paddingTop: 8 },
   weatherFooter: { paddingHorizontal: 14, paddingVertical: 12, backgroundColor: '#f8fafc', gap: 4, borderTopWidth: 1, borderTopColor: '#e2e8f0' },
   sourceText: { color: '#94a3b8', fontSize: 9.5, textAlign: 'right' },
   uvText: { color: '#64748b', fontSize: 10.5, textAlign: 'right', fontWeight: '700' },
