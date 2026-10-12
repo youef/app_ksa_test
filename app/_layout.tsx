@@ -32,14 +32,16 @@ export default function RootLayout() {
       const { data } = await supabase.auth.getSession();
       setHasSession(Boolean(data.session?.user));
       setSessionReady(true);
-      if (data.session?.user) void registerPushToken();
+      // Background sync: never let a denied notification permission surface
+      // as an uncaught rejection (which would show the dev error overlay).
+      if (data.session?.user) void registerPushToken().catch(() => {});
     };
 
     void loadSession();
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setHasSession(Boolean(session?.user));
       setSessionReady(true);
-      if (session?.user) void registerPushToken();
+      if (session?.user) void registerPushToken().catch(() => {});
     });
 
     const timer = setInterval(() => void syncDndWithNotifications(), 5 * 60_000);

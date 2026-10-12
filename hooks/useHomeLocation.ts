@@ -186,6 +186,11 @@ export function useHomeLocation({ setProfile, showToast }: Options) {
           ? 'تم تفعيل إشعارات حيّك ✓'
           : 'تم الدخول. الإشعارات غير مفعلة ويمكن تفعيلها لاحقاً من الإعدادات.',
       );
+    } catch (e) {
+      // Denied permission / unsupported browser must never crash the app.
+      console.warn('enableNotifications skipped:', e);
+      setSetupOpen(false);
+      showToast('تم الدخول. الإشعارات غير مفعلة ويمكن تفعيلها لاحقاً من الإعدادات.');
     } finally {
       setSetupBusy(false);
     }
