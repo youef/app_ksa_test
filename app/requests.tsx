@@ -33,7 +33,7 @@ import {
   CheckCircle2,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import ScreenHeader from '@/components/shared/ScreenHeader';
+import { AppHeader } from '@/components/shared/AppHeader';
 import {
   getActiveLocation,
   subscribeLocation,
@@ -67,7 +67,7 @@ export default function Requests() {
       const { data: session } = await supabase.auth.getSession();
       if (session.session?.user) {
         const currentUid = session.session.user.id;
-        let query = supabase.from('requests').select('*').order('created_at', { ascending: false }).limit(60);
+        let query = supabase.from('requests').select('*, profiles:requester_id(display_name, avatar_url, city, district)').order('created_at', { ascending: false }).limit(60);
         if (q.trim()) query = query.or(`title.ilike.%${q.trim()}%,description.ilike.%${q.trim()}%`);
         const result = await query;
         // Hide requests that are accepted or completed from other users
@@ -151,6 +151,35 @@ export default function Requests() {
 
   return (
     <View style={styles.container}>
+      <AppHeader
+        variant="sub"
+        title="فزعات وطلبات الحي"
+        subtitle={locationLabel}
+        fallbackRoute="/home"
+        rightAction={
+          hasSession ? (
+            <Pressable
+              onPress={() => router.push('/new-request')}
+              style={{
+                flexDirection: 'row-reverse',
+                alignItems: 'center',
+                gap: 4,
+                backgroundColor: '#ecfdf5',
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                borderRadius: 16,
+                borderWidth: 1,
+                borderColor: '#a7f3d0',
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="إضافة طلب جديد"
+            >
+              <Plus size={14} color="#059669" />
+              <Text style={{ fontSize: 12, fontWeight: '800', color: '#059669' }}>طلب جديد</Text>
+            </Pressable>
+          ) : undefined
+        }
+      />
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingBottom: bottomNavInset + 30 }]}
         showsVerticalScrollIndicator={false}
@@ -166,48 +195,9 @@ export default function Requests() {
           />
         }
       >
-        {/* Unified Luxury Header */}
-        <LinearGradient
-          colors={['#064e3b', '#065f46', '#047857']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.hero}
-        >
-          <ScreenHeader
-            title="فزعات وطلبات الحي 🤝"
-            fallbackRoute="/home"
-            rightAction={hasSession ? (
-              <Pressable
-                onPress={() => router.push('/new-request')}
-                style={styles.addBtn}
-                accessibilityRole="button"
-                accessibilityLabel="إضافة طلب جديد"
-              >
-                <Plus size={16} color="#064e3b" />
-                <Text style={styles.addBtnText}>طلب جديد</Text>
-              </Pressable>
-            ) : undefined}
-          />
-
-          <Pressable
-            onPress={() => router.push('/locations')}
-            style={styles.heroLocationRow}
-            accessibilityRole="button"
-            accessibilityLabel={`الموقع الحالي: ${locationLabel}، اضغط للتغيير`}
-          >
-            <ChevronDown size={13} color="#a7f3d0" />
-            <Text style={styles.heroLocationText} numberOfLines={1}>
-              {locationLabel}
-            </Text>
-            <MapPin size={13} color="#6ee7b7" />
-          </Pressable>
-
-          <Text style={styles.heroSubtitle}>
-            منصة تعاون أهالي الحي: للمساعدة، التوصيل، الإعارة، والفزعة المتبادلة
-          </Text>
-
-          {/* Search Box */}
-          <View style={styles.searchBar}>
+        {/* Search Bar */}
+        <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 6 }}>
+          <View style={[styles.searchBar, { borderWidth: 1, borderColor: '#e2e8f0' }]}>
             <Search size={18} color="#059669" />
             <TextInput
               style={styles.searchInput}
@@ -230,7 +220,7 @@ export default function Requests() {
               </Pressable>
             )}
           </View>
-        </LinearGradient>
+        </View>
 
         {/* Filter Segment Chips */}
         <View style={styles.filterSection}>
@@ -400,7 +390,7 @@ export default function Requests() {
                         <User size={13} color="#059669" />
                       </View>
                       <Text style={styles.authorNameText}>
-                        {req.requester_name || 'أحد سكان الحي'}
+                        {req.profiles?.display_name || req.requester_name || 'أحد سكان الحي'}
                       </Text>
                     </View>
 

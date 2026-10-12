@@ -17,6 +17,7 @@ import {
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { useBottomNavInset } from '@/lib/bottomNav';
+import AppHeader from '@/components/shared/AppHeader';
 import {
   User,
   ShieldCheck,
@@ -47,6 +48,10 @@ import {
   Globe,
   FileText,
   Sun,
+  Store,
+  Briefcase,
+  Map,
+  MessageCircle,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { requireAccount } from '@/lib/authGate';
@@ -178,31 +183,95 @@ export default function MoreScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Compact Hero Header */}
-      <LinearGradient
-        colors={['#064e3b', '#065f46', '#047857']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.hero}
-      >
-        <View style={styles.heroTopRow}>
-          <View style={styles.heroVersionPill}>
-            <Sparkles size={12} color="#a7f3d0" />
-            <Text style={styles.heroVersionText}>الإصدار {APP_VERSION}</Text>
-          </View>
-          <View style={{ flex: 1, alignItems: 'flex-end' }}>
-            <Text style={styles.heroTitle}>المزيد والخدمات 🌟</Text>
-            <Text style={styles.heroSubtitle}>كل خدمات حيّك في مكان واحد — مجتمع، سوق، وفزعة 🇸🇦</Text>
-          </View>
-        </View>
-      </LinearGradient>
+      <AppHeader
+        variant="tab"
+        title="المزيد والخدمات"
+        subtitle={`مجتمع وسوق وفزعة · الإصدار ${APP_VERSION}`}
+        rightAction={
+          <Pressable
+            onPress={() => router.push('/settings')}
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 18,
+              backgroundColor: '#f1f5f9',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Settings size={18} color="#475569" />
+          </Pressable>
+        }
+      />
 
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingBottom: bottomNavInset + 24 }]}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.contentWrap}>
-          {!hasSession && (
+          {/* 1. USER PROFILE OR GUEST BANNER */}
+          {hasSession && profile ? (
+            <View style={styles.profileCard}>
+              <View style={styles.profileTopRow}>
+                <View style={styles.avatarWrap}>
+                  {profile.avatar_url ? (
+                    <Image source={{ uri: profile.avatar_url }} style={styles.avatarImg} />
+                  ) : (
+                    <View style={styles.avatarPlaceholder}>
+                      <Text style={styles.avatarLetter}>
+                        {(profile.display_name || profile.username || 'ج')[0]}
+                      </Text>
+                    </View>
+                  )}
+                  {profile.is_verified && (
+                    <View style={styles.verifiedIconBadge}>
+                      <ShieldCheck size={11} color="#fff" />
+                    </View>
+                  )}
+                </View>
+
+                <View style={styles.profileInfoCol}>
+                  <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
+                    <Text style={styles.profileName}>{profile.display_name || profile.username || 'جار حيّنا'}</Text>
+                    {profile.is_verified && (
+                      <View style={styles.verifiedTag}>
+                        <Text style={styles.verifiedTagText}>موثّق 🛡️</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.profileHandle}>@{profile.username || 'user'}</Text>
+                  {(profile.city || profile.district) && (
+                    <View style={styles.profileLocationPill}>
+                      <Text style={styles.profileLocationText}>
+                        📍 {[profile.district, profile.city].filter(Boolean).join(' · ')}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+
+              <View style={styles.profileActionsRow}>
+                <Pressable
+                  style={styles.profileEditBtn}
+                  onPress={() => router.push('/profile')}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.profileEditBtnText}>عرض وتعديل الملف</Text>
+                  <ChevronLeft size={15} color="#059669" />
+                </Pressable>
+                {unreadNotif > 0 && (
+                  <Pressable
+                    style={styles.profileNotifPill}
+                    onPress={() => router.push('/notifications')}
+                    accessibilityRole="button"
+                  >
+                    <Bell size={13} color="#ef4444" />
+                    <Text style={styles.profileNotifText}>{unreadNotif} إشعار جديد</Text>
+                  </Pressable>
+                )}
+              </View>
+            </View>
+          ) : !hasSession ? (
             <View style={styles.guestBanner}>
               <View style={styles.guestIconCircle}>
                 <User size={24} color="#059669" />
@@ -216,58 +285,84 @@ export default function MoreScreen() {
                 <Text style={styles.guestLoginBtnText}>دخول</Text>
               </Pressable>
             </View>
-          )}
+          ) : null}
 
-          {/* WEATHER — moved to a dedicated screen */}
-          <Text style={styles.sectionHeader}>الطقس والجو 🌤️</Text>
+          {/* 2. QUICK HUB 4-CARDS */}
+          <View style={styles.quickHubGrid}>
+            <Pressable style={styles.quickHubCard} onPress={() => router.push('/requests')}>
+              <View style={[styles.quickHubIconCircle, { backgroundColor: '#fff7ed' }]}>
+                <Truck size={22} color="#ea580c" />
+              </View>
+              <Text style={styles.quickHubTitle}>فزعة الحي</Text>
+              <Text style={styles.quickHubSub}>طلب مساعدة</Text>
+            </Pressable>
+
+            <Pressable style={styles.quickHubCard} onPress={() => router.push('/tools')}>
+              <View style={[styles.quickHubIconCircle, { backgroundColor: '#f0fdf4' }]}>
+                <Wrench size={22} color="#16a34a" />
+              </View>
+              <Text style={styles.quickHubTitle}>سلفني بالحي</Text>
+              <Text style={styles.quickHubSub}>إعارة الأدوات</Text>
+            </Pressable>
+
+            <Pressable style={styles.quickHubCard} onPress={() => router.push('/carpooling')}>
+              <View style={[styles.quickHubIconCircle, { backgroundColor: '#ecfdf5' }]}>
+                <Car size={22} color="#059669" />
+              </View>
+              <Text style={styles.quickHubTitle}>توصيل مدارس</Text>
+              <Text style={styles.quickHubSub}>مقاعد مشتركة</Text>
+            </Pressable>
+
+            <Pressable style={styles.quickHubCard} onPress={() => router.push('/emergency-alert')}>
+              <View style={[styles.quickHubIconCircle, { backgroundColor: '#fef2f2' }]}>
+                <Flame size={22} color="#dc2626" />
+              </View>
+              <Text style={styles.quickHubTitle}>طوارئ الحي</Text>
+              <Text style={styles.quickHubSub}>تنبيه مباشر</Text>
+            </Pressable>
+          </View>
+
+          {/* 3. CORE NEIGHBORHOOD SERVICES — unique non-duplicated destinations */}
+          <Text style={styles.sectionHeader}>أقسام وخدمات الحي 🏬</Text>
           <View style={styles.menuGroup}>
+            <MenuItem
+              icon={<Store size={20} color="#059669" />}
+              iconBg="#ecfdf5"
+              title="سوق الحي"
+              sub="بيع واشترِ واعرض منتجاتك وخدماتك في حيك"
+              badge="نشط"
+              badgeColor="#059669"
+              onPress={() => router.push('/market')}
+            />
+            <MenuItem
+              icon={<Briefcase size={20} color="#0284c7" />}
+              iconBg="#f0f9ff"
+              title="دليل الأنشطة والأعمال"
+              sub="المحلات والمهنيون ومقدمو الخدمات المحليون"
+              onPress={() => router.push('/directory')}
+            />
+            <MenuItem
+              icon={<Map size={20} color="#7c3aed" />}
+              iconBg="#f5f3ff"
+              title="خريطة الحي التفاعلية"
+              sub="استكشف مواقع الجيران والمحلات والخدمات حولك"
+              onPress={() => router.push('/map')}
+            />
+            <MenuItem
+              icon={<MessageCircle size={20} color="#0f766e" />}
+              iconBg="#f0fdfa"
+              title="استفسارات وأسئلة الحي"
+              sub="تجارب الجيران ونصائحهم وتوصياتهم"
+              onPress={() => router.push('/questions')}
+            />
             <MenuItem
               icon={<Sun size={20} color="#d97706" />}
               iconBg="#fffbeb"
-              title="الطقس حولك"
-              sub="الآن وتوقعات الأيام القادمة لمدينتك"
+              title="الطقس والجو حولك"
+              sub="درجات الحرارة والتوقعات المباشرة لمدينتك"
               badge="مباشر"
               badgeColor="#0284c7"
               onPress={() => router.push('/weather')}
-            />
-          </View>
-
-          {/* 3. CORE NEIGHBORHOOD SERVICES — unique destinations only */}
-          <Text style={styles.sectionHeader}>خدمات إضافية للحي 🏬</Text>
-          <View style={styles.menuGroup}>
-            <MenuItem
-              icon={<Truck size={20} color="#ea580c" />}
-              iconBg="#fff7ed"
-              title="فزعة وطلبات المساعدة"
-              sub="طلبات المساعدة وإعارة الأدوات بين الجيران"
-              onPress={() => router.push('/requests')}
-            />
-            <MenuItem
-              icon={<Wrench size={20} color="#16a34a" />}
-              iconBg="#f0fdf4"
-              title="سلفني بالحي"
-              sub="استعر وأعِر أدوات ومعدات الصيانة"
-              badge="جديد"
-              badgeColor="#16a34a"
-              onPress={() => router.push('/tools')}
-            />
-            <MenuItem
-              icon={<Car size={20} color="#059669" />}
-              iconBg="#ecfdf5"
-              title="توصيل مدارس الحي"
-              sub="مشاركة المقاعد بين أولياء الأمور"
-              badge="جديد"
-              badgeColor="#059669"
-              onPress={() => router.push('/carpooling')}
-            />
-            <MenuItem
-              icon={<Flame size={20} color="#dc2626" />}
-              iconBg="#fef2f2"
-              title="تنبيه الحي العاجل"
-              sub="تنبيهات الطوارئ وطلبات المساعدة الفورية"
-              badge="عاجل"
-              badgeColor="#dc2626"
-              onPress={() => router.push('/emergency-alert')}
             />
           </View>
 
@@ -681,41 +776,138 @@ const styles = StyleSheet.create({
 
   // Profile Card
   profileCard: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 12,
     backgroundColor: '#fff',
     borderRadius: 20,
     padding: 16,
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    shadowColor: '#000',
-    shadowOpacity: 0.03,
+    shadowColor: '#0f172a',
+    shadowOpacity: 0.04,
     shadowRadius: 8,
     elevation: 2,
+    gap: 12,
   },
-  avatarImg: { width: 50, height: 50, borderRadius: 25 },
+  profileTopRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 12,
+  },
+  avatarWrap: {
+    position: 'relative',
+  },
+  avatarImg: { width: 52, height: 52, borderRadius: 26 },
   avatarPlaceholder: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     backgroundColor: '#ecfdf5',
+    borderWidth: 1.5,
+    borderColor: '#a7f3d0',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarLetter: { fontSize: 19, fontWeight: '900', color: '#047857' },
+  avatarLetter: { fontSize: 20, fontWeight: '900', color: '#047857' },
+  verifiedIconBadge: {
+    position: 'absolute',
+    bottom: -2,
+    left: -2,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#059669',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#fff',
+  },
+  profileInfoCol: {
+    flex: 1,
+    alignItems: 'flex-end',
+    gap: 3,
+  },
   profileName: { fontSize: 16, fontWeight: '900', color: '#0f172a' },
-  profileSub: { fontSize: 12, color: '#64748b', fontWeight: '600' },
-  profileEditPill: {
+  verifiedTag: {
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  verifiedTagText: { fontSize: 10, fontWeight: '900', color: '#047857' },
+  profileHandle: { fontSize: 12, color: '#64748b', fontWeight: '600' },
+  profileLocationPill: {
+    backgroundColor: '#f8fafc',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    marginTop: 2,
+  },
+  profileLocationText: { fontSize: 11, color: '#475569', fontWeight: '700' },
+  profileActionsRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    gap: 2,
+    justifyContent: 'space-between',
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+  },
+  profileEditBtn: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 4,
     backgroundColor: '#ecfdf5',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+  },
+  profileEditBtnText: { fontSize: 12, fontWeight: '800', color: '#047857' },
+  profileNotifPill: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#fef2f2',
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#fecaca',
   },
-  profileEditPillText: { fontSize: 11.5, fontWeight: '800', color: '#059669' },
+  profileNotifText: { fontSize: 11, fontWeight: '800', color: '#dc2626' },
+
+  // Quick Hub Grid (4 Cards)
+  quickHubGrid: {
+    flexDirection: 'row-reverse',
+    gap: 10,
+  },
+  quickHubCard: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 6,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    shadowColor: '#000',
+    shadowOpacity: 0.02,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  quickHubIconCircle: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+  },
+  quickHubTitle: { fontSize: 12, fontWeight: '900', color: '#0f172a', textAlign: 'center' },
+  quickHubSub: { fontSize: 9.5, color: '#64748b', fontWeight: '600', marginTop: 1, textAlign: 'center' },
 
   // Guest Banner
   guestBanner: {

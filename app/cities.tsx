@@ -13,7 +13,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { buildSaudiLocations } from '@/lib/saudiLocations';
 import { ChevronRight, MapPin, Search, ChevronLeft, Building2 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import ScreenHeader from '@/components/shared/ScreenHeader';
+import { AppHeader } from '@/components/shared/AppHeader';
 
 const ALL_SAUDI_REGIONS = buildSaudiLocations();
 
@@ -32,20 +32,15 @@ export default function Cities() {
 
   return (
     <View style={styles.container}>
+      <AppHeader
+        variant="sub"
+        title={region.name}
+        subtitle="مدن ومحافظات المنطقة"
+        fallbackRoute="/locations"
+      />
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: bottomNavInset }]} showsVerticalScrollIndicator={false}>
-        {/* Header Hero */}
-        <LinearGradient
-          colors={['#065f46', '#059669', '#10b981']}
-          style={styles.hero}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        >
-          <ScreenHeader title={region.name} fallbackRoute="/locations" />
-          <Text style={styles.heroSub}>
-            تصفّح مدن ومحافظات المنطقة (عرض فقط). لتفعيل مدينتك استخدم تحديث الموقع عبر GPS من صفحة موقعك.
-          </Text>
-
-          <View style={styles.searchBar}>
+        <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 6 }}>
+          <View style={[styles.searchBar, { borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#fff' }]}>
             <TextInput
               style={styles.searchInput}
               value={search}
@@ -55,7 +50,7 @@ export default function Cities() {
             />
             <Search size={20} color="#059669" />
           </View>
-        </LinearGradient>
+        </View>
 
         <View style={styles.content}>
           {cities.map(c => (

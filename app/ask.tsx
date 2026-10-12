@@ -34,7 +34,7 @@ import {
   HeartHandshake,
 } from 'lucide-react-native';
 import LocationSelectorModal from '@/components/LocationSelectorModal';
-import ScreenHeader from '@/components/shared/ScreenHeader';
+import { AppHeader } from '@/components/shared/AppHeader';
 import { getCurrentDeviceLocation, reverseGeocodeDeviceLocation } from '@/lib/deviceLocation';
 import {
   getActiveLocation,
@@ -365,14 +365,12 @@ export default function AskScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Unified Luxury Header (matching home) */}
-      <LinearGradient colors={['#064e3b', '#065f46', '#047857']} style={styles.header}>
-        <ScreenHeader
-          title="اسأل أهل حيك 🇸🇦"
-          subtitle="مجتمع حيّنا • تواصل الجيران"
-          fallbackRoute="/home"
-        />
-      </LinearGradient>
+      <AppHeader
+        variant="sub"
+        title="اسأل أهل حيك"
+        subtitle="مجتمع حيّنا • تواصل الجيران"
+        fallbackRoute="/home"
+      />
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Post Type Selector Tabs */}

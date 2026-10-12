@@ -1,17 +1,17 @@
 import { Text, View, Pressable } from 'react-native';
 import { router } from 'expo-router';
-import { CloudSun, Flame, ShieldCheck } from 'lucide-react-native';
+import { CloudSun, ShieldCheck } from 'lucide-react-native';
 import { styles } from './homeStyles';
 import { describeWeatherCode, type CurrentWeather } from '@/lib/weather';
 
 type Props = {
   weather: CurrentWeather | null;
   weatherLoading: boolean;
-  activeNeighbors: number;
+  activeNeighbors?: number;
   emergencyCount: number;
 };
 
-export default function AtmosphereBar({ weather, weatherLoading, activeNeighbors, emergencyCount }: Props) {
+export default function AtmosphereBar({ weather, weatherLoading, emergencyCount }: Props) {
   const weatherText = weather
     ? `${Math.round(weather.temperature)}°C · ${describeWeatherCode(weather.weatherCode)} · ${weather.locationName}`
     : weatherLoading
@@ -23,13 +23,6 @@ export default function AtmosphereBar({ weather, weatherLoading, activeNeighbors
       <View style={styles.atmoItem}>
         <CloudSun size={15} color="#059669" />
         <Text style={styles.atmoText} numberOfLines={1}>{weatherText}</Text>
-      </View>
-      <View style={styles.atmoDivider} />
-      <View style={styles.atmoItem}>
-        <Flame size={15} color="#f59e0b" />
-        <Text style={styles.atmoText}>
-          {activeNeighbors > 0 ? `${activeNeighbors} جار نشط اليوم` : 'كن أول المشاركين اليوم'}
-        </Text>
       </View>
       <View style={styles.atmoDivider} />
       <Pressable

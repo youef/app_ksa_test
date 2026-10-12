@@ -11,7 +11,8 @@ import {
   Alert,
 } from 'react-native';
 import { router } from 'expo-router';
-import { buildSaudiLocations, normalizeSaudiLocationName } from '@/lib/saudiLocations';
+import { buildSaudiLocations, normalizeSaudiLocationName, isInsideSaudiArabia, isKnownSaudiCity } from '@/lib/saudiLocations';
+import { AppHeader } from '@/components/shared/AppHeader';
 import {
   MapPin,
   Search,
@@ -60,11 +61,11 @@ export default function Locations() {
     })();
   }, []);
 
-  const hasLock = Boolean(locked && locked.city && !isAllKingdom(locked.city));
+  const hasLock = Boolean(locked && locked.city && !isAllKingdom(locked.city) && isKnownSaudiCity(locked.city));
 
   // Districts of the GPS-locked city only.
   const lockedDistricts = useMemo(() => {
-    if (!locked) return [] as string[];
+    if (!locked || !isKnownSaudiCity(locked.city)) return [] as string[];
     const target = normalizeSaudiLocationName(locked.city);
     for (const reg of ALL_SAUDI_REGIONS) {
       const city = reg.cities.find(item => normalizeSaudiLocationName(item.name) === target);
@@ -92,9 +93,20 @@ export default function Locations() {
         return;
       }
 
+      if (!isInsideSaudiArabia(devLoc.latitude, devLoc.longitude)) {
+        Alert.alert(
+          'الموقع خارج المملكة 🇸🇦',
+          'إحداثيات جهازك الحالية تقع خارج المملكة العربية السعودية. التطبيق مخصص لمدن وأحياء المملكة.',
+        );
+        return;
+      }
+
       const geo = await reverseGeocodeDeviceLocation(devLoc);
-      if (!geo) {
-        Alert.alert('تعذّر تحديد الموقع', 'لم نستطع قراءة اسم المدينة من موقعك. أعد المحاولة وتأكد من تفعيل خدمة الموقع.');
+      if (!geo || geo.isOutsideKSA) {
+        Alert.alert(
+          'الموقع خارج المملكة 🇸🇦',
+          'موقع جهازك الحالي خارج المملكة العربية السعودية. يرجى اختيار منطقتك ومدينتك يدوياً.',
+        );
         return;
       }
 
@@ -192,16 +204,12 @@ export default function Locations() {
 
   return (
     <View style={styles.container}>
-      {/* Top Navbar */}
-      <View style={styles.navbar}>
-        <View style={styles.navInner}>
-          <Pressable onPress={() => router.back()} style={styles.navBackBtn} hitSlop={8}>
-            <ChevronLeft size={22} color="#0f172a" />
-          </Pressable>
-          <Text style={styles.navTitle}>موقعك المُوثَّق عبر GPS 📍</Text>
-          <View style={{ width: 38 }} />
-        </View>
-      </View>
+      <AppHeader
+        variant="sub"
+        title="موقعك الموثّق"
+        subtitle={locked ? `مدينة ${locked.city}` : 'تحديد وتوثيق المدينة والحي'}
+        fallbackRoute="/home"
+      />
 
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingBottom: bottomNavInset + 40 }]}

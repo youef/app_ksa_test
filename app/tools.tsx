@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import { AppHeader } from '@/components/shared/AppHeader';
 import {
   Wrench,
   Search,
@@ -224,41 +225,37 @@ export default function ToolsLendingScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header Hero */}
-      <LinearGradient
-        colors={['#064e3b', '#065f46', '#047857']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.hero}
-      >
-        <View style={styles.heroTopRow}>
+      <AppHeader
+        variant="sub"
+        title="سلفني بالحي"
+        subtitle="سوق إعارة الأدوات والمعدات بين الجيران مجاناً"
+        fallbackRoute="/home"
+        rightAction={
           <Pressable
-            onPress={() => router.back()}
-            style={styles.backBtn}
-            accessibilityRole="button"
-            accessibilityLabel="رجوع"
-          >
-            <ChevronRight size={22} color="#ffffff" />
-          </Pressable>
-
-          <View style={styles.heroTitleWrap}>
-            <Text style={styles.heroTitle}>سلفني بالحي 🔧</Text>
-            <Text style={styles.heroSubtitle}>سوق إعارة الأدوات والمعدات بين الجيران مجاناً</Text>
-          </View>
-
-          <Pressable
-            style={styles.addBtnHeader}
+            style={{
+              flexDirection: 'row-reverse',
+              alignItems: 'center',
+              gap: 4,
+              backgroundColor: '#ecfdf5',
+              paddingHorizontal: 12,
+              paddingVertical: 6,
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: '#a7f3d0',
+            }}
             onPress={() => setAddModalOpen(true)}
             accessibilityRole="button"
             accessibilityLabel="أعِر أداتك للحي"
           >
-            <Plus size={18} color="#064e3b" />
-            <Text style={styles.addBtnHeaderText}>أعِر أداة</Text>
+            <Plus size={14} color="#059669" />
+            <Text style={{ fontSize: 12, fontWeight: '800', color: '#059669' }}>أعِر أداة</Text>
           </Pressable>
-        </View>
+        }
+      />
 
-        {/* Search Input */}
-        <View style={styles.searchBar}>
+      {/* Search Input */}
+      <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 6 }}>
+        <View style={[styles.searchBar, { borderWidth: 1, borderColor: '#e2e8f0' }]}>
           <TextInput
             style={styles.searchInput}
             value={search}
@@ -268,7 +265,7 @@ export default function ToolsLendingScreen() {
           />
           <Search size={18} color="#059669" />
         </View>
-      </LinearGradient>
+      </View>
 
       {/* Category Pills */}
       <View style={styles.categoriesWrap}>

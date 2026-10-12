@@ -16,7 +16,7 @@ import { supabase } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ChevronRight, MapPin, Search, CheckCircle2 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import ScreenHeader from '@/components/shared/ScreenHeader';
+import { AppHeader } from '@/components/shared/AppHeader';
 import { savePermanentMyLocation, getLockedCity } from '@/lib/locationSync';
 
 const ALL_SAUDI_REGIONS = buildSaudiLocations();
@@ -91,20 +91,15 @@ export default function Districts() {
 
   return (
     <View style={styles.container}>
+      <AppHeader
+        variant="sub"
+        title={`أحياء ${city.name}`}
+        subtitle="اختر حيك السكني لتلقي تنبيهات وخدمات الجيران"
+        fallbackRoute="/cities"
+      />
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: bottomNavInset }]} showsVerticalScrollIndicator={false}>
-        {/* Header Hero */}
-        <LinearGradient
-          colors={['#065f46', '#059669', '#10b981']}
-          style={styles.hero}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        >
-          <ScreenHeader title={`أحياء ${city.name}`} fallbackRoute="/cities" />
-          <Text style={styles.heroSub}>
-            اضغط على حيك السكني لربطه بحسابك وتلقي تنبيهات وخدمات الجيران.
-          </Text>
-
-          <View style={styles.searchBar}>
+        <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 6 }}>
+          <View style={[styles.searchBar, { borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#fff' }]}>
             <TextInput
               style={styles.searchInput}
               value={search}
@@ -114,7 +109,7 @@ export default function Districts() {
             />
             <Search size={20} color="#059669" />
           </View>
-        </LinearGradient>
+        </View>
 
         <View style={styles.content}>
           {districts.map(d => (

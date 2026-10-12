@@ -15,7 +15,6 @@ import {
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { supabase } from '@/lib/supabase';
-import { LinearGradient } from 'expo-linear-gradient';
 import {
   MessageCircle,
   Search,
@@ -32,11 +31,14 @@ import {
   ChevronLeft,
   SlidersHorizontal,
   Lock,
-  Sparkles,
   Filter,
+  CheckCircle2,
+  MapPin,
+  Clock,
+  User,
 } from 'lucide-react-native';
 import { useBottomNavInset } from '@/lib/bottomNav';
-import ScreenHeader from '@/components/shared/ScreenHeader';
+import AppHeader from '@/components/shared/AppHeader';
 import { syncDndWithNotifications } from '@/lib/notifications';
 import {
   DndSettings,
@@ -104,10 +106,10 @@ export default function Messages() {
       supabase.from('blocks').select('blocker_id').eq('blocked_id', u.user.id),
     ]);
 
-    const blockedIds = [...new Set((myBlocks || []).map((b: any) => b.blocked_id))] as string[];
-    const blockerIds = [...new Set((blockedBy || []).map((b: any) => b.blocker_id))] as string[];
-    setBlockedIds(blockedIds);
-    setBlockerIds(blockerIds);
+    const bIds = [...new Set((myBlocks || []).map((b: any) => b.blocked_id))] as string[];
+    const brIds = [...new Set((blockedBy || []).map((b: any) => b.blocker_id))] as string[];
+    setBlockedIds(bIds);
+    setBlockerIds(brIds);
 
     // 3. My conversations
     const { data: myConvs } = await supabase
@@ -124,7 +126,6 @@ export default function Messages() {
     const convIds = myConvs.map(c => c.conversation_id);
 
     const [messagesRes, allMembersRes, settings] = await Promise.all([
-      // RLS hides messages from anyone I blocked, and anything I cleared.
       supabase
         .from('messages')
         .select('*')
@@ -170,9 +171,9 @@ export default function Messages() {
             !!lastMsg &&
             lastMsg.sender_id !== u.user.id &&
             !(lastMsg.read_by || []).includes(u.user.id),
-          isBlocked: otherId ? blockedIds.includes(otherId) || blockerIds.includes(otherId) : false,
-          iBlocked: otherId ? blockedIds.includes(otherId) : false,
-          blockedMe: otherId ? blockerIds.includes(otherId) : false,
+          isBlocked: otherId ? bIds.includes(otherId) || brIds.includes(otherId) : false,
+          iBlocked: otherId ? bIds.includes(otherId) : false,
+          blockedMe: otherId ? brIds.includes(otherId) : false,
           isMuted: !!setting?.muted,
           isCleared: !!setting?.clearedAt,
           otherUserId: otherId,
@@ -202,8 +203,6 @@ export default function Messages() {
     }, 60_000);
     return () => clearInterval(timer);
   }, []);
-
-  // ------------------------------------------------------------ actions
 
   async function applyDnd(next: DndSettings) {
     setDnd(next);
@@ -325,76 +324,104 @@ export default function Messages() {
     ]);
   }
 
-  // ------------------------------------------------------------ derived
-
   const filtered = conversations.filter(c => {
-    const matchesSearch = !searchQuery.trim() || c.name.includes(searchQuery.trim());
+    const matchesSearch = !searchQuery.trim() || c.name.toLowerCase().includes(searchQuery.trim().toLowerCase());
     return matchesSearch && (!onlyUnread || c.isUnread);
   });
 
-  // Muted chats and chats inside an active DND window stay out of the badge.
   const unreadCount = conversations.filter(c => c.isUnread && !c.isMuted && !dndNow).length;
   const silentUnread = conversations.filter(c => c.isUnread && (c.isMuted || dndNow)).length;
 
   return (
     <View style={styles.container}>
-      <View style={styles.ambientOrbOne} />
-      <View style={styles.ambientOrbTwo} />
-      <LinearGradient colors={['#064e3b', '#065f46', '#047857']} style={styles.header}>
-        <View style={styles.inner}>
-        <ScreenHeader
-          title="الرسائل 💬"
-          fallbackRoute="/home"
-          subtitle={unreadCount > 0 ? `${unreadCount} غير مقروءة · تواصل حيّنا` : 'تواصل حيّنا ومجتمع الجيران'}
-          rightAction={(
-            <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-              {silentUnread > 0 && (
-                <View style={styles.silentBadge}>
-                  <BellOff size={11} color="#a7f3d0" />
-                  <Text style={styles.silentBadgeText}>{silentUnread}</Text>
-                </View>
-              )}
-              <Pressable
-                style={[styles.dndHeaderBtn, dndNow && styles.dndHeaderBtnActive]}
-                onPress={openDndSheet}
-              >
-                {dndNow ? <BellOff size={16} color="#fff" /> : <Bell size={16} color="#a7f3d0" />}
-                <Text style={[styles.dndHeaderText, dndNow && { color: '#fff' }]}>
-                  {dndNow ? 'صامت' : 'الإشعارات'}
-                </Text>
-              </Pressable>
-              <Pressable style={styles.newChatBtn} onPress={() => router.push('/search')}>
-                <Plus size={20} color="#fff" />
-              </Pressable>
-            </View>
-          )}
-        />
+      <AppHeader
+        variant="tab"
+        title="الرسائل والمحادثات"
+        subtitle={unreadCount > 0 ? `${unreadCount} محادثة جديدة غير مقروءة` : 'تواصل وتنسيق مع جيران حيك'}
+        rightAction={
+          <View style={styles.headerRightActions}>
+            {silentUnread > 0 && (
+              <View style={styles.silentBadge}>
+                <BellOff size={11} color="#059669" />
+                <Text style={styles.silentBadgeText}>{silentUnread}</Text>
+              </View>
+            )}
 
-        <View style={styles.searchBar}>
-          <Search size={18} color="#9ca3af" />
+            <Pressable
+              style={[styles.dndBtn, dndNow && styles.dndBtnActive]}
+              onPress={openDndSheet}
+              accessibilityRole="button"
+              accessibilityLabel="عدم الإزعاج"
+            >
+              {dndNow ? <BellOff size={13} color="#dc2626" /> : <Bell size={13} color="#64748b" />}
+              <Text style={[styles.dndBtnText, dndNow && { color: '#dc2626' }]}>
+                {dndNow ? 'صامت' : 'تنبيهات'}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              style={styles.newChatBtn}
+              onPress={() => router.push('/search')}
+              accessibilityRole="button"
+              accessibilityLabel="محادثة جديدة"
+            >
+              <Plus size={17} color="#059669" />
+            </Pressable>
+          </View>
+        }
+      />
+
+      {/* Modern Search & Filter Capsule */}
+      <View style={styles.searchSection}>
+        <View style={styles.searchBox}>
+          <Search size={17} color="#059669" />
           <TextInput
             style={styles.searchInput}
             placeholder="ابحث في محادثاتك مع الجيران..."
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor="#94a3b8"
             value={searchQuery}
             onChangeText={setSearchQuery}
+            selectionColor="#059669"
           />
+          {searchQuery.length > 0 && (
+            <Pressable onPress={() => setSearchQuery('')} hitSlop={6} style={styles.clearSearchBtn}>
+              <X size={14} color="#64748b" />
+            </Pressable>
+          )}
         </View>
-        <View style={styles.quickFilters}>
-          <Pressable style={[styles.filterChip, !onlyUnread && styles.filterChipActive]} onPress={() => setOnlyUnread(false)}>
-            <MessageCircle size={14} color={!onlyUnread ? '#047857' : '#d1fae5'} /><Text style={[styles.filterChipText, !onlyUnread && styles.filterChipTextActive]}>الكل</Text>
+
+        {/* Filter Pills */}
+        <View style={styles.filtersRow}>
+          <Pressable
+            style={[styles.filterPill, !onlyUnread && styles.filterPillActive]}
+            onPress={() => setOnlyUnread(false)}
+          >
+            <MessageCircle size={13} color={!onlyUnread ? '#fff' : '#64748b'} />
+            <Text style={[styles.filterPillText, !onlyUnread && styles.filterPillTextActive]}>
+              الكل ({conversations.length})
+            </Text>
           </Pressable>
-          <Pressable style={[styles.filterChip, onlyUnread && styles.filterChipActive]} onPress={() => setOnlyUnread(true)}>
-            <Filter size={14} color={onlyUnread ? '#047857' : '#d1fae5'} /><Text style={[styles.filterChipText, onlyUnread && styles.filterChipTextActive]}>غير مقروء</Text>
-            {unreadCount > 0 && <View style={styles.filterCount}><Text style={styles.filterCountText}>{unreadCount}</Text></View>}
+
+          <Pressable
+            style={[styles.filterPill, onlyUnread && styles.filterPillActive]}
+            onPress={() => setOnlyUnread(true)}
+          >
+            <Filter size={13} color={onlyUnread ? '#fff' : '#64748b'} />
+            <Text style={[styles.filterPillText, onlyUnread && styles.filterPillTextActive]}>
+              غير مقروء
+            </Text>
+            {unreadCount > 0 && (
+              <View style={styles.unreadCounterBadge}>
+                <Text style={styles.unreadCounterText}>{unreadCount}</Text>
+              </View>
+            )}
           </Pressable>
         </View>
-        </View>
-      </LinearGradient>
+      </View>
 
       {dndNow && (
         <View style={styles.dndBanner}>
-          <BellOff size={16} color="#b45309" />
+          <BellOff size={15} color="#b45309" />
           <Text style={styles.dndBannerText} numberOfLines={2}>
             {dnd.schedule === 'off'
               ? 'وضع عدم الإزعاج مفعّل — الإشعارات صامتة.'
@@ -409,10 +436,14 @@ export default function Messages() {
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color="#059669" />
+          <Text style={{ marginTop: 10, color: '#059669', fontSize: 13, fontWeight: '800' }}>
+            جاري تحميل الرسائل...
+          </Text>
         </View>
       ) : (
         <ScrollView
           style={styles.list}
+          contentContainerStyle={{ paddingBottom: bottomNavInset + 40 }}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
@@ -427,76 +458,80 @@ export default function Messages() {
           }
         >
           <View style={styles.inner}>
-          {filtered.length === 0 ? (
-            <View style={styles.emptyState}>
-              <View style={styles.emptyIcon}>
-                <MessageCircle size={48} color="#cbd5e1" />
-              </View>
-              <Text style={styles.emptyTitle}>
-                {searchQuery ? 'لا نتائج لبحثك' : 'لا توجد محادثات بعد'}
-              </Text>
-              <Text style={styles.emptySub}>
-                {searchQuery ? 'جرب اسماً آخر' : 'تواصل مع جيرانك واستفسر عن الحي بالضغط على +'}
-              </Text>
-              {!searchQuery && (
-                <Pressable style={styles.startChatBtn} onPress={() => router.push('/search')}>
-                  <Text style={styles.startChatBtnText}>ابحث عن جار وابدأ محادثة</Text>
-                </Pressable>
-              )}
-            </View>
-          ) : (
-            <>
-              {filtered.length > 0 && !onlyUnread && (
-                <View style={styles.listIntro}>
-                  <View><Text style={styles.listTitle}>محادثاتك</Text><Text style={styles.listSub}>{filtered.length} محادثة</Text></View>
-                  <View style={styles.livePill}><View style={styles.liveDot} /><Text style={styles.liveText}>نشطة الآن</Text></View>
+            {filtered.length === 0 ? (
+              <View style={styles.emptyState}>
+                <View style={styles.emptyIcon}>
+                  <MessageCircle size={44} color="#94a3b8" />
                 </View>
-              )}
-              {filtered.some(c => c.isUnread && !c.isMuted && !dndNow) && (
-                <Text style={styles.sectionLabel}>غير مقروء</Text>
-              )}
-              {filtered
-                .filter(c => c.isUnread && !c.isMuted && !dndNow)
-                .map(conv => (
-                  <ConvCard
-                    key={conv.id}
-                    conv={conv}
-                    currentUserId={currentUserId}
-                    onLongPress={() => setTarget(conv)}
-                  />
-                ))}
-
-              {filtered.some(c => c.isUnread && !c.isMuted && !dndNow) &&
-                filtered.some(c => !(c.isUnread && !c.isMuted && !dndNow)) && (
-                  <Text style={styles.sectionLabel}>المحادثات</Text>
+                <Text style={styles.emptyTitle}>
+                  {searchQuery ? 'لا توجد نتائج لبحثك' : 'لا توجد محادثات بعد'}
+                </Text>
+                <Text style={styles.emptySub}>
+                  {searchQuery
+                    ? 'جرب البحث باسم جار آخر أو كلمة مفتاحية أخرى.'
+                    : 'تواصل مع جيران حيك، استفسر عن خدماتهم، أو نسق معهم مباشرة.'}
+                </Text>
+                {!searchQuery && (
+                  <Pressable style={styles.startChatBtn} onPress={() => router.push('/search')}>
+                    <Text style={styles.startChatBtnText}>ابحث عن جار وابدأ محادثة 💬</Text>
+                  </Pressable>
                 )}
-              {filtered
-                .filter(c => !(c.isUnread && !c.isMuted && !dndNow))
-                .map(conv => (
-                  <ConvCard
-                    key={conv.id}
-                    conv={conv}
-                    currentUserId={currentUserId}
-                    onLongPress={() => setTarget(conv)}
-                  />
-                ))}
-            </>
-          )}
-          <View style={{ height: 100 }} />
+              </View>
+            ) : (
+              <>
+                {filtered.some(c => c.isUnread && !c.isMuted && !dndNow) && (
+                  <View style={styles.sectionHeaderRow}>
+                    <Text style={styles.sectionLabel}>غير مقروء 🔔</Text>
+                  </View>
+                )}
+
+                {filtered
+                  .filter(c => c.isUnread && !c.isMuted && !dndNow)
+                  .map(conv => (
+                    <ConvCard
+                      key={conv.id}
+                      conv={conv}
+                      currentUserId={currentUserId}
+                      onLongPress={() => setTarget(conv)}
+                    />
+                  ))}
+
+                {filtered.some(c => c.isUnread && !c.isMuted && !dndNow) &&
+                  filtered.some(c => !(c.isUnread && !c.isMuted && !dndNow)) && (
+                    <View style={styles.sectionHeaderRow}>
+                      <Text style={styles.sectionLabel}>المحادثات</Text>
+                    </View>
+                  )}
+
+                {filtered
+                  .filter(c => !(c.isUnread && !c.isMuted && !dndNow))
+                  .map(conv => (
+                    <ConvCard
+                      key={conv.id}
+                      conv={conv}
+                      currentUserId={currentUserId}
+                      onLongPress={() => setTarget(conv)}
+                    />
+                  ))}
+              </>
+            )}
           </View>
         </ScrollView>
       )}
 
-      
-
-      {/* Conversation actions */}
+      {/* Conversation actions Bottom Sheet */}
       <Modal visible={!!target} transparent animationType="fade" onRequestClose={() => setTarget(null)}>
         <Pressable style={styles.overlay} onPress={() => setTarget(null)}>
           <View style={styles.sheet}>
             <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle} numberOfLines={1}>
-                {target?.name}
-              </Text>
+              <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                <Text style={styles.sheetTitle} numberOfLines={1}>
+                  {target?.name}
+                </Text>
+                <Text style={styles.sheetSub}>
+                  {target?.other?.district ? `حي ${target.other.district}` : 'أحد جيران الحي'}
+                </Text>
+              </View>
               <Pressable onPress={() => setTarget(null)} style={styles.sheetClose}>
                 <X size={18} color="#64748b" />
               </Pressable>
@@ -560,7 +595,7 @@ export default function Messages() {
         <Pressable style={styles.overlay} onPress={() => setDndSheet(false)}>
           <View style={styles.sheet}>
             <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>عدم الإزعاج 🔕</Text>
+              <Text style={styles.sheetTitle}>وضع عدم الإزعاج 🔕</Text>
               <Pressable onPress={() => setDndSheet(false)} style={styles.sheetClose}>
                 <X size={18} color="#64748b" />
               </Pressable>
@@ -571,9 +606,9 @@ export default function Messages() {
               onPress={() => void applyDnd({ ...dnd, enabled: false })}
             >
               <Bell size={18} color={!dnd.enabled ? '#059669' : '#64748b'} />
-              <View style={{ flex: 1 }}>
+              <View style={{ flex: 1, alignItems: 'flex-end' }}>
                 <Text style={styles.optionCardTitle}>إشعارات عادية</Text>
-                <Text style={styles.optionCardSub}>صوت وتنبيهات لكل الرسائل</Text>
+                <Text style={styles.optionCardSub}>صوت وتنبيهات لكل الرسائل الواردة</Text>
               </View>
             </Pressable>
 
@@ -582,9 +617,9 @@ export default function Messages() {
               onPress={() => pickSchedule('off')}
             >
               <BellOff size={18} color="#d97706" />
-              <View style={{ flex: 1 }}>
+              <View style={{ flex: 1, alignItems: 'flex-end' }}>
                 <Text style={styles.optionCardTitle}>صامت دائماً</Text>
-                <Text style={styles.optionCardSub}>كل الإشعارات صامتة طوال اليوم</Text>
+                <Text style={styles.optionCardSub}>كتم كل الإشعارات طوال اليوم</Text>
               </View>
             </Pressable>
 
@@ -593,9 +628,9 @@ export default function Messages() {
               onPress={() => pickSchedule('nightly')}
             >
               <SlidersHorizontal size={18} color="#d97706" />
-              <View style={{ flex: 1 }}>
+              <View style={{ flex: 1, alignItems: 'flex-end' }}>
                 <Text style={styles.optionCardTitle}>صامت ليلاً 🌙</Text>
-                <Text style={styles.optionCardSub}>من 10:00 م حتى 7:00 ص</Text>
+                <Text style={styles.optionCardSub}>من 10:00 م حتى 7:00 ص تلقائياً</Text>
               </View>
             </Pressable>
 
@@ -608,7 +643,7 @@ export default function Messages() {
               onPress={() => pickSchedule('custom')}
             >
               <SlidersHorizontal size={18} color="#d97706" />
-              <View style={{ flex: 1 }}>
+              <View style={{ flex: 1, alignItems: 'flex-end' }}>
                 <Text style={styles.optionCardTitle}>وقت مخصص ⏱</Text>
                 <Text style={styles.optionCardSub}>
                   {dnd.schedule === 'custom'
@@ -685,8 +720,8 @@ function SheetRow({
 }) {
   return (
     <Pressable style={styles.sheetRow} onPress={onPress}>
-      {icon}
-      <View style={{ flex: 1 }}>
+      <View style={styles.sheetRowIconBox}>{icon}</View>
+      <View style={{ flex: 1, alignItems: 'flex-end' }}>
         <Text style={[styles.sheetRowText, danger && { color: '#dc2626' }]}>{label}</Text>
         {subtitle ? <Text style={styles.sheetRowSub}>{subtitle}</Text> : null}
       </View>
@@ -699,7 +734,6 @@ function formatMessagePreview(bodyStr?: string | null, isMine = false): string {
   const trimmed = bodyStr.trim();
   if (!trimmed) return 'ابدأ المحادثة';
 
-  // Check if payload is a JSON object (e.g. location, image, sticker, file)
   if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
     try {
       const parsed = JSON.parse(trimmed);
@@ -710,29 +744,29 @@ function formatMessagePreview(bodyStr?: string | null, isMine = false): string {
           return isMine ? `📍 تم إرسال موقعك${locName}` : `📍 أرسل موقعه${locName}`;
         }
         if (type === 'image' || type === 'photo') {
-          return isMine ? '📷 تم إرسال صورة' : '📷 أرسل صورة';
+          return isMine ? '📷 أرسلت صورة' : '📷 أرسل صورة';
         }
         if (type === 'sticker') {
-          return isMine ? '✨ تم إرسال ملصق' : '✨ أرسل ملصقاً';
+          return isMine ? '✨ أرسلت ملصقاً' : '✨ أرسل ملصقاً';
         }
         if (type === 'file' || type === 'document') {
           const fileName = parsed.name ? ` (${parsed.name})` : '';
-          return isMine ? `📎 تم إرسال ملف${fileName}` : `📎 أرسل ملفاً${fileName}`;
+          return isMine ? `📎 أرسلت ملفاً${fileName}` : `📎 أرسل ملفاً${fileName}`;
         }
         if (type === 'audio' || type === 'voice') {
-          return isMine ? '🎤 تم إرسال تسجيل صوتي' : '🎤 أرسل تسجيلاً صوتياً';
+          return isMine ? '🎤 أرسلت تسجيلاً صوتياً' : '🎤 أرسل تسجيلاً صوتياً';
         }
         if (type === 'video') {
-          return isMine ? '📹 تم إرسال مقطع فيديو' : '📹 أرسل مقطع فيديو';
+          return isMine ? '📹 أرسلت مقطع فيديو' : '📹 أرسل مقطع فيديو';
         }
         if (type === 'appreciation') {
           return isMine
-            ? '☕ أرسلت بطاقة شكر وقهوة (+10 نقاط)'
+            ? '☕ أهديت قهوة وشكر (+10 نقاط)'
             : '☕ وصلتك بطاقة شكر وقهوة (+10 نقاط)';
         }
       }
     } catch {
-      // Not JSON or parse error, fallback to text
+      // fallback
     }
   }
 
@@ -779,17 +813,17 @@ function ConvCard({
           <Image source={{ uri: avatar }} style={styles.avatar} />
         ) : (
           <View style={styles.avatarFallback}>
-            <Text style={styles.avatarLetter}>{name[0]}</Text>
+            <Text style={styles.avatarLetter}>{(name?.[0] || 'ج').toUpperCase()}</Text>
           </View>
         )}
         {other?.is_verified && (
           <View style={styles.verifiedDot}>
-            <Text style={{ fontSize: 8 }}>✓</Text>
+            <CheckCircle2 size={12} color="#059669" />
           </View>
         )}
         {isMuted && (
           <View style={styles.mutedDot}>
-            <BellOff size={10} color="#fff" />
+            <BellOff size={9} color="#fff" />
           </View>
         )}
       </View>
@@ -838,8 +872,8 @@ function formatTime(dateStr: string): string {
     const diffDays = Math.floor(diffHours / 24);
 
     if (diffMins < 1) return 'الآن';
-    if (diffMins < 60) return `${diffMins}د`;
-    if (diffHours < 24) return `${diffHours}س`;
+    if (diffMins < 60) return `${diffMins} د`;
+    if (diffHours < 24) return `${diffHours} س`;
     if (diffDays === 1) return 'أمس';
     return date.toLocaleDateString('ar-SA', { day: 'numeric', month: 'short' });
   } catch {
@@ -848,88 +882,123 @@ function formatTime(dateStr: string): string {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc', overflow: 'hidden' },
-  ambientOrbOne: { position: 'absolute', width: 220, height: 220, borderRadius: 110, backgroundColor: 'rgba(16,185,129,0.07)', top: 150, left: -120 },
-  ambientOrbTwo: { position: 'absolute', width: 180, height: 180, borderRadius: 90, backgroundColor: 'rgba(6,95,70,0.05)', bottom: 100, right: -90 },
-  header: {
-    paddingTop: Platform.OS === 'ios' ? 52 : 36,
-    paddingBottom: 18,
-    paddingHorizontal: 0,
-    backgroundColor: '#064e3b',
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
-    borderBottomWidth: 0,
-    borderBottomColor: 'transparent',
-    shadowColor: '#0f172a', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 3,
-  },
-  headerContent: {
+  container: { flex: 1, backgroundColor: '#f8fafc' },
+  headerRightActions: {
     flexDirection: 'row-reverse',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    gap: 6,
   },
-  headerRight: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
-  headerLeftActions: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
-  heroEyebrow: { position: 'absolute', top: -28, right: 0, flexDirection: 'row-reverse', alignItems: 'center', gap: 5 },
-  heroEyebrowText: { color: '#d1fae5', fontSize: 10, fontWeight: '800' },
-  heroTitleWrap: { flex: 1 },
-  headerTitle: { color: '#fff', fontSize: 27, fontWeight: '900', letterSpacing: -0.5 },
-  unreadBadge: {
-    backgroundColor: '#ef4444',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  unreadBadgeText: { color: '#fff', fontSize: 12, fontWeight: '800' },
   silentBadge: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 3,
-    backgroundColor: 'rgba(0,0,0,0.2)',
-    borderRadius: 12,
-    paddingHorizontal: 8,
+    backgroundColor: '#ecfdf5',
+    borderRadius: 10,
+    paddingHorizontal: 7,
     paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
   },
-  silentBadgeText: { color: '#a7f3d0', fontSize: 11, fontWeight: '800' },
-  dndHeaderBtn: {
+  silentBadgeText: { color: '#059669', fontSize: 11, fontWeight: '800' },
+  dndBtn: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    gap: 5,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    paddingHorizontal: 10,
+    gap: 4,
+    backgroundColor: '#f1f5f9',
+    paddingHorizontal: 9,
     paddingVertical: 6,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderColor: '#e2e8f0',
   },
-  dndHeaderBtnActive: { backgroundColor: '#d97706', borderColor: '#f59e0b' },
-  dndHeaderText: { color: '#ecfdf5', fontSize: 11, fontWeight: '800' },
+  dndBtnActive: { backgroundColor: '#fef2f2', borderColor: '#fecaca' },
+  dndBtnText: { fontSize: 11, fontWeight: '700', color: '#64748b' },
   newChatBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 13,
-    backgroundColor: '#059669',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  searchBar: {
+  searchSection: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 6,
+    backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+    gap: 8,
+  },
+  searchBox: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.98)',
+    backgroundColor: '#f8fafc',
     borderRadius: 16,
-    paddingHorizontal: 14,
-    height: 48,
+    paddingHorizontal: 12,
+    height: 46,
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
     gap: 8,
-    borderWidth: 1, borderColor: '#e2e8f0',
   },
-  searchInput: { flex: 1, fontSize: 13, color: '#111827', textAlign: 'right' },
-  quickFilters: { flexDirection: 'row-reverse', gap: 8, marginTop: 12 },
-  filterChip: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 14, paddingHorizontal: 11, paddingVertical: 7 },
-  filterChipActive: { backgroundColor: '#ecfdf5', borderColor: '#a7f3d0' },
-  filterChipText: { color: '#64748b', fontSize: 11, fontWeight: '800' },
-  filterChipTextActive: { color: '#047857' },
-  filterCount: { minWidth: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: '#ef4444' },
-  filterCountText: { color: '#fff', fontSize: 9, fontWeight: '900' },
+  searchInput: {
+    flex: 1,
+    fontSize: 13,
+    color: '#0f172a',
+    textAlign: 'right',
+    height: 42,
+    padding: 0,
+    fontWeight: '700',
+  },
+  clearSearchBtn: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#e2e8f0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filtersRow: {
+    flexDirection: 'row-reverse',
+    gap: 8,
+    marginBottom: 4,
+  },
+  filterPill: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor: '#f1f5f9',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  filterPillActive: {
+    backgroundColor: '#059669',
+    borderColor: '#059669',
+  },
+  filterPillText: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: '#64748b',
+  },
+  filterPillTextActive: {
+    color: '#ffffff',
+  },
+  unreadCounterBadge: {
+    backgroundColor: '#ef4444',
+    borderRadius: 8,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
+  unreadCounterText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '900',
+  },
   dndBanner: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
@@ -955,65 +1024,60 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   dndBannerActionText: { color: '#fff', fontSize: 11, fontWeight: '800' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  list: { flex: 1, paddingHorizontal: 0, paddingTop: 10 },
-  listIntro: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 4, paddingVertical: 12 },
-  listTitle: { color: '#0f172a', fontSize: 18, fontWeight: '900', textAlign: 'right' },
-  listSub: { color: '#94a3b8', fontSize: 10, fontWeight: '700', marginTop: 2, textAlign: 'right' },
-  livePill: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, backgroundColor: '#ecfdf5', borderWidth: 1, borderColor: '#bbf7d0', paddingHorizontal: 9, paddingVertical: 6, borderRadius: 12 },
-  liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#10b981' },
-  liveText: { color: '#047857', fontSize: 10, fontWeight: '800' },
-  sectionLabel: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#64748b',
-    textAlign: 'right',
-    marginTop: 12,
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 },
+  list: { flex: 1, paddingTop: 10 },
+  inner: { width: '100%', maxWidth: 720, alignSelf: 'center', paddingHorizontal: 16 },
+  sectionHeaderRow: {
     marginBottom: 8,
-    paddingHorizontal: 4,
+    marginTop: 6,
+  },
+  sectionLabel: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: '#475569',
+    textAlign: 'right',
   },
   convCard: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 15,
-    marginBottom: 10,
+    backgroundColor: '#ffffff',
+    borderRadius: 18,
+    padding: 13,
+    marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#e9eef5',
-    gap: 13,
+    borderColor: '#e2e8f0',
+    gap: 12,
     shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.045,
-    shadowRadius: 10,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 5,
+    elevation: 1,
   },
-  convCardUnread: { borderColor: '#6ee7b7', backgroundColor: '#f0fdf4', shadowColor: '#059669', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 10, elevation: 3 },
+  convCardUnread: {
+    borderColor: '#a7f3d0',
+    backgroundColor: '#f0fdf4',
+  },
   convCardBlocked: { opacity: 0.7, backgroundColor: '#fef2f2', borderColor: '#fee2e2' },
   convCardMuted: { backgroundColor: '#f8fafc', borderColor: '#e2e8f0' },
   avatarWrap: { position: 'relative' },
-  avatar: { width: 54, height: 54, borderRadius: 17 },
+  avatar: { width: 50, height: 50, borderRadius: 25, borderWidth: 1.5, borderColor: '#e2e8f0' },
   avatarFallback: {
-    width: 54,
-    height: 54,
-    borderRadius: 17,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     backgroundColor: '#ecfdf5',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#a7f3d0',
   },
-  avatarLetter: { fontSize: 19, fontWeight: '900', color: '#059669' },
+  avatarLetter: { fontSize: 18, fontWeight: '900', color: '#059669' },
   verifiedDot: {
     position: 'absolute',
-    bottom: 0,
-    right: 0,
-    backgroundColor: '#059669',
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: '#fff',
+    bottom: -2,
+    right: -2,
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
   },
   mutedDot: {
     position: 'absolute',
@@ -1036,7 +1100,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   nameBadgesRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, flex: 1 },
-  convName: { fontSize: 15, fontWeight: '800', color: '#0f172a', flexShrink: 1 },
+  convName: { fontSize: 14.5, fontWeight: '800', color: '#0f172a', flexShrink: 1, textAlign: 'right' },
   convNameUnread: { fontWeight: '900', color: '#059669' },
   blockedPill: { backgroundColor: '#fee2e2', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6 },
   blockedPillText: { color: '#dc2626', fontSize: 10, fontWeight: '800' },
@@ -1048,42 +1112,50 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   lastMsgRow: { flexDirection: 'row-reverse', alignItems: 'center', flex: 1 },
-  lastMsg: { fontSize: 12, color: '#64748b', flex: 1, textAlign: 'right' },
+  lastMsg: { fontSize: 12.5, color: '#64748b', flex: 1, textAlign: 'right' },
   lastMsgUnread: { color: '#0f172a', fontWeight: '700' },
   unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#059669', marginRight: 6 },
-  emptyState: { alignItems: 'center', justifyContent: 'center', paddingVertical: 80, paddingHorizontal: 24 },
+  emptyState: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60, paddingHorizontal: 20 },
   emptyIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#e2e8f0',
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: '#f1f5f9',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: 14,
   },
-  emptyTitle: { fontSize: 17, fontWeight: '900', color: '#0f172a', marginBottom: 6 },
-  emptySub: { fontSize: 13, color: '#64748b', textAlign: 'center', lineHeight: 18, marginBottom: 20 },
-  startChatBtn: { backgroundColor: '#059669', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 14 },
-  startChatBtnText: { color: '#fff', fontSize: 13, fontWeight: '800' },
-  
-
-  // sheets
+  emptyTitle: { fontSize: 16, fontWeight: '900', color: '#0f172a', marginBottom: 6 },
+  emptySub: { fontSize: 12.5, color: '#64748b', textAlign: 'center', lineHeight: 18, marginBottom: 18, maxWidth: 360 },
+  startChatBtn: {
+    backgroundColor: '#059669',
+    paddingHorizontal: 20,
+    paddingVertical: 11,
+    borderRadius: 14,
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  startChatBtnText: { color: '#fff', fontSize: 13, fontWeight: '900' },
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.45)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    padding: 20,
   },
   sheet: {
-    width: '92%',
+    width: '100%',
+    maxWidth: 440,
     backgroundColor: '#fff',
-    borderRadius: 20,
+    borderRadius: 22,
     padding: 18,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
+    shadowOpacity: 0.15,
+    shadowRadius: 14,
     elevation: 8,
   },
   sheetHeader: {
@@ -1095,18 +1167,27 @@ const styles = StyleSheet.create({
     borderColor: '#f1f5f9',
     paddingBottom: 10,
   },
-  sheetTitle: { fontSize: 16, fontWeight: '900', color: '#0f172a', flex: 1, textAlign: 'right' },
-  sheetClose: { padding: 4 },
+  sheetTitle: { fontSize: 15.5, fontWeight: '900', color: '#0f172a', textAlign: 'right' },
+  sheetSub: { fontSize: 11.5, color: '#64748b', fontWeight: '600', marginTop: 2, textAlign: 'right' },
+  sheetClose: { padding: 4, borderRadius: 10, backgroundColor: '#f1f5f9' },
   sheetRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 12,
-    paddingVertical: 12,
+    paddingVertical: 11,
     borderBottomWidth: 1,
     borderColor: '#f8fafc',
   },
-  sheetRowText: { fontSize: 14, fontWeight: '800', color: '#334155', textAlign: 'right' },
-  sheetRowSub: { fontSize: 11, color: '#94a3b8', marginTop: 2 },
+  sheetRowIconBox: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: '#f8fafc',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sheetRowText: { fontSize: 13.5, fontWeight: '800', color: '#334155', textAlign: 'right' },
+  sheetRowSub: { fontSize: 11, color: '#94a3b8', marginTop: 1, textAlign: 'right' },
   sheetNote: {
     fontSize: 11,
     color: '#94a3b8',
@@ -1118,7 +1199,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 12,
-    padding: 14,
+    padding: 13,
     borderRadius: 14,
     borderWidth: 1.5,
     borderColor: '#f1f5f9',
@@ -1126,17 +1207,17 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   optionCardActive: { borderColor: '#059669', backgroundColor: '#ecfdf5' },
-  optionCardTitle: { fontSize: 14, fontWeight: '800', color: '#0f172a', textAlign: 'right' },
-  optionCardSub: { fontSize: 11, color: '#64748b', marginTop: 2 },
-  fieldLabel: { fontSize: 12, fontWeight: '800', color: '#475569', marginBottom: 6 },
+  optionCardTitle: { fontSize: 13.5, fontWeight: '800', color: '#0f172a', textAlign: 'right' },
+  optionCardSub: { fontSize: 11, color: '#64748b', marginTop: 2, textAlign: 'right' },
+  fieldLabel: { fontSize: 12, fontWeight: '800', color: '#475569', marginBottom: 6, textAlign: 'right' },
   timeInput: {
     backgroundColor: '#f8fafc',
     borderRadius: 12,
     borderWidth: 1.5,
     borderColor: '#e2e8f0',
     paddingHorizontal: 14,
-    height: 46,
-    fontSize: 16,
+    height: 44,
+    fontSize: 15,
     fontWeight: '800',
     color: '#0f172a',
     textAlign: 'center',
@@ -1145,11 +1226,10 @@ const styles = StyleSheet.create({
   saveTimeBtn: {
     backgroundColor: '#059669',
     borderRadius: 14,
-    height: 48,
+    height: 46,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 14,
+    marginTop: 10,
   },
-  saveTimeBtnText: { color: '#fff', fontSize: 15, fontWeight: '900' },
-  inner: { width: '100%', maxWidth: 640, alignSelf: 'center' },
+  saveTimeBtnText: { color: '#fff', fontSize: 14, fontWeight: '900' },
 });

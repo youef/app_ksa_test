@@ -15,6 +15,8 @@ import {
   SAUDI_REGIONS,
   buildSaudiLocations,
   normalizeSaudiLocationName,
+  isKnownSaudiCity,
+  isInsideSaudiArabia,
   Region,
   City,
   District,
@@ -99,7 +101,7 @@ export default function LocationSelectorModal({
   useEffect(() => { setVisibleCount(100); }, [step, searchQuery]);
 
   // When a GPS-verified city exists, the user may only pick a district inside it.
-  const lockActive = Boolean(activeLock && activeLock.city && activeLock.city !== 'كل المدن');
+  const lockActive = Boolean(activeLock && activeLock.city && activeLock.city !== 'كل المدن' && isKnownSaudiCity(activeLock.city));
   const lockedResolved = useMemo(() => {
     if (!lockActive || !activeLock) return null;
     const target = normalizeSaudiLocationName(activeLock.city);
@@ -166,12 +168,26 @@ export default function LocationSelectorModal({
         Alert.alert('تعذّر تحديد الموقع', 'اسمح للمتصفح أو التطبيق باستخدام موقعك ثم حاول مرة أخرى.');
         return;
       }
+      if (!isInsideSaudiArabia(location.latitude, location.longitude)) {
+        Alert.alert(
+          'الموقع خارج المملكة 🇸🇦',
+          'موقع جهازك الحالي خارج المملكة العربية السعودية. يرجى اختيار منطقتك ومدينتك يدوياً من القائمة.'
+        );
+        return;
+      }
       const place = await reverseGeocodeDeviceLocation(location);
+      if (place?.isOutsideKSA) {
+        Alert.alert(
+          'الموقع خارج المملكة 🇸🇦',
+          'موقع جهازك الحالي خارج المملكة العربية السعودية. يرجى اختيار منطقتك ومدينتك يدوياً من القائمة.'
+        );
+        return;
+      }
       const region = place?.region?.trim() || '';
       const city = place?.city?.trim() || '';
       const district = place?.district?.trim() || '';
-      if (!region || !city || !district) {
-        Alert.alert('الموقع غير مكتمل', 'لم نتمكن من استخراج المنطقة والمدينة والحي بدقة. اخترها يدوياً من القائمة.');
+      if (!region || !city || !district || !isKnownSaudiCity(city)) {
+        Alert.alert('الموقع غير مكتمل', 'لم نتمكن من مطابقة المنطقة والمدينة والحي بدقة مع مدن المملكة. اخترها يدوياً من القائمة.');
         return;
       }
       onSelect(region, city, district);

@@ -24,6 +24,7 @@ import {
 } from 'lucide-react-native';
 
 import { C } from '@/lib/ui';
+import { AppHeader } from '@/components/shared/AppHeader';
 import { supabase } from '@/lib/supabase';
 import { getCurrentDeviceLocation, type DeviceLocation } from '@/lib/deviceLocation';
 import { loadGoogleMaps, pinElement, pinSvg } from '@/lib/googleMaps';
@@ -831,87 +832,81 @@ export default function WebMap() {
 
   return (
     <View style={styles.root}>
-      {/* Map DOM Canvas */}
+      {/* 1. FIXED APP HEADER */}
+      <AppHeader
+        variant="sub"
+        title="خريطة حيّنا 🗺️"
+        subtitle={`${visiblePins.length} نشاط · ${places.length} محل قريب`}
+        fallbackRoute="/home"
+        rightAction={
+          <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
+            <Pressable
+              onPress={() => {
+                setMapNotice(null);
+                setEngine((prev) => (prev === 'leaflet' ? 'google' : 'leaflet'));
+              }}
+              style={[styles.engineBtn, engine === 'google' && styles.engineBtnGoogle]}
+            >
+              {engine === 'leaflet' ? (
+                <>
+                  <Layers size={13} color="#059669" />
+                  <Text style={styles.engineBtnText}>خريطة حيّنا</Text>
+                </>
+              ) : (
+                <>
+                  <Globe size={13} color="#2563eb" />
+                  <Text style={[styles.engineBtnText, { color: '#2563eb' }]}>Google</Text>
+                </>
+              )}
+            </Pressable>
+          </View>
+        }
+      />
+
+      {/* 2. MAP CANVAS (Full screen behind floating controls) */}
       <div
         ref={(node) => {
           mapElRef.current = node;
         }}
-        style={{ width: '100%', height: '100%' }}
+        style={{
+          position: 'absolute',
+          top: 52,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          width: '100%',
+          height: 'calc(100% - 52px)',
+          zIndex: 1,
+        }}
       />
 
-      {/* Top Bar */}
-      <View style={styles.topBar}>
-        <View style={styles.topRow}>
-          <Pressable onPress={() => router.back()} style={styles.iconBtn}>
-            <MapPinIcon size={20} color={C.accent} />
-          </Pressable>
-          <View style={styles.topTitleWrap}>
-            <Text style={styles.topTitle}>خريطة الجيران</Text>
-            <Text style={styles.topSubtitle}>
-              {visiblePins.length} نشاط · {places.length} محل قريب
-            </Text>
-          </View>
-
-          {/* Engine Toggle Pill */}
-          <Pressable
-            onPress={() => {
-              setMapNotice(null);
-              setEngine((prev) => (prev === 'leaflet' ? 'google' : 'leaflet'));
-            }}
-            style={[styles.engineBtn, engine === 'google' && styles.engineBtnGoogle]}
-          >
-            {engine === 'leaflet' ? (
-              <>
-                <Layers size={13} color="#059669" />
-                <Text style={styles.engineBtnText}>خريطة حيّنا</Text>
-              </>
-            ) : (
-              <>
-                <Globe size={13} color="#2563eb" />
-                <Text style={[styles.engineBtnText, { color: '#2563eb' }]}>Google</Text>
-              </>
-            )}
-          </Pressable>
-
-          <Pressable
-            onPress={() => setHeatOn((value) => !value)}
-            style={[styles.iconBtn, heatOn && styles.iconBtnActive]}
-          >
-            <Flame size={18} color={heatOn ? '#fff' : C.accent} />
-          </Pressable>
-          <Pressable
-            onPress={() => void locateMe()}
-            style={[styles.iconBtn, locating && { opacity: 0.6 }]}
-          >
-            <Navigation size={18} color={C.accent} />
-          </Pressable>
-        </View>
-
-        {/* Search Input */}
-        <View style={styles.searchRow}>
-          <Search size={17} color={C.muted} />
+      {/* 3. FLOATING GOOGLE MAPS SEARCH & CATEGORIES */}
+      <View pointerEvents="box-none" style={styles.floatingTopContainer}>
+        {/* Google Maps Search Capsule */}
+        <View style={styles.floatingSearchCapsule}>
+          <Search size={18} color="#059669" />
           <TextInput
             value={query}
             onChangeText={setQuery}
             onSubmitEditing={() => void runPlaceSearch(placeCategory, query)}
-            placeholder="ابحث عن بقالة، صيدلية، حلاق، سباك، مطعم..."
-            placeholderTextColor={C.muted}
-            style={styles.search}
+            placeholder="ابحث في الخريطة عن بقالة، صيدلية، سباك..."
+            placeholderTextColor="#94a3b8"
+            style={styles.floatingSearchInput}
             returnKeyType="search"
           />
           {query.length > 0 ? (
-            <Pressable onPress={() => setQuery('')} hitSlop={8}>
-              <X size={16} color={C.muted} />
+            <Pressable onPress={() => setQuery('')} hitSlop={8} style={{ padding: 4 }}>
+              <X size={15} color="#94a3b8" />
             </Pressable>
           ) : null}
         </View>
 
-        {/* Categories Bar */}
+        {/* Floating Google Maps Category Chips */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.chipScroll}
-          style={styles.chipBar}
+          contentContainerStyle={styles.floatingChipsScroll}
+          style={styles.floatingChipsRow}
         >
           <Pressable
             onPress={() => {
@@ -919,17 +914,17 @@ export default function WebMap() {
               void runPlaceSearch(ALL_PLACES_KEY, query);
             }}
             style={[
-              styles.placeChip,
-              placeCategory === ALL_PLACES_KEY && styles.placeChipActive,
+              styles.floatingChip,
+              placeCategory === ALL_PLACES_KEY && styles.floatingChipActive,
             ]}
           >
             <Text
               style={[
-                styles.placeChipText,
-                placeCategory === ALL_PLACES_KEY && styles.placeChipTextActive,
+                styles.floatingChipText,
+                placeCategory === ALL_PLACES_KEY && styles.floatingChipTextActive,
               ]}
             >
-              الكل
+              🌟 الكل ({places.length})
             </Text>
           </Pressable>
           {PLACE_CATEGORIES.map((category) => (
@@ -940,14 +935,14 @@ export default function WebMap() {
                 void runPlaceSearch(category.key, '');
               }}
               style={[
-                styles.placeChip,
-                placeCategory === category.key && styles.placeChipActive,
+                styles.floatingChip,
+                placeCategory === category.key && styles.floatingChipActive,
               ]}
             >
               <Text
                 style={[
-                  styles.placeChipText,
-                  placeCategory === category.key && styles.placeChipTextActive,
+                  styles.floatingChipText,
+                  placeCategory === category.key && styles.floatingChipTextActive,
                 ]}
               >
                 {category.emoji} {category.label}
@@ -955,46 +950,26 @@ export default function WebMap() {
             </Pressable>
           ))}
         </ScrollView>
+      </View>
 
-        {/* Pins Kind & City Filter Bar */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.chipScroll}
-          style={styles.chipBar}
+      {/* 4. FLOATING GOOGLE MAPS ACTION BUTTONS (BOTTOM-RIGHT FABs) */}
+      <View style={styles.floatingFabCol}>
+        <Pressable
+          onPress={() => void locateMe()}
+          style={styles.floatingFabBtn}
+          accessibilityRole="button"
+          accessibilityLabel="تحديد موقعي"
         >
-          {kindChip('all', 'جميع الأنشطة', C.ink, pins.length)}
-          {MAP_PIN_ORDER.map((value) => {
-            const meta = MAP_PIN_KINDS[value];
-            return kindChip(value, `${meta.emoji} ${meta.short}`, meta.color, kindCounts[value] || 0);
-          })}
-          <View style={styles.divider} />
-          <Pressable
-            onPress={() => {
-              setCity('all');
-              focusCity('all');
-            }}
-            style={[styles.cityChip, city === 'all' && styles.cityChipActive]}
-          >
-            <Text style={[styles.cityChipText, city === 'all' && styles.cityChipTextActive]}>
-              كل المملكة
-            </Text>
-          </Pressable>
-          {cityCounts.map((entry) => (
-            <Pressable
-              key={entry.city}
-              onPress={() => {
-                setCity(entry.city);
-                focusCity(entry.city);
-              }}
-              style={[styles.cityChip, city === entry.city && styles.cityChipActive]}
-            >
-              <Text style={[styles.cityChipText, city === entry.city && styles.cityChipTextActive]}>
-                {entry.city} ({entry.count})
-              </Text>
-            </Pressable>
-          ))}
-        </ScrollView>
+          <Navigation size={18} color={locating ? '#94a3b8' : '#059669'} />
+        </Pressable>
+        <Pressable
+          onPress={() => setHeatOn((v) => !v)}
+          style={[styles.floatingFabBtn, heatOn && { backgroundColor: '#ea580c' }]}
+          accessibilityRole="button"
+          accessibilityLabel="خريطة التفاعل"
+        >
+          <Flame size={18} color={heatOn ? '#fff' : '#ea580c'} />
+        </Pressable>
       </View>
 
       {/* Engine Notice banner if Google fails */}
@@ -1022,7 +997,7 @@ export default function WebMap() {
           onPress={() => setSheetOpen(true)}
           accessibilityRole="button"
         >
-          <Store size={18} color="#fff" />
+          <Store size={17} color="#fff" />
           <Text style={styles.openSheetBtnText}>
             أقرب المحلات ({places.length})
           </Text>
@@ -1039,87 +1014,103 @@ export default function WebMap() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#fff' },
-  topBar: {
+  root: {
+    flex: 1,
+    backgroundColor: '#e2e8f0',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  floatingTopContainer: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(255,255,255,0.96)',
-    borderBottomWidth: 1,
-    borderBottomColor: C.line,
-    paddingTop: 46,
-    paddingBottom: 8,
-    paddingHorizontal: 14,
+    top: 62,
+    left: 12,
+    right: 12,
+    zIndex: 90,
     gap: 8,
-    zIndex: 999,
+    maxWidth: 600,
+    alignSelf: 'center',
   },
-  topRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
-  topTitleWrap: { flex: 1, alignItems: 'center' },
-  topTitle: { fontSize: 16, fontWeight: '900', color: C.ink },
-  topSubtitle: { fontSize: 11, fontWeight: '700', color: C.accent },
-  engineBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#ecfdf5',
-    borderWidth: 1,
-    borderColor: '#a7f3d0',
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: 10,
-  },
-  engineBtnGoogle: {
-    backgroundColor: '#eff6ff',
-    borderColor: '#bfdbfe',
-  },
-  engineBtnText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#059669',
-  },
-  iconBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: C.accentSoft,
-  },
-  iconBtnActive: { backgroundColor: C.accent },
-  searchRow: {
+  floatingSearchCapsule: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    gap: 8,
-    backgroundColor: C.bg,
+    gap: 10,
+    backgroundColor: '#ffffff',
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    height: 48,
     borderWidth: 1,
-    borderColor: C.line,
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    height: 42,
+    borderColor: '#e2e8f0',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 6,
   },
-  search: { flex: 1, textAlign: 'right', color: C.ink, fontSize: 13 },
-  chipBar: { marginHorizontal: -14 },
-  chipScroll: { flexDirection: 'row-reverse', gap: 6, paddingHorizontal: 14 },
-  chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+  floatingSearchInput: {
+    flex: 1,
+    textAlign: 'right',
+    fontSize: 13.5,
+    fontWeight: '600',
+    color: '#0f172a',
+    height: 44,
+    padding: 0,
+  },
+  floatingChipsRow: {
+    marginHorizontal: -4,
+  },
+  floatingChipsScroll: {
+    flexDirection: 'row-reverse',
+    gap: 6,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+  },
+  floatingChip: {
+    paddingHorizontal: 13,
+    paddingVertical: 7,
     borderRadius: 20,
-    backgroundColor: '#fff',
-    borderWidth: 1.5,
-    borderColor: C.line,
+    backgroundColor: 'rgba(255, 255, 255, 0.96)',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  chipText: { fontSize: 11, fontWeight: '800', color: C.muted },
-  chipTextActive: { color: '#fff' },
-  placeChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    backgroundColor: '#fff',
-    borderWidth: 1.5,
-    borderColor: C.line,
+  floatingChipActive: {
+    backgroundColor: '#059669',
+    borderColor: '#059669',
   },
-  placeChipActive: { backgroundColor: C.accent, borderColor: C.accent },
+  floatingChipText: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: '#334155',
+  },
+  floatingChipTextActive: {
+    color: '#ffffff',
+  },
+  floatingFabCol: {
+    position: 'absolute',
+    bottom: 90,
+    right: 16,
+    zIndex: 85,
+    gap: 10,
+  },
+  floatingFabBtn: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.16,
+    shadowRadius: 6,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
   placeChipText: { fontSize: 11.5, fontWeight: '800', color: C.ink },
   placeChipTextActive: { color: '#fff' },
   cityChip: {

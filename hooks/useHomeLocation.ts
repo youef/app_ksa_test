@@ -12,6 +12,7 @@ import {
 } from '@/lib/locationSync';
 import { CurrentWeather, loadCurrentWeather } from '@/lib/weather';
 import { getCurrentDeviceLocation, reverseGeocodeDeviceLocation } from '@/lib/deviceLocation';
+import { isInsideSaudiArabia, isKnownSaudiCity } from '@/lib/saudiLocations';
 import { registerPushToken } from '@/lib/notifications';
 import type { Profile } from '@/lib/homeUtils';
 
@@ -101,13 +102,17 @@ export function useHomeLocation({ setProfile, showToast }: Options) {
   const resolveLiveLocation = useCallback(async () => {
     const device = await getCurrentDeviceLocation();
     if (!device) return null;
+    if (!isInsideSaudiArabia(device.latitude, device.longitude)) {
+      return null;
+    }
     const place = await reverseGeocodeDeviceLocation(device);
+    if (!place || place.isOutsideKSA) return null;
     const live = {
       region: place?.region?.trim() || '',
       city: place?.city?.trim() || '',
       district: place?.district?.trim() || '',
     };
-    return live.region && live.city && live.district ? live : null;
+    return live.region && live.city && live.district && isKnownSaudiCity(live.city) ? live : null;
   }, []);
 
   const persistLocation = useCallback(async (live: HaynaLocation) => {
@@ -127,10 +132,23 @@ export function useHomeLocation({ setProfile, showToast }: Options) {
         setWeeklyMessage('سجّل الدخول أو أنشئ حساباً لتأكيد موقعك ومتابعة حيّك.');
         return;
       }
+      const device = await getCurrentDeviceLocation();
+      if (!device) {
+        setWeeklyMessage(
+          'لم نتمكن من قراءة موقعك الحقيقي. اسمح للتطبيق أو المتصفح بالوصول إلى الموقع، ثم اضغط «تحديث الآن» مرة أخرى.'
+        );
+        return;
+      }
+      if (!isInsideSaudiArabia(device.latitude, device.longitude)) {
+        setWeeklyMessage(
+          'موقع جهازك الحالي خارج المملكة العربية السعودية 🇸🇦. تطبيق حينا مخصص لمدن وأحياء المملكة.'
+        );
+        return;
+      }
       const live = await resolveLiveLocation();
       if (!live) {
         setWeeklyMessage(
-          'لم نتمكن من قراءة موقعك الحقيقي. اسمح للتطبيق أو المتصفح بالوصول إلى الموقع، ثم اضغط «تحديث الآن» مرة أخرى.'
+          'لم نتمكن من مطابقة موقعك مع مدن المملكة بدقة. تأكد من تفعيل GPS أو اختر موقعك يدوياً.'
         );
         return;
       }
@@ -152,9 +170,14 @@ export function useHomeLocation({ setProfile, showToast }: Options) {
     setSetupBusy(true);
     setSetupMessage('جارٍ تحديد موقعك وقراءة المنطقة والمدينة والحي…');
     try {
+      const device = await getCurrentDeviceLocation();
+      if (device && !isInsideSaudiArabia(device.latitude, device.longitude)) {
+        setSetupMessage('موقعك الحالي خارج المملكة العربية السعودية 🇸🇦. التطبيق مخصص لأحياء ومدن المملكة.');
+        return;
+      }
       const live = await resolveLiveLocation();
       if (!live) {
-        setSetupMessage('لم نتمكن من تحديد المنطقة والمدينة والحي بدقة. فعّل إذن الموقع ثم حاول مرة أخرى.');
+        setSetupMessage('لم نتمكن من تحديد المنطقة والمدينة والحي بدقة داخل المملكة. فعّل إذن الموقع ثم حاول مرة أخرى.');
         return;
       }
       await persistLocation(live);

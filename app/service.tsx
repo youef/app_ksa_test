@@ -49,7 +49,7 @@ import {
   CircleAlert,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import ScreenHeader from '@/components/shared/ScreenHeader';
+import { AppHeader } from '@/components/shared/AppHeader';
 import { getListingType, getDeliveryMode, formatServicePrice } from '@/lib/serviceTypes';
 import { relativeTime } from '@/lib/mapPins';
 import { useBottomNavInset } from '@/lib/bottomNav';
@@ -308,29 +308,42 @@ export default function Service() {
 
   return (
     <View style={styles.container}>
-      {/* Top Navbar */}
-      <View style={styles.topNavbar}>
-        <View style={styles.topNavInner}>
-          <Pressable onPress={() => router.back()} style={styles.navBackBtn} hitSlop={8}>
-            <ChevronLeft size={22} color="#0f172a" />
-          </Pressable>
-          <Text style={styles.navTitle} numberOfLines={1}>
-            {service.name}
-          </Text>
-          <View style={styles.navActions}>
-            <Pressable onPress={shareOffer} style={styles.navIconBtn} hitSlop={8}>
-              {copiedLink ? <Check size={18} color="#059669" /> : <Share2 size={18} color="#334155" />}
+      <AppHeader
+        variant="sub"
+        title={service.name}
+        subtitle={[service.city, service.district ? `حي ${service.district}` : null].filter(Boolean).join(' · ')}
+        fallbackRoute="/market"
+        rightAction={
+          <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
+            <Pressable
+              onPress={shareOffer}
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 17,
+                backgroundColor: '#f1f5f9',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              {copiedLink ? <Check size={16} color="#059669" /> : <Share2 size={16} color="#475569" />}
             </Pressable>
             <Pressable
               onPress={() => router.push({ pathname: '/report', params: { type: 'service', id: service.id } })}
-              style={styles.navIconBtn}
-              hitSlop={8}
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 17,
+                backgroundColor: '#f1f5f9',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
             >
-              <Flag size={17} color="#64748b" />
+              <Flag size={15} color="#64748b" />
             </Pressable>
           </View>
-        </View>
-      </View>
+        }
+      />
 
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingBottom: bottomNavInset + 90 }]}

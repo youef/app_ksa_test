@@ -33,7 +33,7 @@ import {
   Coffee,
 } from 'lucide-react-native';
 import { useBottomNavInset } from '@/lib/bottomNav';
-import ScreenHeader from '@/components/shared/ScreenHeader';
+import AppHeader from '@/components/shared/AppHeader';
 
 type NotificationCategory = 'all' | 'emergency' | 'answers' | 'community' | 'stories';
 
@@ -218,49 +218,97 @@ export default function Notifications() {
 
   return (
     <View style={styles.container}>
-      {/* ======================================================== */}
-      {/* 1. TOP CURVED GRADIENT HEADER                            */}
-      {/* ======================================================== */}
-      <LinearGradient colors={['#065f46', '#059669', '#10b981']} style={styles.headerHero}>
-        <ScreenHeader
-          title="مركز الإشعارات"
-          fallbackRoute="/home"
-          subtitle={unreadCount > 0 ? `${unreadCount} جديدة · تنبيهات وتفاعلات أهالي حيك والخدمات` : 'تنبيهات وتفاعلات أهالي حيك والخدمات'}
-          rightAction={(
-            <Pressable onPress={() => setSettingsOpen(true)} style={styles.headerBtn}>
-              <SlidersHorizontal size={20} color="#fff" />
+      <AppHeader
+        variant="sub"
+        title="مركز الإشعارات"
+        fallbackRoute="/home"
+        subtitle={unreadCount > 0 ? `${unreadCount} إشعار جديد` : 'تنبيهات وتفاعلات أهالي حيك'}
+        rightAction={
+          <Pressable
+            onPress={() => setSettingsOpen(true)}
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 18,
+              backgroundColor: '#f1f5f9',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <SlidersHorizontal size={18} color="#475569" />
+          </Pressable>
+        }
+      />
+
+      {/* Action bar inside header */}
+      <View style={{
+        flexDirection: 'row-reverse',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        backgroundColor: '#ffffff',
+        borderBottomWidth: 1,
+        borderBottomColor: '#f1f5f9',
+      }}>
+        <Pressable
+          style={[
+            {
+              flexDirection: 'row-reverse',
+              alignItems: 'center',
+              gap: 6,
+              paddingHorizontal: 12,
+              paddingVertical: 6,
+              borderRadius: 16,
+              backgroundColor: onlyUnread ? '#ecfdf5' : '#f1f5f9',
+              borderWidth: 1,
+              borderColor: onlyUnread ? '#a7f3d0' : '#e2e8f0',
+            },
+          ]}
+          onPress={() => setOnlyUnread(!onlyUnread)}
+        >
+          <View style={[styles.filterDot, onlyUnread && styles.filterDotActive]} />
+          <Text style={{ fontSize: 12, fontWeight: '800', color: onlyUnread ? '#047857' : '#64748b' }}>
+            غير المقروء ({unreadCount})
+          </Text>
+        </Pressable>
+
+        <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8 }}>
+          {unreadCount > 0 && (
+            <Pressable
+              style={{
+                flexDirection: 'row-reverse',
+                alignItems: 'center',
+                gap: 4,
+                paddingHorizontal: 10,
+                paddingVertical: 6,
+                borderRadius: 14,
+                backgroundColor: '#ecfdf5',
+              }}
+              onPress={markAllAsRead}
+            >
+              <CheckCheck size={14} color="#059669" />
+              <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#059669' }}>قراءة الكل</Text>
             </Pressable>
           )}
-        />
 
-        {/* Action bar inside header */}
-        <View style={styles.quickBar}>
-          <Pressable
-            style={[styles.quickPill, onlyUnread && styles.quickPillActive]}
-            onPress={() => setOnlyUnread(!onlyUnread)}
-          >
-            <View style={[styles.filterDot, onlyUnread && styles.filterDotActive]} />
-            <Text style={[styles.quickPillText, onlyUnread && styles.quickPillTextActive]}>
-              غير المقروء ({unreadCount})
-            </Text>
-          </Pressable>
-
-          <View style={styles.headerRightButtons}>
-            {unreadCount > 0 && (
-              <Pressable style={styles.markAllBtn} onPress={markAllAsRead}>
-                <CheckCheck size={16} color="#6ee7b7" />
-                <Text style={styles.markAllText}>قراءة الكل</Text>
-              </Pressable>
-            )}
-
-            {items.length > 0 && (
-              <Pressable style={styles.clearBtn} onPress={confirmClearAll}>
-                <Trash2 size={15} color="rgba(255,255,255,0.7)" />
-              </Pressable>
-            )}
-          </View>
+          {items.length > 0 && (
+            <Pressable
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: 16,
+                backgroundColor: '#f1f5f9',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              onPress={confirmClearAll}
+            >
+              <Trash2 size={14} color="#94a3b8" />
+            </Pressable>
+          )}
         </View>
-      </LinearGradient>
+      </View>
 
       {/* ======================================================== */}
       {/* 2. CATEGORY TABS (SCROLLABLE PILLS)                      */}

@@ -1,5 +1,5 @@
 import { useBottomNavInset } from '@/lib/bottomNav';
-import ScreenHeader from '@/components/shared/ScreenHeader';
+import { AppHeader } from '@/components/shared/AppHeader';
 import { useState, useCallback, useEffect } from 'react';
 import {
   Alert,
@@ -405,21 +405,32 @@ export default function Profile() {
 
   return (
     <View style={styles.container}>
+      <AppHeader
+        variant="sub"
+        title="الملف الشخصي"
+        fallbackRoute="/home"
+        rightAction={
+          <Pressable
+            onPress={() => router.push('/settings')}
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 18,
+              backgroundColor: '#f1f5f9',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Settings size={18} color="#475569" />
+          </Pressable>
+        }
+      />
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: bottomNavInset }]} showsVerticalScrollIndicator={false}>
         {/* ======================================================== */}
         {/* 1. PROFILE HERO HEADER & AVATAR                          */}
         {/* ======================================================== */}
         <LinearGradient colors={["#064e3b", "#059669", "#10b981"]} start={{x:0,y:0}} end={{x:1,y:1}} style={styles.profileHero}>
           <View style={styles.profileHeroInner}>
-          <ScreenHeader
-            title="الملف الشخصي"
-            fallbackRoute="/home"
-            rightAction={(
-              <Pressable onPress={() => router.push('/settings')} style={styles.profileTopButton}>
-                <Settings size={21} color="#fff" />
-              </Pressable>
-            )}
-          />
 
           <View style={styles.profileSummary}>
             <Pressable onPress={pickAvatar} style={styles.twitterAvatarWrap}>
@@ -716,7 +727,7 @@ export default function Profile() {
 const styles = StyleSheet.create({
   profileHero: {
     backgroundColor: '#059669',
-    paddingTop: Platform.OS === 'ios' ? 52 : 32,
+    paddingTop: 18,
     paddingHorizontal: 18,
     paddingBottom: 16,
     borderBottomWidth: 1,

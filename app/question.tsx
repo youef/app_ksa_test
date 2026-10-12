@@ -15,9 +15,8 @@ import {
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
-import { C } from '@/lib/ui';
 import { useBottomNavInset } from '@/lib/bottomNav';
-import ScreenHeader from '@/components/shared/ScreenHeader';
+import { AppHeader } from '@/components/shared/AppHeader';
 import { getActiveLocation } from '@/lib/locationSync';
 import {
   MapPin,
@@ -36,12 +35,22 @@ import {
   ShieldCheck,
   Check,
   Info,
+  Flame,
+  Eye,
+  AlertTriangle,
+  ChevronLeft,
 } from 'lucide-react-native';
 import { requireAccount } from '@/lib/authGate';
 import { areaLabel } from '@/lib/privacy';
 import { getCurrentDeviceLocation, reverseGeocodeDeviceLocation } from '@/lib/deviceLocation';
-import { LinearGradient } from 'expo-linear-gradient';
 import { relativeTime } from '@/lib/mapPins';
+
+const QUICK_QUESTION_RESPONSES = [
+  'شفته بالقرب من المسجد 📍',
+  'الله يحفظه ويرده بالسلامة 🤲',
+  'أنا بالحي وأقدر أساعدكم بالبحث 🚗',
+  'تواصل معي بالخاص للتنسيق 💬',
+];
 
 export default function Question() {
   const bottomNavInset = useBottomNavInset();
@@ -63,11 +72,13 @@ export default function Question() {
     setCurrentUserId(user?.id ?? null);
     const questionPromise = user
       ? supabase.from('questions').select('*').eq('id', id).maybeSingle()
-      : getActiveLocation().then(location => supabase.rpc('hayna_guest_question', {
-          p_id: id,
-          p_city: location.city,
-          p_district: location.district,
-        }));
+      : getActiveLocation().then(location =>
+          supabase.rpc('hayna_guest_question', {
+            p_id: id,
+            p_city: location.city,
+            p_district: location.district,
+          })
+        );
     const [questionResult, b] = await Promise.all([
       questionPromise,
       supabase.from('answers').select('*').eq('question_id', id).order('created_at'),
@@ -75,6 +86,17 @@ export default function Question() {
     const question = Array.isArray(questionResult.data) ? questionResult.data[0] : questionResult.data;
 
     if (question) {
+      // Safely increment views_count
+      if (question.id && user) {
+        try {
+          supabase
+            .from('questions')
+            .update({ views_count: (question.views_count || 0) + 1 })
+            .eq('id', id)
+            .then(() => {});
+        } catch {}
+      }
+
       const userIds = [question.author_id, ...(b.data || []).map((ans: any) => ans.author_id)];
       const uniqueIds = Array.from(new Set(userIds.filter(Boolean)));
 
@@ -83,7 +105,9 @@ export default function Question() {
 
       question.profiles = profilesMap[question.author_id];
       if (b.data) {
-        b.data.forEach((ans: any) => { ans.profiles = profilesMap[ans.author_id]; });
+        b.data.forEach((ans: any) => {
+          ans.profiles = profilesMap[ans.author_id];
+        });
       }
     }
 
@@ -91,16 +115,26 @@ export default function Question() {
     const answerIds = (b.data || []).map((x: any) => x.id);
     let votes: any[] = [];
     if (answerIds.length) {
-      const { data: vd } = await supabase.from('answer_votes').select('answer_id,voter_id,vote').in('answer_id', answerIds);
+      const { data: vd } = await supabase
+        .from('answer_votes')
+        .select('answer_id,voter_id,vote')
+        .in('answer_id', answerIds);
       votes = vd || [];
     }
-    const voteMap = votes.reduce((m: any, v: any) => { (m[v.answer_id] ||= []).push(v); return m; }, {});
-    (b.data || []).forEach((ans: any) => { ans.votes = voteMap[ans.id] || []; });
+    const voteMap = votes.reduce((m: any, v: any) => {
+      (m[v.answer_id] ||= []).push(v);
+      return m;
+    }, {});
+    (b.data || []).forEach((ans: any) => {
+      ans.votes = voteMap[ans.id] || [];
+    });
     setAnswers(b.data ?? []);
     setLoading(false);
   }
 
-  useEffect(() => { load() }, [id]);
+  useEffect(() => {
+    load();
+  }, [id]);
 
   async function answer() {
     if (!body.trim()) return;
@@ -126,133 +160,126 @@ export default function Question() {
     if (error) {
       const code = error.message || '';
       const message =
-        code.includes('AUTH_REQUIRED') ? 'انتهت جلسة الدخول. سجّل الدخول مرة أخرى.' :
-        code.includes('QUESTION_CLOSED') ? 'تم إغلاق الردود على هذا الموضوع.' :
-        code.includes('INVALID_PARENT') ? 'التعليق الذي تحاول الرد عليه غير صالح.' :
-        code.includes('QUESTION_NOT_FOUND') ? 'الموضوع غير موجود.' :
-        code.includes('EMPTY_BODY') ? 'اكتب الرد أولاً.' :
-        'تعذر إرسال الرد الآن. حاول مرة أخرى.';
+        code.includes('AUTH_REQUIRED')
+          ? 'انتهت جلسة الدخول. سجّل الدخول مرة أخرى.'
+          : code.includes('QUESTION_CLOSED')
+          ? 'تم إغلاق الردود على هذا الموضوع.'
+          : code.includes('INVALID_PARENT')
+          ? 'التعليق الذي تحاول الرد عليه غير صالح.'
+          : code.includes('QUESTION_NOT_FOUND')
+          ? 'الموضوع غير موجود.'
+          : code.includes('EMPTY_BODY')
+          ? 'اكتب الرد أولاً.'
+          : 'تعذر إرسال الرد الآن. حاول مرة أخرى.';
       Alert.alert('لم يتم إرسال الرد', message);
       return;
     }
 
     setBody('');
     setReplyTo(null);
-    await load();
-    Alert.alert('تم الإرسال 🌟', 'تم نشر ردك بنجاح في نقاش الحي.');
+    load();
   }
 
-  async function voteAnswer(answerId: string, vote: number) {
-    if (!currentUserId) return requireAccount('سجّل الدخول أو أنشئ حساباً لتقييم الإجابات.');
-    if (voting) return;
-    const { data: sessionCheck } = await supabase.auth.getSession();
-    if (!sessionCheck.session) return Alert.alert('تسجيل الدخول مطلوب', 'سجّل الدخول حتى تتمكن من التصويت.');
-    setVoting(answerId + ':' + vote);
-    const existing = answers.find(a => a.id === answerId)?.votes?.find((v: any) => v.voter_id === currentUserId);
-    let error: any = null;
-    if (existing?.vote === vote) {
-      ({ error } = await supabase.from('answer_votes').delete().eq('answer_id', answerId).eq('voter_id', currentUserId));
-    } else if (existing) {
-      ({ error } = await supabase.from('answer_votes').update({ vote }).eq('answer_id', answerId).eq('voter_id', currentUserId));
-    } else {
-      ({ error } = await supabase.from('answer_votes').insert({ answer_id: answerId, voter_id: currentUserId, vote }));
+  async function voteAnswer(answerId: string, value: number) {
+    if (!currentUserId) {
+      return requireAccount('سجّل الدخول للتصويت على الإجابات.');
     }
-    setVoting(null);
-    if (error) Alert.alert('تعذر تسجيل التقييم', error.message);
-    else load();
+    if (voting) return;
+
+    setVoting(answerId);
+    try {
+      const existingVote = answers.find(a => a.id === answerId)?.votes?.find((v: any) => v.voter_id === currentUserId);
+      if (existingVote && existingVote.vote === value) {
+        await supabase.from('answer_votes').delete().eq('answer_id', answerId).eq('voter_id', currentUserId);
+      } else {
+        await supabase.from('answer_votes').upsert({
+          answer_id: answerId,
+          voter_id: currentUserId,
+          vote: value,
+        });
+      }
+      load();
+    } catch {
+      // Ignored
+    } finally {
+      setVoting(null);
+    }
   }
 
   async function chooseBest(answerId: string) {
-    if (!currentUserId) return Alert.alert('تسجيل الدخول مطلوب', 'سجّل الدخول أولاً.');
-    if (currentUserId !== q.author_id) return Alert.alert('غير مسموح', 'اعتماد الإجابة متاح لصاحب السؤال فقط.');
-    const ok = await new Promise<boolean>(resolve => Alert.alert('اختيار أفضل إجابة ⭐', 'سيتم اعتماد هذا الرد كأفضل إجابة في الحي، ومكافأة الجار بـ +10 نقاط سمعة ⭐ وإغلاق السؤال.', [
-      { text: 'إلغاء', style: 'cancel', onPress: () => resolve(false) },
-      { text: 'اعتماد ومكافأة ⭐', style: 'default', onPress: () => resolve(true) },
-    ]));
-    if (!ok) return;
+    if (!currentUserId || currentUserId !== q.author_id) return;
 
     try {
-      const { data: rpcRes, error: rpcErr } = await supabase.rpc('award_best_answer', {
-        p_question_id: id,
-        p_answer_id: answerId,
-      });
+      let updated: any = null;
+      let updateErr: any = null;
 
-      if (rpcErr) {
-        // Fallback: direct update + reputation + notification
-        let updated: any = null;
-        let updateErr: any = null;
+      const resSolved = await supabase
+        .from('questions')
+        .update({ best_answer_id: answerId, status: 'solved', solved_at: new Date().toISOString() })
+        .eq('id', id)
+        .eq('author_id', currentUserId)
+        .select('id, best_answer_id, status')
+        .maybeSingle();
 
-        // Try 'solved' status first
-        const resSolved = await supabase
+      if (!resSolved.error) {
+        updated = resSolved.data;
+      } else {
+        const resClosed = await supabase
           .from('questions')
-          .update({ best_answer_id: answerId, status: 'solved', solved_at: new Date().toISOString() })
+          .update({ best_answer_id: answerId, status: 'closed', solved_at: new Date().toISOString() })
           .eq('id', id)
           .eq('author_id', currentUserId)
           .select('id, best_answer_id, status')
           .maybeSingle();
 
-        if (!resSolved.error) {
-          updated = resSolved.data;
+        if (!resClosed.error) {
+          updated = resClosed.data;
         } else {
-          // If check constraint violates 'solved', try 'closed'
-          const resClosed = await supabase
+          const resMinimal = await supabase
             .from('questions')
-            .update({ best_answer_id: answerId, status: 'closed', solved_at: new Date().toISOString() })
+            .update({ best_answer_id: answerId, solved_at: new Date().toISOString() })
             .eq('id', id)
             .eq('author_id', currentUserId)
             .select('id, best_answer_id, status')
             .maybeSingle();
 
-          if (!resClosed.error) {
-            updated = resClosed.data;
+          if (!resMinimal.error) {
+            updated = resMinimal.data;
           } else {
-            // If status check fails both, update only best_answer_id and solved_at
-            const resMinimal = await supabase
-              .from('questions')
-              .update({ best_answer_id: answerId, solved_at: new Date().toISOString() })
-              .eq('id', id)
-              .eq('author_id', currentUserId)
-              .select('id, best_answer_id, status')
-              .maybeSingle();
-
-            if (!resMinimal.error) {
-              updated = resMinimal.data;
-            } else {
-              updateErr = resMinimal.error;
-            }
+            updateErr = resMinimal.error;
           }
         }
+      }
 
-        if (updateErr) throw updateErr;
-        if (!updated) return Alert.alert('تعذر الاعتماد', 'لم يتم تعديل السؤال. تأكد أنك صاحب السؤال.');
+      if (updateErr) throw updateErr;
+      if (!updated) return Alert.alert('تعذر الاعتماد', 'لم يتم تعديل السؤال. تأكد أنك صاحب السؤال.');
 
-        const targetAns = answers.find(x => x.id === answerId);
-        if (targetAns?.author_id && targetAns.author_id !== currentUserId) {
-          try {
-            const { data: curRep } = await supabase
-              .from('reputation')
-              .select('points')
-              .eq('user_id', targetAns.author_id)
-              .maybeSingle();
-            const nextPts = (curRep?.points || 0) + 10;
-            await supabase.from('reputation').upsert({
-              user_id: targetAns.author_id,
-              points: nextPts,
-              updated_at: new Date().toISOString(),
-            });
-          } catch {}
+      const targetAns = answers.find(x => x.id === answerId);
+      if (targetAns?.author_id && targetAns.author_id !== currentUserId) {
+        try {
+          const { data: curRep } = await supabase
+            .from('reputation')
+            .select('points')
+            .eq('user_id', targetAns.author_id)
+            .maybeSingle();
+          const nextPts = (curRep?.points || 0) + 10;
+          await supabase.from('reputation').upsert({
+            user_id: targetAns.author_id,
+            points: nextPts,
+            updated_at: new Date().toISOString(),
+          });
+        } catch {}
 
-          try {
-            await supabase.from('notifications').insert({
-              user_id: targetAns.author_id,
-              type: 'answer',
-              title: '🌟 تم اعتماد ردك كأفضل إجابة!',
-              body: `اعتمد جارك ردك كأفضل إجابة على: «${(q.title || '').slice(0, 40)}» (+10 نقاط سمعة ⭐)`,
-              target_type: 'question',
-              target_id: id,
-            });
-          } catch {}
-        }
+        try {
+          await supabase.from('notifications').insert({
+            user_id: targetAns.author_id,
+            type: 'answer',
+            title: '🌟 تم اعتماد ردك كأفضل إجابة!',
+            body: `اعتمد جارك ردك كأفضل إجابة على: «${(q.title || '').slice(0, 40)}» (+10 نقاط سمعة ⭐)`,
+            target_type: 'question',
+            target_id: id,
+          });
+        } catch {}
       }
 
       Alert.alert('تم اعتماد الإجابة بنجاح! 🌟', 'تمت إضافة +10 نقاط سمعة لحساب الجار تقديراً لإفادته أهل الحي.');
@@ -262,13 +289,11 @@ export default function Question() {
     }
   }
 
-  /** Sends the exact location straight into a private chat with one neighbour. */
-  async function shareLocationPrivately(targetUserId: string, targetName: string) {
+  async function shareLocationPrivately(targetUserId: string, _targetName: string) {
     if (!currentUserId || sharingWith) return;
 
     setSharingWith(targetUserId);
     try {
-      // 1. Resilient location detection: GPS first, active location fallback
       let locLat = 24.7136;
       let locLng = 46.6753;
       let label = 'موقعي في الحي';
@@ -279,120 +304,45 @@ export default function Question() {
         locLng = deviceLoc.longitude;
         const place = await reverseGeocodeDeviceLocation(deviceLoc);
         label = place?.district ? `حي ${place.district}` : place?.city || 'موقعي الحالي';
-      } else {
-        // Fallback to active neighborhood from locationSync
-        const activeLocation = await getActiveLocation();
-        if (activeLocation && activeLocation.city && activeLocation.city !== 'كل المدن') {
-          label = activeLocation.district && activeLocation.district !== 'كل الأحياء'
-            ? `حي ${activeLocation.district}`
-            : activeLocation.city;
-        }
       }
 
-      // 2. Resilient conversation resolution (Lookup -> RPC -> Fallback Creation)
       let finalConvId: string | null = null;
-
-      // Step A: Check existing direct conversation via conversation_members
       try {
-        const { data: myMemberships } = await supabase
-          .from('conversation_members')
-          .select('conversation_id')
-          .eq('user_id', currentUserId);
-
-        if (myMemberships && myMemberships.length > 0) {
-          const myConvIds = myMemberships.map((m: any) => m.conversation_id);
-          const { data: partnerMatch } = await supabase
-            .from('conversation_members')
-            .select('conversation_id')
-            .in('conversation_id', myConvIds)
-            .eq('user_id', targetUserId)
-            .limit(1)
-            .maybeSingle();
-
-          if (partnerMatch?.conversation_id) {
-            finalConvId = partnerMatch.conversation_id;
-          }
-        }
+        const { data: rpcConvId } = await supabase.rpc('hayna_get_or_create_direct_conversation', {
+          p_target: targetUserId,
+        });
+        if (rpcConvId) finalConvId = rpcConvId;
       } catch {}
 
-      // Step B: Try RPC if not found
-      if (!finalConvId) {
-        try {
-          const { data: rpcConvId, error: convError } = await supabase.rpc(
-            'hayna_get_or_create_direct_conversation',
-            { p_target: targetUserId },
-          );
-          if (!convError && rpcConvId) {
-            finalConvId = rpcConvId;
-          }
-        } catch {}
-      }
-
-      // Step C: Create new conversation directly (permissive fallback)
-      if (!finalConvId) {
-        try {
-          let convRes = await supabase.from('conversations').insert({}).select('id').single();
-          if (convRes.error) {
-            convRes = await supabase.from('conversations').insert({ created_by: currentUserId }).select('id').single();
-          }
-
-          if (convRes.data?.id) {
-            finalConvId = convRes.data.id;
-            await supabase.from('conversation_members').insert([
-              { conversation_id: finalConvId, user_id: currentUserId },
-              { conversation_id: finalConvId, user_id: targetUserId },
-            ]);
-          }
-        } catch {}
-      }
-
-      if (!finalConvId) {
-        throw new Error('تعذّر فتح المحادثة الخاصة حالياً. يرجى المحاولة لاحقاً.');
-      }
-
-      // Step D: Insert location message
-      const locationPayload = {
-        type: 'location',
-        lat: locLat,
-        lng: locLng,
-        label,
-        note: `مشاركة إحداثيات الموقع بخصوص سؤال: «${(q.title || '').slice(0, 45)}»`,
-      };
-
-      const { error: msgErr } = await supabase.from('messages').insert({
-        conversation_id: finalConvId,
-        sender_id: currentUserId,
-        body: JSON.stringify(locationPayload),
-        read_by: [currentUserId],
-      });
-
-      if (msgErr) {
-        // Fallback without read_by column if not present in schema
-        const retry = await supabase.from('messages').insert({
+      if (finalConvId) {
+        await supabase.from('messages').insert({
           conversation_id: finalConvId,
           sender_id: currentUserId,
-          body: JSON.stringify(locationPayload),
+          body: JSON.stringify({ type: 'location', lat: locLat, lng: locLng, label }),
+          read_by: [currentUserId],
         });
-        if (retry.error) throw retry.error;
+        router.push({ pathname: '/conversation', params: { id: finalConvId } });
       }
-
-      Alert.alert('تم إرسال الموقع بنجاح! 📍', `تمت مشاركة موقعك (${label}) بالخاص مع ${targetName}.`);
-      router.push({ pathname: '/conversation', params: { id: finalConvId } });
-    } catch (e: any) {
-      Alert.alert('تعذّر إرسال الموقع', e?.message || `تعذّر إرسال موقعك إلى ${targetName}.`);
+    } catch {
+      Alert.alert('تنبيه', 'تعذر إرسال الموقع بالخاص حالياً.');
     } finally {
       setSharingWith(null);
     }
   }
 
   const handleShare = async () => {
-    try {
-      await Share.share({
-        message: `استفسار في حيّنا: «${q?.title}»\nشارك برأيك أو إجابتك لجيرانك.`,
-      });
-    } catch {
-      // Ignored
+    const shareUrl = typeof window !== 'undefined' ? window.location.href : `https://hayna.app/question?id=${id}`;
+    const shareText = `استفسار في حيّنا: «${q?.title}»\n${shareUrl}`;
+    if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
+      try {
+        await navigator.clipboard.writeText(shareText);
+        Alert.alert('تم نسخ الرابط 📋', 'تم نسخ رابط السؤال لمشاركته في مجموعات الحي.');
+        return;
+      } catch {}
     }
+    try {
+      await Share.share({ message: shareText, url: shareUrl, title: q?.title });
+    } catch {}
   };
 
   if (loading) {
@@ -415,71 +365,57 @@ export default function Question() {
     );
   }
 
-  const authorName = q.profiles?.hide_name ? 'مستخدم مجهول' : (q.profiles?.display_name || q.profiles?.username || 'أحد سكان الحي');
+  const authorName = q.profiles?.hide_name
+    ? 'مستخدم مجهول'
+    : q.profiles?.display_name || q.profiles?.username || 'أحد سكان الحي';
   const isAuthor = currentUserId === q.author_id;
   const isSolved = q.status === 'solved' || q.status === 'closed' || Boolean(q.best_answer_id);
+  const locationLabel = areaLabel({ district: q.district, city: q.city });
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.container}>
-      {/* Unified Luxury Header */}
-      <LinearGradient
-        colors={['#064e3b', '#065f46', '#047857']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.hero}
+      <AppHeader
+        variant="sub"
+        title="استفسار ونقاش الحي"
+        subtitle={locationLabel}
+        fallbackRoute="/questions"
+        rightAction={
+          <Pressable
+            onPress={handleShare}
+            style={styles.headerShareBtn}
+            accessibilityRole="button"
+            accessibilityLabel="مشاركة السؤال"
+          >
+            <Share2 size={16} color="#059669" />
+          </Pressable>
+        }
+      />
+
+      <ScrollView
+        contentContainerStyle={[styles.scroll, { paddingBottom: bottomNavInset + 100 }]}
+        showsVerticalScrollIndicator={false}
       >
-        <ScreenHeader
-          title="استفسار ونقاش الحي 💬"
-          subtitle="مجتمع حيّنا • تواصل الجيران"
-          fallbackRoute="/home"
-          rightAction={
-            <Pressable
-              onPress={handleShare}
-              style={styles.headerShareBtn}
-              accessibilityRole="button"
-              accessibilityLabel="مشاركة السؤال"
-            >
-              <Share2 size={18} color="#ffffff" />
-            </Pressable>
-          }
-        />
-      </LinearGradient>
-
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {/* Main Question Card */}
+        {/* Main Question Luxury Card */}
         <View style={styles.questionCard}>
-          {/* Header Row: Author info and status badge */}
-          <View style={styles.qHeader}>
-            <View style={styles.authorSection}>
-              {q.profiles?.avatar_url ? (
-                <Image source={{ uri: q.profiles.avatar_url }} style={styles.authorAvatarImg} />
-              ) : (
-                <View style={styles.authorAvatarPlaceholder}>
-                  <Text style={styles.authorAvatarLetter}>{authorName[0] || 'ح'}</Text>
-                </View>
-              )}
-              <View style={styles.authorInfoTexts}>
-                <Pressable onPress={() => q.author_id && router.push({ pathname: '/user', params: { id: q.author_id } })}>
-                  <View style={styles.authorNameRow}>
-                    <Text style={styles.authorName}>{authorName}</Text>
-                    {q.profiles?.is_geoverified && <ShieldCheck size={12} color="#10b981" />}
-                  </View>
-                </Pressable>
-                <View style={styles.metaRow}>
-                  <MapPin size={11} color="#059669" />
-                  <Text style={styles.metaText}>{areaLabel({ district: q.district, city: q.city })}</Text>
-                  {Boolean(q.created_at) && (
-                    <Text style={styles.metaTimeText}>· {relativeTime(q.created_at)}</Text>
-                  )}
-                </View>
+          {/* Top Badges Row */}
+          <View style={styles.topBadgesRow}>
+            {q.is_emergency && (
+              <View style={styles.emergencyBadge}>
+                <Flame size={12} color="#dc2626" />
+                <Text style={styles.emergencyBadgeText}>تنبيه عاجل بالحي 🚨</Text>
               </View>
-            </View>
+            )}
 
-            {/* Status Badge */}
+            {q.category && (
+              <View style={styles.categoryPill}>
+                <Text style={styles.categoryPillText}>{q.category}</Text>
+              </View>
+            )}
+
             {isSolved ? (
               <View style={styles.solvedBadge}>
-                <CheckCircle2 size={12} color="#166534" />
-                <Text style={styles.solvedBadgeText}>تم الحل</Text>
+                <CheckCircle2 size={12} color="#15803d" />
+                <Text style={styles.solvedBadgeText}>تم الحل والاعتماد ✓</Text>
               </View>
             ) : (
               <View style={styles.openBadge}>
@@ -489,24 +425,74 @@ export default function Question() {
             )}
           </View>
 
-          {/* Question Title */}
+          {/* Title */}
           <Text style={styles.qTitle}>{q.title}</Text>
 
-          {/* Question Body */}
+          {/* Body Content */}
           {Boolean(q.body) && (
             <View style={styles.qBodyContainer}>
               <Text style={styles.qBody}>{q.body}</Text>
             </View>
           )}
 
-          {/* Privacy & Safety Note */}
+          {/* Author and Meta Row */}
+          <View style={styles.authorSection}>
+            <Pressable
+              style={styles.authorTouchRow}
+              onPress={() => q.author_id && router.push({ pathname: '/user', params: { id: q.author_id } })}
+            >
+              {q.profiles?.avatar_url ? (
+                <Image source={{ uri: q.profiles.avatar_url }} style={styles.authorAvatarImg} />
+              ) : (
+                <View style={styles.authorAvatarPlaceholder}>
+                  <Text style={styles.authorAvatarLetter}>{(authorName[0] || 'ج').toUpperCase()}</Text>
+                </View>
+              )}
+              <View style={styles.authorInfoTexts}>
+                <View style={styles.authorNameRow}>
+                  <Text style={styles.authorName}>{authorName}</Text>
+                  {q.profiles?.is_geoverified && <ShieldCheck size={12} color="#10b981" />}
+                </View>
+                <View style={styles.metaRow}>
+                  <MapPin size={11} color="#059669" />
+                  <Text style={styles.metaText}>{locationLabel}</Text>
+                  {Boolean(q.created_at) && (
+                    <Text style={styles.metaTimeText}>· {relativeTime(q.created_at)}</Text>
+                  )}
+                  {q.views_count != null && (
+                    <Text style={styles.metaTimeText}>· {q.views_count} مشاهدة</Text>
+                  )}
+                </View>
+              </View>
+            </Pressable>
+          </View>
+
+          {/* Privacy Note */}
           <View style={styles.privacyNote}>
             <Info size={13} color="#059669" />
             <Text style={styles.privacyNoteText}>
-              موقع تقريبي لحماية الخصوصية. يمكنك مشاركة موقعك الدقيق بالخاص مع الجار المناسب.
+              الموقع معروض على مستوى الحي لحماية الخصوصية. يمكنك إرسال موقعك الدقيق بالخاص عند الحاجة.
             </Text>
           </View>
         </View>
+
+        {/* Quick Suggested Responses Pills */}
+        {!isSolved && currentUserId && (
+          <View style={styles.quickPillsSection}>
+            <Text style={styles.quickPillsTitle}>ردود واقتراحات سريعة بنقرة واحدة:</Text>
+            <View style={styles.quickPillsWrap}>
+              {QUICK_QUESTION_RESPONSES.map((resp, idx) => (
+                <Pressable
+                  key={idx}
+                  style={styles.quickResponsePill}
+                  onPress={() => setBody(resp)}
+                >
+                  <Text style={styles.quickResponseText}>{resp}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        )}
 
         {/* Answers / Discussion Section */}
         <View style={styles.answersSection}>
@@ -529,7 +515,9 @@ export default function Question() {
           ) : (
             answers.map(a => {
               const isBest = q.best_answer_id === a.id;
-              const ansAuthorName = a.profiles?.hide_name ? 'مستخدم مجهول' : (a.profiles?.display_name || a.profiles?.username || 'أحد الجيران');
+              const ansAuthorName = a.profiles?.hide_name
+                ? 'مستخدم مجهول'
+                : a.profiles?.display_name || a.profiles?.username || 'أحد الجيران';
               const upvotesCount = a.votes?.filter((v: any) => v.vote === 1).length || 0;
               const downvotesCount = a.votes?.filter((v: any) => v.vote === -1).length || 0;
               const myVote = a.votes?.find((v: any) => v.voter_id === currentUserId)?.vote;
@@ -542,31 +530,34 @@ export default function Question() {
                   {isBest && (
                     <View style={styles.bestBanner}>
                       <Award size={15} color="#166534" />
-                      <Text style={styles.bestBannerText}>الإجابة المعتمدة من صاحب السؤال ⭐</Text>
+                      <Text style={styles.bestBannerText}>الإجابة المعتمدة من صاحب السؤال ⭐ (+10 نقاط)</Text>
                     </View>
                   )}
 
                   <View style={styles.answerHeader}>
-                    <View style={styles.answerAvatarWrap}>
-                      {a.profiles?.avatar_url ? (
-                        <Image source={{ uri: a.profiles.avatar_url }} style={styles.answerAvatarImg} />
-                      ) : (
-                        <View style={styles.answerAvatarPlaceholder}>
-                          <Text style={styles.answerAvatarLetter}>{ansAuthorName[0] || 'ح'}</Text>
-                        </View>
-                      )}
-                    </View>
-                    <View style={styles.answerMeta}>
-                      <Pressable onPress={() => a.author_id && router.push({ pathname: '/user', params: { id: a.author_id } })}>
+                    <Pressable
+                      style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 10, flex: 1 }}
+                      onPress={() => a.author_id && router.push({ pathname: '/user', params: { id: a.author_id } })}
+                    >
+                      <View style={styles.answerAvatarWrap}>
+                        {a.profiles?.avatar_url ? (
+                          <Image source={{ uri: a.profiles.avatar_url }} style={styles.answerAvatarImg} />
+                        ) : (
+                          <View style={styles.answerAvatarPlaceholder}>
+                            <Text style={styles.answerAvatarLetter}>{(ansAuthorName[0] || 'ح').toUpperCase()}</Text>
+                          </View>
+                        )}
+                      </View>
+                      <View style={styles.answerMeta}>
                         <View style={styles.authorNameRow}>
                           <Text style={styles.answerAuthor}>{ansAuthorName}</Text>
                           {a.profiles?.is_geoverified && <ShieldCheck size={11} color="#10b981" />}
                         </View>
-                      </Pressable>
-                      <Text style={styles.dateTextSmall}>
-                        {a.created_at ? relativeTime(a.created_at) : ''}
-                      </Text>
-                    </View>
+                        <Text style={styles.dateTextSmall}>
+                          {a.created_at ? relativeTime(a.created_at) : ''}
+                        </Text>
+                      </View>
+                    </Pressable>
                   </View>
 
                   {a.parent_answer_id && (
@@ -582,7 +573,9 @@ export default function Question() {
                   <View style={styles.answerActions}>
                     <View style={styles.actionsRightGroup}>
                       <Pressable
-                        onPress={() => (currentUserId ? setReplyTo(a) : requireAccount('سجّل الدخول للرد على التعليقات.'))}
+                        onPress={() =>
+                          currentUserId ? setReplyTo(a) : requireAccount('سجّل الدخول للرد على التعليقات.')
+                        }
                         style={styles.replyBtn}
                       >
                         <Reply size={13} color="#475569" />
@@ -613,8 +606,8 @@ export default function Question() {
                     {/* Best Answer Button for question owner */}
                     {isAuthor && !isSolved && (
                       <Pressable onPress={() => chooseBest(a.id)} style={styles.bestBtn}>
-                        <Check size={14} color="#fff" />
-                        <Text style={styles.bestBtnText}>اعتماد</Text>
+                        <Check size={13} color="#fff" />
+                        <Text style={styles.bestBtnText}>اعتماد كأفضل إجابة</Text>
                       </Pressable>
                     )}
 
@@ -628,7 +621,7 @@ export default function Question() {
                         {sharingWith === a.author_id ? (
                           <ActivityIndicator size="small" color="#0f766e" />
                         ) : (
-                          <MapPin size={13} color="#0f766e" />
+                          <MapPin size={12} color="#0f766e" />
                         )}
                         <Text style={styles.shareLocationBtnText}>موقعي (خاص)</Text>
                       </Pressable>
@@ -639,8 +632,6 @@ export default function Question() {
             })
           )}
         </View>
-
-        <View style={{ height: 120 }} />
       </ScrollView>
 
       {/* Bottom Input Area */}
@@ -653,7 +644,7 @@ export default function Question() {
           <MessageCircle size={18} color="#047857" />
         </Pressable>
       ) : (
-        <View style={[styles.inputWrapper, { paddingBottom: Platform.OS === 'ios' ? 26 : 14 }]}>
+        <View style={[styles.inputWrapper, { paddingBottom: Math.max(bottomNavInset, 12) }]}>
           {replyTo && (
             <View style={styles.replyingBar}>
               <Reply size={14} color="#059669" />
@@ -679,7 +670,7 @@ export default function Question() {
                 value={body}
                 onChangeText={setBody}
                 placeholder="اكتب ردك ومشاركتك هنا..."
-                placeholderTextColor="#9ca3af"
+                placeholderTextColor="#94a3b8"
                 maxLength={500}
               />
               <Pressable
@@ -708,11 +699,21 @@ export default function Question() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f6f8f7',
+    backgroundColor: '#f8fafc',
+  },
+  headerShareBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#ecfdf5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: '#f6f8f7',
+    backgroundColor: '#f8fafc',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
@@ -724,7 +725,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   errorText: {
-    fontSize: 17,
+    fontSize: 16,
     color: '#475569',
     marginBottom: 16,
     fontWeight: '800',
@@ -740,50 +741,126 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     fontSize: 14,
   },
-  hero: {
-    paddingTop: Platform.OS === 'ios' ? 52 : 36,
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
-  },
-  headerShareBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: 'rgba(255,255,255,0.14)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-  },
   scroll: {
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    gap: 12,
   },
   questionCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 24,
-    padding: 20,
+    borderRadius: 20,
+    padding: 16,
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
-    shadowRadius: 10,
+    shadowRadius: 6,
     elevation: 2,
-    marginBottom: 20,
+    gap: 12,
   },
-  qHeader: {
+  topBadgesRow: {
     flexDirection: 'row-reverse',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 8,
   },
-  authorSection: {
+  emergencyBadge: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    gap: 12,
-    flex: 1,
+    gap: 4,
+    backgroundColor: '#fee2e2',
+    paddingHorizontal: 10,
+    paddingVertical: 4.5,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#fca5a5',
+  },
+  emergencyBadgeText: {
+    color: '#dc2626',
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  categoryPill: {
+    backgroundColor: '#eff6ff',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+  },
+  categoryPillText: {
+    color: '#2563eb',
+    fontSize: 11.5,
+    fontWeight: '800',
+  },
+  openBadge: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#ecfdf5',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+  },
+  openDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#10b981',
+  },
+  openBadgeText: {
+    color: '#047857',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  solvedBadge: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#dcfce7',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#86efac',
+  },
+  solvedBadgeText: {
+    color: '#15803d',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  qTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#0f172a',
+    textAlign: 'right',
+    lineHeight: 26,
+  },
+  qBodyContainer: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  qBody: {
+    fontSize: 14,
+    lineHeight: 22,
+    color: '#334155',
+    textAlign: 'right',
+  },
+  authorSection: {
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+  },
+  authorTouchRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 10,
   },
   authorAvatarImg: {
     width: 44,
@@ -803,13 +880,13 @@ const styles = StyleSheet.create({
     borderColor: '#a7f3d0',
   },
   authorAvatarLetter: {
-    color: '#065f46',
+    color: '#059669',
     fontSize: 18,
     fontWeight: '900',
   },
   authorInfoTexts: {
-    alignItems: 'flex-end',
     flex: 1,
+    alignItems: 'flex-end',
   },
   authorNameRow: {
     flexDirection: 'row-reverse',
@@ -817,116 +894,84 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   authorName: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '900',
     color: '#0f172a',
-    textAlign: 'right',
   },
   metaRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 4,
-    marginTop: 3,
+    marginTop: 2,
   },
   metaText: {
     fontSize: 11.5,
-    color: '#64748b',
     fontWeight: '700',
+    color: '#475569',
   },
   metaTimeText: {
     fontSize: 11,
-    color: '#94a3b8',
     fontWeight: '600',
-  },
-  solvedBadge: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#dcfce7',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#86efac',
-  },
-  solvedBadgeText: {
-    color: '#166534',
-    fontSize: 11,
-    fontWeight: '900',
-  },
-  openBadge: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: '#ecfdf5',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#a7f3d0',
-  },
-  openDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#10b981',
-  },
-  openBadgeText: {
-    color: '#047857',
-    fontSize: 11,
-    fontWeight: '900',
-  },
-  qTitle: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#0f172a',
-    textAlign: 'right',
-    lineHeight: 26,
-    marginBottom: 12,
-  },
-  qBodyContainer: {
-    backgroundColor: '#f8fafc',
-    padding: 16,
-    borderRadius: 18,
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  qBody: {
-    fontSize: 14.5,
-    lineHeight: 24,
-    color: '#334155',
-    textAlign: 'right',
-    fontWeight: '500',
+    color: '#94a3b8',
   },
   privacyNote: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    gap: 7,
+    gap: 6,
     backgroundColor: '#f0fdf4',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
+    padding: 9,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: '#bbf7d0',
   },
   privacyNoteText: {
     flex: 1,
     fontSize: 11,
-    color: '#065f46',
+    color: '#15803d',
     fontWeight: '700',
     textAlign: 'right',
     lineHeight: 16,
   },
+  quickPillsSection: {
+    gap: 8,
+  },
+  quickPillsTitle: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: '#475569',
+    textAlign: 'right',
+  },
+  quickPillsWrap: {
+    flexDirection: 'row-reverse',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  quickResponsePill: {
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.02,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  quickResponseText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#334155',
+  },
   answersSection: {
-    marginTop: 4,
+    gap: 10,
   },
   answersHeader: {
     flexDirection: 'row-reverse',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 14,
-    paddingHorizontal: 4,
+    justifyContent: 'space-between',
+    paddingHorizontal: 2,
   },
   answersHeaderLeft: {
     flexDirection: 'row-reverse',
@@ -934,95 +979,95 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   answersCountBadge: {
-    backgroundColor: '#059669',
-    color: '#fff',
-    fontSize: 12,
+    backgroundColor: '#ecfdf5',
+    color: '#047857',
+    fontSize: 11.5,
     fontWeight: '900',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 10,
-    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
   },
   answersTitle: {
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: '900',
     color: '#0f172a',
   },
   answersSubtitle: {
     fontSize: 12,
     color: '#64748b',
-    fontWeight: '700',
+    fontWeight: '600',
   },
   emptyState: {
-    alignItems: 'center',
-    paddingVertical: 36,
     backgroundColor: '#ffffff',
-    borderRadius: 24,
+    borderRadius: 18,
+    padding: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    borderStyle: 'dashed',
-    gap: 8,
+    gap: 6,
   },
   emptyStateTitle: {
     fontSize: 15,
-    color: '#0f172a',
     fontWeight: '900',
+    color: '#0f172a',
     marginTop: 4,
   },
   emptyStateText: {
     fontSize: 12.5,
     color: '#64748b',
-    fontWeight: '700',
+    fontWeight: '600',
     textAlign: 'center',
   },
   answerCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: 18,
+    padding: 14,
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    shadowColor: '#000',
+    gap: 10,
+    shadowColor: '#0f172a',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 6,
-    elevation: 2,
+    shadowOpacity: 0.02,
+    shadowRadius: 4,
+    elevation: 1,
   },
   bestAnswerCard: {
     borderColor: '#86efac',
-    borderWidth: 2,
     backgroundColor: '#f0fdf4',
   },
   bestBanner: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 12,
     backgroundColor: '#dcfce7',
     paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
+    paddingVertical: 5,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: '#86efac',
-    alignSelf: 'flex-start',
   },
   bestBannerText: {
-    color: '#166534',
     fontSize: 11.5,
     fontWeight: '900',
+    color: '#166534',
   },
   answerHeader: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    marginBottom: 12,
+    justifyContent: 'space-between',
   },
   answerAvatarWrap: {
-    marginLeft: 12,
+    position: 'relative',
   },
   answerAvatarImg: {
     width: 38,
     height: 38,
     borderRadius: 19,
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
   },
   answerAvatarPlaceholder: {
     width: 38,
@@ -1031,60 +1076,58 @@ const styles = StyleSheet.create({
     backgroundColor: '#ecfdf5',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#a7f3d0',
   },
   answerAvatarLetter: {
-    color: '#047857',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '900',
+    color: '#059669',
   },
   answerMeta: {
     alignItems: 'flex-end',
     flex: 1,
   },
   answerAuthor: {
-    fontSize: 14,
+    fontSize: 13.5,
     fontWeight: '900',
     color: '#0f172a',
-    textAlign: 'right',
   },
   dateTextSmall: {
     fontSize: 11,
     color: '#94a3b8',
     fontWeight: '600',
-    marginTop: 2,
+    marginTop: 1,
   },
   replyToPill: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 4,
-    alignSelf: 'flex-start',
-    marginBottom: 8,
+    backgroundColor: '#f1f5f9',
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 3,
     borderRadius: 8,
-    backgroundColor: '#ecfdf5',
+    alignSelf: 'flex-end',
   },
   replyToText: {
-    color: '#047857',
-    fontSize: 10.5,
-    fontWeight: '800',
+    fontSize: 11,
+    color: '#64748b',
+    fontWeight: '700',
   },
   answerBody: {
-    fontSize: 14,
-    lineHeight: 23,
+    fontSize: 13.5,
+    lineHeight: 22,
     color: '#334155',
     textAlign: 'right',
-    fontWeight: '500',
-    marginBottom: 14,
   },
   answerActions: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: '#f1f5f9',
-    gap: 6,
+    paddingTop: 10,
+    gap: 8,
   },
   actionsRightGroup: {
     flexDirection: 'row-reverse',
@@ -1095,39 +1138,41 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 4,
+    backgroundColor: '#f8fafc',
     paddingHorizontal: 9,
-    paddingVertical: 6,
-    borderRadius: 10,
-    backgroundColor: '#f1f5f9',
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
   replyBtnText: {
-    color: '#475569',
     fontSize: 11.5,
     fontWeight: '800',
+    color: '#475569',
   },
   voteBtn: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    borderRadius: 10,
     backgroundColor: '#f8fafc',
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: '#e2e8f0',
   },
   voteActive: {
-    backgroundColor: '#dcfce7',
-    borderColor: '#86efac',
+    backgroundColor: '#ecfdf5',
+    borderColor: '#a7f3d0',
   },
   voteDownActive: {
-    backgroundColor: '#fee2e2',
-    borderColor: '#fca5a5',
+    backgroundColor: '#fef2f2',
+    borderColor: '#fecaca',
   },
   voteText: {
-    color: '#64748b',
     fontSize: 11.5,
     fontWeight: '800',
+    color: '#64748b',
   },
   voteTextActive: {
     color: '#059669',
@@ -1142,43 +1187,43 @@ const styles = StyleSheet.create({
     backgroundColor: '#059669',
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 10,
+    borderRadius: 8,
   },
   bestBtnText: {
-    color: '#ffffff',
-    fontSize: 11.5,
+    fontSize: 11,
     fontWeight: '900',
+    color: '#ffffff',
   },
   shareLocationBtn: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#ccfbf1',
-    borderWidth: 1,
-    borderColor: '#5eead4',
-    borderRadius: 10,
+    backgroundColor: '#f0fdfa',
     paddingHorizontal: 8,
-    paddingVertical: 6,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#99f6e4',
   },
   shareLocationBtnText: {
-    color: '#0f766e',
     fontSize: 11,
     fontWeight: '800',
+    color: '#0f766e',
   },
   guestPrompt: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingTop: 14,
     backgroundColor: '#ecfdf5',
+    padding: 14,
     borderTopWidth: 1,
-    borderColor: '#d1fae5',
+    borderTopColor: '#a7f3d0',
   },
   guestPromptText: {
-    color: '#047857',
     fontSize: 13,
     fontWeight: '900',
+    color: '#047857',
   },
   inputWrapper: {
     backgroundColor: '#ffffff',
@@ -1190,76 +1235,73 @@ const styles = StyleSheet.create({
   replyingBar: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 8,
+    justifyContent: 'space-between',
+    backgroundColor: '#ecfdf5',
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 10,
-    backgroundColor: '#ecfdf5',
+    marginBottom: 8,
   },
   replyingText: {
-    flex: 1,
-    color: '#047857',
-    fontSize: 12,
-    fontWeight: '800',
-    textAlign: 'right',
-  },
-  cancelReply: {
-    color: '#64748b',
     fontSize: 11.5,
     fontWeight: '800',
+    color: '#059669',
+    flex: 1,
+    textAlign: 'right',
+    marginRight: 6,
+  },
+  cancelReply: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#ef4444',
   },
   closedNotice: {
     flexDirection: 'row-reverse',
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
-    paddingVertical: 10,
+    backgroundColor: '#f1f5f9',
+    paddingVertical: 12,
+    borderRadius: 14,
   },
   closedNoticeText: {
-    color: '#64748b',
     fontSize: 12.5,
     fontWeight: '800',
+    color: '#64748b',
   },
   inputContainer: {
     flexDirection: 'row-reverse',
-    alignItems: 'flex-end',
-    backgroundColor: '#f8fafc',
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    gap: 6,
+    alignItems: 'center',
+    gap: 8,
   },
   input: {
     flex: 1,
-    minHeight: 40,
-    maxHeight: 110,
-    textAlign: 'right',
-    paddingHorizontal: 12,
-    paddingTop: 10,
-    paddingBottom: 10,
-    fontSize: 14,
+    backgroundColor: '#f8fafc',
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 13.5,
     color: '#0f172a',
-    fontWeight: '500',
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    textAlign: 'right',
+    maxHeight: 90,
   },
   sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: '#059669',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#059669',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.2,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 2,
   },
   sendButtonDisabled: {
-    backgroundColor: '#cbd5e1',
-    shadowOpacity: 0,
-    elevation: 0,
+    backgroundColor: '#94a3b8',
+    opacity: 0.6,
   },
 });

@@ -23,7 +23,7 @@ import {
   HeartHandshake,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import ScreenHeader from '@/components/shared/ScreenHeader';
+import { AppHeader } from '@/components/shared/AppHeader';
 import LocationSelectorModal from '@/components/LocationSelectorModal';
 import { getPermanentMyLocation, savePermanentMyLocation, isAllKingdom } from '@/lib/locationSync';
 import { getCurrentDeviceLocation } from '@/lib/deviceLocation';
@@ -130,19 +130,13 @@ export default function NewRequest() {
 
   return (
     <View style={styles.container}>
+      <AppHeader
+        variant="sub"
+        title="إضافة طلب فزعة"
+        subtitle="اطلب مساعدة أو إعارة من أهل حيك"
+        fallbackRoute="/requests"
+      />
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <LinearGradient
-          colors={['#065f46', '#059669', '#10b981']}
-          style={styles.hero}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        >
-          <ScreenHeader title="إضافة طلب فزعة 🤝" fallbackRoute="/requests" />
-          <Text style={styles.heroSub}>
-            اطلب مساعدة، توصيل، إعارة غرض، أو فزعة من أهل حيك.
-          </Text>
-        </LinearGradient>
 
         <View style={styles.formCard}>
           {/* Request Type Selector */}

@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import { AppHeader } from '@/components/shared/AppHeader';
 import {
   Flame,
   AlertTriangle,
@@ -27,6 +28,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import { getCurrentDeviceLocation, reverseGeocodeDeviceLocation } from '@/lib/deviceLocation';
 import { sendPushToMultipleUsers } from '@/lib/pushSender';
+import { useBottomNavInset } from '@/lib/bottomNav';
 
 const ALERT_TYPES = [
   { id: 'missing', label: 'طفل أو شخص مفقود', icon: UserX, color: '#dc2626', bg: '#fef2f2' },
@@ -37,6 +39,7 @@ const ALERT_TYPES = [
 ];
 
 export default function EmergencyAlertScreen() {
+  const bottomNavInset = useBottomNavInset();
   const [selectedType, setSelectedType] = useState('missing');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -100,10 +103,10 @@ export default function EmergencyAlertScreen() {
           onPress: async () => {
             setSubmitting(true);
             try {
-              const district = userProfile?.district || 'العليا';
+              const district = userProfile?.district || 'الياسمين';
               const city = userProfile?.city || 'الرياض';
 
-              // 1. Insert alert in database
+              // 1. Insert alert in database table urgent_alerts
               const { data: insertedAlert, error } = await supabase
                 .from('urgent_alerts')
                 .insert({
@@ -122,7 +125,22 @@ export default function EmergencyAlertScreen() {
 
               if (error) throw error;
 
-              // 2. Fetch neighbors in the same district to send push notifications
+              // 2. Also insert into questions so it appears prominently on neighborhood feeds & search
+              try {
+                await supabase.from('questions').insert({
+                  author_id: auth.user.id,
+                  title: `🚨 تنبيه عاجل: ${title.trim()}`,
+                  content: `${description.trim()}\nالموقع: ${locationLabel || `حي ${district}`}`,
+                  city,
+                  district,
+                  category: 'طوارئ',
+                  is_emergency: true,
+                });
+              } catch (qErr) {
+                console.warn('Questions emergency insert note:', qErr);
+              }
+
+              // 3. Fetch neighbors in the same district to send push notifications
               const { data: neighbors } = await supabase
                 .from('profiles')
                 .select('id')
@@ -140,7 +158,7 @@ export default function EmergencyAlertScreen() {
                 });
               }
 
-              Alert.alert('تم بث التنبيه بنجاح 🚨', 'تم إشعار سكان الحي فوراً للمساعدة.', [
+              Alert.alert('تم بث التنبيه بنجاح 🚨', 'تم إشعار سكان الحي فوراً وحفظ الحالة في قاعدة البيانات.', [
                 { text: 'العودة للرئيسية', onPress: () => router.replace('/home') },
               ]);
             } catch (err: any) {
@@ -156,30 +174,34 @@ export default function EmergencyAlertScreen() {
 
   return (
     <View style={styles.container}>
-      <LinearGradient
-        colors={['#991b1b', '#b91c1c', '#dc2626']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.hero}
-      >
-        <View style={styles.headerTop}>
-          <Pressable onPress={() => router.back()} style={styles.backBtn} accessibilityRole="button">
-            <ChevronRight size={22} color="#ffffff" />
-          </Pressable>
-          <View style={styles.headerTitleWrap}>
-            <View style={styles.heroBadge}>
-              <ShieldAlert size={14} color="#fee2e2" />
-              <Text style={styles.heroBadgeText}>للحالات العاجلة فقط</Text>
-            </View>
-            <Text style={styles.heroTitle}>تنبيه الحي العاجل 🚨</Text>
+      <AppHeader
+        variant="sub"
+        title="تنبيه الحي العاجل"
+        subtitle="للحالات الطارئة التي تتطلب مساعدة فورية"
+        fallbackRoute="/home"
+        rightAction={
+          <View style={{
+            flexDirection: 'row-reverse',
+            alignItems: 'center',
+            gap: 4,
+            backgroundColor: '#fef2f2',
+            paddingHorizontal: 10,
+            paddingVertical: 5,
+            borderRadius: 14,
+            borderWidth: 1,
+            borderColor: '#fecaca',
+          }}>
+            <ShieldAlert size={14} color="#dc2626" />
+            <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#dc2626' }}>طارئ</Text>
           </View>
-        </View>
-        <Text style={styles.heroSubtitle}>
-          أداة تكاتف مخصصة للحالات الطارئة التي تتطلب مساعدة فورية من سكان الحي.
-        </Text>
-      </LinearGradient>
+        }
+      />
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomNavInset + 30 }]}
+        showsVerticalScrollIndicator={false}
+      >
         <Text style={styles.sectionLabel}>نوع الحالة الطارئة:</Text>
         <View style={styles.typesGrid}>
           {ALERT_TYPES.map(t => {

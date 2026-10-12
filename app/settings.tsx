@@ -1,5 +1,5 @@
-﻿import { useBottomNavInset } from '@/lib/bottomNav';
-import ScreenHeader from '@/components/shared/ScreenHeader';
+import { useBottomNavInset } from '@/lib/bottomNav';
+import { AppHeader } from '@/components/shared/AppHeader';
 import { useEffect, useState } from 'react';
 import {
   Alert,
@@ -418,16 +418,17 @@ export default function SettingsScreen() {
 
   return (
     <View style={styles.screen}>
-      {/* Top Header */}
-      <View style={styles.header}>
-        <ScreenHeader
-          title="الإعدادات والمميزات"
-          subtitle="الخصوصية، الرسائل، والميزات الحصرية"
-          fallbackRoute="/profile"
-          variant="plain"
-          rightAction={<View style={styles.headerIconWrap}><Sliders size={22} color="#059669" /></View>}
-        />
-      </View>
+      <AppHeader
+        variant="sub"
+        title="الإعدادات والمميزات"
+        subtitle="الخصوصية، الرسائل، والميزات الحصرية"
+        fallbackRoute="/profile"
+        rightAction={
+          <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' }}>
+            <Sliders size={18} color="#059669" />
+          </View>
+        }
+      />
 
       <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomNavInset }]} showsVerticalScrollIndicator={false}>
         {saving && (

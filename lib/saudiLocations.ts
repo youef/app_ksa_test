@@ -221,11 +221,54 @@ export const SAUDI_BOUNDS = {
 
 export function isInsideSaudiArabia(lat: number, lng: number): boolean {
   return (
+    typeof lat === 'number' &&
+    typeof lng === 'number' &&
+    !isNaN(lat) &&
+    !isNaN(lng) &&
     lat >= SAUDI_BOUNDS.minLat &&
     lat <= SAUDI_BOUNDS.maxLat &&
     lng >= SAUDI_BOUNDS.minLng &&
     lng <= SAUDI_BOUNDS.maxLng
   );
+}
+
+let saudiCityNamesSet: Set<string> | null = null;
+
+function getSaudiCityNamesSet(): Set<string> {
+  if (!saudiCityNamesSet) {
+    const set = new Set<string>();
+    for (const reg of SAUDI_REGIONS) {
+      set.add(normalizeSaudiLocationName(reg.name));
+      for (const c of reg.cities) {
+        set.add(normalizeSaudiLocationName(c.name));
+      }
+    }
+    for (const mc of municipalityCities) {
+      if (mc.name_ar) {
+        set.add(normalizeSaudiLocationName(mc.name_ar));
+      }
+    }
+    saudiCityNamesSet = set;
+  }
+  return saudiCityNamesSet;
+}
+
+export function isKnownSaudiCity(cityName?: string | null): boolean {
+  if (!cityName) return false;
+  const name = cityName.trim();
+  if (
+    name === '' ||
+    name === 'كل المدن' ||
+    name === 'كل المملكة' ||
+    name === 'الكل' ||
+    name === 'جميع المدن' ||
+    name === 'المملكة'
+  ) {
+    return true;
+  }
+  const target = normalizeSaudiLocationName(name);
+  if (!target) return false;
+  return getSaudiCityNamesSet().has(target);
 }
 
 export const SAUDI_REGIONS: Region[] = [

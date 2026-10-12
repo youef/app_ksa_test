@@ -26,7 +26,7 @@ import {
   Phone,
   Clock3,
 } from 'lucide-react-native';
-import ScreenHeader from '@/components/shared/ScreenHeader';
+import { AppHeader } from '@/components/shared/AppHeader';
 import LocationSelectorModal from '@/components/LocationSelectorModal';
 import { getPermanentMyLocation, savePermanentMyLocation, isAllKingdom } from '@/lib/locationSync';
 import {
@@ -244,8 +244,13 @@ export default function NewService() {
 
   return (
     <View style={styles.container}>
+      <AppHeader
+        variant="sub"
+        title="أضف عرضك في السوق"
+        subtitle={`خطوة ${step + 1} من ${STEPS.length}: ${STEPS[step]}`}
+        fallbackRoute="/market"
+      />
       <View style={styles.header}>
-        <ScreenHeader title="أضف عرضك في السوق" fallbackRoute="/market" />
         <View style={styles.stepper}>
           {STEPS.map((label, i) => (
             <Pressable
@@ -536,22 +541,21 @@ const styles = StyleSheet.create({
   loadingText: { color: '#64748b', fontSize: 13, fontWeight: '700' },
   container: { flex: 1, backgroundColor: '#f8fafc' },
   header: {
-    backgroundColor: '#065f46',
-    paddingTop: Platform.OS === 'ios' ? 52 : 40,
-    paddingHorizontal: 18,
-    paddingBottom: 14,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
   },
-  stepper: { flexDirection: 'row-reverse', justifyContent: 'space-between', marginTop: 6, gap: 6 },
+  stepper: { flexDirection: 'row-reverse', justifyContent: 'space-between', marginTop: 2, gap: 6 },
   stepItem: { flex: 1, flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
-  stepDot: { width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
-  stepDotActive: { backgroundColor: '#10b981' },
-  stepNum: { color: '#a7f3d0', fontSize: 11, fontWeight: '900' },
-  stepLabel: { color: '#a7f3d0', fontSize: 11, fontWeight: '700', flexShrink: 1 },
-  stepLabelActive: { color: '#fff', fontWeight: '900' },
-  progressTrack: { height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.15)', marginTop: 12, overflow: 'hidden', flexDirection: 'row-reverse' },
-  progressFill: { height: 4, backgroundColor: '#34d399', borderRadius: 2 },
+  stepDot: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' },
+  stepDotActive: { backgroundColor: '#059669' },
+  stepNum: { color: '#64748b', fontSize: 11, fontWeight: '900' },
+  stepLabel: { color: '#94a3b8', fontSize: 11, fontWeight: '700', flexShrink: 1 },
+  stepLabelActive: { color: '#059669', fontWeight: '900' },
+  progressTrack: { height: 4, borderRadius: 2, backgroundColor: '#f1f5f9', marginTop: 10, overflow: 'hidden', flexDirection: 'row-reverse' },
+  progressFill: { height: 4, backgroundColor: '#059669', borderRadius: 2 },
   scroll: { padding: 16, paddingBottom: 120, width: '100%', maxWidth: 720, alignSelf: 'center' },
 
   stepTitle: { fontSize: 20, fontWeight: '900', color: '#0f172a', textAlign: 'right' },

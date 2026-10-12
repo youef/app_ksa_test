@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, T
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { BarChart3, Building2, CalendarDays, Flag, MapPin, RefreshCw, ShieldCheck, Store, Users, Zap } from 'lucide-react-native';
+import { AppHeader } from '@/components/shared/AppHeader';
 import AdminCommandCenter from '@/components/AdminCommandCenter';
 
 export default function AdminPro() {
@@ -58,15 +59,27 @@ export default function AdminPro() {
 
   return (
     <View style={s.page}>
-      <View style={s.top}>
-        <Pressable onPress={()=>router.replace('/home')} style={s.back}><Text style={s.backText}>الرئيسية</Text></Pressable>
-        <View style={{flex:1,alignItems:'flex-end'}}>
-          <Text style={s.kicker}>HAYNA · ADMIN PRO</Text>
-          <Text style={s.title}>مركز عمليات حيّنا</Text>
-          <Text style={s.sub}>{profile?.display_name || profile?.username || 'مدير النظام'} · لوحة تفصيلية متقدمة</Text>
-        </View>
-        <Pressable onPress={onRefresh} style={s.refresh}><RefreshCw size={18} color="#fff"/></Pressable>
-      </View>
+      <AppHeader
+        variant="sub"
+        title="مركز عمليات حيّنا المتقدم"
+        subtitle={`${profile?.display_name || profile?.username || 'مدير النظام'} · ADMIN PRO`}
+        fallbackRoute="/home"
+        rightAction={
+          <Pressable
+            onPress={onRefresh}
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 18,
+              backgroundColor: '#f1f5f9',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <RefreshCw size={16} color="#059669" />
+          </Pressable>
+        }
+      />
 
       <ScrollView
         style={{flex:1}}

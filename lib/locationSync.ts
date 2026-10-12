@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/lib/supabase';
+import { isKnownSaudiCity } from '@/lib/saudiLocations';
 
 export interface HaynaLocation {
   region: string;
@@ -112,6 +113,11 @@ export async function getLockedCity(): Promise<LockedCity | null> {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (parsed && parsed.city && !isAllKingdom(parsed.city)) {
+      if (!isKnownSaudiCity(parsed.city)) {
+        // Automatically purge any foreign or corrupted locked city (e.g. Paragominas)
+        await AsyncStorage.removeItem(LOCKED_CITY_KEY);
+        return null;
+      }
       return { region: parsed.region || 'المملكة', city: parsed.city };
     }
   } catch {}
@@ -119,7 +125,7 @@ export async function getLockedCity(): Promise<LockedCity | null> {
 }
 
 export async function setLockedCity(region: string, city: string): Promise<void> {
-  if (!city || isAllKingdom(city)) return;
+  if (!city || isAllKingdom(city) || !isKnownSaudiCity(city)) return;
   try {
     await AsyncStorage.setItem(
       LOCKED_CITY_KEY,
@@ -144,8 +150,12 @@ export async function getPermanentMyLocation(): Promise<HaynaLocation> {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && parsed.city && !isAllKingdom(parsed.city)) {
-        cachedLocation = parsed;
-        return parsed;
+        if (!isKnownSaudiCity(parsed.city)) {
+          await AsyncStorage.removeItem(PERMANENT_MY_LOCATION_KEY);
+        } else {
+          cachedLocation = parsed;
+          return parsed;
+        }
       }
     }
   } catch {}
@@ -156,9 +166,13 @@ export async function getPermanentMyLocation(): Promise<HaynaLocation> {
     if (rawActive) {
       const parsed = JSON.parse(rawActive);
       if (parsed && parsed.city && !isAllKingdom(parsed.city)) {
-        await AsyncStorage.setItem(PERMANENT_MY_LOCATION_KEY, JSON.stringify(parsed));
-        cachedLocation = parsed;
-        return parsed;
+        if (!isKnownSaudiCity(parsed.city)) {
+          await AsyncStorage.removeItem(STORAGE_KEY);
+        } else {
+          await AsyncStorage.setItem(PERMANENT_MY_LOCATION_KEY, JSON.stringify(parsed));
+          cachedLocation = parsed;
+          return parsed;
+        }
       }
     }
   } catch {}
@@ -173,19 +187,26 @@ export async function getPermanentMyLocation(): Promise<HaynaLocation> {
         .eq('id', u.user.id)
         .maybeSingle();
       if (prof?.city && !isAllKingdom(prof.city)) {
-        const loc: HaynaLocation = {
-          region: prof.region?.trim() || 'المملكة',
-          city: prof.city.trim(),
-          district: prof.district?.trim() || 'كل الأحياء',
-        };
-        cachedLocation = loc;
-        await AsyncStorage.setItem(PERMANENT_MY_LOCATION_KEY, JSON.stringify(loc));
-        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(loc));
-        return loc;
+        if (isKnownSaudiCity(prof.city)) {
+          const loc: HaynaLocation = {
+            region: prof.region?.trim() || 'المملكة',
+            city: prof.city.trim(),
+            district: prof.district?.trim() || 'كل الأحياء',
+          };
+          cachedLocation = loc;
+          await AsyncStorage.setItem(PERMANENT_MY_LOCATION_KEY, JSON.stringify(loc));
+          await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(loc));
+          return loc;
+        }
       }
     }
   } catch {}
 
+  cachedLocation = {
+    region: 'كل المملكة',
+    city: 'كل المدن',
+    district: 'كل الأحياء',
+  };
   return cachedLocation;
 }
 
@@ -212,8 +233,15 @@ export async function savePermanentMyLocation(
   let city = loc.city || current?.city || 'كل المدن';
   let district = loc.district || current?.district || 'كل الأحياء';
 
+  // Sanitize city if foreign
+  if (city && !isAllKingdom(city) && !isKnownSaudiCity(city)) {
+    city = 'كل المدن';
+    region = 'كل المملكة';
+    district = 'كل الأحياء';
+  }
+
   const requestedCity = (loc.city || '').trim();
-  const hasSpecificCity = Boolean(requestedCity) && !isAllKingdom(requestedCity);
+  const hasSpecificCity = Boolean(requestedCity) && !isAllKingdom(requestedCity) && isKnownSaudiCity(requestedCity);
   const cityMatchesLock = Boolean(lock) && hasSpecificCity
     && normalizeLoc(requestedCity) === normalizeLoc(lock!.city);
 
@@ -225,7 +253,7 @@ export async function savePermanentMyLocation(
       city = lock.city;
       district = 'كل الأحياء';
     } else if (opts?.allowCityChange) {
-      // Only a real GPS reading may pin (or move) the locked city.
+      // Only a real GPS reading inside Saudi Arabia may pin (or move) the locked city.
       await setLockedCity(region, city);
     }
   } else if (lock && !opts?.allowCityChange) {
@@ -260,8 +288,12 @@ export async function getActiveLocation(): Promise<HaynaLocation> {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && parsed.city) {
-        cachedLocation = parsed;
-        return cachedLocation;
+        if (!isAllKingdom(parsed.city) && !isKnownSaudiCity(parsed.city)) {
+          await AsyncStorage.removeItem(STORAGE_KEY);
+        } else {
+          cachedLocation = parsed;
+          return cachedLocation;
+        }
       }
     }
   } catch {
@@ -271,12 +303,17 @@ export async function getActiveLocation(): Promise<HaynaLocation> {
   // If active location not found, try permanent location
   try {
     const perm = await getPermanentMyLocation();
-    if (perm && perm.city && !isAllKingdom(perm.city)) {
+    if (perm && perm.city && !isAllKingdom(perm.city) && isKnownSaudiCity(perm.city)) {
       cachedLocation = perm;
       return cachedLocation;
     }
   } catch {}
 
+  cachedLocation = {
+    region: 'كل المملكة',
+    city: 'كل المدن',
+    district: 'كل الأحياء',
+  };
   return cachedLocation;
 }
 
@@ -289,15 +326,25 @@ export async function setActiveLocation(
   district: string,
   syncRemote = true
 ): Promise<void> {
+  let safeCity = city || 'كل المدن';
+  let safeRegion = region || 'كل المملكة';
+  let safeDistrict = district || 'كل الأحياء';
+
+  if (safeCity && !isAllKingdom(safeCity) && !isKnownSaudiCity(safeCity)) {
+    safeCity = 'كل المدن';
+    safeRegion = 'كل المملكة';
+    safeDistrict = 'كل الأحياء';
+  }
+
   cachedLocation = {
-    region: region || 'كل المملكة',
-    city: city || 'كل المدن',
-    district: district || 'كل الأحياء',
+    region: safeRegion,
+    city: safeCity,
+    district: safeDistrict,
   };
 
   try {
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(cachedLocation));
-    if (city && !isAllKingdom(city)) {
+    if (safeCity && !isAllKingdom(safeCity)) {
       await AsyncStorage.setItem(PERMANENT_MY_LOCATION_KEY, JSON.stringify(cachedLocation));
     }
   } catch {

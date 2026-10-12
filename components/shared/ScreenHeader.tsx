@@ -1,7 +1,5 @@
 import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { router } from 'expo-router';
-import { ChevronRight } from 'lucide-react-native';
+import { AppHeader } from './AppHeader';
 
 type Props = {
   title: string;
@@ -11,35 +9,15 @@ type Props = {
   variant?: 'gradient' | 'plain';
 };
 
-export default function ScreenHeader({ title, fallbackRoute, rightAction, subtitle, variant = 'gradient' }: Props) {
-  const plain = variant === 'plain';
-  const goBack = () => {
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace(fallbackRoute as never);
-    }
-  };
-
+export default function ScreenHeader({ title, fallbackRoute, rightAction, subtitle }: Props) {
   return (
-    <View style={[styles.row, plain && styles.plainRow]}>
-      <Pressable
-        onPress={goBack}
-        style={[styles.action, plain && styles.plainAction]}
-        hitSlop={8}
-        accessibilityRole="button"
-        accessibilityLabel="رجوع"
-      >
-        <ChevronRight size={24} color={plain ? '#059669' : '#fff'} />
-      </Pressable>
-      <View style={styles.titleWrap}>
-        <Text style={[styles.title, plain && styles.plainTitle]} numberOfLines={1} ellipsizeMode="tail">
-          {title}
-        </Text>
-        {subtitle ? <Text style={[styles.subtitle, plain && styles.plainSubtitle]} numberOfLines={1}>{subtitle}</Text> : null}
-      </View>
-      {rightAction ? <View style={styles.rightAction}>{rightAction}</View> : <View style={styles.actionSpacer} />}
-    </View>
+    <AppHeader
+      variant="sub"
+      title={title}
+      fallbackRoute={fallbackRoute}
+      subtitle={subtitle}
+      rightAction={rightAction}
+    />
   );
 }
 

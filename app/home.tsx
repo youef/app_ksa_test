@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, Pressable, RefreshControl, ScrollView, StatusBar, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ChevronLeft, Flame, Plus, Sparkles, HeartHandshake, MessageCircle } from 'lucide-react-native';
+import { ChevronLeft, Flame, Plus, Sparkles, HeartHandshake, MessageCircle, Search, X } from 'lucide-react-native';
 
 import { supabase } from '@/lib/supabase';
 import { getBrandingLogo, subscribeBrandingLogo, getCachedBrandingLogo } from '@/lib/branding';
@@ -22,7 +22,7 @@ import { useHomeLocation } from '@/hooks/useHomeLocation';
 import { useBottomNavInset } from '@/lib/bottomNav';
 import LocationSelectorModal from '@/components/LocationSelectorModal';
 import TwitterInquiryCard from '@/components/TwitterInquiryCard';
-import HomeHero from '@/components/home/HomeHero';
+import AppHeader from '@/components/shared/AppHeader';
 import AtmosphereBar from '@/components/home/AtmosphereBar';
 import StoriesRow from '@/components/home/StoriesRow';
 import ServicesGrid from '@/components/home/ServicesGrid';
@@ -231,10 +231,22 @@ export default function Home() {
         }
       />
 
+      <AppHeader
+        variant="home"
+        profile={feed.profile}
+        isGuest={!feed.currentUserId}
+        logoUri={logoUri}
+        city={loc.city}
+        district={loc.district}
+        unreadCount={feed.unreadNotifCount}
+        onOpenLocation={() => setShowLocationModal(true)}
+      />
+
       <ScrollView
         style={styles.container}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ paddingBottom: bottomNavInset + 24 }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -245,19 +257,6 @@ export default function Home() {
           />
         }
       >
-        <HomeHero
-          profile={feed.profile}
-          isGuest={!feed.currentUserId}
-          logoUri={logoUri}
-          greeting={greeting}
-          unreadCount={feed.unreadNotifCount}
-          city={loc.city}
-          district={loc.district}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          onOpenLocation={() => setShowLocationModal(true)}
-        />
-
         <AtmosphereBar
           weather={loc.weather}
           weatherLoading={loc.weatherLoading}
@@ -297,33 +296,6 @@ export default function Home() {
             showToast('تمت تصفية المنشورات لعرض أدوات الحي');
           }}
         />
-
-        <Pressable
-          style={styles.moreBannerCard}
-          onPress={() => router.push('/more')}
-          accessibilityRole="button"
-          accessibilityLabel="استكشف المزيد من خدمات حيك الذكية"
-        >
-          <LinearGradient
-            colors={['#064e3b', '#047857']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.moreBannerGrad}
-          >
-            <View style={styles.moreBannerContent}>
-              <View style={styles.moreBannerBadge}>
-                <Sparkles size={12} color="#fef08a" />
-                <Text style={styles.moreBannerBadgeText}>جديد التطوير</Text>
-              </View>
-              <Text style={styles.moreBannerTitle}>استكشف المزيد من خدمات حيك الذكية</Text>
-              <Text style={styles.moreBannerSub}>دليل المحلات، مجلس العمارة، إعارة الأدوات، والميزات القادمة</Text>
-            </View>
-            <View style={styles.moreBannerBtn}>
-              <Text style={styles.moreBannerBtnText}>فتح المزيد</Text>
-              <ChevronLeft size={16} color="#064e3b" />
-            </View>
-          </LinearGradient>
-        </Pressable>
 
         <View style={styles.feedSection}>
           <FeedTabs

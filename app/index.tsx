@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, Platform, ActivityIndicator, Image, Animated, Easing, StatusBar, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Platform, ActivityIndicator, Image, Animated, Easing, StatusBar, useWindowDimensions, ScrollView } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { getBrandingLogo, FALLBACK_LOGO_URI, subscribeBrandingLogo, getCachedBrandingLogo } from '@/lib/branding';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, House, UsersRound, Store } from 'lucide-react-native';
+import AppHeader from '@/components/shared/AppHeader';
 
 const FALLBACK_URI = FALLBACK_LOGO_URI;
 
@@ -115,97 +116,127 @@ export default function Index() {
 
   return (
     <View style={styles.page}>
-      <StatusBar barStyle="light-content" backgroundColor="#064e3b" />
-      <LinearGradient
-        colors={['#064e3b', '#047857', '#059669', '#10b981']}
-        locations={[0, 0.38, 0.76, 1]}
-        start={{ x: 0.05, y: 0 }}
-        end={{ x: 0.95, y: 1 }}
-        style={StyleSheet.absoluteFillObject}
+      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+      <AppHeader
+        variant="sub"
+        title="حيّنا 🇸🇦"
+        subtitle="الشبكة الاجتماعية للحي والمدينة"
+        showBack={false}
+        leftAction={
+          <Pressable
+            onPress={() => router.replace('/home')}
+            style={styles.headerSkipBtn}
+            accessibilityRole="button"
+            accessibilityLabel="تخطي كزائر"
+          >
+            <Text style={styles.headerSkipText}>تخطي كزائر</Text>
+            <ArrowLeft size={13} color="#047857" />
+          </Pressable>
+        }
       />
+      <View style={styles.bodyWrap}>
+        <LinearGradient
+          colors={['#064e3b', '#047857', '#059669', '#10b981']}
+          locations={[0, 0.38, 0.76, 1]}
+          start={{ x: 0.05, y: 0 }}
+          end={{ x: 0.95, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+        />
 
-      <View pointerEvents="none" style={styles.topGlow} />
-      <View pointerEvents="none" style={styles.bottomGlow} />
-      <View pointerEvents="none" style={styles.orbOne} />
-      <View pointerEvents="none" style={styles.orbTwo} />
-      <View pointerEvents="none" style={styles.orbThree} />
-      <View pointerEvents="none" style={styles.decorRing} />
+        <View pointerEvents="none" style={styles.topGlow} />
+        <View pointerEvents="none" style={styles.bottomGlow} />
+        <View pointerEvents="none" style={styles.orbOne} />
+        <View pointerEvents="none" style={styles.orbTwo} />
+        <View pointerEvents="none" style={styles.orbThree} />
+        <View pointerEvents="none" style={styles.decorRing} />
 
-      <View style={[styles.content, compact && styles.contentCompact]}>
-        <View style={styles.eyebrow}>
-          <View style={styles.liveDot} />
-          <Text style={styles.eyebrowText}>مجتمعك يبدأ من هنا</Text>
-        </View>
-
-        <Text style={[styles.welcome, compact && styles.welcomeCompact]}>حيّنا… أقرب لبعض</Text>
-
-        <View style={[styles.scene3D, compact && styles.scene3DCompact]}>
-          <View pointerEvents="none" style={[styles.floatCard, styles.floatCardTopLeft, { transform: [{ perspective: 700 }, { rotateY: '16deg' }, { rotateX: '-8deg' }] }]}>
-            <View style={[styles.floatIcon, styles.floatIconMint]}><UsersRound size={18} color="#d1fae5" strokeWidth={2.4} /></View>
-            <View style={styles.floatCardCopy}><Text style={styles.floatCardTitle}>جيرانك</Text><Text style={styles.floatCardSub}>قريبين منك</Text></View>
+        <View style={[styles.content, compact && styles.contentCompact]}>
+          <View style={styles.eyebrow}>
+            <View style={styles.liveDot} />
+            <Text style={styles.eyebrowText}>مجتمعك يبدأ من هنا</Text>
           </View>
-          <View pointerEvents="none" style={[styles.floatCard, styles.floatCardTopRight, { transform: [{ perspective: 700 }, { rotateY: '-18deg' }, { rotateX: '-7deg' }] }]}>
-            <View style={[styles.floatIcon, styles.floatIconGold]}><Store size={18} color="#fef3c7" strokeWidth={2.4} /></View>
-            <View style={styles.floatCardCopy}><Text style={styles.floatCardTitle}>سوق الحي</Text><Text style={styles.floatCardSub}>كل شيء حولك</Text></View>
-          </View>
-          <Animated.View style={[
-            styles.logoStage,
-            compact && styles.logoStageCompact,
-            { transform: [{ translateY: floatY }, { scale: pulse }, { rotate: spin }] },
-          ]}>
-            <View style={styles.logoShadow} />
-            <View style={styles.outerGlass}>
-              <View style={styles.innerGlass}>
-                <Image source={{ uri: logoUri }} style={[styles.logoImage, compact && styles.logoImageCompact]} resizeMode="contain" />
-                <Animated.View style={[styles.shine, { transform: [{ translateX: shineX }, { rotate: '22deg' }] }]} />
-              </View>
+
+          <Text style={[styles.welcome, compact && styles.welcomeCompact]}>حيّنا… أقرب لبعض</Text>
+
+          <View style={[styles.scene3D, compact && styles.scene3DCompact]}>
+            <View pointerEvents="none" style={[styles.floatCard, styles.floatCardTopLeft, { transform: [{ perspective: 700 }, { rotateY: '16deg' }, { rotateX: '-8deg' }] }]}>
+              <View style={[styles.floatIcon, styles.floatIconMint]}><UsersRound size={18} color="#d1fae5" strokeWidth={2.4} /></View>
+              <View style={styles.floatCardCopy}><Text style={styles.floatCardTitle}>جيرانك</Text><Text style={styles.floatCardSub}>قريبين منك</Text></View>
             </View>
-            <View style={styles.glassReflection} />
-            <View style={styles.logoOrbit} />
-          </Animated.View>
-          <View pointerEvents="none" style={[styles.floatCard, styles.floatCardBottom, { transform: [{ perspective: 700 }, { rotateY: '12deg' }, { rotateX: '8deg' }] }]}>
-            <View style={[styles.floatIcon, styles.floatIconBlue]}><House size={18} color="#dbeafe" strokeWidth={2.4} /></View>
-            <View style={styles.floatCardCopy}><Text style={styles.floatCardTitle}>خدمات قريبة</Text><Text style={styles.floatCardSub}>حيّك في مكان واحد</Text></View>
-            <View style={styles.cardLiveDot} />
+            <View pointerEvents="none" style={[styles.floatCard, styles.floatCardTopRight, { transform: [{ perspective: 700 }, { rotateY: '-18deg' }, { rotateX: '-7deg' }] }]}>
+              <View style={[styles.floatIcon, styles.floatIconGold]}><Store size={18} color="#fef3c7" strokeWidth={2.4} /></View>
+              <View style={styles.floatCardCopy}><Text style={styles.floatCardTitle}>سوق الحي</Text><Text style={styles.floatCardSub}>كل شيء حولك</Text></View>
+            </View>
+            <Animated.View style={[
+              styles.logoStage,
+              compact && styles.logoStageCompact,
+              { transform: [{ translateY: floatY }, { scale: pulse }, { rotate: spin }] },
+            ]}>
+              <View style={styles.logoShadow} />
+              <View style={styles.outerGlass}>
+                <View style={styles.innerGlass}>
+                  <Image source={{ uri: logoUri }} style={[styles.logoImage, compact && styles.logoImageCompact]} resizeMode="contain" />
+                  <Animated.View style={[styles.shine, { transform: [{ translateX: shineX }, { rotate: '22deg' }] }]} />
+                </View>
+              </View>
+              <View style={styles.glassReflection} />
+              <View style={styles.logoOrbit} />
+            </Animated.View>
+            <View pointerEvents="none" style={[styles.floatCard, styles.floatCardBottom, { transform: [{ perspective: 700 }, { rotateY: '12deg' }, { rotateX: '8deg' }] }]}>
+              <View style={[styles.floatIcon, styles.floatIconBlue]}><House size={18} color="#dbeafe" strokeWidth={2.4} /></View>
+              <View style={styles.floatCardCopy}><Text style={styles.floatCardTitle}>خدمات قريبة</Text><Text style={styles.floatCardSub}>حيّك في مكان واحد</Text></View>
+              <View style={styles.cardLiveDot} />
+            </View>
+            <View pointerEvents="none" style={styles.sceneFloor} />
           </View>
-          <View pointerEvents="none" style={styles.sceneFloor} />
+
+          <Text style={styles.tagline}>بيوت تجمعنا • مجتمع ينتمي لنا</Text>
+          <Text style={[styles.description, compact && styles.descriptionCompact]}>مكان يجمع أهل الحي، ويقرّب الجيران من بعض.</Text>
+
+          <View style={styles.features}>
+            <View style={styles.feature}>
+              <View style={styles.featureIcon}><UsersRound size={16} color="#d1fae5" strokeWidth={2.2} /></View>
+              <Text style={styles.featureText}>جيرانك</Text>
+            </View>
+            <View style={styles.featureDivider} />
+            <View style={styles.feature}>
+              <View style={styles.featureIcon}><Store size={16} color="#d1fae5" strokeWidth={2.2} /></View>
+              <Text style={styles.featureText}>سوق الحي</Text>
+            </View>
+            <View style={styles.featureDivider} />
+            <View style={styles.feature}>
+              <View style={styles.featureIcon}><House size={16} color="#d1fae5" strokeWidth={2.2} /></View>
+              <Text style={styles.featureText}>خدمات قريبة</Text>
+            </View>
+          </View>
         </View>
 
-        <Text style={styles.tagline}>بيوت تجمعنا • مجتمع ينتمي لنا</Text>
-        <Text style={[styles.description, compact && styles.descriptionCompact]}>مكان يجمع أهل الحي، ويقرّب الجيران من بعض.</Text>
+        <View style={[styles.actionWrap, compact && styles.actionWrapCompact]}>
+          <Pressable
+            onPress={() => router.replace('/auth')}
+            style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+            accessibilityRole="button"
+            accessibilityLabel="ابدأ الآن وتسجيل الدخول"
+            hitSlop={8}
+          >
+            <LinearGradient colors={['#ffffff', '#ecfdf5']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.buttonGradient}>
+              <Text style={styles.buttonText}>تسجيل الدخول / إنشاء حساب</Text>
+              <View style={styles.buttonArrow}><ArrowLeft size={17} color="#065f46" strokeWidth={2.8} /></View>
+            </LinearGradient>
+          </Pressable>
 
-        <View style={styles.features}>
-          <View style={styles.feature}>
-            <View style={styles.featureIcon}><UsersRound size={16} color="#d1fae5" strokeWidth={2.2} /></View>
-            <Text style={styles.featureText}>جيرانك</Text>
-          </View>
-          <View style={styles.featureDivider} />
-          <View style={styles.feature}>
-            <View style={styles.featureIcon}><Store size={16} color="#d1fae5" strokeWidth={2.2} /></View>
-            <Text style={styles.featureText}>سوق الحي</Text>
-          </View>
-          <View style={styles.featureDivider} />
-          <View style={styles.feature}>
-            <View style={styles.featureIcon}><House size={16} color="#d1fae5" strokeWidth={2.2} /></View>
-            <Text style={styles.featureText}>خدمات قريبة</Text>
-          </View>
+          <Pressable
+            onPress={() => router.replace('/home')}
+            style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]}
+            accessibilityRole="button"
+            accessibilityLabel="تصفح حيّنا كزائر"
+            hitSlop={6}
+          >
+            <Text style={styles.secondaryButtonText}>تصفح كزائر دون تسجيل 🏠</Text>
+          </Pressable>
+
+          <Text style={styles.footerText}>حيّك، ناسك، وحياتك اليومية في مكان واحد</Text>
         </View>
-      </View>
-
-      <View style={[styles.actionWrap, compact && styles.actionWrapCompact]}>
-        <Pressable
-          onPress={() => router.replace('/auth')}
-          style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
-          accessibilityRole="button"
-          accessibilityLabel="ابدأ استخدام حيّنا"
-          hitSlop={8}
-        >
-          <LinearGradient colors={['#ffffff', '#ecfdf5']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.buttonGradient}>
-            <Text style={styles.buttonText}>ابدأ الآن</Text>
-            <View style={styles.buttonArrow}><ArrowLeft size={17} color="#065f46" strokeWidth={2.8} /></View>
-          </LinearGradient>
-        </Pressable>
-        <Text style={styles.footerText}>حيّك، ناسك، وحياتك اليومية في مكان واحد</Text>
       </View>
     </View>
   );
@@ -215,19 +246,57 @@ const styles = StyleSheet.create({
   page: {
     flex: 1,
     minHeight: Platform.OS === 'web' ? '100vh' as any : undefined,
-    backgroundColor: '#047857',
+    backgroundColor: '#ffffff',
     overflow: 'hidden',
+  },
+  headerSkipBtn: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+  },
+  headerSkipText: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: '#047857',
+  },
+  bodyWrap: {
+    flex: 1,
     position: 'relative',
+    overflow: 'hidden',
+    backgroundColor: '#047857',
+  },
+  secondaryButton: {
+    width: '100%',
+    maxWidth: 340,
+    marginTop: 8,
+    borderRadius: 16,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.28)',
+  },
+  secondaryButtonText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '800',
   },
   content: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 24,
-    paddingTop: Platform.OS === 'ios' ? 24 : 18,
-    paddingBottom: 150,
+    paddingTop: Platform.OS === 'ios' ? 20 : 14,
+    paddingBottom: 175,
   },
-  contentCompact: { paddingTop: 10, paddingBottom: 125 },
+  contentCompact: { paddingTop: 8, paddingBottom: 155 },
   eyebrow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',

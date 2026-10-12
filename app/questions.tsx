@@ -31,7 +31,7 @@ import {
 
 import { supabase } from '@/lib/supabase';
 import { useBottomNavInset } from '@/lib/bottomNav';
-import ScreenHeader from '@/components/shared/ScreenHeader';
+import { AppHeader } from '@/components/shared/AppHeader';
 import LocationSelectorModal from '@/components/LocationSelectorModal';
 import {
   getActiveLocation,
@@ -188,6 +188,35 @@ export default function Questions() {
 
   return (
     <View style={styles.container}>
+      <AppHeader
+        variant="sub"
+        title="استفسارات الحي"
+        subtitle={locationLabel}
+        fallbackRoute="/home"
+        rightAction={
+          hasSession ? (
+            <Pressable
+              onPress={() => router.push('/ask')}
+              style={{
+                flexDirection: 'row-reverse',
+                alignItems: 'center',
+                gap: 4,
+                backgroundColor: '#ecfdf5',
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                borderRadius: 16,
+                borderWidth: 1,
+                borderColor: '#a7f3d0',
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="اسأل جارك"
+            >
+              <Plus size={14} color="#059669" />
+              <Text style={{ fontSize: 12, fontWeight: '800', color: '#059669' }}>اسأل جارك</Text>
+            </Pressable>
+          ) : undefined
+        }
+      />
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingBottom: bottomNavInset + 24 }]}
         showsVerticalScrollIndicator={false}
@@ -203,54 +232,9 @@ export default function Questions() {
           />
         }
       >
-        {/* Unified Luxury Header (matching home) */}
-        <LinearGradient
-          colors={['#064e3b', '#065f46', '#047857']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.hero}
-        >
-          <ScreenHeader
-            title="أسئلة واستفسارات الحي ❓"
-            subtitle="مجتمع حيّنا • تواصل الجيران"
-            fallbackRoute="/home"
-            rightAction={
-              hasSession ? (
-                <Pressable
-                  onPress={() => router.push('/ask')}
-                  style={styles.addBtn}
-                  accessibilityRole="button"
-                  accessibilityLabel="اسأل جارك"
-                >
-                  <Plus size={16} color="#064e3b" />
-                  <Text style={styles.addBtnText}>اسأل جارك</Text>
-                </Pressable>
-              ) : undefined
-            }
-          />
-
-          <Text style={styles.heroSubtitle}>
-            استفسر عن أي شيء في حيك وتلقى إجابات موثوقة من جيرانك وسكان منطقتك.
-          </Text>
-
-          {/* Interactive Neighborhood Selector Pill (matching home) */}
-          <View style={styles.locationRow}>
-            <Pressable
-              style={styles.locationSelectorPill}
-              onPress={() => setShowLocationModal(true)}
-              accessibilityRole="button"
-              accessibilityLabel={`الموقع الحالي: ${locationLabel}، اضغط للتغيير`}
-            >
-              <ChevronDown size={14} color="#a7f3d0" />
-              <Text style={styles.locationSelectorText} numberOfLines={1}>
-                {locationLabel}
-              </Text>
-              <MapPin size={13} color="#6ee7b7" />
-            </Pressable>
-          </View>
-
-          {/* Search Bar */}
-          <View style={styles.searchBar}>
+        {/* Search & Location Bar */}
+        <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 6 }}>
+          <View style={[styles.searchBar, { borderWidth: 1, borderColor: '#e2e8f0' }]}>
             <TextInput
               style={styles.searchInput}
               value={search}
@@ -276,7 +260,7 @@ export default function Questions() {
               </Pressable>
             )}
           </View>
-        </LinearGradient>
+        </View>
 
         {/* Filter Pills Tabs (matching home FeedTabs) */}
         <View style={styles.filtersWrapper}>

@@ -1,8 +1,16 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import { Platform } from 'react-native';
+import { isInsideSaudiArabia, isKnownSaudiCity } from '@/lib/saudiLocations';
 
 export interface DeviceLocation { latitude: number; longitude: number; accuracy?: number | null; }
+export interface GeocodedDeviceLocation {
+  region: string;
+  city: string;
+  district: string;
+  isOutsideKSA?: boolean;
+}
+
 const KEY = '@hayna_device_location_v1';
 
 export async function getCurrentDeviceLocation(): Promise<DeviceLocation | null> {
@@ -25,7 +33,17 @@ export async function getCurrentDeviceLocation(): Promise<DeviceLocation | null>
   } catch (error) { console.warn('getCurrentDeviceLocation error', error); return null; }
 }
 
-export async function reverseGeocodeDeviceLocation(location: DeviceLocation) {
+export async function reverseGeocodeDeviceLocation(location: DeviceLocation): Promise<GeocodedDeviceLocation | null> {
+  // 1. Strict Saudi Arabia geographic bounding box check
+  if (!isInsideSaudiArabia(location.latitude, location.longitude)) {
+    return {
+      region: '',
+      city: '',
+      district: '',
+      isOutsideKSA: true,
+    };
+  }
+
   const clean = (value: unknown) => typeof value === 'string' ? value.trim() : '';
   const pick = (...values: unknown[]) => values.map(clean).find(Boolean) || '';
 
@@ -45,6 +63,12 @@ export async function reverseGeocodeDeviceLocation(location: DeviceLocation) {
       const na = nData?.address || {};
       const aa = aData?.address || {};
 
+      // Country verification
+      const countryCode = String(na.country_code || aa.CountryCode || '').toLowerCase();
+      if (countryCode && countryCode !== 'sa' && countryCode !== 'sau') {
+        return { region: '', city: '', district: '', isOutsideKSA: true };
+      }
+
       const region = pick(
         na.state, na.region, na.province, na.state_district,
         aa.Region, aa.RegionAbbr,
@@ -57,10 +81,15 @@ export async function reverseGeocodeDeviceLocation(location: DeviceLocation) {
         na.city_district, na.district, aa.Neighborhood, aa.District,
       );
 
+      if (city && !isKnownSaudiCity(city)) {
+        return { region: '', city: '', district: '', isOutsideKSA: true };
+      }
+
       return {
         region,
         city,
         district,
+        isOutsideKSA: false,
       };
     }
 
@@ -70,10 +99,21 @@ export async function reverseGeocodeDeviceLocation(location: DeviceLocation) {
     });
     const place: any = rows[0];
     if (!place) return null;
+
+    const iso = String(place.isoCountryCode || '').toUpperCase();
+    if (iso && iso !== 'SA') {
+      return { region: '', city: '', district: '', isOutsideKSA: true };
+    }
+
     const region = pick(place.region, place.subregion);
     const city = pick(place.city, place.subregion);
     const district = pick(place.district, place.suburb, place.name, place.street);
-    return { region, city, district };
+
+    if (city && !isKnownSaudiCity(city)) {
+      return { region: '', city: '', district: '', isOutsideKSA: true };
+    }
+
+    return { region, city, district, isOutsideKSA: false };
   } catch (error) {
     console.warn('reverseGeocodeDeviceLocation error', error);
     return null;

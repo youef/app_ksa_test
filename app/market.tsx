@@ -19,6 +19,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import { useBottomNavInset } from '@/lib/bottomNav';
 import ScreenState from '@/components/shared/ScreenState';
+import AppHeader from '@/components/shared/AppHeader';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   ShoppingBag,
@@ -1129,65 +1130,41 @@ export default function Market() {
 
   return (
     <View style={styles.container}>
+      <AppHeader
+        variant="tab"
+        title="سوق وخدمات الحي"
+        subtitle={locationLabel}
+        rightAction={
+          <Pressable
+            onPress={handleAddPress}
+            style={{
+              flexDirection: 'row-reverse',
+              alignItems: 'center',
+              gap: 4,
+              backgroundColor: '#ecfdf5',
+              borderWidth: 1,
+              borderColor: '#a7f3d0',
+              paddingHorizontal: 10,
+              paddingVertical: 6,
+              borderRadius: 16,
+            }}
+          >
+            <Plus size={14} color="#047857" />
+            <Text style={{ color: '#047857', fontSize: 12, fontWeight: '800' }}>{addBtnLabel}</Text>
+          </Pressable>
+        }
+      />
+
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingBottom: bottomNavInset + 24 }}
         showsVerticalScrollIndicator={false}
-        stickyHeaderIndices={[1]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadAllData} tintColor="#059669" />}
       >
-        {/* Premium Executive Hero Header */}
-        <LinearGradient
-          colors={['#064e3b', '#065f46', '#047857']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.heroHeader}
-        >
-          <View style={styles.inner}>
-            <View style={styles.topRow}>
-              <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-                  <Text style={styles.headerTitle}>سوق وخدمات الحي</Text>
-                  <View style={styles.proBadge}>
-                    <Sparkles size={11} color="#fef08a" />
-                    <Text style={styles.proBadgeText}>موثّق</Text>
-                  </View>
-                </View>
-                <Pressable onPress={() => router.push('/locations')} style={styles.locRow}>
-                  <MapPin size={13} color="#6ee7b7" />
-                  <Text style={styles.locText} numberOfLines={1}>{locationLabel}</Text>
-                  <ChevronDown size={12} color="#a7f3d0" />
-                </Pressable>
-              </View>
-
-              <View style={styles.headerActions}>
-                <Pressable onPress={() => router.push('/notifications')} style={styles.iconBtn}>
-                  <Bell size={18} color="#fff" />
-                  {unreadNotifCount > 0 && (
-                    <View style={styles.notifBadge}>
-                      <Text style={styles.notifBadgeText}>{unreadNotifCount > 9 ? '9+' : unreadNotifCount}</Text>
-                    </View>
-                  )}
-                </Pressable>
-                <Pressable onPress={() => router.push('/profile')} style={styles.avatarWrap}>
-                  {profile?.avatar_url ? (
-                    <Image source={{ uri: profile.avatar_url }} style={styles.avatarImg} />
-                  ) : (
-                    <View style={styles.avatarPlaceholder}>
-                      <Text style={styles.avatarLetter}>{profile?.display_name?.[0] || 'ح'}</Text>
-                    </View>
-                  )}
-                  {profile?.is_geoverified && (
-                    <View style={styles.avatarVerified}>
-                      <ShieldCheck size={9} color="#fff" />
-                    </View>
-                  )}
-                </Pressable>
-              </View>
-            </View>
-
+        <View style={{ paddingTop: 10 }}>
+          <View style={[styles.inner, { paddingTop: 0 }]}>
             {/* Live Neighborhood KPI Strip */}
-            <View style={styles.kpiRow}>
+            <View style={[styles.kpiRow, { marginTop: 0 }]}>
               <View style={styles.kpiItem}>
                 <ShoppingBag size={14} color="#6ee7b7" />
                 <Text style={styles.kpiVal}>{inAreaMarket.length}</Text>
@@ -1213,7 +1190,7 @@ export default function Market() {
               </View>
             </View>
           </View>
-        </LinearGradient>
+        </View>
 
         {/* Sticky Search & Section Segment Switcher */}
         <View style={styles.stickyWrap}>

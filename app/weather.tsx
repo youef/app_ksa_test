@@ -9,10 +9,12 @@ import {
   TextInput,
   ActivityIndicator,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { router } from 'expo-router';
 import * as Location from 'expo-location';
 import { LinearGradient } from 'expo-linear-gradient';
+import { AppHeader } from '@/components/shared/AppHeader';
 import {
   ChevronRight,
   MapPin,
@@ -36,9 +38,15 @@ import {
   Navigation,
   Umbrella,
   Eye,
+  TriangleAlert,
+  HeartPulse,
+  Megaphone,
+  Bell,
+  Send,
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useBottomNavInset } from '@/lib/bottomNav';
+import { sendPushToMultipleUsers } from '@/lib/pushSender';
 
 type WeatherData = {
   city: string;
@@ -158,6 +166,67 @@ function round(value: any): string {
   return value == null || Number.isNaN(Number(value)) ? '--' : String(Math.round(Number(value)));
 }
 
+type WeatherAlert = { id: string; severity: 'danger' | 'warning' | 'info'; icon: string; title: string; message: string };
+
+function buildAlerts(weather: WeatherData | null): WeatherAlert[] {
+  if (!weather) return [];
+  const alerts: WeatherAlert[] = [];
+  const cur = weather.current || {};
+  const day = weather.daily || {};
+  const air = weather.air || {};
+  const temp = Number(cur.temperature_2m);
+  const feels = Number(cur.apparent_temperature);
+  const wind = Number(cur.wind_speed_10m);
+  const gusts = Number(cur.wind_gusts_10m);
+  const uv = Number(day.uv_index_max?.[0]);
+  const rainProb = Number(day.precipitation_probability_max?.[0]);
+  const rainSum = Number(day.precipitation_sum?.[0]);
+  const nowRain = Number(cur.precipitation);
+  const dust = Number(air.dust);
+  const pm25 = Number(air.pm2_5);
+  const pm10 = Number(air.pm10);
+  const aqi = Number(air.us_aqi);
+
+  if (Number.isFinite(temp) && (temp >= 45 || feels >= 48)) alerts.push({ id: 'heat', severity: 'danger', icon: 'heat', title: 'موجة حر شديدة', message: 'تجنّب التعرّض المباشر للشمس، واشرب الماء بكثرة، وابقَ في أماكن مبرّدة.' });
+  else if (Number.isFinite(temp) && (temp >= 42 || feels >= 45)) alerts.push({ id: 'heat', severity: 'warning', icon: 'heat', title: 'حرارة مرتفعة جداً', message: 'قلّل الأنشطة الخارجية وقت الظهيرة.' });
+  else if (Number.isFinite(temp) && temp >= 38) alerts.push({ id: 'heat', severity: 'info', icon: 'heat', title: 'أجواء حارة', message: 'خذ قسطاً من الراحة في الظل واشرب الماء.' });
+
+  if (nowRain >= 0.5 || rainSum >= 20) alerts.push({ id: 'rain', severity: 'danger', icon: 'rain', title: 'أمطار غزيرة', message: 'احتمال تجمّع المياه؛ تجنّب الأودية والمناطق المنخفضة.' });
+  else if (rainProb >= 60 || rainSum >= 5) alerts.push({ id: 'rain', severity: 'warning', icon: 'rain', title: 'احتمال هطول قوي', message: 'خذ مظلتك وتابع تحديثات الطقس.' });
+  else if (rainProb >= 40 || nowRain > 0) alerts.push({ id: 'rain', severity: 'info', icon: 'rain', title: 'احتمال هطول', message: 'قد تظهر أمطار متفرقة.' });
+
+  if (wind >= 45 || gusts >= 65) alerts.push({ id: 'wind', severity: 'danger', icon: 'wind', title: 'رياح شديدة', message: 'احذر أثناء القيادة وثبّت الأجسام الخفيفة.' });
+  else if (wind >= 30 || gusts >= 45) alerts.push({ id: 'wind', severity: 'warning', icon: 'wind', title: 'رياح نشطة', message: 'توخّ الحذر، خصوصاً على الطرق المفتوحة.' });
+
+  if ((Number.isFinite(dust) && dust >= 200) || (Number.isFinite(pm10) && pm10 >= 300) || (Number.isFinite(aqi) && aqi >= 150)) alerts.push({ id: 'dust', severity: 'danger', icon: 'dust', title: 'غبار كثيف / هواء غير صحي', message: 'أبقِ النوافذ مغلقة، شغّل أجهزة التنقية، وارتدِ كمامة عند الخروج.' });
+  else if ((Number.isFinite(dust) && dust >= 100) || (Number.isFinite(pm10) && pm10 >= 150) || (Number.isFinite(aqi) && aqi >= 100)) alerts.push({ id: 'dust', severity: 'warning', icon: 'dust', title: 'تصاعد غبار / جودة هواء متأثرة', message: 'الفئات الحساسة يفضّل تقليل الأنشطة الخارجية.' });
+
+  if (uv >= 11) alerts.push({ id: 'uv', severity: 'danger', icon: 'uv', title: 'أشعة فوق بنفسجية شديدة', message: 'تجنّب الشمس وقت الذروة واستخدم واقياً بمعامل عالٍ.' });
+  else if (uv >= 8) alerts.push({ id: 'uv', severity: 'warning', icon: 'uv', title: 'أشعة فوق بنفسجية مرتفعة', message: 'استخدم واقي الشمس والقبعة.' });
+
+  if ((Number.isFinite(pm25) && pm25 >= 35) || (Number.isFinite(dust) && dust >= 100)) alerts.push({ id: 'health', severity: 'info', icon: 'health', title: 'تنبيه لمن لديهم ربو أو حساسية', message: 'احمل بخّاخك وتجنّب الجهد الخارجي عند تدهور الهواء.' });
+
+  if (!alerts.length) alerts.push({ id: 'ok', severity: 'info', icon: 'ok', title: 'الأجواء مستقرّة', message: 'لا توجد تنبيهات جوّية مهمة الآن.' });
+  return alerts;
+}
+
+function severityTheme(severity: string) {
+  if (severity === 'danger') return { bg: '#fef2f2', border: '#fecaca', text: '#991b1b', accent: '#dc2626', label: 'تحذير' };
+  if (severity === 'warning') return { bg: '#fff7ed', border: '#fed7aa', text: '#9a3412', accent: '#ea580c', label: 'تنبيه' };
+  return { bg: '#ecfdf5', border: '#a7f3d0', text: '#065f46', accent: '#059669', label: 'معلومة' };
+}
+
+function AlertIcon({ kind, size, color }: { kind: string; size: number; color: string }) {
+  if (kind === 'heat') return <Thermometer size={size} color={color} />;
+  if (kind === 'rain') return <CloudRain size={size} color={color} />;
+  if (kind === 'wind') return <Wind size={size} color={color} />;
+  if (kind === 'dust') return <Waves size={size} color={color} />;
+  if (kind === 'uv') return <Sun size={size} color={color} />;
+  if (kind === 'health') return <HeartPulse size={size} color={color} />;
+  if (kind === 'ok') return <CloudSun size={size} color={color} />;
+  return <TriangleAlert size={size} color={color} />;
+}
+
 export default function WeatherScreen() {
   const bottomNavInset = useBottomNavInset();
   const [weather, setWeather] = useState<WeatherData | null>(null);
@@ -166,6 +235,7 @@ export default function WeatherScreen() {
   const [error, setError] = useState('');
   const [cityInput, setCityInput] = useState('');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [sharing, setSharing] = useState(false);
 
   const fetchWeather = async (latitude: number, longitude: number, meta: { city: string; region: string; district: string }) => {
     const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + latitude +
@@ -283,6 +353,11 @@ export default function WeatherScreen() {
   const todayLow = weather?.daily?.temperature_2m_min?.[0];
   const aqi = weather?.air?.us_aqi;
   const aqiMeta = aqiInfo(aqi);
+  const alerts = buildAlerts(weather);
+  const severityRank: Record<string, number> = { danger: 3, warning: 2, info: 1 };
+  const sortedAlerts = [...alerts].sort((a, b) => (severityRank[b.severity] || 0) - (severityRank[a.severity] || 0));
+  const topAlert = sortedAlerts[0];
+  const bannerMeta = severityTheme(topAlert?.severity || 'info');
 
   const heroSubtitle = weather
     ? 'الآن ' + round(weather.current.temperature_2m) + '° · ' + weatherDescription(weather.current.weather_code) + ' في ' + weather.city
@@ -295,38 +370,127 @@ export default function WeatherScreen() {
   if ((weather?.daily?.precipitation_probability_max?.[0] ?? 0) >= 40) tips.push('احتمال هطول مرتفع اليوم؛ خذ مظلتك معك.');
   if (!tips.length && weather) tips.push('الأجواء مستقرة اليوم؛ استمتع بوقتك في الحي.');
 
+  const getSessionUser = async () => {
+    const { data } = await supabase.auth.getSession();
+    return data.session?.user || null;
+  };
+
+  const weatherSummary = weather
+    ? weatherDescription(weather.current.weather_code) + '، ' + round(weather.current.temperature_2m) + '° (المحسوسة ' + round(weather.current.apparent_temperature) + '°)، الرطوبة ' + round(weather.current.relative_humidity_2m) + '%، الرياح ' + round(weather.current.wind_speed_10m) + ' كم/س'
+    : '';
+
+  const shareWeatherPost = async () => {
+    if (!weather) return;
+    setSharing(true);
+    try {
+      const user = await getSessionUser();
+      if (!user) {
+        Alert.alert('تنبيه', 'يرجى تسجيل الدخول لمشاركة حالة الطقس في حيّك.');
+        return;
+      }
+      const { data: profile } = await supabase.from('profiles').select('city, district, region').eq('id', user.id).maybeSingle();
+      const city = profile?.city || weather.city || '';
+      const district = profile?.district || weather.district || '';
+      const top = sortedAlerts.find((a) => a.severity === 'danger') || sortedAlerts.find((a) => a.severity === 'warning');
+      const title = 'حالة الطقس في ' + (district || city || 'حيّنا') + ' الآن ☁️';
+      const body = weatherSummary + (top ? ' — تنبيه: ' + top.title + '. ' + top.message : '');
+      const base = {
+        author_id: user.id,
+        title,
+        body,
+        city: city || null,
+        district: district || null,
+      };
+      const { error } = await supabase.from('questions').insert({
+        ...base,
+        is_emergency: false,
+        urgency_level: 'normal',
+        is_tool_sharing: false,
+        item_type: 'inquiry',
+        lat: weather.latitude ?? null,
+        lng: weather.longitude ?? null,
+      });
+      if (error) {
+        const { error: fallbackError } = await supabase.from('questions').insert(base);
+        if (fallbackError) throw fallbackError;
+      }
+      Alert.alert('تم النشر ✅', 'نُشرت حالة الطقس في مجتمع حيّك.');
+    } catch (err: any) {
+      Alert.alert('تعذّر النشر', err?.message || 'حاول مرة أخرى.');
+    } finally {
+      setSharing(false);
+    }
+  };
+
+  const notifyNeighbors = () => {
+    if (!weather) return;
+    Alert.alert(
+      'تنبيه الجيران',
+      'سيتم إرسال إشعار لجيرانك في ' + (weather.district || weather.city || 'حيّك') + '. متابعة؟',
+      [
+        { text: 'إلغاء', style: 'cancel' },
+        {
+          text: 'إرسال',
+          style: 'destructive',
+          onPress: async () => {
+            setSharing(true);
+            try {
+              const user = await getSessionUser();
+              if (!user) {
+                Alert.alert('تنبيه', 'يرجى تسجيل الدخول أولًا.');
+                return;
+              }
+              let query = supabase.from('profiles').select('id').eq('city', weather.city).limit(300);
+              if (weather.district) query = query.eq('district', weather.district);
+              const { data: neighbors } = await query;
+              const ids = (neighbors || []).map((n: any) => n.id).filter((id: string) => id && id !== user.id);
+              if (!ids.length) {
+                Alert.alert('لا يوجد جيران', 'لم نجد جيرانًا مطابقين في منطقتك.');
+                return;
+              }
+              const title = 'تنبيه طقس' + (topAlert ? ': ' + topAlert.title : '');
+              const body = weatherSummary;
+              const rows = ids.map((id: string) => ({ user_id: id, type: 'weather', title, body, data: { kind: 'weather', city: weather.city, district: weather.district, url: '/weather' } }));
+              for (let i = 0; i < rows.length; i += 300) {
+                await supabase.from('notifications').insert(rows.slice(i, i + 300));
+              }
+              await sendPushToMultipleUsers(ids, { title, body, data: { url: '/weather' } });
+              Alert.alert('تم الإرسال ✅', 'تم تنبيه ' + ids.length + ' من الجيران.');
+            } catch (err: any) {
+              Alert.alert('تعذّر الإرسال', err?.message || 'حاول مرة أخرى.');
+            } finally {
+              setSharing(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <View style={screenStyles.container}>
-      <LinearGradient
-        colors={['#064e3b', '#047857', '#0e7490']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={screenStyles.hero}
-      >
-        <Pressable
-          onPress={() => router.back()}
-          style={screenStyles.backButton}
-          accessibilityRole="button"
-          accessibilityLabel="رجوع"
-        >
-          <ChevronRight size={22} color="#fff" />
-        </Pressable>
-        <View style={screenStyles.heroCopy}>
-          <View style={screenStyles.livePill}>
-            <View style={screenStyles.liveDot} />
-            <Text style={screenStyles.liveText}>بيانات مباشرة</Text>
-          </View>
-          <Text style={screenStyles.title}>الطقس</Text>
-          <Text style={screenStyles.subtitle} numberOfLines={1}>{heroSubtitle}</Text>
-        </View>
-        <View style={screenStyles.heroIcon}>
-          {weather ? (
-            <Text style={screenStyles.heroTemp}>{round(weather.current.temperature_2m)}°</Text>
-          ) : (
-            <Sun size={30} color="#fde68a" />
-          )}
-        </View>
-      </LinearGradient>
+      <AppHeader
+        variant="sub"
+        title="طقس الحي"
+        subtitle={weather ? `${weather.city} · ${round(weather.current.temperature_2m)}°` : 'توقعات الطقس المباشرة'}
+        fallbackRoute="/home"
+        rightAction={
+          weather ? (
+            <View style={{
+              flexDirection: 'row-reverse',
+              alignItems: 'center',
+              gap: 4,
+              backgroundColor: '#ecfdf5',
+              paddingHorizontal: 10,
+              paddingVertical: 5,
+              borderRadius: 14,
+            }}>
+              <Sun size={14} color="#059669" />
+              <Text style={{ fontSize: 13, fontWeight: '900', color: '#059669' }}>{round(weather.current.temperature_2m)}°</Text>
+            </View>
+          ) : undefined
+        }
+      />
 
       <ScrollView
         contentContainerStyle={[screenStyles.scroll, { paddingBottom: bottomNavInset + 28 }]}
@@ -334,6 +498,31 @@ export default function WeatherScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor="#047857" colors={['#047857']} />}
       >
         <View style={screenStyles.content}>
+          {weather && topAlert ? (
+            <View style={[styles.alertBanner, { backgroundColor: bannerMeta.bg, borderColor: bannerMeta.border }]}>
+              <View style={styles.alertBannerTop}>
+                <View style={[styles.alertIconWrap, { backgroundColor: bannerMeta.accent }]}>
+                  <AlertIcon kind={topAlert.icon} size={16} color="#fff" />
+                </View>
+                <View style={styles.alertBannerCopy}>
+                  <Text style={[styles.alertBadge, { color: bannerMeta.accent }]}>{bannerMeta.label} · {alerts.length}</Text>
+                  <Text style={[styles.alertTitle, { color: bannerMeta.text }]}>{topAlert.title}</Text>
+                </View>
+              </View>
+              <Text style={[styles.alertMessage, { color: bannerMeta.text }]}>{topAlert.message}</Text>
+              {sortedAlerts.length > 1 ? (
+                <View style={styles.alertList}>
+                  {sortedAlerts.slice(1).map((a) => (
+                    <View key={a.id} style={styles.alertRow}>
+                      <AlertIcon kind={a.icon} size={13} color={bannerMeta.accent} />
+                      <Text style={[styles.alertRowText, { color: bannerMeta.text }]}>{a.title}</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+
           {/* City search */}
           <View style={styles.searchCard}>
             <View style={styles.citySearchRow}>
@@ -508,6 +697,28 @@ export default function WeatherScreen() {
                   <Text style={styles.disclaimer}>البيانات والإرشادات تقديرية ولا تغني عن التنبيهات الرسمية.</Text>
                 </View>
 
+                {/* Share / notify neighbors */}
+                <View style={styles.actionsCard}>
+                  <View style={styles.actionsHeader}>
+                    <Megaphone size={16} color="#065f46" />
+                    <Text style={styles.actionsTitle}>شارك حالة الطقس مع جيرانك</Text>
+                  </View>
+                  <Pressable style={[styles.actionPrimary, sharing && styles.actionDisabled]} onPress={shareWeatherPost} disabled={sharing}>
+                    {sharing ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <>
+                        <Send size={16} color="#fff" />
+                        <Text style={styles.actionPrimaryText}>انشر حالة الطقس في حيّك</Text>
+                      </>
+                    )}
+                  </Pressable>
+                  <Pressable style={[styles.actionSecondary, sharing && styles.actionDisabled]} onPress={notifyNeighbors} disabled={sharing}>
+                    <Bell size={16} color="#b91c1c" />
+                    <Text style={styles.actionSecondaryText}>نبّه جيرانك بإشعار</Text>
+                  </Pressable>
+                </View>
+
                 <View style={styles.weatherFooter}>
                   <Text style={styles.sourceText}>المصدر: Open-Meteo · آخر تحديث {lastUpdated ? lastUpdated.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }) : ''}</Text>
                   <Text style={styles.uvText}>مؤشر الأشعة فوق البنفسجية اليوم: {round(weather.daily.uv_index_max?.[0])}</Text>
@@ -635,6 +846,26 @@ const styles = StyleSheet.create({
   weatherFooter: { paddingHorizontal: 14, paddingVertical: 12, backgroundColor: '#f8fafc', gap: 4, borderTopWidth: 1, borderTopColor: '#e2e8f0' },
   sourceText: { color: '#94a3b8', fontSize: 9.5, textAlign: 'right' },
   uvText: { color: '#64748b', fontSize: 10.5, textAlign: 'right', fontWeight: '700' },
+
+  alertBanner: { marginHorizontal: 12, marginTop: 10, marginBottom: 2, borderRadius: 18, borderWidth: 1, padding: 14, gap: 8 },
+  alertBannerTop: { flexDirection: 'row-reverse', alignItems: 'center', gap: 9 },
+  alertIconWrap: { width: 34, height: 34, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  alertBannerCopy: { flex: 1, alignItems: 'flex-end', gap: 2 },
+  alertBadge: { fontSize: 10, fontWeight: '900' },
+  alertTitle: { fontSize: 14.5, fontWeight: '900', textAlign: 'right' },
+  alertMessage: { fontSize: 11.5, lineHeight: 18, textAlign: 'right' },
+  alertList: { gap: 6, marginTop: 4, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.06)', paddingTop: 8 },
+  alertRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 7 },
+  alertRowText: { fontSize: 11, fontWeight: '700', textAlign: 'right', flex: 1 },
+
+  actionsCard: { marginHorizontal: 12, marginTop: 0, marginBottom: 12, padding: 14, backgroundColor: '#fff', borderRadius: 18, borderWidth: 1, borderColor: '#e2e8f0', gap: 10 },
+  actionsHeader: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
+  actionsTitle: { color: '#0f172a', fontSize: 13, fontWeight: '900', textAlign: 'right' },
+  actionPrimary: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#047857', borderRadius: 13, paddingVertical: 12 },
+  actionPrimaryText: { color: '#fff', fontSize: 13, fontWeight: '900' },
+  actionSecondary: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fecaca', borderRadius: 13, paddingVertical: 12 },
+  actionSecondaryText: { color: '#b91c1c', fontSize: 13, fontWeight: '900' },
+  actionDisabled: { opacity: 0.55 },
 
   infoCard: { backgroundColor: '#fff', borderRadius: 16, padding: 15, borderWidth: 1, borderColor: '#e2e8f0', gap: 6 },
   infoTitle: { color: '#0f172a', fontSize: 13, fontWeight: '900', textAlign: 'right' },

@@ -25,7 +25,7 @@ import {
   Flag,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import ScreenHeader from '@/components/shared/ScreenHeader';
+import { AppHeader } from '@/components/shared/AppHeader';
 
 export default function Business() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -117,6 +117,27 @@ export default function Business() {
 
   return (
     <View style={styles.container}>
+      <AppHeader
+        variant="sub"
+        title={business.name || 'دليل المحلات'}
+        subtitle={[business.district && `حي ${business.district}`, business.city].filter(Boolean).join(' · ')}
+        fallbackRoute="/directory"
+        rightAction={
+          <Pressable
+            onPress={() => router.push({ pathname: '/report', params: { type: 'business', id: business.id } })}
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 18,
+              backgroundColor: '#f1f5f9',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Flag size={18} color="#475569" />
+          </Pressable>
+        }
+      />
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* Header Hero */}
         <LinearGradient
@@ -125,18 +146,6 @@ export default function Business() {
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
         >
-          <ScreenHeader
-            title="دليل المحلات"
-            fallbackRoute="/directory"
-            rightAction={(
-              <Pressable
-                onPress={() => router.push({ pathname: '/report', params: { type: 'business', id: business.id } })}
-                style={styles.iconBtn}
-              >
-                <Flag size={20} color="#fff" />
-              </Pressable>
-            )}
-          />
 
           <View style={styles.heroContent}>
             <View style={styles.ratingBadge}>
@@ -294,7 +303,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   hero: {
-    paddingTop: Platform.OS === 'ios' ? 52 : 40,
+    paddingTop: 18,
     paddingHorizontal: 20,
     paddingBottom: 28,
     borderBottomLeftRadius: 30,

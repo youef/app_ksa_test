@@ -11,16 +11,14 @@ import {
   Platform,
   Image,
   Modal,
+  Share,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
-import { C } from '@/lib/ui';
 import { sendPushToUser } from '@/lib/pushSender';
 import {
-  ChevronRight,
   MapPin,
   HeartHandshake,
-  AlertCircle,
   Banknote,
   CheckCircle2,
   Trash2,
@@ -30,17 +28,22 @@ import {
   Clock,
   ShieldCheck,
   Flame,
-  ArrowRight,
   Check,
   Send,
   Info,
   Coffee,
   Sparkles,
   X,
-  Award,
+  ChevronLeft,
+  Share2,
+  Car,
+  Wrench,
+  Eye,
+  ArrowRight,
+  ShieldAlert,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import ScreenHeader from '@/components/shared/ScreenHeader';
+import { AppHeader } from '@/components/shared/AppHeader';
 import { requireAccount } from '@/lib/authGate';
 import { getActiveLocation } from '@/lib/locationSync';
 import { areaLabel } from '@/lib/privacy';
@@ -57,6 +60,36 @@ function isAutoSuggestedOffer(match: any): boolean {
   if (!msg) return false;
   return AUTO_SUGGESTION_MARKERS.some(marker => msg.startsWith(marker));
 }
+
+function getRequestTypeInfo(type?: string) {
+  switch (type) {
+    case 'delivery':
+      return { label: 'توصيل مشوار أو غرض', icon: Car, bg: '#eff6ff', color: '#2563eb', border: '#bfdbfe' };
+    case 'tools':
+      return { label: 'إعارة واستعارة أداة', icon: Wrench, bg: '#fff7ed', color: '#ea580c', border: '#fed7aa' };
+    case 'home':
+    case 'maintenance':
+      return { label: 'مساعدة وصيانة بالحي', icon: Wrench, bg: '#f0fdf4', color: '#16a34a', border: '#bbf7d0' };
+    case 'volunteer':
+      return { label: 'فزعة وتطوع خيري', icon: HeartHandshake, bg: '#fdf2f8', color: '#db2777', border: '#fbcfe8' };
+    default:
+      return { label: type || 'طلب فزعة عامة', icon: HeartHandshake, bg: '#ecfdf5', color: '#059669', border: '#a7f3d0' };
+  }
+}
+
+const QUICK_REPLY_TEMPLATES = [
+  'أقدر أساعدك اليوم إن شاء الله 🤝',
+  'أنا قريب بالحي وأقدر أمرك 🚗',
+  'الأداة متوفرة عندي وتفضل استعرها 🛠️',
+  'أنا بالخدمة وجاهز، تواصل معي 💬',
+];
+
+const COMPLETION_TEMPLATES = [
+  'بيض الله وجهك على الفزعة الكريمة 🤍',
+  'تسلم وما قصرت، يعطيك ألف عافية يا جارنا 🤝',
+  'شكراً لحسن تعاملك وسرعة استجابتك ⭐',
+  'قهوتك واصلة، فزعة في ميزان حسناتك ☕',
+];
 
 export default function Request() {
   const bottomNavInset = useBottomNavInset();
@@ -76,13 +109,6 @@ export default function Request() {
   const [completeNote, setCompleteNote] = useState('بيض الله وجهك على الفزعة الكريمة 🤍');
   const [completingRequest, setCompletingRequest] = useState(false);
 
-  const COMPLETION_TEMPLATES = [
-    'بيض الله وجهك على الفزعة الكريمة 🤍',
-    'تسلم وما قصرت، يعطيك ألف عافية يا جارنا 🤝',
-    'شكراً لحسن تعاملك وسرعة استجابتك ⭐',
-    'قهوتك واصلة، فزعة في ميزان حسناتك ☕',
-  ];
-
   async function load() {
     if (!id) return;
     setLoading(true);
@@ -98,11 +124,12 @@ export default function Request() {
             p_city: location.city,
             p_district: location.district,
           }));
+
       const [requestResult, oData] = await Promise.all([
         requestPromise,
         supabase
           .from('help_matches')
-          .select('id, helper_id, message, status, created_at, profiles:helper_id(id, display_name, username, avatar_url, is_verified, is_geoverified, district)')
+          .select('id, helper_id, message, status, created_at, profiles:helper_id(id, display_name, username, avatar_url, is_verified, is_geoverified, district, city)')
           .eq('request_id', id)
           .order('created_at', { ascending: false }),
       ]);
@@ -110,15 +137,28 @@ export default function Request() {
       const requestData = Array.isArray(requestResult.data) ? requestResult.data[0] : requestResult.data;
       if (requestData) {
         setRequest(requestData);
+
+        // Safely bump views count
+        if (requestData.id && user) {
+          try {
+            supabase
+              .from('requests')
+              .update({ views_count: (requestData.views_count || 0) + 1 })
+              .eq('id', id)
+              .then(() => {});
+          } catch {}
+        }
+
         if (requestData.requester_id) {
           const { data: p } = await supabase
             .from('profiles')
-            .select('id, display_name, username, avatar_url, is_verified, is_geoverified, city, district')
+            .select('id, display_name, username, avatar_url, is_verified, is_geoverified, city, district, badges')
             .eq('id', requestData.requester_id)
             .single();
           setRequester(p);
         }
       }
+
       // Only real neighbour offers are shown. Auto-generated matcher rows are ignored.
       const allMatches = oData.data ?? [];
       const realOffers = allMatches.filter((o: any) => !isAutoSuggestedOffer(o));
@@ -142,6 +182,27 @@ export default function Request() {
   useEffect(() => {
     load();
   }, [id]);
+
+  const handleShare = async () => {
+    const shareUrl = typeof window !== 'undefined' ? window.location.href : `https://hayna.app/request?id=${id}`;
+    const shareText = `طلب فزعة في حي ${request?.district || 'الحي'}: «${request?.title || 'طلب مساعدة'}» عبر منصة حيّنا\n${shareUrl}`;
+
+    if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
+      try {
+        await navigator.clipboard.writeText(shareText);
+        Alert.alert('تم نسخ الرابط 📋', 'تم نسخ رابط الطلب بنجاح، يمكنك مشاركته مع جيرانك في مجموعات الواتساب.');
+        return;
+      } catch {}
+    }
+
+    try {
+      await Share.share({
+        message: shareText,
+        url: shareUrl,
+        title: request?.title || 'طلب فزعة في حيّنا',
+      });
+    } catch {}
+  };
 
   async function sendOffer() {
     if (!me) return requireAccount('سجّل الدخول أو أنشئ حساباً لتقديم المساعدة.');
@@ -342,7 +403,7 @@ export default function Request() {
 
     try {
       // 1. Try RPC function
-      const { data: rpcRes, error: rpcErr } = await supabase.rpc('complete_neighbor_request', {
+      const { data: _rpcRes, error: rpcErr } = await supabase.rpc('complete_neighbor_request', {
         p_request_id: id,
         p_helper_id: helperId,
         p_note: finalNote,
@@ -445,7 +506,7 @@ export default function Request() {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color="#059669" />
-        <Text style={styles.loadingText}>جاري تحميل تفاصيل الطلب...</Text>
+        <Text style={styles.loadingText}>جاري تحميل تفاصيل الفزعة...</Text>
       </View>
     );
   }
@@ -453,7 +514,8 @@ export default function Request() {
   if (!request) {
     return (
       <View style={styles.center}>
-        <Text style={styles.errorText}>الطلب غير موجود أو تم إغلاقه.</Text>
+        <ShieldAlert size={48} color="#94a3b8" />
+        <Text style={styles.errorText}>الطلب غير موجود أو تمت إزالته.</Text>
         <Pressable onPress={() => router.back()} style={styles.backBtnAction}>
           <Text style={styles.backBtnActionText}>العودة للطلبات</Text>
         </Pressable>
@@ -463,76 +525,116 @@ export default function Request() {
 
   const isOwner = me === request.requester_id;
   const locationLabel = areaLabel({ district: request.district, city: request.city });
+  const typeInfo = getRequestTypeInfo(request.request_type);
+  const TypeIcon = typeInfo.icon;
+  const myOffer = offers.find(o => o.helper_id === me);
 
   return (
     <View style={styles.container}>
+      <AppHeader
+        variant="sub"
+        title="طلب فزعة بالحي"
+        subtitle={locationLabel}
+        fallbackRoute="/requests"
+        rightAction={
+          <View style={styles.headerRightActions}>
+            <Pressable
+              onPress={handleShare}
+              style={styles.headerActionBtn}
+              accessibilityRole="button"
+              accessibilityLabel="مشاركة"
+            >
+              <Share2 size={16} color="#059669" />
+            </Pressable>
+            <Pressable
+              onPress={() => router.push({ pathname: '/report', params: { type: 'request', id: request.id } })}
+              style={styles.headerActionBtn}
+              accessibilityRole="button"
+              accessibilityLabel="إبلاغ"
+            >
+              <Flag size={16} color="#64748b" />
+            </Pressable>
+          </View>
+        }
+      />
+
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingBottom: bottomNavInset + 40 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Unified Luxury Header */}
-        <LinearGradient
-          colors={['#064e3b', '#065f46', '#047857']}
-          style={styles.hero}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        >
-          <ScreenHeader
-            title="تفاصيل طلب الفزعة 🤝"
-            fallbackRoute="/requests"
-            rightAction={(
-              <Pressable
-                onPress={() => router.push({ pathname: '/report', params: { type: 'request', id: request.id } })}
-                style={styles.headerActionBtn}
-                accessibilityRole="button"
-                accessibilityLabel="إبلاغ"
-              >
-                <Flag size={18} color="#ffffff" />
-              </Pressable>
-            )}
-          />
-
-          <View style={styles.heroBadgeRow}>
-            {request.is_urgent && (
-              <View style={styles.urgentBadge}>
-                <Flame size={12} color="#dc2626" />
-                <Text style={styles.urgentBadgeText}>فزعة عاجلة</Text>
-              </View>
-            )}
+        {/* Modern Executive Hero Card */}
+        <View style={styles.heroCard}>
+          {/* Top Badges Row */}
+          <View style={styles.heroTopBadges}>
+            {/* Status Badge */}
             {request.status === 'completed' ? (
               <View style={styles.completedBadgeHero}>
-                <Sparkles size={12} color="#047857" />
+                <Sparkles size={13} color="#047857" />
                 <Text style={styles.completedBadgeHeroText}>تمت الفزعة بنجاح ☕</Text>
               </View>
             ) : request.status === 'accepted' ? (
               <View style={styles.acceptedBadge}>
-                <CheckCircle2 size={12} color="#15803d" />
-                <Text style={styles.acceptedBadgeText}>تم قبول مساعدة</Text>
+                <CheckCircle2 size={13} color="#15803d" />
+                <Text style={styles.acceptedBadgeText}>جاري التنفيذ مع جار 🤝</Text>
               </View>
             ) : (
               <View style={styles.openBadge}>
                 <View style={styles.openDot} />
-                <Text style={styles.openBadgeText}>مفتوح للمساعدة</Text>
+                <Text style={styles.openBadgeText}>مفتوح ويحتاج فزعة</Text>
+              </View>
+            )}
+
+            {/* Category / Type Pill */}
+            <View style={[styles.typePill, { backgroundColor: typeInfo.bg, borderColor: typeInfo.border }]}>
+              <TypeIcon size={12} color={typeInfo.color} />
+              <Text style={[styles.typePillText, { color: typeInfo.color }]}>{typeInfo.label}</Text>
+            </View>
+
+            {/* Urgency Badge */}
+            {request.is_urgent && (
+              <View style={styles.urgentBadge}>
+                <Flame size={12} color="#dc2626" />
+                <Text style={styles.urgentBadgeText}>عاجل</Text>
               </View>
             )}
           </View>
 
+          {/* Title */}
           <Text style={styles.heroTitle}>{request.title}</Text>
 
+          {/* Meta Info Row */}
           <View style={styles.metaRow}>
-            <MapPin size={13} color="#a7f3d0" />
-            <Text style={styles.metaText}>{locationLabel}</Text>
+            <View style={styles.metaChip}>
+              <MapPin size={13} color="#059669" />
+              <Text style={styles.metaChipText}>{locationLabel}</Text>
+            </View>
+
             {request.created_at && (
-              <Text style={styles.metaTimeText}>· {relativeTime(request.created_at)}</Text>
+              <View style={styles.metaChip}>
+                <Clock size={12} color="#64748b" />
+                <Text style={styles.metaChipText}>{relativeTime(request.created_at)}</Text>
+              </View>
+            )}
+
+            {request.views_count != null && (
+              <View style={styles.metaChip}>
+                <Eye size={12} color="#64748b" />
+                <Text style={styles.metaChipText}>{request.views_count} مشاهدة</Text>
+              </View>
             )}
           </View>
-          <Text style={styles.heroPrivacy}>
-            الموقع معروض على مستوى الحي فقط لحماية الخصوصية · يتم تبادل الإحداثي الدقيق بالخاص
-          </Text>
-        </LinearGradient>
+
+          {/* Privacy Guarantee Note */}
+          <View style={styles.privacyNoteBox}>
+            <Info size={13} color="#047857" />
+            <Text style={styles.privacyNoteText}>
+              الموقع معروض على مستوى الحي فقط لحماية خصوصية الجيران · يتم تبادل الإحداثيات بالخاص بعد قبول الفزعة.
+            </Text>
+          </View>
+        </View>
 
         <View style={styles.bodyContainer}>
-          {/* Completed celebratory banner */}
+          {/* Celebratory Banner if completed */}
           {request.status === 'completed' && (
             <LinearGradient
               colors={['#ecfdf5', '#d1fae5']}
@@ -544,17 +646,18 @@ export default function Request() {
               <View style={styles.completedStatusTextCol}>
                 <Text style={styles.completedStatusTitle}>تمت الفزعة وإتمام هذا الطلب بنجاح! 🎉</Text>
                 <Text style={styles.completedStatusSub}>
-                  شكراً لتعاون أهل الحي وروح الفزعة والمبادرة الأخوية 🤍☕ (+15 نقطة سمعة)
+                  شكراً لتعاون أهل الحي وروح الفزعة والمبادرة الأخوية 🤍☕ (+15 نقطة سمعة للفازع)
                 </Text>
               </View>
             </LinearGradient>
           )}
+
           {/* Requester Profile Card */}
           {requester && (
             <Pressable
               style={({ pressed }) => [
                 styles.requesterCard,
-                pressed && { opacity: 0.95 },
+                pressed && { opacity: 0.96 },
               ]}
               onPress={() => router.push({ pathname: '/user', params: { id: requester.id } })}
             >
@@ -580,48 +683,144 @@ export default function Request() {
                   <Text style={styles.requesterName}>
                     {requester.display_name || `@${requester.username || 'صاحب الطلب'}`}
                   </Text>
-                  {requester.is_verified && <ShieldCheck size={13} color="#059669" />}
+                  <View style={styles.requesterBadgePill}>
+                    <CheckCircle2 size={11} color="#059669" />
+                    <Text style={styles.requesterBadgePillText}>صاحب الطلب</Text>
+                  </View>
                 </View>
                 <Text style={styles.requesterSub}>
-                  {requester.district ? `ساكن في حي ${requester.district}` : 'أحد جيران الحي'}
+                  {requester.district ? `ساكن في حي ${requester.district} · ${requester.city || ''}` : 'أحد جيران الحي'}
                 </Text>
               </View>
 
-              <View style={styles.requesterArrow}>
-                <ArrowRight size={15} color="#94a3b8" />
+              <View style={styles.visitProfilePill}>
+                <Text style={styles.visitProfilePillText}>الملف</Text>
+                <ChevronLeft size={13} color="#059669" />
               </View>
             </Pressable>
           )}
 
-          {/* Details Card */}
+          {/* Details & Needs Card */}
           <View style={styles.card}>
             <View style={styles.cardHeaderRow}>
+              <View style={styles.cardHeaderIconBox}>
+                <HeartHandshake size={18} color="#059669" />
+              </View>
               <Text style={styles.cardTitle}>تفاصيل الطلب والاحتياج</Text>
-              <HeartHandshake size={18} color="#059669" />
             </View>
+
             <Text style={styles.cardDesc}>{request.description}</Text>
 
+            {request.notes && (
+              <View style={styles.notesBox}>
+                <Info size={14} color="#64748b" />
+                <Text style={styles.notesText}>{request.notes}</Text>
+              </View>
+            )}
+
+            {/* Compensation / Volunteer Mode */}
             {request.budget && Number(request.budget) > 0 ? (
               <View style={styles.budgetBox}>
                 <Banknote size={18} color="#15803d" />
-                <Text style={styles.budgetValue}>المكافأة المقترحة: {request.budget} ر.س</Text>
+                <View style={styles.budgetCol}>
+                  <Text style={styles.budgetValue}>المكافأة المقترحة: {request.budget} ر.س</Text>
+                  <Text style={styles.budgetSub}>مكافأة تقديرية اختيارية من صاحب الطلب</Text>
+                </View>
               </View>
             ) : (
               <View style={styles.volunteerBox}>
                 <HeartHandshake size={18} color="#059669" />
-                <Text style={styles.volunteerValue}>فزعة وتطوع ومساعدة أخوية لوجه الله 🤝</Text>
+                <View style={styles.volunteerCol}>
+                  <Text style={styles.volunteerValue}>فزعة وتطوع ومساعدة أخوية لوجه الله 🤝</Text>
+                  <Text style={styles.volunteerSub}>خدمة جيرة متبادلة تكسبك دعوة صادقة ونقاط سمعة</Text>
+                </View>
               </View>
             )}
+
+            {/* Open Map Link */}
+            <Pressable
+              style={styles.openMapBtn}
+              onPress={() => router.push({ pathname: '/map', params: { district: request.district, city: request.city } })}
+            >
+              <MapPin size={15} color="#059669" />
+              <Text style={styles.openMapBtnText}>عرض موقع الحي في خريطة المنصة 🗺️</Text>
+              <ArrowRight size={14} color="#059669" style={{ transform: [{ rotate: '180deg' }] }} />
+            </Pressable>
           </View>
 
-          {/* Offers Section */}
+          {/* Owner Broadcast Action Card */}
+          {isOwner && (
+            <View style={styles.ownerNoticeCard}>
+              <View style={styles.ownerNoticeTop}>
+                <Sparkles size={18} color="#059669" />
+                <Text style={styles.ownerNoticeTitle}>أنت صاحب هذا الطلب المنشور 📢</Text>
+              </View>
+              <Text style={styles.ownerNoticeSub}>
+                طلبك معروض أمام جميع جيران {locationLabel}. يمكنك نسخ رابط الطلب ومشاركته في قروب الحي بالواتساب لسرعة التجاوب.
+              </Text>
+              <View style={styles.ownerActionRow}>
+                <Pressable style={styles.ownerShareBtn} onPress={handleShare}>
+                  <Share2 size={15} color="#ffffff" />
+                  <Text style={styles.ownerShareBtnText}>مشاركة الطلب في قروب الحي</Text>
+                </Pressable>
+                <Pressable style={styles.ownerDeleteBtn} onPress={deleteRequest}>
+                  <Trash2 size={15} color="#dc2626" />
+                  <Text style={styles.ownerDeleteBtnText}>حذف</Text>
+                </Pressable>
+              </View>
+            </View>
+          )}
+
+          {/* Helper Already Offered State */}
+          {!isOwner && myOffer && (
+            <View style={styles.myOfferNoticeCard}>
+              <View style={styles.myOfferHeader}>
+                <CheckCircle2 size={20} color="#059669" />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.myOfferTitle}>لقد أرسلت عرض فزعتك لهذا الطلب! 🤝</Text>
+                  <Text style={styles.myOfferSub}>
+                    رسالتك: «{myOffer.message}»
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.myOfferStatusRow}>
+                <Text style={styles.myOfferStatusLabel}>حالة العرض:</Text>
+                <View style={[
+                  styles.myOfferStatusPill,
+                  myOffer.status === 'accepted' ? styles.myOfferStatusPillAccepted : styles.myOfferStatusPillPending
+                ]}>
+                  <Text style={[
+                    styles.myOfferStatusText,
+                    myOffer.status === 'accepted' ? styles.myOfferStatusTextAccepted : styles.myOfferStatusTextPending
+                  ]}>
+                    {myOffer.status === 'accepted' ? 'تم قبول عرضك 🎉' : 'قيد انتظار موافقة الجار ⏳'}
+                  </Text>
+                </View>
+              </View>
+
+              {myOffer.status === 'accepted' && convId && (
+                <Pressable
+                  style={styles.goToChatBtn}
+                  onPress={() => router.push({ pathname: '/conversation', params: { id: convId } })}
+                >
+                  <MessageSquare size={16} color="#ffffff" />
+                  <Text style={styles.goToChatBtnText}>الانتقال إلى المحادثة الخاصة للاتفاق 💬</Text>
+                </Pressable>
+              )}
+            </View>
+          )}
+
+          {/* Offers Received Section */}
           <View style={styles.card}>
             <View style={styles.cardHeaderRow}>
-              <View style={styles.sectionTitleWithCount}>
-                <Text style={styles.countBadgePill}>{offers.length}</Text>
-                <Text style={styles.cardTitle}>عروض المساعدة من الجيران</Text>
+              <View style={styles.cardHeaderIconBox}>
+                <MessageSquare size={18} color="#059669" />
               </View>
-              <MessageSquare size={18} color="#059669" />
+              <View style={styles.sectionTitleWithCount}>
+                <Text style={styles.cardTitle}>عروض المساعدة من الجيران</Text>
+                <Text style={styles.countBadgePill}>{offers.length}</Text>
+              </View>
             </View>
 
             {autoSuggestedCount > 0 && (
@@ -635,9 +834,13 @@ export default function Request() {
 
             {offers.length === 0 ? (
               <View style={styles.noOffersBox}>
-                <HeartHandshake size={36} color="#cbd5e1" />
+                <HeartHandshake size={42} color="#cbd5e1" />
                 <Text style={styles.noOffersTitle}>لا توجد عروض مساعدة بعد</Text>
-                <Text style={styles.noOffersSub}>كن أول جار يقدم الفزعة والمساعدة!</Text>
+                <Text style={styles.noOffersSub}>
+                  {isOwner
+                    ? 'سيظهر هنا أي جار يعرض مساعدته فور إرسالها.'
+                    : 'كن أول جار يقدم الفزعة والمبادرة الكريمة!'}
+                </Text>
               </View>
             ) : (
               offers.map(o => (
@@ -645,12 +848,19 @@ export default function Request() {
                   <View style={styles.offerHeader}>
                     <View style={styles.offerHelperInfo}>
                       <View style={styles.offerAvatarCircle}>
-                        <User size={13} color="#059669" />
+                        <User size={14} color="#059669" />
                       </View>
-                      <Text style={styles.offerHelperName}>
-                        {o.profiles?.display_name || `@${o.profiles?.username || 'فاعل خير'}`}
-                      </Text>
-                      {o.profiles?.is_geoverified && <ShieldCheck size={11} color="#10b981" />}
+                      <View>
+                        <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}>
+                          <Text style={styles.offerHelperName}>
+                            {o.profiles?.display_name || `@${o.profiles?.username || 'فاعل خير'}`}
+                          </Text>
+                          {o.profiles?.is_geoverified && <ShieldCheck size={12} color="#10b981" />}
+                        </View>
+                        {o.created_at && (
+                          <Text style={styles.offerTimeText}>{relativeTime(o.created_at)}</Text>
+                        )}
+                      </View>
                     </View>
 
                     <View style={[
@@ -663,20 +873,24 @@ export default function Request() {
                         o.status === 'completed' && styles.offerStatusTextCompleted,
                         o.status === 'accepted' && styles.offerStatusTextAccepted,
                       ]}>
-                        {o.status === 'completed' ? 'تمت الفزعة ✓' : o.status === 'accepted' ? 'جاري الفزعة' : 'عرض جديد'}
+                        {o.status === 'completed' ? 'تمت الفزعة ✓' : o.status === 'accepted' ? 'تم القبول 🤝' : 'عرض جديد'}
                       </Text>
                     </View>
                   </View>
 
-                  <Text style={styles.offerMessage}>{o.message}</Text>
+                  <View style={styles.offerBubble}>
+                    <Text style={styles.offerMessage}>{o.message}</Text>
+                  </View>
 
+                  {/* Owner Accept Button */}
                   {isOwner && o.status === 'proposed' && request.status === 'open' && (
                     <Pressable style={styles.acceptBtn} onPress={() => acceptOffer(o)}>
                       <Check size={16} color="#fff" />
-                      <Text style={styles.acceptBtnText}>قبول العرض وفتح المحادثة 💬</Text>
+                      <Text style={styles.acceptBtnText}>قبول العرض وبدء التنسيق بالخاص 💬</Text>
                     </Pressable>
                   )}
 
+                  {/* Accepted Actions */}
                   {o.status === 'accepted' && (
                     <View style={styles.acceptedOfferWrap}>
                       {convId && (
@@ -686,7 +900,7 @@ export default function Request() {
                             onPress={() => router.push({ pathname: '/conversation', params: { id: convId } })}
                           >
                             <MessageSquare size={15} color="#047857" />
-                            <Text style={styles.openChatBtnText}>فتح المحادثة</Text>
+                            <Text style={styles.openChatBtnText}>فتح المحادثة الخاصة</Text>
                           </Pressable>
 
                           {isOwner && (
@@ -700,7 +914,7 @@ export default function Request() {
                               ) : (
                                 <MapPin size={15} color="#fff" />
                               )}
-                              <Text style={styles.shareLocationBtnText}>إرسال موقعي الدقيق (خاص)</Text>
+                              <Text style={styles.shareLocationBtnText}>إرسال موقعي الدقيق</Text>
                             </Pressable>
                           )}
                         </View>
@@ -713,7 +927,7 @@ export default function Request() {
                         >
                           <Coffee size={16} color="#78350f" />
                           <Text style={styles.completeWithCoffeeBtnText}>
-                            إتمام الطلب وشكر الفازع ☕ (+15 نقطة)
+                            إتمام الطلب وشكر الفازع ☕ (+15 نقطة سمعة)
                           </Text>
                         </Pressable>
                       )}
@@ -733,20 +947,39 @@ export default function Request() {
             )}
           </View>
 
-          {/* Help Form (For non-owners if request is open) */}
-          {!isOwner && request.status === 'open' && me && (
+          {/* Interactive Offer Submission Form (For Neighbors when Request is Open) */}
+          {!isOwner && !myOffer && request.status === 'open' && me && (
             <View style={styles.offerFormCard}>
               <View style={styles.cardHeaderRow}>
+                <View style={styles.cardHeaderIconBox}>
+                  <HeartHandshake size={18} color="#059669" />
+                </View>
                 <Text style={styles.offerFormTitle}>تقديم فزعة ومساعدة 🤝</Text>
               </View>
-              <Text style={styles.offerFormSub}>اكتب رسالة سريعة لصاحب الطلب لتخبره كيف تقدر تساعده.</Text>
+
+              <Text style={styles.offerFormSub}>
+                اختر رداً سريعاً بنقرة واحدة أو اكتب تفاصيل عرضك لصاحب الطلب:
+              </Text>
+
+              {/* Quick Reply Chips */}
+              <View style={styles.quickChipsGrid}>
+                {QUICK_REPLY_TEMPLATES.map((tmpl, idx) => (
+                  <Pressable
+                    key={idx}
+                    style={styles.quickChip}
+                    onPress={() => setMessage(tmpl)}
+                  >
+                    <Text style={styles.quickChipText}>{tmpl}</Text>
+                  </Pressable>
+                ))}
+              </View>
 
               <TextInput
                 style={styles.offerInput}
                 value={message}
                 onChangeText={setMessage}
-                placeholder="مثال: أقدر أساعدك الليلة أو في طريقي للحي..."
-                placeholderTextColor="#9ca3af"
+                placeholder="اكتب رسالتك لجارك... (مثال: أقدر أساعدك وأنا متاح الليلة)"
+                placeholderTextColor="#94a3b8"
                 multiline
               />
 
@@ -760,30 +993,38 @@ export default function Request() {
                 ) : (
                   <>
                     <Send size={16} color="#fff" />
-                    <Text style={styles.sendOfferBtnText}>إرسال عرض المساعدة</Text>
+                    <Text style={styles.sendOfferBtnText}>إرسال عرض المساعدة للجار</Text>
                   </>
                 )}
               </Pressable>
             </View>
           )}
 
+          {/* Guest Sign-In Prompt */}
           {!me && request.status === 'open' && (
             <Pressable
               style={styles.guestOfferPrompt}
               onPress={() => requireAccount('سجّل الدخول أو أنشئ حساباً لتقديم المساعدة لأهل الحي.')}
             >
-              <Text style={styles.guestOfferPromptText}>سجّل الدخول لتقديم المساعدة لأهل الحي</Text>
-              <HeartHandshake size={18} color="#047857" />
+              <HeartHandshake size={20} color="#047857" />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.guestOfferPromptTitle}>سجّل الدخول للمشاركة في فزعة جارك</Text>
+                <Text style={styles.guestOfferPromptSub}>انضم لأهل حيك وساهم في تعزيز روح الجيرة والتكافل</Text>
+              </View>
+              <ChevronLeft size={16} color="#047857" />
             </Pressable>
           )}
 
-          {/* Owner Delete Button */}
-          {isOwner && (
-            <Pressable style={styles.deleteBtn} onPress={deleteRequest}>
-              <Trash2 size={16} color="#ef4444" />
-              <Text style={styles.deleteBtnText}>إلغاء وحذف هذا الطلب</Text>
-            </Pressable>
-          )}
+          {/* Safety & Neighbor Guidelines */}
+          <View style={styles.guidelinesCard}>
+            <View style={styles.guidelinesTitleRow}>
+              <ShieldCheck size={16} color="#059669" />
+              <Text style={styles.guidelinesTitle}>إرشادات الفزعة الآمنة في الحي</Text>
+            </View>
+            <Text style={styles.guidelinesItem}>• التنسيق المباشر واللقاء في أماكن معروفة ومدخل الحي.</Text>
+            <Text style={styles.guidelinesItem}>• الحفاظ على الأمانات والأدوات المعارة وردّها بحالة ممتازة.</Text>
+            <Text style={styles.guidelinesItem}>• التعامل بأخلاق الإسلام وحسن الجوار والإخلاص في المساعدة.</Text>
+          </View>
         </View>
       </ScrollView>
 
@@ -809,7 +1050,7 @@ export default function Request() {
               </Pressable>
               <View style={styles.appreciationModalTitleCol}>
                 <View style={styles.appreciationModalIconCircle}>
-                  <Coffee size={26} color="#78350f" />
+                  <Coffee size={28} color="#78350f" />
                 </View>
                 <Text style={styles.appreciationModalTitle}>إتمام الطلب وشكر الفازع ☕</Text>
                 <Text style={styles.appreciationModalSub}>
@@ -818,7 +1059,7 @@ export default function Request() {
               </View>
             </View>
 
-            <Text style={styles.appreciationSectionLabel}>اختر عبارة شكر وتقدير أو اكتب رسالتك:</Text>
+            <Text style={styles.appreciationSectionLabel}>اختر عبارة شكر وتقدير لجارك:</Text>
             <View style={styles.appreciationChipsWrap}>
               {COMPLETION_TEMPLATES.map((tmpl, idx) => {
                 const isSelected = completeNote === tmpl;
@@ -875,7 +1116,7 @@ export default function Request() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f6f8f7',
+    backgroundColor: '#f8fafc',
   },
   scroll: {
     flexGrow: 1,
@@ -885,7 +1126,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
-    backgroundColor: '#f6f8f7',
+    backgroundColor: '#f8fafc',
     gap: 12,
   },
   loadingText: {
@@ -910,28 +1151,108 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     fontSize: 13,
   },
-  hero: {
-    paddingTop: Platform.OS === 'ios' ? 52 : 36,
-    paddingHorizontal: 16,
-    paddingBottom: 22,
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
+  headerRightActions: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 6,
   },
   headerActionBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: 'rgba(255,255,255,0.14)',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#f1f5f9',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderColor: '#e2e8f0',
   },
-  heroBadgeRow: {
+  heroCard: {
+    backgroundColor: '#ffffff',
+    marginHorizontal: 16,
+    marginTop: 12,
+    borderRadius: 22,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+    gap: 12,
+  },
+  heroTopBadges: {
     flexDirection: 'row-reverse',
+    flexWrap: 'wrap',
+    alignItems: 'center',
     gap: 8,
-    marginTop: 6,
-    marginBottom: 10,
+  },
+  openBadge: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#ecfdf5',
+    paddingHorizontal: 10,
+    paddingVertical: 4.5,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+  },
+  openDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#10b981',
+  },
+  openBadgeText: {
+    color: '#047857',
+    fontSize: 11.5,
+    fontWeight: '900',
+  },
+  acceptedBadge: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#dcfce7',
+    paddingHorizontal: 10,
+    paddingVertical: 4.5,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#86efac',
+  },
+  acceptedBadgeText: {
+    color: '#15803d',
+    fontSize: 11.5,
+    fontWeight: '900',
+  },
+  completedBadgeHero: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#ecfdf5',
+    paddingHorizontal: 10,
+    paddingVertical: 4.5,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+  },
+  completedBadgeHeroText: {
+    fontSize: 11.5,
+    fontWeight: '900',
+    color: '#065f46',
+  },
+  typePill: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 4.5,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  typePillText: {
+    fontSize: 11.5,
+    fontWeight: '800',
   },
   urgentBadge: {
     flexDirection: 'row-reverse',
@@ -939,7 +1260,7 @@ const styles = StyleSheet.create({
     gap: 4,
     backgroundColor: '#fee2e2',
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: 4.5,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: '#fca5a5',
@@ -949,91 +1270,109 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '900',
   },
-  openBadge: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
-  },
-  openDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#6ee7b7',
-  },
-  openBadgeText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '900',
-  },
-  acceptedBadge: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#dcfce7',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
-  },
-  acceptedBadgeText: {
-    color: '#15803d',
-    fontSize: 11,
-    fontWeight: '900',
-  },
   heroTitle: {
-    color: '#fff',
-    fontSize: 20,
+    color: '#0f172a',
+    fontSize: 19,
     fontWeight: '900',
     textAlign: 'right',
     lineHeight: 28,
-    marginBottom: 8,
   },
   metaRow: {
     flexDirection: 'row-reverse',
+    flexWrap: 'wrap',
     alignItems: 'center',
-    gap: 5,
+    gap: 6,
   },
-  metaText: {
-    color: '#ecfdf5',
-    fontSize: 12.5,
-    fontWeight: '800',
+  metaChip: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#f8fafc',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
-  metaTimeText: {
-    color: '#a7f3d0',
+  metaChipText: {
     fontSize: 11.5,
-    fontWeight: '600',
+    fontWeight: '700',
+    color: '#475569',
   },
-  heroPrivacy: {
-    color: 'rgba(255,255,255,0.85)',
+  privacyNoteBox: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#f0fdf4',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+  },
+  privacyNoteText: {
+    flex: 1,
     fontSize: 11,
     fontWeight: '700',
-    marginTop: 8,
+    color: '#15803d',
     textAlign: 'right',
     lineHeight: 16,
   },
   bodyContainer: {
     padding: 16,
-    marginTop: -8,
+    gap: 12,
+  },
+  completedStatusCard: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+    gap: 12,
+  },
+  completedStatusIconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  completedStatusTextCol: {
+    flex: 1,
+  },
+  completedStatusTitle: {
+    fontSize: 13.5,
+    fontWeight: '900',
+    color: '#065f46',
+    marginBottom: 2,
+    textAlign: 'right',
+  },
+  completedStatusSub: {
+    fontSize: 11.5,
+    lineHeight: 17,
+    color: '#047857',
+    textAlign: 'right',
   },
   requesterCard: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     backgroundColor: '#fff',
-    borderRadius: 22,
-    padding: 16,
-    marginBottom: 14,
+    borderRadius: 18,
+    padding: 14,
     borderWidth: 1,
     borderColor: '#e2e8f0',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    elevation: 1,
     gap: 12,
   },
   requesterAvatarWrap: {
@@ -1081,12 +1420,26 @@ const styles = StyleSheet.create({
   requesterNameRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    gap: 5,
+    gap: 6,
   },
   requesterName: {
     color: '#0f172a',
-    fontSize: 15,
+    fontSize: 14.5,
     fontWeight: '900',
+  },
+  requesterBadgePill: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#ecfdf5',
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 6,
+  },
+  requesterBadgePillText: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    color: '#059669',
   },
   requesterSub: {
     color: '#64748b',
@@ -1094,27 +1447,291 @@ const styles = StyleSheet.create({
     marginTop: 3,
     fontWeight: '700',
   },
-  requesterArrow: {
-    transform: [{ rotate: '180deg' }],
+  visitProfilePill: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#f0fdf4',
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+  },
+  visitProfilePillText: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: '#059669',
   },
   card: {
     backgroundColor: '#fff',
-    borderRadius: 22,
-    padding: 18,
-    marginBottom: 14,
+    borderRadius: 20,
+    padding: 16,
     borderWidth: 1,
     borderColor: '#e2e8f0',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    elevation: 1,
   },
   cardHeaderRow: {
     flexDirection: 'row-reverse',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 8,
     marginBottom: 12,
+  },
+  cardHeaderIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: '#ecfdf5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardTitle: {
+    color: '#0f172a',
+    fontSize: 15,
+    fontWeight: '900',
+    textAlign: 'right',
+  },
+  cardDesc: {
+    color: '#334155',
+    fontSize: 14,
+    lineHeight: 23,
+    textAlign: 'right',
+    marginBottom: 12,
+  },
+  notesBox: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#f8fafc',
+    padding: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    marginBottom: 12,
+  },
+  notesText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#64748b',
+    fontWeight: '600',
+    textAlign: 'right',
+  },
+  budgetBox: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#dcfce7',
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#86efac',
+    marginBottom: 10,
+  },
+  budgetCol: {
+    flex: 1,
+    alignItems: 'flex-end',
+  },
+  budgetValue: {
+    color: '#15803d',
+    fontSize: 13.5,
+    fontWeight: '900',
+  },
+  budgetSub: {
+    color: '#166534',
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  volunteerBox: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#ecfdf5',
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+    marginBottom: 10,
+  },
+  volunteerCol: {
+    flex: 1,
+    alignItems: 'flex-end',
+  },
+  volunteerValue: {
+    color: '#065f46',
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  volunteerSub: {
+    color: '#047857',
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  openMapBtn: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f8fafc',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    marginTop: 4,
+  },
+  openMapBtnText: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: '#059669',
+  },
+  ownerNoticeCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1.5,
+    borderColor: '#a7f3d0',
+    gap: 10,
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 2,
+  },
+  ownerNoticeTop: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 6,
+  },
+  ownerNoticeTitle: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#065f46',
+  },
+  ownerNoticeSub: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: '#475569',
+    textAlign: 'right',
+  },
+  ownerActionRow: {
+    flexDirection: 'row-reverse',
+    gap: 8,
+    marginTop: 4,
+  },
+  ownerShareBtn: {
+    flex: 1,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#059669',
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  ownerShareBtnText: {
+    fontSize: 12.5,
+    fontWeight: '900',
+    color: '#ffffff',
+  },
+  ownerDeleteBtn: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: '#fee2e2',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#fca5a5',
+  },
+  ownerDeleteBtnText: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#dc2626',
+  },
+  myOfferNoticeCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1.5,
+    borderColor: '#a7f3d0',
+    gap: 10,
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  myOfferHeader: {
+    flexDirection: 'row-reverse',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  myOfferTitle: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#065f46',
+    textAlign: 'right',
+    marginBottom: 4,
+  },
+  myOfferSub: {
+    fontSize: 12.5,
+    color: '#334155',
+    textAlign: 'right',
+    lineHeight: 18,
+  },
+  myOfferStatusRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 2,
+  },
+  myOfferStatusLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#64748b',
+  },
+  myOfferStatusPill: {
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  myOfferStatusPillPending: {
+    backgroundColor: '#fef3c7',
+  },
+  myOfferStatusPillAccepted: {
+    backgroundColor: '#dcfce7',
+  },
+  myOfferStatusText: {
+    fontSize: 11.5,
+    fontWeight: '900',
+  },
+  myOfferStatusTextPending: {
+    color: '#b45309',
+  },
+  myOfferStatusTextAccepted: {
+    color: '#15803d',
+  },
+  goToChatBtn: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#059669',
+    paddingVertical: 10,
+    borderRadius: 12,
+    marginTop: 4,
+  },
+  goToChatBtnText: {
+    fontSize: 12.5,
+    fontWeight: '900',
+    color: '#ffffff',
   },
   sectionTitleWithCount: {
     flexDirection: 'row-reverse',
@@ -1132,53 +1749,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#a7f3d0',
   },
-  cardTitle: {
-    color: '#0f172a',
-    fontSize: 15.5,
-    fontWeight: '900',
-    textAlign: 'right',
-  },
-  cardDesc: {
-    color: '#334155',
-    fontSize: 14,
-    lineHeight: 23,
-    textAlign: 'right',
-    marginBottom: 14,
-  },
-  budgetBox: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#dcfce7',
-    padding: 14,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#86efac',
-  },
-  budgetValue: {
-    color: '#15803d',
-    fontSize: 13.5,
-    fontWeight: '900',
-  },
-  volunteerBox: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#ecfdf5',
-    padding: 14,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#a7f3d0',
-  },
-  volunteerValue: {
-    color: '#065f46',
-    fontSize: 13,
-    fontWeight: '900',
-  },
   noOffersBox: {
     alignItems: 'center',
-    paddingVertical: 32,
-    gap: 6,
+    paddingVertical: 28,
+    gap: 8,
   },
   autoSuggestionNote: {
     flexDirection: 'row-reverse',
@@ -1207,14 +1781,15 @@ const styles = StyleSheet.create({
   },
   noOffersSub: {
     color: '#64748b',
-    fontSize: 12.5,
+    fontSize: 12,
     fontWeight: '700',
+    textAlign: 'center',
   },
   offerItem: {
     borderTopWidth: 1,
     borderColor: '#f1f5f9',
-    paddingTop: 12,
-    marginTop: 10,
+    paddingTop: 14,
+    marginTop: 12,
   },
   offerHeader: {
     flexDirection: 'row-reverse',
@@ -1225,20 +1800,28 @@ const styles = StyleSheet.create({
   offerHelperInfo: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   offerAvatarCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: '#ecfdf5',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
   },
   offerHelperName: {
     color: '#0f172a',
     fontSize: 13.5,
     fontWeight: '900',
+  },
+  offerTimeText: {
+    color: '#94a3b8',
+    fontSize: 11,
+    fontWeight: '600',
+    textAlign: 'right',
   },
   offerStatusBadge: {
     backgroundColor: '#f1f5f9',
@@ -1249,6 +1832,9 @@ const styles = StyleSheet.create({
   offerStatusAccepted: {
     backgroundColor: '#dcfce7',
   },
+  offerStatusCompleted: {
+    backgroundColor: '#ecfdf5',
+  },
   offerStatusText: {
     color: '#64748b',
     fontSize: 11,
@@ -1257,12 +1843,22 @@ const styles = StyleSheet.create({
   offerStatusTextAccepted: {
     color: '#15803d',
   },
+  offerStatusTextCompleted: {
+    color: '#047857',
+  },
+  offerBubble: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    marginBottom: 8,
+  },
   offerMessage: {
-    color: '#475569',
-    fontSize: 13.5,
-    lineHeight: 21,
+    color: '#334155',
+    fontSize: 13,
+    lineHeight: 20,
     textAlign: 'right',
-    marginBottom: 10,
   },
   acceptBtn: {
     flexDirection: 'row-reverse',
@@ -1270,7 +1866,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     backgroundColor: '#059669',
-    borderRadius: 14,
+    borderRadius: 12,
     paddingVertical: 10,
     marginTop: 4,
   },
@@ -1279,10 +1875,13 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     fontWeight: '900',
   },
+  acceptedOfferWrap: {
+    gap: 8,
+    marginTop: 6,
+  },
   offerActionsRow: {
     flexDirection: 'row-reverse',
     gap: 8,
-    marginTop: 8,
   },
   openChatBtn: {
     flex: 1,
@@ -1291,7 +1890,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     backgroundColor: '#ecfdf5',
-    borderRadius: 14,
+    borderRadius: 12,
     paddingVertical: 10,
     borderWidth: 1,
     borderColor: '#a7f3d0',
@@ -1308,168 +1907,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     backgroundColor: '#0f766e',
-    borderRadius: 14,
+    borderRadius: 12,
     paddingVertical: 10,
   },
   shareLocationBtnText: {
     color: '#fff',
     fontWeight: '900',
     fontSize: 12,
-  },
-  offerFormCard: {
-    backgroundColor: '#fff',
-    borderRadius: 22,
-    padding: 18,
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  offerFormTitle: {
-    color: '#0f172a',
-    fontSize: 15.5,
-    fontWeight: '900',
-    textAlign: 'right',
-  },
-  offerFormSub: {
-    color: '#64748b',
-    fontSize: 12.5,
-    textAlign: 'right',
-    lineHeight: 18,
-    marginBottom: 12,
-  },
-  offerInput: {
-    backgroundColor: '#f8fafc',
-    borderRadius: 16,
-    padding: 14,
-    textAlign: 'right',
-    fontSize: 13.5,
-    color: '#0f172a',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    minHeight: 80,
-    marginBottom: 12,
-  },
-  sendOfferBtn: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#059669',
-    borderRadius: 16,
-    paddingVertical: 13,
-    shadowColor: '#059669',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  sendOfferBtnText: {
-    color: '#fff',
-    fontSize: 13.5,
-    fontWeight: '900',
-  },
-  guestOfferPrompt: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    padding: 14,
-    borderRadius: 18,
-    backgroundColor: '#ecfdf5',
-    borderWidth: 1,
-    borderColor: '#a7f3d0',
-    marginBottom: 14,
-  },
-  guestOfferPromptText: {
-    color: '#047857',
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  deleteBtn: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 14,
-    borderRadius: 16,
-    backgroundColor: '#fee2e2',
-    borderWidth: 1,
-    borderColor: '#fca5a5',
-  },
-  deleteBtnText: {
-    color: '#dc2626',
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  completedBadgeHero: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: '#d1fae5',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-  },
-  completedBadgeHeroText: {
-    fontSize: 11.5,
-    fontWeight: '900',
-    color: '#065f46',
-  },
-  completedStatusCard: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    padding: 14,
-    borderRadius: 18,
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: '#a7f3d0',
-    gap: 12,
-  },
-  completedStatusIconCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#059669',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  completedStatusTextCol: {
-    flex: 1,
-  },
-  completedStatusTitle: {
-    fontSize: 13.5,
-    fontWeight: '900',
-    color: '#065f46',
-    marginBottom: 2,
-    textAlign: 'right',
-  },
-  completedStatusSub: {
-    fontSize: 11.5,
-    lineHeight: 17,
-    color: '#047857',
-    textAlign: 'right',
-  },
-  offerStatusCompleted: {
-    backgroundColor: '#dcfce7',
-    borderColor: '#86efac',
-  },
-  offerStatusTextCompleted: {
-    color: '#15803d',
-    fontWeight: '900',
-  },
-  acceptedOfferWrap: {
-    gap: 8,
-    marginTop: 6,
   },
   completeWithCoffeeBtn: {
     flexDirection: 'row-reverse',
@@ -1479,7 +1923,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fef3c7',
     borderWidth: 1.5,
     borderColor: '#f59e0b',
-    borderRadius: 14,
+    borderRadius: 12,
     paddingVertical: 10,
     paddingHorizontal: 14,
   },
@@ -1496,15 +1940,136 @@ const styles = StyleSheet.create({
     backgroundColor: '#ecfdf5',
     borderWidth: 1,
     borderColor: '#a7f3d0',
-    borderRadius: 14,
-    paddingVertical: 9,
-    paddingHorizontal: 12,
-    marginTop: 8,
+    borderRadius: 12,
+    paddingVertical: 8,
+    marginTop: 6,
   },
   completedHelperBannerText: {
     fontSize: 12,
     fontWeight: '800',
     color: '#065f46',
+  },
+  offerFormCard: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    elevation: 1,
+    gap: 10,
+  },
+  offerFormTitle: {
+    color: '#0f172a',
+    fontSize: 15,
+    fontWeight: '900',
+    textAlign: 'right',
+  },
+  offerFormSub: {
+    color: '#64748b',
+    fontSize: 12,
+    textAlign: 'right',
+    lineHeight: 17,
+  },
+  quickChipsGrid: {
+    flexDirection: 'row-reverse',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  quickChip: {
+    backgroundColor: '#f8fafc',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  quickChipText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  offerInput: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 14,
+    padding: 12,
+    textAlign: 'right',
+    fontSize: 13,
+    color: '#0f172a',
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    minHeight: 70,
+  },
+  sendOfferBtn: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#059669',
+    borderRadius: 14,
+    paddingVertical: 12,
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  sendOfferBtnText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  guestOfferPrompt: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    borderRadius: 18,
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+  },
+  guestOfferPromptTitle: {
+    color: '#047857',
+    fontSize: 13,
+    fontWeight: '900',
+    textAlign: 'right',
+    marginBottom: 2,
+  },
+  guestOfferPromptSub: {
+    color: '#065f46',
+    fontSize: 11,
+    fontWeight: '600',
+    textAlign: 'right',
+  },
+  guidelinesCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    gap: 6,
+  },
+  guidelinesTitleRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  guidelinesTitle: {
+    fontSize: 12.5,
+    fontWeight: '900',
+    color: '#0f172a',
+  },
+  guidelinesItem: {
+    fontSize: 11.5,
+    lineHeight: 18,
+    color: '#64748b',
+    textAlign: 'right',
+    fontWeight: '600',
   },
   modalOverlay: {
     flex: 1,

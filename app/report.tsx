@@ -20,7 +20,7 @@ import {
   CheckCircle2,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import ScreenHeader from '@/components/shared/ScreenHeader';
+import { AppHeader } from '@/components/shared/AppHeader';
 
 export default function Report() {
   const { type, id } = useLocalSearchParams<{ type: string; id: string }>();
@@ -70,19 +70,13 @@ export default function Report() {
 
   return (
     <View style={styles.container}>
+      <AppHeader
+        variant="sub"
+        title="إبلاغ الإدارة"
+        subtitle="حفاظاً على سلامة مجتمع الحي"
+        fallbackRoute="/home"
+      />
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <LinearGradient
-          colors={['#065f46', '#059669', '#10b981']}
-          style={styles.hero}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        >
-          <ScreenHeader title="إبلاغ الإدارة 🛡️" fallbackRoute="/home" />
-          <Text style={styles.heroSub}>
-            حفاظاً على سلامة مجتمع الحي، يرجى توضيح سبب الإبلاغ بدقة.
-          </Text>
-        </LinearGradient>
 
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>اختر سبب البلاغ:</Text>

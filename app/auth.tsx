@@ -6,6 +6,7 @@ import { getBrandingLogo, FALLBACK_LOGO_URI, subscribeBrandingLogo, getCachedBra
 import { C } from '@/lib/ui';
 import { Mail, Lock, User, ArrowRight, Compass } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { AppHeader } from '@/components/shared/AppHeader';
 
 export default function Auth() {
   const [logoUri, setLogoUri] = useState(getCachedBrandingLogo());
@@ -91,103 +92,135 @@ export default function Auth() {
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.container}>
+      <AppHeader
+        variant="sub"
+        title={isLogin ? 'تسجيل الدخول' : 'إنشاء حساب جديد'}
+        subtitle="الشبكة الاجتماعية لجيرانك ومجتمعك المحلي"
+        fallbackRoute="/home"
+      />
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} bounces={false}>
-        
-        <LinearGradient 
-          colors={['#065f46', '#059669', '#10b981']} 
-          start={{ x: 0, y: 0 }} 
-          end={{ x: 1, y: 1 }}
-          style={styles.headerHero}
-        >
-          <View style={styles.heroContent}>
-            <View style={styles.logoBox}>
-              <Image source={{ uri: logoUri }} style={styles.logoImage} resizeMode="contain" />
-            </View>
-            <Text style={styles.subtitle}>الشبكة الاجتماعية لجيرانك ومجتمعك المحلي</Text>
+        <View style={styles.contentWrap}>
+          {/* Segmented Control */}
+          <View style={styles.segmentContainer}>
+            <Pressable
+              onPress={() => setIsLogin(true)}
+              style={[styles.segmentBtn, isLogin && styles.segmentBtnActive]}
+              accessibilityRole="button"
+            >
+              <Text style={[styles.segmentBtnText, isLogin && styles.segmentBtnTextActive]}>تسجيل الدخول</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setIsLogin(false)}
+              style={[styles.segmentBtn, !isLogin && styles.segmentBtnActive]}
+              accessibilityRole="button"
+            >
+              <Text style={[styles.segmentBtnText, !isLogin && styles.segmentBtnTextActive]}>إنشاء حساب جديد</Text>
+            </Pressable>
           </View>
-          <View style={styles.curveBottom} />
-        </LinearGradient>
 
-        <View style={styles.formContainer}>
-          <Text style={styles.formTitle}>
-            {isLogin ? 'تسجيل الدخول لحسابك' : 'إنشاء حساب جديد'}
-          </Text>
+          <View style={styles.formContainer}>
+            <View style={styles.brandBadgeRow}>
+              <View style={styles.brandLogoSmall}>
+                <Image source={{ uri: logoUri }} style={styles.brandLogoImg} resizeMode="contain" />
+              </View>
+              <View style={{ alignItems: 'flex-end', flex: 1 }}>
+                <Text style={styles.brandBadgeTitle}>مرحباً بك في حيّنا 🇸🇦</Text>
+                <Text style={styles.brandBadgeSub}>
+                  {isLogin ? 'سجّل دخولك للمشاركة والتواصل مع جيرانك' : 'انضم لمجتمع وسوق وخدمات حيك اليوم'}
+                </Text>
+              </View>
+            </View>
 
-          {!isLogin && (
+            {!isLogin && (
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>معرف المستخدم (اسم المستخدم)</Text>
+                <View style={styles.inputWrapper}>
+                  <User size={19} color="#059669" style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.input}
+                    autoCapitalize="none"
+                    value={username}
+                    onChangeText={setUsername}
+                    placeholder="مثال: ahmed_123"
+                    placeholderTextColor="#94a3b8"
+                  />
+                </View>
+              </View>
+            )}
+
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>معرف المستخدم</Text>
+              <Text style={styles.label}>البريد الإلكتروني</Text>
               <View style={styles.inputWrapper}>
-                <User size={20} color={C.muted} style={styles.inputIcon} />
+                <Mail size={19} color="#059669" style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
                   autoCapitalize="none"
-                  value={username}
-                  onChangeText={setUsername}
-                  placeholder="مثال: ahmed_123"
-                  placeholderTextColor="#9ca3af"
+                  keyboardType="email-address"
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="name@example.com"
+                  placeholderTextColor="#94a3b8"
                 />
               </View>
             </View>
-          )}
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>البريد الإلكتروني</Text>
-            <View style={styles.inputWrapper}>
-              <Mail size={20} color={C.muted} style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                autoCapitalize="none"
-                keyboardType="email-address"
-                value={email}
-                onChangeText={setEmail}
-                placeholder="name@example.com"
-                placeholderTextColor="#9ca3af"
-              />
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>كلمة المرور</Text>
+              <View style={styles.inputWrapper}>
+                <Lock size={19} color="#059669" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  secureTextEntry
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder="••••••••"
+                  placeholderTextColor="#94a3b8"
+                />
+              </View>
             </View>
-          </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>كلمة المرور</Text>
-            <View style={styles.inputWrapper}>
-              <Lock size={20} color={C.muted} style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                secureTextEntry
-                value={password}
-                onChangeText={setPassword}
-                placeholder="••••••••"
-                placeholderTextColor="#9ca3af"
-              />
-            </View>
-          </View>
-
-          <Pressable
-            style={({ pressed }) => [styles.submitBtn, pressed && styles.submitBtnPressed]}
-            onPress={submit}
-            disabled={loading}
-          >
-            <Text style={styles.submitBtnText}>
-              {loading ? 'جاري التنفيذ...' : isLogin ? 'دخول' : 'إنشاء الحساب'}
-            </Text>
-            {!loading && <ArrowRight size={20} color="#fff" style={{ marginRight: 8 }} />}
-          </Pressable>
-
-          <Pressable
-            style={styles.guestBtn}
-            onPress={() => router.replace('/home')}
-            accessibilityRole="button"
-          >
-            <Compass size={18} color={C.accent} />
-            <Text style={styles.guestBtnText}>الدخول كزائر</Text>
-          </Pressable>
-
-          <View style={styles.switchWrapper}>
-            <Text style={styles.switchLabel}>
-              {isLogin ? 'ليس لديك حساب؟ ' : 'لديك حساب بالفعل؟ '}
-            </Text>
-            <Pressable onPress={() => setIsLogin(!isLogin)} style={styles.switchBtn}>
-              <Text style={styles.switchBtnText}>{isLogin ? 'سجل الآن مجاناً' : 'تسجيل الدخول'}</Text>
+            <Pressable
+              style={({ pressed }) => [styles.submitBtn, pressed && styles.submitBtnPressed]}
+              onPress={submit}
+              disabled={loading}
+              accessibilityRole="button"
+            >
+              <LinearGradient
+                colors={['#059669', '#047857']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.submitGradient}
+              >
+                <Text style={styles.submitBtnText}>
+                  {loading ? 'جاري التنفيذ...' : isLogin ? 'تسجيل الدخول' : 'إنشاء الحساب والانضمام'}
+                </Text>
+                {!loading && <ArrowRight size={18} color="#fff" style={{ marginRight: 6 }} />}
+              </LinearGradient>
             </Pressable>
+
+            <Pressable
+              style={styles.guestBtn}
+              onPress={() => router.replace('/home')}
+              accessibilityRole="button"
+            >
+              <Compass size={17} color="#047857" />
+              <Text style={styles.guestBtnText}>تصفح كزائر دون تسجيل 🏠</Text>
+            </Pressable>
+
+            <View style={styles.switchWrapper}>
+              <Text style={styles.switchLabel}>
+                {isLogin ? 'ليس لديك حساب بعد؟ ' : 'لديك حساب بالفعل؟ '}
+              </Text>
+              <Pressable onPress={() => setIsLogin(!isLogin)} style={styles.switchBtn}>
+                <Text style={styles.switchBtnText}>{isLogin ? 'سجل مجاناً' : 'تسجيل الدخول'}</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.securityNote}>
+              <Text style={styles.securityNoteText}>
+                🛡️ بياناتك مشفرة ومحمية وفق أعلى معايير الخصوصية السعودية
+              </Text>
+            </View>
           </View>
         </View>
       </ScrollView>
@@ -198,142 +231,158 @@ export default function Auth() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: C.bg,
+    backgroundColor: '#f8fafc',
   },
   scroll: {
     flexGrow: 1,
-    backgroundColor: C.bg,
-  },
-  headerHero: {
-    paddingTop: 80,
-    paddingBottom: 60,
+    backgroundColor: '#f8fafc',
+    paddingVertical: 20,
     alignItems: 'center',
-    justifyContent: 'center',
-    borderBottomLeftRadius: 40,
-    borderBottomRightRadius: 40,
-    shadowColor: '#059669',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 15,
-    elevation: 10,
-    position: 'relative',
   },
-  heroContent: {
-    alignItems: 'center',
-    zIndex: 2,
-    paddingHorizontal: 20,
-  },
-  logoBox: {
-    width: 72,
-    height: 72,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.4)',
-  },
-  logoImage: {
-    width: 62,
-    height: 62,
-  },
-  logoText: {
-    fontSize: 32,
-    fontWeight: '900',
-    color: '#fff',
-  },
-  subtitle: {
-    fontSize: 15,
-    color: '#a7f3d0',
-    textAlign: 'center',
-    fontWeight: '500',
-    maxWidth: 250,
-  },
-  curveBottom: {
-    position: 'absolute',
-    bottom: -30,
+  contentWrap: {
     width: '100%',
-    height: 60,
-    backgroundColor: 'transparent',
+    maxWidth: 480,
+    paddingHorizontal: 16,
+    gap: 14,
+  },
+  segmentContainer: {
+    flexDirection: 'row-reverse',
+    backgroundColor: '#e2e8f0',
+    padding: 4,
+    borderRadius: 16,
+    gap: 4,
+  },
+  segmentBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+  },
+  segmentBtnActive: {
+    backgroundColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  segmentBtnText: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: '#64748b',
+  },
+  segmentBtnTextActive: {
+    color: '#047857',
+    fontWeight: '900',
   },
   formContainer: {
-    flex: 1,
-    padding: 24,
-    marginTop: -30,
-    backgroundColor: C.card,
-    marginHorizontal: 20,
-    borderRadius: 32,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.05,
-    shadowRadius: 15,
-    elevation: 4,
-    marginBottom: 40,
+    backgroundColor: '#ffffff',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    padding: 22,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+    elevation: 3,
   },
-  formTitle: {
-    fontSize: 22,
+  brandBadgeRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  brandLogoSmall: {
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  brandLogoImg: {
+    width: 34,
+    height: 34,
+  },
+  brandBadgeTitle: {
+    fontSize: 16,
     fontWeight: '900',
-    color: C.ink,
-    textAlign: 'center',
-    marginBottom: 24,
+    color: '#0f172a',
+  },
+  brandBadgeSub: {
+    fontSize: 12,
+    color: '#64748b',
+    marginTop: 2,
+    lineHeight: 18,
+    textAlign: 'right',
   },
   inputGroup: {
-    marginBottom: 20,
+    marginBottom: 16,
   },
   label: {
     fontWeight: '800',
-    color: '#374151',
+    color: '#334155',
     textAlign: 'right',
-    marginBottom: 8,
-    fontSize: 14,
+    marginBottom: 6,
+    fontSize: 12.5,
   },
   inputWrapper: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    backgroundColor: '#f9fafb',
+    backgroundColor: '#f8fafc',
     borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    height: 56,
+    borderColor: '#cbd5e1',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    height: 48,
   },
   inputIcon: {
-    marginLeft: 12,
+    marginLeft: 10,
   },
   input: {
     flex: 1,
     textAlign: 'right',
-    fontSize: 15,
-    color: C.ink,
+    fontSize: 14,
+    color: '#0f172a',
     height: '100%',
-    fontWeight: '500',
+    fontWeight: '600',
   },
   submitBtn: {
-    backgroundColor: C.accent,
-    borderRadius: 16,
-    height: 56,
+    borderRadius: 14,
+    overflow: 'hidden',
+    marginTop: 10,
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  submitBtnPressed: {
+    opacity: 0.9,
+    transform: [{ scale: 0.99 }],
+  },
+  submitGradient: {
+    height: 50,
     flexDirection: 'row-reverse',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 12,
-    shadowColor: C.accent,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  submitBtnPressed: {
-    opacity: 0.85,
-    transform: [{ scale: 0.98 }],
+    gap: 8,
   },
   submitBtnText: {
     color: '#fff',
     fontWeight: '900',
-    fontSize: 18,
+    fontSize: 15,
   },
   guestBtn: {
-    minHeight: 48,
+    height: 46,
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'center',
@@ -342,30 +391,46 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#a7f3d0',
     borderRadius: 14,
-    backgroundColor: '#f0fdf4',
+    backgroundColor: '#ecfdf5',
   },
   guestBtnText: {
     color: '#047857',
-    fontSize: 14,
-    fontWeight: '900',
+    fontSize: 13,
+    fontWeight: '800',
   },
   switchWrapper: {
     flexDirection: 'row-reverse',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 24,
+    marginTop: 16,
+    gap: 4,
   },
   switchLabel: {
-    color: C.muted,
-    fontSize: 14,
+    color: '#64748b',
+    fontSize: 13,
     fontWeight: '600',
   },
   switchBtn: {
     paddingVertical: 4,
+    paddingHorizontal: 4,
   },
   switchBtnText: {
-    color: C.accent,
+    color: '#059669',
     fontWeight: '900',
-    fontSize: 14,
+    fontSize: 13,
+    textDecorationLine: 'underline',
+  },
+  securityNote: {
+    marginTop: 18,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+    alignItems: 'center',
+  },
+  securityNoteText: {
+    color: '#94a3b8',
+    fontSize: 11,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });

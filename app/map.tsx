@@ -14,6 +14,7 @@ const Map = Platform.OS !== 'web' ? require('@maplibre/maplibre-react-native').M
 const Camera = Platform.OS !== 'web' ? require('@maplibre/maplibre-react-native').Camera : View;
 const Marker = Platform.OS !== 'web' ? require('@maplibre/maplibre-react-native').Marker : View;
 import { router } from 'expo-router';
+import { AppHeader } from '@/components/shared/AppHeader';
 import { C, S } from '@/lib/ui';
 import { getCurrentDeviceLocation, type DeviceLocation } from '@/lib/deviceLocation';
 import {
@@ -228,32 +229,61 @@ export default function MapScreen() {
 
   if (Platform.OS === 'web') {
     return (
-      <ScrollView contentContainerStyle={S.page}>
-        <Text style={S.title}>الخريطة</Text>
-        <Text style={S.subtitle}>الأسئلة وطلبات المساعدة والمحلات حول موقعك.</Text>
-        <TextInput
-          value={query}
-          onChangeText={setQuery}
-          placeholder="ابحث..."
-          placeholderTextColor={C.muted}
-          style={styles.search}
+      <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+        <AppHeader
+          variant="sub"
+          title="خريطة حيّنا 🗺️"
+          subtitle={`${visiblePins.length} نشاط · ${places.length} محل قريب`}
+          fallbackRoute="/home"
         />
-        {filters}
-        {visiblePins.map((pin) => (
-          <Pressable key={pin.id} style={styles.listCard} onPress={() => router.push(pin.href as never)}>
-            <Text style={styles.listTitle} numberOfLines={2}>
-              {MAP_PIN_KINDS[pin.kind].emoji} {pin.title}
-            </Text>
-            <Text style={styles.listMeta} numberOfLines={1}>{pin.area}</Text>
-          </Pressable>
-        ))}
-        <Pressable style={S.ghost} onPress={() => router.back()}><Text>رجوع</Text></Pressable>
-      </ScrollView>
+        <ScrollView contentContainerStyle={[S.page, { paddingTop: 10 }]}>
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="ابحث في الخريطة..."
+            placeholderTextColor={C.muted}
+            style={styles.search}
+          />
+          {filters}
+          {visiblePins.map((pin) => (
+            <Pressable key={pin.id} style={styles.listCard} onPress={() => router.push(pin.href as never)}>
+              <Text style={styles.listTitle} numberOfLines={2}>
+                {MAP_PIN_KINDS[pin.kind].emoji} {pin.title}
+              </Text>
+              <Text style={styles.listMeta} numberOfLines={1}>{pin.area}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      </View>
     );
   }
 
   return (
     <View style={styles.root}>
+      <AppHeader
+        variant="sub"
+        title="خريطة الحي"
+        subtitle={`${visiblePins.length} نشاط · ${places.length} محل قريب`}
+        fallbackRoute="/home"
+        rightAction={
+          <Pressable
+            style={{
+              paddingHorizontal: 10,
+              paddingVertical: 5,
+              borderRadius: 14,
+              backgroundColor: '#ecfdf5',
+              borderWidth: 1,
+              borderColor: '#a7f3d0',
+            }}
+            onPress={locateMe}
+            disabled={locating}
+          >
+            <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#059669' }}>
+              {locating ? 'جارٍ التحديد…' : 'موقعي 📍'}
+            </Text>
+          </Pressable>
+        }
+      />
       <Map style={styles.map} mapStyle={STYLE_URL}>
         <Camera
           key={myLocation ? `${myLocation.latitude}:${myLocation.longitude}` : 'default'}

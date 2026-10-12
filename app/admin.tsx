@@ -16,6 +16,7 @@ import {
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
+import { AppHeader } from '@/components/shared/AppHeader';
 import * as ImagePicker from 'expo-image-picker';
 import {
   getBrandingLogo,
@@ -25,6 +26,12 @@ import {
   subscribeBrandingLogo,
 } from '@/lib/branding';
 import { sendAdminBroadcastPush } from '@/lib/pushSender';
+import { useAdminRealtime } from '@/hooks/useAdminRealtime';
+import { TrendChart, InsightCard, bucketByDay, TrendPoint } from '@/components/admin/AdminInsights';
+import { AdminTaskCenter } from '@/components/admin/AdminTaskCenter';
+import { AdminGlobalSearch } from '@/components/admin/AdminGlobalSearch';
+import { AdminFeatureFlags } from '@/components/admin/AdminFeatureFlags';
+import { AdminRbacPanel } from '@/components/admin/AdminRbacPanel';
 import {
   Shield,
   Users,
@@ -57,6 +64,8 @@ import {
   Activity,
   Archive,
   Phone,
+  ListChecks,
+  Settings,
 } from 'lucide-react-native';
 
 import {
@@ -72,6 +81,15 @@ import {
   AdminStats,
 } from '@/components/admin/adminTypes';
 import { adminStyles as styles, ADMIN_COLORS as C } from '@/components/admin/adminStyles';
+
+function accountAgeLabel(iso?: string | null): string {
+  if (!iso) return '—';
+  const days = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86400000));
+  if (days < 30) return `${days} يوم`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months} شهر`;
+  return `${Math.floor(months / 12)} سنة`;
+}
 
 // Cross-platform alert confirmation
 function confirmAction(title: string, message: string, onConfirm: () => void | Promise<void>) {
@@ -100,7 +118,7 @@ export default function AdminScreen() {
 
   // Active navigation tab
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'users' | 'verifications' | 'reports' | 'platform' | 'content' | 'broadcast' | 'logs' | 'locations' | 'branding'
+    'overview' | 'tasks' | 'search' | 'users' | 'verifications' | 'reports' | 'platform' | 'content' | 'broadcast' | 'logs' | 'locations' | 'branding' | 'config' | 'roles'
   >('overview');
 
   // Core relational data sets
@@ -114,6 +132,13 @@ export default function AdminScreen() {
   const [requestsList, setRequestsList] = useState<AdminRequest[]>([]);
   const [auditLogs, setAuditLogs] = useState<AdminActivityLog[]>([]);
   const [customLocations, setCustomLocations] = useState<any[]>([]);
+
+  // 30-day analytics series for the insights dashboard
+  const [analytics, setAnalytics] = useState<{ users: TrendPoint[]; reports: TrendPoint[]; questions: TrendPoint[] }>({
+    users: [],
+    reports: [],
+    questions: [],
+  });
 
   // Platform statistics
   const [stats, setStats] = useState<AdminStats>({
@@ -138,6 +163,12 @@ export default function AdminScreen() {
     aCount: 0,
     reqCount: 0,
   });
+  const [userDevices, setUserDevices] = useState(0);
+  const [userExtras, setUserExtras] = useState<{
+    services: number;
+    reportsAgainst: number;
+    recent: Array<{ id: string; title: string; created_at: string }>;
+  }>({ services: 0, reportsAgainst: 0, recent: [] });
   const [directNoticeText, setDirectNoticeText] = useState('');
   const [sendingDirectNotice, setSendingDirectNotice] = useState(false);
 
@@ -155,6 +186,11 @@ export default function AdminScreen() {
   const [broadcastTarget, setBroadcastTarget] = useState<'all' | 'الرياض' | 'جدة' | 'الدمام' | 'مكة' | 'المدينة'>('all');
   const [broadcastType, setBroadcastType] = useState<'official' | 'emergency' | 'weather' | 'maintenance'>('official');
   const [sendingBroadcast, setSendingBroadcast] = useState(false);
+  const [broadcastSegment, setBroadcastSegment] = useState<'all' | 'verified' | 'unverified' | 'admins'>('all');
+  const [scheduleEnabled, setScheduleEnabled] = useState(false);
+  const [scheduleAt, setScheduleAt] = useState('');
+  const [scheduledList, setScheduledList] = useState<any[]>([]);
+  const [lastDelivery, setLastDelivery] = useState<{ recipients: number; pushed: number; label: string } | null>(null);
 
   // Custom Locations Form
   const [locationName, setLocationName] = useState('');
@@ -358,6 +394,21 @@ export default function AdminScreen() {
         questions: qCountRes.count ?? allQuestions.length,
         requests: rCountRes.count ?? allRequests.length,
       });
+
+      // 3. 30-day trend series for the analytics dashboard
+      const since = new Date(Date.now() - 29 * 86400000);
+      since.setHours(0, 0, 0, 0);
+      const sinceIso = since.toISOString();
+      const [trendUsers, trendReports, trendQuestions] = await Promise.all([
+        supabase.from('profiles').select('created_at').gte('created_at', sinceIso).limit(3000),
+        supabase.from('reports').select('created_at').gte('created_at', sinceIso).limit(3000),
+        supabase.from('questions').select('created_at').gte('created_at', sinceIso).limit(3000),
+      ]);
+      setAnalytics({
+        users: bucketByDay(trendUsers.data as any, 30),
+        reports: bucketByDay(trendReports.data as any, 30),
+        questions: bucketByDay(trendQuestions.data as any, 30),
+      });
     } catch (err: any) {
       console.error('Error loading admin dashboard:', err);
       showToast('تعذر تحميل بيانات لوحة التحكم: ' + (err?.message || 'خطأ في الاتصال'));
@@ -370,6 +421,22 @@ export default function AdminScreen() {
     loadDashboardData();
   }, [loadDashboardData]);
 
+  // Live moderation signals (Realtime) + auto refresh on new activity.
+  const rt = useAdminRealtime(!loading && !!currentAdmin);
+  useEffect(() => {
+    if (rt.refreshTick > 0) {
+      void loadDashboardData();
+      rt.reset();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rt.refreshTick]);
+
+  // Load scheduled broadcasts once the admin session is ready.
+  useEffect(() => {
+    if (currentAdmin) void loadScheduledBroadcasts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentAdmin]);
+
   // Handle Pull-to-Refresh
   const onRefresh = async () => {
     setRefreshing(true);
@@ -377,19 +444,40 @@ export default function AdminScreen() {
     setRefreshing(false);
   };
 
-  // Inspect User Relations and Activity
+  // Inspect User Relations and Activity (360° dossier)
   const inspectUser = async (target: AdminProfile) => {
     setInspectedUser(target);
+    setUserDevices(0);
+    setUserExtras({ services: 0, reportsAgainst: 0, recent: [] });
     try {
-      const [qRes, aRes, rRes] = await Promise.all([
+      const [qRes, aRes, rRes, devRes, svcRes, myQ, repRes] = await Promise.all([
         supabase.from('questions').select('id', { count: 'exact', head: true }).eq('author_id', target.id),
         supabase.from('answers').select('id', { count: 'exact', head: true }).eq('author_id', target.id),
         supabase.from('requests').select('id', { count: 'exact', head: true }).eq('requester_id', target.id),
+        supabase.from('push_tokens').select('id', { count: 'exact', head: true }).eq('user_id', target.id),
+        supabase.from('services').select('id', { count: 'exact', head: true }).eq('provider_id', target.id),
+        supabase
+          .from('questions')
+          .select('id,title,created_at')
+          .eq('author_id', target.id)
+          .order('created_at', { ascending: false })
+          .limit(5),
+        supabase
+          .from('reports')
+          .select('id', { count: 'exact', head: true })
+          .eq('target_id', target.id)
+          .eq('target_type', 'user'),
       ]);
       setUserActivityStats({
         qCount: qRes.count || 0,
         aCount: aRes.count || 0,
         reqCount: rRes.count || 0,
+      });
+      setUserDevices(devRes.count || 0);
+      setUserExtras({
+        services: svcRes.count || 0,
+        reportsAgainst: repRes.count || 0,
+        recent: (myQ.data || []) as Array<{ id: string; title: string; created_at: string }>,
       });
     } catch (e) {
       console.warn('Could not inspect user stats:', e);
@@ -422,6 +510,24 @@ export default function AdminScreen() {
       setInspectedUser(prev => (prev ? { ...prev, ...data } : null));
     }
     return data;
+  };
+
+  // Bulk user administration (used by the global search tab)
+  const handleBulkUserPatch = async (
+    targets: AdminProfile[],
+    patch: { is_verified?: boolean; is_banned?: boolean }
+  ) => {
+    let ok = 0;
+    for (const t of targets) {
+      try {
+        await adminUpdateUser(t, patch);
+        ok += 1;
+      } catch (e) {
+        console.warn('Bulk update failed for', t.id, e);
+      }
+    }
+    await recordAuditLog('تحديث جماعي للمستخدمين', `${ok} مستخدم`, 'user');
+    showToast(`تم تحديث ${ok} من ${targets.length} مستخدم ✅`);
   };
 
   // Action 1: Toggle Admin / User Role
@@ -708,6 +814,109 @@ export default function AdminScreen() {
     );
   };
 
+  // Deliver a broadcast to the target audience (segment-aware). Reused by the
+  // immediate send and by scheduled dispatches.
+  const deliverBroadcast = async (payload: {
+    title: string;
+    body: string;
+    type: 'official' | 'emergency' | 'weather' | 'maintenance';
+    target: string;
+    segment: string;
+  }) => {
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) throw new Error('انتهت جلسة تسجيل الدخول.');
+
+    const badgeIcon =
+      payload.type === 'emergency'
+        ? '🚨'
+        : payload.type === 'weather'
+        ? '⛈️'
+        : payload.type === 'maintenance'
+        ? '🔧'
+        : '📢';
+
+    const recipientIds = usersList
+      .filter((user) => (payload.target === 'all' ? true : (user.city || '').includes(payload.target)))
+      .filter((user) => {
+        if (payload.segment === 'all') return true;
+        if (payload.segment === 'verified') return !!user.is_verified;
+        if (payload.segment === 'unverified') return !user.is_verified;
+        if (payload.segment === 'admins') return user.role === 'admin';
+        return true;
+      })
+      .map((usr) => usr.id)
+      .filter(Boolean);
+
+    if (!recipientIds.length) throw new Error('لا يوجد مستخدمون مطابقون للمعايير المحددة.');
+
+    const fullTitle = `${badgeIcon} ${payload.title.trim()}`;
+    const fullBody = payload.body.trim();
+
+    const rows = recipientIds.map((usrId) => ({
+      user_id: usrId,
+      type: 'broadcast',
+      title: fullTitle,
+      body: fullBody,
+      data: { actor_id: u.user!.id, broadcast_type: payload.type, target: payload.target, segment: payload.segment },
+    }));
+    for (let i = 0; i < rows.length; i += 400) {
+      const { error: batchErr } = await supabase.from('notifications').insert(rows.slice(i, i + 400));
+      if (batchErr) throw batchErr;
+    }
+
+    const pushResult = await sendAdminBroadcastPush(recipientIds, {
+      title: fullTitle,
+      body: fullBody,
+      data: { type: 'broadcast', broadcast_type: payload.type, target: payload.target, segment: payload.segment },
+    });
+
+    return { recipients: recipientIds.length, pushed: pushResult.sentCount || 0, pushError: pushResult.error };
+  };
+
+  const loadScheduledBroadcasts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('scheduled_broadcasts')
+        .select('*')
+        .eq('status', 'pending')
+        .order('scheduled_at', { ascending: true });
+      if (!error) setScheduledList(data || []);
+    } catch {
+      /* table not migrated yet — ignore */
+    }
+  };
+
+  const cancelScheduledBroadcast = async (id: string) => {
+    try {
+      await supabase.from('scheduled_broadcasts').update({ status: 'canceled' }).eq('id', id);
+      await loadScheduledBroadcasts();
+      showToast('تم إلغاء التعميم المجدول');
+    } catch (e: any) {
+      Alert.alert('خطأ', e?.message || 'تعذر الإلغاء');
+    }
+  };
+
+  const sendScheduledNow = async (item: any) => {
+    setSendingBroadcast(true);
+    try {
+      const res = await deliverBroadcast({
+        title: item.title,
+        body: item.body,
+        type: item.broadcast_type || 'official',
+        target: item.target?.scope || 'all',
+        segment: item.target?.segment || 'all',
+      });
+      await supabase.from('scheduled_broadcasts').update({ status: 'sent', sent_at: new Date().toISOString() }).eq('id', item.id);
+      setLastDelivery({ recipients: res.recipients, pushed: res.pushed, label: item.title });
+      showToast('تم إرسال التعميم المجدول ✅');
+      await loadScheduledBroadcasts();
+    } catch (e: any) {
+      Alert.alert('خطأ', e?.message || 'تعذر الإرسال');
+    } finally {
+      setSendingBroadcast(false);
+    }
+  };
+
   // Action 10: Broadcast Official Announcement
   const handleSendBroadcast = async () => {
     if (!broadcastTitle.trim() || !broadcastBody.trim()) {
@@ -720,55 +929,46 @@ export default function AdminScreen() {
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) throw new Error('انتهت جلسة تسجيل الدخول.');
 
-      const badgeIcon =
-        broadcastType === 'emergency'
-          ? '🚨'
-          : broadcastType === 'weather'
-          ? '⛈️'
-          : broadcastType === 'maintenance'
-          ? '🔧'
-          : '📢';
-
-      // Filter recipients by target city
-      const targetUsers = usersList.filter(user => {
-        if (broadcastTarget === 'all') return true;
-        return (user.city || '').includes(broadcastTarget);
-      });
-
-      const recipientIds = targetUsers.map(usr => usr.id).filter(Boolean);
-      if (!recipientIds.length) throw new Error('لا يوجد مستخدمون مطابقون للمدينة المستهدفة.');
-
-      const fullTitle = `${badgeIcon} ${broadcastTitle.trim()}`;
-      const fullBody = broadcastBody.trim();
-
-      // 1. Bulk insert in-app notifications
-      const rows = recipientIds.map(usrId => ({
-        user_id: usrId,
-        type: 'broadcast',
-        title: fullTitle,
-        body: fullBody,
-        data: { actor_id: u.user.id, broadcast_type: broadcastType, target: broadcastTarget },
-      }));
-
-      for (let i = 0; i < rows.length; i += 400) {
-        const { error: batchErr } = await supabase.from('notifications').insert(rows.slice(i, i + 400));
-        if (batchErr) throw batchErr;
+      // Scheduled path: queue for later instead of sending now.
+      if (scheduleEnabled) {
+        const when = new Date(scheduleAt);
+        if (isNaN(when.getTime())) throw new Error('صيغة وقت الجدولة غير صحيحة. مثال: 2026-10-20 09:30');
+        const { error: schedErr } = await supabase.from('scheduled_broadcasts').insert({
+          title: broadcastTitle.trim(),
+          body: broadcastBody.trim(),
+          broadcast_type: broadcastType,
+          target: { scope: broadcastTarget, segment: broadcastSegment },
+          scheduled_at: when.toISOString(),
+          status: 'pending',
+          created_by: u.user.id,
+        });
+        if (schedErr) throw schedErr;
+        await recordAuditLog('جدولة تعميم للحي', broadcastTitle.trim(), 'broadcast');
+        showToast('تمت جدولة التعميم بنجاح ⏰');
+        setBroadcastTitle('');
+        setBroadcastBody('');
+        setScheduleEnabled(false);
+        setScheduleAt('');
+        await loadScheduledBroadcasts();
+        return;
       }
 
-      // 2. Deliver a real push to every registered mobile/browser device.
-      const pushResult = await sendAdminBroadcastPush(recipientIds, {
-        title: fullTitle,
-        body: fullBody,
-        data: { type: 'broadcast', broadcast_type: broadcastType, target: broadcastTarget },
+      const res = await deliverBroadcast({
+        title: broadcastTitle,
+        body: broadcastBody,
+        type: broadcastType,
+        target: broadcastTarget,
+        segment: broadcastSegment,
       });
 
       await recordAuditLog('بث تعميم رسمي لسكان الحي', broadcastTitle.trim(), 'broadcast');
-      if (pushResult.success && pushResult.sentCount > 0) {
-        showToast(`تم حفظ التعميم وإرسال إشعار فوري إلى ${pushResult.sentCount} جهاز 📢`);
+      setLastDelivery({ recipients: res.recipients, pushed: res.pushed, label: broadcastTitle.trim() });
+      if (res.pushed > 0) {
+        showToast(`تم حفظ التعميم وإرسال إشعار فوري إلى ${res.pushed} جهاز 📢`);
       } else {
         Alert.alert(
           'تم حفظ التعميم',
-          `تم حفظ التعميم داخل التطبيق وإظهاره في صفحة الإشعارات، لكن لم يصل إشعار فوري لأي جهاز مسجّل. ${pushResult.error || 'تحقق من إعدادات مفاتيح الإشعارات في Vercel ومن تسجيل الأجهزة.'}`
+          `تم حفظ التعميم داخل التطبيق وإظهاره في صفحة الإشعارات، لكن لم يصل إشعار فوري لأي جهاز مسجّل. ${res.pushError || 'تحقق من إعدادات مفاتيح الإشعارات في Vercel ومن تسجيل الأجهزة.'}`
         );
       }
       setBroadcastTitle('');
@@ -1012,39 +1212,44 @@ export default function AdminScreen() {
         </Animated.View>
       )}
 
-      {/* ======================================================== */}
-      {/* 1. EXECUTIVE COMMAND HEADER (Dark Modern Royal Green)    */}
-      {/* ======================================================== */}
-      <LinearGradient
-        colors={[C.navyDark, C.navyMid, C.navyLight]}
-        style={[styles.headerGrad, isMobile && { paddingHorizontal: 14, paddingTop: Platform.OS === 'ios' ? 48 : 34 }]}
-      >
-        <View style={styles.headerContent}>
-          <Pressable onPress={() => router.replace('/home')} style={styles.backIconBtn}>
-            <ChevronRight size={22} color="#FFFFFF" />
-          </Pressable>
-
-          <View style={styles.headerTexts}>
-            <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-              <Text style={[styles.headerTitle, isMobile && { fontSize: 17 }]} numberOfLines={1}>
-                مركز عمليات حيّنا 🇸🇦
-              </Text>
-              <Crown size={isMobile ? 16 : 19} color="#F59E0B" />
-            </View>
-            <Text style={[styles.headerSub, isMobile && { fontSize: 10 }]} numberOfLines={1}>
-              لوحة الإدارة والرقابة الشاملة · {currentAdmin.display_name || currentAdmin.username} (مدير النظام)
-            </Text>
-          </View>
-
+      <AppHeader
+        variant="sub"
+        title="مركز عمليات حيّنا"
+        subtitle={`لوحة الإدارة والرقابة · ${currentAdmin.display_name || currentAdmin.username || 'مدير النظام'}`}
+        fallbackRoute="/home"
+        rightAction={
           <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-            <Pressable onPress={handleExportData} style={styles.headerActionBtn}>
-              <Download size={16} color="#FFFFFF" />
+            <Pressable
+              onPress={handleExportData}
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 17,
+                backgroundColor: '#f1f5f9',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Download size={15} color="#475569" />
             </Pressable>
-            <Pressable onPress={onRefresh} style={styles.headerActionBtn}>
-              <RefreshCw size={16} color="#FFFFFF" />
+            <Pressable
+              onPress={onRefresh}
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 17,
+                backgroundColor: '#f1f5f9',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <RefreshCw size={14} color="#059669" />
             </Pressable>
           </View>
-        </View>
+        }
+      />
+
+      <View style={{ backgroundColor: '#0f172a', paddingHorizontal: 16, paddingVertical: 10 }}>
 
         {/* Live Operational Status Ribbon */}
         <View style={styles.alertsRow}>
@@ -1077,13 +1282,49 @@ export default function AdminScreen() {
             </Pressable>
           )}
         </View>
-      </LinearGradient>
+
+        {rt.total > 0 ? (
+          <Pressable
+            style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8, backgroundColor: 'rgba(16,185,129,0.18)', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, marginTop: 8 }}
+            onPress={() => { void loadDashboardData(); rt.reset(); }}
+          >
+            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#34D399' }} />
+            <Text style={{ flex: 1, color: '#D1FAE5', fontSize: 11, fontWeight: '800', textAlign: 'right' }}>
+              {rt.total} تحديث مباشر جديد{rt.lastLabel ? ` · ${rt.lastLabel}` : ''} — اضغط للتحديث الآن
+            </Text>
+          </Pressable>
+        ) : null}
+      </View>
 
       {/* ======================================================== */}
       {/* 2. ADVANCED HORIZONTAL NAVIGATION TABS                   */}
       {/* ======================================================== */}
       <View style={styles.tabBarWrapper}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabBarScroll}>
+          <TabPill
+            label={`مركز المهام${stats.pendingReports + stats.pendingVerifications + stats.urgentAlerts > 0 ? ` (${stats.pendingReports + stats.pendingVerifications + stats.urgentAlerts})` : ''}`}
+            icon={<ListChecks size={15} color={activeTab === 'tasks' ? '#FFFFFF' : '#64748B'} />}
+            active={activeTab === 'tasks'}
+            onPress={() => setActiveTab('tasks')}
+          />
+          <TabPill
+            label="البحث الشامل"
+            icon={<Search size={15} color={activeTab === 'search' ? '#FFFFFF' : '#64748B'} />}
+            active={activeTab === 'search'}
+            onPress={() => setActiveTab('search')}
+          />
+          <TabPill
+            label="تحكم المنصة"
+            icon={<Settings size={15} color={activeTab === 'config' ? '#FFFFFF' : '#64748B'} />}
+            active={activeTab === 'config'}
+            onPress={() => setActiveTab('config')}
+          />
+          <TabPill
+            label="الأدوار والصلاحيات"
+            icon={<ShieldCheck size={15} color={activeTab === 'roles' ? '#FFFFFF' : '#64748B'} />}
+            active={activeTab === 'roles'}
+            onPress={() => setActiveTab('roles')}
+          />
           <TabPill
             label="التحليلات والمؤشرات"
             icon={<BarChart3 size={15} color={activeTab === 'overview' ? '#FFFFFF' : '#64748B'} />}
@@ -1157,6 +1398,32 @@ export default function AdminScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}
       >
+        {/* TAB 0: UNIFIED TASK CENTER */}
+        {activeTab === 'tasks' && (
+          <AdminTaskCenter
+            reports={reports}
+            verifications={verifications}
+            urgentAlerts={urgentAlertsList}
+            questions={questionsList}
+            onNavigate={(tab) => setActiveTab(tab as any)}
+            onResolveAll={() => void loadDashboardData()}
+          />
+        )}
+
+        {/* TAB: GLOBAL SEARCH */}
+        {activeTab === 'search' && (
+          <AdminGlobalSearch
+            onOpenUser={(u) => void inspectUser(u as AdminProfile)}
+            onBulkUsers={(users, patch) => handleBulkUserPatch(users as AdminProfile[], patch)}
+          />
+        )}
+
+        {/* TAB: PLATFORM CONFIG (feature flags / maintenance) */}
+        {activeTab === 'config' && <AdminFeatureFlags onSaved={showToast} />}
+
+        {/* TAB: RBAC (roles & permissions) */}
+        {activeTab === 'roles' && <AdminRbacPanel onSaved={showToast} />}
+
         {/* TAB 1: OVERVIEW & ANALYTICS */}
         {activeTab === 'overview' && (
           <View style={styles.section}>
@@ -1198,6 +1465,39 @@ export default function AdminScreen() {
                 style={{ width: statCardWidth }}
               />
             </View>
+
+            {/* 30-day trend analytics */}
+            {analytics.users.length > 0 ? (
+              <View style={{ marginTop: 18 }}>
+                <Text style={styles.sectionTitle}>اتجاهات آخر 30 يومًا 📈</Text>
+                <Text style={styles.sectionSubDesc}>نمو المستخدمين والمنشورات والبلاغات يوميًا خلال الشهر الماضي.</Text>
+
+                <View style={{ marginTop: 12, backgroundColor: C.card, borderRadius: 16, borderWidth: 1, borderColor: C.border, padding: 14 }}>
+                  <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <Text style={{ fontSize: 12.5, fontWeight: '900', color: C.ink }}>نمو المستخدمين الجدد</Text>
+                    <Text style={{ fontSize: 11, color: C.muted, fontWeight: '700' }}>
+                      الإجمالي: {analytics.users.reduce((s, d) => s + d.value, 0)}
+                    </Text>
+                  </View>
+                  <TrendChart data={analytics.users} color={C.info} height={140} />
+                </View>
+
+                <View style={{ marginTop: 10 }}>
+                  <InsightCard
+                    title="بلاغات واردة (30 يوم)"
+                    value={analytics.reports.reduce((s, d) => s + d.value, 0)}
+                    color={C.danger}
+                    data={analytics.reports}
+                  />
+                  <InsightCard
+                    title="منشورات ومناقشات (30 يوم)"
+                    value={analytics.questions.reduce((s, d) => s + d.value, 0)}
+                    color={C.accent}
+                    data={analytics.questions}
+                  />
+                </View>
+              </View>
+            ) : null}
 
             {/* Cities Distribution */}
             <View style={styles.citiesCard}>
@@ -1929,6 +2229,32 @@ export default function AdminScreen() {
                 <FilterPill label="الدمام" active={broadcastTarget === 'الدمام'} onPress={() => setBroadcastTarget('الدمام')} />
               </View>
 
+              <Text style={[styles.inputLabel, { marginTop: 12 }]}>شريحة الجمهور:</Text>
+              <View style={styles.filterRow}>
+                <FilterPill label="الجميع" active={broadcastSegment === 'all'} onPress={() => setBroadcastSegment('all')} />
+                <FilterPill label="الموثّقون" active={broadcastSegment === 'verified'} onPress={() => setBroadcastSegment('verified')} />
+                <FilterPill label="غير الموثّقين" active={broadcastSegment === 'unverified'} onPress={() => setBroadcastSegment('unverified')} />
+                <FilterPill label="المديرون" active={broadcastSegment === 'admins'} onPress={() => setBroadcastSegment('admins')} />
+              </View>
+
+              <Pressable
+                style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginTop: 12, paddingVertical: 8 }}
+                onPress={() => setScheduleEnabled((v) => !v)}
+              >
+                <Text style={{ fontSize: 13, color: C.ink, fontWeight: '800' }}>
+                  {scheduleEnabled ? '☑️' : '⬜️'} جدولة الإرسال لوقت لاحق
+                </Text>
+              </Pressable>
+              {scheduleEnabled ? (
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="مثال: 2026-10-20 09:30"
+                  placeholderTextColor="#94A3B8"
+                  value={scheduleAt}
+                  onChangeText={setScheduleAt}
+                />
+              ) : null}
+
               {/* Live Preview Notification Card */}
               {broadcastTitle.length > 0 && (
                 <View style={styles.previewBox}>
@@ -1961,6 +2287,49 @@ export default function AdminScreen() {
                   </>
                 )}
               </Pressable>
+
+              {/* Delivery report */}
+              {lastDelivery ? (
+                <View style={{ marginTop: 12, backgroundColor: C.accentLight, borderRadius: 12, padding: 12, gap: 4 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '900', color: C.accentDark, textAlign: 'right' }}>تقرير آخر بث ✅</Text>
+                  <Text style={{ fontSize: 11, color: C.inkMuted, textAlign: 'right', lineHeight: 18 }}>
+                    «{lastDelivery.label}» — {lastDelivery.recipients} مستلم · {lastDelivery.pushed} إشعار فوري مُرسَل
+                  </Text>
+                </View>
+              ) : null}
+
+              {/* Scheduled broadcasts */}
+              {scheduledList.length > 0 ? (
+                <View style={{ marginTop: 16, gap: 8 }}>
+                  <Text style={styles.inputLabel}>التعاميم المجدولة ({scheduledList.length})</Text>
+                  {scheduledList.map((s) => (
+                    <View
+                      key={s.id}
+                      style={{ backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 12, padding: 12, gap: 6 }}
+                    >
+                      <Text style={{ fontSize: 12.5, fontWeight: '900', color: C.ink, textAlign: 'right' }}>{s.title}</Text>
+                      <Text style={{ fontSize: 10.5, color: C.muted, textAlign: 'right' }}>
+                        {new Date(s.scheduled_at).toLocaleString('ar-SA')}
+                      </Text>
+                      <View style={{ flexDirection: 'row-reverse', gap: 8 }}>
+                        <Pressable
+                          style={{ backgroundColor: C.accent, borderRadius: 9, paddingHorizontal: 12, paddingVertical: 6 }}
+                          onPress={() => sendScheduledNow(s)}
+                          disabled={sendingBroadcast}
+                        >
+                          <Text style={{ color: '#fff', fontSize: 11, fontWeight: '900' }}>إرسال الآن</Text>
+                        </Pressable>
+                        <Pressable
+                          style={{ backgroundColor: C.dangerLight, borderRadius: 9, paddingHorizontal: 12, paddingVertical: 6 }}
+                          onPress={() => cancelScheduledBroadcast(s.id)}
+                        >
+                          <Text style={{ color: C.danger, fontSize: 11, fontWeight: '900' }}>إلغاء</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
             </View>
           </View>
         )}
@@ -2175,6 +2544,41 @@ export default function AdminScreen() {
                   <Text style={styles.modalFootprintLabel}>الرتبة</Text>
                 </View>
               </View>
+
+              {/* 360° Dossier */}
+              <Text style={styles.modalSectionLabel}>الملف الموسّع 360°:</Text>
+              <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 }}>
+                {[
+                  { label: 'عمر الحساب', value: accountAgeLabel(inspectedUser.created_at), color: C.info },
+                  { label: 'الأجهزة المسجّلة', value: String(userDevices), color: C.accent },
+                  { label: 'الخدمات المقدّمة', value: String(userExtras.services), color: C.purple },
+                  { label: 'بلاغات ضدّه', value: String(userExtras.reportsAgainst), color: userExtras.reportsAgainst > 0 ? C.danger : C.muted },
+                ].map((m) => (
+                  <View
+                    key={m.label}
+                    style={{ flexBasis: '48%', flexGrow: 1, backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 12, padding: 10, gap: 3 }}
+                  >
+                    <Text style={{ fontSize: 15, fontWeight: '900', color: m.color, textAlign: 'right' }}>{m.value}</Text>
+                    <Text style={{ fontSize: 10.5, color: C.muted, fontWeight: '700', textAlign: 'right' }}>{m.label}</Text>
+                  </View>
+                ))}
+              </View>
+
+              {userExtras.recent.length > 0 ? (
+                <View style={{ marginTop: 10, gap: 6 }}>
+                  <Text style={styles.modalSectionLabel}>آخر النشاطات:</Text>
+                  {userExtras.recent.map((r) => (
+                    <View
+                      key={r.id}
+                      style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8, backgroundColor: C.bg, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8 }}
+                    >
+                      <MessageCircle size={13} color={C.info} />
+                      <Text style={{ flex: 1, fontSize: 11.5, color: C.ink, textAlign: 'right' }} numberOfLines={1}>{r.title}</Text>
+                      <Text style={{ fontSize: 9.5, color: C.subtle, fontWeight: '700' }}>{new Date(r.created_at).toLocaleDateString('ar-SA')}</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
 
               <Text style={styles.modalSectionLabel}>إجراءات الإدارة المباشرة:</Text>
 
