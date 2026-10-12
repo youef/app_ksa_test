@@ -46,8 +46,11 @@ export default function StoryViewer() {
   async function loadStoriesSequence() {
     setLoading(true);
     const { data: u } = await supabase.auth.getUser();
-    if (!u.user) return router.replace('/auth');
-    setCurrentUserId(u.user.id);
+    if (u?.user) {
+      setCurrentUserId(u.user.id);
+    } else {
+      setCurrentUserId('');
+    }
 
     // Fetch the target story first
     const { data: targetStory } = await supabase
@@ -70,11 +73,13 @@ export default function StoryViewer() {
     setAuthor(p);
 
     // Fetch ALL active stories for this author in chronological order
+    const nowIso = new Date().toISOString();
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const { data: allAuthorStories } = await supabase
       .from('stories')
       .select('*')
       .eq('author_id', targetStory.author_id)
-      .gt('expires_at', new Date().toISOString())
+      .or(`expires_at.gt.${nowIso},and(expires_at.is.null,created_at.gte.${yesterday})`)
       .order('created_at', { ascending: true });
 
     const sequence = allAuthorStories && allAuthorStories.length > 0 ? allAuthorStories : [targetStory];
@@ -86,7 +91,9 @@ export default function StoryViewer() {
 
     // Privacy check for replies
     let allowed = true;
-    if (targetStory.allow_replies === false) {
+    if (!u?.user) {
+      allowed = false;
+    } else if (targetStory.allow_replies === false) {
       allowed = false;
     } else if (p?.allow_story_replies === 'nobody') {
       allowed = false;
@@ -249,6 +256,28 @@ export default function StoryViewer() {
     }
   }
 
+  function handleLike() {
+    if (!currentUserId) {
+      Alert.alert('تسجيل الدخول', 'يرجى تسجيل الدخول للتفاعل والإعجاب بالقصة', [
+        { text: 'تسجيل الدخول', onPress: () => router.push('/auth') },
+        { text: 'إلغاء', style: 'cancel' },
+      ]);
+      return;
+    }
+    setLiked(!liked);
+  }
+
+  function handleOpenReply() {
+    if (!currentUserId) {
+      Alert.alert('تسجيل الدخول', 'يرجى تسجيل الدخول للرد على القصة', [
+        { text: 'تسجيل الدخول', onPress: () => router.push('/auth') },
+        { text: 'إلغاء', style: 'cancel' },
+      ]);
+      return;
+    }
+    setShowReplyBox(true);
+  }
+
   if (loading) {
     return (
       <View style={styles.loadingScreen}>
@@ -339,7 +368,14 @@ export default function StoryViewer() {
                     </Text>
                   )}
                 </View>
-                <Text style={styles.storyTime}>تنتهي بعد {timeLeft}س</Text>
+                <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 5 }}>
+                  {(author?.district || author?.city) && (
+                    <Text style={styles.authorDistrictText} numberOfLines={1}>
+                      {[author.district, author.city].filter(Boolean).join(' · ')}
+                    </Text>
+                  )}
+                  <Text style={styles.storyTime}>· تنتهي بعد {timeLeft}س</Text>
+                </View>
               </View>
 
               <View style={styles.authorAvatar}>
@@ -420,21 +456,23 @@ export default function StoryViewer() {
                   </View>
                 ) : (
                   <View style={styles.replyActions}>
-                    <Pressable style={styles.likeBtn} onPress={() => setLiked(!liked)}>
+                    <Pressable style={styles.likeBtn} onPress={handleLike}>
                       <Heart size={26} color={liked ? '#f43f5e' : '#fff'} fill={liked ? '#f43f5e' : 'transparent'} />
                     </Pressable>
-                    <Pressable style={styles.replyTrigger} onPress={() => setShowReplyBox(true)}>
+                    <Pressable style={styles.replyTrigger} onPress={handleOpenReply}>
                       <Text style={styles.replyTriggerText}>رد على القصة...</Text>
                     </Pressable>
                   </View>
                 )
               ) : (
                 <View style={styles.disabledReplyBar}>
-                  <Pressable style={styles.likeBtn} onPress={() => setLiked(!liked)}>
+                  <Pressable style={styles.likeBtn} onPress={handleLike}>
                     <Heart size={26} color={liked ? '#f43f5e' : '#fff'} fill={liked ? '#f43f5e' : 'transparent'} />
                   </Pressable>
                   <View style={styles.disabledReplyNotice}>
-                    <Text style={styles.disabledReplyNoticeText}>الردود معطلة لهذه القصة</Text>
+                    <Text style={styles.disabledReplyNoticeText}>
+                      {!currentUserId ? 'سجل الدخول للتفاعل مع القصة' : 'الردود معطلة لهذه القصة'}
+                    </Text>
                   </View>
                 </View>
               )}
@@ -542,6 +580,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
+  },
+  authorDistrictText: {
+    color: '#a7f3d0',
+    fontSize: 10.5,
+    fontWeight: '800',
   },
   storyTime: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '600', marginTop: 1 },
   tapZonesContainer: {

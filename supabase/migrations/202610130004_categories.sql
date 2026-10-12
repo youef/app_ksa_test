@@ -5,13 +5,13 @@
 create table if not exists public.categories (
   id uuid primary key default gen_random_uuid(),
   parent_id uuid references public.categories(id) on delete set null,
-  key text not null unique,        -- machine key: 'home_maintenance', 'electronics', etc.
-  label text not null,             -- display name: 'صيانة منزلية', 'إلكترونيات'
+  key text not null unique,
+  label text not null,
   description text,
-  icon text,                       -- lucide icon name or emoji
-  color text,                      -- hex color for UI
+  icon text,
+  color text,
   sort_order int not null default 0,
-  entity_types text[] not null default '{}', -- which entities use this: '{"services","requests","market"}'
+  entity_types text[] not null default '{}',
   is_active boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -32,7 +32,6 @@ create policy categories_admin_write on public.categories
   using (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'))
   with check (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'));
 
--- Updated_at trigger
 create or replace function public.tg_categories_updated_at()
 returns trigger
 language plpgsql
@@ -50,9 +49,8 @@ create trigger tg_categories_updated_at
 before update on public.categories
 for each row execute function public.tg_categories_updated_at();
 
--- Seed core categories (idempotent)
+-- Seed Level 1 categories (idempotent)
 insert into public.categories (key, label, description, icon, color, sort_order, entity_types, parent_id) values
-  -- Level 1
   ('home_maintenance', 'صيانة منزلية', 'خدمات الصيانة والإصلاح للمنازل', 'Wrench', '#2563EB', 10, '{"services","requests"}', null),
   ('electronics', 'إلكترونيات', 'أجهزة، جوالات، وملحقاتها', 'Smartphone', '#7C3AED', 20, '{"services","market","requests"}', null),
   ('transport', 'نقل ومواصلات', 'توصيل، نقل أثاث، ركوب مشترك', 'Truck', '#059669', 30, '{"services","requests","carpooling"}', null),
@@ -73,27 +71,20 @@ on conflict (key) do update set
   is_active = excluded.is_active,
   updated_at = now();
 
--- Level 2 examples (children of home_maintenance) - use CTE to reference parent IDs safely
-with parents as (
-  select id, key from public.categories where key in ('home_maintenance','electronics','transport')
-)
-insert into public.categories (key, label, description, icon, color, sort_order, entity_types, parent_id)
-select v.key, v.label, v.description, v.icon, v.color, v.sort_order, v.entity_types::text[], p.id
-from parents p
-join (values
-  ('ac_repair', 'صيانة تكييف', 'تركيب وصيانة المكيفات', 'Snowflake', '#2563EB', 10, '{"services","requests"}', 'home_maintenance'),
-  ('plumbing', 'سباكة', 'إصلاح التسريبات وتركيب الأدوات الصحية', 'Droplets', '#2563EB', 20, '{"services","requests"}', 'home_maintenance'),
-  ('electrical', 'كهرباء', 'تمديدات، مفاتيح، إضاءة', 'Zap', '#2563EB', 30, '{"services","requests"}', 'home_maintenance'),
-  ('carpentry', 'نجارة', 'أبواب، نوافذ، أثاث مخصص', 'Hammer', '#2563EB', 40, '{"services","requests"}', 'home_maintenance'),
-  ('painting', 'دهانات وديكور', 'دهان داخلي/خارجي، ورق جدران', 'Brush', '#2563EB', 50, '{"services","requests"}', 'home_maintenance'),
-  ('phone_repair', 'إصلاح جوالات', 'شاشات، بطاريات، منافذ شحن', 'Smartphone', '#7C3AED', 10, '{"services","market","requests"}', 'electronics'),
-  ('computer_repair', 'إصلاح حواسيب', 'صيانة لابتوب/ديسكتوب', 'Monitor', '#7C3AED', 20, '{"services","requests"}', 'electronics'),
-  ('accessories', 'إكسسوارات', 'سماعات، شواحن، جرابات', 'Headphones', '#7C3AED', 30, '{"market","requests"}', 'electronics'),
-  ('delivery', 'توصيل طلبات', 'طعام، مستلزمات، وثائق', 'Package', '#059669', 10, '{"services","requests","carpooling"}', 'transport'),
-  ('moving', 'نقل أثاث', 'نقل منزلي/مكتبي مع تغليف', 'Package', '#059669', 20, '{"services","requests"}', 'transport'),
-  ('carpooling', 'ركوب مشترك', 'تنقل يومي بين الأحياء', 'Users', '#059669', 30, '{"carpooling","requests"}', 'transport')
-) as v(key, label, description, icon, color, sort_order, entity_types, parent_key)
-on v.parent_key = p.key
+-- Seed Level 2 categories (children) - using subqueries for parent_id
+-- These run after Level 1 is committed, so parent IDs exist
+insert into public.categories (key, label, description, icon, color, sort_order, entity_types, parent_id) values
+  ('ac_repair', 'صيانة تكييف', 'تركيب وصيانة المكيفات', 'Snowflake', '#2563EB', 10, '{"services","requests"}', (select id from public.categories where key = 'home_maintenance')),
+  ('plumbing', 'سباكة', 'إصلاح التسريبات وتركيب الأدوات الصحية', 'Droplets', '#2563EB', 20, '{"services","requests"}', (select id from public.categories where key = 'home_maintenance')),
+  ('electrical', 'كهرباء', 'تمديدات، مفاتيح، إضاءة', 'Zap', '#2563EB', 30, '{"services","requests"}', (select id from public.categories where key = 'home_maintenance')),
+  ('carpentry', 'نجارة', 'أبواب، نوافذ، أثاث مخصص', 'Hammer', '#2563EB', 40, '{"services","requests"}', (select id from public.categories where key = 'home_maintenance')),
+  ('painting', 'دهانات وديكور', 'دهان داخلي/خارجي، ورق جدران', 'Brush', '#2563EB', 50, '{"services","requests"}', (select id from public.categories where key = 'home_maintenance')),
+  ('phone_repair', 'إصلاح جوالات', 'شاشات، بطاريات، منافذ شحن', 'Smartphone', '#7C3AED', 10, '{"services","market","requests"}', (select id from public.categories where key = 'electronics')),
+  ('computer_repair', 'إصلاح حواسيب', 'صيانة لابتوب/ديسكتوب', 'Monitor', '#7C3AED', 20, '{"services","requests"}', (select id from public.categories where key = 'electronics')),
+  ('accessories', 'إكسسوارات', 'سماعات، شواحن، جرابات', 'Headphones', '#7C3AED', 30, '{"market","requests"}', (select id from public.categories where key = 'electronics')),
+  ('delivery', 'توصيل طلبات', 'طعام، مستلزمات، وثائق', 'Package', '#059669', 10, '{"services","requests","carpooling"}', (select id from public.categories where key = 'transport')),
+  ('moving', 'نقل أثاث', 'نقل منزلي/مكتبي مع تغليف', 'Package', '#059669', 20, '{"services","requests"}', (select id from public.categories where key = 'transport')),
+  ('carpooling_cat', 'ركوب مشترك', 'تنقل يومي بين الأحياء', 'Users', '#059669', 30, '{"carpooling","requests"}', (select id from public.categories where key = 'transport'))
 on conflict (key) do update set
   label = excluded.label,
   description = excluded.description,

@@ -89,14 +89,14 @@ export function useHomeFeed({ onLocation }: Options) {
           .select('id', { count: 'exact', head: true })
           .eq('user_id', user.id)
           .is('read_at', null) : Promise.resolve({ count: 0, error: null }),
-        user ? supabase
+        supabase
           .from('stories')
           .select(
             '*, profiles:author_id(id, display_name, username, avatar_url, is_verified, is_geoverified, city, district)',
           )
-          .gt('expires_at', new Date().toISOString())
+          .or(`expires_at.gt.${new Date().toISOString()},and(expires_at.is.null,created_at.gte.${new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()})`)
           .order('created_at', { ascending: false })
-          .limit(30) : Promise.resolve({ data: [], error: null }),
+          .limit(40),
         user
           ? supabase.from('questions').select('*').order('created_at', { ascending: false }).limit(limit)
           : supabase.rpc('hayna_guest_questions', { p_city: loc.city, p_district: loc.district, p_limit: limit }),
@@ -113,21 +113,34 @@ export function useHomeFeed({ onLocation }: Options) {
       if (questionsRes.error) throw questionsRes.error;
       if (requestsRes.error) throw requestsRes.error;
 
-      // Stories: one per author, limited to the user's area.
+      // Stories: one per author, prioritizing current user's area, with neighbor fallback
+      const rawStories = ((storiesRes.data ?? []) as Story[]);
       const seen = new Set<string>();
-      setStories(
-        ((storiesRes.data ?? []) as Story[]).filter(s => {
-          if (!s.author_id || seen.has(s.author_id)) return false;
-          const c = s.profiles?.city || '';
-          const d = s.profiles?.district || '';
-          if (!isAllKingdom(loc.city)) {
-            if (loc.city && c && c !== loc.city) return false;
-            if (loc.district && loc.district !== 'كل الأحياء' && d && d !== loc.district) return false;
-          }
-          seen.add(s.author_id);
-          return true;
-        }),
-      );
+      const areaStories: Story[] = [];
+      const neighborStories: Story[] = [];
+
+      for (const s of rawStories) {
+        if (!s.author_id || seen.has(s.author_id)) continue;
+        const c = s.profiles?.city || '';
+        const d = s.profiles?.district || '';
+        let isLocal = true;
+        if (!isAllKingdom(loc.city)) {
+          if (loc.city && c && c !== loc.city) isLocal = false;
+          if (loc.district && loc.district !== 'كل الأحياء' && d && d !== loc.district) isLocal = false;
+        }
+        if (isLocal) {
+          areaStories.push(s);
+        } else {
+          neighborStories.push(s);
+        }
+        seen.add(s.author_id);
+      }
+
+      // Prioritize local district, then supplement with city/neighbors
+      const combined = areaStories.length > 0
+        ? [...areaStories, ...neighborStories.slice(0, Math.max(0, 8 - areaStories.length))]
+        : neighborStories.slice(0, 10);
+      setStories(combined);
 
       const qRows = dedupe((questionsRes.data ?? []) as Question[], 'author_id');
       const rRows = dedupe((requestsRes.data ?? []) as HelpRequest[], 'requester_id');

@@ -12,19 +12,28 @@ type Props = {
 };
 
 export default function StoriesRow({ profile, stories, selectedDistrict }: Props) {
-  const visibleStories = stories.slice(0, 5);
+  const visibleStories = stories.slice(0, 12);
+
+  const handleAddStory = () => {
+    if (!profile) {
+      router.push('/auth');
+      return;
+    }
+    router.push('/create-story');
+  };
 
   return (
     <View style={styles.storiesContainer}>
+      {/* Header with Title and Quick Actions */}
       <View style={styles.storiesHeaderRow}>
         <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
           <Pressable
             style={styles.publishStoryHeaderBtn}
-            onPress={() => router.push('/create-story')}
+            onPress={handleAddStory}
             accessibilityRole="button"
             accessibilityLabel="نشر يوميات"
           >
-            <Plus size={14} color="#059669" />
+            <Plus size={14} color="#059669" strokeWidth={2.5} />
             <Text style={styles.publishStoryHeaderText}>نشر يوميات</Text>
           </Pressable>
           <Pressable
@@ -32,7 +41,7 @@ export default function StoriesRow({ profile, stories, selectedDistrict }: Props
               flexDirection: 'row-reverse',
               alignItems: 'center',
               gap: 3,
-              paddingHorizontal: 8,
+              paddingHorizontal: 9,
               paddingVertical: 5,
               borderRadius: 10,
               backgroundColor: '#f1f5f9',
@@ -56,7 +65,13 @@ export default function StoriesRow({ profile, stories, selectedDistrict }: Props
       </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.storiesScroll}>
-        <Pressable style={styles.storyBox} onPress={() => router.push('/create-story')}>
+        {/* User's Add Story Bubble */}
+        <Pressable
+          style={styles.storyBox}
+          onPress={handleAddStory}
+          accessibilityRole="button"
+          accessibilityLabel="أضف يومياتك"
+        >
           <LinearGradient
             colors={['#059669', '#10b981', '#34d399']}
             style={styles.storyAddRing}
@@ -76,15 +91,18 @@ export default function StoriesRow({ profile, stories, selectedDistrict }: Props
               </View>
             </View>
           </LinearGradient>
-          <Text style={styles.storyName}>أضف يومياتك</Text>
+          <Text style={styles.storyName} numberOfLines={1}>أضف يومياتك</Text>
           <Text style={styles.storyDistrictSub}>قصتك أنت</Text>
         </Pressable>
 
-        {visibleStories.map(story => {
+        {/* Active Neighbors Stories */}
+        {visibleStories.map((story) => {
           const authorName = story.profiles?.display_name || story.profiles?.username || 'جار';
           const avatarUrl = story.profiles?.avatar_url;
           const verified = story.profiles?.is_verified || story.profiles?.is_geoverified;
           const bg = story.bg_color || '#059669';
+          const storyDistrict = story.profiles?.district || (selectedDistrict !== 'كل الأحياء' ? selectedDistrict : 'جار الحي');
+          const isImage = story.type === 'image' && Boolean(story.image_url);
 
           return (
             <Pressable
@@ -95,21 +113,21 @@ export default function StoriesRow({ profile, stories, selectedDistrict }: Props
               accessibilityLabel={`يوميات ${authorName}`}
             >
               <LinearGradient
-                colors={['#059669', '#10b981', '#3b82f6']}
+                colors={['#059669', '#10b981', '#06b6d4']}
                 style={styles.storyGradientRing}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
               >
                 <View style={styles.storyInnerBorder}>
-                  {story.type === 'text' ? (
-                    <View style={[styles.storyTextPreview, { backgroundColor: bg }]}>
-                      <Text style={styles.storyTextPreviewLetter} numberOfLines={1}>{story.content?.[0] || 'ق'}</Text>
-                    </View>
-                  ) : avatarUrl ? (
+                  {avatarUrl ? (
                     <Image source={{ uri: avatarUrl }} style={styles.storyImg} />
+                  ) : isImage ? (
+                    <Image source={{ uri: story.image_url! }} style={styles.storyImg} />
                   ) : (
                     <View style={[styles.storyTextPreview, { backgroundColor: bg }]}>
-                      <Text style={styles.storyTextPreviewLetter}>{authorName[0]}</Text>
+                      <Text style={styles.storyTextPreviewLetter} numberOfLines={1}>
+                        {story.content?.[0] || authorName[0] || 'ح'}
+                      </Text>
                     </View>
                   )}
                 </View>
@@ -121,34 +139,76 @@ export default function StoriesRow({ profile, stories, selectedDistrict }: Props
               </LinearGradient>
               <Text style={styles.storyName} numberOfLines={1}>{authorName}</Text>
               <Text style={styles.storyDistrictSub} numberOfLines={1}>
-                {selectedDistrict !== 'كل الأحياء' ? selectedDistrict : 'جار الحي'}
+                {storyDistrict}
               </Text>
             </Pressable>
           );
         })}
 
-        {/* View More Stories Button */}
-        <Pressable
-          style={styles.storyBox}
-          onPress={() => router.push('/stories')}
-          accessibilityRole="button"
-          accessibilityLabel="عرض المزيد من اليوميات"
-        >
-          <View style={{
-            width: 58,
-            height: 58,
-            borderRadius: 29,
-            backgroundColor: '#ecfdf5',
-            borderWidth: 2,
-            borderColor: '#a7f3d0',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}>
-            <ChevronLeft size={22} color="#059669" />
-          </View>
-          <Text style={styles.storyName}>المزيد</Text>
-          <Text style={styles.storyDistrictSub}>كل اليوميات</Text>
-        </Pressable>
+        {/* If zero neighbor stories yet, show inviting first-post banner card */}
+        {visibleStories.length === 0 && (
+          <Pressable
+            style={{
+              flexDirection: 'row-reverse',
+              alignItems: 'center',
+              backgroundColor: '#f0fdf4',
+              borderRadius: 16,
+              paddingHorizontal: 14,
+              paddingVertical: 10,
+              borderWidth: 1,
+              borderColor: '#bbf7d0',
+              borderStyle: 'dashed',
+              gap: 8,
+              marginRight: 6,
+            }}
+            onPress={handleAddStory}
+          >
+            <View style={{
+              width: 38,
+              height: 38,
+              borderRadius: 19,
+              backgroundColor: '#dcfce7',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+              <Camera size={18} color="#059669" />
+            </View>
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text style={{ fontSize: 12, fontWeight: '800', color: '#065f46' }}>
+                كن أول من يشارك أهل الحي!
+              </Text>
+              <Text style={{ fontSize: 10, color: '#059669', fontWeight: '600' }}>
+                شارك حالة أو صورة تظل 24 ساعة
+              </Text>
+            </View>
+          </Pressable>
+        )}
+
+        {/* View All Stories Button */}
+        {visibleStories.length > 0 && (
+          <Pressable
+            style={styles.storyBox}
+            onPress={() => router.push('/stories')}
+            accessibilityRole="button"
+            accessibilityLabel="عرض المزيد من اليوميات"
+          >
+            <View style={{
+              width: 62,
+              height: 62,
+              borderRadius: 31,
+              backgroundColor: '#ecfdf5',
+              borderWidth: 2,
+              borderColor: '#a7f3d0',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: 5,
+            }}>
+              <ChevronLeft size={22} color="#059669" />
+            </View>
+            <Text style={styles.storyName}>المزيد</Text>
+            <Text style={styles.storyDistrictSub}>كل اليوميات</Text>
+          </Pressable>
+        )}
       </ScrollView>
     </View>
   );

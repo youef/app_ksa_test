@@ -55,7 +55,13 @@ begin
       'active_users_7d', (select count(distinct user_id) from public.analytics_events where created_at >= v_week and created_at < v_week + interval '7 days' and user_id is not null),
       'reports_total', (select count(*) from public.reports where created_at >= v_week and created_at < v_week + interval '7 days'),
       'reports_pending', (select count(*) from public.reports where status = 'pending'),
-      'verifications_pending', (select count(*) from public.verification_requests where status = 'pending'),
+      'verifications_pending', (
+        begin
+          select count(*) from public.verification_requests where status = 'pending';
+        exception when undefined_table then
+          0;
+        end
+      ),
       'services_new', (select count(*) from public.services where created_at >= v_week and created_at < v_week + interval '7 days'),
       'requests_new', (select count(*) from public.requests where created_at >= v_week and created_at < v_week + interval '7 days'),
       'questions_new', (select count(*) from public.questions where created_at >= v_week and created_at < v_week + interval '7 days')
@@ -73,7 +79,13 @@ begin
     ),
     'revenue_estimate', jsonb_build_object(
       'services', (select coalesce(sum(price_from), 0) from public.services where created_at >= v_week and created_at < v_week + interval '7 days'),
-      'requests', (select coalesce(sum(budget), 0) from public.requests where created_at >= v_week and created_at < v_week + interval '7 days')
+      'requests', (
+        begin
+          select coalesce(sum(price), 0) from public.requests where created_at >= v_week and created_at < v_week + interval '7 days';
+        exception when undefined_column then
+          0;
+        end
+      )
     ),
     'funnel', (
       select jsonb_agg(jsonb_build_object('step', step, 'count', count) order by

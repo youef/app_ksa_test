@@ -19,7 +19,6 @@ alter table public.questions
 create index if not exists questions_search_vector_idx
   on public.questions using gin (search_vector);
 
--- Trigger to keep it updated (redundant with generated column but safe for older PG)
 create or replace function public.tg_questions_search_vector()
 returns trigger
 language plpgsql
@@ -49,8 +48,6 @@ alter table public.services
   generated always as (
     setweight(to_tsvector('arabic', coalesce(name, '')), 'A') ||
     setweight(to_tsvector('arabic', coalesce(description, '')), 'B') ||
-    setweight(to_tsvector('simple', coalesce(category, '')), 'C') ||
-    setweight(to_tsvector('simple', coalesce(subcategory, '')), 'C') ||
     setweight(to_tsvector('simple', coalesce(city, '')), 'C') ||
     setweight(to_tsvector('simple', coalesce(district, '')), 'C')
   ) stored;
@@ -68,8 +65,6 @@ begin
   NEW.search_vector :=
     setweight(to_tsvector('arabic', coalesce(NEW.name, '')), 'A') ||
     setweight(to_tsvector('arabic', coalesce(NEW.description, '')), 'B') ||
-    setweight(to_tsvector('simple', coalesce(NEW.category, '')), 'C') ||
-    setweight(to_tsvector('simple', coalesce(NEW.subcategory, '')), 'C') ||
     setweight(to_tsvector('simple', coalesce(NEW.city, '')), 'C') ||
     setweight(to_tsvector('simple', coalesce(NEW.district, '')), 'C');
   return NEW;
@@ -89,7 +84,6 @@ alter table public.requests
   generated always as (
     setweight(to_tsvector('arabic', coalesce(title, '')), 'A') ||
     setweight(to_tsvector('arabic', coalesce(description, '')), 'B') ||
-    setweight(to_tsvector('simple', coalesce(category, '')), 'C') ||
     setweight(to_tsvector('simple', coalesce(city, '')), 'C') ||
     setweight(to_tsvector('simple', coalesce(district, '')), 'C')
   ) stored;
@@ -107,7 +101,6 @@ begin
   NEW.search_vector :=
     setweight(to_tsvector('arabic', coalesce(NEW.title, '')), 'A') ||
     setweight(to_tsvector('arabic', coalesce(NEW.description, '')), 'B') ||
-    setweight(to_tsvector('simple', coalesce(NEW.category, '')), 'C') ||
     setweight(to_tsvector('simple', coalesce(NEW.city, '')), 'C') ||
     setweight(to_tsvector('simple', coalesce(NEW.district, '')), 'C');
   return NEW;

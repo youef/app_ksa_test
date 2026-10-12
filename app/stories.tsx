@@ -34,16 +34,20 @@ export default function StoriesScreen() {
     try {
       setLoading(true);
       const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const nowIso = new Date().toISOString();
 
       const { data, error } = await supabase
         .from('stories')
         .select(`
           id,
           author_id,
+          type,
           content,
-          media_url,
+          image_url,
           bg_color,
           created_at,
+          expires_at,
+          view_count,
           profiles (
             id,
             display_name,
@@ -55,11 +59,11 @@ export default function StoriesScreen() {
             district
           )
         `)
-        .gte('created_at', yesterday)
+        .or(`expires_at.gt.${nowIso},and(expires_at.is.null,created_at.gte.${yesterday})`)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      const valid = data || [];
+      const valid = (data || []) as any[];
       setStories(valid);
 
       const dSet = new Set<string>();
@@ -93,7 +97,7 @@ export default function StoriesScreen() {
             accessibilityRole="button"
             accessibilityLabel="نشر قصة جديدة"
           >
-            <Plus size={15} color="#fff" />
+            <Plus size={15} color="#fff" strokeWidth={2.5} />
             <Text style={styles.addStoryBtnText}>إضافة</Text>
           </Pressable>
         }
@@ -115,9 +119,9 @@ export default function StoriesScreen() {
               <Pressable
                 key={d}
                 onPress={() => setFilterDistrict(d)}
-                style={[styles.filterChip, filterDistrict === 'd' && styles.filterChipActive]}
+                style={[styles.filterChip, filterDistrict === d && styles.filterChipActive]}
               >
-                <Text style={[styles.filterChipText, filterDistrict === 'd' && styles.filterChipTextActive]}>
+                <Text style={[styles.filterChipText, filterDistrict === d && styles.filterChipTextActive]}>
                   {d}
                 </Text>
               </Pressable>
@@ -141,6 +145,35 @@ export default function StoriesScreen() {
           />
         }
       >
+        {/* Quick Add Story Interactive Hero Banner */}
+        <Pressable
+          style={styles.heroAddBanner}
+          onPress={() => router.push('/create-story')}
+        >
+          <LinearGradient
+            colors={['#059669', '#047857', '#064e3b']}
+            style={styles.heroAddGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <View style={styles.heroAddContent}>
+              <View style={styles.heroAddIconWrap}>
+                <Camera size={22} color="#fff" />
+              </View>
+              <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                <Text style={styles.heroAddTitle}>شارك يومياتك مع جيرانك الآن</Text>
+                <Text style={styles.heroAddSub}>
+                  انشر حالة أو صورة تظهر لأهل حيك لمدة 24 ساعة وتختفي تلقائياً
+                </Text>
+              </View>
+            </View>
+            <View style={styles.heroAddBtn}>
+              <Plus size={14} color="#059669" strokeWidth={3} />
+              <Text style={styles.heroAddBtnText}>أضف الآن</Text>
+            </View>
+          </LinearGradient>
+        </Pressable>
+
         {loading && !refreshing ? (
           <View style={styles.loadingBox}>
             <ActivityIndicator size="large" color="#059669" />
@@ -159,7 +192,7 @@ export default function StoriesScreen() {
               style={styles.emptyActionBtn}
               onPress={() => router.push('/create-story')}
             >
-              <Plus size={16} color="#fff" />
+              <Plus size={16} color="#fff" strokeWidth={2.5} />
               <Text style={styles.emptyActionBtnText}>نشر أول يوميات في حيك</Text>
             </Pressable>
           </View>
@@ -170,6 +203,7 @@ export default function StoriesScreen() {
               const name = author?.display_name || author?.username || 'جار الحي';
               const verified = author?.is_verified || author?.is_geoverified;
               const bg = story.bg_color || '#059669';
+              const hasMedia = story.type === 'image' && Boolean(story.image_url);
 
               return (
                 <Pressable
@@ -180,10 +214,11 @@ export default function StoriesScreen() {
                 >
                   {/* Story Preview Media / Color Box */}
                   <View style={[styles.storyCardMedia, { backgroundColor: bg }]}>
-                    {story.media_url ? (
-                      <Image source={{ uri: story.media_url }} style={styles.storyCardImage} resizeMode="cover" />
+                    {hasMedia ? (
+                      <Image source={{ uri: story.image_url }} style={styles.storyCardImage} resizeMode="cover" />
                     ) : (
                       <View style={styles.storyTextCard}>
+                        <Text style={styles.storyTextQuote}>“</Text>
                         <Text style={styles.storyTextSnippet} numberOfLines={4}>
                           {story.content || 'يوميات جديدة'}
                         </Text>
@@ -192,7 +227,7 @@ export default function StoriesScreen() {
 
                     {/* Gradient Overlay for Readability */}
                     <LinearGradient
-                      colors={['rgba(0,0,0,0.5)', 'transparent', 'rgba(0,0,0,0.7)']}
+                      colors={['rgba(0,0,0,0.55)', 'transparent', 'rgba(0,0,0,0.8)']}
                       style={StyleSheet.absoluteFillObject}
                     />
 
@@ -222,14 +257,20 @@ export default function StoriesScreen() {
                       </View>
                     </View>
 
-                    {/* Bottom District Pill */}
+                    {/* Bottom District & Type Pill */}
                     <View style={styles.storyCardBottomRow}>
-                      {(author?.district || author?.city) && (
+                      {(author?.district || author?.city) ? (
                         <View style={styles.districtBadge}>
-                          <MapPin size={10} color="#fff" />
+                          <MapPin size={9} color="#fff" />
                           <Text style={styles.districtBadgeText} numberOfLines={1}>
                             {[author.district, author.city].filter(Boolean).join(' · ')}
                           </Text>
+                        </View>
+                      ) : null}
+
+                      {hasMedia && (
+                        <View style={styles.mediaTypeBadge}>
+                          <Camera size={10} color="#fff" />
                         </View>
                       )}
                     </View>
@@ -469,5 +510,83 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 10,
     fontWeight: '800',
+  },
+  heroAddBanner: {
+    marginBottom: 16,
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  heroAddGradient: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    gap: 12,
+  },
+  heroAddContent: {
+    flex: 1,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 12,
+  },
+  heroAddIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  heroAddTitle: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#fff',
+    marginBottom: 3,
+  },
+  heroAddSub: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#d1fae5',
+    lineHeight: 16,
+  },
+  heroAddBtn: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 14,
+    gap: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  heroAddBtnText: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#059669',
+  },
+  storyTextQuote: {
+    fontSize: 28,
+    lineHeight: 28,
+    color: 'rgba(255,255,255,0.4)',
+    fontWeight: '900',
+    marginBottom: -4,
+  },
+  mediaTypeBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

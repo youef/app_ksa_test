@@ -7,9 +7,7 @@ alter table public.profiles
   add column if not exists requests_count int not null default 0,
   add column if not exists reports_count int not null default 0,
   add column if not exists questions_count int not null default 0,
-  add column if not exists answers_count int not null default 0,
-  add column if not exists completed_services_count int not null default 0,
-  add column if not exists completed_requests_count int not null default 0;
+  add column if not exists answers_count int not null default 0;
 
 -- Helper: safely increment/decrement a counter
 create or replace function public.increment_counter(
@@ -69,12 +67,6 @@ begin
     perform public.increment_counter('profiles', 'id', NEW.provider_id, 'services_count', 1);
   elsif (TG_OP = 'DELETE') then
     perform public.increment_counter('profiles', 'id', OLD.provider_id, 'services_count', -1);
-  elsif (TG_OP = 'UPDATE' and OLD.status is distinct from NEW.status) then
-    if (NEW.status = 'completed') then
-      perform public.increment_counter('profiles', 'id', NEW.provider_id, 'completed_services_count', 1);
-    elsif (OLD.status = 'completed') then
-      perform public.increment_counter('profiles', 'id', OLD.provider_id, 'completed_services_count', -1);
-    end if;
   end if;
   return null;
 end;
@@ -82,7 +74,7 @@ $$;
 
 drop trigger if exists tg_services_counters on public.services;
 create trigger tg_services_counters
-after insert or update or delete on public.services
+after insert or delete on public.services
 for each row execute function public.tg_services_counters();
 
 -- ============================================================
@@ -99,12 +91,6 @@ begin
     perform public.increment_counter('profiles', 'id', NEW.requester_id, 'requests_count', 1);
   elsif (TG_OP = 'DELETE') then
     perform public.increment_counter('profiles', 'id', OLD.requester_id, 'requests_count', -1);
-  elsif (TG_OP = 'UPDATE' and OLD.status is distinct from NEW.status) then
-    if (NEW.status = 'completed') then
-      perform public.increment_counter('profiles', 'id', NEW.requester_id, 'completed_requests_count', 1);
-    elsif (OLD.status = 'completed') then
-      perform public.increment_counter('profiles', 'id', OLD.requester_id, 'completed_requests_count', -1);
-    end if;
   end if;
   return null;
 end;
@@ -112,7 +98,7 @@ $$;
 
 drop trigger if exists tg_requests_counters on public.requests;
 create trigger tg_requests_counters
-after insert or update or delete on public.requests
+after insert or delete on public.requests
 for each row execute function public.tg_requests_counters();
 
 -- ============================================================
@@ -198,9 +184,7 @@ begin
       requests_count = (select count(*) from public.requests where requester_id = r.id),
       reports_count = (select count(*) from public.reports where target_id = r.id),
       questions_count = (select count(*) from public.questions where author_id = r.id),
-      answers_count = (select count(*) from public.answers where author_id = r.id),
-      completed_services_count = (select count(*) from public.services where provider_id = r.id and status = 'completed'),
-      completed_requests_count = (select count(*) from public.requests where requester_id = r.id and status = 'completed')
+      answers_count = (select count(*) from public.answers where author_id = r.id)
     where id = r.id;
   end loop;
 end;

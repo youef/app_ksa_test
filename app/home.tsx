@@ -264,7 +264,7 @@ export default function Home() {
           emergencyCount={derived.emergency.length}
         />
 
-        {feed.currentUserId && <StoriesRow profile={feed.profile} stories={feed.stories} selectedDistrict={loc.district} />}
+        <StoriesRow profile={feed.profile} stories={feed.stories} selectedDistrict={loc.district} />
 
         {emergencyTop && (
           <View style={styles.emergencyHomeCard}>

@@ -28,25 +28,35 @@ import {
   Sparkles,
   Layers,
   UploadCloud,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  RefreshCw,
+  Check,
 } from 'lucide-react-native';
 import { useStoryComposer } from '@/hooks/useStoryComposer';
 import { useStoryPublisher } from '@/hooks/useStoryPublisher';
 import { BG_GRADIENTS, getGradient } from '@/lib/storyGradients';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const WHATSAPP_FONTS = [
-  { id: 'normal', name: 'عادي', fontWeight: '600' as const, fontStyle: 'normal' as const },
-  { id: 'bold', name: 'عريض', fontWeight: '900' as const, fontStyle: 'normal' as const },
-  { id: 'italic', name: 'مائل', fontWeight: '700' as const, fontStyle: 'italic' as const },
+  { id: 'bold', name: 'عريض', fontWeight: '900' as const, fontStyle: 'normal' as const, isPill: false },
+  { id: 'normal', name: 'عادي', fontWeight: '600' as const, fontStyle: 'normal' as const, isPill: false },
+  { id: 'pill', name: 'كبسولة', fontWeight: '800' as const, fontStyle: 'normal' as const, isPill: true },
+  { id: 'italic', name: 'مائل', fontWeight: '700' as const, fontStyle: 'italic' as const, isPill: false },
 ];
+
+const QUICK_EMOJIS = ['👋', '☕', '🕌', '🇸🇦', '🌙', '📍', '🌧️', '✨', '🚗', '🏡', '🤝', '🔥'];
 
 export default function CreateStory() {
   const composer = useStoryComposer();
   const publisher = useStoryPublisher();
   const { activeSlide } = composer;
 
-  const [fontIndex, setFontIndex] = useState(1); // default bold
+  const [fontIndex, setFontIndex] = useState(0); // default bold
+  const [textAlign, setTextAlign] = useState<'center' | 'right' | 'left'>('center');
+  const [showPalette, setShowPalette] = useState(false);
 
   const withAssetErrors = useCallback(async (fn: () => Promise<unknown>, label: string) => {
     try {
@@ -66,18 +76,28 @@ export default function CreateStory() {
     await withAssetErrors(composer.takePhoto, 'فتح الكاميرا');
   }, [composer, withAssetErrors]);
 
-  // WhatsApp-style Color Palette cycler
-  const handleCycleColor = useCallback(() => {
-    if (!activeSlide) return;
-    const currentId = activeSlide.bgGradId || 1;
-    const nextId = (currentId % BG_GRADIENTS.length) + 1;
-    composer.patchActiveSlide({ bgGradId: nextId });
-  }, [activeSlide, composer]);
-
-  // WhatsApp-style Font styler
   const handleCycleFont = useCallback(() => {
     setFontIndex((prev) => (prev + 1) % WHATSAPP_FONTS.length);
   }, []);
+
+  const handleCycleAlign = useCallback(() => {
+    setTextAlign((prev) => {
+      if (prev === 'center') return 'right';
+      if (prev === 'right') return 'left';
+      return 'center';
+    });
+  }, []);
+
+  const handleSelectGradient = useCallback((gradId: number) => {
+    composer.patchActiveSlide({ bgGradId: gradId });
+  }, [composer]);
+
+  const handleInsertEmoji = useCallback((emoji: string) => {
+    if (!activeSlide) return;
+    const current = activeSlide.content || '';
+    if (current.length >= 300) return;
+    composer.patchActiveSlide({ content: current + emoji });
+  }, [activeSlide, composer]);
 
   const handlePublish = useCallback(async () => {
     if (!composer.isReady) {
@@ -106,26 +126,26 @@ export default function CreateStory() {
         : `تم نشر ${outcome.publishedCount} ${noun} في يوميات الحي وتختفي بعد 24 ساعة.`;
 
     Alert.alert('تم النشر بنجاح! 🎉', body, [
-      { text: 'رائع', onPress: () => router.replace('/home') },
+      { text: 'مشاهدة في الحي', onPress: () => router.replace('/stories') },
     ]);
   }, [composer, publisher]);
 
   if (!activeSlide) return null;
 
-  const currentGradient = getGradient(activeSlide.bgGradId).colors;
+  const currentGradObj = getGradient(activeSlide.bgGradId);
+  const currentGradient = currentGradObj.colors;
   const currentFont = WHATSAPP_FONTS[fontIndex];
   const isImageSlide = activeSlide.type === 'image';
   const hasImage = isImageSlide && Boolean(activeSlide.imageUri);
   const textLength = activeSlide.content?.length || 0;
-  // WhatsApp adaptive font size based on text length
-  const adaptiveFontSize = textLength > 120 ? 20 : textLength > 60 ? 24 : 30;
+  const adaptiveFontSize = textLength > 120 ? 19 : textLength > 60 ? 23 : 28;
 
   return (
     <KeyboardAvoidingView
       style={s.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      {/* Immersive WhatsApp Status Canvas */}
+      {/* Immersive Creative Canvas */}
       <View style={s.canvasWrapper}>
         <LinearGradient
           colors={hasImage ? ['rgba(0,0,0,0.4)', 'rgba(0,0,0,0.85)'] : currentGradient}
@@ -148,7 +168,7 @@ export default function CreateStory() {
               accessibilityRole="button"
               accessibilityLabel="إغلاق"
             >
-              <X size={22} color="#fff" />
+              <X size={20} color="#fff" />
             </Pressable>
 
             {/* Mode Toggle: Text status vs Image status */}
@@ -171,18 +191,18 @@ export default function CreateStory() {
               </Pressable>
             </View>
 
-            {/* WhatsApp Tool Icons */}
+            {/* Creative Top Tools */}
             <View style={s.topToolsRow}>
               {!isImageSlide ? (
                 <>
                   <Pressable
-                    onPress={handleCycleColor}
-                    style={s.toolIconBtn}
+                    onPress={() => setShowPalette(!showPalette)}
+                    style={[s.toolIconBtn, showPalette && s.toolIconBtnActive]}
                     hitSlop={8}
                     accessibilityRole="button"
                     accessibilityLabel="تغيير لون الخلفية"
                   >
-                    <Palette size={20} color="#fff" />
+                    <Palette size={19} color="#fff" />
                   </Pressable>
                   <Pressable
                     onPress={handleCycleFont}
@@ -191,7 +211,22 @@ export default function CreateStory() {
                     accessibilityRole="button"
                     accessibilityLabel="تغيير نمط الخط"
                   >
-                    <Type size={20} color="#fff" />
+                    <Type size={19} color="#fff" />
+                  </Pressable>
+                  <Pressable
+                    onPress={handleCycleAlign}
+                    style={s.toolIconBtn}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel="محاذاة النص"
+                  >
+                    {textAlign === 'center' ? (
+                      <AlignCenter size={18} color="#fff" />
+                    ) : textAlign === 'right' ? (
+                      <AlignRight size={18} color="#fff" />
+                    ) : (
+                      <AlignLeft size={18} color="#fff" />
+                    )}
                   </Pressable>
                 </>
               ) : (
@@ -203,7 +238,7 @@ export default function CreateStory() {
                     accessibilityRole="button"
                     accessibilityLabel="اختيار صورة"
                   >
-                    <ImageIcon size={20} color="#fff" />
+                    <ImageIcon size={19} color="#fff" />
                   </Pressable>
                   <Pressable
                     onPress={handleTakePhoto}
@@ -212,50 +247,82 @@ export default function CreateStory() {
                     accessibilityRole="button"
                     accessibilityLabel="التقاط بالكاميرا"
                   >
-                    <Camera size={20} color="#fff" />
+                    <Camera size={19} color="#fff" />
                   </Pressable>
                 </>
               )}
             </View>
           </View>
 
-          {/* 24H Badge Notice */}
-          <View style={s.badge24h}>
-            <Clock size={11} color="#d1fae5" />
-            <Text style={s.badge24hText}>تختفي تلقائياً بعد 24 ساعة في الحي</Text>
+          {/* 24H Badge & Slide Info Notice */}
+          <View style={s.badge24hRow}>
+            <View style={s.badge24h}>
+              <Clock size={11} color="#d1fae5" />
+              <Text style={s.badge24hText}>تختفي تلقائياً بعد 24 ساعة في الحي</Text>
+            </View>
+            {!isImageSlide && (
+              <View style={s.fontBadge}>
+                <Text style={s.fontBadgeText}>{currentFont.name}</Text>
+              </View>
+            )}
           </View>
+
+          {/* Expandable Palette Selector Bar */}
+          {!isImageSlide && showPalette && (
+            <View style={s.paletteSelectorBox}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.paletteScroll}>
+                {BG_GRADIENTS.map((g) => {
+                  const isSelected = activeSlide.bgGradId === g.id;
+                  return (
+                    <Pressable
+                      key={g.id}
+                      onPress={() => handleSelectGradient(g.id)}
+                      style={[s.paletteCircleWrap, isSelected && s.paletteCircleWrapActive]}
+                    >
+                      <LinearGradient colors={g.colors} style={s.paletteCircle}>
+                        {isSelected && <Check size={14} color="#fff" strokeWidth={3} />}
+                      </LinearGradient>
+                      <Text style={[s.paletteName, isSelected && s.paletteNameActive]}>{g.name}</Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
 
           {/* Central Content Area */}
           <View style={s.centralCanvas}>
             {!isImageSlide ? (
-              <TextInput
-                style={[
-                  s.whatsAppTextInput,
-                  {
-                    fontSize: adaptiveFontSize,
-                    fontWeight: currentFont.fontWeight,
-                    fontStyle: currentFont.fontStyle,
-                  },
-                ]}
-                value={activeSlide.content}
-                onChangeText={(text) => composer.patchActiveSlide({ content: text })}
-                placeholder="اكتب حالتك في الحي هنا..."
-                placeholderTextColor="rgba(255,255,255,0.6)"
-                multiline
-                textAlign="center"
-                maxLength={300}
-                autoFocus
-              />
+              <View style={[s.textCanvasCard, currentFont.isPill && s.textCanvasCardPill]}>
+                <TextInput
+                  style={[
+                    s.whatsAppTextInput,
+                    {
+                      fontSize: adaptiveFontSize,
+                      fontWeight: currentFont.fontWeight,
+                      fontStyle: currentFont.fontStyle,
+                      textAlign: textAlign,
+                    },
+                  ]}
+                  value={activeSlide.content}
+                  onChangeText={(text) => composer.patchActiveSlide({ content: text })}
+                  placeholder="اكتب حالتك أو استفسارك لأهل حيك هنا..."
+                  placeholderTextColor="rgba(255,255,255,0.65)"
+                  multiline
+                  maxLength={300}
+                  autoFocus
+                />
+              </View>
             ) : hasImage ? (
               <View style={s.imageCenterPlaceholder} />
             ) : (
               <View style={s.emptyPhotoCard}>
                 <View style={s.emptyPhotoIconWrap}>
-                  <UploadCloud size={36} color="#059669" />
+                  <UploadCloud size={34} color="#059669" />
                 </View>
                 <Text style={s.emptyPhotoTitle}>أضف صورة ليومياتك</Text>
                 <Text style={s.emptyPhotoSub}>
-                  شارك صور مشاريع، معالم الحي، أو نشاطاتك مع جيرانك
+                  شارك صور مشاريع، معالم الحي، أو نشاطاتك اليومية مع جيرانك
                 </Text>
 
                 <View style={s.emptyPhotoActionsRow}>
@@ -271,6 +338,23 @@ export default function CreateStory() {
               </View>
             )}
           </View>
+
+          {/* Quick Saudi Emojis Bar (Text Mode) */}
+          {!isImageSlide && (
+            <View style={s.emojiBarWrapper}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.emojiScroll}>
+                {QUICK_EMOJIS.map((emoji) => (
+                  <Pressable
+                    key={emoji}
+                    onPress={() => handleInsertEmoji(emoji)}
+                    style={s.emojiBtn}
+                  >
+                    <Text style={s.emojiBtnText}>{emoji}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          )}
 
           {/* Multi-slide carousel indicator strip */}
           {composer.slides.length > 1 && (
@@ -321,7 +405,7 @@ export default function CreateStory() {
                   style={s.whatsAppCaptionInput}
                   value={activeSlide.content}
                   onChangeText={(text) => composer.patchActiveSlide({ content: text })}
-                  placeholder="إضافة شرح... 💬"
+                  placeholder="إضافة شرح وتفاصيل... 💬"
                   placeholderTextColor="#94a3b8"
                   maxLength={150}
                 />
@@ -334,7 +418,7 @@ export default function CreateStory() {
               <View style={{ flex: 1 }} />
             )}
 
-            {/* WhatsApp Iconic Green Circular Send Button */}
+            {/* Glowing Circular Send Button */}
             <Pressable
               style={[
                 s.whatsAppSendFab,
@@ -346,7 +430,7 @@ export default function CreateStory() {
               accessibilityLabel="نشر الحالة"
             >
               <LinearGradient
-                colors={composer.isReady ? ['#059669', '#10b981'] : ['#64748b', '#475569']}
+                colors={composer.isReady ? ['#059669', '#10b981'] : ['#475569', '#334155']}
                 style={s.whatsAppSendFabGrad}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
@@ -361,6 +445,19 @@ export default function CreateStory() {
           </View>
         </LinearGradient>
       </View>
+
+      {/* Publishing Progress Overlay */}
+      {publisher.publishing && (
+        <View style={s.publishingOverlay}>
+          <View style={s.publishingModal}>
+            <ActivityIndicator size="large" color="#059669" />
+            <Text style={s.publishingTitle}>جارٍ نشر يومياتك في الحي...</Text>
+            {publisher.status ? (
+              <Text style={s.publishingStatus}>{publisher.status}</Text>
+            ) : null}
+          </View>
+        </View>
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -396,21 +493,21 @@ const s = StyleSheet.create({
     zIndex: 20,
   },
   circleIconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.35)',
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(0,0,0,0.4)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   modeSwitcherPill: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'rgba(0,0,0,0.45)',
     borderRadius: 24,
     padding: 3,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
+    borderColor: 'rgba(255,255,255,0.18)',
   },
   modeOption: {
     paddingHorizontal: 14,
@@ -438,49 +535,119 @@ const s = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: 'rgba(0,0,0,0.35)',
+    backgroundColor: 'rgba(0,0,0,0.4)',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.2)',
   },
+  toolIconBtnActive: {
+    backgroundColor: '#059669',
+    borderColor: '#34d399',
+  },
+  badge24hRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 8,
+  },
   badge24h: {
-    alignSelf: 'center',
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: 'rgba(0,0,0,0.35)',
+    backgroundColor: 'rgba(0,0,0,0.4)',
     paddingHorizontal: 12,
-    paddingVertical: 4,
+    paddingVertical: 4.5,
     borderRadius: 20,
-    marginTop: 8,
   },
   badge24hText: {
     color: '#d1fae5',
     fontSize: 11,
     fontWeight: '700',
   },
+  fontBadge: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  fontBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  paletteSelectorBox: {
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  paletteScroll: {
+    flexDirection: 'row-reverse',
+    paddingHorizontal: 16,
+    gap: 12,
+    alignItems: 'center',
+  },
+  paletteCircleWrap: {
+    alignItems: 'center',
+    gap: 3,
+  },
+  paletteCircleWrapActive: {
+    transform: [{ scale: 1.08 }],
+  },
+  paletteCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  paletteName: {
+    color: '#94a3b8',
+    fontSize: 9.5,
+    fontWeight: '700',
+  },
+  paletteNameActive: {
+    color: '#34d399',
+    fontWeight: '900',
+  },
   centralCanvas: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
+  },
+  textCanvasCard: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  textCanvasCardPill: {
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderRadius: 24,
+    paddingVertical: 18,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
   },
   whatsAppTextInput: {
     color: '#fff',
-    textAlign: 'center',
     lineHeight: 38,
     width: '100%',
-    paddingHorizontal: 16,
-    textShadowColor: 'rgba(0, 0, 0, 0.4)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
+    paddingHorizontal: 10,
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 1.5 },
+    textShadowRadius: 4,
   },
   imageCenterPlaceholder: {
     flex: 1,
   },
   emptyPhotoCard: {
-    backgroundColor: 'rgba(15, 23, 42, 0.75)',
+    backgroundColor: 'rgba(15, 23, 42, 0.85)',
     borderRadius: 24,
     padding: 24,
     alignItems: 'center',
@@ -488,6 +655,10 @@ const s = StyleSheet.create({
     maxWidth: 340,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.15)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
   },
   emptyPhotoIconWrap: {
     width: 64,
@@ -545,6 +716,27 @@ const s = StyleSheet.create({
     color: '#059669',
     fontSize: 13,
     fontWeight: '800',
+  },
+  emojiBarWrapper: {
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    paddingVertical: 6,
+  },
+  emojiScroll: {
+    flexDirection: 'row-reverse',
+    paddingHorizontal: 16,
+    gap: 10,
+    alignItems: 'center',
+  },
+  emojiBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emojiBtnText: {
+    fontSize: 18,
   },
   slideIndicatorStrip: {
     paddingHorizontal: 16,
@@ -613,12 +805,12 @@ const s = StyleSheet.create({
   },
   whatsAppCaptionInputWrap: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.75)',
+    backgroundColor: 'rgba(15, 23, 42, 0.8)',
     borderRadius: 24,
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderColor: 'rgba(255,255,255,0.25)',
   },
   whatsAppCaptionInput: {
     color: '#fff',
@@ -626,7 +818,7 @@ const s = StyleSheet.create({
     textAlign: 'right',
   },
   charCounterWrap: {
-    backgroundColor: 'rgba(0,0,0,0.35)',
+    backgroundColor: 'rgba(0,0,0,0.4)',
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 12,
@@ -655,5 +847,31 @@ const s = StyleSheet.create({
   },
   whatsAppSendFabDisabled: {
     opacity: 0.5,
+  },
+  publishingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 100,
+  },
+  publishingModal: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+    gap: 12,
+    width: 260,
+  },
+  publishingTitle: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#0f172a',
+    textAlign: 'center',
+  },
+  publishingStatus: {
+    fontSize: 12,
+    color: '#64748b',
+    textAlign: 'center',
   },
 });

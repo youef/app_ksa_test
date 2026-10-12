@@ -259,11 +259,15 @@ begin
   where created_at >= p_date and created_at < p_date + interval '1 day'
     and price_from is not null;
 
-  -- Requests: sum of budget for requests created that day
-  select coalesce(sum(budget), 0) into v_requests
-  from public.requests
-  where created_at >= p_date and created_at < p_date + interval '1 day'
-    and budget is not null;
+  -- Requests: try to sum a price/budget column if it exists, otherwise 0
+  begin
+    select coalesce(sum(price), 0) into v_requests
+    from public.requests
+    where created_at >= p_date and created_at < p_date + interval '1 day'
+      and price is not null;
+  exception when undefined_column then
+    v_requests := 0;
+  end;
 
   insert into public.analytics_revenue_daily (date, services_estimated_revenue, requests_estimated_budget)
   values (p_date, v_services, v_requests)
