@@ -42,6 +42,8 @@ import { useBottomNavInset } from '@/lib/bottomNav';
 
 type WeatherData = {
   city: string;
+  region: string;
+  district: string;
   latitude: number;
   longitude: number;
   current: any;
@@ -76,6 +78,68 @@ function windDir(deg?: number) {
   return dirs[Math.round(((deg % 360) / 45)) % 8];
 }
 
+async function reverseGeocode(latitude: number, longitude: number): Promise<{ region: string; city: string; district: string } | null> {
+  try {
+    const response = await fetch('https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=' + latitude + '&longitude=' + longitude + '&localityLanguage=ar');
+    if (!response.ok) return null;
+    const data = await response.json();
+    const admin: any[] = data?.localityInfo?.administrative || [];
+    const pick = (re: RegExp) => {
+      const hit = admin.find((a) => re.test(String(a?.description || '') + ' ' + String(a?.name || '')));
+      return hit?.name || '';
+    };
+    const region = data?.principalSubdivision || pick(/region|governorate|state|منطقة/i);
+    const city = data?.city || data?.locality || pick(/city|town|village|municipality|مدينة|بلدية/i);
+    const adminNames = admin.map((a) => a?.name).filter(Boolean);
+    const lastAdmin = adminNames.length ? adminNames[adminNames.length - 1] : '';
+    let district = '';
+    const districtHit = [...admin].reverse().find((a) => /suburb|district|neighbourhood|neighborhood|quarter|حي|ضاحية/i.test(String(a?.description || '') + ' ' + String(a?.name || '')));
+    if (districtHit?.name) district = districtHit.name;
+    else if (lastAdmin && lastAdmin !== city && lastAdmin !== region && lastAdmin !== data?.countryName) district = lastAdmin;
+    if (!district && data?.locality && data.locality !== city) district = data.locality;
+    return { region: region || '', city: city || '', district };
+  } catch {
+    return null;
+  }
+}
+
+async function resolvePlace(latitude: number, longitude: number): Promise<{ region: string; city: string; district: string }> {
+  let region = '';
+  let city = '';
+  let district = '';
+  // Native device geocoder (best on iOS/Android)
+  try {
+    const addresses = await Location.reverseGeocodeAsync({ latitude, longitude });
+    const a: any = addresses && addresses[0];
+    if (a) {
+      region = a.region || a.subregion || '';
+      city = a.city || a.subregion || a.district || a.name || '';
+      district = a.district || a.name || '';
+    }
+  } catch {}
+  // BigDataCloud (works on web too, Arabic names)
+  const bdc = await reverseGeocode(latitude, longitude);
+  if (bdc) {
+    region = bdc.region || region;
+    city = bdc.city || city;
+    district = bdc.district || district;
+  }
+  // OpenStreetMap Nominatim for neighborhood granularity
+  if (!district) {
+    try {
+      const response = await fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&accept-language=ar&addressdetails=1&zoom=18&lat=' + latitude + '&lon=' + longitude);
+      if (response.ok) {
+        const data = await response.json();
+        const address = data?.address || {};
+        district = address.suburb || address.neighbourhood || address.quarter || address.city_district || address.hamlet || district;
+        if (!city) city = address.city || address.town || address.village || address.municipality || '';
+        if (!region) region = address.state || address.region || '';
+      }
+    } catch {}
+  }
+  return { region: region || '', city: city || '', district: district || '' };
+}
+
 function aqiInfo(aqi?: number | null) {
   const value = aqi ?? 0;
   if (value <= 50) return { label: 'هواء نظيف', color: '#047857', bg: '#dcfce7', bar: '#10b981' };
@@ -103,7 +167,7 @@ export default function WeatherScreen() {
   const [cityInput, setCityInput] = useState('');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  const fetchWeather = async (latitude: number, longitude: number, city: string) => {
+  const fetchWeather = async (latitude: number, longitude: number, meta: { city: string; region: string; district: string }) => {
     const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + latitude +
       '&longitude=' + longitude +
       '&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,pressure_msl,cloud_cover' +
@@ -121,7 +185,7 @@ export default function WeatherScreen() {
         air = airData.current || null;
       }
     } catch {}
-    setWeather({ city, latitude, longitude, current: data.current, hourly: data.hourly, daily: data.daily, air });
+    setWeather({ city: meta.city || 'موقعك الحالي', region: meta.region || '', district: meta.district || '', latitude, longitude, current: data.current, hourly: data.hourly, daily: data.daily, air });
     setLastUpdated(new Date());
     setError('');
   };
@@ -141,7 +205,7 @@ export default function WeatherScreen() {
       const geo = await geoResponse.json();
       const place = geo.results && geo.results[0];
       if (!place) throw new Error('لم نعثر على المدينة. جرّب كتابة اسمها بالعربية أو الإنجليزية.');
-      await fetchWeather(place.latitude, place.longitude, place.name || trimmed);
+      await fetchWeather(place.latitude, place.longitude, { city: place.name || trimmed, region: place.admin1 || '', district: '' });
     } catch (err: any) {
       setError(err?.message || 'تعذّر تحميل بيانات الطقس. حاول مرة أخرى.');
     } finally {
@@ -156,14 +220,12 @@ export default function WeatherScreen() {
       const permission = await Location.requestForegroundPermissionsAsync();
       if (permission.status !== 'granted') throw new Error('اسمح باستخدام موقعك أثناء الاستخدام، أو اكتب اسم المدينة يدوياً.');
       const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      let city = 'موقعك الحالي';
-      try {
-        const addresses = await Location.reverseGeocodeAsync({ latitude: position.coords.latitude, longitude: position.coords.longitude });
-        const address = addresses[0];
-        city = address?.city || address?.district || address?.region || city;
-      } catch {}
-      setCityInput(city === 'موقعك الحالي' ? '' : city);
-      await fetchWeather(position.coords.latitude, position.coords.longitude, city);
+      const latitude = position.coords.latitude;
+      const longitude = position.coords.longitude;
+      const meta = await resolvePlace(latitude, longitude);
+      if (!meta.city) meta.city = 'موقعك الحالي';
+      setCityInput(meta.city === 'موقعك الحالي' ? '' : meta.city);
+      await fetchWeather(latitude, longitude, meta);
     } catch (err: any) {
       setError(err?.message || 'تعذّر تحديد موقعك.');
     } finally {
@@ -174,7 +236,7 @@ export default function WeatherScreen() {
   const refresh = async () => {
     setRefreshing(true);
     try {
-      if (weather) await fetchWeather(weather.latitude, weather.longitude, weather.city);
+      if (weather) await fetchWeather(weather.latitude, weather.longitude, { city: weather.city, region: weather.region, district: weather.district });
       else if (cityInput.trim()) await loadWeatherForCity(cityInput);
     } finally {
       setRefreshing(false);
@@ -297,6 +359,21 @@ export default function WeatherScreen() {
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
           </View>
 
+          {weather ? (
+            <View style={styles.locationCard}>
+              <View style={styles.locationCardHeader}>
+                <MapPin size={15} color="#047857" />
+                <Text style={styles.locationCardTitle}>الموقع المستخدم لحساب الطقس</Text>
+              </View>
+              <View style={styles.locationGrid}>
+                <LocationItem label="المنطقة" value={weather.region} />
+                <LocationItem label="المدينة" value={weather.city} />
+                <LocationItem label="الحي" value={weather.district} />
+                <LocationItem label="الإحداثيات" value={weather.latitude.toFixed(3) + '، ' + weather.longitude.toFixed(3)} />
+              </View>
+            </View>
+          ) : null}
+
           {/* Current conditions */}
           <View style={styles.card}>
             <LinearGradient
@@ -312,6 +389,10 @@ export default function WeatherScreen() {
                       {loading ? <ActivityIndicator size="small" color="#fff" /> : <RefreshCw size={16} color="#fff" />}
                     </Pressable>
                     <Text style={styles.panelUpdated}>آخر تحديث {lastUpdated ? lastUpdated.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }) : ''}</Text>
+                  </View>
+                  <View style={styles.panelLocation}>
+                    <MapPin size={13} color="#d1fae5" />
+                    <Text style={styles.panelLocationText}>{[weather.district, weather.city, weather.region].filter(Boolean).join(' · ')}</Text>
                   </View>
                   <View style={styles.currentMain}>
                     <View style={styles.tempCopy}>
@@ -455,6 +536,15 @@ function Metric({ icon, bg, label, value, unit }: { icon: any; bg: string; label
   );
 }
 
+function LocationItem({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.locationItem}>
+      <Text style={styles.locationItemLabel}>{label}</Text>
+      <Text style={styles.locationItemValue} numberOfLines={2}>{value && value.trim() ? value : '—'}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   searchCard: { backgroundColor: '#fff', borderRadius: 18, borderWidth: 1, borderColor: '#e2e8f0', overflow: 'hidden' },
   citySearchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12 },
@@ -463,6 +553,16 @@ const styles = StyleSheet.create({
   searchButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', backgroundColor: '#047857', borderRadius: 11 },
   cityInput: { flex: 1, minWidth: 80, backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 11, paddingHorizontal: 11, paddingVertical: 9, color: '#0f172a', fontSize: 12.5 },
   errorText: { color: '#b91c1c', fontSize: 11.5, textAlign: 'right', paddingHorizontal: 14, paddingBottom: 10, lineHeight: 17 },
+
+  locationCard: { backgroundColor: '#fff', borderRadius: 18, borderWidth: 1, borderColor: '#e2e8f0', padding: 14, gap: 10 },
+  locationCardHeader: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
+  locationCardTitle: { color: '#0f172a', fontSize: 12.5, fontWeight: '900', textAlign: 'right' },
+  locationGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 },
+  locationItem: { flexGrow: 1, flexBasis: '44%', backgroundColor: '#f8fafc', borderRadius: 13, padding: 10, gap: 3, alignItems: 'flex-end' },
+  locationItemLabel: { color: '#64748b', fontSize: 10.5, fontWeight: '700' },
+  locationItemValue: { color: '#0f172a', fontSize: 12.5, fontWeight: '900', textAlign: 'right' },
+  panelLocation: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, marginTop: 8 },
+  panelLocationText: { color: '#d1fae5', fontSize: 11, fontWeight: '700', textAlign: 'right' },
 
   card: { backgroundColor: '#fff', borderRadius: 23, borderWidth: 1, borderColor: '#e2e8f0', overflow: 'hidden', shadowColor: '#0f172a', shadowOpacity: 0.05, shadowRadius: 12, elevation: 2 },
   currentPanel: { padding: 17, minHeight: 196 },
