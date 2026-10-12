@@ -40,16 +40,15 @@ jobs:
 
       - run: npm install
       - name: Setup EAS CLI
+        if: ${{ env.EXPO_TOKEN != '' }}
         run: npm install -g eas-cli
 
-      - name: Check EAS authentication
+      - name: Explain skipped mobile build when EAS token is missing
         if: ${{ env.EXPO_TOKEN == '' }}
-        run: |
-          echo "::error::EXPO_TOKEN is not configured in GitHub repository secrets."
-          echo "Add EXPO_TOKEN under Settings -> Secrets and variables -> Actions."
-          exit 1
+        run: echo "EXPO_TOKEN is not configured; skipping Android/iOS builds. Web export remains independent."
 
       - name: Build Android APK with EAS
+        if: ${{ env.EXPO_TOKEN != '' }}
         run: |
           set -euo pipefail
           eas build --platform android --profile preview --non-interactive --wait 2>&1 | tee eas-android.log
@@ -62,6 +61,7 @@ jobs:
           test -s hayna-release.apk
 
       - name: Build iOS production IPA and submit to TestFlight
+        if: ${{ env.EXPO_TOKEN != '' }}
         run: |
           set -euo pipefail
           echo "Building production iOS app and submitting to TestFlight..."
@@ -76,6 +76,7 @@ jobs:
           fi
 
       - name: Upload Android APK artifact
+        if: ${{ env.EXPO_TOKEN != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: hayna-android-apk
@@ -83,6 +84,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload iOS IPA artifact
+        if: ${{ env.EXPO_TOKEN != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: hayna-ios-ipa
@@ -90,6 +92,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Create GitHub Release
+        if: ${{ env.EXPO_TOKEN != '' }}
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.0-beta.${{ github.run_number }}
