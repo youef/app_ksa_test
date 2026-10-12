@@ -50,7 +50,7 @@ export default function WeatherScreen() {
   );
 }
 
-type WeatherData = { city: string; current: any; hourly: any; daily: any; air?: any | null };
+type WeatherData = { city: string; latitude: number; longitude: number; current: any; hourly: any; daily: any; air?: any | null };
 
 function weatherDescription(code: number) {
   if (code === 0) return 'سماء صافية';
@@ -89,7 +89,7 @@ function WeatherSection({ initialCity }: { initialCity: string }) {
   const fetchWeather = async (latitude: number, longitude: number, city: string) => {
     const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + latitude +
       '&longitude=' + longitude +
-      '&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,wind_speed_10m' +
+      '&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,wind_speed_10m,uv_index' +
       '&hourly=temperature_2m,precipitation_probability,weather_code,wind_speed_10m,relative_humidity_2m' +
       '&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max,precipitation_sum,wind_speed_10m_max&forecast_days=7&timezone=auto';
     const response = await fetch(url);
@@ -98,10 +98,10 @@ function WeatherSection({ initialCity }: { initialCity: string }) {
     if (!data.current || !data.daily) throw new Error('وصلت بيانات طقس غير مكتملة.');
     let air: any = null;
     try {
-      const airResponse = await fetch('https://air-quality-api.open-meteo.com/v1/air-quality?latitude=' + latitude + '&longitude=' + longitude + '&current=us_aqi,pm10,pm2_5,dust,uv_index&timezone=auto');
+      const airResponse = await fetch('https://air-quality-api.open-meteo.com/v1/air-quality?latitude=' + latitude + '&longitude=' + longitude + '&current=us_aqi,pm10,pm2_5,dust&timezone=auto');
       if (airResponse.ok) { const airData = await airResponse.json(); air = airData.current || null; }
     } catch {}
-    setWeather({ city: city, current: data.current, hourly: data.hourly, daily: data.daily, air });
+    setWeather({ city: city, latitude, longitude, current: data.current, hourly: data.hourly, daily: data.daily, air });
     setLastUpdated(new Date());
     setWeatherError('');
   };
@@ -182,7 +182,7 @@ function WeatherSection({ initialCity }: { initialCity: string }) {
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={weatherStyles.currentPanel}
         >
           <View style={weatherStyles.weatherTopLine}>
-            <Pressable onPress={() => loadWeatherForCity(cityInput || weather?.city || '')} disabled={loadingWeather} style={weatherStyles.refreshButton} accessibilityLabel="تحديث الطقس">
+            <Pressable onPress={() => weather ? fetchWeather(weather.latitude, weather.longitude, weather.city) : loadWeatherForCity(cityInput)} disabled={loadingWeather} style={weatherStyles.refreshButton} accessibilityLabel="تحديث الطقس">
               {loadingWeather ? <ActivityIndicator size="small" color="#fff" /> : <RefreshCw size={16} color="#fff" />}
             </Pressable>
             <View style={weatherStyles.cityLine}><MapPin size={14} color="#d1fae5" /><Text style={weatherStyles.cityName}>{weather?.city || 'اختر مدينتك'}</Text></View>
@@ -228,7 +228,7 @@ function WeatherSection({ initialCity }: { initialCity: string }) {
               <View style={weatherStyles.metricCard}><View style={[weatherStyles.metricIcon, { backgroundColor: '#f0fdf4' }]}><Wind size={17} color="#16a34a" /></View><Text style={weatherStyles.metricLabel}>الرياح</Text><Text style={weatherStyles.metricValue}>{Math.round(weather.current.wind_speed_10m)} <Text style={weatherStyles.metricUnit}>كم/س</Text></Text></View>
               <View style={weatherStyles.metricCard}><View style={[weatherStyles.metricIcon, { backgroundColor: '#fff7ed' }]}><CloudRain size={17} color="#ea580c" /></View><Text style={weatherStyles.metricLabel}>الهطول</Text><Text style={weatherStyles.metricValue}>{weather.current.precipitation} <Text style={weatherStyles.metricUnit}>مم</Text></Text></View>
             </View>
-            <View style={weatherStyles.forecastHeader}><Text style={weatherStyles.forecastTitle}>توقعات الساعات القادمة</Text><Text style={weatherStyles.forecastHint}>6 ساعات</Text></View>
+            <View style={weatherStyles.forecastHeader}><Text style={weatherStyles.forecastTitle}>توقعات الساعات القادمة</Text><Text style={weatherStyles.forecastHint}>12 ساعة</Text></View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={weatherStyles.hourlyList}>
               {hourlyIndices.map((index) => (
                 <View key={weather.hourly.time[index]} style={weatherStyles.hourCard}>
@@ -262,7 +262,7 @@ function WeatherSection({ initialCity }: { initialCity: string }) {
                 <View style={weatherStyles.metricCard}><Text style={weatherStyles.metricLabel}>PM2.5 · جسيمات دقيقة</Text><Text style={weatherStyles.metricValue}>{weather.air.pm2_5 == null ? '--' : Number(weather.air.pm2_5).toFixed(1)}</Text><Text style={weatherStyles.metricUnit}>µg/m³</Text></View>
                 <View style={weatherStyles.metricCard}><Text style={weatherStyles.metricLabel}>PM10 · جسيمات عالقة</Text><Text style={weatherStyles.metricValue}>{weather.air.pm10 == null ? '--' : Number(weather.air.pm10).toFixed(1)}</Text><Text style={weatherStyles.metricUnit}>µg/m³</Text></View>
                 <View style={weatherStyles.metricCard}><Text style={weatherStyles.metricLabel}>الغبار</Text><Text style={weatherStyles.metricValue}>{weather.air.dust == null ? '--' : Number(weather.air.dust).toFixed(1)}</Text><Text style={weatherStyles.metricUnit}>µg/m³</Text></View>
-                <View style={weatherStyles.metricCard}><Text style={weatherStyles.metricLabel}>مؤشر UV الحالي</Text><Text style={weatherStyles.metricValue}>{weather.air.uv_index == null ? '--' : Number(weather.air.uv_index).toFixed(1)}</Text></View>
+                <View style={weatherStyles.metricCard}><Text style={weatherStyles.metricLabel}>مؤشر UV الحالي</Text><Text style={weatherStyles.metricValue}>{weather.current.uv_index == null ? '--' : Number(weather.current.uv_index).toFixed(1)}</Text></View>
               </View>
             </> : <View style={weatherStyles.airUnavailable}><Info size={17} color="#64748b" /><Text style={weatherStyles.airDescription}>بيانات جودة الهواء غير متاحة حالياً لهذا الموقع.</Text></View>}
             <View style={weatherStyles.tipsCard}><Text style={weatherStyles.tipsTitle}>إرشادات عامة</Text>
