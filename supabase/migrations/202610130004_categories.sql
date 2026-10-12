@@ -2,20 +2,48 @@
 -- Categories management (hierarchical, for market/services/requests)
 -- ============================================================
 
+-- 1. Create table if it doesn't exist
 create table if not exists public.categories (
   id uuid primary key default gen_random_uuid(),
-  parent_id uuid references public.categories(id) on delete set null,
-  key text not null unique,
-  label text not null,
-  description text,
-  icon text,
-  color text,
-  sort_order int not null default 0,
-  entity_types text[] not null default '{}',
-  is_active boolean not null default true,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  created_at timestamptz not null default now()
 );
+
+-- 2. Ensure all columns exist (handles pre-existing tables safely)
+alter table public.categories add column if not exists parent_id uuid references public.categories(id) on delete set null;
+alter table public.categories add column if not exists key text;
+alter table public.categories add column if not exists label text;
+alter table public.categories add column if not exists description text;
+alter table public.categories add column if not exists icon text;
+alter table public.categories add column if not exists color text;
+alter table public.categories add column if not exists sort_order int not null default 0;
+alter table public.categories add column if not exists entity_types text[] not null default '{}';
+alter table public.categories add column if not exists is_active boolean not null default true;
+alter table public.categories add column if not exists updated_at timestamptz not null default now();
+
+-- Sync label from name if pre-existing legacy column exists
+do $$
+begin
+  if exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'categories' and column_name = 'name') then
+    update public.categories set label = coalesce(label, name) where label is null;
+  end if;
+end;
+$$;
+
+-- Ensure unique constraint on key for ON CONFLICT (key)
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint c
+    join pg_class t on c.conrelid = t.oid
+    where t.relname = 'categories' and c.contype = 'u'
+      and (conname = 'categories_key_key' or conname = 'categories_key_unique')
+  ) then
+    alter table public.categories add constraint categories_key_key unique (key);
+  end if;
+exception when others then
+  null;
+end;
+$$;
 
 create index if not exists categories_parent_idx on public.categories (parent_id);
 create index if not exists categories_entity_types_idx on public.categories using gin (entity_types);
