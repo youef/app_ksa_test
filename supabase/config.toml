@@ -1,0 +1,35 @@
+# Supabase Configuration for Hayya KSA
+# Run: supabase db push && supabase functions deploy
+
+project_id = "vkeuyompnddqfvulalkk"
+
+[functions]
+  # Scheduled broadcast dispatcher - runs every minute
+  scheduled-broadcast-dispatch = { verify_jwt = false }
+
+  # Notifications cleanup - runs weekly (Sunday 03:00)
+  notifications-cleanup = { verify_jwt = false }
+
+  # Refresh denormalized counters - runs every 5 minutes
+  refresh-counters = { verify_jwt = false }
+
+  # Weekly admin report - runs Sunday 09:00
+  weekly-admin-report = { verify_jwt = false }
+
+[cron]
+  # Every minute: check and send due scheduled broadcasts
+  scheduled-broadcast-dispatch = "scheduled-broadcast-dispatch * * * * *"
+
+  # Weekly Sunday 03:00: clean old notifications
+  notifications-cleanup = "notifications-cleanup 0 3 * * 0"
+
+  # Every 5 minutes: refresh denormalized counters for active users
+  refresh-counters = "refresh-counters */5 * * * *"
+
+  # Weekly Sunday 09:00: generate and send weekly admin report
+  weekly-admin-report = "weekly-admin-report 0 9 * * 0"
+
+[edge_runtime]
+  # Increase timeout for heavier functions
+  scheduled-broadcast-dispatch = { timeout = 120 }
+  weekly-admin-report = { timeout = 180 }

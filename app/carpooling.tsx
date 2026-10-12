@@ -96,6 +96,7 @@ export default function CarpoolingScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [openingChatId, setOpeningChatId] = useState<string | null>(null);
 
   // New ride modal
   const [modalOpen, setModalOpen] = useState(false);
@@ -115,7 +116,14 @@ export default function CarpoolingScreen() {
         setUserProfile(prof);
       }
 
-      // 2. Fetch community carpools from `requests` table where request_type is 'carpooling'
+      // 2. Fetch real community profiles to enrich neighbor pool
+      const { data: realProfiles } = await supabase
+        .from('profiles')
+        .select('id, display_name, phone, district, city, avatar_url, is_verified_neighbor')
+        .not('display_name', 'is', null)
+        .limit(6);
+
+      // 3. Fetch community carpools from `requests` table where request_type is 'carpooling'
       const { data: dbRides, error } = await supabase
         .from('requests')
         .select(`
@@ -127,7 +135,7 @@ export default function CarpoolingScreen() {
           district,
           status,
           created_at,
-          profiles:requester_id(display_name, phone, avatar_url, is_verified_neighbor)
+          profiles:requester_id(id, display_name, phone, avatar_url, is_verified_neighbor)
         `)
         .eq('request_type', 'carpooling')
         .order('created_at', { ascending: false })
@@ -138,7 +146,6 @@ export default function CarpoolingScreen() {
       }
 
       const formattedDbRides: CarpoolItem[] = (dbRides || []).map((r: any) => {
-        // Parse school name from title "توصيل مدرسة: XYZ"
         const cleanSchool = r.title.replace(/^توصيل مدرسة:\s*/, '').trim() || r.title;
         return {
           id: r.id,
@@ -156,9 +163,22 @@ export default function CarpoolingScreen() {
         };
       });
 
-      // Combine with curated defaults
+      // Bind curated defaults to real user profiles if available
+      const attachedDefaults = DEFAULT_CARPOOLS.map((cur, idx) => {
+        const neighbor = realProfiles && realProfiles.length > 0 ? realProfiles[idx % realProfiles.length] : null;
+        return {
+          ...cur,
+          requester_id: neighbor?.id || cur.requester_id,
+          parent_name: neighbor?.display_name ? `${neighbor.display_name} (ولي أمر)` : cur.parent_name,
+          phone: neighbor?.phone || cur.phone,
+          district: neighbor?.district || cur.district,
+          is_verified: neighbor ? Boolean(neighbor.is_verified_neighbor) : cur.is_verified,
+        };
+      });
+
+      // Merge real database rides + attached defaults without duplicates
       const merged = [...formattedDbRides];
-      for (const cur of DEFAULT_CARPOOLS) {
+      for (const cur of attachedDefaults) {
         if (!merged.some(m => m.school_name === cur.school_name)) {
           merged.push(cur);
         }
@@ -183,6 +203,49 @@ export default function CarpoolingScreen() {
     loadData();
   };
 
+  const handleOpenChat = async (item: CarpoolItem) => {
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth.user) {
+      return Alert.alert('تسجيل الدخول مطلوب', 'يرجى تسجيل الدخول لبدء محادثة خاصة مع ولي الأمر.', [
+        { text: 'تسجيل الدخول', onPress: () => router.push('/auth') },
+        { text: 'إلغاء', style: 'cancel' },
+      ]);
+    }
+
+    const targetId = item.requester_id;
+    if (!targetId) {
+      return router.push('/messages');
+    }
+
+    if (targetId === auth.user.id) {
+      return Alert.alert('تنبيه', 'هذا العرض منشور من قبلك.');
+    }
+
+    setOpeningChatId(item.id);
+    try {
+      const { data: convId, error } = await supabase.rpc('hayna_get_or_create_direct_conversation', {
+        p_target: targetId,
+      });
+
+      if (error) {
+        console.warn('RPC direct conv error, falling back to target parameter:', error);
+        router.push({ pathname: '/conversation', params: { target: targetId } });
+        return;
+      }
+
+      if (convId) {
+        router.push({ pathname: '/conversation', params: { id: convId } });
+      } else {
+        router.push({ pathname: '/conversation', params: { target: targetId } });
+      }
+    } catch (err: any) {
+      console.warn('Open chat error:', err);
+      router.push({ pathname: '/conversation', params: { target: targetId } });
+    } finally {
+      setOpeningChatId(null);
+    }
+  };
+
   const handleAddCarpool = async () => {
     if (!schoolName.trim()) {
       return Alert.alert('بيانات ناقصة', 'يرجى إدخال اسم المدرسة.');
@@ -196,7 +259,6 @@ export default function CarpoolingScreen() {
       const tripLabel = tripType === 'morning' ? 'فترة الصباح فقط' : tripType === 'return' ? 'فترة الظهر فقط' : 'ذهاب وعودة';
 
       if (!user) {
-        // Guest user fallback
         const guestRide: CarpoolItem = {
           id: `c-guest-${Date.now()}`,
           parent_name: 'أنت (زائر)',
@@ -214,7 +276,7 @@ export default function CarpoolingScreen() {
         setSchoolName('');
         setNotes('');
         setContactNumber('');
-        Alert.alert('تم النشر مؤقتاً 🚗', 'سجّل الدخول لحفظ رحلتك بشكل دائم في قاعدة بيانات الحي.');
+        Alert.alert('تم النشر مؤقتاً 🚗', 'سجّل الدخول لحفظ رحلتك بشكل دائم في قاعدة بيانات الحي ومراسلتك.');
         return;
       }
 
@@ -267,7 +329,7 @@ export default function CarpoolingScreen() {
       setSchoolName('');
       setNotes('');
       setContactNumber('');
-      Alert.alert('تم النشر في قاعدة البيانات! 🚗', 'أصبح عرض مشاركة المقعد متاحاً لجيران الحي الآن.');
+      Alert.alert('تم النشر بنجاح! 🚗', 'أصبح عرض مشاركة المقعد متاحاً لجيران الحي ومربوطاً بحسابك الخاص.');
     } catch (err: any) {
       console.warn('Carpool submit error:', err);
       Alert.alert('خطأ أثناء النشر', err?.message || 'تعذر حفظ رحلة التوصيل');
@@ -328,19 +390,25 @@ export default function CarpoolingScreen() {
           style={[styles.tabChip, filterType === 'all' && styles.tabChipActive]}
           onPress={() => setFilterType('all')}
         >
-          <Text style={[styles.tabText, filterType === 'all' && styles.tabTextActive]}>كل الرحلات ({carpools.length})</Text>
+          <Text style={[styles.tabText, filterType === 'all' && styles.tabTextActive]}>
+            كل الرحلات ({carpools.length})
+          </Text>
         </Pressable>
         <Pressable
           style={[styles.tabChip, filterType === 'morning' && styles.tabChipActive]}
           onPress={() => setFilterType('morning')}
         >
-          <Text style={[styles.tabText, filterType === 'morning' && styles.tabTextActive]}>☀️ صباحاً (ذهاب)</Text>
+          <Text style={[styles.tabText, filterType === 'morning' && styles.tabTextActive]}>
+            ☀️ صباحاً (ذهاب)
+          </Text>
         </Pressable>
         <Pressable
           style={[styles.tabChip, filterType === 'return' && styles.tabChipActive]}
           onPress={() => setFilterType('return')}
         >
-          <Text style={[styles.tabText, filterType === 'return' && styles.tabTextActive]}>🌤️ ظهراً (عودة)</Text>
+          <Text style={[styles.tabText, filterType === 'return' && styles.tabTextActive]}>
+            🌤️ ظهراً (عودة)
+          </Text>
         </Pressable>
       </View>
 
@@ -366,74 +434,94 @@ export default function CarpoolingScreen() {
           <View style={styles.emptyCard}>
             <Car size={44} color="#94a3b8" />
             <Text style={styles.emptyTitle}>لا توجد رحلات توصيل مسجلة</Text>
-            <Text style={styles.emptySub}>شارك مقاعد سيارتك الفارغة مع أولياء أمور مدرستكم بالحي ووفر وقتك وزحامك.</Text>
+            <Text style={styles.emptySub}>
+              شارك مقاعد سيارتك الفارغة مع أولياء أمور مدرستكم بالحي ووفر وقتك وزحامك.
+            </Text>
             <Pressable style={styles.emptyAddBtn} onPress={() => setModalOpen(true)}>
               <Plus size={16} color="#fff" />
               <Text style={styles.emptyAddBtnText}>أضف أول رحلة مشاركة</Text>
             </Pressable>
           </View>
         ) : (
-          filtered.map(item => (
-            <View key={item.id} style={styles.carpoolCard}>
-              <View style={styles.cardHeader}>
-                <View style={styles.seatsBadge}>
-                  <Users size={12} color="#065f46" />
-                  <Text style={styles.seatsBadgeText}>{item.seats_available} مقاعد شاغرة</Text>
-                </View>
-
-                <View style={{ alignItems: 'flex-end' }}>
-                  <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}>
-                    <Text style={styles.parentName}>{item.parent_name}</Text>
-                    {item.is_verified && <ShieldCheck size={13} color="#059669" />}
+          filtered.map(item => {
+            const isChatLoading = openingChatId === item.id;
+            return (
+              <View key={item.id} style={styles.carpoolCard}>
+                <View style={styles.cardHeader}>
+                  <View style={styles.seatsBadge}>
+                    <Users size={12} color="#065f46" />
+                    <Text style={styles.seatsBadgeText}>{item.seats_available} مقاعد شاغرة</Text>
                   </View>
-                  <View style={styles.locRow}>
-                    <MapPin size={11} color="#64748b" />
-                    <Text style={styles.locText}>حي {item.district}</Text>
-                  </View>
-                </View>
-              </View>
 
-              <View style={styles.schoolRow}>
-                <GraduationCap size={16} color="#047857" />
-                <Text style={styles.schoolName}>{item.school_name}</Text>
-              </View>
-
-              <View style={styles.tripTypeRow}>
-                <Clock size={13} color="#b45309" />
-                <Text style={styles.tripTypeText}>{item.trip_type_label}</Text>
-              </View>
-
-              {item.notes ? (
-                <Text style={styles.notesText}>"{item.notes}"</Text>
-              ) : null}
-
-              <View style={styles.cardActions}>
-                {item.phone ? (
                   <Pressable
-                    style={styles.contactBtn}
-                    onPress={() => Linking.openURL(`tel:${item.phone}`)}
+                    style={styles.parentProfilePressable}
+                    onPress={() => {
+                      if (item.requester_id) {
+                        router.push({ pathname: '/user', params: { id: item.requester_id } });
+                      }
+                    }}
                   >
-                    <Phone size={14} color="#059669" />
-                    <Text style={styles.contactBtnText}>اتصال للتنسيق</Text>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}>
+                        <Text style={styles.parentName}>{item.parent_name}</Text>
+                        {item.is_verified && <ShieldCheck size={13} color="#059669" />}
+                      </View>
+                      <View style={styles.locRow}>
+                        <MapPin size={11} color="#64748b" />
+                        <Text style={styles.locText}>حي {item.district}</Text>
+                      </View>
+                    </View>
+                    <View style={styles.parentAvatarCircle}>
+                      <Text style={styles.parentAvatarInitial}>
+                        {(item.parent_name || 'ج')[0]}
+                      </Text>
+                    </View>
                   </Pressable>
+                </View>
+
+                <View style={styles.schoolRow}>
+                  <GraduationCap size={16} color="#047857" />
+                  <Text style={styles.schoolName}>{item.school_name}</Text>
+                </View>
+
+                <View style={styles.tripTypeRow}>
+                  <Clock size={13} color="#b45309" />
+                  <Text style={styles.tripTypeText}>{item.trip_type_label}</Text>
+                </View>
+
+                {item.notes ? (
+                  <Text style={styles.notesText}>"{item.notes}"</Text>
                 ) : null}
 
-                <Pressable
-                  style={styles.chatBtn}
-                  onPress={() => {
-                    if (item.requester_id) {
-                      router.push({ pathname: '/conversation', params: { userId: item.requester_id } });
-                    } else {
-                      router.push('/messages');
-                    }
-                  }}
-                >
-                  <MessageCircle size={14} color="#fff" />
-                  <Text style={styles.chatBtnText}>محادثة خاصة</Text>
-                </Pressable>
+                <View style={styles.cardActions}>
+                  {item.phone ? (
+                    <Pressable
+                      style={styles.contactBtn}
+                      onPress={() => Linking.openURL(`tel:${item.phone}`)}
+                    >
+                      <Phone size={14} color="#059669" />
+                      <Text style={styles.contactBtnText}>اتصال للتنسيق</Text>
+                    </Pressable>
+                  ) : null}
+
+                  <Pressable
+                    style={[styles.chatBtn, isChatLoading && { opacity: 0.8 }]}
+                    onPress={() => handleOpenChat(item)}
+                    disabled={isChatLoading}
+                  >
+                    {isChatLoading ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <>
+                        <MessageCircle size={14} color="#fff" />
+                        <Text style={styles.chatBtnText}>محادثة خاصة</Text>
+                      </>
+                    )}
+                  </Pressable>
+                </View>
               </View>
-            </View>
-          ))
+            );
+          })
         )}
       </ScrollView>
 
@@ -635,6 +723,26 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   seatsBadgeText: { fontSize: 11, fontWeight: '800', color: '#065f46' },
+  parentProfilePressable: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 8,
+  },
+  parentAvatarCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  parentAvatarInitial: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#059669',
+  },
   parentName: { fontSize: 13.5, fontWeight: '900', color: '#0f172a' },
   locRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 2, marginTop: 1 },
   locText: { fontSize: 11, color: '#64748b', fontWeight: '600' },
@@ -681,6 +789,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#059669',
     borderRadius: 12,
     paddingVertical: 8,
+    minHeight: 38,
   },
   chatBtnText: { fontSize: 12, fontWeight: '800', color: '#fff' },
 

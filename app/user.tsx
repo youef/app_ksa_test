@@ -44,17 +44,19 @@ import { C } from '@/lib/ui';
 import { getBlockStatus, setBlock } from '@/lib/chatControls';
 import { isExactDistrictMatching } from '@/lib/locationSync';
 
-type Tab = 'market' | 'services' | 'requests' | 'questions';
+type Tab = 'questions' | 'answers' | 'services' | 'requests' | 'market';
 
 const TABS: { id: Tab; label: string; icon: any }[] = [
-  { id: 'market', label: 'السوق', icon: ShoppingBag },
+  { id: 'questions', label: 'الاستفسارات', icon: Search },
+  { id: 'answers', label: 'الإجابات', icon: MessageCircle },
   { id: 'services', label: 'الخدمات', icon: Wrench },
   { id: 'requests', label: 'الطلبات', icon: Package },
-  { id: 'questions', label: 'الاستفسارات', icon: Search },
+  { id: 'market', label: 'السوق', icon: ShoppingBag },
 ];
 
 export default function UserProfile() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const params = useLocalSearchParams<{ id: string }>();
+  const id = Array.isArray(params.id) ? params.id[0] : (params.id || '');
   const { width } = useWindowDimensions();
   const [profile, setProfile] = useState<any>(null);
   const [stats, setStats] = useState({
@@ -71,13 +73,14 @@ export default function UserProfile() {
   const [services, setServices] = useState<any[]>([]);
   const [requests, setRequests] = useState<any[]>([]);
   const [questions, setQuestions] = useState<any[]>([]);
+  const [answers, setAnswers] = useState<any[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [following, setFollowing] = useState(false);
   const [followedBy, setFollowedBy] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const [blockedByOther, setBlockedByOther] = useState(false);
   const [sameDistrict, setSameDistrict] = useState(true);
-  const [tab, setTab] = useState<Tab>('market');
+  const [tab, setTab] = useState<Tab>('questions');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -93,12 +96,12 @@ export default function UserProfile() {
     if (!id) return;
     if (!silent) setLoading(true);
     try {
-      const [{ data: auth }, { data: p, error }] = await Promise.all([
-        supabase.auth.getUser(),
+      const [{ data: sessionData }, { data: p, error }] = await Promise.all([
+        supabase.auth.getSession(),
         supabase.from('profiles').select('*').eq('id', id).maybeSingle(),
       ]);
       if (error) throw error;
-      const me = auth.user?.id || null;
+      const me = sessionData?.session?.user?.id || null;
       setCurrentUserId(me);
       setProfile(p);
       if (!p) return;
@@ -137,6 +140,7 @@ export default function UserProfile() {
         setServices([]);
         setRequests([]);
         setQuestions([]);
+        setAnswers([]);
         setStats({
           market: 0,
           services: 0,
@@ -163,6 +167,7 @@ export default function UserProfile() {
         serviceRows,
         requestRows,
         questionRows,
+        answerRows,
       ] = await Promise.all([
         supabase.from('marketplace_items').select('id', { count: 'exact', head: true }).eq('seller_id', id),
         supabase.from('services').select('id', { count: 'exact', head: true }).eq('provider_id', id),
@@ -192,7 +197,13 @@ export default function UserProfile() {
           .limit(18),
         supabase
           .from('questions')
-          .select('id,title,body,status,category,district,created_at,view_count')
+          .select('id,title,body,status,category,district,created_at,view_count,is_emergency,item_type')
+          .eq('author_id', id)
+          .order('created_at', { ascending: false })
+          .limit(18),
+        supabase
+          .from('answers')
+          .select('id,body,created_at,question_id,questions(id,title,city,district)')
           .eq('author_id', id)
           .order('created_at', { ascending: false })
           .limit(18),
@@ -212,6 +223,20 @@ export default function UserProfile() {
       setServices(serviceRows.data || []);
       setRequests(requestRows.data || []);
       setQuestions(questionRows.data || []);
+      setAnswers(answerRows.data || []);
+
+      // Smart default tab selection based on real contributions
+      if (questionRows.data && questionRows.data.length > 0) {
+        setTab('questions');
+      } else if (answerRows.data && answerRows.data.length > 0) {
+        setTab('answers');
+      } else if (serviceRows.data && serviceRows.data.length > 0) {
+        setTab('services');
+      } else if (requestRows.data && requestRows.data.length > 0) {
+        setTab('requests');
+      } else if (itemRows.data && itemRows.data.length > 0) {
+        setTab('market');
+      }
     } catch (e) {
       console.error('profile load', e);
       setProfile(null);
@@ -367,10 +392,18 @@ export default function UserProfile() {
   const displayName = anonymous ? 'جار مجهول' : profile.display_name || profile.username || 'مستخدم';
   const locked = (profile.profile_privacy === 'private' && !following && !own) || blocked || blockedByOther;
   const isAdmin = profile.role === 'admin';
-  const totalContributions = stats.market + stats.services + stats.requests + stats.questions;
+  const totalContributions = stats.market + stats.services + stats.requests + stats.questions + stats.answers;
 
   const currentData =
-    tab === 'market' ? items : tab === 'services' ? services : tab === 'requests' ? requests : questions;
+    tab === 'market'
+      ? items
+      : tab === 'services'
+      ? services
+      : tab === 'requests'
+      ? requests
+      : tab === 'questions'
+      ? questions
+      : answers;
 
   return (
     <View style={styles.screen}>
@@ -426,7 +459,7 @@ export default function UserProfile() {
             <View style={styles.heroTop}>
               {/* Avatar with Status Ring */}
               <View style={styles.avatarRing}>
-                {profile.avatar_url && !anonymous ? (
+                {profile.avatar_url && !anonymous && !profile.avatar_url.includes('blank-profile-picture') ? (
                   <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
                 ) : (
                   <View style={styles.avatarFallback}>
@@ -564,7 +597,9 @@ export default function UserProfile() {
                     ? stats.services
                     : key === 'requests'
                     ? stats.requests
-                    : stats.questions;
+                    : key === 'questions'
+                    ? stats.questions
+                    : stats.answers;
                 const active = tab === key;
                 return (
                   <Pressable
@@ -654,10 +689,11 @@ function Stat({ label, value }: { label: string; value: number }) {
 
 function Empty({ tab, own }: { tab: Tab; own: boolean }) {
   const titles: Record<Tab, string> = {
-    market: 'لا توجد إعلانات في السوق',
+    questions: 'لا توجد استفسارات',
+    answers: 'لا توجد إجابات منشورة',
     services: 'لا توجد خدمات منشورة',
     requests: 'لا توجد طلبات فزعة',
-    questions: 'لا توجد استفسارات',
+    market: 'لا توجد إعلانات في السوق',
   };
   return (
     <View style={styles.empty}>
@@ -682,7 +718,13 @@ function Empty({ tab, own }: { tab: Tab; own: boolean }) {
 
 function ActivityCard({ type, item, width }: { type: Tab; item: any; width: number }) {
   const image = item.image_url || item.cover_url;
-  const title = type === 'services' ? item.name : item.title || item.name;
+  const title =
+    type === 'services'
+      ? item.name
+      : type === 'answers'
+      ? item.questions?.title || 'إجابة على استفسار بالحي'
+      : item.title || item.name;
+  const itemDistrict = type === 'answers' ? (item.questions?.district || item.district) : item.district;
   const subtitle =
     type === 'market'
       ? item.description || 'إعلان من سوق الحي'
@@ -690,6 +732,8 @@ function ActivityCard({ type, item, width }: { type: Tab; item: any; width: numb
       ? item.description || item.category || 'خدمة محلية'
       : type === 'requests'
       ? item.description || 'طلب مساعدة من الحي'
+      : type === 'answers'
+      ? item.body || 'مشاركة الجار'
       : item.body || item.category || 'استفسار مجتمعي';
   const price =
     type === 'market'
@@ -721,6 +765,8 @@ function ActivityCard({ type, item, width }: { type: Tab; item: any; width: numb
       router.push({ pathname: '/request', params: { id: item.id } });
     } else if (type === 'questions') {
       router.push({ pathname: '/question', params: { id: item.id } });
+    } else if (type === 'answers') {
+      router.push({ pathname: '/question', params: { id: item.question_id } });
     }
   };
 
@@ -740,6 +786,8 @@ function ActivityCard({ type, item, width }: { type: Tab; item: any; width: numb
               <ShoppingBag size={28} color="#059669" />
             ) : type === 'requests' ? (
               <Package size={28} color="#ea580c" />
+            ) : type === 'answers' ? (
+              <MessageCircle size={28} color="#059669" />
             ) : (
               <Search size={28} color="#2563eb" />
             )}
@@ -786,11 +834,11 @@ function ActivityCard({ type, item, width }: { type: Tab; item: any; width: numb
           {price ? (
             <Text style={styles.price}>{price}</Text>
           ) : (
-            <Text style={styles.meta}>{item.district ? `حي ${item.district}` : 'الحي'}</Text>
+            <Text style={styles.meta}>{itemDistrict ? `حي ${itemDistrict}` : 'الحي'}</Text>
           )}
           <View style={styles.metaRow}>
             <MapPin size={11} color="#94a3b8" />
-            <Text style={styles.meta}>{item.district || 'الحي'}</Text>
+            <Text style={styles.meta}>{itemDistrict || 'الحي'}</Text>
           </View>
         </View>
       </View>

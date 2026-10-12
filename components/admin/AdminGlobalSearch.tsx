@@ -55,35 +55,47 @@ export function AdminGlobalSearch({
     setLoading(true);
     setSelected([]);
     try {
-      const like = `%${term}%`;
-      const [u, qs, sv, rq] = await Promise.all([
-        supabase
-          .from('profiles')
-          .select('id,username,display_name,avatar_url,city,district,role,is_verified,is_banned,created_at')
-          .or(`display_name.ilike.${like},username.ilike.${like},city.ilike.${like}`)
-          .limit(20),
-        supabase
-          .from('questions')
-          .select('id,title,city,district,author_id,created_at')
-          .or(`title.ilike.${like},body.ilike.${like}`)
-          .limit(20),
-        supabase
-          .from('services')
-          .select('id,name,city,district,provider_id,created_at')
-          .or(`name.ilike.${like},description.ilike.${like}`)
-          .limit(20),
-        supabase
-          .from('requests')
-          .select('id,title,city,district,requester_id,created_at')
-          .or(`title.ilike.${like},description.ilike.${like}`)
-          .limit(20),
-      ]);
-      setResults({
-        users: (u.data || []) as Any[],
-        questions: (qs.data || []) as Any[],
-        services: (sv.data || []) as Any[],
-        requests: (rq.data || []) as Any[],
+      // Use new full-text search RPC
+      const { data: ftsResults, error: ftsErr } = await supabase.rpc('admin_global_search', {
+        p_query: term,
+        p_limit: 60,
       });
+
+      let users: Any[] = [], questions: Any[] = [], services: Any[] = [], requests: Any[] = [];
+
+      if (!ftsErr && ftsResults) {
+        for (const r of ftsResults) {
+          const item = { id: r.id, title: r.title, subtitle: r.subtitle, city: r.city, district: r.district, created_at: r.created_at };
+          if (r.type === 'question') questions.push(item);
+          else if (r.type === 'service') services.push(item);
+          else if (r.type === 'request') requests.push(item);
+        }
+      } else {
+        console.warn('FTS RPC failed, falling back to ilike:', ftsErr);
+        // Fallback to ilike (original logic)
+        const like = `%${term}%`;
+        const [u, qs, sv, rq] = await Promise.all([
+          supabase.from('profiles').select('id,username,display_name,avatar_url,city,district,role,is_verified,is_banned,created_at').or(`display_name.ilike.${like},username.ilike.${like},city.ilike.${like}`).limit(20),
+          supabase.from('questions').select('id,title,body,city,district,author_id,created_at').or(`title.ilike.${like},body.ilike.${like}`).limit(20),
+          supabase.from('services').select('id,name,description,city,district,provider_id,created_at').or(`name.ilike.${like},description.ilike.${like}`).limit(20),
+          supabase.from('requests').select('id,title,description,city,district,requester_id,created_at').or(`title.ilike.${like},description.ilike.${like}`).limit(20),
+        ]);
+        users = (u.data || []) as Any[];
+        questions = (qs.data || []) as Any[];
+        services = (sv.data || []) as Any[];
+        requests = (rq.data || []) as Any[];
+      }
+
+      // Also search users by name/city (FTS doesn't cover profiles yet)
+      const like = `%${term}%`;
+      const { data: userData } = await supabase
+        .from('profiles')
+        .select('id,username,display_name,avatar_url,city,district,role,is_verified,is_banned,created_at')
+        .or(`display_name.ilike.${like},username.ilike.${like},city.ilike.${like}`)
+        .limit(20);
+      users = (userData || []) as Any[];
+
+      setResults({ users, questions, services, requests });
       setSearched(true);
     } catch (e) {
       console.warn('Global search failed:', e);

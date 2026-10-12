@@ -71,22 +71,26 @@ export default function Questions() {
       setHasSession(Boolean(user));
 
       let fetchedQuestions: any[] = [];
-      if (user) {
-        let query = supabase
-          .from('questions')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(60);
-        if (q.trim()) query = query.or(`title.ilike.%${q.trim()}%,body.ilike.%${q.trim()}%`);
-        const result = await query;
-        fetchedQuestions = result.data ?? [];
+      let query = supabase
+        .from('questions')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(80);
+
+      if (q.trim()) {
+        query = query.or(`title.ilike.%${q.trim()}%,body.ilike.%${q.trim()}%`);
+      }
+
+      const { data, error } = await query;
+      if (!error && data) {
+        fetchedQuestions = data;
       } else {
+        // Fallback for guests or specific RLS configurations
         const result = await supabase.rpc('hayna_guest_questions', {
           p_city: location.city,
           p_district: location.district,
           p_limit: 60,
         });
-        if (result.error) throw result.error;
         const searchTerm = q.trim().toLocaleLowerCase('ar');
         fetchedQuestions = (result.data ?? []).filter((item: any) =>
           !searchTerm || `${item.title} ${item.body}`.toLocaleLowerCase('ar').includes(searchTerm)
@@ -120,7 +124,7 @@ export default function Questions() {
       setItems(fetchedQuestions);
     } catch (e: any) {
       console.warn('Load questions error', e);
-      setLoadError(e?.code === 'PGRST202' ? 'يلزم تحديث قاعدة البيانات لعرض أسئلة الحي للزوار.' : 'تعذر تحميل الأسئلة. حاول مرة أخرى.');
+      setLoadError('تعذر تحميل الأسئلة. حاول مرة أخرى.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -148,12 +152,8 @@ export default function Questions() {
   }, []);
 
   const locationFilteredItems = useMemo(() => {
-    return items.filter(q =>
-      hasSession
-        ? isExactDistrictMatching(q, activeLoc.city, activeLoc.district)
-        : isLocationMatching(q, activeLoc.city, activeLoc.district)
-    );
-  }, [items, hasSession, activeLoc]);
+    return items.filter(q => isLocationMatching(q, activeLoc.city, activeLoc.district));
+  }, [items, activeLoc]);
 
   // Tab Filtering
   const displayedItems = useMemo(() => {
@@ -330,12 +330,31 @@ export default function Questions() {
                   ? `لم يتم طرح أسئلة بعد في ${activeLoc.city}${activeLoc.district !== 'كل الأحياء' ? ` (حي ${activeLoc.district})` : ''}. كن أول من يشارك أهل حيّه!`
                   : 'عندك استفسار عن خدمات الحي أو تجربة شخصية؟ اطرح سؤالك الآن!'}
               </Text>
-              {hasSession && (
-                <Pressable style={styles.emptyAddBtn} onPress={() => router.push('/ask')}>
-                  <Plus size={18} color="#fff" />
-                  <Text style={styles.emptyAddBtnText}>طرح سؤال جديد</Text>
+              {!isAllKingdom(activeLoc.city) && activeLoc.district !== 'كل الأحياء' && (
+                <Pressable
+                  style={[styles.emptyAddBtn, { backgroundColor: '#f0fdf4', borderWidth: 1, borderColor: '#86efac', marginTop: 10 }]}
+                  onPress={() => onSelectLocation(activeLoc.region, activeLoc.city, 'كل الأحياء')}
+                >
+                  <MapPin size={16} color="#059669" />
+                  <Text style={[styles.emptyAddBtnText, { color: '#059669' }]}>
+                    عرض أسئلة كل أحياء {activeLoc.city}
+                  </Text>
                 </Pressable>
               )}
+              {!isAllKingdom(activeLoc.city) && (
+                <Pressable
+                  style={[styles.emptyAddBtn, { backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', marginTop: 8 }]}
+                  onPress={() => onSelectLocation('كل المملكة', 'كل المدن', 'كل الأحياء')}
+                >
+                  <Text style={[styles.emptyAddBtnText, { color: '#475569' }]}>
+                    عرض كل مناطق المملكة 🇸🇦
+                  </Text>
+                </Pressable>
+              )}
+              <Pressable style={[styles.emptyAddBtn, { marginTop: 10 }]} onPress={() => router.push('/ask')}>
+                <Plus size={18} color="#fff" />
+                <Text style={styles.emptyAddBtnText}>طرح سؤال جديد</Text>
+              </Pressable>
             </View>
           ) : (
             displayedItems.map(q => {

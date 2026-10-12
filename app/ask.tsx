@@ -11,9 +11,7 @@ import {
   Platform,
 } from 'react-native';
 import { router } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '@/lib/supabase';
-import { C } from '@/lib/ui';
 import {
   ChevronRight,
   Sparkles,
@@ -32,9 +30,12 @@ import {
   Bot,
   ShieldAlert,
   HeartHandshake,
+  Compass,
+  Zap,
 } from 'lucide-react-native';
 import LocationSelectorModal from '@/components/LocationSelectorModal';
 import { AppHeader } from '@/components/shared/AppHeader';
+import { useBottomNavInset } from '@/lib/bottomNav';
 import { getCurrentDeviceLocation, reverseGeocodeDeviceLocation } from '@/lib/deviceLocation';
 import {
   getActiveLocation,
@@ -54,14 +55,52 @@ import {
 } from '@/lib/aiAssistant';
 
 const QUICK_TEMPLATES = [
-  { label: '🤝 اشتراك بطارية سيارة', type: 'help', title: 'فزعة اشتراك بطارية سيارة بالحي', body: 'السلام عليكم يا جيران، سيارتي متوقفة وتحتاج اشتراك بطارية سريع، متواجد حالياً.' },
-  { label: '📦 مساعدة نقل غرض', type: 'help', title: 'مساعدة في نقل غرض ثقيل', body: 'أحتاج فزعة من أحد الجيران لمساعدتي في إنزال ونقل غرض ثقيل لمدة 10 دقائق.' },
-  { label: '🔧 فني سباكة أو كهرباء', type: 'inquiry', title: 'استفسار عن فني سباكة أو كهربائي أمين ومجرب بالحي', body: 'من يعرف فني سباكة أو كهربائي ممتاز وسريع يخدم في حيّنا؟' },
-  { label: '🧰 دريل أو سلم للإعارة', type: 'tool_sharing', title: 'دريل تخريم / سلم ألمنيوم للإعارة المجانية بالحي', body: 'متوفر عندي وجاهز لإعارته لأي جار يحتاجه بدون أي مقابل.' },
-  { label: '🐱 حيوان أليف مفقود بالحي', type: 'emergency', title: 'قطة مفقودة بالحي اليوم - أرجو التواصل لمن رآها', body: 'فقدنا قطة أليفة بيضاء بالقرب من المسجد، من يعثر عليها لطفاً يراسلني.' },
+  {
+    label: '🚗 اشتراك بطارية سيارة',
+    type: 'help',
+    title: 'فزعة اشتراك بطارية سيارة بالحي',
+    body: 'السلام عليكم يا جيران، سيارتي متوقفة وتحتاج اشتراك بطارية سريع، متواجد عند المربع وسأكون شاكراً لمن يفزع لي.',
+  },
+  {
+    label: '🔧 مفتاح عجل وبنشر',
+    type: 'help',
+    title: 'طلب مساعدة مفتاح عجل أو منفاخ كفرات بالحي',
+    body: 'السلام عليكم، معي بنشر وأحتاج مفتاح عجل مقاس مناسب أو منفاخ سفري لدقائق معدودة.',
+  },
+  {
+    label: '🧰 استعارة دريل أو سلّم',
+    type: 'tool_sharing',
+    title: 'طلب استعارة سلّم ألمنيوم أو دريل تخريم لساعات',
+    body: 'أحتاج سلّم طويل أو دريل لتركيب رف بالبيت وسأعيده بنفس اليوم بإذن الله ونظيفاً كما كان.',
+  },
+  {
+    label: '❄️ فني تكييف أو سباكة',
+    type: 'inquiry',
+    title: 'استفسار عن فني تكييف وسباكة مجرب وأمين بالحي',
+    body: 'من منكم جرب فني تكييف ممتاز وأسعاره معقولة ويخدم حيّنا؟ أرجو تزويدي بالرقم وتجربتكم معه.',
+  },
+  {
+    label: '📦 نقل غرض ثقيل',
+    type: 'help',
+    title: 'مساعدة في نقل غرض ثقيل لمدة 10 دقائق',
+    body: 'أحتاج فزعة من أحد الجيران لمساعدتي في حمل ونقل دولاب لـ 10 دقائق فقط وله جزيل الشكر.',
+  },
+  {
+    label: '🐱 حيوان أليف مفقود بالحي',
+    type: 'emergency',
+    title: 'قطة مفقودة بالحي اليوم - أرجو التواصل لمن رآها',
+    body: 'فقدنا قطة أليفة بيضاء بالقرب من الحديقة، يرجى ممن شاهدها مراسلتي أو التواصل سريعاً.',
+  },
+  {
+    label: '🎁 أثاث أو أغراض لوجه الله',
+    type: 'donate',
+    title: 'أغراض وأثاث بحالة جيدة متاح مجاناً لمن يحتاجه بالحي',
+    body: 'لدينا بعض القطع المنزلية الصالحة للاستخدام، متاحة مجاناً لأي جار أو أسرة محتاجة بالحي.',
+  },
 ];
 
 export default function AskScreen() {
+  const bottomNavInset = useBottomNavInset();
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [budget, setBudget] = useState('');
@@ -71,8 +110,9 @@ export default function AskScreen() {
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [busy, setBusy] = useState(false);
   const [enhancing, setEnhancing] = useState(false);
+  const [locatingGps, setLocatingGps] = useState(false);
 
-  // Post category type: includes direct help request (مساعدة وفزعة)
+  // Post category type
   const [postType, setPostType] = useState<'inquiry' | 'help' | 'tool_sharing' | 'donate' | 'emergency'>('inquiry');
 
   // AI analysis state
@@ -152,7 +192,6 @@ export default function AskScreen() {
 
     initLocation();
 
-    // 3. Listen to real-time location changes across the app (Settings / Header / etc.)
     const unsubscribe = subscribeLocation((newLoc) => {
       if (isMounted && newLoc?.city && !isAllKingdom(newLoc.city)) {
         setCity(newLoc.city);
@@ -167,6 +206,32 @@ export default function AskScreen() {
       unsubscribe();
     };
   }, []);
+
+  // Quick GPS Refresh Handler
+  const handleQuickGps = async () => {
+    setLocatingGps(true);
+    try {
+      const device = await getCurrentDeviceLocation();
+      if (device) {
+        const place = await reverseGeocodeDeviceLocation(device as any);
+        if (place?.city) {
+          setCity(place.city);
+          if (place.district) setDistrict(place.district);
+          if (place.region) setRegion(place.region);
+          await savePermanentMyLocation({
+            region: place.region || 'المملكة',
+            city: place.city,
+            district: place.district || 'كل الأحياء',
+          }, true);
+          Alert.alert('تم التحديد بنجاح 🛰️', `تم ربط موقع السؤال بـ: ${place.city} · حي ${place.district || 'الحي'}`);
+        }
+      }
+    } catch (err) {
+      console.warn('GPS error', err);
+    } finally {
+      setLocatingGps(false);
+    }
+  };
 
   // 2. Real-time AI Analysis & Safety Check on title/body change
   useEffect(() => {
@@ -191,7 +256,6 @@ export default function AskScreen() {
         setInstantAnswer(null);
       }
 
-      // Search for similar questions in the same city
       findSimilarQuestions(title.trim());
     } else {
       setAiAnalysis(null);
@@ -215,9 +279,7 @@ export default function AskScreen() {
 
       const { data } = await q;
       setSimilarQuestions(data ?? []);
-    } catch (e) {
-      // Ignore background search error
-    }
+    } catch (e) {}
   }
 
   // 3. AI Question Enhancement
@@ -234,7 +296,7 @@ export default function AskScreen() {
         setBody(result.enhancedBody);
       }
       setEnhancing(false);
-    }, 400);
+    }, 350);
   }
 
   // 4. Save & Publish
@@ -246,7 +308,6 @@ export default function AskScreen() {
       return Alert.alert('تحديد الموقع', 'يرجى اختيار مدينتك وحيك لضمان وصول طلبك لجيرانك بدقة.');
     }
 
-    // Safety and Anti-spam prevention
     if (safetyCheck?.isSpam) {
       return Alert.alert('تنبيه أمان المجتمع', safetyCheck.spamReason || 'المحتوى ترويجي أو عشوائي وغير مصرح به.');
     }
@@ -254,12 +315,17 @@ export default function AskScreen() {
     setBusy(true);
     try {
       const { data: u } = await supabase.auth.getUser();
-      if (!u.user) throw new Error('يجب تسجيل الدخول أولاً.');
+      if (!u.user) {
+        Alert.alert('تسجيل الدخول مطلوب', 'يرجى تسجيل الدخول أولاً لتتمكن من نشر السؤال وحفظه.', [
+          { text: 'تسجيل الدخول', onPress: () => router.push('/auth') },
+          { text: 'إلغاء', style: 'cancel' },
+        ]);
+        return;
+      }
 
       const isEmergency = safetyCheck?.isEmergency || postType === 'emergency';
       const isToolSharing = postType === 'tool_sharing';
 
-      // Attach the GPS fix if available quickly (non-blocking)
       let deviceLocation: any = null;
       try {
         deviceLocation = await Promise.race([
@@ -268,7 +334,6 @@ export default function AskScreen() {
         ]);
       } catch {}
 
-      // Persist the exact location attached to this post
       if (city) {
         await savePermanentMyLocation({
           region: region || 'المملكة',
@@ -308,7 +373,7 @@ export default function AskScreen() {
           throw reqResult.error || new Error('تعذر نشر طلب المساعدة.');
         }
 
-        Alert.alert('تم بنجاح! 🤝', 'تم نشر طلبك لأهالي الحي وسيتواصل معك من يقدر على المساعدة.');
+        Alert.alert('تم النشر بنجاح! 🤝', 'تم نشر طلبك لأهالي الحي وسيتواصل معك من يقدر على المساعدة فوراً.');
         return router.replace({ pathname: '/request', params: { id: reqResult.data.id } });
       }
 
@@ -323,7 +388,6 @@ export default function AskScreen() {
         lng: deviceLocation?.longitude ?? null,
       };
 
-      // Try inserting with extended columns, fallback gracefully if columns not yet run
       let insertedQuestionId: string | null = null;
       try {
         const { data, error } = await supabase
@@ -333,7 +397,8 @@ export default function AskScreen() {
             is_emergency: isEmergency,
             urgency_level: isEmergency ? 'emergency' : 'normal',
             is_tool_sharing: isToolSharing,
-            item_type: postType,
+            item_type: postType === 'donate' ? 'donate' : isToolSharing ? 'tool' : null,
+            category: postType === 'emergency' ? 'طوارئ' : postType === 'tool_sharing' ? 'أدوات' : 'عام',
           })
           .select('id')
           .single();
@@ -341,7 +406,7 @@ export default function AskScreen() {
         if (error) throw error;
         insertedQuestionId = data.id;
       } catch (errCol) {
-        // Fallback to basic columns if advanced migration not yet executed
+        // Fallback for schema variations
         const { lat: _lat, lng: _lng, ...basicPayload } = payload;
         const { data: fallbackData, error: fallbackError } = await supabase
           .from('questions')
@@ -354,6 +419,7 @@ export default function AskScreen() {
       }
 
       if (insertedQuestionId) {
+        Alert.alert('تم النشر بنجاح! ✨', 'نُشر سؤالك لأهل الحي وسيصلك إشعار فور تفاعل الجيران معه.');
         router.replace({ pathname: '/question', params: { id: insertedQuestionId } });
       }
     } catch (err: any) {
@@ -368,11 +434,20 @@ export default function AskScreen() {
       <AppHeader
         variant="sub"
         title="اسأل أهل حيك"
-        subtitle="مجتمع حيّنا • تواصل الجيران"
+        subtitle={[district && `حي ${district}`, city].filter(Boolean).join(' · ') || 'مجتمع حيّنا • تواصل الجيران'}
         fallbackRoute="/home"
+        rightAction={
+          <View style={styles.headerBadgeWrap}>
+            <Sparkles size={13} color="#059669" />
+            <Text style={styles.headerBadgeText}>مدعوم بالذكاء</Text>
+          </View>
+        }
       />
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomNavInset + 40 }]}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Post Type Selector Tabs */}
         <View style={styles.postTypeContainer}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.postTypeTabs}>
@@ -380,9 +455,9 @@ export default function AskScreen() {
               style={[styles.typeTab, postType === 'inquiry' && styles.typeTabActive]}
               onPress={() => setPostType('inquiry')}
             >
-              <MessageSquare size={16} color={postType === 'inquiry' ? '#fff' : '#059669'} />
+              <MessageSquare size={15} color={postType === 'inquiry' ? '#fff' : '#059669'} />
               <Text style={[styles.typeTabText, postType === 'inquiry' && styles.typeTabTextActive]}>
-                استفسار للحي
+                استفسار للحي 💬
               </Text>
             </Pressable>
 
@@ -390,9 +465,9 @@ export default function AskScreen() {
               style={[styles.typeTab, postType === 'help' && styles.typeTabActiveAmber]}
               onPress={() => setPostType('help')}
             >
-              <HeartHandshake size={16} color={postType === 'help' ? '#fff' : '#d97706'} />
+              <HeartHandshake size={15} color={postType === 'help' ? '#fff' : '#d97706'} />
               <Text style={[styles.typeTabText, postType === 'help' && styles.typeTabTextActive]}>
-                طلب مساعدة وفزعة 🤝
+                طلب فزعة ومساعدة 🤝
               </Text>
             </Pressable>
 
@@ -400,9 +475,9 @@ export default function AskScreen() {
               style={[styles.typeTab, postType === 'tool_sharing' && styles.typeTabActiveGreen]}
               onPress={() => setPostType('tool_sharing')}
             >
-              <Wrench size={16} color={postType === 'tool_sharing' ? '#fff' : '#16a34a'} />
+              <Wrench size={15} color={postType === 'tool_sharing' ? '#fff' : '#16a34a'} />
               <Text style={[styles.typeTabText, postType === 'tool_sharing' && styles.typeTabTextActive]}>
-                إعارة أدوات
+                إعارة أدوات 🛠️
               </Text>
             </Pressable>
 
@@ -410,9 +485,9 @@ export default function AskScreen() {
               style={[styles.typeTab, postType === 'donate' && styles.typeTabActivePurple]}
               onPress={() => setPostType('donate')}
             >
-              <Gift size={16} color={postType === 'donate' ? '#fff' : '#9333ea'} />
+              <Gift size={15} color={postType === 'donate' ? '#fff' : '#9333ea'} />
               <Text style={[styles.typeTabText, postType === 'donate' && styles.typeTabTextActive]}>
-                تبادل مجاني
+                تبادل مجاني 🎁
               </Text>
             </Pressable>
 
@@ -420,7 +495,7 @@ export default function AskScreen() {
               style={[styles.typeTab, postType === 'emergency' && styles.typeTabActiveRed]}
               onPress={() => setPostType('emergency')}
             >
-              <Flame size={16} color={postType === 'emergency' ? '#fff' : '#dc2626'} />
+              <Flame size={15} color={postType === 'emergency' ? '#fff' : '#dc2626'} />
               <Text style={[styles.typeTabText, postType === 'emergency' && styles.typeTabTextActive]}>
                 بلاغ طارئ 🚨
               </Text>
@@ -432,22 +507,33 @@ export default function AskScreen() {
         {postType === 'help' && (
           <View style={styles.helpNoticeCard}>
             <View style={styles.helpNoticeHeader}>
-              <HeartHandshake size={20} color="#d97706" />
+              <HeartHandshake size={18} color="#d97706" />
               <Text style={styles.helpNoticeTitle}>طلب فزعة وتعاون من أهل حيّك 🤝</Text>
             </View>
             <Text style={styles.helpNoticeText}>
-              طلبك سيُنشر مباشرة لأهالي حيك في صفحة «فزعة وطلبات الحي» ويظهر على خريطة الحي ليتواصل معك الجيران القادرون على المساعدة فوراً وبدون تعقيد.
+              طلبك سيُنشر مباشرة لأهالي حيك في صفحة «فزعات وطلبات الحي» ويظهر على خريطة الحي ليتواصل معك الجيران القادرون على المساعدة فوراً.
             </Text>
           </View>
         )}
 
-        {/* Location Selector Card (Auto-linked to user) */}
+        {/* Location Selector Card (Auto-linked to user with GPS shortcut) */}
         <View style={styles.locationCard}>
           <View style={styles.locationCardHeader}>
-            <View style={styles.locationBadge}>
-              <Text style={styles.locationBadgeText}>موقع السؤال المربوط</Text>
-            </View>
-            <Text style={styles.locationLabel}>المنطقة والحي المستهدف</Text>
+            <Pressable
+              style={styles.gpsAutoBtn}
+              onPress={handleQuickGps}
+              disabled={locatingGps}
+            >
+              {locatingGps ? (
+                <ActivityIndicator size="small" color="#059669" />
+              ) : (
+                <>
+                  <Compass size={13} color="#059669" />
+                  <Text style={styles.gpsAutoBtnText}>تحديث بالـ GPS</Text>
+                </>
+              )}
+            </Pressable>
+            <Text style={styles.locationLabel}>موقع السؤال والحي المستهدف</Text>
           </View>
 
           <Pressable
@@ -457,21 +543,21 @@ export default function AskScreen() {
             <ChevronDown size={18} color="#059669" />
             <View style={{ flex: 1, alignItems: 'flex-end' }}>
               <Text style={styles.locationValue}>
-                {city ? `${city} ${district ? `· ${district}` : ''}` : 'اختر مدينتك وحيك...'}
+                {city ? `${city} ${district ? `· حي ${district}` : ''}` : 'اختر مدينتك وحيك...'}
               </Text>
               <Text style={styles.locationHint}>
-                {city ? 'مربوط تلقائياً بإعداداتك ومحفوظ بجهازك · اضغط للتغيير' : 'حدد موقعك ليصل السؤال لجيرانك فقط'}
+                {city ? 'مربوط تلقائياً بحسابك وإعداداتك · اضغط لتغيير الحي' : 'حدد موقعك ليصل السؤال لجيرانك فقط'}
               </Text>
             </View>
             <View style={styles.mapPinWrap}>
-              <MapPin size={20} color="#059669" />
+              <MapPin size={18} color="#059669" />
             </View>
           </Pressable>
         </View>
 
         {/* Quick Suggested Templates */}
         <View style={styles.templatesContainer}>
-          <Text style={styles.templatesTitle}>💡 نماذج واقتراحات سريعة بنقرة زر:</Text>
+          <Text style={styles.templatesTitle}>💡 أفكار ونماذج سريعة بنقرة زر:</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.templatesScroll}>
             {QUICK_TEMPLATES.map((tmpl, idx) => (
               <Pressable
@@ -489,12 +575,12 @@ export default function AskScreen() {
           </ScrollView>
         </View>
 
-        {/* Emergency Alert Banner (Triggered by AI or selector) */}
+        {/* Emergency Alert Banner */}
         {(safetyCheck?.isEmergency || postType === 'emergency') && (
           <View style={styles.emergencyCard}>
             <View style={styles.emergencyHeader}>
-              <Flame size={20} color="#dc2626" />
-              <Text style={styles.emergencyTitle}>تنبيه حالة طارئة بأولوية قصوى لأهل الحي</Text>
+              <Flame size={18} color="#dc2626" />
+              <Text style={styles.emergencyTitle}>تنبيه حالة طارئة بأولوية قصوى لأهل الحي 🚨</Text>
             </View>
             <Text style={styles.emergencyDesc}>
               سيتم تثبيت هذا البلاغ في أعلى خلاصة الحي وإرسال إشعار فوري لجميع الجيران المتواجدين حالياً للمساعدة السريعة.
@@ -505,7 +591,7 @@ export default function AskScreen() {
         {/* Anti-Spam Warning if detected */}
         {safetyCheck?.isSpam && (
           <View style={styles.spamWarningCard}>
-            <ShieldAlert size={20} color="#ea580c" />
+            <ShieldAlert size={18} color="#ea580c" />
             <View style={{ flex: 1 }}>
               <Text style={styles.spamWarningTitle}>تنبيه أمان المجتمع</Text>
               <Text style={styles.spamWarningDesc}>{safetyCheck.spamReason}</Text>
@@ -522,41 +608,44 @@ export default function AskScreen() {
           {enhancing ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <Sparkles size={18} color="#fff" />
+            <Sparkles size={17} color="#fff" />
           )}
           <View style={{ flex: 1, alignItems: 'flex-end' }}>
-            <Text style={styles.aiBannerTitle}>تحسين وتنسيق بالذكاء الاصطناعي ✨</Text>
+            <Text style={styles.aiBannerTitle}>تحسين وتنسيق السؤال بالذكاء الاصطناعي ✨</Text>
             <Text style={styles.aiBannerSub}>
-              صياغة واضحة ومهذبة لجيران الحي تلقائياً بنقرة زر
+              صياغة مهذبة وواضحة وإضافة تحية جيران الحي تلقائياً بنقرة زر
             </Text>
           </View>
         </Pressable>
 
         {/* Input: Title */}
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>
-            {postType === 'help'
-              ? 'عنوان طلب المساعدة والفزعة *'
-              : postType === 'tool_sharing'
-              ? 'اسم الأداة أو المعدة المعارة *'
-              : postType === 'donate'
-              ? 'الشيء المعروض للتبادل المجاني *'
-              : postType === 'emergency'
-              ? 'عنوان البلاغ الطارئ *'
-              : 'عنوان السؤال *'}
-          </Text>
+          <View style={styles.labelRow}>
+            <Text style={styles.charCounter}>{title.length}/120</Text>
+            <Text style={styles.label}>
+              {postType === 'help'
+                ? 'عنوان طلب الفزعة والمساعدة *'
+                : postType === 'tool_sharing'
+                ? 'اسم الأداة أو المعدة المعارة *'
+                : postType === 'donate'
+                ? 'الشيء المعروض للتبادل المجاني *'
+                : postType === 'emergency'
+                ? 'عنوان البلاغ الطارئ *'
+                : 'عنوان السؤال *'}
+            </Text>
+          </View>
           <TextInput
             style={styles.titleInput}
             value={title}
             onChangeText={setTitle}
             placeholder={
               postType === 'help'
-                ? 'مثال: أحتاج أحد يساعدني باشتراك بطارية سيارة، نقل غرض ثقيل، أو توصيل...'
+                ? 'مثال: أحتاج أحد يساعدني باشتراك بطارية سيارة، نقل غرض ثقيل، أو بنشر...'
                 : postType === 'tool_sharing'
                 ? 'مثال: دريل تخريم خرسانة للإعارة المجانية بالحي'
                 : postType === 'emergency'
                 ? 'مثال: طفل مفقود بالقرب من حديقة الحي'
-                : 'مثال: وين أفضل ورشة صيانة سيارات في الحي؟'
+                : 'مثال: وين أفضل ورشة صيانة سيارات أو سباك مجرب في الحي؟'
             }
             placeholderTextColor="#94a3b8"
             maxLength={120}
@@ -591,13 +680,13 @@ export default function AskScreen() {
               value={budget}
               onChangeText={setBudget}
               keyboardType="numeric"
-              placeholder="مثال: 30 ر.س (اتركه فارغاً إذا كان فزعة وتطوع)"
+              placeholder="مثال: 30 ر.س (اتركه فارغاً إذا كان فزعة وتطوع بدون مقابل)"
               placeholderTextColor="#94a3b8"
             />
           </View>
         )}
 
-        {/* INSTANT AI RESIDENT ANSWER (Synthesized Neighborhood Knowledge) */}
+        {/* INSTANT AI RESIDENT ANSWER */}
         {instantAnswer && (
           <View style={styles.instantAnswerCard}>
             <View style={styles.instantAnswerHeader}>
@@ -606,11 +695,11 @@ export default function AskScreen() {
               </View>
               <View style={styles.instantAnswerTitleRow}>
                 <Text style={styles.instantAnswerTitle}>إجابة فورية من أرشيف تجارب الجيران</Text>
-                <Bot size={20} color="#059669" />
+                <Bot size={18} color="#059669" />
               </View>
             </View>
             <Text style={styles.instantAnswerSub}>
-              ملخص ذكي ريثما يرد الجيران الفعليون في الحي:
+              ملخص ذكي ومختصر ريثما يرد الجيران الفعليون في الحي:
             </Text>
 
             <Text style={styles.instantSummaryText}>{instantAnswer.summary}</Text>
@@ -625,19 +714,19 @@ export default function AskScreen() {
             </View>
 
             <View style={styles.actionBox}>
-              <Lightbulb size={16} color="#d97706" />
+              <Lightbulb size={15} color="#d97706" />
               <Text style={styles.actionText}>{instantAnswer.recommendedAction}</Text>
             </View>
           </View>
         )}
 
-        {/* AI Smart Insights (Real-time category & tags) */}
+        {/* AI Smart Insights */}
         {aiAnalysis && (
           <View style={styles.aiInsightCard}>
             <View style={styles.aiInsightHeader}>
               <View style={styles.aiBadge}>
-                <Sparkles size={14} color="#059669" />
-                <Text style={styles.aiBadgeText}>تصنيف الذكاء الاصطناعي</Text>
+                <Sparkles size={13} color="#059669" />
+                <Text style={styles.aiBadgeText}>تصنيف الذكاء</Text>
               </View>
               <Text style={styles.aiInsightCategory}>{aiAnalysis.category}</Text>
             </View>
@@ -646,7 +735,7 @@ export default function AskScreen() {
             <View style={styles.tagsRow}>
               {aiAnalysis.tags.map((t, idx) => (
                 <View key={idx} style={styles.tagPill}>
-                  <Tag size={12} color="#059669" />
+                  <Tag size={11} color="#059669" />
                   <Text style={styles.tagPillText}>#{t}</Text>
                 </View>
               ))}
@@ -663,7 +752,7 @@ export default function AskScreen() {
         {similarQuestions.length > 0 && (
           <View style={styles.similarCard}>
             <View style={styles.similarHeader}>
-              <HelpCircle size={18} color="#d97706" />
+              <HelpCircle size={16} color="#d97706" />
               <Text style={styles.similarTitle}>أسئلة مشابهة سألها جيرانك سابقاً</Text>
             </View>
             {similarQuestions.map(sq => (
@@ -672,7 +761,7 @@ export default function AskScreen() {
                 style={styles.similarItem}
                 onPress={() => router.push({ pathname: '/question', params: { id: sq.id } })}
               >
-                <ExternalLink size={16} color="#059669" />
+                <ExternalLink size={15} color="#059669" />
                 <Text style={styles.similarItemText} numberOfLines={1}>
                   {sq.title}
                 </Text>
@@ -690,25 +779,25 @@ export default function AskScreen() {
           {busy ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <CheckCircle2 size={22} color="#fff" />
+            <CheckCircle2 size={20} color="#fff" />
           )}
           <Text style={styles.submitBtnText}>
             {busy
-              ? 'جاري النشر...'
+              ? 'جاري النشر في الحي...'
               : postType === 'help'
-              ? '🤝 نشر طلب المساعدة في الحي الآن'
+              ? '🤝 نشر طلب الفزعة في الحي الآن'
               : postType === 'emergency'
               ? '🚨 نشر البلاغ الطارئ في الحي فوراً'
               : postType === 'tool_sharing'
               ? '🛠️ نشر عرض إعارة الأداة في الحي'
               : postType === 'donate'
               ? '🎁 نشر عرض التبادل المجاني'
-              : 'نشر السؤال في الحي الآن'}
+              : 'نشر السؤال في الحي الآن ✨'}
           </Text>
         </Pressable>
       </ScrollView>
 
-      {/* Structured Location Selector Modal */}
+      {/* Location Selector Modal */}
       <LocationSelectorModal
         visible={showLocationModal}
         onClose={() => setShowLocationModal(false)}
@@ -721,7 +810,6 @@ export default function AskScreen() {
           setCity(cleanCity);
           setDistrict(cleanDist);
 
-          // Save permanently immediately (persists even if user logs out!)
           if (cleanCity) {
             await savePermanentMyLocation({
               region: r || 'المملكة',
@@ -740,40 +828,27 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8fafc',
   },
-  header: {
+  headerBadgeWrap: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 52 : 40,
-    paddingBottom: 18,
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
+    gap: 4,
+    backgroundColor: '#ecfdf5',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
   },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#fff',
-  },
-  headerSub: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.85)',
-    marginTop: 2,
+  headerBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#059669',
   },
   scrollContent: {
-    padding: 20,
-    paddingBottom: 50,
+    padding: 16,
   },
   postTypeContainer: {
-    marginBottom: 16,
+    marginBottom: 14,
   },
   postTypeTabs: {
     flexDirection: 'row-reverse',
@@ -782,13 +857,13 @@ const styles = StyleSheet.create({
   typeTab: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
     backgroundColor: '#fff',
     borderWidth: 1.5,
     borderColor: '#e2e8f0',
-    gap: 6,
+    gap: 5,
   },
   typeTabActive: {
     backgroundColor: '#059669',
@@ -811,7 +886,7 @@ const styles = StyleSheet.create({
     borderColor: '#dc2626',
   },
   typeTabText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '800',
     color: '#475569',
   },
@@ -822,7 +897,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fffbeb',
     borderRadius: 16,
     padding: 14,
-    marginBottom: 16,
+    marginBottom: 14,
     borderWidth: 1.5,
     borderColor: '#fde68a',
   },
@@ -833,22 +908,22 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   helpNoticeTitle: {
-    fontSize: 14,
+    fontSize: 13.5,
     fontWeight: '900',
     color: '#92400e',
     textAlign: 'right',
   },
   helpNoticeText: {
-    fontSize: 12.5,
-    lineHeight: 20,
+    fontSize: 12,
+    lineHeight: 18,
     color: '#78350f',
     textAlign: 'right',
   },
   templatesContainer: {
-    marginBottom: 16,
+    marginBottom: 14,
   },
   templatesTitle: {
-    fontSize: 12.5,
+    fontSize: 12,
     fontWeight: '800',
     color: '#475569',
     textAlign: 'right',
@@ -861,22 +936,22 @@ const styles = StyleSheet.create({
   },
   templateChip: {
     backgroundColor: '#fff',
-    paddingHorizontal: 12,
+    paddingHorizontal: 11,
     paddingVertical: 7,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#e2e8f0',
   },
   templateChipText: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '700',
     color: '#334155',
   },
   locationCard: {
     backgroundColor: '#fff',
     borderRadius: 18,
-    padding: 16,
-    marginBottom: 16,
+    padding: 14,
+    marginBottom: 14,
     borderWidth: 1.5,
     borderColor: '#e2e8f0',
   },
@@ -887,19 +962,24 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   locationLabel: {
-    fontSize: 14,
+    fontSize: 13.5,
     fontWeight: '800',
     color: '#0f172a',
   },
-  locationBadge: {
+  gpsAutoBtn: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 4,
     backgroundColor: '#ecfdf5',
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
   },
-  locationBadgeText: {
+  gpsAutoBtnText: {
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '800',
     color: '#059669',
   },
   locationBtn: {
@@ -907,26 +987,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#f8fafc',
     borderRadius: 14,
-    padding: 12,
+    padding: 10,
     borderWidth: 1,
     borderColor: '#e2e8f0',
     gap: 10,
   },
   locationValue: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '800',
     color: '#0f172a',
     textAlign: 'right',
   },
   locationHint: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#64748b',
     textAlign: 'right',
     marginTop: 2,
   },
   mapPinWrap: {
-    width: 36,
-    height: 36,
+    width: 32,
+    height: 32,
     borderRadius: 10,
     backgroundColor: '#ecfdf5',
     justifyContent: 'center',
@@ -934,29 +1014,29 @@ const styles = StyleSheet.create({
   },
   emergencyCard: {
     backgroundColor: '#fef2f2',
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderColor: '#fca5a5',
     borderRadius: 16,
-    padding: 14,
-    marginBottom: 16,
+    padding: 12,
+    marginBottom: 14,
   },
   emergencyHeader: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
     marginBottom: 4,
   },
   emergencyTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '900',
     color: '#b91c1c',
     textAlign: 'right',
   },
   emergencyDesc: {
-    fontSize: 12,
+    fontSize: 11.5,
     color: '#991b1b',
     textAlign: 'right',
-    lineHeight: 18,
+    lineHeight: 17,
   },
   spamWarningCard: {
     flexDirection: 'row-reverse',
@@ -965,18 +1045,18 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#fed7aa',
     borderRadius: 16,
-    padding: 14,
-    marginBottom: 16,
-    gap: 10,
+    padding: 12,
+    marginBottom: 14,
+    gap: 8,
   },
   spamWarningTitle: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: '800',
     color: '#c2410c',
     textAlign: 'right',
   },
   spamWarningDesc: {
-    fontSize: 12,
+    fontSize: 11.5,
     color: '#9a3412',
     textAlign: 'right',
     marginTop: 2,
@@ -986,17 +1066,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#059669',
     borderRadius: 16,
-    padding: 14,
-    marginBottom: 16,
-    gap: 12,
+    padding: 12,
+    marginBottom: 14,
+    gap: 10,
     shadowColor: '#059669',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
     elevation: 3,
   },
   aiBannerTitle: {
-    fontSize: 14,
+    fontSize: 13.5,
     fontWeight: '800',
     color: '#fff',
     textAlign: 'right',
@@ -1008,20 +1088,30 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   inputGroup: {
-    marginBottom: 16,
+    marginBottom: 14,
+  },
+  labelRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
   },
   label: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '800',
     color: '#0f172a',
     textAlign: 'right',
-    marginBottom: 8,
+  },
+  charCounter: {
+    fontSize: 11,
+    color: '#94a3b8',
+    fontWeight: '600',
   },
   titleInput: {
     backgroundColor: '#fff',
     borderRadius: 14,
-    padding: 14,
-    fontSize: 15,
+    padding: 12,
+    fontSize: 14,
     fontWeight: '600',
     color: '#0f172a',
     borderWidth: 1.5,
@@ -1029,16 +1119,16 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   bodyInput: {
-    height: 100,
+    height: 95,
     textAlignVertical: 'top',
   },
   instantAnswerCard: {
     backgroundColor: '#f0fdfa',
     borderWidth: 1.5,
     borderColor: '#99f6e4',
-    borderRadius: 18,
-    padding: 16,
-    marginBottom: 16,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 14,
   },
   instantAnswerHeader: {
     flexDirection: 'row-reverse',
@@ -1049,75 +1139,75 @@ const styles = StyleSheet.create({
   instantAnswerTitleRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   instantAnswerTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '900',
     color: '#0f766e',
   },
   confidenceBadge: {
     backgroundColor: '#ccfbf1',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: '#5eead4',
   },
   confidenceText: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: '800',
     color: '#0f766e',
   },
   instantAnswerSub: {
-    fontSize: 12,
+    fontSize: 11.5,
     color: '#115e59',
     textAlign: 'right',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   instantSummaryText: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: '700',
     color: '#134e4a',
     textAlign: 'right',
-    lineHeight: 20,
-    marginBottom: 10,
+    lineHeight: 18,
+    marginBottom: 8,
   },
   keyPointsBox: {
     backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 10,
-    gap: 6,
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 8,
+    gap: 4,
   },
   pointRow: {
     flexDirection: 'row-reverse',
     alignItems: 'flex-start',
-    gap: 6,
+    gap: 5,
   },
   bulletDot: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#0d9488',
-    lineHeight: 18,
+    lineHeight: 16,
   },
   pointText: {
     flex: 1,
-    fontSize: 12,
+    fontSize: 11.5,
     color: '#334155',
     textAlign: 'right',
-    lineHeight: 18,
+    lineHeight: 16,
   },
   actionBox: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     backgroundColor: '#fef3c7',
-    padding: 10,
-    borderRadius: 10,
-    gap: 8,
+    padding: 8,
+    borderRadius: 8,
+    gap: 6,
   },
   actionText: {
     flex: 1,
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '700',
     color: '#92400e',
     textAlign: 'right',
@@ -1125,8 +1215,8 @@ const styles = StyleSheet.create({
   aiInsightCard: {
     backgroundColor: '#fff',
     borderRadius: 16,
-    padding: 14,
-    marginBottom: 16,
+    padding: 12,
+    marginBottom: 14,
     borderWidth: 1,
     borderColor: '#e2e8f0',
   },
@@ -1134,24 +1224,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   aiBadge: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 4,
     backgroundColor: '#ecfdf5',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 10,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 8,
   },
   aiBadgeText: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: '700',
     color: '#059669',
   },
   aiInsightCategory: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: '800',
     color: '#0f172a',
   },
@@ -1159,40 +1249,40 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     flexWrap: 'wrap',
     gap: 6,
-    marginBottom: 10,
+    marginBottom: 8,
   },
   tagPill: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
     backgroundColor: '#f1f5f9',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
   tagPillText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     color: '#059669',
   },
   tipBox: {
     backgroundColor: '#f8fafc',
-    borderRadius: 10,
-    padding: 10,
+    borderRadius: 8,
+    padding: 8,
     borderRightWidth: 3,
     borderRightColor: '#059669',
   },
   tipText: {
-    fontSize: 12,
+    fontSize: 11.5,
     color: '#475569',
     textAlign: 'right',
-    lineHeight: 18,
+    lineHeight: 16,
   },
   similarCard: {
     backgroundColor: '#fff',
     borderRadius: 16,
-    padding: 14,
-    marginBottom: 16,
+    padding: 12,
+    marginBottom: 14,
     borderWidth: 1,
     borderColor: '#fed7aa',
   },
@@ -1200,10 +1290,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 10,
+    marginBottom: 8,
   },
   similarTitle: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: '800',
     color: '#9a3412',
   },
@@ -1211,35 +1301,35 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 8,
+    paddingVertical: 7,
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
   },
   similarItemText: {
     flex: 1,
-    fontSize: 13,
+    fontSize: 12,
     color: '#0f172a',
     textAlign: 'right',
-    marginLeft: 8,
+    marginLeft: 6,
   },
   submitBtn: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#059669',
-    height: 54,
+    height: 50,
     borderRadius: 16,
     gap: 8,
-    marginTop: 10,
+    marginTop: 6,
     shadowColor: '#059669',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 3,
   },
   submitBtnText: {
-    fontSize: 16,
-    fontWeight: '800',
+    fontSize: 15,
+    fontWeight: '900',
     color: '#fff',
   },
 });

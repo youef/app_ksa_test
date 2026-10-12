@@ -35,7 +35,16 @@ import { ChatModals } from '@/components/chat/ChatModals';
 import { sendPushToUser } from '@/lib/pushSender';
 
 export default function Conversation() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const params = useLocalSearchParams<{ id?: string; userId?: string; target?: string }>();
+  const rawId = Array.isArray(params.id) ? params.id[0] : params.id;
+  const rawUserId = Array.isArray(params.userId)
+    ? params.userId[0]
+    : Array.isArray(params.target)
+    ? params.target[0]
+    : (params.userId || params.target);
+
+  const [convId, setConvId] = useState<string>(rawId || '');
+  const [resolvingConv, setResolvingConv] = useState<boolean>(!rawId && !!rawUserId);
   const [messages, setMessages] = useState<MessageItem[]>([]);
   const [body, setBody] = useState('');
   const [loading, setLoading] = useState(true);
@@ -64,14 +73,15 @@ export default function Conversation() {
   const [sendingAppreciation, setSendingAppreciation] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
 
-  const convId = Array.isArray(id) ? id[0] : (id as string);
   const insets = useSafeAreaInsets();
   const bottomSafe = Math.max(insets.bottom, 10);
   const otherName = displayName(otherUser, 'المحادثة');
   const isAnonymous = otherUser?.hide_name === true;
   const anyBlock = blockedByMe || blockedMe;
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (activeIdOverride?: string) => {
+    const idToUse = activeIdOverride || convId;
+    if (!idToUse) return;
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) return router.replace('/auth');
     setCurrentUserId(u.user.id);
@@ -87,7 +97,7 @@ export default function Conversation() {
     const { data: msgs } = await supabase
       .from('messages')
       .select('*')
-      .eq('conversation_id', convId)
+      .eq('conversation_id', idToUse)
       .order('created_at', { ascending: true });
 
     setMessages(prev => {
@@ -110,7 +120,7 @@ export default function Conversation() {
     const { data: members } = await supabase
       .from('conversation_members')
       .select('user_id')
-      .eq('conversation_id', convId)
+      .eq('conversation_id', idToUse)
       .neq('user_id', u.user.id);
 
     const otherId = members && members.length > 0 ? members[0].user_id : null;
@@ -125,8 +135,8 @@ export default function Conversation() {
     }
 
     // 3. My settings
-    const settings = await loadConvSettings(u.user.id, [convId]);
-    const mine = settings[convId];
+    const settings = await loadConvSettings(u.user.id, [idToUse]);
+    const mine = settings[idToUse];
     setIsMuted(!!mine?.muted);
     setIsCleared(!!mine?.clearedAt);
 
@@ -159,7 +169,7 @@ export default function Conversation() {
 
     // 6. Mark read
     if (msgs && msgs.length > 0) {
-      void markConversationRead(convId, u.user.id);
+      void markConversationRead(idToUse, u.user.id);
     }
 
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: false }), 50);
@@ -179,8 +189,37 @@ export default function Conversation() {
       if (!alive) return;
       setCurrentUserId(userId);
 
+      let activeId = convId;
+      if (!activeId && rawUserId) {
+        try {
+          const { data: resolvedId, error: rpcErr } = await supabase.rpc('hayna_get_or_create_direct_conversation', {
+            p_target: rawUserId,
+          });
+          if (rpcErr || !resolvedId) {
+            console.warn('Failed to resolve direct conversation:', rpcErr);
+            Alert.alert('تعذر فتح المحادثة', 'لا يمكن بدء محادثة خاصة مع هذا المستخدم حالياً.');
+            router.replace('/messages');
+            return;
+          }
+          activeId = resolvedId;
+          if (alive) {
+            setConvId(resolvedId);
+            setResolvingConv(false);
+          }
+        } catch (e) {
+          router.replace('/messages');
+          return;
+        }
+      }
+
+      if (!activeId) {
+        setLoading(false);
+        router.replace('/messages');
+        return;
+      }
+
       ch = supabase
-        .channel('chat-' + convId + '-' + userId + '-' + Math.random().toString(36).slice(2), {
+        .channel('chat-' + activeId + '-' + userId + '-' + Math.random().toString(36).slice(2), {
           config: {
             broadcast: { self: false },
             presence: { key: userId },
@@ -192,7 +231,7 @@ export default function Conversation() {
             event: 'INSERT',
             schema: 'public',
             table: 'messages',
-            filter: `conversation_id=eq.${convId}`,
+            filter: `conversation_id=eq.${activeId}`,
           },
           payload => {
             if (!alive) return;
@@ -218,7 +257,7 @@ export default function Conversation() {
             setOtherTyping(false);
             requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
             if (newMsg.sender_id !== userId) {
-              void markConversationRead(convId, userId);
+              void markConversationRead(activeId, userId);
             }
           }
         )
@@ -228,7 +267,7 @@ export default function Conversation() {
             event: 'UPDATE',
             schema: 'public',
             table: 'messages',
-            filter: `conversation_id=eq.${convId}`,
+            filter: `conversation_id=eq.${activeId}`,
           },
           payload => {
             if (!alive) return;
@@ -260,7 +299,7 @@ export default function Conversation() {
         }
       });
 
-      await load();
+      await load(activeId);
     })();
 
     return () => {
@@ -610,7 +649,7 @@ export default function Conversation() {
     ]);
   }
 
-  if (loading) {
+  if (loading || resolvingConv) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color="#059669" />

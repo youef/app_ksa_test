@@ -1,6 +1,4 @@
-import { useBottomNavInset } from '@/lib/bottomNav';
-import { AppHeader } from '@/components/shared/AppHeader';
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   Alert,
   Pressable,
@@ -14,32 +12,14 @@ import {
   Image,
   Modal,
   Platform,
+  Dimensions,
 } from 'react-native';
 import { router } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '@/lib/supabase';
+import { AppHeader } from '@/components/shared/AppHeader';
+import { useBottomNavInset } from '@/lib/bottomNav';
 import { registerPushToken, syncDndWithNotifications } from '@/lib/notifications';
-import { C } from '@/lib/ui';
-import {
-  ChevronRight,
-  Shield,
-  Lock,
-  MessageCircle,
-  Eye,
-  Bell,
-  Sparkles,
-  LogOut,
-  Check,
-  CheckCircle2,
-  ShieldCheck,
-  Sliders,
-  Smartphone,
-  ChevronLeft,
-  BellOff,
-  Moon,
-  UserX,
-  Compass,
-  MapPin,
-} from 'lucide-react-native';
 import { verifyGPSInDistrict } from '@/lib/nationalAddress';
 import { getCurrentDeviceLocation, reverseGeocodeDeviceLocation } from '@/lib/deviceLocation';
 import { savePermanentMyLocation } from '@/lib/locationSync';
@@ -47,7 +27,7 @@ import {
   DEFAULT_DND,
   DndSettings,
   checkChatControlsReady,
-  displayName,
+  displayName as getDisplayName,
   dndLabel,
   formatArabicTime,
   isDndActiveNow,
@@ -56,25 +36,70 @@ import {
   saveDnd,
   setBlock,
 } from '@/lib/chatControls';
+import {
+  Lock,
+  Mail,
+  KeyRound,
+  Shield,
+  ShieldCheck,
+  Eye,
+  MessageCircle,
+  Sparkles,
+  Bell,
+  BellOff,
+  Moon,
+  Clock,
+  Compass,
+  MapPin,
+  UserX,
+  Smartphone,
+  Sliders,
+  LogOut,
+  Check,
+  CheckCircle2,
+  Crown,
+  ChevronLeft,
+  ChevronDown,
+  ChevronUp,
+  RefreshCw,
+  FileText,
+  Trash2,
+  Info,
+  BadgeCheck,
+  Zap,
+  User,
+  Settings,
+} from 'lucide-react-native';
+
+type SettingsCategory = 'all' | 'security' | 'privacy' | 'location' | 'notifications' | 'blocked' | 'system';
 
 export default function SettingsScreen() {
   const bottomNavInset = useBottomNavInset();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState<SettingsCategory>('all');
 
-  // Settings State
+  // User Profile
+  const [profile, setProfile] = useState<any>(null);
+  const [role, setRole] = useState<string>('user');
+
+  // Security
+  const [email, setEmail] = useState('');
+  const [emailDraft, setEmailDraft] = useState('');
+  const [showEmailChange, setShowEmailChange] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPasswordChange, setShowPasswordChange] = useState(false);
+  const [accountSaving, setAccountSaving] = useState(false);
+
+  // Privacy & Community
   const [profilePrivacy, setProfilePrivacy] = useState<'public' | 'private'>('public');
   const [allowDms, setAllowDms] = useState<'everyone' | 'followers' | 'nobody'>('everyone');
   const [allowStoryReplies, setAllowStoryReplies] = useState<'everyone' | 'followers' | 'nobody'>('everyone');
   const [hideName, setHideName] = useState(false);
-  const [role, setRole] = useState<string>('user');
-  const [pushEnabled, setPushEnabled] = useState(false);
-  const [email, setEmail] = useState('');
-  const [emailDraft, setEmailDraft] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [accountSaving, setAccountSaving] = useState(false);
+
+  // Location & Verification
   const [region, setRegion] = useState('');
   const [city, setCity] = useState('');
   const [district, setDistrict] = useState('');
@@ -86,7 +111,8 @@ export default function SettingsScreen() {
   const [verificationSubmitting, setVerificationSubmitting] = useState(false);
   const [documentType, setDocumentType] = useState<'national_id' | 'iqama' | 'freelance'>('national_id');
 
-  // Do-Not-Disturb
+  // Do-Not-Disturb & Notifications
+  const [pushEnabled, setPushEnabled] = useState(false);
   const [dnd, setDnd] = useState<DndSettings>(DEFAULT_DND);
   const [blockedUsers, setBlockedUsers] = useState<any[]>([]);
   const [draftStart, setDraftStart] = useState('22:00');
@@ -94,27 +120,34 @@ export default function SettingsScreen() {
   const [showCustom, setShowCustom] = useState(false);
   const [controlsReady, setControlsReady] = useState<boolean | null>(null);
 
+  // UI helpers
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
   useEffect(() => {
     loadSettings();
   }, []);
 
   async function loadSettings() {
     try {
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const user = sessionData?.session?.user;
+      if (!user) {
         setLoading(false);
         return;
       }
-      setUserId(u.user.id);
-      setEmail(u.user.email || '');
-      setEmailDraft(u.user.email || '');
+      setUserId(user.id);
+      setEmail(user.email || '');
+      setEmailDraft(user.email || '');
 
-      // Load each settings source independently. A failure in chat controls or
-      // verification must never prevent the profile/settings screen from rendering.
-      const profRes = await supabase.from('profiles').select('*').eq('id', u.user.id).maybeSingle();
+      const profRes = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
       const prof = profRes.data;
-      if (profRes.error) console.warn('settings profile load failed:', profRes.error.message);
       if (prof) {
+        setProfile(prof);
         setProfilePrivacy(prof.profile_privacy || 'public');
         setAllowDms(prof.allow_dms || 'everyone');
         setAllowStoryReplies(prof.allow_story_replies || 'everyone');
@@ -128,41 +161,39 @@ export default function SettingsScreen() {
       }
 
       try {
-        const { data: verificationData, error: verificationError } = await supabase
+        const { data: verificationData } = await supabase
           .from('verification_requests')
           .select('status')
-          .eq('user_id', u.user.id)
+          .eq('user_id', user.id)
           .order('created_at', { ascending: false })
           .limit(1);
-        if (verificationError) console.warn('verification load failed:', verificationError.message);
         const latestRequest = verificationData?.[0];
         if (latestRequest && !prof?.is_verified) {
-          setVerificationStatus(latestRequest.status === 'approved' ? 'verified' : latestRequest.status === 'rejected' ? 'rejected' : 'pending');
+          setVerificationStatus(
+            latestRequest.status === 'approved'
+              ? 'verified'
+              : latestRequest.status === 'rejected'
+              ? 'rejected'
+              : 'pending'
+          );
         }
-      } catch (error) {
-        console.warn('verification settings unavailable:', error);
-      }
+      } catch (e) {}
 
       try {
-        const dndRes = await loadDnd(u.user.id);
+        const dndRes = await loadDnd(user.id);
         setDnd(dndRes);
         setDraftStart(dndRes.start || '22:00');
         setDraftEnd(dndRes.end || '07:00');
-      } catch (error) {
-        console.warn('DND settings unavailable:', error);
-      }
+      } catch (e) {}
 
       try {
-        const blockedRes = await loadBlockedUsers(u.user.id);
+        const blockedRes = await loadBlockedUsers(user.id);
         setBlockedUsers((blockedRes || []).filter(Boolean));
-      } catch (error) {
-        console.warn('blocked users unavailable:', error);
-      }
+      } catch (e) {}
 
       try {
         setControlsReady(await checkChatControlsReady());
-      } catch (error) {
-        console.warn('chat controls check failed:', error);
+      } catch (e) {
         setControlsReady(null);
       }
     } catch (err) {
@@ -172,6 +203,7 @@ export default function SettingsScreen() {
     }
   }
 
+  // 1. Change Email
   async function changeEmail() {
     const nextEmail = emailDraft.trim().toLowerCase();
     if (!/^\S+@\S+\.\S+$/.test(nextEmail)) return Alert.alert('البريد غير صالح', 'أدخل بريداً إلكترونياً صالحاً.');
@@ -180,7 +212,8 @@ export default function SettingsScreen() {
     try {
       const { error } = await supabase.auth.updateUser({ email: nextEmail });
       if (error) throw error;
-      Alert.alert('تحقق من بريدك', 'أرسلنا رسالة تأكيد لإكمال تغيير البريد. سيبقى البريد الحالي فعالاً حتى تأكيد الطلب.');
+      showToast('تم إرسال رابط تأكيد إلى بريدك الجديد');
+      setShowEmailChange(false);
     } catch (error: any) {
       Alert.alert('تعذّر تغيير البريد', error?.message || 'حدث خطأ أثناء إرسال طلب التغيير.');
     } finally {
@@ -188,6 +221,7 @@ export default function SettingsScreen() {
     }
   }
 
+  // 2. Change Password
   async function changePassword() {
     if (newPassword.length < 8) return Alert.alert('كلمة المرور قصيرة', 'استخدم 8 أحرف على الأقل.');
     if (newPassword !== confirmPassword) return Alert.alert('كلمتا المرور غير متطابقتين', 'أعد كتابة كلمة المرور نفسها في الحقلين.');
@@ -197,7 +231,8 @@ export default function SettingsScreen() {
       if (error) throw error;
       setNewPassword('');
       setConfirmPassword('');
-      Alert.alert('تم تغيير كلمة المرور', 'تم تحديث كلمة المرور لحسابك.');
+      setShowPasswordChange(false);
+      showToast('تم تحديث كلمة المرور بنجاح 🔒');
     } catch (error: any) {
       Alert.alert('تعذّر تغيير كلمة المرور', error?.message || 'حدث خطأ أثناء تحديث كلمة المرور.');
     } finally {
@@ -205,6 +240,7 @@ export default function SettingsScreen() {
     }
   }
 
+  // 3. Location update
   async function useCurrentLocation() {
     if (locating) return;
     setLocating(true);
@@ -231,11 +267,10 @@ export default function SettingsScreen() {
         .select('id, region, city, district')
         .maybeSingle();
       if (error) throw error;
-      if (!updated) throw new Error('لم يتم تحديث موقع الحساب في Supabase.');
       setRegion(nextRegion);
       setCity(nextCity);
       setDistrict(nextDistrict);
-      Alert.alert('تم تحديث الموقع', 'تم حفظ المنطقة والمدينة والحي في ملفك الشخصي وسيتم استخدامهما في أنحاء التطبيق.');
+      showToast('تم تحديث موقعك المعتمد بنجاح 📍');
     } catch (error: any) {
       Alert.alert('تعذّر تحديث الموقع', error?.message || 'حاول مرة أخرى.');
     } finally {
@@ -243,35 +278,41 @@ export default function SettingsScreen() {
     }
   }
 
+  // 4. Resident GPS check
   async function verifyResidentGPS() {
     if (!city || !district) return Alert.alert('حدد موقعك أولاً', 'اختر المدينة والحي من الملف الشخصي ثم أعد الفحص.');
     if (Platform.OS !== 'web' || typeof navigator === 'undefined' || !navigator.geolocation) {
       return Alert.alert('تحديد الموقع غير متاح', 'الفحص متاح حالياً عبر متصفح يدعم تحديد الموقع.');
     }
     setGeoChecking(true);
-    navigator.geolocation.getCurrentPosition(async ({ coords }) => {
-      try {
-        const result = verifyGPSInDistrict(coords.latitude, coords.longitude, city, district);
-        if (!result.isVerified) {
-          Alert.alert('لم ينجح الفحص', result.message);
-          return;
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords }) => {
+        try {
+          const result = verifyGPSInDistrict(coords.latitude, coords.longitude, city, district);
+          if (!result.isVerified) {
+            Alert.alert('لم ينجح الفحص', result.message);
+            return;
+          }
+          if (!userId) throw new Error('يلزم تسجيل الدخول.');
+          const { error } = await supabase.from('profiles').update({ is_geoverified: true, geoverified_at: new Date().toISOString() }).eq('id', userId);
+          if (error) throw error;
+          setGeoVerified(true);
+          showToast('تم توثيق موقع السكن بنجاح ✓');
+        } catch (error: any) {
+          Alert.alert('تعذّر حفظ نتيجة الفحص', error?.message || 'حاول مرة أخرى.');
+        } finally {
+          setGeoChecking(false);
         }
-        if (!userId) throw new Error('يلزم تسجيل الدخول.');
-        const { error } = await supabase.from('profiles').update({ is_geoverified: true, geoverified_at: new Date().toISOString() }).eq('id', userId);
-        if (error) throw error;
-        setGeoVerified(true);
-        Alert.alert('اكتمل الفحص', result.message);
-      } catch (error: any) {
-        Alert.alert('تعذّر حفظ نتيجة الفحص', error?.message || 'حاول مرة أخرى.');
-      } finally {
+      },
+      (error) => {
         setGeoChecking(false);
-      }
-    }, error => {
-      setGeoChecking(false);
-      Alert.alert('تعذّر تحديد الموقع', error.code === 1 ? 'اسمح للموقع بالوصول إلى موقعك ثم أعد المحاولة.' : 'تحقق من خدمة الموقع ثم أعد المحاولة.');
-    }, { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 });
+        Alert.alert('تعذّر تحديد الموقع', error.code === 1 ? 'اسمح للموقع بالوصول إلى موقعك ثم أعد المحاولة.' : 'تحقق من خدمة الموقع ثم أعد المحاولة.');
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+    );
   }
 
+  // 5. Submit Official ID Verification
   async function submitVerificationRequest() {
     if (!userId) return;
     const docLabels = { national_id: 'الهوية الوطنية', iqama: 'هوية مقيم', freelance: 'وثيقة العمل الحر / سجل تجاري' };
@@ -285,7 +326,7 @@ export default function SettingsScreen() {
       if (error) throw error;
       setVerificationStatus('pending');
       setVerificationModalOpen(false);
-      Alert.alert('تم إرسال الطلب', 'سُجل طلبك للمراجعة الإدارية. لا ترسل رقم الهوية أو صورة الوثيقة عبر هذه الصفحة.');
+      showToast('تم رفع طلب التوثيق للمراجعة الإدارية 🛡️');
     } catch (error: any) {
       Alert.alert('تعذّر إرسال الطلب', error?.message || 'لم يُسجل الطلب. حاول مجدداً.');
     } finally {
@@ -293,6 +334,7 @@ export default function SettingsScreen() {
     }
   }
 
+  // 6. Generic privacy/DM save
   async function saveSettings(
     newPrivacy?: 'public' | 'private',
     newDms?: 'everyone' | 'followers' | 'nobody',
@@ -301,33 +343,18 @@ export default function SettingsScreen() {
   ) {
     if (!userId) return false;
     setSaving(true);
-
     const updatePayload: any = {
       profile_privacy: newPrivacy ?? profilePrivacy,
       allow_dms: newDms ?? allowDms,
       allow_story_replies: newReplies ?? allowStoryReplies,
       hide_name: newHideName ?? hideName,
     };
-
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .update(updatePayload)
-        .eq('id', userId)
-        .select('id')
-        .maybeSingle();
-
-      if (error) {
-        Alert.alert('تعذّر حفظ الإعداد', `${error.message}\nتحقق من إعداد قاعدة البيانات ثم أعد المحاولة.`);
-        return false;
-      }
-      if (!data) {
-        Alert.alert('تعذّر حفظ الإعداد', 'لم يتم تحديث ملف الحساب. أعد تسجيل الدخول ثم حاول مجدداً.');
-        return false;
-      }
+      const { data, error } = await supabase.from('profiles').update(updatePayload).eq('id', userId).select('id').maybeSingle();
+      if (error || !data) throw error || new Error('تعذر الحفظ');
+      showToast('تم حفظ الإعداد ✓');
       return true;
     } catch (e: any) {
-      console.log('Save error:', e);
       Alert.alert('تعذّر حفظ الإعداد', e?.message || 'حدث خطأ أثناء حفظ التغيير.');
       return false;
     } finally {
@@ -335,27 +362,20 @@ export default function SettingsScreen() {
     }
   }
 
+  // 7. Toggle Private Account
   async function togglePrivateAccount(val: boolean) {
     const nextVal = val ? 'private' : 'public';
     setProfilePrivacy(nextVal);
     if (!(await saveSettings(nextVal))) setProfilePrivacy(val ? 'public' : 'private');
   }
 
-  async function changeDmSetting(val: 'everyone' | 'followers' | 'nobody') {
-    setAllowDms(val);
-    if (!(await saveSettings(undefined, val))) setAllowDms(allowDms);
-  }
-
-  async function changeStoryRepliesSetting(val: 'everyone' | 'followers' | 'nobody') {
-    setAllowStoryReplies(val);
-    if (!(await saveSettings(undefined, undefined, val))) setAllowStoryReplies(allowStoryReplies);
-  }
-
+  // 8. Toggle Anonymous Posts
   async function toggleHideName(val: boolean) {
     setHideName(val);
     if (!(await saveSettings(undefined, undefined, undefined, val))) setHideName(!val);
   }
 
+  // 9. Push notifications
   async function activatePushNotifications() {
     try {
       const token = await registerPushToken();
@@ -364,12 +384,13 @@ export default function SettingsScreen() {
         return;
       }
       setPushEnabled(true);
-      Alert.alert('تم التفعيل', 'تم تفعيل الإشعارات لهذا الحساب. ستظهر التنبيهات على شاشة الجهاز حتى عند مغادرة الموقع.');
+      showToast('تم تفعيل إشعارات الجوال الفورية 🔔');
     } catch (error: any) {
       Alert.alert('تعذّر التفعيل', error?.message || 'تعذر تسجيل هذا الجهاز.');
     }
   }
 
+  // 10. DND Schedule
   async function applyDnd(next: DndSettings, keepCustomOpen = false) {
     if (!userId) return;
     const result = await saveDnd(userId, next);
@@ -380,920 +401,1711 @@ export default function SettingsScreen() {
     setDnd(next);
     setShowCustom(keepCustomOpen);
     await syncDndWithNotifications(userId);
+    showToast('تم تحديث جدول عدم الإزعاج 🔕');
   }
 
-  async function toggleDnd(val: boolean) {
-    await applyDnd({ ...dnd, enabled: val });
-  }
-
-  async function saveCustomSchedule() {
-    if (!userId) return;
-    await applyDnd({ enabled: true, schedule: 'custom', start: draftStart, end: draftEnd });
-  }
-
+  // 11. Unblock User
   async function unblockUser(targetId: string, name: string) {
     if (!userId) return;
-    Alert.alert('إلغاء الحظر', `هل تريد السماح لـ ${name} بمراسلتك مرة أخرى؟`, [
+    Alert.alert('إلغاء الحظر', `هل تريد السماح لـ ${name} بمراسلتك والتفاعل معك؟`, [
       { text: 'إلغاء', style: 'cancel' },
       {
         text: 'إلغاء الحظر',
         onPress: async () => {
           const result = await setBlock(userId, targetId, false);
           if (!result.ok) return Alert.alert('خطأ', result.error);
-          setBlockedUsers(prev => prev.filter((b: any) => b.id !== targetId));
-          Alert.alert('تم ✓', 'أُزيل المستخدم من قائمة المحظورين.');
+          setBlockedUsers((prev) => prev.filter((b: any) => b.id !== targetId));
+          showToast('تم فك الحظر بنجاح');
         },
       },
     ]);
   }
 
+  // 12. Sign Out
+  const handleSignOut = () => {
+    Alert.alert('تسجيل الخروج', 'هل أنت متأكد من رغبتك في تسجيل الخروج من تطبيق حيّنا؟', [
+      { text: 'إلغاء', style: 'cancel' },
+      {
+        text: 'تسجيل الخروج',
+        style: 'destructive',
+        onPress: async () => {
+          await supabase.auth.signOut();
+          router.replace('/auth');
+        },
+      },
+    ]);
+  };
+
+  const CATEGORIES: Array<{ key: SettingsCategory; label: string; icon: any }> = [
+    { key: 'all', label: 'الكل', icon: Sliders },
+    { key: 'security', label: 'الأمان والدخول', icon: Lock },
+    { key: 'privacy', label: 'الخصوصية', icon: Shield },
+    { key: 'location', label: 'الموقع والتوثيق', icon: MapPin },
+    { key: 'notifications', label: 'الإشعارات والصمت', icon: Bell },
+    { key: 'blocked', label: 'المحظورون', icon: UserX },
+    { key: 'system', label: 'عن المنصة', icon: Info },
+  ];
+
   if (loading) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color={C.accent} />
-        <Text style={styles.loadingText}>جاري تحميل الإعدادات...</Text>
+        <ActivityIndicator size="large" color="#059669" />
+        <Text style={styles.loadingText}>جاري تجهيز مركز الإعدادات والمميزات...</Text>
       </View>
     );
   }
+
+  const isDndCurrentlyActive = dnd.enabled && isDndActiveNow(dnd);
+  const showSec = (cat: SettingsCategory) => activeCategory === 'all' || activeCategory === cat;
 
   return (
     <View style={styles.screen}>
       <AppHeader
         variant="sub"
-        title="الإعدادات والمميزات"
-        subtitle="الخصوصية، الرسائل، والميزات الحصرية"
-        fallbackRoute="/profile"
+        title="مركز الإعدادات والتحكم"
+        subtitle="الخصوصية، الأمان، وإدارة الحساب"
+        fallbackRoute="/home"
         rightAction={
-          <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' }}>
-            <Sliders size={18} color="#059669" />
-          </View>
+          <Pressable
+            style={styles.headerBtn}
+            onPress={() => router.push('/profile')}
+            accessibilityRole="button"
+            accessibilityLabel="الملف الشخصي"
+          >
+            <User size={18} color="#059669" />
+          </Pressable>
         }
       />
 
-      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomNavInset }]} showsVerticalScrollIndicator={false}>
-        {saving && (
-          <View style={styles.savingBanner}>
-            <ActivityIndicator size="small" color="#059669" />
-            <Text style={styles.savingText}>جاري حفظ التغييرات...</Text>
+      {/* Toast Alert Banner */}
+      {toastMessage && (
+        <View style={styles.toast}>
+          <CheckCircle2 size={16} color="#ffffff" />
+          <Text style={styles.toastText}>{toastMessage}</Text>
+        </View>
+      )}
+
+      <ScrollView
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomNavInset + 40 }]}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Top Profile / Settings Unified Switcher */}
+        <View style={styles.navSegmentContainer}>
+          <View style={styles.navSegmentWrap}>
+            <Pressable
+              style={styles.navSegmentBtn}
+              onPress={() => router.push('/profile')}
+            >
+              <User size={14} color="#64748b" />
+              <Text style={styles.navSegmentText}>
+                الملف الشخصي
+              </Text>
+            </Pressable>
+
+            <Pressable
+              style={[styles.navSegmentBtn, styles.navSegmentBtnActive]}
+              onPress={() => {}}
+            >
+              <Settings size={14} color="#fff" />
+              <Text style={[styles.navSegmentText, styles.navSegmentTextActive]}>
+                مركز الإعدادات والتحكم
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+
+        {/* User Hero Identity Card */}
+        {profile && (
+          <LinearGradient
+            colors={['#064e3b', '#047857', '#059669']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.heroCard}
+          >
+            <View style={styles.heroGlow} />
+            <View style={styles.heroContentRow}>
+              <View style={styles.avatarWrap}>
+                {profile.avatar_url && !profile.avatar_url.includes('blank-profile-picture') ? (
+                  <Image source={{ uri: profile.avatar_url }} style={styles.avatarImg} />
+                ) : (
+                  <View style={styles.avatarFallback}>
+                    <Text style={styles.avatarFallbackText}>
+                      {(profile.display_name || profile.username || 'ج')[0].toUpperCase()}
+                    </Text>
+                  </View>
+                )}
+                {role === 'admin' && (
+                  <View style={styles.crownBadge}>
+                    <Crown size={12} color="#ffffff" />
+                  </View>
+                )}
+              </View>
+
+              <View style={styles.heroInfo}>
+                <View style={styles.heroNameRow}>
+                  <Text style={styles.heroName}>{profile.display_name || profile.username || 'عضو حيّنا'}</Text>
+                  {role === 'admin' ? (
+                    <View style={styles.adminPill}>
+                      <Crown size={10} color="#f59e0b" />
+                      <Text style={styles.adminPillText}>مشرف المنصة</Text>
+                    </View>
+                  ) : profile.is_verified ? (
+                    <BadgeCheck size={16} color="#34d399" />
+                  ) : null}
+                </View>
+                <Text style={styles.heroHandle}>@{profile.username || 'neighbor'}</Text>
+                <View style={styles.heroLocRow}>
+                  <MapPin size={12} color="#a7f3d0" />
+                  <Text style={styles.heroLocText}>
+                    {[profile.district && `حي ${profile.district}`, profile.city].filter(Boolean).join(' · ') ||
+                      'المملكة العربية السعودية'}
+                  </Text>
+                </View>
+              </View>
+
+              <Pressable style={styles.editProfileQuickBtn} onPress={() => router.push('/profile')}>
+                <Text style={styles.editProfileQuickText}>تعديل</Text>
+              </Pressable>
+            </View>
+
+            {/* Quick Badges Row */}
+            <View style={styles.quickBadgesRow}>
+              <View style={styles.quickBadge}>
+                <ShieldCheck size={12} color="#a7f3d0" />
+                <Text style={styles.quickBadgeText}>
+                  {verificationStatus === 'verified' ? 'موثق بالهوية' : 'جار مسجل'}
+                </Text>
+              </View>
+              <View style={styles.quickBadge}>
+                <Compass size={12} color="#a7f3d0" />
+                <Text style={styles.quickBadgeText}>
+                  {geoVerified ? 'موقع GPS معتمد' : 'تحقق GPS متاح'}
+                </Text>
+              </View>
+              <View style={[styles.quickBadge, isDndCurrentlyActive && { backgroundColor: 'rgba(251,191,36,0.2)' }]}>
+                {isDndCurrentlyActive ? <Moon size={12} color="#fde68a" /> : <Bell size={12} color="#a7f3d0" />}
+                <Text style={[styles.quickBadgeText, isDndCurrentlyActive && { color: '#fde68a' }]}>
+                  {isDndCurrentlyActive ? 'عدم الإزعاج نشط' : 'التنبيهات مفعلة'}
+                </Text>
+              </View>
+            </View>
+          </LinearGradient>
+        )}
+
+        {/* Quick Filter Category Pills */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoryScroll}
+        >
+          {CATEGORIES.map(({ key, label, icon: Icon }) => {
+            const active = activeCategory === key;
+            return (
+              <Pressable
+                key={key}
+                onPress={() => setActiveCategory(key)}
+                style={[styles.categoryPill, active && styles.categoryPillActive]}
+              >
+                <Icon size={14} color={active ? '#ffffff' : '#059669'} />
+                <Text style={[styles.categoryPillText, active && styles.categoryPillTextActive]}>{label}</Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+
+        {/* 1. قسم الأمان والدخول (Security & Auth) */}
+        {showSec('security') && (
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <View style={[styles.cardHeaderIcon, { backgroundColor: '#eff6ff' }]}>
+                <Lock size={18} color="#2563eb" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.cardHeaderTitle}>بيانات الدخول والأمان</Text>
+                <Text style={styles.cardHeaderDesc}>البريد الإلكتروني، كلمة المرور، وتأمين الجلسة</Text>
+              </View>
+            </View>
+
+            {/* Email Setting */}
+            <View style={styles.settingBlock}>
+              <View style={styles.settingBlockHead}>
+                <View>
+                  <Text style={styles.blockTitle}>البريد الإلكتروني المسجل</Text>
+                  <Text style={styles.blockValue}>{email || 'لا يوجد بريد مسجل'}</Text>
+                </View>
+                <Pressable
+                  style={styles.actionOutlineBtn}
+                  onPress={() => setShowEmailChange(!showEmailChange)}
+                >
+                  <Text style={styles.actionOutlineText}>{showEmailChange ? 'إلغاء' : 'تغيير البريد'}</Text>
+                </Pressable>
+              </View>
+
+              {showEmailChange && (
+                <View style={styles.expandableBox}>
+                  <Text style={styles.inputLabel}>أدخل البريد الإلكتروني الجديد</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    value={emailDraft}
+                    onChangeText={setEmailDraft}
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                    placeholder="example@hayna.app"
+                    placeholderTextColor="#94a3b8"
+                  />
+                  <Pressable style={styles.primaryActionBtn} onPress={changeEmail} disabled={accountSaving}>
+                    {accountSaving ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <>
+                        <Mail size={15} color="#fff" />
+                        <Text style={styles.primaryActionText}>إرسال رابط تأكيد التغيير</Text>
+                      </>
+                    )}
+                  </Pressable>
+                </View>
+              )}
+            </View>
+
+            <View style={styles.cardDivider} />
+
+            {/* Password Setting */}
+            <View style={styles.settingBlock}>
+              <View style={styles.settingBlockHead}>
+                <View>
+                  <Text style={styles.blockTitle}>كلمة المرور والحماية</Text>
+                  <Text style={styles.blockValue}>••••••••••••</Text>
+                </View>
+                <Pressable
+                  style={styles.actionOutlineBtn}
+                  onPress={() => setShowPasswordChange(!showPasswordChange)}
+                >
+                  <Text style={styles.actionOutlineText}>{showPasswordChange ? 'إلغاء' : 'تغيير كلمة المرور'}</Text>
+                </Pressable>
+              </View>
+
+              {showPasswordChange && (
+                <View style={styles.expandableBox}>
+                  <Text style={styles.inputLabel}>كلمة المرور الجديدة (8 أحرف على الأقل)</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    value={newPassword}
+                    onChangeText={setNewPassword}
+                    secureTextEntry
+                    autoCapitalize="none"
+                    placeholder="كلمة مرور قوية جديدة"
+                    placeholderTextColor="#94a3b8"
+                  />
+                  <Text style={styles.inputLabel}>تأكيد كلمة المرور</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                    secureTextEntry
+                    autoCapitalize="none"
+                    placeholder="أعد إدخال كلمة المرور"
+                    placeholderTextColor="#94a3b8"
+                  />
+                  <Pressable style={styles.primaryActionBtn} onPress={changePassword} disabled={accountSaving}>
+                    {accountSaving ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <>
+                        <KeyRound size={15} color="#fff" />
+                        <Text style={styles.primaryActionText}>تحديث كلمة المرور</Text>
+                      </>
+                    )}
+                  </Pressable>
+                </View>
+              )}
+            </View>
           </View>
         )}
 
-        <View style={styles.card}>
-          <View style={styles.sectionHeader}>
-            <View style={[styles.sectionIcon, { backgroundColor: '#eff6ff' }]}><Lock size={18} color="#2563eb" /></View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.sectionTitle}>البريد وكلمة المرور</Text>
-              <Text style={styles.sectionDesc}>تحديث بيانات دخول حسابك</Text>
-            </View>
-          </View>
-          <Text style={styles.accountLabel}>البريد الحالي</Text>
-          <Text style={styles.currentEmail}>{email || 'لا يوجد بريد مسجل'}</Text>
-          <Text style={styles.accountLabel}>البريد الجديد</Text>
-          <TextInput style={styles.accountInput} value={emailDraft} onChangeText={setEmailDraft} autoCapitalize="none" keyboardType="email-address" placeholder="name@example.com" placeholderTextColor="#94a3b8" />
-          <Pressable style={styles.accountButton} onPress={changeEmail} disabled={accountSaving}>
-            <Text style={styles.accountButtonText}>إرسال رابط تأكيد البريد</Text>
-          </Pressable>
-          <View style={styles.accountDivider} />
-          <Text style={styles.accountLabel}>كلمة المرور الجديدة</Text>
-          <TextInput style={styles.accountInput} value={newPassword} onChangeText={setNewPassword} secureTextEntry autoCapitalize="none" placeholder="8 أحرف على الأقل" placeholderTextColor="#94a3b8" />
-          <Text style={styles.accountLabel}>تأكيد كلمة المرور</Text>
-          <TextInput style={styles.accountInput} value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry autoCapitalize="none" placeholder="أعد كتابة كلمة المرور" placeholderTextColor="#94a3b8" />
-          <Pressable style={styles.accountButton} onPress={changePassword} disabled={accountSaving}>
-            {accountSaving ? <ActivityIndicator color="#fff" /> : <Text style={styles.accountButtonText}>تغيير كلمة المرور</Text>}
-          </Pressable>
-        </View>
-
-        {/* 1. قسم الخصوصية وقفل الحساب */}
-        <View style={styles.card}>
-          <View style={styles.sectionHeader}>
-            <View style={[styles.sectionIcon, { backgroundColor: '#f0fdf4' }]}>
-              <Lock size={18} color="#16a34a" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.sectionTitle}>خصوصية الحساب والملف</Text>
-              <Text style={styles.sectionDesc}>التحكم في ظهور بياناتك للآخرين</Text>
-            </View>
-          </View>
-
-          {/* حساب خاص */}
-          <View style={styles.toggleRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.rowTitle}>قفل الملف الشخصي (حساب خاص)</Text>
-              <Text style={styles.rowDesc}>
-                عند تفعيل هذا الخيار، لا يمكن للغرباء مشاهدة معلومات ملفك أو قصصك إلا بعد متابعتهم لك.
-              </Text>
-            </View>
-            <Switch
-              value={profilePrivacy === 'private'}
-              onValueChange={togglePrivateAccount}
-              trackColor={{ false: '#e5e7eb', true: '#a7f3d0' }}
-              thumbColor={profilePrivacy === 'private' ? '#059669' : '#9ca3af'}
-            />
-          </View>
-
-          {/* إخفاء الاسم */}
-          <View style={[styles.toggleRow, { borderBottomWidth: 0, paddingBottom: 0 }]}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.rowTitle}>إخفاء اسمي في المشاركات</Text>
-              <Text style={styles.rowDesc}>
-                يظهر اسمك كـ "مستخدم مجهول" عند طرح الأسئلة والنقاشات
-              </Text>
-            </View>
-            <Switch
-              value={hideName}
-              onValueChange={toggleHideName}
-              trackColor={{ false: '#e5e7eb', true: '#a7f3d0' }}
-              thumbColor={hideName ? '#059669' : '#9ca3af'}
-            />
-          </View>
-        </View>
-
-        {/* 2. قسم الرسائل الخاصة */}
-        <View style={styles.card}>
-          <View style={styles.sectionHeader}>
-            <View style={[styles.sectionIcon, { backgroundColor: '#ecfdf5' }]}>
-              <MessageCircle size={18} color="#059669" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.sectionTitle}>الرسائل الخاصة (DM)</Text>
-              <Text style={styles.sectionDesc}>الرسائل لا تعمل إلا بين حسابين محددي المدينة والحي نفسيهما.</Text>
-            </View>
-          </View>
-
-          <View style={styles.optionsList}>
-            {/* الجميع */}
-            <Pressable
-              style={[styles.optionItem, allowDms === 'everyone' && styles.optionItemActive]}
-              onPress={() => changeDmSetting('everyone')}
-            >
-              <View style={styles.optionRadio}>
-                {allowDms === 'everyone' && <View style={styles.optionRadioDot} />}
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.optionTitle}>الجميع</Text>
-                <Text style={styles.optionSubtitle}>أي حساب من الحي المطابق لك يمكنه مراسلتك</Text>
-              </View>
-            </Pressable>
-
-            {/* المتابعون فقط */}
-            <Pressable
-              style={[styles.optionItem, allowDms === 'followers' && styles.optionItemActive]}
-              onPress={() => changeDmSetting('followers')}
-            >
-              <View style={styles.optionRadio}>
-                {allowDms === 'followers' && <View style={styles.optionRadioDot} />}
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.optionTitle}>المتابعون فقط</Text>
-                <Text style={styles.optionSubtitle}>فقط الحسابات التي تتابعها من الحي المطابق</Text>
-              </View>
-            </Pressable>
-
-            {/* لا أحد / قفل الخاص */}
-            <Pressable
-              style={[styles.optionItem, allowDms === 'nobody' && styles.optionItemActive]}
-              onPress={() => changeDmSetting('nobody')}
-            >
-              <View style={styles.optionRadio}>
-                {allowDms === 'nobody' && <View style={styles.optionRadioDot} />}
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.optionTitle}>إيقاف الخاص تماماً (لا أحد)</Text>
-                <Text style={styles.optionSubtitle}>لن يستطيع أي شخص إرسال رسائل خاصة لك</Text>
-              </View>
-            </Pressable>
-          </View>
-        </View>
-
-        {/* 3. قسم الردود على الستوري */}
-        <View style={styles.card}>
-          <View style={styles.sectionHeader}>
-            <View style={[styles.sectionIcon, { backgroundColor: '#fdf2f8' }]}>
-              <Sparkles size={18} color="#db2777" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.sectionTitle}>الردود على الستوري والقصص</Text>
-              <Text style={styles.sectionDesc}>من يمكنه إرسال ردود خاصة على قصصك؟</Text>
-            </View>
-          </View>
-
-          <View style={styles.optionsList}>
-            {/* الجميع */}
-            <Pressable
-              style={[styles.optionItem, allowStoryReplies === 'everyone' && styles.optionItemActive]}
-              onPress={() => changeStoryRepliesSetting('everyone')}
-            >
-              <View style={styles.optionRadio}>
-                {allowStoryReplies === 'everyone' && <View style={styles.optionRadioDot} />}
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.optionTitle}>السماح بالرد للجميع</Text>
-                <Text style={styles.optionSubtitle}>أي شخص يشاهد الستوري يمكنه الرد بالخاص</Text>
-              </View>
-            </Pressable>
-
-            {/* المتابعون فقط */}
-            <Pressable
-              style={[styles.optionItem, allowStoryReplies === 'followers' && styles.optionItemActive]}
-              onPress={() => changeStoryRepliesSetting('followers')}
-            >
-              <View style={styles.optionRadio}>
-                {allowStoryReplies === 'followers' && <View style={styles.optionRadioDot} />}
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.optionTitle}>المتابعون فقط</Text>
-                <Text style={styles.optionSubtitle}>الرد متاح فقط للأشخاص المتابعين لك</Text>
-              </View>
-            </Pressable>
-
-            {/* إيقاف الردود */}
-            <Pressable
-              style={[styles.optionItem, allowStoryReplies === 'nobody' && styles.optionItemActive]}
-              onPress={() => changeStoryRepliesSetting('nobody')}
-            >
-              <View style={styles.optionRadio}>
-                {allowStoryReplies === 'nobody' && <View style={styles.optionRadioDot} />}
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.optionTitle}>إيقاف الردود نهائياً</Text>
-                <Text style={styles.optionSubtitle}>لا يمكن لأحد كتابة ردود على قصصك</Text>
-              </View>
-            </Pressable>
-          </View>
-        </View>
-
-        {/* 3.5. حالة حماية المحادثات */}
-        <View style={[styles.card, controlsReady === false && { borderColor: '#fca5a5' }]}>
-          <View style={styles.sectionHeader}>
-            <View
-              style={[
-                styles.sectionIcon,
-                controlsReady === false ? { backgroundColor: '#fef2f2' } : { backgroundColor: '#ecfdf5' },
-              ]}
-            >
-              {controlsReady === false ? (
-                <ShieldCheck size={18} color="#dc2626" />
-              ) : (
+        {/* 2. قسم الخصوصية والمجتمع (Privacy & Community) */}
+        {showSec('privacy') && (
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <View style={[styles.cardHeaderIcon, { backgroundColor: '#f0fdf4' }]}>
                 <Shield size={18} color="#059669" />
-              )}
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.sectionTitle}>حالة حماية المحادثات</Text>
-              <Text style={styles.sectionDesc}>هل الحظر والكتم وعدم الإزعاج مفعّلان فعلاً؟</Text>
-            </View>
-          </View>
-
-          {controlsReady === false ? (
-            <>
-              <View style={styles.readyBadge}>
-                <Text style={styles.readyBadgeText}>
-                  ⚠️ إعدادات قاعدة البيانات لم تُفعَّل بعد — الحظر والكتم يعملان جزئياً من الواجهة فقط.
-                </Text>
               </View>
-              <Text style={styles.readyHint}>
-                افتح Supabase → SQL Editor → ألصق محتوى ملف setup_chat_controls.sql من المشروع ثم Run.
-                يعيد التشغيل بشكل آمن (idempotent) — لا لزوم لحذف أي شيء.
-              </Text>
-            </>
-          ) : (
-            <View style={[styles.readyBadge, { backgroundColor: '#ecfdf5' }]}>
-              <Text style={[styles.readyBadgeText, { color: '#065f46' }]}>
-                ✓ الحماية مفعّلة على الخادم: الحظر يمنع المحظور فعلياً، والكتم وعدم الإزعاج يُسكتان الإشعارات.
-              </Text>
-            </View>
-          )}
-        </View>
-
-        {/* 4. قسم الرسائل وعدم الإزعاج */}
-        <View style={styles.card}>
-          <View style={styles.sectionHeader}>
-            <View style={[styles.sectionIcon, { backgroundColor: '#fffbeb' }]}>
-              <BellOff size={18} color="#d97706" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.sectionTitle}>عدم الإزعاج والرسائل</Text>
-              <Text style={styles.sectionDesc}>تحكم في وقت صمت الإشعارات وكتم المحادثات</Text>
-            </View>
-          </View>
-
-          {/* DND master switch */}
-          <View style={styles.toggleRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.rowTitle}>تفعيل عدم الإزعاج 🔕</Text>
-              <Text style={styles.rowDesc}>
-                {dndLabel(dnd)}
-                {dnd.enabled && isDndActiveNow(dnd) ? ' — صامت الآن' : ' — يُصمت كل الإشعارات عند تفعيله'}
-              </Text>
-            </View>
-            <Switch
-              value={dnd.enabled}
-              onValueChange={toggleDnd}
-              trackColor={{ false: '#e5e7eb', true: '#fde68a' }}
-              thumbColor={dnd.enabled ? '#d97706' : '#9ca3af'}
-            />
-          </View>
-
-          {dnd.enabled && (
-            <View style={styles.scheduleSection}>
-              <Pressable
-                style={[styles.schedulePill, dnd.schedule === 'off' && styles.schedulePillActive]}
-                onPress={() => applyDnd({ ...dnd, schedule: 'off' })}
-              >
-                <Text style={[styles.schedulePillText, dnd.schedule === 'off' && { color: '#fff' }]}>دائماً</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.schedulePill, dnd.schedule === 'nightly' && styles.schedulePillActive]}
-                onPress={() => applyDnd({ ...dnd, schedule: 'nightly' })}
-              >
-                <Text style={[styles.schedulePillText, dnd.schedule === 'nightly' && { color: '#fff' }]}>
-                  ليلاً 🌙
-                </Text>
-              </Pressable>
-              <Pressable
-                style={[styles.schedulePill, dnd.schedule === 'custom' && styles.schedulePillActive]}
-                onPress={() => {
-                  const opening = !showCustom;
-                  setShowCustom(opening);
-                  if (opening) void applyDnd({ ...dnd, schedule: 'custom' }, true);
-                }}
-              >
-                <Text style={[styles.schedulePillText, dnd.schedule === 'custom' && { color: '#fff' }]}>
-                  مخصص ⏱
-                </Text>
-              </Pressable>
-            </View>
-          )}
-
-          {dnd.enabled && dnd.schedule === 'custom' && (
-            <View style={styles.customRow}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.customLabel}>من</Text>
-                <TextInput
-                  style={styles.customInput}
-                  value={draftStart}
-                  onChangeText={setDraftStart}
-                  placeholder="22:00"
-                  placeholderTextColor="#94a3b8"
-                  maxLength={5}
-                />
+                <Text style={styles.cardHeaderTitle}>خصوصية الحساب والتواصل</Text>
+                <Text style={styles.cardHeaderDesc}>التحكم في ظهور بياناتك والمراسلات بين الجيران</Text>
               </View>
-              <Text style={styles.customArrow}>إلى</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.customLabel}>إلى</Text>
-                <TextInput
-                  style={styles.customInput}
-                  value={draftEnd}
-                  onChangeText={setDraftEnd}
-                  placeholder="07:00"
-                  placeholderTextColor="#94a3b8"
-                  maxLength={5}
-                />
+            </View>
+
+            {/* قفل الملف الشخصي */}
+            <View style={styles.toggleRow}>
+              <View style={{ flex: 1, paddingLeft: 12 }}>
+                <Text style={styles.toggleTitle}>قفل الملف الشخصي (حساب خاص)</Text>
+                <Text style={styles.toggleDesc}>
+                  عند القفل، لا يمكن للغرباء مشاهدة قائمة نشاطك أو إسهاماتك إلا بعد متابعتهم لك.
+                </Text>
               </View>
-              <Pressable style={styles.customSave} onPress={saveCustomSchedule}>
-                <Text style={styles.customSaveText}>حفظ</Text>
-              </Pressable>
+              <Switch
+                value={profilePrivacy === 'private'}
+                onValueChange={togglePrivateAccount}
+                trackColor={{ false: '#e2e8f0', true: '#a7f3d0' }}
+                thumbColor={profilePrivacy === 'private' ? '#059669' : '#94a3b8'}
+              />
             </View>
-          )}
 
-          <Text style={styles.schedHint}>
-            الفترة الحالية: {formatArabicTime(dnd.start)} — {formatArabicTime(dnd.end)} (نص الليل حتى الصباح)
-          </Text>
-        </View>
+            <View style={styles.cardDivider} />
 
-        <View style={styles.card}>
-          <View style={styles.sectionHeader}>
-            <View style={[styles.sectionIcon, { backgroundColor: '#ecfdf5' }]}><Compass size={18} color="#059669" /></View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.sectionTitle}>موقع حسابك المُوثَّق</Text>
-              <Text style={styles.sectionDesc}>موقعك مُثبّت تلقائياً عبر GPS. لا يمكن تعديل المدينة يدوياً — يمكنك فقط تحديث موقعك الحقيقي.</Text>
+            {/* المشاركة باسم مجهول */}
+            <View style={styles.toggleRow}>
+              <View style={{ flex: 1, paddingLeft: 12 }}>
+                <Text style={styles.toggleTitle}>المشاركة باسم مجهول في الاستفسارات</Text>
+                <Text style={styles.toggleDesc}>
+                  يظهر اسمك كـ "جار مجهول" عند طرح الأسئلة والنقاشات لحفظ الخصوصية.
+                </Text>
+              </View>
+              <Switch
+                value={hideName}
+                onValueChange={toggleHideName}
+                trackColor={{ false: '#e2e8f0', true: '#a7f3d0' }}
+                thumbColor={hideName ? '#059669' : '#94a3b8'}
+              />
             </View>
-          </View>
-          <View style={styles.locationSummaryRow}>
-            <Text style={styles.locationSummaryLabel}>المنطقة</Text>
-            <Text style={styles.locationSummaryValue}>{region || 'غير محددة'}</Text>
-          </View>
-          <View style={styles.locationSummaryRow}>
-            <Text style={styles.locationSummaryLabel}>المدينة</Text>
-            <Text style={styles.locationSummaryValue}>{city || 'غير محددة'}</Text>
-          </View>
-          <View style={styles.locationSummaryRow}>
-            <Text style={styles.locationSummaryLabel}>الحي</Text>
-            <Text style={styles.locationSummaryValue}>{district || 'غير محدد'}</Text>
-          </View>
-          <Pressable style={[styles.actionBtn, { borderBottomWidth: 0 }]} onPress={useCurrentLocation} disabled={locating}>
-            {locating ? <ActivityIndicator size="small" color="#059669" /> : <MapPin size={20} color="#059669" />}
-            <Text style={styles.actionBtnText}>{locating ? 'جارٍ تحديد موقعك…' : 'تحديث موقعي الحقيقي عبر GPS'}</Text>
-          </Pressable>
-        </View>
 
-        {/* 5. قائمة المحظورين */}
-        <View style={styles.card}>
-          <View style={styles.sectionHeader}>
-            <View style={[styles.sectionIcon, { backgroundColor: '#fef2f2' }]}>
-              <UserX size={18} color="#dc2626" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.sectionTitle}>المستخدمون المحظورون 🚫</Text>
-              <Text style={styles.sectionDesc}>لن يتمكنوا من مراسلتك حتى تُزيل الحظر</Text>
-            </View>
-          </View>
+            <View style={styles.cardDivider} />
 
-          {blockedUsers.length === 0 ? (
-            <Text style={styles.emptyBlocked}>لا يوجد محظورون حالياً.</Text>
-          ) : (
-            blockedUsers.map(b => (
-              <View key={b.id} style={styles.blockedRow}>
-                <View style={styles.blockedAvatarWrap}>
-                  {b.avatar_url && b.hide_name !== true ? (
-                    <Image source={{ uri: b.avatar_url }} style={styles.blockedAvatar} />
-                  ) : (
-                    <View style={styles.blockedAvatarFallback}>
-                      <Text style={styles.blockedAvatarLetter}>
-                        {(b.display_name || b.username || '؟')[0]}
-                      </Text>
+            {/* من يراسلك بالخاص (DM) */}
+            <View style={styles.optionsBlock}>
+              <Text style={styles.optionsBlockTitle}>من يمكنه مراسلتك على الخاص (DM)؟</Text>
+              <Text style={styles.optionsBlockDesc}>
+                الرسائل الخاصة تعمل حصرياً بين سكان الحي والمدينة المتطابقين.
+              </Text>
+              <View style={styles.radioGroup}>
+                {[
+                  { id: 'everyone', title: 'الجميع', sub: 'أي جار من الحي يمكنه التواصل معك' },
+                  { id: 'followers', title: 'المتابعون فقط', sub: 'فقط من يتابعك وتتابعه بالحي' },
+                  { id: 'nobody', title: 'إيقاف الخاص تماماً', sub: 'لن يتمكن أي شخص من فتح محادثة جديدة' },
+                ].map((opt) => (
+                  <Pressable
+                    key={opt.id}
+                    style={[styles.radioCard, allowDms === opt.id && styles.radioCardActive]}
+                    onPress={() => saveSettings(undefined, opt.id as any)}
+                  >
+                    <View style={styles.radioDotWrap}>
+                      {allowDms === opt.id && <View style={styles.radioDot} />}
                     </View>
-                  )}
-                </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.radioLabel, allowDms === opt.id && styles.radioLabelActive]}>
+                        {opt.title}
+                      </Text>
+                      <Text style={styles.radioSub}>{opt.sub}</Text>
+                    </View>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.cardDivider} />
+
+            {/* الردود على الستوري */}
+            <View style={styles.optionsBlock}>
+              <Text style={styles.optionsBlockTitle}>الردود على القصص والستوري</Text>
+              <Text style={styles.optionsBlockDesc}>من يحق له كتابة ردود خاصة على قصصك المنشورة؟</Text>
+              <View style={styles.radioGroup}>
+                {[
+                  { id: 'everyone', title: 'السماح للجميع بالرد' },
+                  { id: 'followers', title: 'المتابعون فقط' },
+                  { id: 'nobody', title: 'إيقاف الردود نهائياً' },
+                ].map((opt) => (
+                  <Pressable
+                    key={opt.id}
+                    style={[styles.radioCard, allowStoryReplies === opt.id && styles.radioCardActive]}
+                    onPress={() => saveSettings(undefined, undefined, opt.id as any)}
+                  >
+                    <View style={styles.radioDotWrap}>
+                      {allowStoryReplies === opt.id && <View style={styles.radioDot} />}
+                    </View>
+                    <Text style={[styles.radioLabel, allowStoryReplies === opt.id && styles.radioLabelActive]}>
+                      {opt.title}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* 3. قسم الموقع والتوثيق (Location & Verification) */}
+        {showSec('location') && (
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <View style={[styles.cardHeaderIcon, { backgroundColor: '#ecfdf5' }]}>
+                <Compass size={18} color="#059669" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.cardHeaderTitle}>الموقع الجغرافي والتوثيق</Text>
+                <Text style={styles.cardHeaderDesc}>تثبيت موقع السكن الرسمي والتحقق من الهوية</Text>
+              </View>
+            </View>
+
+            {/* Location Summary Box */}
+            <View style={styles.locationSummaryBox}>
+              <View style={styles.locItemRow}>
+                <Text style={styles.locItemLabel}>المنطقة:</Text>
+                <Text style={styles.locItemVal}>{region || 'المملكة العربية السعودية'}</Text>
+              </View>
+              <View style={styles.locItemRow}>
+                <Text style={styles.locItemLabel}>المدينة:</Text>
+                <Text style={styles.locItemVal}>{city || 'غير محددة'}</Text>
+              </View>
+              <View style={styles.locItemRow}>
+                <Text style={styles.locItemLabel}>الحي المعتمد:</Text>
+                <Text style={styles.locItemVal}>{district ? `حي ${district}` : 'غير محدد'}</Text>
+              </View>
+            </View>
+
+            <Pressable style={styles.primaryActionBtn} onPress={useCurrentLocation} disabled={locating}>
+              {locating ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <MapPin size={16} color="#fff" />
+                  <Text style={styles.primaryActionText}>تحديث موقعي الفعلي عبر GPS</Text>
+                </>
+              )}
+            </Pressable>
+
+            <View style={styles.cardDivider} />
+
+            {/* Resident GPS Verification */}
+            <View style={styles.settingBlock}>
+              <View style={styles.settingBlockHead}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.blockedName}>{displayName(b)}</Text>
-                  <Text style={styles.blockedDate}>محظور منذ {b.blockedAt ? new Date(b.blockedAt).toLocaleDateString('ar-SA') : '—'}</Text>
+                  <Text style={styles.blockTitle}>فحص القرب الجغرافي للحي (GPS)</Text>
+                  <Text style={styles.blockSubDesc}>
+                    {geoVerified
+                      ? 'تم التحقق من وجودك الجغرافي في الحي بنجاح ✓'
+                      : 'فحص فوري يثبت تواجد جهازك الفعلي داخل النطاق الجغرافي للحي.'}
+                  </Text>
                 </View>
-                <Pressable style={styles.unblockBtn} onPress={() => unblockUser(b.id, displayName(b))}>
-                  <Text style={styles.unblockBtnText}>إلغاء الحظر</Text>
+                <Pressable
+                  style={[styles.actionOutlineBtn, geoVerified && { borderColor: '#10b981', backgroundColor: '#ecfdf5' }]}
+                  onPress={verifyResidentGPS}
+                  disabled={geoChecking || geoVerified}
+                >
+                  {geoChecking ? (
+                    <ActivityIndicator size="small" color="#059669" />
+                  ) : (
+                    <Text style={[styles.actionOutlineText, geoVerified && { color: '#059669' }]}>
+                      {geoVerified ? 'موثق ✓' : 'بدء الفحص'}
+                    </Text>
+                  )}
                 </Pressable>
               </View>
-            ))
-          )}
-        </View>
+            </View>
 
-        <View style={styles.card}>
-          <View style={styles.sectionHeader}>
-            <View style={[styles.sectionIcon, { backgroundColor: '#ecfdf5' }]}><ShieldCheck size={18} color="#059669" /></View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.sectionTitle}>التوثيق وفحص الموقع</Text>
-              <Text style={styles.sectionDesc}>حالة طلب الهوية وفحص تقريبي للموقع</Text>
-            </View>
-          </View>
-          <Pressable style={styles.actionBtn} onPress={verifyResidentGPS} disabled={geoChecking}>
-            {geoChecking ? <ActivityIndicator size="small" color="#059669" /> : <Compass size={20} color={geoVerified ? '#059669' : C.ink} />}
-            <View style={{ flex: 1 }}>
-              <Text style={styles.actionBtnText}>{geoVerified ? 'اجتاز موقعك الفحص الآن ✓' : 'فحص قرب الموقع من المدينة'}</Text>
-              <Text style={styles.sectionDesc}>فحص GPS تقريبي ضمن 7 كم؛ لا يثبت السكن في حي محدد.</Text>
-            </View>
-          </Pressable>
-          <Pressable
-            style={[styles.actionBtn, { borderBottomWidth: 0 }]}
-            disabled={verificationStatus === 'pending' || verificationStatus === 'verified'}
-            onPress={() => setVerificationModalOpen(true)}
-          >
-            <ShieldCheck size={20} color={verificationStatus === 'verified' ? '#059669' : verificationStatus === 'pending' ? '#d97706' : C.ink} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.actionBtnText}>
-                {verificationStatus === 'verified' ? 'حسابك موثّق بالهوية الرسمية ✓' : verificationStatus === 'pending' ? 'طلب توثيق الهوية قيد المراجعة' : verificationStatus === 'rejected' ? 'رُفض الطلب؛ اضغط لإرسال طلب جديد' : 'طلب توثيق الحساب بالهوية'}
-              </Text>
-              <Text style={styles.sectionDesc}>
-                {verificationStatus === 'verified' ? 'تم اعتماد الهوية من إدارة المنصة.' : verificationStatus === 'pending' ? 'انتظر مراجعة إدارة المنصة.' : 'يُسجل الطلب للمراجعة؛ لا يتم التوثيق تلقائياً.'}
-              </Text>
-            </View>
-            {verificationStatus !== 'pending' && verificationStatus !== 'verified' && <ChevronLeft size={18} color="#94a3b8" />}
-          </Pressable>
-        </View>
+            <View style={styles.cardDivider} />
 
-        {/* إشعارات الجوال ولوحة الإدارة */}
-        <View style={styles.card}>
-          <View style={styles.sectionHeader}>
-            <View style={[styles.sectionIcon, { backgroundColor: '#fef3c7' }]}>
-              <Bell size={18} color="#d97706" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.sectionTitle}>إشعارات الجوال</Text>
-              <Text style={styles.sectionDesc}>سجّل هذا الجهاز لاستقبال التنبيهات</Text>
-            </View>
-          </View>
-
-          <Pressable style={styles.actionBtn} onPress={activatePushNotifications}>
-            <Smartphone size={20} color={C.ink} />
-            <Text style={styles.actionBtnText}>{pushEnabled ? 'تم تسجيل هذا الجهاز ✓ (اضغط لإعادة المحاولة)' : 'تفعيل إشعارات الجوال الفورية'}</Text>
-          </Pressable>
-
-          {role === 'admin' && (
-            <Pressable
-              style={[styles.actionBtn, { borderBottomWidth: 0 }]}
-              onPress={() => router.push('/admin')}
-            >
-              <Shield size={20} color={C.accent} />
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.actionBtnText, { color: C.accent }]}>لوحة تحكم مدير النظام 👑</Text>
-                <Text style={styles.sectionDesc}>خاص بمسؤول المنصة والرقابة فقط</Text>
+            {/* Official ID Verification */}
+            <View style={styles.settingBlock}>
+              <View style={styles.settingBlockHead}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.blockTitle}>توثيق الهوية الرسمية 🛡️</Text>
+                  <Text style={styles.blockSubDesc}>
+                    {verificationStatus === 'verified'
+                      ? 'حسابك موثّق بالهوية الوطنية المعتمدة من إدارة المنصة.'
+                      : verificationStatus === 'pending'
+                      ? 'طلب التوثيق قيد المراجعة والتدقيق الإداري حالياً.'
+                      : 'توثيق الحساب بالهوية الوطنية أو وثيقة العمل الحر لرفع الثقة والمصداقية.'}
+                  </Text>
+                </View>
+                <Pressable
+                  style={[
+                    styles.actionOutlineBtn,
+                    verificationStatus === 'verified'
+                      ? { borderColor: '#10b981', backgroundColor: '#ecfdf5' }
+                      : verificationStatus === 'pending'
+                      ? { borderColor: '#f59e0b', backgroundColor: '#fffbeb' }
+                      : {},
+                  ]}
+                  onPress={() => setVerificationModalOpen(true)}
+                  disabled={verificationStatus === 'verified' || verificationStatus === 'pending'}
+                >
+                  <Text
+                    style={[
+                      styles.actionOutlineText,
+                      verificationStatus === 'verified'
+                        ? { color: '#059669' }
+                        : verificationStatus === 'pending'
+                        ? { color: '#d97706' }
+                        : {},
+                    ]}
+                  >
+                    {verificationStatus === 'verified'
+                      ? 'معتمد ✓'
+                      : verificationStatus === 'pending'
+                      ? 'قيد التدقيق ⏳'
+                      : 'طلب التوثيق'}
+                  </Text>
+                </Pressable>
               </View>
-            </Pressable>
-          )}
-        </View>
+            </View>
+          </View>
+        )}
 
-        <View style={{ height: 90 }} />
+        {/* 4. قسم الإشعارات وعدم الإزعاج (Notifications & DND) */}
+        {showSec('notifications') && (
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <View style={[styles.cardHeaderIcon, { backgroundColor: '#fffbeb' }]}>
+                <BellOff size={18} color="#d97706" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.cardHeaderTitle}>الإشعارات وعدم الإزعاج</Text>
+                <Text style={styles.cardHeaderDesc}>التحكم في مواعيد صمت التنبيهات وإشعارات الجهاز</Text>
+              </View>
+            </View>
+
+            {/* Push Notifications */}
+            <View style={styles.toggleRow}>
+              <View style={{ flex: 1, paddingLeft: 12 }}>
+                <Text style={styles.toggleTitle}>إشعارات الجوال الفورية (Push)</Text>
+                <Text style={styles.toggleDesc}>
+                  استقبال تنبيهات النداءات العاجلة والرسائل حتى عند إغلاق التطبيق.
+                </Text>
+              </View>
+              <Pressable
+                style={[styles.actionOutlineBtn, pushEnabled && { borderColor: '#10b981', backgroundColor: '#ecfdf5' }]}
+                onPress={activatePushNotifications}
+              >
+                <Text style={[styles.actionOutlineText, pushEnabled && { color: '#059669' }]}>
+                  {pushEnabled ? 'مفعّل ✓' : 'تفعيل'}
+                </Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.cardDivider} />
+
+            {/* DND Master Switch */}
+            <View style={styles.toggleRow}>
+              <View style={{ flex: 1, paddingLeft: 12 }}>
+                <Text style={styles.toggleTitle}>وضع عدم الإزعاج (DND) 🔕</Text>
+                <Text style={styles.toggleDesc}>
+                  {dndLabel(dnd)} {isDndCurrentlyActive ? '· صامت الآن 🌙' : ''}
+                </Text>
+              </View>
+              <Switch
+                value={dnd.enabled}
+                onValueChange={(val) => applyDnd({ ...dnd, enabled: val })}
+                trackColor={{ false: '#e2e8f0', true: '#fde68a' }}
+                thumbColor={dnd.enabled ? '#d97706' : '#94a3b8'}
+              />
+            </View>
+
+            {/* DND Modes */}
+            {dnd.enabled && (
+              <View style={styles.dndScheduleSection}>
+                <View style={styles.dndPillsRow}>
+                  <Pressable
+                    style={[styles.dndPill, dnd.schedule === 'off' && styles.dndPillActive]}
+                    onPress={() => applyDnd({ ...dnd, schedule: 'off' })}
+                  >
+                    <Text style={[styles.dndPillText, dnd.schedule === 'off' && styles.dndPillTextActive]}>
+                      صامت دائماً
+                    </Text>
+                  </Pressable>
+
+                  <Pressable
+                    style={[styles.dndPill, dnd.schedule === 'nightly' && styles.dndPillActive]}
+                    onPress={() => applyDnd({ ...dnd, schedule: 'nightly' })}
+                  >
+                    <Moon size={13} color={dnd.schedule === 'nightly' ? '#fff' : '#64748b'} />
+                    <Text style={[styles.dndPillText, dnd.schedule === 'nightly' && styles.dndPillTextActive]}>
+                      ليلاً (22:00 - 07:00)
+                    </Text>
+                  </Pressable>
+
+                  <Pressable
+                    style={[styles.dndPill, dnd.schedule === 'custom' && styles.dndPillActive]}
+                    onPress={() => {
+                      setShowCustom(!showCustom);
+                      applyDnd({ ...dnd, schedule: 'custom' }, true);
+                    }}
+                  >
+                    <Clock size={13} color={dnd.schedule === 'custom' ? '#fff' : '#64748b'} />
+                    <Text style={[styles.dndPillText, dnd.schedule === 'custom' && styles.dndPillTextActive]}>
+                      مخصص ⏱
+                    </Text>
+                  </Pressable>
+                </View>
+
+                {dnd.schedule === 'custom' && (
+                  <View style={styles.customTimeBox}>
+                    <View style={styles.customTimeInputs}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.timeLabel}>من الساعة:</Text>
+                        <TextInput
+                          style={styles.timeInput}
+                          value={draftStart}
+                          onChangeText={setDraftStart}
+                          placeholder="22:00"
+                          placeholderTextColor="#94a3b8"
+                          maxLength={5}
+                        />
+                      </View>
+                      <Text style={styles.timeSeparator}>إلى</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.timeLabel}>حتى الساعة:</Text>
+                        <TextInput
+                          style={styles.timeInput}
+                          value={draftEnd}
+                          onChangeText={setDraftEnd}
+                          placeholder="07:00"
+                          placeholderTextColor="#94a3b8"
+                          maxLength={5}
+                        />
+                      </View>
+                    </View>
+                    <Pressable
+                      style={styles.primaryActionBtn}
+                      onPress={() => applyDnd({ enabled: true, schedule: 'custom', start: draftStart, end: draftEnd })}
+                    >
+                      <Text style={styles.primaryActionText}>حفظ الوقت المخصص</Text>
+                    </Pressable>
+                  </View>
+                )}
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* 5. قسم المحظورين (Blocked Users) */}
+        {showSec('blocked') && (
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <View style={[styles.cardHeaderIcon, { backgroundColor: '#fef2f2' }]}>
+                <UserX size={18} color="#dc2626" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.cardHeaderTitle}>قائمة المستخدمين المحظورين</Text>
+                <Text style={styles.cardHeaderDesc}>لن يتمكن المحظورون من مراسلتك أو التعليق على منشوراتك</Text>
+              </View>
+            </View>
+
+            {blockedUsers.length === 0 ? (
+              <View style={styles.emptyStateBox}>
+                <ShieldCheck size={36} color="#a7f3d0" />
+                <Text style={styles.emptyStateTitle}>لا يوجد مستخدمون محظورون</Text>
+                <Text style={styles.emptyStateSub}>بيئة حيك نظيفة وآمنة بدون أي حسابات محظورة.</Text>
+              </View>
+            ) : (
+              blockedUsers.map((b) => (
+                <View key={b.id} style={styles.blockedRow}>
+                  <View style={styles.blockedAvatar}>
+                    {b.avatar_url && b.hide_name !== true ? (
+                      <Image source={{ uri: b.avatar_url }} style={styles.blockedAvatarImg} />
+                    ) : (
+                      <Text style={styles.blockedAvatarTxt}>{(b.display_name || b.username || '؟')[0]}</Text>
+                    )}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.blockedName}>{getDisplayName(b)}</Text>
+                    <Text style={styles.blockedDate}>محظور منذ فترة</Text>
+                  </View>
+                  <Pressable
+                    style={styles.unblockBtn}
+                    onPress={() => unblockUser(b.id, getDisplayName(b))}
+                  >
+                    <Text style={styles.unblockBtnText}>إلغاء الحظر</Text>
+                  </Pressable>
+                </View>
+              ))
+            )}
+          </View>
+        )}
+
+        {/* 6. بوابة المشرفين والإدارة (Admin Operational Center) */}
+        {role === 'admin' && (
+          <Pressable
+            style={styles.adminBannerCard}
+            onPress={() => router.push('/admin')}
+          >
+            <LinearGradient
+              colors={['#1e1b4b', '#312e81', '#4338ca']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.adminBannerGrad}
+            >
+              <View style={styles.adminBannerIcon}>
+                <Crown size={22} color="#f59e0b" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.adminBannerTitle}>مركز عمليات وإدارة حيّنا 👑</Text>
+                <Text style={styles.adminBannerSub}>
+                  مراقبة المنصة، البلاغات، التحقق، حوكمة الميزات، والبث المجتمعي
+                </Text>
+              </View>
+              <ChevronLeft size={20} color="#c7d2fe" />
+            </LinearGradient>
+          </Pressable>
+        )}
+
+        {/* 7. معلومات النظام وحماية البيانات (System & Compliance) */}
+        {showSec('system') && (
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <View style={[styles.cardHeaderIcon, { backgroundColor: '#f1f5f9' }]}>
+                <Info size={18} color="#475569" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.cardHeaderTitle}>معلومات المنصة والامتثال</Text>
+                <Text style={styles.cardHeaderDesc}>الخصوصية، الإصدار، ونظام حماية البيانات</Text>
+              </View>
+            </View>
+
+            <View style={styles.complianceBox}>
+              <ShieldCheck size={18} color="#059669" />
+              <Text style={styles.complianceText}>
+                منصة حيّنا متوافقة مع ضوابط نظام حماية البيانات الشخصية (PDPL) بالمملكة العربية السعودية 🇸🇦
+              </Text>
+            </View>
+
+            <View style={styles.metaRow}>
+              <Text style={styles.metaLabel}>إصدار التطبيق:</Text>
+              <Text style={styles.metaValue}>2.0.4 (Executive Release)</Text>
+            </View>
+            <View style={styles.metaRow}>
+              <Text style={styles.metaLabel}>خادم البيانات:</Text>
+              <Text style={styles.metaValue}>Supabase Cloud (المملكة والشرق الأوسط)</Text>
+            </View>
+            <View style={styles.metaRow}>
+              <Text style={styles.metaLabel}>لغة الواجهة:</Text>
+              <Text style={styles.metaValue}>العربية (المملكة العربية السعودية)</Text>
+            </View>
+
+            {/* Link to Dedicated About & Developer Page */}
+            <Pressable
+              style={{
+                flexDirection: 'row-reverse',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                backgroundColor: '#ecfdf5',
+                borderWidth: 1,
+                borderColor: '#a7f3d0',
+                padding: 12,
+                borderRadius: 14,
+                marginTop: 12,
+              }}
+              onPress={() => router.push('/about')}
+            >
+              <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8 }}>
+                <ShieldCheck size={18} color="#059669" />
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={{ fontSize: 13, fontWeight: '900', color: '#065f46' }}>
+                    حول المنصة ومطور التطبيق
+                  </Text>
+                  <Text style={{ fontSize: 11, color: '#047857', marginTop: 1 }}>
+                    م. يوسف الحازمي — الرؤية والاتصال المباشر (0538243481)
+                  </Text>
+                </View>
+              </View>
+              <ChevronLeft size={16} color="#059669" />
+            </Pressable>
+          </View>
+        )}
+
+        {/* 8. تسجيل الخروج (Sign Out) */}
+        <Pressable style={styles.signOutBtn} onPress={handleSignOut}>
+          <LogOut size={18} color="#ef4444" />
+          <Text style={styles.signOutText}>تسجيل الخروج من الحساب</Text>
+        </Pressable>
       </ScrollView>
 
-      <Modal visible={verificationModalOpen} transparent animationType="fade" onRequestClose={() => setVerificationModalOpen(false)}>
-        <View style={styles.verifyModalShade}>
-          <View style={styles.verifyModalCard}>
-            <Text style={styles.verifyModalTitle}>طلب توثيق الحساب</Text>
-            <Text style={styles.sectionDesc}>اختر نوع الوثيقة للمراجعة الإدارية. لا ترفق رقم الهوية أو صورتها.</Text>
-            {([
-              ['national_id', 'الهوية الوطنية'], ['iqama', 'هوية مقيم'], ['freelance', 'وثيقة العمل الحر / سجل تجاري'],
-            ] as const).map(([value, label]) => (
-              <Pressable key={value} onPress={() => setDocumentType(value)} style={[styles.verifyOption, documentType === value && styles.verifyOptionActive]}>
-                <Text style={[styles.optionTitle, documentType === value && { color: '#059669' }]}>{label}</Text>
+      {/* Verification Request Modal */}
+      <Modal
+        visible={verificationModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setVerificationModalOpen(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <ShieldCheck size={28} color="#059669" />
+              <Text style={styles.modalTitle}>طلب توثيق الحساب بالهوية</Text>
+              <Text style={styles.modalSub}>
+                اختر نوع الوثيقة لرفع طلبك إلى إدارة المنصة. لا ترسل صورة الوثيقة أو أرقامها السرية هنا.
+              </Text>
+            </View>
+
+            <View style={styles.docTypesList}>
+              {[
+                { id: 'national_id', label: 'الهوية الوطنية للمواطنين 🇸🇦' },
+                { id: 'iqama', label: 'هوية مقيم 🛡️' },
+                { id: 'freelance', label: 'وثيقة العمل الحر / سجل تجاري 💼' },
+              ].map((dt) => (
+                <Pressable
+                  key={dt.id}
+                  style={[styles.docTypeItem, documentType === dt.id && styles.docTypeItemActive]}
+                  onPress={() => setDocumentType(dt.id as any)}
+                >
+                  <View style={styles.radioDotWrap}>
+                    {documentType === dt.id && <View style={styles.radioDot} />}
+                  </View>
+                  <Text style={[styles.docTypeLabel, documentType === dt.id && styles.docTypeLabelActive]}>
+                    {dt.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <View style={styles.modalActions}>
+              <Pressable
+                style={styles.modalCancelBtn}
+                onPress={() => setVerificationModalOpen(false)}
+              >
+                <Text style={styles.modalCancelText}>إلغاء</Text>
               </Pressable>
-            ))}
-            <View style={styles.verifyModalActions}>
-              <Pressable style={styles.verifyCancelButton} onPress={() => setVerificationModalOpen(false)}><Text style={styles.verifyCancelText}>إلغاء</Text></Pressable>
-              <Pressable style={styles.accountButton} onPress={submitVerificationRequest} disabled={verificationSubmitting}>
-                {verificationSubmitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.accountButtonText}>إرسال الطلب</Text>}
+              <Pressable
+                style={styles.modalSubmitBtn}
+                onPress={submitVerificationRequest}
+                disabled={verificationSubmitting}
+              >
+                {verificationSubmitting ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.modalSubmitText}>إرسال الطلب</Text>
+                )}
               </Pressable>
             </View>
           </View>
         </View>
       </Modal>
-
-      {/* شريط التنقل السفلي */}
-      
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  accountLabel: { color: '#475569', fontSize: 13, fontWeight: '800', textAlign: 'right', marginTop: 8, marginBottom: 5 },
-  currentEmail: { color: '#64748b', fontSize: 14, textAlign: 'left', paddingVertical: 8 },
-  accountInput: { minHeight: 46, borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, backgroundColor: '#fff', color: '#0f172a', paddingHorizontal: 12, textAlign: 'left', fontSize: 14 },
-  accountButton: { minHeight: 44, flex: 1, borderRadius: 12, backgroundColor: '#0f172a', alignItems: 'center', justifyContent: 'center', marginTop: 10, paddingHorizontal: 14 },
-  accountButtonText: { color: '#fff', fontSize: 13, fontWeight: '900' },
-  accountDivider: { height: 1, backgroundColor: '#e2e8f0', marginVertical: 17 },
-  verifyModalShade: { flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', justifyContent: 'center', padding: 20 },
-  verifyModalCard: { backgroundColor: '#fff', borderRadius: 20, padding: 20, gap: 8 },
-  verifyModalTitle: { color: '#0f172a', fontSize: 18, fontWeight: '900', textAlign: 'right' },
-  verifyOption: { padding: 13, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', alignItems: 'flex-end' },
-  verifyOptionActive: { borderColor: '#059669', backgroundColor: '#ecfdf5' },
-  verifyModalActions: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, marginTop: 8 },
-  verifyCancelButton: { minHeight: 44, borderRadius: 12, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 18, marginTop: 10 },
-  verifyCancelText: { color: '#475569', fontSize: 13, fontWeight: '800' },
   screen: {
     flex: 1,
     backgroundColor: '#f8fafc',
   },
   centerContainer: {
     flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#f8fafc',
+    padding: 24,
   },
   loadingText: {
     marginTop: 12,
-    fontSize: 15,
-    color: '#64748b',
-    fontWeight: '700',
+    fontSize: 14,
+    color: '#059669',
+    fontWeight: '800',
   },
-  header: {
+  headerBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#f1f5f9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  toast: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 56 : 16,
+    alignSelf: 'center',
+    backgroundColor: '#065f46',
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 54,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    gap: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 30,
+    zIndex: 999,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 8,
   },
-  backBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#f1f5f9',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitleWrap: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#0f172a',
-  },
-  headerSubtitle: {
-    fontSize: 12,
-    color: '#64748b',
-    marginTop: 2,
-  },
-  headerIconWrap: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#ecfdf5',
-    justifyContent: 'center',
-    alignItems: 'center',
+  toastText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '800',
   },
   scrollContent: {
     padding: 16,
+    paddingTop: 12,
+    maxWidth: 960,
+    width: '100%',
+    alignSelf: 'center',
   },
-  savingBanner: {
+
+  /* Navigation Switcher Segment (Profile ⇄ Settings) */
+  navSegmentContainer: {
+    marginBottom: 12,
+    width: '100%',
+  },
+  navSegmentWrap: {
+    flexDirection: 'row-reverse',
+    backgroundColor: '#e2e8f0',
+    borderRadius: 14,
+    padding: 3,
+    gap: 4,
+  },
+  navSegmentBtn: {
+    flex: 1,
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#ecfdf5',
-    paddingVertical: 10,
-    borderRadius: 12,
-    marginBottom: 16,
-    gap: 8,
+    gap: 6,
+    paddingVertical: 9,
+    borderRadius: 11,
   },
-  savingText: {
-    color: '#059669',
-    fontSize: 13,
+  navSegmentBtnActive: {
+    backgroundColor: '#059669',
+    shadowColor: '#059669',
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  navSegmentText: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  navSegmentTextActive: {
+    color: '#ffffff',
+    fontWeight: '900',
+  },
+
+  /* Hero Identity Card */
+  heroCard: {
+    borderRadius: 22,
+    padding: 18,
+    marginBottom: 14,
+    overflow: 'hidden',
+  },
+  heroGlow: {
+    position: 'absolute',
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    top: -80,
+    left: -60,
+  },
+  heroContentRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 14,
+  },
+  avatarWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 2.5,
+    borderColor: '#34d399',
+    position: 'relative',
+    backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+  avatarImg: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 32,
+  },
+  avatarFallback: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+  avatarFallbackText: {
+    color: '#ffffff',
+    fontSize: 24,
+    fontWeight: '900',
+  },
+  crownBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    backgroundColor: '#f59e0b',
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#064e3b',
+  },
+  heroInfo: {
+    flex: 1,
+    alignItems: 'flex-end',
+  },
+  heroNameRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 6,
+  },
+  heroName: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  adminPill: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: 'rgba(245, 158, 11, 0.22)',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  adminPillText: {
+    color: '#fde68a',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  heroHandle: {
+    color: '#a7f3d0',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  heroLocRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 5,
+  },
+  heroLocText: {
+    color: '#e2e8f0',
+    fontSize: 11.5,
     fontWeight: '700',
   },
+  editProfileQuickBtn: {
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+  },
+  editProfileQuickText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  quickBadgesRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.12)',
+  },
+  quickBadge: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  quickBadgeText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+
+  /* Category Scroll Filter */
+  categoryScroll: {
+    flexDirection: 'row-reverse',
+    gap: 8,
+    paddingVertical: 4,
+    marginBottom: 14,
+  },
+  categoryPill: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 13,
+    paddingVertical: 8,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  categoryPillActive: {
+    backgroundColor: '#059669',
+    borderColor: '#059669',
+  },
+  categoryPillText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#475569',
+  },
+  categoryPillTextActive: {
+    color: '#ffffff',
+  },
+
+  /* Cards */
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 18,
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
     padding: 18,
-    marginBottom: 16,
+    marginBottom: 14,
     borderWidth: 1,
     borderColor: '#e2e8f0',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
+    shadowOpacity: 0.03,
     shadowRadius: 6,
     elevation: 2,
   },
-  sectionHeader: {
+  cardHeader: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 12,
     marginBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-    paddingBottom: 12,
   },
-  sectionIcon: {
-    width: 38,
-    height: 38,
+  cardHeaderIcon: {
+    width: 40,
+    height: 40,
     borderRadius: 12,
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  sectionTitle: {
-    fontSize: 16,
+  cardHeaderTitle: {
+    fontSize: 15.5,
     fontWeight: '900',
     color: '#0f172a',
     textAlign: 'right',
   },
-  sectionDesc: {
-    fontSize: 12,
+  cardHeaderDesc: {
+    fontSize: 11.5,
     color: '#64748b',
     textAlign: 'right',
     marginTop: 2,
   },
+  cardDivider: {
+    height: 1,
+    backgroundColor: '#f1f5f9',
+    marginVertical: 14,
+  },
+
+  /* Setting Blocks */
+  settingBlock: {
+    gap: 8,
+  },
+  settingBlockHead: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  blockTitle: {
+    fontSize: 13.5,
+    fontWeight: '800',
+    color: '#1e293b',
+    textAlign: 'right',
+  },
+  blockValue: {
+    fontSize: 13,
+    color: '#64748b',
+    fontWeight: '600',
+    textAlign: 'right',
+    marginTop: 2,
+  },
+  blockSubDesc: {
+    fontSize: 11.5,
+    color: '#64748b',
+    textAlign: 'right',
+    marginTop: 4,
+    lineHeight: 18,
+  },
+  actionOutlineBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#059669',
+    backgroundColor: '#f0fdf4',
+  },
+  actionOutlineText: {
+    color: '#059669',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  expandableBox: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 14,
+    padding: 14,
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    gap: 8,
+  },
+  inputLabel: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#475569',
+    textAlign: 'right',
+  },
+  textInput: {
+    backgroundColor: '#ffffff',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    fontSize: 13.5,
+    color: '#0f172a',
+    textAlign: 'left',
+  },
+  primaryActionBtn: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#059669',
+    borderRadius: 12,
+    paddingVertical: 11,
+    paddingHorizontal: 16,
+    marginTop: 6,
+  },
+  primaryActionText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+
+  /* Toggles */
   toggleRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-    gap: 12,
   },
-  rowTitle: {
-    fontSize: 15,
+  toggleTitle: {
+    fontSize: 13.5,
     fontWeight: '800',
     color: '#1e293b',
     textAlign: 'right',
   },
-  rowDesc: {
-    fontSize: 12,
+  toggleDesc: {
+    fontSize: 11.5,
     color: '#64748b',
     textAlign: 'right',
     marginTop: 3,
-    lineHeight: 18,
+    lineHeight: 17,
   },
-  optionsList: {
-    gap: 10,
+
+  /* Radio Group */
+  optionsBlock: {
+    gap: 8,
   },
-  optionItem: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    padding: 14,
-    borderRadius: 14,
-    backgroundColor: '#f8fafc',
-    borderWidth: 1.5,
-    borderColor: '#f1f5f9',
-    gap: 12,
-  },
-  optionItemActive: {
-    borderColor: '#059669',
-    backgroundColor: '#ecfdf5',
-  },
-  optionRadio: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    borderColor: '#059669',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  optionRadioDot: {
-    width: 11,
-    height: 11,
-    borderRadius: 5.5,
-    backgroundColor: '#059669',
-  },
-  optionTitle: {
-    fontSize: 15,
+  optionsBlockTitle: {
+    fontSize: 13.5,
     fontWeight: '800',
-    color: '#0f172a',
+    color: '#1e293b',
     textAlign: 'right',
   },
-  optionSubtitle: {
-    fontSize: 12,
+  optionsBlockDesc: {
+    fontSize: 11.5,
+    color: '#64748b',
+    textAlign: 'right',
+    marginBottom: 4,
+  },
+  radioGroup: {
+    gap: 8,
+  },
+  radioCard: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  radioCardActive: {
+    backgroundColor: '#ecfdf5',
+    borderColor: '#059669',
+  },
+  radioDotWrap: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#059669',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radioDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#059669',
+  },
+  radioLabel: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#334155',
+    textAlign: 'right',
+  },
+  radioLabelActive: {
+    color: '#065f46',
+  },
+  radioSub: {
+    fontSize: 11,
     color: '#64748b',
     textAlign: 'right',
     marginTop: 2,
   },
-  actionBtn: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-    gap: 12,
-  },
-  actionBtnText: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#1e293b',
-    textAlign: 'right',
-  },
-  logoutBtn: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#fff',
-    borderWidth: 1.5,
-    borderColor: '#fee2e2',
-    borderRadius: 16,
-    height: 54,
-    marginTop: 8,
-  },
-  logoutText: {
-    color: '#dc2626',
-    fontWeight: '900',
-    fontSize: 15,
-  },
 
-  // DND
-  readyBadge: {
-    backgroundColor: '#fef2f2',
+  /* Location Box */
+  locationSummaryBox: {
+    backgroundColor: '#f8fafc',
     borderRadius: 12,
     padding: 12,
-    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    gap: 6,
+    marginBottom: 6,
   },
-  readyBadgeText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#b91c1c',
-    lineHeight: 18,
-    textAlign: 'right',
-  },
-  readyHint: {
-    fontSize: 11,
-    color: '#64748b',
-    lineHeight: 17,
-    textAlign: 'right',
-  },
-  scheduleSection: {
+  locItemRow: {
     flexDirection: 'row-reverse',
-    gap: 8,
-    marginTop: 4,
-    marginBottom: 10,
-  },
-  schedulePill: {
-    flex: 1,
     alignItems: 'center',
-    paddingVertical: 9,
-    borderRadius: 12,
-    backgroundColor: '#f8fafc',
-    borderWidth: 1.5,
+    justifyContent: 'space-between',
+  },
+  locItemLabel: {
+    fontSize: 12,
+    color: '#64748b',
+    fontWeight: '700',
+  },
+  locItemVal: {
+    fontSize: 13,
+    color: '#0f172a',
+    fontWeight: '800',
+  },
+
+  /* DND Schedule */
+  dndScheduleSection: {
+    marginTop: 12,
+    gap: 10,
+  },
+  dndPillsRow: {
+    flexDirection: 'row-reverse',
+    gap: 6,
+  },
+  dndPill: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 5,
+    flex: 1,
+    justifyContent: 'center',
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: '#f1f5f9',
+    borderWidth: 1,
     borderColor: '#e2e8f0',
   },
-  schedulePillActive: {
-    backgroundColor: '#d97706',
-    borderColor: '#f59e0b',
+  dndPillActive: {
+    backgroundColor: '#059669',
+    borderColor: '#059669',
   },
-  schedulePillText: {
-    fontSize: 13,
+  dndPillText: {
+    fontSize: 11,
     fontWeight: '800',
     color: '#475569',
   },
-  customRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'flex-end',
-    gap: 8,
-    marginBottom: 8,
+  dndPillTextActive: {
+    color: '#ffffff',
   },
-  customLabel: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#64748b',
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  customInput: {
+  customTimeBox: {
     backgroundColor: '#f8fafc',
     borderRadius: 12,
-    borderWidth: 1.5,
+    padding: 12,
+    borderWidth: 1,
     borderColor: '#e2e8f0',
-    height: 44,
-    fontSize: 14,
-    fontWeight: '800',
+    gap: 8,
+  },
+  customTimeInputs: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 10,
+  },
+  timeLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#475569',
+    textAlign: 'right',
+    marginBottom: 4,
+  },
+  timeInput: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    fontSize: 13,
     color: '#0f172a',
     textAlign: 'center',
   },
-  customArrow: {
+  timeSeparator: {
     fontSize: 12,
-    color: '#94a3b8',
     fontWeight: '800',
-    paddingBottom: 14,
+    color: '#64748b',
+    marginTop: 14,
   },
-  customSave: {
-    backgroundColor: '#059669',
-    borderRadius: 12,
-    height: 44,
-    paddingHorizontal: 16,
+
+  /* Blocked Users */
+  emptyStateBox: {
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 24,
+    gap: 8,
   },
-  customSaveText: {
-    color: '#fff',
-    fontSize: 13,
+  emptyStateTitle: {
+    fontSize: 14,
     fontWeight: '900',
+    color: '#0f172a',
   },
-  schedHint: {
-    fontSize: 11,
-    color: '#94a3b8',
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-
-  locationSummaryRow: {
-    flexDirection: 'row-reverse',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 9,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-  },
-  locationSummaryLabel: { fontSize: 12, color: '#64748b', fontWeight: '700' },
-  locationSummaryValue: { fontSize: 14, color: '#0f172a', fontWeight: '900', maxWidth: '70%', textAlign: 'right' },
-
-  // Blocked users
-  emptyBlocked: {
-    fontSize: 13,
+  emptyStateSub: {
+    fontSize: 12,
     color: '#64748b',
-    textAlign: 'right',
-    paddingVertical: 6,
+    textAlign: 'center',
   },
   blockedRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
+    gap: 10,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#f8fafc',
-    gap: 12,
+    borderBottomColor: '#f1f5f9',
   },
-  blockedAvatarWrap: { position: 'relative' },
-  blockedAvatar: { width: 44, height: 44, borderRadius: 22 },
-  blockedAvatarFallback: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#fef2f2',
+  blockedAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#f1f5f9',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  blockedAvatarLetter: { fontSize: 16, fontWeight: '900', color: '#dc2626' },
-  blockedName: { fontSize: 14, fontWeight: '800', color: '#0f172a', textAlign: 'right' },
-  blockedDate: { fontSize: 11, color: '#94a3b8', marginTop: 2 },
-  unblockBtn: {
-    backgroundColor: '#dc2626',
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 10,
+  blockedAvatarImg: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
   },
-  unblockBtnText: { color: '#fff', fontSize: 11, fontWeight: '800' },
+  blockedAvatarTxt: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#64748b',
+  },
+  blockedName: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0f172a',
+    textAlign: 'right',
+  },
+  blockedDate: {
+    fontSize: 11,
+    color: '#94a3b8',
+    textAlign: 'right',
+  },
+  unblockBtn: {
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fca5a5',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  unblockBtnText: {
+    color: '#dc2626',
+    fontSize: 11.5,
+    fontWeight: '800',
+  },
 
-  bottomNavWrapper: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+  /* Admin Center Banner */
+  adminBannerCard: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    marginBottom: 14,
+  },
+  adminBannerGrad: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 12,
+    padding: 18,
+  },
+  adminBannerIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  adminBannerTitle: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '900',
+    textAlign: 'right',
+  },
+  adminBannerSub: {
+    color: '#c7d2fe',
+    fontSize: 11,
+    textAlign: 'right',
+    marginTop: 2,
+    lineHeight: 16,
+  },
+
+  /* Compliance & Meta */
+  complianceBox: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#ecfdf5',
+    padding: 10,
+    borderRadius: 12,
+    marginBottom: 10,
+  },
+  complianceText: {
+    flex: 1,
+    color: '#065f46',
+    fontSize: 11.5,
+    fontWeight: '700',
+    textAlign: 'right',
+    lineHeight: 17,
+  },
+  metaRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+  },
+  metaLabel: {
+    fontSize: 12,
+    color: '#64748b',
+    fontWeight: '600',
+  },
+  metaValue: {
+    fontSize: 12,
+    color: '#0f172a',
+    fontWeight: '800',
+  },
+
+  /* Sign Out Button */
+  signOutBtn: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fca5a5',
+    paddingVertical: 14,
+    borderRadius: 16,
+    marginTop: 4,
+    marginBottom: 20,
+  },
+  signOutText: {
+    color: '#ef4444',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+
+  /* Modal */
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15,23,42,0.5)',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: '#ffffff',
+    borderRadius: 24,
+    padding: 22,
+    gap: 14,
+    maxWidth: 480,
+    width: '100%',
+    alignSelf: 'center',
+  },
+  modalHeader: {
+    alignItems: 'center',
+    gap: 6,
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: '900',
+    color: '#0f172a',
+    textAlign: 'center',
+  },
+  modalSub: {
+    fontSize: 12,
+    color: '#64748b',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  docTypesList: {
+    gap: 8,
+    marginVertical: 4,
+  },
+  docTypeItem: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#f8fafc',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  docTypeItemActive: {
+    backgroundColor: '#ecfdf5',
+    borderColor: '#059669',
+  },
+  docTypeLabel: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#334155',
+  },
+  docTypeLabelActive: {
+    color: '#065f46',
+  },
+  modalActions: {
+    flexDirection: 'row-reverse',
+    gap: 10,
+    marginTop: 6,
+  },
+  modalCancelBtn: {
+    flex: 1,
+    backgroundColor: '#f1f5f9',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCancelText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#475569',
+  },
+  modalSubmitBtn: {
+    flex: 2,
+    backgroundColor: '#059669',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalSubmitText: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#ffffff',
   },
 });

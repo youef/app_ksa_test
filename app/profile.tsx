@@ -1,6 +1,6 @@
 import { useBottomNavInset } from '@/lib/bottomNav';
 import { AppHeader } from '@/components/shared/AppHeader';
-import { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   Alert,
   Image,
@@ -12,6 +12,7 @@ import {
   View,
   Platform,
   ActivityIndicator,
+  Share,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useFocusEffect } from 'expo-router';
@@ -23,8 +24,8 @@ import { NeighborBadgesCard } from '@/components/profile/NeighborBadgesCard';
 import {
   Camera,
   MapPin,
-  LogOut,
   ChevronRight,
+  ChevronLeft,
   User,
   Settings,
   Sparkles,
@@ -33,6 +34,14 @@ import {
   X,
   Bookmark,
   MessageCircle,
+  Sliders,
+  ShieldCheck,
+  CheckCircle2,
+  Shield,
+  Pencil,
+  Share2,
+  BadgeCheck,
+  HelpCircle,
 } from 'lucide-react-native';
 import ActionSheet from '@/components/ActionSheet';
 import LocationSelectorModal from '@/components/LocationSelectorModal';
@@ -83,6 +92,7 @@ export default function Profile() {
     Boolean(region.trim() && city.trim() && district.trim()),
     Boolean(bio.trim()),
   ].filter(Boolean).length / 5) * 100);
+
   const [activeTab, setActiveTab] = useState<'posts' | 'replies' | 'saved'>('posts');
   const [myQuestions, setMyQuestions] = useState<any[]>([]);
   const [myAnswers, setMyAnswers] = useState<any[]>([]);
@@ -93,7 +103,6 @@ export default function Profile() {
   const [followsList, setFollowsList] = useState<any[]>([]);
   const [followsLoading, setFollowsLoading] = useState(false);
 
-
   const [reputationPoints, setReputationPoints] = useState(15);
 
   const loadProfile = useCallback(async () => {
@@ -102,7 +111,6 @@ export default function Profile() {
     const uid = authData.user.id;
     setUserId(uid);
 
-    // Fetch the current profile and its activity from Supabase.
     const r = await supabase.from('profiles').select('*').eq('id', uid).single();
 
     const [qCount, aCount, followersCount, followingCount, savedRes, postsRes, repliesRes, repRes] = await Promise.all([
@@ -125,7 +133,6 @@ export default function Profile() {
       following: followingCount.count || 0,
     });
 
-    // Load saved questions
     const savedItems = (savedRes.data || []).map((s: any) => s.questions).filter(Boolean);
     setSavedQuestions(savedItems);
     setMyQuestions(postsRes.data || []);
@@ -208,11 +215,6 @@ export default function Profile() {
     }
   }
 
-  async function logout() {
-    await supabase.auth.signOut();
-    router.replace('/auth');
-  }
-
   async function pickAvatar() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
@@ -235,7 +237,6 @@ export default function Profile() {
     setP({ ...p, avatar_url: data.publicUrl });
   }
 
-  // Toggle Handlers with Instant Persistence
   async function save() {
     const uid = userId;
     if (!uid) return;
@@ -263,7 +264,7 @@ export default function Profile() {
         city: city.trim(),
         district: district.trim(),
       }, false);
-      // Reload from the database so the UI reflects the persisted values exactly.
+      
       const { data: freshProfile } = await supabase.from('profiles').select('*').eq('id', uid).maybeSingle();
       if (freshProfile) {
         setP(freshProfile);
@@ -274,9 +275,9 @@ export default function Profile() {
         setBio(freshProfile.bio || '');
       }
       setEditingProfile(false);
-      Alert.alert('تم الحفظ', 'تم تحديث الاسم والمدينة والحي والنبذة في حسابك.');
+      Alert.alert('تم الحفظ', 'تم تحديث بيانات ملفك الشخصي بنجاح.');
     } catch (error: any) {
-      Alert.alert('تعذّر الحفظ', error?.message || 'لم يتم تحديث الملف. تحقق من الاتصال وإعدادات قاعدة البيانات ثم حاول مجدداً.');
+      Alert.alert('تعذّر الحفظ', error?.message || 'لم يتم تحديث الملف. تحقق من الاتصال وحاول مجدداً.');
     } finally {
       setSaving(false);
     }
@@ -315,7 +316,6 @@ export default function Profile() {
     }
   }
 
-  // Load followers / following list
   async function openFollowsModal(type: 'followers' | 'following') {
     if (!userId) return;
     setFollowsModalType(type);
@@ -347,7 +347,6 @@ export default function Profile() {
     }
   }
 
-  // Unfollow user from modal
   async function unfollowUser(targetId: string) {
     if (!userId) return;
     await supabase.from('follows').delete().eq('follower_id', userId).eq('following_id', targetId);
@@ -402,119 +401,211 @@ export default function Profile() {
     }
   }
 
+  const shareProfile = async () => {
+    const text = `حسابي في تطبيق حيّنا: @${p.username || 'user'}\nتعال شارك معنا في مجتمع الحي!`;
+    try {
+      await Share.share({ message: text, title: personalName || 'الملف الشخصي' });
+    } catch {}
+  };
 
   return (
     <View style={styles.container}>
       <AppHeader
         variant="sub"
         title="الملف الشخصي"
+        subtitle="هويتك وحضورك ومشاركاتك في الحي"
         fallbackRoute="/home"
         rightAction={
           <Pressable
             onPress={() => router.push('/settings')}
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: 18,
-              backgroundColor: '#f1f5f9',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
+            style={styles.headerBtn}
+            accessibilityRole="button"
+            accessibilityLabel="مركز الإعدادات والتحكم"
           >
-            <Settings size={18} color="#475569" />
+            <Settings size={18} color="#047857" />
           </Pressable>
         }
       />
-      <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: bottomNavInset }]} showsVerticalScrollIndicator={false}>
+
+      <ScrollView
+        contentContainerStyle={[styles.scroll, { paddingBottom: bottomNavInset + 32 }]}
+        showsVerticalScrollIndicator={false}
+      >
         {/* ======================================================== */}
-        {/* 1. PROFILE HERO HEADER & AVATAR                          */}
+        {/* UNIFIED NAVIGATION SWITCHER (Profile ⇄ Settings)        */}
         {/* ======================================================== */}
-        <LinearGradient colors={["#064e3b", "#059669", "#10b981"]} start={{x:0,y:0}} end={{x:1,y:1}} style={styles.profileHero}>
-          <View style={styles.profileHeroInner}>
-
-          <View style={styles.profileSummary}>
-            <Pressable onPress={pickAvatar} style={styles.twitterAvatarWrap}>
-              {p.avatar_url ? <Image source={{ uri: p.avatar_url }} style={styles.twitterAvatar} /> :
-                <View style={styles.twitterAvatarFallback}><User size={38} color="#64748b" /></View>}
-              <View style={styles.twitterAvatarEdit}><Camera size={15} color="#fff" /></View>
-            </Pressable>
-            <Pressable style={styles.editProfileButton} onPress={() => setEditingProfile(v => !v)}>
-              <Text style={styles.editProfileButtonText}>{editingProfile ? 'إغلاق التعديل' : 'تعديل الملف الشخصي'}</Text>
-            </Pressable>
-          </View>
-
-          <Text style={styles.twitterDisplayName}>{personalName || 'أضف اسمك الشخصي'}</Text>
-          <Text style={styles.twitterHandle}>@{p.username || 'username'}</Text>
-          {!!bio.trim() && <Text style={styles.twitterBio}>{bio}</Text>}
-          {(city || district) ? (
-            <View style={styles.twitterLocation}><MapPin size={14} color="#64748b" />
-              <Text style={styles.twitterLocationText}>{[region, district && formatDistrictLabel(district), city].filter(Boolean).join('، ')}</Text>
-            </View>
-          ) : null}
-
-          <View style={styles.profileCompletion}>
-            <View style={styles.profileCompletionHeading}>
-              <Text style={styles.profileCompletionPercent}>{profileCompletion}%</Text>
-              <Text style={styles.profileCompletionTitle}>
-                {profileCompletion === 100 ? 'ملفك مكتمل' : 'اكتمال الملف الشخصي'}
+        <View style={styles.navSegmentContainer}>
+          <View style={styles.navSegmentWrap}>
+            <Pressable
+              style={[styles.navSegmentBtn, styles.navSegmentBtnActive]}
+              onPress={() => {}}
+            >
+              <User size={14} color="#fff" />
+              <Text style={[styles.navSegmentText, styles.navSegmentTextActive]}>
+                الملف الشخصي
               </Text>
-            </View>
-            <View style={styles.profileCompletionTrack}>
-              <View style={[styles.profileCompletionFill, { width: `${profileCompletion}%` }]} />
-            </View>
-            {profileCompletion < 100 && (
-              <Pressable
-                onPress={() => setEditingProfile(true)}
-                style={styles.profileCompletionAction}
-                accessibilityRole="button"
-                accessibilityLabel="أكمل بيانات ملفك الشخصي"
-              >
-                <Text style={styles.profileCompletionActionText}>أكمل بياناتك ليعرفك الجيران</Text>
-                <ChevronRight size={15} color="#d1fae5" />
+            </Pressable>
+
+            <Pressable
+              style={styles.navSegmentBtn}
+              onPress={() => router.push('/settings')}
+            >
+              <Settings size={14} color="#64748b" />
+              <Text style={styles.navSegmentText}>
+                مركز الإعدادات والتحكم
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+
+        {/* ======================================================== */}
+        {/* EXECUTIVE PROFILE HERO CARD                              */}
+        {/* ======================================================== */}
+        <View style={styles.heroOuterWrap}>
+          <LinearGradient
+            colors={['#064e3b', '#047857', '#059669']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.heroCard}
+          >
+            <View style={styles.heroTopActions}>
+              <Pressable style={styles.heroActionBtn} onPress={shareProfile}>
+                <Share2 size={15} color="#fff" />
               </Pressable>
+              <Pressable
+                style={[styles.heroEditPill, editingProfile && styles.heroEditPillActive]}
+                onPress={() => setEditingProfile(v => !v)}
+              >
+                <Pencil size={13} color={editingProfile ? '#064e3b' : '#fff'} />
+                <Text style={[styles.heroEditPillText, editingProfile && styles.heroEditPillTextActive]}>
+                  {editingProfile ? 'إغلاق التعديل' : 'تعديل البيانات'}
+                </Text>
+              </Pressable>
+            </View>
+
+            {/* Avatar & Main Identity */}
+            <View style={styles.identityRow}>
+              <Pressable onPress={pickAvatar} style={styles.avatarWrap}>
+                {p.avatar_url ? (
+                  <Image source={{ uri: p.avatar_url }} style={styles.avatarImg} />
+                ) : (
+                  <View style={styles.avatarFallback}>
+                    <Text style={styles.avatarFallbackText}>
+                      {(personalName || p.username || 'ج')[0]?.toUpperCase() || 'ج'}
+                    </Text>
+                  </View>
+                )}
+                <View style={styles.avatarCameraBadge}>
+                  <Camera size={13} color="#fff" />
+                </View>
+              </Pressable>
+
+              <View style={styles.identityTextCol}>
+                <View style={styles.displayNameRow}>
+                  <Text style={styles.displayNameText} numberOfLines={1}>
+                    {personalName || 'أضف اسمك الكريم'}
+                  </Text>
+                  {p.is_verified && <BadgeCheck size={18} color="#34d399" />}
+                </View>
+
+                <Text style={styles.usernameText}>@{p.username || 'username'}</Text>
+
+                {(city || district) ? (
+                  <View style={styles.locationPill}>
+                    <MapPin size={11} color="#a7f3d0" />
+                    <Text style={styles.locationPillText} numberOfLines={1}>
+                      {[district && formatDistrictLabel(district), city].filter(Boolean).join(' · ')}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+            </View>
+
+            {/* Bio text */}
+            {!!bio.trim() && (
+              <View style={styles.bioContainer}>
+                <Text style={styles.bioText}>{bio}</Text>
+              </View>
             )}
-          </View>
 
-          <View style={styles.twitterStats}>
-            <Pressable onPress={() => openFollowsModal('following')} style={styles.twitterStat}>
-              <Text style={styles.twitterStatNum}>{stats.following}</Text><Text style={styles.twitterStatLabel}>يتابع</Text>
-            </Pressable>
-            <Pressable onPress={() => openFollowsModal('followers')} style={styles.twitterStat}>
-              <Text style={styles.twitterStatNum}>{stats.followers}</Text><Text style={styles.twitterStatLabel}>متابع</Text>
-            </Pressable>
-            <Text style={styles.twitterStat}><Text style={styles.twitterStatNum}>{stats.questions + stats.answers}</Text><Text style={styles.twitterStatLabel}> منشور</Text></Text>
-          </View>
-          </View>
-        </LinearGradient>
+            {/* High-Contrast Interactive Stats Ribbon */}
+            <View style={styles.statsRibbon}>
+              <Pressable onPress={() => openFollowsModal('followers')} style={styles.statBox}>
+                <Text style={styles.statNumber}>{stats.followers}</Text>
+                <Text style={styles.statLabel}>متابع</Text>
+              </Pressable>
+              <View style={styles.statDivider} />
+              <Pressable onPress={() => openFollowsModal('following')} style={styles.statBox}>
+                <Text style={styles.statNumber}>{stats.following}</Text>
+                <Text style={styles.statLabel}>يتابع</Text>
+              </Pressable>
+              <View style={styles.statDivider} />
+              <View style={styles.statBox}>
+                <Text style={styles.statNumber}>{stats.questions + stats.answers}</Text>
+                <Text style={styles.statLabel}>مشاركات</Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statBox}>
+                <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 2 }}>
+                  <Text style={styles.statNumber}>{reputationPoints}</Text>
+                  <Text style={{ fontSize: 11 }}>⭐</Text>
+                </View>
+                <Text style={styles.statLabel}>السمعة</Text>
+              </View>
+            </View>
 
-        <NeighborBadgesCard
-          userId={userId || p?.id || ''}
-          isVerifiedNeighbor={Boolean(p.is_verified_neighbor || p.is_geoverified)}
-          city={city}
-          district={district}
-          reputationPoints={reputationPoints}
-          badges={Array.isArray(p.badges) ? p.badges : ['جار جديد 👋', 'صاحب الفزعات 🤝']}
-          onVerifiedSuccess={loadProfile}
-        />
+            {/* Profile Completion Bar */}
+            <View style={styles.completionSection}>
+              <View style={styles.completionHeading}>
+                <Text style={styles.completionTitle}>
+                  {profileCompletion === 100 ? 'الملف الشخصي مكتمل بنجاح ✓' : 'اكتمال بيانات الحساب'}
+                </Text>
+                <Text style={styles.completionPercent}>{profileCompletion}%</Text>
+              </View>
+              <View style={styles.completionTrack}>
+                <View style={[styles.completionFill, { width: `${profileCompletion}%` }]} />
+              </View>
+              {profileCompletion < 100 && !editingProfile && (
+                <Pressable onPress={() => setEditingProfile(true)} style={styles.completePrompt}>
+                  <Sparkles size={12} color="#fef08a" />
+                  <Text style={styles.completePromptText}>أكمل بياناتك ليتعرف عليك جيران الحي بسهولة</Text>
+                </Pressable>
+              )}
+            </View>
+          </LinearGradient>
+        </View>
 
-        <View style={styles.contentArea}>
-          {editingProfile && (
-            <View style={styles.editProfileCard}>
-              <Text style={styles.editProfileHeading}>تعديل الملف الشخصي</Text>
-              <Text style={styles.label}>الاسم الشخصي</Text>
+        {/* ======================================================== */}
+        {/* EDIT PROFILE EXPANDABLE FORM                             */}
+        {/* ======================================================== */}
+        {editingProfile && (
+          <View style={styles.editSectionOuter}>
+            <View style={styles.editCard}>
+              <View style={styles.editCardHeader}>
+                <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
+                  <Pencil size={16} color="#059669" />
+                  <Text style={styles.editCardTitle}>تعديل بيانات الملف الشخصي</Text>
+                </View>
+                <Pressable onPress={() => setEditingProfile(false)} style={styles.editCardCloseBtn}>
+                  <X size={16} color="#64748b" />
+                </Pressable>
+              </View>
+
+              <Text style={styles.inputLabel}>الاسم الشخصي (الظاهر للجيران)</Text>
               <TextInput
-                style={styles.profileInput}
+                style={styles.textInput}
                 value={personalName}
                 onChangeText={setPersonalName}
                 placeholder="اسمك الذي يظهر للناس"
                 placeholderTextColor="#94a3b8"
                 maxLength={60}
               />
-              <Text style={styles.label}>اسم المستخدم</Text>
-              <View style={styles.usernameInputRow}>
+
+              <Text style={[styles.inputLabel, { marginTop: 12 }]}>اسم المستخدم (@username)</Text>
+              <View style={styles.usernameRow}>
                 <Text style={styles.usernameAt}>@</Text>
                 <TextInput
-                  style={[styles.profileInput, styles.usernameInput]}
+                  style={[styles.textInput, styles.usernameField]}
                   value={usernameDraft}
                   onChangeText={setUsernameDraft}
                   autoCapitalize="none"
@@ -524,185 +615,338 @@ export default function Profile() {
                   placeholderTextColor="#94a3b8"
                 />
               </View>
-              <Text style={styles.usernameHint}>
+              <Text style={styles.fieldHint}>
                 {usernameChangeLocked
-                  ? `يمكنك التغيير بعد ${usernameNextChangeAt?.toLocaleDateString('ar-SA')}`
-                  : 'يمكن تغيير اسم المستخدم مرة واحدة كل شهر.'}
+                  ? `يمكنك تغيير اسم المستخدم مجدداً بعد ${usernameNextChangeAt?.toLocaleDateString('ar-SA')}`
+                  : 'يمكنك تغيير اسم المستخدم مرة واحدة كل شهر.'}
               </Text>
               <Pressable
-                style={[styles.usernameChangeButton, usernameChangeLocked && styles.usernameChangeButtonDisabled]}
+                style={[styles.usernameChangeBtn, usernameChangeLocked && styles.btnDisabled]}
                 onPress={changeUsername}
                 disabled={usernameSaving || usernameChangeLocked || usernameDraft.trim().toLowerCase() === String(p.username || '').toLowerCase()}
               >
-                {usernameSaving ? <ActivityIndicator color="#047857" /> : <Text style={styles.usernameChangeButtonText}>تغيير اسم المستخدم</Text>}
+                {usernameSaving ? <ActivityIndicator size="small" color="#047857" /> : <Text style={styles.usernameChangeBtnText}>تأكيد تغيير اسم المستخدم</Text>}
               </Pressable>
-              <Text style={styles.label}>{lockedCity ? `الحي داخل ${lockedCity.city}` : 'المدينة والحي'}</Text>
-              <Pressable style={styles.locationSelectorCard} onPress={() => setShowLocationModal(true)}>
-                <View style={styles.locationSelectorContent}>
-                  <MapPin size={20} color={C.accent} />
-                  <Text style={styles.locationSelectorValue} numberOfLines={2}>
-                    {city ? `${region ? `${region} · ` : ''}${city}${district ? ` · ${formatDistrictLabel(district)}` : ''}` : (lockedCity ? 'اختر حياً داخل مدينتك' : 'اختر المنطقة والمدينة والحي')}
-                  </Text>
-                  <ChevronDown size={18} color={C.muted} />
-                </View>
+
+              <Text style={[styles.inputLabel, { marginTop: 14 }]}>
+                {lockedCity ? `الحي المعتمد داخل ${lockedCity.city}` : 'المدينة والحي'}
+              </Text>
+              <Pressable style={styles.locationSelectorBtn} onPress={() => setShowLocationModal(true)}>
+                <MapPin size={18} color="#059669" />
+                <Text style={styles.locationSelectorValue} numberOfLines={1}>
+                  {city ? `${region ? `${region} · ` : ''}${city}${district ? ` · ${formatDistrictLabel(district)}` : ''}` : (lockedCity ? 'اختر حياً داخل مدينتك' : 'اختر المنطقة والمدينة والحي')}
+                </Text>
+                <ChevronDown size={16} color="#64748b" />
               </Pressable>
-              <Pressable style={styles.currentLocationButton} onPress={useCurrentLocation} disabled={locating}>
-                <MapPin size={17} color={C.accent} />
-                <Text style={styles.currentLocationButtonText}>{locating ? 'جارٍ تحديد موقعك…' : 'استخدام موقعي الحالي'}</Text>
+
+              <Pressable style={styles.gpsSyncBtn} onPress={useCurrentLocation} disabled={locating}>
+                <MapPin size={15} color="#059669" />
+                <Text style={styles.gpsSyncBtnText}>{locating ? 'جارٍ تحديد موقعك الحالي...' : 'تحديث الموقع عبر GPS تلقائياً'}</Text>
               </Pressable>
-              <Text style={styles.label}>نبذة</Text>
+
+              <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginTop: 14 }}>
+                <Text style={styles.inputLabel}>نبذة عنك (Bio)</Text>
+                <Pressable onPress={handleGenerateAIBio} style={styles.aiBioBtn}>
+                  <Sparkles size={13} color="#059669" />
+                  <Text style={styles.aiBioBtnText}>اقتراح ذكي بالذكاء الاصطناعي</Text>
+                </Pressable>
+              </View>
               <TextInput
-                style={[styles.profileInput, styles.bioInput]}
+                style={[styles.textInput, styles.bioField]}
                 value={bio}
                 onChangeText={setBio}
-                placeholder="اكتب نبذة قصيرة عنك"
+                placeholder="اكتب نبذة مختصرة عن اهتماماتك أو مجالك ليتعرف عليك الجيران..."
                 placeholderTextColor="#94a3b8"
                 multiline
                 maxLength={240}
               />
-              <Pressable style={styles.saveProfileButton} onPress={save} disabled={saving}>
-                {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveProfileButtonText}>حفظ التغييرات</Text>}
+
+              <Pressable style={[styles.saveBtn, saving && styles.btnDisabled]} onPress={save} disabled={saving}>
+                {saving ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <>
+                    <CheckCircle2 size={16} color="#fff" />
+                    <Text style={styles.saveBtnText}>حفظ وتحديث الملف الشخصي</Text>
+                  </>
+                )}
               </Pressable>
             </View>
-          )}
-
-          <View style={styles.profileTabs}>
-            {([
-              ['posts', 'المنشورات'], ['replies', 'الردود'], ['saved', 'المحفوظات'],
-            ] as const).map(([key, label]) => (
-              <Pressable key={key} onPress={() => setActiveTab(key)} style={styles.profileTab}>
-                  <Text style={[styles.profileTabText, activeTab === key && styles.profileTabTextActive]}>
-                    {label} <Text style={styles.profileTabCount}>{key === 'posts' ? myQuestions.length : key === 'replies' ? myAnswers.length : savedQuestions.length}</Text>
-                  </Text>
-                {activeTab === key && <View style={styles.profileTabIndicator} />}
-              </Pressable>
-            ))}
           </View>
+        )}
 
-          {activeTab === 'posts' && (myQuestions.length ? myQuestions.map(item => (
-            <Pressable key={item.id} style={styles.feedItem} onPress={() => router.push({ pathname: '/question', params: { id: item.id } })}>
-              <View style={styles.feedAvatarSmall}>{p.avatar_url ? <Image source={{ uri: p.avatar_url }} style={styles.feedAvatarImage} /> : <User size={18} color="#64748b" />}</View>
-              <View style={styles.feedBody}>
-                <Text style={styles.feedAuthor}>{personalName || 'مستخدم'} <Text style={styles.feedHandle}>@{p.username || 'username'} · {new Date(item.created_at).toLocaleDateString('ar-SA')}</Text></Text>
-                <Text style={styles.feedTitle}>{item.title}</Text>
-                <Text style={styles.feedText} numberOfLines={4}>{item.body}</Text>
-                {(item.district || item.city) && <Text style={styles.feedMeta}>{[item.district && `حي ${item.district}`, item.city].filter(Boolean).join(' · ')}</Text>}
-              </View>
-            </Pressable>
-          )) : <Text style={styles.emptyFeed}>لا توجد منشورات بعد.</Text>)}
-
-          {activeTab === 'replies' && (myAnswers.length ? myAnswers.map(item => (
-            <Pressable key={item.id} style={styles.feedItem} onPress={() => router.push({ pathname: '/question', params: { id: item.question_id } })}>
-              <View style={styles.feedAvatarSmall}>{p.avatar_url ? <Image source={{ uri: p.avatar_url }} style={styles.feedAvatarImage} /> : <User size={18} color="#64748b" />}</View>
-              <View style={styles.feedBody}>
-                <Text style={styles.feedAuthor}>{personalName || 'مستخدم'} <Text style={styles.feedHandle}>@{p.username || 'username'} · ردّ على</Text></Text>
-                <Text style={styles.feedTitle}>{item.questions?.title || 'سؤال من الحي'}</Text>
-                <Text style={styles.feedText}>{item.body}</Text>
-              </View>
-            </Pressable>
-          )) : <Text style={styles.emptyFeed}>لا توجد ردود بعد.</Text>)}
-
-          {activeTab === 'saved' && (savedQuestions.length ? savedQuestions.map(item => (
-            <Pressable key={item.id} style={styles.feedItem} onPress={() => router.push({ pathname: '/question', params: { id: item.id } })}>
-              <View style={styles.feedAvatarSmall}><Bookmark size={18} color="#059669" /></View>
-              <View style={styles.feedBody}>
-                <Text style={styles.feedAuthor}>استفسار محفوظ</Text>
-                <Text style={styles.feedTitle}>{item.title}</Text>
-                <Text style={styles.feedText} numberOfLines={3}>{item.body}</Text>
-              </View>
-            </Pressable>
-          )) : <Text style={styles.emptyFeed}>لا توجد عناصر محفوظة بعد.</Text>)}
+        {/* ======================================================== */}
+        {/* NEIGHBOR TRUST & BADGES CARD                             */}
+        {/* ======================================================== */}
+        <View style={styles.badgesWrapper}>
+          <NeighborBadgesCard
+            userId={userId || p?.id || ''}
+            isVerifiedNeighbor={Boolean(p.is_verified_neighbor || p.is_geoverified)}
+            city={city}
+            district={district}
+            reputationPoints={reputationPoints}
+            badges={Array.isArray(p.badges) ? p.badges : ['جار جديد 👋', 'صاحب الفزعات 🤝']}
+            onVerifiedSuccess={loadProfile}
+          />
         </View>
 
-          <Pressable style={styles.logoutBtn} onPress={logout}>
-            <LogOut size={18} color={C.danger} style={{ marginLeft: 8 }} />
-            <Text style={styles.logoutText}>تسجيل الخروج</Text>
-          </Pressable>
+        {/* ======================================================== */}
+        {/* ACTIVITY FEED & POSTS TABS                               */}
+        {/* ======================================================== */}
+        <View style={styles.feedSectionOuter}>
+          <View style={styles.tabsBar}>
+            {([
+              ['posts', 'المنشورات والاستفسارات', myQuestions.length],
+              ['replies', 'الردود والمشاركات', myAnswers.length],
+              ['saved', 'المحفوظات', savedQuestions.length],
+            ] as const).map(([key, label, count]) => {
+              const active = activeTab === key;
+              return (
+                <Pressable
+                  key={key}
+                  onPress={() => setActiveTab(key)}
+                  style={[styles.tabItem, active && styles.tabItemActive]}
+                >
+                  <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>
+                    {label}
+                  </Text>
+                  <View style={[styles.tabCountPill, active && styles.tabCountPillActive]}>
+                    <Text style={[styles.tabCountText, active && styles.tabCountTextActive]}>
+                      {count}
+                    </Text>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
 
-          <View style={{ height: 90 }} />
+          {/* TAB 1: POSTS */}
+          {activeTab === 'posts' && (
+            myQuestions.length > 0 ? (
+              <View style={styles.feedList}>
+                {myQuestions.map(item => (
+                  <Pressable
+                    key={item.id}
+                    style={styles.feedCard}
+                    onPress={() => router.push({ pathname: '/question', params: { id: item.id } })}
+                  >
+                    <View style={styles.feedCardTop}>
+                      <View style={styles.feedCardAvatar}>
+                        {p.avatar_url ? (
+                          <Image source={{ uri: p.avatar_url }} style={styles.feedCardAvatarImg} />
+                        ) : (
+                          <User size={16} color="#64748b" />
+                        )}
+                      </View>
+                      <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                        <Text style={styles.feedAuthorName}>{personalName || 'مستخدم'}</Text>
+                        <Text style={styles.feedCardTime}>
+                          {new Date(item.created_at).toLocaleDateString('ar-SA')}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <Text style={styles.feedCardTitle}>{item.title}</Text>
+                    <Text style={styles.feedCardBody} numberOfLines={3}>{item.body}</Text>
+
+                    {(item.district || item.city) && (
+                      <View style={styles.feedCardFooter}>
+                        <MapPin size={11} color="#059669" />
+                        <Text style={styles.feedCardLocation}>
+                          {[item.district && `حي ${item.district}`, item.city].filter(Boolean).join(' · ')}
+                        </Text>
+                      </View>
+                    )}
+                  </Pressable>
+                ))}
+              </View>
+            ) : (
+              <View style={styles.emptyFeedBox}>
+                <MessageCircle size={36} color="#cbd5e1" />
+                <Text style={styles.emptyFeedTitle}>لا توجد منشورات أو استفسارات بعد</Text>
+                <Text style={styles.emptyFeedDesc}>شارك جيرانك سؤالاً أو استفساراً في حيك الآن!</Text>
+                <Pressable style={styles.emptyFeedBtn} onPress={() => router.push('/ask')}>
+                  <Text style={styles.emptyFeedBtnText}>+ طرح استفسار بالحي</Text>
+                </Pressable>
+              </View>
+            )
+          )}
+
+          {/* TAB 2: REPLIES */}
+          {activeTab === 'replies' && (
+            myAnswers.length > 0 ? (
+              <View style={styles.feedList}>
+                {myAnswers.map(item => (
+                  <Pressable
+                    key={item.id}
+                    style={styles.feedCard}
+                    onPress={() => router.push({ pathname: '/question', params: { id: item.question_id } })}
+                  >
+                    <View style={styles.feedCardTop}>
+                      <View style={styles.feedCardAvatar}>
+                        {p.avatar_url ? (
+                          <Image source={{ uri: p.avatar_url }} style={styles.feedCardAvatarImg} />
+                        ) : (
+                          <User size={16} color="#64748b" />
+                        )}
+                      </View>
+                      <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                        <Text style={styles.feedAuthorName}>ردّك على: {item.questions?.title || 'استفسار من الحي'}</Text>
+                        <Text style={styles.feedCardTime}>
+                          {new Date(item.created_at).toLocaleDateString('ar-SA')}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={styles.feedCardBody}>{item.body}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : (
+              <View style={styles.emptyFeedBox}>
+                <MessageCircle size={36} color="#cbd5e1" />
+                <Text style={styles.emptyFeedTitle}>لم تشارك بأي ردود بعد</Text>
+                <Text style={styles.emptyFeedDesc}>تفاعل مع استفسارات الجيران وساعدهم بالمعلومات المفيدة.</Text>
+              </View>
+            )
+          )}
+
+          {/* TAB 3: SAVED */}
+          {activeTab === 'saved' && (
+            savedQuestions.length > 0 ? (
+              <View style={styles.feedList}>
+                {savedQuestions.map(item => (
+                  <Pressable
+                    key={item.id}
+                    style={styles.feedCard}
+                    onPress={() => router.push({ pathname: '/question', params: { id: item.id } })}
+                  >
+                    <View style={styles.feedCardTop}>
+                      <View style={[styles.feedCardAvatar, { backgroundColor: '#ecfdf5' }]}>
+                        <Bookmark size={16} color="#059669" />
+                      </View>
+                      <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                        <Text style={styles.feedAuthorName}>استفسار محفوظ</Text>
+                        <Text style={styles.feedCardTime}>
+                          {new Date(item.created_at).toLocaleDateString('ar-SA')}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={styles.feedCardTitle}>{item.title}</Text>
+                    <Text style={styles.feedCardBody} numberOfLines={3}>{item.body}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : (
+              <View style={styles.emptyFeedBox}>
+                <Bookmark size={36} color="#cbd5e1" />
+                <Text style={styles.emptyFeedTitle}>لا توجد استفسارات محفوظة</Text>
+                <Text style={styles.emptyFeedDesc}>يمكنك حفظ الاستفسارات المهمة للرجوع إليها لاحقاً.</Text>
+              </View>
+            )
+          )}
+        </View>
+
+        {/* ======================================================== */}
+        {/* SEAMLESS JUMP TO SETTINGS CARD (Zero Duplication)        */}
+        {/* ======================================================== */}
+        <View style={styles.settingsPromoWrapper}>
+          <Pressable style={styles.settingsPromoCard} onPress={() => router.push('/settings')}>
+            <View style={styles.settingsPromoIcon}>
+              <Shield size={22} color="#059669" />
+            </View>
+            <View style={{ flex: 1, alignItems: 'flex-end' }}>
+              <Text style={styles.settingsPromoTitle}>مركز الإعدادات والتحكم والأمان</Text>
+              <Text style={styles.settingsPromoDesc}>
+                تغيير كلمة المرور، البريد، ساعات الصمت، توثيق الهوية، وإدارة الخصوصية
+              </Text>
+            </View>
+            <View style={styles.settingsPromoArrow}>
+              <ChevronLeft size={18} color="#059669" />
+            </View>
+          </Pressable>
+        </View>
       </ScrollView>
 
       {/* ======================================================== */}
-      {/* 6. FOLLOWERS & FOLLOWING MODAL                           */}
+      {/* FOLLOWERS & FOLLOWING MODAL                             */}
       {/* ======================================================== */}
-      <ActionSheet visible={followsModalOpen} onClose={() => setFollowsModalOpen(false)} height="50%">
+      <ActionSheet visible={followsModalOpen} onClose={() => setFollowsModalOpen(false)} height="55%">
         <View style={{ flex: 1 }}>
-            <View style={styles.modalHeaderRow}>
-              <Pressable onPress={() => setFollowsModalOpen(false)} style={styles.modalCloseBtn}>
-                <X size={20} color="#64748b" />
-              </Pressable>
-              <Text style={styles.modalTitle}>
-                {followsModalType === 'followers' ? 'المتابعون' : 'من تتابعهم'}
+          <View style={styles.modalHeaderRow}>
+            <Pressable onPress={() => setFollowsModalOpen(false)} style={styles.modalCloseBtn}>
+              <X size={18} color="#64748b" />
+            </Pressable>
+            <Text style={styles.modalTitle}>
+              {followsModalType === 'followers' ? 'المتابعون في الحي' : 'من تتابعهم في الحي'}
+            </Text>
+          </View>
+
+          {followsLoading ? (
+            <View style={styles.modalLoadingBox}>
+              <ActivityIndicator size="large" color="#059669" />
+              <Text style={styles.modalLoadingText}>جاري التحميل...</Text>
+            </View>
+          ) : followsList.length === 0 ? (
+            <View style={styles.modalEmptyBox}>
+              <Users size={44} color="#cbd5e1" />
+              <Text style={styles.modalEmptyTitle}>
+                {followsModalType === 'followers' ? 'لا يوجد متابعون بعد' : 'أنت لا تتابع أحداً بعد'}
+              </Text>
+              <Text style={styles.modalEmptySub}>
+                تفاعل مع أهالي حيك وابدأ بمتابعة من يهمك محتواهم
               </Text>
             </View>
-
-            {followsLoading ? (
-              <View style={styles.modalLoadingBox}>
-                <ActivityIndicator size="large" color="#059669" />
-                <Text style={styles.modalLoadingText}>جاري التحميل...</Text>
-              </View>
-            ) : followsList.length === 0 ? (
-              <View style={styles.modalEmptyBox}>
-                <Users size={48} color="#cbd5e1" />
-                <Text style={styles.modalEmptyTitle}>
-                  {followsModalType === 'followers' ? 'لا يوجد متابعون بعد' : 'أنت لا تتابع أحداً بعد'}
-                </Text>
-                <Text style={styles.modalEmptySub}>
-                  تفاعل مع أهالي حيك وابدأ بمتابعة من يهمك محتواهم
-                </Text>
-              </View>
-            ) : (
-              <ScrollView style={styles.modalList} showsVerticalScrollIndicator={false}>
-                {followsList.map(u => (
-                  <View key={u.id} style={styles.followUserCard}>
-                    {/* Action button: Unfollow if in following mode */}
-                    {followsModalType === 'following' ? (
-                      <Pressable
-                        style={styles.unfollowBtn}
-                        onPress={() => unfollowUser(u.id)}
-                      >
-                        <Text style={styles.unfollowBtnText}>إلغاء المتابعة</Text>
-                      </Pressable>
-                    ) : (
-                      <Pressable
-                        style={styles.viewProfileBtn}
-                        onPress={() => {
-                          setFollowsModalOpen(false);
-                          router.push({ pathname: '/user', params: { id: u.id } });
-                        }}
-                      >
-                        <Text style={styles.viewProfileBtnText}>عرض الحساب</Text>
-                      </Pressable>
-                    )}
-
+          ) : (
+            <ScrollView style={styles.modalList} showsVerticalScrollIndicator={false}>
+              {followsList.map(u => (
+                <View key={u.id} style={styles.followUserCard}>
+                  {followsModalType === 'following' ? (
                     <Pressable
-                      style={styles.followUserInfo}
+                      style={styles.unfollowBtn}
+                      onPress={() => unfollowUser(u.id)}
+                    >
+                      <Text style={styles.unfollowBtnText}>إلغاء المتابعة</Text>
+                    </Pressable>
+                  ) : (
+                    <Pressable
+                      style={styles.viewProfileBtn}
                       onPress={() => {
                         setFollowsModalOpen(false);
                         router.push({ pathname: '/user', params: { id: u.id } });
                       }}
                     >
-                      <View style={{ alignItems: 'flex-end' }}>
-                        <Text style={styles.followUserName}>
-                          {u.display_name || `@${u.username}`} {u.is_verified ? '✓' : ''}
-                        </Text>
-                        <Text style={styles.followUserLocation}>
-                          {u.district ? `حي ${u.district}` : u.city || 'ساكن بالحي'}
-                        </Text>
-                      </View>
-
-                      {u.avatar_url ? (
-                        <Image source={{ uri: u.avatar_url }} style={styles.followAvatar} />
-                      ) : (
-                        <View style={styles.followAvatarFallback}>
-                          <User size={20} color="#059669" />
-                        </View>
-                      )}
+                      <Text style={styles.viewProfileBtnText}>عرض الحساب</Text>
                     </Pressable>
-                  </View>
-                ))}
-              </ScrollView>
-            )}
+                  )}
+
+                  <Pressable
+                    style={styles.followUserInfo}
+                    onPress={() => {
+                      setFollowsModalOpen(false);
+                      router.push({ pathname: '/user', params: { id: u.id } });
+                    }}
+                  >
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={styles.followUserName}>
+                        {u.display_name || `@${u.username}`} {u.is_verified ? '✓' : ''}
+                      </Text>
+                      <Text style={styles.followUserLocation}>
+                        {u.district ? `حي ${u.district}` : u.city || 'ساكن بالحي'}
+                      </Text>
+                    </View>
+
+                    {u.avatar_url ? (
+                      <Image source={{ uri: u.avatar_url }} style={styles.followAvatar} />
+                    ) : (
+                      <View style={styles.followAvatarFallback}>
+                        <User size={18} color="#059669" />
+                      </View>
+                    )}
+                  </Pressable>
+                </View>
+              ))}
+            </ScrollView>
+          )}
         </View>
       </ActionSheet>
 
@@ -717,669 +961,753 @@ export default function Profile() {
           void applyManualLocation(reg, c, d);
         }}
       />
-
-      {/* Bottom Navigation */}
-      
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  profileHero: {
-    backgroundColor: '#059669',
-    paddingTop: 18,
-    paddingHorizontal: 18,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-  },
-  profileHeroInner: {
-    width: '100%',
-    maxWidth: 960,
-    alignSelf: 'center',
-  },
-  profileTopBar: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', height: 42, marginBottom: 8 },
-  profileTopButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.16)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)' },
-  profileTopTitle: { color: '#fff', fontSize: 18, fontWeight: '900' },
-  profileSummary: { flexDirection: 'row-reverse', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: 8, marginBottom: 12 },
-  twitterAvatarWrap: { width: 84, height: 84, borderRadius: 42, position: 'relative' },
-  twitterAvatar: { width: 84, height: 84, borderRadius: 42, backgroundColor: '#e2e8f0' },
-  twitterAvatarFallback: { width: 84, height: 84, borderRadius: 42, backgroundColor: '#e2e8f0', alignItems: 'center', justifyContent: 'center' },
-  twitterAvatarEdit: { position: 'absolute', bottom: 0, left: 0, width: 28, height: 28, borderRadius: 14, backgroundColor: '#059669', borderWidth: 2, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
-  editProfileButton: { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 22, paddingVertical: 8, paddingHorizontal: 15, marginBottom: 4 },
-  editProfileButtonText: { color: '#0f172a', fontSize: 13, fontWeight: '800' },
-  twitterDisplayName: { color: '#fff', fontSize: 21, fontWeight: '900', textAlign: 'right' },
-  twitterHandle: { color: 'rgba(255,255,255,0.72)', fontSize: 14, textAlign: 'right', marginTop: 2 },
-  twitterBio: { color: 'rgba(255,255,255,0.92)', fontSize: 14, lineHeight: 22, textAlign: 'right', marginTop: 12 },
-  twitterLocation: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, marginTop: 9 },
-  twitterLocationText: { color: 'rgba(255,255,255,0.82)', fontSize: 13 },
-  twitterStats: { flexDirection: 'row-reverse', gap: 20, marginTop: 14, backgroundColor: 'rgba(0,0,0,0.16)', borderRadius: 18, paddingVertical: 10, paddingHorizontal: 14 },
-  twitterStat: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4 },
-  twitterStatNum: { color: '#fff', fontSize: 14, fontWeight: '900' },
-  twitterStatLabel: { color: 'rgba(255,255,255,0.78)', fontSize: 13 },
-  profileCompletion: { marginTop: 13, marginBottom: 2 },
-  profileCompletionHeading: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 7 },
-  profileCompletionTitle: { color: 'rgba(255,255,255,0.88)', fontSize: 12, fontWeight: '700' },
-  profileCompletionPercent: { color: '#fff', fontSize: 12, fontWeight: '900' },
-  profileCompletionTrack: { height: 5, borderRadius: 3, overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.24)' },
-  profileCompletionFill: { height: '100%', borderRadius: 3, backgroundColor: '#d1fae5' },
-  profileCompletionAction: { alignSelf: 'flex-start', flexDirection: 'row-reverse', alignItems: 'center', gap: 4, paddingVertical: 6 },
-  profileCompletionActionText: { color: '#d1fae5', fontSize: 12, fontWeight: '800' },
-  editProfileCard: { backgroundColor: '#fff', borderBottomWidth: 1, borderColor: '#e2e8f0', padding: 16, gap: 8 },
-  editProfileHeading: { fontSize: 17, color: '#0f172a', fontWeight: '900', textAlign: 'right', marginBottom: 6 },
-  profileInput: { borderWidth: 1, borderColor: '#cbd5e1', backgroundColor: '#fff', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, color: '#0f172a', textAlign: 'right', fontSize: 14 },
-  usernameInputRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#cbd5e1', backgroundColor: '#fff', borderRadius: 12, paddingHorizontal: 12 },
-  usernameAt: { color: '#64748b', fontSize: 14, fontWeight: '800' },
-  usernameInput: { flex: 1, borderWidth: 0, textAlign: 'left' },
-  usernameHint: { color: '#64748b', fontSize: 12, textAlign: 'right' },
-  usernameChangeButton: { minHeight: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#ecfdf5', borderWidth: 1, borderColor: '#a7f3d0' },
-  usernameChangeButtonDisabled: { opacity: 0.5 },
-  usernameChangeButtonText: { color: '#047857', fontSize: 13, fontWeight: '900' },
-  readOnlyInput: { color: '#64748b', backgroundColor: '#f8fafc', textAlign: 'left' },
-  bioInput: { minHeight: 82, textAlignVertical: 'top' },
-  saveProfileButton: { backgroundColor: '#0f172a', borderRadius: 22, minHeight: 44, alignItems: 'center', justifyContent: 'center', marginTop: 6 },
-  saveProfileButtonText: { color: '#fff', fontSize: 14, fontWeight: '900' },
-  profileTabs: { flexDirection: 'row-reverse', borderBottomWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#fff' },
-  profileTab: { flex: 1, minHeight: 50, alignItems: 'center', justifyContent: 'center', position: 'relative' },
-  profileTabText: { color: '#64748b', fontSize: 13, fontWeight: '700' },
-  profileTabTextActive: { color: '#059669', fontWeight: '900' },
-  profileTabCount: { color: '#94a3b8', fontSize: 11, fontWeight: '700' },
-  profileTabIndicator: { position: 'absolute', bottom: 0, width: 46, height: 3, borderRadius: 2, backgroundColor: '#059669' },
-  feedItem: { flexDirection: 'row-reverse', gap: 10, backgroundColor: '#fff', padding: 15, borderBottomWidth: 1, borderColor: '#e2e8f0' },
-  feedAvatarSmall: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  feedAvatarImage: { width: 40, height: 40, borderRadius: 20 },
-  feedBody: { flex: 1, alignItems: 'flex-end' },
-  feedAuthor: { width: '100%', color: '#0f172a', fontSize: 13, fontWeight: '800', textAlign: 'right' },
-  feedHandle: { color: '#64748b', fontSize: 12, fontWeight: '400' },
-  feedTitle: { color: '#0f172a', fontSize: 15, fontWeight: '800', lineHeight: 22, textAlign: 'right', width: '100%', marginTop: 7 },
-  feedText: { color: '#334155', fontSize: 14, lineHeight: 21, textAlign: 'right', width: '100%', marginTop: 4 },
-  feedMeta: { color: '#059669', fontSize: 12, marginTop: 8, textAlign: 'right', width: '100%' },
-  emptyFeed: { backgroundColor: '#fff', color: '#64748b', fontSize: 14, textAlign: 'center', paddingVertical: 42 },
   container: {
     flex: 1,
     backgroundColor: '#f8fafc',
+    width: '100%',
   },
   scroll: {
     paddingBottom: 40,
   },
-  headerHero: {
-    paddingTop: Platform.OS === 'ios' ? 52 : 40,
-    paddingHorizontal: 20,
-    paddingBottom: 28,
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
-  },
-  navBar: {
-    flexDirection: 'row-reverse',
-    justifyContent: 'space-between',
+  headerBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
     alignItems: 'center',
-    marginBottom: 16,
+    justifyContent: 'center',
   },
-  backBtn: {
-    padding: 6,
+
+  // Navigation Switcher Segment (Profile ⇄ Settings)
+  navSegmentContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 6,
+    maxWidth: 960,
+    width: '100%',
+    alignSelf: 'center',
   },
-  navTitle: {
+  navSegmentWrap: {
+    flexDirection: 'row-reverse',
+    backgroundColor: '#e2e8f0',
+    borderRadius: 14,
+    padding: 3,
+    gap: 4,
+  },
+  navSegmentBtn: {
+    flex: 1,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 9,
+    borderRadius: 11,
+  },
+  navSegmentBtnActive: {
+    backgroundColor: '#059669',
+    shadowColor: '#059669',
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  navSegmentText: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  navSegmentTextActive: {
     color: '#fff',
-    fontSize: 20,
     fontWeight: '900',
   },
-  settingsNavBtn: {
-    padding: 6,
+
+  // Executive Hero Card
+  heroOuterWrap: {
+    paddingHorizontal: 16,
+    paddingTop: 6,
+    paddingBottom: 10,
+    maxWidth: 960,
+    width: '100%',
+    alignSelf: 'center',
   },
-  avatarSection: {
-    alignItems: 'center',
+  heroCard: {
+    borderRadius: 22,
+    padding: 18,
+    shadowColor: '#059669',
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
   },
-  avatarWrapper: {
-    width: 104,
-    height: 104,
-    borderRadius: 52,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderWidth: 3.5,
-    borderColor: '#fff',
+  heroTopActions: {
+    flexDirection: 'row-reverse',
     alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
+    justifyContent: 'space-between',
     marginBottom: 12,
   },
-  avatarImage: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 52,
-  },
-  avatarPlaceholder: {
+  heroEditPill: {
+    flexDirection: 'row-reverse',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+    paddingHorizontal: 11,
+    paddingVertical: 5,
+    borderRadius: 14,
   },
-  editIconWrapper: {
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
+  heroEditPillActive: {
     backgroundColor: '#fff',
+    borderColor: '#fff',
+  },
+  heroEditPillText: {
+    color: '#fff',
+    fontSize: 11.5,
+    fontWeight: '800',
+  },
+  heroEditPillTextActive: {
+    color: '#064e3b',
+    fontWeight: '900',
+  },
+  heroActionBtn: {
     width: 32,
     height: 32,
     borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.18)',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+  },
+
+  // Identity Row
+  identityRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 14,
+  },
+  avatarWrap: {
+    width: 82,
+    height: 82,
+    borderRadius: 41,
+    position: 'relative',
+    borderWidth: 3,
+    borderColor: '#fff',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
     elevation: 3,
   },
-  nameRow: {
-    flexDirection: 'row-reverse',
+  avatarImg: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 38,
+  },
+  avatarFallback: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 38,
+    backgroundColor: 'rgba(255,255,255,0.25)',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 6,
-  },
-  username: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: '900',
-  },
-  statusBadgesRow: {
-    flexDirection: 'row-reverse',
-    flexWrap: 'wrap',
     justifyContent: 'center',
-    gap: 6,
-    marginBottom: 16,
   },
-  verifiedResidentTag: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#dcfce7',
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 12,
-  },
-  verifiedResidentTagText: {
-    color: '#15803d',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  pendingTag: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(245,158,11,0.2)',
-    borderWidth: 1,
-    borderColor: '#f59e0b',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 12,
-  },
-  pendingTagText: {
-    color: '#fef3c7',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  verifiedIdTag: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(5,150,105,0.2)',
-    borderWidth: 1,
-    borderColor: '#a7f3d0',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 12,
-  },
-  verifiedIdTagText: {
-    color: '#ecfdf5',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  privateTag: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(6,95,70,0.6)',
-    borderWidth: 1,
-    borderColor: '#a7f3d0',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 12,
-  },
-  privateTagText: {
+  avatarFallbackText: {
     color: '#fff',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  incognitoTag: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(217,119,6,0.4)',
-    borderWidth: 1,
-    borderColor: '#fbbf24',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 12,
-  },
-  incognitoTagText: {
-    color: '#fef3c7',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  dndTag: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(239,68,68,0.4)',
-    borderWidth: 1,
-    borderColor: '#fca5a5',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 12,
-  },
-  dndTagText: {
-    color: '#fee2e2',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  statsRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    borderRadius: 20,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    width: '100%',
-    justifyContent: 'space-around',
-  },
-  statBox: {
-    alignItems: 'center',
-  },
-  statBoxInteractive: {
-    alignItems: 'center',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  statNumber: {
-    color: '#fff',
-    fontSize: 18,
+    fontSize: 30,
     fontWeight: '900',
   },
-  statLabel: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 11,
-    fontWeight: '700',
-    marginTop: 2,
-  },
-  statDivider: {
-    width: 1,
-    height: 24,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-  },
-  contentArea: {
-    padding: 18,
-    marginTop: -8,
-    width: '100%',
-    maxWidth: 960,
-    alignSelf: 'center',
-  },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 22,
-    padding: 18,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: '#f1f5f9',
-  },
-  sectionHeader: {
-    flexDirection: 'row-reverse',
+  avatarCameraBadge: {
+    position: 'absolute',
+    bottom: -2,
+    left: -2,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#064e3b',
+    borderWidth: 2,
+    borderColor: '#fff',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 16,
-    borderBottomWidth: 1,
-    borderColor: '#f1f5f9',
-    paddingBottom: 10,
+    justifyContent: 'center',
   },
-  sectionTitle: {
-    color: '#0f172a',
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  settingRow: {
-    flexDirection: 'row-reverse',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderColor: '#f8fafc',
-    gap: 12,
-  },
-  settingText: {
+  identityTextCol: {
     flex: 1,
     alignItems: 'flex-end',
   },
-  settingLabelWithBadge: {
+  displayNameRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 3,
   },
-  settingTitle: {
-    color: '#0f172a',
-    fontSize: 14,
-    fontWeight: '800',
+  displayNameText: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '900',
     textAlign: 'right',
   },
-  settingDesc: {
-    color: '#64748b',
-    fontSize: 12,
+  usernameText: {
+    color: '#a7f3d0',
+    fontSize: 13.5,
+    fontWeight: '700',
+    marginTop: 2,
     textAlign: 'right',
-    lineHeight: 18,
   },
-  inputGroup: {
-    marginBottom: 14,
-  },
-  label: {
-    color: '#334155',
-    fontSize: 13,
-    fontWeight: '800',
-    textAlign: 'right',
-    marginBottom: 8,
-  },
-  locationSelectorCard: {
-    backgroundColor: '#f8fafc',
-    borderRadius: 14,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  currentLocationButton: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 7, backgroundColor: '#ecfdf5', borderWidth: 1, borderColor: '#a7f3d0', borderRadius: 12, paddingVertical: 10, marginTop: 2 },
-  currentLocationButtonText: { color: C.accent, fontSize: 13, fontWeight: '900' },
-  locationSelectorContent: {
+  locationPill: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    gap: 10,
+    gap: 4,
+    backgroundColor: 'rgba(0,0,0,0.22)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    marginTop: 6,
   },
-  locationSelectorValue: {
-    flex: 1,
-    color: '#334155',
-    fontSize: 13,
+  locationPillText: {
+    color: '#d1fae5',
+    fontSize: 11,
     fontWeight: '700',
+  },
+
+  // Bio
+  bioContainer: {
+    backgroundColor: 'rgba(0,0,0,0.18)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  bioText: {
+    color: '#ecfdf5',
+    fontSize: 12.5,
     lineHeight: 19,
     textAlign: 'right',
   },
-  locationIconBox: {
-    width: 40,
-    height: 40,
+
+  // Stats Ribbon
+  statsRibbon: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(0,0,0,0.24)',
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginTop: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+  },
+  statBox: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 2,
+  },
+  statNumber: {
+    color: '#fff',
+    fontSize: 14.5,
+    fontWeight: '900',
+  },
+  statLabel: {
+    color: '#a7f3d0',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  statDivider: {
+    width: 1,
+    height: 22,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+  },
+
+  // Completion Section
+  completionSection: {
+    marginTop: 14,
+  },
+  completionHeading: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  completionTitle: {
+    color: '#d1fae5',
+    fontSize: 11.5,
+    fontWeight: '800',
+  },
+  completionPercent: {
+    color: '#fff',
+    fontSize: 11.5,
+    fontWeight: '900',
+  },
+  completionTrack: {
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    overflow: 'hidden',
+  },
+  completionFill: {
+    height: '100%',
+    backgroundColor: '#34d399',
+    borderRadius: 3,
+  },
+  completePrompt: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 6,
+  },
+  completePromptText: {
+    color: '#fef08a',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+
+  // Edit Section
+  editSectionOuter: {
+    paddingHorizontal: 16,
+    marginBottom: 12,
+    maxWidth: 960,
+    width: '100%',
+    alignSelf: 'center',
+  },
+  editCard: {
+    backgroundColor: '#fff',
     borderRadius: 20,
-    backgroundColor: '#ecfdf5',
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    shadowColor: '#0f172a',
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  editCardHeader: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderColor: '#f1f5f9',
+    paddingBottom: 10,
+    marginBottom: 12,
+  },
+  editCardTitle: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#0f172a',
+  },
+  editCardCloseBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#f1f5f9',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  locationTitle: {
+  inputLabel: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#334155',
+    textAlign: 'right',
+    marginBottom: 6,
+  },
+  textInput: {
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     color: '#0f172a',
+    textAlign: 'right',
+    fontSize: 13.5,
+  },
+  usernameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+  },
+  usernameAt: {
+    color: '#64748b',
     fontSize: 14,
     fontWeight: '800',
   },
-  locationSub: {
+  usernameField: {
+    flex: 1,
+    borderWidth: 0,
+    textAlign: 'left',
+    backgroundColor: 'transparent',
+  },
+  fieldHint: {
     color: '#64748b',
     fontSize: 11,
-    marginTop: 2,
-  },
-  bioLabelRow: {
-    flexDirection: 'row-reverse',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    textAlign: 'right',
+    marginTop: 4,
     marginBottom: 8,
+  },
+  usernameChangeBtn: {
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+    paddingVertical: 8,
+    marginBottom: 4,
+  },
+  usernameChangeBtnText: {
+    color: '#047857',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  locationSelectorBtn: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+  },
+  locationSelectorValue: {
+    flex: 1,
+    textAlign: 'right',
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0f172a',
+    marginHorizontal: 8,
+  },
+  gpsSyncBtn: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+    borderRadius: 10,
+    paddingVertical: 8,
+    marginTop: 6,
+  },
+  gpsSyncBtnText: {
+    color: '#047857',
+    fontSize: 12,
+    fontWeight: '800',
   },
   aiBioBtn: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#ecfdf5',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
   },
   aiBioBtnText: {
     color: '#059669',
-    fontSize: 11,
+    fontSize: 11.5,
     fontWeight: '800',
   },
-  inputContainer: {
-    backgroundColor: '#f8fafc',
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  input: {
-    color: '#0f172a',
-    fontSize: 13,
-    width: '100%',
-    textAlign: 'right',
-  },
-  actionBtn: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 13,
-    borderBottomWidth: 1,
-    borderColor: '#f1f5f9',
-  },
-  actionBtnText: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#0f172a',
-  },
-  actionBtnSub: {
-    fontSize: 11,
-    color: '#64748b',
-    marginTop: 2,
-  },
-  smallVerifiedBadge: {
-    backgroundColor: '#dcfce7',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  smallVerifiedBadgeText: {
-    color: '#15803d',
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  smallPendingBadge: {
-    backgroundColor: '#fef3c7',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  smallPendingBadgeText: {
-    color: '#d97706',
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  smallActiveBadge: {
-    backgroundColor: '#dcfce7',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  smallActiveBadgeText: {
-    color: '#15803d',
-    fontSize: 10,
-    fontWeight: '800',
+  bioField: {
+    minHeight: 74,
+    textAlignVertical: 'top',
   },
   saveBtn: {
-    backgroundColor: '#059669',
-    borderRadius: 16,
-    paddingVertical: 15,
+    flexDirection: 'row-reverse',
     alignItems: 'center',
-    marginBottom: 12,
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#059669',
+    borderRadius: 14,
+    paddingVertical: 12,
+    marginTop: 14,
     shadowColor: '#059669',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 4,
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 3,
   },
   saveBtnText: {
     color: '#fff',
-    fontSize: 15,
+    fontSize: 13.5,
     fontWeight: '900',
   },
-  logoutBtn: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    paddingVertical: 14,
-    borderWidth: 1.5,
-    borderColor: '#fecaca',
-  },
-  logoutText: {
-    color: '#ef4444',
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  savedQCard: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 4,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-  },
-  savedQTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#1e293b',
-    textAlign: 'right',
-    lineHeight: 20,
+  btnDisabled: {
+    opacity: 0.5,
   },
 
-  // ID Verification Modal
-  idModalNotice: {
-    color: '#475569',
-    fontSize: 13,
-    lineHeight: 20,
-    textAlign: 'right',
-    marginBottom: 16,
-    backgroundColor: '#f8fafc',
-    padding: 12,
-    borderRadius: 12,
+  // Badges wrapper
+  badgesWrapper: {
+    paddingHorizontal: 16,
+    marginBottom: 8,
+    maxWidth: 960,
+    width: '100%',
+    alignSelf: 'center',
   },
-  idModalSectionTitle: {
-    color: '#0f172a',
-    fontSize: 13,
-    fontWeight: '800',
-    textAlign: 'right',
+
+  // Feed Section
+  feedSectionOuter: {
+    paddingHorizontal: 16,
+    marginTop: 6,
+    maxWidth: 960,
+    width: '100%',
+    alignSelf: 'center',
+  },
+  tabsBar: {
+    flexDirection: 'row-reverse',
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    padding: 3,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    gap: 4,
     marginBottom: 10,
   },
-  idOptionsRow: {
-    flexDirection: 'row-reverse',
-    gap: 8,
-    marginBottom: 16,
-  },
-  idOptionCard: {
+  tabItem: {
     flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 6,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: '#e2e8f0',
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingVertical: 9,
+    borderRadius: 11,
+  },
+  tabItemActive: {
+    backgroundColor: '#0f172a',
+  },
+  tabLabel: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#64748b',
+  },
+  tabLabelActive: {
+    color: '#fff',
+    fontWeight: '900',
+  },
+  tabCountPill: {
+    backgroundColor: '#f1f5f9',
+    borderRadius: 8,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
+  tabCountPillActive: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  tabCountText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#475569',
+  },
+  tabCountTextActive: {
+    color: '#fff',
+  },
+
+  // Feed Cards
+  feedList: {
+    gap: 8,
+  },
+  feedCard: {
     backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  feedCardTop: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 8,
+  },
+  feedCardAvatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#f1f5f9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  feedCardAvatarImg: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+  },
+  feedAuthorName: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: '#0f172a',
+    textAlign: 'right',
+  },
+  feedCardTime: {
+    fontSize: 10.5,
+    color: '#94a3b8',
+    marginTop: 1,
+    textAlign: 'right',
+  },
+  feedCardTitle: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#0f172a',
+    textAlign: 'right',
+    lineHeight: 20,
+    marginBottom: 4,
+  },
+  feedCardBody: {
+    fontSize: 12.5,
+    color: '#475569',
+    textAlign: 'right',
+    lineHeight: 18,
+  },
+  feedCardFooter: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 8,
+    paddingTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: '#f8fafc',
+  },
+  feedCardLocation: {
+    fontSize: 11,
+    color: '#059669',
+    fontWeight: '700',
+  },
+
+  emptyFeedBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    paddingVertical: 36,
+    paddingHorizontal: 20,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    gap: 6,
+  },
+  emptyFeedTitle: {
+    fontSize: 14.5,
+    fontWeight: '800',
+    color: '#0f172a',
+    marginTop: 4,
+  },
+  emptyFeedDesc: {
+    fontSize: 12,
+    color: '#64748b',
+    textAlign: 'center',
+  },
+  emptyFeedBtn: {
+    backgroundColor: '#059669',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+    marginTop: 8,
+  },
+  emptyFeedBtnText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+
+  // Promo card to jump smoothly to Settings
+  settingsPromoWrapper: {
+    paddingHorizontal: 16,
+    marginTop: 14,
+    maxWidth: 960,
+    width: '100%',
+    alignSelf: 'center',
+  },
+  settingsPromoCard: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    shadowColor: '#0f172a',
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  settingsPromoIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#ecfdf5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+  },
+  settingsPromoTitle: {
+    fontSize: 13.5,
+    fontWeight: '900',
+    color: '#0f172a',
+    textAlign: 'right',
+  },
+  settingsPromoDesc: {
+    fontSize: 11.5,
+    color: '#64748b',
+    textAlign: 'right',
+    marginTop: 2,
+    lineHeight: 16,
+  },
+  settingsPromoArrow: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#f8fafc',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  idOptionCardActive: {
-    borderColor: '#059669',
-    backgroundColor: '#ecfdf5',
-  },
-  idOptionText: {
-    color: '#64748b',
-    fontSize: 11,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  idOptionTextActive: {
-    color: '#059669',
-    fontWeight: '900',
-  },
-  securityNoticeBox: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#f0fdf4',
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#bbf7d0',
-  },
-  securityNoticeText: {
-    flex: 1,
-    color: '#166534',
-    fontSize: 11,
-    textAlign: 'right',
-    lineHeight: 16,
-  },
 
-  // Modals (Followers / Following / Blocked)
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalSheet: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    padding: 20,
-    maxHeight: '80%',
-  },
+  // Modals
   modalHeaderRow: {
     flexDirection: 'row-reverse',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 14,
     borderBottomWidth: 1,
     borderColor: '#f1f5f9',
-    paddingBottom: 12,
+    paddingBottom: 10,
   },
   modalTitle: {
     color: '#0f172a',
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '900',
   },
   modalCloseBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: '#f1f5f9',
     alignItems: 'center',
     justifyContent: 'center',
   },
   modalLoadingBox: {
-    paddingVertical: 40,
+    paddingVertical: 36,
     alignItems: 'center',
     gap: 8,
   },
   modalLoadingText: {
     color: '#64748b',
-    fontSize: 13,
+    fontSize: 12.5,
   },
   modalEmptyBox: {
-    paddingVertical: 50,
+    paddingVertical: 40,
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   modalEmptyTitle: {
     color: '#0f172a',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '800',
   },
   modalEmptySub: {
@@ -1394,7 +1722,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderColor: '#f1f5f9',
   },
@@ -1405,21 +1733,21 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   followAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
   },
   followAvatarFallback: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: '#f1f5f9',
     alignItems: 'center',
     justifyContent: 'center',
   },
   followUserName: {
     color: '#0f172a',
-    fontSize: 14,
+    fontSize: 13.5,
     fontWeight: '800',
   },
   followUserLocation: {
@@ -1429,47 +1757,28 @@ const styles = StyleSheet.create({
   },
   unfollowBtn: {
     backgroundColor: '#f1f5f9',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 10,
+    paddingHorizontal: 11,
+    paddingVertical: 5,
+    borderRadius: 9,
     borderWidth: 1,
     borderColor: '#e2e8f0',
   },
   unfollowBtnText: {
     color: '#64748b',
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '700',
   },
   viewProfileBtn: {
     backgroundColor: '#ecfdf5',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 10,
+    paddingHorizontal: 11,
+    paddingVertical: 5,
+    borderRadius: 9,
     borderWidth: 1,
     borderColor: '#a7f3d0',
   },
   viewProfileBtnText: {
     color: '#059669',
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '800',
-  },
-  unblockBtn: {
-    backgroundColor: '#fef2f2',
-    borderWidth: 1,
-    borderColor: '#fecaca',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 10,
-  },
-  unblockBtnText: {
-    color: '#dc2626',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  bottomNavWrapper: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
   },
 });

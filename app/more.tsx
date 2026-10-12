@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -34,17 +34,13 @@ import {
   PackageCheck,
   Lightbulb,
   Award,
-  Lock,
-  ChevronRight,
   Send,
   X,
   Wrench,
   Car,
   Flame,
-  Users,
   Mail,
   Star,
-  Rocket,
   Globe,
   FileText,
   Sun,
@@ -52,6 +48,15 @@ import {
   Briefcase,
   Map,
   MessageCircle,
+  Phone,
+  Code2,
+  CheckCircle2,
+  Copy,
+  HeartHandshake,
+  BadgeCheck,
+  ChevronDown,
+  ChevronRight,
+  Shield,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { requireAccount } from '@/lib/authGate';
@@ -61,6 +66,7 @@ export default function MoreScreen() {
   const [profile, setProfile] = useState<any>(null);
   const [hasSession, setHasSession] = useState(false);
   const [unreadNotif, setUnreadNotif] = useState(0);
+
   // Suggestion Modal State
   const [showIdeaModal, setShowIdeaModal] = useState(false);
   const [ideaText, setIdeaText] = useState('');
@@ -68,6 +74,9 @@ export default function MoreScreen() {
 
   // FAQ accordion
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+
+  // Copy feedback state
+  const [copiedPhone, setCopiedPhone] = useState(false);
 
   useEffect(() => {
     loadUserData();
@@ -95,14 +104,13 @@ export default function MoreScreen() {
 
       setProfile(p);
       setUnreadNotif(count ?? 0);
-
     } catch {}
   };
 
   const handleShareApp = async () => {
-    const text = 'تطبيق حيّنا 🇸🇦 — مجتمع وسوق وخدمات حيك في مكان واحد!\nhttps://appksatest.vercel.app';
+    const text = 'تطبيق حيّنا 🇸🇦 — مجتمع وسوق وفزعة وخدمات حيك في مكان واحد وبدون وسطاء!\nhttps://appksatest.vercel.app';
     try {
-      await Share.share({ message: text, title: 'حيّنا' });
+      await Share.share({ message: text, title: 'تطبيق حيّنا' });
     } catch {}
   };
 
@@ -114,8 +122,21 @@ export default function MoreScreen() {
     }
   };
 
+  const openDeveloperPhone = () => {
+    Linking.openURL('tel:0538243481').catch(() => {
+      Alert.alert('رقم الاتصال', '0538243481');
+    });
+  };
+
+  const openDeveloperWhatsApp = () => {
+    const msg = encodeURIComponent('مرحباً م. يوسف الحازمي، يسعدني التواصل معك بخصوص تطبيق ومنصة حيّنا المجتمعية.');
+    Linking.openURL(`https://wa.me/966538243481?text=${msg}`).catch(() => {
+      Alert.alert('واتساب', 'يمكنك التواصل عبر الرقم: 0538243481');
+    });
+  };
+
   const handleContactSupport = () => {
-    openExternal('mailto:support@hayna.app?subject=' + encodeURIComponent('الدعم - تطبيق حيّنا'));
+    openExternal('mailto:support@hayna.app?subject=' + encodeURIComponent('الدعم والاستفسارات - تطبيق حيّنا'));
   };
 
   const handleOpenPolicy = () => {
@@ -123,7 +144,7 @@ export default function MoreScreen() {
   };
 
   const handleSignOut = () => {
-    Alert.alert('تسجيل الخروج', 'هل أنت متأكد من تسجيل الخروج من حسابك؟', [
+    Alert.alert('تسجيل الخروج', 'هل أنت متأكد من تسجيل الخروج من حسابك في تطبيق حيّنا؟', [
       { text: 'إلغاء', style: 'cancel' },
       {
         text: 'تسجيل الخروج',
@@ -138,12 +159,11 @@ export default function MoreScreen() {
 
   const handleSendIdea = async () => {
     if (!ideaText.trim()) {
-      Alert.alert('تنبيه', 'يرجى كتابة فكرتك أو اقتراحك.');
+      Alert.alert('تنبيه', 'يرجى كتابة فكرتك أو اقتراحك للمنصة.');
       return;
     }
     setSendingIdea(true);
     try {
-      // Record feedback/idea in Supabase reports/feedback if table exists, or notify
       await supabase.from('reports').insert({
         reason: 'اقتراح ميزة مستقبلية: ' + ideaText.trim(),
         reporter_id: profile?.id || null,
@@ -152,7 +172,7 @@ export default function MoreScreen() {
 
       setShowIdeaModal(false);
       setIdeaText('');
-      Alert.alert('شكراً لك! 🌟', 'تم إرسال اقتراحك لفريق التطوير وسنعمل على دراسته في التحديثات القادمة.');
+      Alert.alert('شكراً لك! 🌟', 'تم إرسال اقتراحك للمطور وسنعمل على دراسته وتضمينه في التحديثات القادمة.');
     } catch {
       setShowIdeaModal(false);
     } finally {
@@ -162,64 +182,70 @@ export default function MoreScreen() {
 
   const FAQS = [
     {
-      q: 'هل تُرسل طلبات أو عروض مساعدة تلقائياً؟',
-      a: 'لا. لا يرسل التطبيق أي طلب أو عرض مساعدة نيابةً عنك. جميع الطلبات والعروض تُنشأ فقط عندما يضغط المستخدم الحقيقي على زر الإرسال بنفسه.',
+      q: 'هل توجد عروض أو طلبات وهمية تجريبية في المنصة؟',
+      a: 'إطلاقاً. منصة حيّنا نظيفة تماماً من أي بيانات تجريبية وهمية، وتعتمد بنسبة 100% على المستخدمين وسكان الحي الحقيقيين.',
     },
     {
       q: 'كيف أطلب فزعة أو مساعدة من جيراني؟',
-      a: 'من قسم «فزعة وطلبات المساعدة» اضغط «طلب جديد»، اكتب التفاصيل وحدّد حيّك ثم انشر. سيصل طلبك لجيرانك القريبين منك.',
+      a: 'من قسم «فزعة وطلبات المساعدة» اضغط «طلب جديد»، اكتب التفاصيل وحدّد حيّك ثم انشر. سيصل طلبك فوراً لجيرانك القريبين منك.',
     },
     {
-      q: 'هل موقعي الدقيق ظاهر للجميع؟',
-      a: 'لا. يُعرض موقعك على مستوى الحي فقط لحماية خصوصيتك، ويتم تبادل الموقع الدقيق بالخاص وبموافقتك فقط.',
+      q: 'هل موقعي وسكني الدقيق ظاهر للعامة؟',
+      a: 'لا. يُعرض موقعك على مستوى الحي فقط لحماية خصوصيتك التامة، ويتم تبادل العنوان الدقيق بالمحادثات الخاصة وبموافقتك الشخصية فقط.',
     },
     {
-      q: 'ما فائدة نقاط السمعة وشارات الجار الفاعل؟',
-      a: 'تُمنح نقاط السمعة للجيران المتعاونين عند إتمام الفزعات والإجابات المفيدة، وتظهر كشارات تميّز في ملفك الشخصي.',
+      q: 'ما فائدة شارات الجار الموثق ونقاط السمعة؟',
+      a: 'تُمنح نقاط السمعة والشارات للجيران المتعاونين عند إتمام الفزعات والإجابات المعتمدة وتظهر كأوسمة ثقة وتميز في ملفك الشخصي.',
+    },
+    {
+      q: 'كيف أسجل محلي أو متجري في دليل الأعمال؟',
+      a: 'يمكنك إضافة متجرك أو نشاطك التجاري مجاناً بالكامل من خلال قسم «سوق الحي والدليل» ليظهر لكافة سكان الحي.',
     },
   ];
 
-  const APP_VERSION = '2.5.0';
+  const APP_VERSION = '2.6.0';
 
   return (
     <View style={styles.container}>
       <AppHeader
         variant="tab"
         title="المزيد والخدمات"
-        subtitle={`مجتمع وسوق وفزعة · الإصدار ${APP_VERSION}`}
+        subtitle={`منصة حيّنا المجتمعية · الإصدار ${APP_VERSION}`}
         rightAction={
           <Pressable
             onPress={() => router.push('/settings')}
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: 18,
-              backgroundColor: '#f1f5f9',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
+            style={styles.headerBtn}
+            accessibilityRole="button"
+            accessibilityLabel="مركز الإعدادات والتحكم"
           >
-            <Settings size={18} color="#475569" />
+            <Settings size={18} color="#047857" />
           </Pressable>
         }
       />
 
       <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingBottom: bottomNavInset + 24 }]}
+        contentContainerStyle={[styles.scroll, { paddingBottom: bottomNavInset + 28 }]}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.contentWrap}>
-          {/* 1. USER PROFILE OR GUEST BANNER */}
+          {/* ======================================================== */}
+          {/* 1. USER IDENTITY CARD OR GUEST BANNER                    */}
+          {/* ======================================================== */}
           {hasSession && profile ? (
-            <View style={styles.profileCard}>
-              <View style={styles.profileTopRow}>
+            <LinearGradient
+              colors={['#064e3b', '#047857', '#059669']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.userHeroCard}
+            >
+              <View style={styles.userHeroTopRow}>
                 <View style={styles.avatarWrap}>
                   {profile.avatar_url ? (
                     <Image source={{ uri: profile.avatar_url }} style={styles.avatarImg} />
                   ) : (
-                    <View style={styles.avatarPlaceholder}>
+                    <View style={styles.avatarFallback}>
                       <Text style={styles.avatarLetter}>
-                        {(profile.display_name || profile.username || 'ج')[0]}
+                        {(profile.display_name || profile.username || 'ج')[0]?.toUpperCase() || 'ج'}
                       </Text>
                     </View>
                   )}
@@ -230,71 +256,91 @@ export default function MoreScreen() {
                   )}
                 </View>
 
-                <View style={styles.profileInfoCol}>
+                <View style={styles.userHeroInfoCol}>
                   <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-                    <Text style={styles.profileName}>{profile.display_name || profile.username || 'جار حيّنا'}</Text>
+                    <Text style={styles.userHeroName}>
+                      {profile.display_name || profile.username || 'جار حيّنا'}
+                    </Text>
                     {profile.is_verified && (
                       <View style={styles.verifiedTag}>
                         <Text style={styles.verifiedTagText}>موثّق 🛡️</Text>
                       </View>
                     )}
                   </View>
-                  <Text style={styles.profileHandle}>@{profile.username || 'user'}</Text>
+                  <Text style={styles.userHeroHandle}>@{profile.username || 'user'}</Text>
+
                   {(profile.city || profile.district) && (
-                    <View style={styles.profileLocationPill}>
-                      <Text style={styles.profileLocationText}>
-                        📍 {[profile.district, profile.city].filter(Boolean).join(' · ')}
+                    <View style={styles.userHeroLocationPill}>
+                      <MapPin size={11} color="#a7f3d0" />
+                      <Text style={styles.userHeroLocationText}>
+                        {[profile.district && `حي ${profile.district}`, profile.city].filter(Boolean).join(' · ')}
                       </Text>
                     </View>
                   )}
                 </View>
               </View>
 
-              <View style={styles.profileActionsRow}>
+              <View style={styles.userHeroActionsRow}>
                 <Pressable
-                  style={styles.profileEditBtn}
+                  style={styles.userHeroProfileBtn}
                   onPress={() => router.push('/profile')}
-                  accessibilityRole="button"
                 >
-                  <Text style={styles.profileEditBtnText}>عرض وتعديل الملف</Text>
-                  <ChevronLeft size={15} color="#059669" />
+                  <User size={14} color="#064e3b" />
+                  <Text style={styles.userHeroProfileBtnText}>عرض الملف الشخصي</Text>
+                  <ChevronLeft size={14} color="#064e3b" />
                 </Pressable>
-                {unreadNotif > 0 && (
-                  <Pressable
-                    style={styles.profileNotifPill}
-                    onPress={() => router.push('/notifications')}
-                    accessibilityRole="button"
-                  >
-                    <Bell size={13} color="#ef4444" />
-                    <Text style={styles.profileNotifText}>{unreadNotif} إشعار جديد</Text>
-                  </Pressable>
-                )}
+
+                <Pressable
+                  style={styles.userHeroSettingsBtn}
+                  onPress={() => router.push('/settings')}
+                >
+                  <Settings size={14} color="#fff" />
+                  <Text style={styles.userHeroSettingsBtnText}>الإعدادات والتحكم</Text>
+                </Pressable>
               </View>
-            </View>
+            </LinearGradient>
           ) : !hasSession ? (
             <View style={styles.guestBanner}>
               <View style={styles.guestIconCircle}>
                 <User size={24} color="#059669" />
               </View>
               <View style={{ flex: 1, alignItems: 'flex-end', gap: 3 }}>
-                <Text style={styles.guestTitle}>مرحباً بك في حيّنا! 🇸🇦</Text>
-                <Text style={styles.guestSub}>سجّل دخولك أو أنشئ حساباً للتواصل مع جيرانك وطلب ونشر الخدمات.</Text>
+                <Text style={styles.guestTitle}>مرحباً بك في منصة حيّنا! 🇸🇦</Text>
+                <Text style={styles.guestSub}>سجّل دخولك أو أنشئ حسابك للتواصل مع جيرانك وتفعيل جميع الخدمات.</Text>
               </View>
               <Pressable style={styles.guestLoginBtn} onPress={() => router.push('/auth')}>
                 <LogIn size={15} color="#fff" />
-                <Text style={styles.guestLoginBtnText}>دخول</Text>
+                <Text style={styles.guestLoginBtnText}>تسجيل الدخول</Text>
               </Pressable>
             </View>
           ) : null}
 
-          {/* 2. QUICK HUB 4-CARDS */}
+          {/* ======================================================== */}
+          {/* 2. ABOUT PLATFORM & DEVELOPER (DEDICATED PAGE)           */}
+          {/* ======================================================== */}
+          <View style={styles.menuGroup}>
+            <MenuItem
+              icon={<Code2 size={20} color="#059669" />}
+              iconBg="#ecfdf5"
+              title="حول المنصة ومطور التطبيق"
+              sub="م. يوسف الحازمي — الرؤية، الأهداف، وبيانات التواصل المباشر (0538243481)"
+              badge="المطور 🇸🇦"
+              badgeColor="#059669"
+              onPress={() => router.push('/about')}
+            />
+          </View>
+
+          {/* ======================================================== */}
+          {/* 3. QUICK HUB 4-CARDS                                     */}
+          {/* ======================================================== */}
+          <Text style={styles.sectionHeader}>خدمات الفزعة والتكافل بالحي 🤝</Text>
           <View style={styles.quickHubGrid}>
             <Pressable style={styles.quickHubCard} onPress={() => router.push('/requests')}>
               <View style={[styles.quickHubIconCircle, { backgroundColor: '#fff7ed' }]}>
                 <Truck size={22} color="#ea580c" />
               </View>
               <Text style={styles.quickHubTitle}>فزعة الحي</Text>
-              <Text style={styles.quickHubSub}>طلب مساعدة</Text>
+              <Text style={styles.quickHubSub}>طلب مساعدة الجيران</Text>
             </Pressable>
 
             <Pressable style={styles.quickHubCard} onPress={() => router.push('/tools')}>
@@ -302,7 +348,7 @@ export default function MoreScreen() {
                 <Wrench size={22} color="#16a34a" />
               </View>
               <Text style={styles.quickHubTitle}>سلفني بالحي</Text>
-              <Text style={styles.quickHubSub}>إعارة الأدوات</Text>
+              <Text style={styles.quickHubSub}>إعارة الأدوات المنزلية</Text>
             </Pressable>
 
             <Pressable style={styles.quickHubCard} onPress={() => router.push('/carpooling')}>
@@ -310,7 +356,7 @@ export default function MoreScreen() {
                 <Car size={22} color="#059669" />
               </View>
               <Text style={styles.quickHubTitle}>توصيل مدارس</Text>
-              <Text style={styles.quickHubSub}>مقاعد مشتركة</Text>
+              <Text style={styles.quickHubSub}>مقاعد مشتركة آمنة</Text>
             </Pressable>
 
             <Pressable style={styles.quickHubCard} onPress={() => router.push('/emergency-alert')}>
@@ -318,18 +364,20 @@ export default function MoreScreen() {
                 <Flame size={22} color="#dc2626" />
               </View>
               <Text style={styles.quickHubTitle}>طوارئ الحي</Text>
-              <Text style={styles.quickHubSub}>تنبيه مباشر</Text>
+              <Text style={styles.quickHubSub}>تنبيه للحالات العاجلة</Text>
             </Pressable>
           </View>
 
-          {/* 3. CORE NEIGHBORHOOD SERVICES — unique non-duplicated destinations */}
-          <Text style={styles.sectionHeader}>أقسام وخدمات الحي 🏬</Text>
+          {/* ======================================================== */}
+          {/* 4. CORE NEIGHBORHOOD SERVICES DIRECTORY                  */}
+          {/* ======================================================== */}
+          <Text style={styles.sectionHeader}>أقسام وخدمات الحي الأساسية 🏬</Text>
           <View style={styles.menuGroup}>
             <MenuItem
               icon={<Store size={20} color="#059669" />}
               iconBg="#ecfdf5"
-              title="سوق الحي"
-              sub="بيع واشترِ واعرض منتجاتك وخدماتك في حيك"
+              title="سوق الحي والأسر المنتجة"
+              sub="بيع واشترِ واعرض منتجاتك وخدماتك في حيك بدون عمولات"
               badge="نشط"
               badgeColor="#059669"
               onPress={() => router.push('/market')}
@@ -337,68 +385,70 @@ export default function MoreScreen() {
             <MenuItem
               icon={<Briefcase size={20} color="#0284c7" />}
               iconBg="#f0f9ff"
-              title="دليل الأنشطة والأعمال"
-              sub="المحلات والمهنيون ومقدمو الخدمات المحليون"
+              title="دليل الأنشطة والمحلات التجارية"
+              sub="البقالات، الصيدليات، المغاسل، والورش المحلية بالحي"
               onPress={() => router.push('/directory')}
             />
             <MenuItem
               icon={<Map size={20} color="#7c3aed" />}
               iconBg="#f5f3ff"
-              title="خريطة الحي التفاعلية"
-              sub="استكشف مواقع الجيران والمحلات والخدمات حولك"
+              title="خريطة الحي التفاعلية المباشرة"
+              sub="استكشف الفعاليات والخدمات والمحلات القريبة منك"
               onPress={() => router.push('/map')}
             />
             <MenuItem
               icon={<MessageCircle size={20} color="#0f766e" />}
               iconBg="#f0fdfa"
-              title="استفسارات وأسئلة الحي"
-              sub="تجارب الجيران ونصائحهم وتوصياتهم"
+              title="استفسارات وأسئلة الجيران"
+              sub="تجارب أهالي الحي، نصائحهم، وتوصياتهم الموثوقة"
               onPress={() => router.push('/questions')}
             />
             <MenuItem
               icon={<Sun size={20} color="#d97706" />}
               iconBg="#fffbeb"
-              title="الطقس والجو حولك"
-              sub="درجات الحرارة والتوقعات المباشرة لمدينتك"
+              title="الطقس والمناخ المباشر"
+              sub="درجات الحرارة، الرطوبة، وسرعة الرياح لمدينتك"
               badge="مباشر"
               badgeColor="#0284c7"
               onPress={() => router.push('/weather')}
             />
           </View>
 
-          {/* 4. FUTURE EXPANSIONS & UPGRADES BOX (MODULAR SECTION) */}
+          {/* ======================================================== */}
+          {/* 5. FUTURE EXPANSIONS & COMMUNITY INNOVATIONS             */}
+          {/* ======================================================== */}
           <View style={styles.futureBox}>
             <View style={styles.futureHeader}>
               <Sparkles size={18} color="#059669" />
-              <Text style={styles.futureTitle}>المميزات والتطويرات القادمة 🚀</Text>
+              <Text style={styles.futureTitle}>المميزات والتطويرات القادمة للمنصة 🚀</Text>
             </View>
             <Text style={styles.futureSub}>
-              نعمل باستمرار على إضافة مميزات متطورة تخدم سكان الحي وعمارته:
+              نعمل مع المطور م. يوسف الحازمي على تعزيز الخدمات الرقمية لخدمة الحي:
             </Text>
 
             <View style={styles.futureItemsGrid}>
               <View style={styles.futureItem}>
                 <CreditCard size={18} color="#0284c7" />
                 <Text style={styles.futureItemTitle}>بطاقة الجار الذكية</Text>
-                <Text style={styles.futureItemDesc}>خصومات وعروض خاصة لسكان الحي لدى المتاجر والشركاء (قريباً)</Text>
+                <Text style={styles.futureItemDesc}>خصومات خاصة لسكان الحي لدى المتاجر والشركاء المعتمدين</Text>
               </View>
 
               <View style={styles.futureItem}>
                 <Building size={18} color="#7c3aed" />
                 <Text style={styles.futureItemTitle}>مجلس وسكان العمارة</Text>
-                <Text style={styles.futureItemDesc}>مجموعة خاصة لعمارتك لإدارة الصيانة ومشاركة الأخبار (قريباً)</Text>
+                <Text style={styles.futureItemDesc}>مجموعة خاصة لعمارتك لإدارة الصيانة الدورية وتكاليف الخدمات</Text>
               </View>
 
               <View style={styles.futureItem}>
                 <PackageCheck size={18} color="#059669" />
                 <Text style={styles.futureItemTitle}>صندوق أمانات الحي</Text>
-                <Text style={styles.futureItemDesc}>استلام وتسليم الطرود والمفاتيح بأمان بين الجيران (قريباً)</Text>
+                <Text style={styles.futureItemDesc}>استلام وتسليم الطرود والمفاتيح بأمان فائق بين الجيران</Text>
               </View>
 
               <View style={styles.futureItem}>
                 <Award size={18} color="#d97706" />
                 <Text style={styles.futureItemTitle}>نقاط الجار الفاعل</Text>
-                <Text style={styles.futureItemDesc}>مكافآت وشارات تميز للمساهمين في خدمة وإفادة الحي (قريباً)</Text>
+                <Text style={styles.futureItemDesc}>مكافآت وشارات تميز مجتمعية للمساهمين في خدمة أهالي الحي</Text>
               </View>
             </View>
 
@@ -407,12 +457,14 @@ export default function MoreScreen() {
               onPress={() => setShowIdeaModal(true)}
             >
               <Lightbulb size={16} color="#047857" />
-              <Text style={styles.suggestBtnText}>اقترح فكرة أو خدمة جديدة للمطورين 💡</Text>
+              <Text style={styles.suggestBtnText}>اقترح فكرة أو خدمة جديدة للمطور 💡</Text>
             </Pressable>
           </View>
 
-          {/* 6. SETTINGS & APP ACTIONS */}
-          <Text style={styles.sectionHeader}>الإعدادات والتطبيق ⚙️</Text>
+          {/* ======================================================== */}
+          {/* 6. SETTINGS & APP PREFERENCES                            */}
+          {/* ======================================================== */}
+          <Text style={styles.sectionHeader}>الإعدادات والتحكم ⚙️</Text>
           <View style={styles.menuGroup}>
             {hasSession && (
               <MenuItem
@@ -428,28 +480,30 @@ export default function MoreScreen() {
             <MenuItem
               icon={<Settings size={20} color="#475569" />}
               iconBg="#f1f5f9"
-              title="إعدادات الحساب والخصوصية"
-              sub="إدارة بياناتك والتوثيق والمظهر"
+              title="إعدادات الحساب والأمان والخصوصية"
+              sub="إدارة كلمة المرور، ساعات الصمت، وتوثيق السكن"
               onPress={() => (hasSession ? router.push('/settings') : requireAccount())}
             />
             <MenuItem
               icon={<Share2 size={20} color="#0284c7" />}
               iconBg="#f0f9ff"
               title="شارك تطبيق حيّنا مع جيرانك"
-              sub="ادعُ جيرانك في الحي والعمارة للانضمام"
+              sub="ادعُ جيرانك في الحي للانضمام والمشاركة"
               onPress={handleShareApp}
             />
             <MenuItem
               icon={<Star size={20} color="#d97706" />}
               iconBg="#fffbeb"
               title="قيّم تجربتك في حيّنا"
-              sub="رأيك يساعدنا على تطوير المنصة لخدمة حيّك"
+              sub="رأيك واقتراحاتك تساهم في تطوير وتحديث المنصة"
               onPress={() => openExternal('https://appksatest.vercel.app')}
             />
           </View>
 
-          {/* 6.5 FREQUENTLY ASKED QUESTIONS */}
-          <Text style={styles.sectionHeader}>أسئلة شائعة 💬</Text>
+          {/* ======================================================== */}
+          {/* 7. FREQUENTLY ASKED QUESTIONS                            */}
+          {/* ======================================================== */}
+          <Text style={styles.sectionHeader}>الأسئلة الشائعة 💬</Text>
           <View style={styles.faqCard}>
             {FAQS.map((item, idx) => {
               const isOpen = openFaq === idx;
@@ -473,33 +527,44 @@ export default function MoreScreen() {
             })}
           </View>
 
-          {/* 6.6 SUPPORT & CONTACT */}
-          <Text style={styles.sectionHeader}>الدعم والتواصل 📞</Text>
+          {/* ======================================================== */}
+          {/* 8. SUPPORT & PLATFORM POLICIES                           */}
+          {/* ======================================================== */}
+          <Text style={styles.sectionHeader}>الدعم والسياسات 📜</Text>
           <View style={styles.menuGroup}>
+            <MenuItem
+              icon={<Code2 size={20} color="#059669" />}
+              iconBg="#ecfdf5"
+              title="عن تطبيق حيّنا ومطور المنصة"
+              sub="م. يوسف الحازمي — الرؤية والاتصال المباشر"
+              onPress={() => router.push('/about')}
+            />
             <MenuItem
               icon={<Mail size={20} color="#0284c7" />}
               iconBg="#f0f9ff"
-              title="تواصل مع فريق الدعم"
-              sub="support@hayna.app — نسعد بخدمتك ومساعدتك"
+              title="فريق الدعم الفني"
+              sub="support@hayna.app — نسعد بخدمتكم دائماً"
               onPress={handleContactSupport}
             />
             <MenuItem
               icon={<FileText size={20} color="#7c3aed" />}
               iconBg="#f5f3ff"
               title="سياسة الخصوصية والشروط"
-              sub="نحمي بياناتك ونحترم خصوصية حيّك"
+              sub="حماية بياناتك واحترام خصوصية أهالي الحي"
               onPress={handleOpenPolicy}
             />
             <MenuItem
               icon={<Globe size={20} color="#059669" />}
               iconBg="#ecfdf5"
-              title="زيارة موقع حيّنا"
+              title="موقع المنصة الرسمي"
               sub="appksatest.vercel.app"
               onPress={() => openExternal('https://appksatest.vercel.app')}
             />
           </View>
 
-          {/* 7. SIGN OUT BUTTON (IF LOGGED IN) */}
+          {/* ======================================================== */}
+          {/* 9. SIGN OUT BUTTON (IF LOGGED IN)                        */}
+          {/* ======================================================== */}
           {hasSession && (
             <Pressable style={styles.logoutBtn} onPress={handleSignOut}>
               <LogOut size={18} color="#ef4444" />
@@ -507,27 +572,36 @@ export default function MoreScreen() {
             </Pressable>
           )}
 
-          {/* App Info Footer */}
+          {/* ======================================================== */}
+          {/* 10. APP FOOTER & CREDITS                                 */}
+          {/* ======================================================== */}
           <View style={styles.footerBox}>
-            <Text style={styles.footerTitle}>حيّنا — Hayna</Text>
-            <Text style={styles.footerSub}>المنصة المجتمعية الرقمية لتعزيز الترابط والخدمات بين الجيران 🇸🇦</Text>
+            <Text style={styles.footerTitle}>منصة حيّنا المجتمعية — Hayna</Text>
+            <Text style={styles.footerSub}>
+              المنصة الرقمية الموحدة لترابط سكان وأسر الأحياء بالمملكة العربية السعودية 🇸🇦
+            </Text>
             <View style={styles.footerBadgeRow}>
               <View style={styles.footerBadge}>
                 <ShieldCheck size={12} color="#047857" />
-                <Text style={styles.footerBadgeText}>بيانات حقيقية بلا طلبات تجريبية</Text>
+                <Text style={styles.footerBadgeText}>بيانات حقيقية موثقة</Text>
               </View>
-              <View style={styles.footerBadge}>
-                <Rocket size={12} color="#0369a1" />
-                <Text style={styles.footerBadgeText}>تحديثات مستمرة</Text>
-              </View>
+              <Pressable
+                style={[styles.footerBadge, { borderColor: '#a7f3d0', backgroundColor: '#ecfdf5' }]}
+                onPress={() => router.push('/about')}
+              >
+                <Code2 size={12} color="#047857" />
+                <Text style={[styles.footerBadgeText, { color: '#047857', fontWeight: '800' }]}>
+                  المطور: يوسف الحازمي 👨‍💻
+                </Text>
+              </Pressable>
             </View>
-            <Text style={styles.footerVersion}>الإصدار {APP_VERSION} · التحديث المطور</Text>
+            <Text style={styles.footerVersion}>الإصدار {APP_VERSION} · جميع الحقوق محفوظة</Text>
           </View>
         </View>
       </ScrollView>
 
       {/* ======================================================== */}
-      {/* MODAL: SUGGEST A FEATURE FOR FUTURE DEVELOPMENT          */}
+      {/* MODAL: SUGGEST A FEATURE TO DEVELOPER                    */}
       {/* ======================================================== */}
       <Modal visible={showIdeaModal} animationType="slide" transparent onRequestClose={() => setShowIdeaModal(false)}>
         <View style={styles.modalOverlay}>
@@ -544,7 +618,7 @@ export default function MoreScreen() {
 
             <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 350 }}>
               <Text style={styles.ideaHelpText}>
-                يسعدنا سماع أفكارك لتطوير تطبيق حيّنا! اكتب الخدمة أو الميزة التي تود رؤيتها في حيك:
+                يسعد المطور م. يوسف الحازمي بتلقي اقتراحاتك وأفكارك لتطوير منصة حيّنا! اكتب الميزة أو الخدمة التي تود رؤيتها:
               </Text>
               <TextInput
                 style={styles.ideaInput}
@@ -566,7 +640,7 @@ export default function MoreScreen() {
                 ) : (
                   <>
                     <Send size={16} color="#fff" />
-                    <Text style={styles.submitIdeaBtnText}>إرسال الاقتراح للمطورين</Text>
+                    <Text style={styles.submitIdeaBtnText}>إرسال الاقتراح للمطور</Text>
                   </>
                 )}
               </Pressable>
@@ -577,7 +651,6 @@ export default function MoreScreen() {
     </View>
   );
 }
-
 
 function MenuItem({
   icon,
@@ -598,7 +671,7 @@ function MenuItem({
 }) {
   return (
     <Pressable
-      style={({ pressed }) => [styles.menuItem, pressed && { backgroundColor: '#f8fafc' }]}
+      style={({ pressed }: any) => [styles.menuItem, pressed && { backgroundColor: '#f8fafc' }]}
       onPress={onPress}
     >
       <ChevronLeft size={16} color="#94a3b8" />
@@ -620,294 +693,128 @@ function MenuItem({
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
+  scroll: { paddingTop: 14 },
+  contentWrap: { maxWidth: 860, width: '100%', alignSelf: 'center', paddingHorizontal: 16, gap: 14 },
 
-  // Hero Header
-  hero: {
-    paddingTop: Platform.OS === 'ios' ? 54 : 40,
-    paddingHorizontal: 16,
-    paddingBottom: 20,
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
-    gap: 16,
-  },
-  heroTopRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 10,
-  },
-  heroTitle: { fontSize: 22, fontWeight: '900', color: '#fff', textAlign: 'right' },
-  heroSubtitle: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.9)',
-    textAlign: 'right',
-    marginTop: 4,
-    lineHeight: 17,
-    fontWeight: '600',
-  },
-  heroVersionPill: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(255,255,255,0.14)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 14,
-  },
-  heroVersionText: { color: '#a7f3d0', fontSize: 10.5, fontWeight: '800' },
-  statsRow: {
-    flexDirection: 'row-reverse',
-    gap: 8,
-  },
-  statBox: {
-    flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.16)',
-    borderRadius: 14,
-    paddingVertical: 10,
-    paddingHorizontal: 6,
-    alignItems: 'center',
-    gap: 3,
-  },
-  statIconRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4 },
-  statValue: { color: '#fff', fontSize: 17, fontWeight: '900' },
-  statLabel: { color: 'rgba(255,255,255,0.85)', fontSize: 10, fontWeight: '700' },
-
-  // Quick Actions
-  quickGrid: {
-    flexDirection: 'row-reverse',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  quickCard: {
-    width: '48%',
+  headerBtn: {
+    width: 36,
+    height: 36,
     borderRadius: 18,
-    padding: 14,
-    minHeight: 108,
-    justifyContent: 'space-between',
-    shadowColor: '#000',
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  quickIconCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  quickLabel: { color: '#fff', fontSize: 14, fontWeight: '900', textAlign: 'right' },
-  quickSub: { color: 'rgba(255,255,255,0.85)', fontSize: 10.5, textAlign: 'right', fontWeight: '600' },
 
-  // How it works
-  howCard: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    padding: 16,
+  // User Hero Card
+  userHeroCard: {
+    borderRadius: 22,
+    padding: 18,
+    shadowColor: '#059669',
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
     gap: 14,
   },
-  howRow: { flexDirection: 'row-reverse', alignItems: 'flex-start', gap: 10 },
-  howStepCircle: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: '#ecfdf5',
-    borderWidth: 1,
-    borderColor: '#a7f3d0',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  howStepText: { color: '#047857', fontSize: 14, fontWeight: '900' },
-  howTitle: { fontSize: 14, fontWeight: '900', color: '#0f172a', textAlign: 'right' },
-  howDesc: { fontSize: 11.5, color: '#64748b', textAlign: 'right', lineHeight: 17 },
-  howConnector: { display: 'none' },
-  honestyNote: {
+  userHeroTopRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#ecfdf5',
-    borderWidth: 1,
-    borderColor: '#a7f3d0',
-    borderRadius: 14,
-    padding: 12,
-  },
-  honestyNoteText: {
-    flex: 1,
-    color: '#047857',
-    fontSize: 11.5,
-    lineHeight: 17,
-    fontWeight: '700',
-    textAlign: 'right',
-  },
-
-  // FAQ
-  faqCard: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    overflow: 'hidden',
-  },
-  faqItem: { borderBottomWidth: 1, borderBottomColor: '#f1f5f9', paddingHorizontal: 14 },
-  faqQuestionRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 14,
-  },
-  faqQuestion: { flex: 1, fontSize: 13, fontWeight: '800', color: '#0f172a', textAlign: 'right' },
-  faqAnswer: {
-    fontSize: 12,
-    color: '#475569',
-    textAlign: 'right',
-    lineHeight: 19,
-    paddingBottom: 14,
-    paddingRight: 24,
-  },
-
-  scroll: { paddingTop: 14 },
-  contentWrap: { maxWidth: 800, width: '100%', alignSelf: 'center', paddingHorizontal: 16, gap: 14 },
-
-  // Profile Card
-  profileCard: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    shadowColor: '#0f172a',
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
-    gap: 12,
-  },
-  profileTopRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 12,
+    gap: 14,
   },
   avatarWrap: {
     position: 'relative',
+    borderWidth: 2.5,
+    borderColor: '#fff',
+    borderRadius: 30,
   },
-  avatarImg: { width: 52, height: 52, borderRadius: 26 },
-  avatarPlaceholder: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: '#ecfdf5',
-    borderWidth: 1.5,
-    borderColor: '#a7f3d0',
+  avatarImg: { width: 56, height: 56, borderRadius: 28 },
+  avatarFallback: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255,255,255,0.25)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarLetter: { fontSize: 20, fontWeight: '900', color: '#047857' },
+  avatarLetter: { fontSize: 22, fontWeight: '900', color: '#fff' },
   verifiedIconBadge: {
     position: 'absolute',
     bottom: -2,
     left: -2,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: '#059669',
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#064e3b',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
+    borderWidth: 2,
     borderColor: '#fff',
   },
-  profileInfoCol: {
+  userHeroInfoCol: {
     flex: 1,
     alignItems: 'flex-end',
-    gap: 3,
+    gap: 2,
   },
-  profileName: { fontSize: 16, fontWeight: '900', color: '#0f172a' },
+  userHeroName: { fontSize: 17, fontWeight: '900', color: '#fff' },
   verifiedTag: {
-    backgroundColor: '#ecfdf5',
+    backgroundColor: 'rgba(255,255,255,0.22)',
     borderWidth: 1,
-    borderColor: '#a7f3d0',
+    borderColor: 'rgba(255,255,255,0.3)',
     paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: 8,
   },
-  verifiedTagText: { fontSize: 10, fontWeight: '900', color: '#047857' },
-  profileHandle: { fontSize: 12, color: '#64748b', fontWeight: '600' },
-  profileLocationPill: {
-    backgroundColor: '#f8fafc',
+  verifiedTagText: { fontSize: 10, fontWeight: '900', color: '#fef08a' },
+  userHeroHandle: { fontSize: 12.5, color: '#a7f3d0', fontWeight: '700' },
+  userHeroLocationPill: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(0,0,0,0.22)',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    marginTop: 2,
+    marginTop: 3,
   },
-  profileLocationText: { fontSize: 11, color: '#475569', fontWeight: '700' },
-  profileActionsRow: {
+  userHeroLocationText: { fontSize: 11, color: '#d1fae5', fontWeight: '700' },
+  userHeroActionsRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 10,
+    gap: 8,
+    paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
+    borderTopColor: 'rgba(255,255,255,0.18)',
   },
-  profileEditBtn: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#ecfdf5',
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#a7f3d0',
-  },
-  profileEditBtnText: { fontSize: 12, fontWeight: '800', color: '#047857' },
-  profileNotifPill: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#fef2f2',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#fecaca',
-  },
-  profileNotifText: { fontSize: 11, fontWeight: '800', color: '#dc2626' },
-
-  // Quick Hub Grid (4 Cards)
-  quickHubGrid: {
-    flexDirection: 'row-reverse',
-    gap: 10,
-  },
-  quickHubCard: {
+  userHeroProfileBtn: {
     flex: 1,
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 6,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    shadowColor: '#000',
-    shadowOpacity: 0.02,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  quickHubIconCircle: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
+    flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 6,
+    gap: 5,
+    backgroundColor: '#fff',
+    paddingVertical: 9,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  quickHubTitle: { fontSize: 12, fontWeight: '900', color: '#0f172a', textAlign: 'center' },
-  quickHubSub: { fontSize: 9.5, color: '#64748b', fontWeight: '600', marginTop: 1, textAlign: 'center' },
+  userHeroProfileBtnText: { fontSize: 12, fontWeight: '900', color: '#064e3b' },
+  userHeroSettingsBtn: {
+    flex: 1,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+    paddingVertical: 9,
+    borderRadius: 12,
+  },
+  userHeroSettingsBtnText: { fontSize: 12, fontWeight: '800', color: '#fff' },
 
   // Guest Banner
   guestBanner: {
@@ -941,31 +848,168 @@ const styles = StyleSheet.create({
   },
   guestLoginBtnText: { color: '#fff', fontSize: 12.5, fontWeight: '800' },
 
-  // Location Bar
-  locBar: {
+  // Developer Card (Prestigious & High Credibility)
+  developerCard: {
+    borderRadius: 22,
+    overflow: 'hidden',
+    shadowColor: '#0f172a',
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  developerHeaderGradient: {
+    padding: 18,
+    gap: 12,
+  },
+  developerRoleBadge: {
+    alignSelf: 'flex-start',
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    gap: 10,
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 14,
+    gap: 5,
+    backgroundColor: 'rgba(52, 211, 153, 0.15)',
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: 'rgba(52, 211, 153, 0.3)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
   },
-  locIconBox: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: '#ecfdf5',
+  developerRoleBadgeText: {
+    color: '#34d399',
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  developerProfileRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 12,
+  },
+  developerAvatarBox: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: 'rgba(5, 150, 105, 0.25)',
+    borderWidth: 2,
+    borderColor: '#34d399',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  locBarLabel: { fontSize: 11, color: '#64748b', fontWeight: '700' },
-  locBarValue: { fontSize: 13.5, fontWeight: '900', color: '#0f172a' },
-  locChangeText: { fontSize: 12, fontWeight: '800', color: '#059669' },
+  developerAvatarInitials: {
+    color: '#34d399',
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  developerName: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '900',
+    textAlign: 'right',
+  },
+  developerTitle: {
+    color: '#94a3b8',
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 2,
+    textAlign: 'right',
+  },
+  developerMission: {
+    color: '#cbd5e1',
+    fontSize: 11,
+    marginTop: 4,
+    textAlign: 'right',
+    lineHeight: 16,
+  },
+  developerContactBox: {
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    gap: 10,
+  },
+  developerPhoneRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  developerPhoneLabel: {
+    color: '#e2e8f0',
+    fontSize: 11.5,
+    fontWeight: '700',
+  },
+  developerPhoneValue: {
+    color: '#34d399',
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  developerActionBtnsRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 8,
+  },
+  devBtnCall: {
+    flex: 1,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#0284c7',
+    paddingVertical: 9,
+    borderRadius: 11,
+  },
+  devBtnCallText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  devBtnWa: {
+    flex: 1,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#16a34a',
+    paddingVertical: 9,
+    borderRadius: 11,
+  },
+  devBtnWaText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '800',
+  },
 
   // Section Headers
   sectionHeader: { fontSize: 15, fontWeight: '900', color: '#0f172a', textAlign: 'right', marginTop: 4 },
+
+  // Quick Hub Grid (4 Cards)
+  quickHubGrid: {
+    flexDirection: 'row-reverse',
+    gap: 10,
+  },
+  quickHubCard: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 6,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    shadowColor: '#000',
+    shadowOpacity: 0.03,
+    shadowRadius: 5,
+    elevation: 1,
+  },
+  quickHubIconCircle: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+  },
+  quickHubTitle: { fontSize: 12, fontWeight: '900', color: '#0f172a', textAlign: 'center' },
+  quickHubSub: { fontSize: 9.5, color: '#64748b', fontWeight: '600', marginTop: 1, textAlign: 'center' },
 
   // Menu Group
   menuGroup: {
@@ -974,6 +1018,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e2e8f0',
     overflow: 'hidden',
+    shadowColor: '#0f172a',
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 2,
   },
   menuItem: {
     flexDirection: 'row-reverse',
@@ -992,7 +1040,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  menuItemTitle: { fontSize: 14, fontWeight: '900', color: '#0f172a' },
+  menuItemTitle: { fontSize: 13.5, fontWeight: '900', color: '#0f172a' },
   menuItemSub: { fontSize: 11.5, color: '#64748b', lineHeight: 16 },
   menuBadge: {
     backgroundColor: '#059669',
@@ -1004,12 +1052,16 @@ const styles = StyleSheet.create({
 
   // Future Box
   futureBox: {
-    backgroundColor: '#f8fafc',
-    borderWidth: 1.5,
+    backgroundColor: '#fff',
+    borderWidth: 1,
     borderColor: '#cbd5e1',
     borderRadius: 20,
     padding: 16,
     gap: 10,
+    shadowColor: '#0f172a',
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 2,
   },
   futureHeader: {
     flexDirection: 'row-reverse',
@@ -1026,7 +1078,7 @@ const styles = StyleSheet.create({
   },
   futureItem: {
     width: '48.5%',
-    backgroundColor: '#fff',
+    backgroundColor: '#f8fafc',
     borderRadius: 14,
     padding: 12,
     borderWidth: 1,
@@ -1050,6 +1102,35 @@ const styles = StyleSheet.create({
   },
   suggestBtnText: { fontSize: 12.5, fontWeight: '800', color: '#047857' },
 
+  // FAQ
+  faqCard: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    overflow: 'hidden',
+    shadowColor: '#0f172a',
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  faqItem: { borderBottomWidth: 1, borderBottomColor: '#f1f5f9', paddingHorizontal: 14 },
+  faqQuestionRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 14,
+  },
+  faqQuestion: { flex: 1, fontSize: 13, fontWeight: '800', color: '#0f172a', textAlign: 'right' },
+  faqAnswer: {
+    fontSize: 12,
+    color: '#475569',
+    textAlign: 'right',
+    lineHeight: 19,
+    paddingBottom: 14,
+    paddingRight: 24,
+  },
+
   // Logout
   logoutBtn: {
     flexDirection: 'row-reverse',
@@ -1068,10 +1149,10 @@ const styles = StyleSheet.create({
   footerBox: {
     alignItems: 'center',
     paddingVertical: 16,
-    gap: 3,
+    gap: 4,
   },
   footerTitle: { fontSize: 14, fontWeight: '900', color: '#059669' },
-  footerSub: { fontSize: 11.5, color: '#64748b', textAlign: 'center' },
+  footerSub: { fontSize: 11.5, color: '#64748b', textAlign: 'center', maxWidth: 360, lineHeight: 17 },
   footerBadgeRow: {
     flexDirection: 'row-reverse',
     flexWrap: 'wrap',

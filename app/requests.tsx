@@ -117,11 +117,8 @@ export default function Requests() {
   }, []);
 
   const locationFilteredItems = useMemo(() => {
-    return items.filter(r => hasSession
-      ? isExactDistrictMatching(r, activeLoc.city, activeLoc.district)
-      : isLocationMatching(r, activeLoc.city, activeLoc.district)
-    );
-  }, [items, hasSession, activeLoc]);
+    return items.filter(r => isLocationMatching(r, activeLoc.city, activeLoc.district));
+  }, [items, activeLoc]);
 
   // Tab Filtering
   const displayedItems = useMemo(() => {
