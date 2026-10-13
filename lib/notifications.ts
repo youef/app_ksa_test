@@ -96,11 +96,31 @@ async function registerWebPushToken(): Promise<string> {
   const registration = await navigator.serviceWorker.register('/sw.js');
   await navigator.serviceWorker.ready;
 
+  const applicationServerKey = urlBase64ToUint8Array(publicKey);
   let subscription = await registration.pushManager.getSubscription();
+  if (subscription) {
+    const existingKey = subscription.options.applicationServerKey;
+    const existingBytes = existingKey ? new Uint8Array(existingKey) : null;
+    const keyChanged = !existingBytes
+      || existingBytes.length !== applicationServerKey.length
+      || existingBytes.some((byte, index) => byte !== applicationServerKey[index]);
+
+    if (keyChanged) {
+      const oldToken = JSON.stringify(subscription.toJSON());
+      await subscription.unsubscribe();
+      await supabase
+        .from('push_tokens')
+        .delete()
+        .eq('user_id', u.user.id)
+        .eq('token', oldToken);
+      subscription = null;
+    }
+  }
+
   if (!subscription) {
     subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(publicKey) as unknown as BufferSource,
+      applicationServerKey: applicationServerKey as unknown as BufferSource,
     });
   }
 
