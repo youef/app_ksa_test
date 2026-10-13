@@ -72,12 +72,35 @@ export default function Conversation() {
   const [appreciationNote, setAppreciationNote] = useState('كفو يا جارنا، بيض الله وجهك 🤍');
   const [sendingAppreciation, setSendingAppreciation] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
+  const [webViewport, setWebViewport] = useState<{ top: number; height: number } | null>(null);
 
   const insets = useSafeAreaInsets();
   const bottomSafe = Math.max(insets.bottom, 10);
   const otherName = displayName(otherUser, 'المحادثة');
   const isAnonymous = otherUser?.hide_name === true;
   const anyBlock = blockedByMe || blockedMe;
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+
+    const viewport = window.visualViewport;
+    const updateViewport = () => {
+      setWebViewport({
+        top: viewport?.offsetTop ?? 0,
+        height: viewport?.height ?? window.innerHeight,
+      });
+    };
+
+    updateViewport();
+    viewport?.addEventListener('resize', updateViewport);
+    viewport?.addEventListener('scroll', updateViewport);
+    window.addEventListener('resize', updateViewport);
+    return () => {
+      viewport?.removeEventListener('resize', updateViewport);
+      viewport?.removeEventListener('scroll', updateViewport);
+      window.removeEventListener('resize', updateViewport);
+    };
+  }, []);
 
   const load = useCallback(async (activeIdOverride?: string) => {
     const idToUse = activeIdOverride || convId;
@@ -658,7 +681,15 @@ export default function Conversation() {
   }
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView
+      style={[
+        styles.container,
+        Platform.OS === 'web' && webViewport
+          ? ({ position: 'fixed', top: webViewport.top, height: webViewport.height, minHeight: 0 } as any)
+          : null,
+      ]}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <ChatHeader
         otherUser={otherUser}
         otherName={otherName}

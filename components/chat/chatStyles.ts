@@ -243,6 +243,7 @@ export const chatStyles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'flex-end',
     marginBottom: 8,
+    minWidth: 0,
   },
   msgRowMine: {
     flexDirection: 'row',
@@ -270,6 +271,8 @@ export const chatStyles = StyleSheet.create({
   },
   msgBubble: {
     maxWidth: Platform.OS === 'web' ? 560 : '82%',
+    minWidth: 0,
+    flexShrink: 1,
     borderRadius: 18,
     paddingHorizontal: 15,
     paddingVertical: 10,
@@ -299,6 +302,8 @@ export const chatStyles = StyleSheet.create({
     lineHeight: 20,
     color: '#0f172a',
     textAlign: 'right',
+    flexShrink: 1,
+    ...(Platform.OS === 'web' ? ({ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' } as any) : {}),
   },
   msgTextMine: {
     color: '#fff',
@@ -568,6 +573,7 @@ export const chatStyles = StyleSheet.create({
   },
   inputCapsule: {
     flex: 1,
+    minWidth: 0,
     flexDirection: 'row-reverse',
     alignItems: 'center',
     backgroundColor: '#f8fafc',
@@ -579,7 +585,8 @@ export const chatStyles = StyleSheet.create({
   },
   textInput: {
     flex: 1,
-    fontSize: 14,
+    minWidth: 0,
+    fontSize: 16,
     color: '#0f172a',
     textAlign: 'right',
     maxHeight: 100,
