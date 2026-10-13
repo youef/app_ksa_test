@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
-import { BarChart3, Building2, CalendarDays, Check, Flag, MapPin, RefreshCw, ShieldCheck, Store, Users, X } from 'lucide-react-native';
+import { BarChart3, Building2, CalendarDays, Check, Flag, MapPin, RefreshCw, ShieldCheck, Store, Users, X, Zap } from 'lucide-react-native';
 import { AppHeader } from '@/components/shared/AppHeader';
 import AdminCommandCenter from '@/components/AdminCommandCenter';
 

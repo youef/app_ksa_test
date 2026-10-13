@@ -56,6 +56,7 @@ import {
   CheckCircle2,
   Crown,
   ChevronLeft,
+  ChevronRight,
   ChevronDown,
   RefreshCw,
   FileText,
