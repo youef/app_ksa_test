@@ -121,7 +121,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     !prevMsg || !isSameDay(new Date(msg.created_at), new Date(prevMsg.created_at));
 
   return (
-    <View key={msg.id}>
+    <View key={msg.id} testID="lr-hide" accessible={false} collapsable={false}>
       {showDate && <Text style={styles.dateDivider}>{formatDateLabel(msg.created_at)}</Text>}
       <View style={[styles.msgRow, isMine && styles.msgRowMine]}>
         {!isMine && (

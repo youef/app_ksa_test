@@ -8,6 +8,7 @@ import DialogProvider from '@/lib/dialog';
 import { registerPushToken, syncDndWithNotifications } from '@/lib/notifications';
 import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
+import { initLogRocket } from '@/lib/logrocket';
 import BottomNav from '@/components/BottomNav';
 
 const ACCOUNT_ONLY_ROUTES = [
@@ -27,6 +28,7 @@ export default function RootLayout() {
   const protectCurrentRoute = needsAccount(pathname) && (!sessionReady || !hasSession);
 
   useEffect(() => {
+    initLogRocket();
     void syncDndWithNotifications();
 
     const loadSession = async () => {
