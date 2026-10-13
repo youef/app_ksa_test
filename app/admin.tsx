@@ -32,6 +32,10 @@ import { AdminTaskCenter } from '@/components/admin/AdminTaskCenter';
 import { AdminGlobalSearch } from '@/components/admin/AdminGlobalSearch';
 import { AdminFeatureFlags } from '@/components/admin/AdminFeatureFlags';
 import { AdminRbacPanel } from '@/components/admin/AdminRbacPanel';
+import { AdminAnalytics } from '@/components/admin/AdminAnalytics';
+import { AdminSecurityCenter } from '@/components/admin/AdminSecurityCenter';
+import { AdminBadges } from '@/components/admin/AdminBadges';
+import { AdminWeeklyReport } from '@/components/admin/AdminWeeklyReport';
 import {
   Shield,
   Users,
@@ -66,6 +70,14 @@ import {
   Phone,
   ListChecks,
   Settings,
+  LayoutDashboard,
+  CalendarDays,
+  Award,
+  Lock,
+  TrendingUp,
+  Store,
+  Building2,
+  UserCog,
 } from 'lucide-react-native';
 
 import {
@@ -80,7 +92,7 @@ import {
   AdminActivityLog,
   AdminStats,
 } from '@/components/admin/adminTypes';
-import { adminStyles as styles, ADMIN_COLORS as C } from '@/components/admin/adminStyles';
+import { adminStyles as styles, ADMIN_COLORS as C, ADMIN_GRADIENTS } from '@/components/admin/adminStyles';
 
 function accountAgeLabel(iso?: string | null): string {
   if (!iso) return '—';
@@ -105,6 +117,98 @@ function confirmAction(title: string, message: string, onConfirm: () => void | P
   }
 }
 
+// ============================================================
+// Navigation model (v2 command center) — grouped two-level nav
+// ============================================================
+type AdminTabKey =
+  | 'overview'
+  | 'tasks'
+  | 'search'
+  | 'analytics'
+  | 'users'
+  | 'verifications'
+  | 'reports'
+  | 'content'
+  | 'platform'
+  | 'broadcast'
+  | 'locations'
+  | 'branding'
+  | 'weekly'
+  | 'badges'
+  | 'config'
+  | 'roles'
+  | 'security'
+  | 'logs';
+
+interface AdminTabMeta {
+  key: AdminTabKey;
+  label: string;
+  icon: (active: boolean) => React.ReactNode;
+}
+
+interface AdminNavGroup {
+  key: string;
+  label: string;
+  emoji: string;
+  tabs: AdminTabMeta[];
+}
+
+const ADMIN_NAV: AdminNavGroup[] = [
+  {
+    key: 'command',
+    label: 'القيادة',
+    emoji: '🎯',
+    tabs: [
+      { key: 'overview', label: 'نظرة عامة', icon: (a) => <LayoutDashboard size={15} color={a ? C.accentDark : '#64748B'} /> },
+      { key: 'tasks', label: 'مركز المهام', icon: (a) => <ListChecks size={15} color={a ? C.accentDark : '#64748B'} /> },
+      { key: 'search', label: 'البحث الشامل', icon: (a) => <Search size={15} color={a ? C.accentDark : '#64748B'} /> },
+    ],
+  },
+  {
+    key: 'community',
+    label: 'المجتمع',
+    emoji: '👥',
+    tabs: [
+      { key: 'users', label: 'المستخدمون', icon: (a) => <Users size={15} color={a ? C.accentDark : '#64748B'} /> },
+      { key: 'verifications', label: 'التوثيق', icon: (a) => <Star size={15} color={a ? C.accentDark : '#64748B'} /> },
+      { key: 'reports', label: 'البلاغات', icon: (a) => <Flag size={15} color={a ? C.accentDark : '#64748B'} /> },
+      { key: 'content', label: 'المحتوى', icon: (a) => <MessageCircle size={15} color={a ? C.accentDark : '#64748B'} /> },
+    ],
+  },
+  {
+    key: 'platform',
+    label: 'المنصة',
+    emoji: '🏢',
+    tabs: [
+      { key: 'platform', label: 'الموارد والخدمات', icon: (a) => <Truck size={15} color={a ? C.accentDark : '#64748B'} /> },
+      { key: 'broadcast', label: 'البث والتعاميم', icon: (a) => <Megaphone size={15} color={a ? C.accentDark : '#64748B'} /> },
+      { key: 'locations', label: 'المواقع', icon: (a) => <MapPin size={15} color={a ? C.accentDark : '#64748B'} /> },
+      { key: 'branding', label: 'الهوية والشعار', icon: (a) => <Sparkles size={15} color={a ? C.accentDark : '#64748B'} /> },
+    ],
+  },
+  {
+    key: 'insights',
+    label: 'التحليلات',
+    emoji: '📊',
+    tabs: [
+      { key: 'analytics', label: 'تحليلات متقدمة', icon: (a) => <BarChart3 size={15} color={a ? C.accentDark : '#64748B'} /> },
+      { key: 'weekly', label: 'التقرير الأسبوعي', icon: (a) => <CalendarDays size={15} color={a ? C.accentDark : '#64748B'} /> },
+      { key: 'badges', label: 'الأوسمة والتحفيز', icon: (a) => <Award size={15} color={a ? C.accentDark : '#64748B'} /> },
+    ],
+  },
+  {
+    key: 'system',
+    label: 'النظام',
+    emoji: '⚙️',
+    tabs: [
+      { key: 'config', label: 'الميزات والإعدادات', icon: (a) => <Settings size={15} color={a ? C.accentDark : '#64748B'} /> },
+      { key: 'roles', label: 'الأدوار والصلاحيات', icon: (a) => <ShieldCheck size={15} color={a ? C.accentDark : '#64748B'} /> },
+      { key: 'security', label: 'الأمان والجلسات', icon: (a) => <Lock size={15} color={a ? C.accentDark : '#64748B'} /> },
+      { key: 'logs', label: 'سجل العمليات', icon: (a) => <Clock size={15} color={a ? C.accentDark : '#64748B'} /> },
+    ],
+  },
+];
+
 export default function AdminScreen() {
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
@@ -117,9 +221,7 @@ export default function AdminScreen() {
   const [currentAdmin, setCurrentAdmin] = useState<AdminProfile | null>(null);
 
   // Active navigation tab
-  const [activeTab, setActiveTab] = useState<
-    'overview' | 'tasks' | 'search' | 'users' | 'verifications' | 'reports' | 'platform' | 'content' | 'broadcast' | 'logs' | 'locations' | 'branding' | 'config' | 'roles'
-  >('overview');
+  const [activeTab, setActiveTab] = useState<AdminTabKey>('overview');
 
   // Core relational data sets
   const [usersList, setUsersList] = useState<AdminProfile[]>([]);
@@ -1203,6 +1305,36 @@ export default function AdminScreen() {
     );
   }
 
+  // ============================================================
+  // Derived navigation helpers (grouped command center)
+  // ============================================================
+  const activeGroup = useMemo(
+    () => ADMIN_NAV.find((g) => g.tabs.some((t) => t.key === activeTab)) || ADMIN_NAV[0],
+    [activeTab]
+  );
+
+  const totalPending = stats.pendingReports + stats.pendingVerifications + stats.urgentAlerts;
+
+  const tabBadge = useCallback(
+    (key: AdminTabKey): number => {
+      switch (key) {
+        case 'tasks':
+          return totalPending;
+        case 'users':
+          return usersList.length;
+        case 'verifications':
+          return stats.pendingVerifications;
+        case 'reports':
+          return stats.pendingReports;
+        case 'platform':
+          return stats.urgentAlerts;
+        default:
+          return 0;
+      }
+    },
+    [totalPending, usersList.length, stats.pendingVerifications, stats.pendingReports, stats.urgentAlerts]
+  );
+
   return (
     <View style={styles.container}>
       {/* Toast Banner */}
@@ -1212,181 +1344,162 @@ export default function AdminScreen() {
         </Animated.View>
       )}
 
-      <AppHeader
-        variant="sub"
-        title="مركز عمليات حيّنا"
-        subtitle={`لوحة الإدارة والرقابة · ${currentAdmin.display_name || currentAdmin.username || 'مدير النظام'}`}
-        fallbackRoute="/home"
-        rightAction={
-          <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-            <Pressable
-              onPress={handleExportData}
-              style={{
-                width: 34,
-                height: 34,
-                borderRadius: 17,
-                backgroundColor: '#f1f5f9',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Download size={15} color="#475569" />
-            </Pressable>
-            <Pressable
-              onPress={onRefresh}
-              style={{
-                width: 34,
-                height: 34,
-                borderRadius: 17,
-                backgroundColor: '#f1f5f9',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <RefreshCw size={14} color="#059669" />
-            </Pressable>
-          </View>
-        }
-      />
+      {/* ======================================================== */}
+      {/* 0. COMMAND HERO (gradient)                               */}
+      {/* ======================================================== */}
+      <LinearGradient
+        colors={ADMIN_GRADIENTS.navy}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.heroWrap}
+      >
+        <View style={styles.heroTop}>
+          <Pressable style={styles.heroIconBtn} onPress={() => router.push('/home')}>
+            <ChevronRight size={18} color="#FFFFFF" />
+          </Pressable>
 
-      <View style={{ backgroundColor: '#0f172a', paddingHorizontal: 16, paddingVertical: 10 }}>
-
-        {/* Live Operational Status Ribbon */}
-        <View style={styles.alertsRow}>
-          <View style={[styles.alertPill, { backgroundColor: 'rgba(2,132,199,0.85)' }]}>
-            <ShieldCheck size={12} color="#FFFFFF" />
-            <Text style={styles.alertPillText}>الصلاحيات: مدير (Admin) · مستخدم (User)</Text>
+          <View style={styles.heroBrand}>
+            <View style={styles.heroLogoBox}>
+              {brandingLogo ? (
+                <Image source={{ uri: brandingLogo }} style={styles.heroLogoImg} resizeMode="contain" />
+              ) : (
+                <Shield size={22} color="#6EE7B7" />
+              )}
+            </View>
+            <View style={styles.heroTexts}>
+              <Text style={styles.heroKicker}>COMMAND CENTER · حيّنا</Text>
+              <Text style={styles.heroTitle}>مركز عمليات حيّنا</Text>
+              <Text style={styles.heroSub}>
+                {currentAdmin.display_name || currentAdmin.username || 'مدير النظام'} ·{' '}
+                {new Date().toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long' })}
+              </Text>
+            </View>
           </View>
 
-          {stats.pendingReports > 0 && (
-            <Pressable style={[styles.alertPill, { backgroundColor: C.danger }]} onPress={() => setActiveTab('reports')}>
-              <Flag size={12} color="#FFFFFF" />
-              <Text style={styles.alertPillText}>{stats.pendingReports} بلاغ معلق 🚨</Text>
+          <View style={styles.heroActions}>
+            <Pressable style={styles.heroIconBtn} onPress={handleExportData}>
+              <Download size={15} color="#FFFFFF" />
             </Pressable>
-          )}
+            <Pressable style={styles.heroIconBtn} onPress={onRefresh}>
+              <RefreshCw size={14} color="#FFFFFF" />
+            </Pressable>
+          </View>
+        </View>
 
-          {stats.pendingVerifications > 0 && (
-            <Pressable
-              style={[styles.alertPill, { backgroundColor: C.warning }]}
-              onPress={() => setActiveTab('verifications')}
-            >
-              <Star size={12} color="#FFFFFF" />
-              <Text style={styles.alertPillText}>{stats.pendingVerifications} توثيق بانتظار الاعتماد 🌟</Text>
-            </Pressable>
-          )}
+        {/* Live operational status pills */}
+        <View style={styles.heroStatusRow}>
+          <View style={styles.heroPill}>
+            <View style={rt.total > 0 ? styles.heroLiveDot : styles.heroLiveDotOff} />
+            <Text style={styles.heroPillText}>{rt.total > 0 ? `${rt.total} تحديث مباشر` : 'متزامن مباشر'}</Text>
+          </View>
+          <Pressable style={styles.heroPill} onPress={() => setActiveTab('reports')}>
+            <Flag size={11} color="#FCA5A5" />
+            <Text style={styles.heroPillText}>{stats.pendingReports} بلاغ معلق</Text>
+          </Pressable>
+          <Pressable style={styles.heroPill} onPress={() => setActiveTab('verifications')}>
+            <Star size={11} color="#FDE68A" />
+            <Text style={styles.heroPillText}>{stats.pendingVerifications} توثيق</Text>
+          </Pressable>
+          <Pressable style={styles.heroPill} onPress={() => setActiveTab('platform')}>
+            <AlertTriangle size={11} color="#FCA5A5" />
+            <Text style={styles.heroPillText}>{stats.urgentAlerts} طارئ</Text>
+          </Pressable>
+        </View>
 
-          {stats.urgentAlerts > 0 && (
-            <Pressable style={[styles.alertPill, { backgroundColor: '#B91C1C' }]} onPress={() => setActiveTab('platform')}>
-              <AlertTriangle size={12} color="#FFFFFF" />
-              <Text style={styles.alertPillText}>{stats.urgentAlerts} طارئ نشط ⚠️</Text>
-            </Pressable>
-          )}
+        {/* Platform KPI chips */}
+        <View style={styles.heroKpiRow}>
+          <HeroKpi value={stats.users} label="مستخدم" />
+          <HeroKpi value={stats.services} label="خدمة" />
+          <HeroKpi value={stats.requests} label="فزعة" />
+          <HeroKpi value={stats.questions} label="استفسار" />
+          <HeroKpi value={stats.verifiedUsers} label="موثّق" />
+          <HeroKpi value={stats.admins} label="مدير" />
+        </View>
+
+        {/* Quick actions */}
+        <View style={styles.heroQuickRow}>
+          <Pressable style={styles.heroQuickBtn} onPress={() => setActiveTab('broadcast')}>
+            <Megaphone size={14} color="#0F172A" />
+            <Text style={styles.heroQuickText}>بث تعميم</Text>
+          </Pressable>
+          <Pressable style={styles.heroQuickBtn} onPress={() => setActiveTab('tasks')}>
+            <ListChecks size={14} color="#0F172A" />
+            <Text style={styles.heroQuickText}>مركز المهام</Text>
+            {totalPending > 0 ? (
+              <View style={styles.heroQuickBadge}>
+                <Text style={styles.heroQuickBadgeText}>{totalPending}</Text>
+              </View>
+            ) : null}
+          </Pressable>
+          <Pressable style={styles.heroQuickBtn} onPress={() => setActiveTab('analytics')}>
+            <TrendingUp size={14} color="#0F172A" />
+            <Text style={styles.heroQuickText}>التحليلات</Text>
+          </Pressable>
+          <Pressable style={styles.heroQuickBtn} onPress={() => setActiveTab('security')}>
+            <Lock size={14} color="#0F172A" />
+            <Text style={styles.heroQuickText}>الأمان</Text>
+          </Pressable>
         </View>
 
         {rt.total > 0 ? (
           <Pressable
-            style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8, backgroundColor: 'rgba(16,185,129,0.18)', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, marginTop: 8 }}
+            style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8, backgroundColor: 'rgba(16,185,129,0.18)', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, marginTop: 10 }}
             onPress={() => { void loadDashboardData(); rt.reset(); }}
           >
-            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#34D399' }} />
+            <View style={styles.heroLiveDot} />
             <Text style={{ flex: 1, color: '#D1FAE5', fontSize: 11, fontWeight: '800', textAlign: 'right' }}>
               {rt.total} تحديث مباشر جديد{rt.lastLabel ? ` · ${rt.lastLabel}` : ''} — اضغط للتحديث الآن
             </Text>
           </Pressable>
         ) : null}
-      </View>
+      </LinearGradient>
 
       {/* ======================================================== */}
-      {/* 2. ADVANCED HORIZONTAL NAVIGATION TABS                   */}
+      {/* 2. GROUPED TWO-LEVEL NAVIGATION                          */}
       {/* ======================================================== */}
-      <View style={styles.tabBarWrapper}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabBarScroll}>
-          <TabPill
-            label={`مركز المهام${stats.pendingReports + stats.pendingVerifications + stats.urgentAlerts > 0 ? ` (${stats.pendingReports + stats.pendingVerifications + stats.urgentAlerts})` : ''}`}
-            icon={<ListChecks size={15} color={activeTab === 'tasks' ? '#FFFFFF' : '#64748B'} />}
-            active={activeTab === 'tasks'}
-            onPress={() => setActiveTab('tasks')}
-          />
-          <TabPill
-            label="البحث الشامل"
-            icon={<Search size={15} color={activeTab === 'search' ? '#FFFFFF' : '#64748B'} />}
-            active={activeTab === 'search'}
-            onPress={() => setActiveTab('search')}
-          />
-          <TabPill
-            label="تحكم المنصة"
-            icon={<Settings size={15} color={activeTab === 'config' ? '#FFFFFF' : '#64748B'} />}
-            active={activeTab === 'config'}
-            onPress={() => setActiveTab('config')}
-          />
-          <TabPill
-            label="الأدوار والصلاحيات"
-            icon={<ShieldCheck size={15} color={activeTab === 'roles' ? '#FFFFFF' : '#64748B'} />}
-            active={activeTab === 'roles'}
-            onPress={() => setActiveTab('roles')}
-          />
-          <TabPill
-            label="التحليلات والمؤشرات"
-            icon={<BarChart3 size={15} color={activeTab === 'overview' ? '#FFFFFF' : '#64748B'} />}
-            active={activeTab === 'overview'}
-            onPress={() => setActiveTab('overview')}
-          />
-          <TabPill
-            label={`المستخدمون (${usersList.length})`}
-            icon={<Users size={15} color={activeTab === 'users' ? '#FFFFFF' : '#64748B'} />}
-            active={activeTab === 'users'}
-            onPress={() => setActiveTab('users')}
-          />
-          <TabPill
-            label={`مكتب التوثيق (${stats.pendingVerifications})`}
-            icon={<Star size={15} color={activeTab === 'verifications' ? '#FFFFFF' : '#64748B'} />}
-            active={activeTab === 'verifications'}
-            badge={stats.pendingVerifications > 0 ? stats.pendingVerifications : undefined}
-            onPress={() => setActiveTab('verifications')}
-          />
-          <TabPill
-            label={`مركز البلاغات (${stats.pendingReports})`}
-            icon={<Flag size={15} color={activeTab === 'reports' ? '#FFFFFF' : '#64748B'} />}
-            active={activeTab === 'reports'}
-            badge={stats.pendingReports > 0 ? stats.pendingReports : undefined}
-            onPress={() => setActiveTab('reports')}
-          />
-          <TabPill
-            label="موارد المنصة والخدمات"
-            icon={<Truck size={15} color={activeTab === 'platform' ? '#FFFFFF' : '#64748B'} />}
-            active={activeTab === 'platform'}
-            onPress={() => setActiveTab('platform')}
-          />
-          <TabPill
-            label="مراقبة المحتوى"
-            icon={<MessageCircle size={15} color={activeTab === 'content' ? '#FFFFFF' : '#64748B'} />}
-            active={activeTab === 'content'}
-            onPress={() => setActiveTab('content')}
-          />
-          <TabPill
-            label="بث تعميم للحي 📢"
-            icon={<Megaphone size={15} color={activeTab === 'broadcast' ? '#FFFFFF' : '#64748B'} />}
-            active={activeTab === 'broadcast'}
-            onPress={() => setActiveTab('broadcast')}
-          />
-          <TabPill
-            label="سجل العمليات والتدقيق"
-            icon={<Clock size={15} color={activeTab === 'logs' ? '#FFFFFF' : '#64748B'} />}
-            active={activeTab === 'logs'}
-            onPress={() => setActiveTab('logs')}
-          />
-          <TabPill
-            label="إدارة المواقع"
-            icon={<MapPin size={15} color={activeTab === 'locations' ? '#FFFFFF' : '#64748B'} />}
-            active={activeTab === 'locations'}
-            onPress={() => setActiveTab('locations')}
-          />
-          <TabPill
-            label="الهوية والشعار"
-            icon={<Sparkles size={15} color={activeTab === 'branding' ? '#FFFFFF' : '#64748B'} />}
-            active={activeTab === 'branding'}
-            onPress={() => setActiveTab('branding')}
-          />
+      <View style={styles.navShell}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.navGroupScroll}>
+          {ADMIN_NAV.map((group) => {
+            const isActiveGroup = group.key === activeGroup.key;
+            const groupCount = group.tabs.reduce((sum, t) => sum + tabBadge(t.key), 0);
+            return (
+              <Pressable
+                key={group.key}
+                style={[styles.navGroupChip, isActiveGroup && styles.navGroupChipActive]}
+                onPress={() => setActiveTab(group.tabs[0].key)}
+              >
+                <Text style={styles.navGroupEmoji}>{group.emoji}</Text>
+                <Text style={[styles.navGroupText, isActiveGroup && styles.navGroupTextActive]}>{group.label}</Text>
+                {groupCount > 0 ? (
+                  <View style={styles.navGroupCount}>
+                    <Text style={styles.navGroupCountText}>{groupCount}</Text>
+                  </View>
+                ) : null}
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.navTabScrollV2}>
+          {activeGroup.tabs.map((tab) => {
+            const isActive = tab.key === activeTab;
+            const count = tabBadge(tab.key);
+            return (
+              <Pressable
+                key={tab.key}
+                style={[styles.navTabV2, isActive && styles.navTabV2Active]}
+                onPress={() => setActiveTab(tab.key)}
+              >
+                {tab.icon(isActive)}
+                <Text style={[styles.navTabV2Text, isActive && styles.navTabV2TextActive]}>{tab.label}</Text>
+                {count > 0 ? (
+                  <View style={styles.navTabV2Badge}>
+                    <Text style={styles.navTabV2BadgeText}>{count}</Text>
+                  </View>
+                ) : null}
+              </Pressable>
+            );
+          })}
         </ScrollView>
       </View>
 
@@ -2476,6 +2589,18 @@ export default function AdminScreen() {
           </View>
         )}
 
+        {/* TAB: ADVANCED ANALYTICS */}
+        {activeTab === 'analytics' && <AdminAnalytics onSaved={showToast} />}
+
+        {/* TAB: WEEKLY REPORT */}
+        {activeTab === 'weekly' && <AdminWeeklyReport onSaved={showToast} />}
+
+        {/* TAB: BADGES & REWARDS */}
+        {activeTab === 'badges' && <AdminBadges onSaved={showToast} />}
+
+        {/* TAB: SECURITY & SESSIONS */}
+        {activeTab === 'security' && <AdminSecurityCenter onSaved={showToast} />}
+
         <View style={{ height: 100 }} />
       </ScrollView>
 
@@ -2675,6 +2800,15 @@ export default function AdminScreen() {
 }
 
 // Helper Subcomponents
+function HeroKpi({ value, label }: { value: number; label: string }) {
+  return (
+    <View style={styles.heroKpi}>
+      <Text style={styles.heroKpiNum}>{Number(value || 0).toLocaleString('ar-EG')}</Text>
+      <Text style={styles.heroKpiLabel}>{label}</Text>
+    </View>
+  );
+}
+
 function TabPill({
   label,
   icon,
