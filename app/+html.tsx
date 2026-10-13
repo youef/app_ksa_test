@@ -13,8 +13,13 @@ export default function Root({ children }: PropsWithChildren) {
         <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
         <meta
           name="viewport"
-          content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1.00001, viewport-fit=cover, user-scalable=no"
+          content="width=device-width, initial-scale=1, viewport-fit=cover"
         />
+        <style>{`
+          html, body { width: 100%; min-height: 100%; -webkit-text-size-adjust: 100%; }
+          input, textarea, select { font-size: 16px !important; }
+          input:focus, textarea:focus, select:focus { font-size: 16px !important; }
+        `}</style>
 
         <title>حيّنا | مجتمع وسوق وخدمات الحي</title>
         <meta name="description" content="منصة حيّنا المجتمعية للتواصل، الفزعة، سوق الحي، ودليل الخدمات في المملكة العربية السعودية." />

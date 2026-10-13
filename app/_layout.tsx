@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Platform, View } from 'react-native';
 import { Redirect, Stack, usePathname } from 'expo-router';
+import Head from 'expo-router/head';
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import { DynamicIslandProvider } from '@/context/DynamicIslandContext';
 import DialogProvider from '@/lib/dialog';
@@ -52,27 +53,37 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
-      <DynamicIslandProvider>
-        <DialogProvider>
-          <View style={{ flex: 1 }}>
-            {protectCurrentRoute ? (sessionReady ? <Redirect href="/auth" /> : <View style={{ flex: 1, backgroundColor: C.bg }} />) : (
-              <Stack
-                screenOptions={{
-                  headerShown: false,
-                  // Native gets a short slide; web swaps screens without a blank animation frame.
-                  animation: Platform.OS === 'web' ? 'none' : 'slide_from_right',
-                  animationDuration: Platform.OS === 'web' ? 0 : 180,
-                  contentStyle: { backgroundColor: C.bg, flex: 1 },
-                  freezeOnBlur: false,
-                  gestureEnabled: true,
-                }}
-              />
-            )}
-            <BottomNav />
-          </View>
-        </DialogProvider>
-      </DynamicIslandProvider>
-    </SafeAreaProvider>
+    <>
+      <Head>
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+        <style type="text/css">{`
+          html, body { width: 100%; min-height: 100%; -webkit-text-size-adjust: 100%; }
+          input, textarea, select { font-size: 16px !important; }
+          input:focus, textarea:focus, select:focus { font-size: 16px !important; }
+        `}</style>
+      </Head>
+      <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+        <DynamicIslandProvider>
+          <DialogProvider>
+            <View style={{ flex: 1 }}>
+              {protectCurrentRoute ? (sessionReady ? <Redirect href="/auth" /> : <View style={{ flex: 1, backgroundColor: C.bg }} />) : (
+                <Stack
+                  screenOptions={{
+                    headerShown: false,
+                    // Native gets a short slide; web swaps screens without a blank animation frame.
+                    animation: Platform.OS === 'web' ? 'none' : 'slide_from_right',
+                    animationDuration: Platform.OS === 'web' ? 0 : 180,
+                    contentStyle: { backgroundColor: C.bg, flex: 1 },
+                    freezeOnBlur: false,
+                    gestureEnabled: true,
+                  }}
+                />
+              )}
+              <BottomNav />
+            </View>
+          </DialogProvider>
+        </DynamicIslandProvider>
+      </SafeAreaProvider>
+    </>
   );
 }
