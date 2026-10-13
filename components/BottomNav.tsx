@@ -6,6 +6,7 @@ import { Home, MessageCircle, ShoppingBag, Search, LayoutGrid } from 'lucide-rea
 import { BlurView } from 'expo-blur';
 import { supabase } from '@/lib/supabase';
 import { BOTTOM_NAV_HEIGHT } from '@/lib/bottomNav';
+import { usePlatformConfig } from '@/lib/platformConfig';
 
 export { BOTTOM_NAV_HEIGHT };
 
@@ -55,6 +56,7 @@ function isTabActive(pathname: string, key: string) {
 
 export default function BottomNav() {
   const pathname = usePathname();
+  const { flags, branding } = usePlatformConfig();
   const insets = useSafeAreaInsets();
   const [unreadMsgs, setUnreadMsgs] = useState(0);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -179,7 +181,7 @@ export default function BottomNav() {
         style={styles.surface}
       >
         <View style={contentStyle}>
-          {TABS.filter(tab => hasSession || tab.key !== '/messages').map(tab => {
+          {TABS.filter(tab => (hasSession || tab.key !== '/messages') && (tab.key !== '/market' || flags.market !== false) && (tab.key !== '/search' || flags.search !== false)).map(tab => {
             const isActive = isTabActive(pathname, tab.key);
             const Icon = tab.icon;
             const badge = tab.key === '/messages' ? unreadMsgs : 0;
@@ -207,7 +209,7 @@ export default function BottomNav() {
                   )}
                 </View>
                 <Text style={[styles.label, isActive && styles.labelActive]} numberOfLines={1}>
-                  {tab.label}
+                  {branding.headers?.[tab.key === '/home' ? 'home' : tab.key.slice(1)] || tab.label}
                 </Text>
               </Pressable>
             );

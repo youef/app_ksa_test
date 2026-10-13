@@ -59,8 +59,10 @@ import {
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { requireAccount } from '@/lib/authGate';
+import { usePlatformConfig } from '@/lib/platformConfig';
 
 export default function MoreScreen() {
+  const { flags } = usePlatformConfig();
   const bottomNavInset = useBottomNavInset();
   const [profile, setProfile] = useState<any>(null);
   const [hasSession, setHasSession] = useState(false);
@@ -332,31 +334,31 @@ export default function MoreScreen() {
           {/* ======================================================== */}
           {/* 3. QUICK HUB 4-CARDS                                     */}
           {/* ======================================================== */}
-          <Text style={styles.sectionHeader}>خدمات الفزعة والتكافل بالحي 🤝</Text>
+          {(flags.requests !== false || flags.carpooling !== false || flags.urgent_alerts !== false) && <Text style={styles.sectionHeader}>خدمات الفزعة والتكافل بالحي 🤝</Text>}
           <View style={styles.quickHubGrid}>
-            <Pressable style={styles.quickHubCard} onPress={() => router.push('/requests')}>
+            {flags.requests !== false && <Pressable style={styles.quickHubCard} onPress={() => router.push('/requests')}>
               <View style={[styles.quickHubIconCircle, { backgroundColor: '#fff7ed' }]}>
                 <Truck size={22} color="#ea580c" />
               </View>
               <Text style={styles.quickHubTitle}>فزعة الحي</Text>
               <Text style={styles.quickHubSub}>طلب مساعدة الجيران</Text>
-            </Pressable>
+            </Pressable>}
 
-            <Pressable style={styles.quickHubCard} onPress={() => router.push('/carpooling')}>
+            {flags.carpooling !== false && <Pressable style={styles.quickHubCard} onPress={() => router.push('/carpooling')}>
               <View style={[styles.quickHubIconCircle, { backgroundColor: '#ecfdf5' }]}>
                 <Car size={22} color="#059669" />
               </View>
               <Text style={styles.quickHubTitle}>توصيل مدارس</Text>
               <Text style={styles.quickHubSub}>مقاعد مشتركة آمنة</Text>
-            </Pressable>
+            </Pressable>}
 
-            <Pressable style={styles.quickHubCard} onPress={() => router.push('/emergency-alert')}>
+            {flags.urgent_alerts !== false && <Pressable style={styles.quickHubCard} onPress={() => router.push('/emergency-alert')}>
               <View style={[styles.quickHubIconCircle, { backgroundColor: '#fef2f2' }]}>
                 <Flame size={22} color="#dc2626" />
               </View>
               <Text style={styles.quickHubTitle}>طوارئ الحي</Text>
               <Text style={styles.quickHubSub}>تنبيه للحالات العاجلة</Text>
-            </Pressable>
+            </Pressable>}
           </View>
 
           {/* ======================================================== */}
@@ -660,6 +662,9 @@ function MenuItem({
   badgeColor?: string;
   onPress: () => void;
 }) {
+  const { flags } = usePlatformConfig();
+  const key = title.includes('سوق') ? 'market' : title.includes('دليل الأنشطة') ? 'directory' : title.includes('طقس') ? 'weather' : title.includes('توصيل') ? 'carpooling' : title.includes('طوارئ') ? 'urgent_alerts' : title.includes('بثوث') ? 'live' : title.includes('استفسارات') ? 'questions' : undefined;
+  if (key && flags[key] === false) return null;
   return (
     <Pressable
       style={({ pressed }: any) => [styles.menuItem, pressed && { backgroundColor: '#f8fafc' }]}

@@ -25,6 +25,7 @@ import TwitterInquiryCard from '@/components/TwitterInquiryCard';
 import AppHeader from '@/components/shared/AppHeader';
 import AtmosphereBar from '@/components/home/AtmosphereBar';
 import StoriesRow from '@/components/home/StoriesRow';
+import { usePlatformConfig } from '@/lib/platformConfig';
 import FeedTabs from '@/components/home/FeedTabs';
 import EmptyState from '@/components/home/EmptyState';
 import { FeedSkeleton, ErrorBanner } from '@/components/home/HomeStates';
@@ -35,6 +36,7 @@ import { requireAccount } from '@/lib/authGate';
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export default function Home() {
+  const { flags } = usePlatformConfig();
   const bottomNavInset = useBottomNavInset();
   const { showIsland } = useDynamicIsland();
   const showToast = useCallback((msg: string) => showIsland(msg, undefined, 'success'), [showIsland]);
@@ -263,7 +265,7 @@ export default function Home() {
           emergencyCount={derived.emergency.length}
         />
 
-        <StoriesRow profile={feed.profile} stories={feed.stories} selectedDistrict={loc.district} />
+        {flags.stories !== false && <StoriesRow profile={feed.profile} stories={feed.stories} selectedDistrict={loc.district} />}
 
         {emergencyTop && (
           <View style={styles.emergencyHomeCard}>

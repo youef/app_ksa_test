@@ -22,6 +22,12 @@ const FLAGS: Array<{ key: string; label: string; icon: React.ReactNode }> = [
   { key: 'stories', label: 'القصص اليومية', icon: <Images size={16} color={C.warning} /> },
   { key: 'urgent_alerts', label: 'التنبيهات الطارئة', icon: <AlertTriangle size={16} color={C.danger} /> },
   { key: 'rewards', label: 'المكافآت والتحفيز', icon: <Gift size={16} color={C.accentDark} /> },
+  { key: 'search', label: 'البحث الشامل', icon: <Store size={16} color={C.info} /> },
+  { key: 'directory', label: 'دليل الأنشطة والمتاجر', icon: <Store size={16} color={C.accent} /> },
+  { key: 'requests', label: 'طلبات الفزعة والمساعدة', icon: <AlertTriangle size={16} color={C.warning} /> },
+  { key: 'questions', label: 'أسئلة واستفسارات الحي', icon: <Images size={16} color={C.purple} /> },
+  { key: 'live', label: 'البثوث المباشرة', icon: <Power size={16} color={C.danger} /> },
+  { key: 'map', label: 'خريطة الحي', icon: <Store size={16} color={C.info} /> },
 ];
 
 export function AdminFeatureFlags({ onSaved }: { onSaved: (msg: string) => void }) {
@@ -30,6 +36,7 @@ export function AdminFeatureFlags({ onSaved }: { onSaved: (msg: string) => void 
   const [saving, setSaving] = useState(false);
   const [maintenance, setMaintenance] = useState({ enabled: false, message: '' });
   const [flags, setFlags] = useState<Record<string, boolean>>({});
+  const [branding, setBranding] = useState<{ name: string; description: string; headers: Record<string, string> }>({ name: '', description: '', headers: {} });
 
   useEffect(() => {
     (async () => {
@@ -43,6 +50,7 @@ export function AdminFeatureFlags({ onSaved }: { onSaved: (msg: string) => void 
           (data || []).forEach((r: any) => (map[r.key] = r.value));
           setMaintenance({ enabled: false, message: '', ...(map.maintenance_mode || {}) });
           setFlags(map.feature_flags || {});
+          setBranding({ name: '', description: '', headers: {}, ...(map.site_branding || {}) });
         }
       } catch {
         setUnavailable(true);
@@ -61,6 +69,7 @@ export function AdminFeatureFlags({ onSaved }: { onSaved: (msg: string) => void 
         [
           { key: 'maintenance_mode', value: maintenance, updated_by: auth.user?.id || null, updated_at: now },
           { key: 'feature_flags', value: flags, updated_by: auth.user?.id || null, updated_at: now },
+          { key: 'site_branding', value: branding, updated_by: auth.user?.id || null, updated_at: now },
         ],
         { onConflict: 'key' }
       );
@@ -125,6 +134,15 @@ export function AdminFeatureFlags({ onSaved }: { onSaved: (msg: string) => void 
           style={styles.input}
           multiline
         />
+      </View>
+
+      {/* Feature flags */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>هوية المنصة والعناوين</Text>
+        <Text style={styles.cardHint}>تظهر التغييرات للمستخدمين عند تحديث التطبيق.</Text>
+        <TextInput value={branding.name} onChangeText={name => setBranding(b => ({ ...b, name }))} placeholder="اسم الموقع" placeholderTextColor={C.subtle} style={styles.input} />
+        <TextInput value={branding.description} onChangeText={description => setBranding(b => ({ ...b, description }))} placeholder="وصف المنصة" placeholderTextColor={C.subtle} style={styles.input} multiline />
+        {([['home', 'عنوان الرئيسية'], ['market', 'عنوان السوق'], ['search', 'عنوان البحث'], ['more', 'عنوان المزيد'], ['stories', 'عنوان اليوميات']] as const).map(([key, label]) => <TextInput key={key} value={branding.headers[key] || ''} onChangeText={value => setBranding(b => ({ ...b, headers: { ...b.headers, [key]: value } }))} placeholder={label} placeholderTextColor={C.subtle} style={styles.input} />)}
       </View>
 
       {/* Feature flags */}

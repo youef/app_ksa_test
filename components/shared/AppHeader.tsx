@@ -12,6 +12,7 @@ import {
   LogIn,
 } from 'lucide-react-native';
 import { FALLBACK_LOGO_URI } from '@/lib/branding';
+import { usePlatformConfig } from '@/lib/platformConfig';
 
 export const APP_HEADER_HEIGHT = 52;
 
@@ -53,6 +54,9 @@ export function AppHeader({
   isOnline,
 }: AppHeaderProps) {
   const insets = useSafeAreaInsets();
+  const { branding } = usePlatformConfig();
+  const headerKey = title?.includes('بحث') ? 'search' : title?.includes('سوق') ? 'market' : title?.includes('يوميات') || title?.includes('قصص') ? 'stories' : undefined;
+  const displayTitle = (headerKey && branding.headers?.[headerKey]) || title;
   const topInset = Math.max(insets.top, Platform.OS === 'ios' ? 44 : Platform.OS === 'android' ? 24 : 0);
 
   const goBack = () => {
@@ -165,7 +169,7 @@ export function AppHeader({
         <View style={styles.content}>
           <View style={styles.titleArea}>
             <Text style={styles.pageTitle} numberOfLines={1}>
-              {title}
+              {displayTitle}
             </Text>
             {subtitle ? (
               <Text style={styles.pageSubtitle} numberOfLines={1}>
@@ -210,7 +214,7 @@ export function AppHeader({
             </View>
             <View style={styles.chatTextWrap}>
               <Text style={styles.pageTitle} numberOfLines={1}>
-                {title}
+                {displayTitle}
               </Text>
               {subtitle ? (
                 <Text style={styles.chatStatusText} numberOfLines={1}>
@@ -244,7 +248,7 @@ export function AppHeader({
 
         <View style={styles.centerTitleArea}>
           <Text style={styles.pageTitle} numberOfLines={1}>
-            {title}
+            {displayTitle || branding.name || 'حيّنا'}
           </Text>
           {subtitle ? (
             <Text style={styles.pageSubtitle} numberOfLines={1}>
