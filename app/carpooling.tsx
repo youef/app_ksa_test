@@ -44,6 +44,10 @@ interface CarpoolItem {
   notes: string;
   phone?: string;
   is_verified?: boolean;
+  participants_count?: number;
+  max_participants?: number;
+  departure_time?: string;
+  price_per_seat?: number;
 }
 
 const DEFAULT_CARPOOLS: CarpoolItem[] = [
@@ -156,10 +160,14 @@ export default function CarpoolingScreen() {
           city: r.city || 'الرياض',
           trip_type: 'both',
           trip_type_label: 'مشاركة توصيل مدرسي',
-          seats_available: 2,
+          seats_available: r.max_participants || r.seats_available || 2,
           notes: r.description || 'مشاركة توصيل بين أولياء أمور الحي.',
           phone: r.profiles?.phone || '',
           is_verified: Boolean(r.profiles?.is_verified_neighbor),
+          participants_count: r.current_participants || 0,
+          max_participants: r.max_participants || 2,
+          departure_time: r.departure_time,
+          price_per_seat: r.price_per_seat,
         };
       });
 
@@ -243,6 +251,60 @@ export default function CarpoolingScreen() {
       router.push({ pathname: '/conversation', params: { target: targetId } });
     } finally {
       setOpeningChatId(null);
+    }
+  };
+
+  const handleJoinCarpool = async (item: CarpoolItem) => {
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth.user) {
+      return Alert.alert('تسجيل الدخول مطلوب', 'يرجى تسجيل الدخول للانضمام للرحلة.', [
+        { text: 'تسجيل الدخول', onPress: () => router.push('/auth') },
+        { text: 'إلغاء', style: 'cancel' },
+      ]);
+    }
+
+    if (item.requester_id === auth.user.id) {
+      return Alert.alert('تنبيه', 'لا يمكنك الانضمام لرحلتك الخاصة.');
+    }
+
+    try {
+      // Check if already joined
+      const { data: existing } = await supabase
+        .from('carpool_participants')
+        .select('id, status')
+        .eq('carpool_request_id', item.id)
+        .eq('user_id', auth.user.id)
+        .maybeSingle();
+
+      if (existing) {
+        if (existing.status === 'cancelled') {
+          // Re-join
+          await supabase
+            .from('carpool_participants')
+            .update({ status: 'pending', cancelled_at: null })
+            .eq('id', existing.id);
+        } else {
+          return Alert.alert('معلومات', 'أنت منضم بالفعل لهذه الرحلة.');
+        }
+      } else {
+        // Join new
+        const { error } = await supabase
+          .from('carpool_participants')
+          .insert({
+            carpool_request_id: item.id,
+            user_id: auth.user.id,
+            status: 'pending',
+            seats_booked: 1,
+          });
+        if (error) throw error;
+      }
+
+      // Refresh the carpool data
+      await loadData();
+      Alert.alert('تم الانضمام! 🚗', 'تم طلب الانضمام للرحلة. سينسق معك ولي الأمر لتأكيد التفاصيل.');
+    } catch (err: any) {
+      console.warn('Join carpool error:', err);
+      Alert.alert('خطأ', err?.message || 'تعذر الانضمام للرحلة');
     }
   };
 
@@ -450,7 +512,9 @@ export default function CarpoolingScreen() {
                 <View style={styles.cardHeader}>
                   <View style={styles.seatsBadge}>
                     <Users size={12} color="#065f46" />
-                    <Text style={styles.seatsBadgeText}>{item.seats_available} مقاعد شاغرة</Text>
+                    <Text style={styles.seatsBadgeText}>
+                      {item.participants_count || 0} / {item.max_participants || item.seats_available} مقعد
+                    </Text>
                   </View>
 
                   <Pressable
@@ -503,6 +567,15 @@ export default function CarpoolingScreen() {
                       <Text style={styles.contactBtnText}>اتصال للتنسيق</Text>
                     </Pressable>
                   ) : null}
+
+                  <Pressable
+                    style={[styles.joinBtn, isChatLoading && { opacity: 0.8 }]}
+                    onPress={() => handleJoinCarpool(item)}
+                    disabled={isChatLoading}
+                  >
+                    <Users size={14} color="#fff" />
+                    <Text style={styles.joinBtnText}>الانضمام للرحلة</Text>
+                  </Pressable>
 
                   <Pressable
                     style={[styles.chatBtn, isChatLoading && { opacity: 0.8 }]}
@@ -792,6 +865,38 @@ const styles = StyleSheet.create({
     minHeight: 38,
   },
   chatBtnText: { fontSize: 12, fontWeight: '800', color: '#fff' },
+  joinBtn: {
+    flex: 1,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    backgroundColor: '#047857',
+    borderRadius: 12,
+    paddingVertical: 8,
+    minHeight: 38,
+  },
+  joinBtnText: { fontSize: 12, fontWeight: '800', color: '#fff' },
+  departureRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#f0fdf4',
+    padding: 8,
+    borderRadius: 10,
+    marginBottom: 8,
+  },
+  departureText: { fontSize: 12, fontWeight: '700', color: '#047857', textAlign: 'right' },
+  priceRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#fef3c7',
+    padding: 8,
+    borderRadius: 10,
+    marginBottom: 8,
+  },
+  priceText: { fontSize: 12, fontWeight: '700', color: '#b45309', textAlign: 'right' },
 
   /* Modal */
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },

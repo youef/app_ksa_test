@@ -66,6 +66,79 @@ async function searchRows(
   return [];
 }
 
+/** New secure search using RPC functions */
+async function performSecureSearch(
+  query: string,
+  userId: string | undefined
+): Promise<{
+  users: Row[];
+  questions: Row[];
+  requests: Row[];
+  shops: Row[];
+}> {
+  if (!userId) {
+    return { users: [], questions: [], requests: [], shops: [] };
+  }
+
+  try {
+    // Use the new secure search_all_content RPC
+    const { data: contentResults, error: contentError } = await supabase.rpc(
+      'search_all_content',
+      {
+        p_query: query.trim(),
+        p_user_id: userId,
+        p_limit: 50,
+      }
+    );
+
+    if (contentError) {
+      console.warn('Secure search failed, falling back to legacy:', contentError);
+      return { users: [], questions: [], requests: [], shops: [] };
+    }
+
+    // Also search users separately with privacy filters
+    const { data: userResults, error: userError } = await supabase.rpc(
+      'search_users_safe',
+      {
+        p_query: query.trim(),
+        p_requester_id: userId,
+        p_limit: 20,
+      }
+    );
+
+    if (userError) {
+      console.warn('User search failed:', userError);
+    }
+
+    // Categorize content results
+    const users = (userResults as Row[]) || [];
+    const questions = (contentResults as Row[])?.filter((r: Row) => r.type === 'question') || [];
+    const requests = (contentResults as Row[])?.filter((r: Row) => r.type === 'request' || r.type === 'carpool') || [];
+    const shops: Row[] = []; // Will be populated from legacy search for businesses
+
+    return { users, questions, requests, shops };
+  } catch (e) {
+    console.warn('Secure search exception:', e);
+    return { users: [], questions: [], requests: [], shops: [] };
+  }
+}
+
+/** Legacy fallback search for businesses/shops */
+async function searchBusinesses(term: string, limit = 12): Promise<Row[]> {
+  const searchTerm = `%${term}%`;
+  const attempts = [
+    () => supabase.from('businesses').select('*').or(`name.ilike.${term},description.ilike.${term},category.ilike.${term}`).limit(limit),
+    () => supabase.from('business_directory').select('*').or(`name.ilike.${term},description.ilike.${term},category.ilike.${term}`).limit(limit),
+    () => supabase.from('services').select('*').or(`name.ilike.${term},description.ilike.${term},category.ilike.${term}`).limit(limit),
+  ];
+
+  for (const attempt of attempts) {
+    const { data, error } = await attempt();
+    if (!error) return (data as Row[]) ?? [];
+  }
+  return [];
+}
+
 const TRENDING_KEYWORDS = [
   'سباك 🔧',
   'كهربائي ⚡',
@@ -129,49 +202,96 @@ export default function SearchPage() {
 
   const performSearch = async () => {
     setLoading(true);
-    const searchTerm = `%${query.trim()}%`;
+    const searchTerm = query.trim();
+    if (searchTerm.length === 0) {
+      setResults({ users: [], questions: [], requests: [], shops: [] });
+      setLoading(false);
+      return;
+    }
 
     try {
-      const [auth, u, q, r, shopsA, shopsB] = await Promise.all([
-        supabase.auth.getUser(),
-        supabase
-          .from('profiles')
-          .select('*')
-          .or(`display_name.ilike.${searchTerm},username.ilike.${searchTerm},city.ilike.${searchTerm}`)
-          .limit(15),
-        searchRows('questions', searchTerm, ['title', 'body', 'district', 'city'], ['title']),
-        searchRows('requests', searchTerm, ['title', 'description', 'request_type', 'district', 'city'], ['title']),
-        searchRows('businesses', searchTerm, ['name', 'description', 'category', 'district', 'city'], ['name']),
-        searchRows('business_directory', searchTerm, ['name', 'description', 'category', 'district', 'city'], ['name']),
-      ]);
-
-      // Hide users I blocked (or who blocked me) from search results.
-      let visibleUsers = (u.data as Row[]) || [];
+      const { data: auth } = await supabase.auth.getUser();
       const myId = auth?.data?.user?.id;
-      if (myId) {
-        const { data: blocks } = await supabase
-          .from('blocks')
-          .select('blocker_id, blocked_id')
-          .or(`blocker_id.eq.${myId},blocked_id.eq.${myId}`);
 
-        const blocked = new Set<string>();
-        (blocks || []).forEach((b: Row) => {
-          if (b.blocker_id === myId || b.blocked_id === myId) {
-            blocked.add(b.blocker_id === myId ? b.blocked_id : b.blocker_id);
-          }
-        });
-        visibleUsers = visibleUsers.filter((p: Row) => !blocked.has(p.id));
+      if (!myId) {
+        setResults({ users: [], questions: [], requests: [], shops: [] });
+        setLoading(false);
+        return;
       }
 
-      const shopIds = new Set(shopsA.map((s) => `${s.id}`));
+      // Use new secure search
+      const secureResults = await performSecureSearch(searchTerm, myId);
+      
+      // Also search businesses/shops via legacy method
+      const shops = await searchBusinesses(searchTerm);
+
+      // Get blocked users to filter them out
+      const { data: blocks } = await supabase
+        .from('blocks')
+        .select('blocker_id, blocked_id')
+        .or(`blocker_id.eq.${myId},blocked_id.eq.${myId}`);
+
+      const blocked = new Set<string>();
+      (blocks || []).forEach((b: Row) => {
+        if (b.blocker_id === myId || b.blocked_id === myId) {
+          blocked.add(b.blocker_id === myId ? b.blocked_id : b.blocker_id);
+        }
+      });
+
+      // Filter blocked users
+      const filteredUsers = (secureResults.users || []).filter((u: Row) => !blocked.has(u.id));
+
       setResults({
-        users: visibleUsers,
-        questions: q,
-        requests: r,
-        shops: [...shopsA, ...shopsB.filter((s) => !shopIds.has(`${s.id}`))],
+        users: filteredUsers,
+        questions: secureResults.questions || [],
+        requests: secureResults.requests || [],
+        shops,
       });
     } catch (e) {
       console.log('Search error:', e);
+      // Fallback to legacy search on error
+      try {
+        const searchTerm = `%${query.trim()}%`;
+        const [auth, u, q, r, shopsA, shopsB] = await Promise.all([
+          supabase.auth.getUser(),
+          supabase
+            .from('profiles')
+            .select('*')
+            .or(`display_name.ilike.${searchTerm},username.ilike.${searchTerm},city.ilike.${searchTerm}`)
+            .limit(15),
+          searchRows('questions', searchTerm, ['title', 'body', 'district', 'city'], ['title']),
+          searchRows('requests', searchTerm, ['title', 'description', 'request_type', 'district', 'city'], ['title']),
+          searchRows('businesses', searchTerm, ['name', 'description', 'category', 'district', 'city'], ['name']),
+          searchRows('business_directory', searchTerm, ['name', 'description', 'category', 'district', 'city'], ['name']),
+        ]);
+
+        let visibleUsers = (u.data as Row[]) || [];
+        const myId = auth?.data?.user?.id;
+        if (myId) {
+          const { data: blocks } = await supabase
+            .from('blocks')
+            .select('blocker_id, blocked_id')
+            .or(`blocker_id.eq.${myId},blocked_id.eq.${myId}`);
+
+          const blocked = new Set<string>();
+          (blocks || []).forEach((b: Row) => {
+            if (b.blocker_id === myId || b.blocked_id === myId) {
+              blocked.add(b.blocker_id === myId ? b.blocked_id : b.blocker_id);
+            }
+          });
+          visibleUsers = visibleUsers.filter((p: Row) => !blocked.has(p.id));
+        }
+
+        const shopIds = new Set(shopsA.map((s) => `${s.id}`));
+        setResults({
+          users: visibleUsers,
+          questions: q,
+          requests: r,
+          shops: [...shopsA, ...shopsB.filter((s) => !shopIds.has(`${s.id}`))],
+        });
+      } catch (e) {
+        console.log('Search error:', e);
+      }
     } finally {
       setLoading(false);
     }

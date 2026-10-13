@@ -6,7 +6,7 @@ import {
 } from './saudiLocations';
 import { areaLabel, distanceMeters, obfuscateCoordinate } from './privacy';
 
-export type MapPinKind = 'question' | 'tool' | 'emergency' | 'request' | 'business';
+export type MapPinKind = 'question' | 'tool' | 'emergency' | 'request' | 'business' | 'carpool';
 
 export interface MapPin {
   id: string;
@@ -45,6 +45,7 @@ export const MAP_PIN_KINDS: Record<
   emergency: { label: 'تنبيهات طارئة', short: 'طارئ', color: '#DC2626', emoji: '🚨' },
   request: { label: 'طلبات مساعدة', short: 'طلبات', color: '#F59E0B', emoji: '🤝' },
   business: { label: 'محلات وخدمات', short: 'محلات', color: '#059669', emoji: '🏪' },
+  carpool: { label: 'توصيل مدارس', short: 'توصيل', color: '#059669', emoji: '🚗' },
 };
 
 export const MAP_PIN_ORDER: MapPinKind[] = [
@@ -53,6 +54,7 @@ export const MAP_PIN_ORDER: MapPinKind[] = [
   'request',
   'emergency',
   'business',
+  'carpool',
 ];
 
 const ALL_KINDS: MapPinKind = 'question';
@@ -214,7 +216,7 @@ async function safeRows(
  * Every query is defensive, so a missing column or table degrades instead of breaking.
  */
 export async function loadMapPins(limit = 220): Promise<MapPin[]> {
-  const [questionRows, requestRows, businessRows, directoryRows, servicesRows] = await Promise.all([
+  const [questionRows, requestRows, businessRows, directoryRows, servicesRows, carpoolRows] = await Promise.all([
     safeRows(() =>
       supabase.from('questions').select('*').order('created_at', { ascending: false }).limit(limit),
     ),
@@ -223,6 +225,7 @@ export async function loadMapPins(limit = 220): Promise<MapPin[]> {
         .from('requests')
         .select('*')
         .eq('status', 'open')
+        .neq('request_type', 'carpooling')
         .order('created_at', { ascending: false })
         .limit(limit),
     ),
@@ -234,6 +237,15 @@ export async function loadMapPins(limit = 220): Promise<MapPin[]> {
     ),
     safeRows(() =>
       supabase.from('services').select('*').order('created_at', { ascending: false }).limit(limit),
+    ),
+    safeRows(() =>
+      supabase
+        .from('requests')
+        .select('*')
+        .eq('status', 'open')
+        .eq('request_type', 'carpooling')
+        .order('created_at', { ascending: false })
+        .limit(limit),
     ),
   ]);
 
@@ -311,6 +323,43 @@ export async function loadMapPins(limit = 220): Promise<MapPin[]> {
       urgent: Boolean(row.is_urgent),
       rating: null,
       price: toNumber(row.budget),
+      phone: cleanText(row.phone, 30),
+    });
+  });
+
+  // Carpool pins (requests with request_type = 'carpooling')
+  carpoolRows.forEach((row: any) => {
+    const position = resolvePinPosition({
+      id: `carpool-${row.id}`,
+      lat: row.lat,
+      lng: row.lng,
+      city: row.city,
+      district: row.district,
+    });
+    if (!position) return;
+
+    pins.push({
+      id: `carpool-${row.id}`,
+      kind: 'carpool',
+      title: cleanText(row.title, 90) || 'توصيل مدرسة',
+      body: cleanText(row.description),
+      city: row.city || 'كل المملكة',
+      district: row.district || '',
+      area: areaLabel({ district: row.district, city: row.city }),
+      lat: position.lat,
+      lng: position.lng,
+      approximate: true,
+      exact: false,
+      href: `/request?id=${row.id}`,
+      createdAt: row.created_at || '',
+      author: '',
+      ownerId: row.requester_id || '',
+      category: 'توصيل مدارس',
+      verified: false,
+      isOpen: row.status === 'open',
+      urgent: false,
+      rating: null,
+      price: toNumber(row.price_per_seat),
       phone: cleanText(row.phone, 30),
     });
   });

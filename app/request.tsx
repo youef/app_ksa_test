@@ -12,6 +12,7 @@ import {
   Image,
   Modal,
   Share,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
@@ -41,6 +42,7 @@ import {
   Eye,
   ArrowRight,
   ShieldAlert,
+  Pencil,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AppHeader } from '@/components/shared/AppHeader';
@@ -108,6 +110,12 @@ export default function Request() {
   const [selectedMatch, setSelectedMatch] = useState<any>(null);
   const [completeNote, setCompleteNote] = useState('بيض الله وجهك على الفزعة الكريمة 🤍');
   const [completingRequest, setCompletingRequest] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editNotes, setEditNotes] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [deletingRequest, setDeletingRequest] = useState(false);
 
   async function load() {
     if (!id) return;
@@ -524,6 +532,92 @@ export default function Request() {
   }
 
   const isOwner = me === request.requester_id;
+  const MAX_EDITS = 2;
+  const editCount = request?.edit_count || 0;
+  const editsRemaining = Math.max(0, MAX_EDITS - editCount);
+
+  function handleOpenEdit() {
+    if (editsRemaining <= 0) {
+      Alert.alert(
+        'استنفاد محاولات التعديل ⚠️',
+        'تم استنفاد الحد الأقصى المسموح للتعديل (محاولتان فقط) حفاظاً على مصداقية وسياق الطلبات في الحي.'
+      );
+      return;
+    }
+    setEditTitle(request?.title || '');
+    setEditDescription(request?.description || '');
+    setEditNotes(request?.notes || '');
+    setIsEditModalOpen(true);
+  }
+
+  async function handleSaveEdit() {
+    if (!editTitle.trim()) {
+      return Alert.alert('بيانات ناقصة', 'يرجى كتابة عنوان الطلب.');
+    }
+    if (!editDescription.trim()) {
+      return Alert.alert('بيانات ناقصة', 'يرجى كتابة تفاصيل الطلب.');
+    }
+    if (editsRemaining <= 0) {
+      return Alert.alert('تنبيه', 'تم استنفاد الحد الأقصى للتعديل.');
+    }
+
+    setSavingEdit(true);
+    try {
+      const nextEditCount = editCount + 1;
+      const { error } = await supabase
+        .from('requests')
+        .update({
+          title: editTitle.trim(),
+          description: editDescription.trim(),
+          notes: editNotes.trim() || null,
+          edit_count: nextEditCount,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setIsEditModalOpen(false);
+      Alert.alert(
+        'تم حفظ التعديل بنجاح ✅',
+        `متبقي لك ${MAX_EDITS - nextEditCount} من أصل ${MAX_EDITS} محاولات تعديل.`
+      );
+      load();
+    } catch (err: any) {
+      Alert.alert('خطأ', err?.message || 'تعذر تعديل الطلب.');
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
+  function handleDeleteRequest() {
+    Alert.alert(
+      'حذف طلب الفزعة نهائياً ⚠️',
+      'هل أنت متأكد من رغبتك في حذف هذا الطلب وعروض المساعدة المرتبطة به؟ لا يمكن التراجع عن هذا الإجراء.',
+      [
+        { text: 'إلغاء', style: 'cancel' },
+        {
+          text: 'حذف نهائي',
+          style: 'destructive',
+          onPress: async () => {
+            setDeletingRequest(true);
+            try {
+              await supabase.from('help_matches').delete().eq('request_id', id);
+              const { error } = await supabase.from('requests').delete().eq('id', id);
+              if (error) throw error;
+
+              Alert.alert('تم الحذف', 'تم حذف طلب الفزعة بنجاح.', [
+                { text: 'حسناً', onPress: () => router.replace('/requests') },
+              ]);
+            } catch (err: any) {
+              Alert.alert('خطأ', err?.message || 'تعذر حذف الطلب.');
+              setDeletingRequest(false);
+            }
+          },
+        },
+      ]
+    );
+  }
   const locationLabel = areaLabel({ district: request.district, city: request.city });
   const typeInfo = getRequestTypeInfo(request.request_type);
   const TypeIcon = typeInfo.icon;
@@ -634,6 +728,55 @@ export default function Request() {
         </View>
 
         <View style={styles.bodyContainer}>
+          {/* Author Management Card: Edit (Limit 2) & Delete */}
+          {isOwner && (
+            <View style={styles.authorManageBox}>
+              <View style={styles.authorManageHeader}>
+                <View style={styles.authorManageInfo}>
+                  <Text style={styles.authorManageTitle}>إدارة طلبك</Text>
+                  <Text style={styles.authorManageSub}>
+                    {editsRemaining > 0
+                      ? `متبقي لك ${editsRemaining} من ${MAX_EDITS} محاولات تعديل`
+                      : 'استنفدت الحد الأقصى للتعديل (محاولتان فقط)'}
+                  </Text>
+                </View>
+                <View style={[styles.editLimitBadge, editsRemaining === 0 ? styles.editLimitBadgeExpired : styles.editLimitBadgeActive]}>
+                  <Text style={[styles.editLimitBadgeText, editsRemaining === 0 ? styles.editLimitBadgeTextExpired : styles.editLimitBadgeTextActive]}>
+                    {editsRemaining}/{MAX_EDITS} محاولات
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.authorActionsRow}>
+                <Pressable
+                  style={[styles.editActionBtn, editsRemaining === 0 && styles.disabledActionBtn]}
+                  onPress={handleOpenEdit}
+                  disabled={editsRemaining === 0}
+                >
+                  <Pencil size={15} color={editsRemaining === 0 ? '#94a3b8' : '#047857'} />
+                  <Text style={[styles.editActionBtnText, editsRemaining === 0 && styles.disabledActionBtnText]}>
+                    {editsRemaining === 0 ? 'انتهت محاولات التعديل' : 'تعديل الطلب'}
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  style={[styles.deleteActionBtn, deletingRequest && { opacity: 0.6 }]}
+                  onPress={handleDeleteRequest}
+                  disabled={deletingRequest}
+                >
+                  {deletingRequest ? (
+                    <ActivityIndicator size="small" color="#dc2626" />
+                  ) : (
+                    <>
+                      <Trash2 size={15} color="#dc2626" />
+                      <Text style={styles.deleteActionBtnText}>حذف الطلب</Text>
+                    </>
+                  )}
+                </Pressable>
+              </View>
+            </View>
+          )}
+
           {/* Celebratory Banner if completed */}
           {request.status === 'completed' && (
             <LinearGradient
@@ -1108,6 +1251,103 @@ export default function Request() {
             </Pressable>
           </Pressable>
         </Pressable>
+      </Modal>
+
+      {/* Modal for Editing Request */}
+      <Modal
+        visible={isEditModalOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsEditModalOpen(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalOverlay}
+        >
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalTitle}>تعديل طلب الفزعة</Text>
+                <Text style={styles.modalSubtitle}>
+                  محاولة {editCount + 1} من {MAX_EDITS} (متبقي بعدها {Math.max(0, MAX_EDITS - (editCount + 1))})
+                </Text>
+              </View>
+              <Pressable
+                style={styles.modalCloseBtn}
+                onPress={() => setIsEditModalOpen(false)}
+                disabled={savingEdit}
+              >
+                <X size={18} color="#64748b" />
+              </Pressable>
+            </View>
+
+            <View style={styles.modalBody}>
+              <Text style={styles.modalInputLabel}>عنوان الطلب</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={editTitle}
+                onChangeText={setEditTitle}
+                placeholder="عنوان مختصر لطلب الفزعة..."
+                placeholderTextColor="#94a3b8"
+                textAlign="right"
+                maxLength={100}
+              />
+
+              <Text style={styles.modalInputLabel}>تفاصيل الطلب والاحتياج</Text>
+              <TextInput
+                style={[styles.modalInput, styles.modalTextArea]}
+                value={editDescription}
+                onChangeText={setEditDescription}
+                placeholder="اشرح لجارك بالتفصيل ماذا تحتاج..."
+                placeholderTextColor="#94a3b8"
+                textAlign="right"
+                multiline
+                numberOfLines={4}
+                maxLength={500}
+              />
+
+              <Text style={styles.modalInputLabel}>ملاحظات إضافية (اختياري)</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={editNotes}
+                onChangeText={setEditNotes}
+                placeholder="أي ملاحظات مثل التوقيت أو الأداة المطلوبة..."
+                placeholderTextColor="#94a3b8"
+                textAlign="right"
+                maxLength={200}
+              />
+
+              <View style={styles.editWarningBox}>
+                <Info size={14} color="#d97706" />
+                <Text style={styles.editWarningText}>
+                  تنبيه: يُسمح بتعديل الطلب مرتين كحد أقصى حفاظاً على ترابط عروض الفزعة ومصداقية الطلبات.
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.modalFooter}>
+              <Pressable
+                style={[styles.modalCancelBtn, savingEdit && { opacity: 0.6 }]}
+                onPress={() => setIsEditModalOpen(false)}
+                disabled={savingEdit}
+              >
+                <Text style={styles.modalCancelBtnText}>إلغاء</Text>
+              </Pressable>
+
+              <Pressable
+                style={[styles.modalSubmitBtn, (!editTitle.trim() || !editDescription.trim() || savingEdit) && styles.modalSubmitBtnDisabled]}
+                onPress={handleSaveEdit}
+                disabled={!editTitle.trim() || !editDescription.trim() || savingEdit}
+              >
+                {savingEdit ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.modalSubmitBtnText}>حفظ التعديلات</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -2193,5 +2433,221 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 13,
     fontWeight: '900',
+  },
+  authorManageBox: {
+    backgroundColor: '#ffffff',
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    gap: 12,
+  },
+  authorManageHeader: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  authorManageInfo: {
+    alignItems: 'flex-end',
+  },
+  authorManageTitle: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#0f172a',
+  },
+  authorManageSub: {
+    fontSize: 12,
+    color: '#64748b',
+    marginTop: 2,
+  },
+  editLimitBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  editLimitBadgeActive: {
+    backgroundColor: '#ecfdf5',
+    borderColor: '#a7f3d0',
+  },
+  editLimitBadgeExpired: {
+    backgroundColor: '#fef2f2',
+    borderColor: '#fecaca',
+  },
+  editLimitBadgeText: {
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  editLimitBadgeTextActive: {
+    color: '#047857',
+  },
+  editLimitBadgeTextExpired: {
+    color: '#b91c1c',
+  },
+  authorActionsRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 10,
+  },
+  editActionBtn: {
+    flex: 1,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#ecfdf5',
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+  },
+  editActionBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#047857',
+  },
+  disabledActionBtn: {
+    backgroundColor: '#f1f5f9',
+    borderColor: '#e2e8f0',
+  },
+  disabledActionBtnText: {
+    color: '#94a3b8',
+  },
+  deleteActionBtn: {
+    flex: 1,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#fef2f2',
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  deleteActionBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#dc2626',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+    justifyContent: 'flex-end',
+  },
+  modalCard: {
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 20,
+    gap: 16,
+    maxHeight: '90%',
+  },
+  modalHeader: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: '900',
+    color: '#0f172a',
+    textAlign: 'right',
+  },
+  modalSubtitle: {
+    fontSize: 12,
+    color: '#047857',
+    fontWeight: '700',
+    textAlign: 'right',
+    marginTop: 2,
+  },
+  modalCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#f1f5f9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalBody: {
+    gap: 10,
+  },
+  modalInputLabel: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: '#334155',
+    textAlign: 'right',
+  },
+  modalInput: {
+    backgroundColor: '#f8fafc',
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: '#0f172a',
+    textAlign: 'right',
+  },
+  modalTextArea: {
+    minHeight: 100,
+    textAlignVertical: 'top',
+  },
+  editWarningBox: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#fffbeb',
+    padding: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#fde68a',
+  },
+  editWarningText: {
+    fontSize: 11.5,
+    color: '#92400e',
+    fontWeight: '700',
+    flex: 1,
+    textAlign: 'right',
+    lineHeight: 17,
+  },
+  modalFooter: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 10,
+    paddingTop: 8,
+  },
+  modalSubmitBtn: {
+    flex: 2,
+    backgroundColor: '#059669',
+    paddingVertical: 12,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalSubmitBtnDisabled: {
+    backgroundColor: '#94a3b8',
+    opacity: 0.6,
+  },
+  modalSubmitBtnText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  modalCancelBtn: {
+    flex: 1,
+    backgroundColor: '#f1f5f9',
+    paddingVertical: 12,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCancelBtnText: {
+    color: '#475569',
+    fontSize: 14,
+    fontWeight: '800',
   },
 });

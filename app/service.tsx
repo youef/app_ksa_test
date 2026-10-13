@@ -5,6 +5,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
   ActivityIndicator,
   Platform,
@@ -13,6 +14,7 @@ import {
   Share,
   Linking,
   useWindowDimensions,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
@@ -47,6 +49,7 @@ import {
   PackageCheck,
   BadgeCheck,
   CircleAlert,
+  Pencil,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AppHeader } from '@/components/shared/AppHeader';
@@ -66,6 +69,11 @@ export default function Service() {
   const [activeImage, setActiveImage] = useState(0);
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [deletingService, setDeletingService] = useState(false);
 
   const { width: winWidth } = useWindowDimensions();
   const isWide = winWidth > 768;
@@ -110,26 +118,68 @@ export default function Service() {
     load();
   }, [id]);
 
+
+  const MAX_EDITS = 2;
+
+  function handleOpenEdit() {
+    const svc = service;
+    if (!svc || !me || me !== svc.provider_id) return;
+    const ec = svc.edit_count || 0;
+    const remaining = Math.max(0, MAX_EDITS - ec);
+    if (remaining <= 0) {
+      Alert.alert('استنفاد محاولات التعديل ⚠️', 'تم استنفاد الحد الأقصى المسموح للتعديل (محاولتان فقط).');
+      return;
+    }
+    setEditName(svc.name || '');
+    setEditDescription(svc.description || '');
+    setIsEditModalOpen(true);
+  }
+
+  async function handleSaveEdit() {
+    if (!editName.trim()) return Alert.alert('بيانات ناقصة', 'يرجى كتابة اسم العرض.');
+    const ec = service?.edit_count || 0;
+    const remaining = Math.max(0, MAX_EDITS - ec);
+    if (remaining <= 0) return Alert.alert('تنبيه', 'تم استنفاد الحد الأقصى للتعديل.');
+    setSavingEdit(true);
+    try {
+      const nextEditCount = ec + 1;
+      const { error } = await supabase.from('services').update({
+        name: editName.trim(),
+        description: editDescription.trim() || null,
+        edit_count: nextEditCount,
+        updated_at: new Date().toISOString(),
+      }).eq('id', id);
+      if (error) throw error;
+      setIsEditModalOpen(false);
+      Alert.alert('تم حفظ التعديل بنجاح ✅', `متبقي لك ${MAX_EDITS - nextEditCount} من أصل ${MAX_EDITS} محاولات تعديل.`);
+      const { data: updated } = await supabase.from('services').select('*').eq('id', id).single();
+      if (updated) setService(updated);
+    } catch (err: any) {
+      Alert.alert('خطأ', err?.message || 'تعذر تعديل العرض.');
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
   async function remove() {
     if (!me || me !== service?.provider_id) {
       return Alert.alert('تنبيه', 'يمكن لمالك العرض فقط حذفه.');
     }
-    Alert.alert('تأكيد الحذف', 'هل أنت متأكد من حذف هذا العرض نهائياً من سوق الحي؟', [
+    Alert.alert('تأكيد الحذف ⚠️', 'هل أنت متأكد من حذف هذا العرض نهائياً من سوق الحي؟', [
       { text: 'إلغاء', style: 'cancel' },
       {
         text: 'حذف العرض',
         style: 'destructive',
         onPress: async () => {
+          setDeletingService(true);
           const r = await supabase.from('services').delete().eq('id', id);
-          if (r.error) Alert.alert('خطأ', r.error.message);
-          else {
-            Alert.alert('تم بنجاح', 'تم حذف العرض بنجاح.');
-            router.replace('/market');
-          }
+          if (r.error) { Alert.alert('خطأ', r.error.message); setDeletingService(false); }
+          else { Alert.alert('تم بنجاح', 'تم حذف العرض بنجاح.'); router.replace('/market'); }
         },
       },
     ]);
   }
+
 
   async function shareOffer() {
     if (!service) return;
@@ -601,15 +651,46 @@ export default function Service() {
           {/* 8. OWNER MANAGEMENT (IF VIEWER IS OWNER) */}
           {isOwner && (
             <View style={styles.ownerBox}>
-              <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8 }}>
-                <Sparkles size={18} color="#059669" />
-                <Text style={styles.ownerBoxTitle}>أنت صاحب هذا العرض في سوق الحي</Text>
+              <View style={styles.ownerBoxHeaderRow}>
+                <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8 }}>
+                  <Sparkles size={18} color="#059669" />
+                  <Text style={styles.ownerBoxTitle}>أنت صاحب هذا العرض</Text>
+                </View>
+                <View style={[(service?.edit_count || 0) >= MAX_EDITS ? styles.editLimitBadgeExpired : styles.editLimitBadgeActive, styles.editLimitBadgeBase]}>
+                  <Text style={(service?.edit_count || 0) >= MAX_EDITS ? styles.editLimitBadgeTextExpired : styles.editLimitBadgeTextActive}>
+                    {Math.max(0, MAX_EDITS - (service?.edit_count || 0))}/{MAX_EDITS} محاولات تعديل
+                  </Text>
+                </View>
               </View>
-              <Text style={styles.ownerBoxDesc}>يمكنك إدارة العرض أو حذفه في أي وقت.</Text>
-              <Pressable style={styles.ownerDeleteBtn} onPress={remove}>
-                <Trash2 size={16} color="#ef4444" />
-                <Text style={styles.ownerDeleteBtnText}>حذف هذا العرض نهائياً</Text>
-              </Pressable>
+              <Text style={styles.ownerBoxDesc}>يمكنك تعديل أو حذف هذا العرض في أي وقت.</Text>
+
+              <View style={styles.ownerActionsRow}>
+                <Pressable
+                  style={[styles.ownerEditBtn, (service?.edit_count || 0) >= MAX_EDITS && styles.ownerEditBtnDisabled]}
+                  onPress={handleOpenEdit}
+                  disabled={(service?.edit_count || 0) >= MAX_EDITS}
+                >
+                  <Pencil size={15} color={(service?.edit_count || 0) >= MAX_EDITS ? '#94a3b8' : '#047857'} />
+                  <Text style={[(service?.edit_count || 0) >= MAX_EDITS ? styles.ownerEditBtnTextDisabled : styles.ownerEditBtnText]}>
+                    {(service?.edit_count || 0) >= MAX_EDITS ? 'انتهت محاولات التعديل' : 'تعديل العرض'}
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  style={[styles.ownerDeleteBtn, deletingService && { opacity: 0.6 }]}
+                  onPress={remove}
+                  disabled={deletingService}
+                >
+                  {deletingService ? (
+                    <ActivityIndicator size="small" color="#ef4444" />
+                  ) : (
+                    <>
+                      <Trash2 size={15} color="#ef4444" />
+                      <Text style={styles.ownerDeleteBtnText}>حذف العرض</Text>
+                    </>
+                  )}
+                </Pressable>
+              </View>
             </View>
           )}
 
@@ -700,6 +781,91 @@ export default function Service() {
             <Image source={{ uri: fullscreenImage }} style={styles.modalImage} resizeMode="contain" />
           )}
         </View>
+      </Modal>
+
+      {/* Edit Service Modal */}
+      <Modal
+        visible={isEditModalOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsEditModalOpen(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.editModalOverlay}
+        >
+          <View style={styles.editModalCard}>
+            <View style={styles.editModalHeader}>
+              <View>
+                <Text style={styles.editModalTitle}>تعديل العرض</Text>
+                <Text style={styles.editModalSubtitle}>
+                  محاولة {(service?.edit_count || 0) + 1} من {MAX_EDITS} (متبقي بعدها {Math.max(0, MAX_EDITS - ((service?.edit_count || 0) + 1))})
+                </Text>
+              </View>
+              <Pressable
+                style={styles.editModalCloseBtn}
+                onPress={() => setIsEditModalOpen(false)}
+                disabled={savingEdit}
+              >
+                <X size={18} color="#64748b" />
+              </Pressable>
+            </View>
+
+            <View style={styles.editModalBody}>
+              <Text style={styles.editModalLabel}>اسم العرض</Text>
+              <TextInput
+                style={styles.editModalInput}
+                value={editName}
+                onChangeText={setEditName}
+                placeholder="اسم العرض في سوق الحي..."
+                placeholderTextColor="#94a3b8"
+                textAlign="right"
+                maxLength={120}
+              />
+
+              <Text style={styles.editModalLabel}>وصف العرض (اختياري)</Text>
+              <TextInput
+                style={[styles.editModalInput, styles.editModalTextArea]}
+                value={editDescription}
+                onChangeText={setEditDescription}
+                placeholder="وصف مختصر للعرض والخدمة المقدمة..."
+                placeholderTextColor="#94a3b8"
+                textAlign="right"
+                multiline
+                numberOfLines={4}
+                maxLength={500}
+              />
+
+              <View style={styles.editWarningBox}>
+                <Info size={14} color="#d97706" />
+                <Text style={styles.editWarningText}>
+                  تنبيه: يُسمح بتعديل العرض مرتين كحد أقصى حفاظاً على مصداقية العروض في سوق الحي.
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.editModalFooter}>
+              <Pressable
+                style={[styles.editModalCancelBtn, savingEdit && { opacity: 0.6 }]}
+                onPress={() => setIsEditModalOpen(false)}
+                disabled={savingEdit}
+              >
+                <Text style={styles.editModalCancelBtnText}>إلغاء</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.editModalSubmitBtn, (!editName.trim() || savingEdit) && styles.editModalSubmitBtnDisabled]}
+                onPress={handleSaveEdit}
+                disabled={!editName.trim() || savingEdit}
+              >
+                {savingEdit ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.editModalSubmitBtnText}>حفظ التعديلات</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -1137,4 +1303,126 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   modalImage: { width: '92%', height: '80%' },
+
+  // Owner Management Box
+  ownerBox: {
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    padding: 16,
+    marginHorizontal: 0,
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    gap: 12,
+  },
+  ownerBoxHeaderRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  ownerBoxTitle: { fontSize: 14, fontWeight: '900', color: '#0f172a' },
+  ownerBoxDesc: { fontSize: 12, color: '#64748b', textAlign: 'right' },
+  ownerActionsRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 10,
+  },
+  ownerEditBtn: {
+    flex: 1,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#ecfdf5',
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+  },
+  ownerEditBtnText: { fontSize: 13, fontWeight: '800', color: '#047857' },
+  ownerEditBtnDisabled: { backgroundColor: '#f1f5f9', borderColor: '#e2e8f0' },
+  ownerEditBtnTextDisabled: { fontSize: 13, fontWeight: '800', color: '#94a3b8' },
+  ownerDeleteBtn: {
+    flex: 1,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#fef2f2',
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  ownerDeleteBtnText: { fontSize: 13, fontWeight: '800', color: '#ef4444' },
+
+  // Edit limit badges
+  editLimitBadgeBase: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, borderWidth: 1 },
+  editLimitBadgeActive: { backgroundColor: '#ecfdf5', borderColor: '#a7f3d0' },
+  editLimitBadgeExpired: { backgroundColor: '#fef2f2', borderColor: '#fecaca' },
+  editLimitBadgeTextActive: { fontSize: 11, fontWeight: '900', color: '#047857' },
+  editLimitBadgeTextExpired: { fontSize: 11, fontWeight: '900', color: '#b91c1c' },
+
+  // Edit modal
+  editModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+    justifyContent: 'flex-end',
+  },
+  editModalCard: {
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 20,
+    gap: 16,
+    maxHeight: '90%',
+  },
+  editModalHeader: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  editModalTitle: { fontSize: 17, fontWeight: '900', color: '#0f172a', textAlign: 'right' },
+  editModalSubtitle: { fontSize: 12, color: '#047857', fontWeight: '700', textAlign: 'right', marginTop: 2 },
+  editModalCloseBtn: {
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center',
+  },
+  editModalBody: { gap: 10 },
+  editModalLabel: { fontSize: 12.5, fontWeight: '800', color: '#334155', textAlign: 'right' },
+  editModalInput: {
+    backgroundColor: '#f8fafc',
+    borderWidth: 1.5, borderColor: '#e2e8f0',
+    borderRadius: 14,
+    paddingHorizontal: 14, paddingVertical: 10,
+    fontSize: 14, color: '#0f172a', textAlign: 'right',
+  },
+  editModalTextArea: { minHeight: 100, textAlignVertical: 'top' },
+  editWarningBox: {
+    flexDirection: 'row-reverse', alignItems: 'center', gap: 8,
+    backgroundColor: '#fffbeb', padding: 10,
+    borderRadius: 12, borderWidth: 1, borderColor: '#fde68a',
+  },
+  editWarningText: {
+    fontSize: 11.5, color: '#92400e', fontWeight: '700',
+    flex: 1, textAlign: 'right', lineHeight: 17,
+  },
+  editModalFooter: {
+    flexDirection: 'row-reverse', alignItems: 'center', gap: 10, paddingTop: 8,
+  },
+  editModalSubmitBtn: {
+    flex: 2, backgroundColor: '#059669',
+    paddingVertical: 12, borderRadius: 14,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  editModalSubmitBtnDisabled: { backgroundColor: '#94a3b8', opacity: 0.6 },
+  editModalSubmitBtnText: { color: '#ffffff', fontSize: 14, fontWeight: '900' },
+  editModalCancelBtn: {
+    flex: 1, backgroundColor: '#f1f5f9',
+    paddingVertical: 12, borderRadius: 14,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  editModalCancelBtnText: { color: '#475569', fontSize: 14, fontWeight: '800' },
 });

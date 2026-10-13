@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   Share,
   Image,
+  Modal,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
@@ -39,6 +40,9 @@ import {
   Eye,
   AlertTriangle,
   ChevronLeft,
+  Pencil,
+  Trash2,
+  X,
 } from 'lucide-react-native';
 import { requireAccount } from '@/lib/authGate';
 import { areaLabel } from '@/lib/privacy';
@@ -64,6 +68,13 @@ export default function Question() {
   const [voting, setVoting] = useState<string | null>(null);
   const [replyTo, setReplyTo] = useState<any | null>(null);
   const [sharingWith, setSharingWith] = useState<string | null>(null);
+
+  // Edit & Delete states
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editContent, setEditContent] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [deletingQuestion, setDeletingQuestion] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -345,6 +356,90 @@ export default function Question() {
     } catch {}
   };
 
+  const isAuthor = Boolean(currentUserId && q?.author_id && currentUserId === q.author_id);
+  const editCount = q?.edit_count || 0;
+  const MAX_EDITS = 2;
+  const editsRemaining = Math.max(0, MAX_EDITS - editCount);
+
+  function handleOpenEdit() {
+    if (editsRemaining <= 0) {
+      Alert.alert(
+        'استنفاد محاولات التعديل ⚠️',
+        'تم استنفاد الحد الأقصى المسموح للتعديل (محاولتان فقط) حفاظاً على مصداقية وسياق الردود في الحي.'
+      );
+      return;
+    }
+    setEditTitle(q?.title || '');
+    setEditContent(q?.content || q?.body || '');
+    setIsEditModalOpen(true);
+  }
+
+  async function handleSaveEdit() {
+    if (!editTitle.trim()) {
+      return Alert.alert('بيانات ناقصة', 'يرجى كتابة عنوان السؤال.');
+    }
+    if (editsRemaining <= 0) {
+      return Alert.alert('تنبيه', 'تم استنفاد الحد الأقصى للتعديل.');
+    }
+
+    setSavingEdit(true);
+    try {
+      const nextEditCount = editCount + 1;
+      const { error } = await supabase
+        .from('questions')
+        .update({
+          title: editTitle.trim(),
+          content: editContent.trim(),
+          body: editContent.trim(),
+          edit_count: nextEditCount,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setIsEditModalOpen(false);
+      Alert.alert(
+        'تم حفظ التعديل بنجاح ✅',
+        `متبقي لك ${MAX_EDITS - nextEditCount} من أصل ${MAX_EDITS} محاولات تعديل.`
+      );
+      load();
+    } catch (err: any) {
+      Alert.alert('خطأ', err?.message || 'تعذر تعديل الاستفسار.');
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
+  function handleDeleteQuestion() {
+    Alert.alert(
+      'حذف الاستفسار نهائياً ⚠️',
+      'هل أنت متأكد من رغبتك في حذف هذا الاستفسار وجميع الردود المرتبطة به؟ لا يمكن التراجع عن هذا الإجراء.',
+      [
+        { text: 'إلغاء', style: 'cancel' },
+        {
+          text: 'حذف نهائي',
+          style: 'destructive',
+          onPress: async () => {
+            setDeletingQuestion(true);
+            try {
+              await supabase.from('answers').delete().eq('question_id', id);
+              const { error } = await supabase.from('questions').delete().eq('id', id);
+              if (error) throw error;
+
+              Alert.alert('تم الحذف', 'تم حذف الاستفسار بنجاح من الحي.', [
+                { text: 'حسناً', onPress: () => router.replace('/questions') },
+              ]);
+            } catch (err: any) {
+              Alert.alert('خطأ', err?.message || 'تعذر حذف الاستفسار.');
+              setDeletingQuestion(false);
+            }
+          },
+        },
+      ]
+    );
+  }
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -368,7 +463,6 @@ export default function Question() {
   const authorName = q.profiles?.hide_name
     ? 'مستخدم مجهول'
     : q.profiles?.display_name || q.profiles?.username || 'أحد سكان الحي';
-  const isAuthor = currentUserId === q.author_id;
   const isSolved = q.status === 'solved' || q.status === 'closed' || Boolean(q.best_answer_id);
   const locationLabel = areaLabel({ district: q.district, city: q.city });
 
@@ -475,6 +569,55 @@ export default function Question() {
             </Text>
           </View>
         </View>
+
+        {/* Author Management Card: Edit (Limit 2) & Delete */}
+        {isAuthor && (
+          <View style={styles.authorManageBox}>
+            <View style={styles.authorManageHeader}>
+              <View style={styles.authorManageInfo}>
+                <Text style={styles.authorManageTitle}>إدارة استفسارك</Text>
+                <Text style={styles.authorManageSub}>
+                  {editsRemaining > 0
+                    ? `متبقي لك ${editsRemaining} من ${MAX_EDITS} محاولات تعديل`
+                    : 'استنفدت الحد الأقصى للتعديل (محاولتان فقط)'}
+                </Text>
+              </View>
+              <View style={[styles.editLimitBadge, editsRemaining === 0 ? styles.editLimitBadgeExpired : styles.editLimitBadgeActive]}>
+                <Text style={[styles.editLimitBadgeText, editsRemaining === 0 ? styles.editLimitBadgeTextExpired : styles.editLimitBadgeTextActive]}>
+                  {editsRemaining}/{MAX_EDITS} محاولات
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.authorActionsRow}>
+              <Pressable
+                style={[styles.editActionBtn, editsRemaining === 0 && styles.disabledActionBtn]}
+                onPress={handleOpenEdit}
+                disabled={editsRemaining === 0}
+              >
+                <Pencil size={15} color={editsRemaining === 0 ? '#94a3b8' : '#047857'} />
+                <Text style={[styles.editActionBtnText, editsRemaining === 0 && styles.disabledActionBtnText]}>
+                  {editsRemaining === 0 ? 'انتهت محاولات التعديل' : 'تعديل الاستفسار'}
+                </Text>
+              </Pressable>
+
+              <Pressable
+                style={[styles.deleteActionBtn, deletingQuestion && { opacity: 0.6 }]}
+                onPress={handleDeleteQuestion}
+                disabled={deletingQuestion}
+              >
+                {deletingQuestion ? (
+                  <ActivityIndicator size="small" color="#dc2626" />
+                ) : (
+                  <>
+                    <Trash2 size={15} color="#dc2626" />
+                    <Text style={styles.deleteActionBtnText}>حذف الاستفسار</Text>
+                  </>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        )}
 
         {/* Quick Suggested Responses Pills */}
         {!isSolved && currentUserId && (
@@ -692,6 +835,92 @@ export default function Question() {
           )}
         </View>
       )}
+
+      {/* Modal for Editing Question */}
+      <Modal
+        visible={isEditModalOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsEditModalOpen(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalOverlay}
+        >
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalTitle}>تعديل الاستفسار</Text>
+                <Text style={styles.modalSubtitle}>
+                  محاولة {editCount + 1} من {MAX_EDITS} (متبقي بعدها {Math.max(0, MAX_EDITS - (editCount + 1))})
+                </Text>
+              </View>
+              <Pressable
+                style={styles.modalCloseBtn}
+                onPress={() => setIsEditModalOpen(false)}
+                disabled={savingEdit}
+              >
+                <X size={18} color="#64748b" />
+              </Pressable>
+            </View>
+
+            <View style={styles.modalBody}>
+              <Text style={styles.modalInputLabel}>عنوان الاستفسار</Text>
+              <TextInput
+                style={styles.modalInput}
+                value={editTitle}
+                onChangeText={setEditTitle}
+                placeholder="عنوان واضح ومختصر للاستفسار..."
+                placeholderTextColor="#94a3b8"
+                textAlign="right"
+                maxLength={100}
+              />
+
+              <Text style={styles.modalInputLabel}>تفاصيل الاستفسار</Text>
+              <TextInput
+                style={[styles.modalInput, styles.modalTextArea]}
+                value={editContent}
+                onChangeText={setEditContent}
+                placeholder="تفاصيل إضافية إن وجدت..."
+                placeholderTextColor="#94a3b8"
+                textAlign="right"
+                multiline
+                numberOfLines={4}
+                maxLength={500}
+              />
+
+              <View style={styles.editWarningBox}>
+                <Info size={14} color="#d97706" />
+                <Text style={styles.editWarningText}>
+                  تنبيه: يُسمح بتعديل السؤال مرتين كحد أقصى حفاظاً على ترابط الردود وسياقها في الحي.
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.modalFooter}>
+              <Pressable
+                style={[styles.modalCancelBtn, savingEdit && { opacity: 0.6 }]}
+                onPress={() => setIsEditModalOpen(false)}
+                disabled={savingEdit}
+              >
+                <Text style={styles.modalCancelBtnText}>إلغاء</Text>
+              </Pressable>
+
+              <Pressable
+                style={[styles.modalSubmitBtn, (!editTitle.trim() || savingEdit) && styles.modalSubmitBtnDisabled]}
+                onPress={handleSaveEdit}
+                disabled={!editTitle.trim() || savingEdit}
+              >
+                {savingEdit ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.modalSubmitBtnText}>حفظ التعديلات</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -1303,5 +1532,221 @@ const styles = StyleSheet.create({
   sendButtonDisabled: {
     backgroundColor: '#94a3b8',
     opacity: 0.6,
+  },
+  authorManageBox: {
+    backgroundColor: '#ffffff',
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    gap: 12,
+  },
+  authorManageHeader: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  authorManageInfo: {
+    alignItems: 'flex-end',
+  },
+  authorManageTitle: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#0f172a',
+  },
+  authorManageSub: {
+    fontSize: 12,
+    color: '#64748b',
+    marginTop: 2,
+  },
+  editLimitBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  editLimitBadgeActive: {
+    backgroundColor: '#ecfdf5',
+    borderColor: '#a7f3d0',
+  },
+  editLimitBadgeExpired: {
+    backgroundColor: '#fef2f2',
+    borderColor: '#fecaca',
+  },
+  editLimitBadgeText: {
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  editLimitBadgeTextActive: {
+    color: '#047857',
+  },
+  editLimitBadgeTextExpired: {
+    color: '#b91c1c',
+  },
+  authorActionsRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 10,
+  },
+  editActionBtn: {
+    flex: 1,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#ecfdf5',
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+  },
+  editActionBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#047857',
+  },
+  disabledActionBtn: {
+    backgroundColor: '#f1f5f9',
+    borderColor: '#e2e8f0',
+  },
+  disabledActionBtnText: {
+    color: '#94a3b8',
+  },
+  deleteActionBtn: {
+    flex: 1,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#fef2f2',
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  deleteActionBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#dc2626',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+    justifyContent: 'flex-end',
+  },
+  modalCard: {
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 20,
+    gap: 16,
+    maxHeight: '90%',
+  },
+  modalHeader: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: '900',
+    color: '#0f172a',
+    textAlign: 'right',
+  },
+  modalSubtitle: {
+    fontSize: 12,
+    color: '#047857',
+    fontWeight: '700',
+    textAlign: 'right',
+    marginTop: 2,
+  },
+  modalCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#f1f5f9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalBody: {
+    gap: 10,
+  },
+  modalInputLabel: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: '#334155',
+    textAlign: 'right',
+  },
+  modalInput: {
+    backgroundColor: '#f8fafc',
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: '#0f172a',
+    textAlign: 'right',
+  },
+  modalTextArea: {
+    minHeight: 100,
+    textAlignVertical: 'top',
+  },
+  editWarningBox: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#fffbeb',
+    padding: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#fde68a',
+  },
+  editWarningText: {
+    fontSize: 11.5,
+    color: '#92400e',
+    fontWeight: '700',
+    flex: 1,
+    textAlign: 'right',
+    lineHeight: 17,
+  },
+  modalFooter: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 10,
+    paddingTop: 8,
+  },
+  modalSubmitBtn: {
+    flex: 2,
+    backgroundColor: '#059669',
+    paddingVertical: 12,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalSubmitBtnDisabled: {
+    backgroundColor: '#94a3b8',
+    opacity: 0.6,
+  },
+  modalSubmitBtnText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  modalCancelBtn: {
+    flex: 1,
+    backgroundColor: '#f1f5f9',
+    paddingVertical: 12,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCancelBtnText: {
+    color: '#475569',
+    fontSize: 14,
+    fontWeight: '800',
   },
 });
