@@ -1277,36 +1277,10 @@ export default function AdminScreen() {
     });
   }, [reports, reportStatusFilter]);
 
-  // Loading Screen
-  if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={C.accent} />
-        <Text style={styles.loadingText}>جاري فتح مركز العمليات والرقابة الشاملة...</Text>
-      </View>
-    );
-  }
-
-  // Unauthorized Fallback
-  if (!currentAdmin || currentAdmin.role !== 'admin') {
-    return (
-      <View style={styles.center}>
-        <LinearGradient colors={['#FEE2E2', '#FECACA']} style={styles.unauthorizedIconWrap}>
-          <Shield size={50} color={C.danger} />
-        </LinearGradient>
-        <Text style={styles.unauthorizedTitle}>صلاحية مدير النظام مطلوبة 👑</Text>
-        <Text style={styles.unauthorizedSub}>
-          لوحة التحكم مخصصة حصرياً للمدراء المعتمدين في قاعدة البيانات. صلاحيات المنصة محصورة في: مدير (Admin) ومستخدم عادي (User).
-        </Text>
-        <Pressable style={styles.backBtn} onPress={() => router.replace('/home')}>
-          <Text style={styles.backBtnText}>العودة للرئيسية</Text>
-        </Pressable>
-      </View>
-    );
-  }
-
   // ============================================================
   // Derived navigation helpers (grouped command center)
+  // NOTE: these hooks must run before any early return so the
+  // Rules of Hooks stay valid on every render.
   // ============================================================
   const activeGroup = useMemo(
     () => ADMIN_NAV.find((g) => g.tabs.some((t) => t.key === activeTab)) || ADMIN_NAV[0],
@@ -1334,6 +1308,34 @@ export default function AdminScreen() {
     },
     [totalPending, usersList.length, stats.pendingVerifications, stats.pendingReports, stats.urgentAlerts]
   );
+
+  // Loading Screen
+  if (loading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color={C.accent} />
+        <Text style={styles.loadingText}>جاري فتح مركز العمليات والرقابة الشاملة...</Text>
+      </View>
+    );
+  }
+
+  // Unauthorized Fallback
+  if (!currentAdmin || currentAdmin.role !== 'admin') {
+    return (
+      <View style={styles.center}>
+        <LinearGradient colors={['#FEE2E2', '#FECACA']} style={styles.unauthorizedIconWrap}>
+          <Shield size={50} color={C.danger} />
+        </LinearGradient>
+        <Text style={styles.unauthorizedTitle}>صلاحية مدير النظام مطلوبة 👑</Text>
+        <Text style={styles.unauthorizedSub}>
+          لوحة التحكم مخصصة حصرياً للمدراء المعتمدين في قاعدة البيانات. صلاحيات المنصة محصورة في: مدير (Admin) ومستخدم عادي (User).
+        </Text>
+        <Pressable style={styles.backBtn} onPress={() => router.replace('/home')}>
+          <Text style={styles.backBtnText}>العودة للرئيسية</Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
