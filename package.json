@@ -13,7 +13,11 @@
     "typecheck": "node --stack-size=65000 --max-old-space-size=4096 ./node_modules/typescript/bin/tsc --noEmit"
   },
   "dependencies": {
+    "@config-plugins/react-native-webrtc": "^13.0.0",
     "@expo/metro-runtime": "~6.1.2",
+    "@livekit/react-native": "^3.0.0",
+    "@livekit/react-native-expo-plugin": "^1.0.3",
+    "@livekit/react-native-webrtc": "^144.2.0",
     "@logrocket/react-native": "^3.14.0",
     "@maplibre/maplibre-react-native": "11.4.0",
     "@react-native-async-storage/async-storage": "^2.2.0",
@@ -33,6 +37,7 @@
     "expo-sqlite": "~16.0.10",
     "expo-symbols": "~1.0.8",
     "leaflet": "^1.9.4",
+    "livekit-client": "^2.22.4",
     "logrocket": "^12.4.0",
     "lucide-react-native": "^1.48.0",
     "nativewind": "^2.0.11",

@@ -56,6 +56,7 @@ import {
   ChevronDown,
   ChevronRight,
   Shield,
+  Radio,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { requireAccount } from '@/lib/authGate';
@@ -364,6 +365,19 @@ export default function MoreScreen() {
           {/* ======================================================== */}
           {/* 4. CORE NEIGHBORHOOD SERVICES DIRECTORY                  */}
           {/* ======================================================== */}
+          <Text style={styles.sectionHeader}>التواصل المباشر مع الجيران 📡</Text>
+          <View style={styles.menuGroup}>
+            <MenuItem
+              icon={<Radio size={20} color="#dc2626" />}
+              iconBg="#fef2f2"
+              title="البثوث المباشرة"
+              sub="شاهد بثوث الجيران وابدأ بثك مع ضيوفك"
+              badge="مباشر"
+              badgeColor="#dc2626"
+              onPress={() => router.push('/lives')}
+            />
+          </View>
+
           <Text style={styles.sectionHeader}>أقسام وخدمات الحي الأساسية 🏬</Text>
           <View style={styles.menuGroup}>
             <MenuItem

@@ -10,6 +10,8 @@
     "plugins": [
       "expo-router",
       "@maplibre/maplibre-react-native",
+      "@livekit/react-native-expo-plugin",
+      "@config-plugins/react-native-webrtc",
       [
         "expo-image-picker",
         {
@@ -46,7 +48,9 @@
       "bundleIdentifier": "sa.hayna.app",
       "icon": "./public/brand/HAYNA_APP_ICON.png",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "يحتاج حيّنا إلى الكاميرا لبدء البث المباشر أو الظهور كضيف.",
+        "NSMicrophoneUsageDescription": "يحتاج حيّنا إلى الميكروفون للتحدث أثناء البث المباشر."
       },
       "config": {
         "googleMapsApiKey": "AIzaSyD3dbOJXEPgG1qyNi4Z_sLO46kj6c5bnY8"
@@ -61,7 +65,9 @@
       },
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION"
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ],
       "config": {
         "googleMaps": {

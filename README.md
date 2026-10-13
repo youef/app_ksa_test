@@ -32,3 +32,16 @@ Supabase Project URL: https://vkeuyompnddqfvulalkk.supabase.co
 - الموقع الحالي يعمل على iOS وAndroid عبر `expo-location` بعد منح صلاحية الموقع.
 - إشعارات الدفع تستخدم Expo Push Service وتُسجّل أجهزة المستخدم في Supabase.
 - بناء نسخة iOS/Android النهائية يحتاج EAS Build وبيانات Apple/Google الخاصة بالتطبيق.
+
+## البثوث المباشرة
+- دليل البث: «المزيد» ← «البثوث المباشرة». أضفنا دليل البث، تجهيز البث، غرفة فيديو مباشرة، التعليقات والتفاعلات، طلبات الضيوف، الإبلاغ والحظر.
+- الوسائط تستخدم LiveKit. اضبط الأسرار **في Supabase Edge Function Secrets فقط**: `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`. لا تضفها إلى `EXPO_PUBLIC_*` أو حزمة التطبيق.
+- نُشرت الدالة `livekit-token` في مشروع Supabase، وطُبقت جداول وسياسات البث. لا تعمل رموز الاتصال حتى تضبط أسرار LiveKit.
+- يتطلب Android/iOS بناء Expo Development Client بعد تثبيت حزم LiveKit؛ Expo Go لا يحتوي إضافات WebRTC الأصلية. الويب يستخدم LiveKit Web SDK.
+```bash
+supabase secrets set LIVEKIT_URL=... LIVEKIT_API_KEY=... LIVEKIT_API_SECRET=...
+supabase functions deploy livekit-token
+```
+
+راجع سجل migrations البعيد قبل استخدام `supabase db push` لأن سجل المشروع البعيد لا يطابق كل migrations الموجودة في هذا المستودع.
+
