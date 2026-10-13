@@ -20,9 +20,9 @@ import { getCurrentDeviceLocation, type DeviceLocation } from '@/lib/deviceLocat
 import {
   MAP_PIN_KINDS,
   MAP_PIN_ORDER,
-  countByCity,
   countByKind,
   filterPins,
+  findPlaceCenter,
   loadMapPins,
   type MapPin,
   type MapPinKind,
@@ -34,6 +34,7 @@ import {
   type NearbyPlace,
 } from '@/lib/places';
 import { formatDistance, navigationUrl } from '@/lib/privacy';
+import { getActiveLocation, isAllKingdom, subscribeLocation } from '@/lib/locationSync';
 
 const STYLE_URL = 'https://demotiles.maplibre.org/style.json';
 const DEFAULT_CENTER = [46.6753, 24.7136];
@@ -43,7 +44,7 @@ type KindFilter = MapPinKind | 'all';
 export default function MapScreen() {
   const [pins, setPins] = useState<MapPin[]>([]);
   const [kind, setKind] = useState<KindFilter>('all');
-  const [city, setCity] = useState<string>('all');
+  const [city, setCity] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<MapPin | null>(null);
   const [myLocation, setMyLocation] = useState<DeviceLocation | null>(null);
@@ -52,6 +53,17 @@ export default function MapScreen() {
   const [places, setPlaces] = useState<NearbyPlace[]>([]);
   const [placeCategory, setPlaceCategory] = useState<string>(ALL_PLACES_KEY);
   const [placesLoading, setPlacesLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getActiveLocation().then((location) => {
+      if (!cancelled) setCity(isAllKingdom(location.city) ? null : location.city);
+    });
+    const unsubscribe = subscribeLocation((location) => {
+      setCity(isAllKingdom(location.city) ? null : location.city);
+    });
+    return () => { cancelled = true; unsubscribe(); };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -71,9 +83,13 @@ export default function MapScreen() {
   }, []);
 
   const runPlaceSearch = async (category: string) => {
-    const origin = myLocation ?? (await getCurrentDeviceLocation());
+    const active = await getActiveLocation();
+    if (isAllKingdom(active.city)) return;
+    const center = findPlaceCenter(active.city);
+    const origin = center
+      ? { latitude: center.lat, longitude: center.lng }
+      : myLocation ?? (await getCurrentDeviceLocation());
     if (!origin) return;
-    setMyLocation(origin);
     setPlacesLoading(true);
     const results = await searchNearbyPlaces({
       lat: origin.latitude,
@@ -99,11 +115,11 @@ export default function MapScreen() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const visiblePins = useMemo(
-    () => filterPins(pins, { kind, city: city === 'all' ? null : city, query }),
+    () => city ? filterPins(pins, { kind, city, query }) : [],
     [pins, kind, city, query],
   );
-  const kindCounts = useMemo(() => countByKind(pins), [pins]);
-  const cityCounts = useMemo(() => countByCity(pins).slice(0, 8), [pins]);
+  const scopedPins = useMemo(() => city ? filterPins(pins, { city }) : [], [pins, city]);
+  const kindCounts = useMemo(() => countByKind(scopedPins), [scopedPins]);
 
   const chip = (value: KindFilter, label: string, color: string, count: number) => {
     const active = kind === value;
@@ -146,25 +162,7 @@ export default function MapScreen() {
         })}
       </ScrollView>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-        <Pressable
-          onPress={() => setCity('all')}
-          style={[styles.cityChip, city === 'all' && styles.cityChipActive]}
-        >
-          <Text style={[styles.cityChipText, city === 'all' && { color: '#fff' }]}>كل المملكة</Text>
-        </Pressable>
-        {cityCounts.map((entry) => (
-          <Pressable
-            key={entry.city}
-            onPress={() => setCity(entry.city)}
-            style={[styles.cityChip, city === entry.city && styles.cityChipActive]}
-          >
-            <Text style={[styles.cityChipText, city === entry.city && { color: '#fff' }]}>
-              {entry.city} ({entry.count})
-            </Text>
-          </Pressable>
-        ))}
-      </ScrollView>
+      <Text style={styles.cityScope}>{city ? `يعرض محتوى ${city}` : 'اختر مدينتك من إعدادات الموقع لعرض محتوى منطقتك'}</Text>
     </View>
   );
 
@@ -286,10 +284,12 @@ export default function MapScreen() {
       />
       <Map style={styles.map} mapStyle={STYLE_URL}>
         <Camera
-          key={myLocation ? `${myLocation.latitude}:${myLocation.longitude}` : 'default'}
+          key={city || 'location-required'}
           defaultSettings={{
-            centerCoordinate: myLocation ? [myLocation.longitude, myLocation.latitude] : DEFAULT_CENTER,
-            zoomLevel: myLocation ? 13 : 5.5,
+            centerCoordinate: findPlaceCenter(city)
+              ? [findPlaceCenter(city)!.lng, findPlaceCenter(city)!.lat]
+                : DEFAULT_CENTER,
+            zoomLevel: city ? 11 : 5.5,
           }}
         />
 
@@ -469,6 +469,7 @@ const styles = StyleSheet.create({
   },
   cityChipActive: { backgroundColor: C.accent, borderColor: C.accent },
   cityChipText: { fontSize: 11.5, fontWeight: '800', color: C.accent },
+  cityScope: { fontSize: 12, fontWeight: '800', color: C.muted, textAlign: 'right', paddingHorizontal: 8 },
   placeChip: {
     paddingHorizontal: 12,
     paddingVertical: 5,

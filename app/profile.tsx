@@ -46,7 +46,6 @@ import {
 import ActionSheet from '@/components/ActionSheet';
 import LocationSelectorModal from '@/components/LocationSelectorModal';
 import { generateSmartBioAI } from '@/lib/aiAssistant';
-import { LinearGradient } from 'expo-linear-gradient';
 
 function formatDistrictLabel(value: string) {
   const districtName = value.trim();
@@ -462,21 +461,16 @@ export default function Profile() {
         {/* EXECUTIVE PROFILE HERO CARD                              */}
         {/* ======================================================== */}
         <View style={styles.heroOuterWrap}>
-          <LinearGradient
-            colors={['#064e3b', '#047857', '#059669']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.heroCard}
-          >
+          <View style={styles.heroCard}>
             <View style={styles.heroTopActions}>
               <Pressable style={styles.heroActionBtn} onPress={shareProfile}>
-                <Share2 size={15} color="#fff" />
+                <Share2 size={15} color="#128c7e" />
               </Pressable>
               <Pressable
                 style={[styles.heroEditPill, editingProfile && styles.heroEditPillActive]}
                 onPress={() => setEditingProfile(v => !v)}
               >
-                <Pencil size={13} color={editingProfile ? '#064e3b' : '#fff'} />
+                <Pencil size={13} color="#128c7e" />
                 <Text style={[styles.heroEditPillText, editingProfile && styles.heroEditPillTextActive]}>
                   {editingProfile ? 'إغلاق التعديل' : 'تعديل البيانات'}
                 </Text>
@@ -505,14 +499,14 @@ export default function Profile() {
                   <Text style={styles.displayNameText} numberOfLines={1}>
                     {personalName || 'أضف اسمك الكريم'}
                   </Text>
-                  {p.is_verified && <BadgeCheck size={18} color="#34d399" />}
+                  {p.is_verified && <BadgeCheck size={18} color="#128c7e" />}
                 </View>
 
                 <Text style={styles.usernameText}>@{p.username || 'username'}</Text>
 
                 {(city || district) ? (
                   <View style={styles.locationPill}>
-                    <MapPin size={11} color="#a7f3d0" />
+                    <MapPin size={11} color="#128c7e" />
                     <Text style={styles.locationPillText} numberOfLines={1}>
                       {[district && formatDistrictLabel(district), city].filter(Boolean).join(' · ')}
                     </Text>
@@ -572,7 +566,7 @@ export default function Profile() {
                 </Pressable>
               )}
             </View>
-          </LinearGradient>
+          </View>
         </View>
 
         {/* ======================================================== */}
@@ -1037,13 +1031,16 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   heroCard: {
+    backgroundColor: '#ffffff',
     borderRadius: 22,
     padding: 18,
-    shadowColor: '#059669',
-    shadowOpacity: 0.18,
+    borderWidth: 1,
+    borderColor: '#e5eeea',
+    shadowColor: '#0f172a',
+    shadowOpacity: 0.055,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
+    elevation: 2,
   },
   heroTopActions: {
     flexDirection: 'row-reverse',
@@ -1055,19 +1052,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: 'rgba(255,255,255,0.22)',
+    backgroundColor: '#e9f6f0',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
+    borderColor: '#d1ebdd',
     paddingHorizontal: 11,
     paddingVertical: 5,
     borderRadius: 14,
   },
   heroEditPillActive: {
-    backgroundColor: '#fff',
-    borderColor: '#fff',
+    backgroundColor: '#d8f0e3',
+    borderColor: '#b7e3c8',
   },
   heroEditPillText: {
-    color: '#fff',
+    color: '#147d64',
     fontSize: 11.5,
     fontWeight: '800',
   },
@@ -1079,11 +1076,11 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: '#f2f6f4',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
+    borderColor: '#e4ece8',
   },
 
   // Identity Row
@@ -1098,9 +1095,9 @@ const styles = StyleSheet.create({
     borderRadius: 41,
     position: 'relative',
     borderWidth: 3,
-    borderColor: '#fff',
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
+    borderColor: '#d8eee2',
+    shadowColor: '#145b46',
+    shadowOpacity: 0.1,
     shadowRadius: 6,
     elevation: 3,
   },
@@ -1113,12 +1110,12 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     borderRadius: 38,
-    backgroundColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: '#e3f4eb',
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarFallbackText: {
-    color: '#fff',
+    color: '#128c7e',
     fontSize: 30,
     fontWeight: '900',
   },
@@ -1129,7 +1126,7 @@ const styles = StyleSheet.create({
     width: 26,
     height: 26,
     borderRadius: 13,
-    backgroundColor: '#064e3b',
+    backgroundColor: '#128c7e',
     borderWidth: 2,
     borderColor: '#fff',
     alignItems: 'center',
@@ -1145,13 +1142,13 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   displayNameText: {
-    color: '#fff',
+    color: '#18252d',
     fontSize: 20,
     fontWeight: '900',
     textAlign: 'right',
   },
   usernameText: {
-    color: '#a7f3d0',
+    color: '#68777e',
     fontSize: 13.5,
     fontWeight: '700',
     marginTop: 2,
@@ -1161,30 +1158,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(0,0,0,0.22)',
+    backgroundColor: '#eef7f2',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 10,
     marginTop: 6,
   },
   locationPillText: {
-    color: '#d1fae5',
+    color: '#26745f',
     fontSize: 11,
     fontWeight: '700',
   },
 
   // Bio
   bioContainer: {
-    backgroundColor: 'rgba(0,0,0,0.18)',
+    backgroundColor: '#f5f8f6',
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 8,
     marginTop: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: '#e9efec',
   },
   bioText: {
-    color: '#ecfdf5',
+    color: '#405159',
     fontSize: 12.5,
     lineHeight: 19,
     textAlign: 'right',
@@ -1195,13 +1192,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: 'rgba(0,0,0,0.24)',
+    backgroundColor: '#f7faf8',
     borderRadius: 14,
     paddingVertical: 10,
     paddingHorizontal: 12,
     marginTop: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
+    borderColor: '#e7efea',
   },
   statBox: {
     flex: 1,
@@ -1209,19 +1206,19 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   statNumber: {
-    color: '#fff',
+    color: '#183b31',
     fontSize: 14.5,
     fontWeight: '900',
   },
   statLabel: {
-    color: '#a7f3d0',
+    color: '#66766f',
     fontSize: 10,
     fontWeight: '700',
   },
   statDivider: {
     width: 1,
     height: 22,
-    backgroundColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: '#dce9e2',
   },
 
   // Completion Section
@@ -1235,24 +1232,24 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   completionTitle: {
-    color: '#d1fae5',
+    color: '#66766f',
     fontSize: 11.5,
     fontWeight: '800',
   },
   completionPercent: {
-    color: '#fff',
+    color: '#147d64',
     fontSize: 11.5,
     fontWeight: '900',
   },
   completionTrack: {
     height: 5,
     borderRadius: 3,
-    backgroundColor: 'rgba(255,255,255,0.22)',
+    backgroundColor: '#e1eee6',
     overflow: 'hidden',
   },
   completionFill: {
     height: '100%',
-    backgroundColor: '#34d399',
+    backgroundColor: '#128c7e',
     borderRadius: 3,
   },
   completePrompt: {
@@ -1262,7 +1259,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   completePromptText: {
-    color: '#fef08a',
+    color: '#147d64',
     fontSize: 11,
     fontWeight: '700',
   },

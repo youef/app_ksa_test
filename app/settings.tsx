@@ -19,7 +19,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '@/lib/supabase';
 import { AppHeader } from '@/components/shared/AppHeader';
 import { useBottomNavInset } from '@/lib/bottomNav';
-import { registerPushToken, syncDndWithNotifications } from '@/lib/notifications';
+import { registerPushToken, syncDndWithNotifications, unregisterPushToken } from '@/lib/notifications';
 import { verifyGPSInDistrict } from '@/lib/nationalAddress';
 import { getCurrentDeviceLocation, reverseGeocodeDeviceLocation } from '@/lib/deviceLocation';
 import { savePermanentMyLocation } from '@/lib/locationSync';
@@ -52,21 +52,16 @@ import {
   Compass,
   MapPin,
   UserX,
-  Smartphone,
-  Sliders,
   LogOut,
-  Check,
   CheckCircle2,
   Crown,
   ChevronLeft,
   ChevronDown,
-  ChevronUp,
   RefreshCw,
   FileText,
   Trash2,
   Info,
   BadgeCheck,
-  Zap,
   User,
   Settings,
 } from 'lucide-react-native';
@@ -114,6 +109,7 @@ export default function SettingsScreen() {
 
   // Do-Not-Disturb & Notifications
   const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
   const [dnd, setDnd] = useState<DndSettings>(DEFAULT_DND);
   const [blockedUsers, setBlockedUsers] = useState<any[]>([]);
   const [draftStart, setDraftStart] = useState('22:00');
@@ -160,6 +156,14 @@ export default function SettingsScreen() {
         setGeoVerified(Boolean(prof.is_geoverified));
         if (prof.is_verified) setVerificationStatus('verified');
       }
+
+      const pushRes = await supabase
+        .from('push_tokens')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('platform', Platform.OS)
+        .limit(1);
+      setPushEnabled(Boolean(pushRes.data?.length));
 
       try {
         const { data: verificationData } = await supabase
@@ -282,35 +286,24 @@ export default function SettingsScreen() {
   // 4. Resident GPS check
   async function verifyResidentGPS() {
     if (!city || !district) return Alert.alert('حدد موقعك أولاً', 'اختر المدينة والحي من الملف الشخصي ثم أعد الفحص.');
-    if (Platform.OS !== 'web' || typeof navigator === 'undefined' || !navigator.geolocation) {
-      return Alert.alert('تحديد الموقع غير متاح', 'الفحص متاح حالياً عبر متصفح يدعم تحديد الموقع.');
-    }
     setGeoChecking(true);
-    navigator.geolocation.getCurrentPosition(
-      async ({ coords }) => {
-        try {
-          const result = verifyGPSInDistrict(coords.latitude, coords.longitude, city, district);
-          if (!result.isVerified) {
-            Alert.alert('لم ينجح الفحص', result.message);
-            return;
-          }
-          if (!userId) throw new Error('يلزم تسجيل الدخول.');
-          const { error } = await supabase.from('profiles').update({ is_geoverified: true, geoverified_at: new Date().toISOString() }).eq('id', userId);
-          if (error) throw error;
-          setGeoVerified(true);
-          showToast('تم توثيق موقع السكن بنجاح ✓');
-        } catch (error: any) {
-          Alert.alert('تعذّر حفظ نتيجة الفحص', error?.message || 'حاول مرة أخرى.');
-        } finally {
-          setGeoChecking(false);
-        }
-      },
-      (error) => {
-        setGeoChecking(false);
-        Alert.alert('تعذّر تحديد الموقع', error.code === 1 ? 'اسمح للموقع بالوصول إلى موقعك ثم أعد المحاولة.' : 'تحقق من خدمة الموقع ثم أعد المحاولة.');
-      },
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
-    );
+    try {
+      const location = await getCurrentDeviceLocation();
+      if (!location) throw new Error('اسمح لحيّنا بالوصول إلى موقعك من إعدادات الجهاز ثم أعد المحاولة.');
+      const result = verifyGPSInDistrict(location.latitude, location.longitude, city, district);
+      if (!result.isVerified) return Alert.alert('لم ينجح الفحص', result.message);
+      if (!userId) throw new Error('يلزم تسجيل الدخول.');
+      const { error } = await supabase.from('profiles')
+        .update({ is_geoverified: true, geoverified_at: new Date().toISOString() })
+        .eq('id', userId);
+      if (error) throw error;
+      setGeoVerified(true);
+      showToast('تم التحقق من موقعك بنجاح ✓');
+    } catch (error: any) {
+      Alert.alert('تعذّر التحقق من الموقع', error?.message || 'تحقق من خدمة الموقع ثم أعد المحاولة.');
+    } finally {
+      setGeoChecking(false);
+    }
   }
 
   // 5. Submit Official ID Verification
@@ -353,6 +346,11 @@ export default function SettingsScreen() {
     try {
       const { data, error } = await supabase.from('profiles').update(updatePayload).eq('id', userId).select('id').maybeSingle();
       if (error || !data) throw error || new Error('تعذر الحفظ');
+      setProfilePrivacy(updatePayload.profile_privacy);
+      setAllowDms(updatePayload.allow_dms);
+      setAllowStoryReplies(updatePayload.allow_story_replies);
+      setHideName(updatePayload.hide_name);
+      setProfile((current: any) => current ? { ...current, ...updatePayload } : current);
       showToast('تم حفظ الإعداد ✓');
       return true;
     } catch (e: any) {
@@ -388,6 +386,24 @@ export default function SettingsScreen() {
       showToast('تم تفعيل إشعارات الجوال الفورية 🔔');
     } catch (error: any) {
       Alert.alert('تعذّر التفعيل', error?.message || 'تعذر تسجيل هذا الجهاز.');
+    }
+  }
+
+  async function togglePushNotifications() {
+    if (!pushEnabled) {
+      await activatePushNotifications();
+      return;
+    }
+    if (pushBusy) return;
+    setPushBusy(true);
+    try {
+      await unregisterPushToken();
+      setPushEnabled(false);
+      showToast('تم إيقاف إشعارات هذا النوع من الأجهزة');
+    } catch (error: any) {
+      Alert.alert('تعذّر إيقاف الإشعارات', error?.message || 'حاول مرة أخرى.');
+    } finally {
+      setPushBusy(false);
     }
   }
 
@@ -476,14 +492,13 @@ export default function SettingsScreen() {
     ]);
   }
 
-  const CATEGORIES: Array<{ key: SettingsCategory; label: string; icon: any }> = [
-    { key: 'all', label: 'الكل', icon: Sliders },
-    { key: 'security', label: 'الأمان والدخول', icon: Lock },
-    { key: 'privacy', label: 'الخصوصية', icon: Shield },
-    { key: 'location', label: 'الموقع والتوثيق', icon: MapPin },
-    { key: 'notifications', label: 'الإشعارات والصمت', icon: Bell },
-    { key: 'blocked', label: 'المحظورون', icon: UserX },
-    { key: 'system', label: 'عن المنصة', icon: Info },
+  const CATEGORIES: Array<{ key: Exclude<SettingsCategory, 'all'>; label: string; description: string; icon: any }> = [
+    { key: 'security', label: 'الحساب والأمان', description: 'البريد الإلكتروني وكلمة المرور', icon: Lock },
+    { key: 'privacy', label: 'الخصوصية', description: 'ظهور ملفك والرسائل والقصص', icon: Shield },
+    { key: 'notifications', label: 'الإشعارات', description: 'تنبيهات الجوال وأوقات الهدوء', icon: Bell },
+    { key: 'location', label: 'الموقع والتوثيق', description: 'المدينة والحي والتحقق من الحساب', icon: MapPin },
+    { key: 'blocked', label: 'المحظورون', description: 'إدارة الحسابات التي حظرتها', icon: UserX },
+    { key: 'system', label: 'حول حيّنا', description: 'معلومات التطبيق والخصوصية', icon: Info },
   ];
 
   if (loading) {
@@ -496,7 +511,8 @@ export default function SettingsScreen() {
   }
 
   const isDndCurrentlyActive = dnd.enabled && isDndActiveNow(dnd);
-  const showSec = (cat: SettingsCategory) => activeCategory === 'all' || activeCategory === cat;
+  const showSec = (cat: SettingsCategory) => activeCategory === cat;
+  const selectedCategory = CATEGORIES.find((category) => category.key === activeCategory);
 
   return (
     <View style={styles.screen}>
@@ -529,129 +545,103 @@ export default function SettingsScreen() {
         contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomNavInset + 40 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Top Profile / Settings Unified Switcher */}
-        <View style={styles.navSegmentContainer}>
-          <View style={styles.navSegmentWrap}>
-            <Pressable
-              style={styles.navSegmentBtn}
-              onPress={() => router.push('/profile')}
-            >
-              <User size={14} color="#64748b" />
-              <Text style={styles.navSegmentText}>
-                الملف الشخصي
-              </Text>
-            </Pressable>
-
-            <Pressable
-              style={[styles.navSegmentBtn, styles.navSegmentBtnActive]}
-              onPress={() => {}}
-            >
-              <Settings size={14} color="#fff" />
-              <Text style={[styles.navSegmentText, styles.navSegmentTextActive]}>
-                مركز الإعدادات والتحكم
-              </Text>
-            </Pressable>
-          </View>
-        </View>
-
-        {/* User Hero Identity Card */}
-        {profile && (
-          <LinearGradient
-            colors={['#064e3b', '#047857', '#059669']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.heroCard}
-          >
-            <View style={styles.heroGlow} />
-            <View style={styles.heroContentRow}>
-              <View style={styles.avatarWrap}>
-                {profile.avatar_url && !profile.avatar_url.includes('blank-profile-picture') ? (
-                  <Image source={{ uri: profile.avatar_url }} style={styles.avatarImg} />
-                ) : (
-                  <View style={styles.avatarFallback}>
-                    <Text style={styles.avatarFallbackText}>
-                      {(profile.display_name || profile.username || 'ج')[0].toUpperCase()}
-                    </Text>
-                  </View>
-                )}
-                {role === 'admin' && (
-                  <View style={styles.crownBadge}>
-                    <Crown size={12} color="#ffffff" />
-                  </View>
-                )}
+        {activeCategory === 'all' ? (
+          <>
+            <View style={styles.navSegmentContainer}>
+              <View style={styles.navSegmentWrap}>
+                <Pressable style={styles.navSegmentBtn} onPress={() => router.push('/profile')}>
+                  <User size={14} color="#64748b" />
+                  <Text style={styles.navSegmentText}>الملف الشخصي</Text>
+                </Pressable>
+                <Pressable style={[styles.navSegmentBtn, styles.navSegmentBtnActive]}>
+                  <Settings size={14} color="#fff" />
+                  <Text style={[styles.navSegmentText, styles.navSegmentTextActive]}>الإعدادات</Text>
+                </Pressable>
               </View>
+            </View>
 
-              <View style={styles.heroInfo}>
-                <View style={styles.heroNameRow}>
-                  <Text style={styles.heroName}>{profile.display_name || profile.username || 'عضو حيّنا'}</Text>
-                  {role === 'admin' ? (
-                    <View style={styles.adminPill}>
-                      <Crown size={10} color="#f59e0b" />
-                      <Text style={styles.adminPillText}>مشرف المنصة</Text>
+            {profile && (
+              <Pressable
+                style={styles.settingsIdentityCard}
+                onPress={() => router.push('/profile')}
+                accessibilityRole="button"
+                accessibilityLabel="عرض وتعديل الملف الشخصي"
+              >
+                <View style={styles.settingsAvatarWrap}>
+                  {profile.avatar_url && !profile.avatar_url.includes('blank-profile-picture') ? (
+                    <Image source={{ uri: profile.avatar_url }} style={styles.settingsAvatar} />
+                  ) : (
+                    <View style={styles.settingsAvatarFallback}>
+                      <Text style={styles.settingsAvatarLetter}>
+                        {(profile.display_name || profile.username || 'ح')[0].toUpperCase()}
+                      </Text>
                     </View>
-                  ) : profile.is_verified ? (
-                    <BadgeCheck size={16} color="#34d399" />
-                  ) : null}
+                  )}
                 </View>
-                <Text style={styles.heroHandle}>@{profile.username || 'neighbor'}</Text>
-                <View style={styles.heroLocRow}>
-                  <MapPin size={12} color="#a7f3d0" />
-                  <Text style={styles.heroLocText}>
-                    {[profile.district && `حي ${profile.district}`, profile.city].filter(Boolean).join(' · ') ||
-                      'المملكة العربية السعودية'}
+                <View style={styles.settingsIdentityText}>
+                  <View style={styles.settingsNameRow}>
+                    <Text style={styles.settingsIdentityName} numberOfLines={1}>
+                      {profile.display_name || profile.username || 'عضو حيّنا'}
+                    </Text>
+                    {profile.is_verified && <BadgeCheck size={16} color="#25a56a" />}
+                  </View>
+                  <Text style={styles.settingsIdentityAbout} numberOfLines={1}>
+                    {profile.bio || `@${profile.username || 'neighbor'} · اضغط لتعديل ملفك`}
+                  </Text>
+                  <Text style={styles.settingsIdentityLocation} numberOfLines={1}>
+                    {[profile.district && `حي ${profile.district}`, profile.city].filter(Boolean).join(' · ') || 'المملكة العربية السعودية'}
                   </Text>
                 </View>
-              </View>
-
-              <Pressable style={styles.editProfileQuickBtn} onPress={() => router.push('/profile')}>
-                <Text style={styles.editProfileQuickText}>تعديل</Text>
+                <ChevronLeft size={18} color="#94a3b8" />
               </Pressable>
-            </View>
+            )}
 
-            {/* Quick Badges Row */}
-            <View style={styles.quickBadgesRow}>
-              <View style={styles.quickBadge}>
-                <ShieldCheck size={12} color="#a7f3d0" />
-                <Text style={styles.quickBadgeText}>
-                  {verificationStatus === 'verified' ? 'موثق بالهوية' : 'جار مسجل'}
-                </Text>
-              </View>
-              <View style={styles.quickBadge}>
-                <Compass size={12} color="#a7f3d0" />
-                <Text style={styles.quickBadgeText}>
-                  {geoVerified ? 'موقع GPS معتمد' : 'تحقق GPS متاح'}
-                </Text>
-              </View>
-              <View style={[styles.quickBadge, isDndCurrentlyActive && { backgroundColor: 'rgba(251,191,36,0.2)' }]}>
-                {isDndCurrentlyActive ? <Moon size={12} color="#fde68a" /> : <Bell size={12} color="#a7f3d0" />}
-                <Text style={[styles.quickBadgeText, isDndCurrentlyActive && { color: '#fde68a' }]}>
-                  {isDndCurrentlyActive ? 'عدم الإزعاج نشط' : 'التنبيهات مفعلة'}
-                </Text>
-              </View>
+            <View style={styles.preferenceMenu}>
+              <Text style={styles.preferenceSectionTitle}>إعدادات الحساب</Text>
+              {CATEGORIES.map(({ key, label, description, icon: Icon }, index) => {
+                const detail = key === 'blocked' && blockedUsers.length
+                  ? `${blockedUsers.length} حساب محظور`
+                  : key === 'notifications' && dnd.enabled
+                    ? dndLabel(dnd)
+                    : description;
+                return (
+                  <React.Fragment key={key}>
+                    <Pressable
+                      style={styles.preferenceRow}
+                      onPress={() => setActiveCategory(key)}
+                      accessibilityRole="button"
+                    >
+                      <View style={styles.preferenceIcon}>
+                        <Icon size={19} color="#128c7e" />
+                      </View>
+                      <View style={styles.preferenceCopy}>
+                        <Text style={styles.preferenceTitle}>{label}</Text>
+                        <Text style={styles.preferenceDescription} numberOfLines={1}>{detail}</Text>
+                      </View>
+                      <ChevronLeft size={17} color="#a3adb7" />
+                    </Pressable>
+                    {index < CATEGORIES.length - 1 && <View style={styles.preferenceDivider} />}
+                  </React.Fragment>
+                );
+              })}
             </View>
-          </LinearGradient>
+          </>
+        ) : (
+          <View style={styles.preferenceDetailHeader}>
+            <Pressable
+              style={styles.preferenceBackButton}
+              onPress={() => setActiveCategory('all')}
+              accessibilityRole="button"
+              accessibilityLabel="العودة إلى الإعدادات"
+            >
+              <ChevronRight size={18} color="#128c7e" />
+            </Pressable>
+            <View style={{ flex: 1, alignItems: 'flex-end' }}>
+              <Text style={styles.preferenceDetailTitle}>{selectedCategory?.label}</Text>
+              <Text style={styles.preferenceDetailDescription}>{selectedCategory?.description}</Text>
+            </View>
+          </View>
         )}
-
-        {/* Quick Filter Category Pills */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoryScroll}
-        >
-          {CATEGORIES.map(({ key, label, icon: Icon }) => {
-            const active = activeCategory === key;
-            return (
-              <Pressable
-                key={key}
-                onPress={() => setActiveCategory(key)}
-                style={[styles.categoryPill, active && styles.categoryPillActive]}
-              >
-                <Icon size={14} color={active ? '#ffffff' : '#059669'} />
-                <Text style={[styles.categoryPillText, active && styles.categoryPillTextActive]}>{label}</Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
 
         {/* 1. قسم الأمان والدخول (Security & Auth) */}
         {showSec('security') && (
@@ -1008,16 +998,21 @@ export default function SettingsScreen() {
               <View style={{ flex: 1, paddingLeft: 12 }}>
                 <Text style={styles.toggleTitle}>إشعارات الجوال الفورية (Push)</Text>
                 <Text style={styles.toggleDesc}>
-                  استقبال تنبيهات النداءات العاجلة والرسائل حتى عند إغلاق التطبيق.
+                  {pushEnabled
+                    ? 'الإشعارات مسجلة لهذا النوع من الأجهزة. يمكنك إيقاف إرسال التنبيهات إليه.'
+                    : 'استقبل تنبيهات النداءات العاجلة والرسائل على هذا النوع من الأجهزة.'}
                 </Text>
               </View>
               <Pressable
                 style={[styles.actionOutlineBtn, pushEnabled && { borderColor: '#10b981', backgroundColor: '#ecfdf5' }]}
-                onPress={activatePushNotifications}
+                onPress={togglePushNotifications}
+                disabled={pushBusy}
               >
-                <Text style={[styles.actionOutlineText, pushEnabled && { color: '#059669' }]}>
-                  {pushEnabled ? 'مفعّل ✓' : 'تفعيل'}
-                </Text>
+                {pushBusy ? <ActivityIndicator size="small" color="#059669" /> : (
+                  <Text style={[styles.actionOutlineText, pushEnabled && { color: '#059669' }]}>
+                    {pushEnabled ? 'إيقاف' : 'تفعيل'}
+                  </Text>
+                )}
               </Pressable>
             </View>
 
@@ -1162,7 +1157,7 @@ export default function SettingsScreen() {
         )}
 
         {/* 6. بوابة المشرفين والإدارة (Admin Operational Center) */}
-        {role === 'admin' && (
+        {role === 'admin' && activeCategory === 'system' && (
           <Pressable
             style={styles.adminBannerCard}
             onPress={() => router.push('/admin')}
@@ -1252,20 +1247,24 @@ export default function SettingsScreen() {
         )}
 
         {/* 8. تسجيل الخروج (Sign Out) */}
-        <Pressable style={styles.signOutBtn} onPress={handleSignOut}>
-          <LogOut size={18} color="#ef4444" />
-          <Text style={styles.signOutText}>تسجيل الخروج من الحساب</Text>
-        </Pressable>
-        <Pressable
-          style={[styles.deleteAccountBtn, deletingAccount && styles.deleteAccountBtnDisabled]}
-          onPress={confirmAccountDeletion}
-          disabled={deletingAccount}
-          accessibilityRole="button"
-          accessibilityLabel="حذف الحساب نهائيًا"
-        >
-          {deletingAccount ? <ActivityIndicator size="small" color="#b91c1c" /> : <Trash2 size={18} color="#b91c1c" />}
-          <Text style={styles.deleteAccountText}>{deletingAccount ? 'جارٍ حذف الحساب...' : 'حذف الحساب نهائيًا'}</Text>
-        </Pressable>
+        {(activeCategory === 'all' || activeCategory === 'security') && (
+          <>
+            <Pressable style={styles.signOutBtn} onPress={handleSignOut}>
+              <LogOut size={18} color="#ef4444" />
+              <Text style={styles.signOutText}>تسجيل الخروج من الحساب</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.deleteAccountBtn, deletingAccount && styles.deleteAccountBtnDisabled]}
+              onPress={confirmAccountDeletion}
+              disabled={deletingAccount}
+              accessibilityRole="button"
+              accessibilityLabel="حذف الحساب نهائيًا"
+            >
+              {deletingAccount ? <ActivityIndicator size="small" color="#b91c1c" /> : <Trash2 size={18} color="#b91c1c" />}
+              <Text style={styles.deleteAccountText}>{deletingAccount ? 'جارٍ حذف الحساب...' : 'حذف الحساب نهائيًا'}</Text>
+            </Pressable>
+          </>
+        )}
       </ScrollView>
 
       {/* Verification Request Modal */}
@@ -1425,6 +1424,153 @@ const styles = StyleSheet.create({
   navSegmentTextActive: {
     color: '#ffffff',
     fontWeight: '900',
+  },
+
+  settingsIdentityCard: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e7edf0',
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 20,
+    shadowColor: '#0f172a',
+    shadowOpacity: 0.035,
+    shadowRadius: 9,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 1,
+  },
+  settingsAvatarWrap: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    overflow: 'hidden',
+    backgroundColor: '#d8f3e6',
+  },
+  settingsAvatar: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 29,
+  },
+  settingsAvatarFallback: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#d8f3e6',
+  },
+  settingsAvatarLetter: {
+    color: '#128c7e',
+    fontSize: 24,
+    fontWeight: '800',
+  },
+  settingsIdentityText: {
+    flex: 1,
+    alignItems: 'flex-end',
+    gap: 3,
+  },
+  settingsNameRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 5,
+  },
+  settingsIdentityName: {
+    color: '#18252d',
+    fontSize: 16,
+    fontWeight: '800',
+    textAlign: 'right',
+  },
+  settingsIdentityAbout: {
+    color: '#64747d',
+    fontSize: 12,
+    textAlign: 'right',
+  },
+  settingsIdentityLocation: {
+    color: '#128c7e',
+    fontSize: 10.5,
+    fontWeight: '700',
+    textAlign: 'right',
+  },
+  preferenceMenu: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e7edf0',
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    marginBottom: 18,
+  },
+  preferenceSectionTitle: {
+    color: '#128c7e',
+    fontSize: 12,
+    fontWeight: '800',
+    textAlign: 'right',
+    paddingTop: 15,
+    paddingBottom: 7,
+    paddingHorizontal: 2,
+  },
+  preferenceRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 12,
+    minHeight: 68,
+    paddingVertical: 10,
+  },
+  preferenceIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    backgroundColor: '#e9f6f0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  preferenceCopy: {
+    flex: 1,
+    alignItems: 'flex-end',
+    gap: 3,
+  },
+  preferenceTitle: {
+    color: '#26343c',
+    fontSize: 13,
+    fontWeight: '800',
+    textAlign: 'right',
+  },
+  preferenceDescription: {
+    color: '#78858c',
+    fontSize: 11,
+    textAlign: 'right',
+  },
+  preferenceDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: '#e7edf0',
+    marginRight: 52,
+  },
+  preferenceDetailHeader: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 4,
+    marginBottom: 12,
+  },
+  preferenceBackButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 13,
+    backgroundColor: '#e9f6f0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  preferenceDetailTitle: {
+    color: '#1a292f',
+    fontSize: 16,
+    fontWeight: '900',
+    textAlign: 'right',
+  },
+  preferenceDetailDescription: {
+    color: '#78858c',
+    fontSize: 11,
+    marginTop: 2,
+    textAlign: 'right',
   },
 
   /* Hero Identity Card */

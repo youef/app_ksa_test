@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
-import { BarChart3, Building2, CalendarDays, Flag, MapPin, RefreshCw, ShieldCheck, Store, Users, Zap } from 'lucide-react-native';
+import { BarChart3, Building2, CalendarDays, Check, Flag, MapPin, RefreshCw, ShieldCheck, Store, Users, X } from 'lucide-react-native';
 import { AppHeader } from '@/components/shared/AppHeader';
 import AdminCommandCenter from '@/components/AdminCommandCenter';
 
@@ -19,6 +19,8 @@ export default function AdminPro() {
   const [businesses, setBusinesses] = useState<any[]>([]);
   const [marketplace, setMarketplace] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
+  const [services, setServices] = useState<any[]>([]);
+  const [reviewBusy, setReviewBusy] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -28,7 +30,7 @@ export default function AdminPro() {
     if (!pr || pr.role !== 'admin') { router.replace('/home'); return; }
     setProfile(pr);
 
-    const [u,r,v,q,req,b,m,e] = await Promise.all([
+    const [u,r,v,q,req,b,m,e,srv] = await Promise.all([
       supabase.from('profiles').select('*').order('created_at',{ascending:false}).limit(1000),
       supabase.from('reports').select('*').order('created_at',{ascending:false}).limit(1000),
       supabase.from('verification_requests').select('*').order('created_at',{ascending:false}).limit(1000),
@@ -37,10 +39,12 @@ export default function AdminPro() {
       supabase.from('businesses').select('*').order('created_at',{ascending:false}).limit(500),
       supabase.from('marketplace_items').select('*').order('created_at',{ascending:false}).limit(500),
       supabase.from('events').select('*').order('created_at',{ascending:false}).limit(500),
+      supabase.from('services').select('*, provider:provider_id(display_name, username)').order('created_at',{ascending:false}).limit(500),
     ]);
     const usersData=u.data||[], reportsData=r.data||[], verifData=v.data||[];
     setUsers(usersData); setReports(reportsData); setVerifications(verifData); setQuestions(q.data||[]); setRequests(req.data||[]);
     setBusinesses(b.data||[]); setMarketplace(m.data||[]); setEvents(e.data||[]);
+    setServices(srv.data||[]);
     setStats({
       users:usersData.length, admins:usersData.filter(x=>x.role==='admin').length,
       questions:q.data?.length||0, requests:req.data?.length||0,
@@ -54,6 +58,20 @@ export default function AdminPro() {
   useEffect(()=>{load();},[]);
 
   const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
+
+  const reviewEntry = async (table: 'services' | 'businesses' | 'events', row: any, approve: boolean) => {
+    const key = `${table}:${row.id}`;
+    setReviewBusy(key);
+    try {
+      const { error } = await supabase.from(table).update({ moderation_status: approve ? 'approved' : 'rejected' }).eq('id', row.id);
+      if (error) throw error;
+      await load();
+    } catch (error: any) {
+      Alert.alert('تعذر تحديث الاعتماد', error?.message || 'تعذر تحديث حالة الطلب.');
+    } finally {
+      setReviewBusy(null);
+    }
+  };
 
   if (loading) return <View style={s.center}><ActivityIndicator size="large" color="#059669"/><Text style={s.loading}>جاري تجهيز مركز العمليات المتقدم...</Text></View>;
 
@@ -93,6 +111,29 @@ export default function AdminPro() {
           onTab={(tab)=>{}}
         />
 
+        <Text style={s.sectionTitle}>مراجعة محتوى السوق والفعاليات</Text>
+        <Text style={s.reviewHint}>لن يظهر المحتوى للناس حتى يعتمد من هنا.</Text>
+        <View style={s.reviewList}>
+          {[
+            ...services.filter((x) => x.moderation_status === 'pending').map((row) => ({ table: 'services' as const, row, title: row.name || row.title, owner: row.provider?.display_name || 'مستخدم' })),
+            ...businesses.filter((x) => x.moderation_status === 'pending').map((row) => ({ table: 'businesses' as const, row, title: row.name || 'منشأة', owner: row.owner_name || 'مستخدم' })),
+            ...events.filter((x) => x.moderation_status === 'pending').map((row) => ({ table: 'events' as const, row, title: row.title || 'فعالية', owner: row.organizer_name || 'منظم' })),
+          ].map(({ table, row, title, owner }) => {
+            const key = `${table}:${row.id}`;
+            return (
+              <View key={key} style={s.reviewCard}>
+                <View style={s.reviewCopy}>
+                  <Text style={s.reviewTitle}>{title}</Text>
+                  <Text style={s.reviewMeta}>{table === 'services' ? 'عرض سوق' : table === 'businesses' ? 'منشأة' : 'فعالية'} · {owner}</Text>
+                </View>
+                <Pressable disabled={reviewBusy === key} onPress={() => void reviewEntry(table, row, false)} style={[s.reviewAction, s.reject]}><X size={16} color="#b91c1c" /></Pressable>
+                <Pressable disabled={reviewBusy === key} onPress={() => void reviewEntry(table, row, true)} style={[s.reviewAction, s.approve]}><Check size={16} color="#047857" /></Pressable>
+              </View>
+            );
+          })}
+          {!services.some((x) => x.moderation_status === 'pending') && !businesses.some((x) => x.moderation_status === 'pending') && !events.some((x) => x.moderation_status === 'pending') ? <Text style={s.emptyReview}>لا توجد طلبات اعتماد معلقة.</Text> : null}
+        </View>
+
         <Text style={s.sectionTitle}>خريطة التحكم السريعة</Text>
         <View style={s.quickGrid}>
           <Quick icon={<Users size={19} color="#0284C7"/>} value={users.length} label="المستخدمون"/>
@@ -119,6 +160,7 @@ const s=StyleSheet.create({
  back:{paddingHorizontal:11,paddingVertical:8,borderRadius:11,backgroundColor:'#1E293B'},backText:{fontSize:10,fontWeight:'800',color:'#CBD5E1'},
  refresh:{width:38,height:38,borderRadius:12,backgroundColor:'#059669',alignItems:'center',justifyContent:'center'},
  content:{padding:14,paddingBottom:40},center:{flex:1,alignItems:'center',justifyContent:'center',backgroundColor:'#F8FAFC'},loading:{marginTop:12,fontSize:13,fontWeight:'800',color:'#475569'},
+ reviewHint:{fontSize:12,color:'#64748B',textAlign:'right',marginTop:-5,marginBottom:10},reviewList:{gap:8},reviewCard:{flexDirection:'row-reverse',alignItems:'center',gap:8,backgroundColor:'#fff',padding:12,borderRadius:16,borderWidth:1,borderColor:'#E2E8F0'},reviewCopy:{flex:1},reviewTitle:{fontSize:14,fontWeight:'900',color:'#0F172A',textAlign:'right'},reviewMeta:{fontSize:11,color:'#64748B',textAlign:'right',marginTop:3},reviewAction:{width:36,height:36,borderRadius:12,alignItems:'center',justifyContent:'center'},approve:{backgroundColor:'#ECFDF5'},reject:{backgroundColor:'#FEF2F2'},emptyReview:{fontSize:12,color:'#64748B',textAlign:'center',padding:14,backgroundColor:'#fff',borderRadius:14},
  sectionTitle:{fontSize:16,fontWeight:'900',color:'#0F172A',textAlign:'right',marginTop:5,marginBottom:10},
  quickGrid:{flexDirection:'row-reverse',flexWrap:'wrap',gap:8},quick:{flexGrow:1,flexBasis:145,minWidth:140,backgroundColor:'#fff',borderRadius:17,padding:13,borderWidth:1,borderColor:'#E2E8F0'},qIcon:{width:36,height:36,borderRadius:12,backgroundColor:'#F8FAFC',alignItems:'center',justifyContent:'center',marginBottom:8},qValue:{fontSize:20,fontWeight:'900',color:'#0F172A'},qLabel:{fontSize:10,fontWeight:'800',color:'#64748B',marginTop:2,textAlign:'right'},tip:{marginTop:12,backgroundColor:'#ECFDF5',borderRadius:14,padding:12,flexDirection:'row-reverse',alignItems:'center',gap:8,borderWidth:1,borderColor:'#A7F3D0'},tipText:{flex:1,fontSize:10,fontWeight:'700',color:'#047857',textAlign:'right',lineHeight:16}
 });

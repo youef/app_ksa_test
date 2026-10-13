@@ -199,15 +199,18 @@ export default function Market() {
         supabase
           .from('services')
           .select('*, profiles:provider_id(display_name, avatar_url, is_verified, phone)')
+          .eq('moderation_status', 'approved')
           .order('created_at', { ascending: false }),
         supabase
           .from('businesses')
           .select('*, owner:owner_id(display_name, username)')
+          .eq('moderation_status', 'approved')
           .order('created_at', { ascending: false })
           .limit(50),
         supabase
           .from('events')
           .select('*, organizer:organizer_id(display_name, username)')
+          .eq('moderation_status', 'approved')
           .order('created_at', { ascending: false })
           .limit(50),
       ]);
@@ -251,8 +254,8 @@ export default function Market() {
         categoryLabel: EVENT_CATEGORIES.find((c) => c.id === ev.category)?.label || ev.category || 'أنشطة الحي',
         city: ev.city || '',
         district: ev.district || '',
-        dateLabel: ev.date_label || 'قريباً',
-        location: ev.location || 'نقطة التجمع بالحي',
+        dateLabel: ev.date_label || (ev.starts_at ? new Date(ev.starts_at).toLocaleString('ar-SA') : 'قريباً'),
+        location: ev.location_name || 'نقطة التجمع بالحي',
         organizer: ev.organizer?.display_name || 'أحد سكان الحي',
         attendeesCount: ev.attendees_count || 0,
         isFree: ev.is_free ?? true,
@@ -439,7 +442,7 @@ export default function Market() {
       const newEv = {
         title: eventTitle.trim(),
         description: eventDesc.trim() || 'فعالية مجتمعية لسكان الحي.',
-        location: eventLocation.trim(),
+        location_name: eventLocation.trim(),
         date_label: eventDate.trim() || 'قريباً',
         category: eventCategoryChoice,
         city: isAllKingdom(activeLoc.city) ? 'الرياض' : activeLoc.city,
@@ -448,30 +451,16 @@ export default function Market() {
         created_at: new Date().toISOString(),
       };
 
-      const { data } = await supabase.from('events').insert(newEv).select().maybeSingle();
-
-      const created = data || {
-        ...newEv,
-        id: 'ev-user-' + Date.now(),
-        categoryLabel: EVENT_CATEGORIES.find((c) => c.id === eventCategoryChoice)?.label || 'فعالية',
-        organizer: profile?.display_name || 'أحد سكان الحي',
-        attendeesCount: 1,
-        isFree: true,
-        icon: '🌟',
-        color: '#059669',
-        bg: '#ecfdf5',
-      };
-
-      setEvents((prev) => [created, ...prev]);
+      const { error } = await supabase.from('events').insert({ ...newEv, moderation_status: 'pending' });
+      if (error) throw error;
       setShowEventModal(false);
       setEventTitle('');
       setEventDesc('');
       setEventLocation('');
       setEventDate('');
-      Alert.alert('تمت إضافة الفعالية بنجاح 🌟', 'أصبحت الفعالية متاحة الآن لجميع سكان الحي.');
-    } catch {
-      Alert.alert('تنبيه', 'تمت إضافة الفعالية محلياً.');
-      setShowEventModal(false);
+      Alert.alert('تم استلام الفعالية للمراجعة', 'ستظهر في سوق الحي بعد اعتمادها من الإدارة.');
+    } catch (error: any) {
+      Alert.alert('تعذر إرسال الفعالية', error?.message || 'تحقق من الاتصال ثم حاول مرة أخرى.');
     } finally {
       setSavingEvent(false);
     }

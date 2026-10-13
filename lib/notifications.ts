@@ -170,3 +170,22 @@ export async function registerPushToken(): Promise<string | null> {
     throw new Error('تعذر تسجيل الإشعارات. تحقق من اتصال الإنترنت ثم أعد المحاولة.');
   }
 }
+
+/** Stops server push delivery for the signed-in user's current platform. */
+export async function unregisterPushToken(): Promise<void> {
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  if (authError || !authData.user) throw new Error('سجّل الدخول لإدارة الإشعارات.');
+
+  if (Platform.OS === 'web' && typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+    const registration = await navigator.serviceWorker.getRegistration('/sw.js');
+    const subscription = await registration?.pushManager.getSubscription();
+    if (subscription) await subscription.unsubscribe();
+  }
+
+  const { error } = await supabase
+    .from('push_tokens')
+    .delete()
+    .eq('user_id', authData.user.id)
+    .eq('platform', Platform.OS);
+  if (error) throw new Error('تعذر إيقاف الإشعارات: ' + error.message);
+}

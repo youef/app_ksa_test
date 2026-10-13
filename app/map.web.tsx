@@ -31,10 +31,10 @@ import { loadGoogleMaps, pinElement, pinSvg } from '@/lib/googleMaps';
 import {
   MAP_PIN_KINDS,
   MAP_PIN_ORDER,
-  countByCity,
   countByKind,
   directionsUrl,
   filterPins,
+  findPlaceCenter,
   loadMapPins,
   relativeTime,
   type MapPin,
@@ -47,6 +47,7 @@ import {
   type NearbyPlace,
 } from '@/lib/places';
 import { formatDistance, navigationUrl } from '@/lib/privacy';
+import { getActiveLocation, isAllKingdom, subscribeLocation } from '@/lib/locationSync';
 
 const KSA_CENTER = { lat: 24.7136, lng: 46.6753 };
 const KSA_BOUNDS = { north: 32.6, south: 15.9, east: 56.1, west: 34.4 };
@@ -327,7 +328,7 @@ export default function WebMap() {
   const [engine, setEngine] = useState<MapEngine>('leaflet');
   const [pins, setPins] = useState<MapPin[]>([]);
   const [kind, setKind] = useState<KindFilter>('all');
-  const [city, setCity] = useState<string>('all');
+  const [city, setCity] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [heatOn, setHeatOn] = useState(false);
   const [locating, setLocating] = useState(false);
@@ -340,6 +341,17 @@ export default function WebMap() {
   const [placeCategory, setPlaceCategory] = useState<string>(ALL_PLACES_KEY);
   const [placesLoading, setPlacesLoading] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getActiveLocation().then((location) => {
+      if (!cancelled) setCity(isAllKingdom(location.city) ? null : location.city);
+    });
+    const unsubscribe = subscribeLocation((location) => {
+      setCity(isAllKingdom(location.city) ? null : location.city);
+    });
+    return () => { cancelled = true; unsubscribe(); };
+  }, []);
 
   const refreshPins = useCallback(async () => {
     try {
@@ -468,11 +480,21 @@ export default function WebMap() {
   }, [refreshPins]);
 
   const visiblePins = useMemo(
-    () => filterPins(pins, { kind, city: city === 'all' ? null : city, query }),
+    () => city ? filterPins(pins, { kind, city, query }) : [],
     [pins, kind, city, query],
   );
-  const kindCounts = useMemo(() => countByKind(pins), [pins]);
-  const cityCounts = useMemo(() => countByCity(pins).slice(0, 8), [pins]);
+  const scopedPins = useMemo(() => city ? filterPins(pins, { city }) : [], [pins, city]);
+  const kindCounts = useMemo(() => countByKind(scopedPins), [scopedPins]);
+  useEffect(() => {
+    if (!city) return;
+    const center = findPlaceCenter(city);
+    if (!center) return;
+    if (leafletInstanceRef.current) leafletInstanceRef.current.setView([center.lat, center.lng], 11);
+    if (googleMapRef.current) {
+      googleMapRef.current.setCenter({ lat: center.lat, lng: center.lng });
+      googleMapRef.current.setZoom(11);
+    }
+  }, [city, mapReady]);
 
   // ---------------------------------------------------------------- Update Pins on Active Engine
   useEffect(() => {
@@ -605,7 +627,12 @@ export default function WebMap() {
   const runPlaceSearch = useCallback(
     async (nextCategory: string, nextQuery: string) => {
       let origin: { latitude: number; longitude: number };
-      if (myLocation) {
+      const active = await getActiveLocation();
+      if (isAllKingdom(active.city)) return;
+      const center = findPlaceCenter(active.city);
+      if (center) {
+        origin = { latitude: center.lat, longitude: center.lng };
+      } else if (myLocation) {
         origin = myLocation;
       } else {
         const device = await getCurrentDeviceLocation();
@@ -685,7 +712,9 @@ export default function WebMap() {
       leafletMyMarkerRef.current = L.marker([location.latitude, location.longitude], { icon: myIcon }).addTo(
         leafletInstanceRef.current,
       );
-      leafletInstanceRef.current.flyTo([location.latitude, location.longitude], 15, { duration: 1.2 });
+      const active = await getActiveLocation();
+      const center = findPlaceCenter(active.city);
+      leafletInstanceRef.current.flyTo(center ? [center.lat, center.lng] : [location.latitude, location.longitude], center ? 11 : 6, { duration: 1.2 });
     } else if (googleMapRef.current && googleApiRef.current) {
       if (googleMyMarkerRef.current) {
         googleMyMarkerRef.current.setMap(null);
@@ -700,8 +729,10 @@ export default function WebMap() {
           anchor: new googleApiRef.current.Point(19, 48),
         },
       });
-      googleMapRef.current.panTo({ lat: location.latitude, lng: location.longitude });
-      googleMapRef.current.setZoom(15);
+      const active = await getActiveLocation();
+      const center = findPlaceCenter(active.city);
+      googleMapRef.current.panTo(center ? { lat: center.lat, lng: center.lng } : KSA_CENTER);
+      googleMapRef.current.setZoom(center ? 11 : 6);
     }
 
     void runPlaceSearch(placeCategory, query);

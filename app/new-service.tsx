@@ -174,6 +174,7 @@ export default function NewService() {
 
       const payload: Record<string, any> = {
         provider_id: providerId,
+        moderation_status: 'pending',
         name: name.trim(),
         description: description.trim(),
         category: subcategory || type!.label,
@@ -200,7 +201,7 @@ export default function NewService() {
       let result = await supabase.from('services').insert(attempt).select('id').single();
       for (let i = 0; i < Object.keys(payload).length && result.error; i++) {
         const missing = result.error.message.match(/Could not find the '([^']+)' column/i)?.[1];
-        if (missing && missing in attempt && missing !== 'provider_id' && missing !== 'name') {
+        if (missing && missing in attempt && missing !== 'provider_id' && missing !== 'name' && missing !== 'moderation_status') {
           console.warn(`services.${missing} missing in schema, retrying without it`);
           delete attempt[missing];
         } else if (/column|schema cache/i.test(result.error.message) && NEW_COLUMNS.some((c) => c in attempt)) {
@@ -217,8 +218,8 @@ export default function NewService() {
         console.error('services insert failed:', result.error);
         Alert.alert('تعذر نشر العرض', result.error.message);
       } else {
-        Alert.alert('تم بنجاح! 🎉', 'تم نشر عرضك في سوق الحي.');
-        router.replace({ pathname: '/service', params: { id: result.data.id } });
+        Alert.alert('تم استلام العرض للمراجعة', 'سيظهر في سوق الحي بعد اعتماده من الإدارة.');
+        router.replace('/market');
       }
     } catch (e: any) {
       setBusy(false);

@@ -660,6 +660,8 @@ export default function AskScreen() {
           <TextInput
             style={[styles.titleInput, styles.bodyInput]}
             multiline
+            scrollEnabled
+            maxLength={1200}
             value={body}
             onChangeText={setBody}
             placeholder={
@@ -1111,7 +1113,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 14,
     padding: 12,
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
     color: '#0f172a',
     borderWidth: 1.5,
@@ -1119,7 +1121,9 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   bodyInput: {
-    height: 95,
+    height: 148,
+    minHeight: 148,
+    fontSize: 16,
     textAlignVertical: 'top',
   },
   instantAnswerCard: {

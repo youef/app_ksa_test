@@ -36,7 +36,6 @@ import {
   Award,
   Send,
   X,
-  Wrench,
   Car,
   Flame,
   Mail,
@@ -341,14 +340,6 @@ export default function MoreScreen() {
               </View>
               <Text style={styles.quickHubTitle}>فزعة الحي</Text>
               <Text style={styles.quickHubSub}>طلب مساعدة الجيران</Text>
-            </Pressable>
-
-            <Pressable style={styles.quickHubCard} onPress={() => router.push('/tools')}>
-              <View style={[styles.quickHubIconCircle, { backgroundColor: '#f0fdf4' }]}>
-                <Wrench size={22} color="#16a34a" />
-              </View>
-              <Text style={styles.quickHubTitle}>سلفني بالحي</Text>
-              <Text style={styles.quickHubSub}>إعارة الأدوات المنزلية</Text>
             </Pressable>
 
             <Pressable style={styles.quickHubCard} onPress={() => router.push('/carpooling')}>

@@ -25,7 +25,6 @@ import TwitterInquiryCard from '@/components/TwitterInquiryCard';
 import AppHeader from '@/components/shared/AppHeader';
 import AtmosphereBar from '@/components/home/AtmosphereBar';
 import StoriesRow from '@/components/home/StoriesRow';
-import ServicesGrid from '@/components/home/ServicesGrid';
 import FeedTabs from '@/components/home/FeedTabs';
 import EmptyState from '@/components/home/EmptyState';
 import { FeedSkeleton, ErrorBanner } from '@/components/home/HomeStates';
@@ -289,15 +288,18 @@ export default function Home() {
           </View>
         )}
 
-        <ServicesGrid
-          isGuest={!feed.currentUserId}
-          onTools={() => {
-            setActiveTab('tools');
-            showToast('تمت تصفية المنشورات لعرض أدوات الحي');
-          }}
-        />
-
         <View style={styles.feedSection}>
+          <View style={styles.feedIntro}>
+            <View style={styles.feedIntroCopy}>
+              <Text style={styles.feedIntroEyebrow}>مجتمع حيّك</Text>
+              <Text style={styles.feedIntroTitle}>آخر أخبار الحي</Text>
+              <Text style={styles.feedIntroSubtitle}>{loc.city && loc.city !== 'كل المدن' ? `محتوى قريب من ${loc.city}` : 'اختر مدينتك لتشاهد محتوى منطقتك'}</Text>
+            </View>
+            <View style={styles.feedIntroBadge}>
+              <MessageCircle size={18} color="#047857" />
+              <Text style={styles.feedIntroCount}>{derived.filteredQuestions.length + derived.filteredRequests.length}</Text>
+            </View>
+          </View>
           <FeedTabs
             activeTab={activeTab}
             onChange={setActiveTab}
