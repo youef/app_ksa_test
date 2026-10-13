@@ -92,6 +92,7 @@ export default function SettingsScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPasswordChange, setShowPasswordChange] = useState(false);
   const [accountSaving, setAccountSaving] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   // Privacy & Community
   const [profilePrivacy, setProfilePrivacy] = useState<'public' | 'private'>('public');
@@ -435,6 +436,45 @@ export default function SettingsScreen() {
       },
     ]);
   };
+
+  function confirmAccountDeletion() {
+    const confirmDelete = () => {
+      if (deletingAccount) return;
+      setDeletingAccount(true);
+      void (async () => {
+        try {
+          const { error } = await supabase.functions.invoke('delete-account');
+          if (error) throw error;
+          await supabase.auth.signOut({ scope: 'local' });
+          router.replace('/auth');
+        } catch (error: any) {
+          Alert.alert('تعذّر حذف الحساب', error?.message || 'لم يتم حذف الحساب. حاول مرة أخرى.');
+        } finally {
+          setDeletingAccount(false);
+        }
+      })();
+    };
+
+    const showFinalConfirmation = () => {
+      if (Platform.OS === 'web' && typeof globalThis.confirm === 'function') {
+        if (globalThis.confirm('سيتم حذف حسابك وبياناته نهائيًا ولا يمكن التراجع. هل تريد المتابعة؟')) confirmDelete();
+        return;
+      }
+      Alert.alert('تأكيد حذف الحساب نهائيًا', 'سيتم حذف حسابك وبياناته نهائيًا ولا يمكن التراجع عن هذا الإجراء.', [
+        { text: 'إلغاء', style: 'cancel' },
+        { text: 'حذف نهائيًا', style: 'destructive', onPress: confirmDelete },
+      ]);
+    };
+
+    if (Platform.OS === 'web' && typeof globalThis.confirm === 'function') {
+      if (globalThis.confirm('هل أنت متأكد من رغبتك في حذف حسابك نهائيًا؟')) showFinalConfirmation();
+      return;
+    }
+    Alert.alert('حذف الحساب', 'سيؤدي هذا إلى حذف الحساب والملف الشخصي والبيانات المرتبطة به نهائيًا.', [
+      { text: 'إلغاء', style: 'cancel' },
+      { text: 'متابعة', style: 'destructive', onPress: showFinalConfirmation },
+    ]);
+  }
 
   const CATEGORIES: Array<{ key: SettingsCategory; label: string; icon: any }> = [
     { key: 'all', label: 'الكل', icon: Sliders },
@@ -1215,6 +1255,16 @@ export default function SettingsScreen() {
         <Pressable style={styles.signOutBtn} onPress={handleSignOut}>
           <LogOut size={18} color="#ef4444" />
           <Text style={styles.signOutText}>تسجيل الخروج من الحساب</Text>
+        </Pressable>
+        <Pressable
+          style={[styles.deleteAccountBtn, deletingAccount && styles.deleteAccountBtnDisabled]}
+          onPress={confirmAccountDeletion}
+          disabled={deletingAccount}
+          accessibilityRole="button"
+          accessibilityLabel="حذف الحساب نهائيًا"
+        >
+          {deletingAccount ? <ActivityIndicator size="small" color="#b91c1c" /> : <Trash2 size={18} color="#b91c1c" />}
+          <Text style={styles.deleteAccountText}>{deletingAccount ? 'جارٍ حذف الحساب...' : 'حذف الحساب نهائيًا'}</Text>
         </Pressable>
       </ScrollView>
 
@@ -2015,6 +2065,27 @@ const styles = StyleSheet.create({
   },
   signOutText: {
     color: '#ef4444',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  deleteAccountBtn: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#b91c1c',
+    paddingVertical: 14,
+    borderRadius: 16,
+    marginTop: -8,
+    marginBottom: 24,
+  },
+  deleteAccountBtnDisabled: {
+    opacity: 0.6,
+  },
+  deleteAccountText: {
+    color: '#b91c1c',
     fontSize: 14,
     fontWeight: '900',
   },
