@@ -515,8 +515,8 @@ export default function MoreScreen() {
             <MenuItem icon={<Star size={20} color="#d97706" />} iconBg="#fffbeb" title="المفضلة" sub="عناصرك المحفوظة" onPress={() => router.push('/favorites')} />
             <MenuItem icon={<Mail size={20} color="#475569" />} iconBg="#f1f5f9" title="المتابعون" sub="المتابعون والذين يتابعونك" onPress={() => router.push('/connected-social')} />
             <MenuItem icon={<ShieldCheck size={20} color="#7c3aed" />} iconBg="#f5f3ff" title="قيّم تجربتك" sub="تقييم وملاحظات" onPress={() => router.push('/rate-app')} />
-            <MenuItem icon={<Mail size={20} color="#059669" />} iconBg="#ecfdf5" title="اتصل بنا" sub="رسائل الدعم" onPress={() => router.push('/contact-us')} />
-            <MenuItem icon={<Mail size={20} color="#7c3aed" />} iconBg="#f5f3ff" title="لوحة الدعم" sub="ادم فقط" onPress={() => router.push('/admin-support')} />
+            <MenuItem icon={<Mail size={20} color="#059669" />} iconBg="#ecfdf5" title="مركز الدعم وتذاكري" sub="فتح تذكرة، البحث عن طلباتك، ومتابعة الردود" onPress={() => (hasSession ? router.push('/support') : requireAccount())} />
+            <MenuItem icon={<Mail size={20} color="#7c3aed" />} iconBg="#f5f3ff" title="لوحة الإدارة" sub="إدارة المنصة والتذاكر (للمدير)" onPress={() => router.push('/admin')} />
           </View>
 
           {/* ======================================================== */}
