@@ -134,6 +134,15 @@ export default function LiveMedia({ url, token, canPublish, onConnectionChange, 
       const track = publication.track;
       if (!track) continue;
       const element = track.attach();
+      if (element instanceof HTMLVideoElement) {
+        element.setAttribute('playsinline', '');
+        element.setAttribute('webkit-playsinline', '');
+        element.setAttribute('autoplay', '');
+        element.autoplay = true;
+        element.playsInline = true;
+        element.muted = element.muted || false;
+        void element.play().catch(() => {});
+      }
       element.style.width = '100%';
       element.style.height = '100%';
       element.style.objectFit = 'cover';
@@ -145,7 +154,7 @@ export default function LiveMedia({ url, token, canPublish, onConnectionChange, 
   return (
     <View style={{ flex: 1, backgroundColor: '#020617', minHeight: 280 }}>
       {connection !== 'connected' && <View style={{ position: 'absolute', zIndex: 1, inset: 0, alignItems: 'center', justifyContent: 'center' } as any}><ActivityIndicator color="#fff" /><Text style={{ color: '#fff', marginTop: 10 }}>جارٍ الاتصال بالبث…</Text></View>}
-      <div ref={videoHostRef} style={{ width: '100%', height: '100%', minHeight: 280, display: 'flex', alignItems: 'center', justifyContent: 'center' }} />
+      <div ref={videoHostRef} style={{ position: 'absolute', inset: 0, minHeight: 280, display: 'flex', alignItems: 'center', justifyContent: 'center' }} />
     </View>
   );
 }

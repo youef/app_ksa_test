@@ -92,10 +92,21 @@ const STREAM_FIELDS = `id,host_id,title,category,audience,room_name,status,viewe
   profiles!live_streams_host_id_fkey(id,display_name,username,avatar_url,is_verified,city,district)`;
 
 export async function fetchLiveStreams() {
-  const { error: expiryError } = await supabase.rpc('expire_stale_live_streams');
-  if (expiryError?.code === 'PGRST202') {
-    console.warn('Live-stream cleanup is not active until the lifecycle migration is applied.');
-  } else if (expiryError) throw expiryError;
+  const { data: auth } = await supabase.auth.getUser();
+  if (auth.user) {
+    try {
+      const { error: expiryError } = await supabase.rpc('expire_stale_live_streams');
+      if (expiryError) {
+        if (expiryError.code === 'PGRST202') {
+          console.warn('Live-stream cleanup is not active until the lifecycle migration is applied.');
+        } else {
+          console.warn('Live-stream cleanup was skipped:', expiryError.message);
+        }
+      }
+    } catch (e) {
+      console.warn('Live-stream cleanup was skipped (unavailable).');
+    }
+  }
   const { data, error } = await supabase
     .from('live_streams')
     .select(STREAM_FIELDS)
@@ -105,9 +116,7 @@ export async function fetchLiveStreams() {
     .limit(80);
   if (error) throw error;
   const streams = (data || []) as unknown as LiveStream[];
-  if (!streams.length) return streams;
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth.user) return streams;
+  if (!streams.length || !auth.user) return streams;
   const { data: sessions } = await supabase.from('live_viewer_sessions').select('stream_id')
     .in('stream_id', streams.map((stream) => stream.id))
     .gt('last_seen_at', new Date(Date.now() - 45_000).toISOString());

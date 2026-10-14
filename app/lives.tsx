@@ -43,13 +43,18 @@ export default function LivesScreen() {
         try { setAchievements(await fetchLiveHostAchievements(auth.user.id)); }
         catch { setAchievements([]); }
       } else { setAchievements([]); }
-      try {
-        setTopHosts(await fetchLiveHostLeaderboard(period));
-        setLeaderboardError('');
-      } catch (leaderError) {
+      if (auth.user?.id) {
+        try {
+          setTopHosts(await fetchLiveHostLeaderboard(period));
+          setLeaderboardError('');
+        } catch (leaderError) {
+          setTopHosts([]);
+          setLeaderboardError('قائمة نجوم البث تحتاج إلى تحديث قاعدة البيانات.');
+          console.error('Unable to load live host leaderboard.', leaderError);
+        }
+      } else {
         setTopHosts([]);
-        setLeaderboardError('قائمة نجوم البث تحتاج إلى تحديث قاعدة البيانات.');
-        console.error('Unable to load live host leaderboard.', leaderError);
+        setLeaderboardError('');
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'تعذر تحميل البثوث.');
