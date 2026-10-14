@@ -267,8 +267,8 @@ export const adminStyles = StyleSheet.create({
     flex: 1,
   },
   section: {
-    padding: 22,
-    paddingTop: 24,
+    padding: 16,
+    paddingTop: 20,
     maxWidth: 1440,
     width: '100%',
     alignSelf: 'center',
