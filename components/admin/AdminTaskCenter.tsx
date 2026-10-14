@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Flag, Star, AlertTriangle, MessageCircle, ChevronLeft, Inbox } from 'lucide-react-native';
 import { ADMIN_COLORS as C } from './adminStyles';
+import { SupportEmptyState } from '@/components/shared/SupportUI';
 import type {
   AdminReport,
   AdminVerificationRequest,
@@ -179,11 +180,11 @@ export function AdminTaskCenter({
       </View>
 
       {tasks.length === 0 ? (
-        <View style={styles.empty}>
-          <Inbox size={40} color={C.subtle} />
-          <Text style={styles.emptyTitle}>لا مهام معلّقة 🎉</Text>
-          <Text style={styles.emptySub}>كل البلاغات والتوثيقات والطوارئ معالجة. الحي بأمان.</Text>
-        </View>
+        <SupportEmptyState
+          title="لا مهام معلّقة 🎉"
+          description="كل البلاغات والتوثيقات والطوارئ معالجة. الحي بأمان."
+          icon={<Inbox size={40} color={C.subtle} />}
+        />
       ) : (
         tasks.map((t) => {
           const meta = SEVERITY_META[t.severity];
