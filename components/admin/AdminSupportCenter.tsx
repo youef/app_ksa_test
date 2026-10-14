@@ -1,193 +1,35 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
-import { CheckCircle2, ChevronDown, ChevronUp, Clock3, LifeBuoy, Mail, RefreshCw, Search, ShieldCheck, XCircle } from 'lucide-react-native';
-import { supabase } from '@/lib/supabase';
-
-type TicketStatus = 'open' | 'reviewing' | 'resolved' | 'closed';
-type SupportTicket = {
-  id: string;
-  user_id: string | null;
-  name: string;
-  email: string | null;
-  subject: string;
-  message: string;
-  status: TicketStatus;
-  created_at: string;
-  resolved_at: string | null;
-};
-type FilterKey = 'all' | TicketStatus;
-const STATUS: Record<TicketStatus, { label: string; color: string; bg: string }> = {
-  open: { label: 'جديدة', color: '#B45309', bg: '#FEF3C7' },
-  reviewing: { label: 'قيد المراجعة', color: '#1D4ED8', bg: '#DBEAFE' },
-  resolved: { label: 'تم الحل', color: '#047857', bg: '#D1FAE5' },
-  closed: { label: 'مغلقة', color: '#475569', bg: '#E2E8F0' },
-};
-const FILTERS: Array<{ key: FilterKey; label: string }> = [
-  { key: 'all', label: 'الكل' }, { key: 'open', label: 'جديدة' },
-  { key: 'reviewing', label: 'قيد المراجعة' }, { key: 'resolved', label: 'تم الحل' },
-  { key: 'closed', label: 'مغلقة' },
-];
-const fmtDate = (value: string) => {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? 'تاريخ غير متاح' : date.toLocaleString('ar-SA', { dateStyle: 'medium', timeStyle: 'short' });
-};
-
-export function AdminSupportCenter({ onToast }: { onToast: (message: string) => void }) {
-  const [tickets, setTickets] = useState<SupportTicket[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState<FilterKey>('all');
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [busyId, setBusyId] = useState<string | null>(null);
-  const [loadError, setLoadError] = useState('');
-
-  const loadTickets = useCallback(async (quiet = false) => {
-    if (quiet) setRefreshing(true); else setLoading(true);
-    setLoadError('');
-    try {
-      const { data, error } = await supabase.from('support_tickets')
-        .select('id,user_id,name,email,subject,message,status,created_at,resolved_at')
-        .order('created_at', { ascending: false }).limit(200);
-      if (error) throw error;
-      setTickets((data || []) as SupportTicket[]);
-    } catch (error: any) {
-      setLoadError(error?.message || 'تعذر تحميل تذاكر الدعم. تحقق من اتصال قاعدة البيانات وسياسات الصلاحيات.');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
-  useEffect(() => { void loadTickets(); }, [loadTickets]);
-
-  const counts = useMemo(() => ({
-    all: tickets.length,
-    open: tickets.filter(t => t.status === 'open').length,
-    reviewing: tickets.filter(t => t.status === 'reviewing').length,
-    resolved: tickets.filter(t => t.status === 'resolved').length,
-    closed: tickets.filter(t => t.status === 'closed').length,
-  }), [tickets]);
-  const visibleTickets = useMemo(() => {
-    const term = query.trim().toLocaleLowerCase();
-    return tickets.filter(ticket => {
-      if (filter !== 'all' && ticket.status !== filter) return false;
-      if (!term) return true;
-      return [ticket.subject, ticket.message, ticket.name, ticket.email || '', ticket.id]
-        .some(value => value.toLocaleLowerCase().includes(term));
-    });
-  }, [tickets, filter, query]);
-
-  const updateStatus = async (ticket: SupportTicket, nextStatus: TicketStatus) => {
-    setBusyId(ticket.id);
-    try {
-      const patch = {
-        status: nextStatus,
-        resolved_at: nextStatus === 'resolved' || nextStatus === 'closed' ? new Date().toISOString() : null,
-      };
-      const { error } = await supabase.from('support_tickets').update(patch).eq('id', ticket.id);
-      if (error) throw error;
-      setTickets(prev => prev.map(item => item.id === ticket.id ? { ...item, ...patch } : item));
-      onToast(nextStatus === 'resolved' ? 'تم حل التذكرة وتوثيق الإجراء بنجاح' : nextStatus === 'reviewing' ? 'تم نقل التذكرة إلى قيد المراجعة' : nextStatus === 'closed' ? 'تم إغلاق التذكرة' : 'تمت إعادة فتح التذكرة');
-    } catch (error: any) {
-      onToast('تعذر تحديث التذكرة: ' + (error?.message || 'خطأ غير متوقع'));
-    } finally { setBusyId(null); }
-  };
-
-  const summaryCard = (label: string, value: number, color: string, bg: string) => (
-    <View key={label} style={{ flex: 1, minWidth: 105, backgroundColor: bg, borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0', padding: 14, gap: 5 }}>
-      <Text style={{ color: '#64748B', fontSize: 11, fontWeight: '800', textAlign: 'right' }}>{label}</Text>
-      <Text style={{ color, fontSize: 25, fontWeight: '900', textAlign: 'right' }}>{value.toLocaleString('ar-SA')}</Text>
-    </View>
-  );
-
-  return (
-    <View style={{ paddingHorizontal: 14, paddingTop: 16, paddingBottom: 26, gap: 14 }}>
-      <View style={{ backgroundColor: '#0F172A', borderRadius: 22, padding: 20, overflow: 'hidden', gap: 10 }}>
-        <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 12 }}>
-          <View style={{ width: 48, height: 48, borderRadius: 16, backgroundColor: 'rgba(45,212,191,0.16)', alignItems: 'center', justifyContent: 'center' }}>
-            <LifeBuoy size={25} color="#5EEAD4" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: '#99F6E4', fontSize: 11, fontWeight: '900', textAlign: 'right', letterSpacing: 1 }}>SUPPORT OPERATIONS</Text>
-            <Text style={{ color: '#FFFFFF', fontSize: 22, fontWeight: '900', textAlign: 'right', marginTop: 3 }}>مركز خدمة المستفيدين</Text>
-          </View>
-          <Pressable onPress={() => void loadTickets(true)} disabled={refreshing} style={{ width: 40, height: 40, borderRadius: 13, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center' }}>
-            {refreshing ? <ActivityIndicator size="small" color="#FFFFFF" /> : <RefreshCw size={17} color="#FFFFFF" />}
-          </Pressable>
-        </View>
-        <Text style={{ color: '#CBD5E1', fontSize: 12, lineHeight: 20, textAlign: 'right' }}>إدارة موحّدة لرسائل الدعم، متابعة الحالة، والعودة السريعة لكل طلب مع سجل زمني واضح.</Text>
-        <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 7, alignSelf: 'flex-end', backgroundColor: 'rgba(16,185,129,0.15)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 99 }}>
-          <ShieldCheck size={13} color="#6EE7B7" /><Text style={{ color: '#A7F3D0', fontSize: 10, fontWeight: '800' }}>مساحة إدارية محمية</Text>
-        </View>
-      </View>
-
-      <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 9 }}>
-        {summaryCard('إجمالي التذاكر', counts.all, '#0F172A', '#FFFFFF')}
-        {summaryCard('تحتاج متابعة', counts.open + counts.reviewing, '#B45309', '#FFFBEB')}
-        {summaryCard('تم الحل', counts.resolved, '#047857', '#ECFDF5')}
-      </View>
-
-      <View style={{ backgroundColor: '#FFFFFF', borderColor: '#E2E8F0', borderWidth: 1, borderRadius: 17, padding: 12, gap: 12 }}>
-        <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#F8FAFC', borderRadius: 12, paddingHorizontal: 11 }}>
-          <Search size={17} color="#64748B" />
-          <TextInput value={query} onChangeText={setQuery} placeholder="ابحث بالموضوع أو الاسم أو البريد أو رقم التذكرة..." placeholderTextColor="#94A3B8" style={{ flex: 1, minHeight: 43, textAlign: 'right', color: '#0F172A', fontSize: 12 }} />
-        </View>
-        <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 7 }}>
-          {FILTERS.map(item => {
-            const active = filter === item.key;
-            return <Pressable key={item.key} onPress={() => setFilter(item.key)} style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6, borderRadius: 99, paddingHorizontal: 11, paddingVertical: 8, borderWidth: 1, borderColor: active ? '#0F766E' : '#E2E8F0', backgroundColor: active ? '#CCFBF1' : '#FFFFFF' }}>
-              <Text style={{ color: active ? '#115E59' : '#475569', fontSize: 11, fontWeight: '800' }}>{item.label}</Text>
-              <Text style={{ color: active ? '#0F766E' : '#94A3B8', fontSize: 10, fontWeight: '900' }}>{counts[item.key].toLocaleString('ar-SA')}</Text>
-            </Pressable>;
-          })}
-        </View>
-      </View>
-
-      {loading ? (
-        <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 45, gap: 12 }}><ActivityIndicator size="large" color="#0F766E" /><Text style={{ color: '#64748B', fontSize: 12, fontWeight: '700' }}>جارٍ تحميل تذاكر الدعم...</Text></View>
-      ) : loadError ? (
-        <View style={{ backgroundColor: '#FFF1F2', borderWidth: 1, borderColor: '#FECDD3', borderRadius: 16, padding: 16, gap: 8 }}>
-          <Text style={{ color: '#BE123C', textAlign: 'right', fontWeight: '900' }}>تعذر تحميل بيانات الدعم</Text>
-          <Text style={{ color: '#9F1239', textAlign: 'right', fontSize: 11, lineHeight: 18 }}>{loadError}</Text>
-          <Pressable onPress={() => void loadTickets()} style={{ alignSelf: 'flex-end', backgroundColor: '#BE123C', paddingHorizontal: 13, paddingVertical: 9, borderRadius: 10 }}><Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 11 }}>إعادة المحاولة</Text></Pressable>
-        </View>
-      ) : visibleTickets.length === 0 ? (
-        <View style={{ alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 18, borderWidth: 1, borderColor: '#E2E8F0', padding: 30, gap: 9 }}>
-          <LifeBuoy size={30} color="#94A3B8" /><Text style={{ color: '#0F172A', fontSize: 15, fontWeight: '900', textAlign: 'center' }}>لا توجد تذاكر مطابقة</Text><Text style={{ color: '#64748B', fontSize: 11, textAlign: 'center' }}>جرّب تغيير حالة التذاكر أو تعديل عبارة البحث.</Text>
-        </View>
-      ) : visibleTickets.map(ticket => {
-        const status = STATUS[ticket.status] || STATUS.open;
-        const expanded = expandedId === ticket.id;
-        const busy = busyId === ticket.id;
-        return (
-          <View key={ticket.id} style={{ backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: expanded ? '#99F6E4' : '#E2E8F0', borderRadius: 18, padding: 15, gap: 11, shadowColor: '#0F172A', shadowOpacity: 0.035, shadowRadius: 10, elevation: 1 }}>
-            <View style={{ flexDirection: 'row-reverse', alignItems: 'flex-start', gap: 10 }}>
-              <View style={{ width: 40, height: 40, borderRadius: 13, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' }}><Mail size={18} color="#0F766E" /></View>
-              <View style={{ flex: 1, gap: 5 }}>
-                <Text style={{ color: '#0F172A', fontSize: 14, fontWeight: '900', textAlign: 'right' }}>{ticket.subject}</Text>
-                <Text style={{ color: '#475569', fontSize: 11, textAlign: 'right' }}>{ticket.name}{ticket.email ? ' · ' + ticket.email : ''}</Text>
-                <Text style={{ color: '#94A3B8', fontSize: 10, textAlign: 'right' }}>#{ticket.id.slice(0, 8).toUpperCase()} · {fmtDate(ticket.created_at)}</Text>
-              </View>
-              <View style={{ backgroundColor: status.bg, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 99 }}><Text style={{ color: status.color, fontSize: 10, fontWeight: '900' }}>{status.label}</Text></View>
-            </View>
-            <Text numberOfLines={expanded ? undefined : 3} style={{ color: '#334155', fontSize: 12, lineHeight: 21, textAlign: 'right' }}>{ticket.message}</Text>
-            <Pressable onPress={() => setExpandedId(expanded ? null : ticket.id)} style={{ alignSelf: 'flex-end', flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingVertical: 3 }}>
-              <Text style={{ color: '#0F766E', fontSize: 11, fontWeight: '900' }}>{expanded ? 'عرض أقل' : 'عرض التفاصيل'}</Text>{expanded ? <ChevronUp size={14} color="#0F766E" /> : <ChevronDown size={14} color="#0F766E" />}
-            </Pressable>
-            {expanded ? <View style={{ borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 10, gap: 6 }}>
-              <Text style={{ color: '#64748B', fontSize: 10, textAlign: 'right' }}>معرّف المرسل: {ticket.user_id || 'زائر غير مسجل'}</Text>
-              {ticket.resolved_at ? <Text style={{ color: '#64748B', fontSize: 10, textAlign: 'right' }}>آخر إغلاق: {fmtDate(ticket.resolved_at)}</Text> : null}
-            </View> : null}
-            <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 7, borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 11 }}>
-              {ticket.status === 'open' ? <Pressable disabled={busy} onPress={() => void updateStatus(ticket, 'reviewing')} style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6, backgroundColor: '#DBEAFE', borderRadius: 10, paddingHorizontal: 11, paddingVertical: 9, opacity: busy ? 0.55 : 1 }}><Clock3 size={14} color="#1D4ED8" /><Text style={{ color: '#1D4ED8', fontSize: 11, fontWeight: '900' }}>بدء المراجعة</Text></Pressable> : null}
-              {ticket.status !== 'resolved' ? <Pressable disabled={busy} onPress={() => void updateStatus(ticket, 'resolved')} style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6, backgroundColor: '#D1FAE5', borderRadius: 10, paddingHorizontal: 11, paddingVertical: 9, opacity: busy ? 0.55 : 1 }}>{busy ? <ActivityIndicator size="small" color="#047857" /> : <CheckCircle2 size={14} color="#047857" />}<Text style={{ color: '#047857', fontSize: 11, fontWeight: '900' }}>حل التذكرة</Text></Pressable> : null}
-              {ticket.status !== 'closed' ? <Pressable disabled={busy} onPress={() => void updateStatus(ticket, 'closed')} style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6, backgroundColor: '#F1F5F9', borderRadius: 10, paddingHorizontal: 11, paddingVertical: 9, opacity: busy ? 0.55 : 1 }}><XCircle size={14} color="#475569" /><Text style={{ color: '#475569', fontSize: 11, fontWeight: '900' }}>إغلاق</Text></Pressable> : null}
-              {(ticket.status === 'resolved' || ticket.status === 'closed') ? <Pressable disabled={busy} onPress={() => void updateStatus(ticket, 'open')} style={{ borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 10, paddingHorizontal: 11, paddingVertical: 9, opacity: busy ? 0.55 : 1 }}><Text style={{ color: '#334155', fontSize: 11, fontWeight: '900' }}>إعادة فتح</Text></Pressable> : null}
-            </View>
-          </View>
-        );
-      })}
-      <Text style={{ color: '#94A3B8', fontSize: 10, textAlign: 'center' }}>يعرض المركز أحدث 200 تذكرة. حدّث القائمة لمزامنة آخر المستجدات.</Text>
-    </View>
-  );
+import React,{useCallback,useEffect,useMemo,useState} from 'react';
+import {ActivityIndicator,Alert,Platform,Pressable,ScrollView,Text,TextInput,View} from 'react-native';
+import {CheckCircle2,Clock3,LifeBuoy,Mail,MessageCircle,Pencil,Plus,RefreshCw,Search,Send,Trash2,XCircle} from 'lucide-react-native';
+import {supabase} from '@/lib/supabase';
+type Status='open'|'reviewing'|'resolved'|'closed';
+type Ticket={id:string;user_id:string|null;name:string;email:string|null;subject:string;message:string;status:Status;created_at:string;resolved_at:string|null};
+type Reply={id:string;ticket_id:string;user_id:string|null;author_name:string;message:string;is_admin:boolean;created_at:string};
+type Filter='all'|Status;
+const statuses:Record<Status,{label:string;color:string;bg:string}>={open:{label:'جديدة',color:'#B45309',bg:'#FEF3C7'},reviewing:{label:'قيد المعالجة',color:'#1D4ED8',bg:'#DBEAFE'},resolved:{label:'تم الحل',color:'#047857',bg:'#D1FAE5'},closed:{label:'مغلقة',color:'#475569',bg:'#E2E8F0'}};
+const filters:{key:Filter;label:string}[]=[{key:'all',label:'الكل'},{key:'open',label:'جديدة'},{key:'reviewing',label:'قيد المعالجة'},{key:'resolved',label:'تم الحل'},{key:'closed',label:'مغلقة'}];
+const dateText=(v:string)=>new Date(v).toLocaleString('ar-SA',{dateStyle:'medium',timeStyle:'short'});
+const field:any={borderWidth:1,borderColor:'#DCE5ED',backgroundColor:'#F8FAFC',borderRadius:12,padding:11,textAlign:'right',color:'#0F172A',fontSize:13};
+const action=(bg:string)=>({backgroundColor:bg,borderRadius:11,paddingHorizontal:10,paddingVertical:9,flexDirection:'row' as const,alignItems:'center' as const,justifyContent:'center' as const,gap:5});
+export function AdminSupportCenter({onToast}:{onToast:(message:string)=>void}){
+ const [tickets,setTickets]=useState<Ticket[]>([]),[replies,setReplies]=useState<Reply[]>([]),[adminId,setAdminId]=useState<string|null>(null);
+ const [loading,setLoading]=useState(true),[refreshing,setRefreshing]=useState(false),[query,setQuery]=useState(''),[filter,setFilter]=useState<Filter>('all'),[expanded,setExpanded]=useState<string|null>(null),[busy,setBusy]=useState<string|null>(null);
+ const [replyText,setReplyText]=useState(''),[formOpen,setFormOpen]=useState(false),[editing,setEditing]=useState<Ticket|null>(null),[draft,setDraft]=useState({name:'',email:'',subject:'',message:'',status:'open' as Status});
+ const load=useCallback(async(quiet=false)=>{quiet?setRefreshing(true):setLoading(true);try{const [{data,error},{data:auth}]=await Promise.all([supabase.from('support_tickets').select('id,user_id,name,email,subject,message,status,created_at,resolved_at').order('created_at',{ascending:false}).limit(500),supabase.auth.getUser()]);if(error)throw error;setTickets((data||[]) as Ticket[]);setAdminId(auth.user?.id||null);const {data:rs,error:re}=await supabase.from('support_ticket_replies').select('id,ticket_id,user_id,author_name,message,is_admin,created_at').order('created_at').limit(2000);if(re)throw re;setReplies((rs||[]) as Reply[]);}catch(e:any){onToast('تعذر تحميل الدعم: '+(e?.message||''));}finally{setLoading(false);setRefreshing(false);}},[onToast]);
+ useEffect(()=>{void load();},[load]);
+ const counts=useMemo(()=>({all:tickets.length,open:tickets.filter(t=>t.status==='open').length,reviewing:tickets.filter(t=>t.status==='reviewing').length,resolved:tickets.filter(t=>t.status==='resolved').length,closed:tickets.filter(t=>t.status==='closed').length}),[tickets]);
+ const visible=useMemo(()=>{const q=query.trim().toLowerCase();return tickets.filter(t=>(filter==='all'||t.status===filter)&&(!q||[t.subject,t.message,t.name,t.email||'',t.id].some(v=>v.toLowerCase().includes(q))));},[tickets,filter,query]);
+ const setStatus=async(t:Ticket,next:Status)=>{setBusy(t.id);try{const patch={status:next,resolved_at:next==='resolved'||next==='closed'?new Date().toISOString():null};const {error}=await supabase.from('support_tickets').update(patch).eq('id',t.id);if(error)throw error;setTickets(p=>p.map(x=>x.id===t.id?{...x,...patch}:x));onToast('تم تحديث حالة التذكرة');}catch(e:any){onToast('تعذر تحديث الحالة: '+(e?.message||''));}finally{setBusy(null);}};
+ const sendReply=async(t:Ticket)=>{if(!replyText.trim()||!adminId)return onToast('اكتب الرد وتأكد من تسجيل دخول المدير');setBusy(t.id);try{const {data,error}=await supabase.from('support_ticket_replies').insert({ticket_id:t.id,user_id:adminId,author_name:'فريق دعم حيّنا',message:replyText.trim(),is_admin:true}).select().single();if(error)throw error;setReplies(p=>[...p,data as Reply]);setReplyText('');if(t.status==='open'){const patch={status:'reviewing' as Status,resolved_at:null};await supabase.from('support_tickets').update(patch).eq('id',t.id);setTickets(p=>p.map(x=>x.id===t.id?{...x,...patch}:x));}onToast('تم إرسال الرد للمستخدم');}catch(e:any){onToast('تعذر إرسال الرد: '+(e?.message||''));}finally{setBusy(null);}};
+ const edit=(t:Ticket)=>{setEditing(t);setDraft({name:t.name,email:t.email||'',subject:t.subject,message:t.message,status:t.status});setFormOpen(true);setExpanded(t.id);};
+ const save=async()=>{if(draft.name.trim().length<2||draft.subject.trim().length<3||draft.message.trim().length<3)return onToast('أكمل الاسم والموضوع والرسالة');setBusy('form');try{const patch={name:draft.name.trim(),email:draft.email.trim()||null,subject:draft.subject.trim(),message:draft.message.trim(),status:draft.status,resolved_at:draft.status==='resolved'||draft.status==='closed'?new Date().toISOString():null};if(editing){const {data,error}=await supabase.from('support_tickets').update(patch).eq('id',editing.id).select().single();if(error)throw error;setTickets(p=>p.map(t=>t.id===editing.id?data as Ticket:t));onToast('تم تعديل التذكرة');}else{const {data,error}=await supabase.from('support_tickets').insert({...patch,user_id:null}).select().single();if(error)throw error;setTickets(p=>[data as Ticket,...p]);onToast('تم إنشاء التذكرة');}setFormOpen(false);setEditing(null);setDraft({name:'',email:'',subject:'',message:'',status:'open'});}catch(e:any){onToast('تعذر الحفظ: '+(e?.message||''));}finally{setBusy(null);}};
+ const remove=(t:Ticket)=>{const run=async()=>{setBusy(t.id);try{const {error}=await supabase.from('support_tickets').delete().eq('id',t.id);if(error)throw error;setTickets(p=>p.filter(x=>x.id!==t.id));setReplies(p=>p.filter(r=>r.ticket_id!==t.id));onToast('تم حذف التذكرة وردودها');}catch(e:any){onToast('تعذر الحذف: '+(e?.message||''));}finally{setBusy(null);}};if(Platform.OS==='web'&&typeof window!=='undefined'){if(window.confirm('حذف التذكرة وجميع ردودها؟'))void run();}else Alert.alert('حذف التذكرة','سيتم حذف جميع الردود التابعة لها.',[{text:'إلغاء',style:'cancel'},{text:'حذف',style:'destructive',onPress:()=>void run()}]);};
+ const stat=(label:string,value:number,color:string,bg:string)=><View key={label} style={{flex:1,minWidth:85,backgroundColor:bg,borderRadius:15,borderWidth:1,borderColor:'#E2E8F0',padding:12,gap:4}}><Text style={{fontSize:11,fontWeight:'800',color:'#64748B',textAlign:'right'}}>{label}</Text><Text style={{fontSize:24,fontWeight:'900',color,textAlign:'right'}}>{value.toLocaleString('ar-SA')}</Text></View>;
+ return <ScrollView contentContainerStyle={{padding:14,paddingTop:16,paddingBottom:28,gap:13}}>
+ <View style={{backgroundColor:'#0B172A',borderRadius:23,padding:19,gap:12}}><View style={{flexDirection:'row-reverse',alignItems:'center',gap:11}}><View style={{width:48,height:48,borderRadius:16,backgroundColor:'#123B48',alignItems:'center',justifyContent:'center'}}><LifeBuoy size={25} color="#5EEAD4"/></View><View style={{flex:1}}><Text style={{color:'#99F6E4',fontSize:10,fontWeight:'900',textAlign:'right'}}>HAYNA · SUPPORT DESK</Text><Text style={{color:'#fff',fontSize:22,fontWeight:'900',textAlign:'right',marginTop:4}}>مركز خدمة المستفيدين</Text></View><Pressable onPress={()=>void load(true)} style={{width:40,height:40,borderRadius:13,backgroundColor:'#1E293B',alignItems:'center',justifyContent:'center'}}>{refreshing?<ActivityIndicator color="#fff"/>:<RefreshCw size={17} color="#fff"/>}</Pressable></View><Text style={{color:'#CBD5E1',fontSize:12,lineHeight:20,textAlign:'right'}}>إدارة متكاملة للردود والتذاكر والحالات والبيانات.</Text><Pressable onPress={()=>{setEditing(null);setDraft({name:'',email:'',subject:'',message:'',status:'open'});setFormOpen(v=>!v);}} style={[action('#0F766E'),{alignSelf:'flex-end'}]}><Plus size={15} color="#fff"/><Text style={{color:'#fff',fontWeight:'900',fontSize:12}}>{formOpen?'إغلاق النموذج':'إنشاء تذكرة يدوياً'}</Text></Pressable></View>
+ <View style={{flexDirection:'row-reverse',flexWrap:'wrap',gap:8}}>{stat('الإجمالي',counts.all,'#0F172A','#fff')}{stat('جديدة',counts.open,'#B45309','#FFFBEB')}{stat('قيد المعالجة',counts.reviewing,'#1D4ED8','#EFF6FF')}{stat('تم الحل',counts.resolved,'#047857','#ECFDF5')}</View>
+ {formOpen&&<View style={{backgroundColor:'#fff',borderWidth:1,borderColor:'#CBD5E1',borderRadius:18,padding:14,gap:9}}><Text style={{fontSize:16,fontWeight:'900',color:'#0F172A',textAlign:'right'}}>{editing?'تعديل التذكرة':'إنشاء تذكرة بواسطة الإدارة'}</Text><TextInput value={draft.name} onChangeText={v=>setDraft(p=>({...p,name:v}))} placeholder="اسم صاحب التذكرة" style={field}/><TextInput value={draft.email} onChangeText={v=>setDraft(p=>({...p,email:v}))} placeholder="البريد الإلكتروني (اختياري)" style={field}/><TextInput value={draft.subject} onChangeText={v=>setDraft(p=>({...p,subject:v}))} placeholder="عنوان التذكرة" maxLength={120} style={field}/><TextInput value={draft.message} onChangeText={v=>setDraft(p=>({...p,message:v}))} placeholder="وصف الطلب" multiline maxLength={2000} style={[field,{minHeight:90,textAlignVertical:'top'}]}/><View style={{flexDirection:'row-reverse',flexWrap:'wrap',gap:6}}>{filters.filter(x=>x.key!=='all').map(x=><Pressable key={x.key} onPress={()=>setDraft(p=>({...p,status:x.key as Status}))} style={{backgroundColor:draft.status===x.key?statuses[x.key as Status].bg:'#fff',borderColor:draft.status===x.key?statuses[x.key as Status].color:'#E2E8F0',borderWidth:1,borderRadius:20,padding:8}}><Text style={{fontSize:11,color:draft.status===x.key?statuses[x.key as Status].color:'#64748B',fontWeight:'800'}}>{x.label}</Text></Pressable>)}</View><Pressable disabled={busy==='form'} onPress={()=>void save()} style={action('#0F766E')}>{busy==='form'?<ActivityIndicator color="#fff"/>:<CheckCircle2 size={15} color="#fff"/>}<Text style={{color:'#fff',fontWeight:'900'}}>{editing?'حفظ التعديل':'إنشاء التذكرة'}</Text></Pressable></View>}
+ <View style={{backgroundColor:'#fff',borderColor:'#E2E8F0',borderWidth:1,borderRadius:17,padding:12,gap:11}}><View style={{flexDirection:'row-reverse',alignItems:'center',gap:8}}><Search size={17} color="#64748B"/><TextInput value={query} onChangeText={setQuery} placeholder="بحث بالموضوع أو الاسم أو البريد أو المعرّف..." placeholderTextColor="#94A3B8" style={{flex:1,minHeight:40,textAlign:'right',color:'#0F172A',fontSize:12}}/></View><View style={{flexDirection:'row-reverse',flexWrap:'wrap',gap:6}}>{filters.map(x=><Pressable key={x.key} onPress={()=>setFilter(x.key)} style={{backgroundColor:filter===x.key?'#CCFBF1':'#fff',borderColor:filter===x.key?'#0F766E':'#E2E8F0',borderWidth:1,borderRadius:20,paddingHorizontal:10,paddingVertical:8}}><Text style={{fontSize:11,fontWeight:'800',color:filter===x.key?'#115E59':'#475569'}}>{x.label} · {counts[x.key]}</Text></Pressable>)}</View></View>
+ {loading?<ActivityIndicator size="large" color="#0F766E"/>:visible.length===0?<View style={{padding:28,alignItems:'center',backgroundColor:'#fff',borderRadius:17}}><Text style={{fontWeight:'900',color:'#0F172A'}}>لا توجد تذاكر مطابقة</Text></View>:visible.map(t=>{const st=statuses[t.status],open=expanded===t.id,rs=replies.filter(r=>r.ticket_id===t.id);return <View key={t.id} style={{backgroundColor:'#fff',borderWidth:1,borderColor:open?'#99F6E4':'#E2E8F0',borderRadius:18,padding:14,gap:10}}><View style={{flexDirection:'row-reverse',alignItems:'flex-start',gap:9}}><View style={{width:38,height:38,borderRadius:12,backgroundColor:'#F0FDFA',alignItems:'center',justifyContent:'center'}}><Mail size={17} color="#0F766E"/></View><View style={{flex:1,gap:5}}><Text style={{fontSize:14,fontWeight:'900',color:'#0F172A',textAlign:'right'}}>{t.subject}</Text><Text style={{fontSize:11,color:'#475569',textAlign:'right'}}>{t.name}{t.email?' · '+t.email:''}</Text><Text style={{fontSize:10,color:'#94A3B8',textAlign:'right'}}>#{t.id.slice(0,8).toUpperCase()} · {dateText(t.created_at)} · {rs.length} رد</Text></View><View style={{backgroundColor:st.bg,borderRadius:20,padding:7}}><Text style={{color:st.color,fontSize:10,fontWeight:'900'}}>{st.label}</Text></View></View><Text numberOfLines={open?undefined:3} style={{fontSize:12,lineHeight:20,color:'#334155',textAlign:'right'}}>{t.message}</Text><View style={{flexDirection:'row-reverse',flexWrap:'wrap',gap:6}}><Pressable onPress={()=>setExpanded(open?null:t.id)} style={action('#F1F5F9')}><MessageCircle size={13} color="#334155"/><Text style={{fontSize:10,color:'#334155',fontWeight:'900'}}>{open?'إخفاء الردود':'الردود والتفاصيل'}</Text></Pressable><Pressable onPress={()=>edit(t)} style={action('#EFF6FF')}><Pencil size={13} color="#1D4ED8"/><Text style={{fontSize:10,color:'#1D4ED8',fontWeight:'900'}}>تعديل</Text></Pressable><Pressable onPress={()=>remove(t)} style={action('#FFF1F2')}><Trash2 size={13} color="#BE123C"/><Text style={{fontSize:10,color:'#BE123C',fontWeight:'900'}}>حذف</Text></Pressable>{t.status==='open'&&<Pressable onPress={()=>void setStatus(t,'reviewing')} style={action('#DBEAFE')}><Clock3 size={13} color="#1D4ED8"/><Text style={{fontSize:10,color:'#1D4ED8',fontWeight:'900'}}>بدء المعالجة</Text></Pressable>}{t.status!=='resolved'&&<Pressable onPress={()=>void setStatus(t,'resolved')} style={action('#D1FAE5')}><CheckCircle2 size={13} color="#047857"/><Text style={{fontSize:10,color:'#047857',fontWeight:'900'}}>حل</Text></Pressable>}{t.status!=='closed'&&<Pressable onPress={()=>void setStatus(t,'closed')} style={action('#E2E8F0')}><XCircle size={13} color="#475569"/><Text style={{fontSize:10,color:'#475569',fontWeight:'900'}}>إغلاق</Text></Pressable>}{(t.status==='closed'||t.status==='resolved')&&<Pressable onPress={()=>void setStatus(t,'open')} style={action('#F8FAFC')}><RefreshCw size={12} color="#334155"/><Text style={{fontSize:10,color:'#334155',fontWeight:'900'}}>إعادة فتح</Text></Pressable>}</View>{open&&<View style={{borderTopWidth:1,borderTopColor:'#E2E8F0',paddingTop:11,gap:9}}><Text style={{fontSize:10,color:'#64748B',textAlign:'right'}}>المستخدم: {t.user_id||'زائر'}</Text>{rs.map(r=><View key={r.id} style={{alignSelf:r.is_admin?'flex-end':'flex-start',width:'94%',backgroundColor:r.is_admin?'#F0FDFA':'#F8FAFC',borderWidth:1,borderColor:r.is_admin?'#99F6E4':'#E2E8F0',borderRadius:12,padding:10,gap:5}}><Text style={{fontSize:10,fontWeight:'900',color:r.is_admin?'#0F766E':'#334155',textAlign:'right'}}>{r.author_name} · {dateText(r.created_at)}</Text><Text style={{fontSize:12,lineHeight:20,color:'#334155',textAlign:'right'}}>{r.message}</Text></View>)}<TextInput value={replyText} onChangeText={setReplyText} placeholder="اكتب رد فريق الدعم..." multiline maxLength={2000} style={[field,{minHeight:75,textAlignVertical:'top'}]}/><Pressable disabled={busy===t.id} onPress={()=>void sendReply(t)} style={action('#0F766E')}>{busy===t.id?<ActivityIndicator color="#fff"/>:<Send size={14} color="#fff"/>}<Text style={{fontSize:11,color:'#fff',fontWeight:'900'}}>إرسال الرد للمستخدم</Text></Pressable></View>}</View>})}
+ <Text style={{fontSize:10,color:'#94A3B8',textAlign:'center'}}>أحدث 500 تذكرة · العمليات محمية بسياسات Supabase</Text></ScrollView>;
 }
