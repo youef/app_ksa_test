@@ -5,8 +5,8 @@ import { AppHeader } from '@/components/shared/AppHeader';
 import { useBottomNavInset } from '@/lib/bottomNav';
 import { C } from '@/lib/ui';
 import { supabase } from '@/lib/supabase';
-import { fetchLiveStreams, type LiveStream } from '@/lib/lives';
-import { ChevronLeft, MapPin, Radio, Users, Video } from 'lucide-react-native';
+import { fetchLiveHostLeaderboard, fetchLiveStreams, type LiveHostLeader, type LiveStream } from '@/lib/lives';
+import { BadgeCheck, ChevronLeft, MapPin, Radio, Trophy, Users, Video } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 type Filter = 'all' | 'following' | 'nearby';
@@ -14,6 +14,8 @@ type Filter = 'all' | 'following' | 'nearby';
 export default function LivesScreen() {
   const bottomNavInset = useBottomNavInset();
   const [streams, setStreams] = useState<LiveStream[]>([]);
+  const [topHosts, setTopHosts] = useState<LiveHostLeader[]>([]);
+  const [leaderboardError, setLeaderboardError] = useState('');
   const [following, setFollowing] = useState<string[]>([]);
   const [city, setCity] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>('all');
@@ -33,6 +35,14 @@ export default function LivesScreen() {
       setStreams(rows);
       setCity(profile.data?.city || null);
       setFollowing((follows.data || []).map((row: any) => row.following_id));
+      try {
+        setTopHosts(await fetchLiveHostLeaderboard());
+        setLeaderboardError('');
+      } catch (leaderError) {
+        setTopHosts([]);
+        setLeaderboardError('قائمة نجوم البث تحتاج إلى تحديث قاعدة البيانات.');
+        console.error('Unable to load live host leaderboard.', leaderError);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'تعذر تحميل البثوث.');
     } finally {
@@ -73,6 +83,26 @@ export default function LivesScreen() {
             <ChevronLeft color="#fff" size={22} />
           </LinearGradient>
         </Pressable>
+
+        {topHosts.length > 0 && (
+          <View style={styles.topHostsSection}>
+            <View style={styles.topHostsHeading}>
+              <Text style={styles.topHostsTitle}>نجوم البث هذا الشهر</Text>
+              <View style={styles.topHostsCaption}><Trophy size={14} color="#b45309" /><Text style={styles.topHostsCaptionText}>الأكثر بثًا خلال 30 يومًا</Text></View>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.topHostsRow}>
+              {topHosts.slice(0, 5).map((host, index) => (
+                <View key={host.host_id} style={styles.topHostCard}>
+                  <View style={styles.topHostRank}><Text style={styles.topHostRankText}>{index + 1}</Text></View>
+                  {host.avatar_url ? <Image source={{ uri: host.avatar_url }} style={styles.topHostAvatar} /> : <View style={styles.topHostAvatarFallback}><Text style={styles.topHostInitial}>{host.display_name.slice(0, 1)}</Text></View>}
+                  <View style={styles.topHostNameRow}><Text numberOfLines={1} style={styles.topHostName}>{host.display_name}</Text>{host.is_verified && <BadgeCheck color="#059669" size={14} />}</View>
+                  <Text style={styles.topHostStats}>{host.stream_count} بث · {host.total_minutes} دقيقة</Text>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+        {leaderboardError !== '' && <Text style={styles.leaderboardError}>{leaderboardError}</Text>}
 
         <View style={styles.filterRow}>
           {([
@@ -126,6 +156,8 @@ function LiveCard({ stream, onPress }: { stream: LiveStream; onPress: () => void
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#f0fdf4' }, content: { padding: 16, paddingTop: 8 },
   createCard: { borderRadius: 24, overflow: 'hidden', marginBottom: 18, elevation: 6, shadowColor: '#059669', shadowOpacity: 0.18, shadowRadius: 18, shadowOffset: { width: 0, height: 8 } }, createGradient: { minHeight: 104, padding: 16, flexDirection: 'row-reverse', alignItems: 'center', gap: 12 }, createIcon: { width: 52, height: 52, borderRadius: 18, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' }, createTitle: { color: '#fff', fontSize: 18, fontWeight: '900' }, createSubtitle: { color: '#d1fae5', fontSize: 12, marginTop: 4, textAlign: 'right' },
+  topHostsSection: { marginBottom: 20, padding: 14, borderRadius: 22, backgroundColor: '#fffbeb', borderWidth: 1, borderColor: '#fde68a' }, topHostsHeading: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }, topHostsTitle: { color: '#78350f', fontSize: 15, fontWeight: '900' }, topHostsCaption: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }, topHostsCaptionText: { color: '#92400e', fontSize: 10, fontWeight: '700' }, topHostsRow: { flexDirection: 'row-reverse', gap: 9 }, topHostCard: { width: 132, minHeight: 130, alignItems: 'center', justifyContent: 'center', padding: 10, borderRadius: 18, backgroundColor: '#fff', borderWidth: 1, borderColor: '#fef3c7' }, topHostRank: { position: 'absolute', top: 8, right: 8, width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fef3c7' }, topHostRankText: { color: '#92400e', fontSize: 11, fontWeight: '900' }, topHostAvatar: { width: 48, height: 48, borderRadius: 24, marginBottom: 7 }, topHostAvatarFallback: { width: 48, height: 48, borderRadius: 24, marginBottom: 7, backgroundColor: '#d1fae5', alignItems: 'center', justifyContent: 'center' }, topHostInitial: { color: '#047857', fontSize: 18, fontWeight: '900' }, topHostNameRow: { maxWidth: '100%', flexDirection: 'row-reverse', alignItems: 'center', gap: 3 }, topHostName: { color: '#0f172a', fontSize: 12, fontWeight: '900', maxWidth: 90 }, topHostStats: { color: '#78716c', fontSize: 10, marginTop: 5 },
+  leaderboardError: { color: '#9a3412', fontSize: 11, textAlign: 'right', marginTop: -12, marginBottom: 16 },
   filterRow: { flexDirection: 'row-reverse', gap: 8, marginBottom: 20 }, filter: { paddingHorizontal: 17, paddingVertical: 9, borderRadius: 30, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0', shadowColor: '#0f172a', shadowOpacity: 0.04, shadowRadius: 6, shadowOffset: { width: 0, height: 3 } }, filterActive: { backgroundColor: '#065f46', borderColor: '#065f46' }, filterText: { fontSize: 13, color: '#64748b', fontWeight: '700' }, filterTextActive: { color: '#fff' },
   sectionRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }, sectionTitle: { color: '#0f172a', fontSize: 19, fontWeight: '900', textAlign: 'right' }, liveCount: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, backgroundColor: '#ecfdf5', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 }, liveCountText: { color: '#047857', fontSize: 12, fontWeight: '700' }, liveDot: { width: 7, height: 7, borderRadius: 5, backgroundColor: '#fb3a4b' },
   grid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 12 }, card: { width: '48%', flexGrow: 1, maxWidth: '49%', backgroundColor: '#fff', borderRadius: 22, overflow: 'hidden', marginBottom: 4, borderWidth: 1, borderColor: '#e2e8f0', shadowColor: '#0f172a', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 3 }, cardCover: { minHeight: 190, padding: 12, justifyContent: 'space-between' }, cardTop: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' }, onAir: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, backgroundColor: '#dc2626', borderRadius: 12, paddingHorizontal: 8, paddingVertical: 4 }, onAirText: { color: '#fff', fontSize: 10, fontWeight: '900' }, category: { color: '#d1fae5', fontSize: 11, fontWeight: '700' }, cardCenter: { alignItems: 'center', gap: 8 }, avatarRing: { width: 70, height: 70, borderRadius: 36, borderWidth: 2, borderColor: '#34d399', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', backgroundColor: '#047857' }, avatar: { width: '100%', height: '100%' }, avatarLetter: { color: '#fff', fontWeight: '900', fontSize: 25 }, streamTitle: { color: '#fff', textAlign: 'center', fontWeight: '900', fontSize: 14, minHeight: 36 }, cardBottom: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' }, viewers: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.24)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 }, viewerText: { color: '#fff', fontSize: 11, fontWeight: '800' }, joinText: { flexDirection: 'row-reverse', alignItems: 'center', gap: 1 }, joinLabel: { color: '#d1fae5', fontSize: 11, fontWeight: '800' },

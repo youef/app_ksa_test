@@ -10,6 +10,7 @@ export type LiveMediaProps = {
   url: string;
   token: string;
   canPublish: boolean;
+  showPublisherControls?: boolean;
   onReady?: () => void;
   onError?: (message: string) => void;
 };
@@ -31,7 +32,7 @@ function RoomControls() {
   </View>;
 }
 
-export default function LiveMedia({ url, token, canPublish, onReady, onError }: LiveMediaProps) {
+export default function LiveMedia({ url, token, canPublish, showPublisherControls = true, onReady, onError }: LiveMediaProps) {
   useEffect(() => {
     void AudioSession.startAudioSession();
     return () => { void AudioSession.stopAudioSession(); };
@@ -51,7 +52,7 @@ export default function LiveMedia({ url, token, canPublish, onReady, onError }: 
         onError={(error) => onError?.(error.message || 'تعذر الاتصال بغرفة البث.')}
       >
         <RoomTracks />
-        {canPublish && <RoomControls />}
+        {canPublish && showPublisherControls && <RoomControls />}
       </LiveKitRoom>
     </View>
   );

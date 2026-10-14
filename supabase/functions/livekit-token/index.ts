@@ -36,6 +36,10 @@ serve(async (req) => {
     const user = userData.user;
     if (userError || !user) return respond({ error: 'انتهت الجلسة. سجّل الدخول مجددًا.' }, 401);
 
+    const { error: expiryError } = await supabase.rpc('expire_stale_live_streams');
+    if (expiryError && expiryError.code !== 'PGRST202') throw expiryError;
+    if (expiryError) console.warn('Live-stream cleanup migration is not applied yet.');
+
     const body = await req.json();
     const streamId = typeof body.stream_id === 'string' ? body.stream_id : '';
     const intent = body.intent;

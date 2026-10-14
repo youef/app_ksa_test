@@ -32,10 +32,41 @@ export type LiveChatMessage = {
   profiles?: { display_name: string | null; username: string | null; avatar_url: string | null } | null;
 };
 
+export type LiveGiftEvent = {
+  id: string;
+  stream_id: string;
+  sender_id: string;
+  emoji: '🎁' | '💎' | '🌟' | '🔥';
+  created_at: string;
+  profiles?: { display_name: string | null; username: string | null; avatar_url: string | null; is_verified: boolean | null } | null;
+};
+
+export type LiveHostLeader = {
+  host_id: string;
+  display_name: string;
+  avatar_url: string | null;
+  is_verified: boolean;
+  stream_count: number;
+  total_minutes: number;
+  peak_viewers: number;
+};
+
+export type LiveSupporter = {
+  user_id: string;
+  display_name: string;
+  avatar_url: string | null;
+  is_verified: boolean;
+  gifts_count: number;
+};
+
 const STREAM_FIELDS = `id,host_id,title,category,audience,room_name,status,viewer_count,peak_viewer_count,started_at,updated_at,
   profiles!live_streams_host_id_fkey(id,display_name,username,avatar_url,is_verified,city,district)`;
 
 export async function fetchLiveStreams() {
+  const { error: expiryError } = await supabase.rpc('expire_stale_live_streams');
+  if (expiryError?.code === 'PGRST202') {
+    console.warn('Live-stream cleanup is not active until the lifecycle migration is applied.');
+  } else if (expiryError) throw expiryError;
   const { data, error } = await supabase
     .from('live_streams')
     .select(STREAM_FIELDS)
@@ -56,6 +87,26 @@ export async function fetchLiveStreams() {
   return streams.map((stream) => ({ ...stream, viewer_count: (counts.get(stream.id) || 0) + 1 }));
 }
 
+export async function fetchLiveHostLeaderboard() {
+  const { data, error } = await supabase.rpc('get_live_host_leaderboard');
+  if (error) throw error;
+  return ((data || []) as LiveHostLeader[]).map((host) => ({
+    ...host,
+    stream_count: Number(host.stream_count),
+    total_minutes: Number(host.total_minutes),
+    peak_viewers: Number(host.peak_viewers),
+  }));
+}
+
+export async function fetchLiveSupporters(streamId: string) {
+  const { data, error } = await supabase.rpc('get_live_supporters', { p_stream_id: streamId });
+  if (error) throw error;
+  return ((data || []) as LiveSupporter[]).map((supporter) => ({
+    ...supporter,
+    gifts_count: Number(supporter.gifts_count),
+  }));
+}
+
 export async function createLiveStream(input: { title: string; category: string; audience: LiveStream['audience'] }) {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) throw new Error('سجّل الدخول قبل بدء البث.');
@@ -69,10 +120,16 @@ export async function createLiveStream(input: { title: string; category: string;
 }
 
 export async function endLiveStream(streamId: string) {
-  const { error } = await supabase.from('live_streams')
+  const { data, error } = await supabase.from('live_streams')
     .update({ status: 'ended', ended_at: new Date().toISOString() })
-    .eq('id', streamId).eq('status', 'live');
+    .eq('id', streamId).eq('status', 'live').select('id').maybeSingle();
   if (error) throw error;
+  if (data) return;
+  const { data: existing, error: lookupError } = await supabase.from('live_streams')
+    .select('status').eq('id', streamId).maybeSingle();
+  if (lookupError) throw lookupError;
+  if (existing?.status === 'ended') return;
+  throw new Error('تعذر العثور على بث نشط تملكه لإنهائه.');
 }
 
 export async function getLiveToken(streamId: string, intent: 'host' | 'viewer' | 'guest') {
@@ -122,4 +179,3 @@ export async function addLiveBlock(streamId: string, hostId: string, blockedUser
   }, { onConflict: 'stream_id,blocked_user_id' });
   if (blockError) throw blockError;
 }
-

@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, Share, StatusBar, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, AppState, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Share, StatusBar, StyleSheet, Text, TextInput, View, type StyleProp, type ViewStyle } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
-import { addLiveBlock, endLiveStream, getLiveToken, reportLiveStream, requestLiveGuest, sendLiveMessage, type LiveChatMessage, type LiveStream } from '@/lib/lives';
+import { addLiveBlock, endLiveStream, fetchLiveSupporters, getLiveToken, reportLiveStream, requestLiveGuest, sendLiveMessage, type LiveChatMessage, type LiveStream } from '@/lib/lives';
 import LiveMedia from '@/components/lives/LiveMedia';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Check, Eye, EyeOff, Gift, Heart, MessageCircle, Mic, MoreHorizontal, Radio, Send, Share2, ShieldAlert, UserPlus, Users, X } from 'lucide-react-native';
+import { BadgeCheck, Check, Eye, EyeOff, Gift, Heart, MessageCircle, Mic, MoreHorizontal, Radio, Send, Share2, ShieldAlert, Trophy, UserPlus, Users, X } from 'lucide-react-native';
 
 type Role = 'host' | 'viewer' | 'guest';
 type GuestRequest = { id: string; guest_id: string; stream_id: string; status: string; profiles?: { display_name: string | null; username: string | null; avatar_url: string | null } | null };
+type AudienceMember = { id: string; display_name: string | null; username: string | null; avatar_url: string | null; is_verified: boolean | null };
+type Supporter = { user: AudienceMember; gifts: number };
 
 export default function LiveRoomScreen() {
   const { id, role: roleParam } = useLocalSearchParams<{ id: string; role?: string }>();
@@ -35,8 +37,17 @@ export default function LiveRoomScreen() {
   const [showChat, setShowChat] = useState(true);
   const [showControls, setShowControls] = useState(true);
   const [giftBursts, setGiftBursts] = useState<{ id: string; emoji: string; x: number; y: number }[]>([]);
+  const [audienceMembers, setAudienceMembers] = useState<AudienceMember[]>([]);
+  const [topSupporters, setTopSupporters] = useState<Supporter[]>([]);
+  const [supporterError, setSupporterError] = useState('');
+  const [peoplePanel, setPeoplePanel] = useState<'viewers' | 'supporters' | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   const heartChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const connectedRef = useRef(false);
+  const hostPulseAtRef = useRef(Date.now());
+  const staleSweepAtRef = useRef(0);
+  const roleRef = useRef(role);
+  roleRef.current = role;
   const mediaRole = role === 'host' || role === 'guest';
 
   const loadRoom = useCallback(async () => {
@@ -52,6 +63,7 @@ export default function LiveRoomScreen() {
       if (!live) throw new Error('تعذر العثور على هذا البث.');
       const typed = live as unknown as LiveStream;
       setStream(typed);
+      hostPulseAtRef.current = new Date(typed.updated_at || typed.started_at).getTime();
       if (typed.status !== 'live') throw new Error('انتهى هذا البث.');
       if (typed.host_id !== auth.user.id && Date.now() - new Date(typed.updated_at || typed.started_at).getTime() > 90_000) {
         throw new Error('انقطع اتصال المضيف وانتهى البث.');
@@ -72,7 +84,11 @@ export default function LiveRoomScreen() {
       setError(message);
       if (roleParam === 'host' && id) {
         // A stream row is created before requesting a media token. Close it if the host cannot enter.
-        await endLiveStream(id).catch(() => {});
+        try {
+          await endLiveStream(id);
+        } catch (cleanupError) {
+          console.error('Unable to close the host stream after room setup failed.', cleanupError);
+        }
       }
     } finally {
       setLoading(false);
@@ -82,12 +98,77 @@ export default function LiveRoomScreen() {
   async function loadMessages(streamId: string) {
     const { data, error: chatError } = await supabase.from('live_chat_messages')
       .select('id,stream_id,sender_id,body,created_at,profiles!live_chat_messages_sender_id_fkey(display_name,username,avatar_url)')
-      .eq('stream_id', streamId).eq('is_hidden', false).order('created_at', { ascending: false }).limit(35);
+      .eq('stream_id', streamId).eq('is_hidden', false)
+      .order('created_at', { ascending: false }).limit(10);
     if (chatError) throw chatError;
     setMessages(((data || []).reverse()) as unknown as LiveChatMessage[]);
   }
 
+  async function loadAudience(streamId: string) {
+    const { data, error: audienceError } = await supabase.from('live_viewer_sessions')
+      .select('viewer_id,profiles!live_viewer_sessions_viewer_id_fkey(id,display_name,username,avatar_url,is_verified)')
+      .eq('stream_id', streamId)
+      .gt('last_seen_at', new Date(Date.now() - 45_000).toISOString())
+      .order('last_seen_at', { ascending: false })
+      .limit(50);
+    if (audienceError) throw audienceError;
+    setAudienceMembers((data || []).map((row: any) => row.profiles).filter(Boolean) as AudienceMember[]);
+  }
+
+  async function loadSupporters(streamId: string) {
+    try {
+      const rows = await fetchLiveSupporters(streamId);
+      setTopSupporters(rows.map((item) => ({
+        user: { id: item.user_id, display_name: item.display_name, username: null, avatar_url: item.avatar_url, is_verified: item.is_verified },
+        gifts: item.gifts_count,
+      })));
+      setSupporterError('');
+    } catch (cause) {
+      setSupporterError('قائمة الداعمين تحتاج إلى تحديث قاعدة البيانات.');
+      throw cause;
+    }
+  }
+
   useEffect(() => { void loadRoom(); }, [loadRoom]);
+
+  useEffect(() => {
+    if (!id) return;
+    let previousState = AppState.currentState;
+    const closeHostStream = () => {
+      if (roleRef.current !== 'host' || !connectedRef.current) return;
+      void endLiveStream(id).catch((cause) => {
+        console.error('Unable to end host stream after leaving the room.', cause);
+      });
+    };
+    const appStateSubscription = AppState.addEventListener('change', (nextState) => {
+      if (roleRef.current === 'host' && previousState === 'active' && nextState !== 'active') {
+        void endLiveStream(id).then(() => setError('انتهى البث عند مغادرة التطبيق.')).catch((cause) => {
+          console.error('Unable to end host stream after app backgrounding.', cause);
+        });
+      }
+      previousState = nextState;
+    });
+    const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') closeHostStream();
+    });
+    const onPageHide = () => closeHostStream();
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') closeHostStream();
+    };
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      window.addEventListener('pagehide', onPageHide);
+      document.addEventListener('visibilitychange', onVisibilityChange);
+    }
+    return () => {
+      appStateSubscription.remove();
+      authListener.subscription.unsubscribe();
+      if (Platform.OS === 'web' && typeof document !== 'undefined') {
+        window.removeEventListener('pagehide', onPageHide);
+        document.removeEventListener('visibilitychange', onVisibilityChange);
+      }
+      closeHostStream();
+    };
+  }, [id]);
 
   useEffect(() => {
     if (!id || loading || error) return;
@@ -96,7 +177,9 @@ export default function LiveRoomScreen() {
       .subscribe();
     const streamChannel = supabase.channel(`live-state:${id}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'live_streams', filter: `id=eq.${id}` }, (payload) => {
-        if ((payload.new as any)?.status === 'ended') setError('أنهى المضيف هذا البث.');
+        const next = payload.new as { status?: string; updated_at?: string };
+        if (next.status === 'ended') setError('أنهى المضيف هذا البث.');
+        if (next.updated_at) hostPulseAtRef.current = new Date(next.updated_at).getTime();
       })
       .subscribe();
 
@@ -105,6 +188,11 @@ export default function LiveRoomScreen() {
         const { count } = await supabase.from('live_viewer_sessions').select('viewer_id', { count: 'exact', head: true })
           .eq('stream_id', id).gt('last_seen_at', new Date(Date.now() - 45_000).toISOString());
         setViewerCount((count || 0) + (role === 'host' ? 1 : 0));
+        if (role !== 'host' && Date.now() - hostPulseAtRef.current > 75_000 && Date.now() - staleSweepAtRef.current > 30_000) {
+          staleSweepAtRef.current = Date.now();
+          const { error: sweepError } = await supabase.rpc('expire_stale_live_streams');
+          if (sweepError && sweepError.code !== 'PGRST202') console.error('Unable to expire the disconnected host stream.', sweepError);
+        }
         if (role === 'host') {
           const { data } = await supabase.from('live_guest_requests')
             .select('id,guest_id,stream_id,status,profiles!live_guest_requests_guest_id_fkey(display_name,username,avatar_url)')
@@ -124,11 +212,17 @@ export default function LiveRoomScreen() {
       })();
     }, 2500);
 
-    const presenceChannel = supabase.channel(`live-hearts:${id}`)
+    const presenceChannel = supabase.channel(`live-hearts:${id}`, { config: { broadcast: { self: false } } })
       .on('broadcast', { event: 'heart' }, ({ payload }) => {
         const entry = { id: `${Date.now()}-${Math.random()}`, emoji: typeof payload?.emoji === 'string' ? payload.emoji : '💚' };
         setHearts((items) => [...items.slice(-5), entry]);
         setTimeout(() => setHearts((items) => items.filter((heart) => heart.id !== entry.id)), 2400);
+      })
+      .on('broadcast', { event: 'gift' }, ({ payload }) => {
+        const emoji = typeof payload?.emoji === 'string' ? payload.emoji : '🎁';
+        const entry = { id: `${Date.now()}-${Math.random()}`, emoji };
+        setHearts((items) => [...items.slice(-5), entry]);
+        triggerGiftBurst(emoji);
       })
       .subscribe();
     heartChannelRef.current = presenceChannel;
@@ -144,12 +238,18 @@ export default function LiveRoomScreen() {
     };
     void heartbeat();
     const heartbeatTimer = setInterval(() => { void heartbeat(); }, 20_000);
+    const audienceTimer = setInterval(() => {
+      void loadAudience(id).catch((cause) => console.error('Unable to refresh live audience.', cause));
+      void loadSupporters(id).catch((cause) => console.error('Unable to refresh live supporters.', cause));
+    }, 8_000);
+    void loadAudience(id).catch((cause) => console.error('Unable to load live audience.', cause));
+    void loadSupporters(id).catch((cause) => console.error('Unable to load live supporters.', cause));
     const elapsedTimer = setInterval(() => {
       if (stream?.started_at) setElapsed(Math.max(0, Math.floor((Date.now() - new Date(stream.started_at).getTime()) / 1000)));
     }, 1000);
 
     return () => {
-      clearInterval(poll); clearInterval(heartbeatTimer); clearInterval(elapsedTimer);
+      clearInterval(poll); clearInterval(heartbeatTimer); clearInterval(audienceTimer); clearInterval(elapsedTimer);
       heartChannelRef.current = null;
       void supabase.from('live_viewer_sessions').delete().eq('stream_id', id).eq('viewer_id', currentUser);
       void supabase.removeChannel(chatChannel); void supabase.removeChannel(streamChannel); void supabase.removeChannel(presenceChannel);
@@ -230,9 +330,22 @@ export default function LiveRoomScreen() {
 
   async function sendGift() {
     const emoji = ['🎁', '💎', '🌟', '🔥'][Math.floor(Math.random() * 4)];
-    setHearts((items) => [...items.slice(-5), { id: `${Date.now()}-${Math.random()}`, emoji }]);
-    triggerGiftBurst(emoji);
-    await heartChannelRef.current?.send({ type: 'broadcast', event: 'heart', payload: { emoji } });
+    if (!id || !currentUser) return;
+    try {
+      const { error: giftError } = await supabase.from('live_gift_events').insert({
+        stream_id: id,
+        sender_id: currentUser,
+        emoji,
+      });
+      if (giftError) throw giftError;
+      const entry = { id: `${Date.now()}-${Math.random()}`, emoji };
+      setHearts((items) => [...items.slice(-5), entry]);
+      triggerGiftBurst(emoji);
+      await heartChannelRef.current?.send({ type: 'broadcast', event: 'gift', payload: { emoji } });
+      await loadSupporters(id);
+    } catch (cause) {
+      Alert.alert('تعذر إرسال الهدية', cause instanceof Error ? cause.message : 'حاول مرة أخرى.');
+    }
   }
 
   function toggleOverlayMode() {
@@ -299,17 +412,22 @@ export default function LiveRoomScreen() {
     <View style={styles.screen}>
       <StatusBar hidden />
       <View style={styles.stage}>
-        <LiveMedia url={roomUrl} token={token} canPublish={mediaRole} onReady={() => setConnected(true)} onError={(message) => {
+        <LiveMedia url={roomUrl} token={token} canPublish={mediaRole} showPublisherControls={showControls} onReady={() => { connectedRef.current = true; setConnected(true); }} onError={(message) => {
+          connectedRef.current = false;
           setConnected(false);
-          if (role === 'host' && id) void endLiveStream(id).finally(() => setError(message));
-          else setError(message);
+          if (role === 'host' && id) {
+            void endLiveStream(id).then(() => setError(message)).catch((endError) => {
+              console.error('Unable to close the host stream after media failure.', endError);
+              setError(`${message} تعذر إنهاء البث تلقائيًا؛ استخدم زر الإنهاء.`);
+            });
+          } else setError(message);
         }} />
 
         {showTopBar && (
           <View pointerEvents="box-none" style={[styles.topOverlay, { top: Math.max(insets.top, 12) }]}>
             <Pressable accessibilityLabel="إغلاق البث" onPress={() => void handleBack()} style={styles.roundButton}><X color="#fff" size={21} /></Pressable>
             <View style={styles.livePill}><View style={styles.redDot} /><Text style={styles.liveText}>مباشر</Text></View>
-            <View style={styles.viewerPill}><Users color="#fff" size={14} /><Text style={styles.viewerCount}>{viewerCount}</Text></View>
+            <Pressable onPress={() => setPeoplePanel('viewers')} style={styles.viewerPill}><Users color="#fff" size={14} /><Text style={styles.viewerCount}>{viewerCount}</Text></Pressable>
           </View>
         )}
 
@@ -323,12 +441,16 @@ export default function LiveRoomScreen() {
             {role === 'host' ? <Pressable onPress={confirmEnd} style={styles.endButton}><Text style={styles.endText}>إنهاء</Text></Pressable> : <Pressable onPress={showReport} style={styles.roundButton}><MoreHorizontal color="#fff" size={20} /></Pressable>}
           </View>
         )}
+        {showInfoPanel && topSupporters.length > 0 && (
+          <Pressable onPress={() => setPeoplePanel('supporters')} style={[styles.supportersPill, { top: Math.max(insets.top, 12) + 104 }]}>
+            <Trophy size={14} color="#fde68a" />
+            <Text numberOfLines={1} style={styles.supportersPillText}>الأكثر دعمًا: {topSupporters[0].user.display_name || topSupporters[0].user.username}</Text>
+          </Pressable>
+        )}
 
-        <View pointerEvents="none" style={styles.heartsFloat}>{hearts.slice(-4).map((heart, index) => <Text key={heart.id} style={[styles.floatingHeart, { bottom: 35 + index * 36, opacity: 0.55 + (index * 0.1) }]}>{heart.emoji}</Text>)}</View>
+        <View pointerEvents="none" style={styles.heartsFloat}>{hearts.slice(-4).map((heart, index) => <FloatingEffect key={heart.id} emoji={heart.emoji} duration={2300} style={[styles.floatingHeart, { bottom: 35 + index * 36 }]} />)}</View>
         {giftBursts.map((item) => (
-          <View key={item.id} pointerEvents="none" style={[styles.giftBurst, { left: item.x, bottom: 165 + item.y }]}>
-            <Text style={styles.giftBurstText}>{item.emoji}</Text>
-          </View>
+          <FloatingEffect key={item.id} emoji={item.emoji} style={[styles.giftBurst, { left: item.x, bottom: 165 + item.y }]} />
         ))}
 
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0} style={styles.bottomOverlay}>
@@ -341,7 +463,7 @@ export default function LiveRoomScreen() {
           {showChat && (
             <View style={styles.chatPanel}>
               <ScrollView ref={scrollRef} style={styles.messageList} contentContainerStyle={{ justifyContent: 'flex-end', paddingVertical: 5 }} showsVerticalScrollIndicator={false} onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}>
-                {messages.slice(-18).map((message) => <Pressable key={message.id} onLongPress={() => moderateMessage(message)} style={styles.messageRow}><Text style={styles.messageBody}><Text style={styles.messageName}>{message.profiles?.display_name || message.profiles?.username || 'جارٍ'} </Text>{message.body}</Text></Pressable>)}
+                {messages.slice(-10).map((message) => <Pressable key={message.id} onLongPress={() => moderateMessage(message)} style={styles.messageRow}><Text style={styles.messageBody}><Text style={styles.messageName}>{message.profiles?.display_name || message.profiles?.username || 'جارٍ'} </Text>{message.body}</Text></Pressable>)}
                 {messages.length === 0 && <Text style={styles.firstMessage}>كن أول من يحيّي {hostName} 👋</Text>}
               </ScrollView>
             </View>
@@ -351,7 +473,7 @@ export default function LiveRoomScreen() {
             <>
               <View style={[styles.actionRow, { paddingBottom: Math.max(insets.bottom, 10) }]}>
                 <Pressable onPress={() => void sendHeart()} style={styles.actionButton}><Heart size={22} color="#fff" fill="#fb7185" /><Text style={styles.actionLabel}>تفاعل</Text></Pressable>
-                <Pressable onPress={() => void sendGift()} style={styles.actionButton}><Gift size={21} color="#fff" /><Text style={styles.actionLabel}>هدية</Text></Pressable>
+                <Pressable onPress={() => void sendGift()} style={styles.actionButton}><Gift size={21} color="#fde68a" /><Text style={styles.actionLabel}>هدية مجانية</Text></Pressable>
                 <Pressable onPress={() => setShowChat((value) => !value)} style={styles.actionButton}><MessageCircle size={20} color="#fff" /><Text style={styles.actionLabel}>{showChat ? 'إخفاء' : 'التعليقات'}</Text></Pressable>
                 <Pressable onPress={toggleOverlayMode} style={styles.actionButton}><EyeOff size={20} color="#fff" /><Text style={styles.actionLabel}>وضع</Text></Pressable>
                 {role === 'host' ? (
@@ -377,8 +499,61 @@ export default function LiveRoomScreen() {
           )}
         </KeyboardAvoidingView>
         {!connected && <View pointerEvents="none" style={styles.connectingPill}><ActivityIndicator color="#fff" size="small" /><Text style={styles.connectingText}>جارٍ الاتصال…</Text></View>}
+        <Modal visible={peoplePanel !== null} transparent animationType="fade" onRequestClose={() => setPeoplePanel(null)}>
+          <Pressable style={styles.modalBackdrop} onPress={() => setPeoplePanel(null)}>
+            <Pressable style={styles.peopleSheet} onPress={(event) => event.stopPropagation()}>
+              <View style={styles.peopleSheetHeader}>
+                <Text style={styles.peopleSheetTitle}>{peoplePanel === 'supporters' ? 'أكثر الداعمين' : `المشاهدون (${viewerCount})`}</Text>
+                <Pressable onPress={() => setPeoplePanel(null)} style={styles.modalClose}><X color="#fff" size={19} /></Pressable>
+              </View>
+              <View style={styles.peopleTabs}>
+                <Pressable onPress={() => setPeoplePanel('viewers')} style={[styles.peopleTab, peoplePanel === 'viewers' && styles.peopleTabActive]}><Text style={styles.peopleTabText}>المشاهدون</Text></Pressable>
+                <Pressable onPress={() => setPeoplePanel('supporters')} style={[styles.peopleTab, peoplePanel === 'supporters' && styles.peopleTabActive]}><Text style={styles.peopleTabText}>الداعمون</Text></Pressable>
+              </View>
+              <ScrollView style={styles.peopleList}>
+                {peoplePanel === 'supporters' ? topSupporters.map((supporter, index) => (
+                  <View key={supporter.user.id} style={styles.peopleRow}>
+                    <Text style={styles.peopleRank}>{index + 1}</Text>
+                    {supporter.user.avatar_url ? <Image source={{ uri: supporter.user.avatar_url }} style={styles.peopleAvatar} /> : <View style={styles.peopleAvatarFallback}><Text style={styles.peopleInitial}>{(supporter.user.display_name || supporter.user.username || 'ح').slice(0, 1)}</Text></View>}
+                    <Text numberOfLines={1} style={styles.peopleName}>{supporter.user.display_name || supporter.user.username || 'جارٍ'}{supporter.user.is_verified ? '  ✓' : ''}</Text>
+                    <Text style={styles.giftCount}>🎁 {supporter.gifts}</Text>
+                  </View>
+                )) : audienceMembers.map((member) => (
+                  <View key={member.id} style={styles.peopleRow}>
+                    {member.avatar_url ? <Image source={{ uri: member.avatar_url }} style={styles.peopleAvatar} /> : <View style={styles.peopleAvatarFallback}><Text style={styles.peopleInitial}>{(member.display_name || member.username || 'ح').slice(0, 1)}</Text></View>}
+                    <Text numberOfLines={1} style={styles.peopleName}>{member.display_name || member.username || 'جارٍ'}</Text>
+                    {member.is_verified && <BadgeCheck color="#34d399" size={17} />}
+                  </View>
+                ))}
+                {peoplePanel === 'supporters' && supporterError !== '' && <Text style={styles.peopleEmpty}>{supporterError}</Text>}
+                {peoplePanel === 'supporters' && supporterError === '' && topSupporters.length === 0 && <Text style={styles.peopleEmpty}>كن أول من يرسل هدية مجانية للمضيف.</Text>}
+                {peoplePanel === 'viewers' && audienceMembers.length === 0 && <Text style={styles.peopleEmpty}>أنت أول المشاهدين، حيّاك الله.</Text>}
+              </ScrollView>
+            </Pressable>
+          </Pressable>
+        </Modal>
       </View>
     </View>
+  );
+}
+
+function FloatingEffect({ emoji, style, duration = 1700 }: { emoji: string; style: StyleProp<ViewStyle>; duration?: number }) {
+  const progress = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const animation = Animated.timing(progress, { toValue: 1, duration, useNativeDriver: false });
+    animation.start();
+    return () => animation.stop();
+  }, [duration, progress]);
+  return (
+    <Animated.View pointerEvents="none" style={[style, {
+      opacity: progress.interpolate({ inputRange: [0, 0.2, 1], outputRange: [0, 1, 0] }),
+      transform: [
+        { translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [12, -90] }) },
+        { scale: progress.interpolate({ inputRange: [0, 0.25, 1], outputRange: [0.6, 1.15, 0.85] }) },
+      ],
+    }]}>
+      <Text style={styles.giftBurstText}>{emoji}</Text>
+    </Animated.View>
   );
 }
 
@@ -397,8 +572,10 @@ const styles = StyleSheet.create({
   hostName: { color: '#fff', fontSize: 12, fontWeight: '900' }, hostTitle: { color: '#e2e8f0', fontSize: 10, marginTop: 2 },
   followButton: { backgroundColor: '#059669', borderRadius: 16, paddingHorizontal: 9, paddingVertical: 6 }, followText: { color: '#fff', fontSize: 10, fontWeight: '900' },
   endButton: { backgroundColor: '#dc2626', borderRadius: 20, paddingHorizontal: 15, paddingVertical: 8 }, endText: { color: '#fff', fontSize: 12, fontWeight: '900' },
+  supportersPill: { position: 'absolute', right: 14, zIndex: 10, maxWidth: '76%', flexDirection: 'row-reverse', alignItems: 'center', gap: 6, paddingHorizontal: 11, paddingVertical: 8, borderRadius: 18, backgroundColor: 'rgba(2,6,23,0.55)', borderWidth: 1, borderColor: 'rgba(253,230,138,0.28)' },
+  supportersPillText: { color: '#fff', fontSize: 11, fontWeight: '800' },
   heartsFloat: { position: 'absolute', right: 18, bottom: 150, width: 52, height: 200, zIndex: 3 },
-  floatingHeart: { position: 'absolute', right: 6, fontSize: 25 },
+  floatingHeart: { position: 'absolute', right: 6 },
   giftBurst: { position: 'absolute', width: 26, height: 26, alignItems: 'center', justifyContent: 'center', zIndex: 4 },
   giftBurstText: { fontSize: 22 },
   bottomOverlay: { position: 'absolute', left: 12, right: 12, bottom: 0, zIndex: 10 },
@@ -420,6 +597,24 @@ const styles = StyleSheet.create({
   durationText: { color: '#fff', fontSize: 11, fontWeight: '700' },
   quickReveal: { alignSelf: 'center', flexDirection: 'row-reverse', alignItems: 'center', gap: 8, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 18, backgroundColor: 'rgba(2,6,23,0.58)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', marginBottom: 18 },
   quickRevealText: { color: '#fff', fontWeight: '800', fontSize: 12 },
+  modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)' },
+  peopleSheet: { maxHeight: '72%', backgroundColor: '#0f172a', borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingHorizontal: 18, paddingTop: 16, paddingBottom: 28, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
+  peopleSheetHeader: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
+  peopleSheetTitle: { color: '#fff', fontSize: 17, fontWeight: '900' },
+  modalClose: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.1)' },
+  peopleTabs: { flexDirection: 'row-reverse', gap: 8, marginBottom: 12 },
+  peopleTab: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.08)' },
+  peopleTabActive: { backgroundColor: '#047857' },
+  peopleTabText: { color: '#fff', fontSize: 12, fontWeight: '800' },
+  peopleList: { minHeight: 90 },
+  peopleRow: { minHeight: 52, flexDirection: 'row-reverse', alignItems: 'center', gap: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)' },
+  peopleRank: { color: '#fcd34d', width: 18, textAlign: 'center', fontWeight: '900' },
+  peopleAvatar: { width: 34, height: 34, borderRadius: 17 },
+  peopleAvatarFallback: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#064e3b', alignItems: 'center', justifyContent: 'center' },
+  peopleInitial: { color: '#a7f3d0', fontWeight: '900' },
+  peopleName: { flex: 1, color: '#fff', textAlign: 'right', fontSize: 13, fontWeight: '700' },
+  giftCount: { color: '#fde68a', fontSize: 11, fontWeight: '900' },
+  peopleEmpty: { color: '#cbd5e1', textAlign: 'center', paddingVertical: 24, fontSize: 12 },
   inputBar: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 9, borderRadius: 24, backgroundColor: 'rgba(2,6,23,0.56)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
   sendButton: { width: 30, height: 30, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: '#059669' },
   chatInput: { flex: 1, minHeight: 40, color: '#fff', textAlign: 'right', fontSize: 13 },
