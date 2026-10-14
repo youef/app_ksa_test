@@ -28,5 +28,8 @@ drop policy if exists support_replies_delete_admin on public.support_ticket_repl
 create policy support_replies_delete_admin on public.support_ticket_replies for delete to authenticated using(exists(select 1 from public.profiles p where p.id=(select auth.uid()) and p.role='admin'));
 drop policy if exists tickets_admin_delete on public.support_tickets;
 create policy tickets_admin_delete on public.support_tickets for delete to authenticated using(exists(select 1 from public.profiles p where p.id=(select auth.uid()) and p.role='admin'));
+drop policy if exists tickets_create_all on public.support_tickets;
 drop policy if exists tickets_admin_insert_authenticated on public.support_tickets;
-create policy tickets_admin_insert_authenticated on public.support_tickets for insert to authenticated with check(user_id=(select auth.uid()) or exists(select 1 from public.profiles p where p.id=(select auth.uid()) and p.role='admin'));
+drop policy if exists tickets_create_guest on public.support_tickets;
+create policy tickets_create_guest on public.support_tickets for insert to anon with check(user_id is null);
+create policy tickets_create_authenticated on public.support_tickets for insert to authenticated with check(user_id=(select auth.uid()) or exists(select 1 from public.profiles p where p.id=(select auth.uid()) and p.role='admin'));
