@@ -15,7 +15,7 @@ import { PlatformConfigProvider, usePlatformConfig } from '@/lib/platformConfig'
 const ACCOUNT_ONLY_ROUTES = [
   '/profile', '/settings', '/market', '/messages', '/conversation', '/search',
   '/ask', '/create-story', '/story', '/notifications', '/new-request',
-  '/new-service', '/service', '/business', '/directory', '/user', '/report', '/admin',
+  '/new-service', '/service', '/business', '/directory', '/user', '/report', '/admin', '/support',
   '/live',
 ];
 
