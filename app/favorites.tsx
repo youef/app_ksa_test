@@ -29,7 +29,7 @@ export default function FavoritesScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
-      <AppHeader variant="sub" title="المفضلة" subtitle="الم items you liked" fallbackRoute="/more" />
+      <AppHeader variant="sub" title="المفضلة" subtitle="عناصرك المحفوظة" fallbackRoute="/more" />
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: bottomNavInset + 24 }}>
         {loading ? <ActivityIndicator /> : items.length ? items.map((it) => (
           <View key={it.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#fff', padding: 12, borderRadius: 14, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 8 }}>

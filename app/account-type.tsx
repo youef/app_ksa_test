@@ -55,8 +55,8 @@ export default function AccountTypeScreen() {
               <Text style={{ flex: 1, textAlign: 'right', fontWeight: '800', color: '#0f172a' }}>{t.label}</Text>
             </Pressable>
           ))}
-          <TextInput value={trade} onChangeText={setTrade} placeholder="trait/service" placeholderTextColor="#94a3b8" style={{ borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingVertical: 10, paddingHorizontal: 12, textAlign: 'right' }} />
-          <TextInput value={certUrl} onChangeText={setCertUrl} placeholder="certificate URL" placeholderTextColor="#94a3b8" style={{ borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingVertical: 10, paddingHorizontal: 12, textAlign: 'right' }} />
+          <TextInput value={trade} onChangeText={setTrade} placeholder="النوع أو الخدمة" placeholderTextColor="#94a3b8" style={{ borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingVertical: 10, paddingHorizontal: 12, textAlign: 'right' }} />
+          <TextInput value={certUrl} onChangeText={setCertUrl} placeholder="رابط الشهادة" placeholderTextColor="#94a3b8" style={{ borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingVertical: 10, paddingHorizontal: 12, textAlign: 'right' }} />
           <Pressable style={{ backgroundColor: '#059669', borderRadius: 12, paddingVertical: 13, alignItems: 'center' }} onPress={submit} disabled={saving}>
             {saving ? <ActivityIndicator color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '900', fontSize: 13 }}>حفظ</Text>}
           </Pressable>

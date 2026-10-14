@@ -25,7 +25,7 @@ export default function RateAppScreen() {
 
   return (
     <View style={styles.screen}>
-      <AppHeader variant="sub" title="قيّم تجربتك" subtitle="rating" fallbackRoute="/more" />
+      <AppHeader variant="sub" title="قيّم تجربتك" subtitle="رأيك هام" fallbackRoute="/more" />
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.card}>
           <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 6 }}>
