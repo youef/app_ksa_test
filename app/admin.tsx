@@ -1460,63 +1460,96 @@ export default function AdminScreen() {
         ) : null}
       </LinearGradient>
 
-      {/* ======================================================== */}
-      {/* 2. GROUPED TWO-LEVEL NAVIGATION                          */}
-      {/* ======================================================== */}
-      <View style={styles.navShell}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.navGroupScroll}>
-          {ADMIN_NAV.map((group) => {
-            const isActiveGroup = group.key === activeGroup.key;
-            const groupCount = group.tabs.reduce((sum, t) => sum + tabBadge(t.key), 0);
-            return (
-              <Pressable
-                key={group.key}
-                style={[styles.navGroupChip, isActiveGroup && styles.navGroupChipActive]}
-                onPress={() => setActiveTab(group.tabs[0].key)}
-              >
-                <Text style={styles.navGroupEmoji}>{group.emoji}</Text>
-                <Text style={[styles.navGroupText, isActiveGroup && styles.navGroupTextActive]}>{group.label}</Text>
-                {groupCount > 0 ? (
-                  <View style={styles.navGroupCount}>
-                    <Text style={styles.navGroupCountText}>{groupCount}</Text>
-                  </View>
-                ) : null}
-              </Pressable>
-            );
-          })}
-        </ScrollView>
+      {/* Responsive command-center workspace: full navigation rail on desktop, compact tabs on mobile. */}
+      <View style={[styles.desktopLayout, isMobile && { flexDirection: 'column' }]}>
+        {isMobile ? (
+          <View style={styles.navShell}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.navGroupScroll}>
+              {ADMIN_NAV.map((group) => {
+                const isActiveGroup = group.key === activeGroup.key;
+                const groupCount = group.tabs.reduce((sum, t) => sum + tabBadge(t.key), 0);
+                return (
+                  <Pressable
+                    key={group.key}
+                    style={[styles.navGroupChip, isActiveGroup && styles.navGroupChipActive]}
+                    onPress={() => setActiveTab(group.tabs[0].key)}
+                  >
+                    <Text style={styles.navGroupEmoji}>{group.emoji}</Text>
+                    <Text style={[styles.navGroupText, isActiveGroup && styles.navGroupTextActive]}>{group.label}</Text>
+                    {groupCount > 0 ? (
+                      <View style={styles.navGroupCount}>
+                        <Text style={styles.navGroupCountText}>{groupCount}</Text>
+                      </View>
+                    ) : null}
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.navTabScrollV2}>
+              {activeGroup.tabs.map((tab) => {
+                const isActive = tab.key === activeTab;
+                const count = tabBadge(tab.key);
+                return (
+                  <Pressable
+                    key={tab.key}
+                    style={[styles.navTabV2, isActive && styles.navTabV2Active]}
+                    onPress={() => setActiveTab(tab.key)}
+                  >
+                    {tab.icon(isActive)}
+                    <Text style={[styles.navTabV2Text, isActive && styles.navTabV2TextActive]}>{tab.label}</Text>
+                    {count > 0 ? (
+                      <View style={styles.navTabV2Badge}>
+                        <Text style={styles.navTabV2BadgeText}>{count}</Text>
+                      </View>
+                    ) : null}
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+        ) : (
+          <ScrollView style={styles.desktopSidebar} showsVerticalScrollIndicator={false}>
+            <View style={styles.desktopSidebarIntro}>
+              <Text style={styles.desktopSidebarEyebrow}>HAYNA · ADMIN</Text>
+              <Text style={styles.desktopSidebarTitle}>مساحة الإدارة</Text>
+            </View>
+            {ADMIN_NAV.map((group) => (
+              <View key={group.key}>
+                <Text style={styles.desktopGroupLabel}>{group.emoji}  {group.label}</Text>
+                {group.tabs.map((tab) => {
+                  const isActive = tab.key === activeTab;
+                  const count = tabBadge(tab.key);
+                  return (
+                    <Pressable
+                      key={tab.key}
+                      style={[styles.desktopNavItem, isActive && styles.desktopNavItemActive]}
+                      onPress={() => setActiveTab(tab.key)}
+                    >
+                      {tab.icon(isActive)}
+                      <Text style={[styles.desktopNavLabel, isActive && styles.desktopNavLabelActive]}>{tab.label}</Text>
+                      {count > 0 ? (
+                        <View style={styles.desktopNavCount}>
+                          <Text style={styles.desktopNavCountText}>{count > 99 ? '99+' : count}</Text>
+                        </View>
+                      ) : null}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ))}
+            <View style={styles.desktopSidebarFooter}>
+              <Text style={styles.desktopFooterTitle}>حيّنا · لوحة العمليات</Text>
+              <Text style={styles.desktopFooterText}>إدارة المجتمع والخدمات والدعم من مساحة موحّدة.</Text>
+            </View>
+          </ScrollView>
+        )}
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.navTabScrollV2}>
-          {activeGroup.tabs.map((tab) => {
-            const isActive = tab.key === activeTab;
-            const count = tabBadge(tab.key);
-            return (
-              <Pressable
-                key={tab.key}
-                style={[styles.navTabV2, isActive && styles.navTabV2Active]}
-                onPress={() => setActiveTab(tab.key)}
-              >
-                {tab.icon(isActive)}
-                <Text style={[styles.navTabV2Text, isActive && styles.navTabV2TextActive]}>{tab.label}</Text>
-                {count > 0 ? (
-                  <View style={styles.navTabV2Badge}>
-                    <Text style={styles.navTabV2BadgeText}>{count}</Text>
-                  </View>
-                ) : null}
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-      </View>
-
-      {/* ======================================================== */}
-      {/* 3. MAIN DASHBOARD CONTENT SCROLL                         */}
-      {/* ======================================================== */}
-      <ScrollView
-        style={styles.scroll}
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}
-      >
+        <View style={styles.mainContentShell}>
+          <ScrollView
+            style={styles.scroll}
+            showsVerticalScrollIndicator={false}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}
+          >
         {/* TAB 0: UNIFIED TASK CENTER */}
         {activeTab === 'tasks' && (
           <AdminTaskCenter
@@ -2611,7 +2644,9 @@ export default function AdminScreen() {
         {activeTab === 'security' && <AdminSecurityCenter onSaved={showToast} />}
 
         <View style={{ height: 100 }} />
-      </ScrollView>
+          </ScrollView>
+        </View>
+      </View>
 
       {/* ======================================================== */}
       {/* 4. USER DOSSIER INSPECTOR MODAL                          */}

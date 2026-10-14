@@ -56,7 +56,7 @@ export const ADMIN_GRADIENTS = {
 export const adminStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: ADMIN_COLORS.bg,
+    backgroundColor: '#F4F7F6',
   },
   center: {
     flex: 1,
@@ -268,6 +268,10 @@ export const adminStyles = StyleSheet.create({
   },
   section: {
     padding: 16,
+    paddingTop: 20,
+    maxWidth: 1440,
+    width: '100%',
+    alignSelf: 'center',
   },
   sectionHeaderRow: {
     flexDirection: 'row-reverse',
@@ -309,15 +313,15 @@ export const adminStyles = StyleSheet.create({
   },
   statCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    padding: 16,
+    borderRadius: 20,
+    padding: 18,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    borderColor: '#E5ECE8',
+    shadowColor: '#123D2C',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.035,
+    shadowRadius: 16,
+    elevation: 1,
   },
   statIconBox: {
     width: 44,
@@ -1485,11 +1489,11 @@ export const adminStyles = StyleSheet.create({
   // REDESIGN v2 — Command Hero, Grouped Navigation & Metric Tiles
   // ============================================================
   heroWrap: {
-    paddingHorizontal: 16,
-    paddingTop: 14,
+    paddingHorizontal: 24,
+    paddingTop: 18,
     paddingBottom: 18,
-    borderBottomLeftRadius: 26,
-    borderBottomRightRadius: 26,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
     overflow: 'hidden',
   },
   heroTop: {
@@ -1616,12 +1620,12 @@ export const adminStyles = StyleSheet.create({
   navShell: {
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-    shadowColor: '#000',
+    borderBottomColor: '#E4EBE7',
+    shadowColor: '#123D2C',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
+    shadowOpacity: 0.025,
+    shadowRadius: 8,
+    elevation: 1,
   },
   navGroupScroll: {
     paddingHorizontal: 12,
@@ -1699,10 +1703,10 @@ export const adminStyles = StyleSheet.create({
     flexBasis: 150,
     minWidth: 140,
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    padding: 14,
+    borderColor: '#E5ECE8',
+    padding: 16,
   },
   metricTileHead: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, marginBottom: 6 },
   metricTileLabel: { fontSize: 11, fontWeight: '800', color: '#64748B' },
@@ -1796,4 +1800,40 @@ export const adminStyles = StyleSheet.create({
   selectChipActive: { backgroundColor: ADMIN_COLORS.navyMid, borderColor: ADMIN_COLORS.navyMid },
   selectChipText: { fontSize: 11, fontWeight: '800', color: '#64748B' },
   selectChipTextActive: { color: '#FFFFFF' },
+
+  // Desktop-first command center shell; mobile retains the compact grouped navigation.
+  desktopLayout: { flex: 1, flexDirection: 'row-reverse', minHeight: 0, backgroundColor: '#F4F7F6' },
+  desktopSidebar: {
+    width: 252, backgroundColor: '#FFFFFF', borderLeftWidth: 1, borderLeftColor: '#E4EBE7',
+    paddingTop: 18, paddingHorizontal: 12, paddingBottom: 18,
+  },
+  desktopSidebarIntro: {
+    paddingHorizontal: 12, paddingBottom: 16, marginBottom: 10,
+    borderBottomWidth: 1, borderBottomColor: '#EDF2EF',
+  },
+  desktopSidebarEyebrow: { fontSize: 10, fontWeight: '900', color: '#0F9668', textAlign: 'right', letterSpacing: 0.6 },
+  desktopSidebarTitle: { fontSize: 16, fontWeight: '900', color: '#10271E', textAlign: 'right', marginTop: 5 },
+  desktopGroupLabel: {
+    color: '#93A39A', fontSize: 10, fontWeight: '900', textAlign: 'right',
+    paddingHorizontal: 12, paddingTop: 15, paddingBottom: 6,
+  },
+  desktopNavItem: {
+    minHeight: 42, borderRadius: 12, paddingHorizontal: 12, marginBottom: 3,
+    flexDirection: 'row-reverse', alignItems: 'center', gap: 10, backgroundColor: 'transparent',
+  },
+  desktopNavItemActive: { backgroundColor: '#E9F7EF' },
+  desktopNavLabel: { flex: 1, color: '#52665B', textAlign: 'right', fontSize: 12, fontWeight: '700' },
+  desktopNavLabelActive: { color: '#087A50', fontWeight: '900' },
+  desktopNavCount: {
+    minWidth: 20, paddingHorizontal: 5, paddingVertical: 2, borderRadius: 7,
+    backgroundColor: '#FEE2E2', alignItems: 'center',
+  },
+  desktopNavCountText: { color: '#B91C1C', fontSize: 10, fontWeight: '900' },
+  desktopSidebarFooter: {
+    marginTop: 18, padding: 12, backgroundColor: '#F5F8F6', borderRadius: 14,
+    borderWidth: 1, borderColor: '#E7EEE9',
+  },
+  desktopFooterTitle: { color: '#294438', fontSize: 11, fontWeight: '900', textAlign: 'right' },
+  desktopFooterText: { color: '#7A8C82', fontSize: 10, lineHeight: 16, textAlign: 'right', marginTop: 4 },
+  mainContentShell: { flex: 1, minWidth: 0, backgroundColor: '#F4F7F6' },
 });
