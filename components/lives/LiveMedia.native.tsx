@@ -1,19 +1,54 @@
 import { useEffect } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
-import { AudioSession, LiveKitRoom, VideoTrack, useTracks, isTrackReference, registerGlobals, useLocalParticipant } from '@livekit/react-native';
-import { Track } from 'livekit-client';
-import { Camera, CameraOff, Mic, MicOff } from 'lucide-react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
+import {
+  AudioSession,
+  LiveKitRoom,
+  VideoTrack,
+  useTracks,
+  isTrackReference,
+  registerGlobals,
+  useLocalParticipant,
+  useRoomContext,
+  useConnectionState,
+} from '@livekit/react-native';
+import { ConnectionQuality, ConnectionState, RoomEvent, Track, type Participant } from 'livekit-client';
 
 registerGlobals();
+
+export type LiveMediaConnection = 'connecting' | 'connected' | 'reconnecting' | 'disconnected';
+export type LiveMediaQuality = 'excellent' | 'good' | 'poor' | 'unknown';
+export type LiveMediaState = { cameraEnabled: boolean; microphoneEnabled: boolean };
+
+export type LiveMediaApi = {
+  setCameraEnabled: (enabled: boolean) => void;
+  setMicrophoneEnabled: (enabled: boolean) => void;
+};
 
 export type LiveMediaProps = {
   url: string;
   token: string;
   canPublish: boolean;
-  showPublisherControls?: boolean;
+  onConnectionChange?: (state: LiveMediaConnection) => void;
+  onQualityChange?: (quality: LiveMediaQuality) => void;
+  onMediaStateChange?: (state: LiveMediaState) => void;
+  onApiReady?: (api: LiveMediaApi) => void;
   onReady?: () => void;
   onError?: (message: string) => void;
 };
+
+function normalizeQuality(quality: ConnectionQuality): LiveMediaQuality {
+  if (quality === ConnectionQuality.Excellent) return 'excellent';
+  if (quality === ConnectionQuality.Good) return 'good';
+  if (quality === ConnectionQuality.Poor) return 'poor';
+  return 'unknown';
+}
+
+function connectionFromState(state: ConnectionState): LiveMediaConnection {
+  if (state === ConnectionState.Connected) return 'connected';
+  if (state === ConnectionState.Reconnecting || state === ConnectionState.SignalReconnecting) return 'reconnecting';
+  if (state === ConnectionState.Connecting) return 'connecting';
+  return 'disconnected';
+}
 
 function RoomTracks() {
   const tracks = useTracks([Track.Source.Camera], { onlySubscribed: true });
@@ -24,15 +59,59 @@ function RoomTracks() {
   return <View style={{ flex: 1 }}>{videos.map((track, index) => <VideoTrack key={`${track.participant.identity}-${index}`} trackRef={track} style={{ flex: index === 0 ? 1 : undefined, width: index === 0 ? '100%' : 96, height: index === 0 ? undefined : 140, position: index === 0 ? 'relative' : 'absolute', top: index === 0 ? 0 : 170, right: index === 0 ? 0 : 12, zIndex: index === 0 ? 0 : 1, borderRadius: index === 0 ? 0 : 12 }} />)}</View>;
 }
 
-function RoomControls() {
+/**
+ * Bridges LiveKit room events to the surrounding room UI so the host toolbar and
+ * the status pills stay accurate without re-implementing media inside the screen.
+ */
+function RoomBridge({ onConnectionChange, onQualityChange, onMediaStateChange, onApiReady }: {
+  onConnectionChange?: (state: LiveMediaConnection) => void;
+  onQualityChange?: (quality: LiveMediaQuality) => void;
+  onMediaStateChange?: (state: LiveMediaState) => void;
+  onApiReady?: (api: LiveMediaApi) => void;
+}) {
+  const room = useRoomContext();
+  const connectionState = useConnectionState();
   const { localParticipant, isCameraEnabled, isMicrophoneEnabled } = useLocalParticipant();
-  return <View style={{ position: 'absolute', top: 88, left: 14, zIndex: 4, flexDirection: 'row', gap: 8 }}>
-    <Pressable onPress={() => void localParticipant.setCameraEnabled(!isCameraEnabled)} style={{ width: 38, height: 38, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(2,6,23,0.58)' }}>{isCameraEnabled ? <Camera color="#fff" size={18} /> : <CameraOff color="#fb7185" size={18} />}</Pressable>
-    <Pressable onPress={() => void localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled)} style={{ width: 38, height: 38, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(2,6,23,0.58)' }}>{isMicrophoneEnabled ? <Mic color="#fff" size={18} /> : <MicOff color="#fb7185" size={18} />}</Pressable>
-  </View>;
+
+  useEffect(() => {
+    onConnectionChange?.(connectionFromState(connectionState));
+  }, [connectionState, onConnectionChange]);
+
+  useEffect(() => {
+    onMediaStateChange?.({ cameraEnabled: isCameraEnabled, microphoneEnabled: isMicrophoneEnabled });
+  }, [isCameraEnabled, isMicrophoneEnabled, onMediaStateChange]);
+
+  useEffect(() => {
+    onApiReady?.({
+      setCameraEnabled: (enabled) => { void localParticipant.setCameraEnabled(enabled); },
+      setMicrophoneEnabled: (enabled) => { void localParticipant.setMicrophoneEnabled(enabled); },
+    });
+  }, [localParticipant, onApiReady]);
+
+  useEffect(() => {
+    const onQuality = (quality: ConnectionQuality, participant: Participant) => {
+      if (participant.identity !== localParticipant.identity) return;
+      onQualityChange?.(normalizeQuality(quality));
+    };
+    const onReconnecting = () => onConnectionChange?.('reconnecting');
+    const onReconnected = () => onConnectionChange?.('connected');
+    onQualityChange?.(normalizeQuality(localParticipant.connectionQuality));
+    room.on(RoomEvent.ConnectionQualityChanged, onQuality);
+    room.on(RoomEvent.Reconnecting, onReconnecting);
+    room.on(RoomEvent.SignalReconnecting, onReconnecting);
+    room.on(RoomEvent.Reconnected, onReconnected);
+    return () => {
+      room.off(RoomEvent.ConnectionQualityChanged, onQuality);
+      room.off(RoomEvent.Reconnecting, onReconnecting);
+      room.off(RoomEvent.SignalReconnecting, onReconnecting);
+      room.off(RoomEvent.Reconnected, onReconnected);
+    };
+  }, [room, localParticipant, onQualityChange, onConnectionChange]);
+
+  return null;
 }
 
-export default function LiveMedia({ url, token, canPublish, showPublisherControls = true, onReady, onError }: LiveMediaProps) {
+export default function LiveMedia({ url, token, canPublish, onConnectionChange, onQualityChange, onMediaStateChange, onApiReady, onReady, onError }: LiveMediaProps) {
   useEffect(() => {
     void AudioSession.startAudioSession();
     return () => { void AudioSession.stopAudioSession(); };
@@ -52,7 +131,12 @@ export default function LiveMedia({ url, token, canPublish, showPublisherControl
         onError={(error) => onError?.(error.message || 'تعذر الاتصال بغرفة البث.')}
       >
         <RoomTracks />
-        {canPublish && showPublisherControls && <RoomControls />}
+        <RoomBridge
+          onConnectionChange={onConnectionChange}
+          onQualityChange={onQualityChange}
+          onMediaStateChange={onMediaStateChange}
+          onApiReady={onApiReady}
+        />
       </LiveKitRoom>
     </View>
   );

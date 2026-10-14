@@ -1,16 +1,37 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Alert, Animated, AppState, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Share, StatusBar, StyleSheet, Text, TextInput, View, type StyleProp, type ViewStyle } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
+import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '@/lib/supabase';
-import { addLiveBlock, endLiveStream, fetchLiveSupporters, getLiveToken, reportLiveStream, requestLiveGuest, sendLiveMessage, type LiveChatMessage, type LiveStream } from '@/lib/lives';
-import LiveMedia from '@/components/lives/LiveMedia';
+import {
+  addLiveBlock,
+  endLiveStream,
+  fetchLiveSupporters,
+  getLiveToken,
+  hideLiveMessage,
+  reportLiveStream,
+  requestLiveGuest,
+  sendLiveMessage,
+  setLiveGuestMuted,
+  setLiveMessagePinned,
+  type LiveChatMessage,
+  type LiveChatRole,
+  type LiveStream,
+} from '@/lib/lives';
+import LiveMedia, { type LiveMediaApi, type LiveMediaConnection, type LiveMediaQuality, type LiveMediaState } from '@/components/lives/LiveMedia';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BadgeCheck, Check, Eye, EyeOff, Gift, Heart, MessageCircle, Mic, MoreHorizontal, Radio, Send, Share2, ShieldAlert, Trophy, UserPlus, Users, X } from 'lucide-react-native';
+import { BadgeCheck, Camera, CameraOff, Check, ChevronDown, ChevronUp, Eye, EyeOff, Gift, Heart, MessageCircle, Mic, MicOff, MoreHorizontal, Pin, Radio, Send, Share2, ShieldAlert, SignalHigh, SignalLow, SignalMedium, Trophy, UserMinus, UserPlus, Users, X } from 'lucide-react-native';
 
 type Role = 'host' | 'viewer' | 'guest';
-type GuestRequest = { id: string; guest_id: string; stream_id: string; status: string; profiles?: { display_name: string | null; username: string | null; avatar_url: string | null } | null };
+type GuestRequest = { id: string; guest_id: string; stream_id: string; status: string; is_muted?: boolean; profiles?: { display_name: string | null; username: string | null; avatar_url: string | null } | null };
 type AudienceMember = { id: string; display_name: string | null; username: string | null; avatar_url: string | null; is_verified: boolean | null };
 type Supporter = { user: AudienceMember; gifts: number };
+type HostSheetTab = 'comments' | 'guests';
+type Effect = { id: string; emoji: string; name?: string; kind: 'heart' | 'gift' };
+
+const MAX_EFFECTS = 6;
+const CHAT_BASE_FIELDS = 'id,stream_id,sender_id,body,created_at,profiles!live_chat_messages_sender_id_fkey(display_name,username,avatar_url,is_verified)';
 
 export default function LiveRoomScreen() {
   const { id, role: roleParam } = useLocalSearchParams<{ id: string; role?: string }>();
@@ -19,36 +40,103 @@ export default function LiveRoomScreen() {
   const [roomUrl, setRoomUrl] = useState('');
   const [token, setToken] = useState('');
   const [currentUser, setCurrentUser] = useState('');
+  const [currentUserName, setCurrentUserName] = useState('');
   const [role, setRole] = useState<Role>(roleParam === 'host' ? 'host' : 'viewer');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [messages, setMessages] = useState<LiveChatMessage[]>([]);
+  const [pinnedMessage, setPinnedMessage] = useState<LiveChatMessage | null>(null);
   const [chatInput, setChatInput] = useState('');
   const [sending, setSending] = useState(false);
   const [viewerCount, setViewerCount] = useState(0);
   const [pendingRequests, setPendingRequests] = useState<GuestRequest[]>([]);
+  const [guests, setGuests] = useState<GuestRequest[]>([]);
   const [guestState, setGuestState] = useState<'idle' | 'pending' | 'accepted'>('idle');
-  const [hearts, setHearts] = useState<{ id: string; emoji: string }[]>([]);
+  const [guestMutedByHost, setGuestMutedByHost] = useState(false);
+  const [effects, setEffects] = useState<Effect[]>([]);
   const [elapsed, setElapsed] = useState(0);
   const [connected, setConnected] = useState(false);
+  const [connection, setConnection] = useState<LiveMediaConnection>('connecting');
+  const [quality, setQuality] = useState<LiveMediaQuality>('unknown');
+  const [mediaState, setMediaState] = useState<LiveMediaState>({ cameraEnabled: true, microphoneEnabled: true });
   const [isFollowing, setIsFollowing] = useState(false);
-  const [showTopBar, setShowTopBar] = useState(true);
-  const [showInfoPanel, setShowInfoPanel] = useState(true);
+  const [overlayVisible, setOverlayVisible] = useState(true);
   const [showChat, setShowChat] = useState(true);
-  const [showControls, setShowControls] = useState(true);
-  const [giftBursts, setGiftBursts] = useState<{ id: string; emoji: string; x: number; y: number }[]>([]);
+  const [controlsOpen, setControlsOpen] = useState(true);
   const [audienceMembers, setAudienceMembers] = useState<AudienceMember[]>([]);
   const [topSupporters, setTopSupporters] = useState<Supporter[]>([]);
   const [supporterError, setSupporterError] = useState('');
   const [peoplePanel, setPeoplePanel] = useState<'viewers' | 'supporters' | null>(null);
+  const [hostSheet, setHostSheet] = useState<HostSheetTab | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   const heartChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const mediaApiRef = useRef<LiveMediaApi | null>(null);
   const connectedRef = useRef(false);
+  const chatExtrasRef = useRef(true);
   const hostPulseAtRef = useRef(Date.now());
   const staleSweepAtRef = useRef(0);
+  const guestMutedRef = useRef(false);
   const roleRef = useRef(role);
   roleRef.current = role;
   const mediaRole = role === 'host' || role === 'guest';
+
+  const handleConnectionChange = useCallback((state: LiveMediaConnection) => {
+    setConnection(state);
+    const isConnected = state === 'connected';
+    connectedRef.current = isConnected;
+    setConnected(isConnected);
+  }, []);
+  const handleQualityChange = useCallback((next: LiveMediaQuality) => setQuality(next), []);
+  const handleMediaStateChange = useCallback((next: LiveMediaState) => setMediaState(next), []);
+  const handleApiReady = useCallback((api: LiveMediaApi) => { mediaApiRef.current = api; }, []);
+
+  const loadMessages = useCallback(async (streamId: string) => {
+    const withExtras = `${CHAT_BASE_FIELDS},is_pinned,sender_role`;
+    let rows: LiveChatMessage[] = [];
+    let queryError: unknown = null;
+    if (chatExtrasRef.current) {
+      const result = await supabase.from('live_chat_messages')
+        .select(withExtras)
+        .eq('stream_id', streamId).eq('is_hidden', false)
+        .order('created_at', { ascending: false }).limit(10);
+      if (result.error) chatExtrasRef.current = false;
+      else rows = ((result.data || []).reverse()) as unknown as LiveChatMessage[];
+      queryError = result.error;
+    }
+    if (!chatExtrasRef.current) {
+      const result = await supabase.from('live_chat_messages')
+        .select(CHAT_BASE_FIELDS)
+        .eq('stream_id', streamId).eq('is_hidden', false)
+        .order('created_at', { ascending: false }).limit(10);
+      if (result.error) throw result.error;
+      rows = ((result.data || []).reverse()) as unknown as LiveChatMessage[];
+      setPinnedMessage(null);
+    } else if (queryError) {
+      throw queryError;
+    }
+    setMessages(rows);
+    if (chatExtrasRef.current) {
+      const { data: pin } = await supabase.from('live_chat_messages')
+        .select(withExtras)
+        .eq('stream_id', streamId).eq('is_hidden', false).eq('is_pinned', true).maybeSingle();
+      setPinnedMessage((pin as unknown as LiveChatMessage) || null);
+    }
+  }, []);
+
+  const loadGuests = useCallback(async (streamId: string) => {
+    const result = await supabase.from('live_guest_requests')
+      .select('id,guest_id,stream_id,status,is_muted,profiles!live_guest_requests_guest_id_fkey(display_name,username,avatar_url)')
+      .eq('stream_id', streamId).eq('status', 'accepted');
+    if (result.error) {
+      const fallback = await supabase.from('live_guest_requests')
+        .select('id,guest_id,stream_id,status,profiles!live_guest_requests_guest_id_fkey(display_name,username,avatar_url)')
+        .eq('stream_id', streamId).eq('status', 'accepted');
+      if (fallback.error) throw fallback.error;
+      setGuests((fallback.data || []) as unknown as GuestRequest[]);
+      return;
+    }
+    setGuests((result.data || []) as unknown as GuestRequest[]);
+  }, []);
 
   const loadRoom = useCallback(async () => {
     if (!id) return;
@@ -56,6 +144,8 @@ export default function LiveRoomScreen() {
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) { router.replace('/auth'); return; }
       setCurrentUser(auth.user.id);
+      const { data: me } = await supabase.from('profiles').select('display_name,username').eq('id', auth.user.id).maybeSingle();
+      setCurrentUserName(me?.display_name || me?.username || 'مشاهد');
       const { data: live, error: streamError } = await supabase.from('live_streams')
         .select('id,host_id,title,category,audience,room_name,status,viewer_count,peak_viewer_count,started_at,updated_at,profiles!live_streams_host_id_fkey(id,display_name,username,avatar_url,is_verified,city,district)')
         .eq('id', id).maybeSingle();
@@ -93,16 +183,7 @@ export default function LiveRoomScreen() {
     } finally {
       setLoading(false);
     }
-  }, [id, roleParam]);
-
-  async function loadMessages(streamId: string) {
-    const { data, error: chatError } = await supabase.from('live_chat_messages')
-      .select('id,stream_id,sender_id,body,created_at,profiles!live_chat_messages_sender_id_fkey(display_name,username,avatar_url)')
-      .eq('stream_id', streamId).eq('is_hidden', false)
-      .order('created_at', { ascending: false }).limit(10);
-    if (chatError) throw chatError;
-    setMessages(((data || []).reverse()) as unknown as LiveChatMessage[]);
-  }
+  }, [id, roleParam, loadMessages]);
 
   async function loadAudience(streamId: string) {
     const { data, error: audienceError } = await supabase.from('live_viewer_sessions')
@@ -173,7 +254,7 @@ export default function LiveRoomScreen() {
   useEffect(() => {
     if (!id || loading || error) return;
     const chatChannel = supabase.channel(`live-chat:${id}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'live_chat_messages', filter: `stream_id=eq.${id}` }, () => { void loadMessages(id); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'live_chat_messages', filter: `stream_id=eq.${id}` }, () => { void loadMessages(id); })
       .subscribe();
     const streamChannel = supabase.channel(`live-state:${id}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'live_streams', filter: `id=eq.${id}` }, (payload) => {
@@ -181,6 +262,9 @@ export default function LiveRoomScreen() {
         if (next.status === 'ended') setError('أنهى المضيف هذا البث.');
         if (next.updated_at) hostPulseAtRef.current = new Date(next.updated_at).getTime();
       })
+      .subscribe();
+    const guestChannel = supabase.channel(`live-guests:${id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'live_guest_requests', filter: `stream_id=eq.${id}` }, () => { void loadMessages(id); })
       .subscribe();
 
     const poll = setInterval(() => {
@@ -198,31 +282,40 @@ export default function LiveRoomScreen() {
             .select('id,guest_id,stream_id,status,profiles!live_guest_requests_guest_id_fkey(display_name,username,avatar_url)')
             .eq('stream_id', id).eq('status', 'pending').order('created_at', { ascending: true });
           setPendingRequests((data || []) as unknown as GuestRequest[]);
-        } else if (role === 'viewer' && guestState === 'pending') {
-          const { data } = await supabase.from('live_guest_requests').select('status')
+          void loadGuests(id).catch((cause) => console.error('Unable to refresh live guests.', cause));
+        } else {
+          const primary = await supabase.from('live_guest_requests').select('status,is_muted')
             .eq('stream_id', id).eq('guest_id', currentUser).maybeSingle();
-          if (data?.status === 'accepted') {
+          const own = primary.error
+            ? (await supabase.from('live_guest_requests').select('status')
+                .eq('stream_id', id).eq('guest_id', currentUser).maybeSingle()).data
+            : primary.data;
+          const status = own?.status;
+          if (status === 'accepted' && role === 'viewer') {
             setRole('guest');
             setGuestState('accepted');
             const credential = await getLiveToken(id, 'guest');
             setRoomUrl(credential.url);
             setToken(credential.token);
-          } else if (data?.status === 'rejected' || data?.status === 'removed') setGuestState('idle');
+          } else if (role === 'guest') {
+            const muted = Boolean((own as { is_muted?: boolean } | null)?.is_muted);
+            if (muted && !guestMutedRef.current) mediaApiRef.current?.setMicrophoneEnabled(false);
+            guestMutedRef.current = muted;
+            setGuestMutedByHost(muted);
+            if (status === 'removed') setError('أزالك المضيف من البث.');
+          } else if (status === 'rejected' || status === 'removed') {
+            if (guestState === 'pending') setGuestState('idle');
+          }
         }
       })();
     }, 2500);
 
-    const presenceChannel = supabase.channel(`live-hearts:${id}`, { config: { broadcast: { self: false } } })
+    const presenceChannel = supabase.channel(`live-effects:${id}`, { config: { broadcast: { self: false } } })
       .on('broadcast', { event: 'heart' }, ({ payload }) => {
-        const entry = { id: `${Date.now()}-${Math.random()}`, emoji: typeof payload?.emoji === 'string' ? payload.emoji : '💚' };
-        setHearts((items) => [...items.slice(-5), entry]);
-        setTimeout(() => setHearts((items) => items.filter((heart) => heart.id !== entry.id)), 2400);
+        pushEffect({ emoji: typeof payload?.emoji === 'string' ? payload.emoji : '💚', name: typeof payload?.name === 'string' ? payload.name : undefined, kind: 'heart' });
       })
       .on('broadcast', { event: 'gift' }, ({ payload }) => {
-        const emoji = typeof payload?.emoji === 'string' ? payload.emoji : '🎁';
-        const entry = { id: `${Date.now()}-${Math.random()}`, emoji };
-        setHearts((items) => [...items.slice(-5), entry]);
-        triggerGiftBurst(emoji);
+        pushEffect({ emoji: typeof payload?.emoji === 'string' ? payload.emoji : '🎁', name: typeof payload?.name === 'string' ? payload.name : undefined, kind: 'gift' });
       })
       .subscribe();
     heartChannelRef.current = presenceChannel;
@@ -244,6 +337,7 @@ export default function LiveRoomScreen() {
     }, 8_000);
     void loadAudience(id).catch((cause) => console.error('Unable to load live audience.', cause));
     void loadSupporters(id).catch((cause) => console.error('Unable to load live supporters.', cause));
+    if (role === 'host') void loadGuests(id).catch((cause) => console.error('Unable to load live guests.', cause));
     const elapsedTimer = setInterval(() => {
       if (stream?.started_at) setElapsed(Math.max(0, Math.floor((Date.now() - new Date(stream.started_at).getTime()) / 1000)));
     }, 1000);
@@ -252,9 +346,15 @@ export default function LiveRoomScreen() {
       clearInterval(poll); clearInterval(heartbeatTimer); clearInterval(audienceTimer); clearInterval(elapsedTimer);
       heartChannelRef.current = null;
       void supabase.from('live_viewer_sessions').delete().eq('stream_id', id).eq('viewer_id', currentUser);
-      void supabase.removeChannel(chatChannel); void supabase.removeChannel(streamChannel); void supabase.removeChannel(presenceChannel);
+      void supabase.removeChannel(chatChannel); void supabase.removeChannel(streamChannel); void supabase.removeChannel(guestChannel); void supabase.removeChannel(presenceChannel);
     };
-  }, [id, loading, error, role, guestState, currentUser, stream?.started_at]);
+  }, [id, loading, error, role, guestState, currentUser, stream?.started_at, loadMessages, loadGuests]);
+
+  function pushEffect(input: { emoji: string; name?: string; kind: 'heart' | 'gift' }) {
+    const entry: Effect = { id: `${Date.now()}-${Math.random()}`, ...input };
+    setEffects((items) => [...items, entry].slice(-MAX_EFFECTS));
+    setTimeout(() => setEffects((items) => items.filter((item) => item.id !== entry.id)), 2400);
+  }
 
   async function sendMessage() {
     const body = chatInput.trim();
@@ -275,7 +375,10 @@ export default function LiveRoomScreen() {
     const { error: updateError } = await supabase.from('live_guest_requests')
       .update({ status, decided_at: new Date().toISOString() }).eq('id', request.id).eq('status', 'pending');
     if (updateError) Alert.alert('تعذر تحديث الطلب', updateError.message);
-    else setPendingRequests((rows) => rows.filter((item) => item.id !== request.id));
+    else {
+      setPendingRequests((rows) => rows.filter((item) => item.id !== request.id));
+      if (id) void loadGuests(id).catch(() => {});
+    }
   }
 
   function confirmEnd() {
@@ -308,24 +411,10 @@ export default function LiveRoomScreen() {
     catch (e) { Alert.alert('تعذر إرسال البلاغ', e instanceof Error ? e.message : 'حاول مرة أخرى.'); }
   }
 
-  function triggerGiftBurst(emoji: string) {
-    const burst = Array.from({ length: 5 }, (_, index) => ({
-      id: `${Date.now()}-${Math.random()}-${index}`,
-      emoji,
-      x: 14 + index * 14,
-      y: 34 + index * 18,
-    }));
-    setGiftBursts((items) => [...items, ...burst]);
-    setTimeout(() => {
-      setGiftBursts((items) => items.filter((item) => !burst.some((entry) => entry.id === item.id)));
-    }, 1700);
-  }
-
   async function sendHeart() {
     const emoji = ['💚', '❤️', '👏', '✨'][Math.floor(Math.random() * 4)];
-    setHearts((items) => [...items.slice(-5), { id: `${Date.now()}-${Math.random()}`, emoji }]);
-    triggerGiftBurst(emoji);
-    await heartChannelRef.current?.send({ type: 'broadcast', event: 'heart', payload: { emoji } });
+    pushEffect({ emoji, name: currentUserName, kind: 'heart' });
+    await heartChannelRef.current?.send({ type: 'broadcast', event: 'heart', payload: { emoji, name: currentUserName } });
   }
 
   async function sendGift() {
@@ -338,22 +427,65 @@ export default function LiveRoomScreen() {
         emoji,
       });
       if (giftError) throw giftError;
-      const entry = { id: `${Date.now()}-${Math.random()}`, emoji };
-      setHearts((items) => [...items.slice(-5), entry]);
-      triggerGiftBurst(emoji);
-      await heartChannelRef.current?.send({ type: 'broadcast', event: 'gift', payload: { emoji } });
+      pushEffect({ emoji, name: currentUserName, kind: 'gift' });
+      await heartChannelRef.current?.send({ type: 'broadcast', event: 'gift', payload: { emoji, name: currentUserName } });
       await loadSupporters(id);
     } catch (cause) {
       Alert.alert('تعذر إرسال الهدية', cause instanceof Error ? cause.message : 'حاول مرة أخرى.');
     }
   }
 
-  function toggleOverlayMode() {
-    const shouldShow = !(showTopBar && showInfoPanel && showChat && showControls);
-    setShowTopBar(shouldShow);
-    setShowInfoPanel(shouldShow);
-    setShowChat(shouldShow);
-    setShowControls(shouldShow);
+  async function pinMessage(message: LiveChatMessage) {
+    if (!id) return;
+    try {
+      if (message.is_pinned) {
+        await setLiveMessagePinned(id, message.id, false);
+      } else {
+        const current = pinnedMessage && pinnedMessage.id !== message.id ? pinnedMessage : messages.find((item) => item.is_pinned);
+        if (current && current.id !== message.id) await setLiveMessagePinned(id, current.id, false);
+        await setLiveMessagePinned(id, message.id, true);
+      }
+      await loadMessages(id);
+    } catch (cause) {
+      Alert.alert('تعذر تثبيت التعليق', cause instanceof Error ? cause.message : 'حاول مرة أخرى.');
+    }
+  }
+
+  async function hideMessage(message: LiveChatMessage) {
+    if (!id) return;
+    try { await hideLiveMessage(id, message.id); await loadMessages(id); }
+    catch (cause) { Alert.alert('تعذر إخفاء التعليق', cause instanceof Error ? cause.message : 'حاول مرة أخرى.'); }
+  }
+
+  async function toggleGuestMute(guest: GuestRequest) {
+    if (!id) return;
+    try {
+      await setLiveGuestMuted(id, guest.guest_id, !guest.is_muted);
+      await loadGuests(id);
+    } catch (cause) {
+      Alert.alert('تعذر تعديل المايك', cause instanceof Error ? cause.message : 'حاول مرة أخرى.');
+    }
+  }
+
+  function removeGuest(guest: GuestRequest) {
+    if (!id || !stream) return;
+    Alert.alert('إزالة الضيف؟', 'سيُزال الضيف ويُمنع من الانضمام لهذا البث.', [
+      { text: 'إلغاء', style: 'cancel' },
+      { text: 'إزالة', style: 'destructive', onPress: () => {
+        void addLiveBlock(id, stream.host_id, guest.guest_id)
+          .then(() => { Alert.alert('تمت الإزالة', 'أُزيل الضيف وحُظر من هذا البث.'); void loadGuests(id).catch(() => {}); })
+          .catch((cause) => Alert.alert('تعذر إزالة الضيف', cause instanceof Error ? cause.message : 'حاول مرة أخرى.'));
+      } },
+    ]);
+  }
+
+  function moderateMessage(message: LiveChatMessage) {
+    if (role !== 'host' || !id) return;
+    Alert.alert('إدارة التعليق', undefined, [
+      { text: message.is_pinned ? 'إلغاء التثبيت' : 'تثبيت التعليق', onPress: () => void pinMessage(message) },
+      { text: 'إخفاء التعليق', style: 'destructive', onPress: () => void hideMessage(message) },
+      { text: 'إلغاء', style: 'cancel' },
+    ]);
   }
 
   async function toggleFollow() {
@@ -368,35 +500,6 @@ export default function LiveRoomScreen() {
     catch { /* The share sheet can be dismissed without action. */ }
   }
 
-  function moderateMessage(message: LiveChatMessage) {
-    if (role !== 'host' || !id) return;
-    Alert.alert('إدارة التعليق', 'إخفاء هذا التعليق عن المشاهدين؟', [
-      { text: 'إلغاء', style: 'cancel' },
-      { text: 'إخفاء', style: 'destructive', onPress: () => {
-        void supabase.from('live_chat_messages').update({ is_hidden: true }).eq('id', message.id)
-          .then(({ error: hideError }) => { if (hideError) Alert.alert('تعذر إخفاء التعليق', hideError.message); else void loadMessages(id); });
-      } },
-    ]);
-  }
-
-  async function manageGuests() {
-    const { data } = await supabase.from('live_guest_requests')
-      .select('guest_id,profiles!live_guest_requests_guest_id_fkey(display_name,username)')
-      .eq('stream_id', id).eq('status', 'accepted');
-    const guests = (data || []) as any[];
-    if (!guests.length) { Alert.alert('الضيوف', 'لا يوجد ضيف في البث الآن.'); return; }
-    Alert.alert('إدارة الضيوف', 'يمكنك إزالة الضيف وحظره من هذا البث.', [
-      ...guests.slice(0, 2).map((guest) => ({
-        text: `إزالة ${guest.profiles?.display_name || guest.profiles?.username || 'الضيف'}`,
-        style: 'destructive' as const,
-        onPress: () => void addLiveBlock(id, stream!.host_id, guest.guest_id)
-          .then(() => Alert.alert('تمت الإزالة', 'أُزيل الضيف وحُظر من هذا البث.'))
-          .catch((e) => Alert.alert('تعذر إزالة الضيف', e instanceof Error ? e.message : 'حاول مرة أخرى.')),
-      })),
-      { text: 'إغلاق', style: 'cancel' },
-    ]);
-  }
-
   async function handleBack() {
     if (role === 'host' && stream?.status === 'live') { confirmEnd(); return; }
     if (router.canGoBack()) router.back(); else router.replace('/lives');
@@ -404,6 +507,12 @@ export default function LiveRoomScreen() {
 
   const duration = `${String(Math.floor(elapsed / 60)).padStart(2, '0')}:${String(elapsed % 60).padStart(2, '0')}`;
   const hostName = stream?.profiles?.display_name || stream?.profiles?.username || 'جارٍ';
+  const mediaAlerts = useMemo(() => {
+    const items: string[] = [];
+    if (mediaRole && !mediaState.microphoneEnabled) items.push(guestMutedByHost ? 'كتمك المضيف' : 'المايك مكتوم');
+    if (mediaRole && !mediaState.cameraEnabled) items.push('الكاميرا متوقفة');
+    return items;
+  }, [mediaRole, mediaState, guestMutedByHost]);
 
   if (loading) return <View style={styles.loadingScreen}><StatusBar hidden /><ActivityIndicator size="large" color="#34d399" /><Text style={styles.loadingText}>جارٍ تجهيز البث…</Text></View>;
   if (error || !stream) return <View style={styles.errorScreen}><StatusBar hidden /><View style={styles.errorIcon}><Radio color="#fff" size={30} /></View><Text style={styles.errorTitle}>{error || 'تعذر فتح البث'}</Text><Text style={styles.errorHint}>تأكد من الاتصال بالإنترنت وحاول مرة أخرى.</Text><Pressable onPress={() => router.replace('/lives')} style={styles.returnButton}><Text style={styles.returnText}>العودة للبثوث</Text></Pressable></View>;
@@ -412,93 +521,111 @@ export default function LiveRoomScreen() {
     <View style={styles.screen}>
       <StatusBar hidden />
       <View style={styles.stage}>
-        <LiveMedia url={roomUrl} token={token} canPublish={mediaRole} showPublisherControls={showControls} onReady={() => { connectedRef.current = true; setConnected(true); }} onError={(message) => {
-          connectedRef.current = false;
-          setConnected(false);
-          if (role === 'host' && id) {
-            void endLiveStream(id).then(() => setError(message)).catch((endError) => {
-              console.error('Unable to close the host stream after media failure.', endError);
-              setError(`${message} تعذر إنهاء البث تلقائيًا؛ استخدم زر الإنهاء.`);
-            });
-          } else setError(message);
-        }} />
+        <LiveMedia
+          url={roomUrl}
+          token={token}
+          canPublish={mediaRole}
+          onConnectionChange={handleConnectionChange}
+          onQualityChange={handleQualityChange}
+          onMediaStateChange={handleMediaStateChange}
+          onApiReady={handleApiReady}
+          onReady={() => { connectedRef.current = true; setConnected(true); }}
+          onError={(message) => {
+            connectedRef.current = false;
+            setConnected(false);
+            if (role === 'host' && id) {
+              void endLiveStream(id).then(() => setError(message)).catch((endError) => {
+                console.error('Unable to close the host stream after media failure.', endError);
+                setError(`${message} تعذر إنهاء البث تلقائيًا؛ استخدم زر الإنهاء.`);
+              });
+            } else setError(message);
+          }}
+        />
 
-        {showTopBar && (
-          <View pointerEvents="box-none" style={[styles.topOverlay, { top: Math.max(insets.top, 12) }]}>
-            <Pressable accessibilityLabel="إغلاق البث" onPress={() => void handleBack()} style={styles.roundButton}><X color="#fff" size={21} /></Pressable>
-            <View style={styles.livePill}><View style={styles.redDot} /><Text style={styles.liveText}>مباشر</Text></View>
-            <Pressable onPress={() => setPeoplePanel('viewers')} style={styles.viewerPill}><Users color="#fff" size={14} /><Text style={styles.viewerCount}>{viewerCount}</Text></Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="إظهار أو إخفاء الواجهة"
+          style={styles.stageTap}
+          onPress={() => setOverlayVisible((value) => !value)}
+        />
+
+        {overlayVisible && (
+          <>
+            <LinearGradient colors={['rgba(2,6,23,0.78)', 'rgba(2,6,23,0.32)', 'rgba(2,6,23,0)']} locations={[0, 0.55, 1]} pointerEvents="none" style={[styles.topGradient, { height: 210 + insets.top }]} />
+            <LinearGradient colors={['rgba(2,6,23,0)', 'rgba(2,6,23,0.5)', 'rgba(2,6,23,0.9)']} locations={[0, 0.5, 1]} pointerEvents="none" style={[styles.bottomGradient, { height: 340 + insets.bottom }]} />
+          </>
+        )}
+
+        {overlayVisible ? (
+          <>
+            <View pointerEvents="box-none" style={[styles.topBar, { top: Math.max(insets.top, 12) }]}>
+              <Pressable accessibilityLabel="إغلاق البث" onPress={() => void handleBack()} style={styles.roundButton}><X color="#fff" size={21} /></Pressable>
+              <View style={styles.topCenter}>
+                <View style={styles.livePill}><View style={styles.redDot} /><Text style={styles.liveText}>مباشر</Text></View>
+                {connection === 'connected' && quality !== 'unknown' && (
+                  <View style={styles.qualityPill}>
+                    {quality === 'excellent' ? <SignalHigh size={14} color="#34d399" /> : quality === 'good' ? <SignalMedium size={14} color="#fbbf24" /> : <SignalLow size={14} color="#fb7185" />}
+                    <Text style={styles.qualityText}>{quality === 'excellent' ? 'جودة ممتازة' : quality === 'good' ? 'جودة جيدة' : 'جودة ضعيفة'}</Text>
+                  </View>
+                )}
+              </View>
+              <Pressable onPress={() => setPeoplePanel('viewers')} style={styles.viewerPill}><Users color="#fff" size={14} /><Text style={styles.viewerCount}>{viewerCount}</Text></Pressable>
+            </View>
+
+            <View pointerEvents="box-none" style={[styles.hostOverlay, { top: Math.max(insets.top, 12) + 52 }]}>
+              <View style={styles.hostMeta}>
+                {stream.profiles?.avatar_url ? <Image source={{ uri: stream.profiles.avatar_url }} style={styles.hostAvatar} /> : <View style={styles.hostAvatarFallback}><Text style={{ color: '#047857', fontWeight: '900' }}>ح</Text></View>}
+                <View style={{ alignItems: 'flex-end', maxWidth: 175 }}>
+                  <View style={styles.hostNameRow}>
+                    <Text numberOfLines={1} style={styles.hostName}>{hostName}</Text>
+                    {stream.profiles?.is_verified && <BadgeCheck color="#34d399" size={14} />}
+                    <View style={styles.roleTagHost}><Text style={styles.roleTagHostText}>مضيف</Text></View>
+                  </View>
+                  <Text numberOfLines={1} style={styles.hostTitle}>{stream.title}</Text>
+                </View>
+                {role !== 'host' && <Pressable onPress={() => void toggleFollow()} style={styles.followButton}><Text style={styles.followText}>{isFollowing ? 'تتابع' : 'متابعة +'}</Text></Pressable>}
+              </View>
+              {role === 'host' ? <Pressable onPress={confirmEnd} style={styles.endButton}><Text style={styles.endText}>إنهاء</Text></Pressable> : <Pressable onPress={showReport} style={styles.roundButton}><MoreHorizontal color="#fff" size={20} /></Pressable>}
+            </View>
+
+            {topSupporters.length > 0 && (
+              <Pressable onPress={() => setPeoplePanel('supporters')} style={[styles.supportersPill, { top: Math.max(insets.top, 12) + 104 }]}>
+                <Trophy size={14} color="#fde68a" />
+                <Text numberOfLines={1} style={styles.supportersPillText}>الأكثر دعمًا: {topSupporters[0].user.display_name || topSupporters[0].user.username}</Text>
+              </Pressable>
+            )}
+          </>
+        ) : (
+          <View pointerEvents="box-none" style={[styles.hiddenBar, { top: Math.max(insets.top, 12) }]}>
+            {role === 'host' ? (
+              <Pressable onPress={confirmEnd} style={styles.emergencyButton}><Radio color="#fff" size={16} /><Text style={styles.emergencyText}>إنهاء</Text></Pressable>
+            ) : <View style={styles.roundButtonSpacer} />}
+            <Pressable onPress={() => setOverlayVisible(true)} style={styles.hiddenHint}><Eye size={15} color="#fff" /><Text style={styles.hiddenHintText}>اضغط لإظهار الواجهة</Text></Pressable>
+            <View style={styles.roundButtonSpacer} />
           </View>
         )}
 
-        {showInfoPanel && (
-          <View pointerEvents="box-none" style={[styles.hostOverlay, { top: Math.max(insets.top, 12) + 52 }]}>
-            <View style={styles.hostMeta}>
-              {stream.profiles?.avatar_url ? <Image source={{ uri: stream.profiles.avatar_url }} style={styles.hostAvatar} /> : <View style={styles.hostAvatarFallback}><Text style={{ color: '#047857', fontWeight: '900' }}>ح</Text></View>}
-              <View style={{ alignItems: 'flex-end', maxWidth: 175 }}><Text numberOfLines={1} style={styles.hostName}>{hostName}</Text><Text numberOfLines={1} style={styles.hostTitle}>{stream.title}</Text></View>
-              {role !== 'host' && <Pressable onPress={() => void toggleFollow()} style={styles.followButton}><Text style={styles.followText}>{isFollowing ? 'تتابع' : 'متابعة +'}</Text></Pressable>}
-            </View>
-            {role === 'host' ? <Pressable onPress={confirmEnd} style={styles.endButton}><Text style={styles.endText}>إنهاء</Text></Pressable> : <Pressable onPress={showReport} style={styles.roundButton}><MoreHorizontal color="#fff" size={20} /></Pressable>}
+        {connection === 'reconnecting' && (
+          <View pointerEvents="none" style={styles.connectionBanner}><ActivityIndicator color="#fff" size="small" /><Text style={styles.connectionBannerText}>جارٍ إعادة الاتصال…</Text></View>
+        )}
+        {connection === 'connecting' && !connected && (
+          <View pointerEvents="none" style={styles.connectionBanner}><ActivityIndicator color="#fff" size="small" /><Text style={styles.connectionBannerText}>جارٍ الاتصال…</Text></View>
+        )}
+
+        {mediaAlerts.length > 0 && (
+          <View pointerEvents="none" style={styles.mediaAlertWrap}>
+            {mediaAlerts.map((alert) => (
+              <View key={alert} style={styles.mediaAlert}><MicOff size={13} color="#fecdd3" /><Text style={styles.mediaAlertText}>{alert}</Text></View>
+            ))}
           </View>
         )}
-        {showInfoPanel && topSupporters.length > 0 && (
-          <Pressable onPress={() => setPeoplePanel('supporters')} style={[styles.supportersPill, { top: Math.max(insets.top, 12) + 104 }]}>
-            <Trophy size={14} color="#fde68a" />
-            <Text numberOfLines={1} style={styles.supportersPillText}>الأكثر دعمًا: {topSupporters[0].user.display_name || topSupporters[0].user.username}</Text>
-          </Pressable>
-        )}
 
-        <View pointerEvents="none" style={styles.heartsFloat}>{hearts.slice(-4).map((heart, index) => <FloatingEffect key={heart.id} emoji={heart.emoji} duration={2300} style={[styles.floatingHeart, { bottom: 35 + index * 36 }]} />)}</View>
-        {giftBursts.map((item) => (
-          <FloatingEffect key={item.id} emoji={item.emoji} style={[styles.giftBurst, { left: item.x, bottom: 165 + item.y }]} />
-        ))}
+        <View pointerEvents="none" style={styles.effectsLayer}>
+          {effects.map((effect, index) => (
+            <FloatingEffect key={effect.id} emoji={effect.emoji} name={effect.kind === 'gift' ? effect.name : undefined} style={[styles.floatingEffect, { bottom: 150 + (index % 4) * 34 }]} />
+          ))}
+        </View>
 
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0} style={styles.bottomOverlay}>
-          {showControls && role === 'host' && pendingRequests.length > 0 && (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.requestRow}>
-              {pendingRequests.map((request) => <View key={request.id} style={styles.requestCard}><Text style={styles.requestName}>{request.profiles?.display_name || request.profiles?.username || 'مستخدم'} يطلب الصعود</Text><Pressable onPress={() => void decideGuest(request, 'accepted')} style={styles.acceptButton}><Check color="#fff" size={15} /></Pressable><Pressable onPress={() => void decideGuest(request, 'rejected')} style={styles.rejectButton}><X color="#fff" size={15} /></Pressable></View>)}
-            </ScrollView>
-          )}
-
-          {showChat && (
-            <View style={styles.chatPanel}>
-              <ScrollView ref={scrollRef} style={styles.messageList} contentContainerStyle={{ justifyContent: 'flex-end', paddingVertical: 5 }} showsVerticalScrollIndicator={false} onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}>
-                {messages.slice(-10).map((message) => <Pressable key={message.id} onLongPress={() => moderateMessage(message)} style={styles.messageRow}><Text style={styles.messageBody}><Text style={styles.messageName}>{message.profiles?.display_name || message.profiles?.username || 'جارٍ'} </Text>{message.body}</Text></Pressable>)}
-                {messages.length === 0 && <Text style={styles.firstMessage}>كن أول من يحيّي {hostName} 👋</Text>}
-              </ScrollView>
-            </View>
-          )}
-
-          {showControls ? (
-            <>
-              <View style={[styles.actionRow, { paddingBottom: Math.max(insets.bottom, 10) }]}>
-                <Pressable onPress={() => void sendHeart()} style={styles.actionButton}><Heart size={22} color="#fff" fill="#fb7185" /><Text style={styles.actionLabel}>تفاعل</Text></Pressable>
-                <Pressable onPress={() => void sendGift()} style={styles.actionButton}><Gift size={21} color="#fde68a" /><Text style={styles.actionLabel}>هدية مجانية</Text></Pressable>
-                <Pressable onPress={() => setShowChat((value) => !value)} style={styles.actionButton}><MessageCircle size={20} color="#fff" /><Text style={styles.actionLabel}>{showChat ? 'إخفاء' : 'التعليقات'}</Text></Pressable>
-                <Pressable onPress={toggleOverlayMode} style={styles.actionButton}><EyeOff size={20} color="#fff" /><Text style={styles.actionLabel}>وضع</Text></Pressable>
-                {role === 'host' ? (
-                  <Pressable onPress={() => void manageGuests()} style={styles.actionButton}><Users size={21} color="#fff" /><Text style={styles.actionLabel}>الضيوف</Text></Pressable>
-                ) : role === 'viewer' ? (
-                  <Pressable disabled={guestState !== 'idle'} onPress={() => void requestGuestSeat()} style={[styles.actionButton, guestState !== 'idle' && { opacity: 0.7 }]}><UserPlus size={21} color="#fff" /><Text style={styles.actionLabel}>{guestState === 'pending' ? 'بانتظار المضيف' : 'اطلب الصعود'}</Text></Pressable>
-                ) : <View style={styles.guestBadge}><Mic size={15} color="#fff" /><Text style={styles.actionLabel}>أنت ضيف</Text></View>}
-                {role !== 'host' && <Pressable onPress={showReport} style={styles.actionButton}><ShieldAlert size={20} color="#fff" /><Text style={styles.actionLabel}>إبلاغ</Text></Pressable>}
-                <Pressable onPress={() => void shareLive()} style={styles.actionButton}><Share2 size={19} color="#fff" /><Text style={styles.actionLabel}>مشاركة</Text></Pressable>
-                <View style={styles.durationPill}><Text style={styles.durationText}>{duration}</Text></View>
-              </View>
-
-              <View style={[styles.inputBar, { marginBottom: Math.max(insets.bottom, 8) }]}>
-                <Pressable onPress={() => void sendMessage()} disabled={!chatInput.trim() || sending} style={[styles.sendButton, (!chatInput.trim() || sending) && { opacity: 0.5 }]}><Send color="#fff" size={16} /></Pressable>
-                <TextInput value={chatInput} onChangeText={setChatInput} placeholder="أضف تعليقًا…" placeholderTextColor="#cbd5e1" maxLength={300} style={styles.chatInput} returnKeyType="send" onSubmitEditing={() => void sendMessage()} />
-                <View style={styles.commentIcon}><MessageCircle size={18} color="#fff" /></View>
-              </View>
-            </>
-          ) : (
-            <Pressable onPress={() => setShowControls(true)} style={styles.quickReveal}>
-              <Eye size={16} color="#fff" /><Text style={styles.quickRevealText}>إظهار لوحة التحكم</Text>
-            </Pressable>
-          )}
-        </KeyboardAvoidingView>
-        {!connected && <View pointerEvents="none" style={styles.connectingPill}><ActivityIndicator color="#fff" size="small" /><Text style={styles.connectingText}>جارٍ الاتصال…</Text></View>}
         <Modal visible={peoplePanel !== null} transparent animationType="fade" onRequestClose={() => setPeoplePanel(null)}>
           <Pressable style={styles.modalBackdrop} onPress={() => setPeoplePanel(null)}>
             <Pressable style={styles.peopleSheet} onPress={(event) => event.stopPropagation()}>
@@ -508,10 +635,10 @@ export default function LiveRoomScreen() {
               </View>
               <View style={styles.peopleTabs}>
                 <Pressable onPress={() => setPeoplePanel('viewers')} style={[styles.peopleTab, peoplePanel === 'viewers' && styles.peopleTabActive]}><Text style={styles.peopleTabText}>المشاهدون</Text></Pressable>
-                <Pressable onPress={() => setPeoplePanel('supporters')} style={[styles.peopleTab, peoplePanel === 'supporters' && styles.peopleTabActive]}><Text style={styles.peopleTabText}>الداعمون</Text></Pressable>
+                <Pressable onPress={() => setPeoplePanel('supporters')} style={[styles.peopleTab, peoplePanel === 'supporters' && styles.peopleTabActive]}><Text style={styles.peopleTabText}>أفضل 5 داعمين</Text></Pressable>
               </View>
               <ScrollView style={styles.peopleList}>
-                {peoplePanel === 'supporters' ? topSupporters.map((supporter, index) => (
+                {peoplePanel === 'supporters' ? topSupporters.slice(0, 5).map((supporter, index) => (
                   <View key={supporter.user.id} style={styles.peopleRow}>
                     <Text style={styles.peopleRank}>{index + 1}</Text>
                     {supporter.user.avatar_url ? <Image source={{ uri: supporter.user.avatar_url }} style={styles.peopleAvatar} /> : <View style={styles.peopleAvatarFallback}><Text style={styles.peopleInitial}>{(supporter.user.display_name || supporter.user.username || 'ح').slice(0, 1)}</Text></View>}
@@ -532,12 +659,178 @@ export default function LiveRoomScreen() {
             </Pressable>
           </Pressable>
         </Modal>
+
+        <Modal visible={hostSheet !== null} transparent animationType="slide" onRequestClose={() => setHostSheet(null)}>
+          <Pressable style={styles.modalBackdrop} onPress={() => setHostSheet(null)}>
+            <Pressable style={styles.hostSheet} onPress={(event) => event.stopPropagation()}>
+              <View style={styles.peopleSheetHeader}>
+                <Text style={styles.peopleSheetTitle}>أدوات المضيف</Text>
+                <Pressable onPress={() => setHostSheet(null)} style={styles.modalClose}><X color="#fff" size={19} /></Pressable>
+              </View>
+              <View style={styles.peopleTabs}>
+                <Pressable onPress={() => setHostSheet('comments')} style={[styles.peopleTab, hostSheet === 'comments' && styles.peopleTabActive]}><Text style={styles.peopleTabText}>التعليقات</Text></Pressable>
+                <Pressable onPress={() => setHostSheet('guests')} style={[styles.peopleTab, hostSheet === 'guests' && styles.peopleTabActive]}><Text style={styles.peopleTabText}>الضيوف ({guests.length})</Text></Pressable>
+              </View>
+              <ScrollView style={styles.hostSheetList}>
+                {hostSheet === 'comments' && messages.slice().reverse().map((message) => (
+                  <View key={message.id} style={styles.hostCommentRow}>
+                    <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                      <Text style={styles.hostCommentName}>{message.profiles?.display_name || message.profiles?.username || 'جارٍ'}</Text>
+                      <Text numberOfLines={2} style={styles.hostCommentBody}>{message.body}</Text>
+                    </View>
+                    <Pressable onPress={() => void pinMessage(message)} style={[styles.hostAction, message.is_pinned && styles.hostActionActive]}><Pin size={15} color={message.is_pinned ? '#020617' : '#fff'} /></Pressable>
+                    <Pressable onPress={() => void hideMessage(message)} style={styles.hostActionDanger}><EyeOff size={15} color="#fff" /></Pressable>
+                  </View>
+                ))}
+                {hostSheet === 'comments' && messages.length === 0 && <Text style={styles.peopleEmpty}>لا توجد تعليقات بعد.</Text>}
+                {hostSheet === 'guests' && guests.map((guest) => (
+                  <View key={guest.id} style={styles.peopleRow}>
+                    {guest.profiles?.avatar_url ? <Image source={{ uri: guest.profiles.avatar_url }} style={styles.peopleAvatar} /> : <View style={styles.peopleAvatarFallback}><Text style={styles.peopleInitial}>{(guest.profiles?.display_name || guest.profiles?.username || 'ح').slice(0, 1)}</Text></View>}
+                    <Text numberOfLines={1} style={styles.peopleName}>{guest.profiles?.display_name || guest.profiles?.username || 'ضيف'}</Text>
+                    <Pressable onPress={() => void toggleGuestMute(guest)} style={[styles.hostAction, guest.is_muted && styles.hostActionActive]}>{guest.is_muted ? <MicOff size={15} color="#020617" /> : <Mic size={15} color="#fff" />}</Pressable>
+                    <Pressable onPress={() => removeGuest(guest)} style={styles.hostActionDanger}><UserMinus size={15} color="#fff" /></Pressable>
+                  </View>
+                ))}
+                {hostSheet === 'guests' && guests.length === 0 && <Text style={styles.peopleEmpty}>لا يوجد ضيوف في البث الآن.</Text>}
+              </ScrollView>
+            </Pressable>
+          </Pressable>
+        </Modal>
+
+        {overlayVisible && (
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0} style={styles.bottomOverlay}>
+            {role === 'host' && controlsOpen && pendingRequests.length > 0 && (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.requestRow}>
+                {pendingRequests.map((request) => <View key={request.id} style={styles.requestCard}><Text style={styles.requestName}>{request.profiles?.display_name || request.profiles?.username || 'مستخدم'} يطلب الصعود</Text><Pressable onPress={() => void decideGuest(request, 'accepted')} style={styles.acceptButton}><Check color="#fff" size={15} /></Pressable><Pressable onPress={() => void decideGuest(request, 'rejected')} style={styles.rejectButton}><X color="#fff" size={15} /></Pressable></View>)}
+              </ScrollView>
+            )}
+
+            {pinnedMessage && (
+              <View style={styles.pinnedBanner}>
+                <Pin size={13} color="#a7f3d0" />
+                <Text numberOfLines={2} style={styles.pinnedText}><Text style={styles.pinnedAuthor}>{pinnedMessage.profiles?.display_name || pinnedMessage.profiles?.username || 'مثبّت'}: </Text>{pinnedMessage.body}</Text>
+              </View>
+            )}
+
+            {showChat && (
+              <View style={styles.chatPanel}>
+                <ScrollView ref={scrollRef} style={styles.messageList} contentContainerStyle={{ justifyContent: 'flex-end', paddingVertical: 5 }} showsVerticalScrollIndicator={false} onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}>
+                  {messages.slice(-10).map((message) => <CommentCard key={message.id} message={message} onLongPress={() => moderateMessage(message)} />)}
+                  {messages.length === 0 && <Text style={styles.firstMessage}>كن أول من يحيّي {hostName} 👋</Text>}
+                </ScrollView>
+              </View>
+            )}
+
+            {mediaRole ? (
+              <HostControlBar
+                role={role}
+                open={controlsOpen}
+                onToggleOpen={() => setControlsOpen((value) => !value)}
+                cameraOn={mediaState.cameraEnabled}
+                micOn={mediaState.microphoneEnabled}
+                micLocked={role === 'guest' && guestMutedByHost}
+                bottomInset={insets.bottom}
+                onToggleCamera={() => mediaApiRef.current?.setCameraEnabled(!mediaState.cameraEnabled)}
+                onToggleMic={() => mediaApiRef.current?.setMicrophoneEnabled(!mediaState.microphoneEnabled)}
+                onGuests={() => setHostSheet('guests')}
+                onComments={() => setHostSheet('comments')}
+                onShare={() => void shareLive()}
+                onEnd={confirmEnd}
+              />
+            ) : (
+              <View style={[styles.actionRow, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+                <Pressable onPress={() => void sendHeart()} style={styles.actionButton}><Heart size={22} color="#fff" fill="#fb7185" /><Text style={styles.actionLabel}>تفاعل</Text></Pressable>
+                <Pressable onPress={() => void sendGift()} style={styles.actionButton}><Gift size={21} color="#fde68a" /><Text style={styles.actionLabel}>هدية</Text></Pressable>
+                <Pressable onPress={() => setShowChat((value) => !value)} style={styles.actionButton}><MessageCircle size={20} color="#fff" /><Text style={styles.actionLabel}>{showChat ? 'إخفاء' : 'التعليقات'}</Text></Pressable>
+                <Pressable onPress={() => setOverlayVisible(false)} style={styles.actionButton}><EyeOff size={20} color="#fff" /><Text style={styles.actionLabel}>وضع</Text></Pressable>
+                {guestState !== 'accepted' && (
+                  <Pressable disabled={guestState !== 'idle'} onPress={() => void requestGuestSeat()} style={[styles.actionButton, guestState !== 'idle' && { opacity: 0.7 }]}><UserPlus size={21} color="#fff" /><Text style={styles.actionLabel}>{guestState === 'pending' ? 'بانتظار المضيف' : 'اطلب الصعود'}</Text></Pressable>
+                )}
+                <Pressable onPress={showReport} style={styles.actionButton}><ShieldAlert size={20} color="#fff" /><Text style={styles.actionLabel}>إبلاغ</Text></Pressable>
+                <Pressable onPress={() => void shareLive()} style={styles.actionButton}><Share2 size={19} color="#fff" /><Text style={styles.actionLabel}>مشاركة</Text></Pressable>
+                <View style={styles.durationPill}><Text style={styles.durationText}>{duration}</Text></View>
+              </View>
+            )}
+
+            <View style={[styles.inputBar, { marginBottom: Math.max(insets.bottom, 8) }]}>
+              <Pressable onPress={() => void sendMessage()} disabled={!chatInput.trim() || sending} style={[styles.sendButton, (!chatInput.trim() || sending) && { opacity: 0.5 }]}><Send color="#fff" size={16} /></Pressable>
+              <TextInput value={chatInput} onChangeText={setChatInput} placeholder="أضف تعليقًا…" placeholderTextColor="#cbd5e1" maxLength={300} style={styles.chatInput} returnKeyType="send" onSubmitEditing={() => void sendMessage()} />
+              <View style={styles.commentIcon}><MessageCircle size={18} color="#fff" /></View>
+            </View>
+          </KeyboardAvoidingView>
+        )}
       </View>
     </View>
   );
 }
 
-function FloatingEffect({ emoji, style, duration = 1700 }: { emoji: string; style: StyleProp<ViewStyle>; duration?: number }) {
+function CommentCard({ message, onLongPress }: { message: LiveChatMessage; onLongPress: () => void }) {
+  const role: LiveChatRole = message.sender_role === 'host' || message.sender_role === 'guest' ? message.sender_role : 'viewer';
+  const verified = Boolean(message.profiles?.is_verified) && role === 'viewer';
+  const name = message.profiles?.display_name || message.profiles?.username || 'جارٍ';
+  return (
+    <Pressable onLongPress={onLongPress} delayLongPress={350} style={[styles.commentCard, role === 'host' && styles.commentCardHost, role === 'guest' && styles.commentCardGuest]}>
+      <View style={styles.commentHeader}>
+        {role === 'host' && <View style={styles.commentBadgeHost}><Text style={styles.commentBadgeHostText}>مضيف</Text></View>}
+        {role === 'guest' && <View style={styles.commentBadgeGuest}><Text style={styles.commentBadgeGuestText}>ضيف</Text></View>}
+        {verified && <BadgeCheck size={12} color="#fbbf24" />}
+        <Text style={styles.commentName}>{name}</Text>
+      </View>
+      <Text style={styles.commentBody}>{message.body}</Text>
+    </Pressable>
+  );
+}
+
+function HostControlBar({ role, open, onToggleOpen, cameraOn, micOn, micLocked, bottomInset, onToggleCamera, onToggleMic, onGuests, onComments, onShare, onEnd }: {
+  role: Role;
+  open: boolean;
+  onToggleOpen: () => void;
+  cameraOn: boolean;
+  micOn: boolean;
+  micLocked: boolean;
+  bottomInset: number;
+  onToggleCamera: () => void;
+  onToggleMic: () => void;
+  onGuests: () => void;
+  onComments: () => void;
+  onShare: () => void;
+  onEnd: () => void;
+}) {
+  return (
+    <View style={[styles.glassWrap, { marginBottom: Math.max(bottomInset, 10) }]}>
+      <BlurView intensity={Platform.OS === 'ios' ? 48 : 0} tint="dark" style={styles.glassBar}>
+        <View style={styles.glassTint}>
+          <Pressable onPress={onToggleOpen} style={styles.glassToggle} accessibilityLabel={open ? 'طي الأدوات' : 'فتح الأدوات'}>
+            {open ? <ChevronDown size={18} color="#fff" /> : <ChevronUp size={18} color="#fff" />}
+          </Pressable>
+          {open ? (
+            <View style={styles.glassButtons}>
+              <GlassButton active={cameraOn} label="كاميرا" onPress={onToggleCamera}>{cameraOn ? <Camera size={20} color="#fff" /> : <CameraOff size={20} color="#fb7185" />}</GlassButton>
+              <GlassButton active={micOn && !micLocked} disabled={micLocked} label={micLocked ? 'كتم المضيف' : 'مايك'} onPress={onToggleMic}>{micOn && !micLocked ? <Mic size={20} color="#fff" /> : <MicOff size={20} color="#fb7185" />}</GlassButton>
+              {role === 'host' && <GlassButton label="الضيوف" onPress={onGuests}><Users size={20} color="#fff" /></GlassButton>}
+              {role === 'host' && <GlassButton label="التعليقات" onPress={onComments}><MessageCircle size={20} color="#fff" /></GlassButton>}
+              <GlassButton label="مشاركة" onPress={onShare}><Share2 size={19} color="#fff" /></GlassButton>
+              {role === 'host' && <GlassButton danger label="إنهاء" onPress={onEnd}><Radio size={19} color="#fff" /></GlassButton>}
+            </View>
+          ) : (
+            <Text style={styles.glassCollapsedText}>{role === 'host' ? 'تحكم المضيف' : 'تحكم الضيف'}</Text>
+          )}
+        </View>
+      </BlurView>
+    </View>
+  );
+}
+
+function GlassButton({ children, label, onPress, active, danger, disabled }: { children: ReactNode; label: string; onPress: () => void; active?: boolean; danger?: boolean; disabled?: boolean }) {
+  return (
+    <Pressable onPress={onPress} disabled={disabled} style={[styles.glassButton, active && styles.glassButtonActive, danger && styles.glassButtonDanger, disabled && { opacity: 0.5 }]}>
+      {children}
+      <Text style={styles.glassButtonLabel} numberOfLines={1}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function FloatingEffect({ emoji, name, style, duration = 1900 }: { emoji: string; name?: string; style: StyleProp<ViewStyle>; duration?: number }) {
   const progress = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     const animation = Animated.timing(progress, { toValue: 1, duration, useNativeDriver: false });
@@ -546,59 +839,108 @@ function FloatingEffect({ emoji, style, duration = 1700 }: { emoji: string; styl
   }, [duration, progress]);
   return (
     <Animated.View pointerEvents="none" style={[style, {
-      opacity: progress.interpolate({ inputRange: [0, 0.2, 1], outputRange: [0, 1, 0] }),
+      opacity: progress.interpolate({ inputRange: [0, 0.15, 1], outputRange: [0, 1, 0] }),
       transform: [
-        { translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [12, -90] }) },
-        { scale: progress.interpolate({ inputRange: [0, 0.25, 1], outputRange: [0.6, 1.15, 0.85] }) },
+        { translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [10, -110] }) },
+        { scale: progress.interpolate({ inputRange: [0, 0.25, 1], outputRange: [0.6, 1.1, 0.9] }) },
       ],
     }]}>
-      <Text style={styles.giftBurstText}>{emoji}</Text>
+      {name ? (
+        <View style={styles.effectBubble}>
+          <Text style={styles.effectName} numberOfLines={1}>{name}</Text>
+          <Text style={styles.giftBurstText}>{emoji}</Text>
+        </View>
+      ) : <Text style={styles.giftBurstText}>{emoji}</Text>}
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#020617' }, stage: { flex: 1, backgroundColor: '#020617' },
-  topOverlay: { position: 'absolute', left: 14, right: 14, zIndex: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  stageTap: { ...StyleSheet.absoluteFillObject, zIndex: 1 },
+  topGradient: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 4 },
+  bottomGradient: { position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 4 },
+  topBar: { position: 'absolute', left: 14, right: 14, zIndex: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  topCenter: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
   roundButton: { width: 38, height: 38, borderRadius: 20, backgroundColor: 'rgba(2,6,23,0.45)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
+  roundButtonSpacer: { width: 38, height: 38 },
   livePill: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, paddingVertical: 7, paddingHorizontal: 12, borderRadius: 18, backgroundColor: 'rgba(220,38,38,0.92)', shadowColor: '#ef4444', shadowOpacity: 0.5, shadowRadius: 12, shadowOffset: { width: 0, height: 5 } },
   redDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#fff' },
   liveText: { color: '#fff', fontSize: 12, fontWeight: '900' },
+  qualityPill: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingVertical: 7, paddingHorizontal: 10, borderRadius: 18, backgroundColor: 'rgba(2,6,23,0.62)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  qualityText: { color: '#e2e8f0', fontSize: 10, fontWeight: '800' },
   viewerPill: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, paddingVertical: 7, paddingHorizontal: 10, borderRadius: 18, backgroundColor: 'rgba(2,6,23,0.5)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
   viewerCount: { color: '#fff', fontSize: 12, fontWeight: '800' },
   hostOverlay: { position: 'absolute', left: 14, right: 14, zIndex: 10, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between' },
   hostMeta: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, padding: 6, paddingRight: 10, borderRadius: 24, backgroundColor: 'rgba(2,6,23,0.45)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
   hostAvatar: { width: 34, height: 34, borderRadius: 18 }, hostAvatarFallback: { width: 34, height: 34, borderRadius: 18, backgroundColor: '#d1fae5', alignItems: 'center', justifyContent: 'center' },
+  hostNameRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5 },
   hostName: { color: '#fff', fontSize: 12, fontWeight: '900' }, hostTitle: { color: '#e2e8f0', fontSize: 10, marginTop: 2 },
+  roleTagHost: { backgroundColor: 'rgba(16,185,129,0.22)', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
+  roleTagHostText: { color: '#6ee7b7', fontSize: 9, fontWeight: '900' },
   followButton: { backgroundColor: '#059669', borderRadius: 16, paddingHorizontal: 9, paddingVertical: 6 }, followText: { color: '#fff', fontSize: 10, fontWeight: '900' },
   endButton: { backgroundColor: '#dc2626', borderRadius: 20, paddingHorizontal: 15, paddingVertical: 8 }, endText: { color: '#fff', fontSize: 12, fontWeight: '900' },
   supportersPill: { position: 'absolute', right: 14, zIndex: 10, maxWidth: '76%', flexDirection: 'row-reverse', alignItems: 'center', gap: 6, paddingHorizontal: 11, paddingVertical: 8, borderRadius: 18, backgroundColor: 'rgba(2,6,23,0.55)', borderWidth: 1, borderColor: 'rgba(253,230,138,0.28)' },
   supportersPillText: { color: '#fff', fontSize: 11, fontWeight: '800' },
-  heartsFloat: { position: 'absolute', right: 18, bottom: 150, width: 52, height: 200, zIndex: 3 },
-  floatingHeart: { position: 'absolute', right: 6 },
-  giftBurst: { position: 'absolute', width: 26, height: 26, alignItems: 'center', justifyContent: 'center', zIndex: 4 },
+  hiddenBar: { position: 'absolute', left: 14, right: 14, zIndex: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  hiddenHint: { flexDirection: 'row-reverse', alignItems: 'center', gap: 7, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 18, backgroundColor: 'rgba(2,6,23,0.62)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
+  hiddenHintText: { color: '#fff', fontSize: 11, fontWeight: '800' },
+  emergencyButton: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, backgroundColor: 'rgba(220,38,38,0.9)', borderRadius: 18, paddingHorizontal: 13, paddingVertical: 9 },
+  emergencyText: { color: '#fff', fontSize: 12, fontWeight: '900' },
+  connectionBanner: { position: 'absolute', top: '46%', alignSelf: 'center', zIndex: 20, flexDirection: 'row-reverse', alignItems: 'center', gap: 8, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 9, backgroundColor: 'rgba(2,6,23,0.78)' },
+  connectionBannerText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  mediaAlertWrap: { position: 'absolute', top: '30%', alignSelf: 'center', zIndex: 15, alignItems: 'center', gap: 6 },
+  mediaAlert: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 16, backgroundColor: 'rgba(190,18,60,0.82)' },
+  mediaAlertText: { color: '#fff', fontSize: 11, fontWeight: '800' },
+  effectsLayer: { position: 'absolute', right: 18, bottom: 0, width: 70, height: 340, zIndex: 6 },
+  floatingEffect: { position: 'absolute', right: 4, alignItems: 'flex-end' },
+  effectBubble: { alignItems: 'center' },
+  effectName: { color: '#fff', fontSize: 9, fontWeight: '800', maxWidth: 62, backgroundColor: 'rgba(2,6,23,0.55)', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 7, marginBottom: 2 },
   giftBurstText: { fontSize: 22 },
   bottomOverlay: { position: 'absolute', left: 12, right: 12, bottom: 0, zIndex: 10 },
-  chatPanel: { height: 180, maxHeight: '34%', width: '75%', marginBottom: 6, backgroundColor: 'rgba(2,6,23,0.28)', borderRadius: 14, paddingHorizontal: 9, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+  chatPanel: { maxHeight: '30%', width: '78%', marginBottom: 8 },
   messageList: { flex: 1 },
-  messageRow: { alignSelf: 'flex-end', maxWidth: '100%', backgroundColor: 'rgba(2,6,23,0.42)', borderRadius: 15, paddingHorizontal: 10, paddingVertical: 6, marginVertical: 3 },
-  messageBody: { color: '#fff', fontSize: 12, textAlign: 'right', lineHeight: 18 }, messageName: { color: '#a7f3d0', fontWeight: '900' },
+  commentCard: { alignSelf: 'flex-start', maxWidth: '100%', backgroundColor: 'rgba(2,6,23,0.34)', borderRadius: 15, paddingHorizontal: 10, paddingVertical: 6, marginVertical: 3, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
+  commentCardHost: { borderColor: 'rgba(16,185,129,0.4)', backgroundColor: 'rgba(6,78,59,0.4)' },
+  commentCardGuest: { borderColor: 'rgba(56,189,248,0.38)', backgroundColor: 'rgba(12,74,110,0.38)' },
+  commentHeader: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, marginBottom: 1 },
+  commentName: { color: '#a7f3d0', fontWeight: '900', fontSize: 11 },
+  commentBody: { color: '#fff', fontSize: 12, textAlign: 'right', lineHeight: 18 },
+  commentBadgeHost: { backgroundColor: 'rgba(16,185,129,0.25)', borderRadius: 7, paddingHorizontal: 5, paddingVertical: 1 },
+  commentBadgeHostText: { color: '#6ee7b7', fontSize: 9, fontWeight: '900' },
+  commentBadgeGuest: { backgroundColor: 'rgba(56,189,248,0.25)', borderRadius: 7, paddingHorizontal: 5, paddingVertical: 1 },
+  commentBadgeGuestText: { color: '#7dd3fc', fontSize: 9, fontWeight: '900' },
   firstMessage: { color: '#e2e8f0', fontSize: 12, textAlign: 'right', paddingTop: 12 },
+  pinnedBanner: { flexDirection: 'row-reverse', alignItems: 'center', gap: 7, alignSelf: 'flex-end', maxWidth: '86%', backgroundColor: 'rgba(6,78,59,0.72)', borderRadius: 13, paddingHorizontal: 10, paddingVertical: 7, marginBottom: 7, borderWidth: 1, borderColor: 'rgba(52,211,153,0.4)' },
+  pinnedText: { color: '#e2e8f0', fontSize: 11, textAlign: 'right', flexShrink: 1 },
+  pinnedAuthor: { color: '#a7f3d0', fontWeight: '900' },
   requestRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, paddingVertical: 6 },
   requestCard: { flexDirection: 'row-reverse', alignItems: 'center', gap: 7, borderRadius: 20, paddingHorizontal: 9, paddingVertical: 6, backgroundColor: 'rgba(2,6,23,0.72)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
   requestName: { color: '#fff', fontSize: 11, fontWeight: '700' },
   acceptButton: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#059669', alignItems: 'center', justifyContent: 'center' },
   rejectButton: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#dc2626', alignItems: 'center', justifyContent: 'center' },
   actionRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-around', paddingTop: 8 },
-  actionButton: { minWidth: 48, alignItems: 'center', justifyContent: 'center', gap: 3 },
+  actionButton: { minWidth: 46, alignItems: 'center', justifyContent: 'center', gap: 3 },
   actionLabel: { color: '#fff', fontSize: 9, fontWeight: '700' },
-  guestBadge: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, backgroundColor: 'rgba(5,150,105,0.8)', paddingHorizontal: 9, paddingVertical: 7, borderRadius: 14 },
   durationPill: { paddingHorizontal: 8, paddingVertical: 5, borderRadius: 14, backgroundColor: 'rgba(2,6,23,0.4)' },
   durationText: { color: '#fff', fontSize: 11, fontWeight: '700' },
-  quickReveal: { alignSelf: 'center', flexDirection: 'row-reverse', alignItems: 'center', gap: 8, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 18, backgroundColor: 'rgba(2,6,23,0.58)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', marginBottom: 18 },
-  quickRevealText: { color: '#fff', fontWeight: '800', fontSize: 12 },
+  glassWrap: { borderRadius: 26, overflow: 'hidden', marginTop: 6 },
+  glassBar: { borderRadius: 26, borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
+  glassTint: { backgroundColor: 'rgba(2,6,23,0.52)', minHeight: 58, paddingHorizontal: 8, paddingVertical: 6, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  glassToggle: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.1)' },
+  glassButtons: { flex: 1, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-around' },
+  glassButton: { minWidth: 44, alignItems: 'center', justifyContent: 'center', gap: 3, paddingVertical: 4, paddingHorizontal: 4, borderRadius: 14 },
+  glassButtonActive: { backgroundColor: 'rgba(16,185,129,0.28)' },
+  glassButtonDanger: { backgroundColor: 'rgba(220,38,38,0.8)' },
+  glassButtonLabel: { color: '#fff', fontSize: 9, fontWeight: '800' },
+  glassCollapsedText: { flex: 1, color: '#fff', fontSize: 12, fontWeight: '800', textAlign: 'center' },
+  inputBar: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 9, borderRadius: 24, backgroundColor: 'rgba(2,6,23,0.56)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+  sendButton: { width: 30, height: 30, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: '#059669' },
+  chatInput: { flex: 1, minHeight: 40, color: '#fff', textAlign: 'right', fontSize: 13 },
+  commentIcon: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
   modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)' },
   peopleSheet: { maxHeight: '72%', backgroundColor: '#0f172a', borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingHorizontal: 18, paddingTop: 16, paddingBottom: 28, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
+  hostSheet: { maxHeight: '78%', backgroundColor: '#0f172a', borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingHorizontal: 18, paddingTop: 16, paddingBottom: 28, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
   peopleSheetHeader: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
   peopleSheetTitle: { color: '#fff', fontSize: 17, fontWeight: '900' },
   modalClose: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.1)' },
@@ -607,7 +949,14 @@ const styles = StyleSheet.create({
   peopleTabActive: { backgroundColor: '#047857' },
   peopleTabText: { color: '#fff', fontSize: 12, fontWeight: '800' },
   peopleList: { minHeight: 90 },
+  hostSheetList: { minHeight: 90 },
   peopleRow: { minHeight: 52, flexDirection: 'row-reverse', alignItems: 'center', gap: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)' },
+  hostCommentRow: { minHeight: 56, flexDirection: 'row-reverse', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)', paddingVertical: 6 },
+  hostCommentName: { color: '#a7f3d0', fontSize: 11, fontWeight: '900' },
+  hostCommentBody: { color: '#e2e8f0', fontSize: 12, textAlign: 'right', marginTop: 2 },
+  hostAction: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.1)' },
+  hostActionActive: { backgroundColor: '#34d399' },
+  hostActionDanger: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(220,38,38,0.75)' },
   peopleRank: { color: '#fcd34d', width: 18, textAlign: 'center', fontWeight: '900' },
   peopleAvatar: { width: 34, height: 34, borderRadius: 17 },
   peopleAvatarFallback: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#064e3b', alignItems: 'center', justifyContent: 'center' },
@@ -615,12 +964,6 @@ const styles = StyleSheet.create({
   peopleName: { flex: 1, color: '#fff', textAlign: 'right', fontSize: 13, fontWeight: '700' },
   giftCount: { color: '#fde68a', fontSize: 11, fontWeight: '900' },
   peopleEmpty: { color: '#cbd5e1', textAlign: 'center', paddingVertical: 24, fontSize: 12 },
-  inputBar: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 9, borderRadius: 24, backgroundColor: 'rgba(2,6,23,0.56)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
-  sendButton: { width: 30, height: 30, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: '#059669' },
-  chatInput: { flex: 1, minHeight: 40, color: '#fff', textAlign: 'right', fontSize: 13 },
-  commentIcon: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
-  connectingPill: { position: 'absolute', top: '48%', alignSelf: 'center', flexDirection: 'row-reverse', alignItems: 'center', gap: 8, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 9, backgroundColor: 'rgba(2,6,23,0.7)' },
-  connectingText: { color: '#fff', fontSize: 12 },
   loadingScreen: { flex: 1, backgroundColor: '#020617', alignItems: 'center', justifyContent: 'center', gap: 12 },
   loadingText: { color: '#fff', fontSize: 14 },
   errorScreen: { flex: 1, backgroundColor: '#020617', alignItems: 'center', justifyContent: 'center', padding: 28 },

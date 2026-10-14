@@ -23,13 +23,17 @@ export type LiveStream = {
   } | null;
 };
 
+export type LiveChatRole = 'host' | 'guest' | 'viewer';
+
 export type LiveChatMessage = {
   id: string;
   stream_id: string;
   sender_id: string;
   body: string;
   created_at: string;
-  profiles?: { display_name: string | null; username: string | null; avatar_url: string | null } | null;
+  is_pinned?: boolean;
+  sender_role?: LiveChatRole;
+  profiles?: { display_name: string | null; username: string | null; avatar_url: string | null; is_verified?: boolean | null } | null;
 };
 
 export type LiveGiftEvent = {
@@ -50,6 +54,31 @@ export type LiveHostLeader = {
   total_minutes: number;
   peak_viewers: number;
 };
+
+export type LiveLeaderboardPeriod = 'weekly' | 'monthly';
+
+export type LiveAchievement = {
+  key: string;
+  title: string;
+  description: string;
+  emoji: string;
+  earned: boolean;
+  metric: number;
+};
+
+export const LIVE_ACHIEVEMENT_META: Record<string, { title: string; description: string; emoji: string }> = {
+  first_stream: { title: 'أول بث', description: 'أكملت أول بث مباشر لك.', emoji: '🎬' },
+  active_host: { title: 'مضيف نشط', description: 'قدّمت 4 بثوث خلال آخر 30 يومًا.', emoji: '🔥' },
+  community_voice: { title: 'صوت المجتمع', description: 'بلغ مجموع بثك 60 دقيقة خلال شهر.', emoji: '🎙️' },
+  neighborhood_star: { title: 'نجم الحي', description: 'وصل بثك إلى 25 مشاهدًا في وقت واحد.', emoji: '🌟' },
+  consistent_host: { title: 'مضيف منتظم', description: 'بثثت في 5 أيام مختلفة خلال شهر.', emoji: '📅' },
+};
+
+export const LIVE_LEADERBOARD_PERIOD_LABEL: Record<LiveLeaderboardPeriod, string> = {
+  weekly: 'هذا الأسبوع',
+  monthly: 'هذا الشهر',
+};
+
 
 export type LiveSupporter = {
   user_id: string;
@@ -87,15 +116,25 @@ export async function fetchLiveStreams() {
   return streams.map((stream) => ({ ...stream, viewer_count: (counts.get(stream.id) || 0) + 1 }));
 }
 
-export async function fetchLiveHostLeaderboard() {
-  const { data, error } = await supabase.rpc('get_live_host_leaderboard');
+export async function fetchLiveHostLeaderboard(period: LiveLeaderboardPeriod = 'monthly') {
+  const { data, error } = await supabase.rpc('get_live_host_leaderboard', { p_period: period });
   if (error) throw error;
-  return ((data || []) as LiveHostLeader[]).map((host) => ({
+  return ((data || []) as LiveHostLeader[]) .map((host) => ({
     ...host,
     stream_count: Number(host.stream_count),
     total_minutes: Number(host.total_minutes),
     peak_viewers: Number(host.peak_viewers),
   }));
+}
+
+export async function fetchLiveHostAchievements(hostId: string) {
+  const { data, error } = await supabase.rpc('get_live_host_achievements', { p_host_id: hostId });
+  if (error) throw error;
+  const rows = (data || []) as { key: string; earned: boolean; metric: number }[];
+  return rows.map((row) => {
+    const meta = LIVE_ACHIEVEMENT_META[row.key] || { title: row.key, description: '', emoji: '🏅' };
+    return { key: row.key, ...meta, earned: Boolean(row.earned), metric: Number(row.metric) } as LiveAchievement;
+  });
 }
 
 export async function fetchLiveSupporters(streamId: string) {
@@ -178,4 +217,23 @@ export async function addLiveBlock(streamId: string, hostId: string, blockedUser
     stream_id: streamId, host_id: hostId, blocked_user_id: blockedUserId,
   }, { onConflict: 'stream_id,blocked_user_id' });
   if (blockError) throw blockError;
+}
+
+export async function setLiveMessagePinned(streamId: string, messageId: string, pinned: boolean) {
+  const { error } = await supabase.from('live_chat_messages')
+    .update({ is_pinned: pinned }).eq('id', messageId).eq('stream_id', streamId);
+  if (error) throw error;
+}
+
+export async function hideLiveMessage(streamId: string, messageId: string) {
+  const { error } = await supabase.from('live_chat_messages')
+    .update({ is_hidden: true }).eq('id', messageId).eq('stream_id', streamId);
+  if (error) throw error;
+}
+
+export async function setLiveGuestMuted(streamId: string, guestId: string, muted: boolean) {
+  const { error } = await supabase.from('live_guest_requests')
+    .update({ is_muted: muted })
+    .eq('stream_id', streamId).eq('guest_id', guestId).eq('status', 'accepted');
+  if (error) throw error;
 }
