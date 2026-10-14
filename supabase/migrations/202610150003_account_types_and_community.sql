@@ -1,143 +1,298 @@
--- Community hub and account types: safety center, favorites, ratings,
--- supported merchants & freelancers, and contact tickets.
+-- =========================================================
+-- Community Hub: Account Types, Favorites, Support Tickets,
+-- App Reviews, Follow Statistics
+-- Compatible with Supabase / PostgreSQL
+-- =========================================================
 
--- 1) User account type and merchant/freelancer verification
-alter table public.profiles
-  add column if not exists account_type text not null default 'standard',
-  add column if not exists freelance_trade text,
-  add column if not exists is_verified_merchant boolean not null default false;
+-- =========================================================
+-- 1. USER ACCOUNT TYPES AND MERCHANT VERIFICATION
+-- =========================================================
 
-do $$
-begin
-  if not exists (select 1 from pg_catalog.pg_constraint where conname = 'profiles_account_type_check') then
-    alter table public.profiles add constraint profiles_account_type_check check (
-      account_type in ('standard', 'merchant', 'freelance', 'provider', 'idea')
-    );
-  end if;
-  if not exists (select 1 from pg_catalog.pg_constraint where conname = 'profiles_merchant_verification_consistency') then
-    alter table public.profiles add constraint profiles_merchant_verification_consistency check (
-      not (account_type in ('merchant', 'freelance') and is_verified_merchant is false) or true
-    );
-  end if;
-end
-$$;
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS account_type text NOT NULL DEFAULT 'standard',
+  ADD COLUMN IF NOT EXISTS freelance_trade text,
+  ADD COLUMN IF NOT EXISTS is_verified_merchant boolean NOT NULL DEFAULT false;
 
--- Extend verification requests to handle freelancers / business documents
-alter table public.verification_requests
-  add column if not exists verification_type text not null default 'identity',
-  add column if not exists subject text,
-  add column if not exists attachment_url text;
-
-do $$
-begin
-  if not exists (select 1 from pg_catalog.pg_constraint where conname = 'verification_requests_type_check') then
-    alter table public.verification_requests
-      add constraint verification_requests_type_check check (
-        verification_type in ('identity', 'freelance', 'business')
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_constraint
+    WHERE conname = 'profiles_account_type_check'
+      AND conrelid = 'public.profiles'::regclass
+  ) THEN
+    ALTER TABLE public.profiles
+      ADD CONSTRAINT profiles_account_type_check
+      CHECK (
+        account_type IN ('standard', 'merchant', 'freelance', 'provider', 'idea')
       );
-  end if;
-end
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_constraint
+    WHERE conname = 'profiles_merchant_verification_consistency'
+      AND conrelid = 'public.profiles'::regclass
+  ) THEN
+    ALTER TABLE public.profiles
+      ADD CONSTRAINT profiles_merchant_verification_consistency
+      CHECK (
+        NOT (
+          account_type IN ('merchant', 'freelance')
+          AND is_verified_merchant IS FALSE
+        ) OR TRUE
+      );
+  END IF;
+END
 $$;
 
--- 2) Favorites (wishlist) for marketplace items, services, posts
-create table if not exists public.favorite_items (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references public.profiles(id) on delete cascade,
-  target_type text not null check (target_type in ('service', 'product', 'request', 'store', 'post')),
-  target_id uuid not null,
-  created_at timestamptz not null default now(),
-  unique (user_id, target_type, target_id)
+
+-- =========================================================
+-- 2. VERIFICATION REQUESTS
+-- =========================================================
+
+ALTER TABLE public.verification_requests
+  ADD COLUMN IF NOT EXISTS verification_type text NOT NULL DEFAULT 'identity',
+  ADD COLUMN IF NOT EXISTS subject text,
+  ADD COLUMN IF NOT EXISTS attachment_url text;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_constraint
+    WHERE conname = 'verification_requests_type_check'
+      AND conrelid = 'public.verification_requests'::regclass
+  ) THEN
+    ALTER TABLE public.verification_requests
+      ADD CONSTRAINT verification_requests_type_check
+      CHECK (
+        verification_type IN ('identity', 'freelance', 'business')
+      );
+  END IF;
+END
+$$;
+
+
+-- =========================================================
+-- 3. FAVORITES / WISHLIST
+-- =========================================================
+
+CREATE TABLE IF NOT EXISTS public.favorite_items (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL
+    REFERENCES public.profiles(id) ON DELETE CASCADE,
+  target_type text NOT NULL
+    CHECK (target_type IN ('service', 'product', 'request', 'store', 'post')),
+  target_id uuid NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (user_id, target_type, target_id)
 );
-create index if not exists favorite_items_user_idx on public.favorite_items (user_id, created_at desc);
 
-alter table public.favorite_items enable row level security;
-grant select, insert, delete on public.favorite_items to authenticated;
+CREATE INDEX IF NOT EXISTS favorite_items_user_idx
+  ON public.favorite_items (user_id, created_at DESC);
 
-drop policy if exists favorites_self_all on public.favorite_items;
-create policy favorites_self_all on public.favorite_items
-  for all to authenticated using (user_id = (select auth.uid()))
-  with check (user_id = (select auth.uid()));
+ALTER TABLE public.favorite_items ENABLE ROW LEVEL SECURITY;
 
--- 3) In-app support tickets that reach platform admins
-create table if not exists public.support_tickets (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid references public.profiles(id) on delete set null,
-  name text not null,
+GRANT SELECT, INSERT, DELETE
+  ON public.favorite_items TO authenticated;
+
+DROP POLICY IF EXISTS favorites_self_all
+  ON public.favorite_items;
+
+CREATE POLICY favorites_self_all
+  ON public.favorite_items
+  FOR ALL
+  TO authenticated
+  USING (user_id = (SELECT auth.uid()))
+  WITH CHECK (user_id = (SELECT auth.uid()));
+
+
+-- =========================================================
+-- 4. SUPPORT TICKETS
+-- =========================================================
+
+CREATE TABLE IF NOT EXISTS public.support_tickets (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
+  name text NOT NULL,
   email text,
-  subject text not null check (char_length(subject) between 3 and 120),
-  message text not null check (char_length(message) between 3 and 2000),
-  status text not null default 'open' check (status in ('open','reviewing','resolved','closed')),
-  created_at timestamptz not null default now(),
+  subject text NOT NULL
+    CHECK (char_length(subject) BETWEEN 3 AND 120),
+  message text NOT NULL
+    CHECK (char_length(message) BETWEEN 3 AND 2000),
+  status text NOT NULL DEFAULT 'open'
+    CHECK (status IN ('open', 'reviewing', 'resolved', 'closed')),
+  created_at timestamptz NOT NULL DEFAULT now(),
   resolved_at timestamptz
 );
-create index if not exists support_tickets_status_idx on public.support_tickets (status, created_at desc);
-create index if not exists support_tickets_user_idx on public.support_tickets (user_id, created_at desc);
 
-alter table public.support_tickets enable row level security;
-grant insert on public.support_tickets to authenticated, anon;
-grant select on public.support_tickets to authenticated;
+CREATE INDEX IF NOT EXISTS support_tickets_status_idx
+  ON public.support_tickets (status, created_at DESC);
 
--- Anyone authenticated or a guest can open a ticket
-drop policy if exists tickets_create_all on public.support_tickets;
-create policy tickets_create_all on public.support_tickets
-  for insert to anon, authenticated with check true;
+CREATE INDEX IF NOT EXISTS support_tickets_user_idx
+  ON public.support_tickets (user_id, created_at DESC);
 
--- Owners read their own tickets; platform admins/governance read all
-drop policy if exists tickets_read_own on public.support_tickets;
-create policy tickets_read_own on public.support_tickets
-  for select to authenticated using (
-    user_id = (select auth.uid())
-    or exists (select 1 from public.profiles p where p.id = (select auth.uid()) and p.role = 'admin')
+ALTER TABLE public.support_tickets ENABLE ROW LEVEL SECURITY;
+
+GRANT INSERT ON public.support_tickets TO anon, authenticated;
+GRANT SELECT ON public.support_tickets TO authenticated;
+GRANT UPDATE ON public.support_tickets TO authenticated;
+
+-- Allow guests and signed-in users to submit support tickets.
+DROP POLICY IF EXISTS tickets_create_all
+  ON public.support_tickets;
+
+CREATE POLICY tickets_create_all
+  ON public.support_tickets
+  FOR INSERT
+  TO anon, authenticated
+  WITH CHECK (true);
+
+-- Users can read their own tickets.
+-- Administrators can read all tickets.
+DROP POLICY IF EXISTS tickets_read_own
+  ON public.support_tickets;
+
+CREATE POLICY tickets_read_own
+  ON public.support_tickets
+  FOR SELECT
+  TO authenticated
+  USING (
+    user_id = (SELECT auth.uid())
+    OR EXISTS (
+      SELECT 1
+      FROM public.profiles p
+      WHERE p.id = (SELECT auth.uid())
+        AND p.role = 'admin'
+    )
   );
 
--- Admins can resolve tickets
-drop policy if exists tickets_admin_update on public.support_tickets;
-create policy tickets_admin_update on public.support_tickets
-  for update to authenticated using (
-    exists (select 1 from public.profiles p where p.id = (select auth.uid()) and p.role = 'admin')
-  ) with check (
-    exists (select 1 from public.profiles p where p.id = (select auth.uid()) and p.role = 'admin')
+-- Only administrators can update tickets.
+DROP POLICY IF EXISTS tickets_admin_update
+  ON public.support_tickets;
+
+CREATE POLICY tickets_admin_update
+  ON public.support_tickets
+  FOR UPDATE
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.profiles p
+      WHERE p.id = (SELECT auth.uid())
+        AND p.role = 'admin'
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1
+      FROM public.profiles p
+      WHERE p.id = (SELECT auth.uid())
+        AND p.role = 'admin'
+    )
   );
 
--- 4) App rating / value your experience
-create table if not exists public.app_reviews (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references public.profiles(id) on delete cascade,
-  rating smallint not null check (rating between 1 and 5),
-  body text check (char_length(body) <= 1000),
-  published boolean not null default true,
-  created_at timestamptz not null default now(),
-  unique (user_id)
+
+-- =========================================================
+-- 5. APP REVIEWS AND RATINGS
+-- =========================================================
+
+CREATE TABLE IF NOT EXISTS public.app_reviews (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL
+    REFERENCES public.profiles(id) ON DELETE CASCADE,
+  rating smallint NOT NULL
+    CHECK (rating BETWEEN 1 AND 5),
+  body text
+    CHECK (body IS NULL OR char_length(body) <= 1000),
+  published boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (user_id)
 );
-create index if not exists app_reviews_created_idx on public.app_reviews (created_at desc);
 
-alter table public.app_reviews enable row level security;
-grant insert, update, select on public.app_reviews to authenticated;
+CREATE INDEX IF NOT EXISTS app_reviews_created_idx
+  ON public.app_reviews (created_at DESC);
 
-drop policy if exists reviews_create_self on public.app_reviews;
-create policy reviews_create_self on public.app_reviews
-  for insert to authenticated
-  with check (user_id = (select auth.uid()));
+ALTER TABLE public.app_reviews ENABLE ROW LEVEL SECURITY;
 
-drop policy if exists reviews_upsert_self on public.app_reviews;
-create policy reviews_upsert_self on public.app_reviews
-  for update to authenticated
-  using (user_id = (select auth.uid()))
-  with check (user_id = (select auth.uid()));
+GRANT SELECT, INSERT, UPDATE
+  ON public.app_reviews TO authenticated;
 
-drop policy if exists reviews_read_public on public.app_reviews;
-create policy reviews_read_public on public.app_reviews
-  for select to authenticated using (published = true);
+-- Users can submit their own review.
+DROP POLICY IF EXISTS reviews_create_self
+  ON public.app_reviews;
 
--- 5) Follow list helper (rename-safe wrapper over existing follows table)
--- Profiles expose follower/following through this view
-create or replace view public.user_follow_stats as
-  select p.id,
-    (select count(*) from public.follows f where f.follower_id = p.id) as following_count,
-    (select count(*) from public.follows f where f.following_id = p.id) as followers_count
-  from public.profiles p;
+CREATE POLICY reviews_create_self
+  ON public.app_reviews
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (user_id = (SELECT auth.uid()));
 
-grant select on public.user_follow_stats to authenticated;
+-- Users can update only their own review.
+DROP POLICY IF EXISTS reviews_upsert_self
+  ON public.app_reviews;
 
--- 6) Ensure admin role stays adequate (already default 'user')
-update public.profiles set role = 'user' where role is null;
+CREATE POLICY reviews_upsert_self
+  ON public.app_reviews
+  FOR UPDATE
+  TO authenticated
+  USING (user_id = (SELECT auth.uid()))
+  WITH CHECK (user_id = (SELECT auth.uid()));
+
+-- Authenticated users can read published reviews.
+DROP POLICY IF EXISTS reviews_read_public
+  ON public.app_reviews;
+
+CREATE POLICY reviews_read_public
+  ON public.app_reviews
+  FOR SELECT
+  TO authenticated
+  USING (
+    published = true
+    OR user_id = (SELECT auth.uid())
+    OR EXISTS (
+      SELECT 1
+      FROM public.profiles p
+      WHERE p.id = (SELECT auth.uid())
+        AND p.role = 'admin'
+    )
+  );
+
+
+-- =========================================================
+-- 6. FOLLOWER AND FOLLOWING STATISTICS
+-- =========================================================
+
+CREATE OR REPLACE VIEW public.user_follow_stats
+WITH (security_invoker = true)
+AS
+SELECT
+  p.id,
+  (
+    SELECT count(*)
+    FROM public.follows f
+    WHERE f.follower_id = p.id
+  ) AS following_count,
+  (
+    SELECT count(*)
+    FROM public.follows f
+    WHERE f.following_id = p.id
+  ) AS followers_count
+FROM public.profiles p;
+
+GRANT SELECT ON public.user_follow_stats TO authenticated;
+
+
+-- =========================================================
+-- 7. PROFILE ROLE DEFAULT DATA CLEANUP
+-- =========================================================
+
+UPDATE public.profiles
+SET role = 'user'
+WHERE role IS NULL;
+
+
+-- =========================================================
+-- END OF SCRIPT
+-- =========================================================
