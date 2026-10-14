@@ -508,6 +508,17 @@ export default function MoreScreen() {
           </View>
 
           {/* ======================================================== */}
+          <Text style={styles.sectionHeader}>{'الأمان، نوع الحساب والمجتمع'}</Text>
+          <View style={styles.menuGroup}>
+            <MenuItem icon={<Shield size={20} color="#059669" />} iconBg="#ecfdf5" title="مركز الأمان والثقة" sub="التبليغ والطوارئ" onPress={() => router.push('/safety-center')} />
+            <MenuItem icon={<User size={20} color="#0284c7" />} iconBg="#f0f9ff" title="نوع الحساب والتوثيق" sub="تجاري، عمل حر، مقدم خدمة" onPress={() => router.push('/account-type')} />
+            <MenuItem icon={<Star size={20} color="#d97706" />} iconBg="#fffbeb" title="المفضلة" sub="الواصلات المحفوظة" onPress={() => router.push('/favorites')} />
+            <MenuItem icon={<Mail size={20} color="#475569" />} iconBg="#f1f5f9" title="المتابعون" sub="المتابعين/Mymeme" onPress={() => router.push('/connected-social')} />
+            <MenuItem icon={<ShieldCheck size={20} color="#7c3aed" />} iconBg="#f5f3ff" title="قيّم تجربتك" sub="rating/feedback" onPress={() => router.push('/rate-app')} />
+            <MenuItem icon={<Mail size={20} color="#059669" />} iconBg="#ecfdf5" title="اتصل بنا" sub="رسائل الدعم" onPress={() => router.push('/contact-us')} />
+          </View>
+
+          {/* ======================================================== */}
           {/* 7. FREQUENTLY ASKED QUESTIONS                            */}
           {/* ======================================================== */}
           <Text style={styles.sectionHeader}>الأسئلة الشائعة 💬</Text>
