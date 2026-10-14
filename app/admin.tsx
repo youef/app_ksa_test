@@ -36,6 +36,7 @@ import { AdminAnalytics } from '@/components/admin/AdminAnalytics';
 import { AdminSecurityCenter } from '@/components/admin/AdminSecurityCenter';
 import { AdminBadges } from '@/components/admin/AdminBadges';
 import { AdminWeeklyReport } from '@/components/admin/AdminWeeklyReport';
+import { AdminSupportCenter } from '@/components/admin/AdminSupportCenter';
 import {
   Shield,
   Users,
@@ -74,6 +75,7 @@ import {
   CalendarDays,
   Award,
   Lock,
+  LifeBuoy,
   TrendingUp,
   Store,
   Building2,
@@ -127,6 +129,7 @@ type AdminTabKey =
   | 'analytics'
   | 'users'
   | 'verifications'
+  | 'support'
   | 'reports'
   | 'content'
   | 'platform'
@@ -171,6 +174,7 @@ const ADMIN_NAV: AdminNavGroup[] = [
     tabs: [
       { key: 'users', label: 'المستخدمون', icon: (a) => <Users size={15} color={a ? C.accentDark : '#64748B'} /> },
       { key: 'verifications', label: 'التوثيق', icon: (a) => <Star size={15} color={a ? C.accentDark : '#64748B'} /> },
+      { key: 'support', label: 'الدعم والتذاكر', icon: (a) => <LifeBuoy size={15} color={a ? C.accentDark : '#64748B'} /> },
       { key: 'reports', label: 'البلاغات', icon: (a) => <Flag size={15} color={a ? C.accentDark : '#64748B'} /> },
       { key: 'content', label: 'المحتوى', icon: (a) => <MessageCircle size={15} color={a ? C.accentDark : '#64748B'} /> },
     ],
@@ -2448,6 +2452,9 @@ export default function AdminScreen() {
             </View>
           </View>
         )}
+
+        {/* TAB: INTEGRATED SUPPORT OPERATIONS */}
+        {activeTab === 'support' && <AdminSupportCenter onToast={showToast} />}
 
         {/* TAB 8: AUDIT LOGS */}
         {activeTab === 'logs' && (
