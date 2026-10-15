@@ -440,6 +440,15 @@ export default function WeatherScreen() {
                 Alert.alert('تنبيه', 'يرجى تسجيل الدخول أولًا.');
                 return;
               }
+              // An atomic server-side cooldown prevents repeated weather broadcasts
+              // from alternate devices or by bypassing client state.
+              const { data: allowed, error: cooldownError } = await supabase.rpc('hayna_claim_weather_broadcast');
+              if (cooldownError) throw cooldownError;
+              if (allowed !== true) {
+                Alert.alert('انتظر قليلاً', 'يمكن إرسال تنبيه طقس مرة كل 15 دقيقة من الحساب نفسه.');
+                return;
+              }
+
               let query = supabase.from('profiles').select('id').eq('city', weather.city).limit(300);
               if (weather.district) query = query.eq('district', weather.district);
               const { data: neighbors } = await query;
