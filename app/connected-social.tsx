@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { AppHeader } from '@/components/shared/AppHeader';
+import { router } from 'expo-router';
 import { useBottomNavInset } from '@/lib/bottomNav';
 import { supabase } from '@/lib/supabase';
 import { UserRound, Users, Search, RefreshCw, UserMinus, BadgeCheck, ChevronLeft, UserPlus, Sparkles, Inbox } from 'lucide-react-native';
