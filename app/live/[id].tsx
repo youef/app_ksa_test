@@ -291,7 +291,7 @@ export default function LiveRoomScreen() {
 
     return () => {
       clearInterval(poll); clearInterval(audienceTimer);
-      void supabase.removeChannel(chatChannel); void supabase.removeChannel(streamChannel); void supabase.removeChannel(guestChannel); void supabase.removeChannel(presenceChannel);
+      void supabase.removeChannel(chatChannel); void supabase.removeChannel(streamChannel); void supabase.removeChannel(guestChannel);
     };
   }, [id, loading, error, loadMessages, loadGuests]);
 
