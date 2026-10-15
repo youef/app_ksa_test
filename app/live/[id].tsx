@@ -22,6 +22,7 @@ import {
 import LiveMedia, { type LiveMediaApi, type LiveMediaConnection, type LiveMediaQuality, type LiveMediaState } from '@/components/lives/LiveMedia';
 import LiveModerationPanel from '@/components/lives/LiveModerationPanel';
 import { useLiveModeration } from '@/hooks/useLiveModeration';
+import { useLiveRoomHeartbeat } from '@/hooks/useLiveRoomHeartbeat';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BadgeCheck, Camera, CameraOff, Check, ChevronDown, ChevronUp, Eye, EyeOff, Gift, Heart, MessageCircle, Mic, MicOff, MoreHorizontal, Pin, Radio, Send, Share2, ShieldAlert, SignalHigh, SignalLow, SignalMedium, Trophy, UserMinus, UserPlus, Users, X } from 'lucide-react-native';
 
@@ -57,7 +58,7 @@ export default function LiveRoomScreen() {
   const [guestState, setGuestState] = useState<'idle' | 'pending' | 'accepted'>('idle');
   const [guestMutedByHost, setGuestMutedByHost] = useState(false);
   const [effects, setEffects] = useState<Effect[]>([]);
-  const [elapsed, setElapsed] = useState(0);
+  const elapsed = useLiveRoomHeartbeat(id ? String(id) : undefined, currentUser, role, stream?.started_at);
   const [connected, setConnected] = useState(false);
   const [connection, setConnection] = useState<LiveMediaConnection>('connecting');
   const [quality, setQuality] = useState<LiveMediaQuality>('unknown');
@@ -324,17 +325,6 @@ export default function LiveRoomScreen() {
       .subscribe();
     heartChannelRef.current = presenceChannel;
 
-    const heartbeat = async () => {
-      if (!currentUser) return;
-      if (role === 'host') {
-        await supabase.from('live_streams').update({ updated_at: new Date().toISOString() })
-          .eq('id', id).eq('host_id', currentUser).eq('status', 'live');
-        return;
-      }
-      await supabase.from('live_viewer_sessions').upsert({ stream_id: id, viewer_id: currentUser, last_seen_at: new Date().toISOString() }, { onConflict: 'stream_id,viewer_id' });
-    };
-    void heartbeat();
-    const heartbeatTimer = setInterval(() => { void heartbeat(); }, 20_000);
     const audienceTimer = setInterval(() => {
       void loadAudience(id).catch((cause) => console.error('Unable to refresh live audience.', cause));
       void loadSupporters(id).catch((cause) => console.error('Unable to refresh live supporters.', cause));
@@ -342,14 +332,10 @@ export default function LiveRoomScreen() {
     void loadAudience(id).catch((cause) => console.error('Unable to load live audience.', cause));
     void loadSupporters(id).catch((cause) => console.error('Unable to load live supporters.', cause));
     if (role === 'host') void loadGuests(id).catch((cause) => console.error('Unable to load live guests.', cause));
-    const elapsedTimer = setInterval(() => {
-      if (stream?.started_at) setElapsed(Math.max(0, Math.floor((Date.now() - new Date(stream.started_at).getTime()) / 1000)));
-    }, 1000);
 
     return () => {
-      clearInterval(poll); clearInterval(heartbeatTimer); clearInterval(audienceTimer); clearInterval(elapsedTimer);
+      clearInterval(poll); clearInterval(audienceTimer);
       heartChannelRef.current = null;
-      void supabase.from('live_viewer_sessions').delete().eq('stream_id', id).eq('viewer_id', currentUser);
       void supabase.removeChannel(chatChannel); void supabase.removeChannel(streamChannel); void supabase.removeChannel(guestChannel); void supabase.removeChannel(presenceChannel);
     };
   }, [id, loading, error, role, guestState, currentUser, stream?.started_at, loadMessages, loadGuests]);
