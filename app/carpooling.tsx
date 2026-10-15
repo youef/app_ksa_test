@@ -50,53 +50,11 @@ interface CarpoolItem {
   price_per_seat?: number;
 }
 
-const DEFAULT_CARPOOLS: CarpoolItem[] = [
-  {
-    id: 'c-1',
-    parent_name: 'أبو فهد (ولي أمر)',
-    school_name: 'مدارس التربية النموذجية (بنين)',
-    district: 'الياسمين',
-    city: 'الرياض',
-    trip_type: 'both',
-    trip_type_label: 'ذهاب وعودة (صباحاً وظهراً)',
-    seats_available: 2,
-    notes: 'عندي مقعدين شاغرين لطلاب المرحلة المتوسطة، الانطلاق 6:30 ص والعودة 1:30 ظهراً.',
-    phone: '0501112233',
-    is_verified: true,
-  },
-  {
-    id: 'c-2',
-    parent_name: 'أم سارة',
-    school_name: 'مدارس الفرسان الأهلية (بنات)',
-    district: 'النرجس',
-    city: 'الرياض',
-    trip_type: 'morning',
-    trip_type_label: 'فترة الصباح فقط (6:40 ص)',
-    seats_available: 3,
-    notes: 'مستعدة لتوصيل الطالبات صباحاً بالتبادل مع ولية أمر أخرى تتولى فترة الرجعة.',
-    phone: '0554443322',
-    is_verified: true,
-  },
-  {
-    id: 'c-3',
-    parent_name: 'أبو عبد العزيز',
-    school_name: 'مجمع مدارس حي العارض الحكومي',
-    district: 'العارض',
-    city: 'الرياض',
-    trip_type: 'return',
-    trip_type_label: 'فترة الظهر (1:15 م)',
-    seats_available: 2,
-    notes: 'توصيل الظهر للمرحلة الابتدائية، سيارة عائلية مريحة ومكيفة.',
-    phone: '0567778899',
-    is_verified: true,
-  },
-];
-
 export default function CarpoolingScreen() {
   const bottomNavInset = useBottomNavInset();
   const [filterType, setFilterType] = useState<'all' | 'morning' | 'return'>('all');
   const [search, setSearch] = useState('');
-  const [carpools, setCarpools] = useState<CarpoolItem[]>(DEFAULT_CARPOOLS);
+  const [carpools, setCarpools] = useState<CarpoolItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [userProfile, setUserProfile] = useState<any>(null);
@@ -120,13 +78,6 @@ export default function CarpoolingScreen() {
         setUserProfile(prof);
       }
 
-      // 2. Fetch real community profiles to enrich neighbor pool
-      const { data: realProfiles } = await supabase
-        .from('profiles')
-        .select('id, display_name, phone, district, city, avatar_url, is_verified_neighbor')
-        .not('display_name', 'is', null)
-        .limit(6);
-
       // 3. Fetch community carpools from `requests` table where request_type is 'carpooling'
       const { data: dbRides, error } = await supabase
         .from('requests')
@@ -139,7 +90,7 @@ export default function CarpoolingScreen() {
           district,
           status,
           created_at,
-          profiles:requester_id(id, display_name, phone, avatar_url, is_verified_neighbor)
+          profiles:requester_id(id, display_name, avatar_url, is_verified_neighbor)
         `)
         .eq('request_type', 'carpooling')
         .order('created_at', { ascending: false })
@@ -157,12 +108,12 @@ export default function CarpoolingScreen() {
           parent_name: r.profiles?.display_name || 'ولي أمر بالحي',
           school_name: cleanSchool,
           district: r.district || 'الحي',
-          city: r.city || 'الرياض',
+          city: r.city || '',
           trip_type: 'both',
           trip_type_label: 'مشاركة توصيل مدرسي',
           seats_available: r.max_participants || r.seats_available || 2,
           notes: r.description || 'مشاركة توصيل بين أولياء أمور الحي.',
-          phone: r.profiles?.phone || '',
+          phone: '',
           is_verified: Boolean(r.profiles?.is_verified_neighbor),
           participants_count: r.current_participants || 0,
           max_participants: r.max_participants || 2,
@@ -171,31 +122,10 @@ export default function CarpoolingScreen() {
         };
       });
 
-      // Bind curated defaults to real user profiles if available
-      const attachedDefaults = DEFAULT_CARPOOLS.map((cur, idx) => {
-        const neighbor = realProfiles && realProfiles.length > 0 ? realProfiles[idx % realProfiles.length] : null;
-        return {
-          ...cur,
-          requester_id: neighbor?.id || cur.requester_id,
-          parent_name: neighbor?.display_name ? `${neighbor.display_name} (ولي أمر)` : cur.parent_name,
-          phone: neighbor?.phone || cur.phone,
-          district: neighbor?.district || cur.district,
-          is_verified: neighbor ? Boolean(neighbor.is_verified_neighbor) : cur.is_verified,
-        };
-      });
-
-      // Merge real database rides + attached defaults without duplicates
-      const merged = [...formattedDbRides];
-      for (const cur of attachedDefaults) {
-        if (!merged.some(m => m.school_name === cur.school_name)) {
-          merged.push(cur);
-        }
-      }
-
-      setCarpools(merged);
+      setCarpools(formattedDbRides);
     } catch (e) {
       console.warn('Carpool load error:', e);
-      setCarpools(DEFAULT_CARPOOLS);
+      setCarpools([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
