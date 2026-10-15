@@ -241,54 +241,13 @@ export default function Service() {
         return;
       }
 
-      let convId: string | null = null;
-      const { data: existingMembers } = await supabase
-        .from('conversation_members')
-        .select('conversation_id')
-        .eq('user_id', me)
-        .order('conversation_id');
-
-      if (existingMembers && existingMembers.length > 0) {
-        const myConversations = existingMembers.map(m => m.conversation_id);
-        if (myConversations.length > 0) {
-          const { data: partnerMatches } = await supabase
-            .from('conversation_members')
-            .select('conversation_id, user_id')
-            .in('conversation_id', myConversations)
-            .eq('user_id', providerId)
-            .maybeSingle();
-
-          if (partnerMatches?.conversation_id) {
-            convId = partnerMatches.conversation_id;
-          }
-        }
-      }
-
-      if (!convId) {
-        const { data: conv, error: convError } = await supabase
-          .from('conversations')
-          .insert({})
-          .select('id')
-          .single();
-
-        if (convError || !conv) {
-          throw convError ?? new Error('تعذّر إنشاء محادثة جديدة.');
-        }
-
-        convId = conv.id;
-
-        const membersPayload = [
-          { conversation_id: convId, user_id: me },
-          { conversation_id: convId, user_id: providerId },
-        ];
-
-        const { error: membersError } = await supabase
-          .from('conversation_members')
-          .insert(membersPayload);
-
-        if (membersError) {
-          throw membersError;
-        }
+      // The server RPC enforces private-message preferences and block rules.
+      const { data: convId, error: convError } = await supabase.rpc(
+        'hayna_get_or_create_direct_conversation',
+        { p_target: providerId },
+      );
+      if (convError || !convId) {
+        throw convError || new Error('لا تسمح إعدادات الخصوصية ببدء هذه المحادثة.');
       }
 
       const body = `مرحباً! أستفسر عن عرضك «${service.name}» في سوق الحي. هل هو متوفر الآن؟`;
