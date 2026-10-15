@@ -62,7 +62,7 @@ begin
   where stream_id = new.stream_id;
 
   if coalesce(v_settings.block_links, true)
-     and new.body ~* '(https?://|www[.]|t[.]me/|wa[.]me/|bit[.]ly/|tinyurl[.]com/|linktr[.]ee/)' then
+     and new.body ~* '(https?://|www[.]|t[.]me/|wa[.]me/|bit[.]ly/|tinyurl[.]com/|linktr[.]ee/|[[:alnum:]-]+[.](com|net|org|io|co|me|ly|app|sa|info|biz|dev|site|xyz)(/[^[:space:]]*)?)' then
     raise exception 'الروابط غير مسموحة في تعليقات هذا البث.';
   end if;
 
