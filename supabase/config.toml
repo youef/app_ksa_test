@@ -32,4 +32,7 @@ project_id = "vkeuyompnddqfvulalkk"
 [edge_runtime]
   # Increase timeout for heavier functions
   scheduled-broadcast-dispatch = { timeout = 120 }
+  # Public gateway callback; handler re-fetches and verifies the invoice server-to-server.
+  moyasar-marketplace-webhook = { verify_jwt = false }
+  tap-marketplace-webhook = { verify_jwt = false }
   weekly-admin-report = { timeout = 180 }
