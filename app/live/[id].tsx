@@ -16,7 +16,6 @@ import {
   setLiveGuestMuted,
   setLiveMessagePinned,
   type LiveChatMessage,
-  type LiveChatRole,
   type LiveStream,
 } from '@/lib/lives';
 import LiveMedia, { type LiveMediaApi, type LiveMediaConnection, type LiveMediaQuality, type LiveMediaState } from '@/components/lives/LiveMedia';
@@ -314,7 +313,7 @@ export default function LiveRoomScreen() {
           }
         }
       })();
-    }, 5000);
+    }, 10_000);
 
     const presenceChannel = supabase.channel(`live-effects:${id}`, { config: { broadcast: { self: false } } })
       .on('broadcast', { event: 'heart' }, ({ payload }) => {
@@ -329,7 +328,7 @@ export default function LiveRoomScreen() {
     const audienceTimer = setInterval(() => {
       void loadAudience(id).catch((cause) => console.error('Unable to refresh live audience.', cause));
       void loadSupporters(id).catch((cause) => console.error('Unable to refresh live supporters.', cause));
-    }, 8_000);
+    }, 20_000);
     void loadAudience(id).catch((cause) => console.error('Unable to load live audience.', cause));
     void loadSupporters(id).catch((cause) => console.error('Unable to load live supporters.', cause));
     if (role === 'host') void loadGuests(id).catch((cause) => console.error('Unable to load live guests.', cause));
