@@ -37,11 +37,10 @@ async function resolveImageUrls(
         userId: authorId,
         index: i,
       });
-      urls.push(result.url);
-      if (result.strategy !== 'bucket') degraded += 1;
-      if (result.strategy === 'local' && __DEV__) {
-        console.warn(`[story] شريحة ${i + 1}: تعذر رفع الصورة، تم حفظ مسارها المحلي فقط`);
+      if (result.strategy !== 'bucket' || !/^https?:\\/\\//i.test(result.url)) {
+        throw new Error(result.error || 'تعذر رفع صورة القصة إلى التخزين.');
       }
+      urls.push(result.url);
     } else {
       urls.push(null);
     }
