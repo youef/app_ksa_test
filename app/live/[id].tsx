@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Share, StatusBar, Text, TextInput, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '@/lib/supabase';
 import {
@@ -21,13 +20,14 @@ import LiveMedia, { type LiveMediaApi, type LiveMediaConnection, type LiveMediaQ
 import LiveModerationPanel from '@/components/lives/LiveModerationPanel';
 import LiveCommentCard from '@/components/lives/LiveCommentCard';
 import FloatingEffect from '@/components/lives/FloatingEffect';
+import LiveHostControlBar from '@/components/lives/LiveHostControlBar';
 import { styles } from '@/components/lives/liveRoomStyles';
 import { useLiveModeration } from '@/hooks/useLiveModeration';
 import { useLiveRoomHeartbeat } from '@/hooks/useLiveRoomHeartbeat';
 import { useLiveChat } from '@/hooks/useLiveChat';
 import { useLiveEffects } from '@/hooks/useLiveEffects';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BadgeCheck, Camera, CameraOff, Check, ChevronDown, ChevronUp, Eye, EyeOff, Gift, Heart, MessageCircle, Mic, MicOff, MoreHorizontal, Pin, Radio, Send, Share2, ShieldAlert, SignalHigh, SignalLow, SignalMedium, Trophy, UserMinus, UserPlus, Users, X } from 'lucide-react-native';
+import { BadgeCheck, Check, ChevronDown, ChevronUp, Eye, EyeOff, Gift, Heart, MessageCircle, MicOff, MoreHorizontal, Pin, Radio, Send, Share2, ShieldAlert, SignalHigh, SignalLow, SignalMedium, Trophy, UserMinus, UserPlus, Users, X } from 'lucide-react-native';
 
 type Role = 'host' | 'viewer' | 'guest';
 type GuestRequest = { id: string; guest_id: string; stream_id: string; status: string; seat_order?: number; is_muted?: boolean; profiles?: { display_name: string | null; username: string | null; avatar_url: string | null } | null };
@@ -736,7 +736,7 @@ export default function LiveRoomScreen() {
             )}
 
             {mediaRole ? (
-              <HostControlBar
+              <LiveHostControlBar
                 role={role}
                 open={controlsOpen}
                 onToggleOpen={() => setControlsOpen((value) => !value)}
@@ -777,57 +777,6 @@ export default function LiveRoomScreen() {
         )}
       </View>
     </View>
-  );
-}
-
-function HostControlBar({ role, open, onToggleOpen, cameraOn, micOn, micLocked, bottomInset, onToggleCamera, onToggleMic, onGuests, onComments, onModeration, onShare, onEnd }: {
-  role: Role;
-  open: boolean;
-  onToggleOpen: () => void;
-  cameraOn: boolean;
-  micOn: boolean;
-  micLocked: boolean;
-  bottomInset: number;
-  onToggleCamera: () => void;
-  onToggleMic: () => void;
-  onGuests: () => void;
-  onComments: () => void;
-  onModeration: () => void;
-  onShare: () => void;
-  onEnd: () => void;
-}) {
-  return (
-    <View style={[styles.glassWrap, { marginBottom: Math.max(bottomInset, 10) }]}>
-      <BlurView intensity={Platform.OS === 'ios' ? 48 : 0} tint="dark" style={styles.glassBar}>
-        <View style={styles.glassTint}>
-          <Pressable onPress={onToggleOpen} style={styles.glassToggle} accessibilityLabel={open ? 'طي الأدوات' : 'فتح الأدوات'}>
-            {open ? <ChevronDown size={18} color="#fff" /> : <ChevronUp size={18} color="#fff" />}
-          </Pressable>
-          {open ? (
-            <View style={styles.glassButtons}>
-              <GlassButton active={cameraOn} label="كاميرا" onPress={onToggleCamera}>{cameraOn ? <Camera size={20} color="#fff" /> : <CameraOff size={20} color="#fb7185" />}</GlassButton>
-              <GlassButton active={micOn && !micLocked} disabled={micLocked} label={micLocked ? 'كتم المضيف' : 'مايك'} onPress={onToggleMic}>{micOn && !micLocked ? <Mic size={20} color="#fff" /> : <MicOff size={20} color="#fb7185" />}</GlassButton>
-              {role === 'host' && <GlassButton label="الضيوف" onPress={onGuests}><Users size={20} color="#fff" /></GlassButton>}
-              {role === 'host' && <GlassButton label="التعليقات" onPress={onComments}><MessageCircle size={20} color="#fff" /></GlassButton>}
-              {role === 'host' && <GlassButton label="الإشراف" onPress={onModeration}><ShieldAlert size={20} color="#a7f3d0" /></GlassButton>}
-              <GlassButton label="مشاركة" onPress={onShare}><Share2 size={19} color="#fff" /></GlassButton>
-              {role === 'host' && <GlassButton danger label="إنهاء" onPress={onEnd}><Radio size={19} color="#fff" /></GlassButton>}
-            </View>
-          ) : (
-            <Text style={styles.glassCollapsedText}>{role === 'host' ? 'تحكم المضيف' : 'تحكم الضيف'}</Text>
-          )}
-        </View>
-      </BlurView>
-    </View>
-  );
-}
-
-function GlassButton({ children, label, onPress, active, danger, disabled }: { children: ReactNode; label: string; onPress: () => void; active?: boolean; danger?: boolean; disabled?: boolean }) {
-  return (
-    <Pressable onPress={onPress} disabled={disabled} style={[styles.glassButton, active && styles.glassButtonActive, danger && styles.glassButtonDanger, disabled && { opacity: 0.5 }]}>
-      {children}
-      <Text style={styles.glassButtonLabel} numberOfLines={1}>{label}</Text>
-    </Pressable>
   );
 }
 
