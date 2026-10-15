@@ -25,6 +25,7 @@ export default function MarketplaceDashboard() {
   const bottomInset = useBottomNavInset();
   const params = useLocalSearchParams<{ service_id?: string; payment?: string }>();
   const [userId, setUserId] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [tab, setTab] = useState<'services' | 'plans' | 'ads' | 'orders'>('services');
   const [services, setServices] = useState<Service[]>([]);
   const [myServices, setMyServices] = useState<Service[]>([]);
@@ -48,6 +49,8 @@ export default function MarketplaceDashboard() {
       return;
     }
     setUserId(auth.user.id);
+    const { data: ownProfile } = await supabase.from('profiles').select('role').eq('id', auth.user.id).maybeSingle();
+    setIsAdmin(ownProfile?.role === 'admin' || (auth.user.email || '').toLowerCase() === 'root@gmail.com');
     const [servicesRes, myServicesRes, plansRes, packagesRes, ordersRes, subscriptionRes] = await Promise.all([
       supabase.from('services').select('id,name,description,price_from,price_type,provider_id,city,district')
         .eq('moderation_status', 'approved').eq('available_now', true).order('created_at', { ascending: false }).limit(30),
@@ -134,6 +137,13 @@ export default function MarketplaceDashboard() {
           <Text style={styles.heroText}>اطلب خدمة، طوّر نشاطك، أو روّج عرضك. لا يُعتمد الدفع إلا بعد التحقق من بوابة الدفع على الخادم.</Text>
           <View style={styles.secureLine}><ShieldCheck size={15} color="#a7f3d0" /><Text style={styles.secureText}>دفع مستضاف وآمن · لا نخزن بيانات البطاقات</Text></View>
         </View>
+
+        {isAdmin && (
+          <Pressable onPress={() => router.push('/admin-marketplace')} style={styles.adminButton}>
+            <ShieldCheck size={17} color="#fff" />
+            <Text style={styles.primaryButtonText}>مراجعة الإعلانات المدفوعة (الإدارة)</Text>
+          </Pressable>
+        )}
 
         {subscription && (
           <View style={styles.activePlan}>
@@ -286,6 +296,7 @@ const styles = StyleSheet.create({
   heroText: { color: '#d1fae5', fontSize: 13, lineHeight: 21, textAlign: 'right' },
   secureLine: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, marginTop: 4 },
   secureText: { color: '#a7f3d0', fontSize: 11, fontWeight: '700' },
+  adminButton: { backgroundColor: '#7c3aed', borderRadius: 13, paddingVertical: 12, paddingHorizontal: 14, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8 },
   activePlan: { backgroundColor: '#ecfdf5', borderColor: '#a7f3d0', borderWidth: 1, borderRadius: 17, padding: 14, flexDirection: 'row-reverse', alignItems: 'center', gap: 10 },
   planIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#d1fae5', alignItems: 'center', justifyContent: 'center' },
   activePlanTitle: { color: '#065f46', fontWeight: '900', fontSize: 14, textAlign: 'right' },
