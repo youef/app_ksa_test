@@ -5,7 +5,9 @@ type Cell = string | number | boolean | null | undefined;
 function escapeCell(value: Cell): string {
   if (value === null || value === undefined) return '';
   const s = String(value);
-  return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  // Prevent spreadsheet formula injection while preserving CSV quoting.
+  const safe = /^[\\s\\uFEFF]*[=+\\-@]/.test(s) ? "'" + s : s;
+  return /[",\\n\\r]/.test(safe) ? '"' + safe.replace(/"/g, '""') + '"' : safe;
 }
 
 /**
