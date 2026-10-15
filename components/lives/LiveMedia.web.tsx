@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ConnectionQuality, ConnectionState, Room, RoomEvent, Track, type TrackPublication } from 'livekit-client';
+import { ConnectionQuality, ConnectionState, Room, RoomEvent, Track, type TrackPublication, type RemoteTrack } from 'livekit-client';
 import { ActivityIndicator, Text, View } from 'react-native';
 
 export type LiveMediaConnection = 'connecting' | 'connected' | 'reconnecting' | 'disconnected';
@@ -46,17 +46,63 @@ export default function LiveMedia({ url, token, canPublish, onConnectionChange, 
   const [connection, setConnection] = useState<LiveMediaConnection>('connecting');
   const [quality, setQuality] = useState<LiveMediaQuality>('unknown');
   const [media, setMedia] = useState<LiveMediaState>({ cameraEnabled: canPublish, microphoneEnabled: canPublish });
-  const [mediaRevision, setMediaRevision] = useState(0);
 
   useEffect(() => { callbacksRef.current.onConnectionChange?.(connection); }, [connection]);
   useEffect(() => { callbacksRef.current.onQualityChange?.(quality); }, [quality]);
   useEffect(() => { callbacksRef.current.onMediaStateChange?.(media); }, [media]);
 
+  // Track attached media elements so we don't leak them or duplicate them.
+  const attachedRef = useRef(new Map<string, HTMLMediaElement>());
+
+  const attachTrack = (track: Track) => {
+    const container = videoHostRef.current;
+    if (!container || !track) return;
+
+    const participantIdentity = track.sid || 'local';
+    const key = `${participantIdentity}-${track.kind}`;
+
+    // Track already attached — skip duplicates.
+    if (attachedRef.current.has(key)) return;
+
+    const element = track.attach() as HTMLMediaElement;
+    element.setAttribute('playsinline', '');
+    element.setAttribute('webkit-playsinline', '');
+    element.setAttribute('autoplay', '');
+    element.autoplay = true;
+    element.playsInline = true;
+    element.style.width = '100%';
+    element.style.height = '100%';
+    element.style.objectFit = 'cover';
+
+    // Mute local audio to prevent echo; keep video unmuted.
+    if (track.kind === Track.Kind.Audio) {
+      element.muted = true;
+    }
+
+    // Store reference for cleanup.
+    attachedRef.current.set(key, element);
+    container.appendChild(element);
+
+    // Try to play; if the browser blocks it, catch silently.
+    void element.play().catch(() => {
+      // Autoplay blocked — user interaction will trigger play via controls.
+    });
+  };
+
+  const detachTrack = (track: Track) => {
+    const participantIdentity = track.sid || 'local';
+    const key = `${participantIdentity}-${track.kind}`;
+    const element = attachedRef.current.get(key);
+    if (element) {
+      element.remove();
+      attachedRef.current.delete(key);
+    }
+  };
+
   useEffect(() => {
     let cancelled = false;
     const room = new Room({ adaptiveStream: true, dynacast: true });
     roomRef.current = room;
-    const refresh = () => setMediaRevision((v) => v + 1);
     const syncMedia = () => {
       if (cancelled) return;
       setMedia({
@@ -65,14 +111,29 @@ export default function LiveMedia({ url, token, canPublish, onConnectionChange, 
       });
     };
 
-    room.on(RoomEvent.TrackSubscribed, refresh);
-    room.on(RoomEvent.TrackUnsubscribed, refresh);
-    room.on(RoomEvent.TrackPublished, refresh);
-    room.on(RoomEvent.TrackUnpublished, refresh);
-    room.on(RoomEvent.LocalTrackPublished, syncMedia);
-    room.on(RoomEvent.LocalTrackUnpublished, syncMedia);
-    room.on(RoomEvent.TrackMuted, syncMedia);
-    room.on(RoomEvent.TrackUnmuted, syncMedia);
+    room.on(RoomEvent.TrackSubscribed, (_track: RemoteTrack, _publication: TrackPublication, participant) => {
+      const tracks = participant.getTrackPublications();
+      for (const pub of tracks) {
+        if (pub.track) attachTrack(pub.track);
+      }
+      syncMedia();
+    });
+
+    room.on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack) => {
+      detachTrack(track);
+      syncMedia();
+    });
+
+    room.on(RoomEvent.LocalTrackPublished, (publication) => {
+      if (publication.track) attachTrack(publication.track);
+      syncMedia();
+    });
+
+    room.on(RoomEvent.LocalTrackUnpublished, (publication) => {
+      if (publication.track) detachTrack(publication.track);
+      syncMedia();
+    });
+
     room.on(RoomEvent.ConnectionStateChanged, (state) => setConnection(connectionFromState(state)));
     room.on(RoomEvent.Reconnecting, () => setConnection('reconnecting'));
     room.on(RoomEvent.SignalReconnecting, () => setConnection('reconnecting'));
@@ -110,46 +171,16 @@ export default function LiveMedia({ url, token, canPublish, onConnectionChange, 
 
     return () => {
       cancelled = true;
+      // Detach all tracks before disconnecting.
+      for (const [, element] of attachedRef.current) {
+        element.remove();
+      }
+      attachedRef.current.clear();
       room.removeAllListeners();
       void room.disconnect();
       roomRef.current = null;
     };
   }, [url, token, canPublish]);
-
-  useEffect(() => {
-    const container = videoHostRef.current;
-    const room = roomRef.current;
-    if (!container || !room) return;
-    container.replaceChildren();
-    const publications: TrackPublication[] = [];
-    for (const participant of [room.localParticipant, ...room.remoteParticipants.values()]) {
-      for (const publication of participant.trackPublications.values()) {
-        if (participant === room.localParticipant && publication.kind === Track.Kind.Audio) continue;
-        if (publication.track && (publication.track.kind === Track.Kind.Video || publication.track.kind === Track.Kind.Audio)) {
-          publications.push(publication);
-        }
-      }
-    }
-    for (const publication of publications) {
-      const track = publication.track;
-      if (!track) continue;
-      const element = track.attach();
-      if (element instanceof HTMLVideoElement) {
-        element.setAttribute('playsinline', '');
-        element.setAttribute('webkit-playsinline', '');
-        element.setAttribute('autoplay', '');
-        element.autoplay = true;
-        element.playsInline = true;
-        element.muted = element.muted || false;
-        void element.play().catch(() => {});
-      }
-      element.style.width = '100%';
-      element.style.height = '100%';
-      element.style.objectFit = 'cover';
-      container.appendChild(element);
-    }
-    return () => { for (const publication of publications) publication.track?.detach(); };
-  }, [connection, mediaRevision]);
 
   return (
     <View style={{ flex: 1, backgroundColor: '#020617', minHeight: 280 }}>

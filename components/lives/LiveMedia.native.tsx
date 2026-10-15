@@ -4,6 +4,7 @@ import {
   AudioSession,
   LiveKitRoom,
   VideoTrack,
+  AudioTrack,
   useTracks,
   isTrackReference,
   registerGlobals,
@@ -51,7 +52,7 @@ function connectionFromState(state: ConnectionState): LiveMediaConnection {
 }
 
 function RoomTracks() {
-  const tracks = useTracks([Track.Source.Camera], { onlySubscribed: true });
+  const tracks = useTracks([Track.Source.Camera, Track.Source.Microphone]);
   const videos = tracks.filter((track) => isTrackReference(track) && track.publication.kind === Track.Kind.Video);
   if (!videos.length) {
     return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color="#fff" /><Text style={{ color: '#fff', marginTop: 10 }}>بانتظار صورة المضيف…</Text></View>;

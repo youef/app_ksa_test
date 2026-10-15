@@ -1,16 +1,18 @@
-import React,{useCallback,useEffect,useMemo,useState} from 'react';
+import React,{useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {ActivityIndicator,Alert,Pressable,ScrollView,Text,TextInput,View} from 'react-native';
 import {router} from 'expo-router';
 import {ArrowRight,LifeBuoy,Plus,Search,Send,MessageCircle} from 'lucide-react-native';
 import {supabase} from '@/lib/supabase';
 import { SUPPORT_STATUSES, SupportEmptyState, SupportStatusBadge, type SupportStatus } from '@/components/shared/SupportUI';
+import { AdminSupportCenter } from '@/components/admin/AdminSupportCenter';
+import { AdminTaskCenter } from '@/components/admin/AdminTaskCenter';
 type Status=SupportStatus;
 type Ticket={id:string;user_id:string|null;name:string;email:string|null;subject:string;message:string;status:Status;created_at:string;resolved_at:string|null};
 type Reply={id:string;ticket_id:string;user_id:string|null;author_name:string;message:string;is_admin:boolean;created_at:string};
 const S=SUPPORT_STATUSES;
 const inp:any={borderWidth:1,borderColor:'#DCE5ED',backgroundColor:'#F8FAFC',borderRadius:13,padding:12,textAlign:'right',color:'#0F172A',fontSize:13};
 const dt=(v:string)=>new Date(v).toLocaleString('ar-SA',{dateStyle:'medium',timeStyle:'short'});
-export default function SupportScreen(){
+function UserSupportPage(){
  const [uid,setUid]=useState<string|null>(null),[name,setName]=useState('مستخدم حيّنا'),[email,setEmail]=useState(''),[tickets,setTickets]=useState<Ticket[]>([]),[replies,setReplies]=useState<Reply[]>([]);
  const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[search,setSearch]=useState(''),[selected,setSelected]=useState<string|null>(null),[form,setForm]=useState(false),[subject,setSubject]=useState(''),[message,setMessage]=useState(''),[reply,setReply]=useState('');
  const load=useCallback(async()=>{setLoading(true);try{const {data:auth}=await supabase.auth.getUser();if(!auth.user){router.replace('/auth');return;}setUid(auth.user.id);setEmail(auth.user.email||'');const {data:p}=await supabase.from('profiles').select('display_name,username').eq('id',auth.user.id).maybeSingle();setName(p?.display_name||p?.username||auth.user.email||'مستخدم حيّنا');const {data,error}=await supabase.from('support_tickets').select('id,user_id,name,email,subject,message,status,created_at,resolved_at').eq('user_id',auth.user.id).order('created_at',{ascending:false}).limit(200);if(error)throw error;const ownTickets=(data||[]) as Ticket[];setTickets(ownTickets);if(ownTickets.length){const {data:rs,error:re}=await supabase.from('support_ticket_replies').select('id,ticket_id,user_id,author_name,message,is_admin,created_at').in('ticket_id',ownTickets.map(t=>t.id)).order('created_at').limit(1000);if(re)throw re;setReplies((rs||[]) as Reply[]);}else{setReplies([]);}}catch(e:any){Alert.alert('تعذر تحميل التذاكر',e?.message||'تحقق من الاتصال');}finally{setLoading(false);}},[]);
@@ -25,4 +27,97 @@ export default function SupportScreen(){
  <View style={{backgroundColor:'#fff',borderRadius:17,padding:12,borderWidth:1,borderColor:'#E2E8F0',gap:9}}><View style={{flexDirection:'row-reverse',alignItems:'center',gap:8}}><Search size={17} color="#64748B"/><Text style={{fontSize:15,fontWeight:'900',color:'#0F172A'}}>تذاكري</Text></View><TextInput value={search} onChangeText={setSearch} placeholder="ابحث بالموضوع أو نص الرسالة أو رقم التذكرة..." style={inp}/></View>
  {loading?<View style={{padding:40,alignItems:'center'}}><ActivityIndicator size="large" color="#0F766E"/></View>:visible.length===0?<SupportEmptyState title="لا توجد تذاكر مطابقة" description="افتح تذكرة جديدة أو جرّب عبارة بحث مختلفة." icon={<MessageCircle size={29} color="#94A3B8" />}/>:visible.map(t=>{const st=S[t.status],open=selected===t.id,rs=replies.filter(r=>r.ticket_id===t.id);return <View key={t.id} style={{backgroundColor:'#fff',borderRadius:18,borderWidth:1,borderColor:open?'#99F6E4':'#E2E8F0',padding:15,gap:11}}><View style={{flexDirection:'row-reverse',alignItems:'flex-start',gap:9}}><View style={{flex:1,gap:5}}><Text style={{fontSize:14,fontWeight:'900',color:'#0F172A',textAlign:'right'}}>{t.subject}</Text><Text style={{fontSize:10,color:'#94A3B8',textAlign:'right'}}>#{t.id.slice(0,8).toUpperCase()} · {dt(t.created_at)}</Text></View><SupportStatusBadge status={t.status} compact /></View><Text numberOfLines={open?undefined:2} style={{fontSize:12,lineHeight:20,color:'#475569',textAlign:'right'}}>{t.message}</Text><Pressable onPress={()=>setSelected(open?null:t.id)} style={btn('#F0FDFA')}><MessageCircle size={14} color="#0F766E"/><Text style={{fontSize:11,fontWeight:'900',color:'#0F766E'}}>{open?'إخفاء المحادثة':'عرض المحادثة ('+rs.length+' رد)'}</Text></Pressable>{open&&<View style={{borderTopWidth:1,borderTopColor:'#E2E8F0',paddingTop:11,gap:10}}>{rs.map(r=><View key={r.id} style={{alignSelf:r.is_admin?'flex-start':'flex-end',width:'94%',backgroundColor:r.is_admin?'#F0FDFA':'#F8FAFC',borderWidth:1,borderColor:r.is_admin?'#99F6E4':'#E2E8F0',borderRadius:13,padding:11,gap:5}}><Text style={{fontSize:11,fontWeight:'900',color:r.is_admin?'#0F766E':'#334155',textAlign:'right'}}>{(r.is_admin?'فريق دعم حيّنا':r.author_name)+' · '+dt(r.created_at)}</Text><Text style={{fontSize:12,lineHeight:20,color:'#334155',textAlign:'right'}}>{r.message}</Text></View>)}{t.status!=='closed'&&t.status!=='resolved'?<><TextInput value={reply} onChangeText={setReply} multiline maxLength={2000} placeholder="اكتب ردك أو أضف معلومات..." style={[inp,{minHeight:75,textAlignVertical:'top'}]}/><Pressable disabled={busy} onPress={()=>void send(t)} style={[btn('#0F766E'),{opacity:busy?0.5:1}]}>{busy?<ActivityIndicator color="#fff"/>:<Send size={15} color="#fff"/>}<Text style={{color:'#fff',fontWeight:'900'}}>إرسال الرد</Text></Pressable></>:<Text style={{color:'#64748B',fontSize:11,textAlign:'right'}}>التذكرة مكتملة. افتح تذكرة جديدة إذا احتجت مساعدة إضافية.</Text>}</View>}</View>})}
  <Text style={{fontSize:10,color:'#94A3B8',textAlign:'center'}}>تذاكرك خاصة بحسابك ولا يستطيع الآخرون الاطلاع عليها.</Text></ScrollView></View>;
+}
+
+function AdminSupportPage() {
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [reports, setReports] = useState<any[]>([]);
+  const [verifications, setVerifications] = useState<any[]>([]);
+  const [urgentAlerts, setUrgentAlerts] = useState<any[]>([]);
+  const [questions, setQuestions] = useState<any[]>([]);
+  const loadTaskData = useCallback(async () => {
+    try {
+      const [reportsRes, verifRes, urgentRes, questionsRes] = await Promise.all([
+        supabase.from('reports').select('*, reporter:reporter_id(id, display_name, username)').order('created_at', { ascending: false }).limit(60),
+        supabase.from('verification_requests').select('*').order('created_at', { ascending: false }).limit(60),
+        supabase.from('urgent_alerts').select('*').order('created_at', { ascending: false }).limit(60),
+        supabase.from('questions').select('*, author:author_id(id, display_name, username)').order('created_at', { ascending: false }).limit(60),
+      ]);
+      setReports((reportsRes.data || []) as any[]);
+      setVerifications((verifRes.data || []) as any[]);
+      setUrgentAlerts((urgentRes.data || []) as any[]);
+      setQuestions((questionsRes.data || []) as any[]);
+    } catch {
+      // Ignore errors in task aggregation; support ticket management remains available.
+    }
+  }, []);
+  useEffect(() => {
+    void loadTaskData();
+  }, [loadTaskData]);
+  const showToast = useCallback((message: string) => {
+    setToast(message);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 2600);
+  }, []);
+  return (
+    <View style={{ flex: 1, backgroundColor: '#F4F7FB' }}>
+      {toast ? (
+        <View style={{ backgroundColor: '#0F172A', marginHorizontal: 14, marginTop: 10, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10 }}>
+          <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '800', textAlign: 'right' }}>{toast}</Text>
+        </View>
+      ) : null}
+      <View style={{ paddingHorizontal: 14, paddingTop: 12, paddingBottom: 4, flexDirection: 'row-reverse', alignItems: 'center', gap: 10 }}>
+        <Pressable onPress={() => router.push('/admin')} style={{ backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#DCE5ED', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Text style={{ color: '#334155', fontSize: 12, fontWeight: '800' }}>العودة إلى لوحة الإدارة</Text>
+          <ArrowRight size={15} color="#334155" />
+        </Pressable>
+        <Text style={{ flex: 1, color: '#0F172A', fontSize: 16, fontWeight: '900', textAlign: 'right' }}>مركز الدعم (صفحة موحدة)</Text>
+      </View>
+      <AdminTaskCenter
+        reports={reports as any}
+        verifications={verifications as any}
+        urgentAlerts={urgentAlerts as any}
+        questions={questions as any}
+        onNavigate={(tab: string) => router.push('/admin')}
+        onResolveAll={() => void loadTaskData()}
+      />
+      <AdminSupportCenter onToast={showToast} />
+    </View>
+  );
+}
+
+export default function SupportScreen() {
+  const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const { data: auth } = await supabase.auth.getUser();
+        if (!auth.user) {
+          router.replace('/auth');
+          return;
+        }
+        const { data: profile } = await supabase.from('profiles').select('role').eq('id', auth.user.id).maybeSingle();
+        if (mounted) setIsAdmin(profile?.role === 'admin');
+      } catch {
+        // Keep user view as the safe default when role cannot be determined.
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+  if (loading) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F4F7FB' }}>
+        <ActivityIndicator size="large" color="#0F766E" />
+      </View>
+    );
+  }
+  if (isAdmin) return <AdminSupportPage />;
+  return <UserSupportPage />;
 }

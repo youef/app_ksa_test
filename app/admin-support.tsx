@@ -1,6 +1,6 @@
 import { Redirect } from 'expo-router';
 
-// Keep old bookmarks working while support is managed inside the main admin command center.
+// Keep old bookmarks working while support now lives in a single unified page.
 export default function AdminSupportRedirect() {
-  return <Redirect href="/admin" />;
+  return <Redirect href="/support" />;
 }
