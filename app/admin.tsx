@@ -228,25 +228,13 @@ export default function AdminScreen() {
   const [activeTab, setActiveTab] = useState<AdminTabKey>('overview');
 
   // Enhanced navigation state with search and filter
-  const [navSearch, setNavSearch] = useState<string>('');
-navSearchDebounce} = useCallback(async (value: string) => {
-    // Debounced search to avoid excessive state updates
-    clearTimeout(navSearchTimer);
-    navSearchTimer = setTimeout(() => setNavSearch(value), 300);
-  }, []);
-
-  const [navFilter, setNavFilter] = useState<'navFilter} = useCallback(async (value: string) => {
-    // Filter state for navigation
-    setNavFilter(value);
-  }, []);
-
-  // Enhanced navigation state with search and filter
   const [navSearch, setNavSearch] = useState('');
-('');
-navSearchDebounce} = useCallback(async (value: string) => {
-    // Debounced search to avoid excessive state updates
-    clearTimeout(navSearchTimer);
-    navSearchTimer = setTimeout(() => setNavSearch(value), 300);
+  const [navFilter, setNavFilter] = useState('');
+  const navSearchTimer = useRef<any>(null);
+
+  const setNavSearchDebounced = useCallback((value: string) => {
+    clearTimeout(navSearchTimer.current);
+    navSearchTimer.current = setTimeout(() => setNavSearch(value), 300);
   }, []);
 
   // --- Responsive sidebar state ---
