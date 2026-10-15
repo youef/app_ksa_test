@@ -826,7 +826,7 @@ export default function AdminScreen() {
         const requestedType = ['merchant', 'freelance', 'provider'].includes(verificationRequest?.subject || '')
           ? verificationRequest?.subject
           : null;
-        const profilePatch: Record<string, unknown> = {
+        const profilePatch: any = {
           is_verified: true,
           verification_status: 'verified',
           updated_at: new Date().toISOString(),
