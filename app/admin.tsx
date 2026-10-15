@@ -804,6 +804,13 @@ export default function AdminScreen() {
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) return;
 
+      const { data: verificationRequest, error: verificationLoadError } = await supabase
+        .from('verification_requests')
+        .select('subject,note')
+        .eq('id', reqId)
+        .maybeSingle();
+      if (verificationLoadError) throw verificationLoadError;
+
       const { error: reqErr } = await supabase
         .from('verification_requests')
         .update({
@@ -816,13 +823,22 @@ export default function AdminScreen() {
       if (reqErr) throw reqErr;
 
       if (action === 'approved') {
+        const requestedType = ['merchant', 'freelance', 'provider'].includes(verificationRequest?.subject || '')
+          ? verificationRequest?.subject
+          : null;
+        const profilePatch: Record<string, unknown> = {
+          is_verified: true,
+          verification_status: 'verified',
+          updated_at: new Date().toISOString(),
+        };
+        if (requestedType) {
+          profilePatch.account_type = requestedType;
+          profilePatch.freelance_trade = verificationRequest?.note || null;
+        }
+
         const { error: profErr } = await supabase
           .from('profiles')
-          .update({
-            is_verified: true,
-            verification_status: 'verified',
-            updated_at: new Date().toISOString(),
-          })
+          .update(profilePatch)
           .eq('id', userId);
 
         if (profErr) throw profErr;
