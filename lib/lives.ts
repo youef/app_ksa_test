@@ -208,7 +208,10 @@ export async function sendLiveMessage(streamId: string, body: string) {
     sender_id: auth.user.id,
     body: body.trim(),
   });
-  if (error) throw new Error(error.message.includes('live_chat_messages') ? 'قاعدة البثوث غير مفعّلة بعد.' : 'تعذر إرسال التعليق.');
+  if (error) {
+    if (error.message.includes('live_chat_messages') && error.code === '42P01') throw new Error('قاعدة التعليقات غير مفعّلة بعد.');
+    throw new Error(error.message || 'تعذر إرسال التعليق.');
+  }
 }
 
 export async function reportLiveStream(streamId: string, reason: string) {
