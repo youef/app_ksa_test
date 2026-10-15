@@ -180,10 +180,7 @@ function normalize(raw: RawPlace, category: PlaceCategory | null, origin: { lat:
 }
 
 function apiKey(): string {
-  return (
-    process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ||
-    'AIzaSyD3dbOJXEPgG1qyNi4Z_sLO46kj6c5bnY8'
-  );
+  return process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 }
 
 /** Fallback 1: OpenStreetMap / Nominatim API (Saudi Arabia) */
@@ -268,22 +265,23 @@ async function searchDatabasePlaces(
       if (category && !category.keywords.some((k) => row.name.includes(k) || row.description?.includes(k))) return;
 
       const pos = findPlaceCenter(row.city, row.district);
-      const pLat = pos ? pos.lat : lat + (Math.random() - 0.5) * 0.02;
-      const pLng = pos ? pos.lng : lng + (Math.random() - 0.5) * 0.02;
+      if (!pos) return;
+      const pLat = pos.lat;
+      const pLng = pos.lng;
 
       results.push({
         id: `db-svc-${row.id}`,
         name: row.name,
         categoryKey: category?.key || 'service',
         categoryLabel: category?.label || 'خدمة الحي',
-        address: `${row.city || ''} ${row.district ? `· حي ${row.district}` : ''}`.trim() || 'خدمة محلية',
+        address: [row.city, row.district ? `حي ${row.district}` : null, 'موقع تقريبي على مستوى الحي'].filter(Boolean).join(' · '),
         lat: pLat,
         lng: pLng,
         phone: row.phone || row.whatsapp || '',
-        rating: 4.8,
-        reviews: 24,
+        rating: null,
+        reviews: 0,
         openNow: row.available_now ?? true,
-        hoursText: row.working_hours || 'متاح لخدمة الحي',
+        hoursText: row.working_hours || '',
         distance: distanceMeters({ lat, lng }, { lat: pLat, lng: pLng }),
         mapsUrl: `https://www.google.com/maps/search/?api=1&query=${pLat},${pLng}`,
         permanent: true,
@@ -296,58 +294,17 @@ async function searchDatabasePlaces(
   }
 }
 
-/** Fallback 3: Hyper-local Saudi Neighborhood POIs anchored around user's location */
+/** No seeded/mock POIs are returned. Only verified third-party or database entries are shown. */
 function generateLocalNeighborhoodPlaces(
-  lat: number,
-  lng: number,
-  category: PlaceCategory | null,
-  keyword: string,
+  _lat: number,
+  _lng: number,
+  _category: PlaceCategory | null,
+  _keyword: string,
 ): NearbyPlace[] {
-  const templates = [
-    { cat: 'grocery', name: 'تموينات وأسواق الحي', offset: [0.0018, 0.0016], phone: '0501234567', rating: 4.7, reviews: 45 },
-    { cat: 'pharmacy', name: 'صيدلية الحي المتكاملة', offset: [-0.0015, 0.0022], phone: '0559876543', rating: 4.8, reviews: 56 },
-    { cat: 'bakery', name: 'مخبز وأفران الحي الطازجة', offset: [0.0028, -0.0012], phone: '0543219876', rating: 4.7, reviews: 42 },
-    { cat: 'cafe', name: 'مقهى وكافيه الجيران', offset: [-0.0022, -0.0018], phone: '0567891234', rating: 4.5, reviews: 31 },
-    { cat: 'restaurant', name: 'مطاعم ومطابخ الحي', offset: [0.0035, 0.0028], phone: '0534567890', rating: 4.6, reviews: 68 },
-    { cat: 'laundry', name: 'مغسلة الجيران السريعة', offset: [-0.0031, 0.0014], phone: '0512348765', rating: 4.4, reviews: 22 },
-    { cat: 'salon', name: 'صالون وحلاقة الحي الراقية', offset: [0.0012, -0.0028], phone: '0578901234', rating: 4.7, reviews: 35 },
-    { cat: 'hardware', name: 'سباكة وكهرباء الحي', offset: [-0.0016, -0.0032], phone: '0589012345', rating: 4.9, reviews: 48 },
-  ];
-
-  const filtered = category
-    ? templates.filter((t) => t.cat === category.key || (keyword && t.name.includes(keyword)))
-    : templates;
-
-  const targetList = filtered.length > 0 ? filtered : templates;
-
-  return targetList.map((t, idx) => {
-    const pLat = lat + t.offset[0];
-    const pLng = lng + t.offset[1];
-    const catObj = findPlaceCategory(t.cat);
-    return {
-      id: `local-spot-${t.cat}-${idx}`,
-      name: t.name,
-      categoryKey: t.cat,
-      categoryLabel: catObj?.label || 'محل',
-      address: 'داخل الحي · خدمة مباشرة وسريعة',
-      lat: pLat,
-      lng: pLng,
-      phone: t.phone,
-      rating: t.rating,
-      reviews: t.reviews,
-      openNow: true,
-      hoursText: 'مفتوح · حتى 12:00 ص',
-      distance: distanceMeters({ lat, lng }, { lat: pLat, lng: pLng }),
-      mapsUrl: `https://www.google.com/maps/search/?api=1&query=${pLat},${pLng}`,
-      permanent: true,
-    };
-  }).sort((a, b) => a.distance - b.distance);
+  // An empty state is safer than inventing stores, contact numbers, ratings or map pins.
+  return [];
 }
 
-/**
- * Robust nearby place finder with multi-tier failover.
- * Never fails silently or returns an empty list.
- */
 export async function searchNearbyPlaces(options: {
   lat: number;
   lng: number;
@@ -427,8 +384,8 @@ export async function searchNearbyPlaces(options: {
     }
   } catch {}
 
-  // 4. Guaranteed local neighborhood POI fallback
-  return generateLocalNeighborhoodPlaces(lat, lng, known, keyword).slice(0, maxResults);
+  // Never fabricate places to fill an empty result set.
+  return [];
 }
 
 export function isOpenNowLabel(openNow: boolean | null): string {
