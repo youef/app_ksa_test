@@ -20,6 +20,8 @@ import {
   type LiveStream,
 } from '@/lib/lives';
 import LiveMedia, { type LiveMediaApi, type LiveMediaConnection, type LiveMediaQuality, type LiveMediaState } from '@/components/lives/LiveMedia';
+import LiveModerationPanel from '@/components/lives/LiveModerationPanel';
+import { useLiveModeration } from '@/hooks/useLiveModeration';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BadgeCheck, Camera, CameraOff, Check, ChevronDown, ChevronUp, Eye, EyeOff, Gift, Heart, MessageCircle, Mic, MicOff, MoreHorizontal, Pin, Radio, Send, Share2, ShieldAlert, SignalHigh, SignalLow, SignalMedium, Trophy, UserMinus, UserPlus, Users, X } from 'lucide-react-native';
 
@@ -69,6 +71,12 @@ export default function LiveRoomScreen() {
   const [supporterError, setSupporterError] = useState('');
   const [peoplePanel, setPeoplePanel] = useState<'viewers' | 'supporters' | null>(null);
   const [hostSheet, setHostSheet] = useState<HostSheetTab | null>(null);
+  const [moderationOpen, setModerationOpen] = useState(false);
+  const moderation = useLiveModeration(id ? String(id) : undefined, Boolean(id) && !loading && !error);
+  const moderatorPermissions = moderation.moderators.find((item) => item.user_id === currentUser);
+  const canHideComments = role === 'host' || Boolean(moderatorPermissions?.can_hide_comments);
+  const canTimeoutUsers = role === 'host' || Boolean(moderatorPermissions?.can_timeout_users);
+  const canManageFilters = role === 'host' || Boolean(moderatorPermissions?.can_manage_filters);
   const scrollRef = useRef<ScrollView>(null);
   const heartChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const mediaApiRef = useRef<LiveMediaApi | null>(null);
@@ -352,6 +360,16 @@ export default function LiveRoomScreen() {
     setTimeout(() => setEffects((items) => items.filter((item) => item.id !== entry.id)), 2400);
   }
 
+  async function timeoutMessageAuthor(message: LiveChatMessage, minutes: number) {
+    if (!id || !canTimeoutUsers) return;
+    try {
+      await moderation.timeoutUser(message.sender_id, minutes, 'مخالفة قواعد التعليقات');
+      Alert.alert('تم الحظر المؤقت', `مُنع المستخدم من التعليق لمدة ${minutes} دقيقة.`);
+    } catch (cause) {
+      Alert.alert('تعذر الحظر المؤقت', cause instanceof Error ? cause.message : 'حاول مرة أخرى.');
+    }
+  }
+
   async function sendMessage() {
     const body = chatInput.trim();
     if (!body || sending || !id) return;
@@ -516,12 +534,17 @@ export default function LiveRoomScreen() {
   }
 
   function moderateMessage(message: LiveChatMessage) {
-    if (role !== 'host' || !id) return;
-    Alert.alert('إدارة التعليق', undefined, [
-      { text: message.is_pinned ? 'إلغاء التثبيت' : 'تثبيت التعليق', onPress: () => void pinMessage(message) },
-      { text: 'إخفاء التعليق', style: 'destructive', onPress: () => void hideMessage(message) },
-      { text: 'إلغاء', style: 'cancel' },
-    ]);
+    if (!id || (!canHideComments && !canTimeoutUsers && role !== 'host')) return;
+    const actions: Parameters<typeof Alert.alert>[2] = [];
+    if (role === 'host') actions.push({ text: message.is_pinned ? 'إلغاء التثبيت' : 'تثبيت التعليق', onPress: () => void pinMessage(message) });
+    if (canHideComments) actions.push({ text: 'إخفاء التعليق', style: 'destructive', onPress: () => void hideMessage(message) });
+    if (canTimeoutUsers && message.sender_id !== currentUser && message.sender_id !== stream?.host_id) {
+      actions.push({ text: 'حظر 5 دقائق', style: 'destructive', onPress: () => void timeoutMessageAuthor(message, 5) });
+      actions.push({ text: 'حظر 30 دقيقة', style: 'destructive', onPress: () => void timeoutMessageAuthor(message, 30) });
+      actions.push({ text: 'حظر 24 ساعة', style: 'destructive', onPress: () => void timeoutMessageAuthor(message, 1440) });
+    }
+    actions.push({ text: 'إلغاء', style: 'cancel' });
+    Alert.alert('إدارة التعليق', undefined, actions);
   }
 
   async function toggleFollow() {
@@ -747,6 +770,8 @@ export default function LiveRoomScreen() {
           </Pressable>
         </Modal>
 
+        <LiveModerationPanel visible={moderationOpen} onClose={() => setModerationOpen(false)} settings={moderation.settings} moderators={moderation.moderators} loading={moderation.loading} error={moderation.error} isHost={role === 'host'} canManageSettings={canManageFilters} currentUserId={currentUser} onRefresh={moderation.refresh} onSaveSettings={moderation.saveSettings} onManageModerator={moderation.manageModerator} />
+
         {overlayVisible && (
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0} style={styles.bottomOverlay}>
             {role === 'host' && controlsOpen && pendingRequests.length > 0 && (
@@ -784,6 +809,7 @@ export default function LiveRoomScreen() {
                 onToggleMic={() => mediaApiRef.current?.setMicrophoneEnabled(!mediaState.microphoneEnabled)}
                 onGuests={() => setHostSheet('guests')}
                 onComments={() => setHostSheet('comments')}
+                onModeration={() => setModerationOpen(true)}
                 onShare={() => void shareLive()}
                 onEnd={confirmEnd}
               />
@@ -831,7 +857,7 @@ function CommentCard({ message, onLongPress }: { message: LiveChatMessage; onLon
   );
 }
 
-function HostControlBar({ role, open, onToggleOpen, cameraOn, micOn, micLocked, bottomInset, onToggleCamera, onToggleMic, onGuests, onComments, onShare, onEnd }: {
+function HostControlBar({ role, open, onToggleOpen, cameraOn, micOn, micLocked, bottomInset, onToggleCamera, onToggleMic, onGuests, onComments, onModeration, onShare, onEnd }: {
   role: Role;
   open: boolean;
   onToggleOpen: () => void;
@@ -843,6 +869,7 @@ function HostControlBar({ role, open, onToggleOpen, cameraOn, micOn, micLocked, 
   onToggleMic: () => void;
   onGuests: () => void;
   onComments: () => void;
+  onModeration: () => void;
   onShare: () => void;
   onEnd: () => void;
 }) {
@@ -859,6 +886,7 @@ function HostControlBar({ role, open, onToggleOpen, cameraOn, micOn, micLocked, 
               <GlassButton active={micOn && !micLocked} disabled={micLocked} label={micLocked ? 'كتم المضيف' : 'مايك'} onPress={onToggleMic}>{micOn && !micLocked ? <Mic size={20} color="#fff" /> : <MicOff size={20} color="#fb7185" />}</GlassButton>
               {role === 'host' && <GlassButton label="الضيوف" onPress={onGuests}><Users size={20} color="#fff" /></GlassButton>}
               {role === 'host' && <GlassButton label="التعليقات" onPress={onComments}><MessageCircle size={20} color="#fff" /></GlassButton>}
+              {role === 'host' && <GlassButton label="الإشراف" onPress={onModeration}><ShieldAlert size={20} color="#a7f3d0" /></GlassButton>}
               <GlassButton label="مشاركة" onPress={onShare}><Share2 size={19} color="#fff" /></GlassButton>
               {role === 'host' && <GlassButton danger label="إنهاء" onPress={onEnd}><Radio size={19} color="#fff" /></GlassButton>}
             </View>
