@@ -4,7 +4,7 @@ import {
   StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
-import { BadgeCheck, BriefcaseBusiness, CreditCard, Crown, Megaphone, RefreshCw, ShieldCheck, ShoppingBag, Star } from 'lucide-react-native';
+import { Briefcase, CreditCard, Crown, Megaphone, RefreshCw, ShieldCheck, ShoppingBag, Star } from 'lucide-react-native';
 import { AppHeader } from '@/components/shared/AppHeader';
 import { useBottomNavInset } from '@/lib/bottomNav';
 import { supabase } from '@/lib/supabase';
@@ -182,7 +182,7 @@ export default function MarketplaceDashboard() {
                     <Text style={styles.cardTitle}>{service.name}</Text>
                     <Text style={styles.muted}>{[service.district, service.city].filter(Boolean).join(' · ') || 'خدمة محلية'}</Text>
                   </View>
-                  <View style={styles.smallIcon}><BriefcaseBusiness size={19} color="#047857" /></View>
+                  <View style={styles.smallIcon}><Briefcase size={19} color="#047857" /></View>
                 </View>
                 {!!service.description && <Text style={styles.description}>{service.description}</Text>}
                 <Pressable disabled={!!busyId} style={[styles.primaryButton, !!busyId && styles.disabled]} onPress={() => void checkout({ kind: 'service_order', service_id: service.id }, `service-${service.id}`)}>
