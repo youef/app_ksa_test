@@ -37,10 +37,19 @@ serve(async (req) => {
     const body = await req.json();
     if (body?.action === 'list') {
       const { data, error } = await admin.from('marketplace_ad_campaigns')
-        .select('id,title,description,status,created_at,owner:profiles!marketplace_ad_campaigns_owner_id_fkey(display_name,username),package:marketplace_ad_packages(name,duration_days,price_halalas)')
+        .select('id,title,description,status,created_at,owner_id,package_id')
         .eq('status', 'pending_review').order('created_at', { ascending: true }).limit(100);
       if (error) throw error;
-      return json({ campaigns: data || [] });
+      const rows = data || [];
+      const ownerIds = [...new Set(rows.map((row: any) => row.owner_id).filter(Boolean))];
+      const packageIds = [...new Set(rows.map((row: any) => row.package_id).filter(Boolean))];
+      const [{ data: owners }, { data: packages }] = await Promise.all([
+        ownerIds.length ? admin.from('profiles').select('id,display_name,username').in('id', ownerIds) : Promise.resolve({ data: [] }),
+        packageIds.length ? admin.from('marketplace_ad_packages').select('id,name,duration_days,price_halalas').in('id', packageIds) : Promise.resolve({ data: [] }),
+      ]);
+      const ownerMap = new Map((owners || []).map((item: any) => [item.id, item]));
+      const packageMap = new Map((packages || []).map((item: any) => [item.id, item]));
+      return json({ campaigns: rows.map((row: any) => ({ ...row, owner: ownerMap.get(row.owner_id) || null, package: packageMap.get(row.package_id) || null })) });
     }
 
     if (body?.action === 'review') {
