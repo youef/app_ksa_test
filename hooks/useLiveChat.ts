@@ -41,10 +41,9 @@ export function useLiveChat(streamId?: string) {
 
     setMessages(rows);
     if (chatExtrasRef.current) {
-      const { data: pin, error: pinError } = await supabase.from('live_chat_messages')
+      const { data: pin } = await supabase.from('live_chat_messages')
         .select(withExtras)
         .eq('stream_id', targetId).eq('is_hidden', false).eq('is_pinned', true).maybeSingle();
-      if (pinError) throw pinError;
       setPinnedMessage((pin as unknown as LiveChatMessage) || null);
     }
   }, [streamId]);
