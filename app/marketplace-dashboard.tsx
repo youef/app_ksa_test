@@ -59,7 +59,7 @@ export default function MarketplaceDashboard() {
         .eq('active', true).order('sort_order'),
       supabase.from('marketplace_orders').select('id,order_type,status,amount_halalas,created_at,checkout_url')
         .eq('user_id', auth.user.id).order('created_at', { ascending: false }).limit(30),
-      supabase.from('marketplace_subscriptions').select('id,status,current_period_end,plan:plan_id(name,slug)')
+      supabase.from('marketplace_subscriptions').select('id,status,current_period_end,plan:marketplace_plans(name,slug)')
         .eq('user_id', auth.user.id).eq('status', 'active').order('current_period_end', { ascending: false }).limit(1).maybeSingle(),
     ]);
     setServices(servicesRes.data || []);
@@ -123,7 +123,7 @@ export default function MarketplaceDashboard() {
 
   return (
     <View style={styles.root}>
-      <AppHeader title="سوق خدمات الحي" subtitle="الخدمات · الاشتراكات · الترويج" showBack />
+      <AppHeader variant="sub" title="سوق خدمات الحي" subtitle="الخدمات · الاشتراكات · الترويج" fallbackRoute="/market" />
       <ScrollView
         contentContainerStyle={[styles.content, { paddingBottom: bottomInset + 28 }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor="#047857" />}
