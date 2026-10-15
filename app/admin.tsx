@@ -1326,7 +1326,7 @@ export default function AdminScreen() {
     (key: AdminTabKey): number => {
       switch (key) {
         case 'tasks':
-          return total.pending + total.pendingVerifications + total.urgentAlerts.pending + total.pendingVerifications + total.urgentAlertsPending;
+          return totalPending;
         case 'users':
           return usersList.length;
         case 'verifications':
@@ -1351,56 +1351,6 @@ export default function AdminScreen() {
       </View>
     );
   }
-
-  // --- Responsive Sidebar Navigation ---
-  const sidebarItems = useMemo(() => [
-    { key: 'overview', label: 'نظرة عامة', icon: <LayoutDashboard size={15} color={C.accentDark} />, sub: 'الإحصائيات الرئيسية' },
-    { key: 'tasks', label: 'مركز المهام', icon: <ListChecks size={15} color={C.accentDark} />, sub: 'البلاغات والتوثيق' },
-    { key: 'users', label: 'المستخدمون', icon: <Users size={15} color={C.accentDark} />, sub: 'إدارة الحسابات' },
-    { key: 'verifications', label: 'التوثيق', icon: <Star size={15} color={C.accentDark} />, sub: 'طلبات التوثيق' },
-    { key: 'reports', label: 'البلاغات', icon: <Flag size={15} color={C.accentDark} />, sub: 'مراقبة المحتوى' },
-    { key: 'platform', label: 'المنصة', icon: <Truck size={15} color={C.accentDark} />, sub: 'الخدمات والموارد' },
-    { key: 'support', label: 'الدعم', icon: <LifeBuoy size={15} color={C.accentDark} />, sub: 'التذاكر والردود' },
-    { key: 'broadcast', label: 'التعميم', icon: <Megaphone size={15} color={C.accentDark} />, sub: 'الإشعارات الجماعية' },
-    { key: 'analytics', label: 'التحليلات', icon: <BarChart3 size={15} color={C.accentDark} />, sub: 'اتجاهات البيانات' },
-    { key: 'security', label: 'الأمان', icon: <Lock size={15} color={C.accentDark} />, sub: 'إدارة الجلسات' },
-  ], []);
-
-  const groupedNav = useMemo(() => [
-    { key: 'command', label: 'القيادة', emoji: '🎯', tabs: ['overview', 'tasks', 'search'] },
-    { key: 'community', label: 'المجتمع', emoji: '👥', tabs: ['users', 'verifications', 'reports', 'content'] },
-    { key: 'platform', label: 'المنصة', emoji: '🏢', tabs: ['platform', 'broadcast'] },
-    { key: 'insights', label: 'التحليلات', emoji: '📊', tabs: ['analytics', 'weekly', 'badges'] },
-    { key: 'system', label: 'النظام', emoji: '⚙️', tabs: ['security', 'logs'] },
-  ], []);
-
-  const activeGroup = useMemo(
-    () => groupedNav.find((g) => g.tabs.some((t) => t.key === activeTab)) || groupedNav[0],
-    [activeTab]
-  );
-
-  // --- Unified Dashboard Area ---
-  const totalPending = dashboardMetrics.pendingReports + dashboardMetrics.pendingVerifications + dashboardMetrics.urgentAlerts;
-
-  const tabBadge = useCallback(
-    (key: AdminTabKey): number => {
-      switch (key) {
-        case 'tasks':
-          return total.pending + total.pendingVerifications + total.urgentAlerts.pending + total.pendingVerifications + total.urgentAlertsPending;
-        case 'users':
-          return usersList.length;
-        case 'verifications':
-          return dashboardMetrics.pendingVerifications;
-        case 'reports':
-          return dashboardMetrics.pendingReports;
-        case 'platform':
-          return dashboardMetrics.urgentAlerts;
-        default:
-          return 0;
-      }
-    },
-    [totalPending, usersList.length, dashboardMetrics.pendingVerifications, dashboardMetrics.pendingReports, dashboardMetrics.urgentAlerts]
-  );
 
   // Unauthorized Fallback
   if (!currentAdmin || currentAdmin.role !== 'admin') {
