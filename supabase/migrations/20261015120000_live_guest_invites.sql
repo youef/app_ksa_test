@@ -7,13 +7,19 @@ alter table public.live_guest_requests
   add column if not exists invited_by uuid references public.profiles(id) on delete set null;
 
 -- The state machine gains an 'invited' state (host invites a specific person).
+-- Drop any existing status check regardless of how it was named, then recreate it.
 do $$
+declare
+  constraint_name text;
 begin
-  if exists (
-    select 1 from pg_catalog.pg_constraint where conname = 'live_guest_requests_status_check'
-  ) then
-    alter table public.live_guest_requests drop constraint live_guest_requests_status_check;
-  end if;
+  for constraint_name in
+    select conname from pg_catalog.pg_constraint
+    where conrelid = 'public.live_guest_requests'::regclass
+      and contype = 'c'
+      and pg_get_constraintdef(oid) ~* 'status\s*=\s*ANY'
+  loop
+    execute format('alter table public.live_guest_requests drop constraint %I', constraint_name);
+  end loop;
   alter table public.live_guest_requests
     add constraint live_guest_requests_status_check
     check (status in ('pending', 'invited', 'accepted', 'rejected', 'removed', 'cancelled'));
