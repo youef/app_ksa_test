@@ -268,20 +268,6 @@ export default function Question() {
       const targetAns = answers.find(x => x.id === answerId);
       if (targetAns?.author_id && targetAns.author_id !== currentUserId) {
         try {
-          const { data: curRep } = await supabase
-            .from('reputation')
-            .select('points')
-            .eq('user_id', targetAns.author_id)
-            .maybeSingle();
-          const nextPts = (curRep?.points || 0) + 10;
-          await supabase.from('reputation').upsert({
-            user_id: targetAns.author_id,
-            points: nextPts,
-            updated_at: new Date().toISOString(),
-          });
-        } catch {}
-
-        try {
           await supabase.from('notifications').insert({
             user_id: targetAns.author_id,
             type: 'answer',
