@@ -521,7 +521,7 @@ export default function LiveRoomScreen() {
 
   function moderateMessage(message: LiveChatMessage) {
     if (!id || (!canHideComments && !canTimeoutUsers && role !== 'host')) return;
-    const actions: Parameters<typeof Alert.alert>[2] = [];
+    const actions: NonNullable<Parameters<typeof Alert.alert>[2]> = [];
     if (role === 'host') actions.push({ text: message.is_pinned ? 'إلغاء التثبيت' : 'تثبيت التعليق', onPress: () => void pinMessage(message) });
     if (canHideComments) actions.push({ text: 'إخفاء التعليق', style: 'destructive', onPress: () => void hideMessage(message) });
     if (canTimeoutUsers && message.sender_id !== currentUser && message.sender_id !== stream?.host_id) {
