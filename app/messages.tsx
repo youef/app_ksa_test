@@ -130,7 +130,8 @@ export default function Messages() {
         .from('messages')
         .select('*')
         .in('conversation_id', convIds)
-        .order('created_at', { ascending: false }),
+        .order('created_at', { ascending: false })
+        .limit(500),
       supabase
         .from('conversation_members')
         .select('conversation_id, user_id')
