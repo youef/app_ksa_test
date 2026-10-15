@@ -48,9 +48,6 @@ export async function uploadStoryImage(options: {
     lastError = err instanceof Error ? err.message : 'تعذر قراءة ملف الصورة';
   }
 
-  if (base64) {
-    return { url: `data:image/jpeg;base64,${base64}`, strategy: 'base64', error: lastError };
-  }
-
-  return { url: uri, strategy: 'local', error: lastError };
+  // Never persist base64 or device-local paths as database URLs.
+  throw new Error(lastError || 'تعذر رفع صورة القصة إلى التخزين. تحقق من الاتصال وحاول مجدداً.');
 }
