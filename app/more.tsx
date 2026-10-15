@@ -57,6 +57,9 @@ import {
   ChevronRight,
   Shield,
   Radio,
+  Users,
+  LifeBuoy,
+  Heart,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { requireAccount } from '@/lib/authGate';
@@ -503,20 +506,27 @@ export default function MoreScreen() {
               iconBg="#fffbeb"
               title="قيّم تجربتك في حيّنا"
               sub="رأيك واقتراحاتك تساهم في تطوير وتحديث المنصة"
-              onPress={() => openExternal('https://appksatest.vercel.app')}
+              onPress={() => router.push('/rate-app')}
             />
           </View>
 
           {/* ======================================================== */}
           <Text style={styles.sectionHeader}>{'الأمان، نوع الحساب والمجتمع'}</Text>
+          <View style={styles.communityIntro}>
+            <View style={styles.communityIntroIcon}><ShieldCheck size={20} color="#047857" /></View>
+            <View style={{ flex: 1, gap: 3 }}>
+              <Text style={styles.communityIntroTitle}>كل ما يخص حسابك وثقتك في حيّنا</Text>
+              <Text style={styles.communityIntroSub}>أدِر تفضيلاتك، وثّق نشاطك، وتواصل مع الدعم من مكان واحد.</Text>
+            </View>
+          </View>
           <View style={styles.menuGroup}>
-            <MenuItem icon={<Shield size={20} color="#059669" />} iconBg="#ecfdf5" title="مركز الأمان والثقة" sub="التبليغ والطوارئ" onPress={() => router.push('/safety-center')} />
-            <MenuItem icon={<User size={20} color="#0284c7" />} iconBg="#f0f9ff" title="نوع الحساب والتوثيق" sub="تجاري، عمل حر، مقدم خدمة" onPress={() => router.push('/account-type')} />
-            <MenuItem icon={<Star size={20} color="#d97706" />} iconBg="#fffbeb" title="المفضلة" sub="عناصرك المحفوظة" onPress={() => router.push('/favorites')} />
-            <MenuItem icon={<Mail size={20} color="#475569" />} iconBg="#f1f5f9" title="المتابعون" sub="المتابعون والذين يتابعونك" onPress={() => router.push('/connected-social')} />
+            <MenuItem icon={<Shield size={20} color="#059669" />} iconBg="#ecfdf5" title="مركز الأمان والثقة" sub="البلاغات، الخصوصية، والطوارئ" onPress={() => router.push('/safety-center')} />
+            <MenuItem icon={<BadgeCheck size={20} color="#0284c7" />} iconBg="#f0f9ff" title="نوع الحساب والتوثيق" sub="تاجر، عمل حر، مقدم خدمة — مع متابعة الطلب" onPress={() => router.push('/account-type')} />
+            <MenuItem icon={<Heart size={20} color="#d97706" />} iconBg="#fffbeb" title="المفضلة" sub="بحث وتصنيف لكل العناصر المحفوظة" onPress={() => router.push('/favorites')} />
+            <MenuItem icon={<Users size={20} color="#475569" />} iconBg="#f1f5f9" title="المتابعون" sub="إدارة قوائم المتابعة والبحث عن الحسابات" onPress={() => router.push('/connected-social')} />
             <MenuItem icon={<ShieldCheck size={20} color="#7c3aed" />} iconBg="#f5f3ff" title="قيّم تجربتك" sub="تقييم وملاحظات" onPress={() => router.push('/rate-app')} />
-            <MenuItem icon={<Mail size={20} color="#059669" />} iconBg="#ecfdf5" title="مركز الدعم وتذاكري" sub="فتح تذكرة، البحث عن طلباتك، ومتابعة الردود" onPress={() => (hasSession ? router.push('/support') : requireAccount())} />
-            <MenuItem icon={<Mail size={20} color="#7c3aed" />} iconBg="#f5f3ff" title="لوحة الإدارة" sub="إدارة المنصة والتذاكر (للمدير)" onPress={() => router.push('/admin')} />
+            <MenuItem icon={<LifeBuoy size={20} color="#059669" />} iconBg="#ecfdf5" title="مركز الدعم وتذاكري" sub="فتح تذكرة، البحث عن طلباتك، ومتابعة الردود" onPress={() => (hasSession ? router.push('/support') : requireAccount())} />
+            {profile?.role === 'admin' && <MenuItem icon={<Radio size={20} color="#7c3aed" />} iconBg="#f5f3ff" title="لوحة الإدارة" sub="إدارة المنصة والتذاكر ومتابعة البلاغات" onPress={() => router.push('/admin')} />}
           </View>
 
           {/* ======================================================== */}
@@ -1071,6 +1081,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   menuBadgeText: { color: '#fff', fontSize: 10, fontWeight: '900' },
+  communityIntro: { flexDirection: 'row-reverse', alignItems: 'center', gap: 11, backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#A7F3D0', borderRadius: 17, padding: 13, marginBottom: 2 },
+  communityIntroIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: '#D1FAE5', alignItems: 'center', justifyContent: 'center' },
+  communityIntroTitle: { fontSize: 12, fontWeight: '900', color: '#065F46', textAlign: 'right' },
+  communityIntroSub: { fontSize: 10.5, lineHeight: 16, color: '#047857', textAlign: 'right' },
 
   // Future Box
   futureBox: {
