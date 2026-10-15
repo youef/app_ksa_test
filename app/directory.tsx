@@ -158,27 +158,16 @@ export default function Directory() {
       const user = authData?.user;
 
       if (!user) {
-        // Guest user: save locally and advise to sign in
-        const guestItem = {
-          id: `local-${Date.now()}`,
-          name: recName.trim(),
-          category: recCategory,
-          city: city || '',
-          district: district || '',
-          description: recDesc.trim() || 'توصية موثوقة من أحد جيران الحي.',
-          phone: recPhone.trim() || '',
-          whatsapp: recPhone.trim() ? (recPhone.trim().startsWith('966') ? recPhone.trim() : `966${recPhone.trim().replace(/^0/, '')}`) : '',
-          rating: 5.0,
-          review_count: 1,
-          neighbor_recommended: true,
-          provider_name: 'أنت (زائر)',
-        };
-        setItems(prev => [guestItem, ...prev]);
-        setAddModalOpen(false);
-        setRecName('');
-        setRecPhone('');
-        setRecDesc('');
-        Alert.alert('تمت الإضافة مؤقتاً ⭐', 'قم بتسجيل الدخول ليتم حفظ توصيتك بشكل دائم في قاعدة بيانات الحي.');
+        setSubmitting(false);
+        Alert.alert('تسجيل الدخول مطلوب', 'سجّل الدخول حتى تُحفظ التوصية باسم صاحبها وتخضع للمراجعة.', [
+          { text: 'تسجيل الدخول', onPress: () => router.push('/auth') },
+          { text: 'إلغاء', style: 'cancel' },
+        ]);
+        return;
+      }
+
+      if (!city?.trim() || !district?.trim()) {
+        Alert.alert('حدد موقعك أولاً', 'اختر المدينة والحي من ملفك الشخصي حتى لا تُنسب الخدمة إلى مكان افتراضي.');
         return;
       }
 
@@ -232,14 +221,14 @@ export default function Directory() {
         city: newRow.city,
         district: newRow.district,
         description: newRow.description,
-        rating: 5.0,
-        review_count: 1,
+        rating: null,
+        review_count: 0,
         phone: newRow.phone || '',
         whatsapp: newRow.whatsapp || '',
         is_verified: false,
-        neighbor_recommended: true,
+        neighbor_recommended: false,
         provider_id: newRow.provider_id,
-        provider_name: (newRow as any).profiles?.display_name || 'أحد الجيران',
+        provider_name: (newRow as any).profiles?.display_name || '',
         avatar_url: (newRow as any).profiles?.avatar_url,
       };
 
@@ -248,7 +237,7 @@ export default function Directory() {
       setRecName('');
       setRecPhone('');
       setRecDesc('');
-      Alert.alert('تم الحفظ والنشر بنجاح! ⭐', 'أصبحت التوصية الآن مخزنة في قاعدة البيانات ومتاحة لكل سكان الحي.');
+      Alert.alert('تم إرسال التوصية للمراجعة', 'ستظهر التوصية بعد اعتمادها من إدارة المنصة.');
     } catch (err: any) {
       console.warn('Error saving service recommendation:', err);
       Alert.alert('خطأ أثناء الحفظ', err?.message || 'تعذر حفظ التوصية في قاعدة البيانات');
@@ -273,7 +262,7 @@ export default function Directory() {
       <AppHeader
         variant="sub"
         title="دليل وتوصيات الحي"
-        subtitle={[district && `حي ${district}`, city].filter(Boolean).join(' · ') || 'مهنيو ومحلات الحي المجربة'}
+        subtitle={[district && `حي ${district}`, city].filter(Boolean).join(' · ') || 'الخدمات المسجلة فعلياً في المنصة'}
         fallbackRoute="/home"
         rightAction={
           <Pressable
@@ -379,7 +368,7 @@ export default function Directory() {
 
                 {/* Description */}
                 <Text style={styles.cardDesc} numberOfLines={3}>
-                  {b.description || 'خدمة ومحل معتمد يخدم سكان الحي والمجاورين.'}
+                  {b.description || 'لم يضف مقدم الخدمة وصفاً.'}
                 </Text>
 
                 {/* Meta details & author */}
@@ -387,7 +376,7 @@ export default function Directory() {
                   <View style={styles.locBadge}>
                     <MapPin size={11} color="#059669" />
                     <Text style={styles.locText}>
-                      {b.district ? `حي ${b.district}` : b.city || 'الرياض'}
+                      {[b.district ? `حي ${b.district}` : null, b.city || null].filter(Boolean).join(' · ') || 'لم يحدد الموقع'}
                     </Text>
                   </View>
 
