@@ -127,7 +127,7 @@ export default function LiveMedia({ url, token, canPublish, participantOrder = [
     if (!attached) return;
     attached.element.remove();
     attachedRef.current.delete(key);
-    if (!attached.tile.querySelector('video')) attached.tile.remove();
+    if (![...attachedRef.current.values()].some((item) => item.tile === attached.tile)) attached.tile.remove();
     orderTiles();
     updateGridLayout();
   };
