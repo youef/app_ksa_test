@@ -21,6 +21,7 @@ import {
 } from '@/lib/lives';
 import LiveMedia, { type LiveMediaApi, type LiveMediaConnection, type LiveMediaQuality, type LiveMediaState } from '@/components/lives/LiveMedia';
 import LiveModerationPanel from '@/components/lives/LiveModerationPanel';
+import LiveCommentCard from '@/components/lives/LiveCommentCard';
 import { useLiveModeration } from '@/hooks/useLiveModeration';
 import { useLiveRoomHeartbeat } from '@/hooks/useLiveRoomHeartbeat';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -776,7 +777,7 @@ export default function LiveRoomScreen() {
             {showChat && (
               <View style={styles.chatPanel}>
                 <ScrollView ref={scrollRef} style={styles.messageList} contentContainerStyle={{ justifyContent: 'flex-end', paddingVertical: 5 }} showsVerticalScrollIndicator={false} onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}>
-                  {messages.slice(-10).map((message) => <CommentCard key={message.id} message={message} onLongPress={() => moderateMessage(message)} />)}
+                  {messages.slice(-10).map((message) => <LiveCommentCard key={message.id} message={message} onLongPress={() => moderateMessage(message)} />)}
                   {messages.length === 0 && <Text style={styles.firstMessage}>كن أول من يحيّي {hostName} 👋</Text>}
                 </ScrollView>
               </View>
@@ -824,23 +825,6 @@ export default function LiveRoomScreen() {
         )}
       </View>
     </View>
-  );
-}
-
-function CommentCard({ message, onLongPress }: { message: LiveChatMessage; onLongPress: () => void }) {
-  const role: LiveChatRole = message.sender_role === 'host' || message.sender_role === 'guest' ? message.sender_role : 'viewer';
-  const verified = Boolean(message.profiles?.is_verified) && role === 'viewer';
-  const name = message.profiles?.display_name || message.profiles?.username || 'جارٍ';
-  return (
-    <Pressable onLongPress={onLongPress} delayLongPress={350} style={[styles.commentCard, role === 'host' && styles.commentCardHost, role === 'guest' && styles.commentCardGuest]}>
-      <View style={styles.commentHeader}>
-        {role === 'host' && <View style={styles.commentBadgeHost}><Text style={styles.commentBadgeHostText}>مضيف</Text></View>}
-        {role === 'guest' && <View style={styles.commentBadgeGuest}><Text style={styles.commentBadgeGuestText}>ضيف</Text></View>}
-        {verified && <BadgeCheck size={12} color="#fbbf24" />}
-        <Text style={styles.commentName}>{name}</Text>
-      </View>
-      <Text style={styles.commentBody}>{message.body}</Text>
-    </Pressable>
   );
 }
 
