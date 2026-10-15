@@ -29,6 +29,7 @@ export type LiveMediaProps = {
   url: string;
   token: string;
   canPublish: boolean;
+  participantOrder?: string[];
   onConnectionChange?: (state: LiveMediaConnection) => void;
   onQualityChange?: (quality: LiveMediaQuality) => void;
   onMediaStateChange?: (state: LiveMediaState) => void;
@@ -51,13 +52,34 @@ function connectionFromState(state: ConnectionState): LiveMediaConnection {
   return 'disconnected';
 }
 
-function RoomTracks() {
+function RoomTracks({ participantOrder = [] }: { participantOrder?: string[] }) {
   const tracks = useTracks([Track.Source.Camera, Track.Source.Microphone]);
   const videos = tracks.filter((track) => isTrackReference(track) && track.publication.kind === Track.Kind.Video);
+  videos.sort((a, b) => {
+    const aIndex = participantOrder.indexOf(a.participant.identity);
+    const bIndex = participantOrder.indexOf(b.participant.identity);
+    return (aIndex < 0 ? Number.MAX_SAFE_INTEGER : aIndex) - (bIndex < 0 ? Number.MAX_SAFE_INTEGER : bIndex);
+  });
   if (!videos.length) {
-    return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color="#fff" /><Text style={{ color: '#fff', marginTop: 10 }}>بانتظار صورة المضيف…</Text></View>;
+    return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color="#fff" /><Text style={{ color: '#fff', marginTop: 10 }}>بانتظار صورة المشاركين…</Text></View>;
   }
-  return <View style={{ flex: 1 }}>{videos.map((track, index) => <VideoTrack key={`${track.participant.identity}-${index}`} trackRef={track} style={{ flex: index === 0 ? 1 : undefined, width: index === 0 ? '100%' : 96, height: index === 0 ? undefined : 140, position: index === 0 ? 'relative' : 'absolute', top: index === 0 ? 0 : 170, right: index === 0 ? 0 : 12, zIndex: index === 0 ? 0 : 1, borderRadius: index === 0 ? 0 : 12 }} />)}</View>;
+  const columns = videos.length <= 1 ? 1 : videos.length <= 4 ? 2 : 3;
+  const tileHeight = videos.length <= 2 ? '100%' : videos.length <= 4 ? '50%' : '33.333%';
+  return (
+    <View style={{ flex: 1, flexDirection: 'row', flexWrap: 'wrap', alignContent: 'stretch', backgroundColor: '#020617' }}>
+      {videos.map((track, index) => {
+        const participantName = track.participant.name || track.participant.identity || 'مشارك';
+        return (
+          <View key={`${track.participant.identity}-${track.publication.trackSid || index}`} style={{ width: columns === 1 ? '100%' : `${100 / columns}%`, height: tileHeight, padding: 2, position: 'relative' }}>
+            <VideoTrack trackRef={track} style={{ flex: 1, width: '100%', height: '100%', borderRadius: 12, overflow: 'hidden' }} />
+            <View pointerEvents="none" style={{ position: 'absolute', left: 10, bottom: 10, maxWidth: '88%', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 14, backgroundColor: 'rgba(2,6,23,0.72)' }}>
+              <Text numberOfLines={1} style={{ color: '#fff', fontSize: 11, fontWeight: '800' }}>{participantName}</Text>
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
 }
 
 /**
@@ -112,7 +134,7 @@ function RoomBridge({ onConnectionChange, onQualityChange, onMediaStateChange, o
   return null;
 }
 
-export default function LiveMedia({ url, token, canPublish, onConnectionChange, onQualityChange, onMediaStateChange, onApiReady, onReady, onError }: LiveMediaProps) {
+export default function LiveMedia({ url, token, canPublish, participantOrder, onConnectionChange, onQualityChange, onMediaStateChange, onApiReady, onReady, onError }: LiveMediaProps) {
   useEffect(() => {
     void AudioSession.startAudioSession();
     return () => { void AudioSession.stopAudioSession(); };
@@ -131,7 +153,7 @@ export default function LiveMedia({ url, token, canPublish, onConnectionChange, 
         onDisconnected={() => onError?.('انقطع الاتصال بالبث. أعد المحاولة.')}
         onError={(error) => onError?.(error.message || 'تعذر الاتصال بغرفة البث.')}
       >
-        <RoomTracks />
+        <RoomTracks participantOrder={participantOrder} />
         <RoomBridge
           onConnectionChange={onConnectionChange}
           onQualityChange={onQualityChange}
