@@ -27,11 +27,13 @@ serve(async (req) => {
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   const gateway = (Deno.env.get('PAYMENT_GATEWAY') || 'moyasar').toLowerCase();
   const moyasarSecret = Deno.env.get('MOYASAR_SECRET_KEY');
+  const tapSecret = Deno.env.get('TAP_SECRET_KEY');
   const baseUrl = (Deno.env.get('APP_BASE_URL') || 'https://appksatest-yousef8-15e4.vercel.app').replace(/\/$/, '');
 
   if (!supabaseUrl || !anonKey || !serviceRoleKey) return json({ error: 'إعدادات الخادم غير مكتملة.' }, 503);
-  if (gateway !== 'moyasar') return json({ error: 'بوابة الدفع المحددة غير مدعومة بعد.' }, 503);
-  if (!moyasarSecret) return json({ error: 'أضف MOYASAR_SECRET_KEY إلى أسرار Supabase لتفعيل الدفع.' }, 503);
+  if (!['moyasar', 'tap'].includes(gateway)) return json({ error: 'اختر PAYMENT_GATEWAY=moyasar أو tap.' }, 503);
+  if (gateway === 'moyasar' && !moyasarSecret) return json({ error: 'أضف MOYASAR_SECRET_KEY إلى أسرار Supabase لتفعيل الدفع.' }, 503);
+  if (gateway === 'tap' && !tapSecret) return json({ error: 'أضف TAP_SECRET_KEY إلى أسرار Supabase لتفعيل الدفع.' }, 503);
 
   try {
     const authClient = createClient(supabaseUrl, anonKey, {
@@ -142,42 +144,59 @@ serve(async (req) => {
     if (subscriptionId) await admin.from('marketplace_subscriptions').update({ last_payment_order_id: order.id }).eq('id', subscriptionId);
     if (adCampaignId) await admin.from('marketplace_ad_campaigns').update({ payment_order_id: order.id }).eq('id', adCampaignId);
 
-    const callbackUrl = `${supabaseUrl}/functions/v1/moyasar-marketplace-webhook`;
-    const invoiceResponse = await fetch('https://api.moyasar.com/v1/invoices', {
-      method: 'POST',
-      headers: {
-        Authorization: `Basic ${btoa(`${moyasarSecret}:`)}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        amount: amountHalalas,
-        currency: 'SAR',
-        description,
-        callback_url: callbackUrl,
-        success_url: `${baseUrl}/marketplace-dashboard?payment=success&order_id=${order.id}`,
-        back_url: `${baseUrl}/marketplace-dashboard?payment=cancelled&order_id=${order.id}`,
-        metadata: { marketplace_order_id: order.id, user_id: user.id, order_type: kind },
-      }),
-    });
-    const invoice = await invoiceResponse.json().catch(() => ({}));
-    if (!invoiceResponse.ok || !invoice?.id || !invoice?.url) {
-      await admin.from('marketplace_orders').update({ status: 'failed', metadata: { ...metadata, gateway_error: invoice?.message || 'invoice_creation_failed' } }).eq('id', order.id);
+    const successUrl = `${baseUrl}/marketplace-dashboard?payment=success&order_id=${order.id}`;
+    const backUrl = `${baseUrl}/marketplace-dashboard?payment=cancelled&order_id=${order.id}`;
+    const callbackUrl = `${supabaseUrl}/functions/v1/${gateway === 'moyasar' ? 'moyasar-marketplace-webhook' : 'tap-marketplace-webhook'}`;
+    let providerResponse: Response;
+    if (gateway === 'moyasar') {
+      providerResponse = await fetch('https://api.moyasar.com/v1/invoices', {
+        method: 'POST',
+        headers: {
+          Authorization: `Basic ${btoa(`${moyasarSecret}:`)}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          amount: amountHalalas, currency: 'SAR', description, callback_url: callbackUrl,
+          success_url: successUrl, back_url: backUrl,
+          metadata: { marketplace_order_id: order.id, user_id: user.id, order_type: kind },
+        }),
+      });
+    } else {
+      providerResponse = await fetch('https://api.tap.company/v2/charges', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tapSecret}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: Number((amountHalalas / 100).toFixed(2)), currency: 'SAR', description,
+          source: { id: 'src_all' },
+          customer: { first_name: String(user.user_metadata?.full_name || user.user_metadata?.name || 'Hayna customer').slice(0, 80), ...(user.email ? { email: user.email } : {}) },
+          redirect: { url: successUrl },
+          post: { url: callbackUrl },
+          metadata: { marketplace_order_id: order.id, user_id: user.id, order_type: kind },
+        }),
+      });
+    }
+    const payment = await providerResponse.json().catch(() => ({}));
+    const checkoutUrl = gateway === 'moyasar' ? payment?.url : (payment?.transaction?.url || payment?.redirect?.url);
+    if (!providerResponse.ok || !payment?.id || !checkoutUrl) {
+      await admin.from('marketplace_orders').update({ status: 'failed', metadata: { ...metadata, gateway_error: payment?.message || payment?.errors || 'checkout_creation_failed' } }).eq('id', order.id);
       if (serviceOrderId) await admin.from('marketplace_service_orders').update({ status: 'payment_failed' }).eq('id', serviceOrderId);
-      return json({ error: 'تعذر إنشاء صفحة الدفع لدى مزود الدفع. تحقق من مفاتيح Moyasar وإعدادات حساب التاجر.' }, 502);
+      return json({ error: `تعذر إنشاء صفحة الدفع لدى ${gateway === 'moyasar' ? 'Moyasar' : 'Tap'}؛ تحقق من مفاتيح API وتفعيل حساب التاجر.` }, 502);
     }
 
+    const providerStatus = gateway === 'moyasar' ? (payment.status || 'initiated') : (payment.status || 'INITIATED');
     const { error: updateError } = await admin.from('marketplace_orders').update({
-      gateway_invoice_id: invoice.id, checkout_url: invoice.url, metadata: { ...metadata, gateway_status: invoice.status || 'initiated' },
+      gateway_invoice_id: payment.id, checkout_url: checkoutUrl,
+      metadata: { ...metadata, gateway_status: providerStatus },
     }).eq('id', order.id);
     if (updateError) throw updateError;
 
     const { error: transactionError } = await admin.from('marketplace_payment_transactions').insert({
-      order_id: order.id, user_id: user.id, gateway, gateway_invoice_id: invoice.id,
+      order_id: order.id, user_id: user.id, gateway, gateway_invoice_id: payment.id,
       amount_halalas: amountHalalas, currency: 'SAR', status: 'pending',
-      gateway_payload: { invoice_id: invoice.id, invoice_status: invoice.status || 'initiated' },
+      gateway_payload: { provider_id: payment.id, provider_status: providerStatus },
     });
     if (transactionError) throw transactionError;
-    return json({ order_id: order.id, checkout_url: invoice.url, status: 'pending' });
+    return json({ order_id: order.id, checkout_url: checkoutUrl, status: 'pending', gateway });
   } catch (error) {
     console.error('create-marketplace-checkout failed', error);
     return json({ error: 'تعذر تجهيز عملية الدفع. حاول مرة أخرى.' }, 500);
