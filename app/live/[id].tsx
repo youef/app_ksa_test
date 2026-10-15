@@ -12,7 +12,6 @@ import {
   hideLiveMessage,
   reportLiveStream,
   requestLiveGuest,
-  sendLiveMessage,
   setLiveGuestMuted,
   setLiveMessagePinned,
   type LiveChatMessage,
@@ -23,6 +22,7 @@ import LiveModerationPanel from '@/components/lives/LiveModerationPanel';
 import LiveCommentCard from '@/components/lives/LiveCommentCard';
 import { useLiveModeration } from '@/hooks/useLiveModeration';
 import { useLiveRoomHeartbeat } from '@/hooks/useLiveRoomHeartbeat';
+import { useLiveChat } from '@/hooks/useLiveChat';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BadgeCheck, Camera, CameraOff, Check, ChevronDown, ChevronUp, Eye, EyeOff, Gift, Heart, MessageCircle, Mic, MicOff, MoreHorizontal, Pin, Radio, Send, Share2, ShieldAlert, SignalHigh, SignalLow, SignalMedium, Trophy, UserMinus, UserPlus, Users, X } from 'lucide-react-native';
 
@@ -34,8 +34,6 @@ type HostSheetTab = 'comments' | 'guests';
 type Effect = { id: string; emoji: string; name?: string; kind: 'heart' | 'gift' };
 
 const MAX_EFFECTS = 6;
-const CHAT_BASE_FIELDS = 'id,stream_id,sender_id,body,created_at,profiles!live_chat_messages_sender_id_fkey(display_name,username,avatar_url,is_verified)';
-
 export default function LiveRoomScreen() {
   const { id, role: roleParam } = useLocalSearchParams<{ id: string; role?: string }>();
   const insets = useSafeAreaInsets();
@@ -47,10 +45,8 @@ export default function LiveRoomScreen() {
   const [role, setRole] = useState<Role>(roleParam === 'host' ? 'host' : 'viewer');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [messages, setMessages] = useState<LiveChatMessage[]>([]);
-  const [pinnedMessage, setPinnedMessage] = useState<LiveChatMessage | null>(null);
+  const { messages, pinnedMessage, sending, loadMessages, sendMessage: sendChatMessage } = useLiveChat(id ? String(id) : undefined);
   const [chatInput, setChatInput] = useState('');
-  const [sending, setSending] = useState(false);
   const [viewerCount, setViewerCount] = useState(0);
   const [pendingRequests, setPendingRequests] = useState<GuestRequest[]>([]);
   const [guests, setGuests] = useState<GuestRequest[]>([]);
@@ -82,12 +78,16 @@ export default function LiveRoomScreen() {
   const heartChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const mediaApiRef = useRef<LiveMediaApi | null>(null);
   const connectedRef = useRef(false);
-  const chatExtrasRef = useRef(true);
   const hostPulseAtRef = useRef(Date.now());
   const staleSweepAtRef = useRef(0);
   const guestMutedRef = useRef(false);
   const roleRef = useRef(role);
+  const guestStateRef = useRef(guestState);
+  const currentUserRef = useRef(currentUser);
+  const effectTimeoutsRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   roleRef.current = role;
+  guestStateRef.current = guestState;
+  currentUserRef.current = currentUser;
   const mediaRole = role === 'host' || role === 'guest';
 
   const handleConnectionChange = useCallback((state: LiveMediaConnection) => {
@@ -99,39 +99,6 @@ export default function LiveRoomScreen() {
   const handleQualityChange = useCallback((next: LiveMediaQuality) => setQuality(next), []);
   const handleMediaStateChange = useCallback((next: LiveMediaState) => setMediaState(next), []);
   const handleApiReady = useCallback((api: LiveMediaApi) => { mediaApiRef.current = api; }, []);
-
-  const loadMessages = useCallback(async (streamId: string) => {
-    const withExtras = `${CHAT_BASE_FIELDS},is_pinned,sender_role`;
-    let rows: LiveChatMessage[] = [];
-    let queryError: unknown = null;
-    if (chatExtrasRef.current) {
-      const result = await supabase.from('live_chat_messages')
-        .select(withExtras)
-        .eq('stream_id', streamId).eq('is_hidden', false)
-        .order('created_at', { ascending: false }).limit(10);
-      if (result.error) chatExtrasRef.current = false;
-      else rows = ((result.data || []).reverse()) as unknown as LiveChatMessage[];
-      queryError = result.error;
-    }
-    if (!chatExtrasRef.current) {
-      const result = await supabase.from('live_chat_messages')
-        .select(CHAT_BASE_FIELDS)
-        .eq('stream_id', streamId).eq('is_hidden', false)
-        .order('created_at', { ascending: false }).limit(10);
-      if (result.error) throw result.error;
-      rows = ((result.data || []).reverse()) as unknown as LiveChatMessage[];
-      setPinnedMessage(null);
-    } else if (queryError) {
-      throw queryError;
-    }
-    setMessages(rows);
-    if (chatExtrasRef.current) {
-      const { data: pin } = await supabase.from('live_chat_messages')
-        .select(withExtras)
-        .eq('stream_id', streamId).eq('is_hidden', false).eq('is_pinned', true).maybeSingle();
-      setPinnedMessage((pin as unknown as LiveChatMessage) || null);
-    }
-  }, []);
 
   const loadGuests = useCallback(async (streamId: string) => {
     const result = await supabase.from('live_guest_requests')
@@ -276,13 +243,13 @@ export default function LiveRoomScreen() {
       void (async () => {
         const { count } = await supabase.from('live_viewer_sessions').select('viewer_id', { count: 'exact', head: true })
           .eq('stream_id', id).gt('last_seen_at', new Date(Date.now() - 45_000).toISOString());
-        setViewerCount((count || 0) + (role === 'host' ? 1 : 0));
-        if (role !== 'host' && Date.now() - hostPulseAtRef.current > 75_000 && Date.now() - staleSweepAtRef.current > 30_000) {
+        setViewerCount((count || 0) + (roleRef.current === 'host' ? 1 : 0));
+        if (roleRef.current !== 'host' && Date.now() - hostPulseAtRef.current > 75_000 && Date.now() - staleSweepAtRef.current > 30_000) {
           staleSweepAtRef.current = Date.now();
           const { error: sweepError } = await supabase.rpc('expire_stale_live_streams');
           if (sweepError && sweepError.code !== 'PGRST202') console.error('Unable to expire the disconnected host stream.', sweepError);
         }
-        if (role === 'host') {
+        if (roleRef.current === 'host') {
           const { data } = await supabase.from('live_guest_requests')
             .select('id,guest_id,stream_id,status,profiles!live_guest_requests_guest_id_fkey(display_name,username,avatar_url)')
             .eq('stream_id', id).eq('status', 'pending').order('created_at', { ascending: true });
@@ -290,26 +257,28 @@ export default function LiveRoomScreen() {
           void loadGuests(id).catch((cause) => console.error('Unable to refresh live guests.', cause));
         } else {
           const primary = await supabase.from('live_guest_requests').select('status,is_muted')
-            .eq('stream_id', id).eq('guest_id', currentUser).maybeSingle();
+            .eq('stream_id', id).eq('guest_id', currentUserRef.current).maybeSingle();
           const own = primary.error
             ? (await supabase.from('live_guest_requests').select('status')
-                .eq('stream_id', id).eq('guest_id', currentUser).maybeSingle()).data
+                .eq('stream_id', id).eq('guest_id', currentUserRef.current).maybeSingle()).data
             : primary.data;
           const status = own?.status;
-          if (status === 'accepted' && role === 'viewer') {
+          if (status === 'accepted' && roleRef.current === 'viewer') {
             setRole('guest');
+            roleRef.current = 'guest';
+            guestStateRef.current = 'accepted';
             setGuestState('accepted');
             const credential = await getLiveToken(id, 'guest');
             setRoomUrl(credential.url);
             setToken(credential.token);
-          } else if (role === 'guest') {
+          } else if (roleRef.current === 'guest') {
             const muted = Boolean((own as { is_muted?: boolean } | null)?.is_muted);
             if (muted && !guestMutedRef.current) mediaApiRef.current?.setMicrophoneEnabled(false);
             guestMutedRef.current = muted;
             setGuestMutedByHost(muted);
             if (status === 'removed') setError('أزالك المضيف من البث.');
           } else if (status === 'rejected' || status === 'removed') {
-            if (guestState === 'pending') setGuestState('idle');
+            if (guestStateRef.current === 'pending') setGuestState('idle');
           }
         }
       })();
@@ -331,19 +300,28 @@ export default function LiveRoomScreen() {
     }, 20_000);
     void loadAudience(id).catch((cause) => console.error('Unable to load live audience.', cause));
     void loadSupporters(id).catch((cause) => console.error('Unable to load live supporters.', cause));
-    if (role === 'host') void loadGuests(id).catch((cause) => console.error('Unable to load live guests.', cause));
+    if (roleRef.current === 'host') void loadGuests(id).catch((cause) => console.error('Unable to load live guests.', cause));
 
     return () => {
       clearInterval(poll); clearInterval(audienceTimer);
       heartChannelRef.current = null;
       void supabase.removeChannel(chatChannel); void supabase.removeChannel(streamChannel); void supabase.removeChannel(guestChannel); void supabase.removeChannel(presenceChannel);
     };
-  }, [id, loading, error, role, guestState, currentUser, stream?.started_at, loadMessages, loadGuests]);
+  }, [id, loading, error, loadMessages, loadGuests]);
+
+  useEffect(() => () => {
+    effectTimeoutsRef.current.forEach((timer) => clearTimeout(timer));
+    effectTimeoutsRef.current.clear();
+  }, []);
 
   function pushEffect(input: { emoji: string; name?: string; kind: 'heart' | 'gift' }) {
     const entry: Effect = { id: `${Date.now()}-${Math.random()}`, ...input };
     setEffects((items) => [...items, entry].slice(-MAX_EFFECTS));
-    setTimeout(() => setEffects((items) => items.filter((item) => item.id !== entry.id)), 2400);
+    const timer = setTimeout(() => {
+      effectTimeoutsRef.current.delete(entry.id);
+      setEffects((items) => items.filter((item) => item.id !== entry.id));
+    }, 2400);
+    effectTimeoutsRef.current.set(entry.id, timer);
   }
 
   async function timeoutMessageAuthor(message: LiveChatMessage, minutes: number) {
@@ -359,10 +337,12 @@ export default function LiveRoomScreen() {
   async function sendMessage() {
     const body = chatInput.trim();
     if (!body || sending || !id) return;
-    setSending(true);
-    try { await sendLiveMessage(id, body.slice(0, 300)); setChatInput(''); }
-    catch (e) { Alert.alert('تعذر إرسال التعليق', e instanceof Error ? e.message : 'حاول مرة أخرى.'); }
-    finally { setSending(false); }
+    try {
+      const sent = await sendChatMessage(body);
+      if (sent) setChatInput('');
+    } catch (e) {
+      Alert.alert('تعذر إرسال التعليق', e instanceof Error ? e.message : 'حاول مرة أخرى.');
+    }
   }
 
   async function requestGuestSeat() {
