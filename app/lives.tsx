@@ -1,15 +1,111 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Image, ImageBackground, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  ActivityIndicator,
+  Animated,
+  Image,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { AppHeader } from '@/components/shared/AppHeader';
 import { useBottomNavInset } from '@/lib/bottomNav';
 import { C } from '@/lib/ui';
 import { supabase } from '@/lib/supabase';
-import { fetchLiveHostAchievements, fetchLiveHostLeaderboard, fetchLiveStreams, type LiveAchievement, type LiveHostLeader, type LiveLeaderboardPeriod, type LiveStream } from '@/lib/lives';
-import { BadgeCheck, ChevronLeft, MapPin, Radio, Trophy, Users, Video, Sparkles } from 'lucide-react-native';
+import {
+  fetchLiveHostAchievements,
+  fetchLiveHostLeaderboard,
+  fetchLiveStreams,
+  type LiveAchievement,
+  type LiveHostLeader,
+  type LiveLeaderboardPeriod,
+  type LiveStream,
+} from '@/lib/lives';
+import {
+  BadgeCheck,
+  ChevronLeft,
+  Clock,
+  Crown,
+  Eye,
+  Flame,
+  MapPin,
+  Medal,
+  Radio,
+  Sparkles,
+  Trophy,
+  Users,
+  Video,
+} from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 type Filter = 'all' | 'following' | 'nearby';
+type TabKey = 'live' | 'trending' | 'stars' | 'achievements';
+
+const AUDIENCE_LABEL: Record<LiveStream['audience'], string> = {
+  public: 'عام',
+  followers: 'لمتابعيك',
+  city: 'لمدينتك',
+};
+
+// Achievement progress targets — mirror the descriptions in LIVE_ACHIEVEMENT_META.
+const ACHIEVEMENT_TARGET: Record<string, number> = {
+  first_stream: 1,
+  active_host: 4,
+  community_voice: 60,
+  neighborhood_star: 25,
+  consistent_host: 5,
+};
+
+const ACHIEVEMENT_UNIT: Record<string, string> = {
+  first_stream: 'بث',
+  active_host: 'بث',
+  community_voice: 'دقيقة',
+  neighborhood_star: 'مشاهد',
+  consistent_host: 'أيام',
+};
+
+function compactCount(value: number): string {
+  const n = Number(value) || 0;
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1)} م`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(n >= 10_000 ? 0 : 1)} ألف`;
+  return String(n);
+}
+
+function liveDuration(startedAt: string): string {
+  const minutes = Math.max(0, Math.floor((Date.now() - new Date(startedAt).getTime()) / 60_000));
+  if (minutes < 1) return 'الآن';
+  if (minutes < 60) return `${minutes} د`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest ? `${hours}س ${rest}د` : `${hours} س`;
+}
+
+function LivePulse({ size = 8, color = '#fb3a4b' }: { size?: number; color?: string }) {
+  const value = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(value, { toValue: 1, duration: 1300, useNativeDriver: true }),
+        Animated.timing(value, { toValue: 0, duration: 0, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [value]);
+  const scale = value.interpolate({ inputRange: [0, 1], outputRange: [1, 2.6] });
+  const opacity = value.interpolate({ inputRange: [0, 1], outputRange: [0.55, 0] });
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <Animated.View
+        style={{ position: 'absolute', width: size, height: size, borderRadius: size / 2, backgroundColor: color, transform: [{ scale }], opacity }}
+      />
+      <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: color }} />
+    </View>
+  );
+}
 
 export default function LivesScreen() {
   const bottomNavInset = useBottomNavInset();
@@ -22,6 +118,8 @@ export default function LivesScreen() {
   const [city, setCity] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>('all');
+  const [category, setCategory] = useState<string>('all');
+  const [tab, setTab] = useState<TabKey>('live');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
@@ -73,175 +171,680 @@ export default function LivesScreen() {
     return () => { clearInterval(timer); void supabase.removeChannel(channel); };
   }, [load, leaderboardPeriod]));
 
-  const filtered = useMemo(() => streams.filter((stream) => {
-    if (filter === 'following') return following.includes(stream.host_id);
-    if (filter === 'nearby') return Boolean(city && stream.profiles?.city?.toLocaleLowerCase() === city.toLocaleLowerCase());
+  const isFollowing = useCallback((stream: LiveStream) => following.includes(stream.host_id), [following]);
+  const isNearby = useCallback(
+    (stream: LiveStream) => Boolean(city && stream.profiles?.city?.toLocaleLowerCase() === city.toLocaleLowerCase()),
+    [city],
+  );
+
+  const baseCounts = useMemo(() => ({
+    all: streams.length,
+    following: streams.filter(isFollowing).length,
+    nearby: streams.filter(isNearby).length,
+  }), [streams, isFollowing, isNearby]);
+
+  const categories = useMemo(() => {
+    const set = new Set<string>();
+    streams.forEach((stream) => { if (stream.category) set.add(stream.category); });
+    return ['all', ...Array.from(set)];
+  }, [streams]);
+
+  const visible = useMemo(() => streams.filter((stream) => {
+    if (category !== 'all' && stream.category !== category) return false;
+    if (filter === 'following') return isFollowing(stream);
+    if (filter === 'nearby') return isNearby(stream);
     return true;
-  }), [streams, following, filter, city]);
+  }), [streams, filter, category, isFollowing, isNearby]);
 
   const trending = useMemo(() => {
-    if (streams.length < 4) return [];
+    if (streams.length < 2) return [];
     return [...streams]
       .sort((a, b) => ((b.viewer_count || 0) - (a.viewer_count || 0)) || ((b.peak_viewer_count || 0) - (a.peak_viewer_count || 0)))
-      .slice(0, 6);
+      .slice(0, 8);
   }, [streams]);
+
+  const totalViewers = useMemo(() => streams.reduce((sum, stream) => sum + (stream.viewer_count || 0), 0), [streams]);
+  const hostCount = useMemo(() => new Set(streams.map((stream) => stream.host_id)).size, [streams]);
+  const earnedAchievements = useMemo(() => achievements.filter((item) => item.earned).length, [achievements]);
+
+  const badges: Record<TabKey, number> = {
+    live: streams.length,
+    trending: trending.length,
+    stars: topHosts.length,
+    achievements: earnedAchievements,
+  };
+
+  const reload = useCallback(() => {
+    setLoading(true);
+    void load(leaderboardPeriod);
+  }, [load, leaderboardPeriod]);
+
+  const spotlight = tab === 'live' ? visible[0] : undefined;
+  const gridStreams = spotlight ? visible.slice(1) : visible;
+
+  const openStream = (stream: LiveStream) => router.push({ pathname: '/live/[id]', params: { id: stream.id } });
 
   return (
     <View style={styles.screen}>
-      <AppHeader variant="sub" title="البثوث المباشرة" subtitle="كن قريبًا من مجتمع حيّك" fallbackRoute="/more" />
+      <AppHeader
+        variant="tab"
+        title="البثوث المباشرة"
+        subtitle={streams.length > 0 ? `${compactCount(streams.length)} على الهواء · ${compactCount(totalViewers)} مشاهد` : 'كن قريبًا من مجتمع حيّك'}
+        fallbackRoute="/more"
+        rightAction={(
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="ابدأ بثًا مباشرًا"
+            onPress={() => router.push('/live/create')}
+            style={styles.headerCta}
+          >
+            <Video size={15} color="#fff" />
+            <Text style={styles.headerCtaText}>بث</Text>
+          </Pressable>
+        )}
+      />
+
+      {/* ============ Segmented tab bar (fixed) ============ */}
+      <View style={styles.tabBarWrap}>
+        <View style={styles.tabBar}>
+          {TABS.map((item) => {
+            const active = tab === item.key;
+            const count = badges[item.key];
+            const color = active ? '#fff' : '#64748b';
+            return (
+              <Pressable
+                key={item.key}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: active }}
+                onPress={() => setTab(item.key)}
+                style={[styles.tabItem, active && styles.tabItemActive]}
+              >
+                <View style={styles.tabIconWrap}>
+                  {item.icon(color)}
+                  {count > 0 ? (
+                    <View style={[styles.tabBadge, active && styles.tabBadgeActive]}>
+                      <Text style={[styles.tabBadgeText, active && styles.tabBadgeTextActive]}>{count > 99 ? '99+' : count}</Text>
+                    </View>
+                  ) : null}
+                </View>
+                <Text style={[styles.tabLabel, active && styles.tabLabelActive]} numberOfLines={1}>{item.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
       <ScrollView
         contentContainerStyle={[styles.content, { paddingBottom: bottomNavInset + 28 }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load(leaderboardPeriod); }} tintColor={C.accent} />}
       >
-        <Pressable accessibilityRole="button" style={styles.createCard} onPress={() => router.push('/live/create')}>
-          <LinearGradient colors={['#065f46', '#059669', '#10b981']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.createGradient}>
-            <View style={styles.createIcon}><Video size={25} color="#059669" /></View>
-            <View style={{ flex: 1, alignItems: 'flex-end' }}>
-              <Text style={styles.createTitle}>ابدأ بثًا مباشرًا</Text>
-              <Text style={styles.createSubtitle}>شارك جيرانك لحظتك واصعد بضيوفك</Text>
-            </View>
-            <ChevronLeft color="#fff" size={22} />
-          </LinearGradient>
-        </Pressable>
-
-        {achievements.length > 0 && (
-          <View style={styles.achievementSection}>
-            <View style={styles.achievementHeading}>
-              <Text style={styles.achievementTitle}>إنجازاتك في البث</Text>
-              <View style={styles.achievementCaption}><Sparkles size={14} color="#7c3aed" /><Text style={styles.achievementCaptionText}>تُمنح وفق معايير واضحة، لا بعدد النقرات</Text></View>
-            </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.achievementRow}>
-              {achievements.map((item) => (
-                <View key={item.key} style={[styles.achievementCard, item.earned ? styles.achievementEarned : styles.achievementLocked]}>
-                  <Text style={styles.achievementEmoji}>{item.emoji}</Text>
-                  <Text style={styles.achievementCardTitle}>{item.title}</Text>
-                  <Text numberOfLines={2} style={styles.achievementDesc}>{item.description}</Text>
-                  <Text style={styles.achievementStatus}>{item.earned ? 'أُحرِز' : 'قيد التقدم'} · {item.metric}</Text>
+        {/* ================= LIVE TAB ================= */}
+        {tab === 'live' && (
+          <View>
+            <LinearGradient colors={['#064e3b', '#059669', '#10b981']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
+              <View style={styles.heroTop}>
+                <View style={styles.heroLive}>
+                  <LivePulse size={9} color="#fecdd3" />
+                  <Text style={styles.heroLiveText}>على الهواء الآن</Text>
                 </View>
-              ))}
-            </ScrollView>
-          </View>
-        )}
+                <Text style={styles.heroCaption}>انضم لجيرانك أو ابدأ بثك</Text>
+              </View>
 
-        <View style={styles.starsCard}>
-          <View style={styles.starsHeader}>
-            <View style={styles.starsHeading}>
-              <Text style={styles.starsTitle}>نجوم البث</Text>
-              <Text style={styles.starsCaption}>{leaderboardPeriod === 'weekly' ? 'الأكثر بثًا خلال 7 أيام' : 'الأكثر بثًا خلال 30 يومًا'} · يُقاس بعدد بثوث والدقائق وذروة المشاهدين</Text>
-            </View>
-            <View style={styles.periodSwitch}>
-              <Pressable onPress={() => setLeaderboardPeriod('monthly')} style={[styles.periodTab, leaderboardPeriod === 'monthly' && styles.periodTabActive]}><Text style={[styles.periodTabText, leaderboardPeriod === 'monthly' && styles.periodTabTextActive]}>شهري</Text></Pressable>
-              <Pressable onPress={() => setLeaderboardPeriod('weekly')} style={[styles.periodTab, leaderboardPeriod === 'weekly' && styles.periodTabActive]}><Text style={[styles.periodTabText, leaderboardPeriod === 'weekly' && styles.periodTabTextActive]}>أسبوعي</Text></Pressable>
-            </View>
-          </View>
-          {topHosts.length > 0 ? (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.topHostsRow}>
-              {topHosts.slice(0, 5).map((host, index) => (
-                <View key={host.host_id} style={styles.topHostCard}>
-                  <View style={styles.topHostRank}><Text style={styles.topHostRankText}>{index + 1}</Text></View>
-                  {host.avatar_url ? <Image source={{ uri: host.avatar_url }} style={styles.topHostAvatar} /> : <View style={styles.topHostAvatarFallback}><Text style={styles.topHostInitial}>{host.display_name.slice(0, 1)}</Text></View>}
-                  <View style={styles.topHostNameRow}><Text numberOfLines={1} style={styles.topHostName}>{host.display_name}</Text>{host.is_verified && <BadgeCheck color="#059669" size={14} />}</View>
-                  <Text style={styles.topHostStats}>{host.stream_count} بث · {host.total_minutes} دقيقة</Text>
-                </View>
-              ))}
-            </ScrollView>
-          ) : (
-            <Text style={styles.leaderboardEmpty}>لم يُحدد نجم بث بعد. ابدأ بثك الأول لتبدأ الترتيب.</Text>
-          )}
-        </View>
-        {leaderboardError !== '' && <Text style={styles.leaderboardError}>{leaderboardError}</Text>}
+              <View style={styles.heroStats}>
+                <HeroStat icon={<Radio size={15} color="#d1fae5" />} value={compactCount(streams.length)} label="بث مباشر" />
+                <View style={styles.heroDivider} />
+                <HeroStat icon={<Eye size={15} color="#d1fae5" />} value={compactCount(totalViewers)} label="مشاهد" />
+                <View style={styles.heroDivider} />
+                <HeroStat icon={<Users size={15} color="#d1fae5" />} value={compactCount(hostCount)} label="مضيف" />
+              </View>
 
-        {trending.length > 0 && (
-          <View style={styles.trendingSection}>
+              <Pressable accessibilityRole="button" style={styles.heroCta} onPress={() => router.push('/live/create')}>
+                <View style={styles.heroCtaIcon}><Video size={18} color="#059669" /></View>
+                <Text style={styles.heroCtaText}>ابدأ بثًا مباشرًا</Text>
+                <ChevronLeft size={18} color="#065f46" />
+              </Pressable>
+            </LinearGradient>
+
+            {categories.length > 1 && (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
+                {categories.map((key) => (
+                  <Chip key={key} label={key === 'all' ? 'كل الفئات' : key} active={category === key} onPress={() => setCategory(key)} />
+                ))}
+              </ScrollView>
+            )}
+
+            <View style={styles.segRow}>
+              {([
+                ['all', 'الكل'], ['following', 'أتابعهم'], ['nearby', 'قريب مني'],
+              ] as [Filter, string][]).map(([key, label]) => (
+                <Pressable key={key} onPress={() => setFilter(key)} style={[styles.seg, filter === key && styles.segActive]}>
+                  <Text style={[styles.segText, filter === key && styles.segTextActive]}>{label}</Text>
+                  <View style={[styles.segCount, filter === key && styles.segCountActive]}>
+                    <Text style={[styles.segCountText, filter === key && styles.segCountTextActive]}>{baseCounts[key]}</Text>
+                  </View>
+                </Pressable>
+              ))}
+            </View>
+
             <View style={styles.sectionRow}>
-              <Text style={styles.sectionTitle}>بثوث رائجة</Text>
-              <View style={styles.liveCount}><View style={styles.liveDot} /><Text style={styles.liveCountText}>{trending.length} بث</Text></View>
+              <Text style={styles.sectionTitle}>على الهواء الآن</Text>
+              <View style={styles.countPill}><LivePulse size={7} /><Text style={styles.countPillText}>{visible.length} بث</Text></View>
             </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.trendingRow}>
-              {trending.map((stream) => <LiveCard key={`t-${stream.id}`} stream={stream} compact onPress={() => router.push({ pathname: '/live/[id]', params: { id: stream.id } })} />)}
-            </ScrollView>
+
+            {loading ? (
+              <View style={styles.state}><ActivityIndicator size="large" color={C.accent} /><Text style={styles.stateText}>جارٍ البحث عن بثوث جيرانك…</Text></View>
+            ) : error ? (
+              <View style={styles.empty}><Radio color="#dc2626" size={32} /><Text style={styles.emptyTitle}>تعذر تحميل البثوث</Text><Text style={styles.emptyText}>{error}</Text><Pressable onPress={reload} style={styles.retry}><Text style={styles.retryText}>إعادة المحاولة</Text></Pressable></View>
+            ) : visible.length === 0 ? (
+              <View style={styles.empty}>
+                <Radio color="#059669" size={34} />
+                <Text style={styles.emptyTitle}>{filter === 'following' ? 'لا يوجد بث لمتابَعيك الآن' : filter === 'nearby' ? 'لا يوجد بث قريب الآن' : 'ما فيه بث مباشر الآن'}</Text>
+                <Text style={styles.emptyText}>{category !== 'all' ? 'جرّب فئة أخرى أو' : 'ابدأ بثك الأول وخل جيرانك ينضمون لك.'}</Text>
+                <Pressable onPress={() => router.push('/live/create')} style={styles.emptyCreate}><Text style={styles.emptyCreateText}>ابدأ بثك الأول</Text></Pressable>
+              </View>
+            ) : (
+              <View>
+                {spotlight && <SpotlightCard stream={spotlight} onPress={() => openStream(spotlight)} />}
+                {gridStreams.length > 0 && (
+                  <View style={styles.grid}>
+                    {gridStreams.map((stream) => <LiveCard key={stream.id} stream={stream} onPress={() => openStream(stream)} />)}
+                  </View>
+                )}
+              </View>
+            )}
           </View>
         )}
 
-        <View style={styles.filterRow}>
-          {([
-            ['all', 'لك'], ['following', 'أتابعهم'], ['nearby', 'قريب مني'],
-          ] as [Filter, string][]).map(([key, label]) => (
-            <Pressable key={key} onPress={() => setFilter(key)} style={[styles.filter, filter === key && styles.filterActive]}>
-              <Text style={[styles.filterText, filter === key && styles.filterTextActive]}>{label}</Text>
-            </Pressable>
-          ))}
-        </View>
+        {/* ================= TRENDING TAB ================= */}
+        {tab === 'trending' && (
+          <View>
+            <View style={styles.sectionRow}>
+              <View style={styles.sectionHeading}>
+                <Text style={styles.sectionTitle}>بثوث رائجة</Text>
+                <Text style={styles.sectionSub}>الأكثر مشاهدةً في هذه اللحظة</Text>
+              </View>
+              {trending.length > 0 && <View style={styles.countPill}><Flame size={12} color="#f97316" /><Text style={[styles.countPillText, { color: '#c2410c' }]}>{trending.length}</Text></View>}
+            </View>
 
-        <View style={styles.sectionRow}>
-          <Text style={styles.sectionTitle}>على الهواء الآن</Text>
-          <View style={styles.liveCount}><View style={styles.liveDot} /><Text style={styles.liveCountText}>{filtered.length} بث</Text></View>
-        </View>
-
-        {loading ? (
-          <View style={styles.state}><ActivityIndicator size="large" color={C.accent} /><Text style={styles.stateText}>جارٍ البحث عن بثوث جيرانك…</Text></View>
-        ) : error ? (
-          <View style={styles.empty}><Radio color="#dc2626" size={32} /><Text style={styles.emptyTitle}>تعذر تحميل البثوث</Text><Text style={styles.emptyText}>{error}</Text><Pressable onPress={() => { setLoading(true); void load(leaderboardPeriod); }} style={styles.retry}><Text style={styles.retryText}>إعادة المحاولة</Text></Pressable></View>
-        ) : filtered.length === 0 ? (
-          <View style={styles.empty}>
-            <Radio color="#059669" size={34} />
-            <Text style={styles.emptyTitle}>{filter === 'following' ? 'لا يوجد بث لمتابَعيك الآن' : filter === 'nearby' ? 'لا يوجد بث قريب الآن' : 'ما فيه بث مباشر الآن'}</Text>
-            <Text style={styles.emptyText}>ابدأ بثك الأول وخل جيرانك ينضمون لك.</Text>
-            <Pressable onPress={() => router.push('/live/create')} style={styles.emptyCreate}><Text style={styles.emptyCreateText}>ابدأ بثك الأول</Text></Pressable>
-          </View>
-        ) : (
-          <View style={styles.grid}>
-            {filtered.map((stream) => <LiveCard key={stream.id} stream={stream} onPress={() => router.push({ pathname: '/live/[id]', params: { id: stream.id } })} />)}
+            {loading ? (
+              <View style={styles.state}><ActivityIndicator size="large" color={C.accent} /></View>
+            ) : trending.length === 0 ? (
+              <View style={styles.empty}><Flame color="#f97316" size={32} /><Text style={styles.emptyTitle}>لا توجد بثوث رائجة بعد</Text><Text style={styles.emptyText}>عندما يجتمع المشاهدون حول بث، سيظهر هنا في مقدمة الرائج.</Text></View>
+            ) : (
+              <View style={{ gap: 12 }}>
+                {trending.map((stream, index) => (
+                  <TrendingCard key={stream.id} stream={stream} rank={index + 1} onPress={() => openStream(stream)} />
+                ))}
+              </View>
+            )}
           </View>
         )}
+
+        {/* ================= STARS TAB ================= */}
+        {tab === 'stars' && (
+          <View>
+            <View style={styles.starsHero}>
+              <LinearGradient colors={['#78350f', '#b45309', '#f59e0b']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.starsHeroGradient}>
+                <Trophy size={26} color="#fef3c7" />
+                <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                  <Text style={styles.starsHeroTitle}>نجوم البث</Text>
+                  <Text style={styles.starsHeroSub}>يُقاس الترتيب بعدد البثوث والدقائق وذروة المشاهدين</Text>
+                </View>
+              </LinearGradient>
+            </View>
+
+            <View style={styles.periodSwitch}>
+              {(['monthly', 'weekly'] as LiveLeaderboardPeriod[]).map((period) => (
+                <Pressable key={period} onPress={() => setLeaderboardPeriod(period)} style={[styles.periodTab, leaderboardPeriod === period && styles.periodTabActive]}>
+                  <Text style={[styles.periodTabText, leaderboardPeriod === period && styles.periodTabTextActive]}>{period === 'monthly' ? 'هذا الشهر' : 'هذا الأسبوع'}</Text>
+                </Pressable>
+              ))}
+            </View>
+
+            {leaderboardError !== '' && <Text style={styles.leaderboardError}>{leaderboardError}</Text>}
+
+            {topHosts.length > 0 ? (
+              <View>
+                <View style={styles.podiumRow}>
+                  {[topHosts[1], topHosts[0], topHosts[2]].map((host, position) => {
+                    if (!host) return <View key={`gap-${position}`} style={{ flex: 1 }} />;
+                    const rank = position === 1 ? 1 : position === 0 ? 2 : 3;
+                    return <PodiumCard key={host.host_id} host={host} rank={rank} />;
+                  })}
+                </View>
+                {topHosts.length > 3 && (
+                  <View style={{ gap: 9, marginTop: 6 }}>
+                    {topHosts.slice(3).map((host, index) => (
+                      <HostRow key={host.host_id} host={host} rank={index + 4} />
+                    ))}
+                  </View>
+                )}
+              </View>
+            ) : currentUserId ? (
+              <View style={styles.empty}><Trophy color="#b45309" size={32} /><Text style={styles.emptyTitle}>لم يُحدد نجم بث بعد</Text><Text style={styles.emptyText}>ابدأ بثك الأول لتظهر في قائمة النجوم.</Text></View>
+            ) : (
+              <View style={styles.empty}><Crown color="#b45309" size={32} /><Text style={styles.emptyTitle}>سجّل الدخول لمتابعة النجوم</Text><Text style={styles.emptyText}>تابع ترتيب أشهر المضيفين في حيّك أسبوعيًا وشهريًا.</Text><Pressable onPress={() => router.push('/auth')} style={styles.retry}><Text style={styles.retryText}>تسجيل الدخول</Text></Pressable></View>
+            )}
+          </View>
+        )}
+
+        {/* ================= ACHIEVEMENTS TAB ================= */}
+        {tab === 'achievements' && (
+          <View>
+            <View style={styles.sectionRow}>
+              <View style={styles.sectionHeading}>
+                <Text style={styles.sectionTitle}>إنجازاتك في البث</Text>
+                <Text style={styles.sectionSub}>تُمنح وفق معايير واضحة، لا بعدد النقرات</Text>
+              </View>
+              <View style={styles.countPill}><Sparkles size={12} color="#7c3aed" /><Text style={[styles.countPillText, { color: '#6d28d9' }]}>{earnedAchievements}/{achievements.length || 5}</Text></View>
+            </View>
+
+            {achievements.length > 0 ? (
+              <View>
+                <View style={styles.achSummary}>
+                  <Text style={styles.achSummaryValue}>{earnedAchievements}</Text>
+                  <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                    <Text style={styles.achSummaryTitle}>إنجازات مُحرَزة</Text>
+                    <Text style={styles.achSummarySub}>من أصل {achievements.length} إنجاز متاح</Text>
+                  </View>
+                  <View style={styles.achSummaryPercent}>
+                    <Text style={styles.achSummaryPercentText}>{Math.round((earnedAchievements / achievements.length) * 100)}%</Text>
+                  </View>
+                </View>
+                <View style={styles.achGrid}>
+                  {achievements.map((item) => <AchievementCard key={item.key} item={item} />)}
+                </View>
+              </View>
+            ) : currentUserId ? (
+              <View style={styles.empty}><Sparkles color="#7c3aed" size={32} /><Text style={styles.emptyTitle}>لا توجد إنجازات بعد</Text><Text style={styles.emptyText}>ابدأ بثك الأول لتحصل على أول إنجاز في رحلتك.</Text><Pressable onPress={() => router.push('/live/create')} style={styles.emptyCreate}><Text style={styles.emptyCreateText}>ابدأ بثك الأول</Text></Pressable></View>
+            ) : (
+              <View style={styles.empty}><Sparkles color="#7c3aed" size={32} /><Text style={styles.emptyTitle}>سجّل الدخول لعرض إنجازاتك</Text><Text style={styles.emptyText}>تابع تقدّمك وافتح الأوسمة كلما قدّمت بثوثًا أكثر.</Text><Pressable onPress={() => router.push('/auth')} style={styles.retry}><Text style={styles.retryText}>تسجيل الدخول</Text></Pressable></View>
+            )}
+          </View>
+        )}
+
         <View style={styles.privacyHint}><MapPin size={15} color="#64748b" /><Text style={styles.privacyText}>نُظهر المدينة والحي فقط بحسب إعدادات البث، ولا نشارك موقعك الدقيق.</Text></View>
       </ScrollView>
     </View>
   );
 }
 
-function LiveCard({ stream, compact = false, onPress }: { stream: LiveStream; compact?: boolean; onPress: () => void }) {
-  const profile = stream.profiles;
-  const coverUri = profile?.avatar_url || null;
-  const width = compact ? 176 : undefined;
+const TABS: { key: TabKey; label: string; icon: (color: string) => ReactNode }[] = [
+  { key: 'live', label: 'مباشر', icon: (color) => <Radio size={18} color={color} /> },
+  { key: 'trending', label: 'الرائج', icon: (color) => <Flame size={18} color={color} /> },
+  { key: 'stars', label: 'النجوم', icon: (color) => <Trophy size={18} color={color} /> },
+  { key: 'achievements', label: 'إنجازاتي', icon: (color) => <Sparkles size={18} color={color} /> },
+];
+
+function HeroStat({ icon, value, label }: { icon: ReactNode; value: string; label: string }) {
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={`مشاهدة بث ${profile?.display_name || 'مستخدم'}`} onPress={onPress} style={[styles.card, compact && styles.cardCompact, compact && width ? { width } : null]}>
-      {coverUri ? (
-        <ImageBackground source={{ uri: coverUri }} style={[styles.cardCover, compact && styles.cardCoverCompact]} imageStyle={{ resizeMode: 'cover' }}>
-          <View style={styles.cardCoverShade} />
-          <View style={styles.cardCoverContent}>
-            <View style={styles.cardTop}><View style={styles.onAir}><View style={styles.liveDot} /><Text style={styles.onAirText}>مباشر</Text></View><Text style={styles.category}>{stream.category}</Text></View>
-            <View style={styles.cardCenter}><View style={styles.avatarRing}>{profile?.avatar_url ? <Image source={{ uri: profile.avatar_url }} style={styles.avatar} /> : <Text style={styles.avatarLetter}>{profile?.display_name?.slice(0, 1) || 'ح'}</Text>}</View><Text style={styles.streamTitle} numberOfLines={2}>{stream.title}</Text></View>
-            <View style={styles.cardBottom}><View style={styles.viewers}><Users size={13} color="#fff" /><Text style={styles.viewerText}>{stream.viewer_count || 0}</Text></View><View style={styles.joinText}><Text style={styles.joinLabel}>انضم للبث</Text><ChevronLeft size={14} color="#fff" /></View></View>
-          </View>
-        </ImageBackground>
-      ) : (
-        <LinearGradient colors={['#052e26', '#065f46', '#047857']} style={[styles.cardCover, compact && styles.cardCoverCompact]}>
-          <View style={styles.cardTop}><View style={styles.onAir}><View style={styles.liveDot} /><Text style={styles.onAirText}>مباشر</Text></View><Text style={styles.category}>{stream.category}</Text></View>
-          <View style={styles.cardCenter}><View style={styles.avatarRing}>{profile?.avatar_url ? <Image source={{ uri: profile.avatar_url }} style={styles.avatar} /> : <Text style={styles.avatarLetter}>{profile?.display_name?.slice(0, 1) || 'ح'}</Text>}</View><Text style={styles.streamTitle} numberOfLines={2}>{stream.title}</Text></View>
-          <View style={styles.cardBottom}><View style={styles.viewers}><Users size={13} color="#fff" /><Text style={styles.viewerText}>{stream.viewer_count || 0}</Text></View><View style={styles.joinText}><Text style={styles.joinLabel}>انضم للبث</Text><ChevronLeft size={14} color="#fff" /></View></View>
-        </LinearGradient>
-      )}
-      <View style={styles.hostRow}>
-        <View style={{ flex: 1, alignItems: 'flex-end' }}><Text numberOfLines={1} style={styles.hostName}>{profile?.display_name || profile?.username || 'جارٍ'}</Text><Text numberOfLines={1} style={styles.hostArea}>{profile?.district ? `حي ${profile.district}` : profile?.city || 'من حيّنا'}</Text></View>
-        {profile?.avatar_url ? <Image source={{ uri: profile.avatar_url }} style={styles.smallAvatar} /> : <View style={styles.smallAvatarFallback}><Text style={styles.smallAvatarLetter}>ح</Text></View>}
+    <View style={styles.heroStat}>
+      {icon}
+      <Text style={styles.heroStatValue}>{value}</Text>
+      <Text style={styles.heroStatLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function Chip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} style={[styles.chip, active && styles.chipActive]}>
+      <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function StreamCover({ stream, tall = false }: { stream: LiveStream; tall?: boolean }) {
+  const profile = stream.profiles;
+  return (
+    <View style={[styles.cover, tall && styles.coverTall]}>
+      <LinearGradient colors={['#022c22', '#065f46', '#0f766e']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+      <View style={styles.coverOrbA} />
+      <View style={styles.coverOrbB} />
+      <View style={styles.coverAvatarRing}>
+        {profile?.avatar_url ? (
+          <Image source={{ uri: profile.avatar_url }} style={styles.coverAvatar} />
+        ) : (
+          <Text style={styles.coverAvatarLetter}>{profile?.display_name?.slice(0, 1) || 'ح'}</Text>
+        )}
+      </View>
+    </View>
+  );
+}
+
+function SpotlightCard({ stream, onPress }: { stream: LiveStream; onPress: () => void }) {
+  const profile = stream.profiles;
+  return (
+    <Pressable accessibilityRole="button" onPress={onPress} style={styles.spotlight}>
+      <StreamCover stream={stream} tall />
+      <View style={styles.spotlightTopRow}>
+        <View style={styles.onAir}><LivePulse size={7} color="#fff" /><Text style={styles.onAirText}>مميّز</Text></View>
+        <View style={styles.audienceChip}><Text style={styles.audienceChipText}>{AUDIENCE_LABEL[stream.audience]}</Text></View>
+      </View>
+      <View style={styles.spotlightBottom}>
+        <Text style={styles.spotlightTitle} numberOfLines={1}>{stream.title}</Text>
+        <View style={styles.spotlightMetaRow}>
+          <Text style={styles.spotlightHost} numberOfLines={1}>{profile?.display_name || profile?.username || 'جارٍ'}</Text>
+          {profile?.is_verified && <BadgeCheck size={14} color="#a7f3d0" />}
+        </View>
+        <View style={styles.spotlightChips}>
+          <View style={styles.metaChip}><Users size={12} color="#e2e8f0" /><Text style={styles.metaChipText}>{compactCount(stream.viewer_count || 0)} مشاهد</Text></View>
+          <View style={styles.metaChip}><Clock size={12} color="#e2e8f0" /><Text style={styles.metaChipText}>{liveDuration(stream.started_at)}</Text></View>
+          <View style={styles.metaChip}><Text style={styles.metaChipText}>{stream.category}</Text></View>
+          <View style={styles.spotlightJoin}><Text style={styles.spotlightJoinText}>انضم الآن</Text><ChevronLeft size={14} color="#065f46" /></View>
+        </View>
       </View>
     </Pressable>
   );
 }
 
+function LiveCard({ stream, onPress }: { stream: LiveStream; onPress: () => void }) {
+  const profile = stream.profiles;
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={`مشاهدة بث ${profile?.display_name || 'مستخدم'}`} onPress={onPress} style={styles.card}>
+      <StreamCover stream={stream} />
+      <View style={styles.cardTopRow}>
+        <View style={styles.onAir}><LivePulse size={6} color="#fff" /><Text style={styles.onAirText}>مباشر</Text></View>
+        <View style={styles.viewersPill}><Users size={11} color="#fff" /><Text style={styles.viewersPillText}>{compactCount(stream.viewer_count || 0)}</Text></View>
+      </View>
+      <View style={styles.cardBody}>
+        <Text style={styles.cardTitle} numberOfLines={2}>{stream.title}</Text>
+        <View style={styles.cardMetaRow}>
+          <Text style={styles.cardCategory} numberOfLines={1}>{stream.category}</Text>
+          <Text style={styles.cardDot}>·</Text>
+          <Text style={styles.cardDuration}>{liveDuration(stream.started_at)}</Text>
+        </View>
+        <View style={styles.cardHostRow}>
+          <View style={{ flex: 1, alignItems: 'flex-end' }}>
+            <View style={styles.cardHostNameRow}>
+              <Text numberOfLines={1} style={styles.cardHostName}>{profile?.display_name || profile?.username || 'جارٍ'}</Text>
+              {profile?.is_verified && <BadgeCheck size={13} color="#059669" />}
+            </View>
+            <Text numberOfLines={1} style={styles.cardHostArea}>{profile?.district ? `حي ${profile.district}` : profile?.city || 'من حيّنا'}</Text>
+          </View>
+          {profile?.avatar_url ? <Image source={{ uri: profile.avatar_url }} style={styles.cardHostAvatar} /> : <View style={styles.cardHostAvatarFallback}><Text style={styles.cardHostAvatarLetter}>ح</Text></View>}
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
+function TrendingCard({ stream, rank, onPress }: { stream: LiveStream; rank: number; onPress: () => void }) {
+  const profile = stream.profiles;
+  const rankColor = rank === 1 ? '#f59e0b' : rank === 2 ? '#94a3b8' : rank === 3 ? '#c084fc' : '#64748b';
+  return (
+    <Pressable accessibilityRole="button" onPress={onPress} style={styles.trendingCard}>
+      <View style={[styles.trendingRank, { backgroundColor: rankColor }]}><Text style={styles.trendingRankText}>{rank}</Text></View>
+      <View style={styles.trendingCover}><StreamCover stream={stream} /></View>
+      <View style={styles.trendingInfo}>
+        <Text numberOfLines={1} style={styles.trendingTitle}>{stream.title}</Text>
+        <View style={styles.trendingHostRow}>
+          <Text numberOfLines={1} style={styles.trendingHost}>{profile?.display_name || 'جارٍ'}</Text>
+          {profile?.is_verified && <BadgeCheck size={12} color="#059669" />}
+        </View>
+        <View style={styles.trendingMeta}>
+          <View style={styles.trendingMetaItem}><Eye size={12} color="#059669" /><Text style={styles.trendingMetaText}>{compactCount(stream.viewer_count || 0)}</Text></View>
+          <View style={styles.trendingMetaItem}><Flame size={12} color="#f97316" /><Text style={styles.trendingMetaText}>ذروة {compactCount(stream.peak_viewer_count || 0)}</Text></View>
+        </View>
+      </View>
+      <ChevronLeft size={18} color="#94a3b8" />
+    </Pressable>
+  );
+}
+
+function PodiumCard({ host, rank }: { host: LiveHostLeader; rank: number }) {
+  const tones = rank === 1
+    ? { ring: '#f59e0b', bg: '#fffbeb', border: '#fde68a' }
+    : rank === 2
+      ? { ring: '#cbd5e1', bg: '#f8fafc', border: '#e2e8f0' }
+      : { ring: '#d8b4fe', bg: '#faf5ff', border: '#e9d5ff' };
+  const first = rank === 1;
+  return (
+    <View style={[styles.podiumCard, { backgroundColor: tones.bg, borderColor: tones.border }, first && styles.podiumCardFirst]}>
+      {first && <Crown size={20} color="#f59e0b" style={styles.podiumCrown} />}
+      <View style={[styles.podiumAvatarWrap, { borderColor: tones.ring }, first && styles.podiumAvatarFirst]}>
+        {host.avatar_url ? <Image source={{ uri: host.avatar_url }} style={styles.podiumAvatar} /> : <Text style={styles.podiumInitial}>{host.display_name.slice(0, 1)}</Text>}
+      </View>
+      <View style={[styles.podiumRankBadge, { backgroundColor: tones.ring }]}><Text style={styles.podiumRankText}>{rank}</Text></View>
+      <View style={styles.podiumNameRow}>
+        <Text numberOfLines={1} style={styles.podiumName}>{host.display_name}</Text>
+        {host.is_verified && <BadgeCheck size={13} color="#059669" />}
+      </View>
+      <Text style={styles.podiumStats}>{host.stream_count} بث · {host.total_minutes} د</Text>
+    </View>
+  );
+}
+
+function HostRow({ host, rank }: { host: LiveHostLeader; rank: number }) {
+  return (
+    <View style={styles.hostRow}>
+      <View style={styles.hostRank}><Text style={styles.hostRankText}>{rank}</Text></View>
+      {host.avatar_url ? <Image source={{ uri: host.avatar_url }} style={styles.hostAvatar} /> : <View style={styles.hostAvatarFallback}><Text style={styles.hostInitial}>{host.display_name.slice(0, 1)}</Text></View>}
+      <View style={styles.hostInfo}>
+        <View style={styles.hostNameRow}>
+          <Text numberOfLines={1} style={styles.hostName}>{host.display_name}</Text>
+          {host.is_verified && <BadgeCheck size={13} color="#059669" />}
+        </View>
+        <Text style={styles.hostMeta}>{host.stream_count} بث · {host.total_minutes} دقيقة</Text>
+      </View>
+      <View style={styles.hostMetric}><Medal size={13} color="#b45309" /><Text style={styles.hostMetricText}>{compactCount(host.peak_viewers)} ذروة</Text></View>
+    </View>
+  );
+}
+
+function AchievementCard({ item }: { item: LiveAchievement }) {
+  const target = ACHIEVEMENT_TARGET[item.key] || 1;
+  const progress = Math.min(1, (Number(item.metric) || 0) / target);
+  const unit = ACHIEVEMENT_UNIT[item.key] || '';
+  return (
+    <View style={[styles.achCard, item.earned ? styles.achEarned : styles.achLocked]}>
+      <View style={styles.achTopRow}>
+        <Text style={styles.achEmoji}>{item.emoji}</Text>
+        {item.earned && <View style={styles.achBadge}><Text style={styles.achBadgeText}>أُحرِز</Text></View>}
+      </View>
+      <Text style={styles.achTitle}>{item.title}</Text>
+      <Text numberOfLines={2} style={styles.achDesc}>{item.description}</Text>
+      <View style={styles.achBarBg}>
+        <View style={[styles.achBarFill, { width: `${Math.round(progress * 100)}%` }, item.earned && { backgroundColor: '#7c3aed' }]} />
+      </View>
+      <Text style={styles.achProgressText}>
+        {Math.min(Number(item.metric) || 0, target)}{target > 1 ? `/${target}` : ''} {unit}
+      </Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#f0fdf4' }, content: { padding: 16, paddingTop: 8 },
-  createCard: { borderRadius: 24, overflow: 'hidden', marginBottom: 18, elevation: 6, shadowColor: '#059669', shadowOpacity: 0.18, shadowRadius: 18, shadowOffset: { width: 0, height: 8 } }, createGradient: { minHeight: 104, padding: 16, flexDirection: 'row-reverse', alignItems: 'center', gap: 12 }, createIcon: { width: 52, height: 52, borderRadius: 18, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' }, createTitle: { color: '#fff', fontSize: 18, fontWeight: '900' }, createSubtitle: { color: '#d1fae5', fontSize: 12, marginTop: 4, textAlign: 'right' },
-  achievementSection: { marginBottom: 20, padding: 14, borderRadius: 22, backgroundColor: '#f3f0ff', borderWidth: 1, borderColor: '#ddd6fe' }, achievementHeading: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }, achievementTitle: { color: '#4c1d95', fontSize: 15, fontWeight: '900' }, achievementCaption: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }, achievementCaptionText: { color: '#6d28d9', fontSize: 10, fontWeight: '700' }, achievementRow: { flexDirection: 'row-reverse', gap: 9 }, achievementCard: { width: 164, minHeight: 118, padding: 12, borderRadius: 18, borderWidth: 1 }, achievementEarned: { backgroundColor: '#fff', borderColor: '#c4b5fd' }, achievementLocked: { backgroundColor: 'rgba(255,255,255,0.55)', borderColor: '#e9d5ff', opacity: 0.86 }, achievementEmoji: { fontSize: 22 }, achievementCardTitle: { color: '#4c1d95', fontSize: 12, fontWeight: '900', marginTop: 6 }, achievementDesc: { color: '#6b21a8', fontSize: 10, marginTop: 4, lineHeight: 15, textAlign: 'right' }, achievementStatus: { color: '#7c3aed', fontSize: 9, fontWeight: '800', marginTop: 6 },
-  starsCard: { marginBottom: 20, padding: 14, borderRadius: 22, backgroundColor: '#fffbeb', borderWidth: 1, borderColor: '#fde68a' }, starsHeader: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 8 }, starsHeading: { flex: 1, alignItems: 'flex-end' }, starsTitle: { color: '#78350f', fontSize: 15, fontWeight: '900' }, starsCaption: { color: '#92400e', fontSize: 10, fontWeight: '700', marginTop: 3, textAlign: 'right', lineHeight: 16 }, periodSwitch: { flexDirection: 'row', borderRadius: 30, overflow: 'hidden', borderWidth: 1, borderColor: '#fde68a', backgroundColor: '#fff' }, periodTab: { paddingHorizontal: 12, paddingVertical: 7 }, periodTabActive: { backgroundColor: '#b45309' }, periodTabText: { color: '#92400e', fontSize: 11, fontWeight: '800' }, periodTabTextActive: { color: '#fff' }, topHostsRow: { flexDirection: 'row-reverse', gap: 9 }, topHostCard: { width: 132, minHeight: 130, alignItems: 'center', justifyContent: 'center', padding: 10, borderRadius: 18, backgroundColor: '#fff', borderWidth: 1, borderColor: '#fef3c7' }, topHostRank: { position: 'absolute', top: 8, right: 8, width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fef3c7' }, topHostRankText: { color: '#92400e', fontSize: 11, fontWeight: '900' }, topHostAvatar: { width: 48, height: 48, borderRadius: 24, marginBottom: 7 }, topHostAvatarFallback: { width: 48, height: 48, borderRadius: 24, marginBottom: 7, backgroundColor: '#d1fae5', alignItems: 'center', justifyContent: 'center' }, topHostInitial: { color: '#047857', fontSize: 18, fontWeight: '900' }, topHostNameRow: { maxWidth: '100%', flexDirection: 'row-reverse', alignItems: 'center', gap: 3 }, topHostName: { color: '#0f172a', fontSize: 12, fontWeight: '900', maxWidth: 90 }, topHostStats: { color: '#78716c', fontSize: 10, marginTop: 5 },
-  leaderboardEmpty: { color: '#92400e', fontSize: 11, textAlign: 'center', paddingVertical: 10 },
-  leaderboardError: { color: '#9a3412', fontSize: 11, textAlign: 'right', marginTop: -12, marginBottom: 16 },
-  trendingSection: { marginBottom: 16 }, trendingRow: { flexDirection: 'row-reverse', gap: 10, paddingBottom: 6 },
-  filterRow: { flexDirection: 'row-reverse', gap: 8, marginBottom: 20 }, filter: { paddingHorizontal: 17, paddingVertical: 9, borderRadius: 30, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0', shadowColor: '#0f172a', shadowOpacity: 0.04, shadowRadius: 6, shadowOffset: { width: 0, height: 3 } }, filterActive: { backgroundColor: '#065f46', borderColor: '#065f46' }, filterText: { fontSize: 13, color: '#64748b', fontWeight: '700' }, filterTextActive: { color: '#fff' },
-  sectionRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }, sectionTitle: { color: '#0f172a', fontSize: 19, fontWeight: '900', textAlign: 'right' }, liveCount: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, backgroundColor: '#ecfdf5', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 }, liveCountText: { color: '#047857', fontSize: 12, fontWeight: '700' }, liveDot: { width: 7, height: 7, borderRadius: 5, backgroundColor: '#fb3a4b' },
-  grid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 12 }, card: { width: '48%', flexGrow: 1, maxWidth: '49%', backgroundColor: '#fff', borderRadius: 22, overflow: 'hidden', marginBottom: 4, borderWidth: 1, borderColor: '#e2e8f0', shadowColor: '#0f172a', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 3 }, cardCompact: { width: 176, minWidth: 170, maxWidth: 180 }, cardCover: { minHeight: 190, padding: 12, justifyContent: 'space-between', position: 'relative' }, cardCoverCompact: { minHeight: 178 }, cardCoverShade: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(2,6,23,0.48)' }, cardCoverContent: { flex: 1, justifyContent: 'space-between' }, cardTop: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' }, onAir: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, backgroundColor: '#dc2626', borderRadius: 12, paddingHorizontal: 8, paddingVertical: 4 }, onAirText: { color: '#fff', fontSize: 10, fontWeight: '900' }, category: { color: '#d1fae5', fontSize: 11, fontWeight: '700' }, cardCenter: { alignItems: 'center', gap: 8 }, avatarRing: { width: 70, height: 70, borderRadius: 36, borderWidth: 2, borderColor: '#34d399', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', backgroundColor: '#047857' }, avatar: { width: '100%', height: '100%' }, avatarLetter: { color: '#fff', fontWeight: '900', fontSize: 25 }, streamTitle: { color: '#fff', textAlign: 'center', fontWeight: '900', fontSize: 14, minHeight: 36 }, cardBottom: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' }, viewers: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.3)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 }, viewerText: { color: '#fff', fontSize: 11, fontWeight: '800' }, joinText: { flexDirection: 'row-reverse', alignItems: 'center', gap: 1 }, joinLabel: { color: '#d1fae5', fontSize: 11, fontWeight: '800' },
-  hostRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, padding: 10 }, hostName: { color: '#0f172a', fontSize: 12, fontWeight: '800' }, hostArea: { color: '#64748b', fontSize: 10, marginTop: 2, textAlign: 'right' }, smallAvatar: { width: 30, height: 30, borderRadius: 15 }, smallAvatarFallback: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#d1fae5', alignItems: 'center', justifyContent: 'center' }, smallAvatarLetter: { color: '#047857', fontWeight: '900' },
-  state: { paddingVertical: 50, alignItems: 'center', gap: 12 }, stateText: { color: '#64748b', fontSize: 13 }, empty: { backgroundColor: '#fff', borderRadius: 20, borderWidth: 1, borderColor: '#e2e8f0', padding: 28, alignItems: 'center', gap: 9, shadowColor: '#0f172a', shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } }, emptyTitle: { color: '#0f172a', fontSize: 16, fontWeight: '900', textAlign: 'center' }, emptyText: { color: '#64748b', fontSize: 13, textAlign: 'center', lineHeight: 21 }, retry: { paddingVertical: 9, paddingHorizontal: 18, backgroundColor: '#ecfdf5', borderRadius: 15, marginTop: 5 }, retryText: { color: '#047857', fontWeight: '800' }, emptyCreate: { marginTop: 6, backgroundColor: '#059669', borderRadius: 14, paddingHorizontal: 18, paddingVertical: 10 }, emptyCreateText: { color: '#fff', fontWeight: '900' },
-  privacyHint: { flexDirection: 'row-reverse', alignItems: 'flex-start', gap: 7, padding: 12, marginTop: 16, backgroundColor: '#f1f5f9', borderRadius: 14 }, privacyText: { flex: 1, color: '#64748b', fontSize: 11, textAlign: 'right', lineHeight: 17 },
+  screen: { flex: 1, backgroundColor: '#f0fdf4' },
+  content: { padding: 16, paddingTop: 14 },
+
+  headerCta: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, backgroundColor: '#059669', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
+  headerCtaText: { color: '#fff', fontSize: 12.5, fontWeight: '900' },
+
+  // Tab bar
+  tabBarWrap: { paddingHorizontal: 12, paddingTop: 10, paddingBottom: 10, backgroundColor: '#f0fdf4' },
+  tabBar: { flexDirection: 'row-reverse', gap: 8, backgroundColor: '#ffffff', borderRadius: 20, padding: 6, borderWidth: 1, borderColor: '#d1fae5', shadowColor: '#065f46', shadowOpacity: 0.08, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 3 },
+  tabItem: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3, paddingVertical: 9, borderRadius: 15 },
+  tabItemActive: { backgroundColor: '#065f46' },
+  tabIconWrap: { position: 'relative' },
+  tabLabel: { fontSize: 11.5, fontWeight: '800', color: '#64748b' },
+  tabLabelActive: { color: '#ffffff' },
+  tabBadge: { position: 'absolute', top: -6, left: -10, minWidth: 16, height: 16, borderRadius: 8, paddingHorizontal: 3, backgroundColor: '#ecfdf5', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#a7f3d0' },
+  tabBadgeActive: { backgroundColor: '#10b981', borderColor: '#065f46' },
+  tabBadgeText: { color: '#047857', fontSize: 9, fontWeight: '900' },
+  tabBadgeTextActive: { color: '#fff' },
+
+  // Hero
+  hero: { borderRadius: 24, padding: 16, marginBottom: 16, overflow: 'hidden' },
+  heroTop: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
+  heroLive: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
+  heroLiveText: { color: '#fff', fontSize: 14, fontWeight: '900' },
+  heroCaption: { color: '#d1fae5', fontSize: 11.5, fontWeight: '700' },
+  heroStats: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(2,44,34,0.28)', borderRadius: 18, paddingVertical: 12, paddingHorizontal: 8, marginBottom: 14 },
+  heroStat: { flex: 1, alignItems: 'center', gap: 3 },
+  heroStatValue: { color: '#fff', fontSize: 19, fontWeight: '900' },
+  heroStatLabel: { color: '#d1fae5', fontSize: 10.5, fontWeight: '700' },
+  heroDivider: { width: 1, height: 34, backgroundColor: 'rgba(209,250,229,0.25)' },
+  heroCta: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, backgroundColor: '#fff', borderRadius: 16, paddingVertical: 11, paddingHorizontal: 12 },
+  heroCtaIcon: { width: 34, height: 34, borderRadius: 12, backgroundColor: '#ecfdf5', alignItems: 'center', justifyContent: 'center' },
+  heroCtaText: { flex: 1, color: '#065f46', fontSize: 14.5, fontWeight: '900', textAlign: 'right' },
+
+  // Chips
+  chipsRow: { flexDirection: 'row-reverse', gap: 8, paddingBottom: 14 },
+  chip: { paddingHorizontal: 15, paddingVertical: 8, borderRadius: 999, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0' },
+  chipActive: { backgroundColor: '#065f46', borderColor: '#065f46' },
+  chipText: { color: '#64748b', fontSize: 12.5, fontWeight: '800' },
+  chipTextActive: { color: '#fff' },
+
+  // Sub-filter segmented
+  segRow: { flexDirection: 'row-reverse', gap: 8, marginBottom: 18 },
+  seg: { flex: 1, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 14, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0' },
+  segActive: { backgroundColor: '#ecfdf5', borderColor: '#a7f3d0' },
+  segText: { color: '#64748b', fontSize: 12.5, fontWeight: '800' },
+  segTextActive: { color: '#047857' },
+  segCount: { minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 5, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' },
+  segCountActive: { backgroundColor: '#059669' },
+  segCountText: { color: '#64748b', fontSize: 10.5, fontWeight: '900' },
+  segCountTextActive: { color: '#fff' },
+
+  // Sections
+  sectionRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  sectionHeading: { flex: 1, alignItems: 'flex-end' },
+  sectionTitle: { color: '#0f172a', fontSize: 19, fontWeight: '900', textAlign: 'right' },
+  sectionSub: { color: '#64748b', fontSize: 11.5, fontWeight: '700', marginTop: 2, textAlign: 'right' },
+  countPill: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, backgroundColor: '#ecfdf5', borderRadius: 999, paddingHorizontal: 11, paddingVertical: 6 },
+  countPillText: { color: '#047857', fontSize: 12, fontWeight: '800' },
+
+  // Covers
+  cover: { height: 118, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  coverTall: { height: 168 },
+  coverOrbA: { position: 'absolute', top: -30, left: -20, width: 110, height: 110, borderRadius: 55, backgroundColor: 'rgba(16,185,129,0.28)' },
+  coverOrbB: { position: 'absolute', bottom: -40, right: -24, width: 130, height: 130, borderRadius: 65, backgroundColor: 'rgba(4,120,87,0.35)' },
+  coverAvatarRing: { width: 62, height: 62, borderRadius: 31, borderWidth: 2, borderColor: '#6ee7b7', backgroundColor: '#047857', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  coverAvatar: { width: '100%', height: '100%' },
+  coverAvatarLetter: { color: '#fff', fontWeight: '900', fontSize: 24 },
+
+  // Spotlight
+  spotlight: { borderRadius: 22, overflow: 'hidden', marginBottom: 14, backgroundColor: '#022c22' },
+  spotlightTopRow: { position: 'absolute', top: 12, right: 12, left: 12, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between' },
+  spotlightBottom: { padding: 14, gap: 5 },
+  spotlightTitle: { color: '#fff', fontSize: 17, fontWeight: '900', textAlign: 'right' },
+  spotlightMetaRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5 },
+  spotlightHost: { color: '#a7f3d0', fontSize: 12, fontWeight: '800', maxWidth: '80%' },
+  spotlightChips: { flexDirection: 'row-reverse', alignItems: 'center', gap: 7, marginTop: 4, flexWrap: 'wrap' },
+  metaChip: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.14)', borderRadius: 999, paddingHorizontal: 9, paddingVertical: 5 },
+  metaChipText: { color: '#e2e8f0', fontSize: 11, fontWeight: '800' },
+  spotlightJoin: { flexDirection: 'row-reverse', alignItems: 'center', gap: 2, backgroundColor: '#6ee7b7', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
+  spotlightJoinText: { color: '#065f46', fontSize: 12, fontWeight: '900' },
+
+  // Live grid card
+  grid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 12 },
+  card: { width: '48%', flexGrow: 1, maxWidth: '49%', backgroundColor: '#fff', borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: '#e2e8f0', shadowColor: '#0f172a', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 3 },
+  cardTopRow: { position: 'absolute', top: 9, right: 9, left: 9, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between' },
+  viewersPill: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, backgroundColor: 'rgba(2,6,23,0.42)', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 },
+  viewersPillText: { color: '#fff', fontSize: 11, fontWeight: '900' },
+  cardBody: { padding: 11, gap: 5 },
+  cardTitle: { color: '#0f172a', fontSize: 13.5, fontWeight: '900', textAlign: 'right', minHeight: 34 },
+  cardMetaRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5 },
+  cardCategory: { color: '#059669', fontSize: 11, fontWeight: '800', maxWidth: '60%' },
+  cardDot: { color: '#cbd5e1', fontSize: 11 },
+  cardDuration: { color: '#94a3b8', fontSize: 11, fontWeight: '700' },
+  cardHostRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginTop: 2 },
+  cardHostNameRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 3 },
+  cardHostName: { color: '#0f172a', fontSize: 12, fontWeight: '800', maxWidth: 96 },
+  cardHostArea: { color: '#64748b', fontSize: 10, marginTop: 1, textAlign: 'right' },
+  cardHostAvatar: { width: 30, height: 30, borderRadius: 15 },
+  cardHostAvatarFallback: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#d1fae5', alignItems: 'center', justifyContent: 'center' },
+  cardHostAvatarLetter: { color: '#047857', fontWeight: '900' },
+
+  // On-air badges
+  onAir: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, backgroundColor: '#dc2626', borderRadius: 999, paddingHorizontal: 9, paddingVertical: 4 },
+  onAirText: { color: '#fff', fontSize: 10.5, fontWeight: '900' },
+  audienceChip: { backgroundColor: 'rgba(2,6,23,0.42)', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
+  audienceChipText: { color: '#e2e8f0', fontSize: 10.5, fontWeight: '800' },
+
+  // Trending
+  trendingCard: { flexDirection: 'row-reverse', alignItems: 'center', gap: 11, backgroundColor: '#fff', borderRadius: 18, padding: 10, borderWidth: 1, borderColor: '#e2e8f0', shadowColor: '#0f172a', shadowOpacity: 0.05, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 2 },
+  trendingRank: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  trendingRankText: { color: '#fff', fontSize: 12.5, fontWeight: '900' },
+  trendingCover: { width: 78, height: 78, borderRadius: 14, overflow: 'hidden' },
+  trendingInfo: { flex: 1, gap: 3 },
+  trendingTitle: { color: '#0f172a', fontSize: 13.5, fontWeight: '900', textAlign: 'right' },
+  trendingHostRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4 },
+  trendingHost: { color: '#64748b', fontSize: 11.5, fontWeight: '800', maxWidth: '75%' },
+  trendingMeta: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, marginTop: 2 },
+  trendingMetaItem: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4 },
+  trendingMetaText: { color: '#475569', fontSize: 11, fontWeight: '800' },
+
+  // Stars / leaderboard
+  starsHero: { borderRadius: 20, overflow: 'hidden', marginBottom: 12 },
+  starsHeroGradient: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, padding: 16 },
+  starsHeroTitle: { color: '#fff', fontSize: 18, fontWeight: '900' },
+  starsHeroSub: { color: '#fef3c7', fontSize: 11, fontWeight: '700', marginTop: 3, textAlign: 'right' },
+  periodSwitch: { flexDirection: 'row-reverse', gap: 8, marginBottom: 16 },
+  periodTab: { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: 14, backgroundColor: '#fff', borderWidth: 1, borderColor: '#fde68a' },
+  periodTabActive: { backgroundColor: '#b45309', borderColor: '#b45309' },
+  periodTabText: { color: '#92400e', fontSize: 12.5, fontWeight: '800' },
+  periodTabTextActive: { color: '#fff' },
+  leaderboardError: { color: '#9a3412', fontSize: 11.5, textAlign: 'right', marginBottom: 14 },
+  podiumRow: { flexDirection: 'row-reverse', alignItems: 'flex-end', gap: 8, marginBottom: 14 },
+  podiumCard: { flex: 1, alignItems: 'center', padding: 10, borderRadius: 18, borderWidth: 1, gap: 4 },
+  podiumCardFirst: { paddingTop: 20 },
+  podiumCrown: { position: 'absolute', top: 4 },
+  podiumAvatarWrap: { width: 50, height: 50, borderRadius: 25, borderWidth: 2, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  podiumAvatarFirst: { width: 62, height: 62, borderRadius: 31 },
+  podiumAvatar: { width: '100%', height: '100%' },
+  podiumInitial: { color: '#047857', fontSize: 18, fontWeight: '900' },
+  podiumRankBadge: { position: 'absolute', top: 8, left: 8, width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  podiumRankText: { color: '#fff', fontSize: 11, fontWeight: '900' },
+  podiumNameRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 3, maxWidth: '100%' },
+  podiumName: { color: '#0f172a', fontSize: 12, fontWeight: '900', maxWidth: 82 },
+  podiumStats: { color: '#78716c', fontSize: 9.5, fontWeight: '700' },
+  hostRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, backgroundColor: '#fff', borderRadius: 16, padding: 10, borderWidth: 1, borderColor: '#fef3c7' },
+  hostRank: { width: 26, height: 26, borderRadius: 13, backgroundColor: '#fef3c7', alignItems: 'center', justifyContent: 'center' },
+  hostRankText: { color: '#92400e', fontSize: 12, fontWeight: '900' },
+  hostAvatar: { width: 40, height: 40, borderRadius: 20 },
+  hostAvatarFallback: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#d1fae5', alignItems: 'center', justifyContent: 'center' },
+  hostInitial: { color: '#047857', fontSize: 15, fontWeight: '900' },
+  hostInfo: { flex: 1, gap: 2 },
+  hostNameRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4 },
+  hostName: { color: '#0f172a', fontSize: 13, fontWeight: '900', maxWidth: '75%' },
+  hostMeta: { color: '#78716c', fontSize: 10.5, fontWeight: '700', textAlign: 'right' },
+  hostMetric: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, backgroundColor: '#fffbeb', borderRadius: 999, paddingHorizontal: 9, paddingVertical: 5 },
+  hostMetricText: { color: '#92400e', fontSize: 10.5, fontWeight: '800' },
+
+  // Achievements
+  achSummary: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, backgroundColor: '#f3f0ff', borderWidth: 1, borderColor: '#ddd6fe', borderRadius: 20, padding: 15, marginBottom: 14 },
+  achSummaryValue: { color: '#6d28d9', fontSize: 34, fontWeight: '900' },
+  achSummaryTitle: { color: '#4c1d95', fontSize: 15, fontWeight: '900' },
+  achSummarySub: { color: '#7c3aed', fontSize: 11.5, fontWeight: '700', marginTop: 2 },
+  achSummaryPercent: { width: 54, height: 54, borderRadius: 27, borderWidth: 3, borderColor: '#c4b5fd', alignItems: 'center', justifyContent: 'center' },
+  achSummaryPercentText: { color: '#6d28d9', fontSize: 13, fontWeight: '900' },
+  achGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 12 },
+  achCard: { width: '48%', flexGrow: 1, maxWidth: '49%', padding: 13, borderRadius: 18, borderWidth: 1, gap: 5 },
+  achEarned: { backgroundColor: '#fff', borderColor: '#c4b5fd' },
+  achLocked: { backgroundColor: 'rgba(255,255,255,0.6)', borderColor: '#e9d5ff' },
+  achTopRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between' },
+  achEmoji: { fontSize: 24 },
+  achBadge: { backgroundColor: '#7c3aed', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
+  achBadgeText: { color: '#fff', fontSize: 9.5, fontWeight: '900' },
+  achTitle: { color: '#4c1d95', fontSize: 13, fontWeight: '900', textAlign: 'right' },
+  achDesc: { color: '#6b21a8', fontSize: 10.5, lineHeight: 15, textAlign: 'right', minHeight: 30 },
+  achBarBg: { height: 7, borderRadius: 4, backgroundColor: '#ede9fe', overflow: 'hidden', marginTop: 3 },
+  achBarFill: { height: '100%', borderRadius: 4, backgroundColor: '#a78bfa' },
+  achProgressText: { color: '#7c3aed', fontSize: 10, fontWeight: '800', textAlign: 'right' },
+
+  // States
+  state: { paddingVertical: 50, alignItems: 'center', gap: 12 },
+  stateText: { color: '#64748b', fontSize: 13 },
+  empty: { backgroundColor: '#fff', borderRadius: 20, borderWidth: 1, borderColor: '#e2e8f0', padding: 28, alignItems: 'center', gap: 9, shadowColor: '#0f172a', shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } },
+  emptyTitle: { color: '#0f172a', fontSize: 16, fontWeight: '900', textAlign: 'center' },
+  emptyText: { color: '#64748b', fontSize: 13, textAlign: 'center', lineHeight: 21 },
+  retry: { paddingVertical: 9, paddingHorizontal: 18, backgroundColor: '#ecfdf5', borderRadius: 15, marginTop: 5 },
+  retryText: { color: '#047857', fontWeight: '800' },
+  emptyCreate: { marginTop: 6, backgroundColor: '#059669', borderRadius: 14, paddingHorizontal: 18, paddingVertical: 10 },
+  emptyCreateText: { color: '#fff', fontWeight: '900' },
+
+  privacyHint: { flexDirection: 'row-reverse', alignItems: 'flex-start', gap: 7, padding: 12, marginTop: 18, backgroundColor: '#f1f5f9', borderRadius: 14 },
+  privacyText: { flex: 1, color: '#64748b', fontSize: 11, textAlign: 'right', lineHeight: 17 },
 });
