@@ -44,73 +44,6 @@ const DIRECTORY_CATEGORIES = [
   { id: 'auto', label: 'سيارات وبنشر', emoji: '🚗' },
 ];
 
-const CURATED_NEIGHBOR_RECOMMENDATIONS = [
-  {
-    id: 'cur-1',
-    name: 'أبو أحمد - فني سباكة وتسريبات',
-    category: 'maintenance',
-    categoryLabel: 'سباكة وكهرباء',
-    city: 'الرياض',
-    district: 'الياسمين',
-    description: 'فني ممتاز وأمين، يخدم الحي منذ سنوات، دقيق في المواعيد وأسعاره طيبة ومناسبة.',
-    rating: 4.9,
-    review_count: 28,
-    phone: '0501234567',
-    whatsapp: '966501234567',
-    is_verified: true,
-    neighbor_recommended: true,
-    provider_name: 'أبو أحمد الفني',
-  },
-  {
-    id: 'cur-2',
-    name: 'تموينات ومخابز الضاحية',
-    category: 'grocery',
-    categoryLabel: 'تموينات وبقالة',
-    city: 'الرياض',
-    district: 'الياسمين',
-    description: 'توصيل سريع مجاني لسكان عماير المربع، خبز ساخن يومياً على مدار الساعة ومواد تموينية طازجة.',
-    rating: 4.8,
-    review_count: 42,
-    phone: '0559876543',
-    whatsapp: '966559876543',
-    is_verified: true,
-    neighbor_recommended: true,
-    provider_name: 'إدارة التموينات',
-  },
-  {
-    id: 'cur-3',
-    name: 'مغسلة الأناقة السريعة',
-    category: 'laundry',
-    categoryLabel: 'مغاسل وتنظيف',
-    city: 'الرياض',
-    district: 'النرجس',
-    description: 'غسيل وكوي بخار احترافي مع استلام وتسليم عند باب البيت لجيران الحي خلال 24 ساعة.',
-    rating: 4.7,
-    review_count: 23,
-    phone: '0543210987',
-    whatsapp: '966543210987',
-    is_verified: true,
-    neighbor_recommended: true,
-    provider_name: 'أحمد البلوشي',
-  },
-  {
-    id: 'cur-4',
-    name: 'كهربائي منازل وطوارئ - م. رفيق',
-    category: 'maintenance',
-    categoryLabel: 'سباكة وكهرباء',
-    city: 'الرياض',
-    district: 'العليا',
-    description: 'إصلاح التماسات ولوحات قواطع فورية، تركيب إنارات ومراوح، استجابة سريعة حتى في المساء.',
-    rating: 5.0,
-    review_count: 35,
-    phone: '0567891234',
-    whatsapp: '966567891234',
-    is_verified: true,
-    neighbor_recommended: true,
-    provider_name: 'م. رفيق',
-  },
-];
-
 export default function Directory() {
   const bottomNavInset = useBottomNavInset();
   const [items, setItems] = useState<any[]>([]);
@@ -169,32 +102,24 @@ export default function Directory() {
         id: s.id,
         name: s.name,
         category: s.category || 'maintenance',
-        city: s.city || 'الرياض',
-        district: s.district || 'الحي',
-        description: s.description || 'خدمة ومحل معتمد يخدم سكان الحي.',
-        rating: 4.9,
-        review_count: 1,
+        city: s.city || '',
+        district: s.district || '',
+        description: s.description || '',
+        rating: null,
+        review_count: 0,
         phone: s.phone || '',
         whatsapp: s.whatsapp || (s.phone ? (s.phone.startsWith('966') ? s.phone : `966${s.phone.replace(/^0/, '')}`) : ''),
         is_verified: s.is_verified,
-        neighbor_recommended: true,
+        neighbor_recommended: false,
         provider_id: s.provider_id,
-        provider_name: s.profiles?.display_name || 'أحد جيران الحي',
+        provider_name: s.profiles?.display_name || '',
         avatar_url: s.profiles?.avatar_url,
       }));
 
-      // Combine DB services with curated community recommendations
-      const combined = [...normalizedDb];
-      for (const cur of CURATED_NEIGHBOR_RECOMMENDATIONS) {
-        if (!combined.some(c => c.name === cur.name)) {
-          combined.push(cur);
-        }
-      }
-
-      setItems(combined);
+      setItems(normalizedDb);
     } catch (e) {
       console.warn('Load directory error', e);
-      setItems(CURATED_NEIGHBOR_RECOMMENDATIONS);
+      setItems([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -223,6 +148,10 @@ export default function Directory() {
       return Alert.alert('بيانات ناقصة', 'يرجى كتابة اسم المحل أو المهني.');
     }
 
+    if (!city?.trim() || !district?.trim()) {
+      return Alert.alert('حدد موقعك أولاً', 'اختر المدينة والحي من إعدادات الملف الشخصي قبل إضافة خدمة حتى لا تُنسب لمكان غير صحيح.');
+    }
+
     setSubmitting(true);
     try {
       const { data: authData } = await supabase.auth.getUser();
@@ -234,8 +163,8 @@ export default function Directory() {
           id: `local-${Date.now()}`,
           name: recName.trim(),
           category: recCategory,
-          city: city || 'الرياض',
-          district: district || 'الياسمين',
+          city: city || '',
+          district: district || '',
           description: recDesc.trim() || 'توصية موثوقة من أحد جيران الحي.',
           phone: recPhone.trim() || '',
           whatsapp: recPhone.trim() ? (recPhone.trim().startsWith('966') ? recPhone.trim() : `966${recPhone.trim().replace(/^0/, '')}`) : '',
@@ -266,7 +195,7 @@ export default function Directory() {
         .insert({
           provider_id: user.id,
           name: recName.trim(),
-          description: recDesc.trim() || 'توصية موثوقة من أحد جيران الحي ومجربة.',
+          description: recDesc.trim(),
           category: recCategory,
           city: city || 'الرياض',
           district: district || 'الياسمين',
