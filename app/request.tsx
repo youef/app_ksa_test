@@ -259,58 +259,14 @@ export default function Request() {
       // 3. Resolve or create direct conversation with the helper
       let finalConvId: string | null = null;
 
-      // Step A: Check existing direct conversation via conversation_members
-      try {
-        const { data: myMemberships } = await supabase
-          .from('conversation_members')
-          .select('conversation_id')
-          .eq('user_id', me);
-
-        if (myMemberships && myMemberships.length > 0) {
-          const myConvIds = myMemberships.map((m: any) => m.conversation_id);
-          const { data: partnerMatch } = await supabase
-            .from('conversation_members')
-            .select('conversation_id')
-            .in('conversation_id', myConvIds)
-            .eq('user_id', match.helper_id)
-            .limit(1)
-            .maybeSingle();
-
-          if (partnerMatch?.conversation_id) {
-            finalConvId = partnerMatch.conversation_id;
-          }
-        }
-      } catch {}
-
-      // Step B: Try RPC if not found
-      if (!finalConvId) {
-        try {
-          const { data: rpcConvId, error: convError } = await supabase.rpc(
-            'hayna_get_or_create_direct_conversation',
-            { p_target: match.helper_id },
-          );
-          if (!convError && rpcConvId) {
-            finalConvId = rpcConvId;
-          }
-        } catch {}
-      }
-
-      // Step C: Fallback creation
-      if (!finalConvId) {
-        try {
-          let convRes = await supabase.from('conversations').insert({}).select('id').single();
-          if (convRes.error) {
-            convRes = await supabase.from('conversations').insert({ created_by: me }).select('id').single();
-          }
-
-          if (convRes.data?.id) {
-            finalConvId = convRes.data.id;
-            await supabase.from('conversation_members').insert([
-              { conversation_id: finalConvId, user_id: me },
-              { conversation_id: finalConvId, user_id: match.helper_id },
-            ]);
-          }
-        } catch {}
+      // Use the privacy-aware server RPC for both lookup and creation.
+      // It enforces DM preferences and block rules for existing and new chats.
+      const { data: finalConvId, error: convError } = await supabase.rpc(
+        'hayna_get_or_create_direct_conversation',
+        { p_target: match.helper_id },
+      );
+      if (convError || !finalConvId) {
+        throw convError || new Error('لا تسمح إعدادات الخصوصية ببدء هذه المحادثة.');
       }
 
       // Step D: Send message directly in private chat to the helper
@@ -417,71 +373,12 @@ export default function Request() {
         p_note: finalNote,
       });
 
-      if (rpcErr) {
-        // Fallback: direct update
-        await supabase.from('requests').update({
-          status: 'completed',
-          accepted_by: helperId,
-        }).eq('id', id);
-
-        await supabase.from('help_matches').update({
-          status: 'completed',
-        }).eq('id', targetMatch.id);
-
-        // If conversation exists, post appreciation card
-        if (convId) {
-          try {
-            await supabase.from('messages').insert({
-              conversation_id: convId,
-              sender_id: me,
-              body: JSON.stringify({
-                type: 'appreciation',
-                title: '☕ تمت الفزعة بنجاح! بطاقة شكر وقهوة',
-                note: finalNote,
-                points: 15,
-                giver_name: requester?.display_name || 'جارك',
-                request_id: id,
-              }),
-              read_by: [me],
-            });
-          } catch {}
-        }
-
-        // Award reputation to helper
-        try {
-          const { data: curRep } = await supabase
-            .from('reputation')
-            .select('points')
-            .eq('user_id', helperId)
-            .maybeSingle();
-          const nextPts = (curRep?.points || 0) + 15;
-          await supabase.from('reputation').upsert({
-            user_id: helperId,
-            points: nextPts,
-            updated_at: new Date().toISOString(),
-          });
-        } catch {}
-
-        // Award small reputation bonus to requester (+5)
-        try {
-          const { data: curRepMe } = await supabase
-            .from('reputation')
-            .select('points')
-            .eq('user_id', me)
-            .maybeSingle();
-          const nextPtsMe = (curRepMe?.points || 0) + 5;
-          await supabase.from('reputation').upsert({
-            user_id: me,
-            points: nextPtsMe,
-            updated_at: new Date().toISOString(),
-          });
-        } catch {}
-      }
+      if (rpcErr) throw rpcErr;
 
       setCompleteModalOpen(false);
       Alert.alert(
         'تم إتمام الفزعة بنجاح! 🎉☕',
-        `بيض الله وجهك ووجه ${helperName}! تم إهداء القهوة ومنح +15 نقطة سمعة للفازع تقديراً لتعاونه.`
+        `بيض الله وجهك ووجه ${helperName}! تم تسجيل إتمام الفزعة وإرسال بطاقة الشكر.`
       );
       load();
     } catch (e: any) {
