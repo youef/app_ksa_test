@@ -31,6 +31,7 @@ supabase secrets set APP_BASE_URL=https://appksatest-yousef8-15e4.vercel.app
 supabase db push
 supabase functions deploy create-marketplace-checkout
 supabase functions deploy moyasar-marketplace-webhook
+supabase functions deploy marketplace-admin
 ```
 
 تحقق من أن `SUPABASE_SERVICE_ROLE_KEY` متاح كسر خادم للدوال (عادةً يُحقنه Supabase تلقائيًا). لا تضعه في التطبيق. رابط إشعار Moyasar يُرسل ضمن إنشاء الفاتورة تلقائيًا:
@@ -49,6 +50,6 @@ supabase functions deploy moyasar-marketplace-webhook
 
 - الدفع الحقيقي لن يعمل قبل إضافة مفاتيح تاجر صحيحة ونشر الدوال وتطبيق migration.
 - التجديد التلقائي للاشتراك غير مفعّل؛ الاشتراك الحالي مدفوع لفترة محددة ويمكن بناء التجديد لاحقًا عبر recurring payments بعد تفعيلها مع مزود الدفع.
-- الإعلانات المدفوعة تبقى بانتظار مراجعة الإدارة بعد الدفع. يجب اعتمادها قبل ظهورها للمستخدمين.
+- الإعلانات المدفوعة تبقى بانتظار مراجعة الإدارة بعد الدفع. صفحة «مراجعة إعلانات السوق» متاحة للمدير لاعتماد الحملة أو رفضها؛ لا تظهر قبل الموافقة.
 - المدفوعات تُسجّل مباشرة إلى حساب التاجر في Moyasar. لا يُنفّذ هذا الإصدار تقسيم المبالغ أو تحويل الأرباح تلقائيًا إلى مقدمي الخدمات. إذا كانت المنصة ستحتفظ بعمولة أو تصرف مستحقات للبائعين، يلزم إعداد منتج marketplace/payouts مع مزود الدفع ومراجعة المتطلبات النظامية قبل تشغيله.
 - الأسعار الافتراضية في migration أمثلة قابلة للتعديل قبل الإطلاق، وليست توصية تسعير نهائية.
