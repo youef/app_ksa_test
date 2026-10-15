@@ -218,6 +218,7 @@ export default function EmergencyAlertScreen() {
               const { data: neighbors } = await supabase
                 .from('profiles')
                 .select('id')
+                .eq('city', userProfile?.city || '')
                 .eq('district', district)
                 .neq('id', auth.user.id)
                 .limit(100);
