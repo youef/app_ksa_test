@@ -1,6 +1,6 @@
 # إعداد الدفع التجاري في حيّنا
 
-هذا التكامل يستخدم Moyasar Hosted Invoices لعدم تمرير بيانات البطاقة عبر تطبيق حيّنا. السعر يُقرأ من قاعدة البيانات على الخادم، ويُفعّل الطلب فقط بعد أن يعيد الخادم جلب الفاتورة من Moyasar ويتحقق من حالتها والمبلغ والعملة والطلب المرتبط بها.
+هذا التكامل يدعم Moyasar Hosted Invoices أو Tap Hosted Checkout، ويتم اختيار المزود عبر `PAYMENT_GATEWAY` لعدم تمرير بيانات البطاقة عبر تطبيق حيّنا. السعر يُقرأ من قاعدة البيانات على الخادم، ويُفعّل الطلب فقط بعد أن يعيد الخادم جلب الفاتورة من Moyasar ويتحقق من حالتها والمبلغ والعملة والطلب المرتبط بها.
 
 ## ما تم تضمينه
 
@@ -13,15 +13,18 @@
 
 ## إعداد مفاتيح Moyasar
 
-بعد إنشاء حساب تاجر وتفعيل طرق الدفع المناسبة من Moyasar، أضف الأسرار إلى مشروع Supabase (لا تضعها في `EXPO_PUBLIC_*` أو `app.json` أو تطبيق الهاتف):
+بعد إنشاء حساب تاجر وتفعيل طرق الدفع المناسبة لدى Moyasar أو Tap، أضف أسرار المزود المختار إلى مشروع Supabase (لا تضعها في `EXPO_PUBLIC_*` أو `app.json` أو تطبيق الهاتف).
 
 ```bash
 supabase secrets set PAYMENT_GATEWAY=moyasar
 supabase secrets set MOYASAR_SECRET_KEY=sk_test_REPLACE_ME
+# أو اختر Tap بدل Moyasar:
+# supabase secrets set PAYMENT_GATEWAY=tap
+# supabase secrets set TAP_SECRET_KEY=sk_test_REPLACE_ME
 supabase secrets set APP_BASE_URL=https://appksatest-yousef8-15e4.vercel.app
 ```
 
-ابدأ بمفتاح الاختبار `sk_test_...`. لا تستخدم مفتاح الإنتاج حتى تنجح اختبارات دورة الدفع كاملة. لا تشارك المفتاح في المحادثة أو GitHub.
+ابدأ بمفاتيح الاختبار `sk_test_...`. لا تستخدم مفاتيح الإنتاج حتى تنجح اختبارات دورة الدفع كاملة. اختر بوابة واحدة في `PAYMENT_GATEWAY` لكل بيئة؛ يدعم الكود `moyasar` و`tap`. لا تشارك المفتاح في المحادثة أو GitHub.
 
 ## تطبيق قاعدة البيانات ونشر الدوال
 
@@ -31,11 +34,12 @@ supabase secrets set APP_BASE_URL=https://appksatest-yousef8-15e4.vercel.app
 supabase db push
 supabase functions deploy create-marketplace-checkout
 supabase functions deploy moyasar-marketplace-webhook
+supabase functions deploy tap-marketplace-webhook
 supabase functions deploy marketplace-admin
 ```
 
-تحقق من أن `SUPABASE_SERVICE_ROLE_KEY` متاح كسر خادم للدوال (عادةً يُحقنه Supabase تلقائيًا). لا تضعه في التطبيق. رابط إشعار Moyasar يُرسل ضمن إنشاء الفاتورة تلقائيًا:
-`https://<PROJECT_REF>.supabase.co/functions/v1/moyasar-marketplace-webhook`
+تحقق من أن `SUPABASE_SERVICE_ROLE_KEY` متاح كسر خادم للدوال (عادةً يُحقنه Supabase تلقائيًا). لا تضعه في التطبيق. يُرسل رابط الإشعار المناسب تلقائيًا إلى مزود الدفع المختار:
+`https://<PROJECT_REF>.supabase.co/functions/v1/moyasar-marketplace-webhook أو /functions/v1/tap-marketplace-webhook`
 
 ## التحقق قبل الإنتاج
 
@@ -51,5 +55,5 @@ supabase functions deploy marketplace-admin
 - الدفع الحقيقي لن يعمل قبل إضافة مفاتيح تاجر صحيحة ونشر الدوال وتطبيق migration.
 - التجديد التلقائي للاشتراك غير مفعّل؛ الاشتراك الحالي مدفوع لفترة محددة ويمكن بناء التجديد لاحقًا عبر recurring payments بعد تفعيلها مع مزود الدفع.
 - الإعلانات المدفوعة تبقى بانتظار مراجعة الإدارة بعد الدفع. صفحة «مراجعة إعلانات السوق» متاحة للمدير لاعتماد الحملة أو رفضها؛ لا تظهر قبل الموافقة.
-- المدفوعات تُسجّل مباشرة إلى حساب التاجر في Moyasar. لا يُنفّذ هذا الإصدار تقسيم المبالغ أو تحويل الأرباح تلقائيًا إلى مقدمي الخدمات. إذا كانت المنصة ستحتفظ بعمولة أو تصرف مستحقات للبائعين، يلزم إعداد منتج marketplace/payouts مع مزود الدفع ومراجعة المتطلبات النظامية قبل تشغيله.
+- المدفوعات تُسجّل مباشرة إلى حساب التاجر في مزود الدفع المختار. لا يُنفّذ هذا الإصدار تقسيم المبالغ أو تحويل الأرباح تلقائيًا إلى مقدمي الخدمات. إذا كانت المنصة ستحتفظ بعمولة أو تصرف مستحقات للبائعين، يلزم إعداد منتج marketplace/payouts مع مزود الدفع ومراجعة المتطلبات النظامية قبل تشغيله.
 - الأسعار الافتراضية في migration أمثلة قابلة للتعديل قبل الإطلاق، وليست توصية تسعير نهائية.

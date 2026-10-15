@@ -393,6 +393,15 @@ export default function MoreScreen() {
               onPress={() => router.push('/market')}
             />
             <MenuItem
+              icon={<CreditCard size={20} color="#7c3aed" />}
+              iconBg="#f5f3ff"
+              title="إدارة سوق الخدمات والاشتراكات"
+              sub="طلبات مدفوعة، باقات مقدمي الخدمات، والإعلانات والترويج"
+              badge="جديد"
+              badgeColor="#7c3aed"
+              onPress={() => router.push('/marketplace-dashboard')}
+            />
+            <MenuItem
               icon={<Briefcase size={20} color="#0284c7" />}
               iconBg="#f0f9ff"
               title="دليل الأنشطة والمحلات التجارية"
