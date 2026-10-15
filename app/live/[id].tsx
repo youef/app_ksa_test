@@ -23,6 +23,7 @@ import LiveCommentCard from '@/components/lives/LiveCommentCard';
 import { useLiveModeration } from '@/hooks/useLiveModeration';
 import { useLiveRoomHeartbeat } from '@/hooks/useLiveRoomHeartbeat';
 import { useLiveChat } from '@/hooks/useLiveChat';
+import { useLiveEffects } from '@/hooks/useLiveEffects';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BadgeCheck, Camera, CameraOff, Check, ChevronDown, ChevronUp, Eye, EyeOff, Gift, Heart, MessageCircle, Mic, MicOff, MoreHorizontal, Pin, Radio, Send, Share2, ShieldAlert, SignalHigh, SignalLow, SignalMedium, Trophy, UserMinus, UserPlus, Users, X } from 'lucide-react-native';
 
@@ -31,9 +32,7 @@ type GuestRequest = { id: string; guest_id: string; stream_id: string; status: s
 type AudienceMember = { id: string; display_name: string | null; username: string | null; avatar_url: string | null; is_verified: boolean | null };
 type Supporter = { user: AudienceMember; gifts: number };
 type HostSheetTab = 'comments' | 'guests';
-type Effect = { id: string; emoji: string; name?: string; kind: 'heart' | 'gift' };
 
-const MAX_EFFECTS = 6;
 export default function LiveRoomScreen() {
   const { id, role: roleParam } = useLocalSearchParams<{ id: string; role?: string }>();
   const insets = useSafeAreaInsets();
@@ -53,7 +52,6 @@ export default function LiveRoomScreen() {
   const [guestLimit, setGuestLimit] = useState(4);
   const [guestState, setGuestState] = useState<'idle' | 'pending' | 'accepted'>('idle');
   const [guestMutedByHost, setGuestMutedByHost] = useState(false);
-  const [effects, setEffects] = useState<Effect[]>([]);
   const elapsed = useLiveRoomHeartbeat(id ? String(id) : undefined, currentUser, role, stream?.started_at);
   const [connected, setConnected] = useState(false);
   const [connection, setConnection] = useState<LiveMediaConnection>('connecting');
@@ -70,12 +68,12 @@ export default function LiveRoomScreen() {
   const [hostSheet, setHostSheet] = useState<HostSheetTab | null>(null);
   const [moderationOpen, setModerationOpen] = useState(false);
   const moderation = useLiveModeration(id ? String(id) : undefined, Boolean(id) && !loading && !error);
+  const { effects, pushEffect, channelRef: heartChannelRef } = useLiveEffects(id ? String(id) : undefined, Boolean(id) && !loading && !error);
   const moderatorPermissions = moderation.moderators.find((item) => item.user_id === currentUser);
   const canHideComments = role === 'host' || Boolean(moderatorPermissions?.can_hide_comments);
   const canTimeoutUsers = role === 'host' || Boolean(moderatorPermissions?.can_timeout_users);
   const canManageFilters = role === 'host' || Boolean(moderatorPermissions?.can_manage_filters);
   const scrollRef = useRef<ScrollView>(null);
-  const heartChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const mediaApiRef = useRef<LiveMediaApi | null>(null);
   const connectedRef = useRef(false);
   const hostPulseAtRef = useRef(Date.now());
@@ -84,7 +82,6 @@ export default function LiveRoomScreen() {
   const roleRef = useRef(role);
   const guestStateRef = useRef(guestState);
   const currentUserRef = useRef(currentUser);
-  const effectTimeoutsRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   roleRef.current = role;
   guestStateRef.current = guestState;
   currentUserRef.current = currentUser;
@@ -284,16 +281,6 @@ export default function LiveRoomScreen() {
       })();
     }, 10_000);
 
-    const presenceChannel = supabase.channel(`live-effects:${id}`, { config: { broadcast: { self: false } } })
-      .on('broadcast', { event: 'heart' }, ({ payload }) => {
-        pushEffect({ emoji: typeof payload?.emoji === 'string' ? payload.emoji : '💚', name: typeof payload?.name === 'string' ? payload.name : undefined, kind: 'heart' });
-      })
-      .on('broadcast', { event: 'gift' }, ({ payload }) => {
-        pushEffect({ emoji: typeof payload?.emoji === 'string' ? payload.emoji : '🎁', name: typeof payload?.name === 'string' ? payload.name : undefined, kind: 'gift' });
-      })
-      .subscribe();
-    heartChannelRef.current = presenceChannel;
-
     const audienceTimer = setInterval(() => {
       void loadAudience(id).catch((cause) => console.error('Unable to refresh live audience.', cause));
       void loadSupporters(id).catch((cause) => console.error('Unable to refresh live supporters.', cause));
@@ -304,25 +291,9 @@ export default function LiveRoomScreen() {
 
     return () => {
       clearInterval(poll); clearInterval(audienceTimer);
-      heartChannelRef.current = null;
       void supabase.removeChannel(chatChannel); void supabase.removeChannel(streamChannel); void supabase.removeChannel(guestChannel); void supabase.removeChannel(presenceChannel);
     };
   }, [id, loading, error, loadMessages, loadGuests]);
-
-  useEffect(() => () => {
-    effectTimeoutsRef.current.forEach((timer) => clearTimeout(timer));
-    effectTimeoutsRef.current.clear();
-  }, []);
-
-  function pushEffect(input: { emoji: string; name?: string; kind: 'heart' | 'gift' }) {
-    const entry: Effect = { id: `${Date.now()}-${Math.random()}`, ...input };
-    setEffects((items) => [...items, entry].slice(-MAX_EFFECTS));
-    const timer = setTimeout(() => {
-      effectTimeoutsRef.current.delete(entry.id);
-      setEffects((items) => items.filter((item) => item.id !== entry.id));
-    }, 2400);
-    effectTimeoutsRef.current.set(entry.id, timer);
-  }
 
   async function timeoutMessageAuthor(message: LiveChatMessage, minutes: number) {
     if (!id || !canTimeoutUsers) return;
