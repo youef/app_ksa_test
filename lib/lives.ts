@@ -250,3 +250,108 @@ export async function setLiveGuestMuted(streamId: string, guestId: string, muted
     .eq('stream_id', streamId).eq('guest_id', guestId).eq('status', 'accepted');
   if (error) throw error;
 }
+
+// ---------------------------------------------------------------------------
+// Guest queue and host invites.
+// ---------------------------------------------------------------------------
+
+export type LiveGuestRow = {
+  id: string;
+  stream_id: string;
+  guest_id: string;
+  status: 'pending' | 'invited' | 'accepted' | 'rejected' | 'removed' | 'cancelled';
+  seat_order: number | null;
+  is_muted: boolean;
+  invited_by: string | null;
+  created_at: string;
+  decided_at?: string | null;
+  profiles?: { id?: string; display_name: string | null; username: string | null; avatar_url: string | null; is_verified?: boolean | null } | null;
+};
+
+export type InviteCandidate = {
+  id: string;
+  display_name: string | null;
+  username: string | null;
+  avatar_url: string | null;
+  is_verified: boolean | null;
+};
+
+const GUEST_ROW_FIELDS = 'id,stream_id,guest_id,status,seat_order,is_muted,created_at,decided_at,profiles!live_guest_requests_guest_id_fkey(display_name,username,avatar_url,is_verified)';
+
+/** Accepted guests, oldest seat first — the on-air guest queue. */
+export async function fetchAcceptedGuests(streamId: string) {
+  const { data, error } = await supabase.from('live_guest_requests')
+    .select(GUEST_ROW_FIELDS)
+    .eq('stream_id', streamId).eq('status', 'accepted')
+    .order('seat_order', { ascending: true });
+  if (error) throw error;
+  return (data || []) as unknown as LiveGuestRow[];
+}
+
+/** People waiting to go on air, oldest request first. */
+export async function fetchPendingGuestRequests(streamId: string) {
+  const { data, error } = await supabase.from('live_guest_requests')
+    .select(GUEST_ROW_FIELDS)
+    .eq('stream_id', streamId).eq('status', 'pending')
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return (data || []) as unknown as LiveGuestRow[];
+}
+
+/** The current user's request or invite for this stream, if any. */
+export async function fetchMyGuestState(streamId: string, userId: string) {
+  const { data, error } = await supabase.from('live_guest_requests')
+    .select(GUEST_ROW_FIELDS)
+    .eq('stream_id', streamId).eq('guest_id', userId).maybeSingle();
+  if (error) throw error;
+  return (data || null) as unknown as LiveGuestRow | null;
+}
+
+/** Host invites a specific person (usually a friend) to take a guest seat. */
+export async function inviteLiveGuest(streamId: string, inviteeId: string) {
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) throw new Error('سجّل الدخول أولاً.');
+  const { error } = await supabase.from('live_guest_requests').upsert({
+    stream_id: streamId,
+    guest_id: inviteeId,
+    status: 'invited',
+    invited_by: auth.user.id,
+    is_muted: false,
+    decided_at: null,
+  }, { onConflict: 'stream_id,guest_id' });
+  if (error) throw error;
+}
+
+export async function cancelLiveGuestInvite(streamId: string, inviteeId: string) {
+  const { error } = await supabase.from('live_guest_requests')
+    .update({ status: 'cancelled' })
+    .eq('stream_id', streamId).eq('guest_id', inviteeId).eq('status', 'invited');
+  if (error) throw error;
+}
+
+/** The invitee accepts or declines a host invite. */
+export async function respondToLiveInvite(requestId: string, accept: boolean) {
+  const { error } = await supabase.from('live_guest_requests')
+    .update({ status: accept ? 'accepted' : 'rejected', decided_at: new Date().toISOString() })
+    .eq('id', requestId).eq('status', 'invited');
+  if (error) throw error;
+}
+
+/** People the host follows — used as invite suggestions. */
+export async function fetchInviteCandidates(userId: string) {
+  const { data: follows, error: followError } = await supabase.from('follows')
+    .select('following_id').eq('follower_id', userId).limit(80);
+  if (followError) throw followError;
+  const ids = (follows || []).map((row: { following_id: string }) => row.following_id);
+  if (!ids.length) return [] as InviteCandidate[];
+  const { data, error } = await supabase.from('profiles')
+    .select('id,display_name,username,avatar_url,is_verified').in('id', ids);
+  if (error) throw error;
+  return (data || []) as InviteCandidate[];
+}
+
+/** The next live stream to move to when the current one ends. */
+export async function fetchNextLiveStream(currentId: string) {
+  const streams = await fetchLiveStreams();
+  return streams.find((stream) => stream.id !== currentId) || null;
+}

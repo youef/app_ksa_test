@@ -13,6 +13,7 @@ import {
 import { router, useFocusEffect } from 'expo-router';
 import { AppHeader } from '@/components/shared/AppHeader';
 import { useBottomNavInset } from '@/lib/bottomNav';
+import { useNoCopy } from '@/lib/noCopy';
 import { C } from '@/lib/ui';
 import { supabase } from '@/lib/supabase';
 import {
@@ -109,6 +110,7 @@ function LivePulse({ size = 8, color = '#fb3a4b' }: { size?: number; color?: str
 
 export default function LivesScreen() {
   const bottomNavInset = useBottomNavInset();
+  useNoCopy();
   const [streams, setStreams] = useState<LiveStream[]>([]);
   const [topHosts, setTopHosts] = useState<LiveHostLeader[]>([]);
   const [achievements, setAchievements] = useState<LiveAchievement[]>([]);
