@@ -162,7 +162,7 @@ serve(async (req) => {
     const invoice = await invoiceResponse.json().catch(() => ({}));
     if (!invoiceResponse.ok || !invoice?.id || !invoice?.url) {
       await admin.from('marketplace_orders').update({ status: 'failed', metadata: { ...metadata, gateway_error: invoice?.message || 'invoice_creation_failed' } }).eq('id', order.id);
-      await admin.from('marketplace_service_orders').update({ status: 'payment_failed' }).eq('id', serviceOrderId || '00000000-0000-0000-0000-000000000000');
+      if (serviceOrderId) await admin.from('marketplace_service_orders').update({ status: 'payment_failed' }).eq('id', serviceOrderId);
       return json({ error: 'تعذر إنشاء صفحة الدفع لدى مزود الدفع. تحقق من مفاتيح Moyasar وإعدادات حساب التاجر.' }, 502);
     }
 
