@@ -6,6 +6,9 @@ import type { LiveModerationSettings, LiveModerator } from '@/hooks/useLiveModer
 type Props = {
   visible: boolean;
   onClose: () => void;
+  isHost: boolean;
+  canManageSettings: boolean;
+  currentUserId: string;
   settings: LiveModerationSettings;
   moderators: LiveModerator[];
   loading: boolean;
@@ -19,7 +22,7 @@ type Props = {
 const slowModes = [0, 3, 5, 10, 15, 30, 60];
 
 export default function LiveModerationPanel(props: Props) {
-  const { visible, onClose, settings, moderators, loading, error, onRefresh, onSaveSettings, onManageModerator } = props;
+  const { visible, onClose, settings, moderators, loading, error, isHost, canManageSettings, currentUserId, onRefresh, onSaveSettings, onManageModerator } = props;
   const [draft, setDraft] = useState(settings);
   const [termsText, setTermsText] = useState(settings.blocked_terms.join(', '));
   const [username, setUsername] = useState('');
@@ -77,16 +80,16 @@ export default function LiveModerationPanel(props: Props) {
           <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
             {loading && <ActivityIndicator color="#34d399" />}
             {!!error && <Text style={styles.error}>{error}</Text>}
-            <Text style={styles.sectionTitle}>المشرفون والصلاحيات</Text>
-            <Text style={styles.hint}>أدخل اسم المستخدم دون الحاجة إلى معرفة المعرّف الداخلي.</Text>
-            <TextInput value={username} onChangeText={setUsername} autoCapitalize="none" placeholder="@username" placeholderTextColor="#94a3b8" style={styles.input} />
-            <View style={styles.permissionRow}><Text style={styles.label}>إخفاء التعليقات</Text><Switch value={canHide} onValueChange={setCanHide} /></View>
-            <View style={styles.permissionRow}><Text style={styles.label}>حظر مؤقت للمستخدمين</Text><Switch value={canTimeout} onValueChange={setCanTimeout} /></View>
-            <View style={styles.permissionRow}><Text style={styles.label}>إدارة الفلاتر والإبطاء</Text><Switch value={canFilters} onValueChange={setCanFilters} /></View>
-            <Pressable onPress={() => void addModerator()} disabled={!username.trim() || (!canHide && !canTimeout && !canFilters)} style={[styles.primaryButton, (!username.trim() || (!canHide && !canTimeout && !canFilters)) && styles.disabled]}>
+            {isHost && <Text style={styles.sectionTitle}>المشرفون والصلاحيات</Text>}
+            {isHost && <Text style={styles.hint}>أدخل اسم المستخدم دون الحاجة إلى معرفة المعرّف الداخلي.</Text>}
+            {isHost && <TextInput value={username} onChangeText={setUsername} autoCapitalize="none" placeholder="@username" placeholderTextColor="#94a3b8" style={styles.input} />}
+            {isHost && <View style={styles.permissionRow}><Text style={styles.label}>إخفاء التعليقات</Text><Switch value={canHide} onValueChange={setCanHide} /></View>}
+            {isHost && <View style={styles.permissionRow}><Text style={styles.label}>حظر مؤقت للمستخدمين</Text><Switch value={canTimeout} onValueChange={setCanTimeout} /></View>}
+            {isHost && <View style={styles.permissionRow}><Text style={styles.label}>إدارة الفلاتر والإبطاء</Text><Switch value={canFilters} onValueChange={setCanFilters} /></View>}
+            {isHost && <Pressable onPress={() => void addModerator()} disabled={!username.trim() || (!canHide && !canTimeout && !canFilters)} style={[styles.primaryButton, (!username.trim() || (!canHide && !canTimeout && !canFilters)) && styles.disabled]}>
               <Text style={styles.primaryText}>تعيين / تحديث المشرف</Text>
-            </Pressable>
-            {moderators.map((moderator) => (
+            </Pressable>}
+            {isHost && moderators.map((moderator) => (
               <View key={moderator.user_id} style={styles.moderatorRow}>
                 <View style={styles.moderatorInfo}>
                   <Text style={styles.label}>{moderator.display_name || moderator.username}</Text>
@@ -99,9 +102,11 @@ export default function LiveModerationPanel(props: Props) {
                 <Pressable onPress={() => removeModerator(moderator)} style={styles.removeButton}><UserMinus color="#fecaca" size={17} /></Pressable>
               </View>
             ))}
-            {!moderators.length && <Text style={styles.hint}>لم يُعيّن مشرفون لهذا البث.</Text>}
+            {isHost && !moderators.length && <Text style={styles.hint}>لم يُعيّن مشرفون لهذا البث.</Text>}
+            {!isHost && moderators.some((moderator) => moderator.user_id === currentUserId) && <Text style={styles.hint}>تم تفعيل صلاحيات الإشراف لحسابك في هذا البث.</Text>}
 
             <View style={styles.divider} />
+            {canManageSettings ? <>
             <Text style={styles.sectionTitle}>حماية التعليقات</Text>
             <Text style={styles.label}>وضع الإبطاء</Text>
             <Text style={styles.hint}>الحد الأدنى بين تعليقات الشخص الواحد.</Text>
@@ -115,7 +120,8 @@ export default function LiveModerationPanel(props: Props) {
             <Pressable onPress={() => void save()} disabled={saving} style={[styles.primaryButton, saving && styles.disabled]}>
               {saving ? <ActivityIndicator color="#052e24" /> : <Text style={styles.primaryText}>حفظ إعدادات الإشراف</Text>}
             </Pressable>
-            <Pressable onPress={() => void onRefresh()} style={styles.refreshButton}><Text style={styles.refreshText}>تحديث قائمة المشرفين</Text></Pressable>
+            </> : <Text style={styles.hint}>إعدادات الفلاتر والإبطاء متاحة للمضيف أو للمشرف الذي مُنح صلاحيتها.</Text>}
+            {isHost && <Pressable onPress={() => void onRefresh()} style={styles.refreshButton}><Text style={styles.refreshText}>تحديث قائمة المشرفين</Text></Pressable>}
           </ScrollView>
         </Pressable>
       </Pressable>
