@@ -12,6 +12,7 @@ export type LiveStream = {
   peak_viewer_count: number;
   started_at: string;
   updated_at?: string;
+  guest_limit?: number;
   profiles?: {
     id: string;
     display_name: string | null;

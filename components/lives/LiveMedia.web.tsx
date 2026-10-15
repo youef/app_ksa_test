@@ -15,6 +15,7 @@ export type LiveMediaProps = {
   url: string;
   token: string;
   canPublish: boolean;
+  participantOrder?: string[];
   onConnectionChange?: (state: LiveMediaConnection) => void;
   onQualityChange?: (quality: LiveMediaQuality) => void;
   onMediaStateChange?: (state: LiveMediaState) => void;
@@ -37,7 +38,7 @@ function connectionFromState(state: ConnectionState): LiveMediaConnection {
   return 'disconnected';
 }
 
-export default function LiveMedia({ url, token, canPublish, onConnectionChange, onQualityChange, onMediaStateChange, onApiReady, onReady, onError }: LiveMediaProps) {
+export default function LiveMedia({ url, token, canPublish, participantOrder = [], onConnectionChange, onQualityChange, onMediaStateChange, onApiReady, onReady, onError }: LiveMediaProps) {
   const roomRef = useRef<Room | null>(null);
   const videoHostRef = useRef<HTMLDivElement | null>(null);
   const callbacksRef = useRef({ onConnectionChange, onQualityChange, onMediaStateChange, onApiReady, onReady, onError });
@@ -48,21 +49,56 @@ export default function LiveMedia({ url, token, canPublish, onConnectionChange, 
   const [media, setMedia] = useState<LiveMediaState>({ cameraEnabled: canPublish, microphoneEnabled: canPublish });
 
   useEffect(() => { callbacksRef.current.onConnectionChange?.(connection); }, [connection]);
+  useEffect(() => { orderTiles(); updateGridLayout(); }, [participantOrder.join('|')]);
   useEffect(() => { callbacksRef.current.onQualityChange?.(quality); }, [quality]);
   useEffect(() => { callbacksRef.current.onMediaStateChange?.(media); }, [media]);
 
-  // Track attached media elements so we don't leak them or duplicate them.
-  const attachedRef = useRef(new Map<string, HTMLMediaElement>());
+  // One visual tile per participant. Remote audio stays audible; only local audio is muted.
+  const attachedRef = useRef(new Map<string, { element: HTMLMediaElement; tile: HTMLDivElement }>());
+  const participantOrderRef = useRef(participantOrder);
+  participantOrderRef.current = participantOrder;
 
-  const attachTrack = (track: Track) => {
+  const orderTiles = () => {
+    const container = videoHostRef.current;
+    if (!container) return;
+    const tiles = Array.from(container.querySelectorAll<HTMLDivElement>('[data-live-participant-tile="true"]'));
+    tiles.sort((a, b) => {
+      const order = participantOrderRef.current;
+      const ai = order.indexOf(a.dataset.participantId || '');
+      const bi = order.indexOf(b.dataset.participantId || '');
+      return (ai < 0 ? Number.MAX_SAFE_INTEGER : ai) - (bi < 0 ? Number.MAX_SAFE_INTEGER : bi);
+    });
+    for (const tile of tiles) container.appendChild(tile);
+  };
+
+  const updateGridLayout = () => {
+    const container = videoHostRef.current;
+    if (!container) return;
+    const count = container.querySelectorAll('[data-live-participant-tile="true"]').length;
+    const columns = count <= 1 ? 1 : count <= 4 ? 2 : 3;
+    container.style.display = 'grid';
+    container.style.gridTemplateColumns = `repeat(${columns}, minmax(0, 1fr))`;
+    container.style.gridTemplateRows = count <= 2 ? 'minmax(0, 1fr)' : `repeat(${Math.ceil(count / columns)}, minmax(0, 1fr))`;
+  };
+
+  const attachTrack = (track: Track, participantIdentity: string, participantName: string, isLocal = false) => {
     const container = videoHostRef.current;
     if (!container || !track) return;
-
-    const participantIdentity = track.sid || 'local';
     const key = `${participantIdentity}-${track.kind}`;
-
-    // Track already attached — skip duplicates.
     if (attachedRef.current.has(key)) return;
+
+    let tile = container.querySelector<HTMLDivElement>(`[data-participant-id="${participantIdentity}"]`);
+    if (!tile) {
+      tile = document.createElement('div');
+      tile.dataset.liveParticipantTile = 'true';
+      tile.dataset.participantId = participantIdentity;
+      Object.assign(tile.style, { position: 'relative', minWidth: '0', minHeight: '0', overflow: 'hidden', borderRadius: '12px', background: '#0f172a', border: '1px solid rgba(255,255,255,.12)' });
+      const label = document.createElement('div');
+      label.textContent = participantName || 'مشارك';
+      Object.assign(label.style, { position: 'absolute', left: '8px', bottom: '8px', zIndex: '2', color: '#fff', fontSize: '12px', fontWeight: '700', background: 'rgba(2,6,23,.78)', padding: '5px 9px', borderRadius: '12px', maxWidth: '85%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' });
+      tile.appendChild(label);
+      container.appendChild(tile);
+    }
 
     const element = track.attach() as HTMLMediaElement;
     element.setAttribute('playsinline', '');
@@ -70,33 +106,30 @@ export default function LiveMedia({ url, token, canPublish, onConnectionChange, 
     element.setAttribute('autoplay', '');
     element.autoplay = true;
     element.playsInline = true;
-    element.style.width = '100%';
-    element.style.height = '100%';
-    element.style.objectFit = 'cover';
-
-    // Mute local audio to prevent echo; keep video unmuted.
-    if (track.kind === Track.Kind.Audio) {
-      element.muted = true;
+    if (track.kind === Track.Kind.Video) {
+      Object.assign(element.style, { width: '100%', height: '100%', objectFit: 'cover', display: 'block', position: 'absolute', inset: '0', zIndex: '0' });
+    } else {
+      element.muted = isLocal;
+      Object.assign(element.style, { width: '1px', height: '1px', opacity: '0', position: 'absolute', pointerEvents: 'none' });
     }
-
-    // Store reference for cleanup.
-    attachedRef.current.set(key, element);
-    container.appendChild(element);
-
-    // Try to play; if the browser blocks it, catch silently.
+    attachedRef.current.set(key, { element, tile });
+    tile.appendChild(element);
     void element.play().catch(() => {
-      // Autoplay blocked — user interaction will trigger play via controls.
+      // Browser autoplay policies may require a user gesture for audio.
     });
+    orderTiles();
+    updateGridLayout();
   };
 
-  const detachTrack = (track: Track) => {
-    const participantIdentity = track.sid || 'local';
+  const detachTrack = (track: Track, participantIdentity: string) => {
     const key = `${participantIdentity}-${track.kind}`;
-    const element = attachedRef.current.get(key);
-    if (element) {
-      element.remove();
-      attachedRef.current.delete(key);
-    }
+    const attached = attachedRef.current.get(key);
+    if (!attached) return;
+    attached.element.remove();
+    attachedRef.current.delete(key);
+    if (![...attachedRef.current.values()].some((item) => item.tile === attached.tile)) attached.tile.remove();
+    orderTiles();
+    updateGridLayout();
   };
 
   useEffect(() => {
@@ -111,26 +144,23 @@ export default function LiveMedia({ url, token, canPublish, onConnectionChange, 
       });
     };
 
-    room.on(RoomEvent.TrackSubscribed, (_track: RemoteTrack, _publication: TrackPublication, participant) => {
-      const tracks = participant.getTrackPublications();
-      for (const pub of tracks) {
-        if (pub.track) attachTrack(pub.track);
-      }
+    room.on(RoomEvent.TrackSubscribed, (track: RemoteTrack, _publication: TrackPublication, participant) => {
+      attachTrack(track, participant.identity, participant.name || participant.identity, false);
       syncMedia();
     });
 
-    room.on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack) => {
-      detachTrack(track);
+    room.on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack, _publication: TrackPublication, participant) => {
+      detachTrack(track, participant.identity);
       syncMedia();
     });
 
     room.on(RoomEvent.LocalTrackPublished, (publication) => {
-      if (publication.track) attachTrack(publication.track);
+      if (publication.track) attachTrack(publication.track, room.localParticipant.identity, room.localParticipant.name || room.localParticipant.identity, true);
       syncMedia();
     });
 
     room.on(RoomEvent.LocalTrackUnpublished, (publication) => {
-      if (publication.track) detachTrack(publication.track);
+      if (publication.track) detachTrack(publication.track, room.localParticipant.identity);
       syncMedia();
     });
 
@@ -172,8 +202,9 @@ export default function LiveMedia({ url, token, canPublish, onConnectionChange, 
     return () => {
       cancelled = true;
       // Detach all tracks before disconnecting.
-      for (const [, element] of attachedRef.current) {
-        element.remove();
+      for (const [, attached] of attachedRef.current) {
+        attached.element.remove();
+        attached.tile.remove();
       }
       attachedRef.current.clear();
       room.removeAllListeners();
@@ -185,7 +216,7 @@ export default function LiveMedia({ url, token, canPublish, onConnectionChange, 
   return (
     <View style={{ flex: 1, backgroundColor: '#020617', minHeight: 280 }}>
       {connection !== 'connected' && <View style={{ position: 'absolute', zIndex: 1, inset: 0, alignItems: 'center', justifyContent: 'center' } as any}><ActivityIndicator color="#fff" /><Text style={{ color: '#fff', marginTop: 10 }}>جارٍ الاتصال بالبث…</Text></View>}
-      <div ref={videoHostRef} style={{ position: 'absolute', inset: 0, minHeight: 280, display: 'flex', alignItems: 'center', justifyContent: 'center' }} />
+      <div ref={videoHostRef} style={{ position: 'absolute', inset: 0, minHeight: 280, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gridTemplateRows: 'minmax(0, 1fr)', gap: '4px', padding: '3px', boxSizing: 'border-box' }} />
     </View>
   );
 }

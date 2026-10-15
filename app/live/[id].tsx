@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Alert, Animated, AppState, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Share, StatusBar, StyleSheet, Text, TextInput, View, type StyleProp, type ViewStyle } from 'react-native';
+import { ActivityIndicator, Alert, Animated, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Share, StatusBar, StyleSheet, Text, TextInput, View, type StyleProp, type ViewStyle } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -24,7 +24,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BadgeCheck, Camera, CameraOff, Check, ChevronDown, ChevronUp, Eye, EyeOff, Gift, Heart, MessageCircle, Mic, MicOff, MoreHorizontal, Pin, Radio, Send, Share2, ShieldAlert, SignalHigh, SignalLow, SignalMedium, Trophy, UserMinus, UserPlus, Users, X } from 'lucide-react-native';
 
 type Role = 'host' | 'viewer' | 'guest';
-type GuestRequest = { id: string; guest_id: string; stream_id: string; status: string; is_muted?: boolean; profiles?: { display_name: string | null; username: string | null; avatar_url: string | null } | null };
+type GuestRequest = { id: string; guest_id: string; stream_id: string; status: string; seat_order?: number; is_muted?: boolean; profiles?: { display_name: string | null; username: string | null; avatar_url: string | null } | null };
 type AudienceMember = { id: string; display_name: string | null; username: string | null; avatar_url: string | null; is_verified: boolean | null };
 type Supporter = { user: AudienceMember; gifts: number };
 type HostSheetTab = 'comments' | 'guests';
@@ -51,6 +51,7 @@ export default function LiveRoomScreen() {
   const [viewerCount, setViewerCount] = useState(0);
   const [pendingRequests, setPendingRequests] = useState<GuestRequest[]>([]);
   const [guests, setGuests] = useState<GuestRequest[]>([]);
+  const [guestLimit, setGuestLimit] = useState(4);
   const [guestState, setGuestState] = useState<'idle' | 'pending' | 'accepted'>('idle');
   const [guestMutedByHost, setGuestMutedByHost] = useState(false);
   const [effects, setEffects] = useState<Effect[]>([]);
@@ -125,8 +126,8 @@ export default function LiveRoomScreen() {
 
   const loadGuests = useCallback(async (streamId: string) => {
     const result = await supabase.from('live_guest_requests')
-      .select('id,guest_id,stream_id,status,is_muted,profiles!live_guest_requests_guest_id_fkey(display_name,username,avatar_url)')
-      .eq('stream_id', streamId).eq('status', 'accepted');
+      .select('id,guest_id,stream_id,status,seat_order,is_muted,profiles!live_guest_requests_guest_id_fkey(display_name,username,avatar_url)')
+      .eq('stream_id', streamId).eq('status', 'accepted').order('seat_order', { ascending: true });
     if (result.error) {
       const fallback = await supabase.from('live_guest_requests')
         .select('id,guest_id,stream_id,status,profiles!live_guest_requests_guest_id_fkey(display_name,username,avatar_url)')
@@ -147,12 +148,13 @@ export default function LiveRoomScreen() {
       const { data: me } = await supabase.from('profiles').select('display_name,username').eq('id', auth.user.id).maybeSingle();
       setCurrentUserName(me?.display_name || me?.username || 'مشاهد');
       const { data: live, error: streamError } = await supabase.from('live_streams')
-        .select('id,host_id,title,category,audience,room_name,status,viewer_count,peak_viewer_count,started_at,updated_at,profiles!live_streams_host_id_fkey(id,display_name,username,avatar_url,is_verified,city,district)')
+        .select('id,host_id,title,category,audience,room_name,status,viewer_count,peak_viewer_count,started_at,updated_at,guest_limit,profiles!live_streams_host_id_fkey(id,display_name,username,avatar_url,is_verified,city,district)')
         .eq('id', id).maybeSingle();
       if (streamError) throw streamError;
       if (!live) throw new Error('تعذر العثور على هذا البث.');
       const typed = live as unknown as LiveStream;
       setStream(typed);
+      setGuestLimit(Math.max(1, Math.min(8, Number(typed.guest_limit) || 4)));
       hostPulseAtRef.current = new Date(typed.updated_at || typed.started_at).getTime();
       if (typed.status !== 'live') throw new Error('انتهى هذا البث.');
       if (typed.host_id !== auth.user.id && Date.now() - new Date(typed.updated_at || typed.started_at).getTime() > 90_000) {
@@ -214,38 +216,24 @@ export default function LiveRoomScreen() {
 
   useEffect(() => {
     if (!id) return;
-    let previousState = AppState.currentState;
     const closeHostStream = () => {
       if (roleRef.current !== 'host' || !connectedRef.current) return;
       void endLiveStream(id).catch((cause) => {
         console.error('Unable to end host stream after leaving the room.', cause);
       });
     };
-    const appStateSubscription = AppState.addEventListener('change', (nextState) => {
-      if (roleRef.current === 'host' && previousState === 'active' && nextState !== 'active') {
-        void endLiveStream(id).then(() => setError('انتهى البث عند مغادرة التطبيق.')).catch((cause) => {
-          console.error('Unable to end host stream after app backgrounding.', cause);
-        });
-      }
-      previousState = nextState;
-    });
+    // Deliberately do not end a stream on AppState background transitions.
     const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'SIGNED_OUT') closeHostStream();
     });
     const onPageHide = () => closeHostStream();
-    const onVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') closeHostStream();
-    };
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
       window.addEventListener('pagehide', onPageHide);
-      document.addEventListener('visibilitychange', onVisibilityChange);
     }
     return () => {
-      appStateSubscription.remove();
       authListener.subscription.unsubscribe();
       if (Platform.OS === 'web' && typeof document !== 'undefined') {
         window.removeEventListener('pagehide', onPageHide);
-        document.removeEventListener('visibilitychange', onVisibilityChange);
       }
       closeHostStream();
     };
@@ -264,7 +252,15 @@ export default function LiveRoomScreen() {
       })
       .subscribe();
     const guestChannel = supabase.channel(`live-guests:${id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'live_guest_requests', filter: `stream_id=eq.${id}` }, () => { void loadMessages(id); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'live_guest_requests', filter: `stream_id=eq.${id}` }, () => {
+        if (roleRef.current === 'host') {
+          void loadGuests(id).catch((cause) => console.error('Unable to refresh live guests.', cause));
+          void supabase.from('live_guest_requests')
+            .select('id,guest_id,stream_id,status,profiles!live_guest_requests_guest_id_fkey(display_name,username,avatar_url)')
+            .eq('stream_id', id).eq('status', 'pending').order('created_at', { ascending: true })
+            .then(({ data }) => setPendingRequests((data || []) as unknown as GuestRequest[]));
+        }
+      })
       .subscribe();
 
     const poll = setInterval(() => {
@@ -308,7 +304,7 @@ export default function LiveRoomScreen() {
           }
         }
       })();
-    }, 2500);
+    }, 5000);
 
     const presenceChannel = supabase.channel(`live-effects:${id}`, { config: { broadcast: { self: false } } })
       .on('broadcast', { event: 'heart' }, ({ payload }) => {
@@ -372,6 +368,10 @@ export default function LiveRoomScreen() {
   }
 
   async function decideGuest(request: GuestRequest, status: 'accepted' | 'rejected') {
+    if (status === 'accepted' && guests.length >= guestLimit) {
+      Alert.alert('اكتملت المقاعد', `الحد الحالي ${guestLimit} ضيوف. زد عدد المقاعد أو أزل ضيفًا أولًا.`);
+      return;
+    }
     const { error: updateError } = await supabase.from('live_guest_requests')
       .update({ status, decided_at: new Date().toISOString() }).eq('id', request.id).eq('status', 'pending');
     if (updateError) Alert.alert('تعذر تحديث الطلب', updateError.message);
@@ -379,6 +379,42 @@ export default function LiveRoomScreen() {
       setPendingRequests((rows) => rows.filter((item) => item.id !== request.id));
       if (id) void loadGuests(id).catch(() => {});
     }
+  }
+
+  async function changeGuestLimit(nextLimit: number) {
+    if (role !== 'host' || !id) return;
+    const safeLimit = Math.max(1, Math.min(8, Math.floor(nextLimit)));
+    if (safeLimit < guests.length) {
+      Alert.alert('عدد المقاعد أقل من الضيوف', 'أزل بعض الضيوف قبل تقليل عدد المقاعد.');
+      return;
+    }
+    const { error: updateError } = await supabase.from('live_streams')
+      .update({ guest_limit: safeLimit }).eq('id', id).eq('host_id', currentUser).eq('status', 'live');
+    if (updateError) {
+      Alert.alert('تعذر تحديث المقاعد', updateError.message);
+      return;
+    }
+    setGuestLimit(safeLimit);
+    setStream((current) => current ? { ...current, guest_limit: safeLimit } : current);
+  }
+
+  async function moveGuest(guest: GuestRequest, direction: -1 | 1) {
+    if (!id) return;
+    const ordered = [...guests].sort((a, b) => (a.seat_order ?? 999) - (b.seat_order ?? 999));
+    const index = ordered.findIndex((item) => item.id === guest.id);
+    const targetIndex = index + direction;
+    if (index < 0 || targetIndex < 0 || targetIndex >= ordered.length) return;
+    const current = ordered[index];
+    const target = ordered[targetIndex];
+    const currentOrder = current.seat_order ?? index + 1;
+    const targetOrder = target.seat_order ?? targetIndex + 1;
+    const { error: orderError } = await supabase.from('live_guest_requests')
+      .update({ seat_order: targetOrder }).eq('id', current.id).eq('stream_id', id).eq('status', 'accepted');
+    if (orderError) { Alert.alert('تعذر ترتيب الضيوف', orderError.message); return; }
+    const { error: swapError } = await supabase.from('live_guest_requests')
+      .update({ seat_order: currentOrder }).eq('id', target.id).eq('stream_id', id).eq('status', 'accepted');
+    if (swapError) Alert.alert('تعذر ترتيب الضيوف', swapError.message);
+    await loadGuests(id);
   }
 
   function confirmEnd() {
@@ -522,6 +558,7 @@ export default function LiveRoomScreen() {
       <StatusBar hidden />
       <View style={styles.stage}>
         <LiveMedia
+          participantOrder={[stream.host_id, ...guests.slice().sort((a, b) => (a.seat_order ?? 999) - (b.seat_order ?? 999)).map((guest) => guest.guest_id)]}
           url={roomUrl}
           token={token}
           canPublish={mediaRole}
@@ -683,10 +720,23 @@ export default function LiveRoomScreen() {
                   </View>
                 ))}
                 {hostSheet === 'comments' && messages.length === 0 && <Text style={styles.peopleEmpty}>لا توجد تعليقات بعد.</Text>}
-                {hostSheet === 'guests' && guests.map((guest) => (
+                {hostSheet === 'guests' && (
+                  <View style={styles.seatLimitRow}>
+                    <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                      <Text style={styles.seatLimitTitle}>مقاعد الضيوف</Text>
+                      <Text style={styles.seatLimitHint}>{guests.length} من {guestLimit} مقاعد مستخدمة</Text>
+                    </View>
+                    <Pressable accessibilityLabel="تقليل المقاعد" disabled={guestLimit <= 1 || guests.length >= guestLimit} onPress={() => void changeGuestLimit(guestLimit - 1)} style={[styles.hostAction, (guestLimit <= 1 || guests.length >= guestLimit) && { opacity: 0.35 }]}><Text style={styles.seatLimitButton}>−</Text></Pressable>
+                    <Text style={styles.seatLimitCount}>{guestLimit}</Text>
+                    <Pressable accessibilityLabel="زيادة المقاعد" disabled={guestLimit >= 8} onPress={() => void changeGuestLimit(guestLimit + 1)} style={[styles.hostAction, guestLimit >= 8 && { opacity: 0.35 }]}><Text style={styles.seatLimitButton}>+</Text></Pressable>
+                  </View>
+                )}
+                {hostSheet === 'guests' && guests.map((guest, guestIndex) => (
                   <View key={guest.id} style={styles.peopleRow}>
                     {guest.profiles?.avatar_url ? <Image source={{ uri: guest.profiles.avatar_url }} style={styles.peopleAvatar} /> : <View style={styles.peopleAvatarFallback}><Text style={styles.peopleInitial}>{(guest.profiles?.display_name || guest.profiles?.username || 'ح').slice(0, 1)}</Text></View>}
-                    <Text numberOfLines={1} style={styles.peopleName}>{guest.profiles?.display_name || guest.profiles?.username || 'ضيف'}</Text>
+                    <Text numberOfLines={1} style={styles.peopleName}>{guestIndex + 1}. {guest.profiles?.display_name || guest.profiles?.username || 'ضيف'}</Text>
+                    <Pressable accessibilityLabel="رفع ترتيب الضيف" disabled={guestIndex === 0} onPress={() => void moveGuest(guest, -1)} style={[styles.hostAction, guestIndex === 0 && { opacity: 0.35 }]}><ChevronUp size={15} color="#fff" /></Pressable>
+                    <Pressable accessibilityLabel="خفض ترتيب الضيف" disabled={guestIndex === guests.length - 1} onPress={() => void moveGuest(guest, 1)} style={[styles.hostAction, guestIndex === guests.length - 1 && { opacity: 0.35 }]}><ChevronDown size={15} color="#fff" /></Pressable>
                     <Pressable onPress={() => void toggleGuestMute(guest)} style={[styles.hostAction, guest.is_muted && styles.hostActionActive]}>{guest.is_muted ? <MicOff size={15} color="#020617" /> : <Mic size={15} color="#fff" />}</Pressable>
                     <Pressable onPress={() => removeGuest(guest)} style={styles.hostActionDanger}><UserMinus size={15} color="#fff" /></Pressable>
                   </View>
@@ -949,6 +999,11 @@ const styles = StyleSheet.create({
   peopleTabActive: { backgroundColor: '#047857' },
   peopleTabText: { color: '#fff', fontSize: 12, fontWeight: '800' },
   peopleList: { minHeight: 90 },
+  seatLimitRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, paddingVertical: 12, marginBottom: 4, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)' },
+  seatLimitTitle: { color: '#fff', fontSize: 12, fontWeight: '900' },
+  seatLimitHint: { color: '#cbd5e1', fontSize: 10, marginTop: 3 },
+  seatLimitCount: { color: '#fff', fontSize: 15, fontWeight: '900', minWidth: 20, textAlign: 'center' },
+  seatLimitButton: { color: '#fff', fontSize: 21, fontWeight: '900', lineHeight: 24 },
   hostSheetList: { minHeight: 90 },
   peopleRow: { minHeight: 52, flexDirection: 'row-reverse', alignItems: 'center', gap: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)' },
   hostCommentRow: { minHeight: 56, flexDirection: 'row-reverse', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)', paddingVertical: 6 },
