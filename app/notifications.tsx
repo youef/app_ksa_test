@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   Pressable,
   ScrollView,
@@ -74,15 +75,27 @@ export default function Notifications() {
       }
       setCurrentUserId(u.user.id);
 
-      const { data, error } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('user_id', u.user.id)
-        .order('created_at', { ascending: false })
-        .limit(60);
+      const [{ data, error }, { data: profile }] = await Promise.all([
+        supabase
+          .from('notifications')
+          .select('*')
+          .eq('user_id', u.user.id)
+          .order('created_at', { ascending: false })
+          .limit(60),
+        supabase
+          .from('profiles')
+          .select('notification_preferences')
+          .eq('id', u.user.id)
+          .maybeSingle(),
+      ]);
 
-      if (!error && data) {
-        setItems(data);
+      if (!error && data) setItems(data);
+      const prefs = profile?.notification_preferences as Record<string, unknown> | null;
+      if (prefs) {
+        if (typeof prefs.emergency === 'boolean') setNotifPrefEmergency(prefs.emergency);
+        if (typeof prefs.answers === 'boolean') setNotifPrefAnswers(prefs.answers);
+        if (typeof prefs.community === 'boolean') setNotifPrefCommunity(prefs.community);
+        if (typeof prefs.stories === 'boolean') setNotifPrefStories(prefs.stories);
       }
     } catch (e) {
       console.error('Error loading notifications:', e);
@@ -93,21 +106,46 @@ export default function Notifications() {
   }
 
   useEffect(() => {
-    load();
+    void load();
+  }, []);
 
+  useEffect(() => {
+    if (!currentUserId) return;
     const ch = supabase
-      .channel(`notifications-live-${Math.random().toString(36).slice(2)}`)
+      .channel(`notifications-live-${currentUserId}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'notifications' },
-        () => load()
+        { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${currentUserId}` },
+        () => { void load(); }
       )
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(ch);
+    return () => { void supabase.removeChannel(ch); };
+  }, [currentUserId]);
+
+  async function saveNotificationPreferences() {
+    if (!currentUserId) {
+      Alert.alert('سجّل الدخول أولاً', 'يلزم تسجيل الدخول لحفظ تفضيلات التنبيهات.');
+      return;
+    }
+    const preferences = {
+      emergency: notifPrefEmergency,
+      answers: notifPrefAnswers,
+      community: notifPrefCommunity,
+      stories: notifPrefStories,
     };
-  }, []);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ notification_preferences: preferences } as any)
+        .eq('id', currentUserId);
+      if (error) throw error;
+      setSettingsOpen(false);
+      Alert.alert('تم الحفظ ✅', 'تم حفظ تفضيلات التنبيهات في ملفك الشخصي.');
+    } catch (error: any) {
+      Alert.alert('تعذر الحفظ', error?.message || 'لم نتمكن من حفظ التفضيلات. حاول مرة أخرى.');
+    }
+  }
 
   // Mark single notification as read
   async function markAsRead(id: string) {
@@ -557,10 +595,7 @@ export default function Notifications() {
 
               <Pressable
                 style={styles.modalSaveBtn}
-                onPress={() => {
-                  setSettingsOpen(false);
-                  Alert.alert('تم الحفظ ✅', 'تم تحديث تفضيلات التنبيهات بنجاح');
-                }}
+                onPress={() => { void saveNotificationPreferences(); }}
               >
                 <Text style={styles.modalSaveBtnText}>حفظ الإعدادات</Text>
               </Pressable>
