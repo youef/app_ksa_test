@@ -41,24 +41,64 @@ function RootContent() {
 
     const loadSession = async () => {
       const { data } = await supabase.auth.getSession();
-      setHasSession(Boolean(data.session?.user));
-      if (data.session?.user) {
-        const { data: profile } = await supabase.from('profiles').select('role').eq('id', data.session.user.id).maybeSingle();
-        setIsAdmin(profile?.role === 'admin' || (data.session.user.email || '').toLowerCase() === 'root@gmail.com');
-      } else setIsAdmin(false);
+      const user = data.session?.user;
+      if (!user) {
+        setHasSession(false);
+        setIsAdmin(false);
+        setSessionReady(true);
+        return;
+      }
+
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('role, is_banned')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (profile?.is_banned) {
+        setHasSession(false);
+        setIsAdmin(false);
+        setSessionReady(true);
+        await supabase.auth.signOut();
+        router.replace('/auth');
+        return;
+      }
+
+      setHasSession(true);
+      setIsAdmin(!error && profile?.role === 'admin');
       setSessionReady(true);
       // Background sync: never let a denied notification permission surface
       // as an uncaught rejection (which would show the dev error overlay).
-      if (data.session?.user) void registerPushToken().catch(() => {});
+      void registerPushToken().catch(() => {});
     };
 
     void loadSession();
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setHasSession(Boolean(session?.user));
-      if (!session?.user) setIsAdmin(false);
-      else void supabase.from('profiles').select('role').eq('id', session.user.id).maybeSingle().then(({ data: profile }) => setIsAdmin(profile?.role === 'admin' || (session.user?.email || '').toLowerCase() === 'root@gmail.com'));
-      setSessionReady(true);
-      if (session?.user) void registerPushToken().catch(() => {});
+      if (!session?.user) {
+        setHasSession(false);
+        setIsAdmin(false);
+        setSessionReady(true);
+        return;
+      }
+      void (async () => {
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('role, is_banned')
+          .eq('id', session.user.id)
+          .maybeSingle();
+        if (profile?.is_banned) {
+          setHasSession(false);
+          setIsAdmin(false);
+          setSessionReady(true);
+          await supabase.auth.signOut();
+          router.replace('/auth');
+          return;
+        }
+        setHasSession(true);
+        setIsAdmin(!error && profile?.role === 'admin');
+        setSessionReady(true);
+        void registerPushToken().catch(() => {});
+      })();
     });
 
     const timer = setInterval(() => void syncDndWithNotifications(), 5 * 60_000);
