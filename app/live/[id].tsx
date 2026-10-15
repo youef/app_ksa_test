@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Alert, Animated, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Share, StatusBar, StyleSheet, Text, TextInput, View, type StyleProp, type ViewStyle } from 'react-native';
+import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Share, StatusBar, Text, TextInput, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -12,7 +12,6 @@ import {
   hideLiveMessage,
   reportLiveStream,
   requestLiveGuest,
-  sendLiveMessage,
   setLiveGuestMuted,
   setLiveMessagePinned,
   type LiveChatMessage,
@@ -21,8 +20,12 @@ import {
 import LiveMedia, { type LiveMediaApi, type LiveMediaConnection, type LiveMediaQuality, type LiveMediaState } from '@/components/lives/LiveMedia';
 import LiveModerationPanel from '@/components/lives/LiveModerationPanel';
 import LiveCommentCard from '@/components/lives/LiveCommentCard';
+import FloatingEffect from '@/components/lives/FloatingEffect';
+import { styles } from '@/components/lives/liveRoomStyles';
 import { useLiveModeration } from '@/hooks/useLiveModeration';
 import { useLiveRoomHeartbeat } from '@/hooks/useLiveRoomHeartbeat';
+import { useLiveChat } from '@/hooks/useLiveChat';
+import { useLiveEffects } from '@/hooks/useLiveEffects';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BadgeCheck, Camera, CameraOff, Check, ChevronDown, ChevronUp, Eye, EyeOff, Gift, Heart, MessageCircle, Mic, MicOff, MoreHorizontal, Pin, Radio, Send, Share2, ShieldAlert, SignalHigh, SignalLow, SignalMedium, Trophy, UserMinus, UserPlus, Users, X } from 'lucide-react-native';
 
@@ -31,10 +34,6 @@ type GuestRequest = { id: string; guest_id: string; stream_id: string; status: s
 type AudienceMember = { id: string; display_name: string | null; username: string | null; avatar_url: string | null; is_verified: boolean | null };
 type Supporter = { user: AudienceMember; gifts: number };
 type HostSheetTab = 'comments' | 'guests';
-type Effect = { id: string; emoji: string; name?: string; kind: 'heart' | 'gift' };
-
-const MAX_EFFECTS = 6;
-const CHAT_BASE_FIELDS = 'id,stream_id,sender_id,body,created_at,profiles!live_chat_messages_sender_id_fkey(display_name,username,avatar_url,is_verified)';
 
 export default function LiveRoomScreen() {
   const { id, role: roleParam } = useLocalSearchParams<{ id: string; role?: string }>();
@@ -47,17 +46,14 @@ export default function LiveRoomScreen() {
   const [role, setRole] = useState<Role>(roleParam === 'host' ? 'host' : 'viewer');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [messages, setMessages] = useState<LiveChatMessage[]>([]);
-  const [pinnedMessage, setPinnedMessage] = useState<LiveChatMessage | null>(null);
+  const { messages, pinnedMessage, sending, loadMessages, sendMessage: sendChatMessage } = useLiveChat(id ? String(id) : undefined);
   const [chatInput, setChatInput] = useState('');
-  const [sending, setSending] = useState(false);
   const [viewerCount, setViewerCount] = useState(0);
   const [pendingRequests, setPendingRequests] = useState<GuestRequest[]>([]);
   const [guests, setGuests] = useState<GuestRequest[]>([]);
   const [guestLimit, setGuestLimit] = useState(4);
   const [guestState, setGuestState] = useState<'idle' | 'pending' | 'accepted'>('idle');
   const [guestMutedByHost, setGuestMutedByHost] = useState(false);
-  const [effects, setEffects] = useState<Effect[]>([]);
   const elapsed = useLiveRoomHeartbeat(id ? String(id) : undefined, currentUser, role, stream?.started_at);
   const [connected, setConnected] = useState(false);
   const [connection, setConnection] = useState<LiveMediaConnection>('connecting');
@@ -74,20 +70,23 @@ export default function LiveRoomScreen() {
   const [hostSheet, setHostSheet] = useState<HostSheetTab | null>(null);
   const [moderationOpen, setModerationOpen] = useState(false);
   const moderation = useLiveModeration(id ? String(id) : undefined, Boolean(id) && !loading && !error);
+  const { effects, pushEffect, channelRef: heartChannelRef } = useLiveEffects(id ? String(id) : undefined, Boolean(id) && !loading && !error);
   const moderatorPermissions = moderation.moderators.find((item) => item.user_id === currentUser);
   const canHideComments = role === 'host' || Boolean(moderatorPermissions?.can_hide_comments);
   const canTimeoutUsers = role === 'host' || Boolean(moderatorPermissions?.can_timeout_users);
   const canManageFilters = role === 'host' || Boolean(moderatorPermissions?.can_manage_filters);
   const scrollRef = useRef<ScrollView>(null);
-  const heartChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const mediaApiRef = useRef<LiveMediaApi | null>(null);
   const connectedRef = useRef(false);
-  const chatExtrasRef = useRef(true);
   const hostPulseAtRef = useRef(Date.now());
   const staleSweepAtRef = useRef(0);
   const guestMutedRef = useRef(false);
   const roleRef = useRef(role);
+  const guestStateRef = useRef(guestState);
+  const currentUserRef = useRef(currentUser);
   roleRef.current = role;
+  guestStateRef.current = guestState;
+  currentUserRef.current = currentUser;
   const mediaRole = role === 'host' || role === 'guest';
 
   const handleConnectionChange = useCallback((state: LiveMediaConnection) => {
@@ -99,39 +98,6 @@ export default function LiveRoomScreen() {
   const handleQualityChange = useCallback((next: LiveMediaQuality) => setQuality(next), []);
   const handleMediaStateChange = useCallback((next: LiveMediaState) => setMediaState(next), []);
   const handleApiReady = useCallback((api: LiveMediaApi) => { mediaApiRef.current = api; }, []);
-
-  const loadMessages = useCallback(async (streamId: string) => {
-    const withExtras = `${CHAT_BASE_FIELDS},is_pinned,sender_role`;
-    let rows: LiveChatMessage[] = [];
-    let queryError: unknown = null;
-    if (chatExtrasRef.current) {
-      const result = await supabase.from('live_chat_messages')
-        .select(withExtras)
-        .eq('stream_id', streamId).eq('is_hidden', false)
-        .order('created_at', { ascending: false }).limit(10);
-      if (result.error) chatExtrasRef.current = false;
-      else rows = ((result.data || []).reverse()) as unknown as LiveChatMessage[];
-      queryError = result.error;
-    }
-    if (!chatExtrasRef.current) {
-      const result = await supabase.from('live_chat_messages')
-        .select(CHAT_BASE_FIELDS)
-        .eq('stream_id', streamId).eq('is_hidden', false)
-        .order('created_at', { ascending: false }).limit(10);
-      if (result.error) throw result.error;
-      rows = ((result.data || []).reverse()) as unknown as LiveChatMessage[];
-      setPinnedMessage(null);
-    } else if (queryError) {
-      throw queryError;
-    }
-    setMessages(rows);
-    if (chatExtrasRef.current) {
-      const { data: pin } = await supabase.from('live_chat_messages')
-        .select(withExtras)
-        .eq('stream_id', streamId).eq('is_hidden', false).eq('is_pinned', true).maybeSingle();
-      setPinnedMessage((pin as unknown as LiveChatMessage) || null);
-    }
-  }, []);
 
   const loadGuests = useCallback(async (streamId: string) => {
     const result = await supabase.from('live_guest_requests')
@@ -276,13 +242,13 @@ export default function LiveRoomScreen() {
       void (async () => {
         const { count } = await supabase.from('live_viewer_sessions').select('viewer_id', { count: 'exact', head: true })
           .eq('stream_id', id).gt('last_seen_at', new Date(Date.now() - 45_000).toISOString());
-        setViewerCount((count || 0) + (role === 'host' ? 1 : 0));
-        if (role !== 'host' && Date.now() - hostPulseAtRef.current > 75_000 && Date.now() - staleSweepAtRef.current > 30_000) {
+        setViewerCount((count || 0) + (roleRef.current === 'host' ? 1 : 0));
+        if (roleRef.current !== 'host' && Date.now() - hostPulseAtRef.current > 75_000 && Date.now() - staleSweepAtRef.current > 30_000) {
           staleSweepAtRef.current = Date.now();
           const { error: sweepError } = await supabase.rpc('expire_stale_live_streams');
           if (sweepError && sweepError.code !== 'PGRST202') console.error('Unable to expire the disconnected host stream.', sweepError);
         }
-        if (role === 'host') {
+        if (roleRef.current === 'host') {
           const { data } = await supabase.from('live_guest_requests')
             .select('id,guest_id,stream_id,status,profiles!live_guest_requests_guest_id_fkey(display_name,username,avatar_url)')
             .eq('stream_id', id).eq('status', 'pending').order('created_at', { ascending: true });
@@ -290,40 +256,32 @@ export default function LiveRoomScreen() {
           void loadGuests(id).catch((cause) => console.error('Unable to refresh live guests.', cause));
         } else {
           const primary = await supabase.from('live_guest_requests').select('status,is_muted')
-            .eq('stream_id', id).eq('guest_id', currentUser).maybeSingle();
+            .eq('stream_id', id).eq('guest_id', currentUserRef.current).maybeSingle();
           const own = primary.error
             ? (await supabase.from('live_guest_requests').select('status')
-                .eq('stream_id', id).eq('guest_id', currentUser).maybeSingle()).data
+                .eq('stream_id', id).eq('guest_id', currentUserRef.current).maybeSingle()).data
             : primary.data;
           const status = own?.status;
-          if (status === 'accepted' && role === 'viewer') {
+          if (status === 'accepted' && roleRef.current === 'viewer') {
             setRole('guest');
+            roleRef.current = 'guest';
+            guestStateRef.current = 'accepted';
             setGuestState('accepted');
             const credential = await getLiveToken(id, 'guest');
             setRoomUrl(credential.url);
             setToken(credential.token);
-          } else if (role === 'guest') {
+          } else if (roleRef.current === 'guest') {
             const muted = Boolean((own as { is_muted?: boolean } | null)?.is_muted);
             if (muted && !guestMutedRef.current) mediaApiRef.current?.setMicrophoneEnabled(false);
             guestMutedRef.current = muted;
             setGuestMutedByHost(muted);
             if (status === 'removed') setError('أزالك المضيف من البث.');
           } else if (status === 'rejected' || status === 'removed') {
-            if (guestState === 'pending') setGuestState('idle');
+            if (guestStateRef.current === 'pending') setGuestState('idle');
           }
         }
       })();
     }, 10_000);
-
-    const presenceChannel = supabase.channel(`live-effects:${id}`, { config: { broadcast: { self: false } } })
-      .on('broadcast', { event: 'heart' }, ({ payload }) => {
-        pushEffect({ emoji: typeof payload?.emoji === 'string' ? payload.emoji : '💚', name: typeof payload?.name === 'string' ? payload.name : undefined, kind: 'heart' });
-      })
-      .on('broadcast', { event: 'gift' }, ({ payload }) => {
-        pushEffect({ emoji: typeof payload?.emoji === 'string' ? payload.emoji : '🎁', name: typeof payload?.name === 'string' ? payload.name : undefined, kind: 'gift' });
-      })
-      .subscribe();
-    heartChannelRef.current = presenceChannel;
 
     const audienceTimer = setInterval(() => {
       void loadAudience(id).catch((cause) => console.error('Unable to refresh live audience.', cause));
@@ -331,20 +289,13 @@ export default function LiveRoomScreen() {
     }, 20_000);
     void loadAudience(id).catch((cause) => console.error('Unable to load live audience.', cause));
     void loadSupporters(id).catch((cause) => console.error('Unable to load live supporters.', cause));
-    if (role === 'host') void loadGuests(id).catch((cause) => console.error('Unable to load live guests.', cause));
+    if (roleRef.current === 'host') void loadGuests(id).catch((cause) => console.error('Unable to load live guests.', cause));
 
     return () => {
       clearInterval(poll); clearInterval(audienceTimer);
-      heartChannelRef.current = null;
-      void supabase.removeChannel(chatChannel); void supabase.removeChannel(streamChannel); void supabase.removeChannel(guestChannel); void supabase.removeChannel(presenceChannel);
+      void supabase.removeChannel(chatChannel); void supabase.removeChannel(streamChannel); void supabase.removeChannel(guestChannel);
     };
-  }, [id, loading, error, role, guestState, currentUser, stream?.started_at, loadMessages, loadGuests]);
-
-  function pushEffect(input: { emoji: string; name?: string; kind: 'heart' | 'gift' }) {
-    const entry: Effect = { id: `${Date.now()}-${Math.random()}`, ...input };
-    setEffects((items) => [...items, entry].slice(-MAX_EFFECTS));
-    setTimeout(() => setEffects((items) => items.filter((item) => item.id !== entry.id)), 2400);
-  }
+  }, [id, loading, error, loadMessages, loadGuests]);
 
   async function timeoutMessageAuthor(message: LiveChatMessage, minutes: number) {
     if (!id || !canTimeoutUsers) return;
@@ -359,10 +310,12 @@ export default function LiveRoomScreen() {
   async function sendMessage() {
     const body = chatInput.trim();
     if (!body || sending || !id) return;
-    setSending(true);
-    try { await sendLiveMessage(id, body.slice(0, 300)); setChatInput(''); }
-    catch (e) { Alert.alert('تعذر إرسال التعليق', e instanceof Error ? e.message : 'حاول مرة أخرى.'); }
-    finally { setSending(false); }
+    try {
+      const sent = await sendChatMessage(body);
+      if (sent) setChatInput('');
+    } catch (e) {
+      Alert.alert('تعذر إرسال التعليق', e instanceof Error ? e.message : 'حاول مرة أخرى.');
+    }
   }
 
   async function requestGuestSeat() {
@@ -878,151 +831,3 @@ function GlassButton({ children, label, onPress, active, danger, disabled }: { c
   );
 }
 
-function FloatingEffect({ emoji, name, style, duration = 1900 }: { emoji: string; name?: string; style: StyleProp<ViewStyle>; duration?: number }) {
-  const progress = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    const animation = Animated.timing(progress, { toValue: 1, duration, useNativeDriver: false });
-    animation.start();
-    return () => animation.stop();
-  }, [duration, progress]);
-  return (
-    <Animated.View pointerEvents="none" style={[style, {
-      opacity: progress.interpolate({ inputRange: [0, 0.15, 1], outputRange: [0, 1, 0] }),
-      transform: [
-        { translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [10, -110] }) },
-        { scale: progress.interpolate({ inputRange: [0, 0.25, 1], outputRange: [0.6, 1.1, 0.9] }) },
-      ],
-    }]}>
-      {name ? (
-        <View style={styles.effectBubble}>
-          <Text style={styles.effectName} numberOfLines={1}>{name}</Text>
-          <Text style={styles.giftBurstText}>{emoji}</Text>
-        </View>
-      ) : <Text style={styles.giftBurstText}>{emoji}</Text>}
-    </Animated.View>
-  );
-}
-
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#020617' }, stage: { flex: 1, backgroundColor: '#020617' },
-  stageTap: { ...StyleSheet.absoluteFillObject, zIndex: 1 },
-  topGradient: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 4 },
-  bottomGradient: { position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 4 },
-  topBar: { position: 'absolute', left: 14, right: 14, zIndex: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  topCenter: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
-  roundButton: { width: 38, height: 38, borderRadius: 20, backgroundColor: 'rgba(2,6,23,0.45)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
-  roundButtonSpacer: { width: 38, height: 38 },
-  livePill: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, paddingVertical: 7, paddingHorizontal: 12, borderRadius: 18, backgroundColor: 'rgba(220,38,38,0.92)', shadowColor: '#ef4444', shadowOpacity: 0.5, shadowRadius: 12, shadowOffset: { width: 0, height: 5 } },
-  redDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#fff' },
-  liveText: { color: '#fff', fontSize: 12, fontWeight: '900' },
-  qualityPill: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingVertical: 7, paddingHorizontal: 10, borderRadius: 18, backgroundColor: 'rgba(2,6,23,0.62)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
-  qualityText: { color: '#e2e8f0', fontSize: 10, fontWeight: '800' },
-  viewerPill: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, paddingVertical: 7, paddingHorizontal: 10, borderRadius: 18, backgroundColor: 'rgba(2,6,23,0.5)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
-  viewerCount: { color: '#fff', fontSize: 12, fontWeight: '800' },
-  hostOverlay: { position: 'absolute', left: 14, right: 14, zIndex: 10, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between' },
-  hostMeta: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, padding: 6, paddingRight: 10, borderRadius: 24, backgroundColor: 'rgba(2,6,23,0.45)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
-  hostAvatar: { width: 34, height: 34, borderRadius: 18 }, hostAvatarFallback: { width: 34, height: 34, borderRadius: 18, backgroundColor: '#d1fae5', alignItems: 'center', justifyContent: 'center' },
-  hostNameRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5 },
-  hostName: { color: '#fff', fontSize: 12, fontWeight: '900' }, hostTitle: { color: '#e2e8f0', fontSize: 10, marginTop: 2 },
-  roleTagHost: { backgroundColor: 'rgba(16,185,129,0.22)', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
-  roleTagHostText: { color: '#6ee7b7', fontSize: 9, fontWeight: '900' },
-  followButton: { backgroundColor: '#059669', borderRadius: 16, paddingHorizontal: 9, paddingVertical: 6 }, followText: { color: '#fff', fontSize: 10, fontWeight: '900' },
-  endButton: { backgroundColor: '#dc2626', borderRadius: 20, paddingHorizontal: 15, paddingVertical: 8 }, endText: { color: '#fff', fontSize: 12, fontWeight: '900' },
-  supportersPill: { position: 'absolute', right: 14, zIndex: 10, maxWidth: '76%', flexDirection: 'row-reverse', alignItems: 'center', gap: 6, paddingHorizontal: 11, paddingVertical: 8, borderRadius: 18, backgroundColor: 'rgba(2,6,23,0.55)', borderWidth: 1, borderColor: 'rgba(253,230,138,0.28)' },
-  supportersPillText: { color: '#fff', fontSize: 11, fontWeight: '800' },
-  hiddenBar: { position: 'absolute', left: 14, right: 14, zIndex: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  hiddenHint: { flexDirection: 'row-reverse', alignItems: 'center', gap: 7, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 18, backgroundColor: 'rgba(2,6,23,0.62)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
-  hiddenHintText: { color: '#fff', fontSize: 11, fontWeight: '800' },
-  emergencyButton: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, backgroundColor: 'rgba(220,38,38,0.9)', borderRadius: 18, paddingHorizontal: 13, paddingVertical: 9 },
-  emergencyText: { color: '#fff', fontSize: 12, fontWeight: '900' },
-  connectionBanner: { position: 'absolute', top: '46%', alignSelf: 'center', zIndex: 20, flexDirection: 'row-reverse', alignItems: 'center', gap: 8, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 9, backgroundColor: 'rgba(2,6,23,0.78)' },
-  connectionBannerText: { color: '#fff', fontSize: 12, fontWeight: '700' },
-  mediaAlertWrap: { position: 'absolute', top: '30%', alignSelf: 'center', zIndex: 15, alignItems: 'center', gap: 6 },
-  mediaAlert: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 16, backgroundColor: 'rgba(190,18,60,0.82)' },
-  mediaAlertText: { color: '#fff', fontSize: 11, fontWeight: '800' },
-  effectsLayer: { position: 'absolute', right: 18, bottom: 0, width: 70, height: 340, zIndex: 6 },
-  floatingEffect: { position: 'absolute', right: 4, alignItems: 'flex-end' },
-  effectBubble: { alignItems: 'center' },
-  effectName: { color: '#fff', fontSize: 9, fontWeight: '800', maxWidth: 62, backgroundColor: 'rgba(2,6,23,0.55)', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 7, marginBottom: 2 },
-  giftBurstText: { fontSize: 22 },
-  bottomOverlay: { position: 'absolute', left: 12, right: 12, bottom: 0, zIndex: 10 },
-  chatPanel: { maxHeight: '30%', width: '78%', marginBottom: 8 },
-  messageList: { flex: 1 },
-  commentCard: { alignSelf: 'flex-start', maxWidth: '100%', backgroundColor: 'rgba(2,6,23,0.34)', borderRadius: 15, paddingHorizontal: 10, paddingVertical: 6, marginVertical: 3, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
-  commentCardHost: { borderColor: 'rgba(16,185,129,0.4)', backgroundColor: 'rgba(6,78,59,0.4)' },
-  commentCardGuest: { borderColor: 'rgba(56,189,248,0.38)', backgroundColor: 'rgba(12,74,110,0.38)' },
-  commentHeader: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, marginBottom: 1 },
-  commentName: { color: '#a7f3d0', fontWeight: '900', fontSize: 11 },
-  commentBody: { color: '#fff', fontSize: 12, textAlign: 'right', lineHeight: 18 },
-  commentBadgeHost: { backgroundColor: 'rgba(16,185,129,0.25)', borderRadius: 7, paddingHorizontal: 5, paddingVertical: 1 },
-  commentBadgeHostText: { color: '#6ee7b7', fontSize: 9, fontWeight: '900' },
-  commentBadgeGuest: { backgroundColor: 'rgba(56,189,248,0.25)', borderRadius: 7, paddingHorizontal: 5, paddingVertical: 1 },
-  commentBadgeGuestText: { color: '#7dd3fc', fontSize: 9, fontWeight: '900' },
-  firstMessage: { color: '#e2e8f0', fontSize: 12, textAlign: 'right', paddingTop: 12 },
-  pinnedBanner: { flexDirection: 'row-reverse', alignItems: 'center', gap: 7, alignSelf: 'flex-end', maxWidth: '86%', backgroundColor: 'rgba(6,78,59,0.72)', borderRadius: 13, paddingHorizontal: 10, paddingVertical: 7, marginBottom: 7, borderWidth: 1, borderColor: 'rgba(52,211,153,0.4)' },
-  pinnedText: { color: '#e2e8f0', fontSize: 11, textAlign: 'right', flexShrink: 1 },
-  pinnedAuthor: { color: '#a7f3d0', fontWeight: '900' },
-  requestRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, paddingVertical: 6 },
-  requestCard: { flexDirection: 'row-reverse', alignItems: 'center', gap: 7, borderRadius: 20, paddingHorizontal: 9, paddingVertical: 6, backgroundColor: 'rgba(2,6,23,0.72)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
-  requestName: { color: '#fff', fontSize: 11, fontWeight: '700' },
-  acceptButton: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#059669', alignItems: 'center', justifyContent: 'center' },
-  rejectButton: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#dc2626', alignItems: 'center', justifyContent: 'center' },
-  actionRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-around', paddingTop: 8 },
-  actionButton: { minWidth: 46, alignItems: 'center', justifyContent: 'center', gap: 3 },
-  actionLabel: { color: '#fff', fontSize: 9, fontWeight: '700' },
-  durationPill: { paddingHorizontal: 8, paddingVertical: 5, borderRadius: 14, backgroundColor: 'rgba(2,6,23,0.4)' },
-  durationText: { color: '#fff', fontSize: 11, fontWeight: '700' },
-  glassWrap: { borderRadius: 26, overflow: 'hidden', marginTop: 6 },
-  glassBar: { borderRadius: 26, borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
-  glassTint: { backgroundColor: 'rgba(2,6,23,0.52)', minHeight: 58, paddingHorizontal: 8, paddingVertical: 6, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  glassToggle: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.1)' },
-  glassButtons: { flex: 1, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-around' },
-  glassButton: { minWidth: 44, alignItems: 'center', justifyContent: 'center', gap: 3, paddingVertical: 4, paddingHorizontal: 4, borderRadius: 14 },
-  glassButtonActive: { backgroundColor: 'rgba(16,185,129,0.28)' },
-  glassButtonDanger: { backgroundColor: 'rgba(220,38,38,0.8)' },
-  glassButtonLabel: { color: '#fff', fontSize: 9, fontWeight: '800' },
-  glassCollapsedText: { flex: 1, color: '#fff', fontSize: 12, fontWeight: '800', textAlign: 'center' },
-  inputBar: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 9, borderRadius: 24, backgroundColor: 'rgba(2,6,23,0.56)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
-  sendButton: { width: 30, height: 30, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: '#059669' },
-  chatInput: { flex: 1, minHeight: 40, color: '#fff', textAlign: 'right', fontSize: 13 },
-  commentIcon: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
-  modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)' },
-  peopleSheet: { maxHeight: '72%', backgroundColor: '#0f172a', borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingHorizontal: 18, paddingTop: 16, paddingBottom: 28, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
-  hostSheet: { maxHeight: '78%', backgroundColor: '#0f172a', borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingHorizontal: 18, paddingTop: 16, paddingBottom: 28, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
-  peopleSheetHeader: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
-  peopleSheetTitle: { color: '#fff', fontSize: 17, fontWeight: '900' },
-  modalClose: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.1)' },
-  peopleTabs: { flexDirection: 'row-reverse', gap: 8, marginBottom: 12 },
-  peopleTab: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.08)' },
-  peopleTabActive: { backgroundColor: '#047857' },
-  peopleTabText: { color: '#fff', fontSize: 12, fontWeight: '800' },
-  peopleList: { minHeight: 90 },
-  seatLimitRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, paddingVertical: 12, marginBottom: 4, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)' },
-  seatLimitTitle: { color: '#fff', fontSize: 12, fontWeight: '900' },
-  seatLimitHint: { color: '#cbd5e1', fontSize: 10, marginTop: 3 },
-  seatLimitCount: { color: '#fff', fontSize: 15, fontWeight: '900', minWidth: 20, textAlign: 'center' },
-  seatLimitButton: { color: '#fff', fontSize: 21, fontWeight: '900', lineHeight: 24 },
-  hostSheetList: { minHeight: 90 },
-  peopleRow: { minHeight: 52, flexDirection: 'row-reverse', alignItems: 'center', gap: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)' },
-  hostCommentRow: { minHeight: 56, flexDirection: 'row-reverse', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)', paddingVertical: 6 },
-  hostCommentName: { color: '#a7f3d0', fontSize: 11, fontWeight: '900' },
-  hostCommentBody: { color: '#e2e8f0', fontSize: 12, textAlign: 'right', marginTop: 2 },
-  hostAction: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.1)' },
-  hostActionActive: { backgroundColor: '#34d399' },
-  hostActionDanger: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(220,38,38,0.75)' },
-  peopleRank: { color: '#fcd34d', width: 18, textAlign: 'center', fontWeight: '900' },
-  peopleAvatar: { width: 34, height: 34, borderRadius: 17 },
-  peopleAvatarFallback: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#064e3b', alignItems: 'center', justifyContent: 'center' },
-  peopleInitial: { color: '#a7f3d0', fontWeight: '900' },
-  peopleName: { flex: 1, color: '#fff', textAlign: 'right', fontSize: 13, fontWeight: '700' },
-  giftCount: { color: '#fde68a', fontSize: 11, fontWeight: '900' },
-  peopleEmpty: { color: '#cbd5e1', textAlign: 'center', paddingVertical: 24, fontSize: 12 },
-  loadingScreen: { flex: 1, backgroundColor: '#020617', alignItems: 'center', justifyContent: 'center', gap: 12 },
-  loadingText: { color: '#fff', fontSize: 14 },
-  errorScreen: { flex: 1, backgroundColor: '#020617', alignItems: 'center', justifyContent: 'center', padding: 28 },
-  errorIcon: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#dc2626', alignItems: 'center', justifyContent: 'center' },
-  errorTitle: { color: '#fff', textAlign: 'center', fontWeight: '900', fontSize: 18, marginTop: 16 },
-  errorHint: { color: '#cbd5e1', textAlign: 'center', fontSize: 13, marginTop: 7, lineHeight: 20 },
-  returnButton: { marginTop: 20, backgroundColor: '#059669', borderRadius: 16, paddingHorizontal: 21, paddingVertical: 12 },
-  returnText: { color: '#fff', fontWeight: '900' },
-});
