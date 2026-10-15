@@ -17,6 +17,7 @@ project_id = "vkeuyompnddqfvulalkk"
   weekly-admin-report = { verify_jwt = false }
   # Public gateway callback; handler re-fetches and verifies the invoice server-to-server.
   moyasar-marketplace-webhook = { verify_jwt = false }
+  tap-marketplace-webhook = { verify_jwt = false }
 
 [cron]
   # Every minute: check and send due scheduled broadcasts
