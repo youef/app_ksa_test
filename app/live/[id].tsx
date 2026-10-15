@@ -216,35 +216,24 @@ export default function LiveRoomScreen() {
 
   useEffect(() => {
     if (!id) return;
-    let previousState = AppState.currentState;
     const closeHostStream = () => {
       if (roleRef.current !== 'host' || !connectedRef.current) return;
       void endLiveStream(id).catch((cause) => {
         console.error('Unable to end host stream after leaving the room.', cause);
       });
     };
-    const appStateSubscription = AppState.addEventListener('change', (nextState) => {
-      // Backgrounding can be temporary (calls, notifications, app switcher).
-      // Keep the room alive; explicit host action or route cleanup ends it.
-      previousState = nextState;
-    });
+    // Deliberately do not end a stream on AppState background transitions.
     const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'SIGNED_OUT') closeHostStream();
     });
     const onPageHide = () => closeHostStream();
-    const onVisibilityChange = () => {
-      // A background browser tab is not a request to end the live room.
-    };
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
       window.addEventListener('pagehide', onPageHide);
-      document.addEventListener('visibilitychange', onVisibilityChange);
     }
     return () => {
-      appStateSubscription.remove();
       authListener.subscription.unsubscribe();
       if (Platform.OS === 'web' && typeof document !== 'undefined') {
         window.removeEventListener('pagehide', onPageHide);
-        document.removeEventListener('visibilitychange', onVisibilityChange);
       }
       closeHostStream();
     };
