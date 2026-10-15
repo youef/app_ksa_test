@@ -88,7 +88,7 @@ export default function NewRequest() {
         requester_id: u.user.id,
         title: title.trim(),
         description: description.trim(),
-        request_type: requestType,
+        request_type: requestType === 'tool' ? 'other' : requestType,
         city: city.trim() || null,
         district: district.trim() || null,
         budget: budget ? Number(budget) : null,
