@@ -17,7 +17,7 @@ export const styles = StyleSheet.create({
   locationPromptHelp: { marginTop: 14, fontSize: 11.5, color: '#059669', fontWeight: '800', textAlign: 'center' },
   container: {
     flex: 1,
-    backgroundColor: '#f3f7f5',
+    backgroundColor: '#eaf3ee',
   },
   hero: {
     width: '100%',
