@@ -592,7 +592,7 @@ export default function Question() {
       />
 
       <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingBottom: bottomNavInset + 150 }] }
+        contentContainerStyle={[styles.scroll, { paddingBottom: 24 }]}
         showsVerticalScrollIndicator={false}
       >
         {/* Main Question Luxury Card */}
@@ -912,14 +912,14 @@ export default function Question() {
       {/* Bottom Input Area */}
       {!currentUserId ? (
         <Pressable
-          style={[styles.guestPrompt, { paddingBottom: (Platform.OS === 'ios' ? 12 : 8) + (composerNeedsNavClearance ? 76 : Math.max(bottomNavInset, 8)) }] }
+          style={[styles.guestPrompt, { paddingBottom: Platform.OS === 'ios' ? 12 : 8 }]}
           onPress={() => requireAccount('سجّل الدخول أو أنشئ حساباً للرد والتصويت في نقاشات الحي.')}
         >
           <Text style={styles.guestPromptText}>سجّل الدخول للمشاركة في النقاش</Text>
           <MessageCircle size={18} color="#047857" />
         </Pressable>
       ) : (
-        <View style={[styles.inputWrapper, { paddingBottom: composerNeedsNavClearance ? bottomNavInset + 76 : Math.max(bottomNavInset, 8) }]}>
+        <View style={[styles.inputWrapper, { paddingBottom: Platform.OS === 'ios' ? 12 : 8 }]}>
           {replyTo && (
             <View style={styles.replyingBar}>
               <Reply size={14} color="#059669" />
