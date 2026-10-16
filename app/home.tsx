@@ -258,7 +258,6 @@ export default function Home() {
               accessibilityLabel={`تنبيه طارئ: ${emergencyTop.title}`}
             >
               <Text style={styles.emergencyQuestionTitle}>{emergencyTop.title}</Text>
-              <Text style={styles.emergencyQuestionSub}>تكاتف الجيران واستجابتهم السريعة تصنع الفرق 🤝</Text>
             </Pressable>
           </View>
         )}
