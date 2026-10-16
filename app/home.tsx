@@ -352,6 +352,7 @@ export default function Home() {
                 isMine={activeTab === 'mine' ? true : undefined}
                 onQuickReply={handleQuickReply}
                 onToast={showToast}
+                onDeleted={() => { void feed.reload(); }}
               />
             ))
           )}
