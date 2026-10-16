@@ -107,6 +107,7 @@ export default function BottomNav() {
 
   const path = normalize(pathname);
   if (keyboardVisible || path === '/' || path === '/index' || path === '/auth' || path.startsWith('/auth/') ||
+      path === '/questions' || path.startsWith('/questions/') || path === '/question' || path.startsWith('/question/') ||
       path === '/conversation' || path.startsWith('/conversation/')) return null;
 
   const bottomPadding = Math.max(insets.bottom, Platform.OS === 'ios' ? 8 : 7);
