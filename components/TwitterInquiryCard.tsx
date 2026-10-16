@@ -99,6 +99,7 @@ export default function TwitterInquiryCard({
   const [viewsCount, setViewsCount] = useState<number>(() => Number(data.views_count ?? data.views ?? data.view_count ?? 0));
   const [savesCount, setSavesCount] = useState(0);
   const [isPinned, setIsPinned] = useState(Boolean(data.is_pinned));
+  const [isFeatured, setIsFeatured] = useState(Boolean(data.is_featured));
   const [resolutionStatus, setResolutionStatus] = useState(String(data.resolution_status || 'open'));
   const statusLabels: Record<string, string> = { open: 'بانتظار المساعدة', found: 'تم العثور على الغرض', helped: 'تمت المساعدة', resolved: 'تم حل المشكلة', not_needed: 'لم أعد بحاجة للمساعدة' };
 
@@ -259,17 +260,27 @@ export default function TwitterInquiryCard({
 
   async function togglePinned() {
     if (!currentUserId) return;
-    const next = !isPinned;
+    const isAdminPin = currentUserProfile?.role === 'admin';
+    const next = isAdminPin ? !isFeatured : !isPinned;
     const table = isReq ? 'requests' : 'questions';
     const ownerColumn = isReq ? 'requester_id' : 'author_id';
-    let query = supabase.from(table).update({ is_pinned: next, pinned_at: next ? new Date().toISOString() : null, updated_at: new Date().toISOString() }).eq('id', data.id);
+    const now = new Date().toISOString();
+    let query = supabase.from(table).update({
+      is_pinned: next,
+      pinned_at: next ? now : null,
+      ...(isAdminPin ? { is_featured: next, featured_at: next ? now : null } : {}),
+      updated_at: now,
+    }).eq('id', data.id);
     if (isOwner) query = query.eq(ownerColumn, currentUserId);
     else if (currentUserProfile?.role !== 'admin') return;
     const { error } = await query;
     if (error) return Alert.alert('تعذر تحديث التثبيت', error.message || 'تحقق من الصلاحيات ثم حاول مرة أخرى.');
     setIsPinned(next);
     data.is_pinned = next;
-    onToast(next ? 'تم تثبيت المنشور في أعلى الملف الشخصي 📌' : 'تم إلغاء تثبيت المنشور');
+    if (isAdminPin) { setIsFeatured(next); data.is_featured = next; }
+    onToast(isAdminPin
+      ? (next ? 'تم تثبيت المنشور كتنبيه مهم للحي 📌' : 'تم إلغاء تثبيت التنبيه للحي')
+      : (next ? 'تم تثبيت المنشور في أعلى الملف الشخصي 📌' : 'تم إلغاء تثبيت المنشور'));
   }
 
   function handleMoreOptions() {
@@ -283,7 +294,8 @@ export default function TwitterInquiryCard({
       options.push({ text: 'تحديث حالة المنشور', onPress: openStatusOptions });
     }
     if (isOwner || currentUserProfile?.role === 'admin') {
-      options.push({ text: isPinned ? 'إلغاء تثبيت المنشور' : 'تثبيت المنشور 📌', onPress: () => { void togglePinned(); } });
+      const adminPin = currentUserProfile?.role === 'admin';
+      options.push({ text: adminPin ? (isFeatured ? 'إلغاء تثبيت التنبيه للحي' : 'تثبيت كتنبيه مهم للحي 📌') : (isPinned ? 'إلغاء تثبيت المنشور من الملف' : 'تثبيت في الملف الشخصي 📌'), onPress: () => { void togglePinned(); } });
     }
     options.push({ text: 'نسخ رابط المنشور', onPress: handleShare });
     if (!isGuest) {
@@ -381,6 +393,7 @@ export default function TwitterInquiryCard({
           </Text>
         )}
         {isPinned && <View style={{ alignSelf: 'flex-start', flexDirection: 'row-reverse', alignItems: 'center', gap: 4, backgroundColor: '#fff7ed', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5, marginTop: 8 }}><Text style={{ color: '#c2410c', fontSize: 11, fontWeight: '800' }}>📌 مثبت في الملف الشخصي</Text></View>}
+        {isFeatured && <View style={{ alignSelf: 'flex-start', backgroundColor: '#fee2e2', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5, marginTop: 7 }}><Text style={{ color: '#991b1b', fontSize: 11, fontWeight: '900' }}>📢 تنبيه مثبت من إدارة الحي</Text></View>}
         {resolutionStatus !== 'open' && <View style={{ alignSelf: 'flex-start', backgroundColor: '#dcfce7', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5, marginTop: 7 }}><Text style={{ color: '#166534', fontSize: 11, fontWeight: '800' }}>{statusLabels[resolutionStatus] || resolutionStatus}</Text></View>}
         <View style={s.xHashtagRow}>
           {data.district && (
