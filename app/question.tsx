@@ -681,6 +681,28 @@ export default function Question() {
           </View>
         </View>
 
+        <View style={styles.statsCard}>
+          <View style={styles.statsHeadingRow}>
+            <View style={styles.statsIconBubble}><Sparkles size={16} color="#0f8a62" /></View>
+            <View style={{ flex: 1 }}><Text style={styles.statsTitle}>ملخص الاستفسار</Text><Text style={styles.statsSubtitle}>مؤشرات تفاعل بدون كشف هوية الزوار</Text></View>
+            {Boolean(q.is_pinned) && <View style={styles.pinnedPill}><Pin size={12} color="#8a5a0a" /><Text style={styles.pinnedPillText}>مثبّت</Text></View>}
+          </View>
+          <View style={styles.statsGrid}>
+            <View style={styles.statItem}><Eye size={17} color="#64748b" /><Text style={styles.statValue}>{Number(q.views_count ?? q.view_count ?? 0).toLocaleString('ar-SA')}</Text><Text style={styles.statLabel}>مشاهدة</Text></View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}><MessageCircle size={17} color="#0f8a62" /><Text style={styles.statValue}>{answers.length.toLocaleString('ar-SA')}</Text><Text style={styles.statLabel}>ردود الجيران</Text></View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}><Bookmark size={17} color="#7c3aed" /><Text style={styles.statValue}>{savedCount.toLocaleString('ar-SA')}</Text><Text style={styles.statLabel}>حفظ</Text></View>
+          </View>
+          <View style={styles.questionActionRow}>
+            <Pressable onPress={toggleFavorite} disabled={favoriteBusy} style={[styles.questionActionBtn, isFavorite && styles.questionActionBtnActive]}>
+              {favoriteBusy ? <ActivityIndicator size="small" color="#0f8a62" /> : <Bookmark size={16} color={isFavorite ? '#ffffff' : '#0f8a62'} />}
+              <Text style={[styles.questionActionText, isFavorite && styles.questionActionTextActive]}>{isFavorite ? 'محفوظ عندك' : 'حفظ الاستفسار'}</Text>
+            </Pressable>
+            {!isAuthor && <Pressable onPress={() => { if (!currentUserId) { requireAccount('سجّل الدخول للإبلاغ عن الاستفسار.'); return; } setReportOpen(true); }} style={styles.reportActionBtn}><Flag size={15} color="#b45309" /><Text style={styles.reportActionText}>إبلاغ</Text></Pressable>}
+          </View>
+        </View>
+
         {/* Author Management Card: Edit (Limit 2) & Delete */}
         {isAuthor && (
           <View style={styles.authorManageBox}>
@@ -701,6 +723,10 @@ export default function Question() {
             </View>
 
             <View style={styles.authorActionsRow}>
+              <Pressable style={[styles.pinActionBtn, q.is_pinned && styles.pinActionBtnActive]} onPress={togglePin} disabled={pinBusy}>
+                {pinBusy ? <ActivityIndicator size="small" color="#8a5a0a" /> : <Pin size={15} color={q.is_pinned ? '#ffffff' : '#8a5a0a'} />}
+                <Text style={[styles.pinActionText, q.is_pinned && styles.pinActionTextActive]}>{q.is_pinned ? 'إلغاء التثبيت' : 'تثبيت الاستفسار'}</Text>
+              </Pressable>
               <Pressable
                 style={[styles.editActionBtn, editsRemaining === 0 && styles.disabledActionBtn]}
                 onPress={handleOpenEdit}
@@ -949,6 +975,31 @@ export default function Question() {
         </View>
       )}
 
+      <Modal visible={reportOpen} transparent animationType="slide" onRequestClose={() => setReportOpen(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.reportModalCard}>
+            <View style={styles.modalHeader}>
+              <View><Text style={styles.modalTitle}>الإبلاغ عن الاستفسار</Text><Text style={styles.modalSubtitle}>اختر السبب وسنراجع البلاغ بسرية</Text></View>
+              <Pressable style={styles.modalCloseBtn} onPress={() => setReportOpen(false)} disabled={reportBusy}><X size={18} color="#64748b" /></Pressable>
+            </View>
+            <View style={styles.reportOptions}>
+              {['محتوى غير مناسب', 'معلومة مضللة', 'إساءة أو تنمّر', 'احتيال أو إعلان مزعج', 'انتهاك الخصوصية', 'سبب آخر'].map(reason => {
+                const selected = reportReason === reason;
+                return <Pressable key={reason} onPress={() => setReportReason(reason)} style={[styles.reportOption, selected && styles.reportOptionSelected]}>
+                  <View style={[styles.reportRadio, selected && styles.reportRadioSelected]} />
+                  <Text style={[styles.reportOptionText, selected && styles.reportOptionTextSelected]}>{reason}</Text>
+                </Pressable>;
+              })}
+            </View>
+            <TextInput style={styles.reportDetailsInput} value={reportDetails} onChangeText={setReportDetails} placeholder="تفاصيل إضافية (اختياري)" placeholderTextColor="#94a3b8" multiline maxLength={350} textAlign="right" />
+            <View style={styles.modalFooter}>
+              <Pressable style={styles.modalCancelBtn} onPress={() => setReportOpen(false)} disabled={reportBusy}><Text style={styles.modalCancelBtnText}>إلغاء</Text></Pressable>
+              <Pressable style={[styles.modalSubmitBtn, reportBusy && styles.modalSubmitBtnDisabled]} onPress={submitReport} disabled={reportBusy}>{reportBusy ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.modalSubmitBtnText}>إرسال البلاغ</Text>}</Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Modal for Editing Question */}
       <Modal
         visible={isEditModalOpen}
@@ -1101,6 +1152,38 @@ const styles = StyleSheet.create({
     elevation: 3,
     gap: 13,
   },
+  statsCard: { backgroundColor: '#ffffff', borderRadius: 22, padding: 15, borderWidth: 1, borderColor: '#e2eee7', gap: 14, shadowColor: '#164e3b', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.035, shadowRadius: 10, elevation: 2 },
+  statsHeadingRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10 },
+  statsIconBubble: { width: 36, height: 36, borderRadius: 13, backgroundColor: '#e9f8f0', alignItems: 'center', justifyContent: 'center' },
+  statsTitle: { textAlign: 'right', color: '#15382b', fontSize: 14, fontWeight: '900' },
+  statsSubtitle: { textAlign: 'right', color: '#82928a', fontSize: 10.5, marginTop: 2 },
+  pinnedPill: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, backgroundColor: '#fff7df', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 5 },
+  pinnedPillText: { color: '#8a5a0a', fontSize: 10, fontWeight: '900' },
+  statsGrid: { flexDirection: 'row-reverse', alignItems: 'center', backgroundColor: '#f7faf8', borderRadius: 16, paddingVertical: 13, paddingHorizontal: 5 },
+  statItem: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 4 },
+  statValue: { color: '#18372c', fontSize: 17, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  statLabel: { color: '#82928a', fontSize: 10.5, fontWeight: '700' },
+  statDivider: { width: 1, height: 34, backgroundColor: '#e1eae5' },
+  questionActionRow: { flexDirection: 'row-reverse', gap: 8 },
+  questionActionBtn: { flex: 1, minHeight: 43, borderRadius: 14, borderWidth: 1, borderColor: '#b8e6d0', backgroundColor: '#f2fbf6', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 7 },
+  questionActionBtnActive: { backgroundColor: '#0f8a62', borderColor: '#0f8a62' },
+  questionActionText: { color: '#0f8a62', fontSize: 12, fontWeight: '900' },
+  questionActionTextActive: { color: '#ffffff' },
+  reportActionBtn: { minWidth: 84, minHeight: 43, borderRadius: 14, borderWidth: 1, borderColor: '#f3d9ad', backgroundColor: '#fffbeb', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 12 },
+  reportActionText: { color: '#a16207', fontSize: 12, fontWeight: '900' },
+  pinActionBtn: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 40, paddingHorizontal: 11, borderRadius: 13, borderWidth: 1, borderColor: '#f0d8a4', backgroundColor: '#fffbeb' },
+  pinActionBtnActive: { backgroundColor: '#9a6700', borderColor: '#9a6700' },
+  pinActionText: { color: '#8a5a0a', fontSize: 11, fontWeight: '900' },
+  pinActionTextActive: { color: '#ffffff' },
+  reportModalCard: { width: '100%', maxWidth: 480, alignSelf: 'center', backgroundColor: '#ffffff', borderTopLeftRadius: 26, borderTopRightRadius: 26, borderRadius: 26, padding: 20, gap: 14 },
+  reportOptions: { gap: 7 },
+  reportOption: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, borderRadius: 13, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#f8fafc', paddingHorizontal: 12, paddingVertical: 11 },
+  reportOptionSelected: { borderColor: '#16a36d', backgroundColor: '#effaf4' },
+  reportRadio: { width: 15, height: 15, borderRadius: 8, borderWidth: 1.5, borderColor: '#94a3b8' },
+  reportRadioSelected: { borderColor: '#0f8a62', backgroundColor: '#0f8a62' },
+  reportOptionText: { flex: 1, textAlign: 'right', color: '#475569', fontSize: 12, fontWeight: '700' },
+  reportOptionTextSelected: { color: '#166534', fontWeight: '900' },
+  reportDetailsInput: { minHeight: 72, maxHeight: 120, textAlignVertical: 'top', borderRadius: 14, borderWidth: 1, borderColor: '#dbe5df', backgroundColor: '#f8fafc', padding: 12, color: '#1e293b', fontSize: 13 },
   topBadgesRow: {
     flexDirection: 'row-reverse',
     flexWrap: 'wrap',
