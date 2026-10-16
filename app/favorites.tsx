@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabase';
 import { Bookmark, Heart, Trash2, Search, Store, BriefcaseBusiness, MessageCircle, Package, ChevronLeft, RefreshCw, Sparkles, CalendarDays, Inbox, LogIn } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
-type FavoriteItem = { id: string; target_type: string; target_id: string; created_at: string };
+type FavoriteItem = { id: string; target_type: string; target_id: string; created_at: string; title?: string; body?: string; city?: string; district?: string | null; resolution_status?: string };
 type Filter = 'all' | 'market' | 'service' | 'other';
 
 const typeMeta = (raw: string) => {
@@ -40,7 +40,19 @@ export default function FavoritesScreen() {
       setSignedIn(true);
       const { data, error: queryError } = await supabase.from('favorite_items').select('id,target_type,target_id,created_at').eq('user_id', auth.user.id).order('created_at', { ascending: false }).limit(300);
       if (queryError) throw queryError;
-      setItems((data || []) as FavoriteItem[]);
+      const rows = (data || []) as FavoriteItem[];
+      const questionIds = rows.filter(row => row.target_type === 'question').map(row => row.target_id);
+      const requestIds = rows.filter(row => row.target_type === 'request').map(row => row.target_id);
+      const [questionsResult, requestsResult] = await Promise.all([
+        questionIds.length ? supabase.from('questions').select('id,title,body,city,district,resolution_status').in('id', questionIds) : Promise.resolve({ data: [], error: null } as any),
+        requestIds.length ? supabase.from('requests').select('id,title,description,city,district,resolution_status').in('id', requestIds) : Promise.resolve({ data: [], error: null } as any),
+      ]);
+      if (questionsResult.error) throw questionsResult.error;
+      if (requestsResult.error) throw requestsResult.error;
+      const details = new Map<string, any>();
+      (questionsResult.data || []).forEach((post: any) => details.set('question:' + post.id, { title: post.title, body: post.body, city: post.city, district: post.district, resolution_status: post.resolution_status }));
+      (requestsResult.data || []).forEach((post: any) => details.set('request:' + post.id, { title: post.title, body: post.description, city: post.city, district: post.district, resolution_status: post.resolution_status }));
+      setItems(rows.map(row => ({ ...row, ...(details.get(row.target_type + ':' + row.target_id) || {}) })));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'تعذر تحميل العناصر المحفوظة.');
     } finally { setLoading(false); setRefreshing(false); }
@@ -100,6 +112,10 @@ export default function FavoritesScreen() {
               <View style={[styles.itemIcon,{backgroundColor:meta.tint}]}><Icon size={21} color={meta.color}/></View>
               <View style={styles.itemMain}>
                 <View style={styles.itemTitleRow}><Text style={styles.itemTitle}>{meta.label}</Text><View style={[styles.typePill,{backgroundColor:meta.tint}]}><Text style={[styles.typePillText,{color:meta.color}]}>{item.target_type}</Text></View></View>
+                {item.title ? <Text style={styles.savedPostTitle} numberOfLines={2}>{item.title}</Text> : null}
+                {item.body ? <Text style={styles.savedPostBody} numberOfLines={2}>{item.body}</Text> : null}
+                {item.city || item.district ? <Text style={styles.savedPostLocation}>{[item.district ? 'حي ' + item.district : '', item.city || ''].filter(Boolean).join(' · ')}</Text> : null}
+                {(item.target_type === 'question' || item.target_type === 'request') && <Pressable onPress={() => router.push({ pathname: item.target_type === 'request' ? '/request' : '/question', params: { id: item.target_id } })} style={styles.openPostButton}><Text style={styles.openPostText}>فتح المنشور</Text><ChevronLeft size={14} color="#6D28D9"/></Pressable>}
                 <Text style={styles.itemId}>معرّف العنصر · {shortId(item.target_id)}</Text>
                 <View style={styles.dateRow}><CalendarDays size={12} color="#94A3B8"/><Text style={styles.itemDate}>{new Date(item.created_at).toLocaleDateString('ar-SA',{year:'numeric',month:'short',day:'numeric'})}</Text></View>
               </View>
@@ -122,6 +138,6 @@ const styles = StyleSheet.create({
   statsRow:{flexDirection:'row-reverse',alignItems:'center',justifyContent:'space-between',marginTop:4},stat:{flex:1,alignItems:'center',gap:4},statValue:{fontSize:20,fontWeight:'900',color:'#fff'},statLabel:{fontSize:9.5,color:'#E9D5FF',fontWeight:'700',textAlign:'center'},statDivider:{width:1,height:30,backgroundColor:'rgba(255,255,255,0.22)'},
   searchBox:{flexDirection:'row-reverse',alignItems:'center',gap:9,backgroundColor:'#fff',borderWidth:1,borderColor:'#E2E8F0',borderRadius:15,paddingHorizontal:12},searchInput:{flex:1,paddingVertical:12,fontSize:12,color:'#0F172A',textAlign:'right'},refreshButton:{width:31,height:31,borderRadius:10,backgroundColor:'#F1F5F9',alignItems:'center',justifyContent:'center'},
   filters:{gap:8,paddingVertical:2},filterChip:{flexDirection:'row-reverse',alignItems:'center',gap:7,paddingHorizontal:11,paddingVertical:8,borderRadius:30,borderWidth:1,borderColor:'#E2E8F0',backgroundColor:'#fff'},filterChipActive:{backgroundColor:'#6D28D9',borderColor:'#6D28D9'},filterText:{fontSize:11,fontWeight:'800',color:'#64748B'},filterTextActive:{color:'#fff'},filterCount:{minWidth:20,height:20,borderRadius:10,backgroundColor:'#F1F5F9',alignItems:'center',justifyContent:'center',paddingHorizontal:4},filterCountActive:{backgroundColor:'rgba(255,255,255,0.18)'},filterCountText:{fontSize:9,fontWeight:'900',color:'#64748B'},filterCountTextActive:{color:'#fff'},
-  listWrap:{gap:9},itemCard:{flexDirection:'row-reverse',alignItems:'center',gap:10,backgroundColor:'#fff',borderWidth:1,borderColor:'#E2E8F0',borderRadius:17,padding:12},itemIcon:{width:45,height:45,borderRadius:14,alignItems:'center',justifyContent:'center'},itemMain:{flex:1,gap:5},itemTitleRow:{flexDirection:'row-reverse',alignItems:'center',flexWrap:'wrap',gap:6},itemTitle:{fontSize:12.5,fontWeight:'900',color:'#0F172A'},typePill:{paddingHorizontal:7,paddingVertical:3,borderRadius:6},typePillText:{fontSize:9,fontWeight:'900'},itemId:{fontSize:10.5,color:'#64748B',textAlign:'right'},dateRow:{flexDirection:'row-reverse',alignItems:'center',gap:5},itemDate:{fontSize:10,color:'#94A3B8'},removeButton:{width:35,height:35,borderRadius:11,backgroundColor:'#FEF2F2',alignItems:'center',justifyContent:'center'},
+  listWrap:{gap:9},itemCard:{flexDirection:'row-reverse',alignItems:'center',gap:10,backgroundColor:'#fff',borderWidth:1,borderColor:'#E2E8F0',borderRadius:17,padding:12},itemIcon:{width:45,height:45,borderRadius:14,alignItems:'center',justifyContent:'center'},itemMain:{flex:1,gap:5},itemTitleRow:{flexDirection:'row-reverse',alignItems:'center',flexWrap:'wrap',gap:6},itemTitle:{fontSize:12.5,fontWeight:'900',color:'#0F172A'},typePill:{paddingHorizontal:7,paddingVertical:3,borderRadius:6},typePillText:{fontSize:9,fontWeight:'900'},itemId:{fontSize:10.5,color:'#64748B',textAlign:'right'},savedPostTitle:{fontSize:12,fontWeight:'900',color:'#0F172A',textAlign:'right',lineHeight:18},savedPostBody:{fontSize:10.5,color:'#64748B',textAlign:'right',lineHeight:16},savedPostLocation:{fontSize:10,color:'#64748B',textAlign:'right'},openPostButton:{flexDirection:'row-reverse',alignItems:'center',gap:3,alignSelf:'flex-start',paddingHorizontal:9,paddingVertical:5,borderRadius:8,backgroundColor:'#F5F3FF'},openPostText:{fontSize:10,fontWeight:'900',color:'#6D28D9'},dateRow:{flexDirection:'row-reverse',alignItems:'center',gap:5},itemDate:{fontSize:10,color:'#94A3B8'},removeButton:{width:35,height:35,borderRadius:11,backgroundColor:'#FEF2F2',alignItems:'center',justifyContent:'center'},
   stateCard:{backgroundColor:'#fff',borderWidth:1,borderColor:'#E2E8F0',borderRadius:20,padding:22,alignItems:'center',gap:9},stateIcon:{width:52,height:52,borderRadius:17,backgroundColor:'#F5F3FF',alignItems:'center',justifyContent:'center'},stateTitle:{fontSize:14,fontWeight:'900',color:'#0F172A',textAlign:'center'},stateDesc:{fontSize:11.5,color:'#64748B',textAlign:'center',lineHeight:19},primaryButton:{flexDirection:'row-reverse',alignItems:'center',justifyContent:'center',gap:7,backgroundColor:'#6D28D9',paddingHorizontal:15,paddingVertical:11,borderRadius:12},primaryButtonText:{fontSize:11.5,fontWeight:'900',color:'#fff'},outlineButton:{flexDirection:'row-reverse',alignItems:'center',justifyContent:'center',gap:7,borderWidth:1,borderColor:'#DDD6FE',backgroundColor:'#FAF5FF',paddingHorizontal:14,paddingVertical:10,borderRadius:12},outlineText:{fontSize:11,fontWeight:'900',color:'#6D28D9'},emptyActions:{flexDirection:'row-reverse',flexWrap:'wrap',justifyContent:'center',gap:8,marginTop:4},privacyNote:{flexDirection:'row-reverse',alignItems:'center',justifyContent:'center',gap:7,paddingVertical:8},privacyText:{fontSize:10,color:'#64748B',textAlign:'center'},
 });
