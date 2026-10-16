@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StatusBar, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
-import { ChevronLeft, Flame, Plus, Sparkles, HeartHandshake, MessageCircle, Search, X } from 'lucide-react-native';
+import { ChevronLeft, Flame, Sparkles, HeartHandshake, MessageCircle, Search, X } from 'lucide-react-native';
 
 import { supabase } from '@/lib/supabase';
 import { getBrandingLogo, subscribeBrandingLogo, getCachedBrandingLogo } from '@/lib/branding';
@@ -366,25 +365,6 @@ export default function Home() {
           <View style={{ height: bottomNavInset }} />
         </View>
       </ScrollView>
-
-      <View style={styles.fabContainer}>
-        <Pressable
-          style={styles.fabBtn}
-          onPress={() => feed.currentUserId ? router.push('/ask') : requireAccount('سجّل الدخول أو أنشئ حساباً لنشر سؤالك في الحي.')}
-          accessibilityRole="button"
-          accessibilityLabel="اسأل أهل حيك"
-        >
-          <LinearGradient
-            colors={['#065f46', '#059669', '#10b981']}
-            style={styles.fabGrad}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
-            <Plus size={20} color="#fff" />
-            <Text style={styles.fabText}>اسأل أهل حيك</Text>
-          </LinearGradient>
-        </Pressable>
-      </View>
 
       <LocationSelectorModal
         visible={showLocationModal}
