@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   Alert,
   Image,
+  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -101,6 +102,7 @@ export default function TwitterInquiryCard({
   const [isPinned, setIsPinned] = useState(Boolean(data.is_pinned));
   const [isFeatured, setIsFeatured] = useState(Boolean(data.is_featured));
   const [resolutionStatus, setResolutionStatus] = useState(String(data.resolution_status || 'open'));
+  const [statusPickerOpen, setStatusPickerOpen] = useState(false);
   const statusLabels: Record<string, string> = { open: 'بانتظار المساعدة', found: 'تم العثور على الغرض', helped: 'تمت المساعدة', resolved: 'تم حل المشكلة', not_needed: 'لم أعد بحاجة للمساعدة' };
 
   // Track real view count on mount
@@ -248,10 +250,7 @@ export default function TwitterInquiryCard({
   }
 
   function openStatusOptions() {
-    Alert.alert('تحديث حالة المنشور', 'اختر الحالة الجديدة', [
-      ...Object.entries(statusLabels).map(([value, label]) => ({ text: label, onPress: () => { void updateResolutionStatus(value); } })),
-      { text: 'إلغاء', style: 'cancel' },
-    ]);
+    setStatusPickerOpen(true);
   }
 
   async function togglePinned() {
@@ -618,6 +617,23 @@ export default function TwitterInquiryCard({
           </Pressable>
         </View>
       )}
+      <Modal visible={statusPickerOpen} transparent animationType="fade" onRequestClose={() => setStatusPickerOpen(false)}>
+        <View style={{ flex: 1, justifyContent: 'center', padding: 24, backgroundColor: 'rgba(15,23,42,0.45)' }}>
+          <Pressable style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }} onPress={() => setStatusPickerOpen(false)} accessibilityLabel="إغلاق اختيار الحالة" />
+          <View style={{ backgroundColor: '#ffffff', borderRadius: 22, padding: 18, gap: 9 }}>
+            <Text style={{ color: '#0f172a', fontSize: 16, fontWeight: '900', textAlign: 'right', marginBottom: 4 }}>تحديث حالة المنشور</Text>
+            {Object.entries(statusLabels).map(([value, label]) => (
+              <Pressable key={value} onPress={() => { setStatusPickerOpen(false); void updateResolutionStatus(value); }} style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 13, paddingVertical: 12, borderRadius: 13, backgroundColor: resolutionStatus === value ? '#dcfce7' : '#f8fafc', borderWidth: 1, borderColor: resolutionStatus === value ? '#86efac' : '#e2e8f0' }}>
+                <Text style={{ color: resolutionStatus === value ? '#166534' : '#334155', fontSize: 13, fontWeight: '800', textAlign: 'right' }}>{label}</Text>
+                {resolutionStatus === value && <Check size={16} color="#166534" />}
+              </Pressable>
+            ))}
+            <Pressable onPress={() => setStatusPickerOpen(false)} style={{ alignItems: 'center', padding: 10 }}>
+              <Text style={{ color: '#64748b', fontSize: 12, fontWeight: '800' }}>إلغاء</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
