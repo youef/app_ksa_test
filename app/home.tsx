@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StatusBar, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StatusBar, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { ChevronLeft, Flame, Sparkles, HeartHandshake, MessageCircle, Search, X } from 'lucide-react-native';
+import { ChevronLeft, Flame, Sparkles, HeartHandshake, MessageCircle } from 'lucide-react-native';
 
 import { supabase } from '@/lib/supabase';
 import { getBrandingLogo, subscribeBrandingLogo, getCachedBrandingLogo } from '@/lib/branding';
@@ -10,7 +10,6 @@ import {
   getGreeting,
   isEmergencyQuestion,
   isToolQuestion,
-  normalizeSearchText,
   toFeed,
   type FeedItem,
   type HomeTab,
@@ -42,7 +41,6 @@ export default function Home() {
 
   const [logoUri, setLogoUri] = useState(getCachedBrandingLogo());
   const [activeTab, setActiveTab] = useState<HomeTab>('all');
-  const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [greeting] = useState(() => getGreeting());
@@ -103,14 +101,8 @@ export default function Home() {
   );
 
   // ---------- Filtering ----------
-  const q = normalizeSearchText(searchQuery);
-  const searching = q.length > 0;
   const { matchesLocation } = loc;
 
-  const matches = useCallback(
-    (values: unknown[]) => !q || values.some(v => normalizeSearchText(v).includes(q)),
-    [q],
-  );
   const matchesVisibleLocation = useCallback(
     (item: { city?: string | null; district?: string | null }) => feed.currentUserId
       ? matchesLocation(item)
@@ -121,13 +113,8 @@ export default function Home() {
   const { questions, requests, currentUserId } = feed;
 
   const derived = useMemo(() => {
-    const qSearch = (x: any) =>
-      matches([x.title, x.body, x.profiles?.display_name, x.profiles?.username, x.city, x.district, x.category]);
-    const rSearch = (x: any) =>
-      matches([x.title, x.description, x.profiles?.display_name, x.profiles?.username, x.city, x.district, x.category]);
-
-    const filteredQuestions = questions.filter(x => qSearch(x) && matchesVisibleLocation(x));
-    const filteredRequests = requests.filter(x => rSearch(x) && matchesVisibleLocation(x));
+    const filteredQuestions = questions.filter(matchesVisibleLocation);
+    const filteredRequests = requests.filter(matchesVisibleLocation);
     const myQuestions = questions.filter(x => x.author_id === currentUserId);
     const myRequests = requests.filter(x => x.requester_id === currentUserId);
 
@@ -135,12 +122,12 @@ export default function Home() {
       filteredQuestions,
       filteredRequests,
       myCount: myQuestions.length + myRequests.length,
-      filteredMyQuestions: myQuestions.filter(qSearch),
-      filteredMyRequests: myRequests.filter(rSearch),
+      filteredMyQuestions: myQuestions,
+      filteredMyRequests: myRequests,
       emergency: filteredQuestions.filter(isEmergencyQuestion),
       tools: filteredQuestions.filter(isToolQuestion),
     };
-  }, [questions, requests, currentUserId, matches, matchesVisibleLocation]);
+  }, [questions, requests, currentUserId, matchesVisibleLocation]);
 
   const items: FeedItem[] = useMemo(() => {
     switch (activeTab) {
@@ -253,29 +240,6 @@ export default function Home() {
 
         {flags.stories !== false && <StoriesRow profile={feed.profile} stories={feed.stories} selectedDistrict={loc.district} />}
 
-        <View style={styles.homeSearchWrap}>
-          <View style={styles.homeSearchBox}>
-            <Search size={19} color={searchQuery ? '#047857' : '#94a3b8'} />
-            <TextInput
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder="ابحث في أخبار وطلبات حيك..."
-              placeholderTextColor="#94a3b8"
-              style={styles.homeSearchInput}
-              textAlign="right"
-              returnKeyType="search"
-              accessibilityLabel="البحث في محتوى الحي"
-              clearButtonMode="while-editing"
-            />
-            {searchQuery.length > 0 && (
-              <Pressable onPress={() => setSearchQuery('')} hitSlop={10} accessibilityRole="button" accessibilityLabel="مسح البحث">
-                <X size={17} color="#64748b" />
-              </Pressable>
-            )}
-          </View>
-          <Text style={styles.homeSearchHint}>اكتشف ما يهمّ جيرانك في مكان واحد</Text>
-        </View>
-
         {emergencyTop && (
           <View style={styles.emergencyHomeCard}>
             <View style={styles.emergencyHomeHeader}>
@@ -318,7 +282,7 @@ export default function Home() {
           {feed.loading ? (
             <FeedSkeleton />
           ) : items.length === 0 ? (
-            <EmptyState tab={activeTab} searching={searching} city={loc.city} hasExactLocation={loc.hasExactLocation} />
+            <EmptyState tab={activeTab} searching={false} city={loc.city} hasExactLocation={loc.hasExactLocation} />
           ) : (
             items.map(item => (
               <TwitterInquiryCard
