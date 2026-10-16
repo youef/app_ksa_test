@@ -30,7 +30,6 @@ import {
 } from 'lucide-react-native';
 
 import { supabase } from '@/lib/supabase';
-import { useBottomNavInset } from '@/lib/bottomNav';
 import { AppHeader } from '@/components/shared/AppHeader';
 import LocationSelectorModal from '@/components/LocationSelectorModal';
 import {
@@ -47,7 +46,6 @@ import { relativeTime } from '@/lib/mapPins';
 type QuestionFilter = 'all' | 'solved' | 'hot' | 'district';
 
 export default function Questions() {
-  const bottomNavInset = useBottomNavInset();
   const [items, setItems] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -218,7 +216,7 @@ export default function Questions() {
         }
       />
       <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingBottom: bottomNavInset + 24 }]}
+        contentContainerStyle={[styles.scroll, { paddingBottom: 24 }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
