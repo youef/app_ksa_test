@@ -136,11 +136,16 @@ export default function TwitterInquiryCard({
       if (!currentUserId) { setBookmarked(false); return; }
       try {
         const targetType = type === 'request' ? 'request' : 'question';
-        const [{ data: saved }, { count }] = await Promise.all([
+        const [{ data: saved }, stats] = await Promise.all([
           supabase.from('favorite_items').select('id').eq('user_id', currentUserId).eq('target_type', targetType).eq('target_id', data.id).maybeSingle(),
-          supabase.from('favorite_items').select('id', { count: 'exact', head: true }).eq('target_type', targetType).eq('target_id', data.id),
+          isOwner
+            ? supabase.rpc('get_owned_post_save_count', { p_target_type: targetType, p_target_id: data.id })
+            : Promise.resolve({ data: null, error: null } as any),
         ]);
-        if (active) { setBookmarked(Boolean(saved)); if (isOwner) setSavesCount(count || 0); }
+        if (active) {
+          setBookmarked(Boolean(saved));
+          if (isOwner && !stats.error && typeof stats.data === 'number') setSavesCount(stats.data);
+        }
       } catch { /* Keep the card usable if metadata is unavailable. */ }
     }
     void loadPostMetadata();
