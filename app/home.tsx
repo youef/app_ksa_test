@@ -24,7 +24,6 @@ import AppHeader from '@/components/shared/AppHeader';
 import AtmosphereBar from '@/components/home/AtmosphereBar';
 import StoriesRow from '@/components/home/StoriesRow';
 import { usePlatformConfig } from '@/lib/platformConfig';
-import FeedTabs from '@/components/home/FeedTabs';
 import EmptyState from '@/components/home/EmptyState';
 import { FeedSkeleton, ErrorBanner } from '@/components/home/HomeStates';
 import { LocationGateModal, WeeklyLocationPrompt } from '@/components/home/LocationModals';
@@ -333,18 +332,7 @@ export default function Home() {
               {(appliedFilters.kind !== 'الكل' || appliedFilters.status !== 'الكل' || appliedFilters.period !== 'كل الأوقات') && <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#dc2626' }} />}
             </Pressable>
           </View>
-          <FeedTabs
-            activeTab={activeTab}
-            onChange={setActiveTab}
-            isGuest={!feed.currentUserId}
-            counts={{
-              mine: derived.myCount,
-              emergency: derived.emergency.length,
-              tools: derived.tools.length,
-              questions: derived.filteredQuestions.length,
-              requests: derived.filteredRequests.length,
-            }}
-          />
+
 
           {feed.error && <ErrorBanner message={feed.error} onRetry={feed.reload} />}
 
