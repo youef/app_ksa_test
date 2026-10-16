@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Keyboard, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Home, Compass, Plus, MessageCircle, MoreHorizontal } from 'lucide-react-native';
@@ -41,6 +41,7 @@ export default function BottomNav() {
   const insets = useSafeAreaInsets();
   const [hasSession, setHasSession] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
 
   const refreshUnread = useCallback(async () => {
     try {
@@ -75,8 +76,37 @@ export default function BottomNav() {
     return () => listener.subscription.unsubscribe();
   }, [refreshUnread]);
 
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      const viewport = typeof window !== 'undefined' ? window.visualViewport : null;
+      const syncViewport = () => {
+        if (!viewport || typeof window === 'undefined') return;
+        setKeyboardVisible(window.innerHeight - viewport.height - viewport.offsetTop > 120);
+      };
+      const onComposerFocus = (event: Event) => {
+        const focused = Boolean((event as CustomEvent<{ focused?: boolean }>).detail?.focused);
+        setKeyboardVisible(focused);
+      };
+      viewport?.addEventListener('resize', syncViewport);
+      viewport?.addEventListener('scroll', syncViewport);
+      window.addEventListener('hayna:composer-focus', onComposerFocus);
+      return () => {
+        viewport?.removeEventListener('resize', syncViewport);
+        viewport?.removeEventListener('scroll', syncViewport);
+        window.removeEventListener('hayna:composer-focus', onComposerFocus);
+      };
+    }
+
+    const showSub = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
   const path = normalize(pathname);
-  if (path === '/' || path === '/index' || path === '/auth' || path.startsWith('/auth/') ||
+  if (keyboardVisible || path === '/' || path === '/index' || path === '/auth' || path.startsWith('/auth/') ||
       path === '/conversation' || path.startsWith('/conversation/')) return null;
 
   const bottomPadding = Math.max(insets.bottom, Platform.OS === 'ios' ? 8 : 7);
