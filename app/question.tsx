@@ -16,6 +16,7 @@ import {
   Modal,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import { AppHeader } from '@/components/shared/AppHeader';
 import { getActiveLocation } from '@/lib/locationSync';
@@ -60,6 +61,7 @@ const QUICK_QUESTION_RESPONSES = [
 ];
 
 export default function Question() {
+  const insets = useSafeAreaInsets();
   const [composerFocused, setComposerFocused] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -908,14 +910,14 @@ export default function Question() {
       {/* Bottom Input Area */}
       {!currentUserId ? (
         <Pressable
-          style={[styles.guestPrompt, { paddingBottom: Platform.OS === 'ios' ? 12 : 8 }]}
+          style={[styles.guestPrompt, { paddingBottom: Math.max(insets.bottom, Platform.OS === 'ios' ? 12 : 8) }]}
           onPress={() => requireAccount('سجّل الدخول أو أنشئ حساباً للرد والتصويت في نقاشات الحي.')}
         >
           <Text style={styles.guestPromptText}>سجّل الدخول للمشاركة في النقاش</Text>
           <MessageCircle size={18} color="#047857" />
         </Pressable>
       ) : (
-        <View style={[styles.inputWrapper, { paddingBottom: Platform.OS === 'ios' ? 12 : 8 }]}>
+        <View style={[styles.inputWrapper, { paddingBottom: Math.max(insets.bottom, Platform.OS === 'ios' ? 12 : 8) }]}>
           {replyTo && (
             <View style={styles.replyingBar}>
               <Reply size={14} color="#059669" />
@@ -1777,6 +1779,7 @@ const styles = StyleSheet.create({
   },
   authorActionsRow: {
     flexDirection: 'row-reverse',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: 10,
   },
