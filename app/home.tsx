@@ -300,17 +300,6 @@ export default function Home() {
         )}
 
         <View style={styles.feedSection}>
-          <View style={styles.feedIntro}>
-            <View style={styles.feedIntroCopy}>
-              <Text style={styles.feedIntroEyebrow}>مجتمع حيّك</Text>
-              <Text style={styles.feedIntroTitle}>آخر أخبار الحي</Text>
-              <Text style={styles.feedIntroSubtitle}>{loc.city && loc.city !== 'كل المدن' ? `محتوى قريب من ${loc.city}` : 'اختر مدينتك لتشاهد محتوى منطقتك'}</Text>
-            </View>
-            <View style={styles.feedIntroBadge}>
-              <MessageCircle size={18} color="#047857" />
-              <Text style={styles.feedIntroCount}>{derived.filteredQuestions.length + derived.filteredRequests.length}</Text>
-            </View>
-          </View>
           <FeedTabs
             activeTab={activeTab}
             onChange={setActiveTab}
