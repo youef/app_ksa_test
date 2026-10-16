@@ -2,65 +2,47 @@ import { useCallback, useEffect, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Home, MessageCircle, ShoppingBag, Search, LayoutGrid } from 'lucide-react-native';
+import { Home, Compass, Plus, Bell, UserRound } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
 import { supabase } from '@/lib/supabase';
 import { BOTTOM_NAV_HEIGHT } from '@/lib/bottomNav';
-import { usePlatformConfig } from '@/lib/platformConfig';
 
 export { BOTTOM_NAV_HEIGHT };
 
 const TABS = [
-  { key: '/home', icon: Home, label: 'الرئيسية' },
-  { key: '/market', icon: ShoppingBag, label: 'السوق' },
-  { key: '/search', icon: Search, label: 'البحث' },
-  { key: '/messages', icon: MessageCircle, label: 'الرسائل' },
-  { key: '/more', icon: LayoutGrid, label: 'المزيد' },
+  { key: '/home', label: 'الرئيسية', icon: Home, kind: 'tab' },
+  { key: '/search', label: 'استكشف', icon: Compass, kind: 'tab' },
+  { key: '/ask', label: 'إضافة', icon: Plus, kind: 'create' },
+  { key: '/notifications', label: 'الإشعارات', icon: Bell, kind: 'tab' },
+  { key: '/profile', label: 'حسابي', icon: UserRound, kind: 'tab' },
+] as const;
+
+const ROUTE_PARENT: Array<[string, string]> = [
+  ['/question', '/home'], ['/questions', '/home'], ['/create-story', '/home'],
+  ['/story', '/home'], ['/user', '/profile'], ['/settings', '/profile'],
+  ['/account-type', '/profile'], ['/market', '/search'], ['/service', '/search'],
+  ['/new-service', '/search'], ['/directory', '/search'], ['/business', '/search'],
+  ['/requests', '/home'], ['/conversation', '/notifications'],
 ];
 
-const NESTED_ROUTES: Array<[string, string]> = [
-  ['/question', '/home'],
-  ['/questions', '/home'],
-  ['/ask', '/home'],
-  ['/create-story', '/home'],
-  ['/notifications', '/home'],
-  ['/user', '/home'],
-  ['/requests', '/home'],
-  ['/service', '/market'],
-  ['/new-service', '/market'],
-  ['/directory', '/market'],
-  ['/business', '/market'],
-  ['/conversation', '/messages'],
-  ['/settings', '/more'],
-  ['/locations', '/more'],
-  ['/map', '/more'],
-  ['/admin', '/more'],
-];
-
-// Full-screen routes: the chat owns the whole viewport, the tab bar must not show.
-const FULLSCREEN_ROUTES = ['/conversation'];
-
-function normalize(pathname: string) {
-  if (!pathname) return '/';
-  const trimmed = pathname.replace(/\/+$/, '');
-  return trimmed || '/';
+function normalize(path: string) {
+  const clean = (path || '/').replace(/\/+$/, '');
+  return clean || '/';
 }
 
-function isTabActive(pathname: string, key: string) {
+function activeFor(pathname: string, key: string) {
   const path = normalize(pathname);
   if (path === key || path.startsWith(`${key}/`)) return true;
-  return NESTED_ROUTES.some(
-    ([prefix, parent]) => parent === key && (path === prefix || path.startsWith(`${prefix}/`)),
+  return ROUTE_PARENT.some(([prefix, parent]) =>
+    parent === key && (path === prefix || path.startsWith(`${prefix}/`)),
   );
 }
 
 export default function BottomNav() {
   const pathname = usePathname();
-  const { flags, branding } = usePlatformConfig();
   const insets = useSafeAreaInsets();
-  const [unreadMsgs, setUnreadMsgs] = useState(0);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [hasSession, setHasSession] = useState(false);
+  const [unreadMsgs, setUnreadMsgs] = useState(0);
 
   const loadBadges = useCallback(async () => {
     try {
@@ -77,12 +59,12 @@ export default function BottomNav() {
         .select('conversation_id')
         .eq('user_id', user.id);
 
-      if (!myConvs || myConvs.length === 0) {
+      if (!myConvs?.length) {
         setUnreadMsgs(0);
         return;
       }
 
-      const convIds = myConvs.map((c: any) => c.conversation_id);
+      const convIds = myConvs.map((c: { conversation_id: string }) => c.conversation_id);
       const { data: lastMsgs } = await supabase
         .from('messages')
         .select('conversation_id, sender_id, read_by, created_at')
@@ -103,113 +85,75 @@ export default function BottomNav() {
     }
   }, []);
 
-  const checkAdmin = useCallback(async () => {
-    try {
-      const { data: auth } = await supabase.auth.getSession();
-      const user = auth.session?.user;
-      if (!user) {
-        setIsAdmin(false);
-        return;
-      }
-      if ((user.email || '').toLowerCase().trim() === 'root@gmail.com') {
-        setIsAdmin(true);
-        return;
-      }
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .maybeSingle();
-      setIsAdmin(profile?.role === 'admin');
-    } catch {
-      setIsAdmin(false);
-    }
-  }, []);
-
   useEffect(() => {
     void loadBadges();
-    void checkAdmin();
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
       setHasSession(Boolean(session?.user));
-      if (session?.user) {
-        setTimeout(() => {
-          void loadBadges();
-          void checkAdmin();
-        }, 0);
-      } else {
-        setUnreadMsgs(0);
-        setIsAdmin(false);
-      }
+      if (session?.user) setTimeout(() => void loadBadges(), 0);
+      else setUnreadMsgs(0);
     });
-    const interval = setInterval(() => {
-      void loadBadges();
-      void checkAdmin();
-    }, 30000);
+    const interval = setInterval(() => void loadBadges(), 30000);
     return () => {
       clearInterval(interval);
       authListener.subscription.unsubscribe();
     };
-  }, [loadBadges, checkAdmin]);
+  }, [loadBadges]);
 
-  const normalizedPath = normalize(pathname);
-  if (normalizedPath === '/' || normalizedPath === '/index' || normalizedPath === '/auth') {
-    return null;
-  }
-  if (
-    FULLSCREEN_ROUTES.some(
-      (route) => normalizedPath === route || normalizedPath.startsWith(`${route}/`),
-    )
-  ) {
-    return null;
-  }
+  const path = normalize(pathname);
+  if (path === '/' || path === '/index' || path === '/auth') return null;
+  // Keep immersive conversation/live experiences unobstructed.
+  if (path === '/conversation' || path.startsWith('/conversation/') || path === '/live' || path.startsWith('/live/')) return null;
 
-  const handleTabPress = (key: string) => {
-    if (normalize(pathname) === key) return;
-    router.navigate(key as never);
-  };
-
-  const contentStyle = [
-    styles.content,
-    { paddingBottom: Math.max(insets.bottom, Platform.OS === 'ios' ? 10 : 8) },
-  ];
+  const bottomPadding = Math.max(insets.bottom, Platform.OS === 'ios' ? 8 : 7);
 
   return (
-    <View style={styles.container} pointerEvents="box-none">
-      <BlurView
-        intensity={Platform.OS === 'ios' ? 85 : 100}
-        tint="light"
-        style={styles.surface}
-      >
-        <View style={contentStyle}>
-          {TABS.filter(tab => (hasSession || tab.key !== '/messages') && (tab.key !== '/market' || flags.market !== false) && (tab.key !== '/search' || flags.search !== false)).map(tab => {
-            const isActive = isTabActive(pathname, tab.key);
+    <View pointerEvents="box-none" style={[styles.dock, { paddingBottom: bottomPadding }]}>
+      <BlurView intensity={Platform.OS === 'ios' ? 82 : 96} tint="light" style={styles.glass}>
+        <View style={styles.row}>
+          {TABS.map((tab) => {
+            const isCreate = tab.kind === 'create';
+            const isActive = !isCreate && activeFor(path, tab.key);
             const Icon = tab.icon;
-            const badge = tab.key === '/messages' ? unreadMsgs : 0;
-
+            const badge = tab.key === '/notifications' ? unreadMsgs : 0;
             return (
               <Pressable
                 key={tab.key}
-                onPress={() => handleTabPress(tab.key)}
-                style={styles.tab}
-                hitSlop={6}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: isActive }}
+                accessibilityRole="button"
                 accessibilityLabel={tab.label}
+                accessibilityState={{ selected: isActive }}
+                onPress={() => {
+                  if (isCreate && !hasSession) {
+                    router.navigate('/auth' as never);
+                    return;
+                  }
+                  if (path !== tab.key) router.navigate(tab.key as never);
+                }}
+                style={({ pressed }) => [
+                  styles.tab,
+                  isCreate && styles.createTab,
+                  pressed && styles.pressed,
+                ]}
+                hitSlop={4}
               >
-                <View style={[styles.iconWrap, isActive && styles.iconWrapActive]}>
-                  <Icon
-                    size={22}
-                    color={isActive ? '#059669' : '#94a3b8'}
-                    strokeWidth={isActive ? 2.5 : 2}
-                  />
-                  {badge > 0 && (
-                    <View style={styles.badge}>
-                      <Text style={styles.badgeText}>{badge > 9 ? '9+' : badge}</Text>
+                {isCreate ? (
+                  <View style={styles.createButton}>
+                    <View style={styles.createInner}>
+                      <Icon size={27} color="#ffffff" strokeWidth={2.7} />
                     </View>
-                  )}
-                </View>
-                <Text style={[styles.label, isActive && styles.labelActive]} numberOfLines={1}>
-                  {branding.headers?.[tab.key === '/home' ? 'home' : tab.key.slice(1)] || tab.label}
+                  </View>
+                ) : (
+                  <View style={[styles.iconHalo, isActive && styles.iconHaloActive]}>
+                    <Icon size={22} color={isActive ? '#087f5b' : '#7b8794'} strokeWidth={isActive ? 2.5 : 2} />
+                    {badge > 0 && (
+                      <View style={styles.badge}>
+                        <Text style={styles.badgeText}>{badge > 9 ? '9+' : badge}</Text>
+                      </View>
+                    )}
+                    {isActive && <View style={styles.activeDot} />}
+                  </View>
+                )}
+                <Text numberOfLines={1} style={[styles.label, isActive && styles.labelActive, isCreate && styles.createLabel]}>
+                  {tab.label}
                 </Text>
               </Pressable>
             );
@@ -221,64 +165,103 @@ export default function BottomNav() {
 }
 
 const styles = StyleSheet.create({
-  container: {
+  dock: {
     width: '100%',
+    paddingHorizontal: 12,
+    paddingTop: 5,
+    backgroundColor: 'transparent',
   },
-  surface: {
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(226, 232, 240, 0.85)',
-    backgroundColor: 'rgba(255, 255, 255, 0.94)',
+  glass: {
+    overflow: 'visible',
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.95)',
+    backgroundColor: 'rgba(255,255,255,0.90)',
+    shadowColor: '#123c32',
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.09,
+    shadowRadius: 18,
+    elevation: 14,
   },
-  content: {
+  row: {
+    minHeight: 68,
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    paddingTop: 8,
-    paddingHorizontal: 8,
-    minHeight: BOTTOM_NAV_HEIGHT,
+    justifyContent: 'space-around',
+    paddingHorizontal: 5,
+    paddingTop: 5,
+    paddingBottom: 3,
   },
   tab: {
     flex: 1,
+    minWidth: 0,
+    minHeight: 58,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 2,
+    gap: 3,
+    borderRadius: 18,
+    paddingHorizontal: 1,
     paddingVertical: 2,
   },
-  iconWrap: {
-    width: 52,
-    height: 30,
-    borderRadius: 15,
+  createTab: { marginTop: -18 },
+  pressed: { opacity: 0.76, transform: [{ scale: 0.97 }] },
+  iconHalo: {
+    width: 42,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
   },
-  iconWrapActive: {
-    backgroundColor: 'rgba(5, 150, 105, 0.12)',
+  iconHaloActive: { backgroundColor: 'rgba(8,127,91,0.11)' },
+  activeDot: {
+    position: 'absolute',
+    bottom: -5,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#087f5b',
   },
+  createButton: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    padding: 4,
+    backgroundColor: '#e2f4eb',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#087f5b',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.23,
+    shadowRadius: 9,
+    elevation: 8,
+  },
+  createInner: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#087f5b',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.4)',
+  },
+  label: { fontSize: 10.5, lineHeight: 15, fontWeight: '700', color: '#84909c', textAlign: 'center' },
+  labelActive: { color: '#087f5b', fontWeight: '900' },
+  createLabel: { color: '#087f5b', fontWeight: '900', marginTop: -1 },
   badge: {
     position: 'absolute',
-    top: -2,
-    right: 6,
-    minWidth: 18,
-    height: 18,
+    top: -3,
+    right: 1,
+    minWidth: 17,
+    height: 17,
     borderRadius: 9,
-    backgroundColor: '#ef4444',
+    backgroundColor: '#e5484d',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 4,
+    paddingHorizontal: 3,
     borderWidth: 1.5,
     borderColor: '#fff',
   },
-  badgeText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '900',
-  },
-  label: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#94a3b8',
-  },
-  labelActive: {
-    color: '#059669',
-    fontWeight: '900',
-  },
+  badgeText: { color: '#fff', fontSize: 9, fontWeight: '900' },
 });
