@@ -267,6 +267,29 @@ export default function Home() {
 
         {flags.stories !== false && <StoriesRow profile={feed.profile} stories={feed.stories} selectedDistrict={loc.district} />}
 
+        <View style={styles.homeSearchWrap}>
+          <View style={styles.homeSearchBox}>
+            <Search size={19} color={searchQuery ? '#047857' : '#94a3b8'} />
+            <TextInput
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="ابحث في أخبار وطلبات حيك..."
+              placeholderTextColor="#94a3b8"
+              style={styles.homeSearchInput}
+              textAlign="right"
+              returnKeyType="search"
+              accessibilityLabel="البحث في محتوى الحي"
+              clearButtonMode="while-editing"
+            />
+            {searchQuery.length > 0 && (
+              <Pressable onPress={() => setSearchQuery('')} hitSlop={10} accessibilityRole="button" accessibilityLabel="مسح البحث">
+                <X size={17} color="#64748b" />
+              </Pressable>
+            )}
+          </View>
+          <Text style={styles.homeSearchHint}>اكتشف ما يهمّ جيرانك في مكان واحد</Text>
+        </View>
+
         {emergencyTop && (
           <View style={styles.emergencyHomeCard}>
             <View style={styles.emergencyHomeHeader}>
@@ -316,42 +339,6 @@ export default function Home() {
           />
 
           {feed.error && <ErrorBanner message={feed.error} onRetry={feed.reload} />}
-
-          {activeTab === 'requests' && !feed.loading && (
-            <Pressable
-              style={styles.feedCategoryHeaderBtn}
-              onPress={() => router.push('/requests')}
-              accessibilityRole="button"
-              accessibilityLabel="الانتقال إلى صفحة الطلبات كاملة"
-            >
-              <View style={styles.feedCategoryHeaderRight}>
-                <HeartHandshake size={18} color="#d97706" />
-                <Text style={styles.feedCategoryHeaderTitle}>قسم طلبات وفزعات الجيران</Text>
-              </View>
-              <View style={styles.feedCategoryHeaderLeft}>
-                <Text style={styles.feedCategoryHeaderLink}>عرض الكل في صفحة مخصصة</Text>
-                <ChevronLeft size={16} color="#059669" />
-              </View>
-            </Pressable>
-          )}
-
-          {activeTab === 'questions' && !feed.loading && (
-            <Pressable
-              style={styles.feedCategoryHeaderBtn}
-              onPress={() => router.push('/questions')}
-              accessibilityRole="button"
-              accessibilityLabel="الانتقال إلى صفحة الأسئلة كاملة"
-            >
-              <View style={styles.feedCategoryHeaderRight}>
-                <MessageCircle size={18} color="#059669" />
-                <Text style={styles.feedCategoryHeaderTitle}>مجتمع أسئلة واستفسارات الحي</Text>
-              </View>
-              <View style={styles.feedCategoryHeaderLeft}>
-                <Text style={styles.feedCategoryHeaderLink}>عرض الكل في صفحة مخصصة</Text>
-                <ChevronLeft size={16} color="#059669" />
-              </View>
-            </Pressable>
-          )}
 
           {feed.loading ? (
             <FeedSkeleton />
