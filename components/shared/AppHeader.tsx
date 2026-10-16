@@ -6,6 +6,7 @@ import { BlurView } from 'expo-blur';
 import {
   ChevronRight,
   Bell,
+  Bookmark,
   MapPin,
   ChevronDown,
   ShieldCheck,
@@ -134,20 +135,31 @@ export function AppHeader({
           {/* Left side in RTL: Notifications & Brand Logo */}
           <View style={styles.sideGroup}>
             {!isGuest && (
-              <Pressable
-                onPress={() => router.push('/notifications')}
-                style={styles.iconCircle}
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityLabel="الإشعارات"
-              >
-                <Bell size={18} color="#334155" />
-                {unreadCount > 0 && (
-                  <View style={styles.badge}>
-                    <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
-                  </View>
-                )}
-              </Pressable>
+              <>
+                <Pressable
+                  onPress={() => router.push('/notifications')}
+                  style={styles.iconCircle}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="الإشعارات"
+                >
+                  <Bell size={18} color="#334155" />
+                  {unreadCount > 0 && (
+                    <View style={styles.badge}>
+                      <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+                    </View>
+                  )}
+                </Pressable>
+                <Pressable
+                  onPress={() => router.push('/favorites')}
+                  style={styles.iconCircle}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="المفضلة"
+                >
+                  <Bookmark size={17} color="#334155" />
+                </Pressable>
+              </>
             )}
             <Pressable
               onPress={() => router.push('/home')}
