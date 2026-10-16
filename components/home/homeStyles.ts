@@ -774,6 +774,82 @@ export const styles = StyleSheet.create({
   fTabTextActive: {
     color: '#fff',
   },
+  // Modern horizontally scrollable feed filter chips
+  filterWrap: {
+    marginBottom: 10,
+  },
+  filterChips: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 3,
+    paddingHorizontal: 1,
+  },
+  filterChip: {
+    minHeight: 40,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 13,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.88)',
+    borderWidth: 1,
+    borderColor: '#dbe5df',
+  },
+  filterChipActive: {
+    backgroundColor: '#047857',
+    borderColor: '#047857',
+    shadowColor: '#065f46',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 5,
+    elevation: 2,
+  },
+  filterChipActiveRed: {
+    backgroundColor: '#dc2626',
+    borderColor: '#dc2626',
+  },
+  filterChipActiveGreen: {
+    backgroundColor: '#15803d',
+    borderColor: '#15803d',
+  },
+  filterChipActivePurple: {
+    backgroundColor: '#6d28d9',
+    borderColor: '#6d28d9',
+  },
+  filterChipText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  filterChipTextActive: {
+    color: '#fff',
+    fontWeight: '800',
+  },
+  filterCount: {
+    minWidth: 19,
+    height: 19,
+    borderRadius: 10,
+    paddingHorizontal: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#edf2ef',
+  },
+  filterCountActive: {
+    backgroundColor: 'rgba(255,255,255,0.22)',
+  },
+  filterCountText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#64748b',
+    fontVariant: ['tabular-nums'],
+  },
+  filterCountTextActive: {
+    color: '#fff',
+  },
+
   // Empty state & FAB
   emptyContainer: {
     alignItems: 'center',
