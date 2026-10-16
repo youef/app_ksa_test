@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Alert,
   Pressable,
@@ -27,11 +27,30 @@ export default function Report() {
   const [selectedReason, setSelectedReason] = useState('محتوى غير لائق أو مخالف');
   const [reasonDetails, setReasonDetails] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [myReports, setMyReports] = useState<any[]>([]);
+  const reportStatusLabels: Record<string, string> = { pending: 'قيد المراجعة', reviewing: 'جارٍ الفحص', resolved: 'تمت المعالجة', dismissed: 'لم تثبت المخالفة', rejected: 'مرفوض' };
+
+  useEffect(() => {
+    let active = true;
+    async function loadMyReports() {
+      const { data: authData } = await supabase.auth.getUser();
+      if (!authData.user) return;
+      const { data, error } = await supabase.from('reports')
+        .select('id,target_type,target_id,reason,status,created_at')
+        .eq('reporter_id', authData.user.id)
+        .order('created_at', { ascending: false })
+        .limit(6);
+      if (!error && active) setMyReports(data || []);
+    }
+    void loadMyReports();
+    return () => { active = false; };
+  }, []);
 
   const reasons = [
     'محتوى غير لائق أو مخالف',
     'احتيال أو نشاط مشبوه',
     'معلومات مضللة أو خاطئة',
+    'إعلان مكرر أو ترويجي',
     'إساءة أو مضايقة',
     'انتحال شخصية أو حساب مزيف',
     'أخرى',
@@ -123,6 +142,23 @@ export default function Report() {
           </Pressable>
         </View>
 
+        {myReports.length > 0 && (
+          <View style={[styles.card, { marginTop: 16 }]}>
+            <Text style={styles.sectionTitle}>متابعة بلاغاتي</Text>
+            <Text style={{ color: '#64748b', fontSize: 12, textAlign: 'right', marginBottom: 12 }}>حالة آخر البلاغات التي أرسلتها، ولا تظهر هذه القائمة للآخرين.</Text>
+            {myReports.map(report => (
+              <View key={report.id} style={{ paddingVertical: 11, borderTopWidth: 1, borderTopColor: '#e2e8f0', gap: 5 }}>
+                <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                  <Text style={{ color: '#334155', fontSize: 12, fontWeight: '800', flex: 1, textAlign: 'right' }} numberOfLines={2}>{String(report.reason || '').split(' - تفاصيل:')[0]}</Text>
+                  <View style={{ backgroundColor: report.status === 'resolved' ? '#dcfce7' : report.status === 'dismissed' || report.status === 'rejected' ? '#fee2e2' : '#fef3c7', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5 }}>
+                    <Text style={{ color: '#334155', fontSize: 10, fontWeight: '900' }}>{reportStatusLabels[report.status] || report.status || 'قيد المراجعة'}</Text>
+                  </View>
+                </View>
+                <Text style={{ color: '#94a3b8', fontSize: 10, textAlign: 'right' }}>{new Date(report.created_at).toLocaleDateString('ar-SA')}</Text>
+              </View>
+            ))}
+          </View>
+        )}
         <View style={{ height: 40 }} />
       </ScrollView>
     </View>
