@@ -76,7 +76,6 @@ export default function Question() {
   const [sharingWith, setSharingWith] = useState<string | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
   const [favoriteBusy, setFavoriteBusy] = useState(false);
-  const [savedCount, setSavedCount] = useState(0);
   const [reportOpen, setReportOpen] = useState(false);
   const [reportReason, setReportReason] = useState('محتوى غير مناسب');
   const [reportDetails, setReportDetails] = useState('');
@@ -138,8 +137,6 @@ export default function Question() {
 
     setQ(question);
     if (id) {
-      const { count } = await supabase.from('favorite_items').select('id', { count: 'exact', head: true }).eq('target_type', 'question').eq('target_id', id);
-      setSavedCount(count || 0);
       if (user) {
         const { data: favoriteRow } = await supabase.from('favorite_items').select('id').eq('user_id', user.id).eq('target_type', 'question').eq('target_id', id).maybeSingle();
         setIsFavorite(Boolean(favoriteRow));
@@ -404,12 +401,10 @@ export default function Question() {
         const { error } = await supabase.from('favorite_items').delete().eq('user_id', currentUserId).eq('target_type', 'question').eq('target_id', id);
         if (error) throw error;
         setIsFavorite(false);
-        setSavedCount(value => Math.max(0, value - 1));
       } else {
         const { error } = await supabase.from('favorite_items').insert({ user_id: currentUserId, target_type: 'question', target_id: id });
         if (error) throw error;
         setIsFavorite(true);
-        setSavedCount(value => value + 1);
       }
     } catch {
       Alert.alert('تعذر الحفظ', 'لم نتمكن من تحديث قائمة المحفوظات. تحقق من اتصالك وحاول مجدداً.');
@@ -692,7 +687,7 @@ export default function Question() {
             <View style={styles.statDivider} />
             <View style={styles.statItem}><MessageCircle size={17} color="#0f8a62" /><Text style={styles.statValue}>{answers.length.toLocaleString('ar-SA')}</Text><Text style={styles.statLabel}>ردود الجيران</Text></View>
             <View style={styles.statDivider} />
-            <View style={styles.statItem}><Bookmark size={17} color="#7c3aed" /><Text style={styles.statValue}>{savedCount.toLocaleString('ar-SA')}</Text><Text style={styles.statLabel}>حفظ</Text></View>
+            <View style={styles.statItem}><Bookmark size={17} color="#7c3aed" /><Text style={styles.statValue}>{isFavorite ? 'نعم' : '—'}</Text><Text style={styles.statLabel}>حفظك</Text></View>
           </View>
           <View style={styles.questionActionRow}>
             <Pressable onPress={toggleFavorite} disabled={favoriteBusy} style={[styles.questionActionBtn, isFavorite && styles.questionActionBtnActive]}>
