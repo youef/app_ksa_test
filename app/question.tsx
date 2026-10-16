@@ -17,7 +17,6 @@ import {
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
-import { useBottomNavInset } from '@/lib/bottomNav';
 import { AppHeader } from '@/components/shared/AppHeader';
 import { getActiveLocation } from '@/lib/locationSync';
 import {
@@ -61,7 +60,6 @@ const QUICK_QUESTION_RESPONSES = [
 ];
 
 export default function Question() {
-  const bottomNavInset = useBottomNavInset();
   const [composerFocused, setComposerFocused] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -195,8 +193,6 @@ export default function Question() {
       window.dispatchEvent(new CustomEvent('hayna:composer-focus', { detail: { focused } }));
     }
   };
-
-  const composerNeedsNavClearance = !composerFocused && !keyboardVisible;
 
   async function answer() {
     if (!body.trim()) return;
