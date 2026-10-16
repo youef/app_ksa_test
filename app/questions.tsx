@@ -119,6 +119,13 @@ export default function Questions() {
         });
       }
 
+      fetchedQuestions.sort((a: any, b: any) => {
+        const pinPriority = Number(Boolean(b.is_pinned)) - Number(Boolean(a.is_pinned));
+        if (pinPriority !== 0) return pinPriority;
+        const featuredPriority = Number(Boolean(b.is_featured)) - Number(Boolean(a.is_featured));
+        if (featuredPriority !== 0) return featuredPriority;
+        return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+      });
       setItems(fetchedQuestions);
     } catch (e: any) {
       console.warn('Load questions error', e);
