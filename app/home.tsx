@@ -160,8 +160,8 @@ export default function Home() {
       if (kind === 'خدمات الحي' && !/خدم|صيان|تنظيف|توصيل|سباك|كهرب|نجار/.test(category + ' ' + title)) return false;
       if (kind === 'الطوارئ' && !isEmergency) return false;
 
-      const status = String(data.status || '').toLowerCase();
-      const completed = Boolean(data.best_answer_id || data.is_resolved || data.is_closed || ['completed', 'resolved', 'closed', 'done'].includes(status));
+      const status = String(data.resolution_status || data.status || '').toLowerCase();
+      const completed = Boolean(data.best_answer_id || data.is_resolved || data.is_closed || ['completed', 'resolved', 'closed', 'done', 'found', 'helped', 'not_needed'].includes(status));
       const responded = Number(data.answers_count ?? data.answers?.length ?? 0) > 0;
       if (appliedFilters.status === 'بانتظار المساعدة' && (completed || responded)) return false;
       if (appliedFilters.status === 'تم الرد' && (!responded || completed)) return false;
