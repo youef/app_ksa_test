@@ -24,42 +24,19 @@ export default function StoriesRow({ profile, stories, selectedDistrict }: Props
 
   return (
     <View style={styles.storiesContainer}>
-      {/* Header with Title and Quick Actions */}
+      {/* Compact section header: avoid duplicating the "more stories" action below. */}
       <View style={styles.storiesHeaderRow}>
-        <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-          <Pressable
-            style={styles.publishStoryHeaderBtn}
-            onPress={handleAddStory}
-            accessibilityRole="button"
-            accessibilityLabel="نشر يوميات"
-          >
-            <Plus size={14} color="#059669" strokeWidth={2.5} />
-            <Text style={styles.publishStoryHeaderText}>نشر يوميات</Text>
-          </Pressable>
-          <Pressable
-            style={{
-              flexDirection: 'row-reverse',
-              alignItems: 'center',
-              gap: 3,
-              paddingHorizontal: 9,
-              paddingVertical: 5,
-              borderRadius: 10,
-              backgroundColor: '#f1f5f9',
-            }}
-            onPress={() => router.push('/stories')}
-            accessibilityRole="button"
-            accessibilityLabel="عرض كل اليوميات"
-          >
-            <Text style={{ fontSize: 11, fontWeight: '800', color: '#475569' }}>عرض الكل</Text>
-            <ChevronLeft size={13} color="#475569" />
-          </Pressable>
-        </View>
+        <Pressable
+          style={styles.publishStoryHeaderBtn}
+          onPress={handleAddStory}
+          accessibilityRole="button"
+          accessibilityLabel="نشر يوميات"
+        >
+          <Plus size={14} color="#059669" strokeWidth={2.5} />
+          <Text style={styles.publishStoryHeaderText}>نشر يوميات</Text>
+        </Pressable>
 
         <View style={styles.storiesTitleRow}>
-          <View style={styles.storiesLiveBadge}>
-            <View style={styles.storiesLivePulseDot} />
-            <Text style={styles.storiesLiveText}>مباشر 24س</Text>
-          </View>
           <Text style={styles.storiesSectionTitle}>يوميات الحي</Text>
         </View>
       </View>
