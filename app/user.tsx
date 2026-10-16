@@ -191,14 +191,16 @@ export default function UserProfile() {
           .limit(18),
         supabase
           .from('requests')
-          .select('id,title,description,status,request_type,budget,is_urgent,district,created_at')
+          .select('id,title,description,status,resolution_status,is_pinned,request_type,budget,is_urgent,district,created_at')
           .eq('requester_id', id)
+          .order('is_pinned', { ascending: false })
           .order('created_at', { ascending: false })
           .limit(18),
         supabase
           .from('questions')
-          .select('id,title,body,status,category,district,created_at,view_count,is_emergency,item_type')
+          .select('id,title,body,status,resolution_status,is_pinned,category,district,created_at,view_count,views_count,is_emergency,item_type')
           .eq('author_id', id)
+          .order('is_pinned', { ascending: false })
           .order('created_at', { ascending: false })
           .limit(18),
         supabase
