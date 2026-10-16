@@ -38,5 +38,5 @@ begin
 end;
 $$;
 
-revoke all on function public.get_owned_post_save_count(text, uuid) from public;
+revoke all on function public.get_owned_post_save_count(text, uuid) from public, anon;
 grant execute on function public.get_owned_post_save_count(text, uuid) to authenticated;
