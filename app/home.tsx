@@ -181,6 +181,8 @@ export default function Home() {
         + Number(data.views_count ?? data.views ?? 0);
     };
     return filtered.sort((a, b) => {
+      const featuredPriority = Number(Boolean(b.data.is_featured)) - Number(Boolean(a.data.is_featured));
+      if (featuredPriority !== 0) return featuredPriority;
       if (sortBy === 'engaged') return score(b) - score(a) || new Date(b.data.created_at).getTime() - new Date(a.data.created_at).getTime();
       if (sortBy === 'nearby') {
         const rank = (item: FeedItem) => item.data.district && item.data.district === loc.district ? 0
