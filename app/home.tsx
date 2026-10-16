@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Pressable, RefreshControl, ScrollView, StatusBar, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StatusBar, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ChevronLeft, Flame, Plus, Sparkles, HeartHandshake, MessageCircle, Search, X } from 'lucide-react-native';
@@ -64,19 +64,6 @@ export default function Home() {
     getBrandingLogo().then(setLogoUri);
     return subscribeBrandingLogo(setLogoUri);
   }, []);
-
-  // FAB pulse (stopped on unmount)
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.05, duration: 1000, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [pulseAnim]);
 
   // ---------- Quick reply ----------
   const handleQuickReply = useCallback(
@@ -380,7 +367,7 @@ export default function Home() {
         </View>
       </ScrollView>
 
-      <Animated.View style={[styles.fabContainer, { transform: [{ scale: pulseAnim }] }]}>
+      <View style={styles.fabContainer}>
         <Pressable
           style={styles.fabBtn}
           onPress={() => feed.currentUserId ? router.push('/ask') : requireAccount('سجّل الدخول أو أنشئ حساباً لنشر سؤالك في الحي.')}
@@ -397,9 +384,7 @@ export default function Home() {
             <Text style={styles.fabText}>اسأل أهل حيك</Text>
           </LinearGradient>
         </Pressable>
-      </Animated.View>
-
-      
+      </View>
 
       <LocationSelectorModal
         visible={showLocationModal}
