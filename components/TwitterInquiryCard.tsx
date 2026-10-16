@@ -79,6 +79,7 @@ export default function TwitterInquiryCard({
   onDeleted,
 }: TwitterInquiryCardProps) {
   const isReq = type === 'request';
+  const isOwner = Boolean(currentUserId && currentUserId === (isReq ? data.requester_id : data.author_id));
   const name = data.profiles?.hide_name ? 'جار مجهول 🕶️' : (data.profiles?.display_name || data.profiles?.username || 'ابن الحي');
   const username = data.profiles?.username || 'neighbor';
   const avatar = data.profiles?.avatar_url;
@@ -95,9 +96,11 @@ export default function TwitterInquiryCard({
     return Number(data.likes_count ?? data.likes ?? 0);
   });
   const [bookmarked, setBookmarked] = useState(false);
-  const [viewsCount, setViewsCount] = useState<number>(() => {
-    return Number(data.views_count ?? data.views ?? 0);
-  });
+  const [viewsCount, setViewsCount] = useState<number>(() => Number(data.views_count ?? data.views ?? data.view_count ?? 0));
+  const [savesCount, setSavesCount] = useState(0);
+  const [isPinned, setIsPinned] = useState(Boolean(data.is_pinned));
+  const [resolutionStatus, setResolutionStatus] = useState(String(data.resolution_status || 'open'));
+  const statusLabels: Record<string, string> = { open: 'بانتظار المساعدة', found: 'تم العثور على الغرض', helped: 'تمت المساعدة', resolved: 'تم حل المشكلة', not_needed: 'لم أعد بحاجة للمساعدة' };
 
   // Track real view count on mount
   useEffect(() => {
@@ -127,6 +130,30 @@ export default function TwitterInquiryCard({
     };
   }, [data.id, type]);
 
+  useEffect(() => {
+    let active = true;
+    async function loadPostMetadata() {
+      if (!currentUserId) { setBookmarked(false); return; }
+      try {
+        if (type === 'question') {
+          const [{ data: saved }, { count }] = await Promise.all([
+            supabase.from('saved_questions').select('question_id').eq('user_id', currentUserId).eq('question_id', data.id).maybeSingle(),
+            supabase.from('saved_questions').select('question_id', { count: 'exact', head: true }).eq('question_id', data.id),
+          ]);
+          if (active) { setBookmarked(Boolean(saved)); if (isOwner) setSavesCount(count || 0); }
+        } else {
+          const [{ data: saved }, { count }] = await Promise.all([
+            supabase.from('favorite_items').select('id').eq('user_id', currentUserId).eq('target_type', 'request').eq('target_id', data.id).maybeSingle(),
+            supabase.from('favorite_items').select('id', { count: 'exact', head: true }).eq('target_type', 'request').eq('target_id', data.id),
+          ]);
+          if (active) { setBookmarked(Boolean(saved)); if (isOwner) setSavesCount(count || 0); }
+        }
+      } catch { /* Keep the card usable if metadata is unavailable. */ }
+    }
+    void loadPostMetadata();
+    return () => { active = false; };
+  }, [currentUserId, data.id, isOwner, type]);
+
   const answers = data.answers || [];
   const answersCount = data.answers_count !== undefined ? data.answers_count : answers.length;
   // Limit to maximum 4 responders displayed in the card thread
@@ -146,17 +173,24 @@ export default function TwitterInquiryCard({
   }
 
   async function handleBookmark() {
-    if (isGuest) return requireAccount('سجّل الدخول أو أنشئ حساباً لحفظ المنشورات.');
+    if (isGuest || !currentUserId) return requireAccount('سجّل الدخول أو أنشئ حساباً لحفظ المنشورات.');
     const next = !bookmarked;
     setBookmarked(next);
-    if (next) {
-      onToast('تم حفظ الاستفسار في منشوراتي المحفوظة 🔖');
-      if (currentUserId && type === 'question')
-        supabase.from('saved_questions').upsert({ user_id: currentUserId, question_id: data.id }, { onConflict: 'user_id,question_id' }).then(() => {});
-    } else {
-      onToast('تمت إزالة الاستفسار من المحفوظات');
-      if (currentUserId && type === 'question')
-        supabase.from('saved_questions').delete().eq('user_id', currentUserId).eq('question_id', data.id).then(() => {});
+    setSavesCount(value => Math.max(0, value + (next ? 1 : -1)));
+    try {
+      const result = type === 'question'
+        ? (next
+          ? await supabase.from('saved_questions').upsert({ user_id: currentUserId, question_id: data.id }, { onConflict: 'user_id,question_id' })
+          : await supabase.from('saved_questions').delete().eq('user_id', currentUserId).eq('question_id', data.id))
+        : (next
+          ? await supabase.from('favorite_items').upsert({ user_id: currentUserId, target_type: 'request', target_id: data.id }, { onConflict: 'user_id,target_type,target_id' })
+          : await supabase.from('favorite_items').delete().eq('user_id', currentUserId).eq('target_type', 'request').eq('target_id', data.id));
+      if (result.error) throw result.error;
+      onToast(next ? 'تم حفظ المنشور في المفضلة 🔖' : 'تمت إزالة المنشور من المفضلة');
+    } catch (error: any) {
+      setBookmarked(!next);
+      setSavesCount(value => Math.max(0, value + (next ? -1 : 1)));
+      Alert.alert('تعذر تحديث المفضلة', error?.message || 'حاول مرة أخرى.');
     }
   }
 
@@ -177,8 +211,6 @@ export default function TwitterInquiryCard({
       onToast('تم نسخ الرابط');
     }
   }
-
-  const isOwner = Boolean(currentUserId && currentUserId === (isReq ? data.requester_id : data.author_id));
 
   async function confirmDeletePost() {
     Alert.alert(
@@ -212,6 +244,39 @@ export default function TwitterInquiryCard({
     );
   }
 
+  async function updateResolutionStatus(nextStatus: string) {
+    if (!isOwner || !currentUserId) return;
+    const table = isReq ? 'requests' : 'questions';
+    const ownerColumn = isReq ? 'requester_id' : 'author_id';
+    const { error } = await supabase.from(table).update({ resolution_status: nextStatus, updated_at: new Date().toISOString() }).eq('id', data.id).eq(ownerColumn, currentUserId);
+    if (error) return Alert.alert('تعذر تحديث الحالة', error.message || 'حاول مرة أخرى.');
+    setResolutionStatus(nextStatus);
+    data.resolution_status = nextStatus;
+    onToast('تم تحديث حالة المنشور: ' + (statusLabels[nextStatus] || nextStatus));
+  }
+
+  function openStatusOptions() {
+    Alert.alert('تحديث حالة المنشور', 'اختر الحالة الجديدة', [
+      ...Object.entries(statusLabels).map(([value, label]) => ({ text: label, onPress: () => { void updateResolutionStatus(value); } })),
+      { text: 'إلغاء', style: 'cancel' },
+    ]);
+  }
+
+  async function togglePinned() {
+    if (!currentUserId) return;
+    const next = !isPinned;
+    const table = isReq ? 'requests' : 'questions';
+    const ownerColumn = isReq ? 'requester_id' : 'author_id';
+    let query = supabase.from(table).update({ is_pinned: next, pinned_at: next ? new Date().toISOString() : null, updated_at: new Date().toISOString() }).eq('id', data.id);
+    if (isOwner) query = query.eq(ownerColumn, currentUserId);
+    else if (currentUserProfile?.role !== 'admin') return;
+    const { error } = await query;
+    if (error) return Alert.alert('تعذر تحديث التثبيت', error.message || 'تحقق من الصلاحيات ثم حاول مرة أخرى.');
+    setIsPinned(next);
+    data.is_pinned = next;
+    onToast(next ? 'تم تثبيت المنشور في أعلى الملف الشخصي 📌' : 'تم إلغاء تثبيت المنشور');
+  }
+
   function handleMoreOptions() {
     const options: any[] = [];
     if (isOwner) {
@@ -220,6 +285,10 @@ export default function TwitterInquiryCard({
         onPress: () => router.push({ pathname: isReq ? '/request' : '/question', params: { id: data.id } }),
       });
       options.push({ text: 'حذف المنشور', style: 'destructive', onPress: confirmDeletePost });
+      options.push({ text: 'تحديث حالة المنشور', onPress: openStatusOptions });
+    }
+    if (isOwner || currentUserProfile?.role === 'admin') {
+      options.push({ text: isPinned ? 'إلغاء تثبيت المنشور' : 'تثبيت المنشور 📌', onPress: () => { void togglePinned(); } });
     }
     options.push({ text: 'نسخ رابط المنشور', onPress: handleShare });
     if (!isGuest) {
@@ -316,6 +385,8 @@ export default function TwitterInquiryCard({
             {isReq ? data.description : data.body}
           </Text>
         )}
+        {isPinned && <View style={{ alignSelf: 'flex-start', flexDirection: 'row-reverse', alignItems: 'center', gap: 4, backgroundColor: '#fff7ed', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5, marginTop: 8 }}><Text style={{ color: '#c2410c', fontSize: 11, fontWeight: '800' }}>📌 مثبت في الملف الشخصي</Text></View>}
+        {resolutionStatus !== 'open' && <View style={{ alignSelf: 'flex-start', backgroundColor: '#dcfce7', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5, marginTop: 7 }}><Text style={{ color: '#166534', fontSize: 11, fontWeight: '800' }}>{statusLabels[resolutionStatus] || resolutionStatus}</Text></View>}
         <View style={s.xHashtagRow}>
           {data.district && (
             <View style={s.xHashPill}><Text style={s.xHashText}>#{data.district.replace(/\s+/g, '_')}</Text></View>
@@ -390,6 +461,14 @@ export default function TwitterInquiryCard({
           <Text style={s.xActionViews}>{viewsCount}</Text>
         </View>
       </View>
+
+      {isOwner && (
+        <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-around', gap: 8, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: '#f0fdf4', borderTopWidth: 1, borderTopColor: '#dcfce7' }}>
+          <View style={{ alignItems: 'center', gap: 3 }}><Eye size={15} color="#166534" /><Text style={{ color: '#166534', fontSize: 11, fontWeight: '800' }}>{viewsCount} مشاهدة</Text></View>
+          <View style={{ alignItems: 'center', gap: 3 }}><MessageCircle size={15} color="#166534" /><Text style={{ color: '#166534', fontSize: 11, fontWeight: '800' }}>{answersCount} رد</Text></View>
+          <View style={{ alignItems: 'center', gap: 3 }}><Bookmark size={15} color="#166534" /><Text style={{ color: '#166534', fontSize: 11, fontWeight: '800' }}>{savesCount} حفظ</Text></View>
+        </View>
+      )}
 
       {/* Expanded Thread: Shows up to 4 responders then link to full page */}
       {expanded && (
