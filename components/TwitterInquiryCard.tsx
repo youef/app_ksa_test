@@ -64,6 +64,7 @@ export interface TwitterInquiryCardProps {
   isMine?: boolean;
   onQuickReply: (id: string, text: string) => Promise<void>;
   onToast: (msg: string) => void;
+  onDeleted?: () => void;
 }
 
 export default function TwitterInquiryCard({
@@ -75,6 +76,7 @@ export default function TwitterInquiryCard({
   isMine,
   onQuickReply,
   onToast,
+  onDeleted,
 }: TwitterInquiryCardProps) {
   const isReq = type === 'request';
   const name = data.profiles?.hide_name ? 'جار مجهول 🕶️' : (data.profiles?.display_name || data.profiles?.username || 'ابن الحي');
@@ -176,17 +178,60 @@ export default function TwitterInquiryCard({
     }
   }
 
+  const isOwner = Boolean(currentUserId && currentUserId === (isReq ? data.requester_id : data.author_id));
+
+  async function confirmDeletePost() {
+    Alert.alert(
+      'حذف المنشور نهائياً',
+      'هل أنت متأكد؟ لا يمكن التراجع عن حذف المنشور.',
+      [
+        { text: 'إلغاء', style: 'cancel' },
+        {
+          text: 'حذف المنشور',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const table = isReq ? 'requests' : 'questions';
+              let result: any;
+              if (isReq) {
+                await supabase.from('help_matches').delete().eq('request_id', data.id);
+                result = await supabase.from(table).delete().eq('id', data.id).eq('requester_id', currentUserId);
+              } else {
+                await supabase.from('answers').delete().eq('question_id', data.id);
+                result = await supabase.from(table).delete().eq('id', data.id).eq('author_id', currentUserId);
+              }
+              if (result?.error) throw result.error;
+              onToast('تم حذف المنشور بنجاح');
+              onDeleted?.();
+            } catch (err: any) {
+              Alert.alert('تعذر الحذف', err?.message || 'تأكد من اتصالك ثم حاول مرة أخرى.');
+            }
+          },
+        },
+      ],
+    );
+  }
+
   function handleMoreOptions() {
-    if (isGuest) {
-      Alert.alert('خيارات المنشور', data.title, [{ text: 'نسخ رابط المنشور', onPress: handleShare }, { text: 'إغلاق', style: 'cancel' }]);
-      return;
+    const options: any[] = [];
+    if (isOwner) {
+      options.push({
+        text: 'تعديل المنشور',
+        onPress: () => router.push({ pathname: isReq ? '/request' : '/question', params: { id: data.id } }),
+      });
+      options.push({ text: 'حذف المنشور', style: 'destructive', onPress: confirmDeletePost });
     }
-    Alert.alert('خيارات المنشور', data.title, [
-      { text: 'نسخ رابط المنشور', onPress: handleShare },
-      { text: 'كتم إشعارات هذا المنشور', onPress: () => onToast('تم كتم الإشعارات 🔕') },
-      { text: 'إبلاغ عن محتوى غير لائق', onPress: () => router.push({ pathname: '/report', params: { id: data.id, type: isReq ? 'request' : 'question' } }), style: 'destructive' },
-      { text: 'إلغاء', style: 'cancel' },
-    ]);
+    options.push({ text: 'نسخ رابط المنشور', onPress: handleShare });
+    if (!isGuest) {
+      options.push({ text: 'كتم إشعارات هذا المنشور', onPress: () => onToast('تم كتم الإشعارات 🔕') });
+      options.push({
+        text: 'إبلاغ عن محتوى غير لائق',
+        onPress: () => router.push({ pathname: '/report', params: { id: data.id, type: isReq ? 'request' : 'question' } }),
+        style: 'destructive',
+      });
+    }
+    options.push({ text: 'إلغاء', style: 'cancel' });
+    Alert.alert('خيارات المنشور', data.title, options);
   }
 
   async function handleSendReply() {
