@@ -234,7 +234,7 @@ export default function Home() {
         style={styles.container}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ paddingBottom: bottomNavInset + 24 }}
+        contentContainerStyle={{ paddingBottom: bottomNavInset + 24, backgroundColor: '#eaf3ee', flexGrow: 1 }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
