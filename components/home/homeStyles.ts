@@ -282,11 +282,11 @@ export const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'space-around',
-    backgroundColor: '#fff',
+    backgroundColor: 'rgba(255,255,255,0.78)',
     marginHorizontal: 16,
-    marginTop: 4,
+    marginTop: 8,
     marginBottom: 12,
-    borderRadius: 18,
+    borderRadius: 22,
     paddingVertical: 10,
     paddingHorizontal: 14,
     shadowColor: '#000',
@@ -295,7 +295,7 @@ export const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 2,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: 'rgba(255,255,255,0.95)',
   },
   atmoItem: {
     flexDirection: 'row-reverse',
@@ -316,9 +316,9 @@ export const styles = StyleSheet.create({
   // Upgraded Stories Section
   storiesContainer: {
     paddingVertical: 14,
-    backgroundColor: '#fff',
+    backgroundColor: 'rgba(255,255,255,0.58)',
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    borderBottomColor: 'rgba(255,255,255,0.82)',
   },
   storiesHeaderRow: {
     flexDirection: 'row-reverse',
@@ -538,10 +538,10 @@ export const styles = StyleSheet.create({
     textAlign: 'right',
   },
   emergencyHomeCard: {
-    width: '100%',
+    width: '94%',
     maxWidth: 948,
     alignSelf: 'center',
-    marginHorizontal: 16,
+    marginHorizontal: 0,
     marginTop: 12,
     backgroundColor: 'rgba(255,247,247,0.94)',
     borderRadius: 22,
