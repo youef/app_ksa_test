@@ -135,19 +135,12 @@ export default function TwitterInquiryCard({
     async function loadPostMetadata() {
       if (!currentUserId) { setBookmarked(false); return; }
       try {
-        if (type === 'question') {
-          const [{ data: saved }, { count }] = await Promise.all([
-            supabase.from('saved_questions').select('question_id').eq('user_id', currentUserId).eq('question_id', data.id).maybeSingle(),
-            supabase.from('saved_questions').select('question_id', { count: 'exact', head: true }).eq('question_id', data.id),
-          ]);
-          if (active) { setBookmarked(Boolean(saved)); if (isOwner) setSavesCount(count || 0); }
-        } else {
-          const [{ data: saved }, { count }] = await Promise.all([
-            supabase.from('favorite_items').select('id').eq('user_id', currentUserId).eq('target_type', 'request').eq('target_id', data.id).maybeSingle(),
-            supabase.from('favorite_items').select('id', { count: 'exact', head: true }).eq('target_type', 'request').eq('target_id', data.id),
-          ]);
-          if (active) { setBookmarked(Boolean(saved)); if (isOwner) setSavesCount(count || 0); }
-        }
+        const targetType = type === 'request' ? 'request' : 'question';
+        const [{ data: saved }, { count }] = await Promise.all([
+          supabase.from('favorite_items').select('id').eq('user_id', currentUserId).eq('target_type', targetType).eq('target_id', data.id).maybeSingle(),
+          supabase.from('favorite_items').select('id', { count: 'exact', head: true }).eq('target_type', targetType).eq('target_id', data.id),
+        ]);
+        if (active) { setBookmarked(Boolean(saved)); if (isOwner) setSavesCount(count || 0); }
       } catch { /* Keep the card usable if metadata is unavailable. */ }
     }
     void loadPostMetadata();
@@ -178,13 +171,10 @@ export default function TwitterInquiryCard({
     setBookmarked(next);
     setSavesCount(value => Math.max(0, value + (next ? 1 : -1)));
     try {
-      const result = type === 'question'
-        ? (next
-          ? await supabase.from('saved_questions').upsert({ user_id: currentUserId, question_id: data.id }, { onConflict: 'user_id,question_id' })
-          : await supabase.from('saved_questions').delete().eq('user_id', currentUserId).eq('question_id', data.id))
-        : (next
-          ? await supabase.from('favorite_items').upsert({ user_id: currentUserId, target_type: 'request', target_id: data.id }, { onConflict: 'user_id,target_type,target_id' })
-          : await supabase.from('favorite_items').delete().eq('user_id', currentUserId).eq('target_type', 'request').eq('target_id', data.id));
+      const targetType = type === 'request' ? 'request' : 'question';
+      const result = next
+        ? await supabase.from('favorite_items').upsert({ user_id: currentUserId, target_type: targetType, target_id: data.id }, { onConflict: 'user_id,target_type,target_id' })
+        : await supabase.from('favorite_items').delete().eq('user_id', currentUserId).eq('target_type', targetType).eq('target_id', data.id);
       if (result.error) throw result.error;
       onToast(next ? 'تم حفظ المنشور في المفضلة 🔖' : 'تمت إزالة المنشور من المفضلة');
     } catch (error: any) {
