@@ -44,6 +44,9 @@ import {
   Pencil,
   Trash2,
   X,
+  Bookmark,
+  Flag,
+  Pin,
 } from 'lucide-react-native';
 import { requireAccount } from '@/lib/authGate';
 import { areaLabel } from '@/lib/privacy';
@@ -71,6 +74,14 @@ export default function Question() {
   const [voting, setVoting] = useState<string | null>(null);
   const [replyTo, setReplyTo] = useState<any | null>(null);
   const [sharingWith, setSharingWith] = useState<string | null>(null);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [favoriteBusy, setFavoriteBusy] = useState(false);
+  const [savedCount, setSavedCount] = useState(0);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportReason, setReportReason] = useState('محتوى غير مناسب');
+  const [reportDetails, setReportDetails] = useState('');
+  const [reportBusy, setReportBusy] = useState(false);
+  const [pinBusy, setPinBusy] = useState(false);
 
   // Edit & Delete states
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -126,6 +137,14 @@ export default function Question() {
     }
 
     setQ(question);
+    if (id) {
+      const { count } = await supabase.from('favorite_items').select('id', { count: 'exact', head: true }).eq('target_type', 'question').eq('target_id', id);
+      setSavedCount(count || 0);
+      if (user) {
+        const { data: favoriteRow } = await supabase.from('favorite_items').select('id').eq('user_id', user.id).eq('target_type', 'question').eq('target_id', id).maybeSingle();
+        setIsFavorite(Boolean(favoriteRow));
+      } else setIsFavorite(false);
+    }
     const answerIds = (b.data || []).map((x: any) => x.id);
     let votes: any[] = [];
     if (answerIds.length) {
@@ -373,6 +392,63 @@ export default function Question() {
       Alert.alert('تنبيه', 'تعذر إرسال الموقع بالخاص حالياً.');
     } finally {
       setSharingWith(null);
+    }
+  }
+
+  async function toggleFavorite() {
+    if (!currentUserId) return requireAccount('سجّل الدخول لحفظ الاستفسار والرجوع إليه لاحقاً.');
+    if (favoriteBusy) return;
+    setFavoriteBusy(true);
+    try {
+      if (isFavorite) {
+        const { error } = await supabase.from('favorite_items').delete().eq('user_id', currentUserId).eq('target_type', 'question').eq('target_id', id);
+        if (error) throw error;
+        setIsFavorite(false);
+        setSavedCount(value => Math.max(0, value - 1));
+      } else {
+        const { error } = await supabase.from('favorite_items').insert({ user_id: currentUserId, target_type: 'question', target_id: id });
+        if (error) throw error;
+        setIsFavorite(true);
+        setSavedCount(value => value + 1);
+      }
+    } catch {
+      Alert.alert('تعذر الحفظ', 'لم نتمكن من تحديث قائمة المحفوظات. تحقق من اتصالك وحاول مجدداً.');
+    } finally {
+      setFavoriteBusy(false);
+    }
+  }
+
+  async function submitReport() {
+    if (!currentUserId) return requireAccount('سجّل الدخول للإبلاغ عن الاستفسار.');
+    const reason = [reportReason, reportDetails.trim()].filter(Boolean).join(' — ').slice(0, 500);
+    if (reportBusy || !reason) return;
+    setReportBusy(true);
+    try {
+      const { error } = await supabase.from('reports').insert({ reporter_id: currentUserId, target_type: 'question', target_id: id, reason });
+      if (error) throw error;
+      setReportOpen(false);
+      setReportDetails('');
+      Alert.alert('تم استلام البلاغ', 'شكرًا لمساهمتك في الحفاظ على مجتمع آمن. سيُراجع فريق حيّنا البلاغ.');
+    } catch {
+      Alert.alert('تعذر إرسال البلاغ', 'لم يتم إرسال البلاغ الآن. حاول مرة أخرى لاحقًا.');
+    } finally {
+      setReportBusy(false);
+    }
+  }
+
+  async function togglePin() {
+    if (!isAuthor || pinBusy) return;
+    setPinBusy(true);
+    try {
+      const nextPinned = !Boolean(q?.is_pinned);
+      const { error } = await supabase.from('questions').update({ is_pinned: nextPinned, pinned_at: nextPinned ? new Date().toISOString() : null }).eq('id', id).eq('author_id', currentUserId);
+      if (error) throw error;
+      setQ((current: any) => current ? { ...current, is_pinned: nextPinned, pinned_at: nextPinned ? new Date().toISOString() : null } : current);
+      Alert.alert(nextPinned ? 'تم تثبيت الاستفسار' : 'تم إلغاء التثبيت', nextPinned ? 'تم تثبيت الاستفسار في ملفه.' : 'أزيل التثبيت من الاستفسار.');
+    } catch {
+      Alert.alert('تعذر تحديث التثبيت', 'تأكد من صلاحية تعديل الاستفسار ثم حاول مجددًا.');
+    } finally {
+      setPinBusy(false);
     }
   }
 
