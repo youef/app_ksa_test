@@ -115,14 +115,10 @@ export default function TwitterInquiryCard({
           supabase.rpc('increment_view_count', { p_table: tableName, p_id: data.id })
         )
           .then(({ data: nextVal, error }) => {
-            if (!error && typeof nextVal === 'number' && isMounted) {
-              setViewsCount(nextVal);
-            } else if (isMounted) {
-              setViewsCount(prev => prev + 1);
-            }
+            if (!error && typeof nextVal === 'number' && isMounted) setViewsCount(nextVal);
           })
           .catch(() => {
-            if (isMounted) setViewsCount(prev => prev + 1);
+            // Keep the last persisted count; never fabricate analytics when tracking fails.
           });
       }
     }
