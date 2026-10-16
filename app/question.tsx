@@ -8,6 +8,7 @@ import {
   TextInput,
   View,
   KeyboardAvoidingView,
+  Keyboard,
   Platform,
   ActivityIndicator,
   Share,
@@ -58,6 +59,8 @@ const QUICK_QUESTION_RESPONSES = [
 
 export default function Question() {
   const bottomNavInset = useBottomNavInset();
+  const [composerFocused, setComposerFocused] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const { id } = useLocalSearchParams<{ id: string }>();
   const [q, setQ] = useState<any>();
   const [answers, setAnswers] = useState<any[]>([]);
@@ -146,6 +149,38 @@ export default function Question() {
   useEffect(() => {
     load();
   }, [id]);
+
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      const viewport = typeof window !== 'undefined' ? window.visualViewport : null;
+      const syncViewport = () => {
+        if (!viewport || typeof window === 'undefined') return;
+        setKeyboardVisible(window.innerHeight - viewport.height - viewport.offsetTop > 120);
+      };
+      viewport?.addEventListener('resize', syncViewport);
+      viewport?.addEventListener('scroll', syncViewport);
+      return () => {
+        viewport?.removeEventListener('resize', syncViewport);
+        viewport?.removeEventListener('scroll', syncViewport);
+      };
+    }
+
+    const showSub = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  const notifyComposerFocus = (focused: boolean) => {
+    setComposerFocused(focused);
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('hayna:composer-focus', { detail: { focused } }));
+    }
+  };
+
+  const composerNeedsNavClearance = !composerFocused && !keyboardVisible;
 
   async function answer() {
     if (!body.trim()) return;
@@ -467,7 +502,7 @@ export default function Question() {
   const locationLabel = areaLabel({ district: q.district, city: q.city });
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.container}>
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0} style={styles.container}>
       <AppHeader
         variant="sub"
         title="استفسار ونقاش الحي"
@@ -486,7 +521,7 @@ export default function Question() {
       />
 
       <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingBottom: bottomNavInset + 100 }]}
+        contentContainerStyle={[styles.scroll, { paddingBottom: bottomNavInset + 150 }] }
         showsVerticalScrollIndicator={false}
       >
         {/* Main Question Luxury Card */}
@@ -780,14 +815,14 @@ export default function Question() {
       {/* Bottom Input Area */}
       {!currentUserId ? (
         <Pressable
-          style={[styles.guestPrompt, { paddingBottom: Platform.OS === 'ios' ? 24 : 14 }]}
+          style={[styles.guestPrompt, { paddingBottom: (Platform.OS === 'ios' ? 12 : 8) + (composerNeedsNavClearance ? 76 : Math.max(bottomNavInset, 8)) }] }
           onPress={() => requireAccount('سجّل الدخول أو أنشئ حساباً للرد والتصويت في نقاشات الحي.')}
         >
           <Text style={styles.guestPromptText}>سجّل الدخول للمشاركة في النقاش</Text>
           <MessageCircle size={18} color="#047857" />
         </Pressable>
       ) : (
-        <View style={[styles.inputWrapper, { paddingBottom: Math.max(bottomNavInset, 12) }]}>
+        <View style={[styles.inputWrapper, { paddingBottom: composerNeedsNavClearance ? bottomNavInset + 76 : Math.max(bottomNavInset, 8) }]}>
           {replyTo && (
             <View style={styles.replyingBar}>
               <Reply size={14} color="#059669" />
@@ -815,6 +850,8 @@ export default function Question() {
                 placeholder="اكتب ردك ومشاركتك هنا..."
                 placeholderTextColor="#94a3b8"
                 maxLength={500}
+                onFocus={() => notifyComposerFocus(true)}
+                onBlur={() => notifyComposerFocus(false)}
               />
               <Pressable
                 style={({ pressed }) => [
@@ -928,7 +965,7 @@ export default function Question() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f4f8f6',
   },
   headerShareBtn: {
     width: 36,
@@ -976,17 +1013,17 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   questionCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 20,
-    padding: 16,
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    borderRadius: 24,
+    padding: 17,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
-    gap: 12,
+    borderColor: '#e1eee7',
+    shadowColor: '#164e3b',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.06,
+    shadowRadius: 14,
+    elevation: 3,
+    gap: 13,
   },
   topBadgesRow: {
     flexDirection: 'row-reverse',
@@ -1455,11 +1492,16 @@ const styles = StyleSheet.create({
     color: '#047857',
   },
   inputWrapper: {
-    backgroundColor: '#ffffff',
+    backgroundColor: 'rgba(255,255,255,0.97)',
     borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
-    paddingHorizontal: 16,
+    borderTopColor: '#dcebe3',
+    paddingHorizontal: 14,
     paddingTop: 10,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+    elevation: 8,
   },
   replyingBar: {
     flexDirection: 'row-reverse',
@@ -1505,11 +1547,11 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    backgroundColor: '#f8fafc',
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 13.5,
+    backgroundColor: '#f5f9f7',
+    borderRadius: 17,
+    paddingHorizontal: 15,
+    paddingVertical: 11,
+    fontSize: 16,
     color: '#0f172a',
     borderWidth: 1.5,
     borderColor: '#e2e8f0',
@@ -1517,10 +1559,10 @@ const styles = StyleSheet.create({
     maxHeight: 90,
   },
   sendButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#059669',
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: '#16865b',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#059669',
