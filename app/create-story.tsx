@@ -62,6 +62,7 @@ export default function CreateStory() {
   const [audience, setAudience] = useState<'public' | 'followers' | 'custom'>('public');
   const [audienceCandidates, setAudienceCandidates] = useState<Array<{ id: string; display_name: string | null; username: string | null }>>([]);
   const [allowedUserIds, setAllowedUserIds] = useState<string[]>([]);
+  const [hiddenUserIds, setHiddenUserIds] = useState<string[]>([]);
   const [audienceLoading, setAudienceLoading] = useState(false);
   const [interactiveType, setInteractiveType] = useState<'none' | 'poll' | 'question'>('none');
   const [pollQuestion, setPollQuestion] = useState('');
@@ -165,6 +166,7 @@ export default function CreateStory() {
       outcome = await publisher.publish(composer.slides, {
         audience,
         allowedUserIds,
+        hiddenUserIds,
         interactiveType,
         pollQuestion,
         pollOptions: [pollOptionA, pollOptionB],
@@ -205,7 +207,7 @@ export default function CreateStory() {
     Alert.alert('تم النشر بنجاح!', body, [
       { text: 'مشاهدة في الحي', onPress: () => router.replace('/stories') },
     ]);
-  }, [composer, publisher, audience, allowedUserIds, interactiveType, pollQuestion, pollOptionA, pollOptionB, questionPrompt, textColor, fontSize, fontIndex, textRotation, textOffset]);
+  }, [composer, publisher, audience, allowedUserIds, hiddenUserIds, interactiveType, pollQuestion, pollOptionA, pollOptionB, questionPrompt, textColor, fontSize, fontIndex, textRotation, textOffset]);
 
   if (!activeSlide) return null;
 
@@ -475,6 +477,31 @@ export default function CreateStory() {
                       </ScrollView>
                     )}
                 </View>
+              )}
+
+              <View style={s.optionsSectionHeader}>
+                <ShieldCheck size={15} color="#fbbf24" />
+                <Text style={s.optionsSectionTitle}>إخفاء القصة عن أشخاص محددين</Text>
+              </View>
+              <Text style={s.optionsHint}>الأشخاص المحددون هنا لن تظهر لهم هذه القصة، حتى لو كانوا ضمن جمهورها.</Text>
+              {audienceCandidates.length === 0 ? (
+                <Pressable onPress={loadAudienceCandidates} style={s.personChip}>
+                  <Text style={s.optionsChipText}>تحميل قائمة المتابعين</Text>
+                </Pressable>
+              ) : (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.optionsChipRow}>
+                  {audienceCandidates.map((person) => {
+                    const selected = hiddenUserIds.includes(person.id);
+                    return (
+                      <Pressable key={`hidden-${person.id}`}
+                        onPress={() => setHiddenUserIds((ids) => selected ? ids.filter((id) => id !== person.id) : [...ids, person.id])}
+                        style={[s.personChip, selected && s.optionsChipActive]}>
+                        <Text style={s.optionsChipText}>{person.display_name || person.username || 'مستخدم'}</Text>
+                        {selected ? <Check size={12} color="#fbbf24" /> : null}
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
               )}
 
               </>}
