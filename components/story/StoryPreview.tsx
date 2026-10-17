@@ -140,28 +140,31 @@ export function StoryPreview(props: Props) {
         finalImageUri = await props.onCompressImage(finalImageUri);
       }
 
-      if (props.onPublishWithOptions) {
-        await props.onPublishWithOptions({
-          audience,
-          customAudience,
-          interactiveType,
-          pollQuestion: pollQuestion.trim(),
-          pollOptions: [pollOptionA.trim(), pollOptionB.trim()],
-          questionPrompt: questionPrompt.trim(),
-          textColor,
-          fontSize,
-          fontFamily,
-          rotation,
-          offsetX: offset.x,
-          offsetY: offset.y,
-          imageUri: finalImageUri,
-        });
-      } else {
-        // Backward compatible with the original parent component.
-        await props.onPublish();
-      }
+      const publishResult = props.onPublishWithOptions
+        ? props.onPublishWithOptions({
+            audience,
+            customAudience,
+            interactiveType,
+            pollQuestion: pollQuestion.trim(),
+            pollOptions: [pollOptionA.trim(), pollOptionB.trim()],
+            questionPrompt: questionPrompt.trim(),
+            textColor,
+            fontSize,
+            fontFamily,
+            rotation,
+            offsetX: offset.x,
+            offsetY: offset.y,
+            imageUri: finalImageUri,
+          })
+        : props.onPublish();
 
-      setPublishSuccess(true);
+      // A Promise lets this component know when the publish operation has finished.
+      // A legacy synchronous callback may only start an external upload, so don't
+      // display a success message prematurely in that case.
+      if (publishResult && typeof (publishResult as Promise<void>).then === 'function') {
+        await publishResult;
+        setPublishSuccess(true);
+      }
     } catch (error) {
       setPublishError(
         error instanceof Error && error.message
