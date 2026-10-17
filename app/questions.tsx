@@ -27,6 +27,9 @@ import {
   Award,
   ArrowRight,
   Flame,
+  Pin,
+  CheckCircle2,
+  TrendingUp,
 } from 'lucide-react-native';
 
 import { supabase } from '@/lib/supabase';
@@ -44,6 +47,7 @@ import {
 import { relativeTime } from '@/lib/mapPins';
 
 type QuestionFilter = 'all' | 'solved' | 'hot' | 'district';
+type QuestionSort = 'newest' | 'answers';
 
 export default function Questions() {
   const [items, setItems] = useState<any[]>([]);
@@ -53,6 +57,7 @@ export default function Questions() {
   const [hasSession, setHasSession] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [activeFilter, setActiveFilter] = useState<QuestionFilter>('all');
+  const [activeSort, setActiveSort] = useState<QuestionSort>('newest');
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [activeLoc, setActiveLoc] = useState<HaynaLocation>({
     region: 'كل المملكة',
@@ -162,13 +167,21 @@ export default function Questions() {
 
   // Tab Filtering
   const displayedItems = useMemo(() => {
-    return locationFilteredItems.filter(q => {
+    const filtered = locationFilteredItems.filter(q => {
       if (activeFilter === 'solved') return q.status === 'solved' || Boolean(q.best_answer_id);
       if (activeFilter === 'hot') return (q.answers_count || 0) >= 2;
       if (activeFilter === 'district') return Boolean(q.district);
       return true;
     });
-  }, [locationFilteredItems, activeFilter]);
+    return [...filtered].sort((a: any, b: any) => {
+      const pin = Number(Boolean(b.is_pinned)) - Number(Boolean(a.is_pinned));
+      if (pin) return pin;
+      const featured = Number(Boolean(b.is_featured)) - Number(Boolean(a.is_featured));
+      if (featured) return featured;
+      if (activeSort === 'answers') return (b.answers_count || 0) - (a.answers_count || 0);
+      return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+    });
+  }, [locationFilteredItems, activeFilter, activeSort]);
 
   const counts = useMemo(() => {
     return {
@@ -237,6 +250,31 @@ export default function Questions() {
           />
         }
       >
+        <View style={styles.introWrap}>
+          <LinearGradient colors={['#075b43', '#0b8f63', '#22a06b']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.introCard}>
+            <View style={styles.introDecorOne} /><View style={styles.introDecorTwo} />
+            <View style={styles.introTopRow}>
+              <View style={styles.introIcon}><MessageCircle size={22} color="#ffffff" /></View>
+              <View style={{ flex: 1 }}><Text style={styles.introEyebrow}>مجتمع حيّنا</Text><Text style={styles.introTitle}>سؤالك يقرّب الجيران</Text></View>
+              <View style={styles.livePill}><View style={styles.liveDot} /><Text style={styles.liveText}>مجتمع نشط</Text></View>
+            </View>
+            <Text style={styles.introDescription}>اسأل، شارك خبرتك، واستفد من تجارب أهل الحي.</Text>
+            <View style={styles.introStats}>
+              <View style={styles.introStat}><Text style={styles.introStatValue}>{counts.all.toLocaleString('ar-SA')}</Text><Text style={styles.introStatLabel}>استفسار</Text></View>
+              <View style={styles.introStatDivider} />
+              <View style={styles.introStat}><Text style={styles.introStatValue}>{counts.solved.toLocaleString('ar-SA')}</Text><Text style={styles.introStatLabel}>تمت الإجابة</Text></View>
+              <View style={styles.introStatDivider} />
+              <View style={styles.introStat}><Text style={styles.introStatValue}>{counts.hot.toLocaleString('ar-SA')}</Text><Text style={styles.introStatLabel}>تفاعل نشط</Text></View>
+            </View>
+            {hasSession && <Pressable style={styles.introCta} onPress={() => router.push('/ask')}><Plus size={17} color="#08734f" /><Text style={styles.introCtaText}>اطرح استفسارك الآن</Text><ArrowRight size={15} color="#08734f" /></Pressable>}
+          </LinearGradient>
+          <Pressable style={styles.locationBar} onPress={() => setShowLocationModal(true)} accessibilityRole="button" accessibilityLabel="تغيير نطاق الأسئلة">
+            <View style={styles.locationIcon}><MapPin size={17} color="#087f5b" /></View>
+            <View style={{ flex: 1 }}><Text style={styles.locationEyebrow}>تتصفح الأسئلة في</Text><Text style={styles.locationValue} numberOfLines={1}>{locationLabel}</Text></View>
+            <View style={styles.changeLocation}><Text style={styles.changeLocationText}>تغيير</Text><ChevronDown size={14} color="#087f5b" /></View>
+          </Pressable>
+        </View>
+
         {/* Search & Location Bar */}
         <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 6 }}>
           <View style={[styles.searchBar, { borderWidth: 1, borderColor: '#e2e8f0' }]}>
@@ -309,6 +347,14 @@ export default function Questions() {
               </Text>
             </Pressable>
           </ScrollView>
+        </View>
+
+        <View style={styles.listToolbar}>
+          <View style={styles.listHeading}><Text style={styles.listTitle}>أسئلة الجيران</Text><Text style={styles.listCount}>{displayedItems.length.toLocaleString('ar-SA')} نتيجة</Text></View>
+          <View style={styles.sortSwitch}>
+            <Pressable onPress={() => setActiveSort('newest')} style={[styles.sortOption, activeSort === 'newest' && styles.sortOptionActive]}><Clock size={13} color={activeSort === 'newest' ? '#087f5b' : '#84918a'} /><Text style={[styles.sortOptionText, activeSort === 'newest' && styles.sortOptionTextActive]}>الأحدث</Text></Pressable>
+            <Pressable onPress={() => setActiveSort('answers')} style={[styles.sortOption, activeSort === 'answers' && styles.sortOptionActive]}><TrendingUp size={13} color={activeSort === 'answers' ? '#087f5b' : '#84918a'} /><Text style={[styles.sortOptionText, activeSort === 'answers' && styles.sortOptionTextActive]}>الأكثر ردودًا</Text></Pressable>
+          </View>
         </View>
 
         {/* Questions Feed */}
@@ -405,6 +451,8 @@ export default function Questions() {
                     )}
                   </View>
 
+                  {Boolean(q.is_pinned || q.is_featured) && <View style={styles.cardFlagsRow}>{Boolean(q.is_pinned) && <View style={styles.pinnedBadge}><Pin size={11} color="#8a5a0a" /><Text style={styles.pinnedBadgeText}>مثبّت</Text></View>}{Boolean(q.is_featured) && <View style={styles.featuredBadge}><Sparkles size={11} color="#047857" /><Text style={styles.featuredBadgeText}>مميّز</Text></View>}</View>}
+
                   {/* Title & Body Snippet */}
                   <Text style={styles.questionTitle} numberOfLines={2}>
                     {q.title}
@@ -460,7 +508,7 @@ export default function Questions() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f6f8f7',
+    backgroundColor: '#f4f7f5',
   },
   scroll: {
     flexGrow: 1,
@@ -583,6 +631,45 @@ const styles = StyleSheet.create({
   filterChipTextActive: {
     color: '#ffffff',
   },
+  introWrap: { paddingHorizontal: 16, paddingTop: 10, gap: 10 },
+  introCard: { borderRadius: 26, padding: 18, overflow: 'hidden', gap: 13, shadowColor: '#064e3b', shadowOffset: { width: 0, height: 7 }, shadowOpacity: 0.14, shadowRadius: 16, elevation: 4 },
+  introDecorOne: { position: 'absolute', width: 170, height: 170, borderRadius: 85, backgroundColor: 'rgba(255,255,255,0.07)', top: -95, right: -45 },
+  introDecorTwo: { position: 'absolute', width: 120, height: 120, borderRadius: 60, backgroundColor: 'rgba(255,255,255,0.05)', bottom: -75, left: -28 },
+  introTopRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10 },
+  introIcon: { width: 43, height: 43, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.16)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
+  introEyebrow: { color: '#c6f5dc', textAlign: 'right', fontSize: 10.5, fontWeight: '800', marginBottom: 3 },
+  introTitle: { color: '#ffffff', textAlign: 'right', fontSize: 19, fontWeight: '900', letterSpacing: -0.3 },
+  livePill: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 6, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.13)' },
+  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#86efac' },
+  liveText: { color: '#e7fff1', fontSize: 9.5, fontWeight: '800' },
+  introDescription: { color: '#e0f8eb', textAlign: 'right', fontSize: 12.5, lineHeight: 19 },
+  introStats: { flexDirection: 'row-reverse', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 5, borderRadius: 17, backgroundColor: 'rgba(0,45,32,0.18)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  introStat: { flex: 1, alignItems: 'center', gap: 3 },
+  introStatValue: { color: '#ffffff', fontSize: 19, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  introStatLabel: { color: '#d1fae5', fontSize: 10, fontWeight: '700' },
+  introStatDivider: { width: 1, height: 31, backgroundColor: 'rgba(255,255,255,0.2)' },
+  introCta: { minHeight: 43, borderRadius: 14, backgroundColor: '#ffffff', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 12 },
+  introCtaText: { color: '#08734f', fontSize: 12.5, fontWeight: '900' },
+  locationBar: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, padding: 12, borderRadius: 18, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e1ebe5' },
+  locationIcon: { width: 37, height: 37, borderRadius: 13, backgroundColor: '#eaf8f0', alignItems: 'center', justifyContent: 'center' },
+  locationEyebrow: { textAlign: 'right', color: '#87958d', fontSize: 10, fontWeight: '700' },
+  locationValue: { textAlign: 'right', color: '#17382c', fontSize: 12.5, fontWeight: '900', marginTop: 2 },
+  changeLocation: { flexDirection: 'row-reverse', alignItems: 'center', gap: 3, paddingHorizontal: 9, paddingVertical: 7, borderRadius: 10, backgroundColor: '#f0faf4' },
+  changeLocationText: { color: '#087f5b', fontSize: 11, fontWeight: '900' },
+  listToolbar: { marginHorizontal: 18, marginTop: 10, marginBottom: 4, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' },
+  listHeading: { flexDirection: 'row-reverse', alignItems: 'baseline', gap: 7 },
+  listTitle: { color: '#17382c', fontSize: 15, fontWeight: '900' },
+  listCount: { color: '#84918a', fontSize: 10.5, fontWeight: '700' },
+  sortSwitch: { flexDirection: 'row-reverse', padding: 3, borderRadius: 12, backgroundColor: '#e9efeb', gap: 2 },
+  sortOption: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, paddingHorizontal: 9, paddingVertical: 7, borderRadius: 9 },
+  sortOptionActive: { backgroundColor: '#ffffff', shadowColor: '#164e3b', shadowOpacity: 0.06, shadowRadius: 4, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
+  sortOptionText: { color: '#84918a', fontSize: 10.5, fontWeight: '700' },
+  sortOptionTextActive: { color: '#087f5b', fontWeight: '900' },
+  cardFlagsRow: { flexDirection: 'row-reverse', gap: 6, marginBottom: 8 },
+  pinnedBadge: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 9, backgroundColor: '#fff7df', borderWidth: 1, borderColor: '#f4e2af' },
+  pinnedBadgeText: { color: '#8a5a0a', fontSize: 10, fontWeight: '900' },
+  featuredBadge: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 9, backgroundColor: '#eaf8f0', borderWidth: 1, borderColor: '#c8ead7' },
+  featuredBadgeText: { color: '#047857', fontSize: 10, fontWeight: '900' },
   content: {
     paddingHorizontal: 18,
     paddingTop: 8,
@@ -637,15 +724,15 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: '#fff',
-    borderRadius: 20,
+    borderRadius: 22,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#f1f5f9',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 5,
+    borderColor: '#e8efea',
+    shadowColor: '#164e3b',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.045,
+    shadowRadius: 9,
     elevation: 2,
   },
   cardHeaderRow: {
