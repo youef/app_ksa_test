@@ -33,7 +33,10 @@ import {
   AlignRight,
   RefreshCw,
   Check,
+  SlidersHorizontal,
+  ShieldCheck,
 } from 'lucide-react-native';
+import { supabase } from '@/lib/supabase';
 import { useStoryComposer } from '@/hooks/useStoryComposer';
 import { useStoryPublisher } from '@/hooks/useStoryPublisher';
 import { BG_GRADIENTS, getGradient } from '@/lib/storyGradients';
@@ -48,6 +51,7 @@ const WHATSAPP_FONTS = [
 ];
 
 const QUICK_EMOJIS = ['👋', '☕', '🕌', '🇸🇦', '🌙', '📍', '🌧️', '✨', '🚗', '🏡', '🤝', '🔥'];
+const STORY_TEXT_COLORS = ['#FFFFFF', '#111827', '#F87171', '#FBBF24', '#34D399', '#60A5FA', '#C084FC', '#FB7185'];
 
 export default function CreateStory() {
   const composer = useStoryComposer();
@@ -57,6 +61,20 @@ export default function CreateStory() {
   const [fontIndex, setFontIndex] = useState(0); // default bold
   const [textAlign, setTextAlign] = useState<'center' | 'right' | 'left'>('center');
   const [showPalette, setShowPalette] = useState(false);
+  const [showStoryOptions, setShowStoryOptions] = useState(false);
+  const [audience, setAudience] = useState<'public' | 'followers' | 'custom'>('public');
+  const [audienceCandidates, setAudienceCandidates] = useState<Array<{ id: string; display_name: string | null; username: string | null }>>([]);
+  const [allowedUserIds, setAllowedUserIds] = useState<string[]>([]);
+  const [audienceLoading, setAudienceLoading] = useState(false);
+  const [interactiveType, setInteractiveType] = useState<'none' | 'poll' | 'question'>('none');
+  const [pollQuestion, setPollQuestion] = useState('');
+  const [pollOptionA, setPollOptionA] = useState('نعم');
+  const [pollOptionB, setPollOptionB] = useState('لا');
+  const [questionPrompt, setQuestionPrompt] = useState('');
+  const [textColor, setTextColor] = useState('#FFFFFF');
+  const [fontSize, setFontSize] = useState(28);
+  const [textRotation, setTextRotation] = useState(0);
+  const [textOffset, setTextOffset] = useState({ x: 0, y: 0 });
 
   const withAssetErrors = useCallback(async (fn: () => Promise<unknown>, label: string) => {
     try {
@@ -99,6 +117,41 @@ export default function CreateStory() {
     composer.patchActiveSlide({ content: current + emoji });
   }, [activeSlide, composer]);
 
+  const loadAudienceCandidates = useCallback(async () => {
+    setAudienceLoading(true);
+    try {
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      if (authError) throw authError;
+      const user = authData.user;
+      if (!user) return;
+      const { data: follows, error: followsError } = await supabase
+        .from('follows')
+        .select('follower_id')
+        .eq('following_id', user.id);
+      if (followsError) throw followsError;
+      const ids = [...new Set((follows || []).map((row: { follower_id: string }) => row.follower_id))];
+      if (ids.length === 0) {
+        setAudienceCandidates([]);
+        return;
+      }
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, display_name, username')
+        .in('id', ids);
+      if (profilesError) throw profilesError;
+      setAudienceCandidates((profiles || []) as Array<{ id: string; display_name: string | null; username: string | null }>);
+    } catch (error) {
+      Alert.alert('تعذر تحميل القائمة', error instanceof Error ? error.message : 'حاول مجددًا.');
+    } finally {
+      setAudienceLoading(false);
+    }
+  }, []);
+
+  const handleAudienceChange = useCallback((value: 'public' | 'followers' | 'custom') => {
+    setAudience(value);
+    if (value === 'custom' && audienceCandidates.length === 0) void loadAudienceCandidates();
+  }, [audienceCandidates.length, loadAudienceCandidates]);
+
   const handlePublish = useCallback(async () => {
     if (!composer.isReady) {
       return Alert.alert(
@@ -107,7 +160,30 @@ export default function CreateStory() {
       );
     }
 
-    const outcome = await publisher.publish(composer.slides);
+    if (audience === 'custom' && allowedUserIds.length === 0) {
+      return Alert.alert('اختر الجمهور', 'حدد شخصًا واحدًا على الأقل للقائمة المخصصة.');
+    }
+    if (interactiveType === 'poll' && (!pollQuestion.trim() || !pollOptionA.trim() || !pollOptionB.trim())) {
+      return Alert.alert('استطلاع غير مكتمل', 'أدخل سؤال الاستطلاع والخيارين.');
+    }
+    if (interactiveType === 'question' && !questionPrompt.trim()) {
+      return Alert.alert('السؤال غير مكتمل', 'اكتب السؤال الذي سيظهر للمتابعين.');
+    }
+
+    const outcome = await publisher.publish(composer.slides, {
+      audience,
+      allowedUserIds,
+      interactiveType,
+      pollQuestion,
+      pollOptions: [pollOptionA, pollOptionB],
+      questionPrompt,
+      textColor,
+      fontSize,
+      fontFamily: WHATSAPP_FONTS[fontIndex].id,
+      textRotation,
+      textOffsetX: textOffset.x,
+      textOffsetY: textOffset.y,
+    });
 
     if (outcome.unauthenticated) {
       publisher.reset();
@@ -128,7 +204,7 @@ export default function CreateStory() {
     Alert.alert('تم النشر بنجاح! 🎉', body, [
       { text: 'مشاهدة في الحي', onPress: () => router.replace('/stories') },
     ]);
-  }, [composer, publisher]);
+  }, [composer, publisher, audience, allowedUserIds, interactiveType, pollQuestion, pollOptionA, pollOptionB, questionPrompt, textColor, fontSize, fontIndex, textRotation, textOffset]);
 
   if (!activeSlide) return null;
 
@@ -251,6 +327,15 @@ export default function CreateStory() {
                   </Pressable>
                 </>
               )}
+              <Pressable
+                onPress={() => setShowStoryOptions((value) => !value)}
+                style={[s.toolIconBtn, showStoryOptions && s.toolIconBtnActive]}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="خيارات القصة والخصوصية"
+              >
+                <SlidersHorizontal size={18} color="#fff" />
+              </Pressable>
             </View>
           </View>
 
@@ -298,10 +383,16 @@ export default function CreateStory() {
                   style={[
                     s.whatsAppTextInput,
                     {
-                      fontSize: adaptiveFontSize,
+                      fontSize: fontSize || adaptiveFontSize,
+                      color: textColor,
                       fontWeight: currentFont.fontWeight,
                       fontStyle: currentFont.fontStyle,
                       textAlign: textAlign,
+                      transform: [
+                        { translateX: textOffset.x },
+                        { translateY: textOffset.y },
+                        { rotate: `${textRotation}deg` },
+                      ],
                     },
                   ]}
                   value={activeSlide.content}
@@ -353,6 +444,110 @@ export default function CreateStory() {
                   </Pressable>
                 ))}
               </ScrollView>
+            </View>
+          )}
+
+          {showStoryOptions && (
+            <View style={s.storyOptionsPanel}>
+              <View style={s.optionsSectionHeader}>
+                <ShieldCheck size={15} color="#a7f3d0" />
+                <Text style={s.optionsSectionTitle}>الجمهور والخصوصية</Text>
+              </View>
+              <View style={s.optionsChipRow}>
+                {([
+                  ['public', 'الجميع'],
+                  ['followers', 'المتابعون'],
+                  ['custom', 'قائمة مخصصة'],
+                ] as const).map(([value, label]) => (
+                  <Pressable key={value} onPress={() => handleAudienceChange(value)}
+                    style={[s.optionsChip, audience === value && s.optionsChipActive]}>
+                    <Text style={s.optionsChipText}>{label}</Text>
+                  </Pressable>
+                ))}
+              </View>
+              {audience === 'custom' && (
+                <View style={s.audiencePicker}>
+                  {audienceLoading ? <ActivityIndicator size="small" color="#34d399" /> :
+                    audienceCandidates.length === 0 ? (
+                      <Text style={s.optionsHint}>لا يوجد متابعون متاحون للاختيار حاليًا.</Text>
+                    ) : (
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.optionsChipRow}>
+                        {audienceCandidates.map((person) => {
+                          const selected = allowedUserIds.includes(person.id);
+                          return (
+                            <Pressable key={person.id}
+                              onPress={() => setAllowedUserIds((ids) => selected ? ids.filter((id) => id !== person.id) : [...ids, person.id])}
+                              style={[s.personChip, selected && s.optionsChipActive]}>
+                              <Text style={s.optionsChipText}>{person.display_name || person.username || 'مستخدم'}</Text>
+                              {selected ? <Check size={12} color="#a7f3d0" /> : null}
+                            </Pressable>
+                          );
+                        })}
+                      </ScrollView>
+                    )}
+                </View>
+              )}
+
+              <Text style={s.optionsSectionTitle}>إضافة تفاعل</Text>
+              <View style={s.optionsChipRow}>
+                {([
+                  ['none', 'بدون'],
+                  ['poll', 'استطلاع'],
+                  ['question', 'سؤال'],
+                ] as const).map(([value, label]) => (
+                  <Pressable key={value} onPress={() => setInteractiveType(value)}
+                    style={[s.optionsChip, interactiveType === value && s.optionsChipActive]}>
+                    <Text style={s.optionsChipText}>{label}</Text>
+                  </Pressable>
+                ))}
+              </View>
+              {interactiveType === 'poll' ? (
+                <View style={s.optionsFields}>
+                  <TextInput style={s.optionsInput} value={pollQuestion} onChangeText={setPollQuestion}
+                    placeholder="سؤال الاستطلاع" placeholderTextColor="#94a3b8" maxLength={120} />
+                  <TextInput style={s.optionsInput} value={pollOptionA} onChangeText={setPollOptionA}
+                    placeholder="الخيار الأول" placeholderTextColor="#94a3b8" maxLength={50} />
+                  <TextInput style={s.optionsInput} value={pollOptionB} onChangeText={setPollOptionB}
+                    placeholder="الخيار الثاني" placeholderTextColor="#94a3b8" maxLength={50} />
+                </View>
+              ) : interactiveType === 'question' ? (
+                <TextInput style={s.optionsInput} value={questionPrompt} onChangeText={setQuestionPrompt}
+                  placeholder="السؤال للمتابعين" placeholderTextColor="#94a3b8" maxLength={180} />
+              ) : null}
+
+              <Text style={s.optionsSectionTitle}>تنسيق النص</Text>
+              <View style={s.optionsChipRow}>
+                {STORY_TEXT_COLORS.map((color) => (
+                  <Pressable key={color} onPress={() => setTextColor(color)}
+                    style={[s.storyTextColorDot, { backgroundColor: color }, textColor === color && s.storyTextColorDotActive]} />
+                ))}
+                <Pressable style={s.optionsChip} onPress={() => setFontSize((n) => Math.max(16, n - 2))}>
+                  <Text style={s.optionsChipText}>A−</Text>
+                </Pressable>
+                <Text style={s.optionsChipText}>{fontSize}</Text>
+                <Pressable style={s.optionsChip} onPress={() => setFontSize((n) => Math.min(48, n + 2))}>
+                  <Text style={s.optionsChipText}>A+</Text>
+                </Pressable>
+                <Pressable style={s.optionsChip} onPress={() => setTextRotation((n) => (n + 5) % 360)}>
+                  <Text style={s.optionsChipText}>تدوير ↻</Text>
+                </Pressable>
+                <Pressable style={s.optionsChip} onPress={() => setTextRotation((n) => (n - 5 + 360) % 360)}>
+                  <Text style={s.optionsChipText}>↺</Text>
+                </Pressable>
+              </View>
+              <View style={s.optionsChipRow}>
+                {([
+                  ['↑', 0, -12], ['↓', 0, 12], ['←', -12, 0], ['→', 12, 0],
+                ] as const).map(([label, dx, dy]) => (
+                  <Pressable key={label} style={s.optionsChip}
+                    onPress={() => setTextOffset((pos) => ({ x: Math.max(-140, Math.min(140, pos.x + dx)), y: Math.max(-260, Math.min(260, pos.y + dy)) }))}>
+                    <Text style={s.optionsChipText}>{label}</Text>
+                  </Pressable>
+                ))}
+                <Pressable style={s.optionsChip} onPress={() => { setTextRotation(0); setTextOffset({ x: 0, y: 0 }); }}>
+                  <Text style={s.optionsChipText}>إعادة ضبط الموضع</Text>
+                </Pressable>
+              </View>
             </View>
           )}
 
@@ -454,6 +649,11 @@ export default function CreateStory() {
             <Text style={s.publishingTitle}>جارٍ نشر يومياتك في الحي...</Text>
             {publisher.status ? (
               <Text style={s.publishingStatus}>{publisher.status}</Text>
+            ) : null}
+            {publisher.total > 0 ? (
+              <View style={s.publishProgressTrack}>
+                <View style={[s.publishProgressFill, { width: `${Math.round((publisher.done / publisher.total) * 100)}%` }]} />
+              </View>
             ) : null}
           </View>
         </View>
@@ -848,6 +1048,32 @@ const s = StyleSheet.create({
   whatsAppSendFabDisabled: {
     opacity: 0.5,
   },
+  storyOptionsPanel: {
+    maxHeight: 190,
+    marginHorizontal: 12,
+    marginVertical: 4,
+    padding: 10,
+    borderRadius: 16,
+    backgroundColor: 'rgba(15,23,42,0.94)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+    gap: 7,
+  },
+  optionsSectionHeader: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
+  optionsSectionTitle: { color: '#fff', fontSize: 11, fontWeight: '900', textAlign: 'right' },
+  optionsChipRow: { flexDirection: 'row-reverse', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
+  optionsChip: { paddingHorizontal: 9, paddingVertical: 6, borderRadius: 10, backgroundColor: '#334155', flexDirection: 'row-reverse', alignItems: 'center', gap: 4 },
+  optionsChipActive: { backgroundColor: '#065f46', borderWidth: 1, borderColor: '#34d399' },
+  optionsChipText: { color: '#fff', fontSize: 10, fontWeight: '800' },
+  optionsHint: { color: '#cbd5e1', fontSize: 10, textAlign: 'right' },
+  audiencePicker: { maxHeight: 42 },
+  personChip: { paddingHorizontal: 9, paddingVertical: 6, borderRadius: 10, backgroundColor: '#334155', flexDirection: 'row-reverse', alignItems: 'center', gap: 4 },
+  optionsFields: { gap: 5 },
+  optionsInput: { minHeight: 32, color: '#fff', backgroundColor: 'rgba(255,255,255,0.08)', borderColor: 'rgba(255,255,255,0.2)', borderWidth: 1, borderRadius: 9, paddingHorizontal: 9, paddingVertical: 5, fontSize: 12, textAlign: 'right' },
+  storyTextColorDot: { width: 19, height: 19, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)' },
+  storyTextColorDotActive: { borderWidth: 3, borderColor: '#34d399' },
+  publishProgressTrack: { height: 5, width: '100%', backgroundColor: '#e2e8f0', borderRadius: 5, overflow: 'hidden', marginTop: 4 },
+  publishProgressFill: { height: '100%', backgroundColor: '#059669', borderRadius: 5 },
   publishingOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.75)',
