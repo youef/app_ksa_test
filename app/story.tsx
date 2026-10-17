@@ -65,6 +65,8 @@ export default function StoryViewer() {
   }
 
   function handleStoryPressIn() {
+    // A fresh touch starts a new gesture; long presses are marked below.
+    longPressActive.current = false;
     revealUi();
   }
 
@@ -77,7 +79,7 @@ export default function StoryViewer() {
 
   function handleStoryPressOut() {
     if (longPressActive.current) {
-      longPressActive.current = false;
+      // Keep the marker until onPress is suppressed, or the next touch begins.
       setIsPaused(false);
       revealUi();
     }
@@ -348,7 +350,10 @@ export default function StoryViewer() {
   }
 
   function handleNextStory() {
-    if (longPressActive.current) return;
+    if (longPressActive.current) {
+      longPressActive.current = false;
+      return;
+    }
     if (currentIndex < storiesList.length - 1) {
       setCurrentIndex(prev => prev + 1);
     } else {
@@ -357,7 +362,10 @@ export default function StoryViewer() {
   }
 
   function handlePrevStory() {
-    if (longPressActive.current) return;
+    if (longPressActive.current) {
+      longPressActive.current = false;
+      return;
+    }
     if (currentIndex > 0) {
       setCurrentIndex(prev => prev - 1);
     }
