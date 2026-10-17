@@ -28,6 +28,7 @@ export interface AppHeaderProps {
   city?: string;
   district?: string;
   onOpenLocation?: () => void;
+  showLocation?: boolean;
   profile?: any;
   isGuest?: boolean;
   unreadCount?: number;
@@ -47,6 +48,7 @@ export function AppHeader({
   city = 'كل المدن',
   district,
   onOpenLocation,
+  showLocation = true,
   profile,
   isGuest = false,
   unreadCount = 0,
@@ -117,20 +119,24 @@ export function AppHeader({
             )}
           </View>
 
-          {/* Center: Location Pill (City & District) */}
-          <Pressable
-            onPress={onOpenLocation}
-            style={styles.locationPill}
-            hitSlop={6}
-            accessibilityRole="button"
-            accessibilityLabel="تغيير الحي والموقع"
-          >
-            <MapPin size={14} color="#059669" />
-            <Text style={styles.locationText} numberOfLines={1}>
-              {locationDisplay}
-            </Text>
-            <ChevronDown size={14} color="#64748b" />
-          </Pressable>
+          {showLocation && (
+            <>
+              {/* Center: Location Pill (City & District) */}
+              <Pressable
+                onPress={onOpenLocation}
+                style={styles.locationPill}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityLabel="تغيير الحي والموقع"
+              >
+                <MapPin size={14} color="#059669" />
+                <Text style={styles.locationText} numberOfLines={1}>
+                  {locationDisplay}
+                </Text>
+                <ChevronDown size={14} color="#64748b" />
+              </Pressable>
+            </>
+          )}
 
           {/* Left side in RTL: Notifications & Brand Logo */}
           <View style={styles.sideGroup}>
