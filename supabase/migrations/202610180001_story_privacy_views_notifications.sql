@@ -90,3 +90,16 @@ create policy stories_select on public.stories for select to public using (
     or (coalesce(visibility, 'public') = 'custom' and auth.uid() = any(coalesce(allowed_user_ids, '{}'::uuid[])))
   )
 );
+
+-- Keep anonymous access to public stories while respecting explicit hide lists.
+drop policy if exists stories_select on public.stories;
+create policy stories_select on public.stories for select to public using (
+  expires_at > now()
+  and (auth.uid() is null or not (auth.uid() = any(coalesce(hidden_user_ids, '{}'::uuid[]))))
+  and (
+    coalesce(visibility, 'public') = 'public' or auth.uid() = author_id
+    or (coalesce(visibility, 'public') = 'followers' and auth.uid() is not null
+      and exists (select 1 from public.follows f where f.follower_id = auth.uid() and f.following_id = stories.author_id))
+    or (coalesce(visibility, 'public') = 'custom' and auth.uid() = any(coalesce(allowed_user_ids, '{}'::uuid[])))
+  )
+);
