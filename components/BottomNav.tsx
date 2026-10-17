@@ -1,10 +1,19 @@
-import { useCallback, useEffect, useState, useRef } from 'react';
-import { Keyboard, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  Keyboard,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { router, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Home, Compass, Plus, MessageCircle, MoreHorizontal } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import Animated, { makeMutable, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { supabase } from '@/lib/supabase';
 import { BOTTOM_NAV_HEIGHT } from '@/lib/bottomNav';
 
@@ -30,6 +39,37 @@ const ROUTE_PARENT: Array<[string, string]> = [
 const HIDDEN_PREFIXES = ['/auth', '/questions', '/question', '/conversation'];
 const HIDDEN_EXACT = ['/', '/index'];
 
+// ───────── منطق إخفاء/إظهار الشريط عند السكرول ─────────
+const HIDE_OFFSET = 120;     // مسافة الإخفاء
+const HIDE_AFTER_Y = 60;     // لا يختفي قبل هذا الموضع
+const MIN_DELTA = 8;         // تجاهل الحركات الصغيرة
+
+// قيمة مشتركة (خارج المكوّن) حتى يستطيع أي ScrollView التحكم بها
+const navTranslateY = makeMutable(0);
+
+function setNavHidden(hidden: boolean) {
+  navTranslateY.value = withTiming(hidden ? HIDE_OFFSET : 0, { duration: 200 });
+}
+
+function resolveHidden(y: number, lastY: number): boolean | null {
+  const delta = y - lastY;
+  if (Math.abs(delta) < MIN_DELTA) return null; // لا تغيير
+  if (y <= HIDE_AFTER_Y) return false;
+  return delta > 0;
+}
+
+// للجوال (iOS/Android): مرّره إلى onScroll في أي ScrollView / FlatList
+// مثال: <FlatList onScroll={onNavScroll} scrollEventThrottle={16} />
+let nativeLastY = 0;
+export function onNavScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
+  const y = Math.max(0, e.nativeEvent.contentOffset.y);
+  const hidden = resolveHidden(y, nativeLastY);
+  if (hidden !== null) {
+    setNavHidden(hidden);
+    nativeLastY = y;
+  }
+}
+
 function normalize(path: string) {
   const clean = (path || '/').replace(/\/+$/, '');
   return clean || '/';
@@ -48,13 +88,15 @@ export default function BottomNav() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
 
-  // قيم متحركة لإخفاء/إظهار الشريط بسلاسة عند السكرول
-  const translateY = useSharedValue(0);
-  const lastScrollY = useRef(0);
-
   const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: translateY.value }],
+    transform: [{ translateY: navTranslateY.value }],
   }));
+
+  // إعادة إظهار الشريط عند تغيير الصفحة
+  useEffect(() => {
+    navTranslateY.value = withTiming(0, { duration: 150 });
+    nativeLastY = 0;
+  }, [pathname]);
 
   const refreshUnread = useCallback(async () => {
     try {
@@ -86,9 +128,9 @@ export default function BottomNav() {
   // الاستماع لتغيير الجلسة والرسائل الجديدة (Realtime)
   useEffect(() => {
     void refreshUnread();
-    
-    const { data: authListener } = supabase.auth.onAuthStateChange(() => { 
-      void refreshUnread(); 
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(() => {
+      void refreshUnread();
     });
 
     const channel = supabase
@@ -108,7 +150,7 @@ export default function BottomNav() {
     };
   }, [refreshUnread]);
 
-  // إدارة استماع الكيبورد وحدث السكرول (للويب ومنصة الجوال عبر أحداث مخصصة أو سكرول)
+  // الكيبورد + السكرول (ويب)
   useEffect(() => {
     if (Platform.OS === 'web') {
       const viewport = typeof window !== 'undefined' ? window.visualViewport : null;
@@ -121,29 +163,32 @@ export default function BottomNav() {
         setKeyboardVisible(focused);
       };
 
-      // ميزة الاستماع لحركة السكرول في الويب لإخفاء الشريط
-      const onWindowScroll = () => {
-        const currentScrollY = window.scrollY || window.pageYOffset;
-        if (currentScrollY > lastScrollY.current && currentScrollY > 60) {
-          // التمرير للأسفل -> إخفاء الشريط
-          translateY.value = withTiming(120, { duration: 200 });
-        } else {
-          // التمرير للأعلى -> إظهار الشريط
-          translateY.value = withTiming(0, { duration: 200 });
+      // في React Native Web كل ScrollView له عنصر div خاص به، وحدث scroll لا يصعد (bubble)،
+      // لذلك نستمع في مرحلة capture على window ونتتبع كل عنصر على حدة.
+      const lastPositions = new WeakMap<object, number>();
+      const onAnyScroll = (event: Event) => {
+        const target = event.target as any;
+        const isDoc = target === document || target === document.documentElement || target === document.body;
+        const y = Math.max(0, isDoc ? window.scrollY || window.pageYOffset || 0 : target?.scrollTop ?? 0);
+        const key = (isDoc ? window : target) as object;
+        const last = lastPositions.get(key) ?? 0;
+        const hidden = resolveHidden(y, last);
+        if (hidden !== null) {
+          setNavHidden(hidden);
+          lastPositions.set(key, y);
         }
-        lastScrollY.current = currentScrollY;
       };
 
       viewport?.addEventListener('resize', syncViewport);
       viewport?.addEventListener('scroll', syncViewport);
       window.addEventListener('hayna:composer-focus', onComposerFocus);
-      window.addEventListener('scroll', onWindowScroll, { passive: true });
+      window.addEventListener('scroll', onAnyScroll, { passive: true, capture: true });
 
       return () => {
         viewport?.removeEventListener('resize', syncViewport);
         viewport?.removeEventListener('scroll', syncViewport);
         window.removeEventListener('hayna:composer-focus', onComposerFocus);
-        window.removeEventListener('scroll', onWindowScroll);
+        window.removeEventListener('scroll', onAnyScroll, true);
       };
     }
 
@@ -153,7 +198,7 @@ export default function BottomNav() {
       showSub.remove();
       hideSub.remove();
     };
-  }, [translateY]);
+  }, []);
 
   const path = normalize(pathname);
   const isHiddenRoute = HIDDEN_EXACT.includes(path) || HIDDEN_PREFIXES.some(prefix => path.startsWith(prefix));
