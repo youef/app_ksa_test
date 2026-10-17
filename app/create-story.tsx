@@ -62,7 +62,7 @@ export default function CreateStory() {
   const [audience, setAudience] = useState<'public' | 'followers' | 'custom'>('public');
   const [audienceCandidates, setAudienceCandidates] = useState<Array<{ id: string; display_name: string | null; username: string | null }>>([]);
   const [allowedUserIds, setAllowedUserIds] = useState<string[]>([]);
-  const [hiddenUserIds, setHiddenUserIds] = useState<string[]>([]);
+  const [hiddenUserIds, setHiddenUserIds] = useState<string[]>([]);\n  const [allowStoryReplies, setAllowStoryReplies] = useState(true);
   const [audienceLoading, setAudienceLoading] = useState(false);
   const [interactiveType, setInteractiveType] = useState<'none' | 'poll' | 'question'>('none');
   const [pollQuestion, setPollQuestion] = useState('');
@@ -167,6 +167,7 @@ export default function CreateStory() {
         audience,
         allowedUserIds,
         hiddenUserIds,
+        allowReplies: allowStoryReplies,
         interactiveType,
         pollQuestion,
         pollOptions: [pollOptionA, pollOptionB],
@@ -207,7 +208,7 @@ export default function CreateStory() {
     Alert.alert('تم النشر بنجاح!', body, [
       { text: 'مشاهدة في الحي', onPress: () => router.replace('/stories') },
     ]);
-  }, [composer, publisher, audience, allowedUserIds, hiddenUserIds, interactiveType, pollQuestion, pollOptionA, pollOptionB, questionPrompt, textColor, fontSize, fontIndex, textRotation, textOffset]);
+  }, [composer, publisher, audience, allowedUserIds, hiddenUserIds, allowStoryReplies, interactiveType,, pollOptionA, pollOptionB, questionPrompt, textColor, fontSize, fontIndex, textRotation, textOffset]);
 
   if (!activeSlide) return null;
 
@@ -478,6 +479,15 @@ export default function CreateStory() {
                     )}
                 </View>
               )}
+
+              <View style={s.optionsSectionHeader}>
+                <ShieldCheck size={15} color="#a7f3d0" />
+                <Text style={s.optionsSectionTitle}>الردود على القصة</Text>
+              </View>
+              <Pressable onPress={() => setAllowStoryReplies((value) => !value)} style={[s.optionsChip, allowStoryReplies && s.optionsChipActive]}>
+                <Text style={s.optionsChipText}>{allowStoryReplies ? 'الردود مسموحة' : 'الردود مغلقة'}</Text>
+                <Text style={s.optionsHint}>{allowStoryReplies ? 'يمكن للمشاهدين المسموح لهم الرد على القصة' : 'لن يتمكن أحد من الرد على هذه القصة'}</Text>
+              </Pressable>
 
               <View style={s.optionsSectionHeader}>
                 <ShieldCheck size={15} color="#fbbf24" />
