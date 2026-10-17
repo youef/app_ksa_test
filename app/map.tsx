@@ -241,9 +241,9 @@ export default function MapScreen() {
           {addMenuOpen ? <View style={styles.addMenuWeb}>
             <Text style={styles.addMenuTitle}>وش حاب تضيف للخريطة؟</Text>
             {addAction('محل أو خدمة', '🏪', '/new-service')}
-            {addAction('بلاغ أو تنبيه', '🚨', '/report')}
+            {addAction('تنبيه طارئ', '🚨', '/emergency-alert')}
             {addAction('طلب مساعدة', '🤝', '/new-request')}
-            {addAction('إضافة نشاط تجاري', '📍', '/directory')}
+            {addAction('إعلان أو منتج', '🛍️', '/marketplace-dashboard')}
           </View> : null}
           {selectedPlace ? <View style={styles.placeDetailWeb}>
             <Text style={styles.selectedTitle}>{selectedPlace.name}</Text>
