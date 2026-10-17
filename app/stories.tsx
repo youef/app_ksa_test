@@ -27,6 +27,8 @@ export default function StoriesScreen() {
   const [currentCity, setCurrentCity] = useState<string>('');
   const [currentDistrict, setCurrentDistrict] = useState<string>('');
   const [followingIds, setFollowingIds] = useState<string[]>([]);
+  const [storyNotificationsEnabled, setStoryNotificationsEnabled] = useState(true);
+  const [notificationSettingsBusy, setNotificationSettingsBusy] = useState(false);
 
   useEffect(() => {
     loadAllStories();
@@ -55,6 +57,10 @@ export default function StoriesScreen() {
       setCurrentCity(city);
       setCurrentDistrict(district);
       setFollowingIds(followedIds);
+      if (activeViewerId) {
+        const { data: notificationSettings } = await supabase.from('story_notification_settings').select('enabled').eq('user_id', activeViewerId).maybeSingle();
+        setStoryNotificationsEnabled(notificationSettings?.enabled !== false);
+      }
 
       const { data, error } = await supabase
         .from('stories')
@@ -138,6 +144,30 @@ export default function StoriesScreen() {
     b.totalViews - a.totalViews || new Date(b.newestAt).getTime() - new Date(a.newestAt).getTime()
   );
 
+  async function toggleStoryNotifications() {
+    const { data: auth } = await supabase.auth.getUser();
+    const userId = auth.user?.id;
+    if (!userId) {
+      Alert.alert('تسجيل الدخول مطلوب', 'سجّل الدخول للتحكم في تنبيهات القصص.');
+      return;
+    }
+    if (notificationSettingsBusy) return;
+    const next = !storyNotificationsEnabled;
+    setNotificationSettingsBusy(true);
+    try {
+      const { error } = await supabase.from('story_notification_settings').upsert({
+        user_id: userId, enabled: next, updated_at: new Date().toISOString(),
+      }, { onConflict: 'user_id' });
+      if (error) throw error;
+      setStoryNotificationsEnabled(next);
+      Alert.alert(next ? 'تم تفعيل التنبيهات' : 'تم إيقاف التنبيهات', next ? 'ستصلك تنبيهات عند نشر من تتابعهم قصة جديدة.' : 'لن تصلك تنبيهات القصص الجديدة من الأشخاص الذين تتابعهم.');
+    } catch (error: any) {
+      Alert.alert('تعذر تحديث التنبيهات', error?.message || 'حاول مرة أخرى.');
+    } finally {
+      setNotificationSettingsBusy(false);
+    }
+  }
+
   function openAuthorStories(authorStories: any[]) {
     const firstUnseen = authorStories.find((story: any) => !seenStoryIds.includes(story.id));
     const target = firstUnseen || authorStories[0];
@@ -163,6 +193,20 @@ export default function StoriesScreen() {
           </Pressable>
         }
       />
+
+      <Pressable
+        style={styles.storyNotificationToggle}
+        onPress={toggleStoryNotifications}
+        disabled={notificationSettingsBusy}
+        accessibilityRole="button"
+        accessibilityLabel={storyNotificationsEnabled ? 'إيقاف تنبيهات القصص الجديدة' : 'تفعيل تنبيهات القصص الجديدة'}
+      >
+        <Sparkles size={15} color={storyNotificationsEnabled ? '#D4A72C' : '#64748b'} />
+        <Text style={styles.storyNotificationToggleText}>
+          {storyNotificationsEnabled ? 'تنبيهات قصص المتابَعين مفعّلة' : 'تنبيهات قصص المتابَعين متوقفة'}
+        </Text>
+        <Text style={styles.storyNotificationToggleAction}>{storyNotificationsEnabled ? 'إيقاف' : 'تفعيل'}</Text>
+      </Pressable>
 
       {storyRings.length > 0 && (
         <View style={styles.ringsSection}>
@@ -371,6 +415,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '900',
   },
+  storyNotificationToggle: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginHorizontal: 16, marginTop: 8, marginBottom: 4, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 13, backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0' },
+  storyNotificationToggleText: { flex: 1, textAlign: 'right', color: '#334155', fontSize: 11, fontWeight: '800' },
+  storyNotificationToggleAction: { color: '#047857', fontSize: 11, fontWeight: '900' },
   ringsSection: { backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e2e8f0', paddingTop: 14, paddingBottom: 12 },
   sectionHeadingRow: { flexDirection: 'row-reverse', alignItems: 'center', paddingHorizontal: 16, gap: 10, marginBottom: 10 },
   sectionHeading: { color: '#0f172a', fontSize: 16, fontWeight: '900' },
