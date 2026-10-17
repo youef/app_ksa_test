@@ -448,7 +448,7 @@ export default function CreateStory() {
           )}
 
           {showStoryOptions && (
-            <View style={s.storyOptionsPanel}>
+            <ScrollView style={s.storyOptionsPanel} contentContainerStyle={s.storyOptionsContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
               <View style={s.optionsSectionHeader}>
                 <ShieldCheck size={15} color="#a7f3d0" />
                 <Text style={s.optionsSectionTitle}>الجمهور والخصوصية</Text>
@@ -548,7 +548,7 @@ export default function CreateStory() {
                   <Text style={s.optionsChipText}>إعادة ضبط الموضع</Text>
                 </Pressable>
               </View>
-            </View>
+            </ScrollView>
           )}
 
           {/* Multi-slide carousel indicator strip */}
@@ -597,7 +597,15 @@ export default function CreateStory() {
             {isImageSlide && hasImage ? (
               <View style={s.whatsAppCaptionInputWrap}>
                 <TextInput
-                  style={s.whatsAppCaptionInput}
+                  style={[s.whatsAppCaptionInput, {
+                    color: textColor,
+                    fontSize: Math.min(fontSize, 30),
+                    transform: [
+                      { translateX: textOffset.x },
+                      { translateY: textOffset.y },
+                      { rotate: `${textRotation}deg` },
+                    ],
+                  }]}
                   value={activeSlide.content}
                   onChangeText={(text) => composer.patchActiveSlide({ content: text })}
                   placeholder="إضافة شرح وتفاصيل... 💬"
@@ -1057,8 +1065,8 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(15,23,42,0.94)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.18)',
-    gap: 7,
   },
+  storyOptionsContent: { padding: 10, gap: 7 },
   optionsSectionHeader: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
   optionsSectionTitle: { color: '#fff', fontSize: 11, fontWeight: '900', textAlign: 'right' },
   optionsChipRow: { flexDirection: 'row-reverse', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
