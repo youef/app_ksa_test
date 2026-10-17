@@ -5,7 +5,7 @@ import { ChevronLeft, Flame, Sparkles, HeartHandshake, MessageCircle, SlidersHor
 
 import { supabase } from '@/lib/supabase';
 import { getBrandingLogo, subscribeBrandingLogo, getCachedBrandingLogo } from '@/lib/branding';
-import { isLocationMatching, savePermanentMyLocation, type HaynaLocation } from '@/lib/locationSync';
+import { isLocationMatching, type HaynaLocation } from '@/lib/locationSync';
 import {
   getGreeting,
   isEmergencyQuestion,
@@ -18,7 +18,6 @@ import { useDynamicIsland } from '@/context/DynamicIslandContext';
 import { useHomeFeed } from '@/hooks/useHomeFeed';
 import { useHomeLocation } from '@/hooks/useHomeLocation';
 import { useBottomNavInset } from '@/lib/bottomNav';
-import LocationSelectorModal from '@/components/LocationSelectorModal';
 import TwitterInquiryCard from '@/components/TwitterInquiryCard';
 import AppHeader from '@/components/shared/AppHeader';
 import AtmosphereBar from '@/components/home/AtmosphereBar';
@@ -26,7 +25,6 @@ import StoriesRow from '@/components/home/StoriesRow';
 import { usePlatformConfig } from '@/lib/platformConfig';
 import EmptyState from '@/components/home/EmptyState';
 import { FeedSkeleton, ErrorBanner } from '@/components/home/HomeStates';
-import { LocationGateModal, WeeklyLocationPrompt } from '@/components/home/LocationModals';
 import { styles } from '@/components/home/homeStyles';
 import { requireAccount } from '@/lib/authGate';
 
@@ -47,7 +45,6 @@ export default function Home() {
   const [draftPeriod, setDraftPeriod] = useState('كل الأوقات');
   const [appliedFilters, setAppliedFilters] = useState({ kind: 'الكل', status: 'الكل', period: 'كل الأوقات' });
   const [refreshing, setRefreshing] = useState(false);
-  const [showLocationModal, setShowLocationModal] = useState(false);
   const [greeting] = useState(() => getGreeting());
 
   // The feed hook resolves the saved location; the location hook owns it.
@@ -56,11 +53,6 @@ export default function Home() {
   const feed = useHomeFeed({ onLocation: loc => applyLocationRef.current(loc) });
   const loc = useHomeLocation({ setProfile: feed.setProfile, showToast });
   applyLocationRef.current = loc.apply;
-
-  const { setSetupOpen } = loc;
-  useEffect(() => {
-    setSetupOpen(feed.locationIncomplete);
-  }, [feed.locationIncomplete, setSetupOpen]);
 
   useEffect(() => {
     getBrandingLogo().then(setLogoUri);
@@ -209,64 +201,17 @@ export default function Home() {
     setRefreshing(false);
   }, [feed.reload]);
 
-  const handleLocationSelect = useCallback(
-    (region: string, city: string, district: string) => {
-      const selection = { region, city, district };
-      loc.apply(selection);
-      const incomplete =
-        !region || !city || !district ||
-        city === 'كل المدن' || district === 'كل الأحياء' || district === 'كل أحياء المدينة';
-      void savePermanentMyLocation(selection, Boolean(feed.currentUserId && !incomplete));
-      if (incomplete) {
-        showToast('تم حفظ موقعك بنجاح. تصفح أخبار وخدمات حيك الآن');
-        return;
-      }
-    },
-    [feed.currentUserId, loc.apply, showToast],
-  );
-
   const emergencyTop = derived.emergency[0];
 
   return (
     <View style={styles.container}>
-      <LocationGateModal
-        visible={loc.setupOpen}
-        busy={loc.setupBusy}
-        message={loc.setupMessage}
-        region={loc.region}
-        city={loc.city}
-        district={loc.district}
-        hasExactLocation={loc.hasExactLocation}
-        onSetupLocation={loc.setupRequiredLocation}
-        onEnableNotifications={loc.enableNotifications}
-      />
-
-      <WeeklyLocationPrompt
-        visible={Boolean(feed.currentUserId && loc.promptVisible && !loc.setupOpen)}
-        busy={loc.weeklyBusy}
-        message={loc.weeklyMessage}
-        region={loc.region}
-        city={loc.city}
-        district={loc.district}
-        onUpdate={loc.acceptWeeklyCheck}
-        onOpenSettings={() =>
-          Alert.alert(
-            'كيف أفعّل الموقع؟',
-            'من المتصفح: اضغط أيقونة القفل بجانب عنوان الموقع ثم اسمح بالوصول إلى الموقع، ثم أعد المحاولة.\n\nمن التطبيق: الإعدادات ← التطبيقات ← حيّنا ← الأذونات ← الموقع ← السماح.',
-            [{ text: 'حسناً' }],
-          )
-        }
-      />
-
       <AppHeader
         variant="home"
         profile={feed.profile}
         isGuest={!feed.currentUserId}
         logoUri={logoUri}
-        city={loc.city}
-        district={loc.district}
+        showLocation={false}
         unreadCount={feed.unreadNotifCount}
-        onOpenLocation={() => setShowLocationModal(true)}
       />
 
       <ScrollView
@@ -427,14 +372,6 @@ export default function Home() {
         </View>
       </Modal>
 
-      <LocationSelectorModal
-        visible={showLocationModal}
-        onClose={() => setShowLocationModal(false)}
-        selectedCity={loc.city}
-        selectedDistrict={loc.district}
-        lockedCity={loc.lockedCity}
-        onSelect={handleLocationSelect}
-      />
     </View>
   );
 }
