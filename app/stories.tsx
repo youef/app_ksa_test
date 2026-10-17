@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Platform,
+  Animated,
 } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
@@ -231,7 +232,7 @@ export default function StoriesScreen() {
                         <View style={styles.ringAvatarFallback}><Text style={styles.ringInitial}>{name[0]}</Text></View>}
                     </View>
                     <View style={styles.ringCount}><Text style={styles.ringCountText}>{group.stories.length}</Text></View>
-                  </View>
+                  </Animated.View>
                   <Text style={styles.ringName} numberOfLines={1}>{name}</Text>
                 </Pressable>
               );
