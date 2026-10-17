@@ -15,6 +15,24 @@ export interface StoryGradient {
   name: string;
 }
 
+export type StoryAudience = 'public' | 'followers' | 'custom';
+export type StoryInteractiveType = 'none' | 'poll' | 'question';
+
+export interface StoryPublishOptions {
+  audience: StoryAudience;
+  allowedUserIds: string[];
+  interactiveType: StoryInteractiveType;
+  pollQuestion: string;
+  pollOptions: [string, string];
+  questionPrompt: string;
+  textColor: string;
+  fontSize: number;
+  fontFamily: string;
+  textRotation: number;
+  textOffsetX: number;
+  textOffsetY: number;
+}
+
 export interface StoryInsertPayload {
   author_id: string;
   type: StorySlideType;
@@ -22,6 +40,18 @@ export interface StoryInsertPayload {
   expires_at: string;
   content: string | null;
   image_url: string | null;
+  visibility: StoryAudience;
+  allowed_user_ids: string[];
+  interactive_type: StoryInteractiveType;
+  poll_question: string | null;
+  poll_options: [string, string];
+  question_prompt: string | null;
+  text_color: string;
+  font_size: number;
+  font_family: string;
+  text_rotation: number;
+  text_offset_x: number;
+  text_offset_y: number;
 }
 
 export type PublishPhase = 'idle' | 'publishing';
