@@ -59,6 +59,7 @@ export default function UserProfile() {
   const id = Array.isArray(params.id) ? params.id[0] : (params.id || '');
   const { width } = useWindowDimensions();
   const [profile, setProfile] = useState<any>(null);
+  const [hasActiveStories, setHasActiveStories] = useState(false);
   const [stats, setStats] = useState({
     market: 0,
     services: 0,
@@ -105,6 +106,16 @@ export default function UserProfile() {
       setCurrentUserId(me);
       setProfile(p);
       if (!p) return;
+
+      const nowIso = new Date().toISOString();
+      const yesterdayIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { data: activeStoryRows, error: activeStoryError } = await supabase
+        .from('stories')
+        .select('id')
+        .eq('author_id', id)
+        .or(`expires_at.gt.${nowIso},and(expires_at.is.null,created_at.gte.${yesterdayIso})`)
+        .limit(1);
+      setHasActiveStories(!activeStoryError && !!activeStoryRows?.length);
 
       let isFollowing = false;
       let isFollowedBy = false;
@@ -480,7 +491,7 @@ export default function UserProfile() {
 
             <View style={styles.heroTop}>
               {/* Avatar with Status Ring */}
-              <Pressable style={styles.avatarRing} onPress={openProfileStories} accessibilityRole="button" accessibilityLabel="عرض يوميات هذا المستخدم">
+              <Pressable style={[styles.avatarRing, hasActiveStories && styles.avatarRingHasStory]} onPress={openProfileStories} accessibilityRole="button" accessibilityLabel={hasActiveStories ? "عرض يوميات هذا المستخدم، لديه قصة نشطة" : "عرض يوميات هذا المستخدم"}>
                 {profile.avatar_url && !anonymous && !profile.avatar_url.includes('blank-profile-picture') ? (
                   <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
                 ) : (
@@ -488,6 +499,11 @@ export default function UserProfile() {
                     <Text style={styles.avatarLetter}>
                       {(profile.display_name || profile.username || 'ج')[0].toUpperCase()}
                     </Text>
+                  </View>
+                )}
+                {hasActiveStories && (
+                  <View style={styles.storyAvailableBadge}>
+                    <Sparkles size={11} color="#ffffff" />
                   </View>
                 )}
                 {isAdmin ? (
@@ -901,6 +917,30 @@ const styles = StyleSheet.create({
     borderRadius: 26,
     padding: 3,
     backgroundColor: 'rgba(255,255,255,0.28)',
+  },
+  avatarRingHasStory: {
+    backgroundColor: '#fbbf24',
+    borderWidth: 2,
+    borderColor: '#fde68a',
+    shadowColor: '#f59e0b',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.55,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  storyAvailableBadge: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#f59e0b',
+    borderWidth: 2,
+    borderColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 3,
   },
   avatar: { width: 74, height: 74, borderRadius: 23 },
   avatarFallback: {
