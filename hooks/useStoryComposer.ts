@@ -132,7 +132,7 @@ export function useStoryComposer() {
       mediaTypes: ['images'],
       allowsMultipleSelection: true,
       selectionLimit: STORY_LIMITS.pickerSelectionLimit,
-      quality: 0.85,
+      quality: 0.72,
       base64: true,
     });
     if (res.canceled || !res.assets?.length) return false;
@@ -148,7 +148,7 @@ export function useStoryComposer() {
       mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [9, 16],
-      quality: 0.85,
+      quality: 0.72,
       base64: true,
     });
     if (res.canceled || !res.assets?.length) return false;
