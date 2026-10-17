@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { publishStorySlides, type PublishOutcome } from '@/lib/storyPublish';
-import type { StorySlide } from '@/lib/storyTypes';
+import type { StoryPublishOptions, StorySlide } from '@/lib/storyTypes';
 
 export function useStoryPublisher() {
   const [publishing, setPublishing] = useState(false);
@@ -8,7 +8,7 @@ export function useStoryPublisher() {
   const [done, setDone] = useState(0);
   const [total, setTotal] = useState(0);
 
-  const publish = useCallback(async (slides: StorySlide[]): Promise<PublishOutcome> => {
+  const publish = useCallback(async (slides: StorySlide[], options?: StoryPublishOptions): Promise<PublishOutcome> => {
     setPublishing(true);
     setDone(0);
 
@@ -17,7 +17,7 @@ export function useStoryPublisher() {
         setDone(completed);
         setTotal(count);
         setStatus(`جاري رفع الشريحة ${completed} من ${count}...`);
-      });
+      }, options);
 
       if (outcome.publishedCount === 0) {
         setStatus('');
