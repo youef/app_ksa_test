@@ -53,6 +53,12 @@ export default function MapScreen() {
   const [places, setPlaces] = useState<NearbyPlace[]>([]);
   const [placeCategory, setPlaceCategory] = useState<string>(ALL_PLACES_KEY);
   const [placesLoading, setPlacesLoading] = useState(false);
+  const [sortMode, setSortMode] = useState<'distance' | 'open' | 'rating'>('distance');
+  const [openOnly, setOpenOnly] = useState(false);
+  const [ratedOnly, setRatedOnly] = useState(false);
+  const [selectedPlace, setSelectedPlace] = useState<NearbyPlace | null>(null);
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -70,7 +76,7 @@ export default function MapScreen() {
     (async () => {
       try {
         const loaded = await loadMapPins();
-        if (!cancelled) setPins(loaded);
+        if (!cancelled) { setPins(loaded); setLastUpdated(new Date()); }
       } catch (error) {
         console.warn('map pins failed', error);
       } finally {
@@ -97,6 +103,7 @@ export default function MapScreen() {
       category: category === ALL_PLACES_KEY ? null : category,
     });
     setPlaces(results);
+    setLastUpdated(new Date());
     setPlacesLoading(false);
   };
 
@@ -114,7 +121,25 @@ export default function MapScreen() {
     // Searches the neighbourhood once when the screen opens.
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const visiblePins = useMemo(
+  useEffect(() => {
+    const timer = setInterval(() => {
+      void loadMapPins().then((fresh) => { setPins(fresh); setLastUpdated(new Date()); }).catch(() => {});
+      void runPlaceSearch(placeCategory);
+    }, 60_000);
+    return () => clearInterval(timer);
+  }, [placeCategory]);
+
+  const visiblePlaces = useMemo(() => {
+    let result = [...places];
+    if (openOnly) result = result.filter((place) => place.openNow === true);
+    if (ratedOnly) result = result.filter((place) => place.rating != null);
+    if (sortMode === 'open') result.sort((a, b) => Number(b.openNow === true) - Number(a.openNow === true) || a.distance - b.distance);
+    else if (sortMode === 'rating') result.sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1) || a.distance - b.distance);
+    else result.sort((a, b) => a.distance - b.distance);
+    return result;
+  }, [places, openOnly, ratedOnly, sortMode]);
+
+  const visiblePins = useMemo((
     () => city ? filterPins(pins, { kind, city, query }) : [],
     [pins, kind, city, query],
   );
@@ -167,61 +192,27 @@ export default function MapScreen() {
   );
 
   const placeCard = (place: NearbyPlace) => (
-    <Pressable
-      key={place.id}
-      style={styles.placeCard}
-      onPress={() => setSelected({
-        id: place.id,
-        kind: 'business',
-        title: place.name,
-        body: [place.address, place.hoursText].filter(Boolean).join(' · '),
-        city: '',
-        district: '',
-        area: `${place.categoryLabel} · ${formatDistance(place.distance)}`,
-        lat: place.lat,
-        lng: place.lng,
-        approximate: false,
-        exact: true,
-        href: '',
-        createdAt: '',
-        author: '',
-        ownerId: '',
-        category: place.categoryLabel,
-        verified: false,
-        isOpen: place.openNow ?? true,
-        urgent: false,
-        rating: place.rating,
-        price: null,
-        phone: place.phone,
-      })}
-    >
+    <Pressable key={place.id} style={styles.placeCard} onPress={() => { setSelectedPlace(place); setSelected(null); }}>
       <View style={styles.placeBadge}>
-        <Text style={{ fontSize: 17 }}>
-          {PLACE_CATEGORIES.find((c) => c.key === place.categoryKey)?.emoji ?? '🏬'}
-        </Text>
+        <Text style={{ fontSize: 17 }}>{PLACE_CATEGORIES.find((c) => c.key === place.categoryKey)?.emoji ?? '🏬'}</Text>
       </View>
       <View style={styles.placeBody}>
         <Text style={styles.placeName} numberOfLines={1}>{place.name}</Text>
-        <Text style={styles.placeMeta} numberOfLines={1}>
-          {place.categoryLabel} · {formatDistance(place.distance)}
-          {place.address ? ` · ${place.address}` : ''}
+        <Text style={styles.placeMeta} numberOfLines={2}>
+          {place.categoryLabel} · {formatDistance(place.distance)}{place.address ? ` · ${place.address}` : ''}
         </Text>
         <View style={styles.placeChips}>
-          {place.openNow != null ? (
-            <Text style={[styles.miniChip, place.openNow
-              ? { color: '#15803d', backgroundColor: '#dcfce7' }
-              : { color: '#b91c1c', backgroundColor: '#fee2e2' }]}>
-              {place.openNow ? 'مفتوح' : 'مغلق'}
-            </Text>
-          ) : null}
-          {place.rating != null ? <Text style={styles.miniChip}>★ {place.rating.toFixed(1)}</Text> : null}
-          {place.phone ? (
-            <Text style={[styles.miniChip, { color: '#1d4ed8', backgroundColor: '#eff6ff' }]}>
-              {place.phone}
-            </Text>
-          ) : null}
+          {place.openNow != null ? <Text style={[styles.miniChip, place.openNow ? { color: '#15803d', backgroundColor: '#dcfce7' } : { color: '#b91c1c', backgroundColor: '#fee2e2' }]}>{place.openNow ? 'مفتوح' : 'مغلق'}</Text> : null}
+          {place.rating != null ? <Text style={styles.miniChip}>★ {place.rating.toFixed(1)} ({place.reviews})</Text> : null}
+          {place.phone ? <Text style={[styles.miniChip, { color: '#1d4ed8', backgroundColor: '#eff6ff' }]}>اتصال متاح</Text> : null}
         </View>
       </View>
+    </Pressable>
+  );
+
+  const addAction = (label: string, emoji: string, route: string) => (
+    <Pressable key={route} style={styles.addAction} onPress={() => { setAddMenuOpen(false); router.push(route as never); }}>
+      <Text style={styles.addActionText}>{emoji}  {label}</Text>
     </Pressable>
   );
 
@@ -243,6 +234,11 @@ export default function MapScreen() {
             style={styles.search}
           />
           {filters}
+          <View style={styles.filtersRow}>
+            <Text style={styles.count}>تحديث تلقائي كل دقيقة{lastUpdated ? ` · ${lastUpdated.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })}` : ''}</Text>
+            <Pressable style={styles.addButton} onPress={() => setAddMenuOpen((v) => !v)}><Text style={styles.addButtonText}>＋ إضافة</Text></Pressable>
+          </View>
+          {visiblePlaces.map(placeCard)}
           {visiblePins.map((pin) => (
             <Pressable key={pin.id} style={styles.listCard} onPress={() => router.push(pin.href as never)}>
               <Text style={styles.listTitle} numberOfLines={2}>
@@ -341,16 +337,22 @@ export default function MapScreen() {
           style={styles.search}
         />
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-          {placeChip(ALL_PLACES_KEY, 'كل المحلات')}
+          {placeChip(ALL_PLACES_KEY, 'الكل')}
           {PLACE_CATEGORIES.map((category) =>
             placeChip(category.key, `${category.emoji} ${category.label}`),
           )}
         </ScrollView>
         {filters}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+          <Pressable onPress={() => setSortMode('distance')} style={[styles.sortChip, sortMode === 'distance' && styles.sortChipActive]}><Text style={[styles.sortText, sortMode === 'distance' && styles.sortTextActive]}>الأقرب</Text></Pressable>
+          <Pressable onPress={() => setSortMode('open')} style={[styles.sortChip, sortMode === 'open' && styles.sortChipActive]}><Text style={[styles.sortText, sortMode === 'open' && styles.sortTextActive]}>مفتوح أولاً</Text></Pressable>
+          <Pressable onPress={() => setSortMode('rating')} style={[styles.sortChip, sortMode === 'rating' && styles.sortChipActive]}><Text style={[styles.sortText, sortMode === 'rating' && styles.sortTextActive]}>الأعلى تقييماً</Text></Pressable>
+          <Pressable onPress={() => setOpenOnly((v) => !v)} style={[styles.sortChip, openOnly && styles.sortChipActive]}><Text style={[styles.sortText, openOnly && styles.sortTextActive]}>مفتوح الآن</Text></Pressable>
+          <Pressable onPress={() => setRatedOnly((v) => !v)} style={[styles.sortChip, ratedOnly && styles.sortChipActive]}><Text style={[styles.sortText, ratedOnly && styles.sortTextActive]}>له تقييم</Text></Pressable>
+        </ScrollView>
         <View style={styles.filtersRow}>
-          <Text style={styles.count}>
-            {visiblePins.length} نشاط · {places.length} محل قريب
-          </Text>
+          <Text style={styles.count}>{visiblePins.length} نشاط · {visiblePlaces.length} مكان قريب</Text>
+          <Pressable style={styles.addButton} onPress={() => setAddMenuOpen((v) => !v)}><Text style={styles.addButtonText}>＋ إضافة موقع</Text></Pressable>
           <Pressable style={styles.locationButton} onPress={locateMe} disabled={locating}>
             <Text style={styles.locationButtonText}>
               {locating ? 'جارٍ تحديد موقعي…' : 'موقعي'}
@@ -362,7 +364,7 @@ export default function MapScreen() {
       <View style={styles.placesSheet}>
         <View style={styles.placesHead}>
           <Text style={styles.placesTitle}>
-            {placesLoading ? 'جارٍ البحث عن المحلات القريبة…' : `أقرب المحلات (${places.length})`}
+            {placesLoading ? 'جارٍ تحديث خريطة الحي…' : `أماكن قريبة (${visiblePlaces.length})`}
           </Text>
           {placesLoading ? <ActivityIndicator size="small" color={C.accent} /> : null}
         </View>
@@ -371,12 +373,39 @@ export default function MapScreen() {
           contentContainerStyle={styles.placesContent}
           showsVerticalScrollIndicator={false}
         >
-          {places.map(placeCard)}
+          {visiblePlaces.map(placeCard)}
           {!places.length && !placesLoading ? (
             <Text style={styles.empty}>فعّل الموقع لعرض المحلات القريبة.</Text>
           ) : null}
         </ScrollView>
       </View>
+
+      {addMenuOpen ? (
+        <View style={styles.addMenu}>
+          <View style={styles.addMenuHead}><Text style={styles.addMenuTitle}>وش حاب تضيف للخريطة؟</Text><Pressable onPress={() => setAddMenuOpen(false)}><Text style={styles.closeMenuText}>إغلاق ✕</Text></Pressable></View>
+          {addAction('محل أو خدمة', '🏪', '/new-service')}
+          {addAction('بلاغ أو تنبيه', '🚨', '/report')}
+          {addAction('طلب مساعدة', '🤝', '/new-request')}
+          {addAction('إضافة نشاط تجاري', '📍', '/directory')}
+        </View>
+      ) : null}
+
+      {selectedPlace ? (
+        <View style={styles.placeDetailSheet}>
+          <View style={styles.detailHead}><View style={styles.placeBadge}><Text style={{ fontSize: 20 }}>{PLACE_CATEGORIES.find((c) => c.key === selectedPlace.categoryKey)?.emoji ?? '🏬'}</Text></View><View style={{ flex: 1 }}><Text style={styles.selectedTitle}>{selectedPlace.name}</Text><Text style={styles.selectedMeta}>{selectedPlace.categoryLabel} · {formatDistance(selectedPlace.distance)}</Text></View><Pressable onPress={() => setSelectedPlace(null)}><Text style={styles.closeMenuText}>✕</Text></Pressable></View>
+          {selectedPlace.address ? <Text style={styles.description}>{selectedPlace.address}</Text> : null}
+          <View style={styles.detailFacts}>
+            {selectedPlace.openNow != null ? <Text style={[styles.miniChip, selectedPlace.openNow ? { color: '#15803d', backgroundColor: '#dcfce7' } : { color: '#b91c1c', backgroundColor: '#fee2e2' }]}>{selectedPlace.openNow ? 'مفتوح الآن' : 'مغلق حالياً'}</Text> : null}
+            {selectedPlace.rating != null ? <Text style={styles.miniChip}>★ {selectedPlace.rating.toFixed(1)} · {selectedPlace.reviews} تقييم</Text> : null}
+          </View>
+          {selectedPlace.hoursText ? <Text style={styles.description}>🕒 {selectedPlace.hoursText}</Text> : null}
+          <View style={styles.actions}>
+            <Pressable style={styles.primaryAction} onPress={() => Linking.openURL(selectedPlace.mapsUrl)}><Text style={styles.primaryActionText}>الاتجاهات ↗</Text></Pressable>
+            {selectedPlace.phone ? <Pressable style={styles.secondaryAction} onPress={() => Linking.openURL(`tel:${selectedPlace.phone}`)}><Text style={styles.secondaryActionText}>اتصال</Text></Pressable> : null}
+            <Pressable style={styles.secondaryAction} onPress={() => setSelectedPlace(null)}><Text style={styles.secondaryActionText}>إغلاق</Text></Pressable>
+          </View>
+        </View>
+      ) : null}
 
       {selected ? (
         <View style={styles.selectedPanel}>
@@ -535,6 +564,21 @@ const styles = StyleSheet.create({
   listBody: { flex: 1 },
   listTitle: { fontSize: 13.5, fontWeight: '800', color: C.ink, lineHeight: 20 },
   listMeta: { fontSize: 11.5, color: C.muted, marginTop: 3, fontWeight: '600' },
+  sortChip: { paddingHorizontal: 11, paddingVertical: 6, borderRadius: 14, backgroundColor: '#f8fafc', borderWidth: 1, borderColor: C.line },
+  sortChipActive: { backgroundColor: '#134e4a', borderColor: '#134e4a' },
+  sortText: { fontSize: 11, fontWeight: '800', color: C.muted },
+  sortTextActive: { color: '#fff' },
+  addButton: { borderRadius: 11, paddingHorizontal: 11, paddingVertical: 8, backgroundColor: '#0f766e' },
+  addButtonText: { color: '#fff', fontSize: 12, fontWeight: '900' },
+  addMenu: { position: 'absolute', left: 14, right: 14, bottom: 70, backgroundColor: '#fff', borderRadius: 20, padding: 14, elevation: 12, zIndex: 20, borderWidth: 1, borderColor: C.line },
+  addMenuHead: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  addMenuTitle: { fontSize: 15, fontWeight: '900', color: C.ink, textAlign: 'right' },
+  closeMenuText: { color: C.muted, fontSize: 12, fontWeight: '800', padding: 5 },
+  addAction: { paddingVertical: 12, paddingHorizontal: 12, backgroundColor: '#f8fafc', borderRadius: 12, marginTop: 6 },
+  addActionText: { color: C.ink, fontWeight: '800', textAlign: 'right' },
+  placeDetailSheet: { position: 'absolute', left: 12, right: 12, bottom: 250, backgroundColor: '#fff', borderRadius: 20, padding: 16, elevation: 12, zIndex: 10, borderWidth: 1, borderColor: C.line },
+  detailHead: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10 },
+  detailFacts: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 6, marginTop: 10 },
   selectedPanel: {
     position: 'absolute',
     left: 12,
