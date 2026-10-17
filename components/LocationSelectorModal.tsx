@@ -68,18 +68,38 @@ export default function LocationSelectorModal({
   const [visibleCount, setVisibleCount] = useState(100);
   const [locating, setLocating] = useState(false);
   const [ownLocked, setOwnLocked] = useState<{ region: string; city: string } | null>(null);
+  const [autoLocateAttempted, setAutoLocateAttempted] = useState(false);
 
   // Self-load the GPS lock so every screen that opens this modal respects it,
   // even if the caller does not pass `lockedCity` explicitly.
   useEffect(() => {
-    if (!visible) return;
+    if (!visible || autoLocateAttempted) return;
     let active = true;
     getLockedCity().then(lock => {
       if (!active) return;
       setOwnLocked(lock ? { region: lock.region, city: lock.city } : null);
+
+      const hasSavedCity = Boolean(
+        selectedCity &&
+        !['كل المدن', 'كل المملكة', 'الكل', 'جميع المدن'].includes(selectedCity.trim()) &&
+        isKnownSaudiCity(selectedCity)
+      );
+
+      // First-time setup: detect the real city and neighborhood automatically.
+      // Manual browsing remains only as a fallback when GPS/geocoding is unavailable.
+      if (!lock && !hasSavedCity) {
+        setAutoLocateAttempted(true);
+        void handleUseCurrentLocation();
+      }
+    }).catch(() => {
+      if (!active) return;
+      if (!selectedCity || ['كل المدن', 'كل المملكة', 'الكل', 'جميع المدن'].includes(selectedCity.trim())) {
+        setAutoLocateAttempted(true);
+        void handleUseCurrentLocation();
+      }
     });
     return () => { active = false; };
-  }, [visible]);
+  }, [visible, selectedCity, autoLocateAttempted]);
 
   // Once a city is selected, keep the selector scoped to that city.
   // Users can choose only their district or the whole city.
@@ -269,9 +289,9 @@ export default function LocationSelectorModal({
                 {step === 'district' && `أحياء ${selectedCit?.name}`}
               </Text>
               <Text style={styles.headerSub}>
-                {step === 'region' && 'حدّد مدينتك أول مرة، ثم لن تظهر لك إلا خيارات نطاقها'}
+                {step === 'region' && 'سنحدد مدينتك وحيّك تلقائيًا عند السماح بالموقع'}
                 {step === 'city' && 'اختر مدينتك الحالية'}
-                {step === 'district' && 'اختر حيّك فقط أو اعرض المدينة كاملة'}
+                {step === 'district' && 'تم تحديد موقعك؛ الأحياء المعروضة تخص هذه المدينة فقط'}
               </Text>
             </View>
 
@@ -411,7 +431,7 @@ export default function LocationSelectorModal({
                       <ChevronLeft size={20} color="#94a3b8" />
                       <View style={{ flex: 1 }}>
                         <Text style={styles.itemTitle}>{cit.name}</Text>
-                        <Text style={styles.itemDesc}>{cit.districts.length} أحياء مشهورة</Text>
+                        <Text style={styles.itemDesc}>{cit.districts.length} حيًا من بيانات المدينة</Text>
                       </View>
                       <View style={styles.itemIconWrap}>
                         <MapPin size={18} color="#059669" />
