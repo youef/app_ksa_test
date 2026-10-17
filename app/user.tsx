@@ -499,7 +499,7 @@ export default function UserProfile() {
                     <BadgeCheck size={14} color="#ffffff" />
                   </View>
                 ) : null}
-              </View>
+              </Pressable>
 
               {/* Action Buttons in Hero */}
               <View style={styles.heroActions}>
