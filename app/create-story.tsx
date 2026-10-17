@@ -424,7 +424,6 @@ export default function CreateStory() {
                   شارك صور مشاريع، معالم الحي، أو نشاطاتك اليومية مع جيرانك
                 </Text>
 
-                <Text style={s.emptyPhotoSub}>استخدم زر المعرض أو الكاميرا في الشريط العلوي للمتابعة.</Text>
               </View>
             )}
           </View>
@@ -888,41 +887,6 @@ const s = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 18,
     marginBottom: 20,
-  },
-  emptyPhotoActionsRow: {
-    flexDirection: 'row-reverse',
-    gap: 10,
-    width: '100%',
-  },
-  emptyPhotoBtnPrimary: {
-    flex: 1,
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: '#059669',
-    paddingVertical: 12,
-    borderRadius: 14,
-  },
-  emptyPhotoBtnPrimaryText: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  emptyPhotoBtnSecondary: {
-    flex: 1,
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: '#fff',
-    paddingVertical: 12,
-    borderRadius: 14,
-  },
-  emptyPhotoBtnSecondaryText: {
-    color: '#059669',
-    fontSize: 13,
-    fontWeight: '800',
   },
   emojiBarWrapper: {
     backgroundColor: 'rgba(0,0,0,0.3)',
