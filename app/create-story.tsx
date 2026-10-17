@@ -25,13 +25,10 @@ import {
   Trash2,
   Plus,
   Clock,
-  Sparkles,
-  Layers,
   UploadCloud,
   AlignLeft,
   AlignCenter,
   AlignRight,
-  RefreshCw,
   Check,
   SlidersHorizontal,
   ShieldCheck,
@@ -427,16 +424,7 @@ export default function CreateStory() {
                   شارك صور مشاريع، معالم الحي، أو نشاطاتك اليومية مع جيرانك
                 </Text>
 
-                <View style={s.emptyPhotoActionsRow}>
-                  <Pressable style={s.emptyPhotoBtnPrimary} onPress={handlePickImages}>
-                    <ImageIcon size={18} color="#fff" />
-                    <Text style={s.emptyPhotoBtnPrimaryText}>معرض الصور</Text>
-                  </Pressable>
-                  <Pressable style={s.emptyPhotoBtnSecondary} onPress={handleTakePhoto}>
-                    <Camera size={18} color="#059669" />
-                    <Text style={s.emptyPhotoBtnSecondaryText}>الكاميرا</Text>
-                  </Pressable>
-                </View>
+                <Text style={s.emptyPhotoSub}>استخدم زر المعرض أو الكاميرا في الشريط العلوي للمتابعة.</Text>
               </View>
             )}
           </View>
