@@ -15,6 +15,7 @@ const Camera = Platform.OS !== 'web' ? require('@maplibre/maplibre-react-native'
 const Marker = Platform.OS !== 'web' ? require('@maplibre/maplibre-react-native').Marker : View;
 import { router } from 'expo-router';
 import { AppHeader } from '@/components/shared/AppHeader';
+import NeighborhoodWebMap from '@/components/shared/NeighborhoodWebMap';
 import { C, S } from '@/lib/ui';
 import { getCurrentDeviceLocation, type DeviceLocation } from '@/lib/deviceLocation';
 import {
@@ -257,18 +258,16 @@ export default function MapScreen() {
                   <View><Text style={{ fontSize: 17, fontWeight: '900', color: '#173B31', textAlign: 'right' }}>استكشف على الخريطة</Text><Text style={{ color: '#788980', fontSize: 11, marginTop: 4, textAlign: 'right' }}>{city ? 'المحتوى القريب من ' + city : 'عرض عام للمحتوى المنشور'}</Text></View>
                   <View style={{ backgroundColor: '#E8F5ED', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 7 }}><Text style={{ color: '#19704E', fontSize: 11, fontWeight: '800' }}>● بيانات الحي</Text></View>
                 </View>
-                <View style={{ height: 390, borderRadius: 17, overflow: 'hidden', backgroundColor: '#E8EEE8', position: 'relative', borderWidth: 1, borderColor: '#D8E3DA' }}>
-                  <View style={{ position: 'absolute', left: '-10%', top: '12%', width: '120%', height: 18, backgroundColor: '#fff', borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#D9E2DC', transform: [{ rotate: '18deg' }] }} />
-                  <View style={{ position: 'absolute', left: '-12%', top: '42%', width: '125%', height: 23, backgroundColor: '#fff', borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#D9E2DC', transform: [{ rotate: '-27deg' }] }} />
-                  <View style={{ position: 'absolute', left: '-10%', top: '72%', width: '120%', height: 17, backgroundColor: '#fff', borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#D9E2DC', transform: [{ rotate: '9deg' }] }} />
-                  <View style={{ position: 'absolute', left: '18%', top: '-10%', width: 16, height: '125%', backgroundColor: '#fff', borderLeftWidth: 1, borderRightWidth: 1, borderColor: '#D9E2DC', transform: [{ rotate: '24deg' }] }} />
-                  <View style={{ position: 'absolute', right: '17%', top: '-10%', width: 20, height: '125%', backgroundColor: '#fff', borderLeftWidth: 1, borderRightWidth: 1, borderColor: '#D9E2DC', transform: [{ rotate: '-12deg' }] }} />
-                  <View style={{ position: 'absolute', left: '8%', top: '26%', width: 100, height: 58, borderRadius: 14, backgroundColor: '#D3E6D2', transform: [{ rotate: '-12deg' }] }} />
-                  <View style={{ position: 'absolute', right: '8%', bottom: '15%', width: 130, height: 64, borderRadius: 16, backgroundColor: '#D3E6D2', transform: [{ rotate: '9deg' }] }} />
-                  <View style={{ position: 'absolute', right: 12, top: 12, backgroundColor: '#FFFFFFF2', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9 }}><Text style={{ color: '#23483B', fontSize: 11, fontWeight: '900' }}>⌖ {city || 'المملكة العربية السعودية'}</Text></View>
-                  {webPins.map((pin, index) => { const positions = [{ top: '24%', left: '25%' }, { top: '39%', left: '52%' }, { top: '58%', left: '31%' }, { top: '22%', left: '72%' }, { top: '68%', left: '68%' }, { top: '48%', left: '81%' }, { top: '76%', left: '43%' }, { top: '36%', left: '14%' }, { top: '62%', left: '52%' }, { top: '15%', left: '48%' }, { top: '78%', left: '17%' }, { top: '48%', left: '64%' }]; const meta = MAP_PIN_KINDS[pin.kind]; return <Pressable key={pin.id} onPress={() => setSelected(pin)} style={[{ position: 'absolute', width: 39, height: 39, borderRadius: 14, borderBottomLeftRadius: 4, borderWidth: 2, borderColor: '#fff', alignItems: 'center', justifyContent: 'center', elevation: 5, boxShadow: '0 4px 12px #193c2b30' as never, transform: [{ rotate: '-45deg' }] }, positions[index], { backgroundColor: meta.color }]}><Text style={{ color: '#fff', fontSize: 16, transform: [{ rotate: '45deg' }] }}>{meta.emoji}</Text></Pressable>; })}
-                  <View style={{ position: 'absolute', bottom: 12, left: 12, backgroundColor: '#fff', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9 }}><Text style={{ color: '#45665A', fontSize: 11, fontWeight: '800' }}>{webPins.length} علامة معروضة</Text></View>
-                  <Pressable onPress={locateMe} style={{ position: 'absolute', bottom: 12, right: 12, width: 42, height: 42, borderRadius: 14, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#DCE5DE' }}><Text style={{ fontSize: 21, color: '#176B4D' }}>◎</Text></Pressable>
+                <View style={{ height: 390, borderRadius: 17, overflow: 'hidden', borderWidth: 1, borderColor: '#D8E3DA' }}>
+                  <NeighborhoodWebMap
+                    pins={webPins}
+                    places={visiblePlaces}
+                    center={findPlaceCenter(city)}
+                    city={city}
+                    onSelectPin={(pin) => setSelected(pin)}
+                    onSelectPlace={(place) => { setSelectedPlace(place); setSelected(null); }}
+                    onLocate={locateMe}
+                  />
                 </View>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row-reverse', gap: 7, paddingTop: 13 }}>
                   {chip('all', 'الكل', '#173B31', kindCounts.all || 0)}
