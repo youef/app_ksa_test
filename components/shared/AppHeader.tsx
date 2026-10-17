@@ -6,9 +6,6 @@ import { BlurView } from 'expo-blur';
 import {
   ChevronRight,
   Bell,
-  Bookmark,
-  MapPin,
-  ChevronDown,
   ShieldCheck,
   LogIn,
 } from 'lucide-react-native';
@@ -25,10 +22,6 @@ export interface AppHeaderProps {
   rightAction?: ReactNode;
 
   // Home variant props
-  city?: string;
-  district?: string;
-  onOpenLocation?: () => void;
-  showLocation?: boolean;
   profile?: any;
   isGuest?: boolean;
   unreadCount?: number;
@@ -45,10 +38,6 @@ export function AppHeader({
   subtitle,
   fallbackRoute = '/home',
   rightAction,
-  city = 'كل المدن',
-  district,
-  onOpenLocation,
-  showLocation = true,
   profile,
   isGuest = false,
   unreadCount = 0,
@@ -69,11 +58,6 @@ export function AppHeader({
       router.replace(fallbackRoute as never);
     }
   };
-
-  const locationDisplay =
-    district && district !== 'كل الأحياء' && district !== 'كل أحياء المدينة'
-      ? `${city} · حي ${district}`
-      : city || 'كل المملكة';
 
   const renderContent = () => {
     // 1. HOME VARIANT
@@ -119,25 +103,6 @@ export function AppHeader({
             )}
           </View>
 
-          {showLocation && (
-            <>
-              {/* Center: Location Pill (City & District) */}
-              <Pressable
-                onPress={onOpenLocation}
-                style={styles.locationPill}
-                hitSlop={6}
-                accessibilityRole="button"
-                accessibilityLabel="تغيير الحي والموقع"
-              >
-                <MapPin size={14} color="#059669" />
-                <Text style={styles.locationText} numberOfLines={1}>
-                  {locationDisplay}
-                </Text>
-                <ChevronDown size={14} color="#64748b" />
-              </Pressable>
-            </>
-          )}
-
           {/* Left side in RTL: Notifications & Brand Logo */}
           <View style={styles.sideGroup}>
             {!isGuest && (
@@ -155,15 +120,6 @@ export function AppHeader({
                       <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
                     </View>
                   )}
-                </Pressable>
-                <Pressable
-                  onPress={() => router.push('/favorites')}
-                  style={styles.iconCircle}
-                  hitSlop={8}
-                  accessibilityRole="button"
-                  accessibilityLabel="المفضلة"
-                >
-                  <Bookmark size={17} color="#334155" />
                 </Pressable>
               </>
             )}
@@ -378,26 +334,6 @@ const styles = StyleSheet.create({
     borderColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  locationPill: {
-    flex: 1,
-    maxWidth: 210,
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-    backgroundColor: '#f8fafc',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 18,
-  },
-  locationText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#0f172a',
-    maxWidth: 155,
   },
   iconCircle: {
     width: 36,
