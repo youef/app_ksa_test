@@ -246,6 +246,14 @@ export default function StoryViewer() {
     return () => animation.stop();
   }, [currentIndex, isPaused, showReplyBox, storiesList.length]);
 
+
+  useEffect(() => {
+    const nextStory = storiesList[currentIndex + 1];
+    if (nextStory?.type === 'image' && nextStory.image_url) {
+      Image.prefetch(nextStory.image_url).catch(() => {});
+    }
+  }, [currentIndex, storiesList]);
+
   async function showStoryViewers() {
     if (!currentStory?.id || currentStory.author_id !== currentUserId) return;
     try {
@@ -443,11 +451,19 @@ export default function StoryViewer() {
       <View style={styles.container}>
         {/* Story Background */}
         {currentStory.type === 'image' && currentStory.image_url ? (
-          <Image source={{ uri: currentStory.image_url }} style={styles.bgImage} resizeMode="cover" />
+          <Image
+            key={currentStory.image_url}
+            source={{ uri: currentStory.image_url }}
+            style={styles.bgImage}
+            resizeMode="cover"
+            resizeMethod="scale"
+            fadeDuration={0}
+            accessibilityLabel="صورة القصة بملء الشاشة"
+          />
         ) : null}
 
         <LinearGradient
-          colors={currentStory.type === 'image' ? ['rgba(0,0,0,0.3)', 'rgba(0,0,0,0.75)'] : gradColors}
+          colors={currentStory.type === 'image' ? ['rgba(0,0,0,0.08)', 'rgba(0,0,0,0.42)'] : gradColors}
           style={styles.gradient}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
@@ -732,16 +748,16 @@ const styles = StyleSheet.create({
   notFoundText: { color: '#fff', fontSize: 17, fontWeight: '700', marginBottom: 20, textAlign: 'center' },
   backBtn: { backgroundColor: '#059669', paddingHorizontal: 28, paddingVertical: 12, borderRadius: 14 },
   backBtnText: { color: '#fff', fontWeight: '800', fontSize: 15 },
-  bgImage: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+  bgImage: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%', backgroundColor: '#080808' },
   gradient: {
     flex: 1,
-    paddingBottom: Platform.OS === 'ios' ? 36 : 20,
+    flex: 1,\n    paddingBottom: Platform.OS === 'ios' ? 30 : 12,
   },
   progressRow: {
     flexDirection: 'row',
     gap: 4,
     paddingHorizontal: 14,
-    marginTop: Platform.OS === 'ios' ? 52 : 40,
+    marginTop: Platform.OS === 'ios' ? 54 : 34,
     zIndex: 20,
   },
   progressSegmentTrack: {
@@ -773,7 +789,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.35)',
+    backgroundColor: 'rgba(0,0,0,0.28)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -854,14 +870,14 @@ const styles = StyleSheet.create({
     lineHeight: 42,
     textShadowColor: 'rgba(0,0,0,0.5)',
     textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 8,
+    textShadowRadius: 10,
   },
   imageStory: {
     width: '100%',
     alignItems: 'center',
   },
   captionContainer: {
-    backgroundColor: 'rgba(0,0,0,0.65)',
+    backgroundColor: 'rgba(0,0,0,0.48)',
     borderRadius: 16,
     paddingHorizontal: 18,
     paddingVertical: 10,
@@ -912,7 +928,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.35)',
     borderRadius: 24,
     borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.45)',
+    borderColor: 'rgba(255,255,255,0.35)',
     height: 48,
     justifyContent: 'center',
     paddingHorizontal: 18,
