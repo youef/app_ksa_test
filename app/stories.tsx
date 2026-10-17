@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -28,7 +28,7 @@ export default function StoriesScreen() {
   const [currentDistrict, setCurrentDistrict] = useState<string>('');
   const [followingIds, setFollowingIds] = useState<string[]>([]);
   const [storyNotificationsEnabled, setStoryNotificationsEnabled] = useState(true);
-  const [notificationSettingsBusy, setNotificationSettingsBusy] = useState(false);
+  const [notificationSettingsBusy, setNotificationSettingsBusy] = useState(false);\n  const storyRingPulse = useRef(new Animated.Value(1)).current;\n\n  useEffect(() => {\n    const pulse = Animated.loop(Animated.sequence([\n      Animated.timing(storyRingPulse, { toValue: 1.06, duration: 850, useNativeDriver: true }),\n      Animated.timing(storyRingPulse, { toValue: 1, duration: 850, useNativeDriver: true }),\n    ]));\n    pulse.start();\n    return () => pulse.stop();\n  }, [storyRingPulse]);
 
   useEffect(() => {
     loadAllStories();
@@ -225,7 +225,7 @@ export default function StoriesScreen() {
                 <Pressable key={group.authorId} style={styles.ringItem}
                   onPress={() => openAuthorStories(group.stories)}
                   accessibilityRole="button" accessibilityLabel={`عرض يوميات ${name}`}>
-                  <View style={[styles.ringOuter, group.hasUnseen ? styles.ringUnseen : styles.ringSeen]}>
+                  <Animated.View style={[styles.ringOuter, group.hasUnseen ? styles.ringUnseen : styles.ringSeen, group.stories.length > 1 && { transform: [{ scale: storyRingPulse }] }]}>
                     <View style={styles.ringInner}>
                       {author?.avatar_url ? <Image source={{ uri: author.avatar_url }} style={styles.ringAvatar} /> :
                         <View style={styles.ringAvatarFallback}><Text style={styles.ringInitial}>{name[0]}</Text></View>}
