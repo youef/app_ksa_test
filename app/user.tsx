@@ -252,6 +252,26 @@ export default function UserProfile() {
     void load();
   }, [id]);
 
+  async function openProfileStories() {
+    if (!id || blocked || blockedByOther) return;
+    try {
+      const nowIso = new Date().toISOString();
+      const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { data, error } = await supabase
+        .from('stories')
+        .select('id')
+        .eq('author_id', id)
+        .or(`expires_at.gt.${nowIso},and(expires_at.is.null,created_at.gte.${yesterday})`)
+        .order('created_at', { ascending: true })
+        .limit(1);
+      if (error) throw error;
+      if (data?.[0]?.id) router.push({ pathname: '/story', params: { id: data[0].id } });
+      else Alert.alert('لا توجد يوميات نشطة', 'هذا المستخدم لا يملك يوميات متاحة حالياً.');
+    } catch {
+      Alert.alert('تعذر فتح اليوميات', 'تحقق من اتصالك وحاول مرة أخرى.');
+    }
+  }
+
   async function toggleFollow() {
     if (!currentUserId) return Alert.alert('تسجيل الدخول مطلوب', 'سجّل دخولك أولاً لمتابعة المستخدمين.');
     if (currentUserId === id || blocked || blockedByOther || busy) return;
@@ -460,7 +480,7 @@ export default function UserProfile() {
 
             <View style={styles.heroTop}>
               {/* Avatar with Status Ring */}
-              <View style={styles.avatarRing}>
+              <Pressable style={styles.avatarRing} onPress={openProfileStories} accessibilityRole="button" accessibilityLabel="عرض يوميات هذا المستخدم">
                 {profile.avatar_url && !anonymous && !profile.avatar_url.includes('blank-profile-picture') ? (
                   <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
                 ) : (
