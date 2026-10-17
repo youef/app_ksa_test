@@ -98,7 +98,7 @@ export default function UserProfile() {
   }, [width]);
 
   const load = async (silent = false) => {
-    if (!id) return;
+    if (!lookupKey) return;
     if (!silent) setLoading(true);
     try {
       const { data: sessionData } = await supabase.auth.getSession();
@@ -116,7 +116,7 @@ export default function UserProfile() {
       const yesterdayIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       const { data: activeStoryRows, error: activeStoryError } = await supabase
         .from('stories')
-        .select('p.id')
+        .select('id')
         .eq('author_id', p.id)
         .or(`expires_at.gt.${nowIso},and(expires_at.is.null,created_at.gte.${yesterdayIso})`)
         .limit(1);
@@ -128,15 +128,15 @@ export default function UserProfile() {
       let blockedMe = false;
       if (me && me !== p.id) {
         const [a, b, c] = await Promise.all([
-          supabase.from('follows').select('p.id').eq('follower_id', me).eq('following_id', p.id).maybeSingle(),
-          supabase.from('follows').select('p.id').eq('follower_id', p.id).eq('following_id', me).maybeSingle(),
+          supabase.from('follows').select('id').eq('follower_id', me).eq('following_id', p.id).maybeSingle(),
+          supabase.from('follows').select('id').eq('follower_id', p.id).eq('following_id', me).maybeSingle(),
           getBlockStatus(me, p.id),
         ]);
         isFollowing = !!a.data;
         isFollowedBy = !!b.data;
         iBlocked = c.iBlocked;
         blockedMe = c.blockedMe;
-        const { data: mine } = await supabase.from('profiles').select('city,district').eq('p.id', me).maybeSingle();
+        const { data: mine } = await supabase.from('profiles').select('city,district').eq('id', me).maybeSingle();
         setSameDistrict(!!mine && isExactDistrictMatching(p, mine.city, mine.district));
       } else {
         setSameDistrict(true);
@@ -195,36 +195,38 @@ export default function UserProfile() {
         supabase.from('reputation').select('points').eq('user_id', p.id).maybeSingle(),
         supabase
           .from('marketplace_items')
-          .select('p.id,title,description,price,item_type,district,image_url,status,created_at')
+          .select('id,title,description,price,item_type,district,image_url,status,created_at')
           .eq('seller_id', p.id)
           .order('created_at', { ascending: false })
           .limit(18),
         supabase
           .from('services')
-          .select('p.id,name,description,category,district,price_from,price_to,available_now,is_verified,cover_url,created_at')
+          .select('id,name,description,category,district,price_from,price_to,available_now,is_verified,cover_url,created_at')
           .eq('provider_id', p.id)
           .order('created_at', { ascending: false })
           .limit(18),
         supabase
           .from('requests')
-          .select('p.id,title,description,status,resolution_status,is_pinned,request_type,budget,is_urgent,district,created_at')
+          .select('id,title,description,status,resolution_status,is_pinned,request_type,budget,is_urgent,district,created_at')
           .eq('requester_id', p.id)
           .order('is_pinned', { ascending: false })
           .order('created_at', { ascending: false })
           .limit(18),
         supabase
           .from('questions')
-          .select('p.id,title,body,status,resolution_status,is_pinned,category,district,created_at,view_count,views_count,is_emergency,item_type')
+          .select('id,title,body,status,resolution_status,is_pinned,category,district,created_at,view_count,views_count,is_emergency,item_type')
           .eq('author_id', p.id)
           .order('is_pinned', { ascending: false })
           .order('created_at', { ascending: false })
           .limit(18),
-        supabase
-          .from('answers')
-          .select('p.id,body,created_at,question_id,questions(p.id,title,city,district)')
-          .eq('author_id', p.id)
-          .order('created_at', { ascending: false })
-          .limit(18),
+        me === p.id
+          ? supabase
+              .from('answers')
+              .select('id,body,created_at,question_id,questions(id,title,city,district)')
+              .eq('author_id', p.id)
+              .order('created_at', { ascending: false })
+              .limit(18)
+          : Promise.resolve({ data: [], error: null }),
       ]);
 
       setStats({
@@ -246,7 +248,7 @@ export default function UserProfile() {
       // Smart default tab selection based on real contributions
       if (questionRows.data && questionRows.data.length > 0) {
         setTab('questions');
-      } else if (answerRows.data && answerRows.data.length > 0) {
+      } else if (me === p.id && answerRows.data && answerRows.data.length > 0) {
         setTab('answers');
       } else if (serviceRows.data && serviceRows.data.length > 0) {
         setTab('services');
