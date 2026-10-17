@@ -21,7 +21,7 @@ export type StoryInteractiveType = 'none' | 'poll' | 'question';
 export interface StoryPublishOptions {
   audience: StoryAudience;
   allowedUserIds: string[];
-  hiddenUserIds: string[];
+  hiddenUserIds: string[];\n  allowReplies: boolean;
   interactiveType: StoryInteractiveType;
   pollQuestion: string;
   pollOptions: [string, string];
@@ -43,7 +43,7 @@ export interface StoryInsertPayload {
   image_url: string | null;
   visibility: StoryAudience;
   allowed_user_ids: string[];
-  hidden_user_ids: string[];
+  hidden_user_ids: string[];\n  allow_replies: boolean;
   interactive_type: StoryInteractiveType;
   poll_question: string | null;
   poll_options: [string, string];
