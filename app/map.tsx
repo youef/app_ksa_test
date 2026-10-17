@@ -217,56 +217,91 @@ export default function MapScreen() {
   );
 
   if (Platform.OS === 'web') {
+    const webPins = visiblePins.slice(0, 12);
     return (
-      <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
-        <AppHeader
-          variant="sub"
-          title="خريطة حيّنا 🗺️"
-          subtitle={`${visiblePins.length} نشاط · ${places.length} محل قريب`}
-          fallbackRoute="/home"
-        />
-        <ScrollView contentContainerStyle={[S.page, { paddingTop: 10 }]}>
-          <TextInput
-            value={query}
-            onChangeText={setQuery}
-            placeholder="ابحث في الخريطة..."
-            placeholderTextColor={C.muted}
-            style={styles.search}
-          />
-          {filters}
-          <View style={styles.filtersRow}>
-            <Text style={styles.count}>تحديث تلقائي كل دقيقة{lastUpdated ? ` · ${lastUpdated.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })}` : ''}</Text>
-            <Pressable style={styles.addButton} onPress={() => setAddMenuOpen((v) => !v)}><Text style={styles.addButtonText}>＋ إضافة</Text></Pressable>
-          </View>
-          {addMenuOpen ? <View style={styles.addMenuWeb}>
-            <Text style={styles.addMenuTitle}>وش حاب تضيف للخريطة؟</Text>
-            {addAction('محل أو خدمة', '🏪', '/new-service')}
-            {addAction('تنبيه طارئ', '🚨', '/emergency-alert')}
-            {addAction('طلب مساعدة', '🤝', '/new-request')}
-            {addAction('إعلان أو منتج', '🛍️', '/marketplace-dashboard')}
-          {addAction('فعالية للحي', '🎉', '/market?section=events')}
-          </View> : null}
-          {selectedPlace ? <View style={styles.placeDetailWeb}>
-            <Text style={styles.selectedTitle}>{selectedPlace.name}</Text>
-            <Text style={styles.selectedMeta}>{selectedPlace.categoryLabel} · {formatDistance(selectedPlace.distance)}</Text>
-            {selectedPlace.address ? <Text style={styles.description}>{selectedPlace.address}</Text> : null}
-            {selectedPlace.hoursText ? <Text style={styles.description}>🕒 {selectedPlace.hoursText}</Text> : null}
-            <View style={styles.actions}>
-              <Pressable style={styles.primaryAction} onPress={() => Linking.openURL(selectedPlace.mapsUrl)}><Text style={styles.primaryActionText}>الاتجاهات ↗</Text></Pressable>
-              {selectedPlace.phone ? <Pressable style={styles.secondaryAction} onPress={() => Linking.openURL('tel:' + selectedPlace.phone)}><Text style={styles.secondaryActionText}>اتصال</Text></Pressable> : null}
-              <Pressable style={styles.secondaryAction} onPress={() => setSelectedPlace(null)}><Text style={styles.secondaryActionText}>إغلاق</Text></Pressable>
+      <View style={{ flex: 1, backgroundColor: '#F4F7F5', minHeight: '100vh' as never }}>
+        <View style={{ backgroundColor: '#123F35', paddingHorizontal: 24, paddingTop: 22, paddingBottom: 22, borderBottomLeftRadius: 26, borderBottomRightRadius: 26 }}>
+          <View style={{ maxWidth: 1240, width: '100%', alignSelf: 'center' }}>
+            <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+              <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 12 }}>
+                <View style={{ width: 48, height: 48, borderRadius: 16, backgroundColor: '#FFFFFF20', alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 26, color: '#fff' }}>⌖</Text></View>
+                <View><Text style={{ color: '#fff', fontSize: 25, fontWeight: '900', textAlign: 'right' }}>خريطة الحي</Text><Text style={{ color: '#D1E6DD', fontSize: 12, marginTop: 3, textAlign: 'right' }}>كل ما حولك، في مكان واحد</Text></View>
+              </View>
+              <View style={{ flexDirection: 'row-reverse', gap: 8, flexWrap: 'wrap' }}>
+                <Pressable onPress={locateMe} disabled={locating} style={{ backgroundColor: '#FFFFFF18', borderWidth: 1, borderColor: '#FFFFFF50', borderRadius: 14, paddingHorizontal: 16, paddingVertical: 11 }}><Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }}>{locating ? 'جارٍ تحديد الموقع…' : '◎ موقعي الحالي'}</Text></Pressable>
+                <Pressable onPress={() => setAddMenuOpen(v => !v)} style={{ backgroundColor: '#E4B76A', borderRadius: 14, paddingHorizontal: 18, paddingVertical: 11 }}><Text style={{ color: '#173B31', fontWeight: '900', fontSize: 13 }}>＋ إضافة للحي</Text></Pressable>
+              </View>
             </View>
-          </View> : null}
-          {visiblePlaces.map(placeCard)}
-          {visiblePins.map((pin) => (
-            <Pressable key={pin.id} style={styles.listCard} onPress={() => router.push(pin.href as never)}>
-              <Text style={styles.listTitle} numberOfLines={2}>
-                {MAP_PIN_KINDS[pin.kind].emoji} {pin.title}
-              </Text>
-              <Text style={styles.listMeta} numberOfLines={1}>{pin.area}</Text>
-            </Pressable>
-          ))}
-        </ScrollView>
+            <View style={{ marginTop: 22, flexDirection: 'row-reverse', alignItems: 'center', gap: 10, backgroundColor: '#FFFFFF', borderRadius: 16, paddingHorizontal: 15, paddingVertical: 3, maxWidth: 700, alignSelf: 'flex-end', width: '100%', boxShadow: '0 8px 25px #092c2015' as never }}>
+              <Text style={{ color: '#648076', fontSize: 20 }}>⌕</Text>
+              <TextInput value={query} onChangeText={setQuery} placeholder="ابحث عن فعالية، متجر، خدمة أو تنبيه..." placeholderTextColor="#82928C" style={{ flex: 1, color: '#173B31', textAlign: 'right', fontSize: 14, paddingVertical: 13, outlineStyle: 'none' as never }} />
+              <Text style={{ color: '#82928C' }}>☷</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={{ maxWidth: 1240, width: '100%', alignSelf: 'center', paddingHorizontal: 18, paddingTop: 20, paddingBottom: 40 }}>
+          <View style={{ flexDirection: 'row-reverse', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
+            {[
+              { label: 'منشورات الحي', value: String(visiblePins.length), icon: '✦', bg: '#E7F4ED' },
+              { label: 'أماكن قريبة', value: String(visiblePlaces.length), icon: '⌖', bg: '#E8F0FB' },
+              { label: 'تنبيهات عاجلة', value: String(scopedPins.filter(p => p.urgent || p.kind === 'alert' || p.kind === 'emergency').length), icon: '!', bg: '#FCE9E7' },
+              { label: 'آخر تحديث', value: lastUpdated ? lastUpdated.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }) : 'الآن', icon: '↻', bg: '#FFF2D9' },
+            ].map((stat) => <View key={stat.label} style={{ flexGrow: 1, minWidth: 145, backgroundColor: '#fff', borderRadius: 18, borderWidth: 1, borderColor: '#E4EBE6', padding: 15, flexDirection: 'row-reverse', alignItems: 'center', gap: 12 }}><View style={{ width: 42, height: 42, borderRadius: 14, backgroundColor: stat.bg, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 20, fontWeight: '900', color: '#174A3B' }}>{stat.icon}</Text></View><View><Text style={{ fontSize: 20, fontWeight: '900', color: '#173B31', textAlign: 'right' }}>{stat.value}</Text><Text style={{ fontSize: 11, color: '#77877F', marginTop: 3, textAlign: 'right' }}>{stat.label}</Text></View></View>)}
+          </View>
+
+          <View style={{ flexDirection: 'row-reverse', gap: 18, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+            <View style={{ flex: 2, minWidth: 320, gap: 14 }}>
+              <View style={{ backgroundColor: '#fff', borderRadius: 22, borderWidth: 1, borderColor: '#E2EAE4', padding: 15 }}>
+                <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 13, flexWrap: 'wrap' }}>
+                  <View><Text style={{ fontSize: 17, fontWeight: '900', color: '#173B31', textAlign: 'right' }}>استكشف على الخريطة</Text><Text style={{ color: '#788980', fontSize: 11, marginTop: 4, textAlign: 'right' }}>{city ? 'المحتوى القريب من ' + city : 'عرض عام للمحتوى المنشور'}</Text></View>
+                  <View style={{ backgroundColor: '#E8F5ED', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 7 }}><Text style={{ color: '#19704E', fontSize: 11, fontWeight: '800' }}>● بيانات الحي</Text></View>
+                </View>
+                <View style={{ height: 390, borderRadius: 17, overflow: 'hidden', backgroundColor: '#E8EEE8', position: 'relative', borderWidth: 1, borderColor: '#D8E3DA' }}>
+                  <View style={{ position: 'absolute', left: '-10%', top: '12%', width: '120%', height: 18, backgroundColor: '#fff', borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#D9E2DC', transform: [{ rotate: '18deg' }] }} />
+                  <View style={{ position: 'absolute', left: '-12%', top: '42%', width: '125%', height: 23, backgroundColor: '#fff', borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#D9E2DC', transform: [{ rotate: '-27deg' }] }} />
+                  <View style={{ position: 'absolute', left: '-10%', top: '72%', width: '120%', height: 17, backgroundColor: '#fff', borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#D9E2DC', transform: [{ rotate: '9deg' }] }} />
+                  <View style={{ position: 'absolute', left: '18%', top: '-10%', width: 16, height: '125%', backgroundColor: '#fff', borderLeftWidth: 1, borderRightWidth: 1, borderColor: '#D9E2DC', transform: [{ rotate: '24deg' }] }} />
+                  <View style={{ position: 'absolute', right: '17%', top: '-10%', width: 20, height: '125%', backgroundColor: '#fff', borderLeftWidth: 1, borderRightWidth: 1, borderColor: '#D9E2DC', transform: [{ rotate: '-12deg' }] }} />
+                  <View style={{ position: 'absolute', left: '8%', top: '26%', width: 100, height: 58, borderRadius: 14, backgroundColor: '#D3E6D2', transform: [{ rotate: '-12deg' }] }} />
+                  <View style={{ position: 'absolute', right: '8%', bottom: '15%', width: 130, height: 64, borderRadius: 16, backgroundColor: '#D3E6D2', transform: [{ rotate: '9deg' }] }} />
+                  <View style={{ position: 'absolute', right: 12, top: 12, backgroundColor: '#FFFFFFF2', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9 }}><Text style={{ color: '#23483B', fontSize: 11, fontWeight: '900' }}>⌖ {city || 'المملكة العربية السعودية'}</Text></View>
+                  {webPins.map((pin, index) => { const positions = [{ top: '24%', left: '25%' }, { top: '39%', left: '52%' }, { top: '58%', left: '31%' }, { top: '22%', left: '72%' }, { top: '68%', left: '68%' }, { top: '48%', left: '81%' }, { top: '76%', left: '43%' }, { top: '36%', left: '14%' }, { top: '62%', left: '52%' }, { top: '15%', left: '48%' }, { top: '78%', left: '17%' }, { top: '48%', left: '64%' }]; const meta = MAP_PIN_KINDS[pin.kind]; return <Pressable key={pin.id} onPress={() => setSelected(pin)} style={[{ position: 'absolute', width: 39, height: 39, borderRadius: 14, borderBottomLeftRadius: 4, borderWidth: 2, borderColor: '#fff', alignItems: 'center', justifyContent: 'center', elevation: 5, boxShadow: '0 4px 12px #193c2b30' as never, transform: [{ rotate: '-45deg' }] }, positions[index], { backgroundColor: meta.color }]}><Text style={{ color: '#fff', fontSize: 16, transform: [{ rotate: '45deg' }] }}>{meta.emoji}</Text></Pressable>; })}
+                  <View style={{ position: 'absolute', bottom: 12, left: 12, backgroundColor: '#fff', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9 }}><Text style={{ color: '#45665A', fontSize: 11, fontWeight: '800' }}>{webPins.length} علامة معروضة</Text></View>
+                  <Pressable onPress={locateMe} style={{ position: 'absolute', bottom: 12, right: 12, width: 42, height: 42, borderRadius: 14, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#DCE5DE' }}><Text style={{ fontSize: 21, color: '#176B4D' }}>◎</Text></Pressable>
+                </View>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row-reverse', gap: 7, paddingTop: 13 }}>
+                  {chip('all', 'الكل', '#173B31', kindCounts.all || 0)}
+                  {MAP_PIN_ORDER.map(value => { const meta = MAP_PIN_KINDS[value]; return chip(value, meta.emoji + ' ' + meta.short, meta.color, kindCounts[value] || 0); })}
+                </ScrollView>
+              </View>
+
+              <View style={{ backgroundColor: '#fff', borderRadius: 22, borderWidth: 1, borderColor: '#E2EAE4', padding: 16 }}>
+                <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}><Text style={{ fontSize: 17, fontWeight: '900', color: '#173B31' }}>الأماكن القريبة</Text><Text style={{ fontSize: 12, color: '#6B8176' }}>{visiblePlaces.length} نتيجة</Text></View>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row-reverse', gap: 8, paddingBottom: 12 }}>
+                  {placeChip(ALL_PLACES_KEY, 'كل الأماكن')}
+                  {PLACE_CATEGORIES.map(category => placeChip(category.key, category.emoji + ' ' + category.label))}
+                </ScrollView>
+                <View style={{ flexDirection: 'row-reverse', gap: 7, flexWrap: 'wrap', marginBottom: 13 }}>
+                  {([['distance','الأقرب'],['open','مفتوح أولاً'],['rating','الأعلى تقييماً']] as const).map(([value,label]) => <Pressable key={value} onPress={() => setSortMode(value)} style={{ borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: sortMode === value ? '#173B31' : '#F0F4F1' }}><Text style={{ color: sortMode === value ? '#fff' : '#53675D', fontSize: 11, fontWeight: '800' }}>{label}</Text></Pressable>)}
+                  <Pressable onPress={() => setOpenOnly(v => !v)} style={{ borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: openOnly ? '#173B31' : '#F0F4F1' }}><Text style={{ color: openOnly ? '#fff' : '#53675D', fontSize: 11, fontWeight: '800' }}>مفتوح الآن</Text></Pressable>
+                  <Pressable onPress={() => setRatedOnly(v => !v)} style={{ borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: ratedOnly ? '#173B31' : '#F0F4F1' }}><Text style={{ color: ratedOnly ? '#fff' : '#53675D', fontSize: 11, fontWeight: '800' }}>له تقييم</Text></Pressable>
+                </View>
+                {visiblePlaces.slice(0, 8).map(placeCard)}
+                {!visiblePlaces.length && <Text style={{ color: '#829188', textAlign: 'center', padding: 22, fontSize: 13 }}>{placesLoading ? 'جارٍ تحميل الأماكن القريبة…' : 'لا توجد أماكن مطابقة. اختر مدينة أو حدّث الموقع.'}</Text>}
+              </View>
+            </View>
+
+            <View style={{ flex: 1, minWidth: 280, gap: 14 }}>
+              {addMenuOpen ? <View style={{ backgroundColor: '#fff', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: '#E0E9E2' }}><View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}><Text style={{ fontSize: 16, color: '#173B31', fontWeight: '900' }}>أضف للحي</Text><Pressable onPress={() => setAddMenuOpen(false)}><Text style={{ color: '#7A8A81' }}>إغلاق ✕</Text></Pressable></View>{addAction('محل أو خدمة', '🏪', '/new-service')}{addAction('تنبيه طارئ', '🚨', '/emergency-alert')}{addAction('طلب مساعدة', '🤝', '/new-request')}{addAction('إعلان أو منتج', '🛍️', '/marketplace-dashboard')}{addAction('فعالية للحي', '🎉', '/market?section=events')}</View> : null}
+              {selectedPlace ? <View style={{ backgroundColor: '#fff', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: '#DDE7E0' }}><View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 10 }}><View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: '#E8F5ED', alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 22 }}>{PLACE_CATEGORIES.find(c => c.key === selectedPlace.categoryKey)?.emoji ?? '🏬'}</Text></View><View style={{ flex: 1 }}><Text style={{ color: '#173B31', fontSize: 15, fontWeight: '900', textAlign: 'right' }}>{selectedPlace.name}</Text><Text style={{ color: '#73847A', fontSize: 11, textAlign: 'right', marginTop: 4 }}>{selectedPlace.categoryLabel} · {formatDistance(selectedPlace.distance)}</Text></View><Pressable onPress={() => setSelectedPlace(null)}><Text>✕</Text></Pressable></View>{selectedPlace.address ? <Text style={{ color: '#66786E', fontSize: 12, textAlign: 'right', marginTop: 12 }}>{selectedPlace.address}</Text> : null}{selectedPlace.hoursText ? <Text style={{ color: '#66786E', fontSize: 12, textAlign: 'right', marginTop: 8 }}>◷ {selectedPlace.hoursText}</Text> : null}<View style={{ flexDirection: 'row-reverse', gap: 8, marginTop: 14 }}><Pressable onPress={() => Linking.openURL(selectedPlace.mapsUrl)} style={{ backgroundColor: '#173B31', borderRadius: 12, padding: 11, flex: 1, alignItems: 'center' }}><Text style={{ color: '#fff', fontWeight: '800' }}>الاتجاهات ↗</Text></Pressable>{selectedPlace.phone ? <Pressable onPress={() => Linking.openURL('tel:' + selectedPlace.phone)} style={{ backgroundColor: '#EEF4EF', borderRadius: 12, padding: 11, alignItems: 'center' }}><Text style={{ color: '#173B31', fontWeight: '800' }}>اتصال</Text></Pressable> : null}</View></View> : null}
+              {selected ? <View style={{ backgroundColor: '#fff', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: '#DDE7E0' }}><Text style={{ fontSize: 16, color: '#173B31', fontWeight: '900', textAlign: 'right' }}>{MAP_PIN_KINDS[selected.kind].emoji} {selected.title}</Text><Text style={{ fontSize: 12, color: '#6C8075', textAlign: 'right', marginTop: 7 }}>{MAP_PIN_KINDS[selected.kind].label} · {selected.area}</Text>{selected.body ? <Text style={{ fontSize: 13, color: '#53675D', textAlign: 'right', lineHeight: 21, marginTop: 9 }}>{selected.body}</Text> : null}{selected.approximate ? <Text style={{ color: '#9A6B22', fontSize: 11, textAlign: 'right', marginTop: 8 }}>الموقع تقريبي لحماية الخصوصية</Text> : null}<View style={{ flexDirection: 'row-reverse', gap: 8, marginTop: 13 }}><Pressable onPress={() => router.push(selected.href as never)} style={{ backgroundColor: '#173B31', borderRadius: 12, padding: 11, flex: 1, alignItems: 'center' }}><Text style={{ color: '#fff', fontWeight: '800' }}>فتح التفاصيل</Text></Pressable><Pressable onPress={() => setSelected(null)} style={{ backgroundColor: '#EEF4EF', borderRadius: 12, padding: 11 }}><Text style={{ color: '#173B31', fontWeight: '800' }}>إغلاق</Text></Pressable></View></View> : null}
+              <View style={{ backgroundColor: '#173F35', borderRadius: 22, padding: 20 }}><Text style={{ fontSize: 20, color: '#fff', fontWeight: '900', textAlign: 'right' }}>خلّ الحي أفضل ✨</Text><Text style={{ fontSize: 12, color: '#D0E2D9', lineHeight: 21, textAlign: 'right', marginTop: 7 }}>شارك جيرانك خدمة أو فعالية أو بلاغًا يفيد المجتمع.</Text><Pressable onPress={() => setAddMenuOpen(v => !v)} style={{ backgroundColor: '#E4B76A', borderRadius: 13, padding: 13, alignItems: 'center', marginTop: 14 }}><Text style={{ color: '#173B31', fontWeight: '900' }}>＋ أضف محتوى للحي</Text></Pressable></View>
+              <View style={{ backgroundColor: '#fff', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: '#E1E9E3' }}><Text style={{ fontSize: 15, color: '#173B31', fontWeight: '900', textAlign: 'right', marginBottom: 12 }}>تصفّح حسب النوع</Text>{MAP_PIN_ORDER.map(value => { const meta = MAP_PIN_KINDS[value]; return <Pressable key={value} onPress={() => setKind(value)} style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F0F3F0' }}><View style={{ width: 34, height: 34, borderRadius: 11, backgroundColor: meta.color + '18', alignItems: 'center', justifyContent: 'center' }}><Text>{meta.emoji}</Text></View><Text style={{ flex: 1, color: '#43584D', fontSize: 12, fontWeight: '700', textAlign: 'right' }}>{meta.label}</Text><Text style={{ color: '#839087', fontSize: 11 }}>{kindCounts[value] || 0}</Text></Pressable>})}</View>
+            </View>
+          </View>
+          <Text style={{ textAlign: 'center', color: '#94A198', fontSize: 11, marginTop: 22 }}>تُعرض مواقع المنشورات بشكل تقريبي لحماية خصوصية أصحابها.</Text>
+        </View>
       </View>
     );
   }
