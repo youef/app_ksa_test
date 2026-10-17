@@ -266,7 +266,7 @@ export default function StoryViewer() {
       const body = rows.map((row: any, index: number) => {
         const when = row.viewed_at ? new Date(row.viewed_at).toLocaleString('ar-SA', { dateStyle: 'short', timeStyle: 'short' }) : 'وقت غير متاح';
         return `${index + 1}. ${names.get(row.viewer_id) || 'مستخدم'} — ${when}`;
-      }).join('\\n');
+      }).join('\n');
       Alert.alert(`مشاهدو القصة (${rows.length})`, body);
     } catch (error: any) {
       Alert.alert('تعذر تحميل المشاهدين', error?.message || 'حاول مرة أخرى.');
