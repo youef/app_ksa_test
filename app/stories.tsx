@@ -25,6 +25,7 @@ export default function StoriesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [filterDistrict, setFilterDistrict] = useState<string>('all');
   const [districts, setDistricts] = useState<string[]>([]);
+  const [seenStoryIds, setSeenStoryIds] = useState<string[]>([]);
 
   useEffect(() => {
     loadAllStories();
@@ -65,6 +66,20 @@ export default function StoriesScreen() {
       if (error) throw error;
       const valid = (data || []) as any[];
       setStories(valid);
+
+      const { data: authResult } = await supabase.auth.getUser();
+      const viewerId = authResult.user?.id || '';
+      if (viewerId && valid.length > 0) {
+        const { data: views, error: viewsError } = await supabase
+          .from('story_views')
+          .select('story_id')
+          .eq('viewer_id', viewerId)
+          .in('story_id', valid.map((story) => story.id));
+        if (!viewsError) setSeenStoryIds([...new Set((views || []).map((view: { story_id: string }) => view.story_id))]);
+        else setSeenStoryIds([]);
+      } else {
+        setSeenStoryIds([]);
+      }
 
       const dSet = new Set<string>();
       valid.forEach((s: any) => {
@@ -198,7 +213,11 @@ export default function StoriesScreen() {
           </View>
         ) : (
           <View style={styles.storiesGrid}>
-            {filtered.map((story) => {
+            {filtered
+              .slice()
+              .sort((a, b) => Number(seenStoryIds.includes(a.id)) - Number(seenStoryIds.includes(b.id)) || new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+              .map((story) => {
+              const isSeen = seenStoryIds.includes(story.id);
               const author = story.profiles;
               const name = author?.display_name || author?.username || 'جار الحي';
               const verified = author?.is_verified || author?.is_geoverified;
@@ -208,12 +227,12 @@ export default function StoriesScreen() {
               return (
                 <Pressable
                   key={story.id}
-                  style={styles.storyCard}
+                  style={[styles.storyCard, isSeen ? styles.storyCardSeen : styles.storyCardNew]}
                   onPress={() => router.push({ pathname: '/story', params: { id: story.id } })}
                   accessibilityRole="button"
                 >
                   {/* Story Preview Media / Color Box */}
-                  <View style={[styles.storyCardMedia, { backgroundColor: bg }]}>
+                  <View style={[styles.storyCardMedia, { backgroundColor: bg }, isSeen && styles.storyCardMediaSeen]}>
                     {hasMedia ? (
                       <Image source={{ uri: story.image_url }} style={styles.storyCardImage} resizeMode="cover" />
                     ) : (
@@ -253,6 +272,9 @@ export default function StoriesScreen() {
                         </Text>
                         <Text style={styles.cardTimeText}>
                           {story.created_at ? relativeTime(story.created_at) : 'الآن'}
+                        </Text>
+                        <Text style={[styles.storySeenLabel, isSeen ? styles.storySeenLabelSeen : styles.storySeenLabelNew]}>
+                          {isSeen ? 'تمت المشاهدة' : 'جديدة'}
                         </Text>
                       </View>
                     </View>
@@ -405,12 +427,19 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     overflow: 'hidden',
     backgroundColor: '#059669',
+    borderWidth: 2,
     shadowColor: '#0f172a',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 3,
   },
+  storyCardNew: { borderColor: '#10b981' },
+  storyCardSeen: { borderColor: '#94a3b8', opacity: 0.72 },
+  storyCardMediaSeen: { opacity: 0.82 },
+  storySeenLabel: { fontSize: 9, fontWeight: '900', marginTop: 3, textAlign: 'right' },
+  storySeenLabelNew: { color: '#a7f3d0' },
+  storySeenLabelSeen: { color: '#e2e8f0' },
   storyCardMedia: {
     flex: 1,
     position: 'relative',
