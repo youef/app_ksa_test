@@ -38,6 +38,7 @@ export default function StoryViewer() {
   const [myPollVote, setMyPollVote] = useState<number | null>(null);
   const [questionAnswer, setQuestionAnswer] = useState('');
   const [questionSent, setQuestionSent] = useState(false);
+  const [questionResponses, setQuestionResponses] = useState<Array<{ answer: string; responder_id: string; created_at: string }>>([]);
   const [interactiveSending, setInteractiveSending] = useState(false);
 
   const progressAnim = useRef(new Animated.Value(0)).current;
@@ -51,26 +52,37 @@ export default function StoryViewer() {
       setPollVotes([0, 0]);
       setQuestionAnswer('');
       setQuestionSent(false);
-      if (currentStory.interactive_type !== 'poll') return;
+      setQuestionResponses([]);
 
-      const { data: votes, error } = await supabase
-        .from('story_poll_votes')
-        .select('option_index')
-        .eq('story_id', currentStory.id);
-      if (cancelled || error) return;
-      const rows = votes || [];
-      setPollVotes([
-        rows.filter((row: { option_index: number }) => row.option_index === 0).length,
-        rows.filter((row: { option_index: number }) => row.option_index === 1).length,
-      ]);
-      if (currentUserId) {
-        const { data: ownVote } = await supabase
+      if (currentStory.interactive_type === 'poll') {
+        const { data: votes, error } = await supabase
           .from('story_poll_votes')
           .select('option_index')
+          .eq('story_id', currentStory.id);
+        if (cancelled || error) return;
+        const rows = votes || [];
+        setPollVotes([
+          rows.filter((row: { option_index: number }) => row.option_index === 0).length,
+          rows.filter((row: { option_index: number }) => row.option_index === 1).length,
+        ]);
+        if (currentUserId) {
+          const { data: ownVote } = await supabase
+            .from('story_poll_votes')
+            .select('option_index')
+            .eq('story_id', currentStory.id)
+            .eq('voter_id', currentUserId)
+            .maybeSingle();
+          if (!cancelled && ownVote) setMyPollVote(ownVote.option_index);
+        }
+      }
+
+      if (currentStory.interactive_type === 'question' && currentUserId === currentStory.author_id) {
+        const { data: answers } = await supabase
+          .from('story_question_answers')
+          .select('answer, responder_id, created_at')
           .eq('story_id', currentStory.id)
-          .eq('voter_id', currentUserId)
-          .maybeSingle();
-        if (!cancelled && ownVote) setMyPollVote(ownVote.option_index);
+          .order('created_at', { ascending: false });
+        if (!cancelled) setQuestionResponses((answers || []) as Array<{ answer: string; responder_id: string; created_at: string }>);
       }
     }
     void loadInteractiveState();
@@ -569,7 +581,18 @@ export default function StoryViewer() {
           ) : currentStory.interactive_type === 'question' ? (
             <View style={styles.storyInteractivePanel}>
               <Text style={styles.interactiveQuestion}>{currentStory.question_prompt || 'سؤال للمتابعين'}</Text>
-              {questionSent ? (
+              {isOwn ? (
+                <View style={styles.questionResponsesList}>
+                  <Text style={styles.interactiveHint}>{questionResponses.length} إجابة</Text>
+                  {questionResponses.length === 0 ? (
+                    <Text style={styles.interactiveHint}>ستظهر إجابات المتابعين هنا.</Text>
+                  ) : questionResponses.slice(0, 4).map((response, index) => (
+                    <View key={`${response.responder_id}-${response.created_at}-${index}`} style={styles.questionResponseItem}>
+                      <Text style={styles.questionResponseText}>{response.answer}</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : questionSent ? (
                 <Text style={styles.interactiveHint}>وصلت إجابتك لصاحب القصة ✓</Text>
               ) : (
                 <View style={styles.questionAnswerRow}>
@@ -672,6 +695,9 @@ const styles = StyleSheet.create({
   interactiveVoteTrack: { height: 4, borderRadius: 4, backgroundColor: '#e2e8f0', overflow: 'hidden' },
   interactiveVoteFill: { height: '100%', backgroundColor: '#059669' },
   interactiveHint: { color: '#64748b', fontSize: 10, textAlign: 'center' },
+  questionResponsesList: { maxHeight: 130, gap: 6 },
+  questionResponseItem: { backgroundColor: '#ecfdf5', borderRadius: 10, padding: 9 },
+  questionResponseText: { color: '#064e3b', fontSize: 12, textAlign: 'right', fontWeight: '700' },
   questionAnswerRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
   questionAnswerInput: { flex: 1, minHeight: 40, backgroundColor: '#f1f5f9', borderRadius: 10, paddingHorizontal: 12, color: '#0f172a', textAlign: 'right' },
   questionSendButton: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#059669', alignItems: 'center', justifyContent: 'center' },
