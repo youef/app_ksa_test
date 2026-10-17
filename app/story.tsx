@@ -322,31 +322,9 @@ export default function StoryViewer() {
     }
   }, [currentIndex, storiesList]);
 
-  async function showStoryViewers() {
+  function showStoryViewers() {
     if (!currentStory?.id || currentStory.author_id !== currentUserId) return;
-    try {
-      const { data: views, error } = await supabase
-        .from('story_views')
-        .select('viewer_id, viewed_at')
-        .eq('story_id', currentStory.id)
-        .order('viewed_at', { ascending: false });
-      if (error) throw error;
-      const rows = views || [];
-      if (!rows.length) {
-        Alert.alert('مشاهدو القصة', 'لم يشاهد أحد هذه القصة بعد.');
-        return;
-      }
-      const ids = [...new Set(rows.map((row: any) => row.viewer_id))];
-      const { data: people } = await supabase.from('profiles').select('id, display_name, username').in('id', ids);
-      const names = new Map((people || []).map((p: any) => [p.id, p.display_name || p.username || 'مستخدم']));
-      const body = rows.map((row: any, index: number) => {
-        const when = row.viewed_at ? new Date(row.viewed_at).toLocaleString('ar-SA', { dateStyle: 'short', timeStyle: 'short' }) : 'وقت غير متاح';
-        return `${index + 1}. ${names.get(row.viewer_id) || 'مستخدم'} — ${when}`;
-      }).join('\n');
-      Alert.alert(`مشاهدو القصة (${rows.length})`, body);
-    } catch (error: any) {
-      Alert.alert('تعذر تحميل المشاهدين', error?.message || 'حاول مرة أخرى.');
-    }
+    router.push({ pathname: '/story-viewers', params: { id: currentStory.id } });
   }
 
   function handleNextStory() {
