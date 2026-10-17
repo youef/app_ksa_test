@@ -751,7 +751,7 @@ const styles = StyleSheet.create({
   bgImage: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%', backgroundColor: '#080808' },
   gradient: {
     flex: 1,
-    flex: 1,\n    paddingBottom: Platform.OS === 'ios' ? 30 : 12,
+    paddingBottom: Platform.OS === 'ios' ? 30 : 12,
   },
   progressRow: {
     flexDirection: 'row',
