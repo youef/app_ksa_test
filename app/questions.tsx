@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
+  Share,
   Platform,
   Pressable,
   RefreshControl,
@@ -29,6 +30,9 @@ import {
   Flame,
   Pin,
   TrendingUp,
+  Bookmark,
+  BookmarkCheck,
+  Share2,
 } from 'lucide-react-native';
 
 import { supabase } from '@/lib/supabase';
@@ -44,6 +48,7 @@ import {
   type HaynaLocation,
 } from '@/lib/locationSync';
 import { relativeTime } from '@/lib/mapPins';
+import { requireAccount } from '@/lib/authGate';
 
 type QuestionFilter = 'all' | 'solved' | 'hot' | 'district';
 type QuestionSort = 'newest' | 'answers';
@@ -54,6 +59,9 @@ export default function Questions() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [hasSession, setHasSession] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [savedQuestionIds, setSavedQuestionIds] = useState<Set<string>>(new Set());
+  const [savingQuestionId, setSavingQuestionId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState('');
   const [activeFilter, setActiveFilter] = useState<QuestionFilter>('all');
   const [activeSort, setActiveSort] = useState<QuestionSort>('newest');
@@ -71,6 +79,7 @@ export default function Questions() {
       const { data: session } = await supabase.auth.getSession();
       const user = session.session?.user;
       setHasSession(Boolean(user));
+      setCurrentUserId(user?.id ?? null);
 
       let fetchedQuestions: any[] = [];
       let query = supabase
@@ -104,12 +113,17 @@ export default function Questions() {
         const authorIds = Array.from(new Set(fetchedQuestions.map(x => x.author_id).filter(Boolean)));
         const qIds = fetchedQuestions.map(x => x.id);
 
-        const [profilesRes, answersRes] = await Promise.all([
+        const [profilesRes, answersRes, favoritesRes] = await Promise.all([
           authorIds.length > 0
             ? supabase.from('profiles').select('id, display_name, username, avatar_url, is_geoverified, is_verified, district').in('id', authorIds)
             : Promise.resolve({ data: [] }),
           supabase.from('answers').select('id, question_id').in('question_id', qIds),
+          user
+            ? supabase.from('favorite_items').select('target_id').eq('user_id', user.id).eq('target_type', 'question').in('target_id', qIds)
+            : Promise.resolve({ data: [] }),
         ]);
+
+        setSavedQuestionIds(new Set((favoritesRes.data || []).map((favorite: any) => favorite.target_id)));
 
         const pMap = (profilesRes.data || []).reduce((acc: any, p: any) => ({ ...acc, [p.id]: p }), {});
         const countMap = (answersRes.data || []).reduce((acc: any, a: any) => {
@@ -130,6 +144,7 @@ export default function Questions() {
         if (featuredPriority !== 0) return featuredPriority;
         return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
       });
+      if (fetchedQuestions.length === 0) setSavedQuestionIds(new Set());
       setItems(fetchedQuestions);
     } catch (e: any) {
       console.warn('Load questions error', e);
@@ -194,6 +209,41 @@ export default function Questions() {
   const locationLabel = !isAllKingdom(activeLoc.city)
     ? `${activeLoc.city}${activeLoc.district && activeLoc.district !== 'كل الأحياء' ? ` · حي ${activeLoc.district}` : ''}`
     : 'كل مناطق المملكة';
+
+  async function toggleSavedQuestion(questionId: string) {
+    if (!currentUserId) return requireAccount('سجّل الدخول لحفظ الاستفسار والرجوع إليه لاحقاً.');
+    if (savingQuestionId) return;
+    const wasSaved = savedQuestionIds.has(questionId);
+    setSavingQuestionId(questionId);
+    try {
+      if (wasSaved) {
+        const { error } = await supabase.from('favorite_items').delete().eq('user_id', currentUserId).eq('target_type', 'question').eq('target_id', questionId);
+        if (error) throw error;
+        setSavedQuestionIds(previous => {
+          const next = new Set(previous);
+          next.delete(questionId);
+          return next;
+        });
+      } else {
+        const { error } = await supabase.from('favorite_items').insert({ user_id: currentUserId, target_type: 'question', target_id: questionId });
+        if (error) throw error;
+        setSavedQuestionIds(previous => new Set(previous).add(questionId));
+      }
+    } catch {
+      Alert.alert('تعذر الحفظ', 'لم نتمكن من تحديث قائمة المحفوظات. حاول مجدداً.');
+    } finally {
+      setSavingQuestionId(null);
+    }
+  }
+
+  async function shareQuestion(question: any) {
+    const link = `https://appksatest.vercel.app/question?id=${encodeURIComponent(String(question.id))}`;
+    try {
+      await Share.share({ message: `${question.title || 'استفسار من حيّنا'}\n\n${question.body || ''}\n\nشارك في النقاش عبر حيّنا: ${link}` });
+    } catch {
+      Alert.alert('تعذر المشاركة', 'لم نتمكن من فتح خيارات المشاركة الآن.');
+    }
+  }
 
   const onSelectLocation = async (region: string, city: string, district: string) => {
     const loc: HaynaLocation = { region, city, district };
@@ -480,9 +530,19 @@ export default function Questions() {
                       </View>
                     </View>
 
-                    <View style={styles.cardCtaRow}>
-                      <Text style={styles.cardCtaText}>تفاعل</Text>
-                      <ArrowRight size={13} color="#059669" />
+                    <View style={styles.cardActionsRow}>
+                      <Pressable style={[styles.socialAction, savedQuestionIds.has(q.id) && styles.socialActionSaved]} onPress={() => void toggleSavedQuestion(q.id)} accessibilityRole="button" accessibilityLabel={savedQuestionIds.has(q.id) ? 'إزالة من المحفوظات' : 'حفظ السؤال'} hitSlop={6}>
+                        {savedQuestionIds.has(q.id) ? <BookmarkCheck size={15} color="#087f5b" /> : <Bookmark size={15} color="#64748b" />}
+                        <Text style={[styles.socialActionText, savedQuestionIds.has(q.id) && styles.socialActionTextSaved]}>{savingQuestionId === q.id ? 'جارٍ الحفظ' : savedQuestionIds.has(q.id) ? 'محفوظ' : 'حفظ'}</Text>
+                      </Pressable>
+                      <Pressable style={styles.socialAction} onPress={() => void shareQuestion(q)} accessibilityRole="button" accessibilityLabel="مشاركة السؤال" hitSlop={6}>
+                        <Share2 size={15} color="#64748b" />
+                        <Text style={styles.socialActionText}>مشاركة</Text>
+                      </Pressable>
+                      <View style={styles.cardCtaRow}>
+                        <Text style={styles.cardCtaText}>شارك برأيك</Text>
+                        <ArrowRight size={13} color="#059669" />
+                      </View>
                     </View>
                   </View>
                 </Pressable>
@@ -814,6 +874,32 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     lineHeight: 20,
     marginBottom: 12,
+  },
+  cardActionsRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 12,
+    flexWrap: 'wrap',
+  },
+  socialAction: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 5,
+    paddingHorizontal: 3,
+  },
+  socialActionSaved: {
+    backgroundColor: '#ecfdf5',
+    borderRadius: 9,
+    paddingHorizontal: 8,
+  },
+  socialActionText: {
+    color: '#64748b',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  socialActionTextSaved: {
+    color: '#087f5b',
   },
   cardFooter: {
     flexDirection: 'row-reverse',
