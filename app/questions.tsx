@@ -4,12 +4,13 @@ import {
   Alert,
   RefreshControl,
   ScrollView,
+  Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { router } from 'expo-router';
-import { MessageCircle, Sparkles } from 'lucide-react-native';
+import { MapPin, Sparkles } from 'lucide-react-native';
 
 import { supabase } from '@/lib/supabase';
 import AppHeader from '@/components/shared/AppHeader';
@@ -22,6 +23,7 @@ import { useBottomNavInset } from '@/lib/bottomNav';
 export default function Questions() {
   const bottomNavInset = useBottomNavInset();
   const [items, setItems] = useState<any[]>([]);
+  const [visibleCount, setVisibleCount] = useState(10);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState('');
@@ -118,6 +120,7 @@ export default function Questions() {
           return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
         });
       setItems(questions);
+      setVisibleCount(10);
     } catch (error: any) {
       console.warn('Load questions error', error);
       setLoadError('تعذر تحميل الاستفسارات حالياً. حاول التحديث مرة أخرى.');
@@ -195,13 +198,19 @@ export default function Questions() {
   return (
     <View style={styles.container}>
       <AppHeader
-        variant="home"
-        profile={profile}
-        isGuest={!currentUserId}
-        logoUri={logoUri}
-        city={activeLoc.city}
-        district={activeLoc.district}
-        onOpenLocation={() => setShowLocationModal(true)}
+        variant="sub"
+        title="استفسارات الجيران"
+        fallbackRoute="/home"
+        rightAction={
+          <Pressable
+            onPress={() => setShowLocationModal(true)}
+            style={styles.locationButton}
+            accessibilityRole="button"
+            accessibilityLabel="تغيير المدينة والحي"
+          >
+            <MapPin size={17} color="#176b52" />
+          </Pressable>
+        }
       />
 
       <ScrollView
@@ -209,6 +218,13 @@ export default function Questions() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={[styles.feedContent, { paddingBottom: bottomNavInset + 24 }]}
+        onMomentumScrollEnd={({ nativeEvent }) => {
+          const { contentOffset, contentSize, layoutMeasurement } = nativeEvent;
+          const nearBottom = contentOffset.y + layoutMeasurement.height >= contentSize.height - 180;
+          if (nearBottom && visibleCount < items.length) {
+            setVisibleCount(current => Math.min(current + 10, items.length));
+          }
+        }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -219,20 +235,6 @@ export default function Questions() {
           />
         }
       >
-        <View style={styles.feedHeading}>
-          <View style={styles.headingIcon}>
-            <MessageCircle size={19} color="#176b52" />
-          </View>
-          <View style={styles.headingText}>
-            <Text style={styles.headingTitle}>استفسارات الجيران</Text>
-            <Text style={styles.headingSubtitle}>خبرات قريبة وإجابات من أهل الحي</Text>
-          </View>
-          <View style={styles.livePill}>
-            <View style={styles.liveDot} />
-            <Text style={styles.liveText}>المجتمع</Text>
-          </View>
-        </View>
-
         {loading && items.length === 0 ? (
           <View style={styles.stateBox}>
             <ActivityIndicator size="large" color="#16845f" />
@@ -254,7 +256,7 @@ export default function Questions() {
           </View>
         ) : (
           <View style={styles.posts}>
-            {items.map(question => (
+            {items.slice(0, visibleCount).map(question => (
               <TwitterInquiryCard
                 key={String(question.id)}
                 type="question"
@@ -267,6 +269,12 @@ export default function Questions() {
                 onDeleted={() => { void loadQuestions(activeLoc); }}
               />
             ))}
+            {visibleCount < items.length && (
+              <View style={styles.moreLoading}>
+                <ActivityIndicator size="small" color="#16845f" />
+                <Text style={styles.moreLoadingText}>اسحب للأسفل لعرض المزيد</Text>
+              </View>
+            )}
           </View>
         )}
       </ScrollView>
@@ -285,79 +293,46 @@ export default function Questions() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#eaf3ee',
+    backgroundColor: '#f4f7f5',
   },
   feedContent: {
     flexGrow: 1,
-    paddingTop: 10,
-    backgroundColor: '#eaf3ee',
+    paddingTop: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#f4f7f5',
   },
-  feedHeading: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 13,
-    marginBottom: 10,
-    backgroundColor: '#ffffff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0ebe4',
-  },
-  headingIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
-    backgroundColor: '#e6f5ec',
+  locationButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  headingText: {
-    flex: 1,
-    alignItems: 'flex-end',
-  },
-  headingTitle: {
-    color: '#17382c',
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  headingSubtitle: {
-    color: '#7b8b82',
-    fontSize: 11,
-    marginTop: 3,
-    textAlign: 'right',
-  },
-  livePill: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 9,
-    paddingVertical: 6,
-    borderRadius: 12,
-    backgroundColor: '#effaf3',
-  },
-  liveDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#16a34a',
-  },
-  liveText: {
-    color: '#18724f',
-    fontSize: 10,
-    fontWeight: '800',
+    backgroundColor: '#eaf7ef',
+    borderWidth: 1,
+    borderColor: '#d8eee0',
   },
   posts: {
-    backgroundColor: '#ffffff',
-    borderTopWidth: 1,
-    borderTopColor: '#e0ebe4',
+    backgroundColor: 'transparent',
+  },
+  moreLoading: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 18,
+  },
+  moreLoadingText: {
+    color: '#728178',
+    fontSize: 12,
+    fontWeight: '600',
   },
   stateBox: {
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
     paddingHorizontal: 28,
-    paddingVertical: 54,
-    marginHorizontal: 14,
+    paddingVertical: 44,
+    marginHorizontal: 2,
     borderRadius: 22,
     backgroundColor: '#ffffff',
     borderWidth: 1,
