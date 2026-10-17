@@ -70,10 +70,29 @@ export default function BottomNav() {
     }
   }, []);
 
+  // تفعيل الاستماع لتغيير الجلسة والرسائل الجديدة (Realtime)
   useEffect(() => {
     void refreshUnread();
-    const { data: listener } = supabase.auth.onAuthStateChange(() => { void refreshUnread(); });
-    return () => listener.subscription.unsubscribe();
+    
+    const { data: authListener } = supabase.auth.onAuthStateChange(() => { 
+      void refreshUnread(); 
+    });
+
+    const channel = supabase
+      .channel('bottom-nav-unread')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'messages' },
+        () => {
+          void refreshUnread();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      authListener.subscription.unsubscribe();
+      supabase.removeChannel(channel);
+    };
   }, [refreshUnread]);
 
   useEffect(() => {
