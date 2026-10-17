@@ -431,7 +431,7 @@ export default function UserProfile() {
   const displayName = anonymous ? 'جار مجهول' : profile.display_name || profile.username || 'مستخدم';
   const locked = (profile.profile_privacy === 'private' && !following && !own) || blocked || blockedByOther;
   const isAdmin = profile.role === 'admin';
-  const totalContributions = stats.market + stats.services + stats.requests + stats.questions + stats.answers;
+  const totalContributions = stats.market + stats.services + stats.requests + stats.questions + (own ? stats.answers : 0);
 
   const currentData =
     tab === 'market'
