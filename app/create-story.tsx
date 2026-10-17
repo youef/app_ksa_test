@@ -62,7 +62,8 @@ export default function CreateStory() {
   const [audience, setAudience] = useState<'public' | 'followers' | 'custom'>('public');
   const [audienceCandidates, setAudienceCandidates] = useState<Array<{ id: string; display_name: string | null; username: string | null }>>([]);
   const [allowedUserIds, setAllowedUserIds] = useState<string[]>([]);
-  const [hiddenUserIds, setHiddenUserIds] = useState<string[]>([]);\n  const [allowStoryReplies, setAllowStoryReplies] = useState(true);
+  const [hiddenUserIds, setHiddenUserIds] = useState<string[]>([]);
+  const [allowStoryReplies, setAllowStoryReplies] = useState(true);
   const [audienceLoading, setAudienceLoading] = useState(false);
   const [interactiveType, setInteractiveType] = useState<'none' | 'poll' | 'question'>('none');
   const [pollQuestion, setPollQuestion] = useState('');
