@@ -106,9 +106,37 @@ export async function reverseGeocodeDeviceLocation(location: DeviceLocation): Pr
     }
 
     // Keep administrative levels separate: a street or landmark is not a neighborhood.
-    const region = pick(place.region);
-    const city = pick(place.city, place.subregion);
-    const district = pick(place.district, place.suburb);
+    let region = pick(place.region);
+    let city = pick(place.city, place.subregion);
+    let district = pick(place.district, place.suburb);
+
+    // Native reverse geocoders often return a street/landmark instead of a
+    // neighborhood. Ask two address providers for administrative neighborhood
+    // data when the device result is incomplete; never treat a street as a district.
+    if (!region || !city || !district) {
+      const [nData, aData] = await Promise.all([
+        fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(location.latitude)}&lon=${encodeURIComponent(location.longitude)}&zoom=18&addressdetails=1&accept-language=ar`,
+          { headers: { Accept: 'application/json' } },
+        ).then(async (r) => r.ok ? r.json() : null).catch(() => null),
+        fetch(
+          `https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/reverseGeocode?location=${encodeURIComponent(location.longitude)},${encodeURIComponent(location.latitude)}&distance=100&f=json&langCode=ARA`,
+          { headers: { Accept: 'application/json' } },
+        ).then(async (r) => r.ok ? r.json() : null).catch(() => null),
+      ]);
+      const na = nData?.address || {};
+      const aa = aData?.address || {};
+      const countryCode = String(na.country_code || aa.CountryCode || '').toLowerCase();
+      if (countryCode && countryCode !== 'sa' && countryCode !== 'sau') {
+        return { region: '', city: '', district: '', isOutsideKSA: true };
+      }
+      region = region || pick(na.state, na.region, na.province, na.state_district, aa.Region);
+      city = city || pick(na.city, na.town, na.village, na.municipality, aa.City, aa.Subregion);
+      district = district || pick(
+        na.neighbourhood, na.suburb, na.quarter, na.residential, na.hamlet,
+        na.city_district, na.district, aa.Neighborhood, aa.District,
+      );
+    }
 
     if (city && !isKnownSaudiCity(city)) {
       return { region: '', city: '', district: '', isOutsideKSA: true };
