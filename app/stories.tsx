@@ -68,12 +68,12 @@ export default function StoriesScreen() {
       setStories(valid);
 
       const { data: authResult } = await supabase.auth.getUser();
-      const viewerId = authResult.user?.id || '';
-      if (viewerId && valid.length > 0) {
+      const activeViewerId = authResult.user?.id || '';
+      if (activeViewerId && valid.length > 0) {
         const { data: views, error: viewsError } = await supabase
           .from('story_views')
           .select('story_id')
-          .eq('viewer_id', viewerId)
+          .eq('viewer_id', activeViewerId)
           .in('story_id', valid.map((story) => story.id));
         if (!viewsError) setSeenStoryIds([...new Set((views || []).map((view: { story_id: string }) => view.story_id))]);
         else setSeenStoryIds([]);
@@ -97,6 +97,31 @@ export default function StoriesScreen() {
   const filtered = filterDistrict === 'all'
     ? stories
     : stories.filter((s: any) => s.profiles?.district === filterDistrict);
+
+  const groupedAuthors = Object.values(filtered.reduce((groups: Record<string, any>, story: any) => {
+    const key = story.author_id;
+    if (!groups[key]) groups[key] = { authorId: key, author: story.profiles, stories: [], totalViews: 0, newestAt: story.created_at };
+    groups[key].stories.push(story);
+    groups[key].totalViews += Math.max(0, Number(story.view_count) || 0);
+    if (new Date(story.created_at).getTime() > new Date(groups[key].newestAt).getTime()) groups[key].newestAt = story.created_at;
+    return groups;
+  }, {})).map((group: any) => {
+    const ordered = group.stories.slice().sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    return { ...group, stories: ordered, latestStory: ordered[ordered.length - 1], hasUnseen: ordered.some((story: any) => !seenStoryIds.includes(story.id)) };
+  });
+
+  const storyRings = groupedAuthors.slice().sort((a: any, b: any) =>
+    Number(b.hasUnseen) - Number(a.hasUnseen) || new Date(b.newestAt).getTime() - new Date(a.newestAt).getTime()
+  );
+  const trendingAuthors = groupedAuthors.slice().sort((a: any, b: any) =>
+    b.totalViews - a.totalViews || new Date(b.newestAt).getTime() - new Date(a.newestAt).getTime()
+  );
+
+  function openAuthorStories(authorStories: any[]) {
+    const firstUnseen = authorStories.find((story: any) => !seenStoryIds.includes(story.id));
+    const target = firstUnseen || authorStories[0];
+    if (target?.id) router.push({ pathname: '/story', params: { id: target.id } });
+  }
 
   return (
     <View style={styles.container}>
@@ -141,6 +166,38 @@ export default function StoriesScreen() {
                 </Text>
               </Pressable>
             ))}
+          </ScrollView>
+        </View>
+      )}
+
+      {storyRings.length > 0 && (
+        <View style={styles.ringsSection}>
+          <View style={styles.sectionHeadingRow}>
+            <View style={{ alignItems: 'flex-end', flex: 1 }}>
+              <Text style={styles.sectionHeading}>يوميات الجيران</Text>
+              <Text style={styles.sectionSubheading}>كل جار في دائرة واحدة</Text>
+            </View>
+            <View style={styles.livePill}><View style={styles.liveDot} /><Text style={styles.livePillText}>مباشر</Text></View>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.ringsScroll}>
+            {storyRings.map((group: any) => {
+              const author = group.author;
+              const name = author?.display_name || author?.username || 'جار الحي';
+              return (
+                <Pressable key={group.authorId} style={styles.ringItem}
+                  onPress={() => openAuthorStories(group.stories)}
+                  accessibilityRole="button" accessibilityLabel={`عرض يوميات ${name}`}>
+                  <View style={[styles.ringOuter, group.hasUnseen ? styles.ringUnseen : styles.ringSeen]}>
+                    <View style={styles.ringInner}>
+                      {author?.avatar_url ? <Image source={{ uri: author.avatar_url }} style={styles.ringAvatar} /> :
+                        <View style={styles.ringAvatarFallback}><Text style={styles.ringInitial}>{name[0]}</Text></View>}
+                    </View>
+                    <View style={styles.ringCount}><Text style={styles.ringCountText}>{group.stories.length}</Text></View>
+                  </View>
+                  <Text style={styles.ringName} numberOfLines={1}>{name}</Text>
+                </Pressable>
+              );
+            })}
           </ScrollView>
         </View>
       )}
@@ -212,95 +269,60 @@ export default function StoriesScreen() {
             </Pressable>
           </View>
         ) : (
-          <View style={styles.storiesGrid}>
-            {filtered
-              .slice()
-              .sort((a, b) => Number(seenStoryIds.includes(a.id)) - Number(seenStoryIds.includes(b.id)) || new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-              .map((story) => {
-              const isSeen = seenStoryIds.includes(story.id);
-              const author = story.profiles;
-              const name = author?.display_name || author?.username || 'جار الحي';
-              const verified = author?.is_verified || author?.is_geoverified;
-              const bg = story.bg_color || '#059669';
-              const hasMedia = story.type === 'image' && Boolean(story.image_url);
-
-              return (
-                <Pressable
-                  key={story.id}
-                  style={[styles.storyCard, isSeen ? styles.storyCardSeen : styles.storyCardNew]}
-                  onPress={() => router.push({ pathname: '/story', params: { id: story.id } })}
-                  accessibilityRole="button"
-                >
-                  {/* Story Preview Media / Color Box */}
-                  <View style={[styles.storyCardMedia, { backgroundColor: bg }, isSeen && styles.storyCardMediaSeen]}>
-                    {hasMedia ? (
-                      <Image source={{ uri: story.image_url }} style={styles.storyCardImage} resizeMode="cover" />
-                    ) : (
-                      <View style={styles.storyTextCard}>
-                        <Text style={styles.storyTextQuote}>“</Text>
-                        <Text style={styles.storyTextSnippet} numberOfLines={4}>
-                          {story.content || 'يوميات جديدة'}
-                        </Text>
-                      </View>
-                    )}
-
-                    {/* Gradient Overlay for Readability */}
-                    <LinearGradient
-                      colors={['rgba(0,0,0,0.55)', 'transparent', 'rgba(0,0,0,0.8)']}
-                      style={StyleSheet.absoluteFillObject}
-                    />
-
-                    {/* Top User Info Bar */}
-                    <View style={styles.storyCardTopRow}>
-                      <View style={styles.cardAvatarWrap}>
-                        {author?.avatar_url ? (
-                          <Image source={{ uri: author.avatar_url }} style={styles.cardAvatar} />
-                        ) : (
-                          <View style={styles.cardAvatarFallback}>
-                            <Text style={styles.cardAvatarLetter}>{name[0]}</Text>
-                          </View>
-                        )}
-                        {verified && (
-                          <View style={styles.cardVerifyBadge}>
-                            <ShieldCheck size={9} color="#fff" />
-                          </View>
-                        )}
-                      </View>
-                      <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                        <Text style={styles.cardAuthorName} numberOfLines={1}>
-                          {name}
-                        </Text>
-                        <Text style={styles.cardTimeText}>
-                          {story.created_at ? relativeTime(story.created_at) : 'الآن'}
-                        </Text>
-                        <Text style={[styles.storySeenLabel, isSeen ? styles.storySeenLabelSeen : styles.storySeenLabelNew]}>
-                          {isSeen ? 'تمت المشاهدة' : 'جديدة'}
-                        </Text>
-                      </View>
-                    </View>
-
-                    {/* Bottom District & Type Pill */}
-                    <View style={styles.storyCardBottomRow}>
-                      {(author?.district || author?.city) ? (
-                        <View style={styles.districtBadge}>
-                          <MapPin size={9} color="#fff" />
-                          <Text style={styles.districtBadgeText} numberOfLines={1}>
-                            {[author.district, author.city].filter(Boolean).join(' · ')}
+          <>
+            <View style={styles.trendingHeading}>
+              <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                <Text style={styles.sectionHeading}>الأكثر مشاهدة</Text>
+                <Text style={styles.sectionSubheading}>ترند أهل الحي حسب إجمالي المشاهدات</Text>
+              </View>
+              <View style={styles.trendingBadge}><Text style={styles.trendingBadgeText}>TRENDING</Text></View>
+            </View>
+            <View style={styles.storiesGrid}>
+              {trendingAuthors.map((group: any, index: number) => {
+                const story = group.latestStory;
+                const author = group.author;
+                const name = author?.display_name || author?.username || 'جار الحي';
+                const verified = author?.is_verified || author?.is_geoverified;
+                const bg = story.bg_color || '#059669';
+                const hasMedia = story.type === 'image' && Boolean(story.image_url);
+                const allSeen = !group.hasUnseen;
+                return (
+                  <Pressable key={group.authorId}
+                    style={[styles.storyCard, allSeen ? styles.storyCardSeen : styles.storyCardNew]}
+                    onPress={() => openAuthorStories(group.stories)}
+                    accessibilityRole="button" accessibilityLabel={`فتح يوميات ${name}`}>
+                    <View style={[styles.storyCardMedia, { backgroundColor: bg }, allSeen && styles.storyCardMediaSeen]}>
+                      {hasMedia ? <Image source={{ uri: story.image_url }} style={styles.storyCardImage} resizeMode="cover" /> :
+                        <View style={styles.storyTextCard}>
+                          <Text style={styles.storyTextQuote}>“</Text>
+                          <Text style={styles.storyTextSnippet} numberOfLines={4}>{story.content || 'يوميات جديدة'}</Text>
+                        </View>}
+                      <LinearGradient colors={['rgba(0,0,0,0.55)', 'transparent', 'rgba(0,0,0,0.82)']} style={StyleSheet.absoluteFillObject} />
+                      <View style={styles.storyCardTopRow}>
+                        <View style={styles.cardAvatarWrap}>
+                          {author?.avatar_url ? <Image source={{ uri: author.avatar_url }} style={styles.cardAvatar} /> :
+                            <View style={styles.cardAvatarFallback}><Text style={styles.cardAvatarLetter}>{name[0]}</Text></View>}
+                          {verified && <View style={styles.cardVerifyBadge}><ShieldCheck size={9} color="#fff" /></View>}
+                        </View>
+                        <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                          <Text style={styles.cardAuthorName} numberOfLines={1}>{name}</Text>
+                          <Text style={styles.cardTimeText}>{relativeTime(story.created_at)}</Text>
+                          <Text style={[styles.storySeenLabel, allSeen ? styles.storySeenLabelSeen : styles.storySeenLabelNew]}>
+                            {allSeen ? 'تمت المشاهدة' : 'يوميات جديدة'}
                           </Text>
                         </View>
-                      ) : null}
-
-                      {hasMedia && (
-                        <View style={styles.mediaTypeBadge}>
-                          <Camera size={10} color="#fff" />
-                        </View>
-                      )}
+                      </View>
+                      <View style={styles.trendFooter}>
+                        <View style={styles.trendMetric}><Text style={styles.trendMetricText}>#{index + 1} ترند</Text></View>
+                        <View style={styles.trendMetric}><Text style={styles.trendMetricText}>{group.totalViews.toLocaleString('ar-SA')} مشاهدة</Text></View>
+                        <Text style={styles.trendStoryCount}>{group.stories.length} يوميات</Text>
+                      </View>
                     </View>
-                  </View>
-                </Pressable>
-              );
-            })}
-          </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </>
         )}
       </ScrollView>
     </View>
@@ -416,6 +438,32 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '900',
   },
+  ringsSection: { backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e2e8f0', paddingTop: 14, paddingBottom: 12 },
+  sectionHeadingRow: { flexDirection: 'row-reverse', alignItems: 'center', paddingHorizontal: 16, gap: 10, marginBottom: 10 },
+  sectionHeading: { color: '#0f172a', fontSize: 16, fontWeight: '900' },
+  sectionSubheading: { color: '#64748b', fontSize: 11, marginTop: 2, fontWeight: '600' },
+  livePill: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 12, backgroundColor: '#ecfdf5' },
+  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#10b981' },
+  livePillText: { color: '#047857', fontSize: 10, fontWeight: '900' },
+  ringsScroll: { flexDirection: 'row-reverse', paddingHorizontal: 14, gap: 14 },
+  ringItem: { width: 66, alignItems: 'center', gap: 5 },
+  ringOuter: { width: 62, height: 62, borderRadius: 31, padding: 3, borderWidth: 2.5, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  ringUnseen: { borderColor: '#10b981' },
+  ringSeen: { borderColor: '#cbd5e1' },
+  ringInner: { width: 50, height: 50, borderRadius: 25, overflow: 'hidden', backgroundColor: '#f1f5f9' },
+  ringAvatar: { width: '100%', height: '100%' },
+  ringAvatarFallback: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#d1fae5' },
+  ringInitial: { color: '#047857', fontSize: 20, fontWeight: '900' },
+  ringCount: { position: 'absolute', bottom: -3, right: -2, minWidth: 19, height: 19, borderRadius: 10, backgroundColor: '#0f172a', borderWidth: 2, borderColor: '#fff', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
+  ringCountText: { color: '#fff', fontSize: 9, fontWeight: '900' },
+  ringName: { color: '#334155', fontSize: 10, fontWeight: '800', maxWidth: 66 },
+  trendingHeading: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, marginBottom: 12, marginTop: 6 },
+  trendingBadge: { paddingHorizontal: 9, paddingVertical: 5, borderRadius: 9, backgroundColor: '#0f172a' },
+  trendingBadgeText: { color: '#fff', fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
+  trendFooter: { zIndex: 2, alignItems: 'flex-start', gap: 5 },
+  trendMetric: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,0,0,0.48)', paddingHorizontal: 8, paddingVertical: 5, borderRadius: 10 },
+  trendMetricText: { color: '#fff', fontSize: 10, fontWeight: '900' },
+  trendStoryCount: { color: '#fff', fontSize: 10, fontWeight: '800', textShadowColor: '#000', textShadowRadius: 4 },
   storiesGrid: {
     flexDirection: 'row-reverse',
     flexWrap: 'wrap',
