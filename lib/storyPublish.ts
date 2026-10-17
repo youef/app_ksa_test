@@ -1,13 +1,14 @@
 import { supabase } from './supabase';
 import { getGradient } from './storyGradients';
 import { selectPublishableSlides } from './storySlides';
-import { STORY_LIMITS, type StoryInsertPayload, type StorySlide } from './storyTypes';
+import { STORY_LIMITS, type StoryInsertPayload, type StoryPublishOptions, type StorySlide } from './storyTypes';
 import { uploadStoryImage } from './storyUpload';
 
 function buildPayload(
   slide: StorySlide,
   authorId: string,
   imageUrl: string | null,
+  options: StoryPublishOptions,
 ): StoryInsertPayload {
   const gradient = getGradient(slide.bgGradId);
   return {
@@ -17,6 +18,18 @@ function buildPayload(
     expires_at: new Date(Date.now() + STORY_LIMITS.ttlMs).toISOString(),
     content: slide.content.trim() || (slide.type === 'text' ? 'حالة' : null),
     image_url: imageUrl,
+    visibility: options.audience,
+    allowed_user_ids: options.audience === 'custom' ? options.allowedUserIds : [],
+    interactive_type: options.interactiveType,
+    poll_question: options.interactiveType === 'poll' ? options.pollQuestion.trim() : null,
+    poll_options: options.interactiveType === 'poll' ? options.pollOptions : ['نعم', 'لا'],
+    question_prompt: options.interactiveType === 'question' ? options.questionPrompt.trim() : null,
+    text_color: options.textColor,
+    font_size: options.fontSize,
+    font_family: options.fontFamily,
+    text_rotation: options.textRotation,
+    text_offset_x: options.textOffsetX,
+    text_offset_y: options.textOffsetY,
   };
 }
 
@@ -62,6 +75,20 @@ export interface PublishOutcome {
 export async function publishStorySlides(
   slides: StorySlide[],
   onProgress?: (done: number, total: number) => void,
+  options: StoryPublishOptions = {
+    audience: 'public',
+    allowedUserIds: [],
+    interactiveType: 'none',
+    pollQuestion: '',
+    pollOptions: ['نعم', 'لا'],
+    questionPrompt: '',
+    textColor: '#FFFFFF',
+    fontSize: 28,
+    fontFamily: 'System',
+    textRotation: 0,
+    textOffsetX: 0,
+    textOffsetY: 0,
+  },
 ): Promise<PublishOutcome> {
   const publishable = selectPublishableSlides(slides);
 
@@ -90,7 +117,7 @@ export async function publishStorySlides(
   }
 
   const { urls, degraded } = await resolveImageUrls(publishable, user.id, onProgress);
-  const payloads = publishable.map((slide, i) => buildPayload(slide, user.id, urls[i]));
+  const payloads = publishable.map((slide, i) => buildPayload(slide, user.id, urls[i], options));
 
   const { error } = await supabase.from('stories').insert(payloads);
 
