@@ -240,12 +240,38 @@ export default function StoryViewer() {
 
     // Record view & increment view count for current story
     if (currentUserId && currentStory?.id) {
-      supabase.from('story_views').insert({ story_id: currentStory.id, viewer_id: currentUserId }).then(() => {});
-      supabase.from('stories').update({ view_count: (currentStory.view_count || 0) + 1 }).eq('id', currentStory.id);
+      supabase.rpc('record_story_view', { p_story_id: currentStory.id }).then(() => {});
     }
 
     return () => animation.stop();
   }, [currentIndex, isPaused, showReplyBox, storiesList.length]);
+
+  async function showStoryViewers() {
+    if (!currentStory?.id || currentStory.author_id !== currentUserId) return;
+    try {
+      const { data: views, error } = await supabase
+        .from('story_views')
+        .select('viewer_id, viewed_at')
+        .eq('story_id', currentStory.id)
+        .order('viewed_at', { ascending: false });
+      if (error) throw error;
+      const rows = views || [];
+      if (!rows.length) {
+        Alert.alert('مشاهدو القصة', 'لم يشاهد أحد هذه القصة بعد.');
+        return;
+      }
+      const ids = [...new Set(rows.map((row: any) => row.viewer_id))];
+      const { data: people } = await supabase.from('profiles').select('id, display_name, username').in('id', ids);
+      const names = new Map((people || []).map((p: any) => [p.id, p.display_name || p.username || 'مستخدم']));
+      const body = rows.map((row: any, index: number) => {
+        const when = row.viewed_at ? new Date(row.viewed_at).toLocaleString('ar-SA', { dateStyle: 'short', timeStyle: 'short' }) : 'وقت غير متاح';
+        return `${index + 1}. ${names.get(row.viewer_id) || 'مستخدم'} — ${when}`;
+      }).join('\\n');
+      Alert.alert(`مشاهدو القصة (${rows.length})`, body);
+    } catch (error: any) {
+      Alert.alert('تعذر تحميل المشاهدين', error?.message || 'حاول مرة أخرى.');
+    }
+  }
 
   function handleNextStory() {
     if (currentIndex < storiesList.length - 1) {
@@ -611,10 +637,10 @@ export default function StoryViewer() {
           {/* ======================================================== */}
           {isOwn ? (
             <View style={styles.ownerStats}>
-              <View style={styles.statBadge}>
+              <Pressable style={styles.statBadge} onPress={showStoryViewers} accessibilityRole="button" accessibilityLabel="عرض قائمة مشاهدي القصة">
                 <Eye size={16} color="#fff" />
-                <Text style={styles.statBadgeText}>{currentStory.view_count || 0} مشاهدة</Text>
-              </View>
+                <Text style={styles.statBadgeText}>{currentStory.view_count || 0} مشاهدة · عرض القائمة</Text>
+              </Pressable>
             </View>
           ) : (
             <View style={styles.replyArea}>
