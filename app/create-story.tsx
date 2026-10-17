@@ -170,20 +170,27 @@ export default function CreateStory() {
       return Alert.alert('السؤال غير مكتمل', 'اكتب السؤال الذي سيظهر للمتابعين.');
     }
 
-    const outcome = await publisher.publish(composer.slides, {
-      audience,
-      allowedUserIds,
-      interactiveType,
-      pollQuestion,
-      pollOptions: [pollOptionA, pollOptionB],
-      questionPrompt,
-      textColor,
-      fontSize,
-      fontFamily: WHATSAPP_FONTS[fontIndex].id,
-      textRotation,
-      textOffsetX: textOffset.x,
-      textOffsetY: textOffset.y,
-    });
+    let outcome;
+    try {
+      outcome = await publisher.publish(composer.slides, {
+        audience,
+        allowedUserIds,
+        interactiveType,
+        pollQuestion,
+        pollOptions: [pollOptionA, pollOptionB],
+        questionPrompt,
+        textColor,
+        fontSize,
+        fontFamily: WHATSAPP_FONTS[fontIndex].id,
+        textRotation,
+        textOffsetX: textOffset.x,
+        textOffsetY: textOffset.y,
+      });
+    } catch (error) {
+      publisher.reset();
+      Alert.alert('تعذر النشر', error instanceof Error ? error.message : 'تحقق من الاتصال ثم أعد المحاولة.');
+      return;
+    }
 
     if (outcome.unauthenticated) {
       publisher.reset();
@@ -196,10 +203,14 @@ export default function CreateStory() {
     }
 
     const noun = outcome.publishedCount === 1 ? 'قصة' : 'قصص';
-    const body =
+    const body = [
       outcome.failures.length > 0
         ? `تم نشر ${outcome.publishedCount} ${noun} من ${outcome.requestedCount}. تعذر نشر: ${outcome.failures.join('، ')}`
-        : `تم نشر ${outcome.publishedCount} ${noun} في يوميات الحي وتختفي بعد 24 ساعة.`;
+        : `تم نشر ${outcome.publishedCount} ${noun} في يوميات الحي وتختفي بعد 24 ساعة.`,
+      outcome.degradedUploads > 0
+        ? `تنبيه: تعذر رفع ${outcome.degradedUploads} صورة إلى التخزين السحابي؛ قد لا تظهر للآخرين.`
+        : '',
+    ].filter(Boolean).join('\n');
 
     Alert.alert('تم النشر بنجاح! 🎉', body, [
       { text: 'مشاهدة في الحي', onPress: () => router.replace('/stories') },
