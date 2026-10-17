@@ -31,7 +31,7 @@ begin
   if v_viewer is null then return false; end if;
   insert into public.story_views(story_id, viewer_id, viewed_at)
   select s.id, v_viewer, now() from public.stories s
-  where s.id = p_story_id and s.author_id <> v_viewer and s.expires_at > now()
+  where s.id = p_story_id and s.author_id <> v_viewer and coalesce(s.expires_at, s.created_at + interval '24 hours') > now()
     and not (v_viewer = any(coalesce(s.hidden_user_ids, '{}'::uuid[])))
   on conflict (story_id, viewer_id) do nothing;
   get diagnostics v_inserted = row_count;
