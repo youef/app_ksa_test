@@ -407,6 +407,7 @@ export default function MapScreen() {
           {addAction('تنبيه طارئ', '🚨', '/emergency-alert')}
           {addAction('طلب مساعدة', '🤝', '/new-request')}
           {addAction('إعلان أو منتج', '🛍️', '/marketplace-dashboard')}
+          {addAction('فعالية للحي', '🎉', '/market?section=events')}
         </View>
       ) : null}
 
