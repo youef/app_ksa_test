@@ -49,7 +49,7 @@ import {
   CheckCircle2,
   Award,
 } from 'lucide-react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { relativeTime } from '@/lib/mapPins';
 import {
   getActiveLocation,
@@ -113,7 +113,9 @@ export default function Market() {
   const { width } = useWindowDimensions();
 
   // Active Main Section: 'market' | 'businesses' | 'events'
-  const [section, setSection] = useState<MarketSection>('market');
+  const params = useLocalSearchParams<{ section?: string }>();
+  const initialSection: MarketSection = params.section === 'events' ? 'events' : params.section === 'businesses' ? 'businesses' : 'market';
+  const [section, setSection] = useState<MarketSection>(initialSection);
 
   // Core Market State (Real Database Only - No Mock Data)
   const [items, setItems] = useState<any[]>([]);
