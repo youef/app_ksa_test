@@ -316,7 +316,7 @@ export default function MapScreen() {
         ) : null}
 
         {places.slice(0, 60).map((place) => (
-          <Marker key={`place-${place.id}`} id={`place-${place.id}`} lngLat={[place.lng, place.lat]} anchor="bottom">
+          <Marker key={`place-${place.id}`} id={`place-${place.id}`} lngLat={[place.lng, place.lat]} anchor="bottom" onPress={() => { setSelectedPlace(place); setSelected(null); }}>
             <View style={styles.pinWrap}>
               <View style={[styles.pin, { backgroundColor: '#0F766E' }]}>
                 <Text style={styles.pinEmoji}>🏬</Text>
