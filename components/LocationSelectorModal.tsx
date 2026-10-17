@@ -239,6 +239,16 @@ export default function LocationSelectorModal({
     normalizeSaudiLocationName(d.name).includes(queryKey)
   );
 
+  // If the user already has a district, expose only that district plus the whole-city option.
+  // District browsing is available only during first-time setup when no district is saved yet.
+  const hasSavedDistrict = Boolean(
+    selectedDistrict &&
+    !['كل الأحياء', 'كل أحياء المدينة', 'جميع الأحياء', 'الكل'].includes(selectedDistrict.trim())
+  );
+  const districtOptions = lockActive && hasSavedDistrict
+    ? filteredDistricts.filter(d => normalizeSaudiLocationName(d.name) === normalizeSaudiLocationName(selectedDistrict))
+    : filteredDistricts;
+
   return (
     <ActionSheet
       visible={visible}
@@ -437,7 +447,7 @@ export default function LocationSelectorModal({
 
                 <View style={styles.divider} />
 
-                {filteredDistricts.slice(0, visibleCount).map(dist => {
+                {districtOptions.slice(0, visibleCount).map(dist => {
                   const isSelected = selectedCity === selectedCit?.name && selectedDistrict === dist.name;
                   return (
                     <Pressable
@@ -457,7 +467,7 @@ export default function LocationSelectorModal({
                     </Pressable>
                   );
                 })}
-                {filteredDistricts.length > visibleCount && <Pressable style={styles.loadMore} onPress={() => setVisibleCount(count => count + 100)}><Text style={styles.loadMoreText}>عرض ١٠٠ حي إضافي · المتبقي {filteredDistricts.length - visibleCount}</Text></Pressable>}
+                {districtOptions.length > visibleCount && <Pressable style={styles.loadMore} onPress={() => setVisibleCount(count => count + 100)}><Text style={styles.loadMoreText}>عرض أحياء إضافية · المتبقي {districtOptions.length - visibleCount}</Text></Pressable>}
               </>
             )}
           </ScrollView>
