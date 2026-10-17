@@ -47,7 +47,6 @@ const WHATSAPP_FONTS = [
   { id: 'italic', name: 'مائل', fontWeight: '700' as const, fontStyle: 'italic' as const, isPill: false },
 ];
 
-const QUICK_EMOJIS = ['👋', '☕', '🕌', '🇸🇦', '🌙', '📍', '🌧️', '✨', '🚗', '🏡', '🤝', '🔥'];
 const STORY_TEXT_COLORS = ['#FFFFFF', '#111827', '#F87171', '#FBBF24', '#34D399', '#60A5FA', '#C084FC', '#FB7185'];
 
 export default function CreateStory() {
@@ -59,6 +58,7 @@ export default function CreateStory() {
   const [textAlign, setTextAlign] = useState<'center' | 'right' | 'left'>('center');
   const [showPalette, setShowPalette] = useState(false);
   const [showStoryOptions, setShowStoryOptions] = useState(false);
+  const [settingsSection, setSettingsSection] = useState<'privacy' | 'interactive' | 'format'>('privacy');
   const [audience, setAudience] = useState<'public' | 'followers' | 'custom'>('public');
   const [audienceCandidates, setAudienceCandidates] = useState<Array<{ id: string; display_name: string | null; username: string | null }>>([]);
   const [allowedUserIds, setAllowedUserIds] = useState<string[]>([]);
@@ -106,13 +106,6 @@ export default function CreateStory() {
   const handleSelectGradient = useCallback((gradId: number) => {
     composer.patchActiveSlide({ bgGradId: gradId });
   }, [composer]);
-
-  const handleInsertEmoji = useCallback((emoji: string) => {
-    if (!activeSlide) return;
-    const current = activeSlide.content || '';
-    if (current.length >= 300) return;
-    composer.patchActiveSlide({ content: current + emoji });
-  }, [activeSlide, composer]);
 
   const loadAudienceCandidates = useCallback(async () => {
     setAudienceLoading(true);
@@ -209,7 +202,7 @@ export default function CreateStory() {
         : '',
     ].filter(Boolean).join('\n');
 
-    Alert.alert('تم النشر بنجاح! 🎉', body, [
+    Alert.alert('تم النشر بنجاح!', body, [
       { text: 'مشاهدة في الحي', onPress: () => router.replace('/stories') },
     ]);
   }, [composer, publisher, audience, allowedUserIds, interactiveType, pollQuestion, pollOptionA, pollOptionB, questionPrompt, textColor, fontSize, fontIndex, textRotation, textOffset]);
@@ -227,7 +220,8 @@ export default function CreateStory() {
   return (
     <KeyboardAvoidingView
       style={s.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 12 : 0}
     >
       {/* Immersive Creative Canvas */}
       <View style={s.canvasWrapper}>
@@ -262,7 +256,7 @@ export default function CreateStory() {
                 style={[s.modeOption, !isImageSlide && s.modeOptionActive]}
               >
                 <Text style={[s.modeOptionText, !isImageSlide && s.modeOptionTextActive]}>
-                  ✏️ نص
+                  نص
                 </Text>
               </Pressable>
               <Pressable
@@ -270,7 +264,7 @@ export default function CreateStory() {
                 style={[s.modeOption, isImageSlide && s.modeOptionActive]}
               >
                 <Text style={[s.modeOptionText, isImageSlide && s.modeOptionTextActive]}>
-                  📷 صورة
+                  صورة
                 </Text>
               </Pressable>
             </View>
@@ -405,11 +399,11 @@ export default function CreateStory() {
                   ]}
                   value={activeSlide.content}
                   onChangeText={(text) => composer.patchActiveSlide({ content: text })}
+                  onFocus={() => { setShowStoryOptions(false); setShowPalette(false); }}
                   placeholder="اكتب حالتك أو استفسارك لأهل حيك هنا..."
                   placeholderTextColor="rgba(255,255,255,0.65)"
                   multiline
                   maxLength={300}
-                  autoFocus
                 />
               </View>
             ) : hasImage ? (
@@ -428,25 +422,22 @@ export default function CreateStory() {
             )}
           </View>
 
-          {/* Quick Saudi Emojis Bar (Text Mode) */}
-          {!isImageSlide && (
-            <View style={s.emojiBarWrapper}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.emojiScroll}>
-                {QUICK_EMOJIS.map((emoji) => (
-                  <Pressable
-                    key={emoji}
-                    onPress={() => handleInsertEmoji(emoji)}
-                    style={s.emojiBtn}
-                  >
-                    <Text style={s.emojiBtnText}>{emoji}</Text>
+          {showStoryOptions && (
+            <View style={s.storyOptionsPanel}>
+              <View style={s.settingsTabs}>
+                {([
+                  ['privacy', 'الخصوصية'],
+                  ['interactive', 'التفاعل'],
+                  ['format', 'تنسيق النص'],
+                ] as const).map(([key, label]) => (
+                  <Pressable key={key} onPress={() => setSettingsSection(key)}
+                    style={[s.settingsTab, settingsSection === key && s.settingsTabActive]}>
+                    <Text style={[s.settingsTabText, settingsSection === key && s.settingsTabTextActive]}>{label}</Text>
                   </Pressable>
                 ))}
-              </ScrollView>
-            </View>
-          )}
-
-          {showStoryOptions && (
-            <ScrollView style={s.storyOptionsPanel} contentContainerStyle={s.storyOptionsContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+              </View>
+              <ScrollView style={s.settingsSectionScroll} contentContainerStyle={s.storyOptionsContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+              {settingsSection === 'privacy' && <>
               <View style={s.optionsSectionHeader}>
                 <ShieldCheck size={15} color="#a7f3d0" />
                 <Text style={s.optionsSectionTitle}>الجمهور والخصوصية</Text>
@@ -486,6 +477,8 @@ export default function CreateStory() {
                 </View>
               )}
 
+              </>}
+              {settingsSection === 'interactive' && <>
               <Text style={s.optionsSectionTitle}>إضافة تفاعل</Text>
               <View style={s.optionsChipRow}>
                 {([
@@ -513,6 +506,8 @@ export default function CreateStory() {
                   placeholder="السؤال للمتابعين" placeholderTextColor="#94a3b8" maxLength={180} />
               ) : null}
 
+              </>}
+              {settingsSection === 'format' && <>
               <Text style={s.optionsSectionTitle}>تنسيق النص</Text>
               <View style={s.optionsChipRow}>
                 {STORY_TEXT_COLORS.map((color) => (
@@ -546,7 +541,9 @@ export default function CreateStory() {
                   <Text style={s.optionsChipText}>إعادة ضبط الموضع</Text>
                 </Pressable>
               </View>
-            </ScrollView>
+              </>}
+              </ScrollView>
+            </View>
           )}
 
           {/* Multi-slide carousel indicator strip */}
@@ -563,7 +560,7 @@ export default function CreateStory() {
                       <Image source={{ uri: sItem.imageUri }} style={s.thumbImg} />
                     ) : (
                       <View style={s.thumbTextPlaceholder}>
-                        <Text style={s.thumbTextLetter}>{sItem.content?.[0] || '✏️'}</Text>
+                        <Text style={s.thumbTextLetter}>{sItem.content?.[0] || 'ن'}</Text>
                       </View>
                     )}
                     {idx === composer.activeIdx && composer.slides.length > 1 && (
@@ -606,7 +603,8 @@ export default function CreateStory() {
                   }]}
                   value={activeSlide.content}
                   onChangeText={(text) => composer.patchActiveSlide({ content: text })}
-                  placeholder="إضافة شرح وتفاصيل... 💬"
+                  onFocus={() => { setShowStoryOptions(false); setShowPalette(false); }}
+                  placeholder="إضافة شرح وتفاصيل..."
                   placeholderTextColor="#94a3b8"
                   maxLength={150}
                 />
@@ -888,27 +886,6 @@ const s = StyleSheet.create({
     lineHeight: 18,
     marginBottom: 20,
   },
-  emojiBarWrapper: {
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    paddingVertical: 6,
-  },
-  emojiScroll: {
-    flexDirection: 'row-reverse',
-    paddingHorizontal: 16,
-    gap: 10,
-    alignItems: 'center',
-  },
-  emojiBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emojiBtnText: {
-    fontSize: 18,
-  },
   slideIndicatorStrip: {
     paddingHorizontal: 16,
     paddingVertical: 6,
@@ -1020,16 +997,22 @@ const s = StyleSheet.create({
     opacity: 0.5,
   },
   storyOptionsPanel: {
-    maxHeight: 190,
+    maxHeight: 210,
     marginHorizontal: 12,
     marginVertical: 4,
-    padding: 10,
+    padding: 8,
     borderRadius: 16,
-    backgroundColor: 'rgba(15,23,42,0.94)',
+    backgroundColor: 'rgba(15,23,42,0.96)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.18)',
   },
-  storyOptionsContent: { padding: 10, gap: 7 },
+  settingsTabs: { flexDirection: 'row-reverse', gap: 6, marginBottom: 6 },
+  settingsTab: { flex: 1, paddingVertical: 8, paddingHorizontal: 4, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center' },
+  settingsTabActive: { backgroundColor: '#065f46', borderWidth: 1, borderColor: '#34d399' },
+  settingsTabText: { color: '#cbd5e1', fontSize: 11, fontWeight: '700' },
+  settingsTabTextActive: { color: '#fff', fontWeight: '900' },
+  settingsSectionScroll: { maxHeight: 150 },
+  storyOptionsContent: { paddingHorizontal: 4, paddingVertical: 5, gap: 9 },
   optionsSectionHeader: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
   optionsSectionTitle: { color: '#fff', fontSize: 11, fontWeight: '900', textAlign: 'right' },
   optionsChipRow: { flexDirection: 'row-reverse', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
