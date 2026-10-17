@@ -102,6 +102,7 @@ export default function TwitterInquiryCard({
   const [isPinned, setIsPinned] = useState(Boolean(data.is_pinned));
   const [isFeatured, setIsFeatured] = useState(Boolean(data.is_featured));
   const [resolutionStatus, setResolutionStatus] = useState(String(data.resolution_status || 'open'));
+  const [bestAnswerId, setBestAnswerId] = useState<string | null>(data.best_answer_id || null);
   const [statusPickerOpen, setStatusPickerOpen] = useState(false);
   const statusLabels: Record<string, string> = { open: 'بانتظار المساعدة', found: 'تم العثور على الغرض', helped: 'تمت المساعدة', resolved: 'تم حل المشكلة', not_needed: 'لم أعد بحاجة للمساعدة' };
 
@@ -152,8 +153,8 @@ export default function TwitterInquiryCard({
   }, [currentUserId, data.id, isOwner, type]);
 
   const answers = [...(data.answers || [])].sort((a: any, b: any) => {
-    const aBest = data.best_answer_id && a.id === data.best_answer_id ? 1 : 0;
-    const bBest = data.best_answer_id && b.id === data.best_answer_id ? 1 : 0;
+    const aBest = bestAnswerId && a.id === bestAnswerId ? 1 : 0;
+    const bBest = bestAnswerId && b.id === bestAnswerId ? 1 : 0;
     if (aBest !== bBest) return bBest - aBest;
     return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
   });
@@ -174,6 +175,8 @@ export default function TwitterInquiryCard({
         .maybeSingle();
       if (error) throw error;
       if (!updated) throw new Error('يمكن لصاحب السؤال فقط اعتماد الإجابة.');
+      setBestAnswerId(answerId);
+      setResolutionStatus('resolved');
       data.best_answer_id = answerId;
       data.status = 'answered';
       data.resolution_status = 'resolved';
@@ -557,7 +560,7 @@ export default function TwitterInquiryCard({
                         </View>
                       </View>
                       <Text style={s.xAnswerBodyText}>{ans.body}</Text>
-                      {isOwner && !isReq && data.best_answer_id !== ans.id && (
+                      {isOwner && !isReq && bestAnswerId !== ans.id && (
                         <Pressable
                           onPress={() => void markBestAnswer(ans.id)}
                           style={{ alignSelf: 'flex-start', flexDirection: 'row-reverse', alignItems: 'center', gap: 5, marginTop: 8, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, backgroundColor: '#ecfdf5', borderWidth: 1, borderColor: '#a7f3d0' }}
