@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { Keyboard, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Home, Compass, Plus, MessageCircle, MoreHorizontal } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { supabase } from '@/lib/supabase';
 import { BOTTOM_NAV_HEIGHT } from '@/lib/bottomNav';
 
@@ -25,6 +26,10 @@ const ROUTE_PARENT: Array<[string, string]> = [
   ['/requests', '/home'], ['/conversation', '/messages'], ['/notifications', '/more'],
 ];
 
+// المسارات التي يجب إخفاء شريط التنقل فيها بالكامل
+const HIDDEN_PREFIXES = ['/auth', '/questions', '/question', '/conversation'];
+const HIDDEN_EXACT = ['/', '/index'];
+
 function normalize(path: string) {
   const clean = (path || '/').replace(/\/+$/, '');
   return clean || '/';
@@ -42,6 +47,14 @@ export default function BottomNav() {
   const [hasSession, setHasSession] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+
+  // قيم متحركة لإخفاء/إظهار الشريط بسلاسة عند السكرول
+  const translateY = useSharedValue(0);
+  const lastScrollY = useRef(0);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
 
   const refreshUnread = useCallback(async () => {
     try {
@@ -70,7 +83,7 @@ export default function BottomNav() {
     }
   }, []);
 
-  // تفعيل الاستماع لتغيير الجلسة والرسائل الجديدة (Realtime)
+  // الاستماع لتغيير الجلسة والرسائل الجديدة (Realtime)
   useEffect(() => {
     void refreshUnread();
     
@@ -95,6 +108,7 @@ export default function BottomNav() {
     };
   }, [refreshUnread]);
 
+  // إدارة استماع الكيبورد وحدث السكرول (للويب ومنصة الجوال عبر أحداث مخصصة أو سكرول)
   useEffect(() => {
     if (Platform.OS === 'web') {
       const viewport = typeof window !== 'undefined' ? window.visualViewport : null;
@@ -106,13 +120,30 @@ export default function BottomNav() {
         const focused = Boolean((event as CustomEvent<{ focused?: boolean }>).detail?.focused);
         setKeyboardVisible(focused);
       };
+
+      // ميزة الاستماع لحركة السكرول في الويب لإخفاء الشريط
+      const onWindowScroll = () => {
+        const currentScrollY = window.scrollY || window.pageYOffset;
+        if (currentScrollY > lastScrollY.current && currentScrollY > 60) {
+          // التمرير للأسفل -> إخفاء الشريط
+          translateY.value = withTiming(120, { duration: 200 });
+        } else {
+          // التمرير للأعلى -> إظهار الشريط
+          translateY.value = withTiming(0, { duration: 200 });
+        }
+        lastScrollY.current = currentScrollY;
+      };
+
       viewport?.addEventListener('resize', syncViewport);
       viewport?.addEventListener('scroll', syncViewport);
       window.addEventListener('hayna:composer-focus', onComposerFocus);
+      window.addEventListener('scroll', onWindowScroll, { passive: true });
+
       return () => {
         viewport?.removeEventListener('resize', syncViewport);
         viewport?.removeEventListener('scroll', syncViewport);
         window.removeEventListener('hayna:composer-focus', onComposerFocus);
+        window.removeEventListener('scroll', onWindowScroll);
       };
     }
 
@@ -122,17 +153,17 @@ export default function BottomNav() {
       showSub.remove();
       hideSub.remove();
     };
-  }, []);
+  }, [translateY]);
 
   const path = normalize(pathname);
-  if (keyboardVisible || path === '/' || path === '/index' || path === '/auth' || path.startsWith('/auth/') ||
-      path === '/questions' || path.startsWith('/questions/') || path === '/question' || path.startsWith('/question/') ||
-      path === '/conversation' || path.startsWith('/conversation/')) return null;
+  const isHiddenRoute = HIDDEN_EXACT.includes(path) || HIDDEN_PREFIXES.some(prefix => path.startsWith(prefix));
+
+  if (keyboardVisible || isHiddenRoute) return null;
 
   const bottomPadding = Math.max(insets.bottom, Platform.OS === 'ios' ? 8 : 7);
 
   return (
-    <View pointerEvents="box-none" style={[styles.dock, { paddingBottom: bottomPadding }]}>
+    <Animated.View pointerEvents="box-none" style={[styles.dock, { paddingBottom: bottomPadding }, animatedStyle]}>
       <BlurView intensity={Platform.OS === 'ios' ? 72 : 58} tint="default" style={styles.glass}>
         <View style={styles.row}>
           {TABS.map((tab) => {
@@ -173,7 +204,7 @@ export default function BottomNav() {
           })}
         </View>
       </BlurView>
-    </View>
+    </Animated.View>
   );
 }
 
