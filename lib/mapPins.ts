@@ -6,7 +6,7 @@ import {
 } from './saudiLocations';
 import { areaLabel, distanceMeters, obfuscateCoordinate } from './privacy';
 
-export type MapPinKind = 'question' | 'tool' | 'emergency' | 'request' | 'business' | 'carpool';
+export type MapPinKind = 'question' | 'tool' | 'emergency' | 'request' | 'business' | 'carpool' | 'event' | 'marketplace' | 'alert';
 
 export interface MapPin {
   id: string;
@@ -46,6 +46,9 @@ export const MAP_PIN_KINDS: Record<
   request: { label: 'طلبات مساعدة', short: 'طلبات', color: '#F59E0B', emoji: '🤝' },
   business: { label: 'محلات وخدمات', short: 'محلات', color: '#059669', emoji: '🏪' },
   carpool: { label: 'توصيل مدارس', short: 'توصيل', color: '#059669', emoji: '🚗' },
+  event: { label: 'فعاليات الحي', short: 'فعاليات', color: '#DB2777', emoji: '🎉' },
+  marketplace: { label: 'إعلانات وسوق الحي', short: 'السوق', color: '#D97706', emoji: '🛍️' },
+  alert: { label: 'تنبيهات الحي', short: 'تنبيهات', color: '#B91C1C', emoji: '⚠️' },
 };
 
 export const MAP_PIN_ORDER: MapPinKind[] = [
@@ -55,6 +58,9 @@ export const MAP_PIN_ORDER: MapPinKind[] = [
   'emergency',
   'business',
   'carpool',
+  'event',
+  'marketplace',
+  'alert',
 ];
 
 const ALL_KINDS: MapPinKind = 'question';
@@ -216,7 +222,7 @@ async function safeRows(
  * Every query is defensive, so a missing column or table degrades instead of breaking.
  */
 export async function loadMapPins(limit = 220): Promise<MapPin[]> {
-  const [questionRows, requestRows, businessRows, directoryRows, servicesRows, carpoolRows] = await Promise.all([
+  const [questionRows, requestRows, businessRows, directoryRows, servicesRows, carpoolRows, eventRows, marketplaceRows, alertRows] = await Promise.all([
     safeRows(() =>
       supabase.from('questions').select('*').order('created_at', { ascending: false }).limit(limit),
     ),
@@ -247,6 +253,9 @@ export async function loadMapPins(limit = 220): Promise<MapPin[]> {
         .order('created_at', { ascending: false })
         .limit(limit),
     ),
+    safeRows(() => supabase.from('events').select('*').eq('status', 'published').eq('moderation_status', 'approved').order('starts_at', { ascending: true }).limit(limit)),
+    safeRows(() => supabase.from('marketplace_items').select('*').eq('status', 'available').order('created_at', { ascending: false }).limit(limit)),
+    safeRows(() => supabase.from('urgent_alerts').select('*').eq('status', 'active').order('created_at', { ascending: false }).limit(limit)),
   ]);
 
   const pins: MapPin[] = [];
@@ -450,6 +459,27 @@ export async function loadMapPins(limit = 220): Promise<MapPin[]> {
       price: toNumber(row.price_from),
       phone: cleanText(row.whatsapp, 30),
     });
+  });
+
+  eventRows.forEach((row: any) => {
+    if (!row?.id) return;
+    const position = resolvePinPosition({ id: `event-${row.id}`, lat: row.latitude, lng: row.longitude, city: row.city, district: row.district }, {}, { blur: false });
+    if (!position) return;
+    pins.push({ id: `event-${row.id}`, kind: 'event', title: cleanText(row.title, 90) || 'فعالية في الحي', body: cleanText(row.description), city: row.city || 'كل المملكة', district: row.district || '', area: areaLabel({ district: row.district, city: row.city }), lat: position.lat, lng: position.lng, approximate: position.approximate, exact: !position.approximate, href: '/market', createdAt: row.starts_at || row.created_at || '', author: '', ownerId: row.organizer_id || '', category: cleanText(row.category || 'فعالية', 40), verified: row.moderation_status === 'approved', isOpen: row.status === 'published', urgent: false, rating: null, price: row.is_free ? 0 : null, phone: '' });
+  });
+
+  marketplaceRows.forEach((row: any) => {
+    if (!row?.id) return;
+    const position = resolvePinPosition({ id: `marketplace-${row.id}`, city: row.city, district: row.district });
+    if (!position) return;
+    pins.push({ id: `marketplace-${row.id}`, kind: 'marketplace', title: cleanText(row.title, 90) || 'عرض في سوق الحي', body: cleanText(row.description), city: row.city || 'كل المملكة', district: row.district || '', area: areaLabel({ district: row.district, city: row.city }), lat: position.lat, lng: position.lng, approximate: true, exact: false, href: '/market', createdAt: row.created_at || '', author: '', ownerId: row.seller_id || '', category: cleanText(row.item_type || 'إعلان', 40), verified: false, isOpen: row.status === 'available', urgent: false, rating: null, price: toNumber(row.price), phone: '' });
+  });
+
+  alertRows.forEach((row: any) => {
+    if (!row?.id) return;
+    const position = resolvePinPosition({ id: `alert-${row.id}`, lat: row.location_lat, lng: row.location_lng, city: row.city, district: row.district });
+    if (!position) return;
+    pins.push({ id: `alert-${row.id}`, kind: 'alert', title: cleanText(row.title, 90) || 'تنبيه في الحي', body: cleanText(row.description), city: row.city || 'كل المملكة', district: row.district || '', area: areaLabel({ district: row.district, city: row.city }), lat: position.lat, lng: position.lng, approximate: true, exact: false, href: '', createdAt: row.created_at || '', author: '', ownerId: row.creator_id || '', category: cleanText(row.alert_type || 'تنبيه', 40), verified: false, isOpen: row.status === 'active', urgent: true, rating: null, price: null, phone: '' });
   });
 
   const seen = new Set<string>();
