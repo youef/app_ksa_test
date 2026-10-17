@@ -30,7 +30,17 @@ export default function StoriesScreen() {
   const [currentDistrict, setCurrentDistrict] = useState<string>('');
   const [followingIds, setFollowingIds] = useState<string[]>([]);
   const [storyNotificationsEnabled, setStoryNotificationsEnabled] = useState(true);
-  const [notificationSettingsBusy, setNotificationSettingsBusy] = useState(false);\n  const storyRingPulse = useRef(new Animated.Value(1)).current;\n\n  useEffect(() => {\n    const pulse = Animated.loop(Animated.sequence([\n      Animated.timing(storyRingPulse, { toValue: 1.06, duration: 850, useNativeDriver: true }),\n      Animated.timing(storyRingPulse, { toValue: 1, duration: 850, useNativeDriver: true }),\n    ]));\n    pulse.start();\n    return () => pulse.stop();\n  }, [storyRingPulse]);
+  const [notificationSettingsBusy, setNotificationSettingsBusy] = useState(false);
+  const storyRingPulse = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const pulse = Animated.loop(Animated.sequence([
+      Animated.timing(storyRingPulse, { toValue: 1.06, duration: 850, useNativeDriver: true }),
+      Animated.timing(storyRingPulse, { toValue: 1, duration: 850, useNativeDriver: true }),
+    ]));
+    pulse.start();
+    return () => pulse.stop();
+  }, [storyRingPulse]);
 
   useEffect(() => {
     loadAllStories();
