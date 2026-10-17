@@ -185,13 +185,13 @@ export default function UserProfile() {
         questionRows,
         answerRows,
       ] = await Promise.all([
-        supabase.from('marketplace_items').select('p.id', { count: 'exact', head: true }).eq('seller_id', p.id),
-        supabase.from('services').select('p.id', { count: 'exact', head: true }).eq('provider_id', p.id),
-        supabase.from('requests').select('p.id', { count: 'exact', head: true }).eq('requester_id', p.id),
-        supabase.from('questions').select('p.id', { count: 'exact', head: true }).eq('author_id', p.id),
-        supabase.from('follows').select('p.id', { count: 'exact', head: true }).eq('following_id', p.id),
-        supabase.from('follows').select('p.id', { count: 'exact', head: true }).eq('follower_id', p.id),
-        supabase.from('answers').select('p.id', { count: 'exact', head: true }).eq('author_id', p.id),
+        supabase.from('marketplace_items').select('id', { count: 'exact', head: true }).eq('seller_id', p.id),
+        supabase.from('services').select('id', { count: 'exact', head: true }).eq('provider_id', p.id),
+        supabase.from('requests').select('id', { count: 'exact', head: true }).eq('requester_id', p.id),
+        supabase.from('questions').select('id', { count: 'exact', head: true }).eq('author_id', p.id),
+        supabase.from('follows').select('id', { count: 'exact', head: true }).eq('following_id', p.id),
+        supabase.from('follows').select('id', { count: 'exact', head: true }).eq('follower_id', p.id),
+        supabase.from('answers').select('id', { count: 'exact', head: true }).eq('author_id', p.id),
         supabase.from('reputation').select('points').eq('user_id', p.id).maybeSingle(),
         supabase
           .from('marketplace_items')
