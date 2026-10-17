@@ -102,7 +102,7 @@ function RootContent() {
                   }}
                 />
               )}
-              {!(maintenance.enabled && sessionReady && !isAdmin) && !liveFullScreen && <BottomNav />}
+              {!(maintenance.enabled && sessionReady && !isAdmin) && !liveFullScreen && path !== '/map' && !path.startsWith('/map/') && <BottomNav />}
             </View>
           </DialogProvider>
         </DynamicIslandProvider>
