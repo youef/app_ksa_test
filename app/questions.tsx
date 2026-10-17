@@ -159,7 +159,9 @@ export default function Questions() {
     supabase.auth.getSession().then(({ data }) => setHasSession(Boolean(data.session?.user)));
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
       setHasSession(Boolean(session?.user));
+      setCurrentUserId(session?.user?.id ?? null);
       if (session?.user) void load(search, activeLoc);
+      else setSavedQuestionIds(new Set());
     });
     getActiveLocation().then(location => {
       setActiveLoc(location);
