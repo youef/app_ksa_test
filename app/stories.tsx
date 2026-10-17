@@ -85,7 +85,7 @@ export default function StoriesScreen() {
       if (error) throw error;
       const cityRows = (data || []) as any[];
       const normalize = (value: any) => String(value || '').trim().toLocaleLowerCase('ar');
-      const valid = city ? cityRows.filter((story: any) => normalize(story.profiles?.city) === normalize(city)) : cityRows;
+      const valid = city ? cityRows.filter((story: any) => normalize(story.profiles?.city) === normalize(city)) : [];
       setStories(valid);
       if (activeViewerId && valid.length > 0) {
         const { data: views, error: viewsError } = await supabase
