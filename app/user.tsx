@@ -116,8 +116,8 @@ export default function UserProfile() {
       const yesterdayIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       const { data: activeStoryRows, error: activeStoryError } = await supabase
         .from('stories')
-        .select('id')
-        .eq('author_id', id)
+        .select('p.id')
+        .eq('author_id', p.id)
         .or(`expires_at.gt.${nowIso},and(expires_at.is.null,created_at.gte.${yesterdayIso})`)
         .limit(1);
       setHasActiveStories(!activeStoryError && !!activeStoryRows?.length);
@@ -126,17 +126,17 @@ export default function UserProfile() {
       let isFollowedBy = false;
       let iBlocked = false;
       let blockedMe = false;
-      if (me && me !== id) {
+      if (me && me !== p.id) {
         const [a, b, c] = await Promise.all([
-          supabase.from('follows').select('id').eq('follower_id', me).eq('following_id', id).maybeSingle(),
-          supabase.from('follows').select('id').eq('follower_id', id).eq('following_id', me).maybeSingle(),
-          getBlockStatus(me, id),
+          supabase.from('follows').select('p.id').eq('follower_id', me).eq('following_id', p.id).maybeSingle(),
+          supabase.from('follows').select('p.id').eq('follower_id', p.id).eq('following_id', me).maybeSingle(),
+          getBlockStatus(me, p.id),
         ]);
         isFollowing = !!a.data;
         isFollowedBy = !!b.data;
         iBlocked = c.iBlocked;
         blockedMe = c.blockedMe;
-        const { data: mine } = await supabase.from('profiles').select('city,district').eq('id', me).maybeSingle();
+        const { data: mine } = await supabase.from('profiles').select('city,district').eq('p.id', me).maybeSingle();
         setSameDistrict(!!mine && isExactDistrictMatching(p, mine.city, mine.district));
       } else {
         setSameDistrict(true);
@@ -147,10 +147,10 @@ export default function UserProfile() {
       setBlockedByOther(blockedMe);
 
       const locked =
-        (p.profile_privacy === 'private' && !isFollowing && me !== id) ||
+        (p.profile_privacy === 'private' && !isFollowing && me !== p.id) ||
         iBlocked ||
         blockedMe ||
-        (p.hide_name === true && me !== id);
+        (p.hide_name === true && me !== p.id);
       if (locked) {
         setItems([]);
         setServices([]);
@@ -185,44 +185,44 @@ export default function UserProfile() {
         questionRows,
         answerRows,
       ] = await Promise.all([
-        supabase.from('marketplace_items').select('id', { count: 'exact', head: true }).eq('seller_id', id),
-        supabase.from('services').select('id', { count: 'exact', head: true }).eq('provider_id', id),
-        supabase.from('requests').select('id', { count: 'exact', head: true }).eq('requester_id', id),
-        supabase.from('questions').select('id', { count: 'exact', head: true }).eq('author_id', id),
-        supabase.from('follows').select('id', { count: 'exact', head: true }).eq('following_id', id),
-        supabase.from('follows').select('id', { count: 'exact', head: true }).eq('follower_id', id),
-        supabase.from('answers').select('id', { count: 'exact', head: true }).eq('author_id', id),
-        supabase.from('reputation').select('points').eq('user_id', id).maybeSingle(),
+        supabase.from('marketplace_items').select('p.id', { count: 'exact', head: true }).eq('seller_id', p.id),
+        supabase.from('services').select('p.id', { count: 'exact', head: true }).eq('provider_id', p.id),
+        supabase.from('requests').select('p.id', { count: 'exact', head: true }).eq('requester_id', p.id),
+        supabase.from('questions').select('p.id', { count: 'exact', head: true }).eq('author_id', p.id),
+        supabase.from('follows').select('p.id', { count: 'exact', head: true }).eq('following_id', p.id),
+        supabase.from('follows').select('p.id', { count: 'exact', head: true }).eq('follower_id', p.id),
+        supabase.from('answers').select('p.id', { count: 'exact', head: true }).eq('author_id', p.id),
+        supabase.from('reputation').select('points').eq('user_id', p.id).maybeSingle(),
         supabase
           .from('marketplace_items')
-          .select('id,title,description,price,item_type,district,image_url,status,created_at')
-          .eq('seller_id', id)
+          .select('p.id,title,description,price,item_type,district,image_url,status,created_at')
+          .eq('seller_id', p.id)
           .order('created_at', { ascending: false })
           .limit(18),
         supabase
           .from('services')
-          .select('id,name,description,category,district,price_from,price_to,available_now,is_verified,cover_url,created_at')
-          .eq('provider_id', id)
+          .select('p.id,name,description,category,district,price_from,price_to,available_now,is_verified,cover_url,created_at')
+          .eq('provider_id', p.id)
           .order('created_at', { ascending: false })
           .limit(18),
         supabase
           .from('requests')
-          .select('id,title,description,status,resolution_status,is_pinned,request_type,budget,is_urgent,district,created_at')
-          .eq('requester_id', id)
+          .select('p.id,title,description,status,resolution_status,is_pinned,request_type,budget,is_urgent,district,created_at')
+          .eq('requester_id', p.id)
           .order('is_pinned', { ascending: false })
           .order('created_at', { ascending: false })
           .limit(18),
         supabase
           .from('questions')
-          .select('id,title,body,status,resolution_status,is_pinned,category,district,created_at,view_count,views_count,is_emergency,item_type')
-          .eq('author_id', id)
+          .select('p.id,title,body,status,resolution_status,is_pinned,category,district,created_at,view_count,views_count,is_emergency,item_type')
+          .eq('author_id', p.id)
           .order('is_pinned', { ascending: false })
           .order('created_at', { ascending: false })
           .limit(18),
         supabase
           .from('answers')
-          .select('id,body,created_at,question_id,questions(id,title,city,district)')
-          .eq('author_id', id)
+          .select('p.id,body,created_at,question_id,questions(p.id,title,city,district)')
+          .eq('author_id', p.id)
           .order('created_at', { ascending: false })
           .limit(18),
       ]);
