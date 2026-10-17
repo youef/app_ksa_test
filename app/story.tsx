@@ -12,6 +12,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Animated,
+  PanResponder,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
@@ -40,8 +41,47 @@ export default function StoryViewer() {
   const [questionSent, setQuestionSent] = useState(false);
   const [questionResponses, setQuestionResponses] = useState<Array<{ answer: string; responder_id: string; created_at: string }>>([]);
   const [interactiveSending, setInteractiveSending] = useState(false);
+  const [uiVisible, setUiVisible] = useState(true);
+  const hideUiTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressActive = useRef(false);
 
   const progressAnim = useRef(new Animated.Value(0)).current;
+  const panResponder = useRef(PanResponder.create({
+    onMoveShouldSetPanResponder: (_event, gesture) => Math.abs(gesture.dy) > 14 && Math.abs(gesture.dy) > Math.abs(gesture.dx) * 1.25,
+    onPanResponderRelease: (_event, gesture) => {
+      if (gesture.dy > 105 && Math.abs(gesture.dx) < 90) {
+        if (hideUiTimer.current) clearTimeout(hideUiTimer.current);
+        router.back();
+      }
+    },
+  })).current;
+
+  function revealUi() {
+    setUiVisible(true);
+    if (hideUiTimer.current) clearTimeout(hideUiTimer.current);
+    if (!showReplyBox && !isPaused) {
+      hideUiTimer.current = setTimeout(() => setUiVisible(false), 2600);
+    }
+  }
+
+  function handleStoryPressIn() {
+    revealUi();
+  }
+
+  function handleStoryLongPress() {
+    longPressActive.current = true;
+    setIsPaused(true);
+    setUiVisible(true);
+    if (hideUiTimer.current) clearTimeout(hideUiTimer.current);
+  }
+
+  function handleStoryPressOut() {
+    if (longPressActive.current) {
+      longPressActive.current = false;
+      setIsPaused(false);
+      revealUi();
+    }
+  }
   const currentStory = storiesList[currentIndex];
 
   useEffect(() => {
@@ -149,7 +189,21 @@ export default function StoryViewer() {
   // 1. Initial Load: Fetch active stories for this author
   useEffect(() => {
     loadStoriesSequence();
+    return () => {
+      if (hideUiTimer.current) clearTimeout(hideUiTimer.current);
+    };
   }, [id]);
+
+  useEffect(() => {
+    setUiVisible(true);
+    if (hideUiTimer.current) clearTimeout(hideUiTimer.current);
+    if (!showReplyBox && !isPaused) {
+      hideUiTimer.current = setTimeout(() => setUiVisible(false), 2600);
+    }
+    return () => {
+      if (hideUiTimer.current) clearTimeout(hideUiTimer.current);
+    };
+  }, [currentIndex, showReplyBox, isPaused]);
 
   async function loadStoriesSequence() {
     setLoading(true);
@@ -197,27 +251,39 @@ export default function StoryViewer() {
     const targetIdx = sequence.findIndex(s => s.id === targetStory.id);
     setCurrentIndex(targetIdx >= 0 ? targetIdx : 0);
 
-    // Privacy check for replies
-    let allowed = true;
-    if (!u?.user) {
-      allowed = false;
-    } else if (targetStory.allow_replies === false) {
-      allowed = false;
-    } else if (p?.allow_story_replies === 'nobody') {
-      allowed = false;
-    } else if (p?.allow_story_replies === 'followers') {
-      const { data: followRecord } = await supabase
-        .from('follows')
-        .select('id')
-        .eq('follower_id', u.user.id)
-        .eq('following_id', targetStory.author_id)
-        .maybeSingle();
-      if (!followRecord) allowed = false;
-    }
-    setCanReply(allowed);
+    // Per-story reply permissions are recalculated when the active story changes.
+    setCanReply(Boolean(u?.user) && targetStory.allow_replies !== false);
 
     setLoading(false);
   }
+
+  // Respect the reply policy of the currently displayed story (not just the first story).
+  useEffect(() => {
+    let cancelled = false;
+    async function checkReplyPermission() {
+      if (!currentStory?.id || !currentUserId || currentStory.author_id === currentUserId || currentStory.allow_replies === false) {
+        setCanReply(false);
+        return;
+      }
+      if (author?.allow_story_replies === 'nobody') {
+        setCanReply(false);
+        return;
+      }
+      if (author?.allow_story_replies === 'followers') {
+        const { data: followRecord, error } = await supabase
+          .from('follows')
+          .select('id')
+          .eq('follower_id', currentUserId)
+          .eq('following_id', currentStory.author_id)
+          .maybeSingle();
+        if (!cancelled) setCanReply(!error && Boolean(followRecord));
+        return;
+      }
+      if (!cancelled) setCanReply(true);
+    }
+    void checkReplyPermission();
+    return () => { cancelled = true; };
+  }, [currentStory?.id, currentStory?.allow_replies, currentUserId, author?.allow_story_replies]);
 
   // 2. Animate Progress Bar and Auto-Advance
   useEffect(() => {
@@ -282,6 +348,7 @@ export default function StoryViewer() {
   }
 
   function handleNextStory() {
+    if (longPressActive.current) return;
     if (currentIndex < storiesList.length - 1) {
       setCurrentIndex(prev => prev + 1);
     } else {
@@ -290,6 +357,7 @@ export default function StoryViewer() {
   }
 
   function handlePrevStory() {
+    if (longPressActive.current) return;
     if (currentIndex > 0) {
       setCurrentIndex(prev => prev - 1);
     }
@@ -322,11 +390,21 @@ export default function StoryViewer() {
 
   // Send DM reply
   async function sendReply() {
-    if (!replyText.trim() || !currentStory) return;
+    if (!replyText.trim() || !currentStory || sending) return;
+    if (!currentUserId) {
+      Alert.alert('تسجيل الدخول', 'يرجى تسجيل الدخول للرد على القصة', [
+        { text: 'تسجيل الدخول', onPress: () => router.push('/auth') },
+        { text: 'إلغاء', style: 'cancel' },
+      ]);
+      return;
+    }
+    if (currentStory.allow_replies === false || !canReply) {
+      Alert.alert('الردود غير متاحة', 'لا يمكن إرسال رد على هذه القصة وفق إعدادات الخصوصية.');
+      setShowReplyBox(false);
+      return;
+    }
     setSending(true);
     const msgText = replyText.trim();
-    setReplyText('');
-    setShowReplyBox(false);
 
     try {
       // 1. Try story_replies trigger
@@ -338,6 +416,8 @@ export default function StoryViewer() {
 
       if (!replyErr) {
         setSending(false);
+        setReplyText('');
+        setShowReplyBox(false);
         Alert.alert('تم! ✅', 'وصل ردك لصاحب القصة في الرسائل الخاصة', [
           { text: 'فتح الدردشة', onPress: () => router.replace('/messages') },
           { text: 'لاحقاً' },
@@ -384,6 +464,8 @@ export default function StoryViewer() {
         });
 
         setSending(false);
+        setReplyText('');
+        setShowReplyBox(false);
         Alert.alert('تم! ✅', 'وصل ردك في الرسائل الخاصة', [
           { text: 'فتح الدردشة', onPress: () => router.replace('/messages') },
           { text: 'لاحقاً' },
@@ -448,7 +530,7 @@ export default function StoryViewer() {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <View style={styles.container}>
+      <View style={styles.container} {...panResponder.panHandlers}>
         {/* Story Background */}
         {currentStory.type === 'image' && currentStory.image_url ? (
           <Image
@@ -471,7 +553,7 @@ export default function StoryViewer() {
           {/* ======================================================== */}
           {/* SEGMENTED PROGRESS BARS                                  */}
           {/* ======================================================== */}
-          <View style={styles.progressRow}>
+          {uiVisible && <View style={styles.progressRow}>
             {storiesList.map((st, idx) => {
               let fillWidth: any = '0%';
               if (idx < currentIndex) {
@@ -489,12 +571,12 @@ export default function StoryViewer() {
                 </View>
               );
             })}
-          </View>
+          </View>}
 
           {/* ======================================================== */}
           {/* TOP HEADER                                               */}
           {/* ======================================================== */}
-          <View style={styles.header}>
+          {uiVisible && <View style={styles.header}>
             <View style={styles.headerRightActions}>
               <Pressable onPress={() => router.back()} style={styles.iconBtn}>
                 <X size={22} color="#fff" />
@@ -538,7 +620,7 @@ export default function StoryViewer() {
                 )}
               </View>
             </View>
-          </View>
+          </View>}
 
           {/* ======================================================== */}
           {/* INTERACTIVE TAP ZONES (Left / Right Navigation)          */}
@@ -548,16 +630,20 @@ export default function StoryViewer() {
             <Pressable
               style={styles.tapZoneLeft}
               onPress={handlePrevStory}
-              onPressIn={() => setIsPaused(true)}
-              onPressOut={() => setIsPaused(false)}
+              onPressIn={handleStoryPressIn}
+              onLongPress={handleStoryLongPress}
+              onPressOut={handleStoryPressOut}
+              delayLongPress={260}
             />
 
             {/* Right Tap Zone -> Next Story */}
             <Pressable
               style={styles.tapZoneRight}
               onPress={handleNextStory}
-              onPressIn={() => setIsPaused(true)}
-              onPressOut={() => setIsPaused(false)}
+              onPressIn={handleStoryPressIn}
+              onLongPress={handleStoryLongPress}
+              onPressOut={handleStoryPressOut}
+              delayLongPress={260}
             />
 
             {/* Center Story Content */}
@@ -651,7 +737,7 @@ export default function StoryViewer() {
           {/* ======================================================== */}
           {/* FOOTER: STATS OR DM REPLY                                */}
           {/* ======================================================== */}
-          {isOwn ? (
+          {(uiVisible || showReplyBox || isPaused) && (isOwn ? (
             <View style={styles.ownerStats}>
               <Pressable style={styles.statBadge} onPress={showStoryViewers} accessibilityRole="button" accessibilityLabel="عرض قائمة مشاهدي القصة">
                 <Eye size={16} color="#fff" />
@@ -699,7 +785,7 @@ export default function StoryViewer() {
                 </View>
               )}
             </View>
-          )}
+          ))}
         </LinearGradient>
       </View>
     </KeyboardAvoidingView>
