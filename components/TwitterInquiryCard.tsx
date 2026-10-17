@@ -151,11 +151,42 @@ export default function TwitterInquiryCard({
     return () => { active = false; };
   }, [currentUserId, data.id, isOwner, type]);
 
-  const answers = data.answers || [];
+  const answers = [...(data.answers || [])].sort((a: any, b: any) => {
+    const aBest = data.best_answer_id && a.id === data.best_answer_id ? 1 : 0;
+    const bBest = data.best_answer_id && b.id === data.best_answer_id ? 1 : 0;
+    if (aBest !== bBest) return bBest - aBest;
+    return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
+  });
   const answersCount = data.answers_count !== undefined ? data.answers_count : answers.length;
-  // Limit to maximum 4 responders displayed in the card thread
+  // Keep the accepted answer visible in the compact card even when many replies exist.
   const displayedAnswers = answers.slice(0, 4);
   const remainingCount = Math.max(0, answers.length - 4);
+
+  async function markBestAnswer(answerId: string) {
+    if (!isOwner || isReq || !currentUserId) return;
+    try {
+      const { data: updated, error } = await supabase
+        .from('questions')
+        .update({ best_answer_id: answerId, status: 'answered', solved_at: new Date().toISOString(), resolution_status: 'resolved' })
+        .eq('id', data.id)
+        .eq('author_id', currentUserId)
+        .select('id, best_answer_id')
+        .maybeSingle();
+      if (error) throw error;
+      if (!updated) throw new Error('يمكن لصاحب السؤال فقط اعتماد الإجابة.');
+      data.best_answer_id = answerId;
+      data.status = 'answered';
+      data.resolution_status = 'resolved';
+      data.answers = [...answers].sort((a: any, b: any) => {
+        const aBest = a.id === answerId ? 1 : 0;
+        const bBest = b.id === answerId ? 1 : 0;
+        return bBest - aBest || new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
+      });
+      onToast('تم اعتماد الرد كأفضل إجابة ⭐');
+    } catch (error: any) {
+      Alert.alert('تعذر اعتماد الإجابة', error?.message || 'حاول مرة أخرى.');
+    }
+  }
 
   function handleLike() {
     if (isGuest) return requireAccount('سجّل الدخول أو أنشئ حساباً للإعجاب بمنشورات الحي.');
@@ -526,6 +557,17 @@ export default function TwitterInquiryCard({
                         </View>
                       </View>
                       <Text style={s.xAnswerBodyText}>{ans.body}</Text>
+                      {isOwner && !isReq && data.best_answer_id !== ans.id && (
+                        <Pressable
+                          onPress={() => void markBestAnswer(ans.id)}
+                          style={{ alignSelf: 'flex-start', flexDirection: 'row-reverse', alignItems: 'center', gap: 5, marginTop: 8, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, backgroundColor: '#ecfdf5', borderWidth: 1, borderColor: '#a7f3d0' }}
+                          accessibilityRole="button"
+                          accessibilityLabel="اعتماد الرد كأفضل إجابة"
+                        >
+                          <Award size={13} color="#047857" />
+                          <Text style={{ color: '#047857', fontSize: 11, fontWeight: '800' }}>هل أفادك الرد؟ اعتمده كأفضل إجابة</Text>
+                        </Pressable>
+                      )}
                     </View>
                   </View>
                 );
