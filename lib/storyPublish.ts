@@ -20,6 +20,7 @@ function buildPayload(
     image_url: imageUrl,
     visibility: options.audience,
     allowed_user_ids: options.audience === 'custom' ? options.allowedUserIds : [],
+    hidden_user_ids: options.hiddenUserIds || [],
     interactive_type: options.interactiveType,
     poll_question: options.interactiveType === 'poll' ? options.pollQuestion.trim() : null,
     poll_options: options.interactiveType === 'poll' ? options.pollOptions : ['نعم', 'لا'],
@@ -78,6 +79,7 @@ export async function publishStorySlides(
   options: StoryPublishOptions = {
     audience: 'public',
     allowedUserIds: [],
+    hiddenUserIds: [],
     interactiveType: 'none',
     pollQuestion: '',
     pollOptions: ['نعم', 'لا'],
