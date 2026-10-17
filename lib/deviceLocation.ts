@@ -105,9 +105,10 @@ export async function reverseGeocodeDeviceLocation(location: DeviceLocation): Pr
       return { region: '', city: '', district: '', isOutsideKSA: true };
     }
 
-    const region = pick(place.region, place.subregion);
+    // Keep administrative levels separate: a street or landmark is not a neighborhood.
+    const region = pick(place.region);
     const city = pick(place.city, place.subregion);
-    const district = pick(place.district, place.suburb, place.name, place.street);
+    const district = pick(place.district, place.suburb);
 
     if (city && !isKnownSaudiCity(city)) {
       return { region: '', city: '', district: '', isOutsideKSA: true };
