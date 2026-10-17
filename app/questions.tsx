@@ -330,34 +330,31 @@ export default function Questions() {
           </View>
         </View>
 
-        {/* Search & Location Bar */}
-        <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 6 }}>
-          <View style={[styles.searchBar, { borderWidth: 1, borderColor: '#e2e8f0' }]}>
+        {/* Compact search and location controls */}
+        <View style={styles.searchAndLocationRow}>
+          <View style={[styles.searchBar, { flex: 1, borderWidth: 1, borderColor: '#e2e8f0' }]}>
             <TextInput
               style={styles.searchInput}
               value={search}
               onChangeText={setSearch}
-              onSubmitEditing={() => load(search)}
+              onSubmitEditing={() => load(search, activeLoc)}
               placeholder="ابحث في الأسئلة والتوصيات..."
               placeholderTextColor="#94a3b8"
               returnKeyType="search"
             />
             {search.length > 0 ? (
-              <Pressable
-                onPress={() => {
-                  setSearch('');
-                  load('', activeLoc);
-                }}
-                style={styles.searchIconBtn}
-              >
+              <Pressable onPress={() => { setSearch(''); load('', activeLoc); }} style={styles.searchIconBtn} accessibilityLabel="مسح البحث">
                 <X size={17} color="#64748b" />
               </Pressable>
             ) : (
-              <Pressable onPress={() => load(search)} style={styles.searchIconBtn}>
+              <Pressable onPress={() => load(search, activeLoc)} style={styles.searchIconBtn} accessibilityLabel="بحث">
                 <Search size={18} color="#059669" />
               </Pressable>
             )}
           </View>
+          <Pressable style={styles.locationQuickButton} onPress={() => setShowLocationModal(true)} accessibilityRole="button" accessibilityLabel="تغيير نطاق الأسئلة">
+            <MapPin size={19} color="#087f5b" />
+          </Pressable>
         </View>
 
         {/* Filter Pills Tabs (matching home FeedTabs) */}
