@@ -139,7 +139,7 @@ export default function MapScreen() {
     return result;
   }, [places, openOnly, ratedOnly, sortMode]);
 
-  const visiblePins = useMemo((
+  const visiblePins = useMemo(
     () => city ? filterPins(pins, { kind, city, query }) : [],
     [pins, kind, city, query],
   );
@@ -238,6 +238,24 @@ export default function MapScreen() {
             <Text style={styles.count}>تحديث تلقائي كل دقيقة{lastUpdated ? ` · ${lastUpdated.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })}` : ''}</Text>
             <Pressable style={styles.addButton} onPress={() => setAddMenuOpen((v) => !v)}><Text style={styles.addButtonText}>＋ إضافة</Text></Pressable>
           </View>
+          {addMenuOpen ? <View style={styles.addMenuWeb}>
+            <Text style={styles.addMenuTitle}>وش حاب تضيف للخريطة؟</Text>
+            {addAction('محل أو خدمة', '🏪', '/new-service')}
+            {addAction('بلاغ أو تنبيه', '🚨', '/report')}
+            {addAction('طلب مساعدة', '🤝', '/new-request')}
+            {addAction('إضافة نشاط تجاري', '📍', '/directory')}
+          </View> : null}
+          {selectedPlace ? <View style={styles.placeDetailWeb}>
+            <Text style={styles.selectedTitle}>{selectedPlace.name}</Text>
+            <Text style={styles.selectedMeta}>{selectedPlace.categoryLabel} · {formatDistance(selectedPlace.distance)}</Text>
+            {selectedPlace.address ? <Text style={styles.description}>{selectedPlace.address}</Text> : null}
+            {selectedPlace.hoursText ? <Text style={styles.description}>🕒 {selectedPlace.hoursText}</Text> : null}
+            <View style={styles.actions}>
+              <Pressable style={styles.primaryAction} onPress={() => Linking.openURL(selectedPlace.mapsUrl)}><Text style={styles.primaryActionText}>الاتجاهات ↗</Text></Pressable>
+              {selectedPlace.phone ? <Pressable style={styles.secondaryAction} onPress={() => Linking.openURL('tel:' + selectedPlace.phone)}><Text style={styles.secondaryActionText}>اتصال</Text></Pressable> : null}
+              <Pressable style={styles.secondaryAction} onPress={() => setSelectedPlace(null)}><Text style={styles.secondaryActionText}>إغلاق</Text></Pressable>
+            </View>
+          </View> : null}
           {visiblePlaces.map(placeCard)}
           {visiblePins.map((pin) => (
             <Pressable key={pin.id} style={styles.listCard} onPress={() => router.push(pin.href as never)}>
@@ -570,6 +588,8 @@ const styles = StyleSheet.create({
   sortTextActive: { color: '#fff' },
   addButton: { borderRadius: 11, paddingHorizontal: 11, paddingVertical: 8, backgroundColor: '#0f766e' },
   addButtonText: { color: '#fff', fontSize: 12, fontWeight: '900' },
+  addMenuWeb: { backgroundColor: '#fff', borderRadius: 16, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: C.line },
+  placeDetailWeb: { backgroundColor: '#fff', borderRadius: 16, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: C.line },
   addMenu: { position: 'absolute', left: 14, right: 14, bottom: 70, backgroundColor: '#fff', borderRadius: 20, padding: 14, elevation: 12, zIndex: 20, borderWidth: 1, borderColor: C.line },
   addMenuHead: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   addMenuTitle: { fontSize: 15, fontWeight: '900', color: C.ink, textAlign: 'right' },
