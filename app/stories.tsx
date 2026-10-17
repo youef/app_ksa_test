@@ -14,7 +14,7 @@ import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { AppHeader } from '@/components/shared/AppHeader';
 import { useBottomNavInset } from '@/lib/bottomNav';
-import { Plus, Camera, ShieldCheck, Clock, MapPin, Sparkles, MessageCircle } from 'lucide-react-native';
+import { Plus, ShieldCheck, Sparkles } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { relativeTime } from '@/lib/mapPins';
 
@@ -23,9 +23,10 @@ export default function StoriesScreen() {
   const [stories, setStories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [filterDistrict, setFilterDistrict] = useState<string>('all');
-  const [districts, setDistricts] = useState<string[]>([]);
   const [seenStoryIds, setSeenStoryIds] = useState<string[]>([]);
+  const [currentCity, setCurrentCity] = useState<string>('');
+  const [currentDistrict, setCurrentDistrict] = useState<string>('');
+  const [followingIds, setFollowingIds] = useState<string[]>([]);
 
   useEffect(() => {
     loadAllStories();
@@ -36,6 +37,24 @@ export default function StoriesScreen() {
       setLoading(true);
       const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       const nowIso = new Date().toISOString();
+
+      const { data: authResult } = await supabase.auth.getUser();
+      const activeViewerId = authResult.user?.id || '';
+      let city = '';
+      let district = '';
+      let followedIds: string[] = [];
+      if (activeViewerId) {
+        const [{ data: me }, { data: follows }] = await Promise.all([
+          supabase.from('profiles').select('city,district').eq('id', activeViewerId).maybeSingle(),
+          supabase.from('follows').select('following_id').eq('follower_id', activeViewerId),
+        ]);
+        city = String(me?.city || '').trim();
+        district = String(me?.district || '').trim();
+        followedIds = (follows || []).map((row: any) => String(row.following_id));
+      }
+      setCurrentCity(city);
+      setCurrentDistrict(district);
+      setFollowingIds(followedIds);
 
       const { data, error } = await supabase
         .from('stories')
@@ -64,11 +83,10 @@ export default function StoriesScreen() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      const valid = (data || []) as any[];
+      const cityRows = (data || []) as any[];
+      const normalize = (value: any) => String(value || '').trim().toLocaleLowerCase('ar');
+      const valid = city ? cityRows.filter((story: any) => normalize(story.profiles?.city) === normalize(city)) : cityRows;
       setStories(valid);
-
-      const { data: authResult } = await supabase.auth.getUser();
-      const activeViewerId = authResult.user?.id || '';
       if (activeViewerId && valid.length > 0) {
         const { data: views, error: viewsError } = await supabase
           .from('story_views')
@@ -81,11 +99,6 @@ export default function StoriesScreen() {
         setSeenStoryIds([]);
       }
 
-      const dSet = new Set<string>();
-      valid.forEach((s: any) => {
-        if (s.profiles?.district) dSet.add(s.profiles.district);
-      });
-      setDistricts(Array.from(dSet));
     } catch (e) {
       console.warn('loadAllStories error:', e);
     } finally {
@@ -94,9 +107,7 @@ export default function StoriesScreen() {
     }
   }
 
-  const filtered = filterDistrict === 'all'
-    ? stories
-    : stories.filter((s: any) => s.profiles?.district === filterDistrict);
+  const filtered = stories;
 
   const groupedAuthors = Object.values(filtered.reduce((groups: Record<string, any>, story: any) => {
     const key = story.author_id;
@@ -110,9 +121,19 @@ export default function StoriesScreen() {
     return { ...group, stories: ordered, latestStory: ordered[ordered.length - 1], hasUnseen: ordered.some((story: any) => !seenStoryIds.includes(story.id)) };
   });
 
-  const storyRings = groupedAuthors.slice().sort((a: any, b: any) =>
-    Number(b.hasUnseen) - Number(a.hasUnseen) || new Date(b.newestAt).getTime() - new Date(a.newestAt).getTime()
-  );
+  const normalizeLocation = (value: any) => String(value || '').trim().toLocaleLowerCase('ar');
+  const neighborhoodAndFollowing = groupedAuthors.filter((group: any) => {
+    const sameDistrict = !!currentDistrict && normalizeLocation(group.author?.district) === normalizeLocation(currentDistrict);
+    const followed = followingIds.includes(String(group.authorId));
+    return sameDistrict || followed;
+  });
+  const storyRings = neighborhoodAndFollowing.slice().sort((a: any, b: any) => {
+    const aFollowed = followingIds.includes(String(a.authorId));
+    const bFollowed = followingIds.includes(String(b.authorId));
+    const aSameDistrict = !!currentDistrict && normalizeLocation(a.author?.district) === normalizeLocation(currentDistrict);
+    const bSameDistrict = !!currentDistrict && normalizeLocation(b.author?.district) === normalizeLocation(currentDistrict);
+    return Number(bFollowed) - Number(aFollowed) || Number(bSameDistrict) - Number(aSameDistrict) || Number(b.hasUnseen) - Number(a.hasUnseen) || new Date(b.newestAt).getTime() - new Date(a.newestAt).getTime();
+  });
   const trendingAuthors = groupedAuthors.slice().sort((a: any, b: any) =>
     b.totalViews - a.totalViews || new Date(b.newestAt).getTime() - new Date(a.newestAt).getTime()
   );
@@ -143,39 +164,12 @@ export default function StoriesScreen() {
         }
       />
 
-      {/* Filter Chips by District */}
-      {districts.length > 0 && (
-        <View style={styles.filterBar}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
-            <Pressable
-              onPress={() => setFilterDistrict('all')}
-              style={[styles.filterChip, filterDistrict === 'all' && styles.filterChipActive]}
-            >
-              <Text style={[styles.filterChipText, filterDistrict === 'all' && styles.filterChipTextActive]}>
-                كل الأحياء ({stories.length})
-              </Text>
-            </Pressable>
-            {districts.map((d) => (
-              <Pressable
-                key={d}
-                onPress={() => setFilterDistrict(d)}
-                style={[styles.filterChip, filterDistrict === d && styles.filterChipActive]}
-              >
-                <Text style={[styles.filterChipText, filterDistrict === d && styles.filterChipTextActive]}>
-                  {d}
-                </Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-        </View>
-      )}
-
       {storyRings.length > 0 && (
         <View style={styles.ringsSection}>
           <View style={styles.sectionHeadingRow}>
             <View style={{ alignItems: 'flex-end', flex: 1 }}>
               <Text style={styles.sectionHeading}>يوميات الجيران</Text>
-              <Text style={styles.sectionSubheading}>كل جار في دائرة واحدة</Text>
+              <Text style={styles.sectionSubheading}>{currentDistrict ? `أهل ${currentDistrict} ومن تتابعهم` : 'الأشخاص الذين تتابعهم في مدينتك'}</Text>
             </View>
             <View style={styles.livePill}><View style={styles.liveDot} /><Text style={styles.livePillText}>مباشر</Text></View>
           </View>
@@ -217,35 +211,6 @@ export default function StoriesScreen() {
           />
         }
       >
-        {/* Quick Add Story Interactive Hero Banner */}
-        <Pressable
-          style={styles.heroAddBanner}
-          onPress={() => router.push('/create-story')}
-        >
-          <LinearGradient
-            colors={['#059669', '#047857', '#064e3b']}
-            style={styles.heroAddGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
-            <View style={styles.heroAddContent}>
-              <View style={styles.heroAddIconWrap}>
-                <Camera size={22} color="#fff" />
-              </View>
-              <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                <Text style={styles.heroAddTitle}>شارك يومياتك مع جيرانك الآن</Text>
-                <Text style={styles.heroAddSub}>
-                  انشر حالة أو صورة تظهر لأهل حيك لمدة 24 ساعة وتختفي تلقائياً
-                </Text>
-              </View>
-            </View>
-            <View style={styles.heroAddBtn}>
-              <Plus size={14} color="#059669" strokeWidth={3} />
-              <Text style={styles.heroAddBtnText}>أضف الآن</Text>
-            </View>
-          </LinearGradient>
-        </Pressable>
-
         {loading && !refreshing ? (
           <View style={styles.loadingBox}>
             <ActivityIndicator size="large" color="#059669" />
@@ -272,8 +237,8 @@ export default function StoriesScreen() {
           <>
             <View style={styles.trendingHeading}>
               <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                <Text style={styles.sectionHeading}>الأكثر مشاهدة</Text>
-                <Text style={styles.sectionSubheading}>ترند أهل الحي حسب إجمالي المشاهدات</Text>
+                <Text style={styles.sectionHeading}>ترند المدينة</Text>
+                <Text style={styles.sectionSubheading}>{currentCity ? `الأكثر مشاهدة في مدينة ${currentCity} من جميع الأحياء` : 'الأكثر مشاهدة في المدينة'}</Text>
               </View>
               <View style={styles.trendingBadge}><Text style={styles.trendingBadgeText}>TRENDING</Text></View>
             </View>
@@ -347,38 +312,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 12,
     fontWeight: '800',
-  },
-  filterBar: {
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-    paddingVertical: 8,
-  },
-  filterScroll: {
-    flexDirection: 'row-reverse',
-    paddingHorizontal: 16,
-    gap: 8,
-  },
-  filterChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: '#f1f5f9',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  filterChipActive: {
-    backgroundColor: '#ecfdf5',
-    borderColor: '#a7f3d0',
-  },
-  filterChipText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#64748b',
-  },
-  filterChipTextActive: {
-    color: '#047857',
-    fontWeight: '900',
   },
   scroll: {
     padding: 16,
@@ -587,69 +520,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 10,
     fontWeight: '800',
-  },
-  heroAddBanner: {
-    marginBottom: 16,
-    borderRadius: 20,
-    overflow: 'hidden',
-    shadowColor: '#059669',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  heroAddGradient: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    gap: 12,
-  },
-  heroAddContent: {
-    flex: 1,
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 12,
-  },
-  heroAddIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.3)',
-  },
-  heroAddTitle: {
-    fontSize: 14,
-    fontWeight: '900',
-    color: '#fff',
-    marginBottom: 3,
-  },
-  heroAddSub: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#d1fae5',
-    lineHeight: 16,
-  },
-  heroAddBtn: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 14,
-    gap: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  heroAddBtnText: {
-    fontSize: 12,
-    fontWeight: '900',
-    color: '#059669',
   },
   storyTextQuote: {
     fontSize: 28,
