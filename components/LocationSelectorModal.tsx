@@ -32,7 +32,6 @@ import {
   ChevronRight,
   Search,
   Check,
-  Globe2,
   Compass,
   Building2,
   Sparkles,
@@ -82,7 +81,13 @@ export default function LocationSelectorModal({
     return () => { active = false; };
   }, [visible]);
 
-  const activeLock = lockedCity ?? ownLocked;
+  // Once a city is selected, keep the selector scoped to that city.
+  // Users can choose only their district or the whole city.
+  const activeLock = lockedCity ?? ownLocked ?? (
+    selectedCity && selectedCity !== 'كل المدن' && selectedCity !== 'كل المملكة' && isKnownSaudiCity(selectedCity)
+      ? { region: '', city: selectedCity }
+      : null
+  );
 
   useEffect(() => {
     if (!visible) return;
@@ -133,7 +138,7 @@ export default function LocationSelectorModal({
   function handleApplyResolvedAddress() {
     if (!resolvedAddress) return;
     if (lockActive && activeLock && normalizeSaudiLocationName(resolvedAddress.city) !== normalizeSaudiLocationName(activeLock.city)) {
-      Alert.alert('المدينة مقفلة', `موقعك مُثبّت عبر GPS على مدينة ${activeLock.city}. لا يمكنك الانتقال إلى مدينة أخرى.`);
+      Alert.alert('المدينة غير متاحة', `نطاقك الحالي هو ${activeLock.city}. يمكنك اختيار حي داخله أو المدينة كاملة فقط.`);
       return;
     }
     onSelect(resolvedAddress.region, resolvedAddress.city, resolvedAddress.district);
@@ -148,15 +153,6 @@ export default function LocationSelectorModal({
     setShortCodeInput('');
     setResolvedAddress(null);
     onClose();
-  }
-
-  function handleSelectAllKSA() {
-    if (lockActive && activeLock) {
-      Alert.alert('المدينة مقفلة', `موقعك مُثبّت عبر GPS على مدينة ${activeLock.city}. يمكنك تصفح باقي المدن للعرض فقط دون تفعيلها.`);
-      return;
-    }
-    onSelect('كل المملكة', 'كل المدن', 'كل الأحياء');
-    resetAndClose();
   }
 
   async function handleUseCurrentLocation() {
@@ -201,7 +197,7 @@ export default function LocationSelectorModal({
 
   function handleChooseRegion(reg: Region) {
     if (lockActive && activeLock) {
-      Alert.alert('التصفح فقط', `موقعك مُثبّت عبر GPS على مدينة ${activeLock.city}. يمكنك تصفح باقي المناطق والمدن دون تفعيلها.`);
+      Alert.alert('خارج نطاقك', `لا يمكنك الوصول إلى مناطق أو مدن أخرى. نطاقك الحالي هو ${activeLock.city}.`);
       return;
     }
     setSelectedReg(reg);
@@ -211,7 +207,7 @@ export default function LocationSelectorModal({
 
   function handleChooseCity(cit: City) {
     if (lockActive && activeLock && normalizeSaudiLocationName(cit.name) !== normalizeSaudiLocationName(activeLock.city)) {
-      Alert.alert('التصفح فقط', `لا يمكنك الانتقال إلى مدينة أخرى. موقعك مُثبّت على ${activeLock.city}، ويمكنك اختيار حي بداخلها فقط.`);
+      Alert.alert('خارج نطاقك', `لا يمكنك الانتقال إلى مدينة أخرى. اختر حيّك داخل ${activeLock.city} أو المدينة كاملة.`);
       return;
     }
     setSelectedCit(cit);
@@ -263,9 +259,9 @@ export default function LocationSelectorModal({
                 {step === 'district' && `أحياء ${selectedCit?.name}`}
               </Text>
               <Text style={styles.headerSub}>
-                {step === 'region' && 'تحديد المحتوى المعروض حسب منطقتك'}
-                {step === 'city' && 'اختر المدينة لمشاهدة أسئلة وجيران مدينتك'}
-                {step === 'district' && 'اختر حيك بالتحديد أو كل أحياء المدينة'}
+                {step === 'region' && 'حدّد مدينتك أول مرة، ثم لن تظهر لك إلا خيارات نطاقها'}
+                {step === 'city' && 'اختر مدينتك الحالية'}
+                {step === 'district' && 'اختر حيّك فقط أو اعرض المدينة كاملة'}
               </Text>
             </View>
 
@@ -285,7 +281,7 @@ export default function LocationSelectorModal({
             <View style={styles.lockBanner}>
               <MapPin size={16} color="#b45309" />
               <Text style={styles.lockBannerText}>
-                مدينة {activeLock.city} مُثبّتة عبر GPS. يمكنك اختيار «كل الأحياء» أو حي واحد فقط داخلها.
+                نطاقك محدد في {activeLock.city}. اختر حيّك فقط أو المدينة كاملة؛ بقية المدن والمناطق غير متاحة.
               </Text>
             </View>
           )}
@@ -369,24 +365,6 @@ export default function LocationSelectorModal({
                     </View>
                   )}
                 </View>
-
-                {/* Option for All Saudi Arabia */}
-                <Pressable
-                  style={[
-                    styles.itemCard,
-                    selectedCity === 'كل المدن' && styles.itemCardSelected,
-                  ]}
-                  onPress={handleSelectAllKSA}
-                >
-                  <View style={styles.itemRadio}>
-                    {selectedCity === 'كل المدن' && <Check size={16} color="#059669" />}
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.itemTitle}>🇸🇦 كل مناطق المملكة العربية السعودية</Text>
-                    <Text style={styles.itemDesc}>عرض كافة المنشورات والأسئلة لجميع المناطق</Text>
-                  </View>
-                  <Globe2 size={24} color="#059669" />
-                </Pressable>
 
                 <View style={styles.divider} />
 
