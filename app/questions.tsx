@@ -28,7 +28,6 @@ import {
   ArrowRight,
   Flame,
   Pin,
-  CheckCircle2,
   TrendingUp,
 } from 'lucide-react-native';
 
