@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Share,
   Platform,
@@ -260,7 +261,6 @@ export default function Questions() {
       <AppHeader
         variant="sub"
         title="استفسارات الحي"
-        subtitle={locationLabel}
         fallbackRoute="/home"
         rightAction={
           hasSession ? (
@@ -301,29 +301,33 @@ export default function Questions() {
           />
         }
       >
-        <View style={styles.introWrap}>
-          <LinearGradient colors={['#075b43', '#0b8f63', '#22a06b']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.introCard}>
-            <View style={styles.introDecorOne} /><View style={styles.introDecorTwo} />
-            <View style={styles.introTopRow}>
-              <View style={styles.introIcon}><MessageCircle size={22} color="#ffffff" /></View>
-              <View style={{ flex: 1 }}><Text style={styles.introEyebrow}>مجتمع حيّنا</Text><Text style={styles.introTitle}>سؤالك يقرّب الجيران</Text></View>
-              <View style={styles.livePill}><View style={styles.liveDot} /><Text style={styles.liveText}>مجتمع نشط</Text></View>
-            </View>
-            <Text style={styles.introDescription}>اسأل، شارك خبرتك، واستفد من تجارب أهل الحي.</Text>
-            <View style={styles.introStats}>
-              <View style={styles.introStat}><Text style={styles.introStatValue}>{counts.all.toLocaleString('ar-SA')}</Text><Text style={styles.introStatLabel}>استفسار</Text></View>
-              <View style={styles.introStatDivider} />
-              <View style={styles.introStat}><Text style={styles.introStatValue}>{counts.solved.toLocaleString('ar-SA')}</Text><Text style={styles.introStatLabel}>تمت الإجابة</Text></View>
-              <View style={styles.introStatDivider} />
-              <View style={styles.introStat}><Text style={styles.introStatValue}>{counts.hot.toLocaleString('ar-SA')}</Text><Text style={styles.introStatLabel}>تفاعل نشط</Text></View>
-            </View>
-            {hasSession && <Pressable style={styles.introCta} onPress={() => router.push('/ask')}><Plus size={17} color="#08734f" /><Text style={styles.introCtaText}>اطرح استفسارك الآن</Text><ArrowRight size={15} color="#08734f" /></Pressable>}
-          </LinearGradient>
-          <Pressable style={styles.locationBar} onPress={() => setShowLocationModal(true)} accessibilityRole="button" accessibilityLabel="تغيير نطاق الأسئلة">
-            <View style={styles.locationIcon}><MapPin size={17} color="#087f5b" /></View>
-            <View style={{ flex: 1 }}><Text style={styles.locationEyebrow}>تتصفح الأسئلة في</Text><Text style={styles.locationValue} numberOfLines={1}>{locationLabel}</Text></View>
-            <View style={styles.changeLocation}><Text style={styles.changeLocationText}>تغيير</Text><ChevronDown size={14} color="#087f5b" /></View>
-          </Pressable>
+        <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 6 }}>
+          <View style={[styles.searchBar, { borderWidth: 1, borderColor: '#e2e8f0' }]}>
+            <TextInput
+              style={styles.searchInput}
+              value={search}
+              onChangeText={setSearch}
+              onSubmitEditing={() => load(search, activeLoc)}
+              placeholder="ابحث في الأسئلة والتوصيات..."
+              placeholderTextColor="#94a3b8"
+              returnKeyType="search"
+            />
+            {search.length > 0 ? (
+              <Pressable
+                onPress={() => {
+                  setSearch('');
+                  load('', activeLoc);
+                }}
+                style={styles.searchIconBtn}
+              >
+                <X size={17} color="#64748b" />
+              </Pressable>
+            ) : (
+              <Pressable onPress={() => load(search)} style={styles.searchIconBtn}>
+                <Search size={18} color="#059669" />
+              </Pressable>
+            )}
+          </View>
         </View>
 
         {/* Search & Location Bar */}
@@ -732,8 +736,27 @@ const styles = StyleSheet.create({
   featuredBadge: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 9, backgroundColor: '#eaf8f0', borderWidth: 1, borderColor: '#c8ead7' },
   featuredBadgeText: { color: '#047857', fontSize: 10, fontWeight: '900' },
   content: {
-    paddingHorizontal: 18,
+    paddingHorizontal: 0,
     paddingTop: 8,
+    backgroundColor: '#ffffff',
+  },
+  searchAndLocationRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 9,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 6,
+  },
+  locationQuickButton: {
+    width: 46,
+    height: 46,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#cceedd',
   },
   loadingBox: {
     paddingVertical: 60,
@@ -784,17 +807,16 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 22,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#e8efea',
-    shadowColor: '#164e3b',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.045,
-    shadowRadius: 9,
-    elevation: 2,
+    backgroundColor: '#ffffff',
+    borderRadius: 0,
+    paddingHorizontal: 18,
+    paddingTop: 17,
+    paddingBottom: 14,
+    marginBottom: 0,
+    borderBottomWidth: 1,
+    borderColor: '#e8edf0',
+    shadowOpacity: 0,
+    elevation: 0,
   },
   cardHeaderRow: {
     flexDirection: 'row-reverse',
@@ -808,15 +830,15 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   cardAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: '#ecfdf5',
   },
   cardAvatarPlaceholder: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: '#ecfdf5',
     alignItems: 'center',
     justifyContent: 'center',
@@ -837,9 +859,9 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   authorNameText: {
-    fontSize: 12.5,
-    fontWeight: '800',
-    color: '#1e293b',
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#172b22',
   },
   timeLabelText: {
     fontSize: 10.5,
@@ -863,32 +885,36 @@ const styles = StyleSheet.create({
     color: '#92400e',
   },
   questionTitle: {
-    color: '#0f172a',
-    fontSize: 15,
+    color: '#172b22',
+    fontSize: 16,
     fontWeight: '900',
     textAlign: 'right',
-    lineHeight: 22,
+    lineHeight: 25,
     marginBottom: 6,
   },
   questionBody: {
-    color: '#64748b',
-    fontSize: 13,
+    color: '#46564e',
+    fontSize: 14,
     textAlign: 'right',
-    lineHeight: 20,
-    marginBottom: 12,
+    lineHeight: 23,
+    marginBottom: 13,
   },
   cardActionsRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    gap: 12,
-    flexWrap: 'wrap',
+    justifyContent: 'space-around',
+    gap: 8,
+    flexWrap: 'nowrap',
+    flex: 1,
   },
   socialAction: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    gap: 5,
-    paddingVertical: 5,
-    paddingHorizontal: 3,
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 7,
+    paddingHorizontal: 5,
+    minWidth: 54,
   },
   socialActionSaved: {
     backgroundColor: '#ecfdf5',
@@ -904,36 +930,41 @@ const styles = StyleSheet.create({
     color: '#087f5b',
   },
   cardFooter: {
-    flexDirection: 'row-reverse',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    gap: 6,
     borderTopWidth: 1,
-    borderColor: '#f8fafc',
-    paddingTop: 10,
+    borderColor: '#edf1f3',
+    paddingTop: 9,
+    marginTop: 3,
   },
   metaPillsRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    gap: 8,
+    gap: 12,
+    paddingHorizontal: 4,
   },
   metaPill: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#f8fafc',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
+    gap: 5,
+    backgroundColor: 'transparent',
+    paddingHorizontal: 0,
+    paddingVertical: 3,
+    borderRadius: 0,
   },
   metaPillText: {
-    color: '#64748b',
+    color: '#77847d',
     fontSize: 11,
     fontWeight: '700',
   },
   cardCtaRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 4,
+    paddingVertical: 7,
+    paddingHorizontal: 5,
   },
   cardCtaText: {
     color: '#059669',
