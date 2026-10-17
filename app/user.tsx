@@ -55,8 +55,12 @@ const TABS: { id: Tab; label: string; icon: any }[] = [
 ];
 
 export default function UserProfile() {
-  const params = useLocalSearchParams<{ id: string }>();
-  const id = Array.isArray(params.id) ? params.id[0] : (params.id || '');
+  const params = useLocalSearchParams<{ id?: string; username?: string }>();
+  const routeId = Array.isArray(params.id) ? params.id[0] : (params.id || '');
+  const routeUsername = Array.isArray(params.username) ? params.username[0] : (params.username || '');
+  const lookupKey = routeUsername || routeId;
+  const [resolvedProfileId, setResolvedProfileId] = useState<string>('');
+  const id = resolvedProfileId || routeId;
   const { width } = useWindowDimensions();
   const [profile, setProfile] = useState<any>(null);
   const [hasActiveStories, setHasActiveStories] = useState(false);
@@ -97,15 +101,16 @@ export default function UserProfile() {
     if (!id) return;
     if (!silent) setLoading(true);
     try {
-      const [{ data: sessionData }, { data: p, error }] = await Promise.all([
-        supabase.auth.getSession(),
-        supabase.from('profiles').select('*').eq('id', id).maybeSingle(),
-      ]);
-      if (error) throw error;
+      const { data: sessionData } = await supabase.auth.getSession();
       const me = sessionData?.session?.user?.id || null;
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(lookupKey);
+      const { data: p, error } = await supabase.from('profiles').select('*')
+        .eq(isUuid ? 'id' : 'username', lookupKey).maybeSingle();
+      if (error) throw error;
       setCurrentUserId(me);
       setProfile(p);
       if (!p) return;
+      setResolvedProfileId(p.id);
 
       const nowIso = new Date().toISOString();
       const yesterdayIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -261,7 +266,7 @@ export default function UserProfile() {
 
   useEffect(() => {
     void load();
-  }, [id]);
+  }, [lookupKey]);
 
   async function openProfileStories() {
     if (!id || blocked || blockedByOther) return;
@@ -331,7 +336,8 @@ export default function UserProfile() {
   }
 
   const handleShareProfile = async () => {
-    const url = typeof window !== 'undefined' ? window.location.href : `https://hayna.app/user?id=${id}`;
+    const profileUrl = `https://appksatest.vercel.app/user?username=${encodeURIComponent(profile.username || id)}`;
+    const url = typeof window !== 'undefined' ? `${window.location.origin}/user?username=${encodeURIComponent(profile.username || id)}` : profileUrl;
     const text = `ملف الجار ${displayName} على منصة حيّنا:\n${url}`;
     if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
       try {
@@ -627,7 +633,7 @@ export default function UserProfile() {
           {/* Activity Category Tabs */}
           <View style={styles.tabsCard}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
-              {TABS.map(({ id: key, label, icon: Icon }) => {
+              {TABS.filter(({ id: key }) => key !== 'answers' || own).map(({ id: key, label, icon: Icon }) => {
                 const count =
                   key === 'market'
                     ? stats.market
