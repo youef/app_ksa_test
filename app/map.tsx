@@ -402,9 +402,9 @@ export default function MapScreen() {
         <View style={styles.addMenu}>
           <View style={styles.addMenuHead}><Text style={styles.addMenuTitle}>وش حاب تضيف للخريطة؟</Text><Pressable onPress={() => setAddMenuOpen(false)}><Text style={styles.closeMenuText}>إغلاق ✕</Text></Pressable></View>
           {addAction('محل أو خدمة', '🏪', '/new-service')}
-          {addAction('بلاغ أو تنبيه', '🚨', '/report')}
+          {addAction('تنبيه طارئ', '🚨', '/emergency-alert')}
           {addAction('طلب مساعدة', '🤝', '/new-request')}
-          {addAction('إضافة نشاط تجاري', '📍', '/directory')}
+          {addAction('إعلان أو منتج', '🛍️', '/marketplace-dashboard')}
         </View>
       ) : null}
 
