@@ -513,6 +513,8 @@ export default function StoryViewer() {
                   color: currentStory.text_color || '#FFFFFF',
                   fontSize: currentStory.font_size || 34,
                   fontFamily: currentStory.font_family === 'serif' ? 'serif' : currentStory.font_family === 'monospace' ? 'monospace' : 'System',
+                  fontWeight: currentStory.font_family === 'normal' ? '600' : '900',
+                  fontStyle: currentStory.font_family === 'italic' ? 'italic' : 'normal',
                   transform: [
                     { translateX: Number(currentStory.text_offset_x || 0) },
                     { translateY: Number(currentStory.text_offset_y || 0) },
@@ -527,6 +529,8 @@ export default function StoryViewer() {
                         color: currentStory.text_color || '#FFFFFF',
                         fontSize: currentStory.font_size || 20,
                         fontFamily: currentStory.font_family === 'serif' ? 'serif' : currentStory.font_family === 'monospace' ? 'monospace' : 'System',
+                        fontWeight: currentStory.font_family === 'normal' ? '600' : '900',
+                        fontStyle: currentStory.font_family === 'italic' ? 'italic' : 'normal',
                         transform: [
                           { translateX: Number(currentStory.text_offset_x || 0) },
                           { translateY: Number(currentStory.text_offset_y || 0) },
