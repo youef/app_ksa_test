@@ -34,9 +34,105 @@ export default function StoryViewer() {
   const [showReplyBox, setShowReplyBox] = useState(false);
   const [canReply, setCanReply] = useState(true);
   const [isPaused, setIsPaused] = useState(false);
+  const [pollVotes, setPollVotes] = useState<number[]>([0, 0]);
+  const [myPollVote, setMyPollVote] = useState<number | null>(null);
+  const [questionAnswer, setQuestionAnswer] = useState('');
+  const [questionSent, setQuestionSent] = useState(false);
+  const [interactiveSending, setInteractiveSending] = useState(false);
 
   const progressAnim = useRef(new Animated.Value(0)).current;
   const currentStory = storiesList[currentIndex];
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadInteractiveState() {
+      if (!currentStory?.id) return;
+      setMyPollVote(null);
+      setPollVotes([0, 0]);
+      setQuestionAnswer('');
+      setQuestionSent(false);
+      if (currentStory.interactive_type !== 'poll') return;
+
+      const { data: votes, error } = await supabase
+        .from('story_poll_votes')
+        .select('option_index')
+        .eq('story_id', currentStory.id);
+      if (cancelled || error) return;
+      const rows = votes || [];
+      setPollVotes([
+        rows.filter((row: { option_index: number }) => row.option_index === 0).length,
+        rows.filter((row: { option_index: number }) => row.option_index === 1).length,
+      ]);
+      if (currentUserId) {
+        const { data: ownVote } = await supabase
+          .from('story_poll_votes')
+          .select('option_index')
+          .eq('story_id', currentStory.id)
+          .eq('voter_id', currentUserId)
+          .maybeSingle();
+        if (!cancelled && ownVote) setMyPollVote(ownVote.option_index);
+      }
+    }
+    void loadInteractiveState();
+    return () => { cancelled = true; };
+  }, [currentStory?.id, currentStory?.interactive_type, currentUserId]);
+
+  async function votePoll(optionIndex: number) {
+    if (!currentStory?.id) return;
+    if (!currentUserId) {
+      Alert.alert('تسجيل الدخول', 'سجّل الدخول للتصويت في الاستطلاع.');
+      return;
+    }
+    setInteractiveSending(true);
+    try {
+      const { error } = await supabase.from('story_poll_votes').upsert({
+        story_id: currentStory.id,
+        voter_id: currentUserId,
+        option_index: optionIndex,
+      }, { onConflict: 'story_id,voter_id' });
+      if (error) throw error;
+      setMyPollVote(optionIndex);
+      const { data: votes, error: votesError } = await supabase
+        .from('story_poll_votes')
+        .select('option_index')
+        .eq('story_id', currentStory.id);
+      if (votesError) throw votesError;
+      const rows = votes || [];
+      setPollVotes([
+        rows.filter((row: { option_index: number }) => row.option_index === 0).length,
+        rows.filter((row: { option_index: number }) => row.option_index === 1).length,
+      ]);
+    } catch (error) {
+      Alert.alert('تعذر تسجيل التصويت', error instanceof Error ? error.message : 'حاول مجددًا.');
+    } finally {
+      setInteractiveSending(false);
+    }
+  }
+
+  async function submitQuestionAnswer() {
+    const answer = questionAnswer.trim();
+    if (!currentStory?.id || !answer) return;
+    if (!currentUserId) {
+      Alert.alert('تسجيل الدخول', 'سجّل الدخول لإرسال إجابتك.');
+      return;
+    }
+    setInteractiveSending(true);
+    try {
+      const { error } = await supabase.from('story_question_answers').insert({
+        story_id: currentStory.id,
+        responder_id: currentUserId,
+        answer,
+      });
+      if (error) throw error;
+      setQuestionSent(true);
+      setQuestionAnswer('');
+      Alert.alert('تم الإرسال', 'وصلت إجابتك إلى صاحب القصة.');
+    } catch (error) {
+      Alert.alert('تعذر إرسال الإجابة', error instanceof Error ? error.message : 'حاول مجددًا.');
+    } finally {
+      setInteractiveSending(false);
+    }
+  }
 
   // 1. Initial Load: Fetch active stories for this author
   useEffect(() => {
@@ -413,18 +509,75 @@ export default function StoryViewer() {
             {/* Center Story Content */}
             <View style={styles.storyContent} pointerEvents="box-none">
               {currentStory.type === 'text' ? (
-                <Text style={styles.storyText}>{currentStory.content}</Text>
+                <Text style={[styles.storyText, {
+                  color: currentStory.text_color || '#FFFFFF',
+                  fontSize: currentStory.font_size || 34,
+                  fontFamily: currentStory.font_family === 'serif' ? 'serif' : currentStory.font_family === 'monospace' ? 'monospace' : 'System',
+                  transform: [
+                    { translateX: Number(currentStory.text_offset_x || 0) },
+                    { translateY: Number(currentStory.text_offset_y || 0) },
+                    { rotate: `${Number(currentStory.text_rotation || 0)}deg` },
+                  ],
+                }]}>{currentStory.content}</Text>
               ) : (
                 <View style={styles.imageStory}>
                   {currentStory.content ? (
                     <View style={styles.captionContainer}>
-                      <Text style={styles.imageCaption}>{currentStory.content}</Text>
+                      <Text style={[styles.imageCaption, {
+                        color: currentStory.text_color || '#FFFFFF',
+                        fontSize: currentStory.font_size || 20,
+                        fontFamily: currentStory.font_family === 'serif' ? 'serif' : currentStory.font_family === 'monospace' ? 'monospace' : 'System',
+                        transform: [
+                          { translateX: Number(currentStory.text_offset_x || 0) },
+                          { translateY: Number(currentStory.text_offset_y || 0) },
+                          { rotate: `${Number(currentStory.text_rotation || 0)}deg` },
+                        ],
+                      }]}>{currentStory.content}</Text>
                     </View>
                   ) : null}
                 </View>
               )}
             </View>
           </View>
+
+          {currentStory.interactive_type === 'poll' ? (
+            <View style={styles.storyInteractivePanel}>
+              <Text style={styles.interactiveQuestion}>{currentStory.poll_question || 'استطلاع رأي'}</Text>
+              {((Array.isArray(currentStory.poll_options) ? currentStory.poll_options : ['نعم', 'لا']) as string[]).slice(0, 2).map((option, index) => {
+                const totalVotes = pollVotes[0] + pollVotes[1];
+                const count = pollVotes[index] || 0;
+                const percent = totalVotes ? Math.round((count / totalVotes) * 100) : 0;
+                return (
+                  <Pressable key={index} style={[styles.interactiveOption, myPollVote === index && styles.interactiveOptionSelected]}
+                    onPress={() => votePoll(index)} disabled={interactiveSending}>
+                    <View style={styles.interactiveOptionHeader}>
+                      <Text style={styles.interactiveOptionText}>{option}</Text>
+                      <Text style={styles.interactiveOptionCount}>{count} · {percent}%</Text>
+                    </View>
+                    <View style={styles.interactiveVoteTrack}>
+                      <View style={[styles.interactiveVoteFill, { width: `${percent}%` }]} />
+                    </View>
+                  </Pressable>
+                );
+              })}
+              <Text style={styles.interactiveHint}>{myPollVote === null ? 'اختر إجابتك للتصويت' : 'تم تسجيل تصويتك ويمكنك تغييره'}</Text>
+            </View>
+          ) : currentStory.interactive_type === 'question' ? (
+            <View style={styles.storyInteractivePanel}>
+              <Text style={styles.interactiveQuestion}>{currentStory.question_prompt || 'سؤال للمتابعين'}</Text>
+              {questionSent ? (
+                <Text style={styles.interactiveHint}>وصلت إجابتك لصاحب القصة ✓</Text>
+              ) : (
+                <View style={styles.questionAnswerRow}>
+                  <Pressable style={styles.questionSendButton} onPress={submitQuestionAnswer} disabled={interactiveSending || !questionAnswer.trim()}>
+                    {interactiveSending ? <ActivityIndicator size="small" color="#fff" /> : <Send size={16} color="#fff" />}
+                  </Pressable>
+                  <TextInput value={questionAnswer} onChangeText={setQuestionAnswer} style={styles.questionAnswerInput}
+                    placeholder="اكتب إجابتك..." placeholderTextColor="#64748b" maxLength={1000} />
+                </View>
+              )}
+            </View>
+          ) : null}
 
           {/* ======================================================== */}
           {/* FOOTER: STATS OR DM REPLY                                */}
@@ -497,6 +650,27 @@ function shiftColor(hex: string): string {
 }
 
 const styles = StyleSheet.create({
+  storyInteractivePanel: {
+    marginHorizontal: 18,
+    marginVertical: 8,
+    padding: 12,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    gap: 8,
+    zIndex: 30,
+  },
+  interactiveQuestion: { color: '#0f172a', fontSize: 14, fontWeight: '900', textAlign: 'center' },
+  interactiveOption: { padding: 9, borderRadius: 10, borderWidth: 1, borderColor: '#cbd5e1', backgroundColor: '#f8fafc', gap: 5 },
+  interactiveOptionSelected: { borderColor: '#059669', backgroundColor: '#ecfdf5' },
+  interactiveOptionHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' },
+  interactiveOptionText: { color: '#0f172a', fontSize: 12, fontWeight: '800' },
+  interactiveOptionCount: { color: '#475569', fontSize: 11, fontWeight: '700' },
+  interactiveVoteTrack: { height: 4, borderRadius: 4, backgroundColor: '#e2e8f0', overflow: 'hidden' },
+  interactiveVoteFill: { height: '100%', backgroundColor: '#059669' },
+  interactiveHint: { color: '#64748b', fontSize: 10, textAlign: 'center' },
+  questionAnswerRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
+  questionAnswerInput: { flex: 1, minHeight: 40, backgroundColor: '#f1f5f9', borderRadius: 10, paddingHorizontal: 12, color: '#0f172a', textAlign: 'right' },
+  questionSendButton: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#059669', alignItems: 'center', justifyContent: 'center' },
   container: { flex: 1, backgroundColor: '#000' },
   loadingScreen: { flex: 1, backgroundColor: '#0f172a', alignItems: 'center', justifyContent: 'center' },
   notFoundText: { color: '#fff', fontSize: 17, fontWeight: '700', marginBottom: 20, textAlign: 'center' },
