@@ -244,6 +244,8 @@ export default function MapScreen() {
             {addAction('تنبيه طارئ', '🚨', '/emergency-alert')}
             {addAction('طلب مساعدة', '🤝', '/new-request')}
             {addAction('إعلان أو منتج', '🛍️', '/marketplace-dashboard')}
+          {addAction('فعالية للحي', '🎉', '/market?section=events')}
+            {addAction('فعالية للحي', '🎉', '/market?section=events')}
           </View> : null}
           {selectedPlace ? <View style={styles.placeDetailWeb}>
             <Text style={styles.selectedTitle}>{selectedPlace.name}</Text>
