@@ -170,7 +170,7 @@ export default function CreateStory() {
       return Alert.alert('السؤال غير مكتمل', 'اكتب السؤال الذي سيظهر للمتابعين.');
     }
 
-    let outcome;
+    let outcome: Awaited<ReturnType<typeof publisher.publish>>;
     try {
       outcome = await publisher.publish(composer.slides, {
         audience,
