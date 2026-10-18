@@ -38,7 +38,9 @@ import AppHeader from '@/components/shared/AppHeader';
 
 type NotificationCategory = 'all' | 'emergency' | 'answers' | 'community' | 'stories';
 
-interface NotificationActor { id: string; username?: string | null; display_name?: string | null; avatar_url?: string | null; is_verified?: boolean | null; }\n\ninterface NotificationItem {
+interface NotificationActor { id: string; username?: string | null; display_name?: string | null; avatar_url?: string | null; is_verified?: boolean | null; }
+
+interface NotificationItem {
   id: string;
   user_id: string;
   title: string;
@@ -64,7 +66,9 @@ export default function Notifications() {
   const [notifPrefEmergency, setNotifPrefEmergency] = useState(true);
   const [notifPrefAnswers, setNotifPrefAnswers] = useState(true);
   const [notifPrefCommunity, setNotifPrefCommunity] = useState(true);
-  const [notifPrefStories, setNotifPrefStories] = useState(true);\n  const [notifPrefFollows, setNotifPrefFollows] = useState(true);\n  const [notifPrefReviews, setNotifPrefReviews] = useState(true);\n  const [notifPrefMessages, setNotifPrefMessages] = useState(false);
+  const [notifPrefStories, setNotifPrefStories] = useState(true);
+  const [notifPrefFollows, setNotifPrefFollows] = useState(true);
+  const [notifPrefReviews, setNotifPrefReviews] = useState(true);
 
   async function load() {
     try {
@@ -89,7 +93,6 @@ export default function Notifications() {
           setNotifPrefStories(prefs.stories !== false);
           setNotifPrefFollows(prefs.follows !== false);
           setNotifPrefReviews(prefs.reviews !== false);
-          setNotifPrefMessages(false);
         } catch {}
       }
       if (notificationResult.error) throw notificationResult.error;
@@ -138,7 +141,14 @@ export default function Notifications() {
     };
   }, []);
 
-  async function savePreferences(next?: Partial<{ emergency: boolean; answers: boolean; community: boolean; stories: boolean; follows: boolean; reviews: boolean }>) {\n    if (!currentUserId) return;\n    const prefs = { emergency: notifPrefEmergency, answers: notifPrefAnswers, community: notifPrefCommunity, stories: notifPrefStories, follows: notifPrefFollows, reviews: notifPrefReviews, ...next };\n    try { await AsyncStorage.setItem(`notification-preferences:${currentUserId}`, JSON.stringify(prefs)); }\n    catch { Alert.alert('تعذّر الحفظ', 'لم نتمكن من حفظ تفضيلات التنبيهات على هذا الجهاز.'); }\n  }\n\n  // Mark single notification as read
+  async function savePreferences(next?: Partial<{ emergency: boolean; answers: boolean; community: boolean; stories: boolean; follows: boolean; reviews: boolean }>) {
+    if (!currentUserId) return;
+    const prefs = { emergency: notifPrefEmergency, answers: notifPrefAnswers, community: notifPrefCommunity, stories: notifPrefStories, follows: notifPrefFollows, reviews: notifPrefReviews, ...next };
+    try { await AsyncStorage.setItem(`notification-preferences:${currentUserId}`, JSON.stringify(prefs)); }
+    catch { Alert.alert('تعذّر الحفظ', 'لم نتمكن من حفظ تفضيلات التنبيهات على هذا الجهاز.'); }
+  }
+
+  // Mark single notification as read
   async function markAsRead(id: string) {
     setItems(prev =>
       prev.map(it => (it.id === id ? { ...it, read_at: new Date().toISOString() } : it))
@@ -940,7 +950,15 @@ const styles = StyleSheet.create({
   },
 
   // Cards
-  actorRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 9, marginBottom: 10, padding: 9, borderRadius: 13, backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#edf2f7' },\n  actorAvatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#e2e8f0' },\n  actorAvatarFallback: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#d1fae5', alignItems: 'center', justifyContent: 'center' },\n  actorAvatarInitial: { color: '#047857', fontWeight: '900', fontSize: 15 },\n  actorCopy: { flex: 1, alignItems: 'flex-end' },\n  actorName: { color: '#0f172a', fontSize: 12.5, fontWeight: '900', textAlign: 'right' },\n  actorHandle: { color: '#64748b', fontSize: 10.5, marginTop: 2, textAlign: 'right' },\n  actorLink: { color: '#059669', fontSize: 10.5, fontWeight: '800' },\n  notifCard: {
+  actorRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 9, marginBottom: 10, padding: 9, borderRadius: 13, backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#edf2f7' },
+  actorAvatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#e2e8f0' },
+  actorAvatarFallback: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#d1fae5', alignItems: 'center', justifyContent: 'center' },
+  actorAvatarInitial: { color: '#047857', fontWeight: '900', fontSize: 15 },
+  actorCopy: { flex: 1, alignItems: 'flex-end' },
+  actorName: { color: '#0f172a', fontSize: 12.5, fontWeight: '900', textAlign: 'right' },
+  actorHandle: { color: '#64748b', fontSize: 10.5, marginTop: 2, textAlign: 'right' },
+  actorLink: { color: '#059669', fontSize: 10.5, fontWeight: '800' },
+  notifCard: {
     backgroundColor: '#fff',
     borderRadius: 20,
     padding: 16,
