@@ -10,7 +10,7 @@ create table if not exists public.profile_customizations (
 );
 alter table public.profile_customizations enable row level security;
 create policy "profile customizations public read" on public.profile_customizations for select to anon, authenticated
-using (exists (select 1 from public.profiles p where p.id = user_id and coalesce(p.profile_privacy,'public') = 'public' and coalesce(p.hide_name,false) = false and coalesce(p.is_banned,false) = false));
+using (exists (select 1 from public.profiles p where p.id = user_id and coalesce(p.hide_name,false) = false and coalesce(p.is_banned,false) = false and (coalesce(p.profile_privacy,'public') = 'public' or (auth.uid() is not null and exists (select 1 from public.follows f where f.follower_id = auth.uid() and f.following_id = user_id)))));
 create policy "profile customization owner read" on public.profile_customizations for select to authenticated using ((select auth.uid()) = user_id);
 create policy "profile customizations owner insert" on public.profile_customizations for insert to authenticated
 with check ((select auth.uid()) = user_id);
@@ -31,7 +31,7 @@ create table if not exists public.profile_featured_items (
 create index if not exists profile_featured_items_user_position_idx on public.profile_featured_items(user_id, position, created_at desc);
 alter table public.profile_featured_items enable row level security;
 create policy "featured items public read" on public.profile_featured_items for select to anon, authenticated
-using (exists (select 1 from public.profiles p where p.id = user_id and coalesce(p.profile_privacy,'public') = 'public' and coalesce(p.hide_name,false) = false and coalesce(p.is_banned,false) = false));
+using (exists (select 1 from public.profiles p where p.id = user_id and coalesce(p.hide_name,false) = false and coalesce(p.is_banned,false) = false and (coalesce(p.profile_privacy,'public') = 'public' or (auth.uid() is not null and exists (select 1 from public.follows f where f.follower_id = auth.uid() and f.following_id = user_id)))));
 create policy "featured items owner insert" on public.profile_featured_items for insert to authenticated
 with check (
   (select auth.uid()) = user_id
