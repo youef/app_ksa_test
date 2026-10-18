@@ -106,7 +106,11 @@ async function searchBusinesses(term: string, limit = 20): Promise<Row[]> {
   ]);
 
   const unique = new Map<string, Row>();
-  for (const item of [\n    ...businesses.map((item) => ({ ...item, __sourceTable: 'businesses' })),\n    ...directory.map((item) => ({ ...item, __sourceTable: 'business_directory' })),\n    ...services.map((item) => ({ ...item, __sourceTable: 'services' })),\n  ]) {
+  for (const item of [
+    ...businesses.map((item) => ({ ...item, __sourceTable: 'businesses' })),
+    ...directory.map((item) => ({ ...item, __sourceTable: 'business_directory' })),
+    ...services.map((item) => ({ ...item, __sourceTable: 'services' })),
+  ]) {
     const key = `${item.id ?? ''}:${item.name ?? item.shop_name ?? ''}`;
     if (!unique.has(key)) {
       unique.set(key, {
