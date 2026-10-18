@@ -96,3 +96,20 @@ alter table public.profile_customizations
 
 alter table public.profile_customizations
   add column if not exists customization_history jsonb not null default '[]'::jsonb;
+
+
+-- Private data is isolated from public profile styling to avoid exposing saved templates/history.
+create table if not exists public.profile_customization_private (
+  user_id uuid primary key references public.profiles(id) on delete cascade,
+  saved_templates jsonb not null default '[]'::jsonb,
+  customization_history jsonb not null default '[]'::jsonb,
+  updated_at timestamptz not null default now()
+);
+alter table public.profile_customization_private enable row level security;
+drop policy if exists "profile customization private owner access" on public.profile_customization_private;
+create policy "profile customization private owner access"
+  on public.profile_customization_private
+  for all to authenticated
+  using ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);
+grant select, insert, update, delete on public.profile_customization_private to authenticated;
