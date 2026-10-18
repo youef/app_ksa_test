@@ -1,0 +1,57 @@
+name: Retry Vercel production deploy
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Retry periodically without hammering Vercel's deployment API.
+    - cron: "17 */6 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vercel-production-retry
+  cancel-in-progress: false
+
+jobs:
+  deploy-if-needed:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel
+
+      - name: Skip if latest main is already deployed to production
+        id: check
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: team_Sq5UAjTQnk2cEUHVGF5XRja3
+          VERCEL_PROJECT_ID: prj_K1yWWRZF69dgO7TIJLaLIQnTp5VV
+          TARGET_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          # Scheduled runs are attached to the default branch; use the checked-out main SHA.
+          TARGET_SHA="$(git rev-parse HEAD)"
+          RESPONSE="$(curl -fsS \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            "https://api.vercel.com/v6/deployments?projectId=$VERCEL_PROJECT_ID&target=production&limit=10&teamId=$VERCEL_ORG_ID")"
+          READY_SHA="$(printf '%s' "$RESPONSE" | jq -r '[.deployments[] | select(.readyState == "READY" or .state == "READY")][0].meta.githubCommitSha // empty')"
+          if [ "$READY_SHA" = "$TARGET_SHA" ]; then
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+            echo "Production already serves main commit $TARGET_SHA; skipping."
+          else
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+            echo "Production does not yet serve main commit $TARGET_SHA; retrying deployment."
+          fi
+
+      - name: Deploy latest main to production
+        if: steps.check.outputs.needed == 'true'
+        run: vercel deploy --prod --yes
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: team_Sq5UAjTQnk2cEUHVGF5XRja3
+          VERCEL_PROJECT_ID: prj_K1yWWRZF69dgO7TIJLaLIQnTp5VV
