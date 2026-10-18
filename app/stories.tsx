@@ -23,6 +23,7 @@ import { relativeTime } from '@/lib/mapPins';
 export default function StoriesScreen() {
   const bottomNavInset = useBottomNavInset();
   const [stories, setStories] = useState<any[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [seenStoryIds, setSeenStoryIds] = useState<string[]>([]);
@@ -54,6 +55,7 @@ export default function StoriesScreen() {
 
       const { data: authResult } = await supabase.auth.getUser();
       const activeViewerId = authResult.user?.id || '';
+      setCurrentUserId(activeViewerId);
       let city = '';
       let district = '';
       let followedIds: string[] = [];
@@ -335,7 +337,9 @@ export default function StoriesScreen() {
                       </View>
                       <View style={styles.trendFooter}>
                         <View style={styles.trendMetric}><Text style={styles.trendMetricText}>#{index + 1} ترند</Text></View>
-                        <View style={styles.trendMetric}><Text style={styles.trendMetricText}>{group.totalViews.toLocaleString('ar-SA')} مشاهدة</Text></View>
+                        {String(group.authorId) === currentUserId && (
+                          <View style={styles.trendMetric}><Text style={styles.trendMetricText}>{group.totalViews.toLocaleString('ar-SA')} مشاهدة</Text></View>
+                        )}
                         <Text style={styles.trendStoryCount}>{group.stories.length} يوميات</Text>
                       </View>
                     </View>
