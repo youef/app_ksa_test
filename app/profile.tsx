@@ -21,6 +21,7 @@ import { C } from '@/lib/ui';
 import { savePermanentMyLocation, getLockedCity, type LockedCity } from '@/lib/locationSync';
 import { getCurrentDeviceLocation, reverseGeocodeDeviceLocation } from '@/lib/deviceLocation';
 import { NeighborBadgesCard } from '@/components/profile/NeighborBadgesCard';
+import { ProfileCustomizationEntry } from '@/components/profile/ProfileCustomizationEntry';
 import {
   Camera,
   MapPin,
@@ -456,15 +457,7 @@ export default function Profile() {
             </Pressable>
           </View>
         </View>
-        <Pressable
-          onPress={() => router.push('/profile-customization')}
-          style={{ marginHorizontal: 16, marginTop: 10, padding: 13, borderRadius: 14, borderWidth: 1, borderColor: '#a7f3d0', backgroundColor: '#ecfdf5', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-          accessibilityRole="button"
-          accessibilityLabel="تخصيص الملف وإدارة الأعمال المميزة"
-        >
-          <Sparkles size={16} color="#047857" />
-          <Text style={{ color: '#047857', fontWeight: '800' }}>تخصيص الملف والأعمال المميزة</Text>
-        </Pressable>
+        <ProfileCustomizationEntry />
 
         {/* ======================================================== */}
         {/* EXECUTIVE PROFILE HERO CARD                              */}
