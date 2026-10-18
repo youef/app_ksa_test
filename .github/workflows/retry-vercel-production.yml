@@ -3,8 +3,8 @@ name: Retry Vercel production deploy
 on:
   workflow_dispatch:
   schedule:
-    # Retry periodically without hammering Vercel's deployment API.
-    - cron: "17 */6 * * *"
+    # Run daily at 12:00 AM Saudi Arabia time (21:00 UTC).
+    - cron: "0 21 * * *"
 
 permissions:
   contents: read
@@ -34,7 +34,6 @@ jobs:
           TARGET_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          # Scheduled runs are attached to the default branch; use the checked-out main SHA.
           TARGET_SHA="$(git rev-parse HEAD)"
           RESPONSE="$(curl -fsS \
             -H "Authorization: Bearer $VERCEL_TOKEN" \
