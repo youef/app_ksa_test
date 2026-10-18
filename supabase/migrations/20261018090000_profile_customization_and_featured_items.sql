@@ -76,3 +76,23 @@ revoke all on function public.enforce_profile_featured_items_limit() from public
 create trigger enforce_profile_featured_items_limit_before_insert
 before insert on public.profile_featured_items
 for each row execute function public.enforce_profile_featured_items_limit();
+
+
+-- Phase 2 extension: profile sections, identity modes, reusable templates and undo history.
+alter table public.profile_customizations
+  add column if not exists profile_type text not null default 'personal'
+    check (profile_type in ('personal', 'business'));
+
+alter table public.profile_customizations
+  add column if not exists section_visibility jsonb not null
+    default '{"bio":true,"services":true,"questions":true,"products":true,"reviews":true,"achievements":true}'::jsonb;
+
+alter table public.profile_customizations
+  add column if not exists section_order text[] not null
+    default array['bio','services','questions','products','reviews','achievements']::text[];
+
+alter table public.profile_customizations
+  add column if not exists saved_templates jsonb not null default '[]'::jsonb;
+
+alter table public.profile_customizations
+  add column if not exists customization_history jsonb not null default '[]'::jsonb;
