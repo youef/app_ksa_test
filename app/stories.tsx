@@ -16,7 +16,7 @@ import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { AppHeader } from '@/components/shared/AppHeader';
 import { useBottomNavInset } from '@/lib/bottomNav';
-import { Plus, ShieldCheck, Sparkles } from 'lucide-react-native';
+import { Plus, ShieldCheck, Sparkles, Settings2 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { relativeTime } from '@/lib/mapPins';
 
@@ -76,6 +76,12 @@ export default function StoriesScreen() {
         setStoryNotificationsEnabled(notificationSettings?.enabled !== false);
       }
 
+      let mutedAuthorIds: string[] = [];
+      if (activeViewerId) {
+        const { data: authorPrefs } = await supabase.from('story_author_preferences').select('author_id').eq('user_id', activeViewerId).eq('muted', true);
+        mutedAuthorIds = (authorPrefs || []).map((row: any) => String(row.author_id));
+      }
+
       const { data, error } = await supabase
         .from('stories')
         .select(`
@@ -105,7 +111,7 @@ export default function StoriesScreen() {
       if (error) throw error;
       const cityRows = (data || []) as any[];
       const normalize = (value: any) => String(value || '').trim().toLocaleLowerCase('ar');
-      const valid = city ? cityRows.filter((story: any) => normalize(story.profiles?.city) === normalize(city)) : [];
+      const valid = city ? cityRows.filter((story: any) => normalize(story.profiles?.city) === normalize(city) && !mutedAuthorIds.includes(String(story.author_id))) : [];
       setStories(valid);
       if (activeViewerId && valid.length > 0) {
         const { data: views, error: viewsError } = await supabase
@@ -207,6 +213,17 @@ export default function StoriesScreen() {
           </Pressable>
         }
       />
+
+      <Pressable
+        onPress={() => router.push('/story-settings')}
+        style={styles.storyNotificationToggle}
+        accessibilityRole="button"
+        accessibilityLabel="إعدادات تنبيهات القصص وكتم الحسابات"
+      >
+        <Settings2 size={16} color="#059669" />
+        <Text style={styles.storyNotificationToggleText}>إعدادات تنبيهات القصص وكتم الحسابات</Text>
+        <Text style={styles.storyNotificationToggleAction}>إدارة</Text>
+      </Pressable>
 
       <Pressable
         style={styles.storyNotificationToggle}
