@@ -30,8 +30,6 @@ export default function StoriesScreen() {
   const [currentCity, setCurrentCity] = useState<string>('');
   const [currentDistrict, setCurrentDistrict] = useState<string>('');
   const [followingIds, setFollowingIds] = useState<string[]>([]);
-  const [storyNotificationsEnabled, setStoryNotificationsEnabled] = useState(true);
-  const [notificationSettingsBusy, setNotificationSettingsBusy] = useState(false);
   const storyRingPulse = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -71,11 +69,6 @@ export default function StoriesScreen() {
       setCurrentCity(city);
       setCurrentDistrict(district);
       setFollowingIds(followedIds);
-      if (activeViewerId) {
-        const { data: notificationSettings } = await supabase.from('story_notification_settings').select('enabled').eq('user_id', activeViewerId).maybeSingle();
-        setStoryNotificationsEnabled(notificationSettings?.enabled !== false);
-      }
-
       let mutedAuthorIds: string[] = [];
       if (activeViewerId) {
         const { data: authorPrefs } = await supabase.from('story_author_preferences').select('author_id').eq('user_id', activeViewerId).eq('muted', true);
@@ -164,30 +157,6 @@ export default function StoriesScreen() {
     b.totalViews - a.totalViews || new Date(b.newestAt).getTime() - new Date(a.newestAt).getTime()
   );
 
-  async function toggleStoryNotifications() {
-    const { data: auth } = await supabase.auth.getUser();
-    const userId = auth.user?.id;
-    if (!userId) {
-      Alert.alert('تسجيل الدخول مطلوب', 'سجّل الدخول للتحكم في تنبيهات القصص.');
-      return;
-    }
-    if (notificationSettingsBusy) return;
-    const next = !storyNotificationsEnabled;
-    setNotificationSettingsBusy(true);
-    try {
-      const { error } = await supabase.from('story_notification_settings').upsert({
-        user_id: userId, enabled: next, updated_at: new Date().toISOString(),
-      }, { onConflict: 'user_id' });
-      if (error) throw error;
-      setStoryNotificationsEnabled(next);
-      Alert.alert(next ? 'تم تفعيل التنبيهات' : 'تم إيقاف التنبيهات', next ? 'ستصلك تنبيهات عند نشر من تتابعهم قصة جديدة.' : 'لن تصلك تنبيهات القصص الجديدة من الأشخاص الذين تتابعهم.');
-    } catch (error: any) {
-      Alert.alert('تعذر تحديث التنبيهات', error?.message || 'حاول مرة أخرى.');
-    } finally {
-      setNotificationSettingsBusy(false);
-    }
-  }
-
   function openAuthorStories(authorStories: any[]) {
     const firstUnseen = authorStories.find((story: any) => !seenStoryIds.includes(story.id));
     const target = firstUnseen || authorStories[0];
@@ -199,7 +168,6 @@ export default function StoriesScreen() {
       <AppHeader
         variant="sub"
         title="يوميات أهل الحي"
-        subtitle={`${filtered.length} قصة مباشرة خلال 24 ساعة`}
         fallbackRoute="/home"
         rightAction={
           <Pressable
@@ -223,20 +191,6 @@ export default function StoriesScreen() {
         <Settings2 size={16} color="#059669" />
         <Text style={styles.storyNotificationToggleText}>إعدادات تنبيهات القصص وكتم الحسابات</Text>
         <Text style={styles.storyNotificationToggleAction}>إدارة</Text>
-      </Pressable>
-
-      <Pressable
-        style={styles.storyNotificationToggle}
-        onPress={toggleStoryNotifications}
-        disabled={notificationSettingsBusy}
-        accessibilityRole="button"
-        accessibilityLabel={storyNotificationsEnabled ? 'إيقاف تنبيهات القصص الجديدة' : 'تفعيل تنبيهات القصص الجديدة'}
-      >
-        <Sparkles size={15} color={storyNotificationsEnabled ? '#D4A72C' : '#64748b'} />
-        <Text style={styles.storyNotificationToggleText}>
-          {storyNotificationsEnabled ? 'تنبيهات قصص المتابَعين مفعّلة' : 'تنبيهات قصص المتابَعين متوقفة'}
-        </Text>
-        <Text style={styles.storyNotificationToggleAction}>{storyNotificationsEnabled ? 'إيقاف' : 'تفعيل'}</Text>
       </Pressable>
 
       {storyRings.length > 0 && (
@@ -354,9 +308,6 @@ export default function StoriesScreen() {
                       </View>
                       <View style={styles.trendFooter}>
                         <View style={styles.trendMetric}><Text style={styles.trendMetricText}>#{index + 1} ترند</Text></View>
-                        {String(group.authorId) === currentUserId && (
-                          <View style={styles.trendMetric}><Text style={styles.trendMetricText}>{group.totalViews.toLocaleString('ar-SA')} مشاهدة</Text></View>
-                        )}
                         <Text style={styles.trendStoryCount}>{group.stories.length} يوميات</Text>
                       </View>
                     </View>
