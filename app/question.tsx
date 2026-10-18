@@ -661,9 +661,7 @@ export default function Question() {
       { text: 'حذف', style: 'destructive', onPress: async () => {
         setDeletingAnswerId(answer.id);
         try {
-          // Detach child replies first so the thread remains readable and the owner check is enforced.
-          const { error: childError } = await supabase.from('answers').update({ parent_answer_id: null }).eq('parent_answer_id', answer.id);
-          if (childError) throw childError;
+          // A database trigger detaches child replies before deletion so nested discussion remains readable.
           const { data: deleted, error } = await supabase.from('answers').delete().eq('id', answer.id).eq('author_id', currentUserId).select('id').maybeSingle();
           if (error) throw error;
           if (!deleted) throw new Error('يمكن لصاحب الرد فقط حذفه.');
