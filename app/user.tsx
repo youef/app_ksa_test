@@ -36,6 +36,8 @@ import {
   Wrench,
   Share2,
   Crown,
+  Star,
+  User,
   Edit3,
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
@@ -803,7 +805,7 @@ export default function UserProfile() {
                         {item.reviewer?.avatar_url ? <Image source={{ uri: item.reviewer.avatar_url }} style={styles.reviewAvatar} /> : <View style={styles.reviewAvatarFallback}><User size={16} color="#059669" /></View>}
                         <View style={{ flex: 1 }}>
                           <Text style={styles.reviewAuthorName}>{item.reviewer?.display_name || item.reviewer?.username || 'مستخدم'}</Text>
-                          <Text style={styles.reviewDate}>{formatTimeAgo(item.created_at)}</Text>
+                          <Text style={styles.reviewDate}>{new Date(item.created_at).toLocaleDateString('ar-SA')}</Text>
                         </View>
                         <View style={styles.reviewStars}><Text style={styles.reviewRating}>{Math.max(0, Math.min(5, Number(item.rating) || 0))}/5</Text><Star size={15} color="#d97706" fill="#f59e0b" /></View>
                       </Pressable>
