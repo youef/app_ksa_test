@@ -1,0 +1,67 @@
+-- Phase 2: public profile customization and featured activity
+create table if not exists public.profile_customizations (
+  user_id uuid primary key references public.profiles(id) on delete cascade,
+  accent_color text not null default '#059669' check (accent_color ~ '^#[0-9A-Fa-f]{6}$'),
+  banner_style text not null default 'emerald' check (banner_style in ('emerald','ocean','sunset','midnight')),
+  show_stats boolean not null default true,
+  show_badges boolean not null default true,
+  featured_title text not null default 'أعمالي المميزة' check (char_length(featured_title) between 1 and 40),
+  updated_at timestamptz not null default now()
+);
+alter table public.profile_customizations enable row level security;
+create policy "profile customizations public read" on public.profile_customizations for select to anon, authenticated
+using (exists (select 1 from public.profiles p where p.id = user_id and coalesce(p.profile_privacy,'public') <> 'hidden' and coalesce(p.hide_name,false) = false and coalesce(p.is_banned,false) = false));
+create policy "profile customizations owner insert" on public.profile_customizations for insert to authenticated
+with check ((select auth.uid()) = user_id);
+create policy "profile customizations owner update" on public.profile_customizations for update to authenticated
+using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+grant select on public.profile_customizations to anon, authenticated;
+grant insert, update on public.profile_customizations to authenticated;
+
+create table if not exists public.profile_featured_items (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  item_type text not null check (item_type in ('question','service','request','market')),
+  item_id uuid not null,
+  position smallint not null default 0 check (position between 0 and 9),
+  created_at timestamptz not null default now(),
+  unique(user_id, item_type, item_id)
+);
+create index if not exists profile_featured_items_user_position_idx on public.profile_featured_items(user_id, position, created_at desc);
+alter table public.profile_featured_items enable row level security;
+create policy "featured items public read" on public.profile_featured_items for select to anon, authenticated
+using (exists (select 1 from public.profiles p where p.id = user_id and coalesce(p.profile_privacy,'public') = 'public' and coalesce(p.hide_name,false) = false and coalesce(p.is_banned,false) = false));
+create policy "featured items owner insert" on public.profile_featured_items for insert to authenticated
+with check ((select auth.uid()) = user_id);
+create policy "featured items owner delete" on public.profile_featured_items for delete to authenticated
+using ((select auth.uid()) = user_id);
+grant select on public.profile_featured_items to anon, authenticated;
+grant insert, delete on public.profile_featured_items to authenticated;
+
+create or replace function public.validate_profile_featured_item()
+returns trigger language plpgsql security definer set search_path = ''
+as $$
+declare owner_matches boolean := false;
+begin
+  if new.item_type = 'question' then
+    select exists(select 1 from public.questions q where q.id = new.item_id and q.author_id = new.user_id) into owner_matches;
+  elsif new.item_type = 'service' then
+    select exists(select 1 from public.services s where s.id = new.item_id and s.provider_id = new.user_id) into owner_matches;
+  elsif new.item_type = 'request' then
+    select exists(select 1 from public.requests r where r.id = new.item_id and r.requester_id = new.user_id) into owner_matches;
+  elsif new.item_type = 'market' then
+    select exists(select 1 from public.marketplace_items m where m.id = new.item_id and m.seller_id = new.user_id) into owner_matches;
+  end if;
+  if not owner_matches then raise exception 'featured_item_not_owned'; end if;
+  return new;
+end;
+$$;
+revoke all on function public.validate_profile_featured_item() from public, anon, authenticated;
+create trigger validate_profile_featured_item_before_write before insert or update on public.profile_featured_items
+for each row execute function public.validate_profile_featured_item();
+
+create or replace function public.set_profile_customization_updated_at()
+returns trigger language plpgsql set search_path = ''
+as $$ begin new.updated_at = now(); return new; end; $$;
+create trigger profile_customizations_updated_at before update on public.profile_customizations
+for each row execute function public.set_profile_customization_updated_at();
