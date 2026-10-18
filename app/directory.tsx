@@ -184,7 +184,7 @@ export default function Directory() {
       }));
 
       // Combine DB services with curated community recommendations
-      const combined = [...normalizedDb];
+      const combined: any[] = [...normalizedDb];
       for (const cur of CURATED_NEIGHBOR_RECOMMENDATIONS) {
         if (!combined.some(c => c.name === cur.name)) {
           combined.push(cur);
