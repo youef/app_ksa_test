@@ -4,7 +4,7 @@ import {
   StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
-import { Briefcase, CreditCard, Crown, Megaphone, RefreshCw, ShieldCheck, ShoppingBag, Star } from 'lucide-react-native';
+import { BadgeCheck, Briefcase, CreditCard, Crown, Megaphone, RefreshCw, ShieldCheck, ShoppingBag, Star } from 'lucide-react-native';
 import { AppHeader } from '@/components/shared/AppHeader';
 import { useBottomNavInset } from '@/lib/bottomNav';
 import { supabase } from '@/lib/supabase';
