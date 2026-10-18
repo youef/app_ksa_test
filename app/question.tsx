@@ -643,7 +643,7 @@ export default function Question() {
     setSavingAnswerEdit(true);
     try {
       const { data: updated, error } = await supabase.from('answers')
-        .update({ body: editAnswerBody.trim(), updated_at: new Date().toISOString() })
+        .update({ body: editAnswerBody.trim() })
         .eq('id', editingAnswer.id).eq('author_id', currentUserId).select('id').maybeSingle();
       if (error) throw error;
       if (!updated) throw new Error('يمكن لصاحب الرد فقط تعديله.');
