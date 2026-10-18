@@ -4,7 +4,6 @@ import {
   AudioSession,
   LiveKitRoom,
   VideoTrack,
-  AudioTrack,
   useTracks,
   isTrackReference,
   registerGlobals,
