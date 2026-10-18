@@ -93,6 +93,8 @@ export default function UserProfile() {
   const [tabLoading, setTabLoading] = useState(false);
   const [tabError, setTabError] = useState(false);
   const [loadError, setLoadError] = useState(false);
+  const [featuredItems, setFeaturedItems] = useState<any[]>([]);
+  const [profileCustomization, setProfileCustomization] = useState<any>(null);
 
   const cardWidth = useMemo(() => {
     const max = Math.min(width - 32, 1080);
@@ -220,6 +222,23 @@ export default function UserProfile() {
         });
         return;
       }
+
+      const [customizationResult, featuredResult] = await Promise.all([
+        supabase.from('profile_customizations').select('accent_color,banner_style,show_stats,show_badges,featured_title').eq('user_id', p.id).maybeSingle(),
+        supabase.from('profile_featured_items').select('item_type,item_id,position').eq('user_id', p.id).order('position', { ascending: true }).limit(10),
+      ]);
+      setProfileCustomization(customizationResult.data || null);
+      const featuredRows = featuredResult.data || [];
+      const resolvedFeatured: any[] = [];
+      for (const featured of featuredRows) {
+        let query: any;
+        if (featured.item_type === 'question') query = await supabase.from('questions').select('id,title,body,district,created_at,category').eq('id', featured.item_id).maybeSingle();
+        else if (featured.item_type === 'service') query = await supabase.from('services').select('id,name,description,district,created_at,category,cover_url,price_from,price_to,available_now').eq('id', featured.item_id).maybeSingle();
+        else if (featured.item_type === 'request') query = await supabase.from('requests').select('id,title,description,district,created_at,status,budget,is_urgent').eq('id', featured.item_id).maybeSingle();
+        else if (featured.item_type === 'market') query = await supabase.from('marketplace_items').select('id,title,description,district,created_at,status,price,image_url,item_type').eq('id', featured.item_id).maybeSingle();
+        if (query?.data) resolvedFeatured.push({ ...query.data, _featuredType: featured.item_type });
+      }
+      setFeaturedItems(resolvedFeatured);
 
       const [
         marketCount,
@@ -651,6 +670,27 @@ export default function UserProfile() {
             <Stat label="يتابع" value={stats.following} />
             <Stat label="إسهامات" value={totalContributions} />
           </View>
+
+          {featuredItems.length > 0 && !locked && (
+            <View style={styles.content}>
+              <View style={styles.contentHead}>
+                <View>
+                  <Text style={styles.contentTitle}>{profileCustomization?.featured_title || 'أعمالي المميزة'}</Text>
+                  <Text style={styles.contentSub}>اختيارات مثبتة من هذا الجار</Text>
+                </View>
+                {own && <Pressable style={styles.marketLink} onPress={() => router.push('/profile-customization')}><Text style={styles.marketLinkText}>إدارة</Text><Edit3 size={14} color="#059669" /></Pressable>}
+              </View>
+              <View style={[styles.grid, { gap: 12 }]}>
+                {featuredItems.map(item => <ActivityCard key={item._featuredType + ':' + item.id} type={item._featuredType === 'question' ? 'questions' : item._featuredType === 'service' ? 'services' : item._featuredType === 'request' ? 'requests' : 'market'} item={item} width={cardWidth} />)}
+              </View>
+            </View>
+          )}
+          {own && (
+            <Pressable onPress={() => router.push('/profile-customization')} style={{ backgroundColor: '#ecfdf5', borderWidth: 1, borderColor: '#a7f3d0', padding: 13, borderRadius: 14, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              <Sparkles size={16} color="#047857" />
+              <Text style={{ color: '#047857', fontWeight: '800' }}>تخصيص الملف وإدارة الأعمال المميزة</Text>
+            </Pressable>
+          )}
 
           {/* Activity Category Tabs */}
           <View style={styles.tabsCard}>
