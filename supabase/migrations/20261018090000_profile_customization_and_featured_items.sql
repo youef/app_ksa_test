@@ -47,3 +47,29 @@ using ((select auth.uid()) = user_id);
 grant select on public.profile_featured_items to anon, authenticated;
 grant insert, delete on public.profile_featured_items to authenticated;
 
+
+
+-- Enforce the ten-item limit in the database, not only in the client.
+create or replace function public.enforce_profile_featured_items_limit()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  current_count integer;
+begin
+  perform pg_advisory_xact_lock(hashtextextended(new.user_id::text, 0));
+  select count(*) into current_count
+  from public.profile_featured_items
+  where user_id = new.user_id;
+  if current_count >= 10 then
+    raise exception 'featured_limit_reached';
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public.enforce_profile_featured_items_limit() from public, anon, authenticated;
+create trigger enforce_profile_featured_items_limit_before_insert
+before insert on public.profile_featured_items
+for each row execute function public.enforce_profile_featured_items_limit();
