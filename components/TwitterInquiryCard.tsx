@@ -477,6 +477,21 @@ export default function TwitterInquiryCard({
         {isPinned && <View style={{ alignSelf: 'flex-start', flexDirection: 'row-reverse', alignItems: 'center', gap: 4, backgroundColor: '#fff7ed', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5, marginTop: 8 }}><Text style={{ color: '#c2410c', fontSize: 11, fontWeight: '800' }}>📌 مثبت في الملف الشخصي</Text></View>}
         {isFeatured && <View style={{ alignSelf: 'flex-start', backgroundColor: '#fee2e2', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5, marginTop: 7 }}><Text style={{ color: '#991b1b', fontSize: 11, fontWeight: '900' }}>📢 تنبيه مثبت من إدارة الحي</Text></View>}
         {resolutionStatus !== 'open' && <View style={{ alignSelf: 'flex-start', backgroundColor: '#dcfce7', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5, marginTop: 7 }}><Text style={{ color: '#166534', fontSize: 11, fontWeight: '800' }}>{statusLabels[resolutionStatus] || resolutionStatus}</Text></View>}
+        <View style={s.xStatusTrack}>
+          {[
+            { id: 'open', label: 'مفتوح' },
+            { id: 'in_progress', label: 'جارٍ تقديم المساعدة' },
+            { id: 'helped', label: 'تمت المساعدة' },
+            { id: 'closed', label: 'مغلق' },
+          ].map((stage, index) => {
+            const stageIndex = resolutionStatus === 'open' ? 0 : ['found', 'in_progress'].includes(resolutionStatus) ? 1 : ['helped', 'resolved'].includes(resolutionStatus) ? 2 : 3;
+            const complete = index <= stageIndex;
+            return <View key={stage.id} style={s.xStatusStep}>
+              <View style={[s.xStatusDot, complete && s.xStatusDotActive]} />
+              <Text numberOfLines={2} style={[s.xStatusLabel, complete && s.xStatusLabelActive]}>{stage.label}</Text>
+            </View>;
+          })}
+        </View>
         <View style={s.xHashtagRow}>
           {data.district && (
             <View style={s.xHashPill}><Text style={s.xHashText}>#{data.district.replace(/\s+/g, '_')}</Text></View>
@@ -901,6 +916,12 @@ const s = StyleSheet.create({
   },
   xContentArea: { marginBottom: 10, minHeight: 112 },
   xReadMore: { alignSelf: 'flex-end', color: '#047857', fontSize: 12, fontWeight: '800', marginTop: -3, marginBottom: 8, textAlign: 'right' },
+  xStatusTrack: { flexDirection: 'row-reverse', alignItems: 'flex-start', justifyContent: 'space-between', gap: 4, marginTop: 10, marginBottom: 8, paddingHorizontal: 2 },
+  xStatusStep: { flex: 1, alignItems: 'center', gap: 4 },
+  xStatusDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#cbd5e1', borderWidth: 1, borderColor: '#cbd5e1' },
+  xStatusDotActive: { backgroundColor: '#059669', borderColor: '#059669' },
+  xStatusLabel: { fontSize: 9, lineHeight: 12, color: '#94a3b8', textAlign: 'center' },
+  xStatusLabelActive: { color: '#047857', fontWeight: '800' },
   xReactionsRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 5, marginTop: 2, marginBottom: 8 },
   xReactionChip: { flex: 1, minHeight: 34, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 4, paddingVertical: 6, borderRadius: 12, backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0' },
   xReactionChipActive: { backgroundColor: '#ecfdf5', borderColor: '#6ee7b7' },
