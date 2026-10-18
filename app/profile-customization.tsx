@@ -29,6 +29,7 @@ export default function ProfileCustomization() {
   const [sectionOrder, setSectionOrder] = useState<string[]>(SECTIONS.map(x => x.id));
   const [savedTemplates, setSavedTemplates] = useState<Array<{ name: string; snapshot: ProfileSnapshot; created_at: string }>>([]);
   const [history, setHistory] = useState<ProfileSnapshot[]>([]);
+  const [savedSnapshot, setSavedSnapshot] = useState<ProfileSnapshot | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -37,15 +38,16 @@ export default function ProfileCustomization() {
       if (!auth.user) { router.replace('/login'); return; }
       const id = auth.user.id;
       setUid(id);
-      const [settings, questions, services, requests, market, pins] = await Promise.all([
+      const [settings, questions, services, requests, market, pins, privateData] = await Promise.all([
         supabase.from('profile_customizations').select('*').eq('user_id', id).maybeSingle(),
         supabase.from('questions').select('id,title,body').eq('author_id', id).order('created_at', { ascending: false }).limit(10),
         supabase.from('services').select('id,name,description').eq('provider_id', id).order('created_at', { ascending: false }).limit(10),
         supabase.from('requests').select('id,title,description').eq('requester_id', id).order('created_at', { ascending: false }).limit(10),
         supabase.from('marketplace_items').select('id,title,description').eq('seller_id', id).order('created_at', { ascending: false }).limit(10),
         supabase.from('profile_featured_items').select('item_type,item_id').eq('user_id', id).order('position', { ascending: true }),
+        supabase.from('profile_customization_private').select('saved_templates,customization_history').eq('user_id', id).maybeSingle(),
       ]);
-      const failed = [settings, questions, services, requests, market, pins].find((result: any) => result.error);
+      const failed = [settings, questions, services, requests, market, pins, privateData].find((result: any) => result.error);
       if (failed?.error) throw failed.error;
       const s = settings.data;
       if (s) {
@@ -67,6 +69,10 @@ export default function ProfileCustomization() {
         ...(market.data || []).map((x: any) => ({ id: x.id, type: 'market' as const, title: x.title || 'إعلان', subtitle: x.description })),
       ];
       setCandidates(list);
+      setSavedTemplates(Array.isArray(privateData.data?.saved_templates) ? privateData.data.saved_templates : []);
+      setHistory(Array.isArray(privateData.data?.customization_history) ? privateData.data.customization_history : []);
+      const initialSnapshot: ProfileSnapshot = { accent: settings.data?.accent_color || '#059669', banner: settings.data?.banner_style || 'emerald', showStats: settings.data?.show_stats !== false, showBadges: settings.data?.show_badges !== false, featuredTitle: settings.data?.featured_title || 'أعمالي المميزة', profileType: settings.data?.profile_type === 'business' ? 'business' : 'personal', sectionVisibility: { bio: true, services: true, questions: true, products: true, reviews: true, achievements: true, ...(settings.data?.section_visibility || {}) }, sectionOrder: Array.isArray(settings.data?.section_order) ? settings.data.section_order : SECTIONS.map(x => x.id) };
+      setSavedSnapshot(initialSnapshot);
       setFeatured((pins.data || []).map((x: any) => x.item_type + ':' + x.item_id));
     } catch (e: any) {
       Alert.alert('تعذّر تحميل الإعدادات', e?.message || 'حاول مرة أخرى.');
@@ -150,7 +156,7 @@ export default function ProfileCustomization() {
     applySnapshot(template.snapshot);
     try {
       const value = template.snapshot;
-      const nextHistory = [snapshot(), ...history].slice(0, 20);
+      const nextHistory = [savedSnapshot || snapshot(), ...history].slice(0, 20);
       const { error } = await supabase.from('profile_customizations').upsert({
         user_id: uid, accent_color: value.accent, banner_style: value.banner,
         show_stats: value.showStats, show_badges: value.showBadges,
