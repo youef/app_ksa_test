@@ -1,0 +1,30 @@
+name: Inquiry discussion checks
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, feat/inquiry-card-reactions]
+
+jobs:
+  typecheck-and-platform-bundles:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: TypeScript check
+        run: npm run typecheck
+      - name: Export web bundle
+        run: npx expo export --platform web --output-dir dist-web
+      - name: Export Android JS bundle
+        run: npx expo export --platform android --output-dir dist-android
+      - name: Export iOS JS bundle
+        run: npx expo export --platform ios --output-dir dist-ios
