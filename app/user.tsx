@@ -89,6 +89,10 @@ export default function UserProfile() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [loadedTabs, setLoadedTabs] = useState<Tab[]>([]);
+  const [tabLoading, setTabLoading] = useState(false);
+  const [tabError, setTabError] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   const cardWidth = useMemo(() => {
     const max = Math.min(width - 32, 1080);
@@ -97,9 +101,48 @@ export default function UserProfile() {
     return max;
   }, [width]);
 
+  const loadTabData = async (tabToLoad: Tab, profileId: string, viewerId: string | null, force = false) => {
+    if (loadedTabs.includes(tabToLoad) && !force) return;
+    if (tabToLoad === 'answers' && viewerId !== profileId) return;
+    setTabLoading(true);
+    setTabError(false);
+    try {
+      let result: any;
+      if (tabToLoad === 'market') {
+        result = await supabase.from('marketplace_items').select('id,title,description,price,item_type,district,image_url,status,created_at').eq('seller_id', profileId).order('created_at', { ascending: false }).limit(18);
+        if (result.error) throw result.error;
+        setItems(result.data || []);
+      } else if (tabToLoad === 'services') {
+        result = await supabase.from('services').select('id,name,description,category,district,price_from,price_to,available_now,is_verified,cover_url,created_at').eq('provider_id', profileId).order('created_at', { ascending: false }).limit(18);
+        if (result.error) throw result.error;
+        setServices(result.data || []);
+      } else if (tabToLoad === 'requests') {
+        result = await supabase.from('requests').select('id,title,description,status,resolution_status,is_pinned,request_type,budget,is_urgent,district,created_at').eq('requester_id', profileId).order('is_pinned', { ascending: false }).order('created_at', { ascending: false }).limit(18);
+        if (result.error) throw result.error;
+        setRequests(result.data || []);
+      } else if (tabToLoad === 'questions') {
+        result = await supabase.from('questions').select('id,title,body,status,resolution_status,is_pinned,category,district,created_at,view_count,views_count,is_emergency,item_type').eq('author_id', profileId).order('is_pinned', { ascending: false }).order('created_at', { ascending: false }).limit(18);
+        if (result.error) throw result.error;
+        setQuestions(result.data || []);
+      } else {
+        result = await supabase.from('answers').select('id,body,created_at,question_id,questions(id,title,city,district)').eq('author_id', profileId).order('created_at', { ascending: false }).limit(18);
+        if (result.error) throw result.error;
+        setAnswers(result.data || []);
+      }
+      setLoadedTabs(previous => previous.includes(tabToLoad) ? previous : [...previous, tabToLoad]);
+    } catch (e) {
+      console.error('profile tab load', tabToLoad, e);
+      setTabError(true);
+    } finally {
+      setTabLoading(false);
+    }
+  };
+
   const load = async (silent = false) => {
     if (!lookupKey) return;
     if (!silent) setLoading(true);
+    setLoadError(false);
+    if (silent) setLoadedTabs([]);
     try {
       const { data: sessionData } = await supabase.auth.getSession();
       const me = sessionData?.session?.user?.id || null;
@@ -111,6 +154,11 @@ export default function UserProfile() {
       setProfile(p);
       if (!p) return;
       setResolvedProfileId(p.id);
+      if (p.is_banned === true && me !== p.id) {
+        setItems([]); setServices([]); setRequests([]); setQuestions([]); setAnswers([]);
+        setStats({ market: 0, services: 0, requests: 0, questions: 0, followers: 0, following: 0, answers: 0, reputation: 0 });
+        return;
+      }
 
       const nowIso = new Date().toISOString();
       const yesterdayIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -179,11 +227,6 @@ export default function UserProfile() {
         followingCount,
         answerCount,
         repRes,
-        itemRows,
-        serviceRows,
-        requestRows,
-        questionRows,
-        answerRows,
       ] = await Promise.all([
         supabase.from('marketplace_items').select('id', { count: 'exact', head: true }).eq('seller_id', p.id),
         supabase.from('services').select('id', { count: 'exact', head: true }).eq('provider_id', p.id),
@@ -191,42 +234,8 @@ export default function UserProfile() {
         supabase.from('questions').select('id', { count: 'exact', head: true }).eq('author_id', p.id),
         supabase.from('follows').select('id', { count: 'exact', head: true }).eq('following_id', p.id),
         supabase.from('follows').select('id', { count: 'exact', head: true }).eq('follower_id', p.id),
-        supabase.from('answers').select('id', { count: 'exact', head: true }).eq('author_id', p.id),
+        me === p.id ? supabase.from('answers').select('id', { count: 'exact', head: true }).eq('author_id', p.id) : Promise.resolve({ count: 0, error: null }),
         supabase.from('reputation').select('points').eq('user_id', p.id).maybeSingle(),
-        supabase
-          .from('marketplace_items')
-          .select('id,title,description,price,item_type,district,image_url,status,created_at')
-          .eq('seller_id', p.id)
-          .order('created_at', { ascending: false })
-          .limit(18),
-        supabase
-          .from('services')
-          .select('id,name,description,category,district,price_from,price_to,available_now,is_verified,cover_url,created_at')
-          .eq('provider_id', p.id)
-          .order('created_at', { ascending: false })
-          .limit(18),
-        supabase
-          .from('requests')
-          .select('id,title,description,status,resolution_status,is_pinned,request_type,budget,is_urgent,district,created_at')
-          .eq('requester_id', p.id)
-          .order('is_pinned', { ascending: false })
-          .order('created_at', { ascending: false })
-          .limit(18),
-        supabase
-          .from('questions')
-          .select('id,title,body,status,resolution_status,is_pinned,category,district,created_at,view_count,views_count,is_emergency,item_type')
-          .eq('author_id', p.id)
-          .order('is_pinned', { ascending: false })
-          .order('created_at', { ascending: false })
-          .limit(18),
-        me === p.id
-          ? supabase
-              .from('answers')
-              .select('id,body,created_at,question_id,questions(id,title,city,district)')
-              .eq('author_id', p.id)
-              .order('created_at', { ascending: false })
-              .limit(18)
-          : Promise.resolve({ data: [], error: null }),
       ]);
 
       setStats({
@@ -239,26 +248,23 @@ export default function UserProfile() {
         answers: answerCount.count || 0,
         reputation: repRes?.data?.points || 0,
       });
-      setItems(itemRows.data || []);
-      setServices(serviceRows.data || []);
-      setRequests(requestRows.data || []);
-      setQuestions(questionRows.data || []);
-      setAnswers(answerRows.data || []);
-
-      // Smart default tab selection based on real contributions
-      if (questionRows.data && questionRows.data.length > 0) {
-        setTab('questions');
-      } else if (me === p.id && answerRows.data && answerRows.data.length > 0) {
+      setItems([]); setServices([]); setRequests([]); setQuestions([]); setAnswers([]);
+      setLoadedTabs([]);
+      const initialTab: Tab = (questionCount.count || 0) > 0 ? 'questions'
+        : (serviceCount.count || 0) > 0 ? 'services'
+        : (requestCount.count || 0) > 0 ? 'requests'
+        : (marketCount.count || 0) > 0 ? 'market'
+        : 'questions';
+      if (me === p.id && (answerCount.count || 0) > 0 && !(questionCount.count || serviceCount.count || requestCount.count || marketCount.count)) {
         setTab('answers');
-      } else if (serviceRows.data && serviceRows.data.length > 0) {
-        setTab('services');
-      } else if (requestRows.data && requestRows.data.length > 0) {
-        setTab('requests');
-      } else if (itemRows.data && itemRows.data.length > 0) {
-        setTab('market');
+        await loadTabData('answers', p.id, me, true);
+      } else {
+        setTab(initialTab);
+        await loadTabData(initialTab, p.id, me, true);
       }
     } catch (e) {
       console.error('profile load', e);
+      setLoadError(true);
       setProfile(null);
     } finally {
       setLoading(false);
@@ -269,6 +275,14 @@ export default function UserProfile() {
   useEffect(() => {
     void load();
   }, [lookupKey]);
+
+  useEffect(() => {
+    if (!id || !profile || loading) return;
+    if (profile.is_banned === true && currentUserId !== id) return;
+    if (tab === 'answers' && currentUserId !== id) return;
+    if ((profile.profile_privacy === 'private' && !following && currentUserId !== id) || blocked || blockedByOther) return;
+    void loadTabData(tab, id, currentUserId);
+  }, [tab, id, currentUserId, loading, profile, following, blocked, blockedByOther]);
 
   async function openProfileStories() {
     if (!id || blocked || blockedByOther) return;
@@ -420,10 +434,13 @@ export default function UserProfile() {
     return (
       <View style={styles.center}>
         <UserRoundX size={48} color="#94a3b8" />
-        <Text style={styles.emptyTitle}>الحساب غير موجود</Text>
-        <Pressable style={styles.primaryBtn} onPress={() => router.back()}>
-          <Text style={styles.primaryBtnText}>رجوع</Text>
-        </Pressable>
+        <Text style={styles.emptyTitle}>{loadError ? 'تعذر تحميل الملف' : 'الحساب غير موجود'}</Text>
+        <Text style={styles.emptyText}>{loadError ? 'تحقق من اتصالك ثم أعد المحاولة.' : 'تأكد من اسم المستخدم أو الرابط وحاول مرة أخرى.'}</Text>
+        {loadError ? (
+          <Pressable style={styles.primaryBtn} onPress={() => void load()}><Text style={styles.primaryBtnText}>إعادة المحاولة</Text></Pressable>
+        ) : (
+          <Pressable style={styles.primaryBtn} onPress={() => router.back()}><Text style={styles.primaryBtnText}>رجوع</Text></Pressable>
+        )}
       </View>
     );
   }
@@ -431,7 +448,7 @@ export default function UserProfile() {
   const own = currentUserId === id;
   const anonymous = profile.hide_name === true && !own;
   const displayName = anonymous ? 'جار مجهول' : profile.display_name || profile.username || 'مستخدم';
-  const locked = (profile.profile_privacy === 'private' && !following && !own) || blocked || blockedByOther;
+  const locked = profile.is_banned === true && !own || (profile.profile_privacy === 'private' && !following && !own) || blocked || blockedByOther;
   const isAdmin = profile.role === 'admin';
   const totalContributions = stats.market + stats.services + stats.requests + stats.questions + (own ? stats.answers : 0);
 
@@ -650,7 +667,7 @@ export default function UserProfile() {
                 return (
                   <Pressable
                     key={key}
-                    onPress={() => setTab(key)}
+                    onPress={() => { setTab(key); void loadTabData(key, id, currentUserId); }}
                     style={[styles.tab, active && styles.tabActive]}
                   >
                     <Icon size={15} color={active ? '#fff' : '#64748b'} />
@@ -669,16 +686,18 @@ export default function UserProfile() {
                 <Lock size={28} color="#059669" />
               </View>
               <Text style={styles.lockTitle}>
-                {blocked || blockedByOther ? 'المحتوى غير متاح' : 'هذا الملف خاص'}
+                {profile.is_banned === true && !own ? 'هذا الحساب موقوف' : blocked || blockedByOther ? 'المحتوى غير متاح' : 'هذا الملف خاص'}
               </Text>
               <Text style={styles.lockText}>
-                {blocked
+                {profile.is_banned === true && !own
+                  ? 'لا يمكن عرض محتوى هذا الحساب حالياً.'
+                  : blocked
                   ? 'قمت بحظر هذا المستخدم.'
                   : blockedByOther
                   ? 'هذا المستخدم قام بحظرك.'
                   : 'تابع المستخدم لعرض نشاطه ومحتواه.'}
               </Text>
-              {!blocked && !blockedByOther && !following && (
+              {!profile.is_banned && !blocked && !blockedByOther && !following && (
                 <Pressable style={styles.primaryBtn} onPress={toggleFollow}>
                   <UserPlus size={16} color="#fff" />
                   <Text style={styles.primaryBtnText}>متابعة لعرض المحتوى</Text>
@@ -700,7 +719,11 @@ export default function UserProfile() {
                 )}
               </View>
 
-              {currentData.length === 0 ? (
+              {tabLoading && !loadedTabs.includes(tab) ? (
+                <View style={styles.empty}><ActivityIndicator size="small" color="#059669" /><Text style={styles.emptyText}>جارٍ تحميل القسم...</Text></View>
+              ) : tabError && !loadedTabs.includes(tab) ? (
+                <View style={styles.empty}><Text style={styles.emptyTitle}>تعذر تحميل القسم</Text><Text style={styles.emptyText}>تحقق من الاتصال ثم أعد المحاولة.</Text><Pressable style={styles.primaryBtn} onPress={() => void loadTabData(tab, id, currentUserId, true)}><Text style={styles.primaryBtnText}>إعادة المحاولة</Text></Pressable></View>
+              ) : currentData.length === 0 ? (
                 <Empty tab={tab} own={own} />
               ) : (
                 <View style={[styles.grid, { gap: 12 }]}>
