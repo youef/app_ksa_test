@@ -1,3 +1,9 @@
 import React from 'react';
 import { View } from 'react-native';
-export default function NeighborhoodWebMap() { return <View />; }
+type NeighborhoodWebMapProps = {
+  pins: any[]; places: any[]; center: any; city: string | null;
+  onSelectPin: (pin: any) => void; onSelectPlace: (place: any) => void;
+  onLocate: () => void | Promise<void>;
+};
+
+export default function NeighborhoodWebMap(_props: NeighborhoodWebMapProps) { return <View />; }
