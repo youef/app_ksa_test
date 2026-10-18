@@ -1301,4 +1301,10 @@ const styles = StyleSheet.create({
     zIndex: 995,
   },
   mapHintText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  chip: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 18, paddingHorizontal: 10, paddingVertical: 7, backgroundColor: '#fff' },
+  chipText: { color: '#475569', fontSize: 11, fontWeight: '700' },
+  chipTextActive: { color: '#fff' },
+  engineBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 12, backgroundColor: '#ecfdf5', borderWidth: 1, borderColor: '#a7f3d0' },
+  engineBtnGoogle: { backgroundColor: '#eff6ff', borderColor: '#bfdbfe' },
+  engineBtnText: { color: '#047857', fontSize: 11, fontWeight: '800' },
 });
