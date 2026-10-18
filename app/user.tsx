@@ -632,7 +632,7 @@ export default function UserProfile() {
               </View>
             </View>
 
-            {!anonymous && profile.bio && (
+            {!anonymous && profile.bio && profileCustomization?.section_visibility?.bio !== false && (
               <View style={styles.bioBox}>
                 <Text style={styles.bio}>{profile.bio}</Text>
               </View>
