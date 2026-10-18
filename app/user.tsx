@@ -142,12 +142,14 @@ export default function UserProfile() {
     if (!lookupKey) return;
     if (!silent) setLoading(true);
     setLoadError(false);
-    if (silent) setLoadedTabs([]);
+    setLoadedTabs([]);
+    setTabError(false);
+    setBlocked(false); setBlockedByOther(false); setFollowing(false); setFollowedBy(false);
     try {
       const { data: sessionData } = await supabase.auth.getSession();
       const me = sessionData?.session?.user?.id || null;
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(lookupKey);
-      const { data: p, error } = await supabase.from('profiles').select('*')
+      const { data: p, error } = await supabase.from('profiles').select('id,username,display_name,avatar_url,role,is_verified,city,district,bio,is_geoverified,badges,profile_privacy,hide_name,is_banned,allow_dms')
         .eq(isUuid ? 'id' : 'username', lookupKey).maybeSingle();
       if (error) throw error;
       setCurrentUserId(me);
@@ -196,6 +198,7 @@ export default function UserProfile() {
 
       const locked =
         (p.profile_privacy === 'private' && !isFollowing && me !== p.id) ||
+        (p.hide_name === true && me !== p.id) ||
         iBlocked ||
         blockedMe ||
         (p.hide_name === true && me !== p.id);
@@ -448,7 +451,7 @@ export default function UserProfile() {
   const own = currentUserId === id;
   const anonymous = profile.hide_name === true && !own;
   const displayName = anonymous ? 'جار مجهول' : profile.display_name || profile.username || 'مستخدم';
-  const locked = profile.is_banned === true && !own || (profile.profile_privacy === 'private' && !following && !own) || blocked || blockedByOther;
+  const locked = (profile.is_banned === true && !own) || (profile.profile_privacy === 'private' && !following && !own) || (profile.hide_name === true && !own) || blocked || blockedByOther;
   const isAdmin = profile.role === 'admin';
   const totalContributions = stats.market + stats.services + stats.requests + stats.questions + (own ? stats.answers : 0);
 
@@ -686,7 +689,7 @@ export default function UserProfile() {
                 <Lock size={28} color="#059669" />
               </View>
               <Text style={styles.lockTitle}>
-                {profile.is_banned === true && !own ? 'هذا الحساب موقوف' : blocked || blockedByOther ? 'المحتوى غير متاح' : 'هذا الملف خاص'}
+                {profile.is_banned === true && !own ? 'هذا الحساب موقوف' : blocked || blockedByOther ? 'المحتوى غير متاح' : profile.hide_name === true && !own ? 'هذا الملف غير متاح' : 'هذا الملف خاص'}
               </Text>
               <Text style={styles.lockText}>
                 {profile.is_banned === true && !own
@@ -695,9 +698,11 @@ export default function UserProfile() {
                   ? 'قمت بحظر هذا المستخدم.'
                   : blockedByOther
                   ? 'هذا المستخدم قام بحظرك.'
+                  : profile.hide_name === true && !own
+                  ? 'صاحب الحساب اختار إخفاء ملفه عن الزوار.'
                   : 'تابع المستخدم لعرض نشاطه ومحتواه.'}
               </Text>
-              {!profile.is_banned && !blocked && !blockedByOther && !following && (
+              {!profile.is_banned && profile.profile_privacy !== 'hidden' && profile.hide_name !== true && !blocked && !blockedByOther && !following && (
                 <Pressable style={styles.primaryBtn} onPress={toggleFollow}>
                   <UserPlus size={16} color="#fff" />
                   <Text style={styles.primaryBtnText}>متابعة لعرض المحتوى</Text>
