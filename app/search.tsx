@@ -162,6 +162,8 @@ export default function SearchPage() {
       if (query.trim().length > 0) {
         performSearch();
       } else {
+        searchSequence.current += 1;
+        setLoading(false);
         setResults({ users: [], questions: [], requests: [], shops: [] });
       }
     }, 350);
