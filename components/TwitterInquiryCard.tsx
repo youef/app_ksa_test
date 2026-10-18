@@ -470,29 +470,17 @@ export default function TwitterInquiryCard({
         <Text style={[s.xTitle, isEmergency && { color: '#991b1b' }]} numberOfLines={2}>{data.title}</Text>
         {(data.body || data.description) && (
           <>
-            <Text style={s.xBodyText} numberOfLines={3}>{isReq ? data.description : data.body}</Text>
+            <Text style={s.xBodyText} numberOfLines={2}>{isReq ? data.description : data.body}</Text>
             {String(isReq ? data.description : data.body || '').length > 130 && <Text style={s.xReadMore}>عرض المزيد وفتح التفاصيل ←</Text>}
           </>
         )}
         {isPinned && <View style={{ alignSelf: 'flex-start', flexDirection: 'row-reverse', alignItems: 'center', gap: 4, backgroundColor: '#fff7ed', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5, marginTop: 8 }}><Text style={{ color: '#c2410c', fontSize: 11, fontWeight: '800' }}>📌 مثبت في الملف الشخصي</Text></View>}
         {isFeatured && <View style={{ alignSelf: 'flex-start', backgroundColor: '#fee2e2', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5, marginTop: 7 }}><Text style={{ color: '#991b1b', fontSize: 11, fontWeight: '900' }}>📢 تنبيه مثبت من إدارة الحي</Text></View>}
         {resolutionStatus !== 'open' && <View style={{ alignSelf: 'flex-start', backgroundColor: '#dcfce7', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5, marginTop: 7 }}><Text style={{ color: '#166534', fontSize: 11, fontWeight: '800' }}>{statusLabels[resolutionStatus] || resolutionStatus}</Text></View>}
-        <View style={s.xStatusTrack}>
-          {[
-            { id: 'open', label: 'مفتوح' },
-            { id: 'in_progress', label: 'جارٍ تقديم المساعدة' },
-            { id: 'helped', label: 'تمت المساعدة' },
-            { id: 'closed', label: 'مغلق' },
-          ].map((stage, index) => {
-            const stageIndex = resolutionStatus === 'open' ? 0 : ['found', 'in_progress'].includes(resolutionStatus) ? 1 : ['helped', 'resolved'].includes(resolutionStatus) ? 2 : 3;
-            const complete = index <= stageIndex;
-            return <View key={stage.id} style={s.xStatusStep}>
-              <View style={[s.xStatusDot, complete && s.xStatusDotActive]} />
-              <Text numberOfLines={2} style={[s.xStatusLabel, complete && s.xStatusLabelActive]}>{stage.label}</Text>
-            </View>;
-          })}
-        </View>
-        <View style={s.xHashtagRow}>
+        <View style={s.xCompactStatus}>
+          <View style={[s.xCompactStatusDot, resolutionStatus !== 'open' && s.xCompactStatusDotResolved]} />
+          <Text style={s.xCompactStatusText}>{statusLabels[resolutionStatus] || 'مفتوح'}</Text>
+        </View>       <View style={s.xHashtagRow}>
           {data.district && (
             <View style={s.xHashPill}><Text style={s.xHashText}>#{data.district.replace(/\s+/g, '_')}</Text></View>
           )}
@@ -510,7 +498,7 @@ export default function TwitterInquiryCard({
 
       {/* Interactive Responders Preview (Collapsed Strip) */}
       {!expanded && answers.length > 0 && (
-        <Pressable style={s.xRespondersPreview} onPress={() => setExpanded(true)}>
+        <Pressable style={s.xRespondersPreview} onPress={navigateToDetails} accessibilityRole="button" accessibilityLabel="عرض جميع الردود">
           <View style={s.xRespondersAvatars}>
             {answers.slice(0, 4).map((ans: any, i: number) => {
               const aAvatar = ans.profiles?.avatar_url;
@@ -550,9 +538,9 @@ export default function TwitterInquiryCard({
 
       {/* Action Bar */}
       <View style={s.xActionBar}>
-        <Pressable style={[s.xActionBtn, expanded && s.xActionBtnActive]} onPress={() => setExpanded(!expanded)}>
-          <MessageCircle size={17} color={expanded ? '#059669' : '#64748b'} />
-          <Text style={[s.xActionCounter, expanded && { color: '#059669', fontWeight: '800' }]}>{answersCount}</Text>
+        <Pressable style={s.xActionBtn} onPress={navigateToDetails} accessibilityRole="button" accessibilityLabel="فتح الردود في صفحة المنشور">
+          <MessageCircle size={17} color="#64748b" />
+          <Text style={s.xActionCounter}>{answersCount}</Text>
         </Pressable>
 
         {!isGuest && (
@@ -572,7 +560,7 @@ export default function TwitterInquiryCard({
         </View>
       </View>
 
-      {isOwner && (
+      {isOwner && expanded && (
         <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-around', gap: 8, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: '#f0fdf4', borderTopWidth: 1, borderTopColor: '#dcfce7' }}>
           <View style={{ alignItems: 'center', gap: 3 }}><Eye size={15} color="#166534" /><Text style={{ color: '#166534', fontSize: 11, fontWeight: '800' }}>{viewsCount} مشاهدة</Text></View>
           <View style={{ alignItems: 'center', gap: 3 }}><MessageCircle size={15} color="#166534" /><Text style={{ color: '#166534', fontSize: 11, fontWeight: '800' }}>{answersCount} رد</Text></View>
@@ -771,8 +759,8 @@ const s = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
-  // Collapsed cards share a stable height; expanded threads may grow naturally.
-  xCardCollapsed: { height: 520, overflow: 'hidden' },
+  // Uniform compact cards; full text and replies live on the post details page.
+  xCardCollapsed: { height: 440, overflow: 'hidden' },
   xCardEmergency: {
     borderColor: '#fca5a5',
     backgroundColor: '#fffafa',
@@ -916,7 +904,11 @@ const s = StyleSheet.create({
     color: '#059669',
     fontWeight: '700',
   },
-  xContentArea: { marginBottom: 10, minHeight: 112 },
+  xContentArea: { marginBottom: 8, minHeight: 96 },
+  xCompactStatus: { alignSelf: 'flex-start', flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 10, backgroundColor: '#ecfdf5', marginTop: 5, marginBottom: 3 },
+  xCompactStatusDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#059669' },
+  xCompactStatusDotResolved: { backgroundColor: '#64748b' },
+  xCompactStatusText: { fontSize: 10, color: '#047857', fontWeight: '800' },
   xReadMore: { alignSelf: 'flex-end', color: '#047857', fontSize: 12, fontWeight: '800', marginTop: -3, marginBottom: 8, textAlign: 'right' },
   xStatusTrack: { flexDirection: 'row-reverse', alignItems: 'flex-start', justifyContent: 'space-between', gap: 4, marginTop: 10, marginBottom: 8, paddingHorizontal: 2 },
   xStatusStep: { flex: 1, alignItems: 'center', gap: 4 },
