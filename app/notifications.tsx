@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   Pressable,
   ScrollView,
@@ -37,7 +38,7 @@ import AppHeader from '@/components/shared/AppHeader';
 
 type NotificationCategory = 'all' | 'emergency' | 'answers' | 'community' | 'stories';
 
-interface NotificationItem {
+interface NotificationActor { id: string; username?: string | null; display_name?: string | null; avatar_url?: string | null; is_verified?: boolean | null; }\n\ninterface NotificationItem {
   id: string;
   user_id: string;
   title: string;
@@ -63,7 +64,7 @@ export default function Notifications() {
   const [notifPrefEmergency, setNotifPrefEmergency] = useState(true);
   const [notifPrefAnswers, setNotifPrefAnswers] = useState(true);
   const [notifPrefCommunity, setNotifPrefCommunity] = useState(true);
-  const [notifPrefStories, setNotifPrefStories] = useState(true);
+  const [notifPrefStories, setNotifPrefStories] = useState(true);\n  const [notifPrefFollows, setNotifPrefFollows] = useState(true);\n  const [notifPrefReviews, setNotifPrefReviews] = useState(true);\n  const [notifPrefMessages, setNotifPrefMessages] = useState(false);
 
   async function load() {
     try {
@@ -74,16 +75,44 @@ export default function Notifications() {
       }
       setCurrentUserId(u.user.id);
 
-      const { data, error } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('user_id', u.user.id)
-        .order('created_at', { ascending: false })
-        .limit(60);
-
-      if (!error && data) {
-        setItems(data);
+      const [notificationResult, savedPrefs] = await Promise.all([
+        supabase.from('notifications').select('*').eq('user_id', u.user.id)
+          .order('created_at', { ascending: false }).limit(100),
+        AsyncStorage.getItem(`notification-preferences:${u.user.id}`),
+      ]);
+      if (savedPrefs) {
+        try {
+          const prefs = JSON.parse(savedPrefs);
+          setNotifPrefEmergency(prefs.emergency !== false);
+          setNotifPrefAnswers(prefs.answers !== false);
+          setNotifPrefCommunity(prefs.community !== false);
+          setNotifPrefStories(prefs.stories !== false);
+          setNotifPrefFollows(prefs.follows !== false);
+          setNotifPrefReviews(prefs.reviews !== false);
+          setNotifPrefMessages(false);
+        } catch {}
       }
+      if (notificationResult.error) throw notificationResult.error;
+      const raw = (notificationResult.data || []) as NotificationItem[];
+      // Direct messages already have a dedicated inbox entry; do not duplicate them here.
+      const visible = raw.filter(item => item.type !== 'message' && item.target_type !== 'conversation');
+      const actorIds = [...new Set(visible.map(item => {
+        const data = item.data || {};
+        return data.actor_id || data.author_id || data.follower_id || data.reviewer_id || data.sender_id || null;
+      }).filter((id): id is string => typeof id === 'string'))];
+      let actors: NotificationActor[] = [];
+      if (actorIds.length) {
+        const { data: profiles } = await supabase.from('profiles')
+          .select('id,username,display_name,avatar_url,is_verified')
+          .in('id', actorIds);
+        actors = (profiles || []) as NotificationActor[];
+      }
+      const actorMap = new Map(actors.map(actor => [actor.id, actor]));
+      setItems(visible.map(item => {
+        const data = item.data || {};
+        const actorId = data.actor_id || data.author_id || data.follower_id || data.reviewer_id || data.sender_id;
+        return { ...item, actor: actorId ? actorMap.get(actorId) || null : null };
+      }));
     } catch (e) {
       console.error('Error loading notifications:', e);
     } finally {
@@ -109,7 +138,7 @@ export default function Notifications() {
     };
   }, []);
 
-  // Mark single notification as read
+  async function savePreferences(next?: Partial<{ emergency: boolean; answers: boolean; community: boolean; stories: boolean; follows: boolean; reviews: boolean }>) {\n    if (!currentUserId) return;\n    const prefs = { emergency: notifPrefEmergency, answers: notifPrefAnswers, community: notifPrefCommunity, stories: notifPrefStories, follows: notifPrefFollows, reviews: notifPrefReviews, ...next };\n    try { await AsyncStorage.setItem(`notification-preferences:${currentUserId}`, JSON.stringify(prefs)); }\n    catch { Alert.alert('تعذّر الحفظ', 'لم نتمكن من حفظ تفضيلات التنبيهات على هذا الجهاز.'); }\n  }\n\n  // Mark single notification as read
   async function markAsRead(id: string) {
     setItems(prev =>
       prev.map(it => (it.id === id ? { ...it, read_at: new Date().toISOString() } : it))
@@ -212,9 +241,9 @@ export default function Notifications() {
       }
       return true;
     });
-  }, [items, activeTab, onlyUnread]);
+  }, [items, activeTab, onlyUnread, notifPrefFollows, notifPrefReviews, notifPrefAnswers, notifPrefCommunity, notifPrefStories, notifPrefEmergency]);
 
-  const unreadCount = items.filter(i => !i.read_at).length;
+  const unreadCount = items.filter(i => !i.read_at && i.type !== 'message' && i.target_type !== 'conversation').length;
 
   return (
     <View style={styles.container}>
@@ -441,6 +470,33 @@ export default function Notifications() {
                     </View>
                   </View>
 
+                  {/* Actor identity: tap the avatar/name to open the author's profile. */}
+                  {item.actor && (
+                    <Pressable
+                      style={styles.actorRow}
+                      onPress={e => {
+                        e.stopPropagation();
+                        if (item.actor?.id) {
+                          void markAsRead(item.id);
+                          router.push({ pathname: '/user', params: { id: item.actor.id } });
+                        }
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel={`عرض الملف الشخصي لـ ${item.actor.display_name || item.actor.username || 'المستخدم'}`}
+                    >
+                      {item.actor.avatar_url ? (
+                        <Image source={{ uri: item.actor.avatar_url }} style={styles.actorAvatar} />
+                      ) : (
+                        <View style={styles.actorAvatarFallback}><Text style={styles.actorAvatarInitial}>{(item.actor.display_name || item.actor.username || 'م')[0]}</Text></View>
+                      )}
+                      <View style={styles.actorCopy}>
+                        <Text style={styles.actorName}>{item.actor.display_name || item.actor.username || 'مستخدم'} {item.actor.is_verified ? '✓' : ''}</Text>
+                        {!!item.actor.username && <Text style={styles.actorHandle}>@{item.actor.username}</Text>}
+                      </View>
+                      <Text style={styles.actorLink}>عرض الملف</Text>
+                    </Pressable>
+                  )}
+
                   {/* Body Content */}
                   <View style={styles.cardBodyRow}>
                     <View style={styles.textContainer}>
@@ -492,12 +548,12 @@ export default function Notifications() {
               <Pressable onPress={() => setSettingsOpen(false)} style={styles.modalCloseBtn}>
                 <X size={20} color="#64748b" />
               </Pressable>
-              <Text style={styles.modalTitle}>إعدادات تنبيهات الحي</Text>
+              <Text style={styles.modalTitle}>إعدادات التنبيهات</Text>
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
               <Text style={styles.settingsSectionSub}>
-                تحكم بنوع الإشعارات التي ترغب باستلامها فوراً على هاتفك
+                فعّل فقط التنبيهات التي تهمك. إشعارات الرسائل تبقى في قسم الدردشة لتجنب التكرار.
               </Text>
 
               {/* Setting 1: Emergency */}
@@ -555,11 +611,25 @@ export default function Notifications() {
                 </View>
               </View>
 
+              <View style={styles.settingRow}>
+                <Switch value={notifPrefFollows} onValueChange={v => { setNotifPrefFollows(v); void savePreferences({ follows: v }); }} trackColor={{ false: '#e2e8f0', true: '#a7f3d0' }} thumbColor={notifPrefFollows ? '#059669' : '#9ca3af'} />
+                <View style={styles.settingInfo}><Text style={styles.settingLabel}>👤 متابع جديد</Text><Text style={styles.settingDesc}>عندما يبدأ شخص بمتابعتك</Text></View>
+              </View>
+              <View style={styles.settingRow}>
+                <Switch value={notifPrefReviews} onValueChange={v => { setNotifPrefReviews(v); void savePreferences({ reviews: v }); }} trackColor={{ false: '#e2e8f0', true: '#a7f3d0' }} thumbColor={notifPrefReviews ? '#059669' : '#9ca3af'} />
+                <View style={styles.settingInfo}><Text style={styles.settingLabel}>⭐ التقييمات والشكر</Text><Text style={styles.settingDesc}>تقييم جديد أو تقدير لمساهماتك</Text></View>
+              </View>
+              <View style={styles.settingRow}>
+                <View style={styles.settingInfo}><Text style={styles.settingLabel}>💬 رسائل الدردشة</Text><Text style={styles.settingDesc}>لا تظهر هنا؛ راجع قسم الدردشة لتفادي تكرار التنبيه.</Text></View>
+                <Switch value={false} disabled trackColor={{ false: '#e2e8f0', true: '#a7f3d0' }} />
+              </View>
+
               <Pressable
                 style={styles.modalSaveBtn}
-                onPress={() => {
+                onPress={async () => {
+                  await savePreferences();
                   setSettingsOpen(false);
-                  Alert.alert('تم الحفظ ✅', 'تم تحديث تفضيلات التنبيهات بنجاح');
+                  Alert.alert('تم الحفظ', 'تم حفظ تفضيلات التنبيهات على هذا الجهاز.');
                 }}
               >
                 <Text style={styles.modalSaveBtnText}>حفظ الإعدادات</Text>
@@ -870,7 +940,7 @@ const styles = StyleSheet.create({
   },
 
   // Cards
-  notifCard: {
+  actorRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 9, marginBottom: 10, padding: 9, borderRadius: 13, backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#edf2f7' },\n  actorAvatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#e2e8f0' },\n  actorAvatarFallback: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#d1fae5', alignItems: 'center', justifyContent: 'center' },\n  actorAvatarInitial: { color: '#047857', fontWeight: '900', fontSize: 15 },\n  actorCopy: { flex: 1, alignItems: 'flex-end' },\n  actorName: { color: '#0f172a', fontSize: 12.5, fontWeight: '900', textAlign: 'right' },\n  actorHandle: { color: '#64748b', fontSize: 10.5, marginTop: 2, textAlign: 'right' },\n  actorLink: { color: '#059669', fontSize: 10.5, fontWeight: '800' },\n  notifCard: {
     backgroundColor: '#fff',
     borderRadius: 20,
     padding: 16,
