@@ -32,7 +32,7 @@ function MiniBar({ value, max, label, meta }: { value: number; max: number; labe
   return (
     <View style={s.barRow}>
       <View style={s.barMeta}><Text style={s.barLabel}>{label}</Text><Text style={s.barValue}>{meta}</Text></View>
-      <View style={s.barTrack}><View style={[s.barFill, { width: pct + '%' }]} /></View>
+      <View style={s.barTrack}><View style={[s.barFill, { width: `${pct}%` as `${number}%` }]} /></View>
     </View>
   );
 }

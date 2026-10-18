@@ -109,7 +109,7 @@ export default function Index() {
         title="حيّنا 🇸🇦"
         subtitle="الشبكة الاجتماعية للحي والمدينة"
         showBack={false}
-        leftAction={
+        rightAction={
           <Pressable
             onPress={() => router.replace('/home')}
             style={styles.headerSkip}

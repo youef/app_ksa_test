@@ -2530,11 +2530,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#dc2626',
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.6)',
-    justifyContent: 'flex-end',
-  },
   modalCard: {
     backgroundColor: '#ffffff',
     borderTopLeftRadius: 24,
@@ -2563,14 +2558,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'right',
     marginTop: 2,
-  },
-  modalCloseBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#f1f5f9',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   modalBody: {
     gap: 10,

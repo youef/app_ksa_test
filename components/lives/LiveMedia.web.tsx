@@ -105,7 +105,7 @@ export default function LiveMedia({ url, token, canPublish, participantOrder = [
     element.setAttribute('webkit-playsinline', '');
     element.setAttribute('autoplay', '');
     element.autoplay = true;
-    element.playsInline = true;
+    if (element instanceof HTMLVideoElement) element.playsInline = true;
     if (track.kind === Track.Kind.Video) {
       Object.assign(element.style, { width: '100%', height: '100%', objectFit: 'cover', display: 'block', position: 'absolute', inset: '0', zIndex: '0' });
     } else {

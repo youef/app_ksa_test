@@ -211,7 +211,7 @@ export default function SearchPage() {
 
     try {
       const { data: auth } = await supabase.auth.getUser();
-      const myId = auth?.data?.user?.id;
+      const myId = auth?.user?.id;
 
       if (!myId) {
         setResults({ users: [], questions: [], requests: [], shops: [] });

@@ -563,7 +563,7 @@ export default function UserProfile() {
               {/* Avatar with Status Ring */}
               <Pressable style={[styles.avatarRing, hasActiveStories && styles.avatarRingHasStory]} onPress={openProfileStories} accessibilityRole="button" accessibilityLabel={hasActiveStories ? "عرض يوميات هذا المستخدم، لديه قصة نشطة" : "عرض يوميات هذا المستخدم"}>
                 {profile.avatar_url && !anonymous && !profile.avatar_url.includes('blank-profile-picture') ? (
-                  <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
+                  <Image source={{ uri: profile.avatar_url }} style={styles.avatar as any} />
                 ) : (
                   <View style={styles.avatarFallback}>
                     <Text style={styles.avatarLetter}>
@@ -930,7 +930,7 @@ function ActivityCard({ type, item, width }: { type: Tab; item: any; width: numb
     >
       <View style={styles.cardVisual}>
         {image ? (
-          <Image source={{ uri: image }} style={styles.cardImage} />
+          <Image source={{ uri: image }} style={styles.cardImage as any} />
         ) : (
           <View style={styles.cardPlaceholder}>
             {type === 'services' ? (
@@ -1219,7 +1219,7 @@ const styles = StyleSheet.create({
   tabActive: { backgroundColor: '#059669' },
   tabText: { color: '#64748b', fontSize: 12, fontWeight: '800' },
   tabTextActive: { color: '#ffffff' },
-  tabCount: { color: '#94a3b8', fontSize: 10.5, fontWeight: '850' },
+  tabCount: { color: '#94a3b8', fontSize: 10.5, fontWeight: '800' },
   tabCountActive: { color: '#d1fae5' },
   content: { marginTop: 16 },
   contentHead: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 10 },

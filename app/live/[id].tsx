@@ -602,7 +602,7 @@ export default function LiveRoomScreen() {
   }
 
   function moderateMessage(message: LiveChatMessage) {
-    if (!id || (!canHideComments && !canTimeoutUsers && role !== 'host')) return;
+    if (!id || (!canHideComments && !canTimeoutUsers)) return;
     const actions: NonNullable<Parameters<typeof Alert.alert>[2]> = [];
     if (role === 'host') actions.push({ text: message.is_pinned ? 'إلغاء التثبيت' : 'تثبيت التعليق', onPress: () => void pinMessage(message) });
     if (canHideComments) actions.push({ text: 'إخفاء التعليق', style: 'destructive', onPress: () => void hideMessage(message) });
@@ -1019,7 +1019,7 @@ export default function LiveRoomScreen() {
                   {guestState !== 'accepted' && (
                     <Pressable disabled={guestState !== 'idle'} onPress={startGuestRequest} style={[styles.actionButton, guestState !== 'idle' && { opacity: 0.7 }]}><UserPlus size={21} color="#fff" /><Text style={styles.actionLabel}>{guestState === 'pending' ? 'بانتظار المضيف' : 'اطلب الصعود'}</Text></Pressable>
                   )}
-                  {role !== 'host' && moderatorPermissions && <Pressable onPress={() => setModerationOpen(true)} style={styles.actionButton}><ShieldAlert size={20} color="#a7f3d0" /><Text style={styles.actionLabel}>إشراف</Text></Pressable>}
+                  {moderatorPermissions && <Pressable onPress={() => setModerationOpen(true)} style={styles.actionButton}><ShieldAlert size={20} color="#a7f3d0" /><Text style={styles.actionLabel}>إشراف</Text></Pressable>}
                   <Pressable onPress={showReport} style={styles.actionButton}><ShieldAlert size={20} color="#fff" /><Text style={styles.actionLabel}>إبلاغ</Text></Pressable>
                   <Pressable onPress={() => void shareLive()} style={styles.actionButton}><Share2 size={19} color="#fff" /><Text style={styles.actionLabel}>مشاركة</Text></Pressable>
                   <View style={styles.durationPill}><Text style={styles.durationText}>{duration}</Text></View>

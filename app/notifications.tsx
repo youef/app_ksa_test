@@ -11,6 +11,7 @@ import {
   Modal,
   Switch,
   Platform,
+  Image,
 } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';

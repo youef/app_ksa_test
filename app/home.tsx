@@ -210,7 +210,6 @@ export default function Home() {
         profile={feed.profile}
         isGuest={!feed.currentUserId}
         logoUri={logoUri}
-        showLocation={false}
         unreadCount={feed.unreadNotifCount}
       />
 

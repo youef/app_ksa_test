@@ -13,7 +13,7 @@ export function PlatformConfigProvider({ children }: { children: React.ReactNode
     const { data } = await supabase.from('app_config').select('key,value').in('key', ['maintenance_mode', 'feature_flags', 'site_branding']);
     const values: Record<string, any> = {};
     (data || []).forEach((row: any) => { values[row.key] = row.value; });
-    setConfig({ maintenance: { ...defaults.maintenance, ...(values.maintenance_mode || {}) }, flags: values.feature_flags || {}, branding: values.site_branding || {} });
+    setConfig({ maintenance: { ...defaults.maintenance, ...(values.maintenance_mode || {}) }, flags: values.feature_flags || {}, branding: values.site_branding || {}, ready: true });
     setReady(true);
   }, []);
   useEffect(() => { void refresh(); const timer = setInterval(() => void refresh(), 15000); return () => clearInterval(timer); }, [refresh]);
