@@ -11,6 +11,7 @@ create table if not exists public.profile_customizations (
 alter table public.profile_customizations enable row level security;
 create policy "profile customizations public read" on public.profile_customizations for select to anon, authenticated
 using (exists (select 1 from public.profiles p where p.id = user_id and coalesce(p.profile_privacy,'public') <> 'hidden' and coalesce(p.hide_name,false) = false and coalesce(p.is_banned,false) = false));
+create policy "profile customization owner read" on public.profile_customizations for select to authenticated using ((select auth.uid()) = user_id);
 create policy "profile customizations owner insert" on public.profile_customizations for insert to authenticated
 with check ((select auth.uid()) = user_id);
 create policy "profile customizations owner update" on public.profile_customizations for update to authenticated
@@ -32,36 +33,17 @@ alter table public.profile_featured_items enable row level security;
 create policy "featured items public read" on public.profile_featured_items for select to anon, authenticated
 using (exists (select 1 from public.profiles p where p.id = user_id and coalesce(p.profile_privacy,'public') = 'public' and coalesce(p.hide_name,false) = false and coalesce(p.is_banned,false) = false));
 create policy "featured items owner insert" on public.profile_featured_items for insert to authenticated
-with check ((select auth.uid()) = user_id);
+with check (
+  (select auth.uid()) = user_id
+  and (
+    (item_type = 'question' and exists (select 1 from public.questions q where q.id = item_id and q.author_id = (select auth.uid())))
+    or (item_type = 'service' and exists (select 1 from public.services s where s.id = item_id and s.provider_id = (select auth.uid())))
+    or (item_type = 'request' and exists (select 1 from public.requests r where r.id = item_id and r.requester_id = (select auth.uid())))
+    or (item_type = 'market' and exists (select 1 from public.marketplace_items m where m.id = item_id and m.seller_id = (select auth.uid())))
+  )
+);
 create policy "featured items owner delete" on public.profile_featured_items for delete to authenticated
 using ((select auth.uid()) = user_id);
 grant select on public.profile_featured_items to anon, authenticated;
 grant insert, delete on public.profile_featured_items to authenticated;
 
-create or replace function public.validate_profile_featured_item()
-returns trigger language plpgsql security definer set search_path = ''
-as $$
-declare owner_matches boolean := false;
-begin
-  if new.item_type = 'question' then
-    select exists(select 1 from public.questions q where q.id = new.item_id and q.author_id = new.user_id) into owner_matches;
-  elsif new.item_type = 'service' then
-    select exists(select 1 from public.services s where s.id = new.item_id and s.provider_id = new.user_id) into owner_matches;
-  elsif new.item_type = 'request' then
-    select exists(select 1 from public.requests r where r.id = new.item_id and r.requester_id = new.user_id) into owner_matches;
-  elsif new.item_type = 'market' then
-    select exists(select 1 from public.marketplace_items m where m.id = new.item_id and m.seller_id = new.user_id) into owner_matches;
-  end if;
-  if not owner_matches then raise exception 'featured_item_not_owned'; end if;
-  return new;
-end;
-$$;
-revoke all on function public.validate_profile_featured_item() from public, anon, authenticated;
-create trigger validate_profile_featured_item_before_write before insert or update on public.profile_featured_items
-for each row execute function public.validate_profile_featured_item();
-
-create or replace function public.set_profile_customization_updated_at()
-returns trigger language plpgsql set search_path = ''
-as $$ begin new.updated_at = now(); return new; end; $$;
-create trigger profile_customizations_updated_at before update on public.profile_customizations
-for each row execute function public.set_profile_customization_updated_at();
