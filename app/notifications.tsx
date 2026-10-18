@@ -50,6 +50,8 @@ interface NotificationItem {
   target_id?: string;
   read_at?: string | null;
   created_at: string;
+  data?: Record<string, any> | null;
+  actor?: NotificationActor | null;
 }
 
 export default function Notifications() {
