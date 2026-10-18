@@ -847,6 +847,7 @@ function Empty({ tab, own }: { tab: Tab; own: boolean }) {
     services: 'لا توجد خدمات منشورة',
     requests: 'لا توجد طلبات فزعة',
     market: 'لا توجد إعلانات في السوق',
+    reviews: 'لا توجد تقييمات',
   };
   return (
     <View style={styles.empty}>
@@ -1299,4 +1300,13 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
   },
   footerHintText: { color: '#64748b', fontSize: 11, fontWeight: '700' },
+  reviewCard: { backgroundColor: '#fff', borderRadius: 16, borderWidth: 1, borderColor: '#e2e8f0', padding: 12, gap: 8, width: '100%' },
+  reviewAuthor: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
+  reviewAvatar: { width: 36, height: 36, borderRadius: 18 },
+  reviewAvatarFallback: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#ecfdf5' },
+  reviewAuthorName: { fontSize: 12, fontWeight: '800', color: '#0f172a', textAlign: 'right' },
+  reviewDate: { fontSize: 10, color: '#94a3b8', textAlign: 'right', marginTop: 2 },
+  reviewStars: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  reviewRating: { fontSize: 12, fontWeight: '800', color: '#b45309' },
+  reviewBody: { color: '#475569', fontSize: 12, lineHeight: 19, textAlign: 'right' },
 });
