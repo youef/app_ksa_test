@@ -1187,7 +1187,7 @@ const styles = StyleSheet.create({
   tabActive: { backgroundColor: '#059669' },
   tabText: { color: '#64748b', fontSize: 12, fontWeight: '800' },
   tabTextActive: { color: '#ffffff' },
-  tabCount: { color: '#94a3b8', fontSize: 10.5, fontWeight: '850' },
+  tabCount: { color: '#94a3b8', fontSize: 10.5, fontWeight: '800' },
   tabCountActive: { color: '#d1fae5' },
   content: { marginTop: 16 },
   contentHead: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 10 },
