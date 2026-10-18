@@ -1305,22 +1305,11 @@ const styles = StyleSheet.create({
   modalImage: { width: '92%', height: '80%' },
 
   // Owner Management Box
-  ownerBox: {
-    backgroundColor: '#fff',
-    borderRadius: 18,
-    padding: 16,
-    marginHorizontal: 0,
-    borderWidth: 1.5,
-    borderColor: '#e2e8f0',
-    gap: 12,
-  },
   ownerBoxHeaderRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  ownerBoxTitle: { fontSize: 14, fontWeight: '900', color: '#0f172a' },
-  ownerBoxDesc: { fontSize: 12, color: '#64748b', textAlign: 'right' },
   ownerActionsRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
@@ -1341,19 +1330,6 @@ const styles = StyleSheet.create({
   ownerEditBtnText: { fontSize: 13, fontWeight: '800', color: '#047857' },
   ownerEditBtnDisabled: { backgroundColor: '#f1f5f9', borderColor: '#e2e8f0' },
   ownerEditBtnTextDisabled: { fontSize: 13, fontWeight: '800', color: '#94a3b8' },
-  ownerDeleteBtn: {
-    flex: 1,
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: '#fef2f2',
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#fecaca',
-  },
-  ownerDeleteBtnText: { fontSize: 13, fontWeight: '800', color: '#ef4444' },
 
   // Edit limit badges
   editLimitBadgeBase: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, borderWidth: 1 },
