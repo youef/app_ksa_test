@@ -14,7 +14,7 @@ import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { AppHeader } from '@/components/shared/AppHeader';
 import { useBottomNavInset } from '@/lib/bottomNav';
-import { Plus, ShieldCheck, Sparkles, Settings2, Flame, TrendingUp, Crown, MapPin, Zap } from 'lucide-react-native';
+import { Plus, ShieldCheck, Sparkles, Settings2, Flame, ChevronDown } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { relativeTime } from '@/lib/mapPins';
 
@@ -27,6 +27,7 @@ export default function StoriesScreen() {
   const [currentCity, setCurrentCity] = useState<string>('');
   const [currentDistrict, setCurrentDistrict] = useState<string>('');
   const [followingIds, setFollowingIds] = useState<string[]>([]);
+  const [visibleTrendingCount, setVisibleTrendingCount] = useState(8);
   const storyRingPulse = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -260,39 +261,16 @@ export default function StoriesScreen() {
           </View>
         ) : (
           <>
-            <LinearGradient
-              colors={['#064e3b', '#047857', '#059669']}
-              start={{ x: 1, y: 0 }}
-              end={{ x: 0, y: 1 }}
-              style={styles.trendingHero}
-            >
-              <View style={styles.trendingHeroGlow} />
-              <View style={styles.trendingHeroTop}>
-                <View style={styles.trendingLiveBadge}>
-                  <View style={styles.trendingLiveDot} />
-                  <Text style={styles.trendingLiveText}>يتجدد تلقائياً</Text>
-                </View>
-                <View style={styles.trendingHeroIcon}><Flame size={23} color="#FDE68A" fill="#FDE68A" /></View>
-              </View>
-              <Text style={styles.trendingHeroTitle}>ترند المدينة</Text>
-              <Text style={styles.trendingHeroSubtitle}>
-                {currentCity ? `نبض ${currentCity} · القصص الأكثر تفاعلاً ومشاهدة` : 'القصص الرائجة في مجتمعك'}
-              </Text>
-              <View style={styles.trendingHeroBottom}>
-                <View style={styles.trendingAutoTag}><Zap size={13} color="#FDE68A" /><Text style={styles.trendingAutoTagText}>ترتيب ذكي</Text></View>
-                <View style={styles.trendingHeroHint}><TrendingUp size={14} color="#D1FAE5" /><Text style={styles.trendingHeroHintText}>الأكثر رواجاً أولاً</Text></View>
-              </View>
-            </LinearGradient>
             <View style={styles.trendingSectionTitleRow}>
               <View style={styles.trendingSectionAccent} />
               <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                <Text style={styles.sectionHeading}>الأكثر رواجاً الآن</Text>
-                <Text style={styles.sectionSubheading}>اكتشف ما يتداوله أهل المدينة</Text>
+                <Text style={styles.sectionHeading}>ترند المدينة</Text>
+                <Text style={styles.sectionSubheading}>أكثر اليوميات رواجاً في مدينتك</Text>
               </View>
               <View style={styles.trendingBadge}><Flame size={13} color="#fff" /><Text style={styles.trendingBadgeText}>TRENDING</Text></View>
             </View>
             <View style={styles.storiesGrid}>
-              {trendingAuthors.map((group: any, index: number) => {
+              {trendingAuthors.slice(0, visibleTrendingCount).map((group: any) => {
                 const story = group.latestStory;
                 const author = group.author;
                 const name = author?.display_name || author?.username || 'جار الحي';
@@ -302,22 +280,17 @@ export default function StoriesScreen() {
                 const allSeen = !group.hasUnseen;
                 return (
                   <Pressable key={group.authorId}
-                    style={[
-                      styles.storyCard,
-                      index === 0 && styles.storyCardFeatured,
-                      index > 0 && styles.storyCardCompact,
-                      allSeen ? styles.storyCardSeen : styles.storyCardNew,
-                    ]}
+                    style={[styles.storyCard, allSeen ? styles.storyCardSeen : styles.storyCardNew]}
                     onPress={() => openAuthorStories(group.stories)}
-                    accessibilityRole="button" accessibilityLabel={`فتح يوميات ${name}، الترتيب ${index + 1}`}>
-                    <View style={[styles.storyCardMedia, index === 0 && styles.storyCardMediaFeatured, { backgroundColor: bg }, allSeen && styles.storyCardMediaSeen]}>
+                    accessibilityRole="button" accessibilityLabel={"فتح يوميات " + name}>
+                    <View style={[styles.storyCardMedia, { backgroundColor: bg }, allSeen && styles.storyCardMediaSeen]}>
                       {hasMedia ? <Image source={{ uri: story.image_url }} style={styles.storyCardImage} resizeMode="cover" /> :
                         <View style={styles.storyTextCard}>
                           <Text style={styles.storyTextQuote}>“</Text>
                           <Text style={styles.storyTextSnippet} numberOfLines={4}>{story.content || 'يوميات جديدة'}</Text>
                         </View>}
                       <LinearGradient colors={['rgba(0,0,0,0.55)', 'transparent', 'rgba(0,0,0,0.82)']} style={StyleSheet.absoluteFillObject} />
-                      <View style={[styles.storyCardTopRow, index === 0 && styles.storyCardTopRowFeatured]}>
+                      <View style={styles.storyCardTopRow}>
                         <View style={styles.cardAvatarWrap}>
                           {author?.avatar_url ? <Image source={{ uri: author.avatar_url }} style={styles.cardAvatar} /> :
                             <View style={styles.cardAvatarFallback}><Text style={styles.cardAvatarLetter}>{name[0]}</Text></View>}
@@ -331,21 +304,17 @@ export default function StoriesScreen() {
                           </Text>
                         </View>
                       </View>
-                      <View style={[styles.trendFooter, index === 0 && styles.trendFooterFeatured]}>
-                        <View style={[styles.trendRankPill, index === 0 && styles.trendRankPillFirst]}>
-                          {index === 0 ? <Crown size={13} color="#78350F" /> : <Text style={styles.trendRankNumber}>{index + 1}</Text>}
-                          <Text style={[styles.trendMetricText, index === 0 && styles.trendRankFirstText]}>{index === 0 ? 'نجم المدينة' : `المركز ${index + 1}`}</Text>
-                        </View>
-                        <View style={styles.trendFooterMeta}>
-                          <View style={styles.trendStoryPill}><Sparkles size={11} color="#D1FAE5" /><Text style={styles.trendStoryCount}>{group.stories.length} يوميات</Text></View>
-                          {author?.district ? <View style={styles.trendLocationPill}><MapPin size={10} color="#E2E8F0" /><Text style={styles.trendStoryCount} numberOfLines={1}>{author.district}</Text></View> : null}
-                        </View>
-                      </View>
                     </View>
                   </Pressable>
                 );
               })}
             </View>
+            {trendingAuthors.length > visibleTrendingCount && (
+              <Pressable style={styles.loadMoreButton} onPress={() => setVisibleTrendingCount((count) => count + 8)} accessibilityRole="button" accessibilityLabel="عرض المزيد من ترند المدينة">
+                <Text style={styles.loadMoreButtonText}>عرض المزيد</Text>
+                <ChevronDown size={16} color="#047857" />
+              </Pressable>
+            )}
           </>
         )}
       </ScrollView>
@@ -452,43 +421,19 @@ const styles = StyleSheet.create({
   ringCount: { position: 'absolute', bottom: -3, right: -2, minWidth: 19, height: 19, borderRadius: 10, backgroundColor: '#D4A72C', borderWidth: 2, borderColor: '#fff', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
   ringCountText: { color: '#fff', fontSize: 9, fontWeight: '900' },
   ringName: { color: '#334155', fontSize: 10, fontWeight: '800', maxWidth: 66 },
-  trendingHero: { borderRadius: 26, padding: 20, marginTop: 5, marginBottom: 20, overflow: 'hidden', minHeight: 176, shadowColor: '#065f46', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.18, shadowRadius: 16, elevation: 7 },
-  trendingHeroGlow: { position: 'absolute', width: 190, height: 190, borderRadius: 95, backgroundColor: 'rgba(167,243,208,0.12)', top: -100, left: -40 },
-  trendingHeroTop: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  trendingLiveBadge: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.13)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.17)' },
-  trendingLiveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#86EFAC' },
-  trendingLiveText: { color: '#ECFDF5', fontSize: 10, fontWeight: '800' },
-  trendingHeroIcon: { width: 44, height: 44, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.13)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.17)' },
-  trendingHeroTitle: { color: '#fff', fontSize: 25, fontWeight: '900', textAlign: 'right', letterSpacing: -0.4 },
-  trendingHeroSubtitle: { color: '#D1FAE5', fontSize: 12, fontWeight: '600', textAlign: 'right', marginTop: 5, lineHeight: 19 },
-  trendingHeroBottom: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginTop: 18, paddingTop: 13, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.16)' },
-  trendingAutoTag: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, backgroundColor: 'rgba(6,78,59,0.6)', paddingHorizontal: 9, paddingVertical: 6, borderRadius: 10 },
-  trendingAutoTagText: { color: '#FEF3C7', fontSize: 10, fontWeight: '900' },
-  trendingHeroHint: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5 },
-  trendingHeroHintText: { color: '#D1FAE5', fontSize: 10, fontWeight: '700' },
   trendingSectionTitleRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 9, marginBottom: 13 },
   trendingSectionAccent: { width: 4, height: 30, borderRadius: 3, backgroundColor: '#10B981' },
   trendingBadge: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 7, borderRadius: 10, backgroundColor: '#0f172a' },
   trendingBadgeText: { color: '#fff', fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
-  trendFooter: { zIndex: 2, alignItems: 'flex-start', gap: 9 },
-  trendFooterFeatured: { gap: 10 },
-  trendRankPill: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.52)', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
-  trendRankPillFirst: { backgroundColor: '#FDE68A', borderColor: '#FEF3C7' },
-  trendRankNumber: { color: '#fff', fontSize: 10, fontWeight: '900' },
-  trendRankFirstText: { color: '#78350F' },
-  trendMetricText: { color: '#fff', fontSize: 10, fontWeight: '900' },
-  trendFooterMeta: { flexDirection: 'row-reverse', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
-  trendStoryPill: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,0,0,0.45)', paddingHorizontal: 8, paddingVertical: 5, borderRadius: 9 },
-  trendLocationPill: { flexDirection: 'row-reverse', alignItems: 'center', gap: 3, backgroundColor: 'rgba(0,0,0,0.45)', paddingHorizontal: 8, paddingVertical: 5, borderRadius: 9, maxWidth: '65%' },
-  trendStoryCount: { color: '#fff', fontSize: 10, fontWeight: '800', textShadowColor: '#000', textShadowRadius: 4 },
   storiesGrid: {
     flexDirection: 'row-reverse',
     flexWrap: 'wrap',
-    gap: 12,
+    justifyContent: 'space-between',
+    rowGap: 12,
   },
   storyCard: {
     width: '48%',
-    aspectRatio: 0.72,
+    aspectRatio: 0.78,
     borderRadius: 22,
     overflow: 'hidden',
     backgroundColor: '#059669',
@@ -500,16 +445,14 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 4,
   },
-  storyCardFeatured: { width: '100%', aspectRatio: 1.08, borderRadius: 26, marginBottom: 2 },
-  storyCardCompact: { width: '48%', aspectRatio: 0.82 },
-  storyCardMediaFeatured: { padding: 15 },
-  storyCardTopRowFeatured: { gap: 10 },
   storyCardNew: { borderColor: '#10b981' },
   storyCardSeen: { borderColor: '#94a3b8', opacity: 0.72 },
   storyCardMediaSeen: { opacity: 0.82 },
   storySeenLabel: { fontSize: 9, fontWeight: '900', marginTop: 3, textAlign: 'right' },
   storySeenLabelNew: { color: '#a7f3d0' },
   storySeenLabelSeen: { color: '#e2e8f0' },
+  loadMoreButton: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 7, alignSelf: 'center', marginTop: 18, marginBottom: 8, paddingHorizontal: 20, paddingVertical: 11, borderRadius: 14, backgroundColor: '#ecfdf5', borderWidth: 1, borderColor: '#a7f3d0' },
+  loadMoreButtonText: { color: '#047857', fontSize: 12, fontWeight: '900' },
   storyCardMedia: {
     flex: 1,
     position: 'relative',
