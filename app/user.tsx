@@ -676,21 +676,28 @@ export default function UserProfile() {
             <Stat label="إسهامات" value={totalContributions} />
           </View>}
 
-          {featuredItems.length > 0 && !locked && (
+          {!locked && (featuredItems.length > 0 || own) && (
             <View style={styles.content}>
               <View style={styles.contentHead}>
                 <View>
                   <Text style={[styles.contentTitle, { color: accentColor }]}>{profileCustomization?.featured_title || 'أعمالي المميزة'}</Text>
-                  <Text style={styles.contentSub}>اختيارات مثبتة من هذا الجار</Text>
+                  <Text style={styles.contentSub}>{featuredItems.length ? 'اختيارات مثبتة من هذا الجار' : 'اختر أفضل مساهماتك لتظهر هنا'}</Text>
                 </View>
-                {own && <Pressable style={styles.marketLink} onPress={() => router.push('/profile-customization')}><Text style={[styles.marketLinkText, { color: accentColor }]}>إدارة</Text><Edit3 size={14} color={accentColor} /></Pressable>}
+                {own && featuredItems.length > 0 && <Pressable style={styles.marketLink} onPress={() => router.push('/profile-customization')}><Text style={[styles.marketLinkText, { color: accentColor }]}>إدارة</Text><Edit3 size={14} color={accentColor} /></Pressable>}
               </View>
-              <View style={[styles.grid, { gap: 12 }]}>
-                {featuredItems.map(item => <ActivityCard key={item._featuredType + ':' + item.id} type={item._featuredType === 'question' ? 'questions' : item._featuredType === 'service' ? 'services' : item._featuredType === 'request' ? 'requests' : 'market'} item={item} width={cardWidth} />)}
-              </View>
+              {featuredItems.length > 0 ? (
+                <View style={[styles.grid, { gap: 12 }]}>
+                  {featuredItems.map(item => <ActivityCard key={item._featuredType + ':' + item.id} type={item._featuredType === 'question' ? 'questions' : item._featuredType === 'service' ? 'services' : item._featuredType === 'request' ? 'requests' : 'market'} item={item} width={cardWidth} />)}
+                </View>
+              ) : (
+                <View style={styles.featuredEmpty}>
+                  <Sparkles size={22} color={accentColor} />
+                  <Text style={styles.contentSub}>لم تثبّت أي عمل بعد. ثبّت الاستفسارات أو الخدمات أو الطلبات أو إعلانات السوق التي تفتخر بها.</Text>
+                  <ProfileCustomizationEntry accentColor={accentColor} compact />
+                </View>
+              )}
             </View>
           )}
-          {own && <ProfileCustomizationEntry accentColor={accentColor} compact />}
 
           {/* Activity Category Tabs */}
           <View style={styles.tabsCard}>
@@ -1185,6 +1192,7 @@ const styles = StyleSheet.create({
   content: { marginTop: 16 },
   contentHead: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 10 },
   contentTitle: { color: '#0f172a', fontSize: 17, fontWeight: '900', textAlign: 'right' },
+  featuredEmpty: { alignItems: 'center', gap: 10, paddingVertical: 18 },
   contentSub: { color: '#64748b', fontSize: 11, marginTop: 2, fontWeight: '600', textAlign: 'right' },
   marketLink: { flexDirection: 'row-reverse', alignItems: 'center', gap: 2 },
   marketLinkText: { color: '#059669', fontSize: 12, fontWeight: '900' },
