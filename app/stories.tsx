@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
-  Alert,
   StyleSheet,
   ScrollView,
   Pressable,
@@ -23,7 +22,6 @@ import { relativeTime } from '@/lib/mapPins';
 export default function StoriesScreen() {
   const bottomNavInset = useBottomNavInset();
   const [stories, setStories] = useState<any[]>([]);
-  const [currentUserId, setCurrentUserId] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [seenStoryIds, setSeenStoryIds] = useState<string[]>([]);
@@ -53,7 +51,6 @@ export default function StoriesScreen() {
 
       const { data: authResult } = await supabase.auth.getUser();
       const activeViewerId = authResult.user?.id || '';
-      setCurrentUserId(activeViewerId);
       let city = '';
       let district = '';
       let followedIds: string[] = [];
