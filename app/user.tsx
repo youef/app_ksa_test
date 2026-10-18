@@ -545,7 +545,7 @@ export default function UserProfile() {
               {/* Avatar with Status Ring */}
               <Pressable style={[styles.avatarRing, hasActiveStories && styles.avatarRingHasStory]} onPress={openProfileStories} accessibilityRole="button" accessibilityLabel={hasActiveStories ? "عرض يوميات هذا المستخدم، لديه قصة نشطة" : "عرض يوميات هذا المستخدم"}>
                 {profile.avatar_url && !anonymous && !profile.avatar_url.includes('blank-profile-picture') ? (
-                  <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
+                  <Image source={{ uri: profile.avatar_url }} style={styles.avatar as any} />
                 ) : (
                   <View style={styles.avatarFallback}>
                     <Text style={styles.avatarLetter}>
@@ -898,7 +898,7 @@ function ActivityCard({ type, item, width }: { type: Tab; item: any; width: numb
     >
       <View style={styles.cardVisual}>
         {image ? (
-          <Image source={{ uri: image }} style={styles.cardImage} />
+          <Image source={{ uri: image }} style={styles.cardImage as any} />
         ) : (
           <View style={styles.cardPlaceholder}>
             {type === 'services' ? (
