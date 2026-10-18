@@ -411,7 +411,7 @@ export default function TwitterInquiryCard({
   }
 
   return (
-    <View style={[s.xCard, isEmergency && s.xCardEmergency, isToolSharing && s.xCardToolSharing]}>
+    <View style={[s.xCard, !expanded && s.xCardCollapsed, isEmergency && s.xCardEmergency, isToolSharing && s.xCardToolSharing]}>
       {/* Top Header */}
       <View style={s.xHeader}>
         <Pressable
@@ -771,6 +771,8 @@ const s = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
+  // Collapsed cards share a stable height; expanded threads may grow naturally.
+  xCardCollapsed: { height: 520, overflow: 'hidden' },
   xCardEmergency: {
     borderColor: '#fca5a5',
     backgroundColor: '#fffafa',
