@@ -100,13 +100,13 @@ async function searchUsers(term: string, limit = 15): Promise<Row[]> {
 
 async function searchBusinesses(term: string, limit = 20): Promise<Row[]> {
   const [businesses, directory, services] = await Promise.all([
-    searchRows('businesses', term, ['name', 'description', 'category', 'city', 'district'], ['name'], limit),
+    searchRows('businesses', term, ['name', 'description', 'city', 'district'], ['name'], limit),
     searchRows('business_directory', term, ['name', 'description', 'city', 'district'], ['name'], limit),
     searchRows('services', term, ['name', 'description', 'category', 'subcategory', 'shop_name', 'city', 'district'], ['name'], limit),
   ]);
 
   const unique = new Map<string, Row>();
-  for (const item of [...businesses, ...directory, ...services]) {
+  for (const item of [\n    ...businesses.map((item) => ({ ...item, __sourceTable: 'businesses' })),\n    ...directory.map((item) => ({ ...item, __sourceTable: 'business_directory' })),\n    ...services.map((item) => ({ ...item, __sourceTable: 'services' })),\n  ]) {
     const key = `${item.id ?? ''}:${item.name ?? item.shop_name ?? ''}`;
     if (!unique.has(key)) {
       unique.set(key, {
@@ -377,7 +377,7 @@ export default function SearchPage() {
     <Pressable
       key={`s-${s.id}`}
       style={styles.postCard}
-      onPress={() => router.push({ pathname: '/business', params: { id: s.id } })}
+      onPress={() => router.push({ pathname: s.__sourceTable === 'services' ? '/service' : '/business', params: { id: s.id } })}
     >
       <View style={styles.cardTopRow}>
         <View style={styles.iconBoxTeal}>
