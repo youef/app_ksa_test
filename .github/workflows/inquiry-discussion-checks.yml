@@ -7,9 +7,9 @@ on:
     branches: [main, feat/inquiry-card-reactions]
 
 jobs:
-  typecheck-and-platform-bundles:
+  typecheck:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -22,6 +22,20 @@ jobs:
         run: npm ci
       - name: TypeScript check
         run: npm run typecheck
+
+  platform-bundles:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
       - name: Export web bundle
         run: npx expo export --platform web --output-dir dist-web
       - name: Export Android JS bundle
