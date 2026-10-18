@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -47,96 +47,84 @@ async function searchRows(
   fallbacks: string[],
   limit = 12,
 ): Promise<Row[]> {
+  // Keep the search scoped to literal text; PostgREST's .or() syntax uses commas
+  // as separators, so strip filter-control characters before building the query.
+  const pattern = (term.includes('%') ? term : `%${term}%`)
+    .replace(/[(),]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!pattern || pattern === '%%') return [];
+
   const run = async (order: boolean, cols: string[]) => {
     let query = supabase.from(table).select('*');
     if (order) query = query.order('created_at', { ascending: false });
-    return query.or(cols.map((c) => `${c}.ilike.${term}`).join(',')).limit(limit);
+    return query.or(cols.map((column) => `${column}.ilike.${pattern}`).join(',')).limit(limit);
   };
 
   const attempts: Array<() => PromiseLike<{ data: unknown; error: unknown }>> = [
     () => run(true, columns),
     () => run(false, columns),
-    ...fallbacks.map((col) => () => run(false, [col])),
+    ...fallbacks.map((column) => () => run(false, [column])),
   ];
 
   for (const attempt of attempts) {
-    const { data, error } = await attempt();
-    if (!error) return (data as Row[]) ?? [];
+    try {
+      const { data, error } = await attempt();
+      if (!error) return (data as Row[]) ?? [];
+    } catch {
+      // Continue to a narrower schema-compatible query.
+    }
   }
   return [];
 }
 
-/** New secure search using RPC functions */
-async function performSecureSearch(
-  query: string,
-  userId: string | undefined
-): Promise<{
-  users: Row[];
-  questions: Row[];
-  requests: Row[];
-  shops: Row[];
-}> {
-  if (!userId) {
-    return { users: [], questions: [], requests: [], shops: [] };
-  }
-
-  try {
-    // Use the new secure search_all_content RPC
-    const { data: contentResults, error: contentError } = await supabase.rpc(
-      'search_all_content',
-      {
-        p_query: query.trim(),
-        p_user_id: userId,
-        p_limit: 50,
-      }
-    );
-
-    if (contentError) {
-      console.warn('Secure search failed, falling back to legacy:', contentError);
-      return { users: [], questions: [], requests: [], shops: [] };
-    }
-
-    // Also search users separately with privacy filters
-    const { data: userResults, error: userError } = await supabase.rpc(
-      'search_users_safe',
-      {
-        p_query: query.trim(),
-        p_requester_id: userId,
-        p_limit: 20,
-      }
-    );
-
-    if (userError) {
-      console.warn('User search failed:', userError);
-    }
-
-    // Categorize content results
-    const users = (userResults as Row[]) || [];
-    const questions = (contentResults as Row[])?.filter((r: Row) => r.type === 'question') || [];
-    const requests = (contentResults as Row[])?.filter((r: Row) => r.type === 'request' || r.type === 'carpool') || [];
-    const shops: Row[] = []; // Will be populated from legacy search for businesses
-
-    return { users, questions, requests, shops };
-  } catch (e) {
-    console.warn('Secure search exception:', e);
-    return { users: [], questions: [], requests: [], shops: [] };
-  }
-}
-
-/** Legacy fallback search for businesses/shops */
-async function searchBusinesses(term: string, limit = 12): Promise<Row[]> {
-  const searchTerm = `%${term}%`;
+async function searchUsers(term: string, limit = 15): Promise<Row[]> {
+  const pattern = `%${term.replace(/[(),]/g, ' ').trim()}%`;
+  const safeColumns = 'id,username,display_name,avatar_url,city,district,is_verified,show_in_search,profile_privacy,created_at';
   const attempts = [
-    () => supabase.from('businesses').select('*').or(`name.ilike.${term},description.ilike.${term},category.ilike.${term}`).limit(limit),
-    () => supabase.from('business_directory').select('*').or(`name.ilike.${term},description.ilike.${term},category.ilike.${term}`).limit(limit),
-    () => supabase.from('services').select('*').or(`name.ilike.${term},description.ilike.${term},category.ilike.${term}`).limit(limit),
+    () => supabase.from('profiles').select(safeColumns)
+      .eq('show_in_search', true)
+      .or(`display_name.ilike.${pattern},username.ilike.${pattern},city.ilike.${pattern},district.ilike.${pattern}`)
+      .limit(limit),
+    () => supabase.from('profiles').select('id,username,display_name,avatar_url,city,district,is_verified,created_at')
+      .or(`display_name.ilike.${pattern},username.ilike.${pattern},city.ilike.${pattern}`)
+      .limit(limit),
   ];
-
   for (const attempt of attempts) {
-    const { data, error } = await attempt();
-    if (!error) return (data as Row[]) ?? [];
+    try {
+      const { data, error } = await attempt();
+      if (!error) {
+        return ((data as Row[]) ?? []).filter((profile) =>
+          profile.show_in_search !== false &&
+          (!profile.profile_privacy || profile.profile_privacy === 'public')
+        );
+      }
+    } catch {
+      // Try the compatibility query below.
+    }
   }
   return [];
+}
+
+async function searchBusinesses(term: string, limit = 20): Promise<Row[]> {
+  const [businesses, directory, services] = await Promise.all([
+    searchRows('businesses', term, ['name', 'description', 'category', 'city', 'district'], ['name'], limit),
+    searchRows('business_directory', term, ['name', 'description', 'city', 'district'], ['name'], limit),
+    searchRows('services', term, ['name', 'description', 'category', 'subcategory', 'shop_name', 'city', 'district'], ['name'], limit),
+  ]);
+
+  const unique = new Map<string, Row>();
+  for (const item of [...businesses, ...directory, ...services]) {
+    const key = `${item.id ?? ''}:${item.name ?? item.shop_name ?? ''}`;
+    if (!unique.has(key)) {
+      unique.set(key, {
+        ...item,
+        name: item.name || item.shop_name,
+        category: item.category || item.subcategory,
+      });
+    }
+  }
+  return Array.from(unique.values()).slice(0, limit);
 }
 
 const TRENDING_KEYWORDS = [
@@ -156,7 +144,7 @@ export default function SearchPage() {
   const [query, setQuery] = useState(params.q || '');
   const [activeTab, setActiveTab] = useState<Tab>(params.tab || 'all');
   const [loading, setLoading] = useState(false);
-  const [isFocused, setIsFocused] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);\n  const searchSequence = useRef(0);
   const [recentSearches, setRecentSearches] = useState<string[]>([
     'سباك بالحي',
     'توصيل مدارس',
@@ -188,7 +176,7 @@ export default function SearchPage() {
   }, [query]);
 
   const handleSelectKeyword = (rawKeyword: string) => {
-    const cleanWord = rawKeyword.split(' ')[0].trim();
+    const cleanWord = rawKeyword.replace(/[🔧⚡🚗🛠️❄️🛒✂️🚙]/gu, '').trim();
     setQuery(cleanWord);
     setRecentSearches((prev) => {
       const filtered = prev.filter((s) => s !== cleanWord);
@@ -201,99 +189,59 @@ export default function SearchPage() {
   };
 
   const performSearch = async () => {
-    setLoading(true);
+    const sequence = ++searchSequence.current;
     const searchTerm = query.trim();
-    if (searchTerm.length === 0) {
+    if (!searchTerm) {
       setResults({ users: [], questions: [], requests: [], shops: [] });
       setLoading(false);
       return;
     }
 
+    setLoading(true);
     try {
-      const { data: auth } = await supabase.auth.getUser();
-      const myId = auth?.user?.id;
+      // Query the live Supabase tables directly. Each table query respects its
+      // own RLS policies; one missing/optional table must not cancel all results.
+      const [authResult, usersResult, questionsResult, requestsResult, shopsResult] = await Promise.all([
+        supabase.auth.getUser(),
+        searchUsers(searchTerm),
+        searchRows('questions', searchTerm, ['title', 'body', 'category', 'district', 'city'], ['title'], 20),
+        searchRows('requests', searchTerm, ['title', 'description', 'request_type', 'district', 'city'], ['title'], 20),
+        searchBusinesses(searchTerm, 30),
+      ]);
+      if (sequence !== searchSequence.current) return;
 
-      if (!myId) {
-        setResults({ users: [], questions: [], requests: [], shops: [] });
-        setLoading(false);
-        return;
-      }
-
-      // Use new secure search
-      const secureResults = await performSecureSearch(searchTerm, myId);
-      
-      // Also search businesses/shops via legacy method
-      const shops = await searchBusinesses(searchTerm);
-
-      // Get blocked users to filter them out
-      const { data: blocks } = await supabase
-        .from('blocks')
-        .select('blocker_id, blocked_id')
-        .or(`blocker_id.eq.${myId},blocked_id.eq.${myId}`);
-
-      const blocked = new Set<string>();
-      (blocks || []).forEach((b: Row) => {
-        if (b.blocker_id === myId || b.blocked_id === myId) {
-          blocked.add(b.blocker_id === myId ? b.blocked_id : b.blocker_id);
-        }
-      });
-
-      // Filter blocked users
-      const filteredUsers = (secureResults.users || []).filter((u: Row) => !blocked.has(u.id));
-
-      setResults({
-        users: filteredUsers,
-        questions: secureResults.questions || [],
-        requests: secureResults.requests || [],
-        shops,
-      });
-    } catch (e) {
-      console.log('Search error:', e);
-      // Fallback to legacy search on error
-      try {
-        const searchTerm = `%${query.trim()}%`;
-        const [auth, u, q, r, shopsA, shopsB] = await Promise.all([
-          supabase.auth.getUser(),
-          supabase
-            .from('profiles')
-            .select('*')
-            .or(`display_name.ilike.${searchTerm},username.ilike.${searchTerm},city.ilike.${searchTerm}`)
-            .limit(15),
-          searchRows('questions', searchTerm, ['title', 'body', 'district', 'city'], ['title']),
-          searchRows('requests', searchTerm, ['title', 'description', 'request_type', 'district', 'city'], ['title']),
-          searchRows('businesses', searchTerm, ['name', 'description', 'category', 'district', 'city'], ['name']),
-          searchRows('business_directory', searchTerm, ['name', 'description', 'category', 'district', 'city'], ['name']),
-        ]);
-
-        let visibleUsers = (u.data as Row[]) || [];
-        const myId = auth?.data?.user?.id;
-        if (myId) {
+      const myId = authResult.data?.user?.id;
+      let visibleUsers = usersResult;
+      if (myId) {
+        try {
           const { data: blocks } = await supabase
             .from('blocks')
-            .select('blocker_id, blocked_id')
+            .select('blocker_id,blocked_id')
             .or(`blocker_id.eq.${myId},blocked_id.eq.${myId}`);
-
           const blocked = new Set<string>();
-          (blocks || []).forEach((b: Row) => {
-            if (b.blocker_id === myId || b.blocked_id === myId) {
-              blocked.add(b.blocker_id === myId ? b.blocked_id : b.blocker_id);
-            }
+          (blocks || []).forEach((block: Row) => {
+            if (block.blocker_id === myId) blocked.add(block.blocked_id);
+            if (block.blocked_id === myId) blocked.add(block.blocker_id);
           });
-          visibleUsers = visibleUsers.filter((p: Row) => !blocked.has(p.id));
+          visibleUsers = visibleUsers.filter((profile: Row) => !blocked.has(profile.id));
+        } catch {
+          // Block filtering is best-effort; table RLS still applies to all queries.
         }
+      }
 
-        const shopIds = new Set(shopsA.map((s) => `${s.id}`));
-        setResults({
-          users: visibleUsers,
-          questions: q,
-          requests: r,
-          shops: [...shopsA, ...shopsB.filter((s) => !shopIds.has(`${s.id}`))],
-        });
-      } catch (e) {
-        console.log('Search error:', e);
+      setResults({
+        users: visibleUsers,
+        questions: questionsResult,
+        requests: requestsResult,
+        shops: shopsResult,
+      });
+    } catch (error) {
+      console.warn('Search failed:', error);
+      if (sequence === searchSequence.current) {
+        setResults({ users: [], questions: [], requests: [], shops: [] });
       }
     } finally {
-      setLoading(false);
+      if (sequence === searchSequence.current) setLoading(false);
     }
   };
 
