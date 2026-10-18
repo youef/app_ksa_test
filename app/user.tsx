@@ -40,6 +40,7 @@ import {
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { AppHeader } from '@/components/shared/AppHeader';
+import { ProfileCustomizationEntry } from '@/components/profile/ProfileCustomizationEntry';
 import { C } from '@/lib/ui';
 import { getBlockStatus, setBlock } from '@/lib/chatControls';
 import { isExactDistrictMatching } from '@/lib/locationSync';
@@ -144,6 +145,9 @@ export default function UserProfile() {
     if (!lookupKey) return;
     if (!silent) setLoading(true);
     setLoadError(false);
+    setResolvedProfileId('');
+    setFeaturedItems([]);
+    setProfileCustomization(null);
     setLoadedTabs([]);
     setTabError(false);
     setBlocked(false); setBlockedByOther(false); setFollowing(false); setFollowedBy(false);
@@ -473,6 +477,8 @@ export default function UserProfile() {
   const locked = (profile.is_banned === true && !own) || (profile.profile_privacy === 'private' && !following && !own) || (profile.hide_name === true && !own) || blocked || blockedByOther;
   const isAdmin = profile.role === 'admin';
   const totalContributions = stats.market + stats.services + stats.requests + stats.questions + (own ? stats.answers : 0);
+  const accentColor = profileCustomization?.accent_color || '#059669';
+  const heroColors: [string, string, string] = profileCustomization?.banner_style === 'ocean' ? ['#0c4a6e', '#0369a1', '#0ea5e9'] : profileCustomization?.banner_style === 'sunset' ? ['#7c2d12', '#c2410c', '#f97316'] : profileCustomization?.banner_style === 'midnight' ? ['#111827', '#1e293b', '#334155'] : ['#064e3b', '#047857', '#059669'];
 
   const currentData =
     tab === 'market'
@@ -528,7 +534,7 @@ export default function UserProfile() {
         <View style={[styles.shell, { paddingTop: 14 }]}>
           {/* Executive Hero Banner */}
           <LinearGradient
-            colors={['#064e3b', '#047857', '#059669']}
+            colors={heroColors}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.hero}
@@ -654,7 +660,7 @@ export default function UserProfile() {
                 </Text>
               </View>
 
-              {Array.isArray(profile.badges) &&
+              {profileCustomization?.show_badges !== false && Array.isArray(profile.badges) &&
                 profile.badges.map((b: string, i: number) => (
                   <View key={i} style={styles.customBadgePill}>
                     <Text style={styles.customBadgeText}>{b}</Text>
@@ -664,33 +670,28 @@ export default function UserProfile() {
           </LinearGradient>
 
           {/* Elevated Stats Bar */}
-          <View style={styles.statsCard}>
+          {profileCustomization?.show_stats !== false && <View style={[styles.statsCard, { borderColor: `${accentColor}30` }]}>
             <Stat label="سمعة الحي ⭐" value={stats.reputation} />
             <Stat label="متابعين" value={stats.followers} />
             <Stat label="يتابع" value={stats.following} />
             <Stat label="إسهامات" value={totalContributions} />
-          </View>
+          </View>}
 
           {featuredItems.length > 0 && !locked && (
             <View style={styles.content}>
               <View style={styles.contentHead}>
                 <View>
-                  <Text style={styles.contentTitle}>{profileCustomization?.featured_title || 'أعمالي المميزة'}</Text>
+                  <Text style={[styles.contentTitle, { color: accentColor }]}>{profileCustomization?.featured_title || 'أعمالي المميزة'}</Text>
                   <Text style={styles.contentSub}>اختيارات مثبتة من هذا الجار</Text>
                 </View>
-                {own && <Pressable style={styles.marketLink} onPress={() => router.push('/profile-customization')}><Text style={styles.marketLinkText}>إدارة</Text><Edit3 size={14} color="#059669" /></Pressable>}
+                {own && <Pressable style={styles.marketLink} onPress={() => router.push('/profile-customization')}><Text style={[styles.marketLinkText, { color: accentColor }]}>إدارة</Text><Edit3 size={14} color={accentColor} /></Pressable>}
               </View>
               <View style={[styles.grid, { gap: 12 }]}>
                 {featuredItems.map(item => <ActivityCard key={item._featuredType + ':' + item.id} type={item._featuredType === 'question' ? 'questions' : item._featuredType === 'service' ? 'services' : item._featuredType === 'request' ? 'requests' : 'market'} item={item} width={cardWidth} />)}
               </View>
             </View>
           )}
-          {own && (
-            <Pressable onPress={() => router.push('/profile-customization')} style={{ backgroundColor: '#ecfdf5', borderWidth: 1, borderColor: '#a7f3d0', padding: 13, borderRadius: 14, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-              <Sparkles size={16} color="#047857" />
-              <Text style={{ color: '#047857', fontWeight: '800' }}>تخصيص الملف وإدارة الأعمال المميزة</Text>
-            </Pressable>
-          )}
+          {own && <ProfileCustomizationEntry accentColor={accentColor} compact />}
 
           {/* Activity Category Tabs */}
           <View style={styles.tabsCard}>
