@@ -9,6 +9,7 @@ type Preference = { author_id: string; notifications_enabled: boolean; muted: bo
 
 export default function StorySettingsScreen() {
   const [people, setPeople] = useState<Person[]>([]);
+  const [blockedPeople, setBlockedPeople] = useState<Person[]>([]);
   const [prefs, setPrefs] = useState<Record<string, Preference>>({});
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState('');
@@ -24,13 +25,15 @@ export default function StorySettingsScreen() {
         router.replace('/auth');
         return;
       }
-      const [{ data: follows, error: followsError }, { data: preferenceRows, error: prefError }, { data: globalRow }] = await Promise.all([
+      const [{ data: follows, error: followsError }, { data: preferenceRows, error: prefError }, { data: globalRow }, { data: blockRows, error: blocksError }] = await Promise.all([
         supabase.from('follows').select('following_id').eq('follower_id', user.id),
         supabase.from('story_author_preferences').select('author_id,notifications_enabled,muted').eq('user_id', user.id),
         supabase.from('story_notification_settings').select('enabled').eq('user_id', user.id).maybeSingle(),
+        supabase.from('blocks').select('blocked_id').eq('blocker_id', user.id),
       ]);
       if (followsError) throw followsError;
       if (prefError) throw prefError;
+      if (blocksError) throw blocksError;
       const ids = [...new Set((follows || []).map((row: any) => String(row.following_id)))];
       let profiles: Person[] = [];
       if (ids.length) {
@@ -39,6 +42,14 @@ export default function StorySettingsScreen() {
         profiles = (data || []) as Person[];
       }
       setPeople(profiles);
+      const blockedIds = [...new Set((blockRows || []).map((row: any) => String(row.blocked_id)))];
+      if (blockedIds.length) {
+        const { data: blockedProfiles, error: blockedProfilesError } = await supabase.from('profiles').select('id,display_name,username,avatar_url').in('id', blockedIds);
+        if (blockedProfilesError) throw blockedProfilesError;
+        setBlockedPeople((blockedProfiles || []) as Person[]);
+      } else {
+        setBlockedPeople([]);
+      }
       setPrefs(Object.fromEntries((preferenceRows || []).map((row: any) => [row.author_id, row as Preference])));
       setGlobalEnabled(globalRow?.enabled !== false);
     } catch (e: any) {
@@ -72,6 +83,20 @@ export default function StorySettingsScreen() {
       Alert.alert('تعذر حفظ التغيير', e?.message || 'حاول مرة أخرى.');
     } finally {
       setBusyId('');
+    }
+  }
+
+  async function unblockPerson(person: Person) {
+    try {
+      const { data: authData } = await supabase.auth.getUser();
+      const userId = authData.user?.id;
+      if (!userId) throw new Error('سجّل الدخول أولاً.');
+      const { error } = await supabase.from('blocks').delete().eq('blocker_id', userId).eq('blocked_id', person.id);
+      if (error) throw error;
+      setBlockedPeople(current => current.filter(item => item.id !== person.id));
+      Alert.alert('تم إلغاء الحظر', `يمكنك الآن رؤية محتوى ${person.display_name || person.username || 'هذا الحساب'} وفق إعدادات الخصوصية.`);
+    } catch (e: any) {
+      Alert.alert('تعذر إلغاء الحظر', e?.message || 'حاول مرة أخرى.');
     }
   }
 
@@ -134,6 +159,21 @@ export default function StorySettingsScreen() {
             </View>
           );
         })}
+        <Text style={s.sectionTitle}>الحسابات المحظورة</Text>
+        {blockedPeople.length === 0 ? (
+          <View style={s.empty}><Text style={s.hint}>لا توجد حسابات محظورة حاليًا.</Text></View>
+        ) : blockedPeople.map(person => {
+          const name = person.display_name || person.username || 'مستخدم';
+          return (
+            <View key={person.id} style={s.personCard}>
+              {person.avatar_url ? <Image source={{ uri: person.avatar_url }} style={s.avatar} /> : <View style={[s.avatar, s.avatarFallback]}><Text style={s.initial}>{name[0]}</Text></View>}
+              <View style={{ flex: 1, alignItems: 'flex-end', gap: 7 }}>
+                <Text style={s.rowTitle}>{name}</Text>
+                <Pressable style={s.unblockButton} onPress={() => void unblockPerson(person)}><Text style={s.unblockText}>إلغاء الحظر</Text></Pressable>
+              </View>
+            </View>
+          );
+        })}
         <Text style={s.footer}>الكتم لا يلغي المتابعة. إعدادات التنبيه لكل حساب تعمل بالإضافة إلى خيار التنبيهات العام.</Text>
       </ScrollView>
     </View>
@@ -160,5 +200,7 @@ const s = StyleSheet.create({
   settingLabel: { color: '#475569', fontSize: 12, fontWeight: '600' },
   empty: { backgroundColor: '#fff', padding: 24, borderRadius: 18, alignItems: 'center', gap: 8 },
   emptyTitle: { color: '#0f172a', fontSize: 16, fontWeight: '800' },
+  unblockButton: { backgroundColor: '#fee2e2', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7 },
+  unblockText: { color: '#b91c1c', fontSize: 12, fontWeight: '800' },
   footer: { color: '#64748b', fontSize: 12, lineHeight: 20, textAlign: 'right', paddingHorizontal: 4, marginTop: 8 },
 });
