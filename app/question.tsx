@@ -81,6 +81,11 @@ export default function Question() {
   const [reportDetails, setReportDetails] = useState('');
   const [reportBusy, setReportBusy] = useState(false);
   const [pinBusy, setPinBusy] = useState(false);
+  const [answerSort, setAnswerSort] = useState<'newest' | 'useful'>('newest');
+  const [editingAnswer, setEditingAnswer] = useState<any | null>(null);
+  const [editAnswerBody, setEditAnswerBody] = useState('');
+  const [savingAnswerEdit, setSavingAnswerEdit] = useState(false);
+  const [deletingAnswerId, setDeletingAnswerId] = useState<string | null>(null);
 
   // Edit & Delete states
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -89,8 +94,8 @@ export default function Question() {
   const [savingEdit, setSavingEdit] = useState(false);
   const [deletingQuestion, setDeletingQuestion] = useState(false);
 
-  async function load() {
-    setLoading(true);
+  async function load(showLoading = true) {
+    if (showLoading) setLoading(true);
     const { data: auth } = await supabase.auth.getSession();
     const user = auth.session?.user ?? null;
     setCurrentUserId(user?.id ?? null);
@@ -159,12 +164,32 @@ export default function Question() {
       ans.votes = voteMap[ans.id] || [];
     });
     setAnswers(b.data ?? []);
-    setLoading(false);
+    if (showLoading) setLoading(false);
   }
 
   useEffect(() => {
-    load();
+    void load();
   }, [id]);
+
+  // Keep the discussion and in-app notifications fresh across web and native clients.
+  useEffect(() => {
+    if (!id) return;
+    const channel = supabase
+      .channel(`question-discussion-${id}-${currentUserId || 'guest'}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'answers', filter: `question_id=eq.${id}` }, () => {
+        void load(false);
+      });
+    if (currentUserId) {
+      channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${currentUserId}` }, (payload: any) => {
+        const notification = payload.new;
+        if (notification?.target_type === 'question' && notification?.target_id === id && notification?.type === 'answer') {
+          Alert.alert(notification.title || 'رد جديد على استفسارك', notification.body || 'وصل رد جديد إلى النقاش.');
+        }
+      });
+    }
+    channel.subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [id, currentUserId]);
 
   useEffect(() => {
     if (Platform.OS === 'web') {
@@ -237,7 +262,20 @@ export default function Question() {
 
     setBody('');
     setReplyTo(null);
-    load();
+    // Best-effort in-app notification to the question owner and the replied-to author.
+    try {
+      const recipients = new Set<string>();
+      if (q?.author_id && q.author_id !== auth.session.user.id) recipients.add(q.author_id);
+      if (replyTo?.author_id && replyTo.author_id !== auth.session.user.id) recipients.add(replyTo.author_id);
+      if (recipients.size) {
+        await supabase.from('notifications').insert(Array.from(recipients).map(user_id => ({
+          user_id, type: 'answer', title: replyTo ? '💬 رد جديد على تعليقك' : '💬 وصل رد جديد على استفسارك',
+          body: `${(auth.session.user.user_metadata?.display_name || 'أحد الجيران')} أضاف ردًا: «${body.trim().slice(0, 120)}»`,
+          target_type: 'question', target_id: id,
+        })));
+      }
+    } catch { /* The answer remains successful if optional notifications are unavailable. */ }
+    void load(false);
   }
 
   async function voteAnswer(answerId: string, value: number) {
@@ -570,6 +608,71 @@ export default function Question() {
   const isSolved = q.status === 'solved' || q.status === 'closed' || Boolean(q.best_answer_id);
   const locationLabel = areaLabel({ district: q.district, city: q.city });
 
+  const threadedAnswers = (() => {
+    const compare = (left: any, right: any) => {
+      if (answerSort === 'useful') {
+        const score = (item: any) => (item.votes || []).reduce((sum: number, vote: any) => sum + (vote.vote === 1 ? 1 : vote.vote === -1 ? -1 : 0), 0);
+        const delta = score(right) - score(left);
+        if (delta) return delta;
+      }
+      return new Date(right.created_at || 0).getTime() - new Date(left.created_at || 0).getTime();
+    };
+    const byParent = new Map<string, any[]>();
+    answers.forEach((item: any) => {
+      const parent = item.parent_answer_id || '__root__';
+      byParent.set(parent, [...(byParent.get(parent) || []), item]);
+    });
+    const flattened: { answer: any; depth: number }[] = [];
+    const visit = (parentId: string, depth: number, seen: Set<string>) => {
+      (byParent.get(parentId) || []).sort(compare).forEach((item: any) => {
+        if (seen.has(item.id)) return;
+        flattened.push({ answer: item, depth });
+        const nextSeen = new Set(seen); nextSeen.add(item.id);
+        visit(item.id, Math.min(depth + 1, 4), nextSeen);
+      });
+    };
+    visit('__root__', 0, new Set());
+    // Orphaned replies remain visible rather than disappearing if their parent was removed.
+    answers.filter((item: any) => !flattened.some(entry => entry.answer.id === item.id)).sort(compare)
+      .forEach((item: any) => flattened.push({ answer: item, depth: 0 }));
+    return flattened;
+  })();
+
+  async function saveAnswerEdit() {
+    if (!editingAnswer || !currentUserId || !editAnswerBody.trim() || savingAnswerEdit) return;
+    setSavingAnswerEdit(true);
+    try {
+      const { data: updated, error } = await supabase.from('answers')
+        .update({ body: editAnswerBody.trim() })
+        .eq('id', editingAnswer.id).eq('author_id', currentUserId).select('id').maybeSingle();
+      if (error) throw error;
+      if (!updated) throw new Error('يمكن لصاحب الرد فقط تعديله.');
+      setEditingAnswer(null); setEditAnswerBody('');
+      await load(false);
+    } catch (error: any) {
+      Alert.alert('تعذر تعديل الرد', error?.message || 'تحقق من صلاحياتك وحاول مجددًا.');
+    } finally { setSavingAnswerEdit(false); }
+  }
+
+  function confirmDeleteAnswer(answer: any) {
+    if (!currentUserId || answer.author_id !== currentUserId) return;
+    Alert.alert('حذف الرد', 'هل تريد حذف هذا الرد؟', [
+      { text: 'إلغاء', style: 'cancel' },
+      { text: 'حذف', style: 'destructive', onPress: async () => {
+        setDeletingAnswerId(answer.id);
+        try {
+          // A database trigger detaches child replies before deletion so nested discussion remains readable.
+          const { data: deleted, error } = await supabase.from('answers').delete().eq('id', answer.id).eq('author_id', currentUserId).select('id').maybeSingle();
+          if (error) throw error;
+          if (!deleted) throw new Error('يمكن لصاحب الرد فقط حذفه.');
+          await load(false);
+        } catch (error: any) {
+          Alert.alert('تعذر حذف الرد', error?.message || 'حاول مرة أخرى.');
+        } finally { setDeletingAnswerId(null); }
+      } },
+    ]);
+  }
+
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0} style={styles.container}>
       <AppHeader
@@ -778,6 +881,15 @@ export default function Question() {
               {answers.length === 0 ? 'كن أول من يجيب ويفيد الجار' : `${answers.length} ردود مسجلة`}
             </Text>
           </View>
+          <View style={styles.answerSortRow}>
+            <Text style={styles.answerSortLabel}>ترتيب الردود</Text>
+            <Pressable onPress={() => setAnswerSort('newest')} style={[styles.answerSortButton, answerSort === 'newest' && styles.answerSortButtonActive]}>
+              <Clock size={13} color={answerSort === 'newest' ? '#047857' : '#64748b'} /><Text style={[styles.answerSortButtonText, answerSort === 'newest' && styles.answerSortButtonTextActive]}>الأحدث</Text>
+            </Pressable>
+            <Pressable onPress={() => setAnswerSort('useful')} style={[styles.answerSortButton, answerSort === 'useful' && styles.answerSortButtonActive]}>
+              <ThumbsUp size={13} color={answerSort === 'useful' ? '#047857' : '#64748b'} /><Text style={[styles.answerSortButtonText, answerSort === 'useful' && styles.answerSortButtonTextActive]}>الأكثر فائدة</Text>
+            </Pressable>
+          </View>
 
           {answers.length === 0 ? (
             <View style={styles.emptyState}>
@@ -786,7 +898,7 @@ export default function Question() {
               <Text style={styles.emptyStateText}>شارك بمعلوماتك أو تجربتك لمساعدة أهل حيّك!</Text>
             </View>
           ) : (
-            answers.map(a => {
+            threadedAnswers.map(({ answer: a, depth }) => {
               const isBest = q.best_answer_id === a.id;
               const ansAuthorName = a.profiles?.hide_name
                 ? 'مستخدم مجهول'
@@ -798,7 +910,7 @@ export default function Question() {
               return (
                 <View
                   key={a.id}
-                  style={[styles.answerCard, isBest && styles.bestAnswerCard]}
+                  style={[styles.answerCard, depth > 0 && { marginRight: Math.min(depth, 4) * 14, borderRightWidth: 3, borderRightColor: '#a7f3d0' }, isBest && styles.bestAnswerCard]}
                 >
                   {isBest && (
                     <View style={styles.bestBanner}>
@@ -836,7 +948,7 @@ export default function Question() {
                   {a.parent_answer_id && (
                     <View style={styles.replyToPill}>
                       <Reply size={12} color="#059669" />
-                      <Text style={styles.replyToText}>رد على مشاركة سابقة</Text>
+                      <Text style={styles.replyToText}>رد على: {(answers.find((parent: any) => parent.id === a.parent_answer_id)?.body || 'رد محذوف').slice(0, 70)}</Text>
                     </View>
                   )}
 
@@ -846,14 +958,20 @@ export default function Question() {
                   <View style={styles.answerActions}>
                     <View style={styles.actionsRightGroup}>
                       <Pressable
-                        onPress={() =>
-                          currentUserId ? setReplyTo(a) : requireAccount('سجّل الدخول للرد على التعليقات.')
-                        }
+                        onPress={() => currentUserId ? setReplyTo(a) : requireAccount('سجّل الدخول للرد على التعليقات.')}
                         style={styles.replyBtn}
                       >
                         <Reply size={13} color="#475569" />
-                        <Text style={styles.replyBtnText}>رد</Text>
+                        <Text style={styles.replyBtnText}>الرد على رد</Text>
                       </Pressable>
+                      {currentUserId && a.author_id === currentUserId && <>
+                        <Pressable onPress={() => { setEditingAnswer(a); setEditAnswerBody(a.body || ''); }} style={styles.replyBtn}>
+                          <Pencil size={13} color="#047857" /><Text style={styles.replyBtnText}>تعديل</Text>
+                        </Pressable>
+                        <Pressable onPress={() => confirmDeleteAnswer(a)} style={styles.replyBtn} disabled={deletingAnswerId === a.id}>
+                          {deletingAnswerId === a.id ? <ActivityIndicator size="small" color="#dc2626" /> : <><Trash2 size={13} color="#dc2626" /><Text style={styles.replyBtnText}>حذف</Text></>}
+                        </Pressable>
+                      </>}
 
                       <Pressable
                         onPress={() => voteAnswer(a.id, 1)}
@@ -991,6 +1109,16 @@ export default function Question() {
             </View>
           </View>
         </View>
+      </Modal>
+
+      <Modal visible={Boolean(editingAnswer)} transparent animationType="slide" onRequestClose={() => !savingAnswerEdit && setEditingAnswer(null)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}><View><Text style={styles.modalTitle}>تعديل الرد</Text><Text style={styles.modalSubtitle}>يمكنك تعديل ردك أنت فقط</Text></View><Pressable style={styles.modalCloseBtn} onPress={() => setEditingAnswer(null)} disabled={savingAnswerEdit}><X size={18} color="#64748b" /></Pressable></View>
+            <TextInput style={[styles.modalInput, styles.modalTextArea]} value={editAnswerBody} onChangeText={setEditAnswerBody} placeholder="اكتب الرد بعد التعديل..." placeholderTextColor="#94a3b8" textAlign="right" multiline maxLength={500} />
+            <View style={styles.modalFooter}><Pressable style={styles.modalCancelBtn} onPress={() => setEditingAnswer(null)} disabled={savingAnswerEdit}><Text style={styles.modalCancelBtnText}>إلغاء</Text></Pressable><Pressable style={[styles.modalSubmitBtn, (!editAnswerBody.trim() || savingAnswerEdit) && styles.modalSubmitBtnDisabled]} onPress={saveAnswerEdit} disabled={!editAnswerBody.trim() || savingAnswerEdit}>{savingAnswerEdit ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.modalSubmitBtnText}>حفظ الرد</Text>}</Pressable></View>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Modal for Editing Question */}
@@ -1382,6 +1510,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#334155',
   },
+  answerSortRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' },
+  answerSortLabel: { color: '#64748b', fontSize: 12, fontWeight: '800', marginLeft: 'auto' },
+  answerSortButton: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#fff', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 7 },
+  answerSortButtonActive: { borderColor: '#6ee7b7', backgroundColor: '#ecfdf5' },
+  answerSortButtonText: { color: '#64748b', fontSize: 11, fontWeight: '800' },
+  answerSortButtonTextActive: { color: '#047857' },
   answersSection: {
     gap: 10,
   },
