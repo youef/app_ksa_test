@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
-import { Check, ChevronRight, Pin, PinOff, Palette, Sparkles } from 'lucide-react-native';
+import { Check, ChevronRight, Pin, PinOff, Palette, Sparkles, ArrowUp, ArrowDown, RotateCcw, BookmarkPlus, BriefcaseBusiness, UserRound } from 'lucide-react-native';
 import { AppHeader } from '@/components/shared/AppHeader';
 import { supabase } from '@/lib/supabase';
 
 type Kind = 'question' | 'service' | 'request' | 'market';
-type Candidate = { id: string; type: Kind; title: string; subtitle?: string };
+type Candidate = { id: string; type: Kind; title: string; subtitle?: string };\ntype ProfileSnapshot = { accent: string; banner: string; showStats: boolean; showBadges: boolean; featuredTitle: string; profileType: 'personal' | 'business'; sectionVisibility: Record<string, boolean>; sectionOrder: string[] };\nconst SECTIONS = [{ id: 'bio', label: 'النبذة الشخصية' }, { id: 'services', label: 'الخدمات' }, { id: 'questions', label: 'الأسئلة والمساهمات' }, { id: 'products', label: 'المنتجات والإعلانات' }, { id: 'reviews', label: 'التقييمات' }, { id: 'achievements', label: 'الإنجازات والشارات' }];
 const COLORS = ['#059669', '#2563eb', '#7c3aed', '#db2777', '#ea580c', '#0f172a'];
 const BANNERS = [{ id: 'emerald', label: 'أخضر حيّنا' }, { id: 'ocean', label: 'أزرق' }, { id: 'sunset', label: 'غروب' }, { id: 'midnight', label: 'ليلي' }];
 
@@ -21,7 +21,7 @@ export default function ProfileCustomization() {
   const [featuredTitle, setFeaturedTitle] = useState('أعمالي المميزة');
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [featured, setFeatured] = useState<string[]>([]);
-  const [busyItem, setBusyItem] = useState('');
+  const [busyItem, setBusyItem] = useState('');\n  const [profileType, setProfileType] = useState<'personal' | 'business'>('personal');\n  const [sectionVisibility, setSectionVisibility] = useState<Record<string, boolean>>({ bio: true, services: true, questions: true, products: true, reviews: true, achievements: true });\n  const [sectionOrder, setSectionOrder] = useState<string[]>(SECTIONS.map(x => x.id));\n  const [savedTemplates, setSavedTemplates] = useState<Array<{ name: string; snapshot: ProfileSnapshot; created_at: string }>>([]);\n  const [history, setHistory] = useState<ProfileSnapshot[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -46,7 +46,7 @@ export default function ProfileCustomization() {
         setBanner(s.banner_style || 'emerald');
         setShowStats(s.show_stats !== false);
         setShowBadges(s.show_badges !== false);
-        setFeaturedTitle(s.featured_title || 'أعمالي المميزة');
+        setFeaturedTitle(s.featured_title || 'أعمالي المميزة');\n        setProfileType(s.profile_type === 'business' ? 'business' : 'personal');\n        setSectionVisibility({ bio: true, services: true, questions: true, products: true, reviews: true, achievements: true, ...(s.section_visibility || {}) });\n        setSectionOrder(Array.isArray(s.section_order) ? [...s.section_order.filter((id: string) => SECTIONS.some(x => x.id === id)), ...SECTIONS.map(x => x.id).filter(id => !s.section_order.includes(id))] : SECTIONS.map(x => x.id));\n        setSavedTemplates(Array.isArray(s.saved_templates) ? s.saved_templates : []);\n        setHistory(Array.isArray(s.customization_history) ? s.customization_history : []);
       }
       const list: Candidate[] = [
         ...(questions.data || []).map((x: any) => ({ id: x.id, type: 'question' as const, title: x.title || 'استفسار بدون عنوان', subtitle: x.body })),
@@ -63,19 +63,104 @@ export default function ProfileCustomization() {
 
   useEffect(() => { void load(); }, [load]);
 
+  function snapshot(): ProfileSnapshot {
+    return { accent, banner, showStats, showBadges, featuredTitle: featuredTitle.trim() || 'أعمالي المميزة', profileType, sectionVisibility: { ...sectionVisibility }, sectionOrder: [...sectionOrder] };
+  }
+
   async function saveSettings() {
     if (!uid || saving) return;
     setSaving(true);
     try {
+      const previous = snapshot();
+      const nextHistory = [previous, ...history].slice(0, 20);
       const { error } = await supabase.from('profile_customizations').upsert({
         user_id: uid, accent_color: accent, banner_style: banner, show_stats: showStats,
         show_badges: showBadges, featured_title: featuredTitle.trim() || 'أعمالي المميزة',
+        profile_type: profileType, section_visibility: sectionVisibility, section_order: sectionOrder,
+        saved_templates: savedTemplates, customization_history: nextHistory,
       }, { onConflict: 'user_id' });
       if (error) throw error;
-      Alert.alert('تم الحفظ', 'تم حفظ تخصيصات ملفك في قاعدة البيانات.');
+      setHistory(nextHistory);
+      Alert.alert('تم الحفظ', 'تم حفظ إعدادات الملف وسجل التغييرات.');
     } catch (e: any) {
       Alert.alert('تعذّر الحفظ', e?.message || 'تأكد من تطبيق تحديث قاعدة البيانات ثم حاول مجدداً.');
     } finally { setSaving(false); }
+  }
+
+  async function saveTemplate() {
+    const name = profileType === 'business' ? 'الهوية التجارية' : 'الهوية الشخصية';
+    const template = { name: `${name} ${savedTemplates.length + 1}`, snapshot: snapshot(), created_at: new Date().toISOString() };
+    const next = [template, ...savedTemplates].slice(0, 10);
+    setSavedTemplates(next);
+    try {
+      const { error } = await supabase.from('profile_customizations').upsert({
+        user_id: uid, accent_color: accent, banner_style: banner, show_stats: showStats,
+        show_badges: showBadges, featured_title: featuredTitle.trim() || 'أعمالي المميزة',
+        profile_type: profileType, section_visibility: sectionVisibility, section_order: sectionOrder,
+        saved_templates: next, customization_history: history,
+      }, { onConflict: 'user_id' });
+      if (error) throw error;
+      Alert.alert('تم حفظ القالب', 'يمكنك تطبيقه في أي وقت من قائمة القوالب المحفوظة.');
+    } catch (e: any) {
+      setSavedTemplates(savedTemplates);
+      Alert.alert('تعذّر حفظ القالب', e?.message || 'تحقق من تحديث قاعدة البيانات.');
+    }
+  }
+
+  function applySnapshot(value: ProfileSnapshot) {
+    setAccent(value.accent || '#059669'); setBanner(value.banner || 'emerald');
+    setShowStats(value.showStats !== false); setShowBadges(value.showBadges !== false);
+    setFeaturedTitle(value.featuredTitle || 'أعمالي المميزة');
+    setProfileType(value.profileType === 'business' ? 'business' : 'personal');
+    setSectionVisibility(value.sectionVisibility || {});
+    setSectionOrder(value.sectionOrder || SECTIONS.map(x => x.id));
+  }
+
+  async function restorePrevious() {
+    if (!history.length) return Alert.alert('لا يوجد سجل', 'ستظهر هنا النسخ السابقة بعد حفظ تغييراتك.');
+    const [previous, ...remaining] = history;
+    applySnapshot(previous);
+    setHistory(remaining);
+    try {
+      const { error } = await supabase.from('profile_customizations').upsert({
+        user_id: uid, accent_color: previous.accent, banner_style: previous.banner,
+        show_stats: previous.showStats, show_badges: previous.showBadges,
+        featured_title: previous.featuredTitle, profile_type: previous.profileType,
+        section_visibility: previous.sectionVisibility, section_order: previous.sectionOrder,
+        saved_templates: savedTemplates, customization_history: remaining,
+      }, { onConflict: 'user_id' });
+      if (error) throw error;
+      Alert.alert('تمت الاستعادة', 'أعدنا آخر نسخة محفوظة من تخصيصات الملف.');
+    } catch (e: any) { Alert.alert('تعذّرت الاستعادة', e?.message || 'حاول مرة أخرى.'); }
+  }
+
+  async function applyTemplate(template: { name: string; snapshot: ProfileSnapshot }) {
+    applySnapshot(template.snapshot);
+    try {
+      const value = template.snapshot;
+      const nextHistory = [snapshot(), ...history].slice(0, 20);
+      const { error } = await supabase.from('profile_customizations').upsert({
+        user_id: uid, accent_color: value.accent, banner_style: value.banner,
+        show_stats: value.showStats, show_badges: value.showBadges,
+        featured_title: value.featuredTitle, profile_type: value.profileType,
+        section_visibility: value.sectionVisibility, section_order: value.sectionOrder,
+        saved_templates: savedTemplates, customization_history: nextHistory,
+      }, { onConflict: 'user_id' });
+      if (error) throw error;
+      setHistory(nextHistory);
+      Alert.alert('تم تطبيق القالب', template.name);
+    } catch (e: any) { Alert.alert('تعذّر تطبيق القالب', e?.message || 'حاول مرة أخرى.'); }
+  }
+
+  function moveSection(id: string, direction: -1 | 1) {
+    setSectionOrder(current => {
+      const next = [...current];
+      const index = next.indexOf(id);
+      const target = index + direction;
+      if (index < 0 || target < 0 || target >= next.length) return current;
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
   }
 
   async function toggleFeatured(item: Candidate) {
@@ -129,6 +214,40 @@ export default function ProfileCustomization() {
         <Pressable onPress={saveSettings} disabled={saving} style={[styles.saveBtn,{backgroundColor:accent}]}>{saving?<ActivityIndicator color="#fff" />:<><Check size={17} color="#fff" /><Text style={styles.saveText}>حفظ التخصيصات</Text></>}</Pressable>
       </View>
       <View style={styles.card}>
+        <View style={styles.sectionHead}><BriefcaseBusiness color={accent} size={20} /><Text style={styles.heading}>نوع الهوية</Text></View>
+        <Text style={styles.muted}>بدّل بين عرض شخصي وواجهة مناسبة للأعمال والخدمات.</Text>
+        <View style={styles.modeRow}>
+          <Pressable onPress={() => setProfileType('personal')} style={[styles.modeBtn, profileType === 'personal' && { backgroundColor: accent, borderColor: accent }]}><UserRound size={17} color={profileType === 'personal' ? '#fff' : '#475569'} /><Text style={[styles.modeText, profileType === 'personal' && styles.modeTextActive]}>شخصية</Text></Pressable>
+          <Pressable onPress={() => setProfileType('business')} style={[styles.modeBtn, profileType === 'business' && { backgroundColor: accent, borderColor: accent }]}><BriefcaseBusiness size={17} color={profileType === 'business' ? '#fff' : '#475569'} /><Text style={[styles.modeText, profileType === 'business' && styles.modeTextActive]}>تجارية</Text></Pressable>
+        </View>
+        <View style={styles.sectionHead}><Palette color={accent} size={20} /><Text style={styles.heading}>أقسام البروفايل</Text></View>
+        <Text style={styles.muted}>فعّل الأقسام التي تريد عرضها ورتّب ظهورها. استخدم الأسهم لتحريك القسم، ثم احفظ التخصيصات.</Text>
+        {sectionOrder.map((id, index) => {
+          const section = SECTIONS.find(x => x.id === id);
+          if (!section) return null;
+          return <View key={id} style={styles.sectionRow}>
+            <View style={styles.sectionControls}>
+              <Pressable onPress={() => moveSection(id, -1)} disabled={index === 0} style={styles.orderBtn}><ArrowUp size={15} color={index === 0 ? '#cbd5e1' : '#475569'} /></Pressable>
+              <Pressable onPress={() => moveSection(id, 1)} disabled={index === sectionOrder.length - 1} style={styles.orderBtn}><ArrowDown size={15} color={index === sectionOrder.length - 1 ? '#cbd5e1' : '#475569'} /></Pressable>
+            </View>
+            <View style={styles.switchCopy}><Text style={styles.label}>{section.label}</Text><Text style={styles.muted}>ترتيب العرض: {index + 1}</Text></View>
+            <Switch value={sectionVisibility[id] !== false} onValueChange={v => setSectionVisibility(prev => ({ ...prev, [id]: v }))} trackColor={{ true: accent }} />
+          </View>;
+        })}
+      </View>
+
+      <View style={styles.card}>
+        <View style={styles.sectionHead}><BookmarkPlus color="#7c3aed" size={20} /><Text style={styles.heading}>القوالب وسجل التغييرات</Text></View>
+        <Text style={styles.muted}>احفظ إعدادات مختلفة لهويتك الشخصية أو التجارية، واستعد نسخة سابقة عند الحاجة.</Text>
+        <View style={styles.templateActions}>
+          <Pressable onPress={() => void saveTemplate()} style={[styles.templateBtn, { backgroundColor: accent }]}><BookmarkPlus size={16} color="#fff" /><Text style={styles.templateBtnText}>حفظ كقالب</Text></Pressable>
+          <Pressable onPress={() => void restorePrevious()} style={styles.undoBtn}><RotateCcw size={16} color="#475569" /><Text style={styles.undoText}>تراجع عن آخر حفظ</Text></Pressable>
+        </View>
+        {savedTemplates.length > 0 ? savedTemplates.map((template, index) => <View key={template.created_at + index} style={styles.templateRow}><View style={styles.itemCopy}><Text style={styles.itemTitle}>{template.name}</Text><Text style={styles.muted}>{new Date(template.created_at).toLocaleDateString('ar-SA')}</Text></View><Pressable onPress={() => void applyTemplate(template)} style={styles.pinBtn}><Check size={15} color="#047857" /><Text style={styles.pinText}>تطبيق</Text></Pressable></View>) : <Text style={styles.empty}>لم تحفظ قوالب بعد. اضغط «حفظ كقالب» للاحتفاظ بالهوية الحالية.</Text>}
+        <Text style={styles.label}>النسخ السابقة المحفوظة: {history.length}</Text>
+      </View>
+
+      <View style={styles.card}>
         <View style={styles.sectionHead}><Sparkles color="#d97706" size={20} /><Text style={styles.heading}>أعمالي المميزة</Text></View>
         <Text style={styles.muted}>ثبّت حتى 10 عناصر من منشوراتك لتظهر في ملفك العام. اضغط مرة أخرى لإلغاء التثبيت.</Text>
         {candidates.length===0?<Text style={styles.empty}>لا توجد أعمال منشورة يمكن تثبيتها حتى الآن.</Text>:candidates.map(item=>{
@@ -142,7 +261,7 @@ export default function ProfileCustomization() {
 }
 
 const styles = StyleSheet.create({
-  screen:{flex:1,backgroundColor:'#f8fafc'}, page:{padding:16,paddingBottom:36,gap:14,maxWidth:900,width:'100%',alignSelf:'center'},
+  modeRow:{flexDirection:'row-reverse',gap:10}, modeBtn:{flex:1,flexDirection:'row-reverse',alignItems:'center',justifyContent:'center',gap:8,borderWidth:1,borderColor:'#e2e8f0',borderRadius:12,padding:12,backgroundColor:'#f8fafc'}, modeText:{fontSize:13,fontWeight:'800',color:'#475569'}, modeTextActive:{color:'#fff'}, sectionRow:{flexDirection:'row-reverse',alignItems:'center',gap:10,paddingVertical:10,borderBottomWidth:1,borderBottomColor:'#f1f5f9'}, sectionControls:{flexDirection:'row',gap:4}, orderBtn:{width:30,height:30,borderRadius:9,backgroundColor:'#f1f5f9',alignItems:'center',justifyContent:'center'}, templateActions:{flexDirection:'row-reverse',gap:8}, templateBtn:{flex:1,flexDirection:'row-reverse',alignItems:'center',justifyContent:'center',gap:6,borderRadius:12,padding:11}, templateBtnText:{fontSize:12,fontWeight:'900',color:'#fff'}, undoBtn:{flex:1,flexDirection:'row-reverse',alignItems:'center',justifyContent:'center',gap:6,borderWidth:1,borderColor:'#e2e8f0',borderRadius:12,padding:11,backgroundColor:'#f8fafc'}, undoText:{fontSize:11.5,fontWeight:'800',color:'#475569'}, templateRow:{flexDirection:'row-reverse',alignItems:'center',gap:10,paddingVertical:9,borderBottomWidth:1,borderBottomColor:'#f1f5f9'},\n  screen:{flex:1,backgroundColor:'#f8fafc'}, page:{padding:16,paddingBottom:36,gap:14,maxWidth:900,width:'100%',alignSelf:'center'},
   center:{flex:1,alignItems:'center',justifyContent:'center',gap:10,backgroundColor:'#f8fafc'}, card:{backgroundColor:'#fff',borderRadius:20,padding:18,borderWidth:1,borderColor:'#e2e8f0',gap:12},
   sectionHead:{flexDirection:'row-reverse',alignItems:'center',gap:9}, heading:{fontSize:18,fontWeight:'900',color:'#0f172a',textAlign:'right'},
   label:{fontSize:13,fontWeight:'800',color:'#334155',textAlign:'right'}, muted:{fontSize:12,color:'#64748b',textAlign:'right'}, colorRow:{flexDirection:'row-reverse',gap:12,flexWrap:'wrap'},
