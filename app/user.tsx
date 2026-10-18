@@ -233,16 +233,15 @@ export default function UserProfile() {
       ]);
       setProfileCustomization(customizationResult.data || null);
       const featuredRows = featuredResult.data || [];
-      const resolvedFeatured: any[] = [];
-      for (const featured of featuredRows) {
+      const resolvedFeatured = await Promise.all(featuredRows.map(async (featured: any) => {
         let query: any;
         if (featured.item_type === 'question') query = await supabase.from('questions').select('id,title,body,district,created_at,category').eq('id', featured.item_id).maybeSingle();
         else if (featured.item_type === 'service') query = await supabase.from('services').select('id,name,description,district,created_at,category,cover_url,price_from,price_to,available_now').eq('id', featured.item_id).maybeSingle();
         else if (featured.item_type === 'request') query = await supabase.from('requests').select('id,title,description,district,created_at,status,budget,is_urgent').eq('id', featured.item_id).maybeSingle();
         else if (featured.item_type === 'market') query = await supabase.from('marketplace_items').select('id,title,description,district,created_at,status,price,image_url,item_type').eq('id', featured.item_id).maybeSingle();
-        if (query?.data) resolvedFeatured.push({ ...query.data, _featuredType: featured.item_type });
-      }
-      setFeaturedItems(resolvedFeatured);
+        return query?.data ? { ...query.data, _featuredType: featured.item_type } : null;
+      }));
+      setFeaturedItems(resolvedFeatured.filter(Boolean));
 
       const [
         marketCount,
@@ -584,7 +583,7 @@ export default function UserProfile() {
                   <>
                     {!blocked && !blockedByOther && (
                       <Pressable
-                        style={[styles.followBtn, following && styles.followBtnActive]}
+                        style={[styles.followBtn, { backgroundColor: accentColor }, following && styles.followBtnActive]}
                         onPress={toggleFollow}
                         disabled={busy}
                       >
@@ -596,7 +595,7 @@ export default function UserProfile() {
                     )}
 
                     <Pressable
-                      style={styles.messageBtn}
+                      style={[styles.messageBtn, { backgroundColor: accentColor }]}
                       onPress={openMessage}
                       disabled={busy}
                     >
