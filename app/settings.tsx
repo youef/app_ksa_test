@@ -18,6 +18,7 @@ import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '@/lib/supabase';
 import { AppHeader } from '@/components/shared/AppHeader';
+import { ProfileCustomizationEntry } from '@/components/profile/ProfileCustomizationEntry';
 import { useBottomNavInset } from '@/lib/bottomNav';
 import { registerPushToken, syncDndWithNotifications, unregisterPushToken } from '@/lib/notifications';
 import { verifyGPSInDistrict } from '@/lib/nationalAddress';
@@ -596,6 +597,7 @@ export default function SettingsScreen() {
                 <ChevronLeft size={18} color="#94a3b8" />
               </Pressable>
             )}
+            <ProfileCustomizationEntry />
 
             <View style={styles.preferenceMenu}>
               <Text style={styles.preferenceSectionTitle}>إعدادات الحساب</Text>
