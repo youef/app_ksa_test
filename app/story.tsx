@@ -15,6 +15,7 @@ import {
   PanResponder,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
 import { X, Send, Eye, Heart, Trash2, ChevronLeft, ChevronRight, Flag, Ban } from 'lucide-react-native';
@@ -23,7 +24,7 @@ const { width, height } = Dimensions.get('window');
 const STORY_DURATION = 7000; // 7 seconds per story
 
 export default function StoryViewer() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, resume } = useLocalSearchParams<{ id: string; resume?: string }>();
   const [storiesList, setStoriesList] = useState<any[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [author, setAuthor] = useState<any>(null);
@@ -249,8 +250,15 @@ export default function StoryViewer() {
     const sequence = allAuthorStories && allAuthorStories.length > 0 ? allAuthorStories : [targetStory];
     setStoriesList(sequence);
 
-    // Start from target story index
-    const targetIdx = sequence.findIndex(s => s.id === targetStory.id);
+    // Resume the last viewed story only when opening from the author story ring.
+    let targetIdx = sequence.findIndex(s => s.id === targetStory.id);
+    if (resume === '1') {
+      try {
+        const savedStoryId = await AsyncStorage.getItem(`story_resume_${targetStory.author_id}`);
+        const savedIdx = savedStoryId ? sequence.findIndex(s => s.id === savedStoryId) : -1;
+        if (savedIdx >= 0) targetIdx = savedIdx;
+      } catch {}
+    }
     setCurrentIndex(targetIdx >= 0 ? targetIdx : 0);
 
     // Per-story reply permissions are recalculated when the active story changes.
@@ -258,6 +266,11 @@ export default function StoryViewer() {
 
     setLoading(false);
   }
+
+  useEffect(() => {
+    if (!currentStory?.id || !currentStory?.author_id) return;
+    AsyncStorage.setItem(`story_resume_${currentStory.author_id}`, String(currentStory.id)).catch(() => {});
+  }, [currentStory?.id, currentStory?.author_id]);
 
   // Respect the reply policy of the currently displayed story (not just the first story).
   useEffect(() => {
