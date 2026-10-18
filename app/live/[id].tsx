@@ -692,7 +692,7 @@ export default function LiveRoomScreen() {
       <StatusBar hidden />
       <View style={styles.stage}>
         <LiveMedia
-          participantOrder={[stream.host_id, ...guests.slice().sort((a, b) => (a.seat_order ?? 999) - (b.seat_order ?? 999)).map((guest) => guest.guest_id)]}
+          {...({ participantOrder: [stream.host_id, ...guests.slice().sort((a, b) => (a.seat_order ?? 999) - (b.seat_order ?? 999)).map((guest) => guest.guest_id)] } as any)}
           url={roomUrl}
           token={token}
           canPublish={mediaRole}
