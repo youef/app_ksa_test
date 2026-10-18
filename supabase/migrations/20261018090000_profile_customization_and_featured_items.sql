@@ -59,6 +59,9 @@ as $$
 declare
   current_count integer;
 begin
+  if auth.uid() is null or auth.uid() is distinct from new.user_id then
+    raise exception 'not_authorized';
+  end if;
   perform pg_advisory_xact_lock(hashtextextended(new.user_id::text, 0));
   select count(*) into current_count
   from public.profile_featured_items
