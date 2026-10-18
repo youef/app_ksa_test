@@ -1,92 +1,140 @@
--- Threaded answer management, ownership policies, and realtime delivery.
--- Existing answer creation continues through hayna_create_question_answer RPC.
 
-alter table public.answers enable row level security;
+-- =========================================================
+-- Threaded answer management, ownership policies, realtime
+-- =========================================================
 
-drop policy if exists "Authors can update own answers" on public.answers;
-create policy "Authors can update own answers"
-  on public.answers for update to authenticated
-  using (auth.uid() = author_id)
-  with check (auth.uid() = author_id);
+-- 1. Enable RLS
+ALTER TABLE public.answers ENABLE ROW LEVEL SECURITY;
 
-drop policy if exists "Authors can delete own answers" on public.answers;
-create policy "Authors can delete own answers"
-  on public.answers for delete to authenticated
-  using (auth.uid() = author_id);
+-- 2. Authors can update their own answers
+DROP POLICY IF EXISTS "Authors can update own answers"
+ON public.answers;
 
-grant update, delete on public.answers to authenticated;
+CREATE POLICY "Authors can update own answers"
+ON public.answers
+FOR UPDATE
+TO authenticated
+USING (auth.uid() = author_id)
+WITH CHECK (auth.uid() = author_id);
 
--- Enforce ownership at the row level even if an older permissive policy exists.
-create or replace function public.hayna_enforce_answer_owner()
-returns trigger
-language plpgsql
-security invoker
-set search_path = public
-as $
-begin
-  if tg_op = 'DELETE' then
-    if auth.uid() is distinct from old.author_id then
-      raise exception 'ANSWER_OWNER_REQUIRED';
-    end if;
-    return old;
-  end if;
-  if (new.body is distinct from old.body or new.author_id is distinct from old.author_id)
-     and auth.uid() is distinct from old.author_id then
-    raise exception 'ANSWER_OWNER_REQUIRED';
-  end if;
-  if new.author_id is distinct from old.author_id then
-    raise exception 'ANSWER_OWNER_IMMUTABLE';
-  end if;
-  return new;
-end;
-$;
+-- 3. Authors can delete their own answers
+DROP POLICY IF EXISTS "Authors can delete own answers"
+ON public.answers;
 
-drop trigger if exists answers_enforce_owner_update on public.answers;
-create trigger answers_enforce_owner_update
-before update on public.answers
-for each row execute function public.hayna_enforce_answer_owner();
+CREATE POLICY "Authors can delete own answers"
+ON public.answers
+FOR DELETE
+TO authenticated
+USING (auth.uid() = author_id);
 
-drop trigger if exists answers_enforce_owner_delete on public.answers;
-create trigger answers_enforce_owner_delete
-before delete on public.answers
-for each row execute function public.hayna_enforce_answer_owner();
+-- 4. Grant required table privileges
+GRANT UPDATE, DELETE ON public.answers TO authenticated;
 
--- Preserve replies to a deleted parent by detaching them before the parent row is removed.
-create or replace function public.hayna_detach_child_answers_before_delete()
-returns trigger
-language plpgsql
-security definer
-set search_path = public
-as $$
-begin
-  update public.answers
-     set parent_answer_id = null
-   where parent_answer_id = old.id;
-  return old;
-end;
-$$;
+-- 5. Enforce answer ownership and immutable authorship
+CREATE OR REPLACE FUNCTION public.hayna_enforce_answer_owner()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = public
+AS $function$
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        IF auth.uid() IS DISTINCT FROM OLD.author_id THEN
+            RAISE EXCEPTION 'ANSWER_OWNER_REQUIRED';
+        END IF;
 
-drop trigger if exists answers_detach_children_before_delete on public.answers;
-create trigger answers_detach_children_before_delete
-before delete on public.answers
-for each row execute function public.hayna_detach_child_answers_before_delete();
+        RETURN OLD;
+    END IF;
 
--- Supabase Realtime only publishes tables that are members of supabase_realtime.
-do $$
-begin
-  if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
-    if not exists (
-      select 1 from pg_publication_tables
-       where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'answers'
-    ) then
-      alter publication supabase_realtime add table public.answers;
-    end if;
-    if to_regclass('public.notifications') is not null and not exists (
-      select 1 from pg_publication_tables
-       where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'notifications'
-    ) then
-      alter publication supabase_realtime add table public.notifications;
-    end if;
-  end if;
-end;
-$$;
+    IF (
+        NEW.body IS DISTINCT FROM OLD.body
+        OR NEW.author_id IS DISTINCT FROM OLD.author_id
+    ) AND auth.uid() IS DISTINCT FROM OLD.author_id THEN
+        RAISE EXCEPTION 'ANSWER_OWNER_REQUIRED';
+    END IF;
+
+    IF NEW.author_id IS DISTINCT FROM OLD.author_id THEN
+        RAISE EXCEPTION 'ANSWER_OWNER_IMMUTABLE';
+    END IF;
+
+    RETURN NEW;
+END;
+$function$;
+
+-- 6. Attach ownership triggers
+DROP TRIGGER IF EXISTS answers_enforce_owner_update
+ON public.answers;
+
+CREATE TRIGGER answers_enforce_owner_update
+BEFORE UPDATE ON public.answers
+FOR EACH ROW
+EXECUTE FUNCTION public.hayna_enforce_answer_owner();
+
+DROP TRIGGER IF EXISTS answers_enforce_owner_delete
+ON public.answers;
+
+CREATE TRIGGER answers_enforce_owner_delete
+BEFORE DELETE ON public.answers
+FOR EACH ROW
+EXECUTE FUNCTION public.hayna_enforce_answer_owner();
+
+-- 7. Detach child answers before deleting a parent answer
+CREATE OR REPLACE FUNCTION public.hayna_detach_child_answers_before_delete()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $function$
+BEGIN
+    UPDATE public.answers
+       SET parent_answer_id = NULL
+     WHERE parent_answer_id = OLD.id;
+
+    RETURN OLD;
+END;
+$function$;
+
+DROP TRIGGER IF EXISTS answers_detach_children_before_delete
+ON public.answers;
+
+CREATE TRIGGER answers_detach_children_before_delete
+BEFORE DELETE ON public.answers
+FOR EACH ROW
+EXECUTE FUNCTION public.hayna_detach_child_answers_before_delete();
+
+-- 8. Enable Supabase Realtime publication for answers
+--    and notifications when the table exists.
+DO $function$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM pg_publication
+        WHERE pubname = 'supabase_realtime'
+    ) THEN
+
+        IF NOT EXISTS (
+            SELECT 1
+            FROM pg_publication_tables
+            WHERE pubname = 'supabase_realtime'
+              AND schemaname = 'public'
+              AND tablename = 'answers'
+        ) THEN
+            ALTER PUBLICATION supabase_realtime
+            ADD TABLE public.answers;
+        END IF;
+
+        IF to_regclass('public.notifications') IS NOT NULL
+           AND NOT EXISTS (
+               SELECT 1
+               FROM pg_publication_tables
+               WHERE pubname = 'supabase_realtime'
+                 AND schemaname = 'public'
+                 AND tablename = 'notifications'
+           ) THEN
+            ALTER PUBLICATION supabase_realtime
+            ADD TABLE public.notifications;
+        END IF;
+
+    END IF;
+END;
+$function$;
