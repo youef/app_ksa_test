@@ -20,6 +20,7 @@ import { useBottomNavInset } from '@/lib/bottomNav';
 import AppHeader from '@/components/shared/AppHeader';
 import {
   User,
+  MapPin,
   ShieldCheck,
   ChevronLeft,
   Truck,
