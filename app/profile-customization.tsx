@@ -59,8 +59,6 @@ export default function ProfileCustomization() {
         setProfileType(s.profile_type === 'business' ? 'business' : 'personal');
         setSectionVisibility({ bio: true, services: true, questions: true, products: true, reviews: true, achievements: true, ...(s.section_visibility || {}) });
         setSectionOrder(Array.isArray(s.section_order) ? [...s.section_order.filter((id: string) => SECTIONS.some(x => x.id === id)), ...SECTIONS.map(x => x.id).filter(id => !s.section_order.includes(id))] : SECTIONS.map(x => x.id));
-        setSavedTemplates(Array.isArray(s.saved_templates) ? s.saved_templates : []);
-        setHistory(Array.isArray(s.customization_history) ? s.customization_history : []);
       }
       const list: Candidate[] = [
         ...(questions.data || []).map((x: any) => ({ id: x.id, type: 'question' as const, title: x.title || 'استفسار بدون عنوان', subtitle: x.body })),
@@ -89,16 +87,17 @@ export default function ProfileCustomization() {
     if (!uid || saving) return;
     setSaving(true);
     try {
-      const previous = snapshot();
+      const previous = savedSnapshot || snapshot();
       const nextHistory = [previous, ...history].slice(0, 20);
       const { error } = await supabase.from('profile_customizations').upsert({
         user_id: uid, accent_color: accent, banner_style: banner, show_stats: showStats,
         show_badges: showBadges, featured_title: featuredTitle.trim() || 'أعمالي المميزة',
         profile_type: profileType, section_visibility: sectionVisibility, section_order: sectionOrder,
-        saved_templates: savedTemplates, customization_history: nextHistory,
       }, { onConflict: 'user_id' });
       if (error) throw error;
-      setHistory(nextHistory);
+      const { error: privateError } = await supabase.from('profile_customization_private').upsert({ user_id: uid, saved_templates: savedTemplates, customization_history: nextHistory, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+      if (privateError) throw privateError;
+      setHistory(nextHistory); setSavedSnapshot(snapshot());
       Alert.alert('تم الحفظ', 'تم حفظ إعدادات الملف وسجل التغييرات.');
     } catch (e: any) {
       Alert.alert('تعذّر الحفظ', e?.message || 'تأكد من تطبيق تحديث قاعدة البيانات ثم حاول مجدداً.');
@@ -115,9 +114,10 @@ export default function ProfileCustomization() {
         user_id: uid, accent_color: accent, banner_style: banner, show_stats: showStats,
         show_badges: showBadges, featured_title: featuredTitle.trim() || 'أعمالي المميزة',
         profile_type: profileType, section_visibility: sectionVisibility, section_order: sectionOrder,
-        saved_templates: next, customization_history: history,
       }, { onConflict: 'user_id' });
       if (error) throw error;
+      const { error: privateError } = await supabase.from('profile_customization_private').upsert({ user_id: uid, saved_templates: next, customization_history: history, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+      if (privateError) throw privateError;
       Alert.alert('تم حفظ القالب', 'يمكنك تطبيقه في أي وقت من قائمة القوالب المحفوظة.');
     } catch (e: any) {
       setSavedTemplates(savedTemplates);
@@ -145,9 +145,11 @@ export default function ProfileCustomization() {
         show_stats: previous.showStats, show_badges: previous.showBadges,
         featured_title: previous.featuredTitle, profile_type: previous.profileType,
         section_visibility: previous.sectionVisibility, section_order: previous.sectionOrder,
-        saved_templates: savedTemplates, customization_history: remaining,
       }, { onConflict: 'user_id' });
       if (error) throw error;
+      const { error: privateError } = await supabase.from('profile_customization_private').upsert({ user_id: uid, saved_templates: savedTemplates, customization_history: remaining, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+      if (privateError) throw privateError;
+      setSavedSnapshot(previous);
       Alert.alert('تمت الاستعادة', 'أعدنا آخر نسخة محفوظة من تخصيصات الملف.');
     } catch (e: any) { Alert.alert('تعذّرت الاستعادة', e?.message || 'حاول مرة أخرى.'); }
   }
@@ -162,10 +164,11 @@ export default function ProfileCustomization() {
         show_stats: value.showStats, show_badges: value.showBadges,
         featured_title: value.featuredTitle, profile_type: value.profileType,
         section_visibility: value.sectionVisibility, section_order: value.sectionOrder,
-        saved_templates: savedTemplates, customization_history: nextHistory,
       }, { onConflict: 'user_id' });
       if (error) throw error;
-      setHistory(nextHistory);
+      const { error: privateError } = await supabase.from('profile_customization_private').upsert({ user_id: uid, saved_templates: savedTemplates, customization_history: nextHistory, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+      if (privateError) throw privateError;
+      setHistory(nextHistory); setSavedSnapshot(template.snapshot);
       Alert.alert('تم تطبيق القالب', template.name);
     } catch (e: any) { Alert.alert('تعذّر تطبيق القالب', e?.message || 'حاول مرة أخرى.'); }
   }
