@@ -17,7 +17,7 @@ import {
 import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
-import { X, Send, Eye, Heart, Trash2, ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { X, Send, Eye, Heart, Trash2, ChevronLeft, ChevronRight, Flag, Ban } from 'lucide-react-native';
 
 const { width, height } = Dimensions.get('window');
 const STORY_DURATION = 7000; // 7 seconds per story
@@ -349,6 +349,54 @@ export default function StoryViewer() {
     }
   }
 
+  async function submitStoryReport(reason: 'spam' | 'harassment' | 'inappropriate' | 'misinformation' | 'other') {
+    if (!currentStory?.id || !currentUserId || isOwn) return;
+    const { error } = await supabase.from('story_reports').insert({
+      story_id: currentStory.id,
+      reporter_id: currentUserId,
+      author_id: currentStory.author_id,
+      reason,
+    });
+    if (error) {
+      Alert.alert('تعذر إرسال البلاغ', 'حاول مجددًا بعد قليل.');
+      return;
+    }
+    Alert.alert('تم استلام البلاغ', 'شكرًا لمساعدتنا في الحفاظ على مجتمع آمن.');
+  }
+
+  async function blockStoryAuthor() {
+    if (!currentStory?.author_id || !currentUserId || isOwn) return;
+    const { error } = await supabase.from('blocks').upsert({
+      blocker_id: currentUserId,
+      blocked_id: currentStory.author_id,
+    }, { onConflict: 'blocker_id,blocked_id', ignoreDuplicates: true });
+    if (error) {
+      Alert.alert('تعذر حظر الحساب', error.message || 'حاول مرة أخرى.');
+      return;
+    }
+    Alert.alert('تم حظر الحساب', 'لن تظهر قصص هذا الحساب لك بعد تحديث القائمة.', [
+      { text: 'حسنًا', onPress: () => router.back() },
+    ]);
+  }
+
+  function openStorySafetyMenu() {
+    Alert.alert('خيارات القصة', 'اختر الإجراء المطلوب', [
+      { text: 'إبلاغ عن قصة', onPress: () => Alert.alert('سبب البلاغ', 'اختر السبب الأقرب للمشكلة', [
+        { text: 'محتوى غير لائق', onPress: () => void submitStoryReport('inappropriate') },
+        { text: 'مضايقة أو إساءة', onPress: () => void submitStoryReport('harassment') },
+        { text: 'معلومات مضللة', onPress: () => void submitStoryReport('misinformation') },
+        { text: 'رسائل مزعجة أو احتيال', onPress: () => void submitStoryReport('spam') },
+        { text: 'سبب آخر', onPress: () => void submitStoryReport('other') },
+        { text: 'إلغاء', style: 'cancel' },
+      ]) },
+      { text: 'حظر صاحب الحساب', style: 'destructive', onPress: () => Alert.alert('حظر الحساب؟', 'لن تظهر لك قصص هذا الحساب، ويمكن إدارة الحظر لاحقًا من إعدادات الحساب.', [
+        { text: 'إلغاء', style: 'cancel' },
+        { text: 'حظر', style: 'destructive', onPress: () => void blockStoryAuthor() },
+      ]) },
+      { text: 'إلغاء', style: 'cancel' },
+    ]);
+  }
+
   // Delete active story (if owner)
   function confirmDeleteStory() {
     if (!currentStory) return;
@@ -571,6 +619,11 @@ export default function StoryViewer() {
               {isOwn && (
                 <Pressable onPress={confirmDeleteStory} style={[styles.iconBtn, { backgroundColor: 'rgba(239,68,68,0.3)' }]}>
                   <Trash2 size={18} color="#ef4444" />
+                </Pressable>
+              )}
+              {!isOwn && currentUserId && (
+                <Pressable onPress={openStorySafetyMenu} style={[styles.iconBtn, { backgroundColor: 'rgba(15,23,42,0.32)' }]} accessibilityRole="button" accessibilityLabel="الإبلاغ أو حظر الحساب">
+                  <Flag size={18} color="#fff" />
                 </Pressable>
               )}
             </View>
