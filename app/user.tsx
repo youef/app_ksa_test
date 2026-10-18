@@ -659,7 +659,7 @@ export default function UserProfile() {
                 </Text>
               </View>
 
-              {profileCustomization?.show_badges !== false && Array.isArray(profile.badges) &&
+              {profileCustomization?.show_badges !== false && profileCustomization?.section_visibility?.achievements !== false && Array.isArray(profile.badges) &&
                 profile.badges.map((b: string, i: number) => (
                   <View key={i} style={styles.customBadgePill}>
                     <Text style={styles.customBadgeText}>{b}</Text>
@@ -702,7 +702,7 @@ export default function UserProfile() {
           {/* Activity Category Tabs */}
           <View style={styles.tabsCard}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
-              {TABS.filter(({ id: key }) => key !== 'answers' || own).filter(({ id: key }) => key !== 'services' || (profileCustomization && profileCustomization.section_visibility && profileCustomization.section_visibility.services !== false)).map(({ id: key, label, icon: Icon }) => {
+              {TABS.filter(({ id: key }) => (key !== 'answers' || own) && (key !== 'services' || (profileCustomization && profileCustomization.section_visibility && profileCustomization.section_visibility.services !== false)) && (key !== 'questions' || !(profileCustomization && profileCustomization.section_visibility && profileCustomization.section_visibility.questions === false)) && (key !== 'market' || !(profileCustomization && profileCustomization.section_visibility && profileCustomization.section_visibility.products === false)) && (key !== 'requests' || !(profileCustomization && profileCustomization.section_visibility && profileCustomization.section_visibility.services === false))).map(({ id: key, label, icon: Icon }) => {
                 const count =
                   key === 'market'
                     ? stats.market
