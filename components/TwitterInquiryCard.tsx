@@ -92,10 +92,18 @@ export default function TwitterInquiryCard({
   const [expanded, setExpanded] = useState(false);
   const [quickReplyText, setQuickReplyText] = useState('');
   const [replyLoading, setReplyLoading] = useState(false);
-  const [liked, setLiked] = useState(false);
-  const [likeCount, setLikeCount] = useState<number>(() => {
-    return Number(data.likes_count ?? data.likes ?? 0);
+  type ReactionType = 'like' | 'help' | 'useful' | 'thanks';
+  const REACTIONS: { id: ReactionType; emoji: string; label: string }[] = [
+    { id: 'like', emoji: '❤️', label: 'أعجبني' },
+    { id: 'help', emoji: '🤝', label: 'أبشر بالفزعة' },
+    { id: 'useful', emoji: '💡', label: 'معلومة مفيدة' },
+    { id: 'thanks', emoji: '🙏', label: 'الله يعطيك العافية' },
+  ];
+  const [myReaction, setMyReaction] = useState<ReactionType | null>(null);
+  const [reactionCounts, setReactionCounts] = useState<Record<ReactionType, number>>({
+    like: Number(data.likes_count ?? data.likes ?? 0), help: 0, useful: 0, thanks: 0,
   });
+  const [reactionBusy, setReactionBusy] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
   const [viewsCount, setViewsCount] = useState<number>(() => Number(data.views_count ?? data.views ?? data.view_count ?? 0));
   const [savesCount, setSavesCount] = useState(0);
@@ -129,6 +137,26 @@ export default function TwitterInquiryCard({
       isMounted = false;
     };
   }, [data.id, type]);
+
+  useEffect(() => {
+    let active = true;
+    async function loadReactions() {
+      const targetType = type === 'request' ? 'request' : 'question';
+      try {
+        const { data: rows, error } = await supabase.from('post_reactions').select('reaction_type,user_id').eq('target_type', targetType).eq('target_id', data.id);
+        if (error) throw error;
+        if (!active) return;
+        const counts: Record<ReactionType, number> = { like: 0, help: 0, useful: 0, thanks: 0 };
+        (rows || []).forEach((row: { reaction_type: ReactionType; user_id: string }) => {
+          if (row.reaction_type in counts) counts[row.reaction_type] += 1;
+          if (currentUserId && row.user_id === currentUserId) setMyReaction(row.reaction_type);
+        });
+        setReactionCounts(counts);
+      } catch { /* Optional migration may not have been applied yet. */ }
+    }
+    void loadReactions();
+    return () => { active = false; };
+  }, [currentUserId, data.id, type]);
 
   useEffect(() => {
     let active = true;
@@ -191,16 +219,40 @@ export default function TwitterInquiryCard({
     }
   }
 
-  function handleLike() {
-    if (isGuest) return requireAccount('سجّل الدخول أو أنشئ حساباً للإعجاب بمنشورات الحي.');
-    if (!liked) {
-      setLiked(true);
-      setLikeCount(p => p + 1);
-      onToast('أعجبك الاستفسار ❤️');
-    } else {
-      setLiked(false);
-      setLikeCount(p => p - 1);
-    }
+  async function handleReaction(reaction: ReactionType) {
+    if (isGuest || !currentUserId) return requireAccount('سجّل الدخول أو أنشئ حساباً للتفاعل مع منشورات الحي.');
+    if (reactionBusy) return;
+    const previous = myReaction;
+    const next = previous === reaction ? null : reaction;
+    const targetType = type === 'request' ? 'request' : 'question';
+    setReactionBusy(true);
+    setMyReaction(next);
+    setReactionCounts(current => {
+      const updated = { ...current };
+      if (previous) updated[previous] = Math.max(0, updated[previous] - 1);
+      if (next) updated[next] += 1;
+      return updated;
+    });
+    try {
+      if (next) {
+        const { error } = await supabase.from('post_reactions').upsert({ user_id: currentUserId, target_type: targetType, target_id: data.id, reaction_type: next }, { onConflict: 'target_type,target_id,user_id' });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('post_reactions').delete().eq('user_id', currentUserId).eq('target_type', targetType).eq('target_id', data.id);
+        if (error) throw error;
+      }
+      const selected = REACTIONS.find(item => item.id === next);
+      onToast(next ? (selected?.label || 'تم التفاعل') + ' ' + (selected?.emoji || '') : 'تم إلغاء التفاعل');
+    } catch (error: any) {
+      setMyReaction(previous);
+      setReactionCounts(current => {
+        const updated = { ...current };
+        if (next) updated[next] = Math.max(0, updated[next] - 1);
+        if (previous) updated[previous] += 1;
+        return updated;
+      });
+      Alert.alert('تعذر حفظ التفاعل', error?.message || 'تأكد من تطبيق تحديث قاعدة البيانات ثم حاول مرة أخرى.');
+    } finally { setReactionBusy(false); }
   }
 
   async function handleBookmark() {
@@ -359,7 +411,7 @@ export default function TwitterInquiryCard({
   }
 
   return (
-    <View style={[s.xCard, isEmergency && s.xCardEmergency, isToolSharing && s.xCardToolSharing]}>
+    <View style={[s.xCard, !expanded && s.xCardCollapsed, isEmergency && s.xCardEmergency, isToolSharing && s.xCardToolSharing]}>
       {/* Top Header */}
       <View style={s.xHeader}>
         <Pressable
@@ -414,16 +466,20 @@ export default function TwitterInquiryCard({
       </View>
 
       {/* Main Content Area */}
-      <Pressable onPress={() => setExpanded(!expanded)} style={s.xContentArea}>
-        <Text style={[s.xTitle, isEmergency && { color: '#991b1b' }]}>{data.title}</Text>
+      <Pressable onPress={navigateToDetails} style={s.xContentArea} accessibilityRole="button" accessibilityLabel="فتح تفاصيل المنشور">
+        <Text style={[s.xTitle, isEmergency && { color: '#991b1b' }]} numberOfLines={2}>{data.title}</Text>
         {(data.body || data.description) && (
-          <Text style={s.xBodyText} numberOfLines={expanded ? undefined : 3}>
-            {isReq ? data.description : data.body}
-          </Text>
+          <>
+            <Text style={s.xBodyText} numberOfLines={2}>{isReq ? data.description : data.body}</Text>
+            {String(isReq ? data.description : data.body || '').length > 130 && <Text style={s.xReadMore}>عرض المزيد وفتح التفاصيل ←</Text>}
+          </>
         )}
         {isPinned && <View style={{ alignSelf: 'flex-start', flexDirection: 'row-reverse', alignItems: 'center', gap: 4, backgroundColor: '#fff7ed', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5, marginTop: 8 }}><Text style={{ color: '#c2410c', fontSize: 11, fontWeight: '800' }}>📌 مثبت في الملف الشخصي</Text></View>}
         {isFeatured && <View style={{ alignSelf: 'flex-start', backgroundColor: '#fee2e2', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5, marginTop: 7 }}><Text style={{ color: '#991b1b', fontSize: 11, fontWeight: '900' }}>📢 تنبيه مثبت من إدارة الحي</Text></View>}
-        {resolutionStatus !== 'open' && <View style={{ alignSelf: 'flex-start', backgroundColor: '#dcfce7', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5, marginTop: 7 }}><Text style={{ color: '#166534', fontSize: 11, fontWeight: '800' }}>{statusLabels[resolutionStatus] || resolutionStatus}</Text></View>}
+        <View style={s.xCompactStatus}>
+          <View style={[s.xCompactStatusDot, resolutionStatus !== 'open' && s.xCompactStatusDotResolved]} />
+          <Text style={s.xCompactStatusText}>{statusLabels[resolutionStatus] || 'مفتوح'}</Text>
+        </View>
         <View style={s.xHashtagRow}>
           {data.district && (
             <View style={s.xHashPill}><Text style={s.xHashText}>#{data.district.replace(/\s+/g, '_')}</Text></View>
@@ -442,7 +498,7 @@ export default function TwitterInquiryCard({
 
       {/* Interactive Responders Preview (Collapsed Strip) */}
       {!expanded && answers.length > 0 && (
-        <Pressable style={s.xRespondersPreview} onPress={() => setExpanded(true)}>
+        <Pressable style={s.xRespondersPreview} onPress={navigateToDetails} accessibilityRole="button" accessibilityLabel="عرض جميع الردود">
           <View style={s.xRespondersAvatars}>
             {answers.slice(0, 4).map((ans: any, i: number) => {
               const aAvatar = ans.profiles?.avatar_url;
@@ -470,16 +526,21 @@ export default function TwitterInquiryCard({
         </Pressable>
       )}
 
+      {/* Community reactions persisted in Supabase */}
+      <View style={s.xReactionsRow}>
+        {REACTIONS.map(reaction => {
+          const active = myReaction === reaction.id;
+          return <Pressable key={reaction.id} style={[s.xReactionChip, active && s.xReactionChipActive]} onPress={() => void handleReaction(reaction.id)} disabled={reactionBusy} accessibilityRole="button" accessibilityLabel={reaction.label} accessibilityState={{ selected: active, disabled: reactionBusy }}>
+            <Text style={s.xReactionEmoji}>{reaction.emoji}</Text><Text style={[s.xReactionCount, active && s.xReactionCountActive]}>{reactionCounts[reaction.id]}</Text>
+          </Pressable>;
+        })}
+      </View>
+
       {/* Action Bar */}
       <View style={s.xActionBar}>
-        <Pressable style={[s.xActionBtn, expanded && s.xActionBtnActive]} onPress={() => setExpanded(!expanded)}>
-          <MessageCircle size={17} color={expanded ? '#059669' : '#64748b'} />
-          <Text style={[s.xActionCounter, expanded && { color: '#059669', fontWeight: '800' }]}>{answersCount}</Text>
-        </Pressable>
-
-        <Pressable style={s.xActionBtn} onPress={handleLike}>
-          <Heart size={17} color={liked ? '#f43f5e' : '#64748b'} fill={liked ? '#f43f5e' : 'none'} />
-          <Text style={[s.xActionCounter, liked && { color: '#f43f5e', fontWeight: '800' }]}>{likeCount}</Text>
+        <Pressable style={s.xActionBtn} onPress={navigateToDetails} accessibilityRole="button" accessibilityLabel="فتح الردود في صفحة المنشور">
+          <MessageCircle size={17} color="#64748b" />
+          <Text style={s.xActionCounter}>{answersCount}</Text>
         </Pressable>
 
         {!isGuest && (
@@ -499,7 +560,7 @@ export default function TwitterInquiryCard({
         </View>
       </View>
 
-      {isOwner && (
+      {isOwner && expanded && (
         <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-around', gap: 8, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: '#f0fdf4', borderTopWidth: 1, borderTopColor: '#dcfce7' }}>
           <View style={{ alignItems: 'center', gap: 3 }}><Eye size={15} color="#166534" /><Text style={{ color: '#166534', fontSize: 11, fontWeight: '800' }}>{viewsCount} مشاهدة</Text></View>
           <View style={{ alignItems: 'center', gap: 3 }}><MessageCircle size={15} color="#166534" /><Text style={{ color: '#166534', fontSize: 11, fontWeight: '800' }}>{answersCount} رد</Text></View>
@@ -687,6 +748,7 @@ const s = StyleSheet.create({
   xCard: {
     backgroundColor: '#fff',
     borderRadius: 22,
+    minHeight: 330,
     padding: 16,
     marginBottom: 14,
     borderWidth: 1,
@@ -697,6 +759,8 @@ const s = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
+  // Uniform compact cards; full text and replies live on the post details page.
+  xCardCollapsed: { height: 440, overflow: 'hidden' },
   xCardEmergency: {
     borderColor: '#fca5a5',
     backgroundColor: '#fffafa',
@@ -840,9 +904,24 @@ const s = StyleSheet.create({
     color: '#059669',
     fontWeight: '700',
   },
-  xContentArea: {
-    marginBottom: 10,
-  },
+  xContentArea: { marginBottom: 8, minHeight: 96 },
+  xCompactStatus: { alignSelf: 'flex-start', flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 10, backgroundColor: '#ecfdf5', marginTop: 5, marginBottom: 3 },
+  xCompactStatusDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#059669' },
+  xCompactStatusDotResolved: { backgroundColor: '#64748b' },
+  xCompactStatusText: { fontSize: 10, color: '#047857', fontWeight: '800' },
+  xReadMore: { alignSelf: 'flex-end', color: '#047857', fontSize: 12, fontWeight: '800', marginTop: -3, marginBottom: 8, textAlign: 'right' },
+  xStatusTrack: { flexDirection: 'row-reverse', alignItems: 'flex-start', justifyContent: 'space-between', gap: 4, marginTop: 10, marginBottom: 8, paddingHorizontal: 2 },
+  xStatusStep: { flex: 1, alignItems: 'center', gap: 4 },
+  xStatusDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#cbd5e1', borderWidth: 1, borderColor: '#cbd5e1' },
+  xStatusDotActive: { backgroundColor: '#059669', borderColor: '#059669' },
+  xStatusLabel: { fontSize: 9, lineHeight: 12, color: '#94a3b8', textAlign: 'center' },
+  xStatusLabelActive: { color: '#047857', fontWeight: '800' },
+  xReactionsRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 5, marginTop: 2, marginBottom: 8 },
+  xReactionChip: { flex: 1, minHeight: 34, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 4, paddingVertical: 6, borderRadius: 12, backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0' },
+  xReactionChipActive: { backgroundColor: '#ecfdf5', borderColor: '#6ee7b7' },
+  xReactionEmoji: { fontSize: 13 },
+  xReactionCount: { color: '#64748b', fontSize: 11, fontWeight: '800' },
+  xReactionCountActive: { color: '#047857' },
   xTitle: {
     fontSize: 16,
     fontWeight: '800',
