@@ -228,7 +228,7 @@ export default function UserProfile() {
       }
 
       const [customizationResult, featuredResult] = await Promise.all([
-        supabase.from('profile_customizations').select('accent_color,banner_style,show_stats,show_badges,featured_title').eq('user_id', p.id).maybeSingle(),
+        supabase.from('profile_customizations').select('accent_color,banner_style,show_stats,show_badges,featured_title,profile_type,section_visibility,section_order').eq('user_id', p.id).maybeSingle(),
         supabase.from('profile_featured_items').select('item_type,item_id,position').eq('user_id', p.id).order('position', { ascending: true }).limit(10),
       ]);
       setProfileCustomization(customizationResult.data || null);
