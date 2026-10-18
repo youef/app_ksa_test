@@ -476,11 +476,11 @@ export default function TwitterInquiryCard({
         )}
         {isPinned && <View style={{ alignSelf: 'flex-start', flexDirection: 'row-reverse', alignItems: 'center', gap: 4, backgroundColor: '#fff7ed', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5, marginTop: 8 }}><Text style={{ color: '#c2410c', fontSize: 11, fontWeight: '800' }}>📌 مثبت في الملف الشخصي</Text></View>}
         {isFeatured && <View style={{ alignSelf: 'flex-start', backgroundColor: '#fee2e2', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5, marginTop: 7 }}><Text style={{ color: '#991b1b', fontSize: 11, fontWeight: '900' }}>📢 تنبيه مثبت من إدارة الحي</Text></View>}
-        {resolutionStatus !== 'open' && <View style={{ alignSelf: 'flex-start', backgroundColor: '#dcfce7', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5, marginTop: 7 }}><Text style={{ color: '#166534', fontSize: 11, fontWeight: '800' }}>{statusLabels[resolutionStatus] || resolutionStatus}</Text></View>}
         <View style={s.xCompactStatus}>
           <View style={[s.xCompactStatusDot, resolutionStatus !== 'open' && s.xCompactStatusDotResolved]} />
           <Text style={s.xCompactStatusText}>{statusLabels[resolutionStatus] || 'مفتوح'}</Text>
-        </View>       <View style={s.xHashtagRow}>
+        </View>
+        <View style={s.xHashtagRow}>
           {data.district && (
             <View style={s.xHashPill}><Text style={s.xHashText}>#{data.district.replace(/\s+/g, '_')}</Text></View>
           )}
