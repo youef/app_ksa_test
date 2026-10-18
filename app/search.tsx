@@ -136,7 +136,8 @@ export default function SearchPage() {
   const [query, setQuery] = useState(params.q || '');
   const [activeTab, setActiveTab] = useState<Tab>(params.tab || 'all');
   const [loading, setLoading] = useState(false);
-  const [isFocused, setIsFocused] = useState(false);\n  const searchSequence = useRef(0);
+  const [isFocused, setIsFocused] = useState(false);
+  const searchSequence = useRef(0);
   const [recentSearches, setRecentSearches] = useState<string[]>([
     'سباك بالحي',
     'توصيل مدارس',
@@ -797,7 +798,7 @@ export default function SearchPage() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f9fafb',
   },
   headerMapBtn: {
     width: 36,
@@ -924,17 +925,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: '#ffffff',
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingVertical: 10,
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    marginBottom: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 3,
-    elevation: 1,
+    borderColor: '#e5e7eb',
+    marginBottom: 12
   },
   summaryRight: {
     flexDirection: 'row-reverse',
@@ -992,16 +988,11 @@ const styles = StyleSheet.create({
   },
   userCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 10,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 5,
-    elevation: 1,
+    borderColor: '#e5e7eb'
   },
   cardHeaderRow: {
     flexDirection: 'row-reverse',
@@ -1099,16 +1090,11 @@ const styles = StyleSheet.create({
   },
   postCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 10,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 5,
-    elevation: 1,
+    borderColor: '#e5e7eb'
   },
   cardTopRow: {
     flexDirection: 'row-reverse',
@@ -1268,13 +1254,13 @@ const styles = StyleSheet.create({
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 40,
+    paddingVertical: 32,
     paddingHorizontal: 20,
     backgroundColor: '#ffffff',
-    borderRadius: 20,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    marginTop: 10,
+    borderColor: '#e5e7eb',
+    marginTop: 8
   },
   emptyIconBg: {
     width: 68,
@@ -1321,16 +1307,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     backgroundColor: '#ffffff',
-    borderRadius: 18,
-    padding: 14,
+    borderRadius: 12,
+    padding: 12,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    gap: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
-    elevation: 1,
+    borderColor: '#e5e7eb',
+    gap: 10
   },
   welcomeBannerIcon: {
     width: 44,
