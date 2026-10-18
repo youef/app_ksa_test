@@ -104,6 +104,13 @@ export default function ProfileCustomization() {
     <AppHeader variant="sub" title="تخصيص الملف" subtitle="تحكم بمظهر ملفك وأعمالك المميزة" fallbackRoute="/profile" />
     <ScrollView contentContainerStyle={styles.page}>
       <View style={styles.card}>
+        <View style={styles.sectionHead}><Palette color={accent} size={20} /><Text style={styles.heading}>معاينة مباشرة</Text></View>
+        <View style={[styles.previewBanner, { backgroundColor: banner === 'ocean' ? '#0369a1' : banner === 'sunset' ? '#c2410c' : banner === 'midnight' ? '#111827' : '#047857' }]}>
+          <View style={styles.previewAvatar}><Text style={styles.previewAvatarText}>ح</Text></View>
+          <View style={styles.previewCopy}><Text style={styles.previewName}>ملفك في حيّنا</Text><Text style={styles.previewSub}>معاينة تقريبية قبل الحفظ</Text></View>
+          <View style={styles.previewChip}><Text style={styles.previewChipText}>@username</Text></View>
+        </View>
+        <View style={[styles.previewStats, { opacity: showStats ? 1 : 0.45 }]}><Text style={styles.previewStat}>{showStats ? 'متابعون ١٢' : 'الإحصائيات مخفية'}</Text><Text style={styles.previewStat}>{showBadges ? 'شارات مفعّلة' : 'الشارات مخفية'}</Text></View>
         <View style={styles.sectionHead}><Palette color={accent} size={20} /><Text style={styles.heading}>مظهر الملف</Text></View>
         <Text style={styles.label}>اللون الرئيسي</Text>
         <View style={styles.colorRow}>{COLORS.map(color => <Pressable key={color} accessibilityRole="button" accessibilityLabel={'اختيار اللون '+color} onPress={() => setAccent(color)} style={[styles.swatch,{backgroundColor:color},accent===color&&styles.selectedSwatch]}>{accent===color&&<Check size={17} color="#fff" />}</Pressable>)}</View>
