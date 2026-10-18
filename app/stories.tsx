@@ -191,7 +191,7 @@ export default function StoriesScreen() {
   function openAuthorStories(authorStories: any[]) {
     const firstUnseen = authorStories.find((story: any) => !seenStoryIds.includes(story.id));
     const target = firstUnseen || authorStories[0];
-    if (target?.id) router.push({ pathname: '/story', params: { id: target.id } });
+    if (target?.id) router.push({ pathname: '/story', params: { id: target.id, resume: '1' } });
   }
 
   return (
