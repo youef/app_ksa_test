@@ -20,6 +20,7 @@ export interface AppHeaderProps {
   subtitle?: string;
   fallbackRoute?: string;
   rightAction?: ReactNode;
+  showBack?: boolean;
 
   // Home variant props
   profile?: any;
@@ -38,6 +39,7 @@ export function AppHeader({
   subtitle,
   fallbackRoute = '/home',
   rightAction,
+  showBack = true,
   profile,
   isGuest = false,
   unreadCount = 0,
@@ -210,15 +212,17 @@ export function AppHeader({
     // 4. SUB-PAGE VARIANT (Default for detail/action pages)
     return (
       <View style={styles.content}>
-        <Pressable
-          onPress={goBack}
-          style={styles.iconCircle}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel="رجوع"
-        >
-          <ChevronRight size={22} color="#0f172a" />
-        </Pressable>
+        {showBack ? (
+          <Pressable
+            onPress={goBack}
+            style={styles.iconCircle}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="رجوع"
+          >
+            <ChevronRight size={22} color="#0f172a" />
+          </Pressable>
+        ) : <View style={styles.actionSpacer} />}
 
         <View style={styles.centerTitleArea}>
           <Text style={styles.pageTitle} numberOfLines={1}>
