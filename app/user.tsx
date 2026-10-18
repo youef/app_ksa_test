@@ -873,7 +873,7 @@ function ActivityCard({ type, item, width }: { type: Tab; item: any; width: numb
 
   const handleCardPress = () => {
     if (type === 'market') {
-      router.push({ pathname: '/market' });
+      router.push({ pathname: '/marketplace-item', params: { id: item.id } });
     } else if (type === 'services') {
       router.push({ pathname: '/service', params: { id: item.id } });
     } else if (type === 'requests') {
