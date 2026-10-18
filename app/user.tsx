@@ -45,7 +45,7 @@ import { C } from '@/lib/ui';
 import { getBlockStatus, setBlock } from '@/lib/chatControls';
 import { isExactDistrictMatching } from '@/lib/locationSync';
 
-type Tab = 'questions' | 'answers' | 'services' | 'requests' | 'market';
+type Tab = 'questions' | 'answers' | 'services' | 'requests' | 'market' | 'reviews';
 
 const TABS: { id: Tab; label: string; icon: any }[] = [
   { id: 'questions', label: 'الاستفسارات', icon: Search },
@@ -53,6 +53,7 @@ const TABS: { id: Tab; label: string; icon: any }[] = [
   { id: 'services', label: 'الخدمات', icon: Wrench },
   { id: 'requests', label: 'الطلبات', icon: Package },
   { id: 'market', label: 'السوق', icon: ShoppingBag },
+  { id: 'reviews', label: 'التقييمات', icon: Star },
 ];
 
 export default function UserProfile() {
@@ -77,6 +78,7 @@ export default function UserProfile() {
   });
   const [items, setItems] = useState<any[]>([]);
   const [services, setServices] = useState<any[]>([]);
+  const [reviews, setReviews] = useState<any[]>([]);
   const [requests, setRequests] = useState<any[]>([]);
   const [questions, setQuestions] = useState<any[]>([]);
   const [answers, setAnswers] = useState<any[]>([]);
@@ -127,6 +129,18 @@ export default function UserProfile() {
         result = await supabase.from('questions').select('id,title,body,status,resolution_status,is_pinned,category,district,created_at,view_count,views_count,is_emergency,item_type').eq('author_id', profileId).order('is_pinned', { ascending: false }).order('created_at', { ascending: false }).limit(18);
         if (result.error) throw result.error;
         setQuestions(result.data || []);
+      } else if (tabToLoad === 'reviews') {
+        result = await supabase.from('reviews').select('id,reviewer_id,business_id,service_id,rating,body,created_at').eq('business_id', profileId).order('created_at', { ascending: false }).limit(30);
+        if (result.error) throw result.error;
+        const rows = result.data || [];
+        const reviewerIds = [...new Set(rows.map((row: any) => row.reviewer_id).filter(Boolean))];
+        let reviewers: any[] = [];
+        if (reviewerIds.length) {
+          const people = await supabase.from('profiles').select('id,username,display_name,avatar_url,is_verified').in('id', reviewerIds);
+          reviewers = people.data || [];
+        }
+        const byId = new Map(reviewers.map(person => [person.id, person]));
+        setReviews(rows.map((row: any) => ({ ...row, reviewer: byId.get(row.reviewer_id) || null })));
       } else {
         result = await supabase.from('answers').select('id,body,created_at,question_id,questions(id,title,city,district)').eq('author_id', profileId).order('created_at', { ascending: false }).limit(18);
         if (result.error) throw result.error;
@@ -488,6 +502,8 @@ export default function UserProfile() {
       ? requests
       : tab === 'questions'
       ? questions
+      : tab === 'reviews'
+      ? reviews
       : answers;
 
   return (
@@ -702,7 +718,7 @@ export default function UserProfile() {
           {/* Activity Category Tabs */}
           <View style={styles.tabsCard}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
-              {TABS.filter(({ id: key }) => (key !== 'answers' || own) && (key !== 'services' || (profileCustomization && profileCustomization.section_visibility && profileCustomization.section_visibility.services !== false)) && (key !== 'questions' || !(profileCustomization && profileCustomization.section_visibility && profileCustomization.section_visibility.questions === false)) && (key !== 'market' || !(profileCustomization && profileCustomization.section_visibility && profileCustomization.section_visibility.products === false)) && (key !== 'requests' || !(profileCustomization && profileCustomization.section_visibility && profileCustomization.section_visibility.services === false))).sort((a, b) => { const order = (profileCustomization && profileCustomization.section_order) || []; const aKey = a.id === 'market' ? 'products' : a.id === 'answers' ? 'questions' : a.id === 'requests' ? 'services' : a.id; const bKey = b.id === 'market' ? 'products' : b.id === 'answers' ? 'questions' : b.id === 'requests' ? 'services' : b.id; return order.indexOf(aKey) - order.indexOf(bKey); }).map(({ id: key, label, icon: Icon }) => {
+              {TABS.filter(({ id: key }) => (key !== 'answers' || own) && (key !== 'services' || (profileCustomization && profileCustomization.section_visibility && profileCustomization.section_visibility.services !== false)) && (key !== 'questions' || !(profileCustomization && profileCustomization.section_visibility && profileCustomization.section_visibility.questions === false)) && (key !== 'market' || !(profileCustomization && profileCustomization.section_visibility && profileCustomization.section_visibility.products === false)) && (key !== 'requests' || !(profileCustomization && profileCustomization.section_visibility && profileCustomization.section_visibility.services === false)) && (key !== 'reviews' || !(profileCustomization && profileCustomization.section_visibility && profileCustomization.section_visibility.reviews === false))).sort((a, b) => { const order = (profileCustomization && profileCustomization.section_order) || []; const aKey = a.id === 'market' ? 'products' : a.id === 'answers' ? 'questions' : a.id === 'requests' ? 'services' : a.id; const bKey = b.id === 'market' ? 'products' : b.id === 'answers' ? 'questions' : b.id === 'requests' ? 'services' : b.id; return order.indexOf(aKey) - order.indexOf(bKey); }).map(({ id: key, label, icon: Icon }) => {
                 const count =
                   key === 'market'
                     ? stats.market
@@ -712,6 +728,8 @@ export default function UserProfile() {
                     ? stats.requests
                     : key === 'questions'
                     ? stats.questions
+                    : key === 'reviews'
+                    ? reviews.length
                     : stats.answers;
                 const active = tab === key;
                 return (
@@ -779,7 +797,19 @@ export default function UserProfile() {
                 <Empty tab={tab} own={own} />
               ) : (
                 <View style={[styles.grid, { gap: 12 }]}>
-                  {currentData.map(item => (
+                  {tab === 'reviews' ? currentData.map((item: any) => (
+                    <View key={item.id} style={styles.reviewCard}>
+                      <Pressable style={styles.reviewAuthor} onPress={() => item.reviewer?.id && router.push({ pathname: '/user', params: { id: item.reviewer.id } })}>
+                        {item.reviewer?.avatar_url ? <Image source={{ uri: item.reviewer.avatar_url }} style={styles.reviewAvatar} /> : <View style={styles.reviewAvatarFallback}><User size={16} color="#059669" /></View>}
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.reviewAuthorName}>{item.reviewer?.display_name || item.reviewer?.username || 'مستخدم'}</Text>
+                          <Text style={styles.reviewDate}>{formatTimeAgo(item.created_at)}</Text>
+                        </View>
+                        <View style={styles.reviewStars}><Text style={styles.reviewRating}>{Math.max(0, Math.min(5, Number(item.rating) || 0))}/5</Text><Star size={15} color="#d97706" fill="#f59e0b" /></View>
+                      </Pressable>
+                      {!!item.body && <Text style={styles.reviewBody}>{item.body}</Text>}
+                    </View>
+                  )) : currentData.map(item => (
                     <ActivityCard key={item.id} type={tab} item={item} width={cardWidth} />
                   ))}
                 </View>
