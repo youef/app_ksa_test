@@ -6,7 +6,9 @@ import { AppHeader } from '@/components/shared/AppHeader';
 import { supabase } from '@/lib/supabase';
 
 type Kind = 'question' | 'service' | 'request' | 'market';
-type Candidate = { id: string; type: Kind; title: string; subtitle?: string };\ntype ProfileSnapshot = { accent: string; banner: string; showStats: boolean; showBadges: boolean; featuredTitle: string; profileType: 'personal' | 'business'; sectionVisibility: Record<string, boolean>; sectionOrder: string[] };\nconst SECTIONS = [{ id: 'bio', label: 'النبذة الشخصية' }, { id: 'services', label: 'الخدمات' }, { id: 'questions', label: 'الأسئلة والمساهمات' }, { id: 'products', label: 'المنتجات والإعلانات' }, { id: 'reviews', label: 'التقييمات' }, { id: 'achievements', label: 'الإنجازات والشارات' }];
+type Candidate = { id: string; type: Kind; title: string; subtitle?: string };
+type ProfileSnapshot = { accent: string; banner: string; showStats: boolean; showBadges: boolean; featuredTitle: string; profileType: 'personal' | 'business'; sectionVisibility: Record<string, boolean>; sectionOrder: string[] };
+const SECTIONS = [{ id: 'bio', label: 'النبذة الشخصية' }, { id: 'services', label: 'الخدمات' }, { id: 'questions', label: 'الأسئلة والمساهمات' }, { id: 'products', label: 'المنتجات والإعلانات' }, { id: 'reviews', label: 'التقييمات' }, { id: 'achievements', label: 'الإنجازات والشارات' }];
 const COLORS = ['#059669', '#2563eb', '#7c3aed', '#db2777', '#ea580c', '#0f172a'];
 const BANNERS = [{ id: 'emerald', label: 'أخضر حيّنا' }, { id: 'ocean', label: 'أزرق' }, { id: 'sunset', label: 'غروب' }, { id: 'midnight', label: 'ليلي' }];
 
@@ -21,7 +23,12 @@ export default function ProfileCustomization() {
   const [featuredTitle, setFeaturedTitle] = useState('أعمالي المميزة');
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [featured, setFeatured] = useState<string[]>([]);
-  const [busyItem, setBusyItem] = useState('');\n  const [profileType, setProfileType] = useState<'personal' | 'business'>('personal');\n  const [sectionVisibility, setSectionVisibility] = useState<Record<string, boolean>>({ bio: true, services: true, questions: true, products: true, reviews: true, achievements: true });\n  const [sectionOrder, setSectionOrder] = useState<string[]>(SECTIONS.map(x => x.id));\n  const [savedTemplates, setSavedTemplates] = useState<Array<{ name: string; snapshot: ProfileSnapshot; created_at: string }>>([]);\n  const [history, setHistory] = useState<ProfileSnapshot[]>([]);
+  const [busyItem, setBusyItem] = useState('');
+  const [profileType, setProfileType] = useState<'personal' | 'business'>('personal');
+  const [sectionVisibility, setSectionVisibility] = useState<Record<string, boolean>>({ bio: true, services: true, questions: true, products: true, reviews: true, achievements: true });
+  const [sectionOrder, setSectionOrder] = useState<string[]>(SECTIONS.map(x => x.id));
+  const [savedTemplates, setSavedTemplates] = useState<Array<{ name: string; snapshot: ProfileSnapshot; created_at: string }>>([]);
+  const [history, setHistory] = useState<ProfileSnapshot[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -46,7 +53,12 @@ export default function ProfileCustomization() {
         setBanner(s.banner_style || 'emerald');
         setShowStats(s.show_stats !== false);
         setShowBadges(s.show_badges !== false);
-        setFeaturedTitle(s.featured_title || 'أعمالي المميزة');\n        setProfileType(s.profile_type === 'business' ? 'business' : 'personal');\n        setSectionVisibility({ bio: true, services: true, questions: true, products: true, reviews: true, achievements: true, ...(s.section_visibility || {}) });\n        setSectionOrder(Array.isArray(s.section_order) ? [...s.section_order.filter((id: string) => SECTIONS.some(x => x.id === id)), ...SECTIONS.map(x => x.id).filter(id => !s.section_order.includes(id))] : SECTIONS.map(x => x.id));\n        setSavedTemplates(Array.isArray(s.saved_templates) ? s.saved_templates : []);\n        setHistory(Array.isArray(s.customization_history) ? s.customization_history : []);
+        setFeaturedTitle(s.featured_title || 'أعمالي المميزة');
+        setProfileType(s.profile_type === 'business' ? 'business' : 'personal');
+        setSectionVisibility({ bio: true, services: true, questions: true, products: true, reviews: true, achievements: true, ...(s.section_visibility || {}) });
+        setSectionOrder(Array.isArray(s.section_order) ? [...s.section_order.filter((id: string) => SECTIONS.some(x => x.id === id)), ...SECTIONS.map(x => x.id).filter(id => !s.section_order.includes(id))] : SECTIONS.map(x => x.id));
+        setSavedTemplates(Array.isArray(s.saved_templates) ? s.saved_templates : []);
+        setHistory(Array.isArray(s.customization_history) ? s.customization_history : []);
       }
       const list: Candidate[] = [
         ...(questions.data || []).map((x: any) => ({ id: x.id, type: 'question' as const, title: x.title || 'استفسار بدون عنوان', subtitle: x.body })),
@@ -261,7 +273,8 @@ export default function ProfileCustomization() {
 }
 
 const styles = StyleSheet.create({
-  modeRow:{flexDirection:'row-reverse',gap:10}, modeBtn:{flex:1,flexDirection:'row-reverse',alignItems:'center',justifyContent:'center',gap:8,borderWidth:1,borderColor:'#e2e8f0',borderRadius:12,padding:12,backgroundColor:'#f8fafc'}, modeText:{fontSize:13,fontWeight:'800',color:'#475569'}, modeTextActive:{color:'#fff'}, sectionRow:{flexDirection:'row-reverse',alignItems:'center',gap:10,paddingVertical:10,borderBottomWidth:1,borderBottomColor:'#f1f5f9'}, sectionControls:{flexDirection:'row',gap:4}, orderBtn:{width:30,height:30,borderRadius:9,backgroundColor:'#f1f5f9',alignItems:'center',justifyContent:'center'}, templateActions:{flexDirection:'row-reverse',gap:8}, templateBtn:{flex:1,flexDirection:'row-reverse',alignItems:'center',justifyContent:'center',gap:6,borderRadius:12,padding:11}, templateBtnText:{fontSize:12,fontWeight:'900',color:'#fff'}, undoBtn:{flex:1,flexDirection:'row-reverse',alignItems:'center',justifyContent:'center',gap:6,borderWidth:1,borderColor:'#e2e8f0',borderRadius:12,padding:11,backgroundColor:'#f8fafc'}, undoText:{fontSize:11.5,fontWeight:'800',color:'#475569'}, templateRow:{flexDirection:'row-reverse',alignItems:'center',gap:10,paddingVertical:9,borderBottomWidth:1,borderBottomColor:'#f1f5f9'},\n  screen:{flex:1,backgroundColor:'#f8fafc'}, page:{padding:16,paddingBottom:36,gap:14,maxWidth:900,width:'100%',alignSelf:'center'},
+  modeRow:{flexDirection:'row-reverse',gap:10}, modeBtn:{flex:1,flexDirection:'row-reverse',alignItems:'center',justifyContent:'center',gap:8,borderWidth:1,borderColor:'#e2e8f0',borderRadius:12,padding:12,backgroundColor:'#f8fafc'}, modeText:{fontSize:13,fontWeight:'800',color:'#475569'}, modeTextActive:{color:'#fff'}, sectionRow:{flexDirection:'row-reverse',alignItems:'center',gap:10,paddingVertical:10,borderBottomWidth:1,borderBottomColor:'#f1f5f9'}, sectionControls:{flexDirection:'row',gap:4}, orderBtn:{width:30,height:30,borderRadius:9,backgroundColor:'#f1f5f9',alignItems:'center',justifyContent:'center'}, templateActions:{flexDirection:'row-reverse',gap:8}, templateBtn:{flex:1,flexDirection:'row-reverse',alignItems:'center',justifyContent:'center',gap:6,borderRadius:12,padding:11}, templateBtnText:{fontSize:12,fontWeight:'900',color:'#fff'}, undoBtn:{flex:1,flexDirection:'row-reverse',alignItems:'center',justifyContent:'center',gap:6,borderWidth:1,borderColor:'#e2e8f0',borderRadius:12,padding:11,backgroundColor:'#f8fafc'}, undoText:{fontSize:11.5,fontWeight:'800',color:'#475569'}, templateRow:{flexDirection:'row-reverse',alignItems:'center',gap:10,paddingVertical:9,borderBottomWidth:1,borderBottomColor:'#f1f5f9'},
+  screen:{flex:1,backgroundColor:'#f8fafc'}, page:{padding:16,paddingBottom:36,gap:14,maxWidth:900,width:'100%',alignSelf:'center'},
   center:{flex:1,alignItems:'center',justifyContent:'center',gap:10,backgroundColor:'#f8fafc'}, card:{backgroundColor:'#fff',borderRadius:20,padding:18,borderWidth:1,borderColor:'#e2e8f0',gap:12},
   sectionHead:{flexDirection:'row-reverse',alignItems:'center',gap:9}, heading:{fontSize:18,fontWeight:'900',color:'#0f172a',textAlign:'right'},
   label:{fontSize:13,fontWeight:'800',color:'#334155',textAlign:'right'}, muted:{fontSize:12,color:'#64748b',textAlign:'right'}, colorRow:{flexDirection:'row-reverse',gap:12,flexWrap:'wrap'},
