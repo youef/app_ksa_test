@@ -94,7 +94,13 @@ export default function ProfileCustomization() {
         setFeatured(prev => [...prev, key]);
       }
     } catch (e: any) {
-      Alert.alert('تعذّر تحديث الأعمال المميزة', e?.message?.includes('featured_item_not_owned') ? 'لا يمكن تثبيت محتوى لا تملكه.' : e?.message || 'حاول مرة أخرى.');
+      const message = String(e?.message || '');
+      const friendly = message.includes('featured_item_not_owned')
+        ? 'لا يمكن تثبيت محتوى لا تملكه.'
+        : message.includes('featured_limit_reached')
+          ? 'وصلت إلى الحد الأقصى: 10 أعمال مميزة.'
+          : message || 'حاول مرة أخرى.';
+      Alert.alert('تعذّر تحديث الأعمال المميزة', friendly);
     } finally { setBusyItem(''); }
   }
 
