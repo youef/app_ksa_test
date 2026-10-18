@@ -80,30 +80,22 @@ async function searchRows(
 
 async function searchUsers(term: string, limit = 15): Promise<Row[]> {
   const pattern = `%${term.replace(/[(),]/g, ' ').trim()}%`;
-  const safeColumns = 'id,username,display_name,avatar_url,city,district,is_verified,show_in_search,profile_privacy,created_at';
-  const attempts = [
-    () => supabase.from('profiles').select(safeColumns)
-      .eq('show_in_search', true)
-      .or(`display_name.ilike.${pattern},username.ilike.${pattern},city.ilike.${pattern},district.ilike.${pattern}`)
-      .limit(limit),
-    () => supabase.from('profiles').select('id,username,display_name,avatar_url,city,district,is_verified,created_at')
-      .or(`display_name.ilike.${pattern},username.ilike.${pattern},city.ilike.${pattern}`)
-      .limit(limit),
-  ];
-  for (const attempt of attempts) {
-    try {
-      const { data, error } = await attempt();
-      if (!error) {
-        return ((data as Row[]) ?? []).filter((profile) =>
-          profile.show_in_search !== false &&
-          (!profile.profile_privacy || profile.profile_privacy === 'public')
-        );
-      }
-    } catch {
-      // Try the compatibility query below.
-    }
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id,username,display_name,avatar_url,city,district,is_verified,show_in_search,profile_privacy,created_at')
+    .eq('show_in_search', true)
+    .or(`display_name.ilike.${pattern},username.ilike.${pattern},city.ilike.${pattern},district.ilike.${pattern}`)
+    .limit(limit);
+
+  if (error) {
+    console.warn('Profile search unavailable:', error.message);
+    return [];
   }
-  return [];
+
+  return ((data as Row[]) ?? []).filter((profile) =>
+    profile.show_in_search === true &&
+    (!profile.profile_privacy || profile.profile_privacy === 'public')
+  );
 }
 
 async function searchBusinesses(term: string, limit = 20): Promise<Row[]> {
