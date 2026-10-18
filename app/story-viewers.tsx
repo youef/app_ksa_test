@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase';
 type Viewer = {
   id: string;
   avatar_url: string | null;
+  display_name: string | null;
   viewed_at: string | null;
 };
 
@@ -58,7 +59,7 @@ export default function StoryViewersScreen() {
         if (ids.length) {
           const { data, error } = await supabase
             .from('profiles')
-            .select('id, avatar_url')
+            .select('id, avatar_url, display_name')
             .in('id', ids);
           if (error) throw error;
           profiles = data || [];
@@ -67,6 +68,7 @@ export default function StoryViewersScreen() {
         const result = rows.map((row: any) => ({
           id: row.viewer_id,
           avatar_url: profileMap.get(row.viewer_id)?.avatar_url || null,
+          display_name: profileMap.get(row.viewer_id)?.display_name || null,
           viewed_at: row.viewed_at || null,
         }));
         if (active) setViewers(result);
@@ -118,7 +120,10 @@ export default function StoryViewersScreen() {
               ) : (
                 <View style={styles.avatarFallback}><UserRound size={22} color="#64748b" /></View>
               )}
-              <Text style={styles.time}>{formatViewedAt(viewer.viewed_at)}</Text>
+              <View style={styles.viewerInfo}>
+                <Text style={styles.displayName} numberOfLines={1}>{viewer.display_name?.trim() || 'مستخدم'}</Text>
+                <Text style={styles.time}>{formatViewedAt(viewer.viewed_at)}</Text>
+              </View>
             </Pressable>
           ))}
         </ScrollView>
@@ -149,7 +154,9 @@ const styles = StyleSheet.create({
   },
   avatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: '#e2e8f0' },
   avatarFallback: { width: 52, height: 52, borderRadius: 26, backgroundColor: '#e2e8f0', alignItems: 'center', justifyContent: 'center' },
-  time: { marginLeft: 'auto', color: '#64748b', fontSize: 13, fontWeight: '700', textAlign: 'right' },
+  viewerInfo: { flex: 1, marginLeft: 'auto', alignItems: 'flex-end', gap: 4 },
+  displayName: { color: '#0f172a', fontSize: 14, fontWeight: '800', textAlign: 'right', maxWidth: '100%' },
+  time: { color: '#64748b', fontSize: 12, fontWeight: '700', textAlign: 'right' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28, gap: 10 },
   message: { color: '#64748b', fontSize: 14, fontWeight: '700', textAlign: 'center' },
 });
