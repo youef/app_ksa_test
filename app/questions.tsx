@@ -13,7 +13,6 @@ import { router } from 'expo-router';
 import { MapPin, Sparkles } from 'lucide-react-native';
 
 import { supabase } from '@/lib/supabase';
-import { isEmergencyQuestion } from '@/lib/homeUtils';
 import AppHeader from '@/components/shared/AppHeader';
 import LocationSelectorModal from '@/components/LocationSelectorModal';
 import LocationScopeBar from '@/components/LocationScopeBar';
@@ -113,7 +112,6 @@ export default function Questions() {
       }
 
       questions = questions
-        .filter(question => !isEmergencyQuestion(question))
         .filter(question => isLocationMatching(question, location.city, location.district))
         .sort((a, b) => {
           const pinned = Number(Boolean(b.is_pinned)) - Number(Boolean(a.is_pinned));
