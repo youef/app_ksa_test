@@ -69,7 +69,7 @@ import {
 export type MarketSection = 'market' | 'businesses' | 'events';
 
 export type SortOption = 'newest' | 'engaged' | 'nearby';
-const SORT_OPTIONS: { id: SortOption; label: string; icon: string }[] = [
+const SORT_OPTIONS: { id: SortOption; label: string; Icon: any }[] = [
   { id: 'newest', label: 'الأحدث', Icon: Clock },
   { id: 'engaged', label: 'الأكثر تفاعلاً', Icon: TrendingUp },
   { id: 'nearby', label: 'الأقرب إلى الحي', Icon: MapPin },
@@ -794,7 +794,8 @@ export default function Market() {
             </View>
 
             <Pressable
-              style={[styles.rsvpBtn, isAttending && styles.rsvpBtnActive]}
+              style={[styles.rsvpBtn, isAttending && styles.rsvpBtnActive, attendeeActionBusy && { opacity: 0.65 }]}
+              disabled={attendeeActionBusy}
               onPress={(e: any) => {
                 e?.stopPropagation?.();
                 toggleRsvp(ev.id);
@@ -1302,8 +1303,9 @@ export default function Market() {
                 {/* RSVP Interactive Button */}
                 <View style={{ marginVertical: 12 }}>
                   <Pressable
-                    style={[styles.bigRsvpBtn, rsvpList[selectedEvent.id] && styles.bigRsvpBtnActive]}
+                    style={[styles.bigRsvpBtn, rsvpList[selectedEvent.id] && styles.bigRsvpBtnActive, attendeeActionBusy && { opacity: 0.65 }]}
                     onPress={() => toggleRsvp(selectedEvent.id)}
+                    disabled={attendeeActionBusy}
                   >
                     {rsvpList[selectedEvent.id] ? (
                       <>
