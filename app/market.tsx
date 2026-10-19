@@ -1337,8 +1337,33 @@ export default function Market() {
 
                 <View style={styles.detailSectionBox}>
                   <Text style={styles.detailSectionTitle}>عن الفعالية والنشاط</Text>
-                  <Text style={styles.detailSectionDesc}>{selectedEvent.description}</Text>
+                  <Text style={styles.detailSectionDesc}>{selectedEvent.description || 'تفاصيل الفعالية سيضيفها المنظم قريباً.'}</Text>
                 </View>
+                {Array.isArray(selectedEvent.agenda) && selectedEvent.agenda.length > 0 && (
+                  <View style={styles.detailSectionBox}>
+                    <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 7 }}>
+                      <Calendar size={17} color="#059669" />
+                      <Text style={styles.detailSectionTitle}>برنامج الفعالية</Text>
+                    </View>
+                    <View style={{ gap: 9, marginTop: 8 }}>
+                      {selectedEvent.agenda.map((entry: any, index: number) => (
+                        <View key={index} style={styles.eventAgendaRow}>
+                          <View style={styles.eventAgendaNumber}><Text style={styles.eventAgendaNumberText}>{index + 1}</Text></View>
+                          <Text style={[styles.detailSectionDesc, { flex: 1 }]}>{typeof entry === 'string' ? entry : entry?.title || entry?.description || String(entry)}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+                {selectedEvent.guidelines ? (
+                  <View style={styles.detailSectionBox}>
+                    <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 7 }}>
+                      <ShieldCheck size={17} color="#059669" />
+                      <Text style={styles.detailSectionTitle}>إرشادات المشاركة</Text>
+                    </View>
+                    <Text style={[styles.detailSectionDesc, { marginTop: 7 }]}>{selectedEvent.guidelines}</Text>
+                  </View>
+                ) : null}
 
 
                 {selectedEvent.organizerId === profile?.id && (
@@ -1700,6 +1725,9 @@ const styles = StyleSheet.create({
   filterResetBtn: { alignItems: 'center', paddingVertical: 11, marginTop: 8, borderRadius: 10, backgroundColor: '#f1f5f9' },
   filterResetText: { fontSize: 12, color: '#475569', fontWeight: '800' },
   attendeeRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
+  eventAgendaRow: { flexDirection: 'row-reverse', alignItems: 'flex-start', gap: 9 },
+  eventAgendaNumber: { width: 25, height: 25, borderRadius: 9, backgroundColor: '#ecfdf5', alignItems: 'center', justifyContent: 'center' },
+  eventAgendaNumberText: { fontSize: 11, color: '#047857', fontWeight: '900' },
   attendeeAvatar: { width: 36, height: 36, borderRadius: 18, overflow: 'hidden', backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' },
   // Sticky Wrap
   stickyWrap: {
