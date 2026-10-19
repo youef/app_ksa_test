@@ -22,7 +22,7 @@ import ScreenState from '@/components/shared/ScreenState';
 import AppHeader from '@/components/shared/AppHeader';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
-  ShoppingBag,
+  ShoppingBag, TrendingUp, SlidersHorizontal, Utensils, Pill, Shirt, Scissors, Wrench, Croissant, UsersRound, HeartHandshake, Trophy, Palette, House, Package, Image as ImageIcon, CircleCheck, ChevronDown,
   MapPin,
   ShieldCheck,
   Plus,
@@ -70,40 +70,40 @@ export type MarketSection = 'market' | 'businesses' | 'events';
 
 export type SortOption = 'newest' | 'engaged' | 'nearby';
 const SORT_OPTIONS: { id: SortOption; label: string; icon: string }[] = [
-  { id: 'newest', label: 'الأحدث', icon: '◷' },
-  { id: 'engaged', label: 'الأكثر تفاعلاً', icon: '↗' },
-  { id: 'nearby', label: 'الأقرب', icon: '⌖' },
+  { id: 'newest', label: 'الأحدث', Icon: Clock },
+  { id: 'engaged', label: 'الأكثر تفاعلاً', Icon: TrendingUp },
+  { id: 'nearby', label: 'الأقرب إلى الحي', Icon: MapPin },
 ];
 
 type QuickFilter = 'all' | 'available' | 'delivery' | 'images' | 'verified';
-const QUICK_FILTERS: { id: QuickFilter; label: string }[] = [
-  { id: 'all', label: 'الكل' },
-  { id: 'available', label: '🟢 متاح الآن' },
-  { id: 'delivery', label: '🚗 توصيل' },
-  { id: 'images', label: '📷 بالصور' },
-  { id: 'verified', label: '🛡️ موثق' },
+const QUICK_FILTERS: { id: QuickFilter; label: string; Icon?: any }[] = [
+  { id: 'all', label: 'كل العروض', Icon: LayoutGrid },
+  { id: 'available', label: 'متاح الآن', Icon: CircleCheck },
+  { id: 'delivery', label: 'يتوفر توصيل', Icon: Truck },
+  { id: 'images', label: 'عروض بالصور', Icon: ImageIcon },
+  { id: 'verified', label: 'حساب موثق', Icon: ShieldCheck },
 ];
 
 type BusinessCategory = 'all' | 'grocery' | 'restaurant' | 'pharmacy' | 'laundry' | 'salon' | 'repair' | 'bakery';
-const BUSINESS_CATEGORIES: { id: BusinessCategory; label: string; emoji: string }[] = [
-  { id: 'all', label: 'الكل', emoji: '🏬' },
-  { id: 'grocery', label: 'بقالة وتموينات', emoji: '🛒' },
-  { id: 'restaurant', label: 'مطاعم ومقاهي', emoji: '🍽️' },
-  { id: 'pharmacy', label: 'صيدليات وعناية', emoji: '💊' },
-  { id: 'laundry', label: 'مغاسل وتنظيف', emoji: '🧺' },
-  { id: 'salon', label: 'حلاقة وصالونات', emoji: '✂️' },
-  { id: 'repair', label: 'صيانة وورش', emoji: '🔧' },
-  { id: 'bakery', label: 'مخابز وحلويات', emoji: '🥖' },
+const BUSINESS_CATEGORIES: { id: BusinessCategory; label: string; Icon: any }[] = [
+  { id: 'all', label: 'كل المحلات', Icon: Store },
+  { id: 'grocery', label: 'بقالة وتموينات', Icon: ShoppingBag },
+  { id: 'restaurant', label: 'مطاعم ومقاهي', Icon: Utensils },
+  { id: 'pharmacy', label: 'صيدليات وعناية', Icon: Pill },
+  { id: 'laundry', label: 'مغاسل وتنظيف', Icon: Shirt },
+  { id: 'salon', label: 'حلاقة وصالونات', Icon: Scissors },
+  { id: 'repair', label: 'صيانة وورش', Icon: Wrench },
+  { id: 'bakery', label: 'مخابز وحلويات', Icon: Croissant },
 ];
 
 type EventCategory = 'all' | 'community' | 'volunteer' | 'sports' | 'family' | 'culture';
-const EVENT_CATEGORIES: { id: EventCategory; label: string; emoji: string }[] = [
-  { id: 'all', label: 'الكل', emoji: '🌟' },
-  { id: 'community', label: 'ملتقيات الجيران', emoji: '☕' },
-  { id: 'volunteer', label: 'مبادرات وتطوع', emoji: '🌿' },
-  { id: 'sports', label: 'رياضية وشبابية', emoji: '⚽' },
-  { id: 'family', label: 'عائلية وأطفال', emoji: '👨‍👩‍👧‍👦' },
-  { id: 'culture', label: 'ثقافة ومجتمع', emoji: '🎨' },
+const EVENT_CATEGORIES: { id: EventCategory; label: string; Icon: any }[] = [
+  { id: 'all', label: 'كل الفعاليات', Icon: Calendar },
+  { id: 'community', label: 'ملتقيات الجيران', Icon: UsersRound },
+  { id: 'volunteer', label: 'مبادرات وتطوع', Icon: HeartHandshake },
+  { id: 'sports', label: 'رياضية وشبابية', Icon: Trophy },
+  { id: 'family', label: 'عائلية وأطفال', Icon: House },
+  { id: 'culture', label: 'ثقافة ومجتمع', Icon: Palette },
 ];
 
 export default function Market() {
@@ -132,6 +132,10 @@ export default function Market() {
   const [eventCategory, setEventCategory] = useState<EventCategory>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('newest');
+  const [filterMenu, setFilterMenu] = useState<'sort' | 'category' | null>(null);
+  const [eventAttendees, setEventAttendees] = useState<any[]>([]);
+  const [loadingAttendees, setLoadingAttendees] = useState(false);
+  const [attendeeActionBusy, setAttendeeActionBusy] = useState(false);
   const [savedItems, setSavedItems] = useState<Record<string, boolean>>({});
 
   // Location State
@@ -236,7 +240,7 @@ export default function Market() {
         whatsapp: b.whatsapp || '',
         openNow: b.is_open ?? true,
         is_verified: Boolean(b.is_verified),
-        icon: BUSINESS_CATEGORIES.find((c) => c.id === b.category)?.emoji || '🏪',
+        Icon: BUSINESS_CATEGORIES.find((c) => c.id === b.category)?.Icon || Store,
         color: '#059669',
         bg: '#ecfdf5',
         hours: b.working_hours || 'ساعات العمل حسب التنسيق',
@@ -258,9 +262,10 @@ export default function Market() {
         dateLabel: ev.date_label || (ev.starts_at ? new Date(ev.starts_at).toLocaleString('ar-SA') : 'قريباً'),
         location: ev.location_name || 'نقطة التجمع بالحي',
         organizer: ev.organizer?.display_name || 'أحد سكان الحي',
+        organizerId: ev.organizer_id,
         attendeesCount: ev.attendees_count || 0,
         isFree: ev.is_free ?? true,
-        icon: EVENT_CATEGORIES.find((c) => c.id === ev.category)?.emoji || '🌟',
+        Icon: EVENT_CATEGORIES.find((c) => c.id === ev.category)?.Icon || Calendar,
         color: '#059669',
         bg: '#ecfdf5',
         description: ev.description || 'نشاط مجتمعي يجمع الجيران في أجواء طيبة ومميزة.',
@@ -400,15 +405,49 @@ export default function Market() {
     } catch {}
   };
 
-  const toggleRsvp = (eventId: string) => {
-    setRsvpList((prev) => {
-      const next = !prev[eventId];
-      if (next) {
-        Alert.alert('تم تسجيل حضورك بنجاح! 🎉', 'يسعدنا تواجدك مع جيرانك في الفعالية، ونتمنى لكم وقتاً ممتعاً.');
+  const toggleRsvp = async (eventId: string) => {
+    const { data: auth } = await supabase.auth.getUser();
+    const userId = auth.user?.id;
+    if (!userId) { router.push('/auth'); return; }
+    const attending = Boolean(rsvpList[eventId]);
+    setAttendeeActionBusy(true);
+    try {
+      if (attending) {
+        const { error } = await supabase.from('event_attendees').delete().eq('event_id', eventId).eq('user_id', userId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('event_attendees').upsert({ event_id: eventId, user_id: userId, status: 'going' }, { onConflict: 'event_id,user_id' });
+        if (error) throw error;
       }
-      return { ...prev, [eventId]: next };
-    });
+      setRsvpList((prev) => ({ ...prev, [eventId]: !attending }));
+      setEvents((prev) => prev.map((ev) => ev.id === eventId ? { ...ev, attendeesCount: Math.max(0, (ev.attendeesCount || 0) + (attending ? -1 : 1)) } : ev));
+      if (!attending) Alert.alert('تم تسجيل حضورك', 'تم تسجيل مشاركتك في الفعالية.');
+      if (selectedEvent?.id === eventId) setSelectedEvent((prev: any) => prev ? { ...prev, attendeesCount: Math.max(0, (prev.attendeesCount || 0) + (attending ? -1 : 1)) } : prev);
+    } catch (error: any) {
+      Alert.alert('تعذر تحديث الحضور', error?.message || 'حاول مرة أخرى بعد قليل.');
+    } finally { setAttendeeActionBusy(false); }
   };
+
+  useEffect(() => {
+    const loadRsvpAndAttendees = async () => {
+      if (!selectedEvent) { setEventAttendees([]); return; }
+      const { data: auth } = await supabase.auth.getUser();
+      const userId = auth.user?.id;
+      if (userId) {
+        const { data: mine } = await supabase.from('event_attendees').select('event_id,status').eq('event_id', selectedEvent.id).eq('user_id', userId).maybeSingle();
+        setRsvpList((prev) => ({ ...prev, [selectedEvent.id]: Boolean(mine && mine.status !== 'cancelled') }));
+      }
+      if (userId && selectedEvent.organizerId === userId) {
+        setLoadingAttendees(true);
+        const { data, error } = await supabase.from('event_attendees')
+          .select('user_id,status,created_at,profile:profiles!event_attendees_user_id_fkey(display_name,username,avatar_url)')
+          .eq('event_id', selectedEvent.id).eq('status', 'going').order('created_at', { ascending: false });
+        if (!error) setEventAttendees(data || []);
+        setLoadingAttendees(false);
+      } else setEventAttendees([]);
+    };
+    void loadRsvpAndAttendees();
+  }, [selectedEvent?.id, selectedEvent?.organizerId]);
 
   const openPhone = (phone?: string) => {
     if (!phone) return;
@@ -549,7 +588,7 @@ export default function Market() {
         <View style={styles.cardBody}>
           <Text style={styles.cardTitle} numberOfLines={1}>{item.name}</Text>
           <Text style={styles.cardSub} numberOfLines={1}>
-            {item.shop_name ? `🏪 ${item.shop_name}` : (item.subcategory || item.profiles?.display_name || item.category || 'عرض محلي')}
+            {item.shop_name ? item.shop_name : (item.subcategory || item.profiles?.display_name || item.category || 'عرض محلي')}
           </Text>
 
           <View style={styles.cardFooter}>
@@ -591,7 +630,7 @@ export default function Market() {
         ]}
       >
         <View style={[styles.cardImage, { height: w * 0.58, backgroundColor: b.bg || '#f0f9ff' }]}>
-          <Text style={{ fontSize: Math.min(36, w * 0.22) }}>{b.icon || '🏬'}</Text>
+          <Text style={{ fontSize: Math.min(36, w * 0.22) }}><b.Icon size={34} color={b.color || '#0284c7'} /></Text>
           <View style={[styles.typeBadge, { backgroundColor: 'rgba(255,255,255,0.96)' }]}>
             <Text style={[styles.typeBadgeText, { color: b.color || '#0284c7' }]}>{b.categoryLabel}</Text>
           </View>
@@ -710,12 +749,12 @@ export default function Market() {
         ]}
       >
         <View style={[styles.cardImage, { height: w * 0.58, backgroundColor: ev.bg || '#ecfdf5' }]}>
-          <Text style={{ fontSize: Math.min(36, w * 0.22) }}>{ev.icon || '🗓️'}</Text>
+          <Text style={{ fontSize: Math.min(36, w * 0.22) }}><ev.Icon size={34} color={ev.color || '#059669'} /></Text>
           <View style={[styles.typeBadge, { backgroundColor: 'rgba(255,255,255,0.96)' }]}>
             <Text style={[styles.typeBadgeText, { color: ev.color || '#059669' }]}>{ev.categoryLabel}</Text>
           </View>
           <View style={[styles.availableBadgePill, { backgroundColor: '#ecfdf5', borderColor: '#a7f3d0' }]}>
-            <Text style={[styles.availableBadgeText, { color: '#047857' }]}>{ev.isFree ? 'مجاني 🎟️' : 'تسجيل'}</Text>
+            <Text style={[styles.availableBadgeText, { color: '#047857' }]}>{ev.isFree ? 'مجاني' : 'تسجيل'}</Text>
           </View>
           <View style={styles.cardTopActions}>
             <Pressable
@@ -824,32 +863,11 @@ export default function Market() {
                     </View>
                   </View>
 
-                  <Text style={styles.heroTitle}>سوق وتجارة الجيران</Text>
-                  <Text style={styles.heroSubtitle}>منتجات وخدمات وأعمال محلية في مكان واحد.</Text>
+                  <Text style={styles.heroTitle}>سوق الحي</Text>
+                  <Text style={styles.heroSubtitle}>عروض الجيران، دليل المحلات، وفعاليات الحي في مكان واحد.</Text>
                 </View>
               </View>
 
-              {/* High-Contrast Live KPI Ribbon */}
-              <View style={styles.kpiRow}>
-                <View style={styles.kpiItem}>
-                  <ShoppingBag size={15} color="#a7f3d0" />
-                  <Text style={styles.kpiVal}>{inAreaMarket.length}</Text>
-                  <Text style={styles.kpiLbl}>عروض نشطة</Text>
-                </View>
-                <View style={styles.kpiDivider} />
-                <View style={styles.kpiItem}>
-                  <Store size={15} color="#a7f3d0" />
-                  <Text style={styles.kpiVal}>{displayedBusinesses.length}</Text>
-                  <Text style={styles.kpiLbl}>محلات ومتاجر</Text>
-                </View>
-                <View style={styles.kpiDivider} />
-                <View style={styles.kpiItem}>
-                  <Calendar size={15} color="#a7f3d0" />
-                  <Text style={styles.kpiVal}>{displayedEvents.length}</Text>
-                  <Text style={styles.kpiLbl}>فعاليات مجدولة</Text>
-                </View>
-
-              </View>
             </LinearGradient>
           </View>
         </View>
@@ -866,7 +884,7 @@ export default function Market() {
                 style={[styles.segmentBtn, section === 'market' && styles.segmentBtnActive]}
               >
                 <ShoppingBag size={14} color={section === 'market' ? '#fff' : '#64748b'} />
-                <Text style={[styles.segmentText, section === 'market' && styles.segmentTextActive]}>سوق الحي والأسر</Text>
+                <Text style={[styles.segmentText, section === 'market' && styles.segmentTextActive]}>سوق الحي</Text>
                 <View style={[styles.segmentCount, section === 'market' && styles.segmentCountActive]}>
                   <Text style={[styles.segmentCountText, section === 'market' && styles.segmentCountTextActive]}>
                     {inAreaMarket.length}
@@ -879,7 +897,7 @@ export default function Market() {
                 style={[styles.segmentBtn, section === 'businesses' && styles.segmentBtnActive]}
               >
                 <Building2 size={14} color={section === 'businesses' ? '#fff' : '#64748b'} />
-                <Text style={[styles.segmentText, section === 'businesses' && styles.segmentTextActive]}>دليل المحلات والأنشطة</Text>
+                <Text style={[styles.segmentText, section === 'businesses' && styles.segmentTextActive]}>دليل المحلات</Text>
                 <View style={[styles.segmentCount, section === 'businesses' && styles.segmentCountActive]}>
                   <Text style={[styles.segmentCountText, section === 'businesses' && styles.segmentCountTextActive]}>
                     {displayedBusinesses.length}
@@ -892,7 +910,7 @@ export default function Market() {
                 style={[styles.segmentBtn, section === 'events' && styles.segmentBtnActive]}
               >
                 <Calendar size={14} color={section === 'events' ? '#fff' : '#64748b'} />
-                <Text style={[styles.segmentText, section === 'events' && styles.segmentTextActive]}>ملتقيات وفعاليات</Text>
+                <Text style={[styles.segmentText, section === 'events' && styles.segmentTextActive]}>الفعاليات</Text>
                 <View style={[styles.segmentCount, section === 'events' && styles.segmentCountActive]}>
                   <Text style={[styles.segmentCountText, section === 'events' && styles.segmentCountTextActive]}>
                     {displayedEvents.length}
@@ -933,26 +951,16 @@ export default function Market() {
               </Pressable>
             </View>
 
-            {/* Smart Sorting Bar */}
-            <View style={styles.sortBar}>
-              <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}>
-                <ArrowUpDown size={12} color="#64748b" />
-                <Text style={styles.sortBarLabel}>ترتيب</Text>
-              </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row-reverse', gap: 6 }}>
-                {SORT_OPTIONS.map((opt) => (
-                  <Pressable
-                    key={opt.id}
-                    onPress={() => setSortBy(opt.id)}
-                    style={[styles.sortChip, sortBy === opt.id && styles.sortChipActive]}
-                  >
-                    <Text style={{ fontSize: 12, fontWeight: '800' }}>{opt.icon}</Text>
-                    <Text style={[styles.sortChipText, sortBy === opt.id && styles.sortChipTextActive]}>
-                      {opt.label}
-                    </Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
+            <View style={styles.filterControlsRow}>
+              <Pressable style={styles.filterSelect} onPress={() => setFilterMenu('sort')}>
+                <ArrowUpDown size={15} color="#64748b" /><Text style={styles.filterSelectLabel}>الترتيب</Text>
+                <Text style={styles.filterSelectValue}>{SORT_OPTIONS.find((o) => o.id === sortBy)?.label || 'الأحدث'}</Text><ChevronDown size={15} color="#64748b" />
+              </Pressable>
+              <Pressable style={styles.filterSelect} onPress={() => setFilterMenu('category')}>
+                <SlidersHorizontal size={15} color="#64748b" /><Text style={styles.filterSelectLabel}>التصفية</Text>
+                <Text style={styles.filterSelectValue} numberOfLines={1}>{section === 'market' ? (activeType === 'all' ? QUICK_FILTERS.find((f) => f.id === quick)?.label || 'كل العروض' : LISTING_TYPES.find((t) => t.id === activeType)?.short || 'كل العروض') : section === 'businesses' ? (BUSINESS_CATEGORIES.find((c) => c.id === businessCategory)?.label || 'كل المحلات') : (EVENT_CATEGORIES.find((c) => c.id === eventCategory)?.label || 'كل الفعاليات')}</Text>
+                <ChevronDown size={15} color="#64748b" />
+              </Pressable>
             </View>
           </View>
         </View>
@@ -974,45 +982,13 @@ export default function Market() {
               {/* ======================================================== */}
               {section === 'market' && (
                 <>
-                  {/* Category Circles */}
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.typesRow} style={styles.typesScroll}>
-                    <TypeCircle
-                      label="الكل"
-                      active={activeType === 'all'}
-                      color="#059669"
-                      bg="#ecfdf5"
-                      Icon={LayoutGrid}
-                      count={inAreaMarket.length}
-                      onPress={() => setActiveType('all')}
-                    />
-                    {LISTING_TYPES.map((t) => (
-                      <TypeCircle
-                        key={t.id}
-                        label={t.short}
-                        active={activeType === t.id}
-                        color={t.color}
-                        bg={t.bg}
-                        Icon={t.Icon}
-                        count={typeCounts[t.id] || 0}
-                        onPress={() => setActiveType(activeType === t.id ? 'all' : t.id)}
-                      />
-                    ))}
-                  </ScrollView>
-
-                  {/* Quick Filter Chips */}
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickRow}>
-                    {QUICK_FILTERS.map((f) => (
-                      <Pressable key={f.id} onPress={() => setQuick(f.id)} style={[styles.quickChip, quick === f.id && styles.quickChipActive]}>
-                        <Text style={[styles.quickText, quick === f.id && styles.quickTextActive]}>{f.label}</Text>
-                      </Pressable>
-                    ))}
-                  </ScrollView>
+                  <View style={styles.filterHintRow}><SlidersHorizontal size={14} color="#64748b" /><Text style={styles.filterHintText}>اختر نوع العرض أو حالته من قائمة التصفية</Text></View>
 
                   {/* Productive Families Spotlight */}
                   {families.length > 0 && (
                     <View style={{ marginBottom: 18 }}>
                       <View style={styles.sectionHead}>
-                        <Text style={styles.sectionTitle}>🏠 من الأسر المنتجة في حيّك</Text>
+                        <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}><House size={16} color="#059669" /><Text style={styles.sectionTitle}>من الأسر المنتجة في حيّك</Text></View>
                         <Pressable onPress={() => setActiveType('home_family')}>
                           <Text style={styles.seeAll}>عرض الكل</Text>
                         </Pressable>
@@ -1055,23 +1031,10 @@ export default function Market() {
               {/* ======================================================== */}
               {section === 'businesses' && (
                 <>
-                  {/* Category Pills */}
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickRow} style={{ marginTop: 12 }}>
-                    {BUSINESS_CATEGORIES.map((c) => (
-                      <Pressable
-                        key={c.id}
-                        onPress={() => setBusinessCategory(c.id)}
-                        style={[styles.quickChip, businessCategory === c.id && styles.quickChipActive]}
-                      >
-                        <Text style={[styles.quickText, businessCategory === c.id && styles.quickTextActive]}>
-                          {c.emoji} {c.label}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </ScrollView>
+                  <View style={styles.filterHintRow}><SlidersHorizontal size={14} color="#64748b" /><Text style={styles.filterHintText}>صفِّ المحلات حسب النشاط من قائمة التصفية</Text></View>
 
                   <View style={styles.sectionHead}>
-                    <Text style={styles.sectionTitle}>المحلات والأنشطة التجارية في الحي</Text>
+                    <Text style={styles.sectionTitle}>دليل المحلات في الحي</Text>
                     <Text style={styles.resultCount}>{displayedBusinesses.length} منشأة</Text>
                   </View>
 
@@ -1082,7 +1045,7 @@ export default function Market() {
                   ) : (
                     <View style={styles.emptyState}>
                       <View style={[styles.emptyIcon, { backgroundColor: '#f0f9ff' }]}><Building2 size={32} color="#0284c7" /></View>
-                      <Text style={styles.emptyTitle}>دليل المحلات والأنشطة التجارية</Text>
+                      <Text style={styles.emptyTitle}>دليل المحلات</Text>
                       <Text style={styles.emptyText}>
                         لم يتم تسجيل محلات في هذا التصنيف بعد. هل تملك بقالة، مغسلة، صيدلية، أو نشاطاً تجارياً؟ سجله مجاناً ليظهر لجميع سكان الحي!
                       </Text>
@@ -1100,23 +1063,10 @@ export default function Market() {
               {/* ======================================================== */}
               {section === 'events' && (
                 <>
-                  {/* Event Category Pills */}
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickRow} style={{ marginTop: 12 }}>
-                    {EVENT_CATEGORIES.map((c) => (
-                      <Pressable
-                        key={c.id}
-                        onPress={() => setEventCategory(c.id)}
-                        style={[styles.quickChip, eventCategory === c.id && styles.quickChipActive]}
-                      >
-                        <Text style={[styles.quickText, eventCategory === c.id && styles.quickTextActive]}>
-                          {c.emoji} {c.label}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </ScrollView>
+                  <View style={styles.filterHintRow}><SlidersHorizontal size={14} color="#64748b" /><Text style={styles.filterHintText}>صفِّ الفعاليات حسب نوع النشاط من قائمة التصفية</Text></View>
 
                   <View style={styles.sectionHead}>
-                    <Text style={styles.sectionTitle}>فعاليات وأنشطة الحي القادمة</Text>
+                    <Text style={styles.sectionTitle}>فعاليات الحي القادمة</Text>
                     <Text style={styles.resultCount}>{displayedEvents.length} فعالية</Text>
                   </View>
 
@@ -1144,6 +1094,25 @@ export default function Market() {
         </View>
       </ScrollView>
 
+      <Modal visible={!!filterMenu} transparent animationType="fade" onRequestClose={() => setFilterMenu(null)}>
+        <Pressable style={styles.filterModalBackdrop} onPress={() => setFilterMenu(null)}>
+          <View style={styles.filterMenuCard}>
+            <View style={styles.filterMenuHeader}><Text style={styles.filterMenuTitle}>{filterMenu === 'sort' ? 'ترتيب النتائج' : 'تصفية النتائج'}</Text><Pressable onPress={() => setFilterMenu(null)} style={styles.modalCloseBtn}><X size={17} color="#0f172a" /></Pressable></View>
+            <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
+              {filterMenu === 'sort' ? SORT_OPTIONS.map((opt) => <Pressable key={opt.id} style={styles.filterMenuItem} onPress={() => { setSortBy(opt.id); setFilterMenu(null); }}><opt.Icon size={18} color={sortBy === opt.id ? '#059669' : '#64748b'} /><Text style={[styles.filterMenuItemText, sortBy === opt.id && { color: '#047857', fontWeight: '900' }]}>{opt.label}</Text>{sortBy === opt.id && <Check size={17} color="#059669" />}</Pressable>) : section === 'market' ? (
+                <>
+                  <Pressable style={styles.filterMenuItem} onPress={() => { setActiveType('all'); setQuick('all'); setFilterMenu(null); }}><LayoutGrid size={18} color="#64748b" /><Text style={styles.filterMenuItemText}>كل العروض</Text></Pressable>
+                  {LISTING_TYPES.map((t) => <Pressable key={t.id} style={styles.filterMenuItem} onPress={() => { setActiveType(t.id); setFilterMenu(null); }}><t.Icon size={18} color={activeType === t.id ? '#059669' : t.color} /><Text style={styles.filterMenuItemText}>{t.label}</Text>{activeType === t.id && <Check size={17} color="#059669" />}</Pressable>)}
+                  <View style={styles.filterMenuDivider} />
+                  {QUICK_FILTERS.map((f) => <Pressable key={f.id} style={styles.filterMenuItem} onPress={() => { setQuick(f.id); setFilterMenu(null); }}>{f.Icon && <f.Icon size={18} color={quick === f.id ? '#059669' : '#64748b'} />}<Text style={styles.filterMenuItemText}>{f.label}</Text>{quick === f.id && <Check size={17} color="#059669" />}</Pressable>)}
+                </>
+              ) : section === 'businesses' ? BUSINESS_CATEGORIES.map((c) => <Pressable key={c.id} style={styles.filterMenuItem} onPress={() => { setBusinessCategory(c.id); setFilterMenu(null); }}><c.Icon size={18} color={businessCategory === c.id ? '#059669' : '#64748b'} /><Text style={styles.filterMenuItemText}>{c.label}</Text>{businessCategory === c.id && <Check size={17} color="#059669" />}</Pressable>) : EVENT_CATEGORIES.map((c) => <Pressable key={c.id} style={styles.filterMenuItem} onPress={() => { setEventCategory(c.id); setFilterMenu(null); }}><c.Icon size={18} color={eventCategory === c.id ? '#059669' : '#64748b'} /><Text style={styles.filterMenuItemText}>{c.label}</Text>{eventCategory === c.id && <Check size={17} color="#059669" />}</Pressable>)}
+            </ScrollView>
+            <Pressable style={styles.filterResetBtn} onPress={() => { setActiveType('all'); setBusinessCategory('all'); setEventCategory('all'); setQuick('all'); setFilterMenu(null); }}><Text style={styles.filterResetText}>إعادة ضبط التصفية</Text></Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+
       {/* ======================================================== */}
       {/* MODAL 1: BUSINESS DETAILS                                */}
       {/* ======================================================== */}
@@ -1164,7 +1133,7 @@ export default function Market() {
               <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
                 <View style={[styles.detailHeroBox, { backgroundColor: selectedBusiness.bg || '#f0f9ff' }]}>
                   <View style={styles.detailHeroIconCircle}>
-                    <Text style={{ fontSize: 34 }}>{selectedBusiness.icon || '🏬'}</Text>
+                    <Text style={{ fontSize: 34 }}><selectedBusiness.Icon size={34} color={selectedBusiness.color || '#0284c7'} /></Text>
                   </View>
                   <View style={{ alignItems: 'center', marginTop: 10, gap: 4 }}>
                     <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
@@ -1193,7 +1162,7 @@ export default function Market() {
                   </View>
                   <View style={[styles.statusTag, selectedBusiness.openNow ? styles.statusTagOpen : styles.statusTagClosed]}>
                     <Text style={[styles.statusTagText, selectedBusiness.openNow ? { color: '#15803d' } : { color: '#b91c1c' }]}>
-                      {selectedBusiness.openNow ? 'مفتوح الآن 🟢' : 'مغلق حالياً 🔴'}
+                      {selectedBusiness.openNow ? 'مفتوح الآن' : 'مغلق حالياً'}
                     </Text>
                   </View>
                 </View>
@@ -1282,7 +1251,7 @@ export default function Market() {
               <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
                 <View style={[styles.detailHeroBox, { backgroundColor: selectedEvent.bg || '#ecfdf5' }]}>
                   <View style={styles.detailHeroIconCircle}>
-                    <Text style={{ fontSize: 34 }}>{selectedEvent.icon || '🗓️'}</Text>
+                    <Text style={{ fontSize: 34 }}><selectedEvent.Icon size={34} color={selectedEvent.color || '#059669'} /></Text>
                   </View>
                   <View style={{ alignItems: 'center', marginTop: 10, gap: 4 }}>
                     <Text style={styles.detailHeroTitle}>{selectedEvent.title}</Text>
@@ -1293,7 +1262,7 @@ export default function Market() {
                       <View style={[styles.detailRatingPill, { backgroundColor: '#ecfdf5', borderColor: '#a7f3d0' }]}>
                         <Award size={13} color="#059669" />
                         <Text style={{ fontSize: 12, fontWeight: '800', color: '#047857' }}>
-                          {selectedEvent.isFree ? 'دخول مجاني 🎟️' : 'تسجيل مسبق'}
+                          {selectedEvent.isFree ? 'دخول مجاني' : 'تسجيل مسبق'}
                         </Text>
                       </View>
                     </View>
@@ -1311,7 +1280,7 @@ export default function Market() {
                   <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}>
                     <Users size={14} color="#059669" />
                     <Text style={{ fontSize: 12.5, fontWeight: '900', color: '#059669' }}>
-                      {selectedEvent.attendeesCount + (rsvpList[selectedEvent.id] ? 1 : 0)} جار مسجل
+                      {selectedEvent.attendeesCount || 0} جار مسجل
                     </Text>
                   </View>
                 </View>
@@ -1365,10 +1334,20 @@ export default function Market() {
                 </View>
 
                 <View style={styles.detailSectionBox}>
-                  <Text style={styles.detailSectionTitle}>عن الفعالية والنشاط ℹ️</Text>
+                  <Text style={styles.detailSectionTitle}>عن الفعالية والنشاط</Text>
                   <Text style={styles.detailSectionDesc}>{selectedEvent.description}</Text>
                 </View>
 
+
+                {selectedEvent.organizerId === profile?.id && (
+                  <View style={styles.detailSectionBox}>
+                    <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                      <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 7 }}><Users size={17} color="#059669" /><Text style={styles.detailSectionTitle}>قائمة المشاركين في فعاليتك</Text></View>
+                      <Text style={{ fontSize: 11, color: '#64748b', fontWeight: '700' }}>{eventAttendees.length} مشارك</Text>
+                    </View>
+                    {loadingAttendees ? <ActivityIndicator color="#059669" style={{ marginTop: 10 }} /> : eventAttendees.length ? <View style={{ gap: 10, marginTop: 10 }}>{eventAttendees.map((attendee) => <View key={attendee.user_id} style={styles.attendeeRow}><View style={styles.attendeeAvatar}>{attendee.profile?.avatar_url ? <Image source={{ uri: attendee.profile.avatar_url }} style={StyleSheet.absoluteFillObject} /> : <User size={17} color="#64748b" />}</View><View style={{ flex: 1, alignItems: 'flex-end', gap: 2 }}><Text style={{ fontSize: 13, color: '#0f172a', fontWeight: '800' }}>{attendee.profile?.display_name || attendee.profile?.username || 'جارٍ مشارك'}</Text><Text style={{ fontSize: 11, color: '#64748b' }}>مسجل لحضور الفعالية</Text></View><BadgeCheck size={16} color="#059669" /></View>)}</View> : <Text style={[styles.detailSectionDesc, { marginTop: 8 }]}>لا يوجد مشاركون مسجلون حتى الآن.</Text>}
+                  </View>
+                )}
                 <View style={{ height: 20 }} />
               </ScrollView>
             </View>
@@ -1407,7 +1386,7 @@ export default function Market() {
                   </View>
 
                   <Text style={styles.productModalSub}>
-                    {selectedProduct.shop_name ? `🏪 ${selectedProduct.shop_name}` : selectedProduct.subcategory || selectedProduct.category || 'عرض محلي'}
+                    {selectedProduct.shop_name ? selectedProduct.shop_name : selectedProduct.subcategory || selectedProduct.category || 'عرض محلي'}
                   </Text>
 
                   {/* Delivery & Status row */}
@@ -1421,7 +1400,7 @@ export default function Market() {
                       const dm = getDeliveryMode(m);
                       return dm ? (
                         <View key={m} style={styles.deliveryPill}>
-                          <Text style={{ fontSize: 12 }}>{dm.emoji}</Text>
+                          {m === 'delivery' ? <Truck size={14} color="#475569" /> : m === 'remote' ? <ExternalLink size={14} color="#475569" /> : m === 'home_visit' ? <User size={14} color="#475569" /> : m === 'at_shop' ? <Store size={14} color="#475569" /> : <Package size={14} color="#475569" />}
                           <Text style={styles.deliveryPillText}>{dm.label}</Text>
                         </View>
                       ) : null;
@@ -1438,7 +1417,7 @@ export default function Market() {
 
                   {/* Description */}
                   <View style={styles.detailSectionBox}>
-                    <Text style={styles.detailSectionTitle}>وصف السلعة والتفاصيل 📝</Text>
+                    <Text style={styles.detailSectionTitle}>وصف السلعة والتفاصيل</Text>
                     <Text style={styles.detailSectionDesc}>
                       {selectedProduct.description || 'عرض متاح من أحد سكان أو أسر الحي، تم فحصه لضمان أفضل تجربة.'}
                     </Text>
@@ -1703,6 +1682,23 @@ const styles = StyleSheet.create({
   kpiLbl: { fontSize: 10, color: '#a7f3d0', fontWeight: '700' },
   kpiDivider: { width: 1, height: 22, backgroundColor: 'rgba(255,255,255,0.18)' },
 
+  filterControlsRow: { flexDirection: 'row-reverse', gap: 10, marginTop: 10 },
+  filterSelect: { flex: 1, minWidth: 0, flexDirection: 'row-reverse', alignItems: 'center', gap: 6, backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 11 },
+  filterSelectLabel: { fontSize: 10, color: '#64748b', fontWeight: '700' },
+  filterSelectValue: { flex: 1, fontSize: 11.5, color: '#0f172a', fontWeight: '900', textAlign: 'right' },
+  filterHintRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, paddingTop: 10, paddingBottom: 2 },
+  filterHintText: { fontSize: 11, color: '#64748b', fontWeight: '600' },
+  filterModalBackdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.35)', justifyContent: 'center', padding: 22 },
+  filterMenuCard: { backgroundColor: '#fff', borderRadius: 18, padding: 14, maxWidth: 520, width: '100%', alignSelf: 'center', maxHeight: '85%' },
+  filterMenuHeader: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: '#f1f5f9', marginBottom: 4 },
+  filterMenuTitle: { fontSize: 15, fontWeight: '900', color: '#0f172a' },
+  filterMenuItem: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#f8fafc' },
+  filterMenuItemText: { flex: 1, textAlign: 'right', fontSize: 13, color: '#334155', fontWeight: '700' },
+  filterMenuDivider: { height: 1, backgroundColor: '#e2e8f0', marginVertical: 5 },
+  filterResetBtn: { alignItems: 'center', paddingVertical: 11, marginTop: 8, borderRadius: 10, backgroundColor: '#f1f5f9' },
+  filterResetText: { fontSize: 12, color: '#475569', fontWeight: '800' },
+  attendeeRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
+  attendeeAvatar: { width: 36, height: 36, borderRadius: 18, overflow: 'hidden', backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' },
   // Sticky Wrap
   stickyWrap: {
     backgroundColor: '#fff',
