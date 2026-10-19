@@ -448,6 +448,17 @@ export default function AskScreen() {
         contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomNavInset + 40 }]}
         showsVerticalScrollIndicator={false}
       >
+        <View style={styles.welcomeCard}>
+          <View style={styles.welcomeIcon}>
+            <MessageSquare size={26} color="#059669" />
+          </View>
+          <View style={styles.welcomeCopy}>
+            <Text style={styles.welcomeTitle}>أهلاً بك 👋</Text>
+            <Text style={styles.welcomeText}>اكتب استفسارك أو بلاغك، وسيصل إلى أهل حيك.</Text>
+            <Text style={styles.welcomeLocation}>{district ? `حي ${district}` : ''}${district && city ? ' · ' : ''}${city || 'جارٍ تحديد الموقع تلقائياً'}</Text>
+          </View>
+        </View>
+
         {/* Post Type Selector Tabs */}
         <View style={styles.postTypeContainer}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.postTypeTabs}>
@@ -539,26 +550,6 @@ export default function AskScreen() {
           </View>
         </View>
 
-        {/* Quick Suggested Templates */}
-        <View style={styles.templatesContainer}>
-          <Text style={styles.templatesTitle}>💡 أفكار ونماذج سريعة بنقرة زر:</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.templatesScroll}>
-            {QUICK_TEMPLATES.map((tmpl, idx) => (
-              <Pressable
-                key={idx}
-                style={styles.templateChip}
-                onPress={() => {
-                  setPostType(tmpl.type as any);
-                  setTitle(tmpl.title);
-                  setBody(tmpl.body);
-                }}
-              >
-                <Text style={styles.templateChipText}>{tmpl.label}</Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-        </View>
-
         {/* Emergency Alert Banner */}
         {(safetyCheck?.isEmergency || postType === 'emergency') && (
           <View style={styles.emergencyCard}>
@@ -582,25 +573,6 @@ export default function AskScreen() {
             </View>
           </View>
         )}
-
-        {/* AI Enhancement Action Banner */}
-        <Pressable
-          style={styles.aiBanner}
-          onPress={handleAIEnhance}
-          disabled={enhancing}
-        >
-          {enhancing ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <Sparkles size={17} color="#fff" />
-          )}
-          <View style={{ flex: 1, alignItems: 'flex-end' }}>
-            <Text style={styles.aiBannerTitle}>تحسين وتنسيق السؤال بالذكاء الاصطناعي ✨</Text>
-            <Text style={styles.aiBannerSub}>
-              صياغة مهذبة وواضحة وإضافة تحية جيران الحي تلقائياً بنقرة زر
-            </Text>
-          </View>
-        </Pressable>
 
         {/* Input: Title */}
         <View style={styles.inputGroup}>
@@ -669,56 +641,6 @@ export default function AskScreen() {
               placeholder="مثال: 30 ر.س (اتركه فارغاً إذا كان فزعة وتطوع بدون مقابل)"
               placeholderTextColor="#94a3b8"
             />
-          </View>
-        )}
-
-        {/* AI Smart Insights */}
-        {aiAnalysis && (
-          <View style={styles.aiInsightCard}>
-            <View style={styles.aiInsightHeader}>
-              <View style={styles.aiBadge}>
-                <Sparkles size={13} color="#059669" />
-                <Text style={styles.aiBadgeText}>تصنيف الذكاء</Text>
-              </View>
-              <Text style={styles.aiInsightCategory}>{aiAnalysis.category}</Text>
-            </View>
-
-            {/* Smart Tags */}
-            <View style={styles.tagsRow}>
-              {aiAnalysis.tags.map((t, idx) => (
-                <View key={idx} style={styles.tagPill}>
-                  <Tag size={11} color="#059669" />
-                  <Text style={styles.tagPillText}>#{t}</Text>
-                </View>
-              ))}
-            </View>
-
-            {/* Instant Tip */}
-            <View style={styles.tipBox}>
-              <Text style={styles.tipText}>{aiAnalysis.instantTip}</Text>
-            </View>
-          </View>
-        )}
-
-        {/* AI Similar Questions Found */}
-        {similarQuestions.length > 0 && (
-          <View style={styles.similarCard}>
-            <View style={styles.similarHeader}>
-              <HelpCircle size={16} color="#d97706" />
-              <Text style={styles.similarTitle}>أسئلة مشابهة سألها جيرانك سابقاً</Text>
-            </View>
-            {similarQuestions.map(sq => (
-              <Pressable
-                key={sq.id}
-                style={styles.similarItem}
-                onPress={() => router.push({ pathname: '/question', params: { id: sq.id } })}
-              >
-                <ExternalLink size={15} color="#059669" />
-                <Text style={styles.similarItemText} numberOfLines={1}>
-                  {sq.title}
-                </Text>
-              </Pressable>
-            ))}
           </View>
         )}
 
@@ -799,6 +721,29 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 16,
   },
+  welcomeCard: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 14,
+    backgroundColor: '#eff6ff',
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: '#dbeafe',
+    padding: 18,
+    marginBottom: 18,
+  },
+  welcomeIcon: {
+    width: 54,
+    height: 54,
+    borderRadius: 18,
+    backgroundColor: '#d1fae5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  welcomeCopy: { flex: 1, alignItems: 'flex-end', gap: 5 },
+  welcomeTitle: { fontSize: 21, fontWeight: '900', color: '#0f172a', textAlign: 'right' },
+  welcomeText: { fontSize: 13, lineHeight: 20, color: '#475569', textAlign: 'right' },
+  welcomeLocation: { fontSize: 12, fontWeight: '800', color: '#059669', textAlign: 'right', marginTop: 2 },
   postTypeContainer: {
     marginBottom: 14,
   },
