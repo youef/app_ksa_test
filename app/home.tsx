@@ -122,14 +122,14 @@ export default function Home() {
       myCount: myQuestions.length + myRequests.length,
       filteredMyQuestions: myQuestions,
       filteredMyRequests: myRequests,
-      emergency: filteredQuestions.filter(isEmergencyQuestion),
+      emergency: [],
       tools: filteredQuestions.filter(isToolQuestion),
     };
   }, [questions, requests, currentUserId, matchesVisibleLocation]);
 
   const items: FeedItem[] = useMemo(() => {
     switch (activeTab) {
-      case 'emergency': return toFeed(derived.emergency, []);
+      case 'emergency': return [];
       case 'tools': return toFeed(derived.tools, []);
       case 'questions': return toFeed(derived.filteredQuestions, []);
       case 'requests': return toFeed([], derived.filteredRequests);
@@ -240,27 +240,25 @@ export default function Home() {
 
         {flags.stories !== false && <StoriesRow profile={feed.profile} stories={feed.stories} selectedDistrict={loc.district} />}
 
-        {emergencyTop && (
-          <View style={styles.emergencyHomeCard}>
-            <View style={styles.emergencyHomeHeader}>
-              <View style={styles.emergencyLiveBadge}>
-                <Text style={styles.emergencyLiveText}>تنبيه مباشر</Text>
-              </View>
-              <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-                <Flame size={18} color="#dc2626" />
-                <Text style={styles.emergencyHomeTitle}>تنبيه طارئ عاجل في حيك</Text>
-              </View>
+        <Pressable
+          onPress={() => router.push('/emergency-alert')}
+          style={[styles.emergencyHomeCard, { marginBottom: 12 }]}
+          accessibilityRole="button"
+          accessibilityLabel="فتح صفحة البلاغات والطوارئ"
+        >
+          <View style={styles.emergencyHomeHeader}>
+            <View style={styles.emergencyLiveBadge}>
+              <Text style={styles.emergencyLiveText}>قسم مستقل</Text>
             </View>
-            <Pressable
-              onPress={() => router.push({ pathname: '/question', params: { id: emergencyTop.id } })}
-              style={styles.emergencyContentBox}
-              accessibilityRole="button"
-              accessibilityLabel={`تنبيه طارئ: ${emergencyTop.title}`}
-            >
-              <Text style={styles.emergencyQuestionTitle}>{emergencyTop.title}</Text>
-            </Pressable>
+            <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
+              <Flame size={18} color="#dc2626" />
+              <Text style={styles.emergencyHomeTitle}>البلاغات والطوارئ</Text>
+            </View>
           </View>
-        )}
+          <View style={styles.emergencyContentBox}>
+            <Text style={styles.emergencyQuestionTitle}>عرض البلاغات المسجلة أو إضافة بلاغ طارئ</Text>
+          </View>
+        </Pressable>
 
         <View style={styles.feedSection}>
           <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, gap: 8 }}>
