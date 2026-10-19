@@ -159,6 +159,28 @@ export default function Questions() {
     await loadQuestions(activeLoc);
   }, [activeLoc, loadQuestions]);
 
+  // Keep the questions screen fresh without requiring a manual page reload.
+  useEffect(() => {
+    let disposed = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const refreshSoon = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (!disposed) void loadQuestions(activeLoc);
+      }, 900);
+    };
+    const channel = supabase
+      .channel(`questions-live-${Math.random().toString(36).slice(2)}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'questions' }, refreshSoon)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'answers' }, refreshSoon);
+    channel.subscribe();
+    return () => {
+      disposed = true;
+      if (timer) clearTimeout(timer);
+      void supabase.removeChannel(channel);
+    };
+  }, [activeLoc, loadQuestions]);
+
   const onSelectLocation = useCallback(async (region: string, city: string, district: string) => {
     const location = { region, city, district };
     await savePermanentMyLocation(location, true);
