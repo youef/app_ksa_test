@@ -377,20 +377,6 @@ export default function AskScreen() {
         return router.replace({ pathname: '/request', params: { id: reqResult.data.id } });
       }
 
-      // Emergency reports have one source of truth: the dedicated urgent_alerts page.
-      // Do not create a duplicate question row for the same emergency.
-      if (postType === 'emergency' || isEmergency) {
-        Alert.alert(
-          'البلاغات والطوارئ',
-          'لمنع تكرار البلاغ، أكمل نشره من صفحة البلاغات والطوارئ مع تحديد الموقع الفعلي.',
-          [
-            { text: 'لاحقاً', style: 'cancel' },
-            { text: 'فتح صفحة البلاغات', onPress: () => router.replace('/emergency-alert') },
-          ],
-        );
-        return;
-      }
-
       // 2. Questions / Tools / Donate / Emergency branch
       const payload: any = {
         author_id: u.user.id,
