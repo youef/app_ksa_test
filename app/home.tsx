@@ -251,9 +251,14 @@ export default function Home() {
           />
         }
       >
-        <LocationScopeBar location={{ region: loc.region, city: loc.city, district: loc.district }} />
-
-        <AtmosphereBar weather={loc.weather} weatherLoading={loc.weatherLoading} />
+        <View style={{ flexDirection: 'row-reverse', alignItems: 'stretch', gap: 8, marginHorizontal: 12, marginTop: 6, marginBottom: 10 }}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <LocationScopeBar compact location={{ region: loc.region, city: loc.city, district: loc.district }} />
+          </View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <AtmosphereBar compact weather={loc.weather} weatherLoading={loc.weatherLoading} />
+          </View>
+        </View>
 
         {flags.stories !== false && <StoriesRow profile={feed.profile} stories={feed.stories} selectedDistrict={loc.district} />}
 
