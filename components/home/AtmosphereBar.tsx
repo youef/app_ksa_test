@@ -16,7 +16,7 @@ export default function AtmosphereBar({ weather, weatherLoading }: Props) {
       : 'الطقس غير متاح حالياً';
 
   return (
-    <View style={[styles.atmosphereBar, { justifyContent: 'flex-start' }]>
+    <View style={[styles.atmosphereBar, { justifyContent: 'flex-start' }]}>
       <View style={styles.atmoItem}>
         <CloudSun size={15} color="#059669" />
         <Text style={styles.atmoText} numberOfLines={1}>{weatherText}</Text>
