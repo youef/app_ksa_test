@@ -15,6 +15,7 @@ import { MapPin, Sparkles } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import AppHeader from '@/components/shared/AppHeader';
 import LocationSelectorModal from '@/components/LocationSelectorModal';
+import LocationScopeBar from '@/components/LocationScopeBar';
 import TwitterInquiryCard from '@/components/TwitterInquiryCard';
 import { getActiveLocation, subscribeLocation, isLocationMatching, savePermanentMyLocation, type HaynaLocation } from '@/lib/locationSync';
 import { getBrandingLogo, getCachedBrandingLogo, subscribeBrandingLogo } from '@/lib/branding';
@@ -235,6 +236,7 @@ export default function Questions() {
           />
         }
       >
+        <LocationScopeBar location={activeLoc} />
         {loading && items.length === 0 ? (
           <View style={styles.stateBox}>
             <ActivityIndicator size="large" color="#16845f" />
