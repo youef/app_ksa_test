@@ -5,6 +5,7 @@ import {
   getActiveLocation,
   setActiveLocation,
   isAllKingdom,
+  isLocationMatching,
   type HaynaLocation,
 } from '@/lib/locationSync';
 import {
@@ -113,34 +114,22 @@ export function useHomeFeed({ onLocation }: Options) {
       if (questionsRes.error) throw questionsRes.error;
       if (requestsRes.error) throw requestsRes.error;
 
-      // Stories: one per author, prioritizing current user's area, with neighbor fallback
+      // Stories obey the same strict location boundary as posts: no neighboring districts
+      // are used as fallback when the current area has no stories.
       const rawStories = ((storiesRes.data ?? []) as Story[]);
       const seen = new Set<string>();
-      const areaStories: Story[] = [];
-      const neighborStories: Story[] = [];
-
-      for (const s of rawStories) {
-        if (!s.author_id || seen.has(s.author_id)) continue;
-        const c = s.profiles?.city || '';
-        const d = s.profiles?.district || '';
-        let isLocal = true;
-        if (!isAllKingdom(loc.city)) {
-          if (loc.city && c && c !== loc.city) isLocal = false;
-          if (loc.district && loc.district !== 'كل الأحياء' && d && d !== loc.district) isLocal = false;
-        }
-        if (isLocal) {
-          areaStories.push(s);
-        } else {
-          neighborStories.push(s);
-        }
-        seen.add(s.author_id);
+      const localStories: Story[] = [];
+      for (const story of rawStories) {
+        if (!story.author_id || seen.has(story.author_id)) continue;
+        if (!isLocationMatching(
+          { city: story.profiles?.city, district: story.profiles?.district },
+          loc.city,
+          loc.district,
+        )) continue;
+        localStories.push(story);
+        seen.add(story.author_id);
       }
-
-      // Prioritize local district, then supplement with city/neighbors
-      const combined = areaStories.length > 0
-        ? [...areaStories, ...neighborStories.slice(0, Math.max(0, 8 - areaStories.length))]
-        : neighborStories.slice(0, 10);
-      setStories(combined);
+      setStories(localStories.slice(0, 10));
 
       const qRows = dedupe((questionsRes.data ?? []) as Question[], 'author_id');
       const rRows = dedupe((requestsRes.data ?? []) as HelpRequest[], 'requester_id');
