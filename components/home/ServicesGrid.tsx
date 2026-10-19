@@ -1,6 +1,6 @@
 import { Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { Briefcase, Camera, Map, MessageCircle, Truck, Wrench } from 'lucide-react-native';
+import { Briefcase, Camera, Map, MessageCircle, Wrench } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import { styles } from './homeStyles';
 import { requireAccount } from '@/lib/authGate';
@@ -37,7 +37,6 @@ export default function ServicesGrid({ onTools, isGuest }: { onTools: () => void
       {!isGuest && <ServicePill icon={<Camera size={22} color="#8b5cf6" />} bg="#f5f3ff" label="يوميات الحي" badge="24 ساعة" badgeBg="#7c3aed" onPress={() => router.push('/create-story')} />}
       <ServicePill icon={<Wrench size={22} color="#16a34a" />} bg="#f0fdf4" label="إعارة أدوات" badge="سلفني" badgeBg="#16a34a" onPress={() => router.push('/tools')} />
       {!isGuest && <ServicePill icon={<Briefcase size={22} color="#0284c7" />} bg="#f0f9ff" label="خدمات الحي" badge="مهنيون" badgeBg="#0284c7" onPress={() => router.push('/market')} />}
-      <ServicePill icon={<Truck size={22} color="#d97706" />} bg="#fffbeb" label="فزعة وطلبات" badge="تعاون" badgeBg="#d97706" onPress={() => router.push('/requests')} />
       <ServicePill icon={<Map size={22} color="#059669" />} bg="#ecfdf5" label="خريطة الحي" badge="مباشر" badgeBg="#059669" onPress={() => router.push('/map')} />
     </View>
   );
