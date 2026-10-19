@@ -23,7 +23,6 @@ import {
   MapPin,
   ShieldCheck,
   ChevronLeft,
-  Truck,
   Settings,
   Bell,
   Share2,
