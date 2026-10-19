@@ -8,9 +8,10 @@ import { isInsideSaudiArabia, isKnownSaudiCity } from '@/lib/saudiLocations';
 type Props = {
   location: HaynaLocation;
   onLocationChanged?: (location: HaynaLocation) => void;
+  compact?: boolean;
 };
 
-export default function LocationScopeBar({ location, onLocationChanged }: Props) {
+export default function LocationScopeBar({ location, onLocationChanged, compact = false }: Props) {
   const [busy, setBusy] = useState<'district' | 'city' | null>(null);
   const [open, setOpen] = useState(false);
   const districtMode = Boolean(location.city && location.city !== 'كل المدن' && location.district && !['كل الأحياء', 'كل أحياء المدينة', 'جميع الأحياء'].includes(location.district));
@@ -56,11 +57,11 @@ export default function LocationScopeBar({ location, onLocationChanged }: Props)
     : 'لم يتم التحقق من موقعك بعد';
 
   return (
-    <View style={{ marginHorizontal: 12, marginTop: 6, marginBottom: 6, alignItems: 'flex-end', zIndex: 20 }}>
+    <View style={{ marginHorizontal: compact ? 0 : 12, marginTop: compact ? 0 : 6, marginBottom: compact ? 0 : 6, alignItems: 'stretch', zIndex: 20, flex: compact ? 1 : undefined }}>
       <Pressable onPress={() => setOpen((value) => !value)} accessibilityRole="button" accessibilityState={{ expanded: open }}
-        style={{ minHeight: 36, maxWidth: '100%', flexDirection: 'row-reverse', alignItems: 'center', gap: 7, paddingHorizontal: 11, paddingVertical: 7, borderRadius: 12, backgroundColor: '#f7faf8', borderWidth: 1, borderColor: '#dce9e1' }}>
+        style={{ minHeight: compact ? 54 : 36, maxWidth: '100%', flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: compact ? 8 : 11, paddingVertical: 7, borderRadius: 14, backgroundColor: '#f7faf8', borderWidth: 1, borderColor: '#dce9e1' }}>
         <MapPin size={15} color="#176b52" />
-        <Text numberOfLines={1} style={{ color: '#345348', fontSize: 12, fontWeight: '800', flexShrink: 1, textAlign: 'right' }}>{title}</Text>
+        <Text numberOfLines={compact ? 2 : 1} style={{ color: '#345348', fontSize: compact ? 10.5 : 12, fontWeight: '800', flexShrink: 1, textAlign: 'right' }}>{title}</Text>
         <ChevronDown size={14} color="#176b52" />
       </Pressable>
       {open && (
