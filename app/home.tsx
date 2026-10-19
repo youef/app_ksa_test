@@ -262,37 +262,66 @@ export default function Home() {
 
         {flags.stories !== false && <StoriesRow profile={feed.profile} stories={feed.stories} selectedDistrict={loc.district} />}
 
-        <View style={[styles.emergencyHomeCard, { marginBottom: 12 }]}>
-          <Pressable onPress={() => router.push('/ask')} accessibilityRole="button" accessibilityLabel="إضافة بلاغ طارئ" style={styles.emergencyHomeHeader}>
-            <View style={styles.emergencyLiveBadge}><Text style={styles.emergencyLiveText}>قسم مستقل</Text></View>
-            <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 7 }}>
-              <ShieldAlert size={20} color="#dc2626" />
-              <Text style={styles.emergencyHomeTitle}>البلاغات والطوارئ</Text>
+        <View style={[styles.emergencyHomeCard, { marginHorizontal: 12, marginBottom: 16, padding: 14, borderRadius: 22, backgroundColor: '#fffafa', borderWidth: 1, borderColor: '#fee2e2', shadowColor: '#7f1d1d', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.06, shadowRadius: 14, elevation: 2 }]}>
+          <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 10, flex: 1 }}>
+              <View style={{ width: 44, height: 44, borderRadius: 15, backgroundColor: '#fee2e2', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#fecaca' }}>
+                <ShieldAlert size={23} color="#b91c1c" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: '#7f1d1d', fontSize: 17, fontWeight: '900', textAlign: 'right' }}>البلاغات والطوارئ</Text>
+                <Text style={{ color: '#9f5a5a', fontSize: 11, textAlign: 'right', marginTop: 3 }}>تنبيهات مهمة من سكان الحي</Text>
+              </View>
             </View>
-          </Pressable>
-          <Text style={{ color: '#7f1d1d', fontSize: 12, textAlign: 'right', marginBottom: 10 }}>عرض آخر 5 بلاغات مسجلة أو إضافة بلاغ طارئ</Text>
+            <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 5, backgroundColor: '#fff1f2', paddingHorizontal: 9, paddingVertical: 6, borderRadius: 12, borderWidth: 1, borderColor: '#ffe4e6' }}>
+              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#ef4444' }} />
+              <Text style={{ color: '#be123c', fontSize: 10, fontWeight: '900' }}>قسم مستقل</Text>
+            </View>
+          </View>
+          <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <Text style={{ color: '#64748b', fontSize: 11, textAlign: 'right', flex: 1, lineHeight: 17 }}>آخر البلاغات المسجلة في نطاقك — اضغط على البلاغ لمعرفة التفاصيل.</Text>
+            <View style={{ backgroundColor: '#f1f5f9', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 5, marginRight: 8 }}>
+              <Text style={{ color: '#475569', fontSize: 10, fontWeight: '900' }}>{derived.emergency.length} من 5</Text>
+            </View>
+          </View>
           {derived.emergency.length > 0 ? (
             <ScrollView ref={emergencyCarouselRef} horizontal inverted showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingVertical: 2 }}>
               {derived.emergency.map((report: any, index: number) => (
-                <Pressable key={String(report.id)} onPress={() => router.push({ pathname: '/question', params: { id: String(report.id) } })} accessibilityRole="button" style={{ width: 280, minHeight: 118, borderRadius: 16, padding: 13, backgroundColor: '#fff', borderWidth: 1, borderColor: '#fecaca', justifyContent: 'space-between' }}>
+                <Pressable key={String(report.id)} onPress={() => router.push({ pathname: '/question', params: { id: String(report.id) } })} accessibilityRole="button" accessibilityLabel={`عرض تفاصيل البلاغ ${index + 1}`} style={{ width: 265, minHeight: 142, borderRadius: 17, padding: 13, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#f1d2d2', justifyContent: 'space-between' }}>
                   <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-                    <Flame size={15} color="#dc2626" />
+                    <View style={{ width: 28, height: 28, borderRadius: 10, backgroundColor: '#fff1f2', alignItems: 'center', justifyContent: 'center' }}>
+                      <Flame size={15} color="#dc2626" />
+                    </View>
                     <Text style={{ color: '#b91c1c', fontSize: 10, fontWeight: '900' }}>بلاغ طارئ {index + 1}</Text>
                     <View style={{ flex: 1 }} />
-                    <Text style={{ color: '#64748b', fontSize: 10 }}>{report.created_at ? new Date(report.created_at).toLocaleDateString('ar-SA') : ''}</Text>
+                    <Text style={{ color: '#94a3b8', fontSize: 10 }}>{report.created_at ? new Date(report.created_at).toLocaleDateString('ar-SA') : ''}</Text>
                   </View>
-                  <Text numberOfLines={2} style={{ color: '#172a22', fontSize: 14, fontWeight: '900', textAlign: 'right', marginTop: 8 }}>{report.title || report.body || report.content || 'بلاغ طارئ مسجل'}</Text>
-                  <Text numberOfLines={1} style={{ color: '#64748b', fontSize: 11, textAlign: 'right', marginTop: 6 }}>{report.district || report.city || 'بلاغ من المجتمع'} · اضغط لعرض التفاصيل</Text>
+                  <Text numberOfLines={3} style={{ color: '#172a22', fontSize: 14, lineHeight: 21, fontWeight: '900', textAlign: 'right', marginTop: 10 }}>{report.title || report.body || report.content || 'بلاغ طارئ مسجل'}</Text>
+                  <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 5, marginTop: 10, paddingTop: 9, borderTopWidth: 1, borderTopColor: '#f1f5f9' }}>
+                    <View style={{ width: 22, height: 22, borderRadius: 7, backgroundColor: '#f8fafc', alignItems: 'center', justifyContent: 'center' }}>
+                      <Text style={{ color: '#64748b', fontSize: 11 }}>⌖</Text>
+                    </View>
+                    <Text numberOfLines={1} style={{ color: '#64748b', fontSize: 11, textAlign: 'right', flex: 1 }}>{report.district || report.city || 'الموقع غير محدد'}</Text>
+                    <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 3 }}>
+                      <Text style={{ color: '#b91c1c', fontSize: 10, fontWeight: '900' }}>التفاصيل</Text>
+                      <ChevronLeft size={13} color="#b91c1c" />
+                    </View>
+                  </View>
                 </Pressable>
               ))}
             </ScrollView>
           ) : (
-            <View style={{ backgroundColor: '#fff', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#fecaca' }}>
-              <Text style={{ color: '#7f1d1d', fontSize: 12, textAlign: 'right' }}>لا توجد بلاغات طارئة مسجلة حالياً.</Text>
+            <View style={{ alignItems: 'center', backgroundColor: '#ffffff', borderRadius: 16, padding: 18, borderWidth: 1, borderColor: '#f1d2d2' }}>
+              <View style={{ width: 42, height: 42, borderRadius: 14, backgroundColor: '#fff1f2', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
+                <ShieldAlert size={21} color="#dc2626" />
+              </View>
+              <Text style={{ color: '#7f1d1d', fontSize: 12, fontWeight: '800', textAlign: 'center' }}>لا توجد بلاغات طارئة مسجلة حالياً</Text>
+              <Text style={{ color: '#94a3b8', fontSize: 11, textAlign: 'center', marginTop: 4 }}>يمكنك إضافة بلاغ ليستفيد سكان الحي</Text>
             </View>
           )}
-          <Pressable onPress={() => router.push('/ask')} accessibilityRole="button" style={{ alignSelf: 'flex-start', marginTop: 10, backgroundColor: '#dc2626', paddingHorizontal: 14, paddingVertical: 9, borderRadius: 12 }}>
-            <Text style={{ color: '#fff', fontSize: 12, fontWeight: '900' }}>＋ إضافة بلاغ طارئ</Text>
+          <Pressable onPress={() => router.push('/ask')} accessibilityRole="button" accessibilityLabel="إضافة بلاغ طارئ" style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 12, minHeight: 46, backgroundColor: '#b91c1c', paddingHorizontal: 16, borderRadius: 14, shadowColor: '#b91c1c', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.15, shadowRadius: 6, elevation: 2 }}>
+            <Text style={{ color: '#fff', fontSize: 13, fontWeight: '900' }}>＋ إضافة بلاغ طارئ</Text>
+            <Text style={{ color: '#fecaca', fontSize: 11 }}>ساعد في تنبيه الحي</Text>
           </Pressable>
         </View>
 
