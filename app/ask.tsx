@@ -56,43 +56,43 @@ import {
 
 const QUICK_TEMPLATES = [
   {
-    label: '🚗 اشتراك بطارية سيارة',
+    label: 'اشتراك بطارية سيارة',
     type: 'help',
     title: 'فزعة اشتراك بطارية سيارة بالحي',
     body: 'السلام عليكم يا جيران، سيارتي متوقفة وتحتاج اشتراك بطارية سريع، متواجد عند المربع وسأكون شاكراً لمن يفزع لي.',
   },
   {
-    label: '🔧 مفتاح عجل وبنشر',
+    label: 'مفتاح عجل وبنشر',
     type: 'help',
     title: 'طلب مساعدة مفتاح عجل أو منفاخ كفرات بالحي',
     body: 'السلام عليكم، معي بنشر وأحتاج مفتاح عجل مقاس مناسب أو منفاخ سفري لدقائق معدودة.',
   },
   {
-    label: '🧰 استعارة دريل أو سلّم',
+    label: 'استعارة دريل أو سلّم',
     type: 'tool_sharing',
     title: 'طلب استعارة سلّم ألمنيوم أو دريل تخريم لساعات',
     body: 'أحتاج سلّم طويل أو دريل لتركيب رف بالبيت وسأعيده بنفس اليوم بإذن الله ونظيفاً كما كان.',
   },
   {
-    label: '❄️ فني تكييف أو سباكة',
+    label: 'فني تكييف أو سباكة',
     type: 'inquiry',
     title: 'استفسار عن فني تكييف وسباكة مجرب وأمين بالحي',
     body: 'من منكم جرب فني تكييف ممتاز وأسعاره معقولة ويخدم حيّنا؟ أرجو تزويدي بالرقم وتجربتكم معه.',
   },
   {
-    label: '📦 نقل غرض ثقيل',
+    label: 'نقل غرض ثقيل',
     type: 'help',
     title: 'مساعدة في نقل غرض ثقيل لمدة 10 دقائق',
     body: 'أحتاج فزعة من أحد الجيران لمساعدتي في حمل ونقل دولاب لـ 10 دقائق فقط وله جزيل الشكر.',
   },
   {
-    label: '🐱 حيوان أليف مفقود بالحي',
+    label: 'حيوان أليف مفقود',
     type: 'emergency',
     title: 'قطة مفقودة بالحي اليوم - أرجو التواصل لمن رآها',
     body: 'فقدنا قطة أليفة بيضاء بالقرب من الحديقة، يرجى ممن شاهدها مراسلتي أو التواصل سريعاً.',
   },
   {
-    label: '🎁 أثاث أو أغراض لوجه الله',
+    label: 'أغراض مجانية',
     type: 'donate',
     title: 'أغراض وأثاث بحالة جيدة متاح مجاناً لمن يحتاجه بالحي',
     body: 'لدينا بعض القطع المنزلية الصالحة للاستخدام، متاحة مجاناً لأي جار أو أسرة محتاجة بالحي.',
@@ -111,6 +111,7 @@ export default function AskScreen() {
   const [busy, setBusy] = useState(false);
   const [enhancing, setEnhancing] = useState(false);
   const [locatingGps, setLocatingGps] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<{ title?: string; city?: string }>({});
 
   // Post category type
   const [postType, setPostType] = useState<'inquiry' | 'help' | 'tool_sharing' | 'donate' | 'emergency'>('inquiry');
@@ -301,6 +302,11 @@ export default function AskScreen() {
 
   // 4. Save & Publish
   async function save() {
+    const nextErrors: { title?: string; city?: string } = {};
+    if (!title.trim()) nextErrors.title = 'اكتب عنواناً مختصراً قبل النشر.';
+    if (!city.trim()) nextErrors.city = 'اختر المدينة والحي حتى يصل المنشور للجيران المناسبين.';
+    setFieldErrors(nextErrors);
+    if (Object.keys(nextErrors).length) return;
     if (!title.trim()) {
       return Alert.alert('مطلوب', postType === 'help' ? 'يرجى كتابة عنوان لطلب المساعدة.' : 'يرجى كتابة عنوان السؤال.');
     }
@@ -439,17 +445,14 @@ export default function AskScreen() {
       />
 
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomNavInset + 40 }]}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(bottomNavInset, 24) + 24 }]}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.welcomeCard}>
-          <View style={styles.welcomeIcon}>
-            <MessageSquare size={26} color="#059669" />
-          </View>
-          <View style={styles.welcomeCopy}>
-            <Text style={styles.welcomeTitle}>أهلاً بك</Text>
-            <Text style={styles.welcomeText}>اكتب استفسارك أو بلاغك، وسيصل إلى أهل حيك.</Text>
-            <Text style={styles.welcomeLocation}>{district ? `حي ${district}` : ''}${district && city ? ' · ' : ''}${city || 'جارٍ تحديد الموقع تلقائياً'}</Text>
+        <View style={styles.introRow}>
+          <View style={styles.introIcon}><MessageSquare size={21} color="#16865b" /></View>
+          <View style={styles.introCopy}>
+            <Text style={styles.introTitle}>وش تحتاج من جيرانك؟</Text>
+            <Text style={styles.introSub}>اختر نوع المنشور واكتب التفاصيل باختصار.</Text>
           </View>
         </View>
 
@@ -462,49 +465,59 @@ export default function AskScreen() {
             >
               <MessageSquare size={15} color={postType === 'inquiry' ? '#fff' : '#059669'} />
               <Text style={[styles.typeTabText, postType === 'inquiry' && styles.typeTabTextActive]}>
-                استفسار للحي
+                استفسار
               </Text>
             </Pressable>
 
             <Pressable
-              style={[styles.typeTab, postType === 'help' && styles.typeTabActiveAmber]}
+              style={[styles.typeTab, postType === 'help' && styles.typeTabActive]}
               onPress={() => setPostType('help')}
             >
-              <HeartHandshake size={15} color={postType === 'help' ? '#fff' : '#d97706'} />
+              <HeartHandshake size={17} color={postType === 'help' ? '#fff' : '#64748b'} />
               <Text style={[styles.typeTabText, postType === 'help' && styles.typeTabTextActive]}>
-                طلب فزعة ومساعدة
+                طلب فزعة
               </Text>
             </Pressable>
 
             <Pressable
-              style={[styles.typeTab, postType === 'tool_sharing' && styles.typeTabActiveGreen]}
+              style={[styles.typeTab, postType === 'tool_sharing' && styles.typeTabActive]}
               onPress={() => setPostType('tool_sharing')}
             >
-              <Wrench size={15} color={postType === 'tool_sharing' ? '#fff' : '#16a34a'} />
+              <Wrench size={17} color={postType === 'tool_sharing' ? '#fff' : '#64748b'} />
               <Text style={[styles.typeTabText, postType === 'tool_sharing' && styles.typeTabTextActive]}>
                 إعارة أدوات
               </Text>
             </Pressable>
 
             <Pressable
-              style={[styles.typeTab, postType === 'donate' && styles.typeTabActivePurple]}
+              style={[styles.typeTab, postType === 'donate' && styles.typeTabActive]}
               onPress={() => setPostType('donate')}
             >
-              <Gift size={15} color={postType === 'donate' ? '#fff' : '#9333ea'} />
+              <Gift size={17} color={postType === 'donate' ? '#fff' : '#64748b'} />
               <Text style={[styles.typeTabText, postType === 'donate' && styles.typeTabTextActive]}>
-                تبادل مجاني
+                تبرّع
               </Text>
             </Pressable>
 
             <Pressable
-              style={[styles.typeTab, postType === 'emergency' && styles.typeTabActiveRed]}
+              style={[styles.typeTab, postType === 'emergency' && styles.typeTabActive]}
               onPress={() => setPostType('emergency')}
             >
-              <Flame size={15} color={postType === 'emergency' ? '#fff' : '#dc2626'} />
+              <Flame size={17} color={postType === 'emergency' ? '#fff' : '#64748b'} />
               <Text style={[styles.typeTabText, postType === 'emergency' && styles.typeTabTextActive]}>
                 بلاغ طارئ
               </Text>
             </Pressable>
+          </ScrollView>
+        </View>
+
+        <View style={styles.templatesContainer}>
+          <Text style={styles.templatesTitle}>ابدأ بقالب جاهز (اختياري)</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.templatesScroll}>
+            {QUICK_TEMPLATES.map((template, index) => {
+              const TemplateIcon = index === 0 ? Zap : index === 1 ? Wrench : index === 2 ? Wrench : index === 3 ? HelpCircle : index === 4 ? HeartHandshake : index === 5 ? AlertTriangle : Gift;
+              return <Pressable key={template.title} accessibilityRole="button" accessibilityLabel={`استخدام قالب ${template.label}`} onPress={() => { setTitle(template.title); setBody(template.body); setPostType(template.type as typeof postType); setFieldErrors(prev => ({ ...prev, title: undefined })); }} style={({ pressed }) => [styles.templateChip, pressed && { opacity: 0.7 }]}><TemplateIcon size={15} color="#16865b" /><Text style={styles.templateChipText}>{template.label}</Text></Pressable>;
+            })}
           </ScrollView>
         </View>
 
@@ -545,6 +558,8 @@ export default function AskScreen() {
           </View>
         )}
 
+        {fieldErrors.city ? <Text accessibilityRole="alert" style={styles.fieldError}>{fieldErrors.city}</Text> : null}
+
         {/* Input: Title */}
         <View style={styles.inputGroup}>
           <View style={styles.labelRow}>
@@ -562,9 +577,11 @@ export default function AskScreen() {
             </Text>
           </View>
           <TextInput
-            style={styles.titleInput}
+            accessibilityLabel="عنوان المنشور"
+            returnKeyType="next"
+            style={[styles.titleInput, fieldErrors.title && styles.inputInvalid]}
             value={title}
-            onChangeText={setTitle}
+            onChangeText={(value) => { setTitle(value); if (value.trim()) setFieldErrors(prev => ({ ...prev, title: undefined })); }}
             placeholder={
               postType === 'help'
                 ? 'مثال: أحتاج أحد يساعدني باشتراك بطارية سيارة، نقل غرض ثقيل، أو بنشر...'
@@ -577,6 +594,7 @@ export default function AskScreen() {
             placeholderTextColor="#94a3b8"
             maxLength={120}
           />
+          {fieldErrors.title ? <Text accessibilityRole="alert" style={styles.fieldError}>{fieldErrors.title}</Text> : null}
         </View>
 
         {/* Input: Body */}
@@ -585,6 +603,8 @@ export default function AskScreen() {
             {postType === 'help' ? 'تفاصيل المساعدة المطلوبة بدقة *' : 'التفاصيل والشرح (اختياري)'}
           </Text>
           <TextInput
+            accessibilityLabel="تفاصيل المنشور"
+            returnKeyType="default"
             style={[styles.titleInput, styles.bodyInput]}
             multiline
             scrollEnabled
@@ -605,6 +625,7 @@ export default function AskScreen() {
           <View style={styles.inputGroup}>
             <Text style={styles.label}>مكافأة أو شكر رمزي للمساعد (اختياري)</Text>
             <TextInput
+              accessibilityLabel="المكافأة الاختيارية بالريال السعودي"
               style={styles.titleInput}
               value={budget}
               onChangeText={setBudget}
@@ -626,19 +647,7 @@ export default function AskScreen() {
           ) : (
             <CheckCircle2 size={20} color="#fff" />
           )}
-          <Text style={styles.submitBtnText}>
-            {busy
-              ? 'جاري النشر في الحي...'
-              : postType === 'help'
-              ? 'نشر طلب الفزعة في الحي الآن'
-              : postType === 'emergency'
-              ? 'نشر البلاغ الطارئ في الحي فوراً'
-              : postType === 'tool_sharing'
-              ? 'نشر عرض إعارة الأداة في الحي'
-              : postType === 'donate'
-              ? 'نشر عرض التبادل المجاني'
-              : 'نشر السؤال في الحي الآن'}
-          </Text>
+          <Text style={styles.submitBtnText}>{busy ? 'جارٍ النشر...' : 'نشر في الحي'}</Text>
         </Pressable>
       </ScrollView>
 
@@ -690,8 +699,16 @@ const styles = StyleSheet.create({
     color: '#059669',
   },
   scrollContent: {
-    padding: 16,
+    padding: 18,
+    paddingTop: 12,
   },
+  introRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, marginBottom: 18, paddingVertical: 8 },
+  introIcon: { width: 44, height: 44, borderRadius: 15, backgroundColor: '#eaf7f0', alignItems: 'center', justifyContent: 'center' },
+  introCopy: { flex: 1, alignItems: 'flex-end', gap: 4 },
+  introTitle: { fontSize: 20, fontWeight: '900', color: '#102a20', textAlign: 'right' },
+  introSub: { fontSize: 12.5, color: '#64748b', textAlign: 'right', lineHeight: 19 },
+  fieldError: { color: '#b91c1c', fontSize: 12, textAlign: 'right', marginTop: 5, marginBottom: 8 },
+  inputInvalid: { borderColor: '#dc2626', backgroundColor: '#fffafa' },
   welcomeCard: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
@@ -725,8 +742,9 @@ const styles = StyleSheet.create({
   typeTab: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    minHeight: 44,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     borderRadius: 12,
     backgroundColor: '#fff',
     borderWidth: 1.5,
@@ -734,8 +752,13 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   typeTabActive: {
-    backgroundColor: '#059669',
-    borderColor: '#059669',
+    backgroundColor: '#16865b',
+    borderColor: '#16865b',
+    shadowColor: '#16865b',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 2,
   },
   typeTabActiveGreen: {
     backgroundColor: '#16a34a',
@@ -754,7 +777,7 @@ const styles = StyleSheet.create({
     borderColor: '#dc2626',
   },
   typeTabText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '800',
     color: '#475569',
   },
@@ -803,15 +826,19 @@ const styles = StyleSheet.create({
     paddingBottom: 2,
   },
   templateChip: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 7,
+    minHeight: 42,
     backgroundColor: '#fff',
-    paddingHorizontal: 11,
-    paddingVertical: 7,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#e2e8f0',
   },
   templateChipText: {
-    fontSize: 11.5,
+    fontSize: 12,
     fontWeight: '700',
     color: '#334155',
   },
@@ -1186,8 +1213,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#059669',
-    height: 50,
+    backgroundColor: '#16865b',
+    minHeight: 54,
     borderRadius: 16,
     gap: 8,
     marginTop: 6,
@@ -1198,7 +1225,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   submitBtnText: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '900',
     color: '#fff',
   },
