@@ -1,6 +1,5 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
 import { MAP_PIN_KINDS, type MapPin } from '@/lib/mapPins';
 import type { NearbyPlace } from '@/lib/places';
 
@@ -16,6 +15,17 @@ type Props = {
 };
 
 export default function NeighborhoodWebMap({ pins, places, center, city, onSelectPin, onSelectPlace, onLocate }: Props) {
+  useEffect(() => {
+    if (typeof document === 'undefined' || document.getElementById('leaflet-css')) return;
+    const link = document.createElement('link');
+    link.id = 'leaflet-css';
+    link.rel = 'stylesheet';
+    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    document.head.appendChild(link);
+    return () => {
+      // Keep the shared stylesheet mounted because other map screens may use Leaflet too.
+    };
+  }, []);
   const mapCenter: [number, number] = center ? [center.lat, center.lng] : [24.7136, 46.6753];
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: 360, borderRadius: 17, overflow: 'hidden', background: '#e8eee8' }}>
