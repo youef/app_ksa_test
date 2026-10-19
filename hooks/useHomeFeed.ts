@@ -222,8 +222,7 @@ export function useHomeFeed({ onLocation }: Options) {
   // Realtime: new posts refresh the feed (debounced), new notifications bump the badge.
   const channelRef = useRef<any>(null);
   useEffect(() => {
-    if (!currentUserId) return;
-
+    // Public feed updates are subscribed for guests too; notifications remain account-only.
     let disposed = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -240,15 +239,18 @@ export function useHomeFeed({ onLocation }: Options) {
 
       // Unique topic per subscription: the realtime client reuses a still-registered
       // channel with the same topic, and adding bindings to a joined channel throws.
-      const channel = supabase
-        .channel(`home-live-${currentUserId}-${Math.random().toString(36).slice(2)}`)
+      let channel = supabase
+        .channel(`home-live-${currentUserId || 'guest'}-${Math.random().toString(36).slice(2)}`)
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'questions' }, refresh)
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'requests' }, refresh)
-        .on(
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'requests' }, refresh);
+
+      if (currentUserId) {
+        channel = channel.on(
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${currentUserId}` },
           () => setUnreadNotifCount(c => c + 1),
         );
+      }
 
       channel.subscribe();
       if (disposed) {
