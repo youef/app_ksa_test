@@ -193,7 +193,7 @@ export default function MoreScreen() {
     },
     {
       q: 'كيف أطلب فزعة أو مساعدة من جيراني؟',
-      a: 'من قسم «فزعة وطلبات المساعدة» اضغط «طلب جديد»، اكتب التفاصيل وحدّد حيّك ثم انشر. سيصل طلبك فوراً لجيرانك القريبين منك.',
+      a: 'من زر «إضافة» أسفل التطبيق، اختر نوع المنشور «طلب فزعة» أو «إعارة أدوات»، واكتب التفاصيل وحدّد حيّك ثم انشر.',
     },
     {
       q: 'هل موقعي وسكني الدقيق ظاهر للعامة؟',
@@ -339,16 +339,8 @@ export default function MoreScreen() {
           {/* ======================================================== */}
           {/* 3. QUICK HUB 4-CARDS                                     */}
           {/* ======================================================== */}
-          {(flags.requests !== false || flags.carpooling !== false || flags.urgent_alerts !== false) && <Text style={styles.sectionHeader}>خدمات الفزعة والتكافل بالحي 🤝</Text>}
+          {(flags.carpooling !== false || flags.urgent_alerts !== false) && <Text style={styles.sectionHeader}>خدمات الحي والمساندة 🤝</Text>}
           <View style={styles.quickHubGrid}>
-            {flags.requests !== false && <Pressable style={styles.quickHubCard} onPress={() => router.push('/requests')}>
-              <View style={[styles.quickHubIconCircle, { backgroundColor: '#fff7ed' }]}>
-                <Truck size={22} color="#ea580c" />
-              </View>
-              <Text style={styles.quickHubTitle}>فزعة الحي</Text>
-              <Text style={styles.quickHubSub}>طلب مساعدة الجيران</Text>
-            </Pressable>}
-
             {flags.carpooling !== false && <Pressable style={styles.quickHubCard} onPress={() => router.push('/carpooling')}>
               <View style={[styles.quickHubIconCircle, { backgroundColor: '#ecfdf5' }]}>
                 <Car size={22} color="#059669" />
