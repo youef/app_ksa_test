@@ -456,6 +456,15 @@ export default function AskScreen() {
           </View>
         </View>
 
+        <Pressable accessibilityRole="button" accessibilityLabel="تعديل المدينة والحي" onPress={() => setShowLocationModal(true)} style={styles.locationInline}>
+          <View style={styles.locationInlineIcon}><MapPin size={17} color="#16865b" /></View>
+          <View style={styles.locationInlineCopy}>
+            <Text style={styles.locationInlineTitle}>{city ? [district, city].filter(Boolean).join("، ") : "حدد المدينة والحي"}</Text>
+            <Text style={styles.locationInlineHint}>مكان ظهور منشورك للجيران · تعديل</Text>
+          </View>
+          <ChevronRight size={17} color="#64748b" />
+        </Pressable>
+
         {/* Post Type Selector Tabs */}
         <View style={styles.postTypeContainer}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.postTypeTabs}>
@@ -707,6 +716,11 @@ const styles = StyleSheet.create({
   introCopy: { flex: 1, alignItems: 'flex-end', gap: 4 },
   introTitle: { fontSize: 20, fontWeight: '900', color: '#102a20', textAlign: 'right' },
   introSub: { fontSize: 12.5, color: '#64748b', textAlign: 'right', lineHeight: 19 },
+  locationInline: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 16, minHeight: 58 },
+  locationInlineIcon: { width: 34, height: 34, borderRadius: 11, backgroundColor: '#eaf7f0', alignItems: 'center', justifyContent: 'center' },
+  locationInlineCopy: { flex: 1, alignItems: 'flex-end', gap: 3 },
+  locationInlineTitle: { fontSize: 13, fontWeight: '800', color: '#0f172a', textAlign: 'right' },
+  locationInlineHint: { fontSize: 11, color: '#64748b', textAlign: 'right' },
   fieldError: { color: '#b91c1c', fontSize: 12, textAlign: 'right', marginTop: 5, marginBottom: 8 },
   inputInvalid: { borderColor: '#dc2626', backgroundColor: '#fffafa' },
   welcomeCard: {
