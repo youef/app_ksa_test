@@ -373,7 +373,7 @@ export default function AskScreen() {
           throw reqResult.error || new Error('تعذر نشر طلب المساعدة.');
         }
 
-        Alert.alert('تم النشر بنجاح! 🤝', 'تم نشر طلبك لأهالي الحي وسيتواصل معك من يقدر على المساعدة فوراً.');
+        Alert.alert('تم النشر بنجاح', 'تم نشر طلبك لأهالي الحي وسيتواصل معك من يقدر على المساعدة فوراً.');
         return router.replace({ pathname: '/request', params: { id: reqResult.data.id } });
       }
 
@@ -419,7 +419,7 @@ export default function AskScreen() {
       }
 
       if (insertedQuestionId) {
-        Alert.alert('تم النشر بنجاح! ✨', 'نُشر سؤالك لأهل الحي وسيصلك إشعار فور تفاعل الجيران معه.');
+        Alert.alert('تم النشر بنجاح', 'نُشر سؤالك لأهل الحي وسيصلك إشعار فور تفاعل الجيران معه.');
         router.replace({ pathname: '/question', params: { id: insertedQuestionId } });
       }
     } catch (err: any) {
@@ -434,14 +434,8 @@ export default function AskScreen() {
       <AppHeader
         variant="sub"
         title="اسأل أهل حيك"
-        subtitle={[district && `حي ${district}`, city].filter(Boolean).join(' · ') || 'مجتمع حيّنا • تواصل الجيران'}
+        subtitle={[district && `حي ${district}`, city].filter(Boolean).join(' · ') || 'تواصل مع جيرانك'}
         fallbackRoute="/home"
-        rightAction={
-          <View style={styles.headerBadgeWrap}>
-            <Sparkles size={13} color="#059669" />
-            <Text style={styles.headerBadgeText}>مدعوم بالذكاء</Text>
-          </View>
-        }
       />
 
       <ScrollView
@@ -453,7 +447,7 @@ export default function AskScreen() {
             <MessageSquare size={26} color="#059669" />
           </View>
           <View style={styles.welcomeCopy}>
-            <Text style={styles.welcomeTitle}>أهلاً بك 👋</Text>
+            <Text style={styles.welcomeTitle}>أهلاً بك</Text>
             <Text style={styles.welcomeText}>اكتب استفسارك أو بلاغك، وسيصل إلى أهل حيك.</Text>
             <Text style={styles.welcomeLocation}>{district ? `حي ${district}` : ''}${district && city ? ' · ' : ''}${city || 'جارٍ تحديد الموقع تلقائياً'}</Text>
           </View>
@@ -468,7 +462,7 @@ export default function AskScreen() {
             >
               <MessageSquare size={15} color={postType === 'inquiry' ? '#fff' : '#059669'} />
               <Text style={[styles.typeTabText, postType === 'inquiry' && styles.typeTabTextActive]}>
-                استفسار للحي 💬
+                استفسار للحي
               </Text>
             </Pressable>
 
@@ -478,7 +472,7 @@ export default function AskScreen() {
             >
               <HeartHandshake size={15} color={postType === 'help' ? '#fff' : '#d97706'} />
               <Text style={[styles.typeTabText, postType === 'help' && styles.typeTabTextActive]}>
-                طلب فزعة ومساعدة 🤝
+                طلب فزعة ومساعدة
               </Text>
             </Pressable>
 
@@ -488,7 +482,7 @@ export default function AskScreen() {
             >
               <Wrench size={15} color={postType === 'tool_sharing' ? '#fff' : '#16a34a'} />
               <Text style={[styles.typeTabText, postType === 'tool_sharing' && styles.typeTabTextActive]}>
-                إعارة أدوات 🛠️
+                إعارة أدوات
               </Text>
             </Pressable>
 
@@ -498,7 +492,7 @@ export default function AskScreen() {
             >
               <Gift size={15} color={postType === 'donate' ? '#fff' : '#9333ea'} />
               <Text style={[styles.typeTabText, postType === 'donate' && styles.typeTabTextActive]}>
-                تبادل مجاني 🎁
+                تبادل مجاني
               </Text>
             </Pressable>
 
@@ -508,7 +502,7 @@ export default function AskScreen() {
             >
               <Flame size={15} color={postType === 'emergency' ? '#fff' : '#dc2626'} />
               <Text style={[styles.typeTabText, postType === 'emergency' && styles.typeTabTextActive]}>
-                بلاغ طارئ 🚨
+                بلاغ طارئ
               </Text>
             </Pressable>
           </ScrollView>
@@ -519,36 +513,13 @@ export default function AskScreen() {
           <View style={styles.helpNoticeCard}>
             <View style={styles.helpNoticeHeader}>
               <HeartHandshake size={18} color="#d97706" />
-              <Text style={styles.helpNoticeTitle}>طلب فزعة وتعاون من أهل حيّك 🤝</Text>
+              <Text style={styles.helpNoticeTitle}>طلب فزعة وتعاون من أهل حيّك</Text>
             </View>
             <Text style={styles.helpNoticeText}>
               طلبك سيُنشر مباشرة لأهالي حيك في صفحة «فزعات وطلبات الحي» ويظهر على خريطة الحي ليتواصل معك الجيران القادرون على المساعدة فوراً.
             </Text>
           </View>
         )}
-
-        <View style={styles.locationCard}>
-          <View style={styles.locationCardHeader}>
-            <Text style={styles.locationLabel}>موقعك تلقائياً</Text>
-            <View style={styles.gpsAutoBtn}>
-              <CheckCircle2 size={13} color="#059669" />
-              <Text style={styles.gpsAutoBtnText}>تحديد تلقائي</Text>
-            </View>
-          </View>
-          <View style={styles.locationBtn}>
-            <View style={{ flex: 1, alignItems: 'flex-end' }}>
-              <Text style={styles.locationValue}>
-                {city ? `${district ? `حي ${district} · ` : ''}${city}` : 'جارٍ تحديد موقعك...'}
-              </Text>
-              <Text style={styles.locationHint}>
-                {city ? 'يُحدّد من إعداداتك وموقع الجهاز تلقائياً' : 'سيظهر الحي عند توفر بيانات الموقع'}
-              </Text>
-            </View>
-            <View style={styles.mapPinWrap}>
-              <MapPin size={18} color="#059669" />
-            </View>
-          </View>
-        </View>
 
         {/* Emergency Alert Banner */}
         {(safetyCheck?.isEmergency || postType === 'emergency') && (
@@ -659,14 +630,14 @@ export default function AskScreen() {
             {busy
               ? 'جاري النشر في الحي...'
               : postType === 'help'
-              ? '🤝 نشر طلب الفزعة في الحي الآن'
+              ? 'نشر طلب الفزعة في الحي الآن'
               : postType === 'emergency'
-              ? '🚨 نشر البلاغ الطارئ في الحي فوراً'
+              ? 'نشر البلاغ الطارئ في الحي فوراً'
               : postType === 'tool_sharing'
-              ? '🛠️ نشر عرض إعارة الأداة في الحي'
+              ? 'نشر عرض إعارة الأداة في الحي'
               : postType === 'donate'
-              ? '🎁 نشر عرض التبادل المجاني'
-              : 'نشر السؤال في الحي الآن ✨'}
+              ? 'نشر عرض التبادل المجاني'
+              : 'نشر السؤال في الحي الآن'}
           </Text>
         </Pressable>
       </ScrollView>
