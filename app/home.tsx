@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, RefreshControl, ScrollView, StatusBar, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { ChevronLeft, Flame, Sparkles, HeartHandshake, MessageCircle, SlidersHorizontal, X, Check } from 'lucide-react-native';
+import { ChevronLeft, Flame, Sparkles, HeartHandshake, MessageCircle, SlidersHorizontal, X, Check, ShieldAlert } from 'lucide-react-native';
 
 import { supabase } from '@/lib/supabase';
 import { getBrandingLogo, subscribeBrandingLogo, getCachedBrandingLogo } from '@/lib/branding';
@@ -47,6 +47,7 @@ export default function Home() {
   const [appliedFilters, setAppliedFilters] = useState({ kind: 'الكل', status: 'الكل', period: 'كل الأوقات' });
   const [refreshing, setRefreshing] = useState(false);
   const [greeting] = useState(() => getGreeting());
+  const emergencyCarouselRef = useRef<ScrollView>(null);
 
   // The feed hook resolves the saved location; the location hook owns it.
   // A ref breaks the circular dependency between the two hooks.
@@ -122,7 +123,7 @@ export default function Home() {
       myCount: myQuestions.length + myRequests.length,
       filteredMyQuestions: myQuestions,
       filteredMyRequests: myRequests,
-      emergency: [],
+      emergency: filteredQuestions.filter(isEmergencyQuestion).slice(0, 5),
       tools: filteredQuestions.filter(isToolQuestion),
     };
   }, [questions, requests, currentUserId, matchesVisibleLocation]);
@@ -204,6 +205,16 @@ export default function Home() {
 
   const emergencyTop = derived.emergency[0];
 
+  useEffect(() => {
+    if (derived.emergency.length < 2) return;
+    let index = 0;
+    const timer = setInterval(() => {
+      index = (index + 1) % derived.emergency.length;
+      emergencyCarouselRef.current?.scrollTo({ x: index * 290, animated: true });
+    }, 30000);
+    return () => clearInterval(timer);
+  }, [derived.emergency.length]);
+
   return (
     <View style={styles.container}>
       <AppHeader
@@ -231,34 +242,43 @@ export default function Home() {
       >
         <LocationScopeBar location={{ region: loc.region, city: loc.city, district: loc.district }} />
 
-        <AtmosphereBar
-          weather={loc.weather}
-          weatherLoading={loc.weatherLoading}
-          activeNeighbors={activeNeighbors}
-          emergencyCount={derived.emergency.length}
-        />
+        <AtmosphereBar weather={loc.weather} weatherLoading={loc.weatherLoading} />
 
         {flags.stories !== false && <StoriesRow profile={feed.profile} stories={feed.stories} selectedDistrict={loc.district} />}
 
-        <Pressable
-          onPress={() => router.push('/ask')}
-          style={[styles.emergencyHomeCard, { marginBottom: 12 }]}
-          accessibilityRole="button"
-          accessibilityLabel="فتح صفحة البلاغات والطوارئ"
-        >
-          <View style={styles.emergencyHomeHeader}>
-            <View style={styles.emergencyLiveBadge}>
-              <Text style={styles.emergencyLiveText}>قسم مستقل</Text>
-            </View>
-            <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-              <Flame size={18} color="#dc2626" />
+        <View style={[styles.emergencyHomeCard, { marginBottom: 12 }]}>
+          <Pressable onPress={() => router.push('/ask')} accessibilityRole="button" accessibilityLabel="إضافة بلاغ طارئ" style={styles.emergencyHomeHeader}>
+            <View style={styles.emergencyLiveBadge}><Text style={styles.emergencyLiveText}>قسم مستقل</Text></View>
+            <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 7 }}>
+              <ShieldAlert size={20} color="#dc2626" />
               <Text style={styles.emergencyHomeTitle}>البلاغات والطوارئ</Text>
             </View>
-          </View>
-          <View style={styles.emergencyContentBox}>
-            <Text style={styles.emergencyQuestionTitle}>عرض البلاغات المسجلة أو إضافة بلاغ طارئ</Text>
-          </View>
-        </Pressable>
+          </Pressable>
+          <Text style={{ color: '#7f1d1d', fontSize: 12, textAlign: 'right', marginBottom: 10 }}>عرض آخر 5 بلاغات مسجلة أو إضافة بلاغ طارئ</Text>
+          {derived.emergency.length > 0 ? (
+            <ScrollView ref={emergencyCarouselRef} horizontal inverted showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingVertical: 2 }}>
+              {derived.emergency.map((report: any, index: number) => (
+                <Pressable key={String(report.id)} onPress={() => router.push({ pathname: '/question', params: { id: String(report.id) } })} accessibilityRole="button" style={{ width: 280, minHeight: 118, borderRadius: 16, padding: 13, backgroundColor: '#fff', borderWidth: 1, borderColor: '#fecaca', justifyContent: 'space-between' }}>
+                  <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
+                    <Flame size={15} color="#dc2626" />
+                    <Text style={{ color: '#b91c1c', fontSize: 10, fontWeight: '900' }}>بلاغ طارئ {index + 1}</Text>
+                    <View style={{ flex: 1 }} />
+                    <Text style={{ color: '#64748b', fontSize: 10 }}>{report.created_at ? new Date(report.created_at).toLocaleDateString('ar-SA') : ''}</Text>
+                  </View>
+                  <Text numberOfLines={2} style={{ color: '#172a22', fontSize: 14, fontWeight: '900', textAlign: 'right', marginTop: 8 }}>{report.title || report.body || report.content || 'بلاغ طارئ مسجل'}</Text>
+                  <Text numberOfLines={1} style={{ color: '#64748b', fontSize: 11, textAlign: 'right', marginTop: 6 }}>{report.district || report.city || 'بلاغ من المجتمع'} · اضغط لعرض التفاصيل</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          ) : (
+            <View style={{ backgroundColor: '#fff', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#fecaca' }}>
+              <Text style={{ color: '#7f1d1d', fontSize: 12, textAlign: 'right' }}>لا توجد بلاغات طارئة مسجلة حالياً.</Text>
+            </View>
+          )}
+          <Pressable onPress={() => router.push('/ask')} accessibilityRole="button" style={{ alignSelf: 'flex-start', marginTop: 10, backgroundColor: '#dc2626', paddingHorizontal: 14, paddingVertical: 9, borderRadius: 12 }}>
+            <Text style={{ color: '#fff', fontSize: 12, fontWeight: '900' }}>＋ إضافة بلاغ طارئ</Text>
+          </Pressable>
+        </View>
 
         <View style={styles.feedSection}>
           <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, gap: 8 }}>
