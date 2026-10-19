@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import { router } from 'expo-router';
-import { MapPin, Sparkles } from 'lucide-react-native';
+import { Sparkles, SlidersHorizontal } from 'lucide-react-native';
 
 import { supabase } from '@/lib/supabase';
 import AppHeader from '@/components/shared/AppHeader';
@@ -30,7 +30,7 @@ export default function Questions() {
   const [loadError, setLoadError] = useState('');
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [profile, setProfile] = useState<any>(null);
-  const [logoUri, setLogoUri] = useState(getCachedBrandingLogo());
+  const [sortBy, setSortBy] = useState<'newest' | 'engaged' | 'nearby'>('newest');
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [activeLoc, setActiveLoc] = useState<HaynaLocation>({
     region: 'كل المملكة',
@@ -133,8 +133,6 @@ export default function Questions() {
 
   useEffect(() => {
     let active = true;
-    void getBrandingLogo().then(uri => { if (active) setLogoUri(uri); }).catch(() => undefined);
-    const unsubscribeBranding = subscribeBrandingLogo(uri => { if (active) setLogoUri(uri); });
     void getActiveLocation().then(location => {
       if (!active) return;
       setActiveLoc(location);
@@ -151,7 +149,6 @@ export default function Questions() {
     });
     return () => {
       active = false;
-      unsubscribeBranding();
       unsubscribeLocation();
       authListener.subscription.unsubscribe();
     };
@@ -202,16 +199,7 @@ export default function Questions() {
         variant="sub"
         title="استفسارات الجيران"
         fallbackRoute="/home"
-        rightAction={
-          <Pressable
-            onPress={() => setShowLocationModal(true)}
-            style={styles.locationButton}
-            accessibilityRole="button"
-            accessibilityLabel="تغيير المدينة والحي"
-          >
-            <MapPin size={17} color="#176b52" />
-          </Pressable>
-        }
+
       />
 
       <ScrollView
@@ -237,6 +225,17 @@ export default function Questions() {
         }
       >
         <LocationScopeBar location={activeLoc} />
+        <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 7, marginTop: 8, marginBottom: 12 }}>
+          {([['newest', 'الأحدث'], ['engaged', 'الأكثر تفاعلاً'], ['nearby', 'الأقرب']] as const).map(([key, label]) => (
+            <Pressable key={key} onPress={() => setSortBy(key)} style={{ paddingHorizontal: 13, paddingVertical: 8, borderRadius: 18, backgroundColor: sortBy === key ? '#176b52' : '#ffffff', borderWidth: 1, borderColor: sortBy === key ? '#176b52' : '#dbe5df' }}>
+              <Text style={{ color: sortBy === key ? '#ffffff' : '#475569', fontSize: 12, fontWeight: '800' }}>{label}</Text>
+            </Pressable>
+          ))}
+          <Pressable onPress={() => Alert.alert('تصفية', 'استخدم خيارات الفرز: الأحدث، الأكثر تفاعلاً، والأقرب.')} style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 11, paddingVertical: 9, borderRadius: 14, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#b7d8c8' }}>
+            <SlidersHorizontal size={15} color='#176b52' />
+            <Text style={{ color: '#176b52', fontSize: 12, fontWeight: '900' }}>تصفية</Text>
+          </Pressable>
+        </View>
         {loading && items.length === 0 ? (
           <View style={styles.stateBox}>
             <ActivityIndicator size="large" color="#16845f" />
