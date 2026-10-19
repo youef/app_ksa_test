@@ -748,7 +748,7 @@ const s = StyleSheet.create({
   xCard: {
     backgroundColor: '#fff',
     borderRadius: 22,
-    minHeight: 330,
+    minHeight: 0,
     padding: 16,
     marginBottom: 14,
     borderWidth: 1,
@@ -760,7 +760,7 @@ const s = StyleSheet.create({
     elevation: 3,
   },
   // Uniform compact cards; full text and replies live on the post details page.
-  xCardCollapsed: { height: 440, overflow: 'hidden' },
+  xCardCollapsed: { height: 350, overflow: 'hidden' },
   xCardEmergency: {
     borderColor: '#fca5a5',
     backgroundColor: '#fffafa',
