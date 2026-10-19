@@ -24,18 +24,7 @@ export default function StoriesRow({ profile, stories, selectedDistrict }: Props
 
   return (
     <View style={styles.storiesContainer}>
-      {/* Compact section header: avoid duplicating the "more stories" action below. */}
-      <View style={styles.storiesHeaderRow}>
-        <Pressable
-          style={styles.publishStoryHeaderBtn}
-          onPress={handleAddStory}
-          accessibilityRole="button"
-          accessibilityLabel="نشر يوميات"
-        >
-          <Plus size={14} color="#059669" strokeWidth={2.5} />
-          <Text style={styles.publishStoryHeaderText}>نشر يوميات</Text>
-        </Pressable>
-
+      <View style={[styles.storiesHeaderRow, { justifyContent: 'flex-end' }]}>
         <View style={styles.storiesTitleRow}>
           <Text style={styles.storiesSectionTitle}>يوميات الحي</Text>
         </View>
