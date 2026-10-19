@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { router, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Home, Compass, Plus, MessageCircle, MoreHorizontal } from 'lucide-react-native';
+import { Home, Compass, Plus, Store, MoreHorizontal } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
 import Animated, { makeMutable, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { supabase } from '@/lib/supabase';
@@ -23,7 +23,7 @@ const TABS = [
   { key: '/home', label: 'الرئيسية', icon: Home, kind: 'tab' },
   { key: '/search', label: 'استكشف', icon: Compass, kind: 'tab' },
   { key: '/ask', label: 'إضافة', icon: Plus, kind: 'create' },
-  { key: '/messages', label: 'الدردشة', icon: MessageCircle, kind: 'tab' },
+  { key: '/market', label: 'السوق', icon: Store, kind: 'tab' },
   { key: '/more', label: 'المزيد', icon: MoreHorizontal, kind: 'tab' },
 ] as const;
 
