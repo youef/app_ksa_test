@@ -203,6 +203,15 @@ export default function Home() {
     setRefreshing(false);
   }, [feed.reload]);
 
+  // Infinite feed: fetch the next batch when the user scrolls near the end.
+  const handleFeedScroll = useCallback(({ nativeEvent }: any) => {
+    const { contentOffset, contentSize, layoutMeasurement } = nativeEvent;
+    const nearEnd = contentOffset.y + layoutMeasurement.height >= contentSize.height - 520;
+    if (nearEnd && feed.hasMore && !feed.loadingMore && !feed.loading) {
+      void feed.loadMore();
+    }
+  }, [feed.hasMore, feed.loadingMore, feed.loading, feed.loadMore]);
+
   const emergencyTop = derived.emergency[0];
 
   useEffect(() => {
@@ -229,6 +238,8 @@ export default function Home() {
         style={styles.container}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        onScroll={handleFeedScroll}
+        scrollEventThrottle={300}
         contentContainerStyle={{ paddingBottom: bottomNavInset + 24, backgroundColor: '#eaf3ee', flexGrow: 1 }}
         refreshControl={
           <RefreshControl
