@@ -6,6 +6,7 @@ import { BlurView } from 'expo-blur';
 import {
   ChevronRight,
   Bell,
+  MessageCircle,
   ShieldCheck,
   LogIn,
 } from 'lucide-react-native';
@@ -122,6 +123,9 @@ export function AppHeader({
                       <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
                     </View>
                   )}
+                </Pressable>
+                <Pressable onPress={() => router.push('/messages')} style={styles.iconCircle} hitSlop={8} accessibilityRole="button" accessibilityLabel="الدردشة">
+                  <MessageCircle size={18} color="#16865b" />
                 </Pressable>
               </>
             )}
