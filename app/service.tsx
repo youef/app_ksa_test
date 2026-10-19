@@ -50,6 +50,7 @@ import {
   BadgeCheck,
   CircleAlert,
   Pencil,
+  GraduationCap,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AppHeader } from '@/components/shared/AppHeader';
@@ -341,16 +342,16 @@ export default function Service() {
   const details: Record<string, string> = service.details || {};
 
   // Standard details mapping
-  const detailKeyLabels: Record<string, { label: string; icon: string }> = {
-    preorder: { label: 'حالة التوفر والطلب', icon: '⏳' },
-    quantity: { label: 'الكمية المتاحة', icon: '📦' },
-    condition: { label: 'حالة السلعة', icon: '✨' },
-    warranty: { label: 'الضمان والموثوقية', icon: '🛡️' },
-    experience: { label: 'سنوات الخبرة', icon: '⭐' },
-    delivery_time: { label: 'مدة التسليم المتوقعة', icon: '⏱️' },
-    level: { label: 'المرحلة التعليمية', icon: '🎓' },
-    range: { label: 'نطاق الخدمة والتغطية', icon: '📍' },
-    map_link: { label: 'رابط الخريطة', icon: '🗺️' },
+  const detailKeyLabels: Record<string, { label: string; Icon: typeof Info }> = {
+    preorder: { label: 'حالة التوفر والطلب', Icon: Clock },
+    quantity: { label: 'الكمية المتاحة', Icon: PackageCheck },
+    condition: { label: 'حالة السلعة', Icon: Sparkles },
+    warranty: { label: 'الضمان والموثوقية', Icon: ShieldCheck },
+    experience: { label: 'سنوات الخبرة', Icon: Award },
+    delivery_time: { label: 'مدة التسليم المتوقعة', Icon: Clock },
+    level: { label: 'المرحلة التعليمية', Icon: GraduationCap },
+    range: { label: 'نطاق الخدمة والتغطية', Icon: MapPin },
+    map_link: { label: 'رابط الخريطة', Icon: MapPin },
   };
 
   const extraEntries = Object.entries(details).filter(([_, v]) => Boolean(v && String(v).trim()));
