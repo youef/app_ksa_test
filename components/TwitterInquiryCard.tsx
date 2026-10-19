@@ -447,8 +447,7 @@ export default function TwitterInquiryCard({
             <Text style={s.xDot}>·</Text>
             <Text style={s.xHandle} numberOfLines={1}>@{username}</Text>
             {isIdVerified && <CheckCircle2 size={13} color="#059669" />}
-            <Pressable onPress={() => isGuest ? requireAccount() : data.profiles?.id && router.push({ pathname: '/user', params: { id: data.profiles.id } })}>
-              <Text style={s.xAuthorName} numberOfLines={1}>{name}</Text>
+            <Pressable onPress={() => isGuest ? requireAccount() : data.profiles?.id && router.push({ pathname: '/user', params: { id: data.profiles.id } })}>              <Text style={s.xAuthorName} numberOfLines={1}>{name}</Text>
             </Pressable>
           </View>
 
@@ -747,10 +746,10 @@ export default function TwitterInquiryCard({
 const s = StyleSheet.create({
   xCard: {
     backgroundColor: '#fff',
-    borderRadius: 22,
+    borderRadius: 20,
     minHeight: 0,
-    padding: 16,
-    marginBottom: 14,
+    padding: 14,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: '#e2e8f0',
     shadowColor: '#0f172a',
@@ -759,8 +758,8 @@ const s = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
-  // Uniform compact cards; full text and replies live on the post details page.
-  xCardCollapsed: { height: 350, overflow: 'hidden' },
+  // Compact feed card with less dead space; full replies remain on the details page.
+  xCardCollapsed: { height: 300, overflow: 'hidden' },
   xCardEmergency: {
     borderColor: '#fca5a5',
     backgroundColor: '#fffafa',
@@ -773,7 +772,7 @@ const s = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   xAvatarWrap: {
     position: 'relative',
@@ -897,14 +896,13 @@ const s = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 4,
-    marginTop: 2,
-  },
+    marginTop: 2,  },
   xLocationText: {
     fontSize: 11,
     color: '#059669',
     fontWeight: '700',
   },
-  xContentArea: { marginBottom: 8, minHeight: 96 },
+  xContentArea: { marginBottom: 6, minHeight: 0 },
   xCompactStatus: { alignSelf: 'flex-start', flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 10, backgroundColor: '#ecfdf5', marginTop: 5, marginBottom: 3 },
   xCompactStatusDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#059669' },
   xCompactStatusDotResolved: { backgroundColor: '#64748b' },
@@ -916,7 +914,7 @@ const s = StyleSheet.create({
   xStatusDotActive: { backgroundColor: '#059669', borderColor: '#059669' },
   xStatusLabel: { fontSize: 9, lineHeight: 12, color: '#94a3b8', textAlign: 'center' },
   xStatusLabelActive: { color: '#047857', fontWeight: '800' },
-  xReactionsRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 5, marginTop: 2, marginBottom: 8 },
+  xReactionsRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginTop: 5, marginBottom: 7 },
   xReactionChip: { flex: 1, minHeight: 34, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 4, paddingVertical: 6, borderRadius: 12, backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0' },
   xReactionChipActive: { backgroundColor: '#ecfdf5', borderColor: '#6ee7b7' },
   xReactionEmoji: { fontSize: 13 },
@@ -927,15 +925,15 @@ const s = StyleSheet.create({
     fontWeight: '800',
     color: '#0f172a',
     textAlign: 'right',
-    lineHeight: 23,
-    marginBottom: 6,
+    lineHeight: 22,
+    marginBottom: 5,
   },
   xBodyText: {
     fontSize: 13.5,
     color: '#475569',
     textAlign: 'right',
-    lineHeight: 21,
-    marginBottom: 10,
+    lineHeight: 20,
+    marginBottom: 7,
   },
   xHashtagRow: {
     flexDirection: 'row-reverse',
@@ -1010,7 +1008,7 @@ const s = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 10,
+    paddingTop: 8,
     borderTopWidth: 1,
     borderTopColor: '#f1f5f9',
   },
