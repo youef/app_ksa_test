@@ -68,12 +68,11 @@ import {
 
 export type MarketSection = 'market' | 'businesses' | 'events';
 
-export type SortOption = 'newest' | 'rating' | 'price_asc' | 'price_desc';
+export type SortOption = 'newest' | 'engaged' | 'nearby';
 const SORT_OPTIONS: { id: SortOption; label: string; icon: string }[] = [
-  { id: 'newest', label: 'الأحدث', icon: '⚡' },
-  { id: 'rating', label: 'الأعلى تقييماً', icon: '⭐' },
-  { id: 'price_asc', label: 'الأقل سعراً', icon: '🏷️' },
-  { id: 'price_desc', label: 'الأعلى سعراً', icon: '💎' },
+  { id: 'newest', label: 'الأحدث', icon: '◷' },
+  { id: 'engaged', label: 'الأكثر تفاعلاً', icon: '↗' },
+  { id: 'nearby', label: 'الأقرب', icon: '⌖' },
 ];
 
 type QuickFilter = 'all' | 'available' | 'delivery' | 'images' | 'verified';
@@ -322,25 +321,21 @@ export default function Market() {
     });
 
     return filtered.sort((a, b) => {
-      if (sortBy === 'price_asc') {
-        const pA = a.item.price_from ?? 999999;
-        const pB = b.item.price_from ?? 999999;
-        return pA - pB;
+      if (sortBy === 'engaged') {
+        const score = (x: any) => Number(x.views_count ?? x.views ?? 0) + Number(x.likes_count ?? x.likes ?? 0) * 2 + Number(x.favorites_count ?? 0) * 3;
+        return score(b.item) - score(a.item) || new Date(b.item.created_at || 0).getTime() - new Date(a.item.created_at || 0).getTime();
       }
-      if (sortBy === 'price_desc') {
-        const pA = a.item.price_from ?? 0;
-        const pB = b.item.price_from ?? 0;
-        return pB - pA;
+      if (sortBy === 'nearby') {
+        const rank = (x: any) => {
+          const city = x.item.city || x.item.profiles?.city;
+          const district = x.item.district || x.item.profiles?.district;
+          return district && district === activeLoc.district ? 0 : city && city === activeLoc.city ? 1 : 2;
+        };
+        return rank(a) - rank(b) || new Date(b.item.created_at || 0).getTime() - new Date(a.item.created_at || 0).getTime();
       }
-      if (sortBy === 'rating') {
-        const rA = a.item.rating ?? (a.item.profiles?.is_verified ? 5.0 : 4.5);
-        const rB = b.item.rating ?? (b.item.profiles?.is_verified ? 5.0 : 4.5);
-        return rB - rA;
-      }
-      // default: newest
       return new Date(b.item.created_at || 0).getTime() - new Date(a.item.created_at || 0).getTime();
     });
-  }, [inAreaMarket, activeType, quick, query, sortBy]);
+  }, [inAreaMarket, activeType, quick, query, sortBy, activeLoc]);
 
   const families = activeType === 'all' && quick === 'all' && !query
     ? inAreaMarket.filter((e) => e.type?.id === 'home_family').slice(0, 10)
@@ -360,8 +355,12 @@ export default function Market() {
     });
 
     return filtered.sort((a, b) => {
-      if (sortBy === 'rating') return (b.rating || 0) - (a.rating || 0);
-      return (b.reviews || 0) - (a.reviews || 0);
+      if (sortBy === 'engaged') return (b.reviews || 0) - (a.reviews || 0) || (b.rating || 0) - (a.rating || 0);
+      if (sortBy === 'nearby') {
+        const rank = (x: any) => x.district && x.district === activeLoc.district ? 0 : x.city && x.city === activeLoc.city ? 1 : 2;
+        return rank(a) - rank(b) || (b.reviews || 0) - (a.reviews || 0);
+      }
+      return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
     });
   }, [businesses, activeLoc, businessCategory, quick, query, sortBy]);
 
@@ -833,10 +832,6 @@ export default function Market() {
               <View style={styles.heroHeaderRow}>
                 <View style={{ flex: 1 }}>
                   <View style={styles.heroBadgeRow}>
-                    <View style={styles.heroBadge}>
-                      <Sparkles size={11} color="#fef08a" />
-                      <Text style={styles.heroBadgeText}>تجارة وخدمات الحي المباشرة</Text>
-                    </View>
                     <View style={styles.heroLocBadge}>
                       <MapPin size={10} color="#a7f3d0" />
                       <Text style={styles.heroLocText} numberOfLines={1}>{locationLabel}</Text>
@@ -844,9 +839,7 @@ export default function Market() {
                   </View>
 
                   <Text style={styles.heroTitle}>سوق وتجارة الجيران</Text>
-                  <Text style={styles.heroSubtitle}>
-                    منصة البيع والخدمات ودليل الأعمال والأسر المنتجة في الحي بدون وسطاء أو عمولات
-                  </Text>
+                  <Text style={styles.heroSubtitle}>منتجات وخدمات وأعمال محلية في مكان واحد.</Text>
                 </View>
               </View>
 
@@ -869,12 +862,7 @@ export default function Market() {
                   <Text style={styles.kpiVal}>{displayedEvents.length}</Text>
                   <Text style={styles.kpiLbl}>فعاليات مجدولة</Text>
                 </View>
-                <View style={styles.kpiDivider} />
-                <View style={styles.kpiItem}>
-                  <ShieldCheck size={15} color="#a7f3d0" />
-                  <Text style={styles.kpiVal}>100%</Text>
-                  <Text style={styles.kpiLbl}>أمان وموثوقية</Text>
-                </View>
+
               </View>
             </LinearGradient>
           </View>
@@ -937,7 +925,7 @@ export default function Market() {
                   onChangeText={setSearchQuery}
                   placeholder={
                     section === 'market'
-                      ? 'ابحث عن منتج، سلعة، أو أسر منتجة...'
+                      ? 'ابحث عن منتج أو خدمة...'
                       : section === 'businesses'
                       ? 'ابحث عن بقالة، صيدلية، مطعم، ورشة...'
                       : 'ابحث في فعاليات وملتقيات الحي...'
@@ -972,7 +960,7 @@ export default function Market() {
                     onPress={() => setSortBy(opt.id)}
                     style={[styles.sortChip, sortBy === opt.id && styles.sortChipActive]}
                   >
-                    <Text style={{ fontSize: 10 }}>{opt.icon}</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '800' }}>{opt.icon}</Text>
                     <Text style={[styles.sortChipText, sortBy === opt.id && styles.sortChipTextActive]}>
                       {opt.label}
                     </Text>
