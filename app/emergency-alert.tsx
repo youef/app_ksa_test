@@ -142,13 +142,8 @@ export default function EmergencyAlertScreen() {
         .limit(50);
 
       if (error) throw error;
-      // Show only alerts whose verified city AND district exactly match this device's area.
-      // Unknown location means no local alerts are shown; no global/random fallback.
-      setAlerts((data || []).filter((item: any) =>
-        verifiedArea &&
-        normalizeSaudiLocationName(String(item.city || '')) === normalizeSaudiLocationName(verifiedArea.city) &&
-        normalizeSaudiLocationName(String(item.district || '')) === normalizeSaudiLocationName(verifiedArea.district)
-      ));
+      // Keep fetched rows separate; the visible list below applies the latest verified area state.
+      setAlerts(data || []);
     } catch (e) {
       console.warn('loadAlerts error:', e);
     } finally {
@@ -424,8 +419,13 @@ export default function EmergencyAlertScreen() {
     );
   };
 
-  const activeAlertsCount = alerts.filter((a) => a.status === 'active').length;
-  const filteredAlerts = alerts.filter((a) => {
+  const localAlerts = alerts.filter((item: any) =>
+    Boolean(verifiedArea) &&
+    normalizeSaudiLocationName(String(item.city || '')) === normalizeSaudiLocationName(verifiedArea!.city) &&
+    normalizeSaudiLocationName(String(item.district || '')) === normalizeSaudiLocationName(verifiedArea!.district)
+  );
+  const activeAlertsCount = localAlerts.filter((a) => a.status === 'active').length;
+  const filteredAlerts = localAlerts.filter((a) => {
     if (statusFilter === 'active') return a.status === 'active';
     if (statusFilter === 'resolved') return a.status === 'resolved';
     return true;
@@ -471,7 +471,7 @@ export default function EmergencyAlertScreen() {
               <View style={styles.activeAlertsDot} />
             )}
             <Text style={[styles.segmentBtnText, activeTab === 'list' && styles.segmentBtnTextActive]}>
-              🚨 قسم البلاغات ({alerts.length})
+              🚨 قسم البلاغات ({localAlerts.length})
             </Text>
           </View>
         </Pressable>
@@ -562,7 +562,7 @@ export default function EmergencyAlertScreen() {
               onPress={() => setStatusFilter('all')}
             >
               <Text style={[styles.filterChipText, statusFilter === 'all' && styles.filterChipTextActive]}>
-                الكل ({alerts.length})
+                الكل ({localAlerts.length})
               </Text>
             </Pressable>
             <Pressable
@@ -581,7 +581,7 @@ export default function EmergencyAlertScreen() {
               onPress={() => setStatusFilter('resolved')}
             >
               <Text style={[styles.filterChipText, statusFilter === 'resolved' && styles.filterChipTextActiveSuccess]}>
-                تم حلها ✅ ({alerts.filter((a) => a.status === 'resolved').length})
+                تم حلها ✅ ({localAlerts.filter((a) => a.status === 'resolved').length})
               </Text>
             </Pressable>
           </View>
