@@ -47,6 +47,7 @@ import { getCurrentDeviceLocation, reverseGeocodeDeviceLocation } from '@/lib/de
 import { sendPushToMultipleUsers } from '@/lib/pushSender';
 import { useBottomNavInset } from '@/lib/bottomNav';
 import { relativeTime } from '@/lib/mapPins';
+import { isInsideSaudiArabia, isKnownSaudiCity, normalizeSaudiLocationName } from '@/lib/saudiLocations';
 
 const ALERT_TYPES = [
   { id: 'missing', label: 'طفل أو شخص مفقود', icon: UserX, color: '#dc2626', bg: '#fef2f2' },
@@ -80,6 +81,8 @@ export default function EmergencyAlertScreen() {
   const [fetchingLoc, setFetchingLoc] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [verifiedArea, setVerifiedArea] = useState<{ region: string; city: string; district: string } | null>(null);
+  const [areaLoading, setAreaLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   // Edit & Delete states
@@ -90,17 +93,33 @@ export default function EmergencyAlertScreen() {
   const [deletingAlertId, setDeletingAlertId] = useState<string | null>(null);
 
   useEffect(() => {
-    supabase.auth.getUser().then(async ({ data }) => {
-      if (data.user) {
-        setCurrentUserId(data.user.id);
-        const { data: prof } = await supabase.from('profiles').select('*').eq('id', data.user.id).maybeSingle();
-        setUserProfile(prof);
-        if (prof?.district) {
-          setLocationLabel(`حي ${prof.district}، ${prof.city || 'الرياض'}`);
+    let alive = true;
+    (async () => {
+      try {
+        const { data } = await supabase.auth.getUser();
+        if (data.user && alive) {
+          setCurrentUserId(data.user.id);
+          const { data: prof } = await supabase.from('profiles').select('*').eq('id', data.user.id).maybeSingle();
+          if (alive) setUserProfile(prof);
         }
+        // Use verified device GPS, not a profile default or a fabricated city/district.
+        const device = await getCurrentDeviceLocation();
+        if (device && isInsideSaudiArabia(device.latitude, device.longitude)) {
+          const geo = await reverseGeocodeDeviceLocation(device);
+          if (geo && !geo.isOutsideKSA && geo.region && geo.city && geo.district && isKnownSaudiCity(geo.city) && alive) {
+            setVerifiedArea({ region: geo.region, city: geo.city, district: geo.district });
+            setCoords({ lat: device.latitude, lng: device.longitude });
+            setLocationLabel(`حي ${geo.district}، ${geo.city}`);
+          }
+        }
+      } catch (e) {
+        console.warn('Emergency location verification failed:', e);
+      } finally {
+        if (alive) setAreaLoading(false);
       }
-    });
-    loadAlerts();
+      await loadAlerts();
+    })();
+    return () => { alive = false; };
   }, []);
 
   const loadAlerts = async () => {
@@ -123,7 +142,13 @@ export default function EmergencyAlertScreen() {
         .limit(50);
 
       if (error) throw error;
-      setAlerts(data || []);
+      // Show only alerts whose verified city AND district exactly match this device's area.
+      // Unknown location means no local alerts are shown; no global/random fallback.
+      setAlerts((data || []).filter((item: any) =>
+        verifiedArea &&
+        normalizeSaudiLocationName(String(item.city || '')) === normalizeSaudiLocationName(verifiedArea.city) &&
+        normalizeSaudiLocationName(String(item.district || '')) === normalizeSaudiLocationName(verifiedArea.district)
+      ));
     } catch (e) {
       console.warn('loadAlerts error:', e);
     } finally {
@@ -136,13 +161,19 @@ export default function EmergencyAlertScreen() {
     setFetchingLoc(true);
     try {
       const loc = await getCurrentDeviceLocation();
-      if (loc) {
-        setCoords({ lat: loc.latitude, lng: loc.longitude });
-        const geo = await reverseGeocodeDeviceLocation(loc);
-        if (geo?.district) {
-          setLocationLabel(`حي ${geo.district}، ${geo.city || ''}`);
-        }
+      if (!loc || !isInsideSaudiArabia(loc.latitude, loc.longitude)) {
+        Alert.alert('تعذر تحديد موقعك', 'فعّل الموقع وتأكد أنك داخل المملكة ثم أعد المحاولة.');
+        return;
       }
+      const geo = await reverseGeocodeDeviceLocation(loc);
+      if (!geo || geo.isOutsideKSA || !geo.region || !geo.city || !geo.district || !isKnownSaudiCity(geo.city)) {
+        Alert.alert('موقع غير مكتمل', 'لم نستطع التحقق من المدينة والحي الحقيقيين. لن نستخدم بيانات افتراضية.');
+        return;
+      }
+      setCoords({ lat: loc.latitude, lng: loc.longitude });
+      setVerifiedArea({ region: geo.region, city: geo.city, district: geo.district });
+      setLocationLabel(`حي ${geo.district}، ${geo.city}`);
+      await loadAlerts();
     } catch (err) {
       console.warn('GPS location fetch error', err);
     } finally {
@@ -166,6 +197,10 @@ export default function EmergencyAlertScreen() {
       ]);
     }
 
+    if (!coords || !verifiedArea?.city || !verifiedArea?.district) {
+      return Alert.alert('تحديد الموقع مطلوب', 'اضغط تحديد موقعي أولاً حتى نربط البلاغ بمكانه الحقيقي ونرسله لجيران الحي الصحيح.');
+    }
+
     Alert.alert(
       'تأكيد بث التنبيه الطارئ 🚨',
       'سيتم إرسال هذا التنبيه فوراً لجميع جيران الحي كإشعار عاجل. هل تود المتابعة؟',
@@ -177,8 +212,15 @@ export default function EmergencyAlertScreen() {
           onPress: async () => {
             setSubmitting(true);
             try {
-              const district = userProfile?.district || 'الياسمين';
-              const city = userProfile?.city || 'الرياض';
+              const live = await getCurrentDeviceLocation();
+              if (!live || !isInsideSaudiArabia(live.latitude, live.longitude)) throw new Error('تعذر التحقق من GPS داخل المملكة. أعد تحديد موقعك.');
+              const geo = await reverseGeocodeDeviceLocation(live);
+              if (!geo || geo.isOutsideKSA || !geo.region || !geo.city || !geo.district || !isKnownSaudiCity(geo.city)) throw new Error('تعذر تأكيد المدينة والحي الفعليين. لم يتم إرسال البلاغ.');
+              const city = geo.city;
+              const district = geo.district;
+              setCoords({ lat: live.latitude, lng: live.longitude });
+              setVerifiedArea({ region: geo.region, city, district });
+              setLocationLabel(`حي ${district}، ${city}`);
 
               // 1. Insert alert in database table urgent_alerts
               const { data: insertedAlert, error } = await supabase
@@ -191,8 +233,8 @@ export default function EmergencyAlertScreen() {
                   city,
                   district,
                   status: 'active',
-                  location_lat: coords?.lat || null,
-                  location_lng: coords?.lng || null,
+                  location_lat: live.latitude,
+                  location_lng: live.longitude,
                 })
                 .select('id')
                 .single();
@@ -219,6 +261,7 @@ export default function EmergencyAlertScreen() {
                 .from('profiles')
                 .select('id')
                 .eq('district', district)
+                .eq('city', city)
                 .neq('id', auth.user.id)
                 .limit(100);
 
@@ -466,6 +509,13 @@ export default function EmergencyAlertScreen() {
             />
           }
         >
+          <View style={{ marginBottom: 10, padding: 12, borderRadius: 14, backgroundColor: verifiedArea ? '#ecfdf5' : '#fff7ed', borderWidth: 1, borderColor: verifiedArea ? '#a7f3d0' : '#fed7aa' }}>
+            <Text style={{ color: verifiedArea ? '#065f46' : '#9a3412', textAlign: 'right', fontWeight: '800', fontSize: 12 }}>
+              {areaLoading ? 'جارٍ التحقق من موقعك الحقيقي…' : verifiedArea ? `نطاق البلاغات: حي ${verifiedArea.district}، ${verifiedArea.city}` : 'لم يتم التحقق من موقعك؛ لا يمكن عرض بلاغات حي محدد حتى يتم تحديد الموقع.'}
+            </Text>
+            {!verifiedArea && !areaLoading && <Pressable onPress={() => void handleFetchCurrentGps()} style={{ alignSelf: 'flex-end', marginTop: 8, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, backgroundColor: '#9a3412' }}><Text style={{ color: '#fff', fontWeight: '800' }}>تحديد موقعي الحقيقي</Text></Pressable>}
+          </View>
+
           {/* Executive Overview Banner */}
           <LinearGradient
             colors={activeAlertsCount > 0 ? ['#dc2626', '#b91c1c', '#991b1b'] : ['#059669', '#047857', '#064e3b']}
@@ -542,6 +592,10 @@ export default function EmergencyAlertScreen() {
               <ActivityIndicator size="large" color="#dc2626" />
               <Text style={styles.loadingText}>جارٍ جلب بلاغات الحي...</Text>
             </View>
+          ) : areaLoading ? (
+            <View style={styles.loadingBox}><ActivityIndicator size="large" color="#dc2626" /><Text style={styles.loadingText}>جارٍ التحقق من موقعك قبل عرض البلاغات…</Text></View>
+          ) : !verifiedArea ? (
+            <View style={styles.emptyBox}><MapPin size={36} color="#d97706" /><Text style={styles.emptyTitle}>حدد موقعك لعرض البلاغات المحلية</Text><Text style={styles.emptySub}>لن نعرض بلاغات من أحياء أخرى أو مواقع غير مؤكدة.</Text><Pressable style={styles.emptyAddBtn} onPress={() => void handleFetchCurrentGps()}><Text style={styles.emptyAddBtnText}>تحديد موقعي</Text></Pressable></View>
           ) : filteredAlerts.length === 0 ? (
             <View style={styles.emptyBox}>
               <View style={styles.emptyIconCircle}>
