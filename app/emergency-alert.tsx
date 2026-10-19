@@ -422,7 +422,9 @@ export default function EmergencyAlertScreen() {
   const localAlerts = alerts.filter((item: any) =>
     Boolean(verifiedArea) &&
     normalizeSaudiLocationName(String(item.city || '')) === normalizeSaudiLocationName(verifiedArea!.city) &&
-    normalizeSaudiLocationName(String(item.district || '')) === normalizeSaudiLocationName(verifiedArea!.district)
+    normalizeSaudiLocationName(String(item.district || '')) === normalizeSaudiLocationName(verifiedArea!.district) &&
+    Number.isFinite(Number(item.location_lat)) && Number.isFinite(Number(item.location_lng)) &&
+    isInsideSaudiArabia(Number(item.location_lat), Number(item.location_lng))
   );
   const activeAlertsCount = localAlerts.filter((a) => a.status === 'active').length;
   const filteredAlerts = localAlerts.filter((a) => {
@@ -513,6 +515,7 @@ export default function EmergencyAlertScreen() {
             <Text style={{ color: verifiedArea ? '#065f46' : '#9a3412', textAlign: 'right', fontWeight: '800', fontSize: 12 }}>
               {areaLoading ? 'جارٍ التحقق من موقعك الحقيقي…' : verifiedArea ? `نطاق البلاغات: حي ${verifiedArea.district}، ${verifiedArea.city}` : 'لم يتم التحقق من موقعك؛ لا يمكن عرض بلاغات حي محدد حتى يتم تحديد الموقع.'}
             </Text>
+            {verifiedArea && <Text style={{ color: '#64748b', textAlign: 'right', fontSize: 10, marginTop: 4 }}>بلاغات مجتمعية مرتبطة بموقع GPS؛ ليست تأكيدًا رسميًا من جهات الطوارئ.</Text>}
             {!verifiedArea && !areaLoading && <Pressable onPress={() => void handleFetchCurrentGps()} style={{ alignSelf: 'flex-end', marginTop: 8, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, backgroundColor: '#9a3412' }}><Text style={{ color: '#fff', fontWeight: '800' }}>تحديد موقعي الحقيقي</Text></Pressable>}
           </View>
 
