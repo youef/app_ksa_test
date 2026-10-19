@@ -465,60 +465,32 @@ export default function AskScreen() {
           <ChevronRight size={17} color="#64748b" />
         </Pressable>
 
-        {/* Post Type Selector Tabs */}
-        <View style={styles.postTypeContainer}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.postTypeTabs}>
-            <Pressable
-              style={[styles.typeTab, postType === 'inquiry' && styles.typeTabActive]}
-              onPress={() => setPostType('inquiry')}
-            >
-              <MessageSquare size={15} color={postType === 'inquiry' ? '#fff' : '#059669'} />
-              <Text style={[styles.typeTabText, postType === 'inquiry' && styles.typeTabTextActive]}>
-                استفسار
-              </Text>
-            </Pressable>
-
-            <Pressable
-              style={[styles.typeTab, postType === 'help' && styles.typeTabActive]}
-              onPress={() => setPostType('help')}
-            >
-              <HeartHandshake size={17} color={postType === 'help' ? '#fff' : '#64748b'} />
-              <Text style={[styles.typeTabText, postType === 'help' && styles.typeTabTextActive]}>
-                طلب فزعة
-              </Text>
-            </Pressable>
-
-            <Pressable
-              style={[styles.typeTab, postType === 'tool_sharing' && styles.typeTabActive]}
-              onPress={() => setPostType('tool_sharing')}
-            >
-              <Wrench size={17} color={postType === 'tool_sharing' ? '#fff' : '#64748b'} />
-              <Text style={[styles.typeTabText, postType === 'tool_sharing' && styles.typeTabTextActive]}>
-                إعارة أدوات
-              </Text>
-            </Pressable>
-
-            <Pressable
-              style={[styles.typeTab, postType === 'donate' && styles.typeTabActive]}
-              onPress={() => setPostType('donate')}
-            >
-              <Gift size={17} color={postType === 'donate' ? '#fff' : '#64748b'} />
-              <Text style={[styles.typeTabText, postType === 'donate' && styles.typeTabTextActive]}>
-                تبرّع
-              </Text>
-            </Pressable>
-
-            <Pressable
-              style={[styles.typeTab, postType === 'emergency' && styles.typeTabActive]}
-              onPress={() => setPostType('emergency')}
-            >
-              <Flame size={17} color={postType === 'emergency' ? '#fff' : '#64748b'} />
-              <Text style={[styles.typeTabText, postType === 'emergency' && styles.typeTabTextActive]}>
-                بلاغ طارئ
-              </Text>
-            </Pressable>
-          </ScrollView>
-        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="اختيار نوع المنشور"
+          onPress={() => Alert.alert('نوع المنشور', 'اختر التصنيف المناسب لمنشورك', [
+            { text: 'استفسار', onPress: () => setPostType('inquiry') },
+            { text: 'طلب فزعة', onPress: () => setPostType('help') },
+            { text: 'إعارة أدوات', onPress: () => setPostType('tool_sharing') },
+            { text: 'تبرّع', onPress: () => setPostType('donate') },
+            { text: 'بلاغ طارئ', style: 'destructive', onPress: () => setPostType('emergency') },
+            { text: 'إلغاء', style: 'cancel' },
+          ])}
+          style={styles.categorySelect}
+        >
+          <View style={styles.categorySelectLeading}>
+            {postType === 'help' ? <HeartHandshake size={18} color="#16865b" /> :
+             postType === 'tool_sharing' ? <Wrench size={18} color="#16865b" /> :
+             postType === 'donate' ? <Gift size={18} color="#16865b" /> :
+             postType === 'emergency' ? <Flame size={18} color="#b91c1c" /> :
+             <MessageSquare size={18} color="#16865b" />}
+            <View style={styles.categorySelectCopy}>
+              <Text style={styles.categorySelectLabel}>نوع المنشور</Text>
+              <Text style={styles.categorySelectValue}>{postType === 'help' ? 'طلب فزعة' : postType === 'tool_sharing' ? 'إعارة أدوات' : postType === 'donate' ? 'تبرّع' : postType === 'emergency' ? 'بلاغ طارئ' : 'استفسار'}</Text>
+            </View>
+          </View>
+          <ChevronDown size={18} color="#64748b" />
+        </Pressable>
 
         <View style={styles.templatesContainer}>
           <Text style={styles.templatesTitle}>ابدأ بقالب جاهز (اختياري)</Text>
@@ -689,7 +661,7 @@ export default function AskScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#fff',
   },
   headerBadgeWrap: {
     flexDirection: 'row-reverse',
@@ -708,15 +680,15 @@ const styles = StyleSheet.create({
     color: '#059669',
   },
   scrollContent: {
-    padding: 18,
-    paddingTop: 12,
+    paddingHorizontal: 16,
+    paddingTop: 6,
   },
-  introRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, marginBottom: 18, paddingVertical: 8 },
+  introRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, marginBottom: 10, paddingVertical: 5 },
   introIcon: { width: 44, height: 44, borderRadius: 15, backgroundColor: '#eaf7f0', alignItems: 'center', justifyContent: 'center' },
   introCopy: { flex: 1, alignItems: 'flex-end', gap: 4 },
-  introTitle: { fontSize: 20, fontWeight: '900', color: '#102a20', textAlign: 'right' },
+  introTitle: { fontSize: 18, fontWeight: '900', color: '#102a20', textAlign: 'right' },
   introSub: { fontSize: 12.5, color: '#64748b', textAlign: 'right', lineHeight: 19 },
-  locationInline: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 16, minHeight: 58 },
+  locationInline: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 9, marginBottom: 12, minHeight: 54 },
   locationInlineIcon: { width: 34, height: 34, borderRadius: 11, backgroundColor: '#eaf7f0', alignItems: 'center', justifyContent: 'center' },
   locationInlineCopy: { flex: 1, alignItems: 'flex-end', gap: 3 },
   locationInlineTitle: { fontSize: 13, fontWeight: '800', color: '#0f172a', textAlign: 'right' },
@@ -747,7 +719,7 @@ const styles = StyleSheet.create({
   welcomeText: { fontSize: 13, lineHeight: 20, color: '#475569', textAlign: 'right' },
   welcomeLocation: { fontSize: 12, fontWeight: '800', color: '#059669', textAlign: 'right', marginTop: 2 },
   postTypeContainer: {
-    marginBottom: 14,
+    marginBottom: 10,
   },
   postTypeTabs: {
     flexDirection: 'row-reverse',
@@ -824,8 +796,40 @@ const styles = StyleSheet.create({
     color: '#78350f',
     textAlign: 'right',
   },
+  categorySelect: {
+    minHeight: 62,
+    paddingHorizontal: 13,
+    paddingVertical: 10,
+    marginBottom: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#dbe5e0',
+    backgroundColor: '#f8fbf9',
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  categorySelectLeading: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 11,
+  },
+  categorySelectCopy: {
+    alignItems: 'flex-end',
+    gap: 3,
+  },
+  categorySelectLabel: {
+    color: '#64748b',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  categorySelectValue: {
+    color: '#102a20',
+    fontSize: 14,
+    fontWeight: '900',
+  },
   templatesContainer: {
-    marginBottom: 14,
+    marginBottom: 10,
   },
   templatesTitle: {
     fontSize: 12,
@@ -1018,8 +1022,9 @@ const styles = StyleSheet.create({
   },
   titleInput: {
     backgroundColor: '#fff',
-    borderRadius: 14,
-    padding: 12,
+    borderRadius: 12,
+    paddingHorizontal: 13,
+    paddingVertical: 13,
     fontSize: 16,
     fontWeight: '600',
     color: '#0f172a',
@@ -1028,8 +1033,8 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   bodyInput: {
-    height: 148,
-    minHeight: 148,
+    height: 124,
+    minHeight: 124,
     fontSize: 16,
     textAlignVertical: 'top',
   },
@@ -1229,9 +1234,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#16865b',
     minHeight: 54,
-    borderRadius: 16,
+    borderRadius: 14,
     gap: 8,
-    marginTop: 6,
+    marginTop: 8,
     shadowColor: '#059669',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.2,
