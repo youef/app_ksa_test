@@ -19,6 +19,7 @@ import { useHomeFeed } from '@/hooks/useHomeFeed';
 import { useHomeLocation } from '@/hooks/useHomeLocation';
 import { useBottomNavInset } from '@/lib/bottomNav';
 import TwitterInquiryCard from '@/components/TwitterInquiryCard';
+import LocationScopeBar from '@/components/LocationScopeBar';
 import AppHeader from '@/components/shared/AppHeader';
 import AtmosphereBar from '@/components/home/AtmosphereBar';
 import StoriesRow from '@/components/home/StoriesRow';
@@ -228,6 +229,8 @@ export default function Home() {
           />
         }
       >
+        <LocationScopeBar location={{ region: loc.region, city: loc.city, district: loc.district }} />
+
         <AtmosphereBar
           weather={loc.weather}
           weatherLoading={loc.weatherLoading}
