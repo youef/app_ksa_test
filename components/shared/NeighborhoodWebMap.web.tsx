@@ -14,18 +14,41 @@ type Props = {
   onLocate: () => void;
 };
 
+const LEAFLET_ASSETS_STYLE_ID = 'leaflet-local-assets';
+
 export default function NeighborhoodWebMap({ pins, places, center, city, onSelectPin, onSelectPlace, onLocate }: Props) {
   useEffect(() => {
-    if (typeof document === 'undefined' || document.getElementById('leaflet-css')) return;
-    const link = document.createElement('link');
-    link.id = 'leaflet-css';
-    link.rel = 'stylesheet';
-    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-    document.head.appendChild(link);
-    return () => {
-      // Keep the shared stylesheet mounted because other map screens may use Leaflet too.
-    };
+    if (typeof document === 'undefined') return;
+
+    if (!document.getElementById('leaflet-css')) {
+      const link = document.createElement('link');
+      link.id = 'leaflet-css';
+      link.rel = 'stylesheet';
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.appendChild(link);
+    }
+
+    // Keep Leaflet's stylesheet but serve its image assets from this app's public folder.
+    // The default-icon-path rule is also used by Leaflet to discover the marker image directory.
+    if (!document.getElementById(LEAFLET_ASSETS_STYLE_ID)) {
+      const style = document.createElement('style');
+      style.id = LEAFLET_ASSETS_STYLE_ID;
+      style.textContent = `
+        .leaflet-default-icon-path {
+          background-image: url('/leaflet/images/marker-icon.png');
+        }
+        .leaflet-control-layers-toggle {
+          background-image: url('/leaflet/images/layers.png');
+        }
+        .leaflet-retina .leaflet-control-layers-toggle {
+          background-image: url('/leaflet/images/layers-2x.png');
+          background-size: 26px 26px;
+        }
+      `;
+      document.head.appendChild(style);
+    }
   }, []);
+
   const mapCenter: [number, number] = center ? [center.lat, center.lng] : [24.7136, 46.6753];
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: 360, borderRadius: 17, overflow: 'hidden', background: '#e8eee8' }}>
