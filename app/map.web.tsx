@@ -13,6 +13,15 @@ import { router } from 'expo-router';
 import {
   Flame,
   Globe,
+  ShoppingBasket,
+  Pill,
+  Shirt,
+  Scissors,
+  Wrench,
+  Coffee,
+  Utensils,
+  Croissant,
+  MapPinned,
   Layers,
   MapPin as MapPinIcon,
   Navigation,
@@ -52,6 +61,22 @@ import { getActiveLocation, isAllKingdom, subscribeLocation } from '@/lib/locati
 const KSA_CENTER = { lat: 24.7136, lng: 46.6753 };
 const KSA_BOUNDS = { north: 32.6, south: 15.9, east: 56.1, west: 34.4 };
 const MAP_ID = process.env.EXPO_PUBLIC_GOOGLE_MAPS_MAP_ID || '';
+
+function CategoryIcon({ categoryKey, size = 16, color = '#059669' }: { categoryKey: string; size?: number; color?: string }) {
+  const props = { size, color, strokeWidth: 2.2 };
+  switch (categoryKey) {
+    case 'grocery': return <ShoppingBasket {...props} />;
+    case 'pharmacy': return <Pill {...props} />;
+    case 'clothing': return <Shirt {...props} />;
+    case 'salon': return <Scissors {...props} />;
+    case 'hardware': return <Wrench {...props} />;
+    case 'cafe': return <Coffee {...props} />;
+    case 'restaurant': return <Utensils {...props} />;
+    case 'bakery': return <Croissant {...props} />;
+    case 'market': return <Store {...props} />;
+    default: return <MapPinned {...props} />;
+  }
+}
 
 const MAP_STYLES: any[] = [
   { elementType: 'geometry', stylers: [{ color: '#eef2f6' }] },
@@ -738,6 +763,19 @@ export default function WebMap() {
     void runPlaceSearch(placeCategory, query);
   }, [engine, placeCategory, query, runPlaceSearch]);
 
+  const startNavigation = useCallback(async (place: NearbyPlace) => {
+    let origin = '';
+    try {
+      const current = myLocation ?? await getCurrentDeviceLocation();
+      if (current) {
+        setMyLocation(current);
+        origin = `&origin=${current.latitude},${current.longitude}`;
+      }
+    } catch {}
+    const url = `https://www.google.com/maps/dir/?api=1${origin}&destination=${place.lat},${place.lng}&travelmode=driving&dir_action=navigate`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }, [myLocation]);
+
   const focusPlace = useCallback(
     (place: NearbyPlace) => {
       if (engine === 'leaflet' && leafletInstanceRef.current) {
@@ -775,9 +813,7 @@ export default function WebMap() {
         style={styles.placeRow}
       >
         <View style={styles.placeBadge}>
-          <Text style={{ fontSize: 17 }}>
-            {PLACE_CATEGORIES.find((c) => c.key === place.categoryKey)?.emoji ?? '🏬'}
-          </Text>
+          <CategoryIcon categoryKey={place.categoryKey} size={19} />
         </View>
         <View style={styles.placeBody}>
           <Text style={styles.placeName} numberOfLines={1}>
@@ -811,7 +847,7 @@ export default function WebMap() {
         <View style={styles.placeActions}>
           <Pressable
             hitSlop={8}
-            onPress={() => window.open(navigationUrl(place.lat, place.lng), '_blank', 'noopener')}
+            onPress={() => void startNavigation(place)}
             style={styles.placeActionBtn}
           >
             <Navigation size={15} color={C.accent} />
@@ -955,7 +991,7 @@ export default function WebMap() {
                 placeCategory === ALL_PLACES_KEY && styles.floatingChipTextActive,
               ]}
             >
-              🌟 الكل ({places.length})
+              <Globe size={14} color={placeCategory === ALL_PLACES_KEY ? '#fff' : '#059669'} /> الكل ({places.length})
             </Text>
           </Pressable>
           {PLACE_CATEGORIES.map((category) => (
@@ -976,7 +1012,7 @@ export default function WebMap() {
                   placeCategory === category.key && styles.floatingChipTextActive,
                 ]}
               >
-                {category.emoji} {category.label}
+                <CategoryIcon categoryKey={category.key} size={14} color={placeCategory === category.key ? '#fff' : '#059669'} /> {category.label}
               </Text>
             </Pressable>
           ))}
