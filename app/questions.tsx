@@ -112,6 +112,7 @@ export default function Questions() {
       }
 
       questions = questions
+        .filter(question => !isEmergencyQuestion(question))
         .filter(question => isLocationMatching(question, location.city, location.district))
         .sort((a, b) => {
           const pinned = Number(Boolean(b.is_pinned)) - Number(Boolean(a.is_pinned));
