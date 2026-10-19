@@ -516,43 +516,27 @@ export default function AskScreen() {
           </View>
         )}
 
-        {/* Location Selector Card (Auto-linked to user with GPS shortcut) */}
         <View style={styles.locationCard}>
           <View style={styles.locationCardHeader}>
-            <Pressable
-              style={styles.gpsAutoBtn}
-              onPress={handleQuickGps}
-              disabled={locatingGps}
-            >
-              {locatingGps ? (
-                <ActivityIndicator size="small" color="#059669" />
-              ) : (
-                <>
-                  <Compass size={13} color="#059669" />
-                  <Text style={styles.gpsAutoBtnText}>تحديث بالـ GPS</Text>
-                </>
-              )}
-            </Pressable>
-            <Text style={styles.locationLabel}>موقع السؤال والحي المستهدف</Text>
+            <Text style={styles.locationLabel}>موقعك تلقائياً</Text>
+            <View style={styles.gpsAutoBtn}>
+              <CheckCircle2 size={13} color="#059669" />
+              <Text style={styles.gpsAutoBtnText}>تحديد تلقائي</Text>
+            </View>
           </View>
-
-          <Pressable
-            style={styles.locationBtn}
-            onPress={() => setShowLocationModal(true)}
-          >
-            <ChevronDown size={18} color="#059669" />
+          <View style={styles.locationBtn}>
             <View style={{ flex: 1, alignItems: 'flex-end' }}>
               <Text style={styles.locationValue}>
-                {city ? `${city} ${district ? `· حي ${district}` : ''}` : 'اختر مدينتك وحيك...'}
+                {city ? `${district ? `حي ${district} · ` : ''}${city}` : 'جارٍ تحديد موقعك...'}
               </Text>
               <Text style={styles.locationHint}>
-                {city ? 'مربوط تلقائياً بحسابك وإعداداتك · اضغط لتغيير الحي' : 'حدد موقعك ليصل السؤال لجيرانك فقط'}
+                {city ? 'يُحدّد من إعداداتك وموقع الجهاز تلقائياً' : 'سيظهر الحي عند توفر بيانات الموقع'}
               </Text>
             </View>
             <View style={styles.mapPinWrap}>
               <MapPin size={18} color="#059669" />
             </View>
-          </Pressable>
+          </View>
         </View>
 
         {/* Quick Suggested Templates */}
@@ -685,40 +669,6 @@ export default function AskScreen() {
               placeholder="مثال: 30 ر.س (اتركه فارغاً إذا كان فزعة وتطوع بدون مقابل)"
               placeholderTextColor="#94a3b8"
             />
-          </View>
-        )}
-
-        {/* INSTANT AI RESIDENT ANSWER */}
-        {instantAnswer && (
-          <View style={styles.instantAnswerCard}>
-            <View style={styles.instantAnswerHeader}>
-              <View style={styles.confidenceBadge}>
-                <Text style={styles.confidenceText}>دقة {instantAnswer.confidenceScore}%</Text>
-              </View>
-              <View style={styles.instantAnswerTitleRow}>
-                <Text style={styles.instantAnswerTitle}>إجابة فورية من أرشيف تجارب الجيران</Text>
-                <Bot size={18} color="#059669" />
-              </View>
-            </View>
-            <Text style={styles.instantAnswerSub}>
-              ملخص ذكي ومختصر ريثما يرد الجيران الفعليون في الحي:
-            </Text>
-
-            <Text style={styles.instantSummaryText}>{instantAnswer.summary}</Text>
-
-            <View style={styles.keyPointsBox}>
-              {instantAnswer.keyPoints.map((pt, idx) => (
-                <View key={idx} style={styles.pointRow}>
-                  <Text style={styles.pointText}>{pt}</Text>
-                  <Text style={styles.bulletDot}>•</Text>
-                </View>
-              ))}
-            </View>
-
-            <View style={styles.actionBox}>
-              <Lightbulb size={15} color="#d97706" />
-              <Text style={styles.actionText}>{instantAnswer.recommendedAction}</Text>
-            </View>
           </View>
         )}
 
