@@ -796,21 +796,7 @@ export default function Market() {
 
   return (
     <View style={styles.container}>
-      <AppHeader
-        variant="tab"
-        title="سوق ودليل الحي"
-        subtitle={locationLabel}
-        rightAction={
-          <Pressable
-            id="market-header-add"
-            onPress={handleAddPress}
-            style={styles.headerAddBtn}
-          >
-            <Plus size={14} color="#047857" />
-            <Text style={styles.headerAddBtnText}>{addBtnLabel}</Text>
-          </Pressable>
-        }
-      />
+      <AppHeader variant="tab" title="السوق" subtitle={locationLabel} />
 
       <ScrollView
         style={{ flex: 1 }}
@@ -951,7 +937,7 @@ export default function Market() {
             <View style={styles.sortBar}>
               <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}>
                 <ArrowUpDown size={12} color="#64748b" />
-                <Text style={styles.sortBarLabel}>ترتيب:</Text>
+                <Text style={styles.sortBarLabel}>ترتيب</Text>
               </View>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row-reverse', gap: 6 }}>
                 {SORT_OPTIONS.map((opt) => (
