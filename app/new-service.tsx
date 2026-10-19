@@ -457,24 +457,6 @@ export default function NewService() {
         )}
       </ScrollView>
 
-      <View style={styles.footer}>
-        <Pressable style={styles.backBtn} onPress={back}>
-          <ChevronRight size={18} color="#334155" />
-          <Text style={styles.backBtnText}>{step === 0 ? 'إلغاء' : 'رجوع'}</Text>
-        </Pressable>
-        {step > 0 && (
-          step < STEPS.length - 1 ? (
-            <Pressable id="wizard-next" style={styles.nextBtn} onPress={next}>
-              <Text style={styles.nextBtnText}>التالي</Text>
-              <ChevronLeft size={18} color="#fff" />
-            </Pressable>
-          ) : (
-            <Pressable id="publish-service" style={[styles.nextBtn, busy && { opacity: 0.6 }]} onPress={save} disabled={busy}>
-              {busy ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.nextBtnText}>نشر العرض ✨</Text>}
-            </Pressable>
-          )
-        )}
-      </View>
 
       <LocationSelectorModal
         visible={showLocationModal}
@@ -557,7 +539,7 @@ const styles = StyleSheet.create({
   stepLabelActive: { color: '#059669', fontWeight: '900' },
   progressTrack: { height: 4, borderRadius: 2, backgroundColor: '#f1f5f9', marginTop: 10, overflow: 'hidden', flexDirection: 'row-reverse' },
   progressFill: { height: 4, backgroundColor: '#059669', borderRadius: 2 },
-  scroll: { padding: 16, paddingBottom: 120, width: '100%', maxWidth: 720, alignSelf: 'center' },
+  scroll: { padding: 16, paddingBottom: 28, width: '100%', maxWidth: 720, alignSelf: 'center' },
 
   stepTitle: { fontSize: 20, fontWeight: '900', color: '#0f172a', textAlign: 'right' },
   stepHint: { fontSize: 13, color: '#64748b', textAlign: 'right', marginTop: 4, marginBottom: 16 },
