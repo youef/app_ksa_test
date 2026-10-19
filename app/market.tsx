@@ -399,7 +399,7 @@ export default function Market() {
   };
 
   const shareEvent = async (ev: any) => {
-    const text = `دعوة لحضور «${ev.title}» بحيّنا!\n📍 المكان: ${ev.location}\n🗓️ الموعد: ${ev.dateLabel}\nالدعوة عامة والدخول مجاني 🎉`;
+    const text = `دعوة لحضور «${ev.title}» بحيّنا!\nالمكان: ${ev.location}\nالموعد: ${ev.dateLabel}\nالدعوة عامة والدخول مجاني`;
     try {
       await Share.share({ message: text, title: ev.title });
     } catch {}
@@ -1315,7 +1315,7 @@ export default function Market() {
                     ) : (
                       <>
                         <Sparkles size={20} color="#fff" />
-                        <Text style={styles.bigRsvpBtnText}>تسجيل الحضور في الفعالية (سأحضر 🎉)</Text>
+                        <Text style={styles.bigRsvpBtnText}>تسجيل الحضور في الفعالية (سأحضر)</Text>
                       </>
                     )}
                   </Pressable>
@@ -1395,7 +1395,7 @@ export default function Market() {
                   <View style={{ flexDirection: 'row-reverse', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
                     {selectedProduct.available_now && (
                       <View style={[styles.statusTag, styles.statusTagOpen]}>
-                        <Text style={[styles.statusTagText, { color: '#15803d' }]}>متاح الآن للتسليم 🟢</Text>
+                        <Text style={[styles.statusTagText, { color: '#15803d' }]}>متاح الآن للتسليم</Text>
                       </View>
                     )}
                     {(selectedProduct.delivery_modes || []).map((m: string) => {
@@ -1502,7 +1502,7 @@ export default function Market() {
               <Pressable onPress={() => setShowEventModal(false)} style={styles.modalCloseBtn}>
                 <X size={18} color="#0f172a" />
               </Pressable>
-              <Text style={styles.modalTitle}>إضافة فعالية جديدة للحي 📅</Text>
+              <Text style={styles.modalTitle}>إضافة فعالية جديدة للحي</Text>
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 480 }}>
@@ -1568,7 +1568,7 @@ export default function Market() {
                 ) : (
                   <>
                     <Calendar size={18} color="#fff" />
-                    <Text style={styles.submitEventBtnText}>نشر الفعالية لسكان الحي 📢</Text>
+                    <Text style={styles.submitEventBtnText}>نشر الفعالية لسكان الحي</Text>
                   </>
                 )}
               </Pressable>
