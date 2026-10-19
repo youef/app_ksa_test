@@ -396,7 +396,7 @@ export default function Service() {
       />
 
       <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingBottom: bottomNavInset + 90 }]}
+        contentContainerStyle={[styles.scroll, { paddingBottom: bottomNavInset + 28 }]}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.bodyWrap}>
@@ -509,7 +509,7 @@ export default function Service() {
               <BadgeCheck size={22} color="#059669" />
             </View>
             <View style={{ flex: 1, alignItems: 'flex-end', gap: 2 }}>
-              <Text style={styles.trustTitle}>معاملة مباشرة وموثوقة بين الجيران 🛡️</Text>
+              <Text style={styles.trustTitle}>معاملة مباشرة وموثوقة بين الجيران</Text>
               <Text style={styles.trustDesc}>
                 هذا العرض منشور من أحد سكان {service.city ? `مدينة ${service.city}` : 'الحي'}{service.district ? ` (حي ${service.district})` : ''}. يتم الفحص والاستلام مباشرة باليد أو التوصيل بالاتفاق.
               </Text>
@@ -552,16 +552,30 @@ export default function Service() {
             </Pressable>
           )}
 
+          {!isOwner && (
+            <View style={styles.inlineContactCard}>
+              <Text style={styles.inlineContactTitle}>التواصل مع صاحب العرض</Text>
+              <View style={styles.inlineContactActions}>
+                <Pressable style={styles.inlineMessageBtn} onPress={contactProvider} disabled={contacting}>
+                  {contacting ? <ActivityIndicator size="small" color="#fff" /> : <MessageSquare size={16} color="#fff" />}
+                  <Text style={styles.inlineMessageText}>رسالة داخل التطبيق</Text>
+                </Pressable>
+                {Boolean(service.whatsapp || service.phone) && <Pressable style={styles.inlineWhatsAppBtn} onPress={openWhatsApp}><MessageCircle size={16} color="#047857" /><Text style={styles.inlineWhatsAppText}>واتساب</Text></Pressable>}
+                {Boolean(service.phone || service.whatsapp) && <Pressable style={styles.inlinePhoneBtn} onPress={callPhone}><Phone size={16} color="#0369a1" /><Text style={styles.inlinePhoneText}>اتصال</Text></Pressable>}
+              </View>
+            </View>
+          )}
+
           {/* 5. DESCRIPTION */}
           <View style={styles.sectionCard}>
-            <Text style={styles.sectionCardTitle}>تفاصيل ووصف العرض 📝</Text>
+            <Text style={styles.sectionCardTitle}>تفاصيل ووصف العرض</Text>
             <Text style={styles.sectionCardDesc}>{service.description || 'لا يوجد وصف مفصل لهذا العرض.'}</Text>
           </View>
 
           {/* 6. DELIVERY & RECEIPT MODES */}
           {modes.length > 0 && (
             <View style={styles.sectionCard}>
-              <Text style={styles.sectionCardTitle}>طرق الاستلام والتسليم المتاحة 🚗</Text>
+              <View style={styles.sectionTitleWithIcon}><Truck size={17} color="#059669" /><Text style={styles.sectionCardTitle}>طرق الاستلام والتسليم المتاحة</Text></View>
               <View style={styles.modesContainer}>
                 {modes.map((m) => {
                   const mode = getDeliveryMode(m);
@@ -576,7 +590,7 @@ export default function Service() {
                   return (
                     <View key={m} style={styles.deliveryModeRow}>
                       <View style={styles.deliveryModeEmojiBox}>
-                        <Text style={{ fontSize: 18 }}>{mode.emoji}</Text>
+                        {m === 'delivery' ? <Truck size={18} color="#059669" /> : m === 'remote' ? <ExternalLink size={18} color="#059669" /> : m === 'home_visit' ? <User size={18} color="#059669" /> : m === 'at_shop' ? <Store size={18} color="#059669" /> : <PackageCheck size={18} color="#059669" />}
                       </View>
                       <View style={{ flex: 1, alignItems: 'flex-end' }}>
                         <Text style={styles.deliveryModeLabel}>{mode.label}</Text>
@@ -591,7 +605,7 @@ export default function Service() {
 
           {/* 7. SPECIFICATIONS & DETAILS */}
           <View style={styles.sectionCard}>
-            <Text style={styles.sectionCardTitle}>بيانات ومواصفات إضافية 📋</Text>
+            <Text style={styles.sectionCardTitle}>بيانات ومواصفات إضافية</Text>
             <View style={styles.specsList}>
               <View style={styles.specRow}>
                 <Text style={styles.specVal}>{service.subcategory || service.category || type?.label || 'عام'}</Text>
@@ -600,26 +614,26 @@ export default function Service() {
 
               {service.shop_name && (
                 <View style={styles.specRow}>
-                  <Text style={styles.specVal}>🏪 {service.shop_name}</Text>
+                  <View style={styles.specValueWithIcon}><Store size={14} color="#64748b" /><Text style={styles.specVal}>{service.shop_name}</Text></View>
                   <Text style={styles.specLabel}>المتجر / المحل:</Text>
                 </View>
               )}
 
               {service.working_hours && (
                 <View style={styles.specRow}>
-                  <Text style={styles.specVal}>⏰ {service.working_hours}</Text>
+                  <View style={styles.specValueWithIcon}><Clock size={14} color="#64748b" /><Text style={styles.specVal}>{service.working_hours}</Text></View>
                   <Text style={styles.specLabel}>أوقات التواجد والعمل:</Text>
                 </View>
               )}
 
               {extraEntries.map(([k, v]) => {
-                const meta = detailKeyLabels[k] || { label: k, icon: '📌' };
+                const meta = detailKeyLabels[k] || { label: k, Icon: Info };
                 if (k === 'map_link') {
                   return (
                     <View key={k} style={styles.specRow}>
                       <Pressable onPress={() => Linking.openURL(v).catch(() => {})}>
                         <Text style={[styles.specVal, { color: '#0284c7', textDecorationLine: 'underline' }]}>
-                          فتح في خرائط Google 🗺️
+                          فتح في خرائط Google
                         </Text>
                       </Pressable>
                       <Text style={styles.specLabel}>{meta.label}:</Text>
@@ -628,7 +642,7 @@ export default function Service() {
                 }
                 return (
                   <View key={k} style={styles.specRow}>
-                    <Text style={styles.specVal}>{meta.icon} {v}</Text>
+                    <View style={styles.specValueWithIcon}><meta.Icon size={14} color="#64748b" /><Text style={styles.specVal}>{v}</Text></View>
                     <Text style={styles.specLabel}>{meta.label}:</Text>
                   </View>
                 );
@@ -640,7 +654,7 @@ export default function Service() {
                   style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}
                 >
                   <Text style={[styles.specVal, { color: '#059669', textDecorationLine: 'underline' }]}>
-                    {service.city || ''} {service.district ? `· حي ${service.district}` : ''} 📍
+                    {service.city || ''} {service.district ? `· حي ${service.district}` : ''}
                   </Text>
                 </Pressable>
                 <Text style={styles.specLabel}>الموقع المحدد:</Text>
@@ -701,7 +715,7 @@ export default function Service() {
                 <Pressable onPress={() => router.push('/market')}>
                   <Text style={styles.relatedSeeAll}>تصفح كل السوق</Text>
                 </Pressable>
-                <Text style={styles.relatedTitle}>عروض أخرى من الحي 🛍️</Text>
+                <Text style={styles.relatedTitle}>عروض أخرى من الحي</Text>
               </View>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.relatedRow}>
                 {related.map((rel) => {
@@ -731,45 +745,6 @@ export default function Service() {
           )}
         </View>
       </ScrollView>
-
-      {/* 10. STICKY BOTTOM ACTION BAR (INSTANT CONTACT) */}
-      {!isOwner && (
-        <View style={styles.bottomBar}>
-          <View style={styles.bottomBarInner}>
-            {/* WhatsApp Direct */}
-            {Boolean(service.whatsapp || service.phone) && (
-              <Pressable style={styles.barWaBtn} onPress={openWhatsApp}>
-                <MessageCircle size={18} color="#fff" />
-                <Text style={styles.barWaBtnText}>محادثة واتساب</Text>
-              </Pressable>
-            )}
-
-            {/* Direct Phone Call */}
-            {Boolean(service.phone || service.whatsapp) && (
-              <Pressable style={styles.barPhoneBtn} onPress={callPhone}>
-                <Phone size={17} color="#0284c7" />
-                <Text style={styles.barPhoneBtnText}>اتصال</Text>
-              </Pressable>
-            )}
-
-            {/* In-app Conversation */}
-            <Pressable
-              style={[styles.barMsgBtn, contacting && { opacity: 0.6 }]}
-              onPress={contactProvider}
-              disabled={contacting}
-            >
-              {contacting ? (
-                <ActivityIndicator size="small" color="#059669" />
-              ) : (
-                <>
-                  <MessageSquare size={17} color="#059669" />
-                  <Text style={styles.barMsgBtnText}>رسالة</Text>
-                </>
-              )}
-            </Pressable>
-          </View>
-        </View>
-      )}
 
       {/* Fullscreen Lightbox Modal */}
       <Modal visible={Boolean(fullscreenImage)} transparent animationType="fade">
@@ -1142,6 +1117,17 @@ const styles = StyleSheet.create({
   sectionCardDesc: { fontSize: 13.5, color: '#334155', lineHeight: 22, textAlign: 'right' },
 
   // Delivery Modes
+  sectionTitleWithIcon: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
+  specValueWithIcon: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, flex: 1, justifyContent: 'flex-start' },
+  inlineContactCard: { backgroundColor: '#fff', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#e2e8f0', gap: 10 },
+  inlineContactTitle: { fontSize: 14, fontWeight: '900', color: '#0f172a', textAlign: 'right' },
+  inlineContactActions: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 },
+  inlineMessageBtn: { flexGrow: 1, flexBasis: 140, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 7, backgroundColor: '#059669', borderRadius: 11, paddingVertical: 11, paddingHorizontal: 12 },
+  inlineMessageText: { color: '#fff', fontSize: 12, fontWeight: '900' },
+  inlineWhatsAppBtn: { flexGrow: 1, flexBasis: 85, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#ecfdf5', borderRadius: 11, paddingVertical: 11, paddingHorizontal: 12 },
+  inlineWhatsAppText: { color: '#047857', fontSize: 12, fontWeight: '800' },
+  inlinePhoneBtn: { flexGrow: 1, flexBasis: 75, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#eff6ff', borderRadius: 11, paddingVertical: 11, paddingHorizontal: 12 },
+  inlinePhoneText: { color: '#0369a1', fontSize: 12, fontWeight: '800' },
   modesContainer: { gap: 8 },
   deliveryModeRow: {
     flexDirection: 'row-reverse',
