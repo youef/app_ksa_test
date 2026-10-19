@@ -69,6 +69,7 @@ export default function EmergencyAlertScreen() {
   // Data states
   const [alerts, setAlerts] = useState<any[]>([]);
   const [loadingAlerts, setLoadingAlerts] = useState(true);
+  const [alertsLoadError, setAlertsLoadError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [resolvingId, setResolvingId] = useState<string | null>(null);
 
@@ -100,7 +101,20 @@ export default function EmergencyAlertScreen() {
         if (data.user && alive) {
           setCurrentUserId(data.user.id);
           const { data: prof } = await supabase.from('profiles').select('*').eq('id', data.user.id).maybeSingle();
-          if (alive) setUserProfile(prof);
+          if (alive) {
+            setUserProfile(prof);
+            // If browser GPS is unavailable, use the user's saved city/district as a fallback.
+            // This is explicitly a saved profile location, not presented as a fresh GPS fix.
+            const profileCity = String(prof?.city || '').trim();
+            const profileDistrict = String(prof?.district || '').trim();
+            if (profileCity && profileDistrict && isKnownSaudiCity(profileCity)) {
+              setVerifiedArea((current) => current || {
+                region: String(prof?.region || ''),
+                city: profileCity,
+                district: profileDistrict,
+              });
+            }
+          }
         }
         // Use verified device GPS, not a profile default or a fabricated city/district.
         const device = await getCurrentDeviceLocation();
@@ -125,27 +139,33 @@ export default function EmergencyAlertScreen() {
   const loadAlerts = async () => {
     try {
       setLoadingAlerts(true);
+      setAlertsLoadError(null);
+      // Query the alert table independently: a missing/ambiguous FK relationship to profiles
+      // must not break the entire feed.
       const { data, error } = await supabase
         .from('urgent_alerts')
-        .select(`
-          *,
-          profiles:creator_id (
-            id,
-            display_name,
-            username,
-            avatar_url,
-            is_verified,
-            phone
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: false })
-        .limit(50);
+        .limit(100);
 
       if (error) throw error;
-      // Keep fetched rows separate; the visible list below applies the latest verified area state.
-      setAlerts(data || []);
-    } catch (e) {
+      const rows = data || [];
+      const creatorIds = Array.from(new Set(rows.map((row: any) => row.creator_id).filter(Boolean)));
+      let profilesById: Record<string, any> = {};
+      if (creatorIds.length) {
+        const { data: profilesData, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id,display_name,username,avatar_url,is_verified,phone')
+          .in('id', creatorIds);
+        if (!profilesError && profilesData) {
+          profilesById = Object.fromEntries(profilesData.map((profile: any) => [profile.id, profile]));
+        }
+      }
+      // Legacy alerts without coordinates remain visible when their city/district match.
+      setAlerts(rows.map((row: any) => ({ ...row, profiles: profilesById[row.creator_id] || null })));
+    } catch (e: any) {
       console.warn('loadAlerts error:', e);
+      setAlertsLoadError(e?.message || 'تعذر الاتصال بقاعدة بيانات البلاغات.');
     } finally {
       setLoadingAlerts(false);
       setRefreshing(false);
@@ -419,13 +439,16 @@ export default function EmergencyAlertScreen() {
     );
   };
 
-  const localAlerts = alerts.filter((item: any) =>
-    Boolean(verifiedArea) &&
-    normalizeSaudiLocationName(String(item.city || '')) === normalizeSaudiLocationName(verifiedArea!.city) &&
-    normalizeSaudiLocationName(String(item.district || '')) === normalizeSaudiLocationName(verifiedArea!.district) &&
-    Number.isFinite(Number(item.location_lat)) && Number.isFinite(Number(item.location_lng)) &&
-    isInsideSaudiArabia(Number(item.location_lat), Number(item.location_lng))
-  );
+  const localAlerts = alerts.filter((item: any) => {
+    if (!verifiedArea) return false;
+    const alertCity = normalizeSaudiLocationName(String(item.city || ''));
+    const alertDistrict = normalizeSaudiLocationName(String(item.district || ''));
+    const currentCity = normalizeSaudiLocationName(verifiedArea.city);
+    const currentDistrict = normalizeSaudiLocationName(verifiedArea.district);
+    // City + district are the primary scope. GPS columns are optional for older reports.
+    return Boolean(alertCity && alertDistrict && currentCity && currentDistrict &&
+      alertCity === currentCity && alertDistrict === currentDistrict);
+  });
   const activeAlertsCount = localAlerts.filter((a) => a.status === 'active').length;
   const filteredAlerts = localAlerts.filter((a) => {
     if (statusFilter === 'active') return a.status === 'active';
@@ -590,7 +613,14 @@ export default function EmergencyAlertScreen() {
           </View>
 
           {/* Alerts List */}
-          {loadingAlerts && !refreshing ? (
+          {alertsLoadError && !loadingAlerts ? (
+            <View style={styles.emptyBox}>
+              <AlertTriangle size={34} color="#dc2626" />
+              <Text style={styles.emptyTitle}>تعذر تحميل البلاغات</Text>
+              <Text style={styles.emptySub}>{alertsLoadError}</Text>
+              <Pressable style={styles.emptyAddBtn} onPress={() => void loadAlerts()}><Text style={styles.emptyAddBtnText}>إعادة المحاولة</Text></Pressable>
+            </View>
+          ) : loadingAlerts && !refreshing ? (
             <View style={styles.loadingBox}>
               <ActivityIndicator size="large" color="#dc2626" />
               <Text style={styles.loadingText}>جارٍ جلب بلاغات الحي...</Text>
