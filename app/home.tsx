@@ -241,7 +241,7 @@ export default function Home() {
         {flags.stories !== false && <StoriesRow profile={feed.profile} stories={feed.stories} selectedDistrict={loc.district} />}
 
         <Pressable
-          onPress={() => router.push('/emergency-alert')}
+          onPress={() => router.push('/ask')}
           style={[styles.emergencyHomeCard, { marginBottom: 12 }]}
           accessibilityRole="button"
           accessibilityLabel="فتح صفحة البلاغات والطوارئ"
