@@ -48,6 +48,9 @@ import {
   Send,
   CheckCircle2,
   Award,
+  Truck,
+  BadgeCheck,
+  User,
 } from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { relativeTime } from '@/lib/mapPins';
