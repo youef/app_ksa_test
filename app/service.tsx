@@ -57,12 +57,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { getListingType, getDeliveryMode, formatServicePrice } from '@/lib/serviceTypes';
 import { relativeTime } from '@/lib/mapPins';
 import { useBottomNavInset } from '@/lib/bottomNav';
+import { AccountIdentityBadge, AccountVerificationBadge } from '@/components/profile/AccountIdentityBadge';
 
 export default function Service() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const bottomNavInset = useBottomNavInset();
   const [service, setService] = useState<any>(null);
   const [provider, setProvider] = useState<any>(null);
+  const [business, setBusiness] = useState<any>(null);
   const [related, setRelated] = useState<any[]>([]);
   const [me, setMe] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -96,10 +98,19 @@ export default function Service() {
           if (s.provider_id) {
             const { data: p } = await supabase
               .from('profiles')
-              .select('id, display_name, username, avatar_url, is_verified, is_geoverified, city, district, created_at')
+              .select('id, display_name, username, avatar_url, is_verified, is_geoverified, account_type, freelance_trade, role, city, district, created_at')
               .eq('id', s.provider_id)
               .maybeSingle();
             setProvider(p);
+          }
+
+          if (s.business_id) {
+            const { data: b } = await supabase.from('businesses')
+              .select('id,name,logo_url,is_verified,city,district')
+              .eq('id', s.business_id).maybeSingle();
+            setBusiness(b || null);
+          } else {
+            setBusiness(null);
           }
 
           // Load related services in the same city or category
@@ -517,7 +528,26 @@ export default function Service() {
             </View>
           </View>
 
-          {/* 4. SELLER / PROVIDER PROFILE CARD */}
+          {/* 4. BUSINESS + PROVIDER IDENTITY */}
+          {business && (
+            <Pressable
+              style={[styles.sellerCard, { borderColor: '#fde68a', backgroundColor: '#fffbeb' }]}
+              onPress={() => router.push({ pathname: '/business', params: { id: business.id } })}
+            >
+              <View style={styles.sellerActionBtn}>
+                <Text style={[styles.sellerActionBtnText, { color: '#b7791f' }]}>المنشأة</Text>
+                <ChevronLeft size={14} color="#b7791f" />
+              </View>
+              <View style={{ flex: 1, alignItems: 'flex-end', gap: 3 }}>
+                <Text style={[styles.sellerName, { color: '#78350f' }]}>{business.name}</Text>
+                <Text style={styles.sellerSub}>{business.is_verified ? 'منشأة موثقة مرتبطة بصاحب الخدمة' : 'منشأة مرتبطة بالخدمة'}</Text>
+              </View>
+              <View style={[styles.sellerAvatarPlaceholder, { backgroundColor: '#fff7ed' }]}>
+                <Store size={20} color="#b7791f" />
+              </View>
+            </Pressable>
+          )}
+
           {provider && (
             <Pressable
               style={styles.sellerCard}
@@ -528,15 +558,18 @@ export default function Service() {
                 <ChevronLeft size={14} color="#059669" />
               </View>
 
-              <View style={{ flex: 1, alignItems: 'flex-end', gap: 3 }}>
-                <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-                  <Text style={styles.sellerName}>
-                    {provider.display_name || `@${provider.username || 'أحد الجيران'}`}
-                  </Text>
-                  {provider.is_verified && <ShieldCheck size={16} color="#059669" />}
+              <View style={{ flex: 1, alignItems: 'flex-end', gap: 4 }}>
+                <Text style={styles.sellerName}>
+                  {provider.account_type === 'merchant' && provider.freelance_trade
+                    ? provider.freelance_trade
+                    : provider.display_name || `@${provider.username || 'أحد الجيران'}`}
+                </Text>
+                <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 4 }}>
+                  <AccountIdentityBadge role={provider.role} accountType={provider.account_type} isVerified={Boolean(provider.is_verified)} compact />
+                  <AccountVerificationBadge role={provider.role} accountType={provider.account_type} isVerified={Boolean(provider.is_verified)} compact />
                 </View>
                 <Text style={styles.sellerSub}>
-                  {provider.district ? `سكان حي ${provider.district}` : 'صاحب الإعلان في حيّنا'}
+                  {provider.district ? `حي ${provider.district}` : 'مقدم الخدمة'}
                   {provider.city ? ` · ${provider.city}` : ''}
                 </Text>
               </View>
