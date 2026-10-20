@@ -656,20 +656,19 @@ export default function Request() {
         contentContainerStyle={[styles.scroll, { paddingBottom: bottomNavInset + 40 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Compact forum-style author strip */}
+        {/* Modern Executive Hero Card */}
+        <View style={styles.heroCard}>
+        {/* Author and topic header */}
         <View style={{
           flexDirection: 'row-reverse',
           alignItems: 'center',
           gap: 10,
-          marginHorizontal: 14,
-          marginTop: 12,
-          marginBottom: 10,
-          paddingHorizontal: 12,
-          paddingVertical: 10,
-          borderRadius: 16,
-          backgroundColor: '#ffffff',
-          borderWidth: 1,
-          borderColor: '#e2e8f0',
+          paddingHorizontal: 0,
+          paddingVertical: 0,
+          paddingBottom: 12,
+          marginBottom: 2,
+          borderBottomWidth: 1,
+          borderBottomColor: '#e2e8f0',
         }}>
           {requester?.avatar_url ? (
             <Image
@@ -708,8 +707,6 @@ export default function Request() {
           </View>
         </View>
 
-        {/* Modern Executive Hero Card */}
-        <View style={styles.heroCard}>
           {/* Top Badges Row */}
           <View style={styles.heroTopBadges}>
             {/* Status Badge */}
@@ -804,24 +801,25 @@ export default function Request() {
                   style={[styles.editActionBtn, editsRemaining === 0 && styles.disabledActionBtn]}
                   onPress={handleOpenEdit}
                   disabled={editsRemaining === 0}
+                  accessibilityRole="button"
+                  accessibilityLabel={editsRemaining === 0 ? 'انتهت محاولات التعديل' : 'تعديل الطلب'}
                 >
                   <Pencil size={15} color={editsRemaining === 0 ? '#94a3b8' : '#047857'} />
-                  <Text style={[styles.editActionBtnText, editsRemaining === 0 && styles.disabledActionBtnText]}>
-                    {editsRemaining === 0 ? 'انتهت محاولات التعديل' : 'تعديل الطلب'}
-                  </Text>
+                  <Text style={styles.srOnly}>{editsRemaining === 0 ? 'انتهت محاولات التعديل' : 'تعديل الطلب'}</Text>
                 </Pressable>
 
                 <Pressable
                   style={[styles.deleteActionBtn, deletingRequest && { opacity: 0.6 }]}
                   onPress={handleDeleteRequest}
                   disabled={deletingRequest}
+                  accessibilityRole="button"
+                  accessibilityLabel="حذف الطلب"
                 >
                   {deletingRequest ? (
                     <ActivityIndicator size="small" color="#dc2626" />
                   ) : (
                     <>
                       <Trash2 size={15} color="#dc2626" />
-                      <Text style={styles.deleteActionBtnText}>حذف الطلب</Text>
                     </>
                   )}
                 </Pressable>
@@ -845,54 +843,6 @@ export default function Request() {
                 </Text>
               </View>
             </LinearGradient>
-          )}
-
-          {/* Requester Profile Card */}
-          {requester && (
-            <Pressable
-              style={({ pressed }) => [
-                styles.requesterCard,
-                pressed && { opacity: 0.96 },
-              ]}
-              onPress={() => router.push({ pathname: '/user', params: { id: requester.id } })}
-            >
-              <View style={styles.requesterAvatarWrap}>
-                {requester.avatar_url ? (
-                  <Image source={{ uri: requester.avatar_url }} style={styles.requesterAvatar} />
-                ) : (
-                  <View style={styles.avatarPlaceholder}>
-                    <Text style={styles.avatarLetter}>
-                      {(requester.display_name || requester.username || 'ح')[0]}
-                    </Text>
-                  </View>
-                )}
-                {requester.is_geoverified && (
-                  <View style={styles.verifiedBadgeCircle}>
-                    <ShieldCheck size={11} color="#fff" />
-                  </View>
-                )}
-              </View>
-
-              <View style={styles.requesterTextCol}>
-                <View style={styles.requesterNameRow}>
-                  <Text style={styles.requesterName}>
-                    {requester.display_name || `@${requester.username || 'صاحب الطلب'}`}
-                  </Text>
-                  <View style={styles.requesterBadgePill}>
-                    <CheckCircle2 size={11} color="#059669" />
-                    <Text style={styles.requesterBadgePillText}>صاحب الطلب</Text>
-                  </View>
-                </View>
-                <Text style={styles.requesterSub}>
-                  {requester.district ? `ساكن في حي ${requester.district} · ${requester.city || ''}` : 'أحد جيران الحي'}
-                </Text>
-              </View>
-
-              <View style={styles.visitProfilePill}>
-                <Text style={styles.visitProfilePillText}>الملف</Text>
-                <ChevronLeft size={13} color="#059669" />
-              </View>
-            </Pressable>
           )}
 
           {/* Details & Needs Card */}
@@ -936,32 +886,40 @@ export default function Request() {
             <Pressable
               style={styles.openMapBtn}
               onPress={() => router.push({ pathname: '/map', params: { district: request.district, city: request.city } })}
+              accessibilityRole="button"
+              accessibilityLabel="عرض موقع الحي على الخريطة"
             >
               <MapPin size={15} color="#059669" />
-              <Text style={styles.openMapBtnText}>عرض موقع الحي في خريطة المنصة 🗺️</Text>
-              <ArrowRight size={14} color="#059669" style={{ transform: [{ rotate: '180deg' }] }} />
+              <Text style={styles.openMapBtnText}>موقع الحي على الخريطة</Text>
             </Pressable>
           </View>
 
-          {/* Owner Broadcast Action Card */}
+          {/* Owner quick actions */}
           {isOwner && (
             <View style={styles.ownerNoticeCard}>
               <View style={styles.ownerNoticeTop}>
-                <Sparkles size={18} color="#059669" />
-                <Text style={styles.ownerNoticeTitle}>أنت صاحب هذا الطلب المنشور 📢</Text>
-              </View>
-              <Text style={styles.ownerNoticeSub}>
-                طلبك معروض أمام جميع جيران {locationLabel}. يمكنك نسخ رابط الطلب ومشاركته في قروب الحي بالواتساب لسرعة التجاوب.
-              </Text>
-              <View style={styles.ownerActionRow}>
-                <Pressable style={styles.ownerShareBtn} onPress={handleShare}>
-                  <Share2 size={15} color="#ffffff" />
-                  <Text style={styles.ownerShareBtnText}>مشاركة الطلب في قروب الحي</Text>
-                </Pressable>
-                <Pressable style={styles.ownerDeleteBtn} onPress={deleteRequest}>
-                  <Trash2 size={15} color="#dc2626" />
-                  <Text style={styles.ownerDeleteBtnText}>حذف</Text>
-                </Pressable>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.ownerNoticeTitle}>طلبك منشور لجيران الحي</Text>
+                  <Text style={styles.ownerNoticeSub}>شارك الرابط لتصل الفزعة بشكل أسرع.</Text>
+                </View>
+                <View style={{ flexDirection: 'row-reverse', gap: 8 }}>
+                  <Pressable
+                    style={styles.ownerShareBtn}
+                    onPress={handleShare}
+                    accessibilityRole="button"
+                    accessibilityLabel="مشاركة الطلب"
+                  >
+                    <Share2 size={18} color="#ffffff" />
+                  </Pressable>
+                  <Pressable
+                    style={styles.ownerDeleteBtn}
+                    onPress={deleteRequest}
+                    accessibilityRole="button"
+                    accessibilityLabel="حذف الطلب"
+                  >
+                    <Trash2 size={18} color="#dc2626" />
+                  </Pressable>
+                </View>
               </View>
             </View>
           )}
@@ -1406,6 +1364,7 @@ export default function Request() {
 }
 
 const styles = StyleSheet.create({
+  srOnly: { position: 'absolute', width: 1, height: 1, opacity: 0 },
   container: {
     flex: 1,
     backgroundColor: '#f8fafc',
@@ -1462,8 +1421,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     marginHorizontal: 16,
     marginTop: 12,
-    borderRadius: 22,
-    padding: 18,
+    borderRadius: 18,
+    padding: 15,
     borderWidth: 1,
     borderColor: '#e2e8f0',
     shadowColor: '#0f172a',
