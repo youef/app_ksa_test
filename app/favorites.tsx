@@ -88,7 +88,7 @@ export default function FavoritesScreen() {
       rows.forEach(row => { (grouped[row.target_type] ||= []).push(row.target_id); });
 
       const tableByType: Record<string, string> = {
-        product: 'services', service: 'services', store: 'businesses', business: 'businesses',
+        product: 'marketplace_items', service: 'services', store: 'businesses', business: 'businesses',
         request: 'requests', question: 'questions', post: 'posts',
       };
       const details = new Map<string, any>();
@@ -107,7 +107,9 @@ export default function FavoritesScreen() {
               : type === 'question' || type === 'post'
               ? { pathname: '/question', params: { id: row.id } }
               : type === 'store' || type === 'business'
-              ? { pathname: '/market', params: { section: 'businesses', businessId: row.id } }
+              ? { pathname: '/business', params: { id: row.id } }
+              : type === 'product'
+              ? { pathname: '/marketplace-item', params: { id: row.id } }
               : { pathname: '/service', params: { id: row.id } };
             details.set(type + ':' + row.id, {
               title, body, city: row.city || row.profiles?.city || '', district: row.district || row.profiles?.district || '',
