@@ -17,6 +17,7 @@ import {
 import { router, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/lib/supabase';
+import { requireAccount } from '@/lib/authGate';
 import { LinearGradient } from 'expo-linear-gradient';
 import { X, Send, Eye, Heart, Trash2, ChevronLeft, ChevronRight, Flag, Ban } from 'lucide-react-native';
 
@@ -215,6 +216,11 @@ export default function StoryViewer() {
       setCurrentUserId(u.user.id);
     } else {
       setCurrentUserId('');
+      setStoriesList([]);
+      setLoading(false);
+      requireAccount('اليوميات متاحة لأعضاء حيّنا فقط. سجّل الدخول أو أنشئ حساباً للمشاهدة.');
+      router.replace('/auth');
+      return;
     }
 
     // Fetch the target story first
