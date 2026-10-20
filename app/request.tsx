@@ -45,6 +45,8 @@ import {
   Pencil,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import TwitterInquiryCard from '@/components/TwitterInquiryCard';
+import { useDynamicIsland } from '@/context/DynamicIslandContext';
 import { AppHeader } from '@/components/shared/AppHeader';
 import { requireAccount } from '@/lib/authGate';
 import { getActiveLocation } from '@/lib/locationSync';
@@ -95,6 +97,8 @@ const COMPLETION_TEMPLATES = [
 
 export default function Request() {
   const bottomNavInset = useBottomNavInset();
+  const { showIsland } = useDynamicIsland();
+  const [viewerProfile, setViewerProfile] = useState<any>(null);
   const { id } = useLocalSearchParams<{ id: string }>();
   const [request, setRequest] = useState<any>(null);
   const [requester, setRequester] = useState<any>(null);
@@ -124,6 +128,8 @@ export default function Request() {
       const { data: auth } = await supabase.auth.getSession();
       const user = auth.session?.user ?? null;
       setMe(user?.id || '');
+      const viewer = user ? await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle() : { data: null };
+      setViewerProfile(viewer.data);
 
       const requestPromise = user
         ? supabase.from('requests').select('*').eq('id', id).maybeSingle()
@@ -143,19 +149,8 @@ export default function Request() {
       ]);
 
       const requestData = Array.isArray(requestResult.data) ? requestResult.data[0] : requestResult.data;
+      setRequest(requestData || null);
       if (requestData) {
-        setRequest(requestData);
-
-        // Safely bump views count
-        if (requestData.id && user) {
-          try {
-            supabase
-              .from('requests')
-              .update({ views_count: (requestData.views_count || 0) + 1 })
-              .eq('id', id)
-              .then(() => {});
-          } catch {}
-        }
 
         if (requestData.requester_id) {
           const { data: p } = await supabase
@@ -656,220 +651,13 @@ export default function Request() {
         contentContainerStyle={[styles.scroll, { paddingBottom: bottomNavInset + 40 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Modern Executive Hero Card */}
-        <View style={styles.heroCard}>
-        {/* Author and topic header */}
-        <View style={{
-          flexDirection: 'row-reverse',
-          alignItems: 'center',
-          gap: 10,
-          paddingHorizontal: 0,
-          paddingVertical: 0,
-          paddingBottom: 12,
-          marginBottom: 2,
-          borderBottomWidth: 1,
-          borderBottomColor: '#e2e8f0',
-        }}>
-          {requester?.avatar_url ? (
-            <Image
-              source={{ uri: requester.avatar_url }}
-              style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: '#f1f5f9' }}
-            />
-          ) : (
-            <View style={{
-              width: 42, height: 42, borderRadius: 21, backgroundColor: '#ecfdf5',
-              alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#a7f3d0',
-            }}>
-              <User size={20} color="#047857" />
-            </View>
-          )}
-          <View style={{ flex: 1, alignItems: 'flex-end', gap: 3 }}>
-            <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
-              <Text style={{ color: '#0f172a', fontSize: 13, fontWeight: '900' }}>
-                {requester?.display_name || requester?.username || 'عضو في حيّنا'}
-              </Text>
-              {requester?.is_verified && <ShieldCheck size={14} color="#0284c7" />}
-              {requester?.is_geoverified && (
-                <View style={{ backgroundColor: '#ecfdf5', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 7 }}>
-                  <Text style={{ color: '#047857', fontSize: 9.5, fontWeight: '800' }}>موثّق الحي</Text>
-                </View>
-              )}
-            </View>
-            <Text style={{ color: '#64748b', fontSize: 11, textAlign: 'right' }}>
-              {requester?.username ? `@${requester.username} · ` : ''}صاحب الموضوع
-              {request.created_at ? ` · ${relativeTime(request.created_at)}` : ''}
-            </Text>
-          </View>
-          <View style={{ width: 1, height: 30, backgroundColor: '#e2e8f0' }} />
-          <View style={{ alignItems: 'center', minWidth: 42, gap: 2 }}>
-            <MessageSquare size={15} color="#059669" />
-            <Text style={{ color: '#475569', fontSize: 10, fontWeight: '800' }}>موضوع</Text>
-          </View>
+        <TwitterInquiryCard detailMode type="request" data={{ ...request, profiles: requester, answers_count: offers.length }} currentUserId={me || null} currentUserProfile={viewerProfile} isGuest={!me} onQuickReply={async () => {}} onToast={message => showIsland(message, undefined, 'success')} onDeleted={() => void load()} />
+        <View style={{ backgroundColor: '#fff', borderRadius: 22, padding: 16, gap: 12, borderWidth: 1, borderColor: '#e5e7eb' }}>
+          {Boolean(request.notes) && <Text style={styles.notesText}>{request.notes}</Text>}
+          {Number(request.budget) > 0 && <Text style={styles.budgetValue}>المكافأة المقترحة: {request.budget} ر.س</Text>}
+          <Pressable onPress={() => router.push({ pathname: '/map', params: { district: request.district, city: request.city } })} accessibilityRole="button" style={styles.openMapBtn}><MapPin size={16} color="#176b52" /><Text style={styles.openMapBtnText}>عرض الحي على الخريطة</Text></Pressable>
         </View>
-
-          {/* Top Badges Row */}
-          <View style={styles.heroTopBadges}>
-            {/* Status Badge */}
-            {request.status === 'completed' ? (
-              <View style={styles.completedBadgeHero}>
-                <Sparkles size={13} color="#047857" />
-                <Text style={styles.completedBadgeHeroText}>تمت الفزعة بنجاح ☕</Text>
-              </View>
-            ) : request.status === 'accepted' ? (
-              <View style={styles.acceptedBadge}>
-                <CheckCircle2 size={13} color="#15803d" />
-                <Text style={styles.acceptedBadgeText}>جاري التنفيذ مع جار 🤝</Text>
-              </View>
-            ) : (
-              <View style={styles.openBadge}>
-                <View style={styles.openDot} />
-                <Text style={styles.openBadgeText}>مفتوح ويحتاج فزعة</Text>
-              </View>
-            )}
-
-            {/* Category / Type Pill */}
-            <View style={[styles.typePill, { backgroundColor: typeInfo.bg, borderColor: typeInfo.border }]}>
-              <TypeIcon size={12} color={typeInfo.color} />
-              <Text style={[styles.typePillText, { color: typeInfo.color }]}>{typeInfo.label}</Text>
-            </View>
-
-            {/* Urgency Badge */}
-            {request.is_urgent && (
-              <View style={styles.urgentBadge}>
-                <Flame size={12} color="#dc2626" />
-                <Text style={styles.urgentBadgeText}>عاجل</Text>
-              </View>
-            )}
-          </View>
-
-          {/* Title */}
-          <Text style={styles.heroTitle}>{request.title}</Text>
-
-          {/* Details & Needs Card */}
-          <View style={{ borderTopWidth: 1, borderTopColor: '#e2e8f0', paddingTop: 13, gap: 10 }}>
-            <View style={styles.cardHeaderRow}>
-              <View style={styles.cardHeaderIconBox}>
-                <HeartHandshake size={18} color="#059669" />
-              </View>
-              <Text style={styles.cardTitle}>تفاصيل الطلب والاحتياج</Text>
-            </View>
-
-            <Text style={styles.cardDesc}>{request.description}</Text>
-
-            {request.notes && (
-              <View style={styles.notesBox}>
-                <Info size={14} color="#64748b" />
-                <Text style={styles.notesText}>{request.notes}</Text>
-              </View>
-            )}
-
-            {/* Compensation / Volunteer Mode */}
-            {request.budget && Number(request.budget) > 0 ? (
-              <View style={styles.budgetBox}>
-                <Banknote size={18} color="#15803d" />
-                <View style={styles.budgetCol}>
-                  <Text style={styles.budgetValue}>المكافأة المقترحة: {request.budget} ر.س</Text>
-                  <Text style={styles.budgetSub}>مكافأة تقديرية اختيارية من صاحب الطلب</Text>
-                </View>
-              </View>
-            ) : (
-              <View style={styles.volunteerBox}>
-                <HeartHandshake size={18} color="#059669" />
-                <View style={styles.volunteerCol}>
-                  <Text style={styles.volunteerValue}>فزعة وتطوع ومساعدة أخوية لوجه الله 🤝</Text>
-                  <Text style={styles.volunteerSub}>خدمة جيرة متبادلة تكسبك دعوة صادقة ونقاط سمعة</Text>
-                </View>
-              </View>
-            )}
-
-            {/* Open Map Link */}
-            <Pressable
-              style={styles.openMapBtn}
-              onPress={() => router.push({ pathname: '/map', params: { district: request.district, city: request.city } })}
-              accessibilityRole="button"
-              accessibilityLabel="عرض موقع الحي على الخريطة"
-            >
-              <MapPin size={15} color="#059669" />
-              <Text style={styles.openMapBtnText}>موقع الحي على الخريطة</Text>
-            </Pressable>
-          </View>
-
-
-          {/* Meta Info Row */}
-          <View style={styles.metaRow}>
-            <View style={styles.metaChip}>
-              <MapPin size={13} color="#059669" />
-              <Text style={styles.metaChipText}>{locationLabel}</Text>
-            </View>
-
-            {request.created_at && (
-              <View style={styles.metaChip}>
-                <Clock size={12} color="#64748b" />
-                <Text style={styles.metaChipText}>{relativeTime(request.created_at)}</Text>
-              </View>
-            )}
-
-            {request.views_count != null && (
-              <View style={styles.metaChip}>
-                <Eye size={12} color="#64748b" />
-                <Text style={styles.metaChipText}>{request.views_count} مشاهدة</Text>
-              </View>
-            )}
-          </View>
-
-        </View>
-
         <View style={styles.bodyContainer}>
-          {/* Author Management Card: Edit (Limit 2) & Delete */}
-          {isOwner && (
-            <View style={styles.authorManageBox}>
-              <View style={styles.authorManageHeader}>
-                <View style={styles.authorManageInfo}>
-                  <Text style={styles.authorManageTitle}>إدارة طلبك</Text>
-                  <Text style={styles.authorManageSub}>
-                    {editsRemaining > 0
-                      ? `متبقي لك ${editsRemaining} من ${MAX_EDITS} محاولات تعديل`
-                      : 'استنفدت الحد الأقصى للتعديل (محاولتان فقط)'}
-                  </Text>
-                </View>
-                <View style={[styles.editLimitBadge, editsRemaining === 0 ? styles.editLimitBadgeExpired : styles.editLimitBadgeActive]}>
-                  <Text style={[styles.editLimitBadgeText, editsRemaining === 0 ? styles.editLimitBadgeTextExpired : styles.editLimitBadgeTextActive]}>
-                    {editsRemaining}/{MAX_EDITS} محاولات
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.authorActionsRow}>
-                <Pressable
-                  style={[styles.editActionBtn, editsRemaining === 0 && styles.disabledActionBtn]}
-                  onPress={handleOpenEdit}
-                  disabled={editsRemaining === 0}
-                  accessibilityRole="button"
-                  accessibilityLabel={editsRemaining === 0 ? 'انتهت محاولات التعديل' : 'تعديل الطلب'}
-                >
-                  <Pencil size={15} color={editsRemaining === 0 ? '#94a3b8' : '#047857'} />
-                  <Text style={styles.srOnly}>{editsRemaining === 0 ? 'انتهت محاولات التعديل' : 'تعديل الطلب'}</Text>
-                </Pressable>
-
-                <Pressable
-                  style={[styles.deleteActionBtn, deletingRequest && { opacity: 0.6 }]}
-                  onPress={handleDeleteRequest}
-                  disabled={deletingRequest}
-                  accessibilityRole="button"
-                  accessibilityLabel="حذف الطلب"
-                >
-                  {deletingRequest ? (
-                    <ActivityIndicator size="small" color="#dc2626" />
-                  ) : (
-                    <>
-                      <Trash2 size={15} color="#dc2626" />
-                    </>
-                  )}
-                </Pressable>
-              </View>
-            </View>
-          )}
-
           {/* Celebratory Banner if completed */}
           {request.status === 'completed' && (
             <LinearGradient
@@ -886,36 +674,6 @@ export default function Request() {
                 </Text>
               </View>
             </LinearGradient>
-          )}
-
-          {/* Owner quick actions */}
-          {isOwner && (
-            <View style={styles.ownerNoticeCard}>
-              <View style={styles.ownerNoticeTop}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.ownerNoticeTitle}>طلبك منشور لجيران الحي</Text>
-                  <Text style={styles.ownerNoticeSub}>شارك الرابط لتصل الفزعة بشكل أسرع.</Text>
-                </View>
-                <View style={{ flexDirection: 'row-reverse', gap: 8 }}>
-                  <Pressable
-                    style={styles.ownerShareBtn}
-                    onPress={handleShare}
-                    accessibilityRole="button"
-                    accessibilityLabel="مشاركة الطلب"
-                  >
-                    <Share2 size={18} color="#ffffff" />
-                  </Pressable>
-                  <Pressable
-                    style={styles.ownerDeleteBtn}
-                    onPress={deleteRequest}
-                    accessibilityRole="button"
-                    accessibilityLabel="حذف الطلب"
-                  >
-                    <Trash2 size={18} color="#dc2626" />
-                  </Pressable>
-                </View>
-              </View>
-            </View>
           )}
 
           {/* Helper Already Offered State */}
@@ -1361,17 +1119,17 @@ const styles = StyleSheet.create({
   srOnly: { position: 'absolute', width: 1, height: 1, opacity: 0 },
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f5f7f6',
   },
   scroll: {
-    flexGrow: 1,
+    flexGrow: 1, width: '100%', maxWidth: 760, alignSelf: 'center', paddingHorizontal: 16, paddingTop: 12, gap: 12,
   },
   center: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f5f7f6',
     gap: 12,
   },
   loadingText: {
@@ -1532,7 +1290,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f5f7f6',
     paddingHorizontal: 9,
     paddingVertical: 4,
     borderRadius: 8,
@@ -1564,7 +1322,7 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   bodyContainer: {
-    padding: 16,
+    padding: 0,
     gap: 12,
   },
   completedStatusCard: {
@@ -1751,7 +1509,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f5f7f6',
     padding: 10,
     borderRadius: 12,
     borderWidth: 1,
@@ -1821,7 +1579,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f5f7f6',
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: 12,
@@ -2092,7 +1850,7 @@ const styles = StyleSheet.create({
     color: '#047857',
   },
   offerBubble: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f5f7f6',
     borderRadius: 12,
     padding: 10,
     borderWidth: 1,
@@ -2225,7 +1983,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   quickChip: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f5f7f6',
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 10,
@@ -2238,7 +1996,7 @@ const styles = StyleSheet.create({
     color: '#334155',
   },
   offerInput: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f5f7f6',
     borderRadius: 14,
     padding: 12,
     textAlign: 'right',
@@ -2388,7 +2146,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   appreciationChip: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f5f7f6',
     borderWidth: 1,
     borderColor: '#e2e8f0',
     paddingHorizontal: 12,
@@ -2409,7 +2167,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   appreciationInput: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f5f7f6',
     borderWidth: 1.5,
     borderColor: '#e2e8f0',
     borderRadius: 16,
@@ -2574,7 +2332,7 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   modalInput: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f5f7f6',
     borderWidth: 1.5,
     borderColor: '#e2e8f0',
     borderRadius: 14,
