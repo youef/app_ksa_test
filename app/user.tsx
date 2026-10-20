@@ -43,6 +43,7 @@ import {
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { ProfileCustomizationEntry } from '@/components/profile/ProfileCustomizationEntry';
+import { AccountIdentityBadge, AccountIdentityIcon } from '@/components/profile/AccountIdentityBadge';
 import { C } from '@/lib/ui';
 import { getBlockStatus, setBlock } from '@/lib/chatControls';
 import { isExactDistrictMatching } from '@/lib/locationSync';
@@ -171,7 +172,7 @@ export default function UserProfile() {
       const { data: sessionData } = await supabase.auth.getSession();
       const me = sessionData?.session?.user?.id || null;
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(lookupKey);
-      const { data: p, error } = await supabase.from('profiles').select('id,username,display_name,avatar_url,role,is_verified,city,district,bio,is_geoverified,badges,profile_privacy,hide_name,is_banned,allow_dms')
+      const { data: p, error } = await supabase.from('profiles').select('id,username,display_name,avatar_url,role,is_verified,account_type,city,district,bio,is_geoverified,badges,profile_privacy,hide_name,is_banned,allow_dms')
         .eq(isUuid ? 'id' : 'username', lookupKey).maybeSingle();
       if (error) throw error;
       setCurrentUserId(me);
@@ -576,14 +577,14 @@ export default function UserProfile() {
                     <Sparkles size={11} color="#ffffff" />
                   </View>
                 )}
-                {isAdmin ? (
-                  <View style={styles.adminBadgeCircle}>
-                    <Crown size={12} color="#ffffff" />
-                  </View>
-                ) : profile.is_verified ? (
-                  <View style={styles.verified}>
-                    <BadgeCheck size={14} color="#ffffff" />
-                  </View>
+                {!anonymous ? (
+                  <AccountIdentityIcon
+                    role={profile.role}
+                    accountType={profile.account_type}
+                    isVerified={Boolean(profile.is_verified)}
+                    size={28}
+                    style={styles.accountIdentityMark}
+                  />
                 ) : null}
               </Pressable>
 
@@ -629,12 +630,14 @@ export default function UserProfile() {
             <View style={styles.heroIdentity}>
               <View style={styles.nameRow}>
                 <Text style={styles.name}>{displayName}</Text>
-                {isAdmin && (
-                  <View style={styles.adminPill}>
-                    <Crown size={11} color="#f59e0b" />
-                    <Text style={styles.adminPillText}>مشرف المنصة</Text>
-                  </View>
-                )}
+                {!anonymous ? (
+                  <AccountIdentityBadge
+                    role={profile.role}
+                    accountType={profile.account_type}
+                    isVerified={Boolean(profile.is_verified)}
+                    compact
+                  />
+                ) : null}
               </View>
 
               {!anonymous && profile.username && (
@@ -1309,4 +1312,12 @@ const styles = StyleSheet.create({
   reviewStars: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   reviewRating: { fontSize: 12, fontWeight: '800', color: '#b45309' },
   reviewBody: { color: '#475569', fontSize: 12, lineHeight: 19, textAlign: 'right' },
+
+  accountIdentityMark: {
+    position: 'absolute',
+    right: -5,
+    bottom: -4,
+    zIndex: 5,
+  },
+
 });
