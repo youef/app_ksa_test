@@ -35,7 +35,6 @@ export default function Home() {
   const showToast = useCallback((msg: string) => showIsland(msg, undefined, 'success'), [showIsland]);
 
   const [logoUri, setLogoUri] = useState(getCachedBrandingLogo());
-  const [activeTab, setActiveTab] = useState<HomeTab>('all');
   const [sortBy, setSortBy] = useState<'newest' | 'engaged' | 'nearby'>('newest');
   const [filterOpen, setFilterOpen] = useState(false);
   const [draftKind, setDraftKind] = useState('الكل');
@@ -43,6 +42,7 @@ export default function Home() {
   const [draftPeriod, setDraftPeriod] = useState('كل الأوقات');
   const [appliedFilters, setAppliedFilters] = useState({ kind: 'الكل', status: 'الكل', period: 'كل الأوقات' });
   const [refreshing, setRefreshing] = useState(false);
+  const activeTab: HomeTab = appliedFilters.kind === 'منشوراتي' ? 'mine' : 'all';
 
   // The feed hook resolves the saved location; the location hook owns it.
   // A ref breaks the circular dependency between the two hooks.
@@ -124,14 +124,9 @@ export default function Home() {
   }, [questions, requests, currentUserId, matchesVisibleLocation]);
 
   const items: FeedItem[] = useMemo(() => {
-    switch (activeTab) {
-      case 'emergency': return [];
-      case 'tools': return toFeed(derived.tools, []);
-      case 'questions': return toFeed(derived.filteredQuestions, []);
-      case 'requests': return toFeed([], derived.filteredRequests);
-      case 'mine': return toFeed(derived.filteredMyQuestions, derived.filteredMyRequests);
-      default: return toFeed(derived.filteredQuestions, derived.filteredRequests);
-    }
+    return activeTab === 'mine'
+      ? toFeed(derived.filteredMyQuestions, derived.filteredMyRequests)
+      : toFeed(derived.filteredQuestions, derived.filteredRequests);
   }, [activeTab, derived]);
 
   const filteredItems = useMemo(() => {
@@ -236,17 +231,6 @@ export default function Home() {
         {flags.stories !== false && <View style={layout.stories}><StoriesRow profile={feed.profile} stories={feed.stories} selectedDistrict={loc.district} /></View>}
 
         <View style={[styles.feedSection, layout.feed]}>
-          <View style={layout.heading}>
-            <Text accessibilityRole="header" style={layout.title}>منشورات الحي</Text>
-            <Text style={layout.subtitle}>كل جديد من جيرانك</Text>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={layout.tabsScroll} contentContainerStyle={layout.tabs}>
-            {([['all', 'الكل'], ['questions', 'استفسارات'], ['requests', 'طلبات المساعدة'], ['tools', 'إعارة أدوات'], ...(currentUserId ? [['mine', 'منشوراتي']] : [])] as [HomeTab, string][]).map(([key, label]) => (
-              <Pressable key={key} onPress={() => setActiveTab(key)} accessibilityRole="tab" accessibilityState={{ selected: activeTab === key }} style={[layout.tab, activeTab === key && layout.tabSelected]}>
-                <Text style={[layout.tabText, activeTab === key && layout.tabTextSelected]}>{label}</Text>
-              </Pressable>
-            ))}
-          </ScrollView>
           <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, gap: 8 }}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 7 }}>
               {([
@@ -326,7 +310,7 @@ export default function Home() {
             </View>
             <ScrollView showsVerticalScrollIndicator={false}>
               {([
-                { title: 'نوع المنشور', value: draftKind, setter: setDraftKind, options: ['الكل', 'مساعدة وطلبات', 'إعارة أغراض', 'أسئلة واستفسارات', 'خدمات الحي', 'الطوارئ'] },
+                { title: 'نوع المنشور', value: draftKind, setter: setDraftKind, options: ['الكل', 'مساعدة وطلبات', 'إعارة أغراض', 'أسئلة واستفسارات', 'خدمات الحي', 'الطوارئ', ...(currentUserId ? ['منشوراتي'] : [])] },
                 { title: 'حالة الطلب', value: draftStatus, setter: setDraftStatus, options: ['الكل', 'بانتظار المساعدة', 'تم الرد', 'مكتمل'] },
                 { title: 'تاريخ النشر', value: draftPeriod, setter: setDraftPeriod, options: ['كل الأوقات', 'اليوم', 'هذا الأسبوع', 'هذا الشهر'] },
               ] as const).map(section => (
@@ -367,13 +351,5 @@ const layout = StyleSheet.create({
   contextRow: { width: '100%', maxWidth: 760, alignSelf: 'center', flexDirection: 'row-reverse', alignItems: 'stretch', gap: 8, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12 },
   stories: { width: '100%', maxWidth: 728, alignSelf: 'center', backgroundColor: '#fff', borderRadius: 22, overflow: 'hidden', marginBottom: 8 },
   feed: { maxWidth: 760, marginTop: 16 },
-  heading: { alignItems: 'flex-end', marginBottom: 16, gap: 4 },
-  title: { color: '#182e25', fontSize: 22, fontWeight: '800', textAlign: 'right' },
-  subtitle: { color: '#7b8982', fontSize: 12, textAlign: 'right' },
-  tabsScroll: { marginBottom: 12, borderBottomWidth: 1, borderBottomColor: '#e0e7e2' },
-  tabs: { flexDirection: 'row-reverse', flexGrow: 1, gap: 6 },
-  tab: { minHeight: 48, paddingHorizontal: 14, justifyContent: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
-  tabSelected: { borderBottomColor: '#176b52' },
-  tabText: { color: '#7b8982', fontSize: 13, fontWeight: '600' },
-  tabTextSelected: { color: '#176b52', fontWeight: '800' },
+
 });
