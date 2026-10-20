@@ -596,7 +596,24 @@ export default function Market() {
 
           <View style={styles.cardFooter}>
             <Text style={styles.cardPrice} numberOfLines={1}>{formatServicePrice(item)}</Text>
-            {modes.length > 0 && <Text style={styles.cardModes}>{modes.map((m) => getDeliveryMode(m)?.emoji).join('')}</Text>}
+            {modes.length > 0 && (
+              <View style={styles.cardModes}>
+                {modes.map((m) => {
+                  const mode = getDeliveryMode(m);
+                  if (!mode) return null;
+                  const ModeIcon = m === 'delivery' ? Truck
+                    : m === 'pickup_home' ? House
+                    : m === 'at_shop' ? Store
+                    : m === 'home_visit' ? Wrench
+                    : ExternalLink;
+                  return (
+                    <View key={m} style={styles.cardModeIcon} accessibilityLabel={mode.label}>
+                      <ModeIcon size={13} color="#64748b" strokeWidth={2.1} />
+                    </View>
+                  );
+                })}
+              </View>
+            )}
           </View>
 
           <View style={styles.cardMeta}>
@@ -1888,7 +1905,8 @@ const styles = StyleSheet.create({
   cardSub: { fontSize: 11.5, color: '#64748b', textAlign: 'right', marginTop: 2, lineHeight: 16 },
   cardFooter: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginTop: 7, gap: 4 },
   cardPrice: { fontSize: 13.5, fontWeight: '900', color: '#059669', flexShrink: 1 },
-  cardModes: { fontSize: 11 },
+  cardModes: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  cardModeIcon: { width: 22, height: 22, borderRadius: 7, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' },
   cardTimeText: { fontSize: 10, color: '#94a3b8', fontWeight: '600' },
   cardMeta: { flexDirection: 'row-reverse', alignItems: 'center', gap: 3, marginTop: 6 },
   cardMetaText: { fontSize: 10.5, color: '#94a3b8', fontWeight: '600', flexShrink: 1 },
