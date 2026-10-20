@@ -122,6 +122,14 @@ export default function TwitterInquiryCard({
   const [statusPickerOpen, setStatusPickerOpen] = useState(false);
   const statusLabels: Record<string, string> = { accepted: 'جارٍ تنفيذ الطلب', open: 'بانتظار المساعدة', found: 'تم العثور على الغرض', helped: 'تمت المساعدة', resolved: 'تم حل المشكلة', not_needed: 'لم أعد بحاجة للمساعدة' };
 
+  // Detail screens reload after accepting an answer or completing a request.
+  useEffect(() => {
+    setResolutionStatus(String(data.status === 'completed' ? 'helped' : data.status === 'accepted' ? 'accepted' : data.resolution_status || 'open'));
+    setBestAnswerId(data.best_answer_id || null);
+    setIsPinned(Boolean(data.is_pinned));
+    setIsFeatured(Boolean(data.is_featured));
+  }, [data.status, data.resolution_status, data.best_answer_id, data.is_pinned, data.is_featured]);
+
   // Track real view count on mount
   useEffect(() => {
     let isMounted = true;
