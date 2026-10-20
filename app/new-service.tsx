@@ -51,6 +51,7 @@ export default function NewService() {
   const [step, setStep] = useState(0);
   const [authChecking, setAuthChecking] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [capabilities, setCapabilities] = useState<any>({});
 
   const [typeId, setTypeId] = useState<ListingTypeId | null>(null);
   const [subcategory, setSubcategory] = useState('');
@@ -83,18 +84,30 @@ export default function NewService() {
         router.replace('/auth');
         return;
       }
-      const loc = await getPermanentMyLocation();
+      const [loc, profileRes, capsRes] = await Promise.all([
+        getPermanentMyLocation(),
+        supabase.from('profiles').select('region,city,district,account_type,is_verified,freelance_trade,display_name').eq('id', authData.user.id).maybeSingle(),
+        supabase.rpc('hayna_my_account_capabilities'),
+      ]);
+      if (!capsRes.data?.can_publish_services) {
+        setAuthChecking(false);
+        Alert.alert('يتطلب حسابًا مهنيًا معتمدًا', 'إضافة الخدمات متاحة للحساب التجاري أو العمل الحر أو مقدم الخدمة بعد موافقة الإدارة.');
+        router.replace({ pathname: '/profile', params: { tab: 'profile' } });
+        return;
+      }
+      setCapabilities(capsRes.data || {});
       if (loc?.city && !isAllKingdom(loc.city)) {
         if (loc.region) setRegion(loc.region);
         setCity(loc.city);
         if (loc.district && loc.district !== 'كل الأحياء' && loc.district !== 'كل أحياء المدينة') setDistrict(loc.district);
       }
-      const { data: p } = await supabase.from('profiles').select('region, city, district').eq('id', authData.user.id).maybeSingle();
+      const p = profileRes.data;
       if (p?.region) setRegion(p.region);
       if (p?.city) {
         setCity(p.city);
         if (p?.district) setDistrict(p.district);
       }
+      if (p?.account_type === 'merchant' && p?.freelance_trade) setShopName(p.freelance_trade);
       setAuthChecking(false);
     })();
   }, []);
@@ -219,7 +232,7 @@ export default function NewService() {
         Alert.alert('تعذر نشر العرض', result.error.message);
       } else {
         Alert.alert('تم استلام العرض للمراجعة', 'سيظهر في سوق الحي بعد اعتماده من الإدارة.');
-        router.replace('/market');
+        router.replace({ pathname: '/profile', params: { tab: 'content' } });
       }
     } catch (e: any) {
       setBusy(false);
@@ -247,9 +260,9 @@ export default function NewService() {
     <View style={styles.container}>
       <AppHeader
         variant="sub"
-        title="أضف عرضك في السوق"
+        title="إضافة خدمة"
         subtitle={`خطوة ${step + 1} من ${STEPS.length}: ${STEPS[step]}`}
-        fallbackRoute="/market"
+        fallbackRoute="/profile?tab=content"
       />
       <View style={styles.header}>
         <View style={styles.stepper}>
