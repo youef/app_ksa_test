@@ -656,6 +656,58 @@ export default function Request() {
         contentContainerStyle={[styles.scroll, { paddingBottom: bottomNavInset + 40 }]}
         showsVerticalScrollIndicator={false}
       >
+        {/* Compact forum-style author strip */}
+        <View style={{
+          flexDirection: 'row-reverse',
+          alignItems: 'center',
+          gap: 10,
+          marginHorizontal: 14,
+          marginTop: 12,
+          marginBottom: 10,
+          paddingHorizontal: 12,
+          paddingVertical: 10,
+          borderRadius: 16,
+          backgroundColor: '#ffffff',
+          borderWidth: 1,
+          borderColor: '#e2e8f0',
+        }}>
+          {requester?.avatar_url ? (
+            <Image
+              source={{ uri: requester.avatar_url }}
+              style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: '#f1f5f9' }}
+            />
+          ) : (
+            <View style={{
+              width: 42, height: 42, borderRadius: 21, backgroundColor: '#ecfdf5',
+              alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#a7f3d0',
+            }}>
+              <User size={20} color="#047857" />
+            </View>
+          )}
+          <View style={{ flex: 1, alignItems: 'flex-end', gap: 3 }}>
+            <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+              <Text style={{ color: '#0f172a', fontSize: 13, fontWeight: '900' }}>
+                {requester?.display_name || requester?.username || 'عضو في حيّنا'}
+              </Text>
+              {requester?.is_verified && <ShieldCheck size={14} color="#0284c7" />}
+              {requester?.is_geoverified && (
+                <View style={{ backgroundColor: '#ecfdf5', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 7 }}>
+                  <Text style={{ color: '#047857', fontSize: 9.5, fontWeight: '800' }}>موثّق الحي</Text>
+                </View>
+              )}
+            </View>
+            <Text style={{ color: '#64748b', fontSize: 11, textAlign: 'right' }}>
+              {requester?.username ? `@${requester.username} · ` : ''}صاحب الموضوع
+              {request.created_at ? ` · ${relativeTime(request.created_at)}` : ''}
+            </Text>
+          </View>
+          <View style={{ width: 1, height: 30, backgroundColor: '#e2e8f0' }} />
+          <View style={{ alignItems: 'center', minWidth: 42, gap: 2 }}>
+            <MessageSquare size={15} color="#059669" />
+            <Text style={{ color: '#475569', fontSize: 10, fontWeight: '800' }}>موضوع</Text>
+          </View>
+        </View>
+
         {/* Modern Executive Hero Card */}
         <View style={styles.heroCard}>
           {/* Top Badges Row */}
