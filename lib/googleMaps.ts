@@ -1,3 +1,4 @@
+import { mapSymbolSvg } from './mapSymbols';
 /**
  * Web-only Google Maps JavaScript API loader.
  * Loaded once per document; the key can be overridden with EXPO_PUBLIC_GOOGLE_MAPS_API_KEY.
@@ -60,7 +61,7 @@ export function loadGoogleMaps(timeoutMs = 15000): Promise<any> {
 }
 
 /** Pin graphic used by both the advanced and the legacy marker implementations. */
-export function pinSvg(color: string, emoji: string): string {
+export function pinSvg(color: string, symbol: string): string {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="52" viewBox="0 0 40 52">
     <filter id="s" x="-30%" y="-30%" width="160%" height="160%">
       <feDropShadow dx="0" dy="2" stdDeviation="2.4" flood-color="rgba(15,23,42,0.35)" />
@@ -68,14 +69,13 @@ export function pinSvg(color: string, emoji: string): string {
     <path filter="url(#s)" fill="${color}" stroke="#ffffff" stroke-width="2.2"
       d="M20 1.6c-9.6 0-17.4 7.6-17.4 17 0 12.3 15.3 29.9 16.2 31.1a1.7 1.7 0 0 0 2.4 0c.9-1.2 16.2-18.8 16.2-31.1 0-9.4-7.8-17-17.4-17z"/>
     <circle cx="20" cy="18.4" r="9.6" fill="#ffffff" />
-    <text x="20" y="23.4" font-size="13" font-weight="700" text-anchor="middle"
-      font-family="Segoe UI, Tahoma, sans-serif" fill="${color}">${emoji}</text>
+    <g transform="translate(11 9.4) scale(.75)" fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${mapSymbolSvg(symbol, color).replace(/^<svg[^>]*>/, '').replace('</svg>', '')}</g>
   </svg>`;
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 }
 
 /** DOM node used as AdvancedMarkerElement content. */
-export function pinElement(color: string, emoji: string, urgent: boolean): HTMLElement {
+export function pinElement(color: string, symbol: string, urgent: boolean): HTMLElement {
   const root = document.createElement('div');
   root.style.cssText = 'position:relative;width:40px;height:52px;';
 
@@ -109,7 +109,7 @@ export function pinElement(color: string, emoji: string, urgent: boolean): HTMLE
   }
 
   const img = document.createElement('img');
-  img.src = pinSvg(color, emoji);
+  img.src = pinSvg(color, symbol);
   img.width = 40;
   img.height = 52;
   img.style.cssText = 'position:absolute;inset:0;';
