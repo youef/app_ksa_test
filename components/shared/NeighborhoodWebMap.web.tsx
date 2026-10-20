@@ -1,3 +1,6 @@
+import MapJourney, { type JourneyTarget } from './MapJourney.web';
+import { LocateFixed, MapPin as PinIcon } from 'lucide-react-native';
+import type { DeviceLocation } from '@/lib/deviceLocation';
 import React, { useEffect } from 'react';
 import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
 import { MAP_PIN_KINDS, type MapPin } from '@/lib/mapPins';
@@ -5,6 +8,9 @@ import type { NearbyPlace } from '@/lib/places';
 
 type Center = { lat: number; lng: number } | null;
 type Props = {
+  myLocation?: DeviceLocation | null;
+  destination?: JourneyTarget | null;
+  onLocation?: (value: DeviceLocation) => void;
   pins: MapPin[];
   places: NearbyPlace[];
   center: Center;
@@ -16,7 +22,7 @@ type Props = {
 
 const LEAFLET_ASSETS_STYLE_ID = 'leaflet-local-assets';
 
-export default function NeighborhoodWebMap({ pins, places, center, city, onSelectPin, onSelectPlace, onLocate }: Props) {
+export default function NeighborhoodWebMap({ pins, places, center, city, onSelectPin, onSelectPlace, onLocate, myLocation, destination, onLocation }: Props) {
   useEffect(() => {
     if (typeof document === 'undefined') return;
 
@@ -53,6 +59,7 @@ export default function NeighborhoodWebMap({ pins, places, center, city, onSelec
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: 360, borderRadius: 17, overflow: 'hidden', background: '#e8eee8' }}>
       <MapContainer center={mapCenter} zoom={city ? 12 : 5} scrollWheelZoom style={{ width: '100%', height: '100%', minHeight: 360 }}>
+        <MapJourney center={center} location={myLocation} destination={destination} onLocation={onLocation} />
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -74,7 +81,7 @@ export default function NeighborhoodWebMap({ pins, places, center, city, onSelec
             <CircleMarker key={pin.id} center={[pin.lat, pin.lng]} radius={pin.urgent ? 10 : 7} pathOptions={{ color: '#fff', weight: 2, fillColor: meta.color, fillOpacity: 0.95 }} eventHandlers={{ click: () => onSelectPin(pin) }}>
               <Popup>
                 <div dir="rtl" style={{ minWidth: 150, textAlign: 'right', fontFamily: 'system-ui, sans-serif' }}>
-                  <strong>{meta.emoji} {pin.title}</strong>
+                  <strong>{pin.title}</strong>
                   <div style={{ marginTop: 4, color: '#617168', fontSize: 12 }}>{meta.label} · {pin.area}</div>
                   {pin.body ? <div style={{ marginTop: 6, fontSize: 12 }}>{pin.body}</div> : null}
                   <button style={{ marginTop: 8, border: 0, borderRadius: 8, background: '#173f35', color: '#fff', padding: '7px 10px', cursor: 'pointer' }} onClick={() => onSelectPin(pin)}>عرض التفاصيل</button>
@@ -85,9 +92,9 @@ export default function NeighborhoodWebMap({ pins, places, center, city, onSelec
         })}
       </MapContainer>
       <div style={{ position: 'absolute', zIndex: 500, top: 12, right: 12, borderRadius: 12, padding: '9px 12px', background: '#ffffffed', color: '#23483b', fontSize: 12, fontWeight: 800, boxShadow: '0 3px 12px #173b3118', pointerEvents: 'none' }}>
-        ⌖ {city || 'المملكة العربية السعودية'}
+        {city || 'المملكة العربية السعودية'}
       </div>
-      <button onClick={onLocate} style={{ position: 'absolute', zIndex: 500, bottom: 14, right: 14, width: 42, height: 42, borderRadius: 13, background: '#fff', color: '#176b4d', border: '1px solid #dce5de', fontSize: 22, cursor: 'pointer', boxShadow: '0 3px 12px #173b3118' }} aria-label="تحديد موقعي">◎</button>
+      <button onClick={onLocate} style={{ position: 'absolute', zIndex: 500, bottom: 14, right: 14, width: 42, height: 42, borderRadius: 13, background: '#fff', color: '#176b4d', border: '1px solid #dce5de', fontSize: 22, cursor: 'pointer', boxShadow: '0 3px 12px #173b3118' }} aria-label="تحديد موقعي"><LocateFixed size={21} color="#176b4d" /></button>
     </div>
   );
 }

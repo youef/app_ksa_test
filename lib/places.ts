@@ -6,12 +6,11 @@
  * 1. Google Places (New) API (if enabled & configured)
  * 2. OpenStreetMap / Nominatim API (high coverage Saudi POIs in Arabic)
  * 3. Supabase database (services, businesses, directory)
- * 4. Local Saudi Neighborhood POI templates (guarantees places are never 0)
+ * No generated places or invented ratings.
  */
 
 import { distanceMeters } from './privacy';
 import { supabase } from './supabase';
-import { findPlaceCenter } from './mapPins';
 
 const PLACES_ENDPOINT = 'https://places.googleapis.com/v1/places:searchNearby';
 
@@ -223,7 +222,7 @@ async function searchOsmPlaces(
       const item = items[i];
       const pLat = Number(item.lat);
       const pLng = Number(item.lon);
-      if (isNaN(pLat) || isNaN(pLng)) continue;
+      if (!Number.isFinite(pLat) || !Number.isFinite(pLng)) continue;
       const name = item.name || item.display_name?.split(',')[0] || queryTerm;
       const dist = distanceMeters({ lat, lng }, { lat: pLat, lng: pLng });
       results.push({
@@ -235,10 +234,10 @@ async function searchOsmPlaces(
         lat: pLat,
         lng: pLng,
         phone: '',
-        rating: 4.6,
-        reviews: 18,
-        openNow: true,
-        hoursText: 'مفتوح · يخدم الحي',
+        rating: null,
+        reviews: 0,
+        openNow: null,
+        hoursText: '',
         distance: dist,
         mapsUrl: `https://www.google.com/maps/search/?api=1&query=${pLat},${pLng}`,
         permanent: true,
@@ -267,9 +266,9 @@ async function searchDatabasePlaces(
       if (keyword && !row.name.includes(keyword) && !row.description?.includes(keyword)) return;
       if (category && !category.keywords.some((k) => row.name.includes(k) || row.description?.includes(k))) return;
 
-      const pos = findPlaceCenter(row.city, row.district);
-      const pLat = pos ? pos.lat : lat + (Math.random() - 0.5) * 0.02;
-      const pLng = pos ? pos.lng : lng + (Math.random() - 0.5) * 0.02;
+      const pLat = Number(row.details?.latitude);
+      const pLng = Number(row.details?.longitude);
+      if (!Number.isFinite(pLat) || !Number.isFinite(pLng) || !row.details?.latitude || !row.details?.longitude) return;
 
       results.push({
         id: `db-svc-${row.id}`,
@@ -280,9 +279,9 @@ async function searchDatabasePlaces(
         lat: pLat,
         lng: pLng,
         phone: row.phone || row.whatsapp || '',
-        rating: 4.8,
-        reviews: 24,
-        openNow: row.available_now ?? true,
+        rating: null,
+        reviews: 0,
+        openNow: row.available_now ?? null,
         hoursText: row.working_hours || 'متاح لخدمة الحي',
         distance: distanceMeters({ lat, lng }, { lat: pLat, lng: pLng }),
         mapsUrl: `https://www.google.com/maps/search/?api=1&query=${pLat},${pLng}`,
@@ -296,57 +295,9 @@ async function searchDatabasePlaces(
   }
 }
 
-/** Fallback 3: Hyper-local Saudi Neighborhood POIs anchored around user's location */
-function generateLocalNeighborhoodPlaces(
-  lat: number,
-  lng: number,
-  category: PlaceCategory | null,
-  keyword: string,
-): NearbyPlace[] {
-  const templates = [
-    { cat: 'grocery', name: 'تموينات وأسواق الحي', offset: [0.0018, 0.0016], phone: '0501234567', rating: 4.7, reviews: 45 },
-    { cat: 'pharmacy', name: 'صيدلية الحي المتكاملة', offset: [-0.0015, 0.0022], phone: '0559876543', rating: 4.8, reviews: 56 },
-    { cat: 'bakery', name: 'مخبز وأفران الحي الطازجة', offset: [0.0028, -0.0012], phone: '0543219876', rating: 4.7, reviews: 42 },
-    { cat: 'cafe', name: 'مقهى وكافيه الجيران', offset: [-0.0022, -0.0018], phone: '0567891234', rating: 4.5, reviews: 31 },
-    { cat: 'restaurant', name: 'مطاعم ومطابخ الحي', offset: [0.0035, 0.0028], phone: '0534567890', rating: 4.6, reviews: 68 },
-    { cat: 'laundry', name: 'مغسلة الجيران السريعة', offset: [-0.0031, 0.0014], phone: '0512348765', rating: 4.4, reviews: 22 },
-    { cat: 'salon', name: 'صالون وحلاقة الحي الراقية', offset: [0.0012, -0.0028], phone: '0578901234', rating: 4.7, reviews: 35 },
-    { cat: 'hardware', name: 'سباكة وكهرباء الحي', offset: [-0.0016, -0.0032], phone: '0589012345', rating: 4.9, reviews: 48 },
-  ];
-
-  const filtered = category
-    ? templates.filter((t) => t.cat === category.key || (keyword && t.name.includes(keyword)))
-    : templates;
-
-  const targetList = filtered.length > 0 ? filtered : templates;
-
-  return targetList.map((t, idx) => {
-    const pLat = lat + t.offset[0];
-    const pLng = lng + t.offset[1];
-    const catObj = findPlaceCategory(t.cat);
-    return {
-      id: `local-spot-${t.cat}-${idx}`,
-      name: t.name,
-      categoryKey: t.cat,
-      categoryLabel: catObj?.label || 'محل',
-      address: 'داخل الحي · خدمة مباشرة وسريعة',
-      lat: pLat,
-      lng: pLng,
-      phone: t.phone,
-      rating: t.rating,
-      reviews: t.reviews,
-      openNow: true,
-      hoursText: 'مفتوح · حتى 12:00 ص',
-      distance: distanceMeters({ lat, lng }, { lat: pLat, lng: pLng }),
-      mapsUrl: `https://www.google.com/maps/search/?api=1&query=${pLat},${pLng}`,
-      permanent: true,
-    };
-  }).sort((a, b) => a.distance - b.distance);
-}
-
 /**
  * Robust nearby place finder with multi-tier failover.
- * Never fails silently or returns an empty list.
+ * Returns an empty list when no real places can be found.
  */
 export async function searchNearbyPlaces(options: {
   lat: number;
@@ -374,7 +325,7 @@ export async function searchNearbyPlaces(options: {
     if (key) {
       const body: Record<string, unknown> = {
         includedTypes: known ? [known.type] : undefined,
-        maxResultCount: Math.min(Math.max(maxResults, 1), 25),
+        maxResultCount: Math.min(Math.max(maxResults, 1), 20),
         locationRestriction: {
           circle: { center: { latitude: lat, longitude: lng }, radius: Math.min(radiusMeters, 5000) },
         },
@@ -386,7 +337,8 @@ export async function searchNearbyPlaces(options: {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 2500);
 
-      const response = await fetch(PLACES_ENDPOINT, {
+      if (keyword) { delete body.locationRestriction; delete body.includedTypes; body.locationBias = { circle: { center: {latitude:lat,longitude:lng}, radius: Math.min(radiusMeters,5000) } }; }
+      const response = await fetch(keyword ? 'https://places.googleapis.com/v1/places:searchText' : PLACES_ENDPOINT, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -427,8 +379,8 @@ export async function searchNearbyPlaces(options: {
     }
   } catch {}
 
-  // 4. Guaranteed local neighborhood POI fallback
-  return generateLocalNeighborhoodPlaces(lat, lng, known, keyword).slice(0, maxResults);
+  // No synthetic destinations: an empty result is preferable to a fake location.
+  return [];
 }
 
 export function isOpenNowLabel(openNow: boolean | null): string {
