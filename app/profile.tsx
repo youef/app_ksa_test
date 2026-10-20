@@ -526,11 +526,17 @@ export default function Profile() {
               <View style={styles.identityTextCol}>
                 <View style={styles.displayNameRow}>
                   <Text style={styles.displayNameText} numberOfLines={1}>
-                    {personalName || 'أضف اسمك الكريم'}
+                    {p.account_type === 'merchant' && p.freelance_trade
+                      ? p.freelance_trade
+                      : personalName || 'أضف اسمك الكريم'}
                   </Text>
                 </View>
 
                 <Text style={styles.usernameText}>@{p.username || 'username'}</Text>
+
+                {p.account_type === 'merchant' && p.freelance_trade && personalName ? (
+                  <Text style={styles.accountOwnerText}>يديره {personalName}</Text>
+                ) : null}
 
                 <View style={styles.identityBadgeRow}>
                   <AccountIdentityBadge
@@ -585,7 +591,7 @@ export default function Profile() {
               <View style={styles.statBox}>
                 <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 2 }}>
                   <Text style={styles.statNumber}>{reputationPoints}</Text>
-                  <Text style={{ fontSize: 11 }}>⭐</Text>
+                  <Sparkles size={11} color="#B45309" />
                 </View>
                 <Text style={styles.statLabel}>السمعة</Text>
               </View>
@@ -1229,6 +1235,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 
+  accountOwnerText: {
+    color: '#64748B',
+    fontSize: 10.5,
+    fontWeight: '700',
+    marginTop: 4,
+    textAlign: 'right',
+  },
   identityBadgeRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
