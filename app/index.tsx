@@ -1,3 +1,4 @@
+import { HeaderAction } from '@/components/shared/AppHeader';
 import { useEffect, useState } from 'react';
 import {
   AccessibilityInfo,
@@ -94,7 +95,7 @@ export default function Index() {
   if (signedIn) {
     return (
       <View style={styles.loading}>
-        <StatusBar barStyle="light-content" backgroundColor="#047857" />
+        <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
         <Image source={{ uri: logoUri }} style={styles.loadingLogo} resizeMode="contain" />
         <ActivityIndicator color="#ffffff" />
       </View>
@@ -103,14 +104,14 @@ export default function Index() {
 
   return (
     <View style={styles.page}>
-      <StatusBar barStyle="light-content" backgroundColor="#047857" />
+      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
       <AppHeader
         variant="sub"
-        title="حيّنا 🇸🇦"
+        title="حيّنا"
         subtitle="الشبكة الاجتماعية للحي والمدينة"
         showBack={false}
         rightAction={
-          <Pressable
+          <HeaderAction
             onPress={() => router.replace('/home')}
             style={styles.headerSkip}
             accessibilityRole="button"
@@ -119,7 +120,7 @@ export default function Index() {
           >
             <Text style={styles.headerSkipText}>تصفح كزائر</Text>
             <ArrowLeft size={14} color="#047857" />
-          </Pressable>
+          </HeaderAction>
         }
       />
 

@@ -1,3 +1,4 @@
+import { AppHeader, HeaderAction, useAppHeaderHeight } from '@/components/shared/AppHeader';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Modal, PanResponder, Platform, Pressable, ScrollView, Share, StatusBar, Text, TextInput, View, type GestureResponderHandlers } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -44,6 +45,7 @@ type Supporter = { user: AudienceMember; gifts: number };
 type HostSheetTab = 'comments' | 'guests' | 'requests';
 
 export default function LiveRoomScreen() {
+  const appHeaderHeight = useAppHeaderHeight();
   const { id, role: roleParam } = useLocalSearchParams<{ id: string; role?: string }>();
   const insets = useSafeAreaInsets();
   const [stream, setStream] = useState<LiveStream | null>(null);
@@ -729,9 +731,7 @@ export default function LiveRoomScreen() {
 
         {overlayVisible ? (
           <>
-            <View pointerEvents="box-none" style={[styles.topBar, { top: Math.max(insets.top, 12) }]}>
-              <Pressable accessibilityLabel="إغلاق البث" onPress={() => void handleBack()} style={styles.roundButton}><X color="#fff" size={21} /></Pressable>
-              <View style={styles.topCenter}>
+            <AppHeader tone="overlay" title="بث مباشر" fallbackRoute="/lives" onBackPress={() => { void handleBack(); }} style={{position: 'absolute', top: 0}} titleContent={<View style={styles.topCenter}>
                 <View style={styles.livePill}><View style={styles.redDot} /><Text style={styles.liveText}>مباشر</Text></View>
                 {connection === 'connected' && quality !== 'unknown' && (
                   <View style={styles.qualityPill}>
@@ -739,11 +739,9 @@ export default function LiveRoomScreen() {
                     <Text style={styles.qualityText}>{quality === 'excellent' ? 'جودة ممتازة' : quality === 'good' ? 'جودة جيدة' : 'جودة ضعيفة'}</Text>
                   </View>
                 )}
-              </View>
-              <Pressable onPress={() => setPeoplePanel('viewers')} style={styles.viewerPill}><Users color="#fff" size={14} /><Text style={styles.viewerCount}>{viewerCount}</Text></Pressable>
-            </View>
+              </View>} rightAction={<HeaderAction tone="overlay" accessibilityLabel="مشاهدو البث" onPress={() => setPeoplePanel('viewers')}><Users color="#fff" size={17}/><Text style={styles.viewerCount}>{viewerCount}</Text></HeaderAction>} />
 
-            <View pointerEvents="box-none" style={[styles.hostOverlay, { top: Math.max(insets.top, 12) + 52 }]}>
+            <View pointerEvents="box-none" style={[styles.hostOverlay, { top: appHeaderHeight + 8 }]}>
               <View style={styles.hostMeta}>
                 {stream.profiles?.avatar_url ? <Image source={{ uri: stream.profiles.avatar_url }} style={styles.hostAvatar} /> : <View style={styles.hostAvatarFallback}><Text style={{ color: '#047857', fontWeight: '900' }}>ح</Text></View>}
                 <View style={{ alignItems: 'flex-end', maxWidth: 175 }}>
@@ -760,7 +758,7 @@ export default function LiveRoomScreen() {
             </View>
 
             {topSupporters.length > 0 && (
-              <Pressable onPress={() => setPeoplePanel('supporters')} style={[styles.supportersPill, { top: Math.max(insets.top, 12) + 104 }]}>
+              <Pressable onPress={() => setPeoplePanel('supporters')} style={[styles.supportersPill, { top: appHeaderHeight + 60 }]}>
                 <Trophy size={14} color="#fde68a" />
                 <Text numberOfLines={1} style={styles.supportersPillText}>الأكثر دعمًا: {topSupporters[0].user.display_name || topSupporters[0].user.username}</Text>
               </Pressable>

@@ -1,3 +1,4 @@
+import { HeaderAction, AppHeader } from '@/components/shared/AppHeader';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -41,7 +42,6 @@ import {
   Edit3,
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
-import { AppHeader } from '@/components/shared/AppHeader';
 import { ProfileCustomizationEntry } from '@/components/profile/ProfileCustomizationEntry';
 import { C } from '@/lib/ui';
 import { getBlockStatus, setBlock } from '@/lib/chatControls';
@@ -516,7 +516,7 @@ export default function UserProfile() {
         subtitle={[profile.district && `حي ${profile.district}`, profile.city || ''].filter(Boolean).join(' · ')}
         fallbackRoute="/home"
         rightAction={
-          <Pressable
+          <HeaderAction
             style={{
               width: 36,
               height: 36,
@@ -530,7 +530,7 @@ export default function UserProfile() {
             accessibilityLabel="خيارات"
           >
             <MoreHorizontal size={18} color="#475569" />
-          </Pressable>
+          </HeaderAction>
         }
       />
 

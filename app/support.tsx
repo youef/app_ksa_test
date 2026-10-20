@@ -1,3 +1,4 @@
+import { AppHeader, HeaderAction } from '@/components/shared/AppHeader';
 import React,{useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {ActivityIndicator,Alert,Pressable,ScrollView,Text,TextInput,View} from 'react-native';
 import {router} from 'expo-router';
@@ -22,8 +23,8 @@ function UserSupportPage(){
  const create=async()=>{if(subject.trim().length<3||message.trim().length<3){Alert.alert('بيانات ناقصة','اكتب عنواناً ووصفاً واضحين.');return;}if(!uid)return;setBusy(true);try{const {data,error}=await supabase.from('support_tickets').insert({user_id:uid,name,email:email||null,subject:subject.trim(),message:message.trim()}).select().single();if(error)throw error;setTickets(p=>[data as Ticket,...p]);setSelected(data.id);setSubject('');setMessage('');setForm(false);Alert.alert('تم إنشاء التذكرة','يمكنك متابعة الردود من هذه الصفحة.');}catch(e:any){Alert.alert('تعذر إرسال الطلب',e?.message||'حاول مرة أخرى');}finally{setBusy(false);}};
  const send=async(t:Ticket)=>{if(!reply.trim()||!uid)return;if(t.status==='resolved'||t.status==='closed'){Alert.alert('التذكرة مكتملة','افتح تذكرة جديدة إذا استمرت المشكلة.');return;}setBusy(true);try{const {data,error}=await supabase.from('support_ticket_replies').insert({ticket_id:t.id,user_id:uid,author_name:name,message:reply.trim(),is_admin:false}).select().single();if(error)throw error;setReplies(p=>[...p,data as Reply]);setReply('');Alert.alert('تم إرسال الرد','وصلت رسالتك إلى فريق الدعم.');}catch(e:any){Alert.alert('تعذر إرسال الرد',e?.message||'تحقق من الصلاحيات');}finally{setBusy(false);}};
  const btn=(bg:string)=>({backgroundColor:bg,borderRadius:12,paddingHorizontal:13,paddingVertical:11,flexDirection:'row' as const,alignItems:'center' as const,justifyContent:'center' as const,gap:7});
- return <View style={{flex:1,backgroundColor:'#F4F7FB'}}><ScrollView contentContainerStyle={{padding:16,paddingBottom:35,gap:14}}>
- <View style={{backgroundColor:'#0B172A',borderRadius:24,padding:21,gap:12}}><Pressable onPress={()=>router.back()} style={{alignSelf:'flex-start',flexDirection:'row',alignItems:'center',gap:6}}><ArrowRight size={17} color="#CBD5E1"/><Text style={{color:'#CBD5E1',fontSize:12}}>رجوع</Text></Pressable><View style={{flexDirection:'row-reverse',alignItems:'center',gap:12}}><View style={{width:50,height:50,borderRadius:16,backgroundColor:'#123B48',alignItems:'center',justifyContent:'center'}}><LifeBuoy size={27} color="#5EEAD4"/></View><View style={{flex:1}}><Text style={{fontSize:11,fontWeight:'900',color:'#99F6E4',textAlign:'right'}}>HAYNA SUPPORT</Text><Text style={{fontSize:23,fontWeight:'900',color:'#fff',textAlign:'right',marginTop:4}}>مركز الدعم والمساعدة</Text></View></View><Text style={{color:'#CBD5E1',fontSize:12,lineHeight:21,textAlign:'right'}}>افتح طلباً، ابحث عن تذاكرك السابقة، وتابع الردود مع فريق الدعم.</Text><Pressable onPress={()=>setForm(v=>!v)} style={[btn('#0F766E'),{alignSelf:'flex-end'}]}><Plus size={16} color="#fff"/><Text style={{color:'#fff',fontWeight:'900'}}>{form?'إلغاء':'فتح تذكرة جديدة'}</Text></Pressable></View>
+ return <View style={{flex:1,backgroundColor:'#F4F7FB'}}><AppHeader title="مركز الدعم والمساعدة" fallbackRoute="/more" rightAction={<HeaderAction accessibilityLabel={form?'إلغاء التذكرة':'تذكرة جديدة'} onPress={()=>setForm(v=>!v)}><Plus size={20} color="#047857"/></HeaderAction>}/><ScrollView contentContainerStyle={{padding:16,paddingBottom:120,gap:14}}>
+
  <View style={{flexDirection:'row-reverse',gap:8}}>
   {[{key:'all',label:'كل التذاكر',value:tickets.length,color:'#334155',bg:'#F1F5F9'},{key:'open',label:'جديدة',value:openCount,color:'#92400E',bg:'#FEF3C7'},{key:'reviewing',label:'قيد المعالجة',value:reviewCount,color:'#1D4ED8',bg:'#DBEAFE'},{key:'resolved',label:'مكتملة',value:doneCount,color:'#047857',bg:'#D1FAE5'}].map((item:any)=><Pressable key={item.key} onPress={()=>setStatusFilter(item.key)} style={{flex:1,minWidth:0,backgroundColor:statusFilter===item.key?item.bg:'#fff',borderWidth:1,borderColor:statusFilter===item.key?item.color:'#E2E8F0',borderRadius:13,paddingVertical:10,paddingHorizontal:4,alignItems:'center',gap:4}}><Text numberOfLines={1} style={{fontSize:9,fontWeight:'800',color:item.color}}>{item.label}</Text><Text style={{fontSize:16,fontWeight:'900',color:item.color}}>{item.value}</Text></Pressable>)}
  </View>
@@ -71,13 +72,7 @@ function AdminSupportPage() {
           <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '800', textAlign: 'right' }}>{toast}</Text>
         </View>
       ) : null}
-      <View style={{ paddingHorizontal: 14, paddingTop: 12, paddingBottom: 4, flexDirection: 'row-reverse', alignItems: 'center', gap: 10 }}>
-        <Pressable onPress={() => router.push('/admin')} style={{ backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#DCE5ED', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Text style={{ color: '#334155', fontSize: 12, fontWeight: '800' }}>العودة إلى لوحة الإدارة</Text>
-          <ArrowRight size={15} color="#334155" />
-        </Pressable>
-        <Text style={{ flex: 1, color: '#0F172A', fontSize: 16, fontWeight: '900', textAlign: 'right' }}>مركز الدعم (صفحة موحدة)</Text>
-      </View>
+      <AppHeader title="دعم الإدارة" subtitle="التذاكر والبلاغات" fallbackRoute="/admin" />
       <AdminTaskCenter
         reports={reports as any}
         verifications={verifications as any}

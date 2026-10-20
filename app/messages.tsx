@@ -1,3 +1,4 @@
+import { HeaderAction } from '@/components/shared/AppHeader';
 import { useEffect, useState, useCallback } from 'react';
 import {
   View,
@@ -347,7 +348,7 @@ export default function Messages() {
               </View>
             )}
 
-            <Pressable
+            <HeaderAction
               style={[styles.dndBtn, dndNow && styles.dndBtnActive]}
               onPress={openDndSheet}
               accessibilityRole="button"
@@ -357,16 +358,16 @@ export default function Messages() {
               <Text style={[styles.dndBtnText, dndNow && { color: '#dc2626' }]}>
                 {dndNow ? 'صامت' : 'تنبيهات'}
               </Text>
-            </Pressable>
+            </HeaderAction>
 
-            <Pressable
+            <HeaderAction
               style={styles.newChatBtn}
               onPress={() => router.push('/search')}
               accessibilityRole="button"
               accessibilityLabel="محادثة جديدة"
             >
               <Plus size={17} color="#059669" />
-            </Pressable>
+            </HeaderAction>
           </View>
         }
       />

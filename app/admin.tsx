@@ -1,3 +1,4 @@
+import { HeaderAction, AppHeader } from '@/components/shared/AppHeader';
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import {
   Alert,
@@ -16,7 +17,6 @@ import {
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
-import { AppHeader } from '@/components/shared/AppHeader';
 import * as ImagePicker from 'expo-image-picker';
 import {
   getBrandingLogo,
@@ -1388,6 +1388,7 @@ export default function AdminScreen() {
 
   return (
     <View style={styles.container}>
+      <AppHeader title="إدارة حيّنا" subtitle="مركز العمليات" fallbackRoute="/more" rightAction={<View style={{flexDirection: 'row-reverse'}}><HeaderAction accessibilityLabel="تصدير البيانات" onPress={handleExportData}><Download size={19} color="#047857" /></HeaderAction><HeaderAction accessibilityLabel="تحديث الإدارة" onPress={onRefresh}><RefreshCw size={19} color="#047857" /></HeaderAction></View>} />
       {/* Toast Banner */}
       {toastMsg && (
         <Animated.View style={[styles.toastBanner, { opacity: toastAnim }]}>
@@ -1404,38 +1405,7 @@ export default function AdminScreen() {
         end={{ x: 1, y: 1 }}
         style={styles.heroWrap}
       >
-        <View style={styles.heroTop}>
-          <Pressable style={styles.heroIconBtn} onPress={() => router.push('/home')}>
-            <ChevronRight size={18} color="#FFFFFF" />
-          </Pressable>
-
-          <View style={styles.heroBrand}>
-            <View style={styles.heroLogoBox}>
-              {brandingLogo ? (
-                <Image source={{ uri: brandingLogo }} style={styles.heroLogoImg} resizeMode="contain" />
-              ) : (
-                <Shield size={22} color="#6EE7B7" />
-              )}
-            </View>
-            <View style={styles.heroTexts}>
-              <Text style={styles.heroKicker}>COMMAND CENTER · حيّنا</Text>
-              <Text style={styles.heroTitle}>مركز عمليات حيّنا</Text>
-              <Text style={styles.heroSub}>
-                {currentAdmin.display_name || currentAdmin.username || 'مدير النظام'} ·{' '}
-                {new Date().toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long' })}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.heroActions}>
-            <Pressable style={styles.heroIconBtn} onPress={handleExportData}>
-              <Download size={15} color="#FFFFFF" />
-            </Pressable>
-            <Pressable style={styles.heroIconBtn} onPress={onRefresh}>
-              <RefreshCw size={14} color="#FFFFFF" />
-            </Pressable>
-          </View>
-        </View>
+        <Text style={styles.heroSub}>{currentAdmin.display_name || currentAdmin.username || 'مدير النظام'}</Text>
 
         {/* Live operational status pills */}
         <View style={styles.heroStatusRow}>

@@ -1,3 +1,4 @@
+import { HeaderAction, AppHeader } from '@/components/shared/AppHeader';
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   Pressable,
@@ -31,7 +32,6 @@ import {
   Sparkles,
   Share2,
 } from 'lucide-react-native';
-import { AppHeader } from '@/components/shared/AppHeader';
 
 const DIRECTORY_CATEGORIES = [
   { id: 'all', label: 'الكل', emoji: '🏬' },
@@ -347,7 +347,7 @@ export default function Directory() {
         subtitle={[district && `حي ${district}`, city].filter(Boolean).join(' · ') || 'مهنيو ومحلات الحي المجربة'}
         fallbackRoute="/home"
         rightAction={
-          <Pressable
+          <HeaderAction
             style={styles.addBtnHeader}
             onPress={() => setAddModalOpen(true)}
             accessibilityRole="button"
@@ -355,7 +355,7 @@ export default function Directory() {
           >
             <Plus size={14} color="#059669" />
             <Text style={styles.addBtnHeaderText}>أضف توصية</Text>
-          </Pressable>
+          </HeaderAction>
         }
       />
 

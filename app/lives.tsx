@@ -1,3 +1,4 @@
+import { HeaderAction, AppHeader } from '@/components/shared/AppHeader';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
@@ -11,7 +12,6 @@ import {
   View,
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
-import { AppHeader } from '@/components/shared/AppHeader';
 import { useBottomNavInset } from '@/lib/bottomNav';
 import { useNoCopy } from '@/lib/noCopy';
 import { C } from '@/lib/ui';
@@ -234,7 +234,7 @@ export default function LivesScreen() {
         subtitle={streams.length > 0 ? `${compactCount(streams.length)} على الهواء · ${compactCount(totalViewers)} مشاهد` : 'كن قريبًا من مجتمع حيّك'}
         fallbackRoute="/more"
         rightAction={(
-          <Pressable
+          <HeaderAction
             accessibilityRole="button"
             accessibilityLabel="ابدأ بثًا مباشرًا"
             onPress={() => router.push('/live/create')}
@@ -242,7 +242,7 @@ export default function LivesScreen() {
           >
             <Video size={15} color="#fff" />
             <Text style={styles.headerCtaText}>بث</Text>
-          </Pressable>
+          </HeaderAction>
         )}
       />
 

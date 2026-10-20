@@ -1,3 +1,4 @@
+import { HeaderAction } from '@/components/shared/AppHeader';
 import React, { useState } from 'react';
 import {
   View,
@@ -89,14 +90,14 @@ export default function AboutScreen() {
         subtitle="معلومات مختصرة وتواصل مباشر"
         fallbackRoute="/more"
         rightAction={
-          <Pressable
+          <HeaderAction
             style={styles.headerAction}
             onPress={handleShareApp}
             accessibilityRole="button"
             accessibilityLabel="مشاركة المنصة"
           >
             <Share2 size={18} color="#075e54" />
-          </Pressable>
+          </HeaderAction>
         }
       />
 

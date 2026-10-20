@@ -1,3 +1,4 @@
+import { HeaderAction } from '@/components/shared/AppHeader';
 import { useEffect, useState } from 'react';
 import {
   Alert,
@@ -676,14 +677,14 @@ export default function Question() {
         subtitle={locationLabel}
         fallbackRoute="/questions"
         rightAction={
-          <Pressable
+          <HeaderAction
             onPress={handleShare}
             style={styles.headerShareBtn}
             accessibilityRole="button"
             accessibilityLabel="مشاركة السؤال"
           >
             <Share2 size={16} color="#059669" />
-          </Pressable>
+          </HeaderAction>
         }
       />
 

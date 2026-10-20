@@ -1,3 +1,4 @@
+import { HeaderAction } from '@/components/shared/AppHeader';
 import { useEffect, useState, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -266,8 +267,8 @@ export default function Notifications() {
         fallbackRoute="/home"
         subtitle={unreadCount > 0 ? `${unreadCount} إشعار جديد` : 'تنبيهات وتفاعلات أهالي حيك'}
         rightAction={
-          <Pressable
-            onPress={() => setSettingsOpen(true)}
+          <HeaderAction
+            accessibilityLabel="إعدادات الإشعارات" onPress={() => setSettingsOpen(true)}
             style={{
               width: 36,
               height: 36,
@@ -278,7 +279,7 @@ export default function Notifications() {
             }}
           >
             <SlidersHorizontal size={18} color="#475569" />
-          </Pressable>
+          </HeaderAction>
         }
       />
 

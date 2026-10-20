@@ -1,3 +1,4 @@
+import { HeaderAction, AppHeader } from '@/components/shared/AppHeader';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -15,7 +16,6 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { AppHeader } from '@/components/shared/AppHeader';
 import {
   Wrench,
   Search,
@@ -231,7 +231,7 @@ export default function ToolsLendingScreen() {
         subtitle="سوق إعارة الأدوات والمعدات بين الجيران مجاناً"
         fallbackRoute="/home"
         rightAction={
-          <Pressable
+          <HeaderAction
             style={{
               flexDirection: 'row-reverse',
               alignItems: 'center',
@@ -249,7 +249,7 @@ export default function ToolsLendingScreen() {
           >
             <Plus size={14} color="#059669" />
             <Text style={{ fontSize: 12, fontWeight: '800', color: '#059669' }}>أعِر أداة</Text>
-          </Pressable>
+          </HeaderAction>
         }
       />
 

@@ -1,9 +1,9 @@
+import { HeaderAction, AppHeader } from '@/components/shared/AppHeader';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { BarChart3, Building2, CalendarDays, Check, Flag, MapPin, RefreshCw, ShieldCheck, Store, Users, X, Zap } from 'lucide-react-native';
-import { AppHeader } from '@/components/shared/AppHeader';
 import AdminCommandCenter from '@/components/AdminCommandCenter';
 
 export default function AdminPro() {
@@ -83,8 +83,8 @@ export default function AdminPro() {
         subtitle={`${profile?.display_name || profile?.username || 'مدير النظام'} · ADMIN PRO`}
         fallbackRoute="/home"
         rightAction={
-          <Pressable
-            onPress={onRefresh}
+          <HeaderAction
+            accessibilityLabel="تحديث البيانات" onPress={onRefresh}
             style={{
               width: 36,
               height: 36,
@@ -95,7 +95,7 @@ export default function AdminPro() {
             }}
           >
             <RefreshCw size={16} color="#059669" />
-          </Pressable>
+          </HeaderAction>
         }
       />
 

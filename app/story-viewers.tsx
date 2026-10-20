@@ -1,3 +1,4 @@
+import { AppHeader } from '@/components/shared/AppHeader';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -84,13 +85,7 @@ export default function StoryViewersScreen() {
 
   return (
     <View style={styles.screen}>
-      <View style={styles.header}>
-        <Pressable style={styles.backButton} onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="رجوع">
-          <ArrowRight size={22} color="#0f172a" />
-        </Pressable>
-        <Text style={styles.title}>مشاهدو القصة</Text>
-        <View style={styles.countPill}><Text style={styles.countText}>{viewers.length}</Text></View>
-      </View>
+      <AppHeader title="مشاهدو القصة" fallbackRoute="/stories" rightAction={<View style={styles.countPill}><Text style={styles.countText}>{viewers.length}</Text></View>} />
 
       {loading ? (
         <View style={styles.center}>

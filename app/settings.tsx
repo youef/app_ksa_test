@@ -1,3 +1,4 @@
+import { HeaderAction, AppHeader } from '@/components/shared/AppHeader';
 import React, { useEffect, useState, useMemo } from 'react';
 import {
   Alert,
@@ -17,7 +18,6 @@ import {
 import { router, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '@/lib/supabase';
-import { AppHeader } from '@/components/shared/AppHeader';
 import { ProfileCustomizationEntry } from '@/components/profile/ProfileCustomizationEntry';
 import { useBottomNavInset } from '@/lib/bottomNav';
 import { registerPushToken, syncDndWithNotifications, unregisterPushToken } from '@/lib/notifications';
@@ -525,14 +525,14 @@ export default function SettingsScreen() {
         subtitle="الخصوصية، الأمان، وإدارة الحساب"
         fallbackRoute="/home"
         rightAction={
-          <Pressable
+          <HeaderAction
             style={styles.headerBtn}
             onPress={() => router.push('/profile')}
             accessibilityRole="button"
             accessibilityLabel="الملف الشخصي"
           >
             <User size={18} color="#059669" />
-          </Pressable>
+          </HeaderAction>
         }
       />
 

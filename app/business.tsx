@@ -1,3 +1,4 @@
+import { HeaderAction, AppHeader } from '@/components/shared/AppHeader';
 import { useEffect, useState } from 'react';
 import {
   Alert,
@@ -25,7 +26,6 @@ import {
   Flag,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { AppHeader } from '@/components/shared/AppHeader';
 
 export default function Business() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -123,8 +123,8 @@ export default function Business() {
         subtitle={[business.district && `حي ${business.district}`, business.city].filter(Boolean).join(' · ')}
         fallbackRoute="/directory"
         rightAction={
-          <Pressable
-            onPress={() => router.push({ pathname: '/report', params: { type: 'business', id: business.id } })}
+          <HeaderAction
+            accessibilityLabel="الإبلاغ عن النشاط" onPress={() => router.push({ pathname: '/report', params: { type: 'business', id: business.id } })}
             style={{
               width: 36,
               height: 36,
@@ -135,7 +135,7 @@ export default function Business() {
             }}
           >
             <Flag size={18} color="#475569" />
-          </Pressable>
+          </HeaderAction>
         }
       />
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>

@@ -1,3 +1,5 @@
+import { useAppHeaderHeight } from '@/components/shared/AppHeader';
+import { HeaderAction } from '@/components/shared/AppHeader';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -328,6 +330,7 @@ function buildPlaceInfoWindow(place: NearbyPlace, onClose: () => void) {
 }
 
 export default function WebMap() {
+  const appHeaderHeight = useAppHeaderHeight();
   const { width } = useWindowDimensions();
   const isWide = width >= 980;
 
@@ -881,7 +884,7 @@ export default function WebMap() {
         fallbackRoute="/home"
         rightAction={
           <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-            <Pressable
+            <HeaderAction
               onPress={() => {
                 setMapNotice(null);
                 setEngine((prev) => (prev === 'leaflet' ? 'google' : 'leaflet'));
@@ -900,7 +903,7 @@ export default function WebMap() {
 
                 </>
               )}
-            </Pressable>
+            </HeaderAction>
           </View>
         }
       />
@@ -912,7 +915,7 @@ export default function WebMap() {
         }}
         style={{
           position: 'absolute',
-          top: 52,
+          top: appHeaderHeight,
           left: 0,
           right: 0,
           bottom: 0,

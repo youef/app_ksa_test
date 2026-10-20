@@ -1,3 +1,4 @@
+import { HeaderAction, AppHeader } from '@/components/shared/AppHeader';
 import { useEffect, useState, useMemo } from 'react';
 import {
   Alert,
@@ -53,7 +54,6 @@ import {
   GraduationCap,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { AppHeader } from '@/components/shared/AppHeader';
 import { getListingType, getDeliveryMode, formatServicePrice } from '@/lib/serviceTypes';
 import { relativeTime } from '@/lib/mapPins';
 import { useBottomNavInset } from '@/lib/bottomNav';
@@ -366,8 +366,8 @@ export default function Service() {
         fallbackRoute="/market"
         rightAction={
           <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-            <Pressable
-              onPress={shareOffer}
+            <HeaderAction
+              accessibilityLabel="مشاركة العرض" onPress={shareOffer}
               style={{
                 width: 34,
                 height: 34,
@@ -378,9 +378,9 @@ export default function Service() {
               }}
             >
               {copiedLink ? <Check size={16} color="#059669" /> : <Share2 size={16} color="#475569" />}
-            </Pressable>
-            <Pressable
-              onPress={() => router.push({ pathname: '/report', params: { type: 'service', id: service.id } })}
+            </HeaderAction>
+            <HeaderAction
+              accessibilityLabel="الإبلاغ عن العرض" onPress={() => router.push({ pathname: '/report', params: { type: 'service', id: service.id } })}
               style={{
                 width: 34,
                 height: 34,
@@ -391,7 +391,7 @@ export default function Service() {
               }}
             >
               <Flag size={15} color="#64748b" />
-            </Pressable>
+            </HeaderAction>
           </View>
         }
       />

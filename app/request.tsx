@@ -1,3 +1,4 @@
+import { HeaderAction } from '@/components/shared/AppHeader';
 import { useEffect, useState } from 'react';
 import {
   Alert,
@@ -627,22 +628,22 @@ export default function Request() {
         fallbackRoute="/requests"
         rightAction={
           <View style={styles.headerRightActions}>
-            <Pressable
+            <HeaderAction
               onPress={handleShare}
               style={styles.headerActionBtn}
               accessibilityRole="button"
               accessibilityLabel="مشاركة"
             >
               <Share2 size={16} color="#059669" />
-            </Pressable>
-            <Pressable
+            </HeaderAction>
+            <HeaderAction
               onPress={() => router.push({ pathname: '/report', params: { type: 'request', id: request.id } })}
               style={styles.headerActionBtn}
               accessibilityRole="button"
               accessibilityLabel="إبلاغ"
             >
               <Flag size={16} color="#64748b" />
-            </Pressable>
+            </HeaderAction>
           </View>
         }
       />

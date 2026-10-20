@@ -1,3 +1,4 @@
+import { AppHeader } from '@/components/shared/AppHeader';
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
@@ -127,7 +128,7 @@ export default function MoreScreen() {
   const groups = [{ title: 'خدمات حيّنا', items: services }, { title: 'حسابي', items: account }, { title: 'الدعم والخصوصية', items: help }, { title: 'شاركنا', items: actions }, { title: 'الإدارة', items: admin }].map(group => ({ ...group, items: group.items.filter(match) })).filter(group => group.items.length);
   const profileVisible = !search.trim() || match({ title: 'الملف الشخصي', subtitle: name, Icon: UserRound });
   return <View style={styles.screen}>
-    <View style={styles.header}><View><Text style={styles.heading}>المزيد</Text><Text style={styles.subtitle}>حيّنا أقرب إليك</Text></View><View style={styles.iconBox}><Compass size={23} color="#047857" /></View></View>
+    <AppHeader variant="tab" title="المزيد" subtitle="حيّنا أقرب إليك" />
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.content, { paddingBottom: 110 + bottomInset }]} showsVerticalScrollIndicator={false}>
       {profileVisible && <Pressable accessibilityRole="button" accessibilityLabel={user ? 'فتح الملف الشخصي' : 'تسجيل الدخول'} onPress={() => router.push(user ? '/profile' : '/auth')} style={styles.hero}>
         <View style={styles.avatar}>{loading ? <ActivityIndicator color="#047857" /> : profile?.avatar_url && !imageFailed ? <Image source={{ uri: profile.avatar_url }} style={styles.avatarImage} onError={() => setImageFailed(true)} /> : <UserRound size={28} color="#047857" />}</View>

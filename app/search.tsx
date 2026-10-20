@@ -1,3 +1,4 @@
+import { HeaderAction } from '@/components/shared/AppHeader';
 import { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -439,12 +440,12 @@ export default function SearchPage() {
         title="البحث الشامل"
         subtitle={query.trim() ? `النتائج لكلمة: «${query.trim()}»` : 'ابحث في كل ما يخص حيك'}
         rightAction={
-          <Pressable
-            onPress={() => router.push('/map')}
+          <HeaderAction
+            accessibilityLabel="فتح الخريطة" onPress={() => router.push('/map')}
             style={styles.headerMapBtn}
           >
             <MapPin size={17} color="#059669" />
-          </Pressable>
+          </HeaderAction>
         }
       />
 

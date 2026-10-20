@@ -1,3 +1,5 @@
+import { AppHeader, HeaderAction, headerTopInset } from '@/components/shared/AppHeader';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useEffect, useState, useRef } from 'react';
 import {
   View,
@@ -25,6 +27,7 @@ const { width, height } = Dimensions.get('window');
 const STORY_DURATION = 7000; // 7 seconds per story
 
 export default function StoryViewer() {
+  const headerInsets = useSafeAreaInsets();
   const { id, resume } = useLocalSearchParams<{ id: string; resume?: string }>();
   const [storiesList, setStoriesList] = useState<any[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -606,7 +609,7 @@ export default function StoryViewer() {
           {/* ======================================================== */}
           {/* SEGMENTED PROGRESS BARS                                  */}
           {/* ======================================================== */}
-          {uiVisible && <View style={styles.progressRow}>
+          {uiVisible && <View style={[styles.progressRow, { marginTop: headerTopInset(headerInsets.top) + 4 }]}>
             {storiesList.map((st, idx) => {
               let fillWidth: any = '0%';
               if (idx < currentIndex) {
@@ -629,56 +632,7 @@ export default function StoryViewer() {
           {/* ======================================================== */}
           {/* TOP HEADER                                               */}
           {/* ======================================================== */}
-          {uiVisible && <View style={styles.header}>
-            <View style={styles.headerRightActions}>
-              <Pressable onPress={() => router.back()} style={styles.iconBtn}>
-                <X size={22} color="#fff" />
-              </Pressable>
-
-              {isOwn && (
-                <Pressable onPress={confirmDeleteStory} style={[styles.iconBtn, { backgroundColor: 'rgba(239,68,68,0.3)' }]}>
-                  <Trash2 size={18} color="#ef4444" />
-                </Pressable>
-              )}
-              {!isOwn && currentUserId && (
-                <Pressable onPress={openStorySafetyMenu} style={[styles.iconBtn, { backgroundColor: 'rgba(15,23,42,0.32)' }]} accessibilityRole="button" accessibilityLabel="الإبلاغ أو حظر الحساب">
-                  <Flag size={18} color="#fff" />
-                </Pressable>
-              )}
-            </View>
-
-            {/* Author info & Story Counter */}
-            <View style={styles.authorRow}>
-              <View style={styles.authorInfo}>
-                <View style={styles.authorNameRow}>
-                  <Text style={styles.authorName}>{author?.display_name || author?.username || 'جار'}</Text>
-                  {storiesList.length > 1 && (
-                    <Text style={styles.counterBadge}>
-                      {currentIndex + 1} / {storiesList.length}
-                    </Text>
-                  )}
-                </View>
-                <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 5 }}>
-                  {(author?.district || author?.city) && (
-                    <Text style={styles.authorDistrictText} numberOfLines={1}>
-                      {[author.district, author.city].filter(Boolean).join(' · ')}
-                    </Text>
-                  )}
-                  <Text style={styles.storyTime}>· تنتهي بعد {timeLeft}س</Text>
-                </View>
-              </View>
-
-              <View style={styles.authorAvatar}>
-                {author?.avatar_url ? (
-                  <Image source={{ uri: author.avatar_url }} style={styles.avatarImg} />
-                ) : (
-                  <View style={styles.avatarFallback}>
-                    <Text style={styles.avatarLetter}>{author?.display_name?.[0] || 'ج'}</Text>
-                  </View>
-                )}
-              </View>
-            </View>
-          </View>}
+          {uiVisible && <AppHeader tone="overlay" safeArea={false} variant="chat" title={author?.display_name || author?.username || 'جار'} subtitle={`${currentIndex + 1} / ${storiesList.length} · تنتهي بعد ${timeLeft}س`} avatarUrl={author?.avatar_url} fallbackRoute="/stories" rightAction={<>{isOwn ? <HeaderAction tone="overlay" accessibilityLabel="حذف القصة" onPress={confirmDeleteStory}><Trash2 size={19} color="#fff" /></HeaderAction> : currentUserId ? <HeaderAction tone="overlay" accessibilityLabel="الإبلاغ أو حظر الحساب" onPress={openStorySafetyMenu}><Flag size={19} color="#fff" /></HeaderAction> : null}</>} />}
 
           {/* ======================================================== */}
           {/* INTERACTIVE TAP ZONES (Left / Right Navigation)          */}

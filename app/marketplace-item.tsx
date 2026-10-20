@@ -1,8 +1,8 @@
+import { HeaderAction, AppHeader } from '@/components/shared/AppHeader';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ArrowUpRight, MapPin, Package, Share2, ShoppingBag, UserRound } from 'lucide-react-native';
-import { AppHeader } from '@/components/shared/AppHeader';
 import { supabase } from '@/lib/supabase';
 
 export default function MarketplaceItemPage() {
@@ -49,7 +49,7 @@ export default function MarketplaceItemPage() {
   if (error || !item) return <View style={styles.center}><Package size={42} color="#94a3b8" /><Text style={styles.title}>{error ? 'تعذّر تحميل الإعلان' : 'الإعلان غير موجود'}</Text><Text style={styles.muted}>قد يكون الإعلان حُذف أو لم يعد متاحاً.</Text><Pressable style={styles.primary} onPress={() => error ? void load() : router.back()}><Text style={styles.primaryText}>{error ? 'إعادة المحاولة' : 'رجوع'}</Text></Pressable></View>;
 
   return <View style={styles.screen}>
-    <AppHeader variant="sub" title="تفاصيل الإعلان" fallbackRoute="/user" rightAction={<Pressable onPress={share} accessibilityRole="button" accessibilityLabel="مشاركة الإعلان" style={styles.share}><Share2 size={18} color="#047857" /></Pressable>} />
+    <AppHeader variant="sub" title="تفاصيل الإعلان" fallbackRoute="/user" rightAction={<HeaderAction onPress={share} accessibilityRole="button" accessibilityLabel="مشاركة الإعلان" style={styles.share}><Share2 size={18} color="#047857" /></HeaderAction>} />
     <ScrollView contentContainerStyle={styles.page}>
       {item.image_url ? <Image source={{ uri: item.image_url }} style={styles.image} resizeMode="cover" /> : <View style={styles.imageFallback}><ShoppingBag size={42} color="#059669" /><Text style={styles.muted}>إعلان من سوق الحي</Text></View>}
       <View style={styles.card}>

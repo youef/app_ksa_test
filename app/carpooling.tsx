@@ -1,3 +1,4 @@
+import { HeaderAction, AppHeader } from '@/components/shared/AppHeader';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -14,7 +15,6 @@ import {
   RefreshControl,
 } from 'react-native';
 import { router } from 'expo-router';
-import { AppHeader } from '@/components/shared/AppHeader';
 import {
   Car,
   Users,
@@ -420,7 +420,7 @@ export default function CarpoolingScreen() {
         subtitle="مشاركة المقاعد وتخفيف الزحام بين أولياء الأمور"
         fallbackRoute="/home"
         rightAction={
-          <Pressable
+          <HeaderAction
             style={styles.headerActionBtn}
             onPress={() => setModalOpen(true)}
             accessibilityRole="button"
@@ -428,7 +428,7 @@ export default function CarpoolingScreen() {
           >
             <Plus size={14} color="#059669" />
             <Text style={styles.headerActionBtnText}>شارك مقعداً</Text>
-          </Pressable>
+          </HeaderAction>
         }
       />
 

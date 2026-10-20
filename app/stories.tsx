@@ -1,3 +1,4 @@
+import { HeaderAction, AppHeader } from '@/components/shared/AppHeader';
 import { useEffect, useRef, useState } from 'react';
 import {
   View,
@@ -13,7 +14,6 @@ import {
 import { router } from 'expo-router';
 import { requireAccount } from '@/lib/authGate';
 import { supabase } from '@/lib/supabase';
-import { AppHeader } from '@/components/shared/AppHeader';
 import { useBottomNavInset } from '@/lib/bottomNav';
 import { Plus, ShieldCheck, Sparkles, Settings2, Flame, ChevronDown } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -174,7 +174,7 @@ export default function StoriesScreen() {
         title="يوميات أهل الحي"
         fallbackRoute="/home"
         rightAction={
-          <Pressable
+          <HeaderAction
             onPress={() => router.push('/create-story')}
             style={styles.addStoryBtn}
             accessibilityRole="button"
@@ -182,7 +182,7 @@ export default function StoriesScreen() {
           >
             <Plus size={15} color="#fff" strokeWidth={2.5} />
             <Text style={styles.addStoryBtnText}>إضافة</Text>
-          </Pressable>
+          </HeaderAction>
         }
       />
 

@@ -1,3 +1,4 @@
+import { HeaderAction, AppHeader } from '@/components/shared/AppHeader';
 import { MapPin as PinIcon, Store, Search, Navigation, Plus, X, Clock, RefreshCw, TriangleAlert, MessageCircle, Wrench, HandHelping, Car, Calendar, ShoppingBag, LocateFixed } from 'lucide-react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -15,7 +16,6 @@ const Map = Platform.OS !== 'web' ? require('@maplibre/maplibre-react-native').M
 const Camera = Platform.OS !== 'web' ? require('@maplibre/maplibre-react-native').Camera : View;
 const Marker = Platform.OS !== 'web' ? require('@maplibre/maplibre-react-native').Marker : View;
 import { router } from 'expo-router';
-import { AppHeader } from '@/components/shared/AppHeader';
 import NeighborhoodWebMap from '@/components/shared/NeighborhoodWebMap';
 import { C, S } from '@/lib/ui';
 import { getCurrentDeviceLocation, type DeviceLocation } from '@/lib/deviceLocation';
@@ -323,7 +323,7 @@ export default function MapScreen() {
         subtitle={`${visiblePins.length} نشاط · ${places.length} محل قريب`}
         fallbackRoute="/home"
         rightAction={
-          <Pressable
+          <HeaderAction
             style={{
               paddingHorizontal: 10,
               paddingVertical: 5,
@@ -332,13 +332,13 @@ export default function MapScreen() {
               borderWidth: 1,
               borderColor: '#a7f3d0',
             }}
-            onPress={locateMe}
+            accessibilityLabel="تحديد موقعي" onPress={locateMe}
             disabled={locating}
           >
             <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#059669' }}>
               {locating ? 'جارٍ التحديد…' : 'موقعي'}
             </Text>
-          </Pressable>
+          </HeaderAction>
         }
       />
       <Map style={styles.map} mapStyle={STYLE_URL}>

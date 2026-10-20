@@ -1,5 +1,5 @@
+import { HeaderAction, AppHeader } from '@/components/shared/AppHeader';
 import { useBottomNavInset } from '@/lib/bottomNav';
-import { AppHeader } from '@/components/shared/AppHeader';
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   Alert,
@@ -416,14 +416,14 @@ export default function Profile() {
         subtitle="هويتك وحضورك ومشاركاتك في الحي"
         fallbackRoute="/home"
         rightAction={
-          <Pressable
+          <HeaderAction
             onPress={() => router.push('/settings')}
             style={styles.headerBtn}
             accessibilityRole="button"
             accessibilityLabel="مركز الإعدادات والتحكم"
           >
             <Settings size={18} color="#047857" />
-          </Pressable>
+          </HeaderAction>
         }
       />
 

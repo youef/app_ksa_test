@@ -1,3 +1,4 @@
+import { AppHeader, HeaderAction } from '@/components/shared/AppHeader';
 import { useState, useCallback } from 'react';
 import {
   Alert,
@@ -242,19 +243,7 @@ export default function CreateStory() {
           )}
 
           {/* Top WhatsApp Status Bar */}
-          <View style={s.topBar}>
-            <Pressable
-              onPress={() => router.back()}
-              style={s.circleIconBtn}
-              hitSlop={10}
-              accessibilityRole="button"
-              accessibilityLabel="إغلاق"
-            >
-              <X size={20} color="#fff" />
-            </Pressable>
-
-            {/* Mode Toggle: Text status vs Image status */}
-            <View style={s.modeSwitcherPill}>
+          <AppHeader tone="overlay" title="إنشاء قصة" fallbackRoute="/stories" titleContent={<View style={s.modeSwitcherPill}>
               <Pressable
                 onPress={() => composer.setActiveSlideType('text')}
                 style={[s.modeOption, !isImageSlide && s.modeOptionActive]}
@@ -271,13 +260,11 @@ export default function CreateStory() {
                   صورة
                 </Text>
               </Pressable>
-            </View>
-
-            {/* Creative Top Tools */}
-            <View style={s.topToolsRow}>
+            </View>} />
+          <View style={{paddingHorizontal: 16, alignItems: 'flex-end'}}><View style={s.topToolsRow}>
               {!isImageSlide ? (
                 <>
-                  <Pressable
+                  <HeaderAction tone="overlay"
                     onPress={() => setShowPalette(!showPalette)}
                     style={[s.toolIconBtn, showPalette && s.toolIconBtnActive]}
                     hitSlop={8}
@@ -285,8 +272,8 @@ export default function CreateStory() {
                     accessibilityLabel="تغيير لون الخلفية"
                   >
                     <Palette size={19} color="#fff" />
-                  </Pressable>
-                  <Pressable
+                  </HeaderAction>
+                  <HeaderAction tone="overlay"
                     onPress={handleCycleFont}
                     style={s.toolIconBtn}
                     hitSlop={8}
@@ -294,8 +281,8 @@ export default function CreateStory() {
                     accessibilityLabel="تغيير نمط الخط"
                   >
                     <Type size={19} color="#fff" />
-                  </Pressable>
-                  <Pressable
+                  </HeaderAction>
+                  <HeaderAction tone="overlay"
                     onPress={handleCycleAlign}
                     style={s.toolIconBtn}
                     hitSlop={8}
@@ -309,11 +296,11 @@ export default function CreateStory() {
                     ) : (
                       <AlignLeft size={18} color="#fff" />
                     )}
-                  </Pressable>
+                  </HeaderAction>
                 </>
               ) : (
                 <>
-                  <Pressable
+                  <HeaderAction tone="overlay"
                     onPress={handlePickImages}
                     style={s.toolIconBtn}
                     hitSlop={8}
@@ -321,8 +308,8 @@ export default function CreateStory() {
                     accessibilityLabel="اختيار صورة"
                   >
                     <ImageIcon size={19} color="#fff" />
-                  </Pressable>
-                  <Pressable
+                  </HeaderAction>
+                  <HeaderAction tone="overlay"
                     onPress={handleTakePhoto}
                     style={s.toolIconBtn}
                     hitSlop={8}
@@ -330,10 +317,10 @@ export default function CreateStory() {
                     accessibilityLabel="التقاط بالكاميرا"
                   >
                     <Camera size={19} color="#fff" />
-                  </Pressable>
+                  </HeaderAction>
                 </>
               )}
-              <Pressable
+              <HeaderAction tone="overlay"
                 onPress={() => setShowStoryOptions((value) => !value)}
                 style={[s.toolIconBtn, showStoryOptions && s.toolIconBtnActive]}
                 hitSlop={8}
@@ -341,9 +328,8 @@ export default function CreateStory() {
                 accessibilityLabel="خيارات القصة والخصوصية"
               >
                 <SlidersHorizontal size={18} color="#fff" />
-              </Pressable>
-            </View>
-          </View>
+              </HeaderAction>
+            </View></View>
 
           {/* 24H Badge & Slide Info Notice */}
           <View style={s.badge24hRow}>
