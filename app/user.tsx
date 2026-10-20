@@ -756,7 +756,7 @@ export default function UserProfile() {
                 isVerified={Boolean(profile.is_verified)}
                 descriptor={identityDescriptor}
                 owner={false}
-                onManage={own ? () => router.push('/account-type') : undefined}
+                onManage={own ? () => router.push({ pathname: '/profile', params: { tab: 'profile', section: 'identity' } }) : undefined}
               />
             </View>
           ) : null}
@@ -776,7 +776,7 @@ export default function UserProfile() {
                   <Text style={[styles.contentTitle, { color: accentColor }]}>{profileCustomization?.featured_title || 'أعمالي المميزة'}</Text>
                   <Text style={styles.contentSub}>{featuredItems.length ? 'اختيارات مثبتة من هذا الجار' : 'اختر أفضل مساهماتك لتظهر هنا'}</Text>
                 </View>
-                {own && featuredItems.length > 0 && <Pressable style={styles.marketLink} onPress={() => router.push('/profile-customization')}><Text style={[styles.marketLinkText, { color: accentColor }]}>إدارة</Text><Edit3 size={14} color={accentColor} /></Pressable>}
+                {own && featuredItems.length > 0 && <Pressable style={styles.marketLink} onPress={() => router.push({ pathname: '/profile', params: { tab: 'settings', section: 'design' } })}><Text style={[styles.marketLinkText, { color: accentColor }]}>إدارة</Text><Edit3 size={14} color={accentColor} /></Pressable>}
               </View>
               {featuredItems.length > 0 ? (
                 <View style={[styles.grid, { gap: 12 }]}>
