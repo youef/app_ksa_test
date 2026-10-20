@@ -205,14 +205,16 @@ export default function FavoritesScreen() {
             const meta = typeMeta(item.target_type);
             const Icon = meta.icon;
             const state = statusLabel(item.resolution_status);
+            const showImage = ['product', 'service', 'store', 'business'].includes(item.target_type);
             return (
               <View key={item.id} style={styles.itemCard}>
                 <Pressable onPress={() => item.route && router.push(item.route)} style={styles.cardOpenArea} accessibilityRole="button" accessibilityLabel="فتح التفاصيل">
-                  <View style={styles.imageFrame}>
+                  {showImage ? <View style={styles.imageFrame}>
                     {item.imageUrl ? <Image source={{ uri: item.imageUrl }} style={styles.itemImage} resizeMode="cover" /> : <View style={styles.imagePlaceholder}><ImageIcon size={24} color="#94A3B8" /><Text style={styles.noImageText}>لا توجد صورة</Text></View>}
                     <View style={[styles.imageTypeBadge, { backgroundColor: meta.tint }]}><Icon size={12} color={meta.color} /><Text style={[styles.imageTypeText, { color: meta.color }]}>{meta.label}</Text></View>
-                  </View>
+                  </View> : null}
                   <View style={styles.itemMain}>
+                    {!showImage ? <View style={[styles.inlineTypeBadge, { backgroundColor: meta.tint }]}><Icon size={12} color={meta.color} /><Text style={[styles.imageTypeText, { color: meta.color }]}>{meta.label}</Text></View> : null}
                     <Text style={styles.itemTitle} numberOfLines={2}>{item.title || meta.label}</Text>
                     {item.subtitle ? <Text style={styles.itemSubtitle} numberOfLines={1}>{item.subtitle}</Text> : null}
                     {item.body ? <Text style={styles.savedPostBody} numberOfLines={3}>{item.body}</Text> : <Text style={styles.savedPostBody} numberOfLines={2}>اضغط لعرض التفاصيل الكاملة لهذا العنصر.</Text>}
@@ -282,6 +284,7 @@ const styles = StyleSheet.create({
   noImageText: { fontSize: 9, color: '#94A3B8', textAlign: 'center' },
   imageTypeBadge: { position: 'absolute', right: 5, bottom: 5, flexDirection: 'row-reverse', alignItems: 'center', gap: 4, paddingHorizontal: 6, paddingVertical: 4, borderRadius: 7 },
   imageTypeText: { fontSize: 9, fontWeight: '900' },
+  inlineTypeBadge: { flexDirection: 'row-reverse', alignItems: 'center', alignSelf: 'flex-start', gap: 5, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8 },
   itemMain: { flex: 1, minWidth: 0, gap: 6, alignItems: 'stretch', paddingVertical: 3 },
   itemTitle: { fontSize: 13, fontWeight: '900', color: '#0F172A', textAlign: 'right', lineHeight: 20 },
   itemSubtitle: { fontSize: 10.5, color: '#6D28D9', textAlign: 'right', fontWeight: '800' },
