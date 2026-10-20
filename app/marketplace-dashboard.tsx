@@ -49,7 +49,7 @@ export default function MarketplaceDashboard() {
     }
     setUserId(auth.user.id);
     const { data: ownProfile } = await supabase.from('profiles').select('role').eq('id', auth.user.id).maybeSingle();
-    setIsAdmin(ownProfile?.role === 'admin' || (auth.user.email || '').toLowerCase() === 'root@gmail.com');
+    setIsAdmin(ownProfile?.role === 'admin');
     const [myServicesRes, plansRes, packagesRes, ordersRes, subscriptionRes] = await Promise.all([
       supabase.from('services').select('id,name,description,price_from,price_type,provider_id,city,district')
         .eq('provider_id', auth.user.id).order('created_at', { ascending: false }).limit(50),
