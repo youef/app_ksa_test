@@ -510,7 +510,7 @@ export default function Market() {
   };
 
   // Render Card: Market Product / Service
-  const renderMarketCard = ({ item, type }: { item: any; type: ReturnType<typeof getListingType> }, w: number) => {
+  const renderMarketCard = ({ item, type }: { item: any; type: ReturnType<typeof getListingType> }, w: number, listMode = false) => {
     const cover = getServiceCover(item);
     const modes: string[] = (item.delivery_modes || []).slice(0, 3);
     const timeAgo = relativeTime(item.created_at);
@@ -524,11 +524,12 @@ export default function Market() {
         style={({ pressed, hovered }: any) => [
           styles.card,
           { width: w },
+          listMode && styles.cardRow,
           hovered && styles.cardHover,
           pressed && { transform: [{ scale: 0.985 }] },
         ]}
       >
-        <View style={[styles.cardImage, { height: w * 0.78, backgroundColor: type?.bg || '#f1f5f9' }]}>
+        <View style={[styles.cardImage, listMode ? styles.cardImageRow : { height: w * 0.78 }, { backgroundColor: type?.bg || '#f1f5f9' }]}>
           {cover ? (
             <Image source={{ uri: cover }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
           ) : type ? (
@@ -588,8 +589,8 @@ export default function Market() {
           </View>
         </View>
 
-        <View style={styles.cardBody}>
-          <Text style={styles.cardTitle} numberOfLines={1}>{item.name}</Text>
+        <View style={[styles.cardBody, listMode && styles.cardBodyRow]}>
+          <Text style={styles.cardTitle} numberOfLines={listMode ? 2 : 1}>{item.name}</Text>
           <Text style={styles.cardSub} numberOfLines={1}>
             {item.shop_name ? item.shop_name : (item.subcategory || item.profiles?.display_name || item.category || 'عرض محلي')}
           </Text>
@@ -635,7 +636,7 @@ export default function Market() {
   };
 
   // Render Card: Local Business / Store Directory
-  const renderBusinessCard = (b: any, w: number) => {
+  const renderBusinessCard = (b: any, w: number, listMode = false) => {
     const isSaved = Boolean(savedItems[b.id]);
 
     return (
@@ -649,7 +650,7 @@ export default function Market() {
           pressed && { transform: [{ scale: 0.985 }] },
         ]}
       >
-        <View style={[styles.cardImage, { height: w * 0.58, backgroundColor: b.bg || '#f0f9ff' }]}>
+        <View style={[styles.cardImage, listMode ? styles.cardImageRow : { height: w * 0.58 }, { backgroundColor: b.bg || '#f0f9ff' }]}>
           <Text style={{ fontSize: Math.min(36, w * 0.22) }}><b.Icon size={34} color={b.color || '#0284c7'} /></Text>
           <View style={[styles.typeBadge, { backgroundColor: 'rgba(255,255,255,0.96)' }]}>
             <Text style={[styles.typeBadgeText, { color: b.color || '#0284c7' }]}>{b.categoryLabel}</Text>
@@ -684,7 +685,7 @@ export default function Market() {
           </View>
         </View>
 
-        <View style={styles.cardBody}>
+        <View style={[styles.cardBody, listMode && styles.cardBodyRow]}>
           <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between' }}>
             <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4, flex: 1 }}>
               <Text style={styles.cardTitle} numberOfLines={1}>{b.name}</Text>
@@ -753,7 +754,7 @@ export default function Market() {
   };
 
   // Render Card: Neighborhood Community Event
-  const renderEventCard = (ev: any, w: number) => {
+  const renderEventCard = (ev: any, w: number, listMode = false) => {
     const isAttending = Boolean(rsvpList[ev.id]);
     const currentCount = ev.attendeesCount + (isAttending ? 1 : 0);
 
@@ -768,7 +769,7 @@ export default function Market() {
           pressed && { transform: [{ scale: 0.985 }] },
         ]}
       >
-        <View style={[styles.cardImage, { height: w * 0.58, backgroundColor: ev.bg || '#ecfdf5' }]}>
+        <View style={[styles.cardImage, listMode ? styles.cardImageRow : { height: w * 0.58 }, { backgroundColor: ev.bg || '#ecfdf5' }]}>
           <Text style={{ fontSize: Math.min(36, w * 0.22) }}><ev.Icon size={34} color={ev.color || '#059669'} /></Text>
           <View style={[styles.typeBadge, { backgroundColor: 'rgba(255,255,255,0.96)' }]}>
             <Text style={[styles.typeBadgeText, { color: ev.color || '#059669' }]}>{ev.categoryLabel}</Text>
@@ -790,8 +791,8 @@ export default function Market() {
           </View>
         </View>
 
-        <View style={styles.cardBody}>
-          <Text style={styles.cardTitle} numberOfLines={1}>{ev.title}</Text>
+        <View style={[styles.cardBody, listMode && styles.cardBodyRow]}>
+          <Text style={styles.cardTitle} numberOfLines={listMode ? 2 : 1}>{ev.title}</Text>
           <Text style={styles.cardSub} numberOfLines={2}>{ev.description}</Text>
 
           <View style={styles.eventInfoBox}>
@@ -1028,8 +1029,8 @@ export default function Market() {
                   </View>
 
                   {displayedMarket.length > 0 ? (
-                    <View style={[styles.grid, { gap }]}>
-                      {displayedMarket.map((e) => renderMarketCard(e, cardWidth))}
+                    <View style={[styles.list, { gap }]}>
+                      {displayedMarket.map((e) => renderMarketCard(e, contentWidth, true))}
                     </View>
                   ) : (
                     <View style={styles.emptyState}>
@@ -1060,8 +1061,8 @@ export default function Market() {
                   </View>
 
                   {displayedBusinesses.length > 0 ? (
-                    <View style={[styles.grid, { gap }]}>
-                      {displayedBusinesses.map((b) => renderBusinessCard(b, cardWidth))}
+                    <View style={[styles.list, { gap }]}>
+                      {displayedBusinesses.map((b) => renderBusinessCard(b, contentWidth, true))}
                     </View>
                   ) : (
                     <View style={styles.emptyState}>
@@ -1092,8 +1093,8 @@ export default function Market() {
                   </View>
 
                   {displayedEvents.length > 0 ? (
-                    <View style={[styles.grid, { gap }]}>
-                      {displayedEvents.map((ev) => renderEventCard(ev, cardWidth))}
+                    <View style={[styles.list, { gap }]}>
+                      {displayedEvents.map((ev) => renderEventCard(ev, contentWidth, true))}
                     </View>
                   ) : (
                     <View style={styles.emptyState}>
@@ -1872,6 +1873,7 @@ const styles = StyleSheet.create({
   resultCount: { fontSize: 11.5, color: '#94a3b8', fontWeight: '700' },
 
   grid: { flexDirection: 'row-reverse', flexWrap: 'wrap' },
+  list: { flexDirection: 'column', width: '100%' },
   card: {
     backgroundColor: '#fff',
     borderRadius: 18,
@@ -1884,6 +1886,9 @@ const styles = StyleSheet.create({
     elevation: 2,
     ...(Platform.OS === 'web' ? ({ transition: 'transform 160ms ease, box-shadow 160ms ease', cursor: 'pointer' } as any) : {}),
   },
+  cardRow: { flexDirection: 'row-reverse', alignItems: 'stretch', minHeight: 124, borderRadius: 16 },
+  cardImageRow: { width: 112, height: 124, flexShrink: 0, borderRadius: 0 },
+  cardBodyRow: { flex: 1, minWidth: 0, justifyContent: 'center', padding: 12 },
   cardHover: {
     transform: [{ translateY: -3 }],
     shadowColor: '#0f172a',
