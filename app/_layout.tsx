@@ -71,6 +71,7 @@ function RootContent() {
   const path = pathname.replace(/\/+$/, '') || '/';
   const liveFullScreen = path === '/live' || path.startsWith('/live/');
   const storyFullScreen = ['/stories', '/create-story', '/story', '/story-viewers', '/story-settings'].some(route => path === route || path.startsWith(route + '/'));
+  const hideBottomNav = path === '/service' || path.startsWith('/service/');
   const hiddenRoute = Object.entries(flags).some(([key, enabled]) => enabled === false && ({ market: ['/market', '/service', '/new-service'], directory: ['/directory', '/business'], search: ['/search'], stories: ['/stories', '/story', '/create-story'], weather: ['/weather'], carpooling: ['/carpooling'], urgent_alerts: ['/emergency-alert'], questions: ['/questions', '/question'], live: ['/lives', '/live'], map: ['/map'] }[key] || []).some(route => path === route || path.startsWith(route + '/')));
   const routeBlocked = hiddenRoute && path !== '/admin';
 
@@ -103,7 +104,7 @@ function RootContent() {
                   }}
                 />
               )}
-              {!(maintenance.enabled && sessionReady && !isAdmin) && !liveFullScreen && !storyFullScreen && path !== '/map' && !path.startsWith('/map/') && <BottomNav />}
+              {!(maintenance.enabled && sessionReady && !isAdmin) && !liveFullScreen && !storyFullScreen && !hideBottomNav && path !== '/map' && !path.startsWith('/map/') && <BottomNav />}
             </View>
           </DialogProvider>
         </DynamicIslandProvider>
