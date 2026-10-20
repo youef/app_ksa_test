@@ -116,6 +116,10 @@ export default function Business() {
     );
   }
 
+  const averageRating = reviews.length
+    ? reviews.reduce((sum, review) => sum + Number(review.rating || 0), 0) / reviews.length
+    : 0;
+
   return (
     <View style={styles.container}>
       <AppHeader
@@ -152,7 +156,7 @@ export default function Business() {
             <View style={styles.ratingBadge}>
               <Star size={14} color="#f59e0b" fill="#f59e0b" />
               <Text style={styles.ratingText}>
-                {Number(business.rating || 5.0).toFixed(1)} ({business.review_count || 0} تقييم)
+                {reviews.length ? averageRating.toFixed(1) : 'جديد'} ({reviews.length} تقييم)
               </Text>
             </View>
 
@@ -178,7 +182,7 @@ export default function Business() {
             <View style={styles.divider} />
 
             <View style={styles.infoRow}>
-              <Text style={styles.infoVal}>{business.category || 'متجر'}</Text>
+              <Text style={styles.infoVal}>منشأة محلية</Text>
               <Text style={styles.infoLabel}>النشاط:</Text>
             </View>
 
