@@ -171,9 +171,9 @@ export default function Market() {
   const gap = 12;
   const cardWidth = (contentWidth - gap * (columns - 1)) / columns;
 
-  const favoriteKey = (targetType: 'service' | 'store', itemId: string) => `${targetType}:${itemId}`;
+  const favoriteKey = (targetType: 'service' | 'product' | 'store', itemId: string) => `${targetType}:${itemId}`;
 
-  const toggleSaveItem = async (itemId: string, targetType: 'service' | 'store') => {
+  const toggleSaveItem = async (itemId: string, targetType: 'service' | 'product' | 'store') => {
     const { data: auth, error: authError } = await supabase.auth.getUser();
     if (authError || !auth.user) {
       Alert.alert('سجّل الدخول أولاً', 'يلزم تسجيل الدخول لحفظ المنتجات والمتاجر في المفضلة.');
@@ -207,13 +207,13 @@ export default function Market() {
       if (!u.user) return;
       const { data: favorites } = await supabase.from('favorite_items')
         .select('target_type,target_id').eq('user_id', u.user.id)
-        .in('target_type', ['service', 'store']);
+        .in('target_type', ['service', 'product', 'store']);
       if (favorites) {
         setSavedItems(Object.fromEntries(favorites.map((fav: any) => [favoriteKey(fav.target_type, fav.target_id), true])));
       }
       const { data: p } = await supabase
         .from('profiles')
-        .select('id, display_name, avatar_url, is_geoverified')
+        .select('id, display_name, avatar_url, is_geoverified, account_type, is_verified, freelance_trade')
         .eq('id', u.user.id)
         .maybeSingle();
       setProfile(p);
@@ -241,11 +241,16 @@ export default function Market() {
     setRefreshing(true);
     setLoadError(false);
     try {
-      const [servicesRes, businessRes, eventsRes] = await Promise.all([
+      const [servicesRes, productsRes, businessRes, eventsRes] = await Promise.all([
         supabase
           .from('services')
-          .select('*, profiles:provider_id(display_name, avatar_url, is_verified, phone)')
+          .select('*, profiles:provider_id(display_name, avatar_url, is_verified, phone, city, district, account_type, freelance_trade), business:business_id(id,name,is_verified)')
           .eq('moderation_status', 'approved')
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('marketplace_items')
+          .select('*, seller:seller_id(display_name, avatar_url, is_verified, phone, city, district, account_type, freelance_trade), business:business_id(id,name,is_verified)')
+          .eq('status', 'available')
           .order('created_at', { ascending: false }),
         supabase
           .from('businesses')
@@ -261,11 +266,36 @@ export default function Market() {
           .limit(50),
       ]);
 
-      if (servicesRes.error) {
-        setItems([]);
-      } else {
-        setItems(servicesRes.data || []);
-      }
+      const serviceRows = servicesRes.error
+        ? []
+        : (servicesRes.data || []).map((row: any) => ({ ...row, _source: 'service' }));
+
+      const productRows = productsRes.error
+        ? []
+        : (productsRes.data || []).map((row: any) => ({
+            ...row,
+            _source: 'product',
+            name: row.title,
+            price_from: row.price,
+            price_to: null,
+            price_type: row.price == null ? 'negotiable' : 'fixed',
+            listing_type: row.seller?.account_type === 'merchant' ? 'product_in_shop' : 'home_sale',
+            subcategory: row.item_type,
+            shop_name: row.business?.name || (row.seller?.account_type === 'merchant' ? row.seller?.freelance_trade : null),
+            cover_url: row.image_url,
+            images: row.image_url ? [row.image_url] : [],
+            available_now: row.status === 'available',
+            delivery_modes: [],
+            whatsapp: null,
+            phone: row.seller?.phone || null,
+            profiles: row.seller || null,
+          }));
+
+      setItems(
+        [...serviceRows, ...productRows].sort(
+          (a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime(),
+        ),
+      );
 
       // Map real businesses only (No mock data)
       const dbBusinesses = (businessRes.data || []).map((b: any) => ({
@@ -427,9 +457,10 @@ export default function Market() {
 
   const shareItem = async (item: any) => {
     const text = `شوف هذا العرض في سوق حيّنا: ${item.name} — ${formatServicePrice(item)}`;
+    const route = item._source === 'product' ? 'marketplace-item' : 'service';
     try {
       await Share.share({
-        message: Platform.OS === 'web' && typeof window !== 'undefined' ? `${text} — ${window.location.origin}/service?id=${item.id}` : text,
+        message: Platform.OS === 'web' && typeof window !== 'undefined' ? `${text} — ${window.location.origin}/${route}?id=${item.id}` : text,
         title: item.name,
       });
     } catch {}
@@ -512,6 +543,10 @@ export default function Market() {
   };
 
   const openItem = (item: any) => {
+    if (item._source === 'product') {
+      router.push({ pathname: '/marketplace-item', params: { id: item.id } });
+      return;
+    }
     setSelectedProduct(item);
   };
 
@@ -555,7 +590,8 @@ export default function Market() {
     const cover = getServiceCover(item);
     const modes: string[] = (item.delivery_modes || []).slice(0, 3);
     const timeAgo = relativeTime(item.created_at);
-    const isSaved = Boolean(savedItems[favoriteKey('service', item.id)]);
+    const favoriteType = item._source === 'product' ? 'product' : 'service';
+    const isSaved = Boolean(savedItems[favoriteKey(favoriteType, item.id)]);
 
     return (
       <Pressable
@@ -600,7 +636,7 @@ export default function Market() {
               style={[styles.shareFab, isSaved && { backgroundColor: '#fef2f2' }]}
               onPress={(e: any) => {
                 e?.stopPropagation?.();
-                void toggleSaveItem(item.id, 'service');
+                void toggleSaveItem(item.id, favoriteType);
               }}
             >
               <Heart size={13} color={isSaved ? '#ef4444' : '#475569'} fill={isSaved ? '#ef4444' : 'none'} />
@@ -888,15 +924,15 @@ export default function Market() {
   // Add Button Action based on current section
   const handleAddPress = () => {
     if (section === 'market') {
-      router.push('/new-service');
+      router.push('/new-listing');
     } else if (section === 'businesses') {
-      router.push('/new-service');
+      router.push({ pathname: '/profile', params: { tab: 'content' } });
     } else {
       setShowEventModal(true);
     }
   };
 
-  const addBtnLabel = section === 'market' ? 'أضف عرضك' : section === 'businesses' ? 'أضف محلك' : 'أضف فعالية';
+  const addBtnLabel = section === 'market' ? 'إضافة منتج أو خدمة' : section === 'businesses' ? 'إدارة منشأتي' : 'أضف فعالية';
 
   return (
     <View style={styles.container}>
