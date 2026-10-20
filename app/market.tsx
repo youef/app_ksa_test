@@ -1613,7 +1613,7 @@ export default function Market() {
                     style={[styles.quickChip, eventCategoryChoice === c.id && styles.quickChipActive]}
                   >
                     <Text style={[styles.quickText, eventCategoryChoice === c.id && styles.quickTextActive]}>
-                      {c.emoji} {c.label}
+                      {c.label}
                     </Text>
                   </Pressable>
                 ))}

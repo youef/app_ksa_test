@@ -235,9 +235,7 @@ export default function BottomNav() {
                 ) : (
                   <View style={[styles.iconWrap, isActive && styles.iconWrapActive]}>
                     <Icon size={21} color={isActive ? '#16865b' : '#64748b'} strokeWidth={isActive ? 2.4 : 2} />
-                    {tab.key === '/messages' && unreadCount > 0 && (
-                      <View style={styles.badge}><Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text></View>
-                    )}
+
                   </View>
                 )}
                 <Text numberOfLines={1} style={[styles.label, isActive && styles.labelActive, isCreate && styles.createLabel]}>

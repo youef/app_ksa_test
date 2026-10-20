@@ -14,7 +14,7 @@ import {
   Platform,
   Dimensions,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '@/lib/supabase';
 import { AppHeader } from '@/components/shared/AppHeader';
@@ -71,11 +71,12 @@ import {
 type SettingsCategory = 'all' | 'security' | 'privacy' | 'location' | 'notifications' | 'blocked' | 'system';
 
 export default function SettingsScreen() {
+  const { section } = useLocalSearchParams<{ section?: string }>();
   const bottomNavInset = useBottomNavInset();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
-  const [activeCategory, setActiveCategory] = useState<SettingsCategory>('all');
+  const [activeCategory, setActiveCategory] = useState<SettingsCategory>(section === 'privacy' ? 'privacy' : 'all');
 
   // User Profile
   const [profile, setProfile] = useState<any>(null);
