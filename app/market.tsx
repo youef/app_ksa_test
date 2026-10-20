@@ -646,6 +646,7 @@ export default function Market() {
         style={({ pressed, hovered }: any) => [
           styles.card,
           { width: w },
+          listMode && styles.cardRow,
           hovered && styles.cardHover,
           pressed && { transform: [{ scale: 0.985 }] },
         ]}
@@ -765,6 +766,7 @@ export default function Market() {
         style={({ pressed, hovered }: any) => [
           styles.card,
           { width: w },
+          listMode && styles.cardRow,
           hovered && styles.cardHover,
           pressed && { transform: [{ scale: 0.985 }] },
         ]}
