@@ -18,6 +18,8 @@ import {
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
+import TwitterInquiryCard from '@/components/TwitterInquiryCard';
+import { useDynamicIsland } from '@/context/DynamicIslandContext';
 import { AppHeader } from '@/components/shared/AppHeader';
 import { getActiveLocation } from '@/lib/locationSync';
 import {
@@ -62,6 +64,8 @@ const QUICK_QUESTION_RESPONSES = [
 
 export default function Question() {
   const insets = useSafeAreaInsets();
+  const { showIsland } = useDynamicIsland();
+  const [viewerProfile, setViewerProfile] = useState<any>(null);
   const [composerFocused, setComposerFocused] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -99,6 +103,8 @@ export default function Question() {
     const { data: auth } = await supabase.auth.getSession();
     const user = auth.session?.user ?? null;
     setCurrentUserId(user?.id ?? null);
+    const viewer = user ? await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle() : { data: null };
+    setViewerProfile(viewer.data);
     const questionPromise = user
       ? supabase.from('questions').select('*').eq('id', id).maybeSingle()
       : getActiveLocation().then(location =>
@@ -115,17 +121,6 @@ export default function Question() {
     const question = Array.isArray(questionResult.data) ? questionResult.data[0] : questionResult.data;
 
     if (question) {
-      // Safely increment views_count
-      if (question.id && user) {
-        try {
-          supabase
-            .from('questions')
-            .update({ views_count: (question.views_count || 0) + 1 })
-            .eq('id', id)
-            .then(() => {});
-        } catch {}
-      }
-
       const userIds = [question.author_id, ...(b.data || []).map((ans: any) => ans.author_id)];
       const uniqueIds = Array.from(new Set(userIds.filter(Boolean)));
 
@@ -696,161 +691,7 @@ export default function Question() {
         contentContainerStyle={[styles.scroll, { paddingBottom: 24 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Main Question Luxury Card */}
-        <View style={styles.questionCard}>
-          {/* Top Badges Row */}
-          <View style={styles.topBadgesRow}>
-            {q.is_emergency && (
-              <View style={styles.emergencyBadge}>
-                <Flame size={12} color="#dc2626" />
-                <Text style={styles.emergencyBadgeText}>تنبيه عاجل بالحي 🚨</Text>
-              </View>
-            )}
-
-            {q.category && (
-              <View style={styles.categoryPill}>
-                <Text style={styles.categoryPillText}>{q.category}</Text>
-              </View>
-            )}
-
-            {isSolved ? (
-              <View style={styles.solvedBadge}>
-                <CheckCircle2 size={12} color="#15803d" />
-                <Text style={styles.solvedBadgeText}>تم الحل والاعتماد ✓</Text>
-              </View>
-            ) : (
-              <View style={styles.openBadge}>
-                <View style={styles.openDot} />
-                <Text style={styles.openBadgeText}>مفتوح للنقاش</Text>
-              </View>
-            )}
-          </View>
-
-          {/* Title */}
-          <Text style={styles.qTitle}>{q.title}</Text>
-
-          {/* Body Content */}
-          {Boolean(q.body) && (
-            <View style={styles.qBodyContainer}>
-              <Text style={styles.qBody}>{q.body}</Text>
-            </View>
-          )}
-
-          {/* Author and Meta Row */}
-          <View style={styles.authorSection}>
-            <Pressable
-              style={styles.authorTouchRow}
-              onPress={() => q.author_id && router.push({ pathname: '/user', params: { id: q.author_id } })}
-            >
-              {q.profiles?.avatar_url ? (
-                <Image source={{ uri: q.profiles.avatar_url }} style={styles.authorAvatarImg} />
-              ) : (
-                <View style={styles.authorAvatarPlaceholder}>
-                  <Text style={styles.authorAvatarLetter}>{(authorName[0] || 'ج').toUpperCase()}</Text>
-                </View>
-              )}
-              <View style={styles.authorInfoTexts}>
-                <View style={styles.authorNameRow}>
-                  <Text style={styles.authorName}>{authorName}</Text>
-                  {q.profiles?.is_geoverified && <ShieldCheck size={12} color="#10b981" />}
-                </View>
-                <View style={styles.metaRow}>
-                  <MapPin size={11} color="#059669" />
-                  <Text style={styles.metaText}>{locationLabel}</Text>
-                  {Boolean(q.created_at) && (
-                    <Text style={styles.metaTimeText}>· {relativeTime(q.created_at)}</Text>
-                  )}
-                  {q.views_count != null && (
-                    <Text style={styles.metaTimeText}>· {q.views_count} مشاهدة</Text>
-                  )}
-                </View>
-              </View>
-            </Pressable>
-          </View>
-
-          {/* Privacy Note */}
-          <View style={styles.privacyNote}>
-            <Info size={13} color="#059669" />
-            <Text style={styles.privacyNoteText}>
-              الموقع معروض على مستوى الحي لحماية الخصوصية. يمكنك إرسال موقعك الدقيق بالخاص عند الحاجة.
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.statsCard}>
-          <View style={styles.statsHeadingRow}>
-            <View style={styles.statsIconBubble}><Sparkles size={16} color="#0f8a62" /></View>
-            <View style={{ flex: 1 }}><Text style={styles.statsTitle}>ملخص الاستفسار</Text><Text style={styles.statsSubtitle}>مؤشرات تفاعل بدون كشف هوية الزوار</Text></View>
-            {Boolean(q.is_pinned) && <View style={styles.pinnedPill}><Pin size={12} color="#8a5a0a" /><Text style={styles.pinnedPillText}>مثبّت</Text></View>}
-          </View>
-          <View style={styles.statsGrid}>
-            <View style={styles.statItem}><Eye size={17} color="#64748b" /><Text style={styles.statValue}>{Number(q.views_count ?? q.view_count ?? 0).toLocaleString('ar-SA')}</Text><Text style={styles.statLabel}>مشاهدة</Text></View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}><MessageCircle size={17} color="#0f8a62" /><Text style={styles.statValue}>{answers.length.toLocaleString('ar-SA')}</Text><Text style={styles.statLabel}>ردود الجيران</Text></View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}><Bookmark size={17} color="#7c3aed" /><Text style={styles.statValue}>{isFavorite ? 'نعم' : '—'}</Text><Text style={styles.statLabel}>حفظك</Text></View>
-          </View>
-          <View style={styles.questionActionRow}>
-            <Pressable onPress={toggleFavorite} disabled={favoriteBusy} style={[styles.questionActionBtn, isFavorite && styles.questionActionBtnActive]}>
-              {favoriteBusy ? <ActivityIndicator size="small" color="#0f8a62" /> : <Bookmark size={16} color={isFavorite ? '#ffffff' : '#0f8a62'} />}
-              <Text style={[styles.questionActionText, isFavorite && styles.questionActionTextActive]}>{isFavorite ? 'محفوظ عندك' : 'حفظ الاستفسار'}</Text>
-            </Pressable>
-            {!isAuthor && <Pressable onPress={() => { if (!currentUserId) { requireAccount('سجّل الدخول للإبلاغ عن الاستفسار.'); return; } setReportOpen(true); }} style={styles.reportActionBtn}><Flag size={15} color="#b45309" /><Text style={styles.reportActionText}>إبلاغ</Text></Pressable>}
-          </View>
-        </View>
-
-        {/* Author Management Card: Edit (Limit 2) & Delete */}
-        {isAuthor && (
-          <View style={styles.authorManageBox}>
-            <View style={styles.authorManageHeader}>
-              <View style={styles.authorManageInfo}>
-                <Text style={styles.authorManageTitle}>إدارة استفسارك</Text>
-                <Text style={styles.authorManageSub}>
-                  {editsRemaining > 0
-                    ? `متبقي لك ${editsRemaining} من ${MAX_EDITS} محاولات تعديل`
-                    : 'استنفدت الحد الأقصى للتعديل (محاولتان فقط)'}
-                </Text>
-              </View>
-              <View style={[styles.editLimitBadge, editsRemaining === 0 ? styles.editLimitBadgeExpired : styles.editLimitBadgeActive]}>
-                <Text style={[styles.editLimitBadgeText, editsRemaining === 0 ? styles.editLimitBadgeTextExpired : styles.editLimitBadgeTextActive]}>
-                  {editsRemaining}/{MAX_EDITS} محاولات
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.authorActionsRow}>
-              <Pressable style={[styles.pinActionBtn, q.is_pinned && styles.pinActionBtnActive]} onPress={togglePin} disabled={pinBusy}>
-                {pinBusy ? <ActivityIndicator size="small" color="#8a5a0a" /> : <Pin size={15} color={q.is_pinned ? '#ffffff' : '#8a5a0a'} />}
-                <Text style={[styles.pinActionText, q.is_pinned && styles.pinActionTextActive]}>{q.is_pinned ? 'إلغاء التثبيت' : 'تثبيت الاستفسار'}</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.editActionBtn, editsRemaining === 0 && styles.disabledActionBtn]}
-                onPress={handleOpenEdit}
-                disabled={editsRemaining === 0}
-              >
-                <Pencil size={15} color={editsRemaining === 0 ? '#94a3b8' : '#047857'} />
-                <Text style={[styles.editActionBtnText, editsRemaining === 0 && styles.disabledActionBtnText]}>
-                  {editsRemaining === 0 ? 'انتهت محاولات التعديل' : 'تعديل الاستفسار'}
-                </Text>
-              </Pressable>
-
-              <Pressable
-                style={[styles.deleteActionBtn, deletingQuestion && { opacity: 0.6 }]}
-                onPress={handleDeleteQuestion}
-                disabled={deletingQuestion}
-              >
-                {deletingQuestion ? (
-                  <ActivityIndicator size="small" color="#dc2626" />
-                ) : (
-                  <>
-                    <Trash2 size={15} color="#dc2626" />
-                    <Text style={styles.deleteActionBtnText}>حذف الاستفسار</Text>
-                  </>
-                )}
-              </Pressable>
-            </View>
-          </View>
-        )}
+        <TwitterInquiryCard detailMode type="question" data={{ ...q, answers, answers_count: answers.length }} currentUserId={currentUserId} currentUserProfile={viewerProfile} isGuest={!currentUserId} onQuickReply={async () => {}} onToast={message => showIsland(message, undefined, 'success')} onDeleted={() => void load(false)} />
 
         {/* Quick Suggested Responses Pills */}
         {!isSolved && currentUserId && (
@@ -936,7 +777,7 @@ export default function Question() {
                       <View style={styles.answerMeta}>
                         <View style={styles.authorNameRow}>
                           <Text style={styles.answerAuthor}>{ansAuthorName}</Text>
-                          {a.profiles?.is_geoverified && <ShieldCheck size={11} color="#10b981" />}
+
                         </View>
                         <Text style={styles.dateTextSmall}>
                           {a.created_at ? relativeTime(a.created_at) : ''}
@@ -1227,7 +1068,7 @@ const styles = StyleSheet.create({
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f5f7f6',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
@@ -1256,6 +1097,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   scroll: {
+    width: '100%',
+    maxWidth: 760,
+    alignSelf: 'center',
     paddingHorizontal: 16,
     paddingTop: 12,
     gap: 12,
@@ -1298,13 +1142,13 @@ const styles = StyleSheet.create({
   pinActionTextActive: { color: '#ffffff' },
   reportModalCard: { width: '100%', maxWidth: 480, alignSelf: 'center', backgroundColor: '#ffffff', borderTopLeftRadius: 26, borderTopRightRadius: 26, borderRadius: 26, padding: 20, gap: 14 },
   reportOptions: { gap: 7 },
-  reportOption: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, borderRadius: 13, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#f8fafc', paddingHorizontal: 12, paddingVertical: 11 },
+  reportOption: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, borderRadius: 13, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#f5f7f6', paddingHorizontal: 12, paddingVertical: 11 },
   reportOptionSelected: { borderColor: '#16a36d', backgroundColor: '#effaf4' },
   reportRadio: { width: 15, height: 15, borderRadius: 8, borderWidth: 1.5, borderColor: '#94a3b8' },
   reportRadioSelected: { borderColor: '#0f8a62', backgroundColor: '#0f8a62' },
   reportOptionText: { flex: 1, textAlign: 'right', color: '#475569', fontSize: 12, fontWeight: '700' },
   reportOptionTextSelected: { color: '#166534', fontWeight: '900' },
-  reportDetailsInput: { minHeight: 72, maxHeight: 120, textAlignVertical: 'top', borderRadius: 14, borderWidth: 1, borderColor: '#dbe5df', backgroundColor: '#f8fafc', padding: 12, color: '#1e293b', fontSize: 13 },
+  reportDetailsInput: { minHeight: 72, maxHeight: 120, textAlignVertical: 'top', borderRadius: 14, borderWidth: 1, borderColor: '#dbe5df', backgroundColor: '#f5f7f6', padding: 12, color: '#1e293b', fontSize: 13 },
   topBadgesRow: {
     flexDirection: 'row-reverse',
     flexWrap: 'wrap',
@@ -1386,7 +1230,7 @@ const styles = StyleSheet.create({
     lineHeight: 26,
   },
   qBodyContainer: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f5f7f6',
     borderRadius: 14,
     padding: 12,
     borderWidth: 1,
@@ -1690,7 +1534,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f5f7f6',
     paddingHorizontal: 9,
     paddingVertical: 5,
     borderRadius: 8,
@@ -1706,7 +1550,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f5f7f6',
     paddingHorizontal: 9,
     paddingVertical: 5,
     borderRadius: 8,
@@ -2010,7 +1854,7 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   modalInput: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f5f7f6',
     borderWidth: 1.5,
     borderColor: '#e2e8f0',
     borderRadius: 14,
