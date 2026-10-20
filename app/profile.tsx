@@ -415,12 +415,16 @@ export default function Profile() {
   const verificationState = String(latestVerificationRequest?.status || '').toLowerCase();
   const verificationPending = verificationState === 'pending';
   const verificationRejected = verificationState === 'rejected';
-  const verificationStatusText = p.is_verified
-    ? 'موثّق رسميًا'
-    : verificationPending
-      ? 'طلب التوثيق قيد مراجعة الإدارة'
-      : verificationRejected
-        ? 'طلب التوثيق يحتاج إلى تعديل وإعادة تقديم'
+  const verificationStatusText = verificationPending
+    ? p.is_verified
+      ? 'الصفة الحالية موثّقة، وطلب تغيير الصفة قيد مراجعة الإدارة'
+      : 'طلب التوثيق قيد مراجعة الإدارة'
+    : verificationRejected
+      ? p.is_verified
+        ? 'الصفة الحالية ما زالت موثّقة، وآخر طلب تغيير لم يُعتمد'
+        : 'طلب التوثيق يحتاج إلى تعديل وإعادة تقديم'
+      : p.is_verified
+        ? 'موثّق رسميًا'
         : 'يمكنك طلب التوثيق أو تغيير صفة الحساب';
 
   return (
@@ -606,12 +610,16 @@ export default function Profile() {
             </View>
             <View style={styles.accountIdentityBottomRow}>
               <View style={styles.accountIdentitySecurity}>
-                <ShieldCheck size={14} color={p.is_verified ? '#047857' : verificationPending ? '#B45309' : '#64748B'} />
+                <ShieldCheck size={14} color={verificationPending ? '#B45309' : p.is_verified ? '#047857' : '#64748B'} />
                 <Text style={[
                   styles.accountIdentitySecurityText,
-                  p.is_verified ? styles.accountIdentityVerifiedText : verificationPending ? styles.accountIdentityPendingText : null,
+                  verificationPending ? styles.accountIdentityPendingText : p.is_verified ? styles.accountIdentityVerifiedText : null,
                 ]}>
-                  {p.is_verified ? 'تمت مراجعة الصفة ومنح التوثيق' : verificationPending ? 'بانتظار قرار الإدارة' : 'مراجعة يدوية قبل اعتماد الصفة'}
+                  {verificationPending
+                    ? 'بانتظار قرار الإدارة على طلب تغيير الصفة'
+                    : p.is_verified
+                      ? 'تمت مراجعة الصفة ومنح التوثيق'
+                      : 'مراجعة يدوية قبل اعتماد الصفة'}
                 </Text>
               </View>
               <View style={styles.accountIdentityAction}>
