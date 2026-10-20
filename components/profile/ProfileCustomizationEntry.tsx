@@ -10,7 +10,7 @@ export function ProfileCustomizationEntry({ accentColor = '#059669', compact = f
     <Pressable
       accessibilityRole="button"
       accessibilityLabel="فتح تخصيص الملف وإدارة الأعمال المميزة"
-      onPress={() => router.push('/profile-customization')}
+      onPress={() => router.push({ pathname: '/profile', params: { tab: 'settings', section: 'design' } })}
       style={({ pressed }) => [
         styles.card,
         compact && styles.compact,
