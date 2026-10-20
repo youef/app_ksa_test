@@ -22,7 +22,8 @@ import { savePermanentMyLocation, getLockedCity, type LockedCity } from '@/lib/l
 import { getCurrentDeviceLocation, reverseGeocodeDeviceLocation } from '@/lib/deviceLocation';
 import { NeighborBadgesCard } from '@/components/profile/NeighborBadgesCard';
 import { ProfileCustomizationEntry } from '@/components/profile/ProfileCustomizationEntry';
-import { AccountIdentityBadge } from '@/components/profile/AccountIdentityBadge';
+import { AccountIdentityBadge, AccountIdentityIcon, AccountVerificationBadge, type AccountKind } from '@/components/profile/AccountIdentityBadge';
+import { ProfileIdentityCard } from '@/components/profile/ProfileIdentityCard';
 import {
   Camera,
   MapPin,
@@ -513,6 +514,13 @@ export default function Profile() {
                 <View style={styles.avatarCameraBadge}>
                   <Camera size={13} color="#fff" />
                 </View>
+                <AccountIdentityIcon
+                  role={p.role}
+                  accountType={p.account_type}
+                  isVerified={Boolean(p.is_verified)}
+                  size={29}
+                  style={styles.avatarIdentityBadge}
+                />
               </Pressable>
 
               <View style={styles.identityTextCol}>
@@ -520,15 +528,24 @@ export default function Profile() {
                   <Text style={styles.displayNameText} numberOfLines={1}>
                     {personalName || 'أضف اسمك الكريم'}
                   </Text>
+                </View>
+
+                <Text style={styles.usernameText}>@{p.username || 'username'}</Text>
+
+                <View style={styles.identityBadgeRow}>
                   <AccountIdentityBadge
                     role={p.role}
                     accountType={p.account_type}
                     isVerified={Boolean(p.is_verified)}
                     compact
                   />
+                  <AccountVerificationBadge
+                    role={p.role}
+                    accountType={p.account_type}
+                    isVerified={Boolean(p.is_verified)}
+                    compact
+                  />
                 </View>
-
-                <Text style={styles.usernameText}>@{p.username || 'username'}</Text>
 
                 {(city || district) ? (
                   <View style={styles.locationPill}>
@@ -596,38 +613,19 @@ export default function Profile() {
         </View>
 
         <View style={styles.accountIdentityOuter}>
-          <Pressable style={styles.accountIdentityCard} onPress={() => router.push('/account-type')}>
-            <View style={styles.accountIdentityTopRow}>
-              <View style={styles.accountIdentityTextCol}>
-                <Text style={styles.accountIdentityTitle}>هوية الحساب والتوثيق</Text>
-                <Text style={styles.accountIdentitySub}>{verificationStatusText}</Text>
-              </View>
-              <AccountIdentityBadge
-                role={p.role}
-                accountType={p.account_type}
-                isVerified={Boolean(p.is_verified)}
-              />
-            </View>
-            <View style={styles.accountIdentityBottomRow}>
-              <View style={styles.accountIdentitySecurity}>
-                <ShieldCheck size={14} color={verificationPending ? '#B45309' : p.is_verified ? '#047857' : '#64748B'} />
-                <Text style={[
-                  styles.accountIdentitySecurityText,
-                  verificationPending ? styles.accountIdentityPendingText : p.is_verified ? styles.accountIdentityVerifiedText : null,
-                ]}>
-                  {verificationPending
-                    ? 'بانتظار قرار الإدارة على طلب تغيير الصفة'
-                    : p.is_verified
-                      ? 'تمت مراجعة الصفة ومنح التوثيق'
-                      : 'مراجعة يدوية قبل اعتماد الصفة'}
-                </Text>
-              </View>
-              <View style={styles.accountIdentityAction}>
-                <Text style={styles.accountIdentityActionText}>{p.is_verified ? 'إدارة الصفة' : 'التوثيق'}</Text>
-                <ChevronLeft size={15} color="#047857" />
-              </View>
-            </View>
-          </Pressable>
+          <ProfileIdentityCard
+            owner
+            role={p.role}
+            accountType={p.account_type}
+            isVerified={Boolean(p.is_verified)}
+            descriptor={p.freelance_trade}
+            pending={verificationPending}
+            rejected={verificationRejected}
+            onManage={() => router.push('/account-type')}
+            onSelectType={(nextType: AccountKind) =>
+              router.push({ pathname: '/account-type', params: { type: nextType } })
+            }
+          />
         </View>
 
         {/* ======================================================== */}
@@ -1229,6 +1227,20 @@ const styles = StyleSheet.create({
     color: '#26745f',
     fontSize: 11,
     fontWeight: '700',
+  },
+
+  identityBadgeRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 5,
+    marginTop: 7,
+  },
+  avatarIdentityBadge: {
+    position: 'absolute',
+    right: -4,
+    top: -4,
+    zIndex: 4,
   },
 
   // Bio
