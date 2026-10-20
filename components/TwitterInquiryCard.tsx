@@ -38,6 +38,7 @@ import {
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { requireAccount } from '@/lib/authGate';
+import { showDialog } from '@/lib/dialog';
 
 export function formatArabicTimeAgo(dateStr: string): string {
   if (!dateStr) return '';
@@ -80,12 +81,11 @@ export default function TwitterInquiryCard({
   onDeleted,
 }: TwitterInquiryCardProps) {
   const isReq = type === 'request';
+  const isAdmin = Boolean(currentUserId && currentUserProfile?.role === 'admin');
   const isOwner = Boolean(currentUserId && currentUserId === (isReq ? data.requester_id : data.author_id));
   const name = data.profiles?.hide_name ? 'جار مجهول 🕶️' : (data.profiles?.display_name || data.profiles?.username || 'ابن الحي');
   const username = data.profiles?.username || 'neighbor';
   const avatar = data.profiles?.avatar_url;
-  const isVerifiedNeighbor = data.profiles?.is_geoverified;
-  const isIdVerified = data.profiles?.is_verified;
   const isEmergency = data.is_urgent || data.is_emergency || data.urgency_level === 'emergency' || (data.title && (data.title.includes('مفقود') || data.title.includes('طارئ')));
   const isToolSharing = data.is_tool_sharing || data.item_type === 'tool_sharing' || (data.title && (data.title.includes('إعارة') || data.title.includes('دريل')));
 
@@ -93,17 +93,22 @@ export default function TwitterInquiryCard({
   const [quickReplyText, setQuickReplyText] = useState('');
   const [replyLoading, setReplyLoading] = useState(false);
   type ReactionType = 'like' | 'help' | 'useful' | 'thanks';
-  const REACTIONS: { id: ReactionType; emoji: string; label: string }[] = [
-    { id: 'like', emoji: '❤️', label: 'أعجبني' },
-    { id: 'help', emoji: '🤝', label: 'أبشر بالفزعة' },
-    { id: 'useful', emoji: '💡', label: 'معلومة مفيدة' },
-    { id: 'thanks', emoji: '🙏', label: 'الله يعطيك العافية' },
+  const REACTIONS: { id: ReactionType; Icon: typeof Heart; label: string }[] = [
+    { id: 'like', Icon: Heart, label: 'أعجبني' },
+    { id: 'help', Icon: HeartHandshake, label: 'أبشر بالفزعة' },
+    { id: 'useful', Icon: Sparkles, label: 'معلومة مفيدة' },
+    { id: 'thanks', Icon: Coffee, label: 'الله يعطيك العافية' },
   ];
   const [myReaction, setMyReaction] = useState<ReactionType | null>(null);
   const [reactionCounts, setReactionCounts] = useState<Record<ReactionType, number>>({
     like: Number(data.likes_count ?? data.likes ?? 0), help: 0, useful: 0, thanks: 0,
   });
   const [reactionBusy, setReactionBusy] = useState(false);
+  const [reactionPickerOpen, setReactionPickerOpen] = useState(false);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editTitle, setEditTitle] = useState(String(data.title || ''));
+  const [editBody, setEditBody] = useState(String(isReq ? data.description || '' : data.body || ''));
+  const [editBusy, setEditBusy] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
   const [viewsCount, setViewsCount] = useState<number>(() => Number(data.views_count ?? data.views ?? data.view_count ?? 0));
   const [savesCount, setSavesCount] = useState(0);
@@ -242,7 +247,7 @@ export default function TwitterInquiryCard({
         if (error) throw error;
       }
       const selected = REACTIONS.find(item => item.id === next);
-      onToast(next ? (selected?.label || 'تم التفاعل') + ' ' + (selected?.emoji || '') : 'تم إلغاء التفاعل');
+      onToast(next ? (selected?.label || 'تم التفاعل') : 'تم إلغاء التفاعل');
     } catch (error: any) {
       setMyReaction(previous);
       setReactionCounts(current => {
@@ -293,10 +298,7 @@ export default function TwitterInquiryCard({
   }
 
   async function confirmDeletePost() {
-    Alert.alert(
-      'حذف المنشور نهائياً',
-      'هل أنت متأكد؟ لا يمكن التراجع عن حذف المنشور.',
-      [
+    showDialog({ title: 'حذف المنشور نهائياً', message: 'هل أنت متأكد؟ لا يمكن التراجع عن حذف المنشور.', buttons: [
         { text: 'إلغاء', style: 'cancel' },
         {
           text: 'حذف المنشور',
@@ -304,15 +306,12 @@ export default function TwitterInquiryCard({
           onPress: async () => {
             try {
               const table = isReq ? 'requests' : 'questions';
-              let result: any;
-              if (isReq) {
-                await supabase.from('help_matches').delete().eq('request_id', data.id);
-                result = await supabase.from(table).delete().eq('id', data.id).eq('requester_id', currentUserId);
-              } else {
-                await supabase.from('answers').delete().eq('question_id', data.id);
-                result = await supabase.from(table).delete().eq('id', data.id).eq('author_id', currentUserId);
-              }
-              if (result?.error) throw result.error;
+              if (!currentUserId || (!isOwner && !isAdmin)) return;
+              let query = supabase.from(table).delete().eq('id', data.id);
+              if (!isAdmin) query = query.eq(isReq ? 'requester_id' : 'author_id', currentUserId);
+              const { data: removed, error } = await query.select('id');
+              if (error) throw error;
+              if (!removed?.length) throw new Error('لا تملك صلاحية حذف هذا المنشور.');
               onToast('تم حذف المنشور بنجاح');
               onDeleted?.();
             } catch (err: any) {
@@ -321,14 +320,17 @@ export default function TwitterInquiryCard({
           },
         },
       ],
-    );
+    });
   }
 
   async function updateResolutionStatus(nextStatus: string) {
-    if (!isOwner || !currentUserId) return;
+    if ((!isOwner && !isAdmin) || !currentUserId) return;
     const table = isReq ? 'requests' : 'questions';
     const ownerColumn = isReq ? 'requester_id' : 'author_id';
-    const { error } = await supabase.from(table).update({ resolution_status: nextStatus, updated_at: new Date().toISOString() }).eq('id', data.id).eq(ownerColumn, currentUserId);
+    let query = supabase.from(table).update({ resolution_status: nextStatus, updated_at: new Date().toISOString() }).eq('id', data.id);
+    if (!isAdmin) query = query.eq(ownerColumn, currentUserId);
+    const { data: updated, error } = await query.select('id').maybeSingle();
+    if (!error && !updated) return Alert.alert('تعذر تحديث الحالة', 'لا تملك صلاحية تعديل هذا المنشور.');
     if (error) return Alert.alert('تعذر تحديث الحالة', error.message || 'حاول مرة أخرى.');
     setResolutionStatus(nextStatus);
     data.resolution_status = nextStatus;
@@ -366,10 +368,10 @@ export default function TwitterInquiryCard({
 
   function handleMoreOptions() {
     const options: any[] = [];
-    if (isOwner) {
+    if (isOwner || isAdmin) {
       options.push({
         text: 'تعديل المنشور',
-        onPress: () => router.push({ pathname: isReq ? '/request' : '/question', params: { id: data.id } }),
+        onPress: () => { setEditTitle(String(data.title || '')); setEditBody(String(isReq ? data.description || '' : data.body || '')); setEditorOpen(true); },
       });
       options.push({ text: 'حذف المنشور', style: 'destructive', onPress: confirmDeletePost });
       options.push({ text: 'تحديث حالة المنشور', onPress: openStatusOptions });
@@ -380,7 +382,6 @@ export default function TwitterInquiryCard({
     }
     options.push({ text: 'نسخ رابط المنشور', onPress: handleShare });
     if (!isGuest) {
-      options.push({ text: 'كتم إشعارات هذا المنشور', onPress: () => onToast('تم كتم الإشعارات 🔕') });
       options.push({
         text: 'إبلاغ عن محتوى غير لائق',
         onPress: () => router.push({ pathname: '/report', params: { id: data.id, type: isReq ? 'request' : 'question' } }),
@@ -388,7 +389,26 @@ export default function TwitterInquiryCard({
       });
     }
     options.push({ text: 'إلغاء', style: 'cancel' });
-    Alert.alert('خيارات المنشور', data.title, options);
+    showDialog({ title: 'خيارات المنشور', message: data.title, buttons: options });
+  }
+
+  async function savePostEdit() {
+    if (!currentUserId || (!isOwner && !isAdmin) || !editTitle.trim() || editBusy) return;
+    setEditBusy(true);
+    try {
+      const changes = { title: editTitle.trim(), [isReq ? 'description' : 'body']: editBody.trim(), updated_at: new Date().toISOString() };
+      let query = supabase.from(isReq ? 'requests' : 'questions').update(changes).eq('id', data.id);
+      if (!isAdmin) query = query.eq(isReq ? 'requester_id' : 'author_id', currentUserId);
+      const { data: updated, error } = await query.select('id').maybeSingle();
+      if (error) throw error;
+      if (!updated) throw new Error('لا تملك صلاحية تعديل هذا المنشور.');
+      Object.assign(data, changes);
+      setEditorOpen(false);
+      onToast('تم حفظ التعديلات');
+      onDeleted?.();
+    } catch (error: any) {
+      Alert.alert('تعذر حفظ التعديلات', error?.message || 'حاول مرة أخرى.');
+    } finally { setEditBusy(false); }
   }
 
   async function handleSendReply() {
@@ -427,13 +447,13 @@ export default function TwitterInquiryCard({
               <User size={20} color="#fff" />
             </View>
           )}
-          {isVerifiedNeighbor && (
-            <View style={s.xGeoBadge}><ShieldCheck size={9} color="#fff" /></View>
-          )}
+
         </Pressable>
 
         <View style={s.xAuthorMeta}>
           <View style={s.xAuthorRow}>
+            <Pressable onPress={() => isGuest ? requireAccount() : data.profiles?.id && router.push({ pathname: '/user', params: { id: data.profiles.id } })}>              <Text style={s.xAuthorName} numberOfLines={1}>{name}</Text>
+            </Pressable>
             {isEmergency ? (
               <View style={s.xEmergencyBadge}><Flame size={11} color="#dc2626" /><Text style={s.xEmergencyBadgeText}>عاجل</Text></View>
             ) : isToolSharing ? (
@@ -443,13 +463,10 @@ export default function TwitterInquiryCard({
             ) : (
               <View style={s.xCategoryBadge}><MessageCircle size={11} color="#059669" /><Text style={s.xCategoryBadgeText}>استفسار</Text></View>
             )}
-            <Text style={s.xTimeAgo}>{formatArabicTimeAgo(data.created_at)}</Text>
-            <Text style={s.xDot}>·</Text>
-            <Text style={s.xHandle} numberOfLines={1}>@{username}</Text>
-            {isIdVerified && <CheckCircle2 size={13} color="#059669" />}
-            <Pressable onPress={() => isGuest ? requireAccount() : data.profiles?.id && router.push({ pathname: '/user', params: { id: data.profiles.id } })}>              <Text style={s.xAuthorName} numberOfLines={1}>{name}</Text>
-            </Pressable>
+
           </View>
+
+          {!data.profiles?.hide_name && <Text style={[s.xHandle, { maxWidth: '100%', textAlign: 'right', writingDirection: 'ltr' }]} numberOfLines={1}>@{username}</Text>}
 
           <View style={s.xLocationRow}>
             <MapPin size={11} color="#059669" />
@@ -525,14 +542,16 @@ export default function TwitterInquiryCard({
         </Pressable>
       )}
 
-      {/* Community reactions persisted in Supabase */}
-      <View style={s.xReactionsRow}>
-        {REACTIONS.map(reaction => {
-          const active = myReaction === reaction.id;
-          return <Pressable key={reaction.id} style={[s.xReactionChip, active && s.xReactionChipActive]} onPress={() => void handleReaction(reaction.id)} disabled={reactionBusy} accessibilityRole="button" accessibilityLabel={reaction.label} accessibilityState={{ selected: active, disabled: reactionBusy }}>
-            <Text style={s.xReactionEmoji}>{reaction.emoji}</Text><Text style={[s.xReactionCount, active && s.xReactionCountActive]}>{reactionCounts[reaction.id]}</Text>
-          </Pressable>;
-        })}
+      <View style={[s.xReactionsRow, { justifyContent: 'space-between' }]}>
+        <Text style={s.xTimeAgo}>{formatArabicTimeAgo(data.created_at)}</Text>
+        <Pressable style={[s.xActionBtn, myReaction && s.xActionBtnActive]} onPress={() => {
+          if (isGuest || !currentUserId) return requireAccount('سجّل الدخول لاختيار تفاعلك مع منشورات جيرانك.');
+          setReactionPickerOpen(true);
+        }} accessibilityRole="button" accessibilityLabel="اختيار التفاعل" accessibilityState={{ expanded: reactionPickerOpen }}>
+          <Heart size={18} color={myReaction ? '#059669' : '#64748b'} />
+          <Text style={s.xActionCounter}>{REACTIONS.find(r => r.id === myReaction)?.label || 'تفاعل'}</Text>
+          <Text style={s.xActionCounter}>{Object.values(reactionCounts).reduce((sum, count) => sum + count, 0)}</Text>
+        </Pressable>
       </View>
 
       {/* Action Bar */}
@@ -608,7 +627,7 @@ export default function TwitterInquiryCard({
                         <Text style={s.xAnswerTime}>{formatArabicTimeAgo(ans.created_at)}</Text>
                         <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 5 }}>
                           <Text style={s.xAnswerAuthorName}>{ansName}</Text>
-                          {ans.profiles?.is_geoverified && <ShieldCheck size={11} color="#16a34a" />}
+
                           {isAccepted && (
                             <View style={s.xAcceptedBadge}>
                               <Award size={10} color="#fff" />
@@ -722,6 +741,33 @@ export default function TwitterInquiryCard({
           </Pressable>
         </View>
       )}
+      <Modal visible={reactionPickerOpen} transparent animationType="fade" onRequestClose={() => setReactionPickerOpen(false)}>
+        <View style={s.pickerBackdrop}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setReactionPickerOpen(false)} accessibilityRole="button" accessibilityLabel="إغلاق التفاعلات" />
+          <View style={s.pickerPanel}>
+            <Text style={s.pickerTitle}>اختر تفاعلك</Text>
+            {REACTIONS.map(({ id, Icon, label }) => (
+              <Pressable key={id} disabled={reactionBusy} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected: myReaction === id, disabled: reactionBusy }} style={[s.pickerOption, myReaction === id && s.xReactionChipActive]} onPress={() => { setReactionPickerOpen(false); void handleReaction(id); }}>
+                <Icon size={22} color="#059669" />
+                <Text style={s.pickerLabel}>{label}</Text>
+                <Text style={s.xReactionCount}>{reactionCounts[id]}</Text>
+              </Pressable>
+            ))}
+            <Text style={s.xTimeAgo}>اختيار تفاعلك الحالي مرة أخرى يزيله</Text>
+          </View>
+        </View>
+      </Modal>
+      <Modal visible={editorOpen} transparent animationType="fade" onRequestClose={() => { if (!editBusy) setEditorOpen(false); }}>
+        <View style={s.pickerBackdrop}>
+          <View style={s.pickerPanel}>
+            <Text style={s.pickerTitle}>تعديل المنشور</Text>
+            <TextInput accessibilityLabel="عنوان المنشور" value={editTitle} onChangeText={setEditTitle} maxLength={200} style={s.editInput} />
+            <TextInput accessibilityLabel="نص المنشور" value={editBody} onChangeText={setEditBody} multiline maxLength={5000} style={[s.editInput, { minHeight: 100 }]} />
+            <Pressable accessibilityRole="button" disabled={editBusy || !editTitle.trim()} onPress={() => void savePostEdit()} style={[s.pickerOption, { backgroundColor: '#ecfdf5' }]}><Text style={s.pickerLabel}>{editBusy ? 'جارٍ الحفظ...' : 'حفظ التعديلات'}</Text></Pressable>
+            <Pressable accessibilityRole="button" disabled={editBusy} onPress={() => setEditorOpen(false)} style={s.pickerOption}><Text style={s.pickerLabel}>إلغاء</Text></Pressable>
+          </View>
+        </View>
+      </Modal>
       <Modal visible={statusPickerOpen} transparent animationType="fade" onRequestClose={() => setStatusPickerOpen(false)}>
         <View style={{ flex: 1, justifyContent: 'center', padding: 24, backgroundColor: 'rgba(15,23,42,0.45)' }}>
           <Pressable style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }} onPress={() => setStatusPickerOpen(false)} accessibilityLabel="إغلاق اختيار الحالة" />
@@ -744,6 +790,12 @@ export default function TwitterInquiryCard({
 }
 
 const s = StyleSheet.create({
+  pickerBackdrop: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, backgroundColor: 'rgba(15,23,42,0.4)' },
+  pickerPanel: { width: '100%', maxWidth: 420, borderRadius: 24, backgroundColor: '#fff', padding: 20, gap: 10 },
+  pickerTitle: { color: '#173c2c', fontSize: 18, fontWeight: '800', textAlign: 'right', marginBottom: 4 },
+  pickerOption: { minHeight: 48, borderRadius: 14, paddingHorizontal: 12, flexDirection: 'row-reverse', alignItems: 'center', gap: 12, backgroundColor: '#f7faf8' },
+  pickerLabel: { flex: 1, textAlign: 'right', color: '#254b39', fontSize: 14, fontWeight: '700' },
+  editInput: { borderWidth: 1, borderColor: '#dbe5df', borderRadius: 12, padding: 12, color: '#173c2c', textAlign: 'right', fontSize: 14 },
   xCard: {
     backgroundColor: '#ffffff',
     borderRadius: 22,
