@@ -90,14 +90,14 @@ export function useHomeFeed({ onLocation }: Options) {
           .select('id', { count: 'exact', head: true })
           .eq('user_id', user.id)
           .is('read_at', null) : Promise.resolve({ count: 0, error: null }),
-        supabase
+        user ? supabase
           .from('stories')
           .select(
             '*, profiles:author_id(id, display_name, username, avatar_url, is_verified, is_geoverified, city, district)',
           )
           .or(`expires_at.gt.${new Date().toISOString()},and(expires_at.is.null,created_at.gte.${new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()})`)
           .order('created_at', { ascending: false })
-          .limit(40),
+          .limit(40) : Promise.resolve({ data: [], error: null }),
         user
           ? supabase.from('questions').select('*').order('created_at', { ascending: false }).limit(limit)
           : supabase.rpc('hayna_guest_questions', { p_city: loc.city, p_district: loc.district, p_limit: limit }),
