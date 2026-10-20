@@ -745,6 +745,56 @@ export default function Request() {
           {/* Title */}
           <Text style={styles.heroTitle}>{request.title}</Text>
 
+          {/* Details & Needs Card */}
+          <View style={{ borderTopWidth: 1, borderTopColor: '#e2e8f0', paddingTop: 13, gap: 10 }}>
+            <View style={styles.cardHeaderRow}>
+              <View style={styles.cardHeaderIconBox}>
+                <HeartHandshake size={18} color="#059669" />
+              </View>
+              <Text style={styles.cardTitle}>تفاصيل الطلب والاحتياج</Text>
+            </View>
+
+            <Text style={styles.cardDesc}>{request.description}</Text>
+
+            {request.notes && (
+              <View style={styles.notesBox}>
+                <Info size={14} color="#64748b" />
+                <Text style={styles.notesText}>{request.notes}</Text>
+              </View>
+            )}
+
+            {/* Compensation / Volunteer Mode */}
+            {request.budget && Number(request.budget) > 0 ? (
+              <View style={styles.budgetBox}>
+                <Banknote size={18} color="#15803d" />
+                <View style={styles.budgetCol}>
+                  <Text style={styles.budgetValue}>المكافأة المقترحة: {request.budget} ر.س</Text>
+                  <Text style={styles.budgetSub}>مكافأة تقديرية اختيارية من صاحب الطلب</Text>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.volunteerBox}>
+                <HeartHandshake size={18} color="#059669" />
+                <View style={styles.volunteerCol}>
+                  <Text style={styles.volunteerValue}>فزعة وتطوع ومساعدة أخوية لوجه الله 🤝</Text>
+                  <Text style={styles.volunteerSub}>خدمة جيرة متبادلة تكسبك دعوة صادقة ونقاط سمعة</Text>
+                </View>
+              </View>
+            )}
+
+            {/* Open Map Link */}
+            <Pressable
+              style={styles.openMapBtn}
+              onPress={() => router.push({ pathname: '/map', params: { district: request.district, city: request.city } })}
+              accessibilityRole="button"
+              accessibilityLabel="عرض موقع الحي على الخريطة"
+            >
+              <MapPin size={15} color="#059669" />
+              <Text style={styles.openMapBtnText}>موقع الحي على الخريطة</Text>
+            </Pressable>
+          </View>
+
+
           {/* Meta Info Row */}
           <View style={styles.metaRow}>
             <View style={styles.metaChip}>
@@ -767,13 +817,6 @@ export default function Request() {
             )}
           </View>
 
-          {/* Privacy Guarantee Note */}
-          <View style={styles.privacyNoteBox}>
-            <Info size={13} color="#047857" />
-            <Text style={styles.privacyNoteText}>
-              الموقع معروض على مستوى الحي فقط لحماية خصوصية الجيران · يتم تبادل الإحداثيات بالخاص بعد قبول الفزعة.
-            </Text>
-          </View>
         </View>
 
         <View style={styles.bodyContainer}>
@@ -852,55 +895,7 @@ export default function Request() {
                 <HeartHandshake size={18} color="#059669" />
               </View>
               <Text style={styles.cardTitle}>تفاصيل الطلب والاحتياج</Text>
-            </View>
-
-            <Text style={styles.cardDesc}>{request.description}</Text>
-
-            {request.notes && (
-              <View style={styles.notesBox}>
-                <Info size={14} color="#64748b" />
-                <Text style={styles.notesText}>{request.notes}</Text>
-              </View>
-            )}
-
-            {/* Compensation / Volunteer Mode */}
-            {request.budget && Number(request.budget) > 0 ? (
-              <View style={styles.budgetBox}>
-                <Banknote size={18} color="#15803d" />
-                <View style={styles.budgetCol}>
-                  <Text style={styles.budgetValue}>المكافأة المقترحة: {request.budget} ر.س</Text>
-                  <Text style={styles.budgetSub}>مكافأة تقديرية اختيارية من صاحب الطلب</Text>
-                </View>
-              </View>
-            ) : (
-              <View style={styles.volunteerBox}>
-                <HeartHandshake size={18} color="#059669" />
-                <View style={styles.volunteerCol}>
-                  <Text style={styles.volunteerValue}>فزعة وتطوع ومساعدة أخوية لوجه الله 🤝</Text>
-                  <Text style={styles.volunteerSub}>خدمة جيرة متبادلة تكسبك دعوة صادقة ونقاط سمعة</Text>
-                </View>
-              </View>
-            )}
-
-            {/* Open Map Link */}
-            <Pressable
-              style={styles.openMapBtn}
-              onPress={() => router.push({ pathname: '/map', params: { district: request.district, city: request.city } })}
-              accessibilityRole="button"
-              accessibilityLabel="عرض موقع الحي على الخريطة"
-            >
-              <MapPin size={15} color="#059669" />
-              <Text style={styles.openMapBtnText}>موقع الحي على الخريطة</Text>
-            </Pressable>
-          </View>
-
-          {/* Owner quick actions */}
-          {isOwner && (
-            <View style={styles.ownerNoticeCard}>
-              <View style={styles.ownerNoticeTop}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.ownerNoticeTitle}>طلبك منشور لجيران الحي</Text>
-                  <Text style={styles.ownerNoticeSub}>شارك الرابط لتصل الفزعة بشكل أسرع.</Text>
+  iceSub}>شارك الرابط لتصل الفزعة بشكل أسرع.</Text>
                 </View>
                 <View style={{ flexDirection: 'row-reverse', gap: 8 }}>
                   <Pressable
