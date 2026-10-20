@@ -181,7 +181,9 @@ export default function AccountCenter() {
 
   useEffect(() => {
     setTab(requestedTab);
-  }, [requestedTab]);
+    const section = Array.isArray(params.section) ? params.section[0] : params.section;
+    if (section === 'identity') setIdentityOpen(true);
+  }, [requestedTab, params.section]);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -293,6 +295,7 @@ export default function AccountCenter() {
 
   const verificationPending = (verification?.status || '').toLowerCase() === 'pending';
   const totalOwned = products.length + services.length + questions.length + requests.length;
+  const IdentityMetaIcon = identityMeta.Icon;
 
   async function saveProfile() {
     if (!userId || !displayName.trim()) return;
@@ -470,7 +473,7 @@ export default function AccountCenter() {
 
   async function saveDndSettings(enabled: boolean, start = dndStart, end = dndEnd) {
     if (!userId) return;
-    const next: DndSettings = { ...dnd, enabled, start, end };
+    const next: DndSettings = { ...dnd, enabled, schedule: enabled ? 'custom' : 'off', start, end };
     const result = await saveDnd(userId, next);
     if (!result.ok) {
       Alert.alert('تعذر الحفظ', result.error);
@@ -725,7 +728,7 @@ export default function AccountCenter() {
                   <Text style={styles.sectionSub}>نوع الحساب والتوثيق منفصلان، ولا تتغير الصفة العامة حتى تعتمدها الإدارة</Text>
                 </View>
                 <View style={[styles.identitySquare, { backgroundColor: identityMeta.softColor }]}>
-                  <identityMeta.Icon size={23} color={identityMeta.color} />
+                  <IdentityMetaIcon size={23} color={identityMeta.color} />
                 </View>
               </View>
 
