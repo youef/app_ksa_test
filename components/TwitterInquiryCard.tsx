@@ -67,6 +67,7 @@ export interface TwitterInquiryCardProps {
   onQuickReply: (id: string, text: string) => Promise<void>;
   onToast: (msg: string) => void;
   onDeleted?: () => void;
+  detailMode?: boolean;
 }
 
 export default function TwitterInquiryCard({
@@ -79,6 +80,7 @@ export default function TwitterInquiryCard({
   onQuickReply,
   onToast,
   onDeleted,
+  detailMode = false,
 }: TwitterInquiryCardProps) {
   const isReq = type === 'request';
   const isAdmin = Boolean(currentUserId && currentUserProfile?.role === 'admin');
@@ -109,15 +111,16 @@ export default function TwitterInquiryCard({
   const [editTitle, setEditTitle] = useState(String(data.title || ''));
   const [editBody, setEditBody] = useState(String(isReq ? data.description || '' : data.body || ''));
   const [editBusy, setEditBusy] = useState(false);
+  const [editNotes, setEditNotes] = useState(String(data.notes || ''));
   const [bookmarked, setBookmarked] = useState(false);
   const [viewsCount, setViewsCount] = useState<number>(() => Number(data.views_count ?? data.views ?? data.view_count ?? 0));
   const [savesCount, setSavesCount] = useState(0);
   const [isPinned, setIsPinned] = useState(Boolean(data.is_pinned));
   const [isFeatured, setIsFeatured] = useState(Boolean(data.is_featured));
-  const [resolutionStatus, setResolutionStatus] = useState(String(data.resolution_status || 'open'));
+  const [resolutionStatus, setResolutionStatus] = useState(String(data.status === 'completed' ? 'helped' : data.status === 'accepted' ? 'accepted' : data.resolution_status || 'open'));
   const [bestAnswerId, setBestAnswerId] = useState<string | null>(data.best_answer_id || null);
   const [statusPickerOpen, setStatusPickerOpen] = useState(false);
-  const statusLabels: Record<string, string> = { open: 'بانتظار المساعدة', found: 'تم العثور على الغرض', helped: 'تمت المساعدة', resolved: 'تم حل المشكلة', not_needed: 'لم أعد بحاجة للمساعدة' };
+  const statusLabels: Record<string, string> = { accepted: 'جارٍ تنفيذ الطلب', open: 'بانتظار المساعدة', found: 'تم العثور على الغرض', helped: 'تمت المساعدة', resolved: 'تم حل المشكلة', not_needed: 'لم أعد بحاجة للمساعدة' };
 
   // Track real view count on mount
   useEffect(() => {
@@ -371,7 +374,7 @@ export default function TwitterInquiryCard({
     if (isOwner || isAdmin) {
       options.push({
         text: 'تعديل المنشور',
-        onPress: () => { setEditTitle(String(data.title || '')); setEditBody(String(isReq ? data.description || '' : data.body || '')); setEditorOpen(true); },
+        onPress: () => { setEditTitle(String(data.title || '')); setEditBody(String(isReq ? data.description || '' : data.body || '')); setEditNotes(String(data.notes || '')); setEditorOpen(true); },
       });
       options.push({ text: 'حذف المنشور', style: 'destructive', onPress: confirmDeletePost });
       options.push({ text: 'تحديث حالة المنشور', onPress: openStatusOptions });
@@ -396,7 +399,7 @@ export default function TwitterInquiryCard({
     if (!currentUserId || (!isOwner && !isAdmin) || !editTitle.trim() || editBusy) return;
     setEditBusy(true);
     try {
-      const changes = { title: editTitle.trim(), [isReq ? 'description' : 'body']: editBody.trim(), updated_at: new Date().toISOString() };
+      const changes = { ...(isReq ? { notes: editNotes.trim() } : {}), title: editTitle.trim(), [isReq ? 'description' : 'body']: editBody.trim(), updated_at: new Date().toISOString() };
       let query = supabase.from(isReq ? 'requests' : 'questions').update(changes).eq('id', data.id);
       if (!isAdmin) query = query.eq(isReq ? 'requester_id' : 'author_id', currentUserId);
       const { data: updated, error } = await query.select('id').maybeSingle();
@@ -482,12 +485,12 @@ export default function TwitterInquiryCard({
       </View>
 
       {/* Main Content Area */}
-      <Pressable onPress={navigateToDetails} style={s.xContentArea} accessibilityRole="button" accessibilityLabel="فتح تفاصيل المنشور">
-        <Text style={[s.xTitle, isEmergency && { color: '#991b1b' }]} numberOfLines={2}>{data.title}</Text>
+      <Pressable onPress={detailMode ? undefined : navigateToDetails} style={s.xContentArea} accessibilityRole={detailMode ? undefined : "button"} accessibilityLabel={detailMode ? undefined : "فتح تفاصيل المنشور"}>
+        <Text style={[s.xTitle, isEmergency && { color: '#991b1b' }]} numberOfLines={detailMode ? undefined : 2}>{data.title}</Text>
         {(data.body || data.description) && (
           <>
-            <Text style={s.xBodyText} numberOfLines={2}>{isReq ? data.description : data.body}</Text>
-            {String(isReq ? data.description : data.body || '').length > 130 && <Text style={s.xReadMore}>عرض المزيد وفتح التفاصيل ←</Text>}
+            <Text style={s.xBodyText} numberOfLines={detailMode ? undefined : 2}>{isReq ? data.description : data.body}</Text>
+            {!detailMode && String(isReq ? data.description : data.body || '').length > 130 && <Text style={s.xReadMore}>عرض المزيد وفتح التفاصيل ←</Text>}
           </>
         )}
         {isPinned && <View style={{ alignSelf: 'flex-start', flexDirection: 'row-reverse', alignItems: 'center', gap: 4, backgroundColor: '#fff7ed', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5, marginTop: 8 }}><Text style={{ color: '#c2410c', fontSize: 11, fontWeight: '800' }}>📌 مثبت في الملف الشخصي</Text></View>}
@@ -513,7 +516,7 @@ export default function TwitterInquiryCard({
       </Pressable>
 
       {/* Interactive Responders Preview (Collapsed Strip) */}
-      {!expanded && answers.length > 0 && (
+      {!detailMode && !expanded && answers.length > 0 && (
         <Pressable style={s.xRespondersPreview} onPress={navigateToDetails} accessibilityRole="button" accessibilityLabel="عرض جميع الردود">
           <View style={s.xRespondersAvatars}>
             {answers.slice(0, 4).map((ans: any, i: number) => {
@@ -556,7 +559,7 @@ export default function TwitterInquiryCard({
 
       {/* Action Bar */}
       <View style={s.xActionBar}>
-        <Pressable style={s.xActionBtn} onPress={navigateToDetails} accessibilityRole="button" accessibilityLabel="فتح الردود في صفحة المنشور">
+        <Pressable style={s.xActionBtn} onPress={detailMode ? undefined : navigateToDetails} accessibilityRole={detailMode ? undefined : "button"} accessibilityLabel={detailMode ? "عدد الردود" : "فتح الردود في صفحة المنشور"}>
           <MessageCircle size={17} color="#64748b" />
           <Text style={s.xActionCounter}>{answersCount}</Text>
         </Pressable>
@@ -763,6 +766,7 @@ export default function TwitterInquiryCard({
             <Text style={s.pickerTitle}>تعديل المنشور</Text>
             <TextInput accessibilityLabel="عنوان المنشور" value={editTitle} onChangeText={setEditTitle} maxLength={200} style={s.editInput} />
             <TextInput accessibilityLabel="نص المنشور" value={editBody} onChangeText={setEditBody} multiline maxLength={5000} style={[s.editInput, { minHeight: 100 }]} />
+            {isReq && <TextInput accessibilityLabel="ملاحظات الطلب" value={editNotes} onChangeText={setEditNotes} multiline maxLength={2000} style={s.editInput} />}
             <Pressable accessibilityRole="button" disabled={editBusy || !editTitle.trim()} onPress={() => void savePostEdit()} style={[s.pickerOption, { backgroundColor: '#ecfdf5' }]}><Text style={s.pickerLabel}>{editBusy ? 'جارٍ الحفظ...' : 'حفظ التعديلات'}</Text></Pressable>
             <Pressable accessibilityRole="button" disabled={editBusy} onPress={() => setEditorOpen(false)} style={s.pickerOption}><Text style={s.pickerLabel}>إلغاء</Text></Pressable>
           </View>
@@ -773,7 +777,7 @@ export default function TwitterInquiryCard({
           <Pressable style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }} onPress={() => setStatusPickerOpen(false)} accessibilityLabel="إغلاق اختيار الحالة" />
           <View style={{ backgroundColor: '#ffffff', borderRadius: 22, padding: 18, gap: 9 }}>
             <Text style={{ color: '#0f172a', fontSize: 16, fontWeight: '900', textAlign: 'right', marginBottom: 4 }}>تحديث حالة المنشور</Text>
-            {Object.entries(statusLabels).map(([value, label]) => (
+            {Object.entries(statusLabels).filter(([value]) => value !== 'accepted').map(([value, label]) => (
               <Pressable key={value} onPress={() => { setStatusPickerOpen(false); void updateResolutionStatus(value); }} style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 13, paddingVertical: 12, borderRadius: 13, backgroundColor: resolutionStatus === value ? '#dcfce7' : '#f8fafc', borderWidth: 1, borderColor: resolutionStatus === value ? '#86efac' : '#e2e8f0' }}>
                 <Text style={{ color: resolutionStatus === value ? '#166534' : '#334155', fontSize: 13, fontWeight: '800', textAlign: 'right' }}>{label}</Text>
                 {resolutionStatus === value && <Check size={16} color="#166534" />}
