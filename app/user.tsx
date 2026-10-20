@@ -44,7 +44,6 @@ import {
 import { supabase } from '@/lib/supabase';
 import { ProfileCustomizationEntry } from '@/components/profile/ProfileCustomizationEntry';
 import { AccountIdentityBadge, AccountIdentityIcon, AccountVerificationBadge, getAccountIdentityMeta } from '@/components/profile/AccountIdentityBadge';
-import { ProfileIdentityCard } from '@/components/profile/ProfileIdentityCard';
 import { C } from '@/lib/ui';
 import { getBlockStatus, setBlock } from '@/lib/chatControls';
 import { isExactDistrictMatching } from '@/lib/locationSync';
@@ -782,19 +781,6 @@ export default function UserProfile() {
             </View>
           </LinearGradient>
 
-          {!anonymous ? (
-            <View style={styles.identityCardWrap}>
-              <ProfileIdentityCard
-                role={profile.role}
-                accountType={profile.account_type}
-                isVerified={Boolean(profile.is_verified)}
-                descriptor={identityDescriptor}
-                owner={false}
-                onManage={own ? () => router.push({ pathname: '/profile', params: { tab: 'profile', section: 'identity' } }) : undefined}
-              />
-            </View>
-          ) : null}
-
           {/* Elevated Stats Bar */}
           {profileCustomization?.show_stats !== false && <View style={[styles.statsCard, { borderColor: `${accentColor}30` }]}>
             <Stat label="السمعة" value={stats.reputation} />
@@ -1326,10 +1312,6 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 6,
     marginTop: 8,
-  },
-  identityCardWrap: {
-    marginTop: 12,
-    marginHorizontal: 4,
   },
   statsCard: {
     marginTop: -16,
