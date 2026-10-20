@@ -11,6 +11,7 @@ import {
   Animated,
 } from 'react-native';
 import { router } from 'expo-router';
+import { requireAccount } from '@/lib/authGate';
 import { supabase } from '@/lib/supabase';
 import { AppHeader } from '@/components/shared/AppHeader';
 import { useBottomNavInset } from '@/lib/bottomNav';
@@ -51,6 +52,12 @@ export default function StoriesScreen() {
 
       const { data: authResult } = await supabase.auth.getUser();
       const activeViewerId = authResult.user?.id || '';
+      if (!activeViewerId) {
+        setStories([]);
+        requireAccount('سجّل الدخول أو أنشئ حساباً لمشاهدة يوميات أهل الحي.');
+        router.replace('/auth');
+        return;
+      }
       let city = '';
       let district = '';
       let followedIds: string[] = [];
