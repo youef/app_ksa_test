@@ -22,6 +22,7 @@ import { savePermanentMyLocation, getLockedCity, type LockedCity } from '@/lib/l
 import { getCurrentDeviceLocation, reverseGeocodeDeviceLocation } from '@/lib/deviceLocation';
 import { NeighborBadgesCard } from '@/components/profile/NeighborBadgesCard';
 import { ProfileCustomizationEntry } from '@/components/profile/ProfileCustomizationEntry';
+import { AccountIdentityBadge } from '@/components/profile/AccountIdentityBadge';
 import {
   Camera,
   MapPin,
@@ -104,6 +105,7 @@ export default function Profile() {
   const [followsLoading, setFollowsLoading] = useState(false);
 
   const [reputationPoints, setReputationPoints] = useState(15);
+  const [latestVerificationRequest, setLatestVerificationRequest] = useState<any | null>(null);
 
   const loadProfile = useCallback(async () => {
     const { data: authData } = await supabase.auth.getUser();
@@ -113,7 +115,7 @@ export default function Profile() {
 
     const r = await supabase.from('profiles').select('*').eq('id', uid).single();
 
-    const [qCount, aCount, followersCount, followingCount, savedRes, postsRes, repliesRes, repRes] = await Promise.all([
+    const [qCount, aCount, followersCount, followingCount, savedRes, postsRes, repliesRes, repRes, verificationRes] = await Promise.all([
       supabase.from('questions').select('id', { count: 'exact', head: true }).eq('author_id', uid),
       supabase.from('answers').select('id', { count: 'exact', head: true }).eq('author_id', uid),
       supabase.from('follows').select('id', { count: 'exact', head: true }).eq('following_id', uid),
@@ -122,9 +124,11 @@ export default function Profile() {
       supabase.from('questions').select('id, title, body, created_at, city, district').eq('author_id', uid).order('created_at', { ascending: false }).limit(50),
       supabase.from('answers').select('id, body, created_at, question_id, questions(title)').eq('author_id', uid).order('created_at', { ascending: false }).limit(50),
       supabase.from('reputation').select('points').eq('user_id', uid).maybeSingle(),
+      supabase.from('verification_requests').select('id,status,subject,created_at,reviewed_at').eq('user_id', uid).order('created_at', { ascending: false }).limit(1).maybeSingle(),
     ]);
 
     setReputationPoints(repRes.data?.points || 15);
+    setLatestVerificationRequest(verificationRes.data || null);
 
     setStats({
       questions: qCount.count || 0,
@@ -408,6 +412,21 @@ export default function Profile() {
     } catch {}
   };
 
+  const verificationState = String(latestVerificationRequest?.status || '').toLowerCase();
+  const verificationPending = verificationState === 'pending';
+  const verificationRejected = verificationState === 'rejected';
+  const verificationStatusText = verificationPending
+    ? p.is_verified
+      ? 'الصفة الحالية موثّقة، وطلب تغيير الصفة قيد مراجعة الإدارة'
+      : 'طلب التوثيق قيد مراجعة الإدارة'
+    : verificationRejected
+      ? p.is_verified
+        ? 'الصفة الحالية ما زالت موثّقة، وآخر طلب تغيير لم يُعتمد'
+        : 'طلب التوثيق يحتاج إلى تعديل وإعادة تقديم'
+      : p.is_verified
+        ? 'موثّق رسميًا'
+        : 'يمكنك طلب التوثيق أو تغيير صفة الحساب';
+
   return (
     <View style={styles.container}>
       <AppHeader
@@ -501,7 +520,12 @@ export default function Profile() {
                   <Text style={styles.displayNameText} numberOfLines={1}>
                     {personalName || 'أضف اسمك الكريم'}
                   </Text>
-                  {p.is_verified && <BadgeCheck size={18} color="#128c7e" />}
+                  <AccountIdentityBadge
+                    role={p.role}
+                    accountType={p.account_type}
+                    isVerified={Boolean(p.is_verified)}
+                    compact
+                  />
                 </View>
 
                 <Text style={styles.usernameText}>@{p.username || 'username'}</Text>
@@ -569,6 +593,41 @@ export default function Profile() {
               )}
             </View>
           </View>
+        </View>
+
+        <View style={styles.accountIdentityOuter}>
+          <Pressable style={styles.accountIdentityCard} onPress={() => router.push('/account-type')}>
+            <View style={styles.accountIdentityTopRow}>
+              <View style={styles.accountIdentityTextCol}>
+                <Text style={styles.accountIdentityTitle}>هوية الحساب والتوثيق</Text>
+                <Text style={styles.accountIdentitySub}>{verificationStatusText}</Text>
+              </View>
+              <AccountIdentityBadge
+                role={p.role}
+                accountType={p.account_type}
+                isVerified={Boolean(p.is_verified)}
+              />
+            </View>
+            <View style={styles.accountIdentityBottomRow}>
+              <View style={styles.accountIdentitySecurity}>
+                <ShieldCheck size={14} color={verificationPending ? '#B45309' : p.is_verified ? '#047857' : '#64748B'} />
+                <Text style={[
+                  styles.accountIdentitySecurityText,
+                  verificationPending ? styles.accountIdentityPendingText : p.is_verified ? styles.accountIdentityVerifiedText : null,
+                ]}>
+                  {verificationPending
+                    ? 'بانتظار قرار الإدارة على طلب تغيير الصفة'
+                    : p.is_verified
+                      ? 'تمت مراجعة الصفة ومنح التوثيق'
+                      : 'مراجعة يدوية قبل اعتماد الصفة'}
+                </Text>
+              </View>
+              <View style={styles.accountIdentityAction}>
+                <Text style={styles.accountIdentityActionText}>{p.is_verified ? 'إدارة الصفة' : 'التوثيق'}</Text>
+                <ChevronLeft size={15} color="#047857" />
+              </View>
+            </View>
+          </Pressable>
         </View>
 
         {/* ======================================================== */}
@@ -1780,4 +1839,87 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: '800',
   },
+
+  accountIdentityOuter: {
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    maxWidth: 960,
+    width: '100%',
+    alignSelf: 'center',
+  },
+  accountIdentityCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#DDE9E3',
+    gap: 12,
+  },
+  accountIdentityTopRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  accountIdentityTextCol: {
+    flex: 1,
+    alignItems: 'flex-end',
+    gap: 3,
+  },
+  accountIdentityTitle: {
+    color: '#17242C',
+    fontSize: 14,
+    fontWeight: '900',
+    textAlign: 'right',
+  },
+  accountIdentitySub: {
+    color: '#64748B',
+    fontSize: 10.5,
+    lineHeight: 16,
+    fontWeight: '700',
+    textAlign: 'right',
+  },
+  accountIdentityBottomRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#EEF3F0',
+    paddingTop: 10,
+  },
+  accountIdentitySecurity: {
+    flex: 1,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 6,
+  },
+  accountIdentitySecurityText: {
+    flex: 1,
+    color: '#64748B',
+    fontSize: 10,
+    fontWeight: '800',
+    textAlign: 'right',
+  },
+  accountIdentityVerifiedText: {
+    color: '#047857',
+  },
+  accountIdentityPendingText: {
+    color: '#B45309',
+  },
+  accountIdentityAction: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ECFDF5',
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+  },
+  accountIdentityActionText: {
+    color: '#047857',
+    fontSize: 10.5,
+    fontWeight: '900',
+  },
+
 });

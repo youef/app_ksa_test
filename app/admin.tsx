@@ -11,6 +11,7 @@ import {
   Platform,
   TextInput,
   Image,
+  Linking,
   Animated,
   useWindowDimensions,
 } from 'react-native';
@@ -95,6 +96,16 @@ import {
   AdminStats,
 } from '@/components/admin/adminTypes';
 import { adminStyles as styles, ADMIN_COLORS as C, ADMIN_GRADIENTS } from '@/components/admin/adminStyles';
+
+function verificationAccountLabel(value?: string | null): string {
+  switch (value) {
+    case 'merchant': return 'مؤسسة أو نشاط تجاري';
+    case 'freelance': return 'عمل حر';
+    case 'provider': return 'مقدم خدمة';
+    case 'idea': return 'مبادرة أو مشروع ناشئ';
+    default: return 'حساب فردي';
+  }
+}
 
 function accountAgeLabel(iso?: string | null): string {
   if (!iso) return '—';
@@ -793,6 +804,27 @@ export default function AdminScreen() {
     }
   };
 
+  const openVerificationAttachment = async (request: AdminVerificationRequest) => {
+    const attachment = request.attachment_url || request.document_url || null;
+    if (!attachment) {
+      Alert.alert('لا يوجد مستند', 'لم يرفق صاحب الطلب مستندًا مع هذا الطلب.');
+      return;
+    }
+
+    try {
+      if (/^https?:\/\//i.test(attachment)) {
+        await Linking.openURL(attachment);
+        return;
+      }
+      const signed = await supabase.storage.from('verification-documents').createSignedUrl(attachment, 600);
+      if (signed.error) throw signed.error;
+      if (!signed.data?.signedUrl) throw new Error('تعذر إنشاء رابط آمن للمستند.');
+      await Linking.openURL(signed.data.signedUrl);
+    } catch (error: any) {
+      Alert.alert('تعذر فتح المستند', error?.message || 'حاول مرة أخرى.');
+    }
+  };
+
   // Action 6: Verification Request Decision (Approve / Reject)
   const handleVerificationDecision = async (
     reqId: string,
@@ -806,52 +838,42 @@ export default function AdminScreen() {
 
       const { data: verificationRequest, error: verificationLoadError } = await supabase
         .from('verification_requests')
-        .select('subject,note')
+        .select('subject,note,attachment_url,document_url,verification_type')
         .eq('id', reqId)
         .maybeSingle();
       if (verificationLoadError) throw verificationLoadError;
+      if (!verificationRequest) throw new Error('طلب التوثيق غير موجود.');
 
-      const { error: reqErr } = await supabase
-        .from('verification_requests')
-        .update({
-          status: action,
-          reviewed_by: u.user.id,
-          reviewed_at: new Date().toISOString(),
-        })
-        .eq('id', reqId);
+      const { data: decision, error: decisionError } = await supabase.rpc('admin_review_verification', {
+        p_request_id: reqId,
+        p_status: action,
+      });
+      if (decisionError) throw decisionError;
 
-      if (reqErr) throw reqErr;
+      const decisionData = decision as any;
+      const requestedLabel = verificationAccountLabel(
+        decisionData?.requested_account_type || verificationRequest.subject,
+      );
 
       if (action === 'approved') {
-        const requestedType = ['merchant', 'freelance', 'provider'].includes(verificationRequest?.subject || '')
-          ? verificationRequest?.subject
-          : null;
-        const profilePatch: any = {
-          is_verified: true,
-          verification_status: 'verified',
-          updated_at: new Date().toISOString(),
-        };
-        if (requestedType) {
-          profilePatch.account_type = requestedType;
-          profilePatch.freelance_trade = verificationRequest?.note || null;
-        }
-
-        const { error: profErr } = await supabase
-          .from('profiles')
-          .update(profilePatch)
-          .eq('id', userId);
-
-        if (profErr) throw profErr;
-
-        setUsersList(prev => prev.map(usr => (usr.id === userId ? { ...usr, is_verified: true, verification_status: 'verified' } : usr)));
+        setUsersList(prev => prev.map(usr => (
+          usr.id === userId
+            ? {
+                ...usr,
+                is_verified: Boolean(decisionData?.is_verified),
+                verification_status: decisionData?.verification_status || 'verified',
+                account_type: decisionData?.account_type || usr.account_type,
+                is_verified_merchant: Boolean(decisionData?.is_verified_merchant),
+              }
+            : usr
+        )));
       }
 
-      // Dispatch in-app notification
-      const notifTitle = action === 'approved' ? 'تهانينا! تم اعتماد توثيق حسابك 🎉' : 'تحديث بشأن طلب التوثيق';
+      const notifTitle = action === 'approved' ? 'تم اعتماد توثيق حسابك' : 'تحديث بشأن طلب التوثيق';
       const notifBody =
         action === 'approved'
-          ? 'تم اعتماد هويتك في حيّنا ومنحك الشارة الزرقاء الرسمية.'
-          : 'تمت مراجعة طلب التوثيق الخاص بك، يرجى استيفاء البيانات والتقديم مجدداً.';
+          ? 'وافقت الإدارة على طلب ' + requestedLabel + ' وتم تحديث صفة الحساب وشارة التوثيق تلقائيًا.'
+          : 'تمت مراجعة طلب ' + requestedLabel + ' ولم يعتمد حاليًا. راجع البيانات ثم يمكنك التقديم مجددًا.';
 
       await supabase.from('notifications').insert({
         user_id: userId,
@@ -861,22 +883,38 @@ export default function AdminScreen() {
         data: { actor_id: u.user.id, request_id: reqId, status: action },
       });
 
-      // Dispatch push notification
       await sendAdminBroadcastPush([userId], {
         title: notifTitle,
         body: notifBody,
         data: { type: 'verification', status: action },
       });
 
-      await recordAuditLog(
-        action === 'approved' ? 'اعتماد طلب توثيق رسمي' : 'رفض طلب توثيق رسمي',
-        userName,
-        'verification',
-        reqId
-      );
+      const privateAttachment = verificationRequest.attachment_url || null;
+      if (privateAttachment && !/^https?:\/\//i.test(privateAttachment)) {
+        const cleanup = await supabase.storage.from('verification-documents').remove([privateAttachment]);
+        if (!cleanup.error) {
+          await supabase.from('verification_requests').update({ attachment_url: null }).eq('id', reqId);
+        } else {
+          console.warn('Could not remove reviewed verification evidence:', cleanup.error.message);
+        }
+      }
 
-      setVerifications(prev => prev.map(v => (v.id === reqId ? { ...v, status: action } : v)));
-      showToast(action === 'approved' ? 'تم اعتماد التوثيق ومنح الشارة الزرقاء ✓' : 'تم رفض طلب التوثيق');
+      setVerifications(prev => prev.map(v => (
+        v.id === reqId
+          ? {
+              ...v,
+              status: action,
+              reviewed_by: decisionData?.reviewed_by || u.user?.id || null,
+              reviewed_at: decisionData?.reviewed_at || new Date().toISOString(),
+              attachment_url:
+                privateAttachment && !/^https?:\/\//i.test(privateAttachment)
+                  ? null
+                  : v.attachment_url,
+            }
+          : v
+      )));
+
+      showToast(action === 'approved' ? 'تم اعتماد الصفة والتوثيق الرسمي' : 'تم رفض طلب التوثيق');
     } catch (e: any) {
       Alert.alert('خطأ', e?.message || 'تعذر البت في طلب التوثيق');
     }
@@ -1927,10 +1965,28 @@ export default function AdminScreen() {
                       </View>
                     </View>
 
+                    <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 4 }}>
+                      <View style={{ flex: 1, alignItems: 'flex-end', gap: 3 }}>
+                        <Text style={{ color: '#64748B', fontSize: 10, fontWeight: '800' }}>نوع الطلب</Text>
+                        <Text style={{ color: '#0F172A', fontSize: 12.5, fontWeight: '900', textAlign: 'right' }}>
+                          {verificationAccountLabel(v.subject)}
+                        </Text>
+                      </View>
+                      {(v.attachment_url || v.document_url) ? (
+                        <Pressable
+                          onPress={() => void openVerificationAttachment(v)}
+                          style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6, backgroundColor: '#ECFDF5', borderRadius: 12, paddingHorizontal: 11, paddingVertical: 8, borderWidth: 1, borderColor: '#D1FAE5' }}
+                        >
+                          <Eye size={15} color="#047857" />
+                          <Text style={{ color: '#047857', fontSize: 10.5, fontWeight: '900' }}>عرض المستند الخاص</Text>
+                        </Pressable>
+                      ) : null}
+                    </View>
+
                     {v.note ? (
                       <View style={styles.dossierNoteBox}>
-                        <Text style={styles.dossierNoteTitle}>ملاحظة المتقدم للتوثيق:</Text>
-                        <Text style={styles.dossierNoteText}>"{v.note}"</Text>
+                        <Text style={styles.dossierNoteTitle}>بيانات المتقدم:</Text>
+                        <Text style={styles.dossierNoteText}>{v.note}</Text>
                       </View>
                     ) : null}
 
@@ -1958,7 +2014,7 @@ export default function AdminScreen() {
                           onPress={() => handleVerificationDecision(v.id, v.user_id, 'approved', u.display_name || u.username || 'مواطن')}
                         >
                           <Check size={16} color="#FFFFFF" />
-                          <Text style={styles.btnApproveVerifText}>اعتماد ومنح الشارة الزرقاء ✓</Text>
+                          <Text style={styles.btnApproveVerifText}>اعتماد الصفة والتوثيق</Text>
                         </Pressable>
 
                         <Pressable
