@@ -29,9 +29,9 @@ const TABS = [
 
 const ROUTE_PARENT: Array<[string, string]> = [
   ['/question', '/home'], ['/questions', '/home'], ['/create-story', '/home'],
-  ['/story', '/home'], ['/user', '/more'], ['/settings', '/more'],
-  ['/account-type', '/more'], ['/market', '/search'], ['/service', '/search'],
-  ['/new-service', '/search'], ['/directory', '/search'], ['/business', '/search'],
+  ['/story', '/home'], ['/user', '/more'], ['/settings', '/profile'],
+  ['/account-type', '/profile'], ['/profile-customization', '/profile'], ['/market', '/search'], ['/service', '/search'],
+  ['/new-service', '/profile'], ['/new-listing', '/profile'], ['/directory', '/search'], ['/business', '/search'],
   ['/requests', '/home'], ['/conversation', '/messages'], ['/notifications', '/more'],
 ];
 
