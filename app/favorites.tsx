@@ -107,7 +107,7 @@ export default function FavoritesScreen() {
               : type === 'question' || type === 'post'
               ? { pathname: '/question', params: { id: row.id } }
               : type === 'store' || type === 'business'
-              ? { pathname: '/market', params: { section: 'businesses' } }
+              ? { pathname: '/market', params: { section: 'businesses', businessId: row.id } }
               : { pathname: '/service', params: { id: row.id } };
             details.set(type + ':' + row.id, {
               title, body, city: row.city || row.profiles?.city || '', district: row.district || row.profiles?.district || '',
