@@ -12,6 +12,19 @@ import {
 import { router } from 'expo-router';
 import {
   Flame,
+  LocateFixed,
+  Coffee,
+  Pill,
+  ShoppingCart,
+  Shirt,
+  Scissors,
+  Wrench,
+  Utensils,
+  WashingMachine,
+  Croissant,
+  SlidersHorizontal,
+  ChevronDown,
+  ChevronUp,
   Globe,
   Layers,
   MapPin as MapPinIcon,
@@ -23,6 +36,7 @@ import {
   X,
 } from 'lucide-react-native';
 
+import { mapSymbolSvg } from '@/lib/mapSymbols';
 import { C } from '@/lib/ui';
 import { AppHeader } from '@/components/shared/AppHeader';
 import { supabase } from '@/lib/supabase';
@@ -64,6 +78,8 @@ const MAP_STYLES: any[] = [
   { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#f1f5f9' }] },
   { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#dbeafe' }] },
 ];
+
+const categoryIcons: Record<string, typeof Store> = { grocery: ShoppingCart, pharmacy: Pill, clothing: Shirt, salon: Scissors, hardware: Wrench, cafe: Coffee, restaurant: Utensils, laundry: WashingMachine, bakery: Croissant, market: Store };
 
 type KindFilter = MapPinKind | 'all';
 type MapEngine = 'leaflet' | 'google';
@@ -139,7 +155,10 @@ function buildPinInfoWindow(pin: MapPin, onOpen: () => void, onClose: () => void
     'font-family:inherit;min-width:230px;max-width:280px;padding:2px 4px;direction:rtl;';
 
   const tag = document.createElement('div');
-  tag.textContent = `${kind.emoji} ${kind.short}`;
+  tag.innerHTML = mapSymbolSvg(pin.kind, kind.color);
+  tag.appendChild(document.createTextNode(' ' + kind.short));
+  tag.style.display = 'inline-flex';
+  tag.style.alignItems = 'center';
   tag.style.cssText = `display:inline-block;background:${kind.color}1a;color:${kind.color};font-weight:800;font-size:11px;padding:3px 9px;border-radius:999px;margin-bottom:6px;`;
   wrap.appendChild(tag);
 
@@ -150,7 +169,7 @@ function buildPinInfoWindow(pin: MapPin, onOpen: () => void, onClose: () => void
   wrap.appendChild(title);
 
   const area = document.createElement('div');
-  area.textContent = `📍 ${pin.area}`;
+  area.textContent = pin.area;
   area.style.cssText = 'font-size:12px;font-weight:700;color:#059669;';
   wrap.appendChild(area);
 
@@ -278,7 +297,7 @@ function buildPlaceInfoWindow(place: NearbyPlace, onClose: () => void) {
 
   if (place.hoursText) {
     const hours = document.createElement('div');
-    hours.textContent = `🕒 ${place.hoursText}`;
+    hours.textContent = place.hoursText;
     hours.style.cssText = 'font-size:11px;color:#334155;font-weight:700;margin-top:6px;';
     wrap.appendChild(hours);
   }
@@ -340,6 +359,8 @@ export default function WebMap() {
   const [places, setPlaces] = useState<NearbyPlace[]>([]);
   const [placeCategory, setPlaceCategory] = useState<string>(ALL_PLACES_KEY);
   const [placesLoading, setPlacesLoading] = useState(false);
+  const [categoriesOpen, setCategoriesOpen] = useState(false);
+  const searchSequence = useRef(0);
   const [sheetOpen, setSheetOpen] = useState(false);
 
   useEffect(() => {
@@ -406,7 +427,7 @@ export default function WebMap() {
     // Handle Google auth failures gracefully
     if (typeof window !== 'undefined') {
       (window as any).gm_authFailure = () => {
-        setMapNotice('تعذّر تفعيل خرائط Google (تحتاج تفعيل Maps API والفوترة في Google Cloud). تم التبديل تلقائياً لخريطة حيّنا المباشرة.');
+        setMapNotice('تعذر تحميل الخريطة البديلة. تم استعادة الخريطة الأساسية.');
         setEngine('leaflet');
       };
     }
@@ -510,7 +531,7 @@ export default function WebMap() {
         const kindMeta = MAP_PIN_KINDS[pin.kind];
         const icon = L.divIcon({
           className: 'hayna-custom-pin',
-          html: pinElement(kindMeta.color, kindMeta.emoji, pin.urgent).outerHTML,
+          html: pinElement(kindMeta.color, pin.kind, pin.urgent).outerHTML,
           iconSize: [40, 52],
           iconAnchor: [20, 50],
           popupAnchor: [0, -45],
@@ -543,7 +564,7 @@ export default function WebMap() {
           position: { lat: pin.lat, lng: pin.lng },
           title: pin.title,
           icon: {
-            url: pinSvg(kindMeta.color, kindMeta.emoji),
+            url: pinSvg(kindMeta.color, pin.kind),
             scaledSize: new api.Size(38, 50),
             anchor: new api.Point(19, 48),
           },
@@ -577,7 +598,7 @@ export default function WebMap() {
       places.forEach((place) => {
         const icon = L.divIcon({
           className: 'hayna-custom-place',
-          html: pinElement('#0F766E', '🏬', false).outerHTML,
+          html: pinElement('#0F766E', 'business', false).outerHTML,
           iconSize: [40, 52],
           iconAnchor: [20, 50],
           popupAnchor: [0, -45],
@@ -604,7 +625,7 @@ export default function WebMap() {
           position: { lat: place.lat, lng: place.lng },
           title: place.name,
           icon: {
-            url: pinSvg('#0F766E', '🏬'),
+            url: pinSvg('#0F766E', 'business'),
             scaledSize: new api.Size(38, 50),
             anchor: new api.Point(19, 48),
           },
@@ -626,41 +647,37 @@ export default function WebMap() {
   // ---------------------------------------------------------------- Nearby Places Search
   const runPlaceSearch = useCallback(
     async (nextCategory: string, nextQuery: string) => {
+      const sequence = ++searchSequence.current;
       let origin: { latitude: number; longitude: number };
       const active = await getActiveLocation();
       if (isAllKingdom(active.city)) return;
       const center = findPlaceCenter(active.city);
-      if (center) {
-        origin = { latitude: center.lat, longitude: center.lng };
-      } else if (myLocation) {
+      if (myLocation) {
         origin = myLocation;
+      } else if (center) {
+        origin = { latitude: center.lat, longitude: center.lng };
       } else {
         const device = await getCurrentDeviceLocation();
-        origin = device ?? { latitude: KSA_CENTER.lat, longitude: KSA_CENTER.lng };
+        if (!device) { setMapNotice('حدد مدينتك أو اسمح بالوصول إلى موقعك لعرض أماكن قريبة.'); return; }
+        origin = device;
         setMyLocation(origin);
       }
 
       setPlacesLoading(true);
-      setSheetOpen(true);
+      try {
       const results = await searchNearbyPlaces({
         lat: origin.latitude,
         lng: origin.longitude,
         category: nextCategory === ALL_PLACES_KEY ? null : nextCategory,
         text: nextQuery,
       });
-      setPlaces(results);
-      setPlacesLoading(false);
+      if (sequence === searchSequence.current) setPlaces(results);
+      } catch { if (sequence === searchSequence.current) setMapNotice('تعذر تحميل الأماكن. حاول مجددًا.'); }
+      finally { if (sequence === searchSequence.current) setPlacesLoading(false); }
     },
     [myLocation],
   );
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (places.length || placesLoading) return;
-      void runPlaceSearch(placeCategory, query);
-    }, 600);
-    return () => clearTimeout(timer);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---------------------------------------------------------------- Actions
   const focusCity = useCallback(
@@ -695,7 +712,7 @@ export default function WebMap() {
     setLocating(true);
     const location = await getCurrentDeviceLocation();
     setLocating(false);
-    if (!location) return;
+    if (!location) { setMapNotice('اسمح بالوصول إلى موقعك ثم أعد المحاولة.'); return; }
     setMyLocation(location);
 
     if (engine === 'leaflet' && leafletInstanceRef.current) {
@@ -705,7 +722,7 @@ export default function WebMap() {
       }
       const myIcon = L.divIcon({
         className: 'hayna-my-pin',
-        html: pinElement('#2563EB', '📍', true).outerHTML,
+        html: pinElement('#2563EB', 'location', true).outerHTML,
         iconSize: [40, 52],
         iconAnchor: [20, 50],
       });
@@ -714,7 +731,7 @@ export default function WebMap() {
       );
       const active = await getActiveLocation();
       const center = findPlaceCenter(active.city);
-      leafletInstanceRef.current.flyTo(center ? [center.lat, center.lng] : [location.latitude, location.longitude], center ? 11 : 6, { duration: 1.2 });
+      leafletInstanceRef.current.flyTo([location.latitude, location.longitude], 16, { duration: 1.2 });
     } else if (googleMapRef.current && googleApiRef.current) {
       if (googleMyMarkerRef.current) {
         googleMyMarkerRef.current.setMap(null);
@@ -724,18 +741,17 @@ export default function WebMap() {
         position: { lat: location.latitude, lng: location.longitude },
         title: 'موقعي',
         icon: {
-          url: pinSvg('#2563EB', '📍'),
+          url: pinSvg('#2563EB', 'location'),
           scaledSize: new googleApiRef.current.Size(38, 50),
           anchor: new googleApiRef.current.Point(19, 48),
         },
       });
       const active = await getActiveLocation();
       const center = findPlaceCenter(active.city);
-      googleMapRef.current.panTo(center ? { lat: center.lat, lng: center.lng } : KSA_CENTER);
-      googleMapRef.current.setZoom(center ? 11 : 6);
+      googleMapRef.current.panTo({lat:location.latitude,lng:location.longitude});
+      googleMapRef.current.setZoom(16);
     }
 
-    void runPlaceSearch(placeCategory, query);
   }, [engine, placeCategory, query, runPlaceSearch]);
 
   const focusPlace = useCallback(
@@ -768,6 +784,7 @@ export default function WebMap() {
 
   const placeRow = (place: NearbyPlace) => {
     const open = place.openNow;
+    const CategoryIcon = categoryIcons[place.categoryKey] || Store;
     return (
       <Pressable
         key={place.id}
@@ -775,9 +792,7 @@ export default function WebMap() {
         style={styles.placeRow}
       >
         <View style={styles.placeBadge}>
-          <Text style={{ fontSize: 17 }}>
-            {PLACE_CATEGORIES.find((c) => c.key === place.categoryKey)?.emoji ?? '🏬'}
-          </Text>
+<CategoryIcon size={20} color={C.accent} />
         </View>
         <View style={styles.placeBody}>
           <Text style={styles.placeName} numberOfLines={1}>
@@ -838,13 +853,8 @@ export default function WebMap() {
         <Text style={styles.sheetTitle}>
           {placesLoading ? 'جارٍ البحث عن المحلات القريبة…' : `أقرب المحلات (${places.length})`}
         </Text>
-        {placesLoading ? (
-          <ActivityIndicator size="small" color={C.accent} />
-        ) : (
-          <Pressable onPress={() => setSheetOpen(false)} hitSlop={8}>
-            <X size={16} color={C.muted} />
-          </Pressable>
-        )}
+        {placesLoading ? <ActivityIndicator size="small" color={C.accent} /> : null}
+        <Pressable accessibilityLabel="إغلاق أقرب المحلات" onPress={() => setSheetOpen(false)} hitSlop={8}><X size={20} color={C.muted} /></Pressable>
       </View>
       <ScrollView
         style={styles.sheetScroll}
@@ -866,8 +876,8 @@ export default function WebMap() {
       {/* 1. FIXED APP HEADER */}
       <AppHeader
         variant="sub"
-        title="خريطة حيّنا 🗺️"
-        subtitle={`${visiblePins.length} نشاط · ${places.length} محل قريب`}
+        title="خريطة الحي"
+        subtitle={city || 'استكشف ما حولك'}
         fallbackRoute="/home"
         rightAction={
           <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
@@ -876,17 +886,18 @@ export default function WebMap() {
                 setMapNotice(null);
                 setEngine((prev) => (prev === 'leaflet' ? 'google' : 'leaflet'));
               }}
+              accessibilityLabel="تبديل الخريطة"
               style={[styles.engineBtn, engine === 'google' && styles.engineBtnGoogle]}
             >
               {engine === 'leaflet' ? (
                 <>
                   <Layers size={13} color="#059669" />
-                  <Text style={styles.engineBtnText}>خريطة حيّنا</Text>
+
                 </>
               ) : (
                 <>
                   <Globe size={13} color="#2563eb" />
-                  <Text style={[styles.engineBtnText, { color: '#2563eb' }]}>Google</Text>
+
                 </>
               )}
             </Pressable>
@@ -920,7 +931,7 @@ export default function WebMap() {
             value={query}
             onChangeText={setQuery}
             onSubmitEditing={() => void runPlaceSearch(placeCategory, query)}
-            placeholder="ابحث في الخريطة عن بقالة، صيدلية، سباك..."
+            placeholder="ابحث عن مكان أو خدمة"
             placeholderTextColor="#94a3b8"
             style={styles.floatingSearchInput}
             returnKeyType="search"
@@ -932,8 +943,10 @@ export default function WebMap() {
           ) : null}
         </View>
 
-        {/* Floating Google Maps Category Chips */}
-        <ScrollView
+        <Pressable accessibilityRole="button" accessibilityState={{ expanded: categoriesOpen }} onPress={() => setCategoriesOpen(v => !v)} style={styles.filterToggle}>
+          <SlidersHorizontal size={17} color={C.accent} /><Text style={styles.floatingChipText}>فئات الأماكن</Text>{categoriesOpen ? <ChevronUp size={16} color={C.muted}/> : <ChevronDown size={16} color={C.muted}/>}
+        </Pressable>
+        {categoriesOpen ? <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.floatingChipsScroll}
@@ -955,10 +968,10 @@ export default function WebMap() {
                 placeCategory === ALL_PLACES_KEY && styles.floatingChipTextActive,
               ]}
             >
-              🌟 الكل ({places.length})
+              كل الأماكن
             </Text>
           </Pressable>
-          {PLACE_CATEGORIES.map((category) => (
+          {PLACE_CATEGORIES.map((category) => { const CategoryIcon = categoryIcons[category.key] || Store; return (
             <Pressable
               key={category.key}
               onPress={() => {
@@ -970,17 +983,18 @@ export default function WebMap() {
                 placeCategory === category.key && styles.floatingChipActive,
               ]}
             >
+              <CategoryIcon size={16} color={placeCategory === category.key ? '#fff' : C.accent} />
               <Text
                 style={[
                   styles.floatingChipText,
                   placeCategory === category.key && styles.floatingChipTextActive,
                 ]}
               >
-                {category.emoji} {category.label}
+                {category.label}
               </Text>
             </Pressable>
-          ))}
-        </ScrollView>
+          ); })}
+        </ScrollView> : null}
       </View>
 
       {/* 4. FLOATING GOOGLE MAPS ACTION BUTTONS (BOTTOM-RIGHT FABs) */}
@@ -991,7 +1005,7 @@ export default function WebMap() {
           accessibilityRole="button"
           accessibilityLabel="تحديد موقعي"
         >
-          <Navigation size={18} color={locating ? '#94a3b8' : '#059669'} />
+          <LocateFixed size={20} color={locating ? '#94a3b8' : '#059669'} />
         </Pressable>
         <Pressable
           onPress={() => setHeatOn((v) => !v)}
@@ -1025,12 +1039,12 @@ export default function WebMap() {
       {!sheetOpen && (
         <Pressable
           style={styles.openSheetBtn}
-          onPress={() => setSheetOpen(true)}
+          onPress={() => { setSheetOpen(true); void runPlaceSearch(placeCategory, query); }}
           accessibilityRole="button"
         >
           <Store size={17} color="#fff" />
           <Text style={styles.openSheetBtnText}>
-            أقرب المحلات ({places.length})
+            أقرب المحلات
           </Text>
         </Pressable>
       )}
@@ -1038,7 +1052,7 @@ export default function WebMap() {
       {sheetOpen ? placesSheet : null}
 
       <View style={styles.legend}>
-        <Text style={styles.legendText}>📍 نطاق الحي فقط — الموقع الدقيق بالخاص</Text>
+        <Text style={styles.legendText}>مواقع المنشورات تقريبية لحماية الخصوصية</Text>
       </View>
     </View>
   );
@@ -1095,7 +1109,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     paddingVertical: 2,
   },
+  filterToggle: { alignSelf: 'flex-end', flexDirection: 'row-reverse', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: '#e2e8f0' },
   floatingChip: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 6,
     paddingHorizontal: 13,
     paddingVertical: 7,
     borderRadius: 20,

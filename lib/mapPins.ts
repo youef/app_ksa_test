@@ -168,6 +168,7 @@ export function resolvePinPosition(
     }
   }
 
+  if (!blur) return null; // Public destinations require recorded coordinates, never a scattered city centre.
   const center = findPlaceCenter(row.city, row.district);
   if (!center) return null;
   const spread = normalizeSaudiLocationName(row.district || '') ? DISTRICT_SPREAD : CITY_SPREAD;
@@ -211,7 +212,7 @@ async function safeRows(
 ): Promise<any[]> {
   try {
     const result = await build();
-    return result?.data ?? fallback;
+    return (result?.data ?? fallback).filter((row: any) => !/بيانات تجريبية|متجر محلي تجريبي|خدمة تجريبية|شبه واقعية|synthetic|mock data|demo data/i.test(String(row.description || '') + ' ' + String(row.body || '')));
   } catch {
     return fallback;
   }
@@ -427,6 +428,8 @@ export async function loadMapPins(limit = 220): Promise<MapPin[]> {
     const position = resolvePinPosition(
       {
         id: `service-${row.id}`,
+        lat: row.details?.latitude,
+        lng: row.details?.longitude,
         city: row.city,
         district: row.district,
       },
