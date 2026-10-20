@@ -387,12 +387,15 @@ export default function AccountCenter() {
       return;
     }
     const isProfessional = identityType !== 'standard';
+    const needsEvidence = isProfessional || !Boolean(profile?.is_verified);
     if (isProfessional && !professionalName.trim()) {
       Alert.alert('بيانات ناقصة', identityType === 'merchant' ? 'اكتب اسم المنشأة أو النشاط التجاري.' : 'اكتب اسم المجال أو النشاط المهني.');
       return;
     }
-    if (isProfessional && !evidence) {
-      Alert.alert('الإثبات مطلوب', 'أرفق مستندًا مناسبًا حتى تتمكن الإدارة من التحقق من الصفة.');
+    if (needsEvidence && !evidence) {
+      Alert.alert('الإثبات مطلوب', identityType === 'standard'
+        ? 'أرفق إثبات هوية حتى تتمكن الإدارة من توثيق الحساب الفردي.'
+        : 'أرفق مستندًا مناسبًا حتى تتمكن الإدارة من التحقق من الصفة.');
       return;
     }
 
