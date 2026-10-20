@@ -228,7 +228,7 @@ export default function Home() {
           </View>
         </View>
 
-        {flags.stories !== false && <View style={layout.stories}><StoriesRow profile={feed.profile} stories={feed.stories} selectedDistrict={loc.district} /></View>}
+        {flags.stories !== false && Boolean(feed.currentUserId) && <View style={layout.stories}><StoriesRow profile={feed.profile} stories={feed.stories} selectedDistrict={loc.district} /></View>}
 
         <View style={[styles.feedSection, layout.feed]}>
           <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, gap: 8 }}>
