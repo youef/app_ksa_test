@@ -28,7 +28,8 @@ type MenuLink = {
 };
 
 export default function MoreScreen() {
-  const { flags } = usePlatformConfig();
+  const platformConfig = usePlatformConfig();
+  const flags = platformConfig?.flags ?? {};
   const bottomNavInset = useBottomNavInset();
   const [profile, setProfile] = useState<any>(null);
   const [hasSession, setHasSession] = useState(false);
