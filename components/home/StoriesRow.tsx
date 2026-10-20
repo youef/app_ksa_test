@@ -24,13 +24,14 @@ export default function StoriesRow({ profile, stories, selectedDistrict }: Props
 
   return (
     <View style={styles.storiesContainer}>
-      <View style={[styles.storiesHeaderRow, { justifyContent: 'flex-end' }]}>
+      <View style={[styles.storiesHeaderRow, { justifyContent: 'space-between' }]}>
         <View style={styles.storiesTitleRow}>
           <Text style={styles.storiesSectionTitle}>يوميات الحي</Text>
         </View>
+        {visibleStories.length > 0 && <Pressable onPress={() => router.push('/stories')} accessibilityRole="button" accessibilityLabel="عرض كل يوميات الحي" style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: 4 }}><ChevronLeft size={18} color="#73857b" /></Pressable>}
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.storiesScroll}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.storiesScroll, { flexDirection: 'row-reverse', flexGrow: 1 }]}>
         {/* User's Add Story Bubble */}
         <Pressable
           style={styles.storyBox}
@@ -58,7 +59,7 @@ export default function StoriesRow({ profile, stories, selectedDistrict }: Props
             </View>
           </LinearGradient>
           <Text style={styles.storyName} numberOfLines={1}>أضف يومياتك</Text>
-          <Text style={styles.storyDistrictSub}>قصتك أنت</Text>
+
         </Pressable>
 
         {/* Active Neighbors Stories */}
@@ -110,45 +111,6 @@ export default function StoriesRow({ profile, stories, selectedDistrict }: Props
             </Pressable>
           );
         })}
-
-        {/* If zero neighbor stories yet, show inviting first-post banner card */}
-        {visibleStories.length === 0 && (
-          <Pressable
-            style={{
-              flexDirection: 'row-reverse',
-              alignItems: 'center',
-              backgroundColor: '#f0fdf4',
-              borderRadius: 16,
-              paddingHorizontal: 14,
-              paddingVertical: 10,
-              borderWidth: 1,
-              borderColor: '#bbf7d0',
-              borderStyle: 'dashed',
-              gap: 8,
-              marginRight: 6,
-            }}
-            onPress={handleAddStory}
-          >
-            <View style={{
-              width: 38,
-              height: 38,
-              borderRadius: 19,
-              backgroundColor: '#dcfce7',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
-              <Camera size={18} color="#059669" />
-            </View>
-            <View style={{ alignItems: 'flex-end' }}>
-              <Text style={{ fontSize: 12, fontWeight: '800', color: '#065f46' }}>
-                كن أول من يشارك أهل الحي!
-              </Text>
-              <Text style={{ fontSize: 10, color: '#059669', fontWeight: '600' }}>
-                شارك حالة أو صورة تظل 24 ساعة
-              </Text>
-            </View>
-          </Pressable>
-        )}
 
         {/* View All Stories Button */}
         {visibleStories.length > 0 && (
