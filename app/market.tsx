@@ -171,9 +171,9 @@ export default function Market() {
   const gap = 12;
   const cardWidth = (contentWidth - gap * (columns - 1)) / columns;
 
-  const favoriteKey = (targetType: 'service' | 'business', itemId: string) => `${targetType}:${itemId}`;
+  const favoriteKey = (targetType: 'service' | 'store', itemId: string) => `${targetType}:${itemId}`;
 
-  const toggleSaveItem = async (itemId: string, targetType: 'service' | 'business') => {
+  const toggleSaveItem = async (itemId: string, targetType: 'service' | 'store') => {
     const { data: auth, error: authError } = await supabase.auth.getUser();
     if (authError || !auth.user) {
       Alert.alert('سجّل الدخول أولاً', 'يلزم تسجيل الدخول لحفظ المنتجات والمتاجر في المفضلة.');
@@ -207,7 +207,7 @@ export default function Market() {
       if (!u.user) return;
       const { data: favorites } = await supabase.from('favorite_items')
         .select('target_type,target_id').eq('user_id', u.user.id)
-        .in('target_type', ['service', 'business']);
+        .in('target_type', ['service', 'store']);
       if (favorites) {
         setSavedItems(Object.fromEntries(favorites.map((fav: any) => [favoriteKey(fav.target_type, fav.target_id), true])));
       }
@@ -678,7 +678,7 @@ export default function Market() {
 
   // Render Card: Local Business / Store Directory
   const renderBusinessCard = (b: any, w: number, listMode = false) => {
-    const isSaved = Boolean(savedItems[favoriteKey('business', b.id)]);
+    const isSaved = Boolean(savedItems[favoriteKey('store', b.id)]);
 
     return (
       <Pressable
@@ -709,7 +709,7 @@ export default function Market() {
               style={[styles.shareFab, isSaved && { backgroundColor: '#fef2f2' }]}
               onPress={(e: any) => {
                 e?.stopPropagation?.();
-                void toggleSaveItem(b.id, 'business');
+                void toggleSaveItem(b.id, 'store');
               }}
             >
               <Heart size={13} color={isSaved ? '#ef4444' : '#475569'} fill={isSaved ? '#ef4444' : 'none'} />
