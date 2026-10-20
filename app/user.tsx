@@ -511,7 +511,12 @@ export default function UserProfile() {
 
   const own = currentUserId === id;
   const anonymous = profile.hide_name === true && !own;
-  const displayName = anonymous ? 'جار مجهول' : profile.display_name || profile.username || 'مستخدم';
+  const personalDisplayName = profile.display_name || profile.username || 'مستخدم';
+  const displayName = anonymous
+    ? 'جار مجهول'
+    : profile.account_type === 'merchant' && profile.freelance_trade
+      ? profile.freelance_trade
+      : personalDisplayName;
   const locked = (profile.is_banned === true && !own) || (profile.profile_privacy === 'private' && !following && !own) || (profile.hide_name === true && !own) || blocked || blockedByOther;
   const isAdmin = profile.role === 'admin';
   const totalContributions = stats.market + stats.services + stats.requests + stats.questions + (own ? stats.answers : 0);
@@ -675,6 +680,10 @@ export default function UserProfile() {
 
               {!anonymous && profile.username ? (
                 <Text style={styles.handle}>@{profile.username}</Text>
+              ) : null}
+
+              {!anonymous && profile.account_type === 'merchant' && profile.freelance_trade && profile.display_name ? (
+                <Text style={styles.accountOwnerLine}>يديره {profile.display_name}</Text>
               ) : null}
 
               {!anonymous ? (
@@ -1270,6 +1279,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.12)',
   },
   customBadgeText: { color: '#ecfdf5', fontSize: 10.5, fontWeight: '700' },
+  accountOwnerLine: {
+    color: '#D1FAE5',
+    fontSize: 10.5,
+    fontWeight: '700',
+    textAlign: 'right',
+    marginTop: 3,
+  },
   heroIdentityBadges: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
