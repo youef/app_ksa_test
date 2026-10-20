@@ -43,7 +43,8 @@ import {
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { ProfileCustomizationEntry } from '@/components/profile/ProfileCustomizationEntry';
-import { AccountIdentityBadge, AccountIdentityIcon } from '@/components/profile/AccountIdentityBadge';
+import { AccountIdentityBadge, AccountIdentityIcon, AccountVerificationBadge, getAccountIdentityMeta } from '@/components/profile/AccountIdentityBadge';
+import { ProfileIdentityCard } from '@/components/profile/ProfileIdentityCard';
 import { C } from '@/lib/ui';
 import { getBlockStatus, setBlock } from '@/lib/chatControls';
 import { isExactDistrictMatching } from '@/lib/locationSync';
@@ -172,7 +173,7 @@ export default function UserProfile() {
       const { data: sessionData } = await supabase.auth.getSession();
       const me = sessionData?.session?.user?.id || null;
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(lookupKey);
-      const { data: p, error } = await supabase.from('profiles').select('id,username,display_name,avatar_url,role,is_verified,account_type,city,district,bio,is_geoverified,badges,profile_privacy,hide_name,is_banned,allow_dms')
+      const { data: p, error } = await supabase.from('profiles').select('id,username,display_name,avatar_url,role,is_verified,is_verified_merchant,verification_status,account_type,freelance_trade,city,district,bio,is_geoverified,badges,profile_privacy,hide_name,is_banned,allow_dms')
         .eq(isUuid ? 'id' : 'username', lookupKey).maybeSingle();
       if (error) throw error;
       setCurrentUserId(me);
@@ -292,11 +293,32 @@ export default function UserProfile() {
       });
       setItems([]); setServices([]); setRequests([]); setQuestions([]); setAnswers([]);
       setLoadedTabs([]);
-      const initialTab: Tab = (questionCount.count || 0) > 0 ? 'questions'
-        : (serviceCount.count || 0) > 0 ? 'services'
-        : (requestCount.count || 0) > 0 ? 'requests'
-        : (marketCount.count || 0) > 0 ? 'market'
-        : 'questions';
+      const initialTab: Tab =
+        p.account_type === 'merchant'
+          ? (marketCount.count || 0) > 0
+            ? 'market'
+            : (serviceCount.count || 0) > 0
+              ? 'services'
+              : (questionCount.count || 0) > 0
+                ? 'questions'
+                : 'market'
+          : p.account_type === 'freelance' || p.account_type === 'provider'
+            ? (serviceCount.count || 0) > 0
+              ? 'services'
+              : (questionCount.count || 0) > 0
+                ? 'questions'
+                : (marketCount.count || 0) > 0
+                  ? 'market'
+                  : 'services'
+            : (questionCount.count || 0) > 0
+              ? 'questions'
+              : (serviceCount.count || 0) > 0
+                ? 'services'
+                : (requestCount.count || 0) > 0
+                  ? 'requests'
+                  : (marketCount.count || 0) > 0
+                    ? 'market'
+                    : 'questions';
       if (me === p.id && (answerCount.count || 0) > 0 && !(questionCount.count || serviceCount.count || requestCount.count || marketCount.count)) {
         setTab('answers');
         await loadTabData('answers', p.id, me, true);
@@ -493,8 +515,27 @@ export default function UserProfile() {
   const locked = (profile.is_banned === true && !own) || (profile.profile_privacy === 'private' && !following && !own) || (profile.hide_name === true && !own) || blocked || blockedByOther;
   const isAdmin = profile.role === 'admin';
   const totalContributions = stats.market + stats.services + stats.requests + stats.questions + (own ? stats.answers : 0);
-  const accentColor = profileCustomization?.accent_color || '#059669';
-  const heroColors: [string, string, string] = profileCustomization?.banner_style === 'ocean' ? ['#0c4a6e', '#0369a1', '#0ea5e9'] : profileCustomization?.banner_style === 'sunset' ? ['#7c2d12', '#c2410c', '#f97316'] : profileCustomization?.banner_style === 'midnight' ? ['#111827', '#1e293b', '#334155'] : ['#064e3b', '#047857', '#059669'];
+  const identityMeta = getAccountIdentityMeta(profile.role, profile.account_type, Boolean(profile.is_verified));
+  const accentColor = profileCustomization?.accent_color || identityMeta.color;
+  const heroColors: [string, string, string] =
+    profileCustomization?.banner_style === 'ocean'
+      ? ['#0c4a6e', '#0369a1', '#0ea5e9']
+      : profileCustomization?.banner_style === 'sunset'
+        ? ['#7c2d12', '#c2410c', '#f97316']
+        : profileCustomization?.banner_style === 'midnight'
+          ? ['#111827', '#1e293b', '#334155']
+          : identityMeta.heroColors;
+  const identityDescriptor =
+    profile.freelance_trade ||
+    (profile.account_type === 'merchant'
+      ? 'نشاط تجاري محلي في مجتمع حيّنا'
+      : profile.account_type === 'freelance'
+        ? 'مستقل يقدم أعماله وخبراته للمجتمع'
+        : profile.account_type === 'provider'
+          ? 'مقدم خدمات محلية لسكان الحي'
+          : profile.account_type === 'idea'
+            ? 'مبادرة أو مشروع ناشئ في المجتمع'
+            : 'عضو من أفراد مجتمع حيّنا');
 
   const currentData =
     tab === 'market'
@@ -630,19 +671,28 @@ export default function UserProfile() {
             <View style={styles.heroIdentity}>
               <View style={styles.nameRow}>
                 <Text style={styles.name}>{displayName}</Text>
-                {!anonymous ? (
+              </View>
+
+              {!anonymous && profile.username ? (
+                <Text style={styles.handle}>@{profile.username}</Text>
+              ) : null}
+
+              {!anonymous ? (
+                <View style={styles.heroIdentityBadges}>
                   <AccountIdentityBadge
                     role={profile.role}
                     accountType={profile.account_type}
                     isVerified={Boolean(profile.is_verified)}
                     compact
                   />
-                ) : null}
-              </View>
-
-              {!anonymous && profile.username && (
-                <Text style={styles.handle}>@{profile.username}</Text>
-              )}
+                  <AccountVerificationBadge
+                    role={profile.role}
+                    accountType={profile.account_type}
+                    isVerified={Boolean(profile.is_verified)}
+                    compact
+                  />
+                </View>
+              ) : null}
 
               <View style={styles.heroLocation}>
                 <MapPin size={13} color="#a7f3d0" />
@@ -676,7 +726,7 @@ export default function UserProfile() {
               >
                 <Sparkles size={13} color="#fde68a" />
                 <Text style={[styles.trustText, { color: '#fde68a' }]}>
-                  {stats.reputation || 0} نقطة سمعة ⭐
+                  {stats.reputation || 0} نقطة سمعة
                 </Text>
               </View>
 
@@ -689,9 +739,22 @@ export default function UserProfile() {
             </View>
           </LinearGradient>
 
+          {!anonymous ? (
+            <View style={styles.identityCardWrap}>
+              <ProfileIdentityCard
+                role={profile.role}
+                accountType={profile.account_type}
+                isVerified={Boolean(profile.is_verified)}
+                descriptor={identityDescriptor}
+                owner={false}
+                onManage={own ? () => router.push('/account-type') : undefined}
+              />
+            </View>
+          ) : null}
+
           {/* Elevated Stats Bar */}
           {profileCustomization?.show_stats !== false && <View style={[styles.statsCard, { borderColor: `${accentColor}30` }]}>
-            <Stat label="سمعة الحي ⭐" value={stats.reputation} />
+            <Stat label="السمعة" value={stats.reputation} />
             <Stat label="متابعين" value={stats.followers} />
             <Stat label="يتابع" value={stats.following} />
             <Stat label="إسهامات" value={totalContributions} />
@@ -723,7 +786,23 @@ export default function UserProfile() {
           {/* Activity Category Tabs */}
           <View style={styles.tabsCard}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
-              {TABS.filter(({ id: key }) => (key !== 'answers' || own) && (key !== 'services' || (profileCustomization && profileCustomization.section_visibility && profileCustomization.section_visibility.services !== false)) && (key !== 'questions' || !(profileCustomization && profileCustomization.section_visibility && profileCustomization.section_visibility.questions === false)) && (key !== 'market' || !(profileCustomization && profileCustomization.section_visibility && profileCustomization.section_visibility.products === false)) && (key !== 'requests' || !(profileCustomization && profileCustomization.section_visibility && profileCustomization.section_visibility.services === false)) && (key !== 'reviews' || !(profileCustomization && profileCustomization.section_visibility && profileCustomization.section_visibility.reviews === false))).sort((a, b) => { const order = (profileCustomization && profileCustomization.section_order) || []; const aKey = a.id === 'market' ? 'products' : a.id === 'answers' ? 'questions' : a.id === 'requests' ? 'services' : a.id; const bKey = b.id === 'market' ? 'products' : b.id === 'answers' ? 'questions' : b.id === 'requests' ? 'services' : b.id; return order.indexOf(aKey) - order.indexOf(bKey); }).map(({ id: key, label, icon: Icon }) => {
+              {TABS.filter(({ id: key }) => (key !== 'answers' || own) && (key !== 'services' || (profileCustomization && profileCustomization.section_visibility && profileCustomization.section_visibility.services !== false)) && (key !== 'questions' || !(profileCustomization && profileCustomization.section_visibility && profileCustomization.section_visibility.questions === false)) && (key !== 'market' || !(profileCustomization && profileCustomization.section_visibility && profileCustomization.section_visibility.products === false)) && (key !== 'requests' || !(profileCustomization && profileCustomization.section_visibility && profileCustomization.section_visibility.services === false)) && (key !== 'reviews' || !(profileCustomization && profileCustomization.section_visibility && profileCustomization.section_visibility.reviews === false))).sort((a, b) => {
+                const customOrder = (profileCustomization && profileCustomization.section_order) || [];
+                if (customOrder.length) {
+                  const aKey = a.id === 'market' ? 'products' : a.id === 'answers' ? 'questions' : a.id === 'requests' ? 'services' : a.id;
+                  const bKey = b.id === 'market' ? 'products' : b.id === 'answers' ? 'questions' : b.id === 'requests' ? 'services' : b.id;
+                  return customOrder.indexOf(aKey) - customOrder.indexOf(bKey);
+                }
+                const accountOrder: Record<string, Tab[]> = {
+                  merchant: ['market', 'services', 'reviews', 'questions', 'requests', 'answers'],
+                  freelance: ['services', 'reviews', 'market', 'questions', 'requests', 'answers'],
+                  provider: ['services', 'reviews', 'questions', 'requests', 'market', 'answers'],
+                  idea: ['questions', 'requests', 'services', 'market', 'reviews', 'answers'],
+                  standard: ['questions', 'requests', 'market', 'services', 'reviews', 'answers'],
+                };
+                const order = accountOrder[profile.account_type || 'standard'] || accountOrder.standard;
+                return order.indexOf(a.id) - order.indexOf(b.id);
+              }).map(({ id: key, label, icon: Icon }) => {
                 const count =
                   key === 'market'
                     ? stats.market
@@ -1191,6 +1270,17 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.12)',
   },
   customBadgeText: { color: '#ecfdf5', fontSize: 10.5, fontWeight: '700' },
+  heroIdentityBadges: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 8,
+  },
+  identityCardWrap: {
+    marginTop: 12,
+    marginHorizontal: 4,
+  },
   statsCard: {
     marginTop: -16,
     marginHorizontal: 10,
