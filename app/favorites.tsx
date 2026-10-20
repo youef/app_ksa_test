@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { AppHeader } from '@/components/shared/AppHeader';
 import { useBottomNavInset } from '@/lib/bottomNav';
 import { supabase } from '@/lib/supabase';
-import { Bookmark, Heart, Trash2, Search, Store, MessageCircle, Package, ChevronLeft, RefreshCw, Sparkles, CalendarDays, Inbox, LogIn, MapPin, Image as ImageIcon, Tag, Clock, CircleCheck, HelpCircle } from 'lucide-react-native';
+import { Bookmark, Heart, Trash2, Search, Store, MessageCircle, Package, ChevronLeft, RefreshCw, Sparkles, CalendarDays, Inbox, LogIn, MapPin, Image as ImageIcon, Tag, CircleCheck } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 type Filter = 'all' | 'market' | 'questions' | 'requests' | 'stores';
