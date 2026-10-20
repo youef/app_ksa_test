@@ -115,7 +115,7 @@ export default function Market() {
   const { width } = useWindowDimensions();
 
   // Active Main Section: 'market' | 'businesses' | 'events'
-  const params = useLocalSearchParams<{ section?: string }>();
+  const params = useLocalSearchParams<{ section?: string; businessId?: string }>();
   const initialSection: MarketSection = params.section === 'events' ? 'events' : params.section === 'businesses' ? 'businesses' : 'market';
   const [section, setSection] = useState<MarketSection>(initialSection);
 
@@ -227,6 +227,15 @@ export default function Market() {
   useEffect(() => {
     loadAllData();
   }, []);
+
+  useEffect(() => {
+    if (!params.businessId || !businesses.length) return;
+    const savedBusiness = businesses.find((business) => business.id === params.businessId);
+    if (savedBusiness) {
+      setSection('businesses');
+      setSelectedBusiness(savedBusiness);
+    }
+  }, [params.businessId, businesses]);
 
   const loadAllData = async () => {
     setRefreshing(true);
