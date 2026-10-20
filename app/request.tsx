@@ -888,14 +888,13 @@ export default function Request() {
             </LinearGradient>
           )}
 
-          {/* Details & Needs Card */}
-          <View style={styles.card}>
-            <View style={styles.cardHeaderRow}>
-              <View style={styles.cardHeaderIconBox}>
-                <HeartHandshake size={18} color="#059669" />
-              </View>
-              <Text style={styles.cardTitle}>تفاصيل الطلب والاحتياج</Text>
-  iceSub}>شارك الرابط لتصل الفزعة بشكل أسرع.</Text>
+          {/* Owner quick actions */}
+          {isOwner && (
+            <View style={styles.ownerNoticeCard}>
+              <View style={styles.ownerNoticeTop}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.ownerNoticeTitle}>طلبك منشور لجيران الحي</Text>
+                  <Text style={styles.ownerNoticeSub}>شارك الرابط لتصل الفزعة بشكل أسرع.</Text>
                 </View>
                 <View style={{ flexDirection: 'row-reverse', gap: 8 }}>
                   <Pressable
