@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { AppHeader } from '@/components/shared/AppHeader';
 import { useBottomNavInset } from '@/lib/bottomNav';
 import { supabase } from '@/lib/supabase';
@@ -147,6 +147,8 @@ function isPendingStatus(status?: string | null) {
 
 export default function AccountTypeScreen() {
   const bottomNavInset = useBottomNavInset();
+  const params = useLocalSearchParams<{ type?: string }>();
+  const requestedTypeParam = Array.isArray(params.type) ? params.type[0] : params.type;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [type, setType] = useState<AccountKind>('standard');
@@ -160,6 +162,11 @@ export default function AccountTypeScreen() {
   const [userId, setUserId] = useState<string | null>(null);
 
   const selected = useMemo(() => TYPES.find((item) => item.key === type) || TYPES[0], [type]);
+  const requestedType = useMemo<AccountKind | null>(() => {
+    return TYPES.some((item) => item.key === requestedTypeParam)
+      ? (requestedTypeParam as AccountKind)
+      : null;
+  }, [requestedTypeParam]);
   const pendingRequest = useMemo(() => requests.find((item) => isPendingStatus(item.status)), [requests]);
   const latestRequest = requests[0] || null;
 
@@ -193,7 +200,7 @@ export default function AccountTypeScreen() {
 
       const savedType = (profileRes.data?.account_type || 'standard') as AccountKind;
       setCurrentType(savedType);
-      setType(savedType);
+      setType(requestedType || savedType);
       setTrade(profileRes.data?.freelance_trade || '');
       setDisplayName(profileRes.data?.display_name || '');
       setIsVerified(Boolean(profileRes.data?.is_verified));
@@ -204,7 +211,7 @@ export default function AccountTypeScreen() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [requestedType]);
 
   useEffect(() => {
     void load();
