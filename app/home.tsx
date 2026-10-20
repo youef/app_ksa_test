@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, RefreshControl, ScrollView, StatusBar, Text, View } from 'react-native';
-import { router } from 'expo-router';
-import { ChevronLeft, Flame, Sparkles, HeartHandshake, MessageCircle, SlidersHorizontal, X, Check, ShieldAlert } from 'lucide-react-native';
+import { ActivityIndicator, Alert, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SlidersHorizontal, X, Check } from 'lucide-react-native';
 
 import { supabase } from '@/lib/supabase';
 import { getBrandingLogo, subscribeBrandingLogo, getCachedBrandingLogo } from '@/lib/branding';
 import { isLocationMatching, type HaynaLocation } from '@/lib/locationSync';
 import {
-  getGreeting,
   isEmergencyQuestion,
   isToolQuestion,
   toFeed,
@@ -29,7 +27,6 @@ import { FeedSkeleton, ErrorBanner } from '@/components/home/HomeStates';
 import { styles } from '@/components/home/homeStyles';
 import { requireAccount } from '@/lib/authGate';
 
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 export default function Home() {
   const { flags } = usePlatformConfig();
@@ -46,8 +43,6 @@ export default function Home() {
   const [draftPeriod, setDraftPeriod] = useState('كل الأوقات');
   const [appliedFilters, setAppliedFilters] = useState({ kind: 'الكل', status: 'الكل', period: 'كل الأوقات' });
   const [refreshing, setRefreshing] = useState(false);
-  const [greeting] = useState(() => getGreeting());
-  const emergencyCarouselRef = useRef<ScrollView>(null);
 
   // The feed hook resolves the saved location; the location hook owns it.
   // A ref breaks the circular dependency between the two hooks.
@@ -96,7 +91,7 @@ export default function Home() {
       );
       showToast('تم نشر الرد بنجاح في المحادثة');
     },
-    [feed.profile, feed.setQuestions, showToast],
+    [feed.currentUserId, feed.profile, feed.setQuestions, showToast],
   );
 
   // ---------- Filtering ----------
@@ -187,16 +182,6 @@ export default function Home() {
     });
   }, [items, appliedFilters, sortBy, loc.city, loc.district]);
 
-  // Real activity: distinct neighbours who posted in the visible area during the last 24h.
-  const activeNeighbors = useMemo(() => {
-    const since = Date.now() - DAY_MS;
-    const ids = new Set<string>();
-    derived.filteredQuestions.forEach(x => new Date(x.created_at).getTime() > since && ids.add(x.author_id));
-    derived.filteredRequests.forEach(x => new Date(x.created_at).getTime() > since && ids.add(x.requester_id));
-    feed.stories.forEach(s => s.author_id && ids.add(s.author_id));
-    return ids.size;
-  }, [derived.filteredQuestions, derived.filteredRequests, feed.stories]);
-
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await feed.reload();
@@ -212,20 +197,8 @@ export default function Home() {
     }
   }, [feed.hasMore, feed.loadingMore, feed.loading, feed.loadMore]);
 
-  const emergencyTop = derived.emergency[0];
-
-  useEffect(() => {
-    if (derived.emergency.length < 2) return;
-    let index = 0;
-    const timer = setInterval(() => {
-      index = (index + 1) % derived.emergency.length;
-      emergencyCarouselRef.current?.scrollTo({ x: index * 290, animated: true });
-    }, 30000);
-    return () => clearInterval(timer);
-  }, [derived.emergency.length]);
-
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, layout.page]}>
       <AppHeader
         variant="home"
         profile={feed.profile}
@@ -240,7 +213,7 @@ export default function Home() {
         keyboardShouldPersistTaps="handled"
         onScroll={handleFeedScroll}
         scrollEventThrottle={300}
-        contentContainerStyle={{ paddingBottom: bottomNavInset + 24, backgroundColor: '#eaf3ee', flexGrow: 1 }}
+        contentContainerStyle={{ paddingBottom: bottomNavInset + 24, backgroundColor: '#f5f7f6', flexGrow: 1 }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -251,7 +224,7 @@ export default function Home() {
           />
         }
       >
-        <View style={{ flexDirection: 'row-reverse', alignItems: 'stretch', gap: 8, marginHorizontal: 12, marginTop: 6, marginBottom: 10 }}>
+        <View style={layout.contextRow}>
           <View style={{ flex: 1, minWidth: 0 }}>
             <LocationScopeBar compact location={{ region: loc.region, city: loc.city, district: loc.district }} />
           </View>
@@ -260,72 +233,20 @@ export default function Home() {
           </View>
         </View>
 
-        {flags.stories !== false && <StoriesRow profile={feed.profile} stories={feed.stories} selectedDistrict={loc.district} />}
+        {flags.stories !== false && <View style={layout.stories}><StoriesRow profile={feed.profile} stories={feed.stories} selectedDistrict={loc.district} /></View>}
 
-        <View style={[styles.emergencyHomeCard, { marginHorizontal: 12, marginBottom: 16, padding: 14, borderRadius: 22, backgroundColor: '#fffafa', borderWidth: 1, borderColor: '#fee2e2', shadowColor: '#7f1d1d', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.06, shadowRadius: 14, elevation: 2 }]}>
-          <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-            <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 10, flex: 1 }}>
-              <View style={{ width: 44, height: 44, borderRadius: 15, backgroundColor: '#fee2e2', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#fecaca' }}>
-                <ShieldAlert size={23} color="#b91c1c" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: '#7f1d1d', fontSize: 17, fontWeight: '900', textAlign: 'right' }}>البلاغات والطوارئ</Text>
-                <Text style={{ color: '#9f5a5a', fontSize: 11, textAlign: 'right', marginTop: 3 }}>تنبيهات مهمة من سكان الحي</Text>
-              </View>
-            </View>
-            <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 5, backgroundColor: '#fff1f2', paddingHorizontal: 9, paddingVertical: 6, borderRadius: 12, borderWidth: 1, borderColor: '#ffe4e6' }}>
-              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#ef4444' }} />
-              <Text style={{ color: '#be123c', fontSize: 10, fontWeight: '900' }}>قسم مستقل</Text>
-            </View>
+        <View style={[styles.feedSection, layout.feed]}>
+          <View style={layout.heading}>
+            <Text accessibilityRole="header" style={layout.title}>منشورات الحي</Text>
+            <Text style={layout.subtitle}>كل جديد من جيرانك</Text>
           </View>
-          <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <Text style={{ color: '#64748b', fontSize: 11, textAlign: 'right', flex: 1, lineHeight: 17 }}>آخر البلاغات المسجلة في نطاقك — اضغط على البلاغ لمعرفة التفاصيل.</Text>
-            <View style={{ backgroundColor: '#f1f5f9', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 5, marginRight: 8 }}>
-              <Text style={{ color: '#475569', fontSize: 10, fontWeight: '900' }}>{derived.emergency.length} من 5</Text>
-            </View>
-          </View>
-          {derived.emergency.length > 0 ? (
-            <ScrollView ref={emergencyCarouselRef} horizontal inverted showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingVertical: 2 }}>
-              {derived.emergency.map((report: any, index: number) => (
-                <Pressable key={String(report.id)} onPress={() => router.push({ pathname: '/question', params: { id: String(report.id) } })} accessibilityRole="button" accessibilityLabel={`عرض تفاصيل البلاغ ${index + 1}`} style={{ width: 265, minHeight: 142, borderRadius: 17, padding: 13, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#f1d2d2', justifyContent: 'space-between' }}>
-                  <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-                    <View style={{ width: 28, height: 28, borderRadius: 10, backgroundColor: '#fff1f2', alignItems: 'center', justifyContent: 'center' }}>
-                      <Flame size={15} color="#dc2626" />
-                    </View>
-                    <Text style={{ color: '#b91c1c', fontSize: 10, fontWeight: '900' }}>بلاغ طارئ {index + 1}</Text>
-                    <View style={{ flex: 1 }} />
-                    <Text style={{ color: '#94a3b8', fontSize: 10 }}>{report.created_at ? new Date(report.created_at).toLocaleDateString('ar-SA') : ''}</Text>
-                  </View>
-                  <Text numberOfLines={3} style={{ color: '#172a22', fontSize: 14, lineHeight: 21, fontWeight: '900', textAlign: 'right', marginTop: 10 }}>{report.title || report.body || report.content || 'بلاغ طارئ مسجل'}</Text>
-                  <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 5, marginTop: 10, paddingTop: 9, borderTopWidth: 1, borderTopColor: '#f1f5f9' }}>
-                    <View style={{ width: 22, height: 22, borderRadius: 7, backgroundColor: '#f8fafc', alignItems: 'center', justifyContent: 'center' }}>
-                      <Text style={{ color: '#64748b', fontSize: 11 }}>⌖</Text>
-                    </View>
-                    <Text numberOfLines={1} style={{ color: '#64748b', fontSize: 11, textAlign: 'right', flex: 1 }}>{report.district || report.city || 'الموقع غير محدد'}</Text>
-                    <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 3 }}>
-                      <Text style={{ color: '#b91c1c', fontSize: 10, fontWeight: '900' }}>التفاصيل</Text>
-                      <ChevronLeft size={13} color="#b91c1c" />
-                    </View>
-                  </View>
-                </Pressable>
-              ))}
-            </ScrollView>
-          ) : (
-            <View style={{ alignItems: 'center', backgroundColor: '#ffffff', borderRadius: 16, padding: 18, borderWidth: 1, borderColor: '#f1d2d2' }}>
-              <View style={{ width: 42, height: 42, borderRadius: 14, backgroundColor: '#fff1f2', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
-                <ShieldAlert size={21} color="#dc2626" />
-              </View>
-              <Text style={{ color: '#7f1d1d', fontSize: 12, fontWeight: '800', textAlign: 'center' }}>لا توجد بلاغات طارئة مسجلة حالياً</Text>
-              <Text style={{ color: '#94a3b8', fontSize: 11, textAlign: 'center', marginTop: 4 }}>يمكنك إضافة بلاغ ليستفيد سكان الحي</Text>
-            </View>
-          )}
-          <Pressable onPress={() => router.push('/ask')} accessibilityRole="button" accessibilityLabel="إضافة بلاغ طارئ" style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 12, minHeight: 46, backgroundColor: '#b91c1c', paddingHorizontal: 16, borderRadius: 14, shadowColor: '#b91c1c', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.15, shadowRadius: 6, elevation: 2 }}>
-            <Text style={{ color: '#fff', fontSize: 13, fontWeight: '900' }}>＋ إضافة بلاغ طارئ</Text>
-            <Text style={{ color: '#fecaca', fontSize: 11 }}>ساعد في تنبيه الحي</Text>
-          </Pressable>
-        </View>
-
-        <View style={styles.feedSection}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={layout.tabsScroll} contentContainerStyle={layout.tabs}>
+            {([['all', 'الكل'], ['questions', 'استفسارات'], ['requests', 'طلبات المساعدة'], ['tools', 'إعارة أدوات'], ...(currentUserId ? [['mine', 'منشوراتي']] : [])] as [HomeTab, string][]).map(([key, label]) => (
+              <Pressable key={key} onPress={() => setActiveTab(key)} accessibilityRole="tab" accessibilityState={{ selected: activeTab === key }} style={[layout.tab, activeTab === key && layout.tabSelected]}>
+                <Text style={[layout.tabText, activeTab === key && layout.tabTextSelected]}>{label}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
           <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, gap: 8 }}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 7 }}>
               {([
@@ -333,12 +254,12 @@ export default function Home() {
                 ['engaged', 'الأكثر تفاعلاً'],
                 ['nearby', 'الأقرب'],
               ] as const).map(([key, label]) => (
-                <Pressable key={key} onPress={() => setSortBy(key)} style={{ paddingHorizontal: 13, paddingVertical: 8, borderRadius: 18, backgroundColor: sortBy === key ? '#176b52' : '#ffffff', borderWidth: 1, borderColor: sortBy === key ? '#176b52' : '#dbe5df' }} accessibilityRole="button" accessibilityState={{ selected: sortBy === key }}>
-                  <Text style={{ color: sortBy === key ? '#ffffff' : '#475569', fontSize: 12, fontWeight: '800' }}>{label}</Text>
+                <Pressable key={key} onPress={() => setSortBy(key)} style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: 10, borderRadius: 12, backgroundColor: sortBy === key ? '#e7efea' : 'transparent' }} accessibilityRole="button" accessibilityState={{ selected: sortBy === key }}>
+                  <Text style={{ color: sortBy === key ? '#176b52' : '#78857f', fontSize: 12, fontWeight: '800' }}>{label}</Text>
                 </Pressable>
               ))}
             </ScrollView>
-            <Pressable onPress={() => { setDraftKind(appliedFilters.kind); setDraftStatus(appliedFilters.status); setDraftPeriod(appliedFilters.period); setFilterOpen(true); }} style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 14, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#b7d8c8' }} accessibilityRole="button" accessibilityLabel="تصفية المنشورات">
+            <Pressable onPress={() => { setDraftKind(appliedFilters.kind); setDraftStatus(appliedFilters.status); setDraftPeriod(appliedFilters.period); setFilterOpen(true); }} style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6, minHeight: 44, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 14, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#b7d8c8' }} accessibilityRole="button" accessibilityLabel="تصفية المنشورات">
               <SlidersHorizontal size={15} color="#176b52" />
               <Text style={{ color: '#176b52', fontSize: 12, fontWeight: '900' }}>تصفية</Text>
               {(appliedFilters.kind !== 'الكل' || appliedFilters.status !== 'الكل' || appliedFilters.period !== 'كل الأوقات') && <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#dc2626' }} />}
@@ -385,7 +306,7 @@ export default function Home() {
             </Pressable>
           )}
 
-          <View style={{ height: bottomNavInset }} />
+
         </View>
       </ScrollView>
 
@@ -440,3 +361,19 @@ export default function Home() {
     </View>
   );
 }
+
+const layout = StyleSheet.create({
+  page: { backgroundColor: '#f5f7f6' },
+  contextRow: { width: '100%', maxWidth: 760, alignSelf: 'center', flexDirection: 'row-reverse', alignItems: 'stretch', gap: 8, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12 },
+  stories: { width: '100%', maxWidth: 728, alignSelf: 'center', backgroundColor: '#fff', borderRadius: 22, overflow: 'hidden', marginBottom: 8 },
+  feed: { maxWidth: 760, marginTop: 16 },
+  heading: { alignItems: 'flex-end', marginBottom: 16, gap: 4 },
+  title: { color: '#182e25', fontSize: 22, fontWeight: '800', textAlign: 'right' },
+  subtitle: { color: '#7b8982', fontSize: 12, textAlign: 'right' },
+  tabsScroll: { marginBottom: 12, borderBottomWidth: 1, borderBottomColor: '#e0e7e2' },
+  tabs: { flexDirection: 'row-reverse', flexGrow: 1, gap: 6 },
+  tab: { minHeight: 48, paddingHorizontal: 14, justifyContent: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  tabSelected: { borderBottomColor: '#176b52' },
+  tabText: { color: '#7b8982', fontSize: 13, fontWeight: '600' },
+  tabTextSelected: { color: '#176b52', fontWeight: '800' },
+});
