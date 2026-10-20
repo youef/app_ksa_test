@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -14,11 +14,11 @@ import { Sparkles, SlidersHorizontal } from 'lucide-react-native';
 
 import { supabase } from '@/lib/supabase';
 import AppHeader from '@/components/shared/AppHeader';
-import LocationSelectorModal from '@/components/LocationSelectorModal';
+import QuestionFilterSheet from '@/components/QuestionFilterSheet';
+import { DEFAULT_QUESTION_FILTERS, filterQuestions, type QuestionFilters } from '@/lib/questionFilters';
 import LocationScopeBar from '@/components/LocationScopeBar';
 import TwitterInquiryCard from '@/components/TwitterInquiryCard';
-import { getActiveLocation, subscribeLocation, isLocationMatching, savePermanentMyLocation, type HaynaLocation } from '@/lib/locationSync';
-import { getBrandingLogo, getCachedBrandingLogo, subscribeBrandingLogo } from '@/lib/branding';
+import { getActiveLocation, subscribeLocation, isLocationMatching, type HaynaLocation } from '@/lib/locationSync';
 import { useBottomNavInset } from '@/lib/bottomNav';
 
 export default function Questions() {
@@ -31,7 +31,11 @@ export default function Questions() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [profile, setProfile] = useState<any>(null);
   const [sortBy, setSortBy] = useState<'newest' | 'engaged' | 'nearby'>('newest');
-  const [showLocationModal, setShowLocationModal] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [filters, setFilters] = useState<QuestionFilters>(DEFAULT_QUESTION_FILTERS);
+  const [draftFilters, setDraftFilters] = useState<QuestionFilters>(DEFAULT_QUESTION_FILTERS);
+  const [queryLimit, setQueryLimit] = useState(80);
+  const [hasMore, setHasMore] = useState(false);
   const [activeLoc, setActiveLoc] = useState<HaynaLocation>({
     region: 'كل المملكة',
     city: 'كل المدن',
@@ -58,23 +62,12 @@ export default function Questions() {
       }
 
       let questions: any[] = [];
-      const { data, error } = await supabase
-        .from('questions')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(80);
-
-      if (!error && data) {
-        questions = data;
-      } else {
-        const fallback = await supabase.rpc('hayna_guest_questions', {
-          p_city: location.city,
-          p_district: location.district,
-          p_limit: 60,
-        });
-        if (fallback.error) throw fallback.error;
-        questions = fallback.data ?? [];
-      }
+      const result = user
+        ? await supabase.from('questions').select('*').order('created_at', { ascending: false }).limit(queryLimit)
+        : await supabase.rpc('hayna_guest_questions', { p_city: location.city, p_district: location.district, p_limit: queryLimit });
+      if (result.error) throw result.error;
+      questions = result.data ?? [];
+      setHasMore(questions.length >= queryLimit);
 
       if (questions.length) {
         const authorIds = Array.from(new Set(questions.map(q => q.author_id).filter(Boolean)));
@@ -129,7 +122,12 @@ export default function Questions() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [activeLoc]);
+  }, [activeLoc, queryLimit]);
+
+  const activeLocRef = useRef(activeLoc);
+  activeLocRef.current = activeLoc;
+  const loadRef = useRef(loadQuestions);
+  loadRef.current = loadQuestions;
 
   useEffect(() => {
     let active = true;
@@ -145,7 +143,7 @@ export default function Questions() {
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!active) return;
       setCurrentUserId(session?.user?.id ?? null);
-      void loadQuestions();
+      setTimeout(() => { if (active) void loadRef.current(activeLocRef.current); }, 0);
     });
     return () => {
       active = false;
@@ -181,14 +179,6 @@ export default function Questions() {
     };
   }, [activeLoc, loadQuestions]);
 
-  const onSelectLocation = useCallback(async (region: string, city: string, district: string) => {
-    const location = { region, city, district };
-    await savePermanentMyLocation(location, true);
-    setActiveLoc(location);
-    setShowLocationModal(false);
-    void loadQuestions(location);
-  }, [loadQuestions]);
-
   const onQuickReply = useCallback(async (questionId: string, text: string) => {
     const body = text.trim();
     if (!body) return;
@@ -215,6 +205,11 @@ export default function Questions() {
     Alert.alert('حيّنا', message);
   }, []);
 
+  const filteredItems = useMemo(() => filterQuestions(items, filters, currentUserId, sortBy, activeLoc.district), [items, filters, currentUserId, sortBy, activeLoc.district]);
+  const filtersActive = Object.keys(DEFAULT_QUESTION_FILTERS).some(key => filters[key as keyof QuestionFilters] !== DEFAULT_QUESTION_FILTERS[key as keyof QuestionFilters]);
+  useEffect(() => { setVisibleCount(10); }, [filters, sortBy]);
+  useEffect(() => { if (queryLimit > 80) void loadQuestions(activeLoc); }, [queryLimit]);
+
   return (
     <View style={styles.container}>
       <AppHeader
@@ -232,8 +227,8 @@ export default function Questions() {
         onMomentumScrollEnd={({ nativeEvent }) => {
           const { contentOffset, contentSize, layoutMeasurement } = nativeEvent;
           const nearBottom = contentOffset.y + layoutMeasurement.height >= contentSize.height - 180;
-          if (nearBottom && visibleCount < items.length) {
-            setVisibleCount(current => Math.min(current + 10, items.length));
+          if (nearBottom && visibleCount < filteredItems.length) {
+            setVisibleCount(current => Math.min(current + 10, filteredItems.length));
           }
         }}
         refreshControl={
@@ -247,13 +242,14 @@ export default function Questions() {
         }
       >
         <LocationScopeBar location={activeLoc} />
-        <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 7, marginTop: 8, marginBottom: 12 }}>
+        <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', alignItems: 'center', gap: 7, marginTop: 8, marginBottom: 12 }}>
           {([['newest', 'الأحدث'], ['engaged', 'الأكثر تفاعلاً'], ['nearby', 'الأقرب']] as const).map(([key, label]) => (
-            <Pressable key={key} onPress={() => setSortBy(key)} style={{ paddingHorizontal: 13, paddingVertical: 8, borderRadius: 18, backgroundColor: sortBy === key ? '#176b52' : '#ffffff', borderWidth: 1, borderColor: sortBy === key ? '#176b52' : '#dbe5df' }}>
+            <Pressable key={key} accessibilityRole="button" accessibilityState={{ selected: sortBy === key }} onPress={() => setSortBy(key)} style={{ paddingHorizontal: 13, paddingVertical: 8, borderRadius: 18, backgroundColor: sortBy === key ? '#176b52' : '#ffffff', borderWidth: 1, borderColor: sortBy === key ? '#176b52' : '#dbe5df' }}>
               <Text style={{ color: sortBy === key ? '#ffffff' : '#475569', fontSize: 12, fontWeight: '800' }}>{label}</Text>
             </Pressable>
           ))}
-          <Pressable onPress={() => Alert.alert('تصفية', 'استخدم خيارات الفرز: الأحدث، الأكثر تفاعلاً، والأقرب.')} style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 11, paddingVertical: 9, borderRadius: 14, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#b7d8c8' }}>
+          <Pressable accessibilityRole="button" accessibilityLabel="تصفية المنشورات" onPress={() => { setDraftFilters(filters); setFilterOpen(true); }} style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 11, paddingVertical: 9, borderRadius: 14, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#b7d8c8' }}>
+            {filtersActive && <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#176b52' }} />}
             <SlidersHorizontal size={15} color='#176b52' />
             <Text style={{ color: '#176b52', fontSize: 12, fontWeight: '900' }}>تصفية</Text>
           </Pressable>
@@ -268,18 +264,19 @@ export default function Questions() {
             <Text style={styles.stateTitle}>{loadError}</Text>
             <Text onPress={() => void loadQuestions(activeLoc)} style={styles.retryText}>إعادة المحاولة</Text>
           </View>
-        ) : items.length === 0 ? (
+        ) : filteredItems.length === 0 ? (
           <View style={styles.stateBox}>
             <View style={styles.emptyIcon}>
               <Sparkles size={28} color="#16845f" />
             </View>
-            <Text style={styles.stateTitle}>كن أول من يبدأ النقاش</Text>
-            <Text style={styles.stateText}>لا توجد استفسارات ظاهرة حالياً. شارك سؤالك ليستفيد جيرانك من خبرتك وتستفيد من تجاربهم.</Text>
+            <Text style={styles.stateTitle}>{filtersActive ? 'لا توجد نتائج تطابق التصفية' : 'كن أول من يبدأ النقاش'}</Text>
+            <Text style={styles.stateText}>{filtersActive ? 'جرّب تغيير الخيارات أو مسح التصفية.' : 'شارك استفسارك مع جيرانك.'}</Text>
+            {filtersActive && <Pressable accessibilityRole="button" onPress={() => setFilters(DEFAULT_QUESTION_FILTERS)}><Text style={styles.askLink}>مسح التصفية</Text></Pressable>}
             <Text onPress={() => router.push('/ask')} style={styles.askLink}>+ اطرح استفسارك</Text>
           </View>
         ) : (
           <View style={styles.posts}>
-            {items.slice(0, visibleCount).map(question => (
+            {filteredItems.slice(0, visibleCount).map(question => (
               <TwitterInquiryCard
                 key={String(question.id)}
                 type="question"
@@ -292,7 +289,7 @@ export default function Questions() {
                 onDeleted={() => { void loadQuestions(activeLoc); }}
               />
             ))}
-            {visibleCount < items.length && (
+            {visibleCount < filteredItems.length && (
               <View style={styles.moreLoading}>
                 <ActivityIndicator size="small" color="#16845f" />
                 <Text style={styles.moreLoadingText}>اسحب للأسفل لعرض المزيد</Text>
@@ -300,15 +297,10 @@ export default function Questions() {
             )}
           </View>
         )}
+        {hasMore && <Pressable disabled={loading} accessibilityRole="button" onPress={() => setQueryLimit(limit => limit + 80)} style={styles.moreLoading}><Text style={styles.askLink}>{loading ? 'جارٍ التحميل...' : 'تحميل منشورات أقدم'}</Text></Pressable>}
       </ScrollView>
 
-      <LocationSelectorModal
-        visible={showLocationModal}
-        selectedCity={activeLoc.city}
-        selectedDistrict={activeLoc.district}
-        onSelect={onSelectLocation}
-        onClose={() => setShowLocationModal(false)}
-      />
+      <QuestionFilterSheet visible={filterOpen} value={draftFilters} isMember={Boolean(currentUserId)} onChange={setDraftFilters} onClose={() => setFilterOpen(false)} onApply={() => { setFilters(draftFilters); setFilterOpen(false); }} onReset={() => { setFilters(DEFAULT_QUESTION_FILTERS); setDraftFilters(DEFAULT_QUESTION_FILTERS); setFilterOpen(false); }} />
     </View>
   );
 }
@@ -320,6 +312,7 @@ const styles = StyleSheet.create({
   },
   feedContent: {
     flexGrow: 1,
+    width: '100%', maxWidth: 760, alignSelf: 'center',
     paddingTop: 8,
     paddingHorizontal: 12,
     backgroundColor: '#f4f7f5',
