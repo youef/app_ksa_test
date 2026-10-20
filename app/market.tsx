@@ -171,17 +171,46 @@ export default function Market() {
   const gap = 12;
   const cardWidth = (contentWidth - gap * (columns - 1)) / columns;
 
-  const toggleSaveItem = (itemId: string) => {
-    setSavedItems((prev) => ({
-      ...prev,
-      [itemId]: !prev[itemId],
-    }));
+  const favoriteKey = (targetType: 'service' | 'business', itemId: string) => `${targetType}:${itemId}`;
+
+  const toggleSaveItem = async (itemId: string, targetType: 'service' | 'business') => {
+    const { data: auth, error: authError } = await supabase.auth.getUser();
+    if (authError || !auth.user) {
+      Alert.alert('سجّل الدخول أولاً', 'يلزم تسجيل الدخول لحفظ المنتجات والمتاجر في المفضلة.');
+      router.push('/auth');
+      return;
+    }
+    const key = favoriteKey(targetType, itemId);
+    const isSaved = Boolean(savedItems[key]);
+    setSavedItems((prev) => ({ ...prev, [key]: !isSaved }));
+    try {
+      if (isSaved) {
+        const { error } = await supabase.from('favorite_items').delete()
+          .eq('user_id', auth.user.id).eq('target_type', targetType).eq('target_id', itemId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('favorite_items').upsert(
+          { user_id: auth.user.id, target_type: targetType, target_id: itemId },
+          { onConflict: 'user_id,target_type,target_id', ignoreDuplicates: true },
+        );
+        if (error) throw error;
+      }
+    } catch (error: any) {
+      setSavedItems((prev) => ({ ...prev, [key]: isSaved }));
+      Alert.alert('تعذر تحديث المفضلة', error?.message || 'حاول مرة أخرى بعد قليل.');
+    }
   };
 
   useEffect(() => {
     const loadUser = async () => {
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) return;
+      const { data: favorites } = await supabase.from('favorite_items')
+        .select('target_type,target_id').eq('user_id', u.user.id)
+        .in('target_type', ['service', 'business']);
+      if (favorites) {
+        setSavedItems(Object.fromEntries(favorites.map((fav: any) => [favoriteKey(fav.target_type, fav.target_id), true])));
+      }
       const { data: p } = await supabase
         .from('profiles')
         .select('id, display_name, avatar_url, is_geoverified')
@@ -234,6 +263,9 @@ export default function Market() {
         id: b.id,
         name: b.name || 'منشأة تجارية',
         category: b.category || 'grocery',
+        image_url: b.image_url || b.cover_url || b.logo_url || null,
+        cover_url: b.cover_url || b.image_url || null,
+        logo_url: b.logo_url || null,
         categoryLabel: BUSINESS_CATEGORIES.find((c) => c.id === b.category)?.label || b.category || 'خدمات محلية',
         city: b.city || '',
         district: b.district || '',
@@ -514,7 +546,7 @@ export default function Market() {
     const cover = getServiceCover(item);
     const modes: string[] = (item.delivery_modes || []).slice(0, 3);
     const timeAgo = relativeTime(item.created_at);
-    const isSaved = Boolean(savedItems[item.id]);
+    const isSaved = Boolean(savedItems[favoriteKey('service', item.id)]);
 
     return (
       <Pressable
@@ -559,7 +591,7 @@ export default function Market() {
               style={[styles.shareFab, isSaved && { backgroundColor: '#fef2f2' }]}
               onPress={(e: any) => {
                 e?.stopPropagation?.();
-                toggleSaveItem(item.id);
+                void toggleSaveItem(item.id, 'service');
               }}
             >
               <Heart size={13} color={isSaved ? '#ef4444' : '#475569'} fill={isSaved ? '#ef4444' : 'none'} />
@@ -637,7 +669,7 @@ export default function Market() {
 
   // Render Card: Local Business / Store Directory
   const renderBusinessCard = (b: any, w: number, listMode = false) => {
-    const isSaved = Boolean(savedItems[b.id]);
+    const isSaved = Boolean(savedItems[favoriteKey('business', b.id)]);
 
     return (
       <Pressable
@@ -668,7 +700,7 @@ export default function Market() {
               style={[styles.shareFab, isSaved && { backgroundColor: '#fef2f2' }]}
               onPress={(e: any) => {
                 e?.stopPropagation?.();
-                toggleSaveItem(b.id);
+                void toggleSaveItem(b.id, 'business');
               }}
             >
               <Heart size={13} color={isSaved ? '#ef4444' : '#475569'} fill={isSaved ? '#ef4444' : 'none'} />
