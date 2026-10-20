@@ -838,49 +838,37 @@ export default function AdminScreen() {
 
       const { data: verificationRequest, error: verificationLoadError } = await supabase
         .from('verification_requests')
-        .select('subject,note,attachment_url,verification_type')
+        .select('subject,note,attachment_url,document_url,verification_type')
         .eq('id', reqId)
         .maybeSingle();
       if (verificationLoadError) throw verificationLoadError;
+      if (!verificationRequest) throw new Error('طلب التوثيق غير موجود.');
 
-      const { error: reqErr } = await supabase
-        .from('verification_requests')
-        .update({
-          status: action,
-          reviewed_by: u.user.id,
-          reviewed_at: new Date().toISOString(),
-        })
-        .eq('id', reqId);
+      const { data: decision, error: decisionError } = await supabase.rpc('admin_review_verification', {
+        p_request_id: reqId,
+        p_status: action,
+      });
+      if (decisionError) throw decisionError;
 
-      if (reqErr) throw reqErr;
+      const decisionData = decision as any;
+      const requestedLabel = verificationAccountLabel(
+        decisionData?.requested_account_type || verificationRequest.subject,
+      );
 
       if (action === 'approved') {
-        const requestedType = ['standard', 'merchant', 'freelance', 'provider', 'idea'].includes(verificationRequest?.subject || '')
-          ? verificationRequest?.subject
-          : null;
-        const profilePatch: any = {
-          is_verified: true,
-          verification_status: 'verified',
-          verification_method: 'manual_review',
-          updated_at: new Date().toISOString(),
-        };
-        if (requestedType) {
-          profilePatch.account_type = requestedType;
-          profilePatch.is_verified_merchant = requestedType === 'merchant';
-          profilePatch.freelance_trade = requestedType === 'standard' ? null : verificationRequest?.note || null;
-        }
-
-        const { error: profErr } = await supabase
-          .from('profiles')
-          .update(profilePatch)
-          .eq('id', userId);
-
-        if (profErr) throw profErr;
-
-        setUsersList(prev => prev.map(usr => (usr.id === userId ? { ...usr, is_verified: true, verification_status: 'verified', account_type: requestedType || usr.account_type, is_verified_merchant: requestedType === 'merchant' } : usr)));
+        setUsersList(prev => prev.map(usr => (
+          usr.id === userId
+            ? {
+                ...usr,
+                is_verified: Boolean(decisionData?.is_verified),
+                verification_status: decisionData?.verification_status || 'verified',
+                account_type: decisionData?.account_type || usr.account_type,
+                is_verified_merchant: Boolean(decisionData?.is_verified_merchant),
+              }
+            : usr
+        )));
       }
 
-      const requestedLabel = verificationAccountLabel(verificationRequest?.subject);
       const notifTitle = action === 'approved' ? 'تم اعتماد توثيق حسابك' : 'تحديث بشأن طلب التوثيق';
       const notifBody =
         action === 'approved'
@@ -895,21 +883,13 @@ export default function AdminScreen() {
         data: { actor_id: u.user.id, request_id: reqId, status: action },
       });
 
-      // Dispatch push notification
       await sendAdminBroadcastPush([userId], {
         title: notifTitle,
         body: notifBody,
         data: { type: 'verification', status: action },
       });
 
-      await recordAuditLog(
-        action === 'approved' ? 'اعتماد طلب توثيق رسمي' : 'رفض طلب توثيق رسمي',
-        userName + ' · ' + requestedLabel,
-        'verification',
-        reqId
-      );
-
-      const privateAttachment = verificationRequest?.attachment_url || null;
+      const privateAttachment = verificationRequest.attachment_url || null;
       if (privateAttachment && !/^https?:\/\//i.test(privateAttachment)) {
         const cleanup = await supabase.storage.from('verification-documents').remove([privateAttachment]);
         if (!cleanup.error) {
@@ -919,7 +899,21 @@ export default function AdminScreen() {
         }
       }
 
-      setVerifications(prev => prev.map(v => (v.id === reqId ? { ...v, status: action, attachment_url: privateAttachment && !/^https?:\/\//i.test(privateAttachment) ? null : v.attachment_url } : v)));
+      setVerifications(prev => prev.map(v => (
+        v.id === reqId
+          ? {
+              ...v,
+              status: action,
+              reviewed_by: decisionData?.reviewed_by || u.user?.id || null,
+              reviewed_at: decisionData?.reviewed_at || new Date().toISOString(),
+              attachment_url:
+                privateAttachment && !/^https?:\/\//i.test(privateAttachment)
+                  ? null
+                  : v.attachment_url,
+            }
+          : v
+      )));
+
       showToast(action === 'approved' ? 'تم اعتماد الصفة والتوثيق الرسمي' : 'تم رفض طلب التوثيق');
     } catch (e: any) {
       Alert.alert('خطأ', e?.message || 'تعذر البت في طلب التوثيق');
