@@ -13,7 +13,7 @@ import {
 
 // Store the background-only image at public/welcome/welcome-background.png.
 // The background is separate from the interactive buttons and text below.
-const WELCOME_BACKGROUND = { uri: 'https://appksatest.vercel.app/welcome/welcome-background.png.png' };
+const WELCOME_BACKGROUND = { uri: 'https://appksatest.vercel.app/welcome/welcome-background.png' };
 
 export default function Index() {
   const [signedIn, setSignedIn] = useState(false);
