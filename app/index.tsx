@@ -11,9 +11,9 @@ import {
   FALLBACK_LOGO_URI, getBrandingLogo, getCachedBrandingLogo, subscribeBrandingLogo,
 } from '@/lib/branding';
 
-// Upload the original background photograph to public/welcome-background.jpg.
-// A public URL (rather than require()) keeps web and native builds working before upload.
-const WELCOME_BACKGROUND = { uri: 'https://appksatest.vercel.app/welcome-background.jpg' };
+// Store the background-only image at public/welcome/welcome-background.png.
+// The background is separate from the interactive buttons and text below.
+const WELCOME_BACKGROUND = { uri: 'https://appksatest.vercel.app/welcome/welcome-background.png' };
 
 export default function Index() {
   const [signedIn, setSignedIn] = useState(false);
