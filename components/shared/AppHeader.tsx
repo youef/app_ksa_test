@@ -37,7 +37,7 @@ function actionContent(children: ReactNode, color: string): ReactNode {
     return child;
   });
 }
-export function HeaderAction({ children, style, tone = 'light', bare = false, ...props }: PressableProps & { children: ReactNode; tone?: HeaderTone; bare?: boolean }) {
+export function HeaderAction({ children, style, tone = 'light', bare = true, ...props }: PressableProps & { children: ReactNode; tone?: HeaderTone; bare?: boolean }) {
   return <Pressable {...props} accessibilityRole="button" hitSlop={0} style={state => [typeof style === 'function' ? style(state) : style, styles.actionButton, bare && styles.bareAction, tone === 'overlay' && styles.overlayButton, (state.pressed || props.disabled) && styles.pressed]}>{actionContent(children, tone === 'overlay' ? '#ffffff' : '#047857')}</Pressable>;
 }
 
