@@ -39,9 +39,9 @@ export default function Button({ children, onPress, variant = 'primary', loading
 }
 
 const styles = StyleSheet.create({
-  base:{minHeight:46,borderRadius:15,paddingHorizontal:18,alignItems:'center',justifyContent:'center',flexDirection:'row',gap:8},
-  primary:{backgroundColor:'#059669'},
-  secondary:{backgroundColor:'#ecfdf5',borderWidth:1,borderColor:'#a7f3d0'},
+  base:{minHeight:46,borderRadius:16,paddingHorizontal:18,alignItems:'center',justifyContent:'center',flexDirection:'row',gap:8},
+  primary:{backgroundColor:'#047857'},
+  secondary:{backgroundColor:'#ECFDF5',borderWidth:1,borderColor:'#A7F3D0'},
   ghost:{backgroundColor:'transparent'},
   danger:{backgroundColor:'#dc2626'},
   disabled:{opacity:.5},
