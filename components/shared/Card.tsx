@@ -8,5 +8,5 @@ export default function Card({ children, style }: Props) {
 }
 
 const styles = StyleSheet.create({
-  card:{backgroundColor:'#fff',borderRadius:22,borderWidth:1,borderColor:'#e2e8f0',padding:16,shadowColor:'#0f172a',shadowOpacity:.06,shadowRadius:18,shadowOffset:{width:0,height:8},elevation:3},
+  card:{backgroundColor:'#fff',borderRadius:20,borderWidth:1,borderColor:'#E2ECE6',padding:16,shadowColor:'#0f172a',shadowOpacity:.035,shadowRadius:12,shadowOffset:{width:0,height:4},elevation:1},
 });
