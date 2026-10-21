@@ -9,7 +9,7 @@ import { usePlatformConfig } from '@/lib/platformConfig';
 export const APP_HEADER_HEIGHT = 56;
 export const HEADER_ACTION_SIZE = 44;
 export const HEADER_HORIZONTAL_PADDING = 16;
-export const HEADER_SIDE_WIDTH = 88;
+export const HEADER_SIDE_WIDTH = 104;
 export type HeaderTone = 'light' | 'overlay';
 
 export function headerTopInset(top: number) {
@@ -68,7 +68,7 @@ export function AppHeader({ variant = 'sub', title, subtitle, fallbackRoute = '/
   const [failedImage, setFailedImage] = useState<string | null>(null);
   const [failedLogo, setFailedLogo] = useState(false);
   const dark = tone === 'overlay';
-  const color = dark ? '#ffffff' : '#334155';
+  const color = dark ? '#ffffff' : '#166044';
   const headerKey = title?.includes('بحث') ? 'search' : title?.includes('سوق') ? 'market' : title?.includes('يوميات') || title?.includes('قصص') ? 'stories' : undefined;
   const displayTitle = (headerKey && branding.headers?.[headerKey]) || title || branding.name || 'حيّنا';
   const goBack = () => {
@@ -81,7 +81,7 @@ export function AppHeader({ variant = 'sub', title, subtitle, fallbackRoute = '/
   const identity = titleContent || <>
     {home ? <View style={styles.brand}>
       {failedLogo ? <Home size={22} color="#047857" /> : <Image source={{ uri: logoUri || FALLBACK_LOGO_URI }} style={styles.logo} onError={() => setFailedLogo(true)} />}
-      <Text numberOfLines={1} style={[styles.title, dark && styles.lightText]}>حيّنا</Text>
+
     </View> : <View style={styles.identityRow}>
       {variant === 'chat' ? <View>{avatar(avatarUrl)}{isOnline ? <View style={styles.onlineDot} /> : null}</View> : null}
       <View style={styles.titleCopy}><Text accessibilityRole="header" numberOfLines={1} style={[styles.title, dark && styles.lightText]}>{displayTitle}</Text>{subtitle ? <Text numberOfLines={1} style={[styles.subtitle, dark && styles.lightSubtitle]}>{subtitle}</Text> : null}</View>
@@ -104,7 +104,7 @@ export function AppHeader({ variant = 'sub', title, subtitle, fallbackRoute = '/
 }
 
 const styles = StyleSheet.create({
-  container: { width: '100%', backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e8eeeb', zIndex: 20, flexShrink: 0 },
+  container: { width: '100%', backgroundColor: '#ffffff', borderBottomWidth: 1, borderBottomColor: '#e4eee8', zIndex: 20, flexShrink: 0 },
   overlay: { backgroundColor: 'transparent', borderBottomColor: 'transparent' },
   content: { height: APP_HEADER_HEIGHT, width: '100%', maxWidth: 1100, alignSelf: 'center', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: HEADER_HORIZONTAL_PADDING, gap: 4 },
   side: { width: HEADER_SIDE_WIDTH, flexShrink: 0, alignItems: 'flex-start', justifyContent: 'center', height: HEADER_ACTION_SIZE },
@@ -116,11 +116,11 @@ const styles = StyleSheet.create({
   lightText: { color: '#fff' }, lightSubtitle: { color: '#e2e8f0' },
   identityRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', minWidth: 0 },
   brand: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  logo: { width: 28, height: 28, borderRadius: 8 }, avatar: { width: 32, height: 32, borderRadius: 16 }, avatarFallback: { backgroundColor: '#ecfdf5', alignItems: 'center', justifyContent: 'center' },
-  actionScroll: { flexGrow: 0, maxWidth: HEADER_SIDE_WIDTH }, actions: { flexDirection: 'row-reverse', alignItems: 'center' },
-  actionButton: { height: HEADER_ACTION_SIZE, minHeight: HEADER_ACTION_SIZE, minWidth: HEADER_ACTION_SIZE, paddingVertical: 0, paddingHorizontal: 8, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row-reverse', gap: 4, backgroundColor: '#f1f7f3', borderWidth: 0, flexShrink: 0 },
+  logo: { width: 38, height: 38, borderRadius: 11 }, avatar: { width: 32, height: 32, borderRadius: 16 }, avatarFallback: { backgroundColor: '#ecfdf5', alignItems: 'center', justifyContent: 'center' },
+  actionScroll: { flexGrow: 0, maxWidth: HEADER_SIDE_WIDTH }, actions: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
+  actionButton: { height: HEADER_ACTION_SIZE, minHeight: HEADER_ACTION_SIZE, minWidth: HEADER_ACTION_SIZE, paddingVertical: 0, paddingHorizontal: 8, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row-reverse', gap: 4, backgroundColor: '#f0f7f3', borderWidth: 1, borderColor: '#e0eee6', flexShrink: 0 },
   overlayButton: { backgroundColor: 'rgba(15,23,42,0.35)' }, pressed: { opacity: 0.65 },
-  badge: { position: 'absolute', top: 2, right: 2, minWidth: 15, height: 15, borderRadius: 8, backgroundColor: '#16834A', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 }, badgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
+  badge: { position: 'absolute', top: 0, right: 0, minWidth: 18, height: 18, borderRadius: 9, backgroundColor: '#16834A', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, borderWidth: 1.5, borderColor: '#fff' }, badgeText: { color: '#fff', fontSize: 10, fontWeight: '800' },
   onlineDot: { width: 8, height: 8, borderRadius: 4, position: 'absolute', bottom: 0, left: 0, backgroundColor: '#10b981', borderWidth: 1, borderColor: '#fff' },
 });
 export default AppHeader;
