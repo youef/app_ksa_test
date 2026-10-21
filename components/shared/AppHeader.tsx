@@ -37,8 +37,8 @@ function actionContent(children: ReactNode, color: string): ReactNode {
     return child;
   });
 }
-export function HeaderAction({ children, style, tone = 'light', ...props }: PressableProps & { children: ReactNode; tone?: HeaderTone }) {
-  return <Pressable {...props} accessibilityRole="button" hitSlop={0} style={state => [typeof style === 'function' ? style(state) : style, styles.actionButton, tone === 'overlay' && styles.overlayButton, (state.pressed || props.disabled) && styles.pressed]}>{actionContent(children, tone === 'overlay' ? '#ffffff' : '#047857')}</Pressable>;
+export function HeaderAction({ children, style, tone = 'light', bare = false, ...props }: PressableProps & { children: ReactNode; tone?: HeaderTone; bare?: boolean }) {
+  return <Pressable {...props} accessibilityRole="button" hitSlop={0} style={state => [typeof style === 'function' ? style(state) : style, styles.actionButton, bare && styles.bareAction, tone === 'overlay' && styles.overlayButton, (state.pressed || props.disabled) && styles.pressed]}>{actionContent(children, tone === 'overlay' ? '#ffffff' : '#047857')}</Pressable>;
 }
 
 export interface AppHeaderProps {
@@ -89,14 +89,14 @@ export function AppHeader({ variant = 'sub', title, subtitle, fallbackRoute = '/
   </>;
   return <AppHeaderFrame tone={tone} safeArea={safeArea} style={style}>
     <View style={[styles.side, styles.leading]}>
-      {home ? isGuest ? <HeaderAction tone={tone} accessibilityLabel="تسجيل الدخول" onPress={() => router.push('/auth')}><LogIn size={21} color="#047857" /></HeaderAction> : <HeaderAction tone={tone} accessibilityLabel="الملف الشخصي" onPress={() => router.push('/profile')}>{avatar(profile?.avatar_url)}</HeaderAction> : showBack ? <HeaderAction tone={tone} accessibilityLabel="رجوع" onPress={goBack}><ChevronRight size={23} color={color} /></HeaderAction> : null}
+      {home ? isGuest ? <HeaderAction tone={tone} accessibilityLabel="تسجيل الدخول" onPress={() => router.push('/auth')}><LogIn size={21} color="#047857" /></HeaderAction> : <HeaderAction bare tone={tone} accessibilityLabel="الملف الشخصي" onPress={() => router.push('/profile')}>{avatar(profile?.avatar_url)}</HeaderAction> : showBack ? <HeaderAction tone={tone} accessibilityLabel="رجوع" onPress={goBack}><ChevronRight size={23} color={color} /></HeaderAction> : null}
     </View>
     {onTitlePress ? <Pressable accessibilityRole="button" accessibilityLabel={displayTitle} onPress={onTitlePress} style={styles.center}>{identity}</Pressable> : <View style={styles.center}>{identity}</View>}
     <View style={styles.side}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.actions} style={styles.actionScroll}>
         {home ? !isGuest ? <>
-          <HeaderAction tone={tone} accessibilityLabel="الإشعارات" onPress={() => router.push('/notifications')}><Bell size={20} color={color} />{unreadCount > 0 ? <View style={styles.badge}><Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text></View> : null}</HeaderAction>
-          <HeaderAction tone={tone} accessibilityLabel="الدردشة" onPress={() => router.push('/messages')}><MessageCircle size={20} color={color} />{unreadMessagesCount > 0 ? <View style={styles.badge}><Text style={styles.badgeText}>{unreadMessagesCount > 99 ? "99+" : unreadMessagesCount}</Text></View> : null}</HeaderAction>
+          <HeaderAction bare tone={tone} accessibilityLabel="الإشعارات" onPress={() => router.push('/notifications')}><Bell size={20} color={color} />{unreadCount > 0 ? <View style={styles.badge}><Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text></View> : null}</HeaderAction>
+          <HeaderAction bare tone={tone} accessibilityLabel="الدردشة" onPress={() => router.push('/messages')}><MessageCircle size={20} color={color} />{unreadMessagesCount > 0 ? <View style={styles.badge}><Text style={styles.badgeText}>{unreadMessagesCount > 99 ? "99+" : unreadMessagesCount}</Text></View> : null}</HeaderAction>
         </> : null : rightAction}
       </ScrollView>
     </View>
@@ -119,8 +119,9 @@ const styles = StyleSheet.create({
   logo: { width: 38, height: 38, borderRadius: 11 }, avatarRing: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, borderColor: '#047857', padding: 2, backgroundColor: '#ffffff', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }, avatar: { width: 32, height: 32, borderRadius: 16 }, avatarFallback: { backgroundColor: '#ecfdf5', alignItems: 'center', justifyContent: 'center' },
   actionScroll: { flexGrow: 0, maxWidth: HEADER_SIDE_WIDTH }, actions: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
   actionButton: { height: HEADER_ACTION_SIZE, minHeight: HEADER_ACTION_SIZE, minWidth: HEADER_ACTION_SIZE, paddingVertical: 0, paddingHorizontal: 8, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row-reverse', gap: 4, backgroundColor: '#ecfdf5', borderWidth: 1, borderColor: '#a7f3d0', flexShrink: 0 },
+  bareAction: { backgroundColor: 'transparent', borderWidth: 0, paddingHorizontal: 0, borderRadius: 22 },
   overlayButton: { backgroundColor: 'rgba(15,23,42,0.35)' }, pressed: { opacity: 0.65 },
-  badge: { position: 'absolute', top: 0, right: 0, minWidth: 18, height: 18, borderRadius: 9, backgroundColor: '#047857', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, borderWidth: 1.5, borderColor: '#fff' }, badgeText: { color: '#fff', fontSize: 10, fontWeight: '800' },
+  badge: { position: 'absolute', top: 0, right: 0, minWidth: 19, height: 19, borderRadius: 10, backgroundColor: '#047857', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, borderWidth: 2, borderColor: '#fff' }, badgeText: { color: '#ffffff', fontSize: 11, lineHeight: 14, fontWeight: '900', textAlign: 'center', includeFontPadding: false },
   onlineDot: { width: 8, height: 8, borderRadius: 4, position: 'absolute', bottom: 0, left: 0, backgroundColor: '#10b981', borderWidth: 1, borderColor: '#fff' },
 });
 export default AppHeader;
