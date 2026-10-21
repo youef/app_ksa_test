@@ -145,10 +145,16 @@ export function useHomeFeed({ onLocation }: Options) {
       // Stories obey the same strict location boundary as posts: no neighboring districts
       // are used as fallback when the current area has no stories.
       const rawStories = ((storiesRes.data ?? []) as Story[]);
+      const mutedAuthors = new Set<string>();
+      if (user) {
+        const preferences = await supabase.from('story_author_preferences').select('author_id').eq('user_id', user.id).eq('muted', true);
+        if (preferences.error) { setStories([]); } else (preferences.data || []).forEach(row => mutedAuthors.add(row.author_id));
+        if (preferences.error) rawStories.length = 0;
+      }
       const seen = new Set<string>();
       const localStories: Story[] = [];
       for (const story of rawStories) {
-        if (!story.author_id || seen.has(story.author_id)) continue;
+        if (!story.author_id || seen.has(story.author_id) || mutedAuthors.has(story.author_id)) continue;
         if (!isLocationMatching(
           { city: story.profiles?.city, district: story.profiles?.district },
           loc.city,

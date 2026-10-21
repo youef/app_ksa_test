@@ -1,5 +1,5 @@
 import { AppHeader, HeaderAction } from '@/components/shared/AppHeader';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   Alert,
   Dimensions,
@@ -65,6 +65,26 @@ export default function CreateStory() {
   const [allowedUserIds, setAllowedUserIds] = useState<string[]>([]);
   const [hiddenUserIds, setHiddenUserIds] = useState<string[]>([]);
   const [allowStoryReplies, setAllowStoryReplies] = useState(true);
+  const [defaultsReady, setDefaultsReady] = useState(false);
+  const [accountRepliesDisabled, setAccountRepliesDisabled] = useState(false);
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const auth = await supabase.auth.getUser();
+        if (auth.error) throw auth.error;
+        if (!auth.data.user) { router.replace('/auth'); return; }
+        const result = await supabase.from('profiles').select('profile_privacy,allow_story_replies').eq('id', auth.data.user.id).single();
+        if (result.error) throw result.error;
+        if (!active) return;
+        setAudience(result.data.profile_privacy === 'private' ? 'followers' : 'public');
+        setAllowStoryReplies(result.data.allow_story_replies !== 'nobody');
+        setAccountRepliesDisabled(result.data.allow_story_replies === 'nobody');
+        setDefaultsReady(true);
+      } catch { if (active) Alert.alert('تعذر تحميل إعدادات حسابك', 'أعد فتح الصفحة بعد التحقق من الاتصال.'); }
+    })();
+    return () => { active = false; };
+  }, []);
   const [audienceLoading, setAudienceLoading] = useState(false);
   const [interactiveType, setInteractiveType] = useState<'none' | 'poll' | 'question'>('none');
   const [pollQuestion, setPollQuestion] = useState('');
@@ -146,6 +166,7 @@ export default function CreateStory() {
   }, [audienceCandidates.length, loadAudienceCandidates]);
 
   const handlePublish = useCallback(async () => {
+    if (!defaultsReady) return;
     if (!composer.isReady) {
       return Alert.alert(
         'تنبيه',
@@ -210,7 +231,7 @@ export default function CreateStory() {
     Alert.alert('تم النشر بنجاح!', body, [
       { text: 'مشاهدة في الحي', onPress: () => router.replace('/stories') },
     ]);
-  }, [composer, publisher, audience, allowedUserIds, hiddenUserIds, allowStoryReplies, interactiveType,, pollOptionA, pollOptionB, questionPrompt, textColor, fontSize, fontIndex, textRotation, textOffset]);
+  }, [composer, publisher, defaultsReady, audience, allowedUserIds, hiddenUserIds, allowStoryReplies, interactiveType, pollQuestion, pollOptionA, pollOptionB, questionPrompt, textColor, fontSize, fontIndex, textRotation, textOffset]);
 
   if (!activeSlide) return null;
 
@@ -471,9 +492,9 @@ export default function CreateStory() {
                 <ShieldCheck size={15} color="#a7f3d0" />
                 <Text style={s.optionsSectionTitle}>الردود على القصة</Text>
               </View>
-              <Pressable onPress={() => setAllowStoryReplies((value) => !value)} style={[s.optionsChip, allowStoryReplies && s.optionsChipActive]}>
+              <Pressable disabled={accountRepliesDisabled} onPress={() => setAllowStoryReplies((value) => !value)} style={[s.optionsChip, allowStoryReplies && s.optionsChipActive]}>
                 <Text style={s.optionsChipText}>{allowStoryReplies ? 'الردود مسموحة' : 'الردود مغلقة'}</Text>
-                <Text style={s.optionsHint}>{allowStoryReplies ? 'يمكن للمشاهدين المسموح لهم الرد على القصة' : 'لن يتمكن أحد من الرد على هذه القصة'}</Text>
+                <Text style={s.optionsHint}>{accountRepliesDisabled ? 'الردود مغلقة من إعدادات حسابك. غيّرها من إعدادات اليوميات.' : allowStoryReplies ? 'تطبق صلاحيات الرد من إعدادات حسابك' : 'لن يتمكن أحد من الرد على هذه القصة'}</Text>
               </Pressable>
 
               <View style={s.optionsSectionHeader}>
@@ -648,7 +669,7 @@ export default function CreateStory() {
                 (!composer.isReady || publisher.publishing) && s.whatsAppSendFabDisabled,
               ]}
               onPress={handlePublish}
-              disabled={!composer.isReady || publisher.publishing}
+              disabled={!defaultsReady || !composer.isReady || publisher.publishing}
               accessibilityRole="button"
               accessibilityLabel="نشر الحالة"
             >

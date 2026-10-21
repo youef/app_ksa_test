@@ -15,7 +15,7 @@ import {
   View,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import {
   Bell,
   BellOff,
@@ -50,6 +50,7 @@ import {
 } from 'lucide-react-native';
 
 import { AppHeader } from '@/components/shared/AppHeader';
+import { ProfileStories } from '@/components/profile/ProfileStories';
 import {
   AccountIdentityBadge,
   AccountIdentityIcon,
@@ -280,9 +281,7 @@ export default function AccountCenter() {
     }
   }, []);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   const identityMeta = useMemo(
     () => getAccountIdentityMeta(profile?.role, profile?.account_type, Boolean(profile?.is_verified)),
@@ -686,6 +685,7 @@ export default function AccountCenter() {
 
         {tab === 'profile' ? (
           <View style={styles.stack}>
+            <ProfileStories userId={userId} own />
             <SectionCard>
               <View style={styles.sectionHeader}>
                 <View style={styles.sectionHeaderCopy}>
@@ -924,6 +924,7 @@ export default function AccountCenter() {
 
         {tab === 'settings' ? (
           <View style={styles.stack}>
+            <SectionCard><Pressable accessibilityRole="button" onPress={() => router.push('/story-settings')} style={styles.navigationRow}><View style={styles.navigationIcon}><Sparkles size={20} color="#166044" /></View><View style={styles.navigationCopy}><Text style={styles.navigationTitle}>إعدادات يوميات الحي</Text><Text style={styles.navigationSub}>الردود، الخصوصية، التنبيهات والحسابات المكتومة</Text></View><ChevronLeft size={18} color="#64748B" /></Pressable></SectionCard>
             <SectionCard>
               <View style={styles.sectionHeader}>
                 <View style={styles.sectionHeaderCopy}>

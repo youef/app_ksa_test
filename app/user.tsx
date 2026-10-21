@@ -42,6 +42,7 @@ import {
   Edit3,
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
+import { ProfileStories } from '@/components/profile/ProfileStories';
 import { ProfileCustomizationEntry } from '@/components/profile/ProfileCustomizationEntry';
 import { AccountIdentityBadge, AccountIdentityIcon, AccountVerificationBadge, getAccountIdentityMeta } from '@/components/profile/AccountIdentityBadge';
 import { C } from '@/lib/ui';
@@ -813,6 +814,7 @@ export default function UserProfile() {
           )}
 
           {/* Activity Category Tabs */}
+          {!locked ? <ProfileStories userId={id} own={own} /> : null}
           <View style={styles.tabsCard}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
               {TABS.filter(({ id: key }) => (key !== 'answers' || own) && (key !== 'services' || (profileCustomization && profileCustomization.section_visibility && profileCustomization.section_visibility.services !== false)) && (key !== 'questions' || !(profileCustomization && profileCustomization.section_visibility && profileCustomization.section_visibility.questions === false)) && (key !== 'market' || !(profileCustomization && profileCustomization.section_visibility && profileCustomization.section_visibility.products === false)) && (key !== 'requests' || !(profileCustomization && profileCustomization.section_visibility && profileCustomization.section_visibility.services === false)) && (key !== 'reviews' || !(profileCustomization && profileCustomization.section_visibility && profileCustomization.section_visibility.reviews === false))).sort((a, b) => {

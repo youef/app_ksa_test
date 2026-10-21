@@ -52,5 +52,5 @@ export async function uploadStoryImage(options: {
     return { url: `data:image/jpeg;base64,${base64}`, strategy: 'base64', error: lastError };
   }
 
-  return { url: uri, strategy: 'local', error: lastError };
+  throw new Error(lastError || 'تعذر رفع الصورة؛ لم تُنشر اليومية. تحقق من الاتصال وحاول مجددًا.');
 }

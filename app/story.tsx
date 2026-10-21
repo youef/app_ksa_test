@@ -17,6 +17,7 @@ import {
   PanResponder,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
+import { isActiveStory } from '@/lib/storyActivity';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/lib/supabase';
 import { requireAccount } from '@/lib/authGate';
@@ -36,9 +37,30 @@ export default function StoryViewer() {
   const [replyText, setReplyText] = useState('');
   const [sending, setSending] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string>('');
+  const activeLikeStory = useRef<string | undefined>(undefined);
+  activeLikeStory.current = storiesList[currentIndex]?.id;
   const [liked, setLiked] = useState(false);
+  const [likeBusy, setLikeBusy] = useState(false);
+  const [likesReady, setLikesReady] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
+  useEffect(() => {
+    let active = true;
+    setLiked(false); setLikesReady(false); setLikeCount(0);
+    if (!currentStoryIdForLikes()) return;
+    const storyId = storiesList[currentIndex]?.id;
+    (async () => {
+      const [mine, count] = await Promise.all([
+        supabase.from('story_likes').select('story_id').eq('story_id', storyId).eq('user_id', currentUserId).maybeSingle(),
+        supabase.from('story_likes').select('story_id', { count: 'exact', head: true }).eq('story_id', storyId),
+      ]);
+      if (!active || mine.error || count.error) return;
+      setLiked(Boolean(mine.data)); setLikeCount(count.count || 0); setLikesReady(true);
+    })().catch(() => {});
+    return () => { active = false; };
+    function currentStoryIdForLikes() { return Boolean(storiesList[currentIndex]?.id && currentUserId); }
+  }, [storiesList[currentIndex]?.id, currentUserId]);
   const [showReplyBox, setShowReplyBox] = useState(false);
-  const [canReply, setCanReply] = useState(true);
+  const [canReply, setCanReply] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [pollVotes, setPollVotes] = useState<number[]>([0, 0]);
   const [myPollVote, setMyPollVote] = useState<number | null>(null);
@@ -256,7 +278,8 @@ export default function StoryViewer() {
       .or(`expires_at.gt.${nowIso},and(expires_at.is.null,created_at.gte.${yesterday})`)
       .order('created_at', { ascending: true });
 
-    const sequence = allAuthorStories && allAuthorStories.length > 0 ? allAuthorStories : [targetStory];
+    const sequence = !isActiveStory(targetStory) && targetStory.author_id === u.user.id ? [targetStory] : (allAuthorStories || []).filter(story => isActiveStory(story));
+    if (!sequence.length) { setStoriesList([]); setLoading(false); return; }
     setStoriesList(sequence);
 
     // Resume the last viewed story only when opening from the author story ring.
@@ -271,7 +294,7 @@ export default function StoryViewer() {
     setCurrentIndex(targetIdx >= 0 ? targetIdx : 0);
 
     // Per-story reply permissions are recalculated when the active story changes.
-    setCanReply(Boolean(u?.user) && targetStory.allow_replies !== false);
+    setCanReply(false);
 
     setLoading(false);
   }
@@ -285,15 +308,16 @@ export default function StoryViewer() {
   useEffect(() => {
     let cancelled = false;
     async function checkReplyPermission() {
+      setCanReply(false);
       if (!currentStory?.id || !currentUserId || currentStory.author_id === currentUserId || currentStory.allow_replies === false) {
         setCanReply(false);
         return;
       }
-      if (author?.allow_story_replies === 'nobody') {
+      if (author?.allow_story_replies === 'nobody' || author?.allow_dms === 'nobody') {
         setCanReply(false);
         return;
       }
-      if (author?.allow_story_replies === 'followers') {
+      if (author?.allow_story_replies === 'followers' || author?.allow_dms === 'followers') {
         const { data: followRecord, error } = await supabase
           .from('follows')
           .select('id')
@@ -307,7 +331,7 @@ export default function StoryViewer() {
     }
     void checkReplyPermission();
     return () => { cancelled = true; };
-  }, [currentStory?.id, currentStory?.allow_replies, currentUserId, author?.allow_story_replies]);
+  }, [currentStory?.id, currentStory?.allow_replies, currentUserId, author?.allow_story_replies, author?.allow_dms]);
 
   // 2. Animate Progress Bar and Auto-Advance
   useEffect(() => {
@@ -430,7 +454,8 @@ export default function StoryViewer() {
         text: 'حذف',
         style: 'destructive',
         onPress: async () => {
-          await supabase.from('stories').delete().eq('id', currentStory.id);
+          const deleted = await supabase.from('stories').delete().eq('id', currentStory.id).eq('author_id', currentUserId).select('id').single();
+          if (deleted.error || !deleted.data) { Alert.alert('تعذر الحذف', 'لم يتم حذف اليومية. حاول مجددًا.'); setIsPaused(false); return; }
           const remaining = storiesList.filter(s => s.id !== currentStory.id);
           if (remaining.length === 0) {
             router.back();
@@ -463,88 +488,28 @@ export default function StoryViewer() {
     const msgText = replyText.trim();
 
     try {
-      // 1. Try story_replies trigger
-      const { error: replyErr } = await supabase.from('story_replies').insert({
-        story_id: currentStory.id,
-        sender_id: currentUserId,
-        body: msgText,
-      });
-
-      if (!replyErr) {
-        setSending(false);
-        setReplyText('');
-        setShowReplyBox(false);
-        Alert.alert('تم! ✅', 'وصل ردك لصاحب القصة في الرسائل الخاصة', [
-          { text: 'فتح الدردشة', onPress: () => router.replace('/messages') },
-          { text: 'لاحقاً' },
-        ]);
-        return;
-      }
-
-      // 2. Manual conversation fallback
-      const { data: myConvs } = await supabase
-        .from('conversation_members')
-        .select('conversation_id')
-        .eq('user_id', currentUserId);
-
-      let convId: string | null = null;
-      if (myConvs && myConvs.length > 0) {
-        const convIds = myConvs.map((c: any) => c.conversation_id);
-        const { data: otherMember } = await supabase
-          .from('conversation_members')
-          .select('conversation_id')
-          .eq('user_id', currentStory.author_id)
-          .in('conversation_id', convIds)
-          .limit(1)
-          .maybeSingle();
-        if (otherMember) convId = otherMember.conversation_id;
-      }
-
-      if (!convId) {
-        const { data: newConv } = await supabase.from('conversations').insert({}).select().single();
-        convId = newConv?.id;
-        if (convId) {
-          await supabase.from('conversation_members').insert([
-            { conversation_id: convId, user_id: currentUserId },
-            { conversation_id: convId, user_id: currentStory.author_id },
-          ]);
-        }
-      }
-
-      if (convId) {
-        await supabase.from('messages').insert({
-          conversation_id: convId,
-          sender_id: currentUserId,
-          body: `↩️ رد على قصتك: ${msgText}`,
-          read_by: [currentUserId],
-        });
-
-        setSending(false);
-        setReplyText('');
-        setShowReplyBox(false);
-        Alert.alert('تم! ✅', 'وصل ردك في الرسائل الخاصة', [
-          { text: 'فتح الدردشة', onPress: () => router.replace('/messages') },
-          { text: 'لاحقاً' },
-        ]);
-      } else {
-        setSending(false);
-        Alert.alert('خطأ', 'لم نتمكن من إرسال ردك.');
-      }
+      const { error } = await supabase.from('story_replies').insert({ story_id: currentStory.id, sender_id: currentUserId, body: msgText });
+      if (error) throw error;
+      setReplyText(''); setShowReplyBox(false); setSending(false);
+      Alert.alert('تم إرسال الرد', 'يمكنك متابعة المحادثة في الرسائل الخاصة.', [{ text: 'فتح الرسائل', onPress: () => router.replace('/messages') }, { text: 'لاحقًا' }]);
     } catch (e: any) {
       setSending(false);
       Alert.alert('خطأ', e.message);
     }
   }
 
-  function handleLike() {
-    if (!currentUserId) {
-      Alert.alert('تسجيل الدخول', 'يرجى تسجيل الدخول للتفاعل والإعجاب بالقصة', [
-        { text: 'تسجيل الدخول', onPress: () => router.push('/auth') },
-        { text: 'إلغاء', style: 'cancel' },
-      ]);
-      return;
-    }
-    setLiked(!liked);
+  async function handleLike() {
+    if (!currentUserId || !currentStory || likeBusy || !likesReady) return;
+    const storyId = currentStory.id;
+    setLikeBusy(true);
+    try {
+      const result = liked
+        ? await supabase.from('story_likes').delete().eq('story_id', storyId).eq('user_id', currentUserId)
+        : await supabase.from('story_likes').upsert({ story_id: storyId, user_id: currentUserId }, { onConflict: 'story_id,user_id', ignoreDuplicates: true });
+      if (result.error) throw result.error;
+      if (activeLikeStory.current === storyId) { setLiked(!liked); setLikeCount(value => Math.max(0, value + (liked ? -1 : 1))); }
+    } catch { Alert.alert('تعذر حفظ الإعجاب', 'تحقق من الاتصال وحاول مجددًا.'); }
+    finally { setLikeBusy(false); }
   }
 
   function handleOpenReply() {
@@ -753,7 +718,7 @@ export default function StoryViewer() {
             <View style={styles.ownerStats}>
               <Pressable style={styles.statBadge} onPress={showStoryViewers} accessibilityRole="button" accessibilityLabel="عرض قائمة مشاهدي القصة">
                 <Eye size={16} color="#fff" />
-                <Text style={styles.statBadgeText}>{currentStory.view_count || 0} مشاهدة · عرض القائمة</Text>
+                <Text style={styles.statBadgeText}>{currentStory.view_count || 0} مشاهدة · {likesReady ? likeCount : '—'} إعجاب · عرض القائمة</Text>
               </Pressable>
             </View>
           ) : (
@@ -767,6 +732,7 @@ export default function StoryViewer() {
                     <TextInput
                       style={styles.replyInput}
                       value={replyText}
+                      maxLength={2000}
                       onChangeText={setReplyText}
                       placeholder="ردك يصل مباشرة للرسائل..."
                       placeholderTextColor="rgba(255,255,255,0.5)"
@@ -776,7 +742,7 @@ export default function StoryViewer() {
                   </View>
                 ) : (
                   <View style={styles.replyActions}>
-                    <Pressable style={styles.likeBtn} onPress={handleLike}>
+                    <Pressable style={[styles.likeBtn, !likesReady && { opacity: 0.4 }]} onPress={handleLike} disabled={likeBusy || !likesReady} accessibilityRole="button" accessibilityLabel={!likesReady ? 'الإعجابات غير متاحة مؤقتًا' : liked ? 'إلغاء الإعجاب' : 'إعجاب باليومية'}>
                       <Heart size={26} color={liked ? '#f43f5e' : '#fff'} fill={liked ? '#f43f5e' : 'transparent'} />
                     </Pressable>
                     <Pressable style={styles.replyTrigger} onPress={handleOpenReply}>
@@ -786,7 +752,7 @@ export default function StoryViewer() {
                 )
               ) : (
                 <View style={styles.disabledReplyBar}>
-                  <Pressable style={styles.likeBtn} onPress={handleLike}>
+                  <Pressable style={[styles.likeBtn, !likesReady && { opacity: 0.4 }]} onPress={handleLike} disabled={likeBusy || !likesReady} accessibilityRole="button" accessibilityLabel={!likesReady ? 'الإعجابات غير متاحة مؤقتًا' : liked ? 'إلغاء الإعجاب' : 'إعجاب باليومية'}>
                     <Heart size={26} color={liked ? '#f43f5e' : '#fff'} fill={liked ? '#f43f5e' : 'transparent'} />
                   </Pressable>
                   <View style={styles.disabledReplyNotice}>

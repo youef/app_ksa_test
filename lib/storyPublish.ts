@@ -120,6 +120,9 @@ export async function publishStorySlides(
     };
   }
 
+  const account = await supabase.from('profiles').select('allow_story_replies').eq('id', user.id).single();
+  if (account.error) throw account.error;
+  if (account.data.allow_story_replies === 'nobody') options = { ...options, allowReplies: false };
   const { urls, degraded } = await resolveImageUrls(publishable, user.id, onProgress);
   const payloads = publishable.map((slide, i) => buildPayload(slide, user.id, urls[i], options));
 

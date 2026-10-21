@@ -359,7 +359,6 @@ export default function Messages() {
             </HeaderAction>
 
             <HeaderAction
-              style={styles.newChatBtn}
               onPress={() => router.push('/search')}
               accessibilityRole="button"
               accessibilityLabel="محادثة جديدة"

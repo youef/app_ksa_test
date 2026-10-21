@@ -1,7 +1,7 @@
 import { Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Camera, Plus, ShieldCheck, ChevronLeft } from 'lucide-react-native';
+import { Camera, Plus, ShieldCheck, ChevronLeft, Settings2 } from 'lucide-react-native';
 import { styles } from './homeStyles';
 import type { Profile, Story } from '@/lib/homeUtils';
 
@@ -28,7 +28,10 @@ export default function StoriesRow({ profile, stories, selectedDistrict }: Props
         <View style={styles.storiesTitleRow}>
           <Text style={styles.storiesSectionTitle}>يوميات الحي</Text>
         </View>
-        {visibleStories.length > 0 && <Pressable onPress={() => router.push('/stories')} accessibilityRole="button" accessibilityLabel="عرض كل يوميات الحي" style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: 4 }}><ChevronLeft size={18} color="#73857b" /></Pressable>}
+        <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8 }}>
+          {profile ? <Pressable onPress={() => router.push('/story-settings')} accessibilityRole="button" accessibilityLabel="إعدادات يوميات الحي" style={{ width: 36, minHeight: 44, justifyContent: 'center', alignItems: 'center' }}><Settings2 size={17} color="#73857B" /></Pressable> : null}
+          <Pressable onPress={() => router.push(profile ? '/stories' : '/auth')} accessibilityRole="button" accessibilityLabel="عرض كل يوميات الحي" style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: 4 }}><ChevronLeft size={18} color="#73857b" /></Pressable>
+        </View>
       </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.storiesScroll, { flexDirection: 'row-reverse', flexGrow: 1 }]}>
@@ -64,7 +67,7 @@ export default function StoriesRow({ profile, stories, selectedDistrict }: Props
 
         {/* Active Neighbors Stories */}
         {visibleStories.map((story) => {
-          const authorName = story.profiles?.display_name || story.profiles?.username || 'جار';
+          const authorName = story.author_id === profile?.id ? 'يومياتي' : story.profiles?.display_name || story.profiles?.username || 'جار';
           const avatarUrl = story.profiles?.avatar_url;
           const verified = story.profiles?.is_verified || story.profiles?.is_geoverified;
           const bg = story.bg_color || '#059669';

@@ -13,3 +13,4 @@ local_tests_and_docs/
 .vscode/settings.json
 .vscode/
 .env
+supabase/.temp/
