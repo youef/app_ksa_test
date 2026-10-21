@@ -746,20 +746,20 @@ export const styles = StyleSheet.create({
     borderColor: '#e2e8f0',
   },
   fTabActive: {
-    backgroundColor: '#059669',
-    borderColor: '#059669',
+    backgroundColor: '#047857',
+    borderColor: '#047857',
   },
   fTabActiveRed: {
-    backgroundColor: '#dc2626',
-    borderColor: '#dc2626',
+    backgroundColor: '#047857',
+    borderColor: '#047857',
   },
   fTabActiveGreen: {
-    backgroundColor: '#16a34a',
-    borderColor: '#16a34a',
+    backgroundColor: '#047857',
+    borderColor: '#047857',
   },
   fTabActiveMine: {
-    backgroundColor: '#7c3aed',
-    borderColor: '#7c3aed',
+    backgroundColor: '#047857',
+    borderColor: '#047857',
   },
   fTabText: {
     fontSize: 12,
