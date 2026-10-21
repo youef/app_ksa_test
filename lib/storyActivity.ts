@@ -14,3 +14,12 @@ export function matchesStoryScope(story: { id: string; author_id: string; profil
   if (scope === 'district') return Boolean(district.trim()) && (story.profiles?.district || '').trim().toLocaleLowerCase('ar') === district.trim().toLocaleLowerCase('ar');
   return true;
 }
+
+export function storyDiscoveryMembership(author: { city?: string | null; district?: string | null } | null | undefined, authorId: string, viewerId: string, following: string[], city: string, district: string) {
+  const normalize = (value?: string | null) => (value || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase('ar');
+  const knownCity = Boolean(normalize(city)) && !['كل المدن', 'كل المملكة', 'جميع المدن'].includes(city.trim());
+  const inCity = knownCity && normalize(author?.city) === normalize(city);
+  const knownDistrict = Boolean(normalize(district)) && !['كل الأحياء', 'كل أحياء المدينة', 'جميع الأحياء'].includes(district.trim());
+  const inDistrict = inCity && knownDistrict && normalize(author?.district) === normalize(district);
+  return { ring: authorId === viewerId || following.includes(authorId) || inDistrict, trending: inCity };
+}

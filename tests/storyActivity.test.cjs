@@ -23,3 +23,14 @@ test('scope filters separate own stories, following and unseen neighbors', () =>
   assert.equal(matches(neighbor, 'district'), true);
   assert.equal(matchesStoryScope(neighbor, 'district', 'me', [], [], ''), false);
 });
+const { storyDiscoveryMembership } = require('../lib/storyActivity.ts');
+test('neighborhood rings and city trends are independent, including authors without a district', () => {
+ const scope = (author, id = 'other', follows = []) => storyDiscoveryMembership(author, id, 'me', follows, 'عرعر', 'الخليج الشرقي');
+ assert.deepEqual(scope({city:'عرعر',district:null}), {ring:false,trending:true});
+ assert.deepEqual(scope({city:'عرعر',district:null},'me'), {ring:true,trending:true});
+ assert.deepEqual(scope({city:'عرعر',district:null},'friend',['friend']), {ring:true,trending:true});
+ assert.deepEqual(scope({city:'الرياض',district:'الخليج الشرقي'}), {ring:false,trending:false});
+ assert.deepEqual(scope({city:'الرياض'},'friend',['friend']), {ring:true,trending:false});
+ assert.deepEqual(scope({city:'عرعر',district:'الخليج الشرقي'}), {ring:true,trending:true});
+ assert.deepEqual(storyDiscoveryMembership({city:'عرعر'},'other','me',[],'',''),{ring:false,trending:false});
+});

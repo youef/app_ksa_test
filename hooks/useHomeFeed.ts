@@ -1,3 +1,4 @@
+import { storyDiscoveryMembership } from '@/lib/storyActivity';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { supabase } from '@/lib/supabase';
@@ -142,8 +143,7 @@ export function useHomeFeed({ onLocation }: Options) {
       if (questionsRes.error) throw questionsRes.error;
       if (requestsRes.error) throw requestsRes.error;
 
-      // Stories obey the same strict location boundary as posts: no neighboring districts
-      // are used as fallback when the current area has no stories.
+      // Story rings include the owner, followed authors and exact neighborhood matches.
       const rawStories = ((storiesRes.data ?? []) as Story[]);
       const mutedAuthors = new Set<string>();
       if (user) {
@@ -151,15 +151,15 @@ export function useHomeFeed({ onLocation }: Options) {
         if (preferences.error) { setStories([]); } else (preferences.data || []).forEach(row => mutedAuthors.add(row.author_id));
         if (preferences.error) rawStories.length = 0;
       }
+      const follows = user ? await supabase.from('follows').select('following_id').eq('follower_id', user.id) : { data: [], error: null };
+      if (storiesRes.error) throw storiesRes.error;
+      if (follows.error) throw follows.error;
+      const following = (follows.data || []).map(row => String(row.following_id));
       const seen = new Set<string>();
       const localStories: Story[] = [];
       for (const story of rawStories) {
         if (!story.author_id || seen.has(story.author_id) || mutedAuthors.has(story.author_id)) continue;
-        if (!isLocationMatching(
-          { city: story.profiles?.city, district: story.profiles?.district },
-          loc.city,
-          loc.district,
-        )) continue;
+        if (!storyDiscoveryMembership(story.profiles, story.author_id, user?.id || '', following, loc.city, loc.district).ring) continue;
         localStories.push(story);
         seen.add(story.author_id);
       }

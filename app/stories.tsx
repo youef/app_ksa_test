@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -8,34 +8,79 @@ import {
   Image,
   ActivityIndicator,
   RefreshControl,
-  Platform,
+  Animated,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { AppHeader } from '@/components/shared/AppHeader';
 import { useBottomNavInset } from '@/lib/bottomNav';
-import { Plus, Camera, ShieldCheck, Clock, MapPin, Sparkles, MessageCircle } from 'lucide-react-native';
+import { Plus, ShieldCheck, Sparkles, ChevronDown } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { getActiveLocation, isAllKingdom } from '@/lib/locationSync';
+import { isActiveStory, storyDiscoveryMembership } from '@/lib/storyActivity';
 import { relativeTime } from '@/lib/mapPins';
 
 export default function StoriesScreen() {
   const bottomNavInset = useBottomNavInset();
+  const [viewerId, setViewerId] = useState('');
+  const [errorText, setErrorText] = useState('');
+  const [needsLogin, setNeedsLogin] = useState(false);
   const [stories, setStories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [filterDistrict, setFilterDistrict] = useState<string>('all');
-  const [districts, setDistricts] = useState<string[]>([]);
   const [seenStoryIds, setSeenStoryIds] = useState<string[]>([]);
+  const [currentCity, setCurrentCity] = useState<string>('');
+  const [currentDistrict, setCurrentDistrict] = useState<string>('');
+  const [followingIds, setFollowingIds] = useState<string[]>([]);
+  const [visibleTrendingCount, setVisibleTrendingCount] = useState(8);
+  const storyRingPulse = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    loadAllStories();
-  }, []);
+    const pulse = Animated.loop(Animated.sequence([
+      Animated.timing(storyRingPulse, { toValue: 1.06, duration: 850, useNativeDriver: true }),
+      Animated.timing(storyRingPulse, { toValue: 1, duration: 850, useNativeDriver: true }),
+    ]));
+    pulse.start();
+    return () => pulse.stop();
+  }, [storyRingPulse]);
+
+  useFocusEffect(useCallback(() => { void loadAllStories(); }, []));
 
   async function loadAllStories() {
     try {
-      setLoading(true);
+      setLoading(true); setErrorText('');
       const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       const nowIso = new Date().toISOString();
+
+      const { data: authResult, error: authError } = await supabase.auth.getUser();
+      const activeViewerId = authResult.user?.id || '';
+      if (authError) throw authError;
+      setViewerId(activeViewerId); setNeedsLogin(!activeViewerId);
+      if (!activeViewerId) { setStories([]); return; }
+      let city = '';
+      let district = '';
+      let followedIds: string[] = [];
+      if (activeViewerId) {
+        const [{ data: me, error: meError }, { data: follows, error: followsError }] = await Promise.all([
+          supabase.from('profiles').select('city,district').eq('id', activeViewerId).maybeSingle(),
+          supabase.from('follows').select('following_id').eq('follower_id', activeViewerId),
+        ]);
+        if (meError) throw meError;
+        if (followsError) throw followsError;
+        const location = await getActiveLocation();
+        city = String(me?.city || (!isAllKingdom(location.city) ? location.city : '')).trim();
+        district = String(me?.district || (location.city === city ? location.district : '')).trim();
+        followedIds = (follows || []).map((row: any) => String(row.following_id));
+      }
+      setCurrentCity(city);
+      setCurrentDistrict(district);
+      setFollowingIds(followedIds);
+      let mutedAuthorIds: string[] = [];
+      if (activeViewerId) {
+        const { data: authorPrefs, error: prefsError } = await supabase.from('story_author_preferences').select('author_id').eq('user_id', activeViewerId).eq('muted', true);
+        if (prefsError) throw prefsError;
+        mutedAuthorIds = (authorPrefs || []).map((row: any) => String(row.author_id));
+      }
 
       const { data, error } = await supabase
         .from('stories')
@@ -64,11 +109,9 @@ export default function StoriesScreen() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      const valid = (data || []) as any[];
+      const cityRows = (data || []) as any[];
+      const valid = cityRows.filter((story: any) => isActiveStory(story) && !mutedAuthorIds.includes(String(story.author_id)));
       setStories(valid);
-
-      const { data: authResult } = await supabase.auth.getUser();
-      const activeViewerId = authResult.user?.id || '';
       if (activeViewerId && valid.length > 0) {
         const { data: views, error: viewsError } = await supabase
           .from('story_views')
@@ -81,22 +124,16 @@ export default function StoriesScreen() {
         setSeenStoryIds([]);
       }
 
-      const dSet = new Set<string>();
-      valid.forEach((s: any) => {
-        if (s.profiles?.district) dSet.add(s.profiles.district);
-      });
-      setDistricts(Array.from(dSet));
     } catch (e) {
-      console.warn('loadAllStories error:', e);
+      setStories([]);
+      setErrorText(e instanceof Error ? e.message : 'تعذر تحميل اليوميات');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }
 
-  const filtered = filterDistrict === 'all'
-    ? stories
-    : stories.filter((s: any) => s.profiles?.district === filterDistrict);
+  const filtered = stories;
 
   const groupedAuthors = Object.values(filtered.reduce((groups: Record<string, any>, story: any) => {
     const key = story.author_id;
@@ -110,17 +147,23 @@ export default function StoriesScreen() {
     return { ...group, stories: ordered, latestStory: ordered[ordered.length - 1], hasUnseen: ordered.some((story: any) => !seenStoryIds.includes(story.id)) };
   });
 
-  const storyRings = groupedAuthors.slice().sort((a: any, b: any) =>
-    Number(b.hasUnseen) - Number(a.hasUnseen) || new Date(b.newestAt).getTime() - new Date(a.newestAt).getTime()
-  );
-  const trendingAuthors = groupedAuthors.slice().sort((a: any, b: any) =>
+  const membership = (group: any) => storyDiscoveryMembership(group.author, group.authorId, viewerId, followingIds, currentCity, currentDistrict);
+  const neighborhoodAndFollowing = groupedAuthors.filter((group: any) => membership(group).ring);
+  const storyRings = neighborhoodAndFollowing.slice().sort((a: any, b: any) => {
+    const aFollowed = followingIds.includes(String(a.authorId));
+    const bFollowed = followingIds.includes(String(b.authorId));
+    const aSameDistrict = membership(a).ring && !aFollowed;
+    const bSameDistrict = membership(b).ring && !bFollowed;
+    return Number(bFollowed) - Number(aFollowed) || Number(bSameDistrict) - Number(aSameDistrict) || Number(b.hasUnseen) - Number(a.hasUnseen) || new Date(b.newestAt).getTime() - new Date(a.newestAt).getTime();
+  });
+  const trendingAuthors = groupedAuthors.filter((group: any) => membership(group).trending).slice().sort((a: any, b: any) =>
     b.totalViews - a.totalViews || new Date(b.newestAt).getTime() - new Date(a.newestAt).getTime()
   );
 
   function openAuthorStories(authorStories: any[]) {
     const firstUnseen = authorStories.find((story: any) => !seenStoryIds.includes(story.id));
     const target = firstUnseen || authorStories[0];
-    if (target?.id) router.push({ pathname: '/story', params: { id: target.id } });
+    if (target?.id) router.push({ pathname: '/story', params: { id: target.id, resume: '1' } });
   }
 
   return (
@@ -128,7 +171,6 @@ export default function StoriesScreen() {
       <AppHeader
         variant="sub"
         title="يوميات أهل الحي"
-        subtitle={`${filtered.length} قصة مباشرة خلال 24 ساعة`}
         fallbackRoute="/home"
         rightAction={
           <Pressable
@@ -143,43 +185,16 @@ export default function StoriesScreen() {
         }
       />
 
-      {/* Filter Chips by District */}
-      {districts.length > 0 && (
-        <View style={styles.filterBar}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
-            <Pressable
-              onPress={() => setFilterDistrict('all')}
-              style={[styles.filterChip, filterDistrict === 'all' && styles.filterChipActive]}
-            >
-              <Text style={[styles.filterChipText, filterDistrict === 'all' && styles.filterChipTextActive]}>
-                كل الأحياء ({stories.length})
-              </Text>
-            </Pressable>
-            {districts.map((d) => (
-              <Pressable
-                key={d}
-                onPress={() => setFilterDistrict(d)}
-                style={[styles.filterChip, filterDistrict === d && styles.filterChipActive]}
-              >
-                <Text style={[styles.filterChipText, filterDistrict === d && styles.filterChipTextActive]}>
-                  {d}
-                </Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-        </View>
-      )}
-
-      {storyRings.length > 0 && (
-        <View style={styles.ringsSection}>
+      <View style={styles.ringsSection}>
           <View style={styles.sectionHeadingRow}>
             <View style={{ alignItems: 'flex-end', flex: 1 }}>
-              <Text style={styles.sectionHeading}>يوميات الجيران</Text>
-              <Text style={styles.sectionSubheading}>كل جار في دائرة واحدة</Text>
+              <Text style={styles.sectionHeading}>أهل الحي ومن أتابعهم</Text>
+              <Text style={styles.sectionSubheading}>{currentDistrict ? `أهل ${currentDistrict} ومن تتابعهم` : 'من تتابعهم · أضف حيّك في ملفك الشخصي لعرض الجيران'}</Text>
             </View>
             <View style={styles.livePill}><View style={styles.liveDot} /><Text style={styles.livePillText}>مباشر</Text></View>
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.ringsScroll}>
+            <Pressable style={styles.ringItem} accessibilityRole="button" accessibilityLabel="أضف يومياتك" onPress={() => router.push(needsLogin ? '/auth' : '/create-story')}><View style={[styles.ringOuter, styles.ringSeen]}><Plus size={27} color="#059669" /></View><Text style={styles.ringName}>أضف يومياتك</Text></Pressable>
             {storyRings.map((group: any) => {
               const author = group.author;
               const name = author?.display_name || author?.username || 'جار الحي';
@@ -187,20 +202,20 @@ export default function StoriesScreen() {
                 <Pressable key={group.authorId} style={styles.ringItem}
                   onPress={() => openAuthorStories(group.stories)}
                   accessibilityRole="button" accessibilityLabel={`عرض يوميات ${name}`}>
-                  <View style={[styles.ringOuter, group.hasUnseen ? styles.ringUnseen : styles.ringSeen]}>
+                  <Animated.View style={[styles.ringOuter, group.hasUnseen ? styles.ringUnseen : styles.ringSeen, group.stories.length > 1 && { transform: [{ scale: storyRingPulse }] }]}>
                     <View style={styles.ringInner}>
                       {author?.avatar_url ? <Image source={{ uri: author.avatar_url }} style={styles.ringAvatar} /> :
                         <View style={styles.ringAvatarFallback}><Text style={styles.ringInitial}>{name[0]}</Text></View>}
                     </View>
                     <View style={styles.ringCount}><Text style={styles.ringCountText}>{group.stories.length}</Text></View>
-                  </View>
+                  </Animated.View>
                   <Text style={styles.ringName} numberOfLines={1}>{name}</Text>
                 </Pressable>
               );
             })}
           </ScrollView>
-        </View>
-      )}
+          {!loading && !errorText && !storyRings.length ? <Text style={[styles.sectionSubheading, { paddingHorizontal: 16, textAlign: 'right', marginTop: 10 }]}>{needsLogin ? 'سجل الدخول لمشاهدة اليوميات' : 'لا توجد يوميات نشطة لأهل حيّك أو من تتابعهم الآن'}</Text> : null}
+      </View>
 
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingBottom: bottomNavInset + 30 }]}
@@ -217,68 +232,34 @@ export default function StoriesScreen() {
           />
         }
       >
-        {/* Quick Add Story Interactive Hero Banner */}
-        <Pressable
-          style={styles.heroAddBanner}
-          onPress={() => router.push('/create-story')}
-        >
-          <LinearGradient
-            colors={['#059669', '#047857', '#064e3b']}
-            style={styles.heroAddGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
-            <View style={styles.heroAddContent}>
-              <View style={styles.heroAddIconWrap}>
-                <Camera size={22} color="#fff" />
-              </View>
-              <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                <Text style={styles.heroAddTitle}>شارك يومياتك مع جيرانك الآن</Text>
-                <Text style={styles.heroAddSub}>
-                  انشر حالة أو صورة تظهر لأهل حيك لمدة 24 ساعة وتختفي تلقائياً
-                </Text>
-              </View>
-            </View>
-            <View style={styles.heroAddBtn}>
-              <Plus size={14} color="#059669" strokeWidth={3} />
-              <Text style={styles.heroAddBtnText}>أضف الآن</Text>
-            </View>
-          </LinearGradient>
-        </Pressable>
-
+        <View style={styles.trendingSectionTitleRow}><View style={styles.trendingSectionAccent} /><View style={{ flex: 1, alignItems: 'flex-end' }}><Text style={styles.sectionHeading}>ترند المدينة</Text><Text style={styles.sectionSubheading}>{currentCity ? `الأكثر مشاهدة في ${currentCity} خلال ٢٤ ساعة` : 'حدد مدينتك من ملفك الشخصي'}</Text></View></View>
+        {errorText ? <Pressable accessibilityRole="button" onPress={() => void loadAllStories()} style={{ padding: 16 }}><Text style={{ color: '#A65A49', textAlign: 'right' }}>تعذر تحميل اليوميات. اضغط لإعادة المحاولة.</Text></Pressable> : null}
         {loading && !refreshing ? (
           <View style={styles.loadingBox}>
             <ActivityIndicator size="large" color="#059669" />
             <Text style={styles.loadingText}>جارٍ جلب يوميات جيرانك...</Text>
           </View>
-        ) : filtered.length === 0 ? (
+        ) : errorText ? null : trendingAuthors.length === 0 ? (
           <View style={styles.emptyBox}>
             <View style={styles.emptyIconCircle}>
               <Sparkles size={36} color="#059669" />
             </View>
-            <Text style={styles.emptyTitle}>لا توجد يوميات نشطة حالياً</Text>
+            <Text style={styles.emptyTitle}>{needsLogin ? 'سجل الدخول لمشاهدة اليوميات' : !currentCity ? 'حدد مدينتك أولاً' : 'لا توجد يوميات نشطة في مدينتك حالياً'}</Text>
             <Text style={styles.emptySub}>
               كن أول من يشارك أهل حيه يومياته وتحديثاته اليوم! تظل اليوميات ظاهرة لمدة 24 ساعة.
             </Text>
             <Pressable
               style={styles.emptyActionBtn}
-              onPress={() => router.push('/create-story')}
+              onPress={() => router.push(needsLogin ? '/auth' : !currentCity ? '/profile' : '/create-story')}
             >
               <Plus size={16} color="#fff" strokeWidth={2.5} />
-              <Text style={styles.emptyActionBtnText}>نشر أول يوميات في حيك</Text>
+              <Text style={styles.emptyActionBtnText}>{needsLogin ? 'تسجيل الدخول' : !currentCity ? 'تحديث ملفي' : 'شارك يومياتك'}</Text>
             </Pressable>
           </View>
         ) : (
           <>
-            <View style={styles.trendingHeading}>
-              <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                <Text style={styles.sectionHeading}>الأكثر مشاهدة</Text>
-                <Text style={styles.sectionSubheading}>ترند أهل الحي حسب إجمالي المشاهدات</Text>
-              </View>
-              <View style={styles.trendingBadge}><Text style={styles.trendingBadgeText}>TRENDING</Text></View>
-            </View>
             <View style={styles.storiesGrid}>
-              {trendingAuthors.map((group: any, index: number) => {
+              {trendingAuthors.slice(0, visibleTrendingCount).map((group: any) => {
                 const story = group.latestStory;
                 const author = group.author;
                 const name = author?.display_name || author?.username || 'جار الحي';
@@ -290,7 +271,7 @@ export default function StoriesScreen() {
                   <Pressable key={group.authorId}
                     style={[styles.storyCard, allSeen ? styles.storyCardSeen : styles.storyCardNew]}
                     onPress={() => openAuthorStories(group.stories)}
-                    accessibilityRole="button" accessibilityLabel={`فتح يوميات ${name}`}>
+                    accessibilityRole="button" accessibilityLabel={"فتح يوميات " + name}>
                     <View style={[styles.storyCardMedia, { backgroundColor: bg }, allSeen && styles.storyCardMediaSeen]}>
                       {hasMedia ? <Image source={{ uri: story.image_url }} style={styles.storyCardImage} resizeMode="cover" /> :
                         <View style={styles.storyTextCard}>
@@ -312,16 +293,17 @@ export default function StoriesScreen() {
                           </Text>
                         </View>
                       </View>
-                      <View style={styles.trendFooter}>
-                        <View style={styles.trendMetric}><Text style={styles.trendMetricText}>#{index + 1} ترند</Text></View>
-                        <View style={styles.trendMetric}><Text style={styles.trendMetricText}>{group.totalViews.toLocaleString('ar-SA')} مشاهدة</Text></View>
-                        <Text style={styles.trendStoryCount}>{group.stories.length} يوميات</Text>
-                      </View>
                     </View>
                   </Pressable>
                 );
               })}
             </View>
+            {trendingAuthors.length > visibleTrendingCount && (
+              <Pressable style={styles.loadMoreButton} onPress={() => setVisibleTrendingCount((count) => count + 8)} accessibilityRole="button" accessibilityLabel="عرض المزيد من ترند المدينة">
+                <Text style={styles.loadMoreButtonText}>عرض المزيد</Text>
+                <ChevronDown size={16} color="#047857" />
+              </Pressable>
+            )}
           </>
         )}
       </ScrollView>
@@ -347,38 +329,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 12,
     fontWeight: '800',
-  },
-  filterBar: {
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-    paddingVertical: 8,
-  },
-  filterScroll: {
-    flexDirection: 'row-reverse',
-    paddingHorizontal: 16,
-    gap: 8,
-  },
-  filterChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: '#f1f5f9',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  filterChipActive: {
-    backgroundColor: '#ecfdf5',
-    borderColor: '#a7f3d0',
-  },
-  filterChipText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#64748b',
-  },
-  filterChipTextActive: {
-    color: '#047857',
-    fontWeight: '900',
   },
   scroll: {
     padding: 16,
@@ -438,6 +388,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '900',
   },
+  storyNotificationToggle: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginHorizontal: 16, marginTop: 8, marginBottom: 4, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 13, backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0' },
+  storyNotificationToggleText: { flex: 1, textAlign: 'right', color: '#334155', fontSize: 11, fontWeight: '800' },
+  storyNotificationToggleAction: { color: '#047857', fontSize: 11, fontWeight: '900' },
   ringsSection: { backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e2e8f0', paddingTop: 14, paddingBottom: 12 },
   sectionHeadingRow: { flexDirection: 'row-reverse', alignItems: 'center', paddingHorizontal: 16, gap: 10, marginBottom: 10 },
   sectionHeading: { color: '#0f172a', fontSize: 16, fontWeight: '900' },
@@ -448,39 +401,38 @@ const styles = StyleSheet.create({
   ringsScroll: { flexDirection: 'row-reverse', paddingHorizontal: 14, gap: 14 },
   ringItem: { width: 66, alignItems: 'center', gap: 5 },
   ringOuter: { width: 62, height: 62, borderRadius: 31, padding: 3, borderWidth: 2.5, alignItems: 'center', justifyContent: 'center', position: 'relative' },
-  ringUnseen: { borderColor: '#10b981' },
-  ringSeen: { borderColor: '#cbd5e1' },
+  ringUnseen: { borderColor: '#D4A72C', borderWidth: 3.5, shadowColor: '#D4A72C', shadowOpacity: 0.38, shadowRadius: 5, elevation: 5 },
+  ringSeen: { borderColor: '#94a3b8', borderWidth: 2 },
   ringInner: { width: 50, height: 50, borderRadius: 25, overflow: 'hidden', backgroundColor: '#f1f5f9' },
   ringAvatar: { width: '100%', height: '100%' },
   ringAvatarFallback: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#d1fae5' },
   ringInitial: { color: '#047857', fontSize: 20, fontWeight: '900' },
-  ringCount: { position: 'absolute', bottom: -3, right: -2, minWidth: 19, height: 19, borderRadius: 10, backgroundColor: '#0f172a', borderWidth: 2, borderColor: '#fff', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
+  ringCount: { position: 'absolute', bottom: -3, right: -2, minWidth: 19, height: 19, borderRadius: 10, backgroundColor: '#D4A72C', borderWidth: 2, borderColor: '#fff', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
   ringCountText: { color: '#fff', fontSize: 9, fontWeight: '900' },
   ringName: { color: '#334155', fontSize: 10, fontWeight: '800', maxWidth: 66 },
-  trendingHeading: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, marginBottom: 12, marginTop: 6 },
-  trendingBadge: { paddingHorizontal: 9, paddingVertical: 5, borderRadius: 9, backgroundColor: '#0f172a' },
+  trendingSectionTitleRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 9, marginBottom: 13 },
+  trendingSectionAccent: { width: 4, height: 30, borderRadius: 3, backgroundColor: '#10B981' },
+  trendingBadge: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 7, borderRadius: 10, backgroundColor: '#0f172a' },
   trendingBadgeText: { color: '#fff', fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
-  trendFooter: { zIndex: 2, alignItems: 'flex-start', gap: 5 },
-  trendMetric: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,0,0,0.48)', paddingHorizontal: 8, paddingVertical: 5, borderRadius: 10 },
-  trendMetricText: { color: '#fff', fontSize: 10, fontWeight: '900' },
-  trendStoryCount: { color: '#fff', fontSize: 10, fontWeight: '800', textShadowColor: '#000', textShadowRadius: 4 },
   storiesGrid: {
     flexDirection: 'row-reverse',
     flexWrap: 'wrap',
-    gap: 12,
+    justifyContent: 'space-between',
+    rowGap: 12,
   },
   storyCard: {
     width: '48%',
-    aspectRatio: 0.72,
-    borderRadius: 20,
+    aspectRatio: 0.78,
+    borderRadius: 22,
     overflow: 'hidden',
     backgroundColor: '#059669',
-    borderWidth: 2,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.6)',
     shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 4,
   },
   storyCardNew: { borderColor: '#10b981' },
   storyCardSeen: { borderColor: '#94a3b8', opacity: 0.72 },
@@ -488,6 +440,8 @@ const styles = StyleSheet.create({
   storySeenLabel: { fontSize: 9, fontWeight: '900', marginTop: 3, textAlign: 'right' },
   storySeenLabelNew: { color: '#a7f3d0' },
   storySeenLabelSeen: { color: '#e2e8f0' },
+  loadMoreButton: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 7, alignSelf: 'center', marginTop: 18, marginBottom: 8, paddingHorizontal: 20, paddingVertical: 11, borderRadius: 14, backgroundColor: '#ecfdf5', borderWidth: 1, borderColor: '#a7f3d0' },
+  loadMoreButtonText: { color: '#047857', fontSize: 12, fontWeight: '900' },
   storyCardMedia: {
     flex: 1,
     position: 'relative',
@@ -587,69 +541,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 10,
     fontWeight: '800',
-  },
-  heroAddBanner: {
-    marginBottom: 16,
-    borderRadius: 20,
-    overflow: 'hidden',
-    shadowColor: '#059669',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  heroAddGradient: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    gap: 12,
-  },
-  heroAddContent: {
-    flex: 1,
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 12,
-  },
-  heroAddIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.3)',
-  },
-  heroAddTitle: {
-    fontSize: 14,
-    fontWeight: '900',
-    color: '#fff',
-    marginBottom: 3,
-  },
-  heroAddSub: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#d1fae5',
-    lineHeight: 16,
-  },
-  heroAddBtn: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 14,
-    gap: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  heroAddBtnText: {
-    fontSize: 12,
-    fontWeight: '900',
-    color: '#059669',
   },
   storyTextQuote: {
     fontSize: 28,
