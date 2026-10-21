@@ -29,7 +29,7 @@ serve(async (req) => {
     const user = authData.user;
     if (authError || !user) return json({ error: 'انتهت الجلسة.' }, 401);
     const { data: profile } = await authClient.from('profiles').select('role').eq('id', user.id).maybeSingle();
-    if (profile?.role !== 'admin' && (user.email || '').toLowerCase() !== 'root@gmail.com') {
+    if (profile?.role !== 'admin') {
       return json({ error: 'هذه العملية مخصصة للإدارة.' }, 403);
     }
 

@@ -28,7 +28,7 @@ serve(async (req) => {
   const gateway = (Deno.env.get('PAYMENT_GATEWAY') || 'moyasar').toLowerCase();
   const moyasarSecret = Deno.env.get('MOYASAR_SECRET_KEY');
   const tapSecret = Deno.env.get('TAP_SECRET_KEY');
-  const baseUrl = (Deno.env.get('APP_BASE_URL') || 'https://appksatest-yousef8-15e4.vercel.app').replace(/\/$/, '');
+  const baseUrl = (Deno.env.get('APP_BASE_URL') || 'https://appksatest.vercel.app').replace(/\/$/, '');
 
   if (!supabaseUrl || !anonKey || !serviceRoleKey) return json({ error: 'إعدادات الخادم غير مكتملة.' }, 503);
   if (!['moyasar', 'tap'].includes(gateway)) return json({ error: 'اختر PAYMENT_GATEWAY=moyasar أو tap.' }, 503);
@@ -44,9 +44,23 @@ serve(async (req) => {
     if (authError || !authData.user) return json({ error: 'انتهت الجلسة. سجّل الدخول مجددًا.' }, 401);
     const user = authData.user;
     const admin = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
+    const { data: profile, error: profileError } = await admin
+      .from('profiles')
+      .select('role,account_type,is_verified')
+      .eq('id', user.id)
+      .maybeSingle();
+    if (profileError || !profile) return json({ error: 'تعذر التحقق من صلاحية الحساب.' }, 403);
+
     const body = await req.json();
     const kind = body?.kind;
     if (!['service_order', 'subscription', 'ad_campaign'].includes(kind)) return json({ error: 'نوع الدفع غير صالح.' }, 400);
+
+    const canUseProfessionalPayments =
+      profile.role === 'admin' ||
+      (profile.is_verified && ['merchant', 'freelance', 'provider'].includes(profile.account_type || ''));
+    if ((kind === 'subscription' || kind === 'ad_campaign') && !canUseProfessionalPayments) {
+      return json({ error: 'الاشتراكات والترويج مخصصة للحسابات المهنية المعتمدة.' }, 403);
+    }
 
     const rawRequestId = typeof body.request_id === 'string' ? body.request_id.slice(0, 100) : crypto.randomUUID();
     const idempotencyKey = `${user.id}:${rawRequestId}`;

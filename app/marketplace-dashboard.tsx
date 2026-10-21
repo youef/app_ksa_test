@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator, Alert, Linking, Pressable, RefreshControl, ScrollView,
   StyleSheet, Text, TextInput, View,
@@ -26,8 +26,7 @@ export default function MarketplaceDashboard() {
   const params = useLocalSearchParams<{ service_id?: string; payment?: string }>();
   const [userId, setUserId] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [tab, setTab] = useState<'services' | 'plans' | 'ads' | 'orders'>('services');
-  const [services, setServices] = useState<Service[]>([]);
+  const [tab, setTab] = useState<'plans' | 'ads' | 'orders'>('plans');
   const [myServices, setMyServices] = useState<Service[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [packages, setPackages] = useState<AdPackage[]>([]);
@@ -50,10 +49,8 @@ export default function MarketplaceDashboard() {
     }
     setUserId(auth.user.id);
     const { data: ownProfile } = await supabase.from('profiles').select('role').eq('id', auth.user.id).maybeSingle();
-    setIsAdmin(ownProfile?.role === 'admin' || (auth.user.email || '').toLowerCase() === 'root@gmail.com');
-    const [servicesRes, myServicesRes, plansRes, packagesRes, ordersRes, subscriptionRes] = await Promise.all([
-      supabase.from('services').select('id,name,description,price_from,price_type,provider_id,city,district')
-        .eq('moderation_status', 'approved').eq('available_now', true).order('created_at', { ascending: false }).limit(30),
+    setIsAdmin(ownProfile?.role === 'admin');
+    const [myServicesRes, plansRes, packagesRes, ordersRes, subscriptionRes] = await Promise.all([
       supabase.from('services').select('id,name,description,price_from,price_type,provider_id,city,district')
         .eq('provider_id', auth.user.id).order('created_at', { ascending: false }).limit(50),
       supabase.from('marketplace_plans').select('id,slug,name,description,price_halalas,period_days,features')
@@ -65,7 +62,6 @@ export default function MarketplaceDashboard() {
       supabase.from('marketplace_subscriptions').select('id,status,current_period_end,plan:marketplace_plans(name,slug)')
         .eq('user_id', auth.user.id).eq('status', 'active').order('current_period_end', { ascending: false }).limit(1).maybeSingle(),
     ]);
-    setServices(servicesRes.data || []);
     setMyServices(myServicesRes.data || []);
     setPlans(plansRes.data || []);
     setPackages(packagesRes.data || []);
@@ -79,7 +75,6 @@ export default function MarketplaceDashboard() {
     if (params.payment === 'success') Alert.alert('تمت العودة من الدفع', 'سيظهر الطلب مدفوعًا بعد تأكيد بوابة الدفع. اسحب للتحديث إذا لزم الأمر.');
   }, [params.payment]);
 
-  const fixedServices = useMemo(() => services.filter(s => s.price_type !== 'negotiable' && Number(s.price_from) > 0), [services]);
 
   async function checkout(body: Record<string, unknown>, key: string) {
     if (!userId || busyId) return;
@@ -122,19 +117,19 @@ export default function MarketplaceDashboard() {
     setRefreshing(false);
   };
 
-  if (loading) return <View style={styles.loading}><ActivityIndicator size="large" color="#047857" /><Text style={styles.muted}>نجهز سوق الخدمات والدفع الآمن…</Text></View>;
+  if (loading) return <View style={styles.loading}><ActivityIndicator size="large" color="#047857" /><Text style={styles.muted}>نجهز المزايا التجارية والمدفوعات…</Text></View>;
 
   return (
     <View style={styles.root}>
-      <AppHeader variant="sub" title="سوق خدمات الحي" subtitle="الخدمات · الاشتراكات · الترويج" fallbackRoute="/market" />
+      <AppHeader variant="sub" title="المزايا التجارية" subtitle="الاشتراكات · الترويج · المدفوعات" fallbackRoute="/profile?tab=content" />
       <ScrollView
         contentContainerStyle={[styles.content, { paddingBottom: bottomInset + 28 }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor="#047857" />}
       >
         <View style={styles.hero}>
           <View style={styles.heroIcon}><ShoppingBag size={26} color="#fff" /></View>
-          <Text style={styles.heroTitle}>سوق حيّنا التجاري</Text>
-          <Text style={styles.heroText}>اطلب خدمة، طوّر نشاطك، أو روّج عرضك. لا يُعتمد الدفع إلا بعد التحقق من بوابة الدفع على الخادم.</Text>
+          <Text style={styles.heroTitle}>مزايا الحساب المهني</Text>
+          <Text style={styles.heroText}>الاشتراكات والترويج وسجل المدفوعات في مكان واحد. استكشاف المنتجات والخدمات يبقى في سوق حيّنا.</Text>
           <View style={styles.secureLine}><ShieldCheck size={15} color="#a7f3d0" /><Text style={styles.secureText}>دفع مستضاف وآمن · لا نخزن بيانات البطاقات</Text></View>
         </View>
 
@@ -158,7 +153,6 @@ export default function MarketplaceDashboard() {
 
         <View style={styles.tabs}>
           {([
-            ['services', 'الخدمات', ShoppingBag],
             ['plans', 'الاشتراكات', Crown],
             ['ads', 'الترويج', Megaphone],
             ['orders', 'طلباتي', CreditCard],
@@ -169,30 +163,6 @@ export default function MarketplaceDashboard() {
             </Pressable>
           ))}
         </View>
-
-        {tab === 'services' && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>خدمات متاحة للطلب</Text>
-            <Text style={styles.muted}>الدفع متاح للخدمات ذات السعر الثابت فقط. الخدمات القابلة للتفاوض تحتاج اتفاقًا على السعر أولًا.</Text>
-            {fixedServices.length === 0 ? <Empty text="لا توجد حاليًا خدمات بسعر ثابت متاحة للدفع." /> : fixedServices.map(service => (
-              <View key={service.id} style={styles.card}>
-                <View style={styles.cardTop}>
-                  <View style={styles.pricePill}><Text style={styles.priceText}>{money(Math.round(Number(service.price_from) * 100))}</Text></View>
-                  <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                    <Text style={styles.cardTitle}>{service.name}</Text>
-                    <Text style={styles.muted}>{[service.district, service.city].filter(Boolean).join(' · ') || 'خدمة محلية'}</Text>
-                  </View>
-                  <View style={styles.smallIcon}><Briefcase size={19} color="#047857" /></View>
-                </View>
-                {!!service.description && <Text style={styles.description}>{service.description}</Text>}
-                <Pressable disabled={!!busyId} style={[styles.primaryButton, !!busyId && styles.disabled]} onPress={() => void checkout({ kind: 'service_order', service_id: service.id }, `service-${service.id}`)}>
-                  {busyId === `service-${service.id}` ? <ActivityIndicator color="#fff" /> : <CreditCard size={17} color="#fff" />}
-                  <Text style={styles.primaryButtonText}>اطلب وادفع الآن</Text>
-                </Pressable>
-              </View>
-            ))}
-          </View>
-        )}
 
         {tab === 'plans' && (
           <View style={styles.section}>

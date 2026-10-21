@@ -1,200 +1,114 @@
-import { HeaderAction, AppHeader } from '@/components/shared/AppHeader';
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
+  Image,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
-  ActivityIndicator,
-  Platform,
-  Linking,
-  Modal,
-  Alert,
-  RefreshControl,
 } from 'react-native';
 import { router } from 'expo-router';
-import { supabase } from '@/lib/supabase';
-import { useBottomNavInset } from '@/lib/bottomNav';
 import {
-  Store,
-  Search,
+  BriefcaseBusiness,
+  ChevronLeft,
   MapPin,
-  Star,
-  Phone,
-  MessageCircle,
-  Plus,
-  ThumbsUp,
+  Search,
   ShieldCheck,
-  X,
-  User,
-  Sparkles,
-  Share2,
+  Store,
+  UserRound,
+  Wrench,
 } from 'lucide-react-native';
 
-const DIRECTORY_CATEGORIES = [
-  { id: 'all', label: 'الكل', emoji: '🏬' },
-  { id: 'maintenance', label: 'سباكة وكهرباء', emoji: '🔧' },
-  { id: 'grocery', label: 'تموينات وبقالة', emoji: '🛒' },
-  { id: 'laundry', label: 'مغاسل وتنظيف', emoji: '🧺' },
-  { id: 'pharmacy', label: 'صيدليات ورعاية', emoji: '💊' },
-  { id: 'cafe', label: 'كافيهات ومطاعم', emoji: '☕' },
-  { id: 'salon', label: 'حلاقة وصالونات', emoji: '✂️' },
-  { id: 'auto', label: 'سيارات وبنشر', emoji: '🚗' },
-];
+import { AppHeader } from '@/components/shared/AppHeader';
+import { AccountIdentityBadge, AccountVerificationBadge } from '@/components/profile/AccountIdentityBadge';
+import { supabase } from '@/lib/supabase';
+import { getActiveLocation, isAllKingdom, isLocationMatching } from '@/lib/locationSync';
 
-const CURATED_NEIGHBOR_RECOMMENDATIONS = [
-  {
-    id: 'cur-1',
-    name: 'أبو أحمد - فني سباكة وتسريبات',
-    category: 'maintenance',
-    categoryLabel: 'سباكة وكهرباء',
-    city: 'الرياض',
-    district: 'الياسمين',
-    description: 'فني ممتاز وأمين، يخدم الحي منذ سنوات، دقيق في المواعيد وأسعاره طيبة ومناسبة.',
-    rating: 4.9,
-    review_count: 28,
-    phone: '0501234567',
-    whatsapp: '966501234567',
-    is_verified: true,
-    neighbor_recommended: true,
-    provider_name: 'أبو أحمد الفني',
-  },
-  {
-    id: 'cur-2',
-    name: 'تموينات ومخابز الضاحية',
-    category: 'grocery',
-    categoryLabel: 'تموينات وبقالة',
-    city: 'الرياض',
-    district: 'الياسمين',
-    description: 'توصيل سريع مجاني لسكان عماير المربع، خبز ساخن يومياً على مدار الساعة ومواد تموينية طازجة.',
-    rating: 4.8,
-    review_count: 42,
-    phone: '0559876543',
-    whatsapp: '966559876543',
-    is_verified: true,
-    neighbor_recommended: true,
-    provider_name: 'إدارة التموينات',
-  },
-  {
-    id: 'cur-3',
-    name: 'مغسلة الأناقة السريعة',
-    category: 'laundry',
-    categoryLabel: 'مغاسل وتنظيف',
-    city: 'الرياض',
-    district: 'النرجس',
-    description: 'غسيل وكوي بخار احترافي مع استلام وتسليم عند باب البيت لجيران الحي خلال 24 ساعة.',
-    rating: 4.7,
-    review_count: 23,
-    phone: '0543210987',
-    whatsapp: '966543210987',
-    is_verified: true,
-    neighbor_recommended: true,
-    provider_name: 'أحمد البلوشي',
-  },
-  {
-    id: 'cur-4',
-    name: 'كهربائي منازل وطوارئ - م. رفيق',
-    category: 'maintenance',
-    categoryLabel: 'سباكة وكهرباء',
-    city: 'الرياض',
-    district: 'العليا',
-    description: 'إصلاح التماسات ولوحات قواطع فورية، تركيب إنارات ومراوح، استجابة سريعة حتى في المساء.',
-    rating: 5.0,
-    review_count: 35,
-    phone: '0567891234',
-    whatsapp: '966567891234',
-    is_verified: true,
-    neighbor_recommended: true,
-    provider_name: 'م. رفيق',
-  },
-];
+type DirectoryItem = {
+  id: string;
+  type: 'business' | 'service';
+  title: string;
+  description: string;
+  city?: string | null;
+  district?: string | null;
+  image?: string | null;
+  ownerId?: string | null;
+  owner?: any;
+  verified?: boolean;
+  category?: string | null;
+  businessName?: string | null;
+};
 
 export default function Directory() {
-  const bottomNavInset = useBottomNavInset();
-  const [items, setItems] = useState<any[]>([]);
-  const [search, setSearch] = useState('');
-  const [category, setCategory] = useState('all');
+  const [items, setItems] = useState<DirectoryItem[]>([]);
+  const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState<'all' | 'business' | 'service'>('all');
+  const [location, setLocation] = useState({ region: 'كل المملكة', city: 'كل المدن', district: 'كل الأحياء' });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [city, setCity] = useState<string | null>(null);
-  const [district, setDistrict] = useState<string | null>(null);
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [error, setError] = useState(false);
 
-  // Add recommendation modal state
-  const [addModalOpen, setAddModalOpen] = useState(false);
-  const [recName, setRecName] = useState('');
-  const [recCategory, setRecCategory] = useState('maintenance');
-  const [recPhone, setRecPhone] = useState('');
-  const [recDesc, setRecDesc] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-
-  const load = useCallback(async (q = '') => {
-    setLoading(true);
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
+    setError(false);
     try {
-      // 1. Fetch real community services from DB joined with provider profiles
-      let query = supabase
-        .from('services')
-        .select(`
-          id,
-          name,
-          description,
-          city,
-          district,
-          phone,
-          whatsapp,
-          category,
-          is_verified,
-          available_now,
-          price_from,
-          price_to,
-          created_at,
-          provider_id,
-          profiles:provider_id(display_name, avatar_url)
-        `)
-        .order('created_at', { ascending: false })
-        .limit(60);
+      const [loc, businessesRes, servicesRes] = await Promise.all([
+        getActiveLocation(),
+        supabase
+          .from('businesses')
+          .select('id,owner_id,name,description,city,district,logo_url,cover_url,is_verified,moderation_status,owner:owner_id(id,display_name,username,avatar_url,is_verified,account_type,freelance_trade)')
+          .eq('moderation_status', 'approved')
+          .order('created_at', { ascending: false })
+          .limit(100),
+        supabase
+          .from('services')
+          .select('id,provider_id,business_id,name,description,city,district,cover_url,category,subcategory,is_verified,moderation_status,provider:provider_id(id,display_name,username,avatar_url,is_verified,account_type,freelance_trade),business:business_id(id,name,is_verified)')
+          .eq('moderation_status', 'approved')
+          .order('created_at', { ascending: false })
+          .limit(100),
+      ]);
+      setLocation(loc);
 
-      if (q.trim()) {
-        query = query.or(`name.ilike.%${q.trim()}%,description.ilike.%${q.trim()}%`);
-      }
+      if (businessesRes.error) throw businessesRes.error;
+      if (servicesRes.error) throw servicesRes.error;
 
-      const { data: dbServices, error: dbError } = await query;
-      if (dbError) {
-        console.warn('DB services error:', dbError);
-      }
-
-      const normalizedDb = (dbServices || []).map((s: any) => ({
-        id: s.id,
-        name: s.name,
-        category: s.category || 'maintenance',
-        city: s.city || 'الرياض',
-        district: s.district || 'الحي',
-        description: s.description || 'خدمة ومحل معتمد يخدم سكان الحي.',
-        rating: 4.9,
-        review_count: 1,
-        phone: s.phone || '',
-        whatsapp: s.whatsapp || (s.phone ? (s.phone.startsWith('966') ? s.phone : `966${s.phone.replace(/^0/, '')}`) : ''),
-        is_verified: s.is_verified,
-        neighbor_recommended: true,
-        provider_id: s.provider_id,
-        provider_name: s.profiles?.display_name || 'أحد جيران الحي',
-        avatar_url: s.profiles?.avatar_url,
+      const businesses: DirectoryItem[] = (businessesRes.data || []).map((row: any) => ({
+        id: row.id,
+        type: 'business',
+        title: row.name,
+        description: row.description || 'منشأة محلية في مجتمع حيّنا',
+        city: row.city,
+        district: row.district,
+        image: row.logo_url || row.cover_url,
+        ownerId: row.owner_id,
+        owner: row.owner,
+        verified: Boolean(row.is_verified),
+        businessName: row.name,
       }));
 
-      // Combine DB services with curated community recommendations
-      const combined: any[] = [...normalizedDb];
-      for (const cur of CURATED_NEIGHBOR_RECOMMENDATIONS) {
-        if (!combined.some(c => c.name === cur.name)) {
-          combined.push(cur);
-        }
-      }
+      const services: DirectoryItem[] = (servicesRes.data || []).map((row: any) => ({
+        id: row.id,
+        type: 'service',
+        title: row.name,
+        description: row.description || row.subcategory || row.category || 'خدمة محلية',
+        city: row.city,
+        district: row.district,
+        image: row.cover_url,
+        ownerId: row.provider_id,
+        owner: row.provider,
+        verified: Boolean(row.provider?.is_verified || row.is_verified),
+        category: row.subcategory || row.category,
+        businessName: row.business?.name || null,
+      }));
 
-      setItems(combined);
+      setItems([...businesses, ...services]);
     } catch (e) {
-      console.warn('Load directory error', e);
-      setItems(CURATED_NEIGHBOR_RECOMMENDATIONS);
+      console.warn('directory load', e);
+      setItems([]);
+      setError(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -202,623 +116,154 @@ export default function Directory() {
   }, []);
 
   useEffect(() => {
-    supabase.auth.getUser().then(async ({ data: u }) => {
-      if (u.user) {
-        setCurrentUser(u.user);
-        const { data: p } = await supabase.from('profiles').select('city, district').eq('id', u.user.id).single();
-        if (p?.city) setCity(p.city);
-        if (p?.district) setDistrict(p.district);
-      }
+    void load();
+  }, [load]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLocaleLowerCase('ar');
+    return items.filter((item) => {
+      if (filter !== 'all' && item.type !== filter) return false;
+      const locationMatch = isAllKingdom(location.city) || isLocationMatching(item, location.city, location.district);
+      if (!locationMatch) return false;
+      if (!q) return true;
+      return [item.title, item.description, item.category, item.businessName, item.owner?.display_name, item.city, item.district]
+        .some((value) => String(value || '').toLocaleLowerCase('ar').includes(q));
     });
-    load(search);
-  }, [load, search]);
+  }, [items, filter, location, query]);
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    load(search);
-  };
-
-  const handleAddRecommendation = async () => {
-    if (!recName.trim()) {
-      return Alert.alert('بيانات ناقصة', 'يرجى كتابة اسم المحل أو المهني.');
-    }
-
-    setSubmitting(true);
-    try {
-      const { data: authData } = await supabase.auth.getUser();
-      const user = authData?.user;
-
-      if (!user) {
-        // Guest user: save locally and advise to sign in
-        const guestItem = {
-          id: `local-${Date.now()}`,
-          name: recName.trim(),
-          category: recCategory,
-          city: city || 'الرياض',
-          district: district || 'الياسمين',
-          description: recDesc.trim() || 'توصية موثوقة من أحد جيران الحي.',
-          phone: recPhone.trim() || '',
-          whatsapp: recPhone.trim() ? (recPhone.trim().startsWith('966') ? recPhone.trim() : `966${recPhone.trim().replace(/^0/, '')}`) : '',
-          rating: 5.0,
-          review_count: 1,
-          neighbor_recommended: true,
-          provider_name: 'أنت (زائر)',
-        };
-        setItems(prev => [guestItem, ...prev]);
-        setAddModalOpen(false);
-        setRecName('');
-        setRecPhone('');
-        setRecDesc('');
-        Alert.alert('تمت الإضافة مؤقتاً ⭐', 'قم بتسجيل الدخول ليتم حفظ توصيتك بشكل دائم في قاعدة بيانات الحي.');
-        return;
-      }
-
-      // Format WhatsApp number
-      const cleanPhone = recPhone.trim();
-      let waNum: string | null = null;
-      if (cleanPhone) {
-        waNum = cleanPhone.startsWith('966') ? cleanPhone : `966${cleanPhone.replace(/^0/, '')}`;
-      }
-
-      // Real INSERT into Supabase `services` table!
-      const { data: newRow, error: insertError } = await supabase
-        .from('services')
-        .insert({
-          provider_id: user.id,
-          name: recName.trim(),
-          description: recDesc.trim() || 'توصية موثوقة من أحد جيران الحي ومجربة.',
-          category: recCategory,
-          city: city || 'الرياض',
-          district: district || 'الياسمين',
-          phone: cleanPhone || null,
-          whatsapp: waNum,
-          is_verified: false,
-          available_now: true,
-        })
-        .select(`
-          id,
-          name,
-          description,
-          city,
-          district,
-          phone,
-          whatsapp,
-          category,
-          is_verified,
-          available_now,
-          created_at,
-          provider_id,
-          profiles:provider_id(display_name, avatar_url)
-        `)
-        .single();
-
-      if (insertError) {
-        throw insertError;
-      }
-
-      const formattedNew = {
-        id: newRow.id,
-        name: newRow.name,
-        category: newRow.category,
-        city: newRow.city,
-        district: newRow.district,
-        description: newRow.description,
-        rating: 5.0,
-        review_count: 1,
-        phone: newRow.phone || '',
-        whatsapp: newRow.whatsapp || '',
-        is_verified: false,
-        neighbor_recommended: true,
-        provider_id: newRow.provider_id,
-        provider_name: (newRow as any).profiles?.display_name || 'أحد الجيران',
-        avatar_url: (newRow as any).profiles?.avatar_url,
-      };
-
-      setItems(prev => [formattedNew, ...prev]);
-      setAddModalOpen(false);
-      setRecName('');
-      setRecPhone('');
-      setRecDesc('');
-      Alert.alert('تم الحفظ والنشر بنجاح! ⭐', 'أصبحت التوصية الآن مخزنة في قاعدة البيانات ومتاحة لكل سكان الحي.');
-    } catch (err: any) {
-      console.warn('Error saving service recommendation:', err);
-      Alert.alert('خطأ أثناء الحفظ', err?.message || 'تعذر حفظ التوصية في قاعدة البيانات');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const filtered = items.filter(b => {
-    if (category !== 'all' && b.category !== category) return false;
-    if (!search.trim()) return true;
-    const s = search.trim().toLowerCase();
-    return (
-      b.name?.toLowerCase().includes(s) ||
-      b.description?.toLowerCase().includes(s) ||
-      b.district?.toLowerCase().includes(s)
-    );
-  });
+  const locationLabel = isAllKingdom(location.city)
+    ? 'كل المملكة'
+    : location.city + (location.district && location.district !== 'كل الأحياء' ? ' · حي ' + location.district : '');
 
   return (
-    <View style={styles.container}>
-      <AppHeader
-        variant="sub"
-        title="دليل وتوصيات الحي"
-        subtitle={[district && `حي ${district}`, city].filter(Boolean).join(' · ') || 'مهنيو ومحلات الحي المجربة'}
-        fallbackRoute="/home"
-        rightAction={
-          <HeaderAction
-            style={styles.addBtnHeader}
-            onPress={() => setAddModalOpen(true)}
-            accessibilityRole="button"
-            accessibilityLabel="إضافة توصية"
-          >
-            <Plus size={14} color="#059669" />
-            <Text style={styles.addBtnHeaderText}>أضف توصية</Text>
-          </HeaderAction>
-        }
-      />
-
+    <View style={styles.screen}>
+      <AppHeader variant="sub" title="دليل الأعمال" subtitle={locationLabel} fallbackRoute="/more" />
       <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingBottom: bottomNavInset + 30 }]}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load(true); }} tintColor="#059669" />}
+        contentContainerStyle={styles.page}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor="#059669"
-            colors={['#059669']}
-          />
-        }
       >
-        {/* Search Bar */}
-        <View style={styles.searchSection}>
-          <View style={styles.searchBar}>
-            <TextInput
-              style={styles.searchInput}
-              value={search}
-              onChangeText={setSearch}
-              placeholder="ابحث: سباك، كهربائي، تموينات، مغسلة، صيدلية..."
-              placeholderTextColor="#9ca3af"
-              returnKeyType="search"
-            />
-            <Search size={18} color="#059669" />
+        <View style={styles.searchWrap}>
+          <Search size={17} color="#94A3B8" />
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="ابحث عن منشأة أو خدمة"
+            placeholderTextColor="#94A3B8"
+            style={styles.searchInput}
+            textAlign="right"
+          />
+        </View>
+
+        <View style={styles.filters}>
+          <Filter active={filter === 'all'} label={'الكل ' + filtered.length} onPress={() => setFilter('all')} />
+          <Filter active={filter === 'business'} label="المنشآت" onPress={() => setFilter('business')} />
+          <Filter active={filter === 'service'} label="الخدمات" onPress={() => setFilter('service')} />
+        </View>
+
+        <View style={styles.notice}>
+          <ShieldCheck size={17} color="#047857" />
+          <Text style={styles.noticeText}>هذا الدليل يعرض بيانات حقيقية من حيّنا فقط. إدارة النشاط والإضافة تتم من «حسابي».</Text>
+        </View>
+
+        {loading ? (
+          <View style={styles.state}><ActivityIndicator size="large" color="#059669" /><Text style={styles.stateText}>جاري تحميل الدليل...</Text></View>
+        ) : error ? (
+          <View style={styles.state}><Text style={styles.stateTitle}>تعذر تحميل الدليل</Text><Pressable style={styles.retry} onPress={() => void load()}><Text style={styles.retryText}>إعادة المحاولة</Text></Pressable></View>
+        ) : filtered.length ? (
+          <View style={styles.list}>
+            {filtered.map((item) => <DirectoryRow key={item.type + ':' + item.id} item={item} />)}
           </View>
-        </View>
-
-        {/* Category Pills */}
-        <View style={styles.catWrap}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.catScroll}>
-            {DIRECTORY_CATEGORIES.map(c => {
-              const active = category === c.id;
-              return (
-                <Pressable
-                  key={c.id}
-                  style={[styles.catPill, active && styles.catPillActive]}
-                  onPress={() => setCategory(c.id)}
-                >
-                  <Text style={styles.catEmoji}>{c.emoji}</Text>
-                  <Text style={[styles.catLabel, active && styles.catLabelActive]}>{c.label}</Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        </View>
-
-        {/* Directory List */}
-        <View style={styles.content}>
-          {loading ? (
-            <View style={styles.loadingBox}>
-              <ActivityIndicator size="large" color="#059669" />
-              <Text style={styles.loadingText}>جاري تحميل دليل خدمات وتوصيات الحي...</Text>
-            </View>
-          ) : filtered.length === 0 ? (
-            <View style={styles.emptyCard}>
-              <Store size={44} color="#94a3b8" />
-              <Text style={styles.emptyTitle}>لا توجد نتائج مطابقة</Text>
-              <Text style={styles.emptySub}>جرّب تصنيفاً آخر أو أضف توصية لمهني مجرب تعرفه في حيك.</Text>
-              <Pressable style={styles.emptyActionBtn} onPress={() => setAddModalOpen(true)}>
-                <Plus size={16} color="#fff" />
-                <Text style={styles.emptyActionBtnText}>أضف أول توصية في الحي</Text>
-              </Pressable>
-            </View>
-          ) : (
-            filtered.map(b => (
-              <View key={b.id} style={styles.card}>
-                {/* Header Row */}
-                <View style={styles.cardHeader}>
-                  <View style={styles.ratingBadge}>
-                    <Star size={12} color="#f59e0b" fill="#f59e0b" />
-                    <Text style={styles.ratingText}>
-                      {Number(b.rating || 5.0).toFixed(1)} ({b.review_count || 1})
-                    </Text>
-                  </View>
-
-                  <View style={styles.cardTitleBox}>
-                    <View style={styles.titleWithBadge}>
-                      <Text style={styles.cardTitle}>{b.name}</Text>
-                      {b.is_verified && <ShieldCheck size={14} color="#059669" />}
-                    </View>
-                    {b.neighbor_recommended && (
-                      <View style={styles.recommendedBadge}>
-                        <ThumbsUp size={10} color="#065f46" />
-                        <Text style={styles.recommendedBadgeText}>توصية موثوقة من الجيران</Text>
-                      </View>
-                    )}
-                  </View>
-                </View>
-
-                {/* Description */}
-                <Text style={styles.cardDesc} numberOfLines={3}>
-                  {b.description || 'خدمة ومحل معتمد يخدم سكان الحي والمجاورين.'}
-                </Text>
-
-                {/* Meta details & author */}
-                <View style={styles.metaRow}>
-                  <View style={styles.locBadge}>
-                    <MapPin size={11} color="#059669" />
-                    <Text style={styles.locText}>
-                      {b.district ? `حي ${b.district}` : b.city || 'الرياض'}
-                    </Text>
-                  </View>
-
-                  {b.provider_name && (
-                    <Pressable
-                      style={styles.providerBadge}
-                      onPress={() => {
-                        if (b.provider_id) {
-                          router.push({ pathname: '/user', params: { id: b.provider_id } });
-                        }
-                      }}
-                    >
-                      <User size={11} color="#64748b" />
-                      <Text style={styles.providerText}>الموصي: {b.provider_name}</Text>
-                    </Pressable>
-                  )}
-                </View>
-
-                {/* Action Buttons */}
-                <View style={styles.cardActionsRow}>
-                  {b.phone ? (
-                    <Pressable
-                      style={styles.actionBtnCall}
-                      onPress={() => Linking.openURL(`tel:${b.phone}`)}
-                    >
-                      <Phone size={13} color="#0284c7" />
-                      <Text style={styles.actionBtnCallText}>اتصال مباشر</Text>
-                    </Pressable>
-                  ) : null}
-
-                  {b.whatsapp ? (
-                    <Pressable
-                      style={styles.actionBtnWa}
-                      onPress={() => Linking.openURL(`https://wa.me/${b.whatsapp}`)}
-                    >
-                      <MessageCircle size={13} color="#059669" />
-                      <Text style={styles.actionBtnWaText}>واتساب</Text>
-                    </Pressable>
-                  ) : null}
-
-                  {b.provider_id ? (
-                    <Pressable
-                      style={styles.actionBtnProfile}
-                      onPress={() => router.push({ pathname: '/user', params: { id: b.provider_id } })}
-                    >
-                      <Text style={styles.actionBtnProfileText}>الملف</Text>
-                    </Pressable>
-                  ) : null}
-                </View>
-              </View>
-            ))
-          )}
-        </View>
+        ) : (
+          <View style={styles.state}>
+            <BriefcaseBusiness size={34} color="#94A3B8" />
+            <Text style={styles.stateTitle}>لا توجد نتائج حاليًا</Text>
+            <Text style={styles.stateText}>ستظهر المنشآت والخدمات المعتمدة في هذا النطاق هنا.</Text>
+          </View>
+        )}
       </ScrollView>
-
-      {/* Modal: Add Recommendation */}
-      <Modal visible={addModalOpen} transparent animationType="slide" onRequestClose={() => setAddModalOpen(false)}>
-        <Pressable style={styles.modalBackdrop} onPress={() => setAddModalOpen(false)}>
-          <Pressable style={styles.modalCard} onPress={e => e.stopPropagation?.()}>
-            <View style={styles.modalHeader}>
-              <Pressable onPress={() => setAddModalOpen(false)} style={styles.modalCloseBtn}>
-                <X size={18} color="#64748b" />
-              </Pressable>
-              <Text style={styles.modalTitle}>إضافة توصية لخدمة في الحي ⭐</Text>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 440 }}>
-              <Text style={styles.fieldLabel}>اسم المهني أو المتجر *</Text>
-              <TextInput
-                style={styles.input}
-                value={recName}
-                onChangeText={setRecName}
-                placeholder="مثال: سباك الحي (أبو محمد)، مغسلة النقاء..."
-                placeholderTextColor="#9ca3af"
-              />
-
-              <Text style={styles.fieldLabel}>التصنيف</Text>
-              <View style={styles.categoryPickerWrap}>
-                {DIRECTORY_CATEGORIES.filter(c => c.id !== 'all').map(c => (
-                  <Pressable
-                    key={c.id}
-                    style={[styles.catPill, recCategory === c.id && styles.catPillActive]}
-                    onPress={() => setRecCategory(c.id)}
-                  >
-                    <Text style={styles.catEmoji}>{c.emoji}</Text>
-                    <Text style={[styles.catLabel, recCategory === c.id && styles.catLabelActive]}>
-                      {c.label}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-
-              <Text style={styles.fieldLabel}>رقم الجوال أو الواتساب</Text>
-              <TextInput
-                style={styles.input}
-                value={recPhone}
-                onChangeText={setRecPhone}
-                keyboardType="phone-pad"
-                placeholder="05XXXXXXXX"
-                placeholderTextColor="#9ca3af"
-              />
-
-              <Text style={styles.fieldLabel}>لماذا توصي به؟ (رأيك وتجربتك)</Text>
-              <TextInput
-                style={[styles.input, { height: 80, textAlignVertical: 'top' }]}
-                value={recDesc}
-                onChangeText={setRecDesc}
-                placeholder="مثال: تعاملت معه في صيانة السباكة، أمين وشغله نظيف وسعره معقول ومناسب..."
-                placeholderTextColor="#9ca3af"
-                multiline
-              />
-
-              <Pressable
-                style={[styles.submitBtn, submitting && { opacity: 0.7 }]}
-                onPress={handleAddRecommendation}
-                disabled={submitting}
-              >
-                {submitting ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <>
-                    <ThumbsUp size={16} color="#fff" />
-                    <Text style={styles.submitBtnText}>حفظ ونشر التوصية للحي 📢</Text>
-                  </>
-                )}
-              </Pressable>
-            </ScrollView>
-          </Pressable>
-        </Pressable>
-      </Modal>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
-  scroll: { paddingBottom: 20 },
-  addBtnHeader: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#ecfdf5',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#a7f3d0',
-  },
-  addBtnHeaderText: { fontSize: 12, fontWeight: '800', color: '#059669' },
-  searchSection: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 6 },
-  searchBar: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    height: 44,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 13,
-    color: '#0f172a',
-    textAlign: 'right',
-    paddingHorizontal: 8,
-  },
-  catWrap: {
-    backgroundColor: '#fff',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderColor: '#f1f5f9',
-  },
-  catScroll: { flexDirection: 'row-reverse', paddingHorizontal: 14, gap: 8 },
-  catPill: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    backgroundColor: '#f8fafc',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  catPillActive: { backgroundColor: '#059669', borderColor: '#059669' },
-  catEmoji: { fontSize: 13 },
-  catLabel: { fontSize: 11.5, fontWeight: '700', color: '#475569' },
-  catLabelActive: { color: '#ffffff', fontWeight: '900' },
-  content: { padding: 16, gap: 12 },
-  loadingBox: { paddingVertical: 50, alignItems: 'center', gap: 10 },
-  loadingText: { fontSize: 13, color: '#64748b', fontWeight: '700' },
-  emptyCard: {
-    backgroundColor: '#fff',
-    borderRadius: 18,
-    padding: 28,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    marginTop: 10,
-  },
-  emptyTitle: { fontSize: 16, fontWeight: '900', color: '#0f172a', marginTop: 10 },
-  emptySub: { fontSize: 12, color: '#64748b', textAlign: 'center', marginTop: 4, lineHeight: 18 },
-  emptyActionBtn: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#059669',
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 14,
-    marginTop: 16,
-  },
-  emptyActionBtnText: { color: '#fff', fontSize: 13, fontWeight: '800' },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 18,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  cardHeader: {
-    flexDirection: 'row-reverse',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-  },
-  cardTitleBox: { flex: 1, alignItems: 'flex-end', marginLeft: 8 },
-  titleWithBadge: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 5,
-  },
-  cardTitle: { fontSize: 15, fontWeight: '900', color: '#0f172a', textAlign: 'right' },
-  recommendedBadge: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: '#ecfdf5',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-    marginTop: 4,
-  },
-  recommendedBadgeText: { fontSize: 10, fontWeight: '800', color: '#065f46' },
-  ratingBadge: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#fffbeb',
-    borderWidth: 1,
-    borderColor: '#fde68a',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-  },
-  ratingText: { fontSize: 11, fontWeight: '800', color: '#92400e' },
-  cardDesc: { fontSize: 12.5, color: '#475569', lineHeight: 18, textAlign: 'right', marginBottom: 8 },
-  metaRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  locBadge: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#f1f5f9',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  locText: { fontSize: 11, color: '#475569', fontWeight: '700' },
-  providerBadge: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 4,
-  },
-  providerText: { fontSize: 11, color: '#64748b', fontWeight: '600' },
-  cardActionsRow: {
-    flexDirection: 'row-reverse',
-    gap: 8,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderColor: '#f8fafc',
-  },
-  actionBtnCall: {
-    flex: 1,
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-    backgroundColor: '#eff6ff',
-    borderWidth: 1,
-    borderColor: '#bfdbfe',
-    borderRadius: 12,
-    paddingVertical: 8,
-  },
-  actionBtnCallText: { fontSize: 12, fontWeight: '800', color: '#0284c7' },
-  actionBtnWa: {
-    flex: 1,
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-    backgroundColor: '#ecfdf5',
-    borderWidth: 1,
-    borderColor: '#a7f3d0',
-    borderRadius: 12,
-    paddingVertical: 8,
-  },
-  actionBtnWaText: { fontSize: 12, fontWeight: '800', color: '#059669' },
-  actionBtnProfile: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-    backgroundColor: '#f8fafc',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionBtnProfileText: { fontSize: 11.5, fontWeight: '700', color: '#64748b' },
+function DirectoryRow({ item }: { item: DirectoryItem }) {
+  const Icon = item.type === 'business' ? Store : Wrench;
+  const open = () => {
+    if (item.type === 'business') router.push({ pathname: '/business', params: { id: item.id } });
+    else router.push({ pathname: '/service', params: { id: item.id } });
+  };
 
-  /* Modal */
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalCard: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20 },
-  modalHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  modalTitle: { fontSize: 16, fontWeight: '900', color: '#0f172a' },
-  modalCloseBtn: { padding: 4 },
-  fieldLabel: { fontSize: 12, fontWeight: '800', color: '#334155', textAlign: 'right', marginBottom: 6 },
-  categoryPickerWrap: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 6, marginBottom: 10 },
-  input: {
-    backgroundColor: '#f8fafc',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    fontSize: 13,
-    color: '#0f172a',
-    textAlign: 'right',
-    marginBottom: 10,
-  },
-  submitBtn: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#059669',
-    paddingVertical: 13,
-    borderRadius: 14,
-    marginTop: 6,
-    marginBottom: 14,
-  },
-  submitBtnText: { color: '#fff', fontSize: 13.5, fontWeight: '900' },
+  return (
+    <Pressable style={styles.row} onPress={open}>
+      <View style={styles.visual}>
+        {item.image ? <Image source={{ uri: item.image }} style={styles.image} /> : <Icon size={22} color="#0F766E" />}
+      </View>
+      <View style={styles.copy}>
+        <View style={styles.titleRow}>
+          <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
+          {item.verified ? <ShieldCheck size={13} color="#059669" /> : null}
+        </View>
+        {item.businessName && item.type === 'service' ? <Text style={styles.businessName}>{item.businessName}</Text> : null}
+        <Text style={styles.description} numberOfLines={2}>{item.description}</Text>
+        <View style={styles.meta}>
+          <MapPin size={11} color="#94A3B8" />
+          <Text style={styles.metaText}>{[item.district && 'حي ' + item.district, item.city].filter(Boolean).join(' · ') || 'الموقع غير محدد'}</Text>
+        </View>
+        {item.owner ? (
+          <Pressable
+            style={styles.ownerLine}
+            onPress={(event: any) => {
+              event?.stopPropagation?.();
+              item.ownerId && router.push({ pathname: '/user', params: { id: item.ownerId } });
+            }}
+          >
+            <View style={styles.ownerAvatar}>
+              {item.owner.avatar_url ? <Image source={{ uri: item.owner.avatar_url }} style={styles.image} /> : <UserRound size={13} color="#64748B" />}
+            </View>
+            <Text style={styles.ownerName}>{item.owner.display_name || item.owner.username}</Text>
+            <AccountIdentityBadge role={item.owner.role} accountType={item.owner.account_type} isVerified={Boolean(item.owner.is_verified)} compact />
+            <AccountVerificationBadge role={item.owner.role} accountType={item.owner.account_type} isVerified={Boolean(item.owner.is_verified)} compact />
+          </Pressable>
+        ) : null}
+      </View>
+      <ChevronLeft size={18} color="#CBD5E1" />
+    </Pressable>
+  );
+}
+
+function Filter({ active, label, onPress }: { active: boolean; label: string; onPress: () => void }) {
+  return <Pressable style={[styles.filter, active && styles.filterActive]} onPress={onPress}><Text style={[styles.filterText, active && styles.filterTextActive]}>{label}</Text></Pressable>;
+}
+
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: '#F7F9F8' },
+  page: { padding: 14, paddingBottom: 36, gap: 12, maxWidth: 820, width: '100%', alignSelf: 'center' },
+  searchWrap: { height: 46, borderRadius: 14, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFFFFF', flexDirection: 'row-reverse', alignItems: 'center', gap: 8, paddingHorizontal: 12 },
+  searchInput: { flex: 1, color: '#0F172A', fontSize: 12, fontWeight: '700' },
+  filters: { flexDirection: 'row-reverse', gap: 7 },
+  filter: { borderRadius: 999, backgroundColor: '#F1F5F9', paddingHorizontal: 12, paddingVertical: 7 },
+  filterActive: { backgroundColor: '#0F766E' },
+  filterText: { color: '#64748B', fontSize: 10.5, fontWeight: '900' },
+  filterTextActive: { color: '#FFFFFF' },
+  notice: { flexDirection: 'row-reverse', alignItems: 'flex-start', gap: 7, backgroundColor: '#ECFDF5', borderRadius: 13, padding: 10, borderWidth: 1, borderColor: '#D1FAE5' },
+  noticeText: { flex: 1, color: '#065F46', fontSize: 9.5, lineHeight: 16, fontWeight: '700', textAlign: 'right' },
+  list: { gap: 8 },
+  row: { minHeight: 112, borderRadius: 17, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', padding: 10, flexDirection: 'row-reverse', alignItems: 'center', gap: 10 },
+  visual: { width: 66, height: 66, borderRadius: 15, backgroundColor: '#F0FDF4', overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  image: { width: '100%', height: '100%' },
+  copy: { flex: 1, alignItems: 'flex-end', minWidth: 0 },
+  titleRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, width: '100%' },
+  title: { flex: 1, color: '#0F172A', fontSize: 13, fontWeight: '900', textAlign: 'right' },
+  businessName: { color: '#047857', fontSize: 9.5, fontWeight: '800', marginTop: 2 },
+  description: { color: '#64748B', fontSize: 10, lineHeight: 15, textAlign: 'right', marginTop: 3 },
+  meta: { flexDirection: 'row-reverse', alignItems: 'center', gap: 3, marginTop: 5 },
+  metaText: { color: '#94A3B8', fontSize: 9, fontWeight: '700' },
+  ownerLine: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, marginTop: 6, maxWidth: '100%' },
+  ownerAvatar: { width: 21, height: 21, borderRadius: 11, backgroundColor: '#F1F5F9', overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  ownerName: { color: '#475569', fontSize: 9, fontWeight: '800', maxWidth: 100 },
+  state: { minHeight: 240, alignItems: 'center', justifyContent: 'center', gap: 8 },
+  stateTitle: { color: '#334155', fontSize: 14, fontWeight: '900' },
+  stateText: { color: '#94A3B8', fontSize: 10.5, textAlign: 'center', lineHeight: 17 },
+  retry: { backgroundColor: '#0F766E', borderRadius: 11, paddingHorizontal: 15, paddingVertical: 9 },
+  retryText: { color: '#FFFFFF', fontSize: 10.5, fontWeight: '900' },
 });

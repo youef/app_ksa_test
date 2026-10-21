@@ -100,15 +100,13 @@ async function searchUsers(term: string, limit = 15): Promise<Row[]> {
 }
 
 async function searchBusinesses(term: string, limit = 20): Promise<Row[]> {
-  const [businesses, directory, services] = await Promise.all([
+  const [businesses, services] = await Promise.all([
     searchRows('businesses', term, ['name', 'description', 'city', 'district'], ['name'], limit),
-    searchRows('business_directory', term, ['name', 'description', 'city', 'district'], ['name'], limit),
     searchRows('services', term, ['name', 'description', 'category', 'subcategory', 'shop_name', 'city', 'district'], ['name'], limit),
   ]);
 
   const taggedItems: Row[] = [
     ...businesses.map((item: Row) => ({ ...item, __sourceTable: 'businesses' } as Row)),
-    ...directory.map((item: Row) => ({ ...item, __sourceTable: 'business_directory' } as Row)),
     ...services.map((item: Row) => ({ ...item, __sourceTable: 'services' } as Row)),
   ];
   const unique = new Map<string, Row>();

@@ -223,7 +223,7 @@ async function safeRows(
  * Every query is defensive, so a missing column or table degrades instead of breaking.
  */
 export async function loadMapPins(limit = 220): Promise<MapPin[]> {
-  const [questionRows, requestRows, businessRows, directoryRows, servicesRows, carpoolRows, eventRows, marketplaceRows, alertRows] = await Promise.all([
+  const [questionRows, requestRows, businessRows, servicesRows, carpoolRows, eventRows, marketplaceRows, alertRows] = await Promise.all([
     safeRows(() =>
       supabase.from('questions').select('*').order('created_at', { ascending: false }).limit(limit),
     ),
@@ -238,9 +238,6 @@ export async function loadMapPins(limit = 220): Promise<MapPin[]> {
     ),
     safeRows(() =>
       supabase.from('businesses').select('*').not('latitude', 'is', null).limit(limit),
-    ),
-    safeRows(() =>
-      supabase.from('business_directory').select('*').limit(limit),
     ),
     safeRows(() =>
       supabase.from('services').select('*').eq('moderation_status', 'approved').order('created_at', { ascending: false }).limit(limit),
@@ -374,12 +371,7 @@ export async function loadMapPins(limit = 220): Promise<MapPin[]> {
     });
   });
 
-  const shops = [
-    ...businessRows.map((row: any) => ({ row, table: 'businesses' })),
-    ...directoryRows
-      .filter((row: any) => !businessRows.some((b: any) => b.id === row?.id))
-      .map((row: any) => ({ row, table: 'business_directory' })),
-  ];
+  const shops = businessRows.map((row: any) => ({ row, table: 'businesses' }));
 
   shops.forEach(({ row, table }: { row: any; table: string }) => {
     if (!row?.id) return;

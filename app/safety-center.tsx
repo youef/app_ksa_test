@@ -18,8 +18,8 @@ export default function SafetyCenterScreen() {
   };
 
   const items = [
-    { icon: <Eye size={19} color="#0F766E" />, title: 'تحكّم بخصوصيتك', desc: 'راجع من يمكنه التواصل معك وما يظهر في ملفك الشخصي.', action: 'إعدادات الخصوصية', onPress: () => router.push('/settings') },
-    { icon: <UserRoundCheck size={19} color="#2563EB" />, title: 'تعزيز موثوقية حسابك', desc: 'أكمل بيانات ملفك واطلب توثيق حسابك عند الحاجة.', action: 'نوع الحساب والتوثيق', onPress: () => router.push('/account-type') },
+    { icon: <Eye size={19} color="#0F766E" />, title: 'تحكّم بخصوصيتك', desc: 'راجع من يمكنه التواصل معك وما يظهر في ملفك الشخصي.', action: 'إعدادات الخصوصية', onPress: () => router.push({ pathname: '/profile', params: { tab: 'settings' } }) },
+    { icon: <UserRoundCheck size={19} color="#2563EB" />, title: 'تعزيز موثوقية حسابك', desc: 'أكمل بيانات ملفك واطلب توثيق حسابك عند الحاجة.', action: 'نوع الحساب والتوثيق', onPress: () => router.push({ pathname: '/profile', params: { tab: 'profile', section: 'identity' } }) },
     { icon: <LifeBuoy size={19} color="#7C3AED" />, title: 'تحتاج إلى مساعدة؟', desc: 'افتح تذكرة خاصة وتابع الردود من فريق حيّنا.', action: 'مركز الدعم', onPress: () => router.push('/support') },
   ];
 

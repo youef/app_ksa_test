@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
+import { AccountIdentityBadge, AccountVerificationBadge } from '@/components/profile/AccountIdentityBadge';
 import { C } from '@/lib/ui';
 import {
   ChevronRight,
@@ -41,20 +42,20 @@ export default function Business() {
     setLoading(true);
     try {
       const [bData, rData] = await Promise.all([
-        supabase.from('business_directory').select('*').eq('id', id).single(),
+        supabase
+          .from('businesses')
+          .select('*, owner:owner_id(id,display_name,username,avatar_url,role,account_type,freelance_trade,is_verified)')
+          .eq('id', id)
+          .maybeSingle(),
         supabase
           .from('reviews')
           .select('id, rating, body, created_at, profiles:reviewer_id(display_name, username, avatar_url)')
           .eq('business_id', id)
           .order('created_at', { ascending: false }),
       ]);
-      if (bData.error || !bData.data) {
-        // Some listings come from the `businesses` table (e.g. map pins).
-        const alt = await supabase.from('businesses').select('*').eq('id', id).maybeSingle();
-        setBusiness(alt.data ?? null);
-      } else {
-        setBusiness(bData.data);
-      }
+      if (bData.error) throw bData.error;
+      if (rData.error) throw rData.error;
+      setBusiness(bData.data ?? null);
       setReviews(rData.data ?? []);
     } catch (e) {
       console.warn('Load business error', e);
@@ -115,6 +116,10 @@ export default function Business() {
     );
   }
 
+  const averageRating = reviews.length
+    ? reviews.reduce((sum, review) => sum + Number(review.rating || 0), 0) / reviews.length
+    : 0;
+
   return (
     <View style={styles.container}>
       <AppHeader
@@ -151,7 +156,7 @@ export default function Business() {
             <View style={styles.ratingBadge}>
               <Star size={14} color="#f59e0b" fill="#f59e0b" />
               <Text style={styles.ratingText}>
-                {Number(business.rating || 5.0).toFixed(1)} ({business.review_count || 0} تقييم)
+                {reviews.length ? averageRating.toFixed(1) : 'جديد'} ({reviews.length} تقييم)
               </Text>
             </View>
 
@@ -177,7 +182,7 @@ export default function Business() {
             <View style={styles.divider} />
 
             <View style={styles.infoRow}>
-              <Text style={styles.infoVal}>{business.category || 'متجر'}</Text>
+              <Text style={styles.infoVal}>منشأة محلية</Text>
               <Text style={styles.infoLabel}>النشاط:</Text>
             </View>
 
@@ -188,6 +193,27 @@ export default function Business() {
               </View>
             )}
           </View>
+
+          {business.owner ? (
+            <Pressable
+              style={styles.ownerCard}
+              onPress={() => router.push({ pathname: '/user', params: { id: business.owner.id } })}
+            >
+              <View style={styles.ownerCopy}>
+                <Text style={styles.ownerEyebrow}>مالك النشاط</Text>
+                <Text style={styles.ownerName}>
+                  {business.owner.account_type === 'merchant' && business.owner.freelance_trade
+                    ? business.owner.freelance_trade
+                    : business.owner.display_name || business.owner.username}
+                </Text>
+                <View style={styles.ownerBadges}>
+                  <AccountIdentityBadge role={business.owner.role} accountType={business.owner.account_type} isVerified={Boolean(business.owner.is_verified)} compact />
+                  <AccountVerificationBadge role={business.owner.role} accountType={business.owner.account_type} isVerified={Boolean(business.owner.is_verified)} compact />
+                </View>
+              </View>
+              <ChevronRight size={18} color="#94A3B8" />
+            </Pressable>
+          ) : null}
 
           {/* Add Review Card */}
           <View style={styles.reviewFormCard}>
@@ -375,6 +401,20 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 2,
   },
+  ownerCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    padding: 13,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 10,
+  },
+  ownerCopy: { flex: 1, alignItems: 'flex-end', gap: 3 },
+  ownerEyebrow: { color: '#94a3b8', fontSize: 9, fontWeight: '900' },
+  ownerName: { color: '#0f172a', fontSize: 13, fontWeight: '900', textAlign: 'right' },
+  ownerBadges: { flexDirection: 'row-reverse', gap: 4, flexWrap: 'wrap', marginTop: 3 },
   cardTitle: {
     color: '#0f172a',
     fontSize: 16,

@@ -15,7 +15,7 @@ import { PlatformConfigProvider, usePlatformConfig } from '@/lib/platformConfig'
 const ACCOUNT_ONLY_ROUTES = [
   '/profile', '/settings', '/market', '/messages', '/conversation', '/search',
   '/ask', '/create-story', '/story', '/notifications',
-  '/new-service', '/service', '/business', '/directory', '/user', '/report', '/admin', '/support',
+  '/new-service', '/new-listing', '/service', '/business', '/directory', '/user', '/report', '/admin', '/support',
   '/live',
 ];
 
@@ -71,8 +71,8 @@ function RootContent() {
   const path = pathname.replace(/\/+$/, '') || '/';
   const liveFullScreen = path === '/live' || path.startsWith('/live/');
   const storyFullScreen = ['/stories', '/create-story', '/story', '/story-viewers', '/story-settings'].some(route => path === route || path.startsWith(route + '/'));
-  const hideBottomNav = ['/service', '/new-service'].some(route => path === route || path.startsWith(`${route}/`));
-  const hiddenRoute = Object.entries(flags).some(([key, enabled]) => enabled === false && ({ market: ['/market', '/service', '/new-service'], directory: ['/directory', '/business'], search: ['/search'], stories: ['/stories', '/story', '/create-story'], weather: ['/weather'], carpooling: ['/carpooling'], urgent_alerts: ['/emergency-alert'], questions: ['/questions', '/question'], live: ['/lives', '/live'], map: ['/map'] }[key] || []).some(route => path === route || path.startsWith(route + '/')));
+  const hideBottomNav = ['/service', '/new-service', '/new-listing'].some(route => path === route || path.startsWith(route + '/'));
+  const hiddenRoute = Object.entries(flags).some(([key, enabled]) => enabled === false && ({ market: ['/market', '/service', '/new-service', '/new-listing'], directory: ['/directory', '/business'], search: ['/search'], stories: ['/stories', '/story', '/create-story'], weather: ['/weather'], carpooling: ['/carpooling'], urgent_alerts: ['/emergency-alert'], questions: ['/questions', '/question'], live: ['/lives', '/live'], map: ['/map'] }[key] || []).some(route => path === route || path.startsWith(route + '/')));
   const routeBlocked = hiddenRoute && path !== '/admin';
 
   return (

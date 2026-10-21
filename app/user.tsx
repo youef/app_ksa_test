@@ -44,7 +44,6 @@ import {
 import { supabase } from '@/lib/supabase';
 import { ProfileCustomizationEntry } from '@/components/profile/ProfileCustomizationEntry';
 import { AccountIdentityBadge, AccountIdentityIcon, AccountVerificationBadge, getAccountIdentityMeta } from '@/components/profile/AccountIdentityBadge';
-import { ProfileIdentityCard } from '@/components/profile/ProfileIdentityCard';
 import { C } from '@/lib/ui';
 import { getBlockStatus, setBlock } from '@/lib/chatControls';
 import { isExactDistrictMatching } from '@/lib/locationSync';
@@ -134,13 +133,47 @@ export default function UserProfile() {
         if (result.error) throw result.error;
         setQuestions(result.data || []);
       } else if (tabToLoad === 'reviews') {
-        result = await supabase.from('reviews').select('id,reviewer_id,business_id,service_id,rating,body,created_at').eq('business_id', profileId).order('created_at', { ascending: false }).limit(30);
-        if (result.error) throw result.error;
-        const rows = result.data || [];
+        const [ownedBusiness, ownedServices] = await Promise.all([
+          supabase.from('businesses').select('id').eq('owner_id', profileId).maybeSingle(),
+          supabase.from('services').select('id').eq('provider_id', profileId).limit(100),
+        ]);
+        const serviceIds = (ownedServices.data || []).map((row: any) => row.id).filter(Boolean);
+        const reviewQueries: Promise<any>[] = [];
+        if (ownedBusiness.data?.id) {
+          reviewQueries.push(
+            Promise.resolve(
+              supabase.from('reviews')
+                .select('id,reviewer_id,business_id,service_id,rating,body,created_at')
+                .eq('business_id', ownedBusiness.data.id)
+                .order('created_at', { ascending: false })
+                .limit(30),
+            ),
+          );
+        }
+        if (serviceIds.length) {
+          reviewQueries.push(
+            Promise.resolve(
+              supabase.from('reviews')
+                .select('id,reviewer_id,business_id,service_id,rating,body,created_at')
+                .in('service_id', serviceIds)
+                .order('created_at', { ascending: false })
+                .limit(30),
+            ),
+          );
+        }
+        const reviewResults = reviewQueries.length ? await Promise.all(reviewQueries) : [];
+        for (const reviewResult of reviewResults) {
+          if (reviewResult.error) throw reviewResult.error;
+        }
+        const deduped = new Map<string, any>();
+        reviewResults.flatMap((reviewResult: any) => reviewResult.data || []).forEach((row: any) => deduped.set(row.id, row));
+        const rows = [...deduped.values()]
+          .sort((a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
+          .slice(0, 30);
         const reviewerIds = [...new Set(rows.map((row: any) => row.reviewer_id).filter(Boolean))];
         let reviewers: any[] = [];
         if (reviewerIds.length) {
-          const people = await supabase.from('profiles').select('id,username,display_name,avatar_url,is_verified').in('id', reviewerIds);
+          const people = await supabase.from('profiles').select('id,username,display_name,avatar_url,is_verified,account_type').in('id', reviewerIds);
           reviewers = people.data || [];
         }
         const byId = new Map(reviewers.map(person => [person.id, person]));
@@ -748,19 +781,6 @@ export default function UserProfile() {
             </View>
           </LinearGradient>
 
-          {!anonymous ? (
-            <View style={styles.identityCardWrap}>
-              <ProfileIdentityCard
-                role={profile.role}
-                accountType={profile.account_type}
-                isVerified={Boolean(profile.is_verified)}
-                descriptor={identityDescriptor}
-                owner={false}
-                onManage={own ? () => router.push('/account-type') : undefined}
-              />
-            </View>
-          ) : null}
-
           {/* Elevated Stats Bar */}
           {profileCustomization?.show_stats !== false && <View style={[styles.statsCard, { borderColor: `${accentColor}30` }]}>
             <Stat label="السمعة" value={stats.reputation} />
@@ -776,7 +796,7 @@ export default function UserProfile() {
                   <Text style={[styles.contentTitle, { color: accentColor }]}>{profileCustomization?.featured_title || 'أعمالي المميزة'}</Text>
                   <Text style={styles.contentSub}>{featuredItems.length ? 'اختيارات مثبتة من هذا الجار' : 'اختر أفضل مساهماتك لتظهر هنا'}</Text>
                 </View>
-                {own && featuredItems.length > 0 && <Pressable style={styles.marketLink} onPress={() => router.push('/profile-customization')}><Text style={[styles.marketLinkText, { color: accentColor }]}>إدارة</Text><Edit3 size={14} color={accentColor} /></Pressable>}
+                {own && featuredItems.length > 0 && <Pressable style={styles.marketLink} onPress={() => router.push({ pathname: '/profile', params: { tab: 'settings', section: 'design' } })}><Text style={[styles.marketLinkText, { color: accentColor }]}>إدارة</Text><Edit3 size={14} color={accentColor} /></Pressable>}
               </View>
               {featuredItems.length > 0 ? (
                 <View style={[styles.grid, { gap: 12 }]}>
@@ -1292,10 +1312,6 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 6,
     marginTop: 8,
-  },
-  identityCardWrap: {
-    marginTop: 12,
-    marginHorizontal: 4,
   },
   statsCard: {
     marginTop: -16,
