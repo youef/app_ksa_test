@@ -1,12 +1,6 @@
 name: Deploy حيّنا to Vercel
 
 on:
-  push:
-    branches:
-      - main
-    paths-ignore:
-      - "README.md"
-      - "docs/**"
   workflow_dispatch:
 
 concurrency:
@@ -34,19 +28,20 @@ jobs:
         run: npm ci
 
       - name: Pull Vercel production settings
-        run: npx vercel@latest pull --yes --environment=production --token="${{ secrets.VERCEL_TOKEN }}"
+        run: npx vercel@latest pull --yes --environment=production
         env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: team_Sq5UAjTQnk2cEUHVGF5XRja3
           VERCEL_PROJECT_ID: prj_K1yWWRZF69dgO7TIJLaLIQnTp5VV
 
       - name: Build for production
-        run: npx vercel@latest build --prod --token="${{ secrets.VERCEL_TOKEN }}"
+        run: npx vercel@latest build --prod
         env:
           VERCEL_ORG_ID: team_Sq5UAjTQnk2cEUHVGF5XRja3
           VERCEL_PROJECT_ID: prj_K1yWWRZF69dgO7TIJLaLIQnTp5VV
 
       - name: Deploy prebuilt output
-        run: npx vercel@latest deploy --prebuilt --prod --yes --token="${{ secrets.VERCEL_TOKEN }}"
+        run: npx vercel@latest deploy --prebuilt --prod --yes
         env:
           VERCEL_ORG_ID: team_Sq5UAjTQnk2cEUHVGF5XRja3
           VERCEL_PROJECT_ID: prj_K1yWWRZF69dgO7TIJLaLIQnTp5VV
