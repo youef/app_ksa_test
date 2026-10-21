@@ -315,7 +315,7 @@ export default function Market() {
         openNow: b.is_open ?? true,
         is_verified: Boolean(b.is_verified),
         Icon: BUSINESS_CATEGORIES.find((c) => c.id === b.category)?.Icon || Store,
-        color: '#059669',
+        color: '#047857',
         bg: '#ecfdf5',
         hours: b.working_hours || 'ساعات العمل حسب التنسيق',
         description: b.description || 'منشأة معتمدة لخدمة سكان الحي بأعلى معايير الجودة.',
@@ -340,7 +340,7 @@ export default function Market() {
         attendeesCount: ev.attendees_count || 0,
         isFree: ev.is_free ?? true,
         Icon: EVENT_CATEGORIES.find((c) => c.id === ev.category)?.Icon || Calendar,
-        color: '#059669',
+        color: '#047857',
         bg: '#ecfdf5',
         description: ev.description || 'نشاط مجتمعي يجمع الجيران في أجواء طيبة ومميزة.',
         agenda: ev.agenda || [],
@@ -695,7 +695,7 @@ export default function Market() {
           </View>
 
           <View style={styles.cardMeta}>
-            {item.profiles?.is_verified && <ShieldCheck size={12} color="#059669" />}
+            {item.profiles?.is_verified && <ShieldCheck size={12} color="#047857" />}
             <MapPin size={10} color="#94a3b8" />
             <Text style={styles.cardMetaText} numberOfLines={1}>
               {type?.nationwide ? 'عن بُعد' : (item.district || item.profiles?.district) ? `حي ${item.district || item.profiles?.district}` : (item.city || 'داخل الحي')}
@@ -705,7 +705,7 @@ export default function Market() {
 
           <View style={styles.cardDetailsHintRow}>
             <Text style={styles.cardDetailsHintText}>عرض التفاصيل الكاملة</Text>
-            <ArrowRight size={11} color="#059669" />
+            <ArrowRight size={11} color="#047857" />
           </View>
         </View>
       </Pressable>
@@ -767,7 +767,7 @@ export default function Market() {
           <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between' }}>
             <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4, flex: 1 }}>
               <Text style={styles.cardTitle} numberOfLines={1}>{b.name}</Text>
-              {b.is_verified && <ShieldCheck size={13} color="#059669" />}
+              {b.is_verified && <ShieldCheck size={13} color="#047857" />}
             </View>
             <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 2 }}>
               <Star size={11} color="#f59e0b" fill="#f59e0b" />
@@ -778,7 +778,7 @@ export default function Market() {
           <Text style={styles.cardSub} numberOfLines={2}>{b.description || b.hours}</Text>
 
           <View style={[styles.cardMeta, { marginTop: 6 }]}>
-            <MapPin size={10} color="#059669" />
+            <MapPin size={10} color="#047857" />
             <Text style={[styles.cardMetaText, { color: '#475569' }]} numberOfLines={1}>
               {b.district ? `حي ${b.district}` : ''} {b.city ? `· ${b.city}` : ''}
             </Text>
@@ -849,9 +849,9 @@ export default function Market() {
         ]}
       >
         <View style={[styles.cardImage, listMode ? styles.cardImageRow : { height: w * 0.58 }, { backgroundColor: ev.bg || '#ecfdf5' }]}>
-          <Text style={{ fontSize: Math.min(36, w * 0.22) }}><ev.Icon size={34} color={ev.color || '#059669'} /></Text>
+          <Text style={{ fontSize: Math.min(36, w * 0.22) }}><ev.Icon size={34} color={ev.color || '#047857'} /></Text>
           <View style={[styles.typeBadge, { backgroundColor: 'rgba(255,255,255,0.96)' }]}>
-            <Text style={[styles.typeBadgeText, { color: ev.color || '#059669' }]}>{ev.categoryLabel}</Text>
+            <Text style={[styles.typeBadgeText, { color: ev.color || '#047857' }]}>{ev.categoryLabel}</Text>
           </View>
           <View style={[styles.availableBadgePill, { backgroundColor: '#ecfdf5', borderColor: '#a7f3d0' }]}>
             <Text style={[styles.availableBadgeText, { color: '#047857' }]}>{ev.isFree ? 'مجاني' : 'تسجيل'}</Text>
@@ -880,7 +880,7 @@ export default function Market() {
               <Text style={styles.eventInfoText} numberOfLines={1}>{ev.dateLabel}</Text>
             </View>
             <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4, marginTop: 4 }}>
-              <MapPin size={11} color="#059669" />
+              <MapPin size={11} color="#047857" />
               <Text style={styles.eventInfoText} numberOfLines={1}>{ev.location}</Text>
             </View>
           </View>
@@ -901,7 +901,7 @@ export default function Market() {
                 toggleRsvp(ev.id);
               }}
             >
-              {isAttending ? <Check size={12} color="#fff" /> : <Sparkles size={12} color="#059669" />}
+              {isAttending ? <Check size={12} color="#fff" /> : <Sparkles size={12} color="#047857" />}
               <Text style={[styles.rsvpBtnText, isAttending && { color: '#fff' }]}>
                 {isAttending ? 'سأحضر ✓' : 'حضور'}
               </Text>
@@ -909,8 +909,8 @@ export default function Market() {
           </View>
 
           <View style={styles.cardDetailsHintRow}>
-            <Text style={[styles.cardDetailsHintText, { color: '#059669' }]}>عرض تفاصيل الفعالية والبرنامج</Text>
-            <ArrowRight size={11} color="#059669" />
+            <Text style={[styles.cardDetailsHintText, { color: '#047857' }]}>عرض تفاصيل الفعالية والبرنامج</Text>
+            <ArrowRight size={11} color="#047857" />
           </View>
         </View>
       </Pressable>
@@ -942,7 +942,7 @@ export default function Market() {
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingBottom: bottomNavInset + 28 }}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadAllData} tintColor="#059669" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadAllData} tintColor="#047857" />}
       >
         {/* ======================================================== */}
         {/* HERO EXECUTIVE CARD                                      */}
@@ -950,7 +950,7 @@ export default function Market() {
         <View style={styles.heroSectionWrap}>
           <View style={styles.inner}>
             <LinearGradient
-              colors={['#064e3b', '#047857', '#059669']}
+              colors={['#064e3b', '#047857', '#047857']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.heroCard}
@@ -1089,7 +1089,7 @@ export default function Market() {
                   {families.length > 0 && (
                     <View style={{ marginBottom: 18 }}>
                       <View style={styles.sectionHead}>
-                        <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}><House size={16} color="#059669" /><Text style={styles.sectionTitle}>من الأسر المنتجة في حيّك</Text></View>
+                        <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}><House size={16} color="#047857" /><Text style={styles.sectionTitle}>من الأسر المنتجة في حيّك</Text></View>
                         <Pressable onPress={() => setActiveType('home_family')}>
                           <Text style={styles.seeAll}>عرض الكل</Text>
                         </Pressable>
@@ -1113,7 +1113,7 @@ export default function Market() {
                     </View>
                   ) : (
                     <View style={styles.emptyState}>
-                      <View style={styles.emptyIcon}><ShoppingBag size={32} color="#059669" /></View>
+                      <View style={styles.emptyIcon}><ShoppingBag size={32} color="#047857" /></View>
                       <Text style={styles.emptyTitle}>لا توجد عروض في هذا الحي حالياً</Text>
                       <Text style={styles.emptyText}>
                         كن أول جار يشارك منتجاته أو خدماته مع أهالي {locationLabel} وبدون أي عمولات.
@@ -1200,14 +1200,14 @@ export default function Market() {
           <View style={styles.filterMenuCard}>
             <View style={styles.filterMenuHeader}><Text style={styles.filterMenuTitle}>{filterMenu === 'sort' ? 'ترتيب النتائج' : 'تصفية النتائج'}</Text><Pressable onPress={() => setFilterMenu(null)} style={styles.modalCloseBtn}><X size={17} color="#0f172a" /></Pressable></View>
             <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
-              {filterMenu === 'sort' ? SORT_OPTIONS.map((opt) => <Pressable key={opt.id} style={styles.filterMenuItem} onPress={() => { setSortBy(opt.id); setFilterMenu(null); }}><opt.Icon size={18} color={sortBy === opt.id ? '#059669' : '#64748b'} /><Text style={[styles.filterMenuItemText, sortBy === opt.id && { color: '#047857', fontWeight: '900' }]}>{opt.label}</Text>{sortBy === opt.id && <Check size={17} color="#059669" />}</Pressable>) : section === 'market' ? (
+              {filterMenu === 'sort' ? SORT_OPTIONS.map((opt) => <Pressable key={opt.id} style={styles.filterMenuItem} onPress={() => { setSortBy(opt.id); setFilterMenu(null); }}><opt.Icon size={18} color={sortBy === opt.id ? '#047857' : '#64748b'} /><Text style={[styles.filterMenuItemText, sortBy === opt.id && { color: '#047857', fontWeight: '900' }]}>{opt.label}</Text>{sortBy === opt.id && <Check size={17} color="#047857" />}</Pressable>) : section === 'market' ? (
                 <>
                   <Pressable style={styles.filterMenuItem} onPress={() => { setActiveType('all'); setQuick('all'); setFilterMenu(null); }}><LayoutGrid size={18} color="#64748b" /><Text style={styles.filterMenuItemText}>كل العروض</Text></Pressable>
-                  {LISTING_TYPES.map((t) => <Pressable key={t.id} style={styles.filterMenuItem} onPress={() => { setActiveType(t.id); setFilterMenu(null); }}><t.Icon size={18} color={activeType === t.id ? '#059669' : t.color} /><Text style={styles.filterMenuItemText}>{t.label}</Text>{activeType === t.id && <Check size={17} color="#059669" />}</Pressable>)}
+                  {LISTING_TYPES.map((t) => <Pressable key={t.id} style={styles.filterMenuItem} onPress={() => { setActiveType(t.id); setFilterMenu(null); }}><t.Icon size={18} color={activeType === t.id ? '#047857' : t.color} /><Text style={styles.filterMenuItemText}>{t.label}</Text>{activeType === t.id && <Check size={17} color="#047857" />}</Pressable>)}
                   <View style={styles.filterMenuDivider} />
-                  {QUICK_FILTERS.map((f) => <Pressable key={f.id} style={styles.filterMenuItem} onPress={() => { setQuick(f.id); setFilterMenu(null); }}>{f.Icon && <f.Icon size={18} color={quick === f.id ? '#059669' : '#64748b'} />}<Text style={styles.filterMenuItemText}>{f.label}</Text>{quick === f.id && <Check size={17} color="#059669" />}</Pressable>)}
+                  {QUICK_FILTERS.map((f) => <Pressable key={f.id} style={styles.filterMenuItem} onPress={() => { setQuick(f.id); setFilterMenu(null); }}>{f.Icon && <f.Icon size={18} color={quick === f.id ? '#047857' : '#64748b'} />}<Text style={styles.filterMenuItemText}>{f.label}</Text>{quick === f.id && <Check size={17} color="#047857" />}</Pressable>)}
                 </>
-              ) : section === 'businesses' ? BUSINESS_CATEGORIES.map((c) => <Pressable key={c.id} style={styles.filterMenuItem} onPress={() => { setBusinessCategory(c.id); setFilterMenu(null); }}><c.Icon size={18} color={businessCategory === c.id ? '#059669' : '#64748b'} /><Text style={styles.filterMenuItemText}>{c.label}</Text>{businessCategory === c.id && <Check size={17} color="#059669" />}</Pressable>) : EVENT_CATEGORIES.map((c) => <Pressable key={c.id} style={styles.filterMenuItem} onPress={() => { setEventCategory(c.id); setFilterMenu(null); }}><c.Icon size={18} color={eventCategory === c.id ? '#059669' : '#64748b'} /><Text style={styles.filterMenuItemText}>{c.label}</Text>{eventCategory === c.id && <Check size={17} color="#059669" />}</Pressable>)}
+              ) : section === 'businesses' ? BUSINESS_CATEGORIES.map((c) => <Pressable key={c.id} style={styles.filterMenuItem} onPress={() => { setBusinessCategory(c.id); setFilterMenu(null); }}><c.Icon size={18} color={businessCategory === c.id ? '#047857' : '#64748b'} /><Text style={styles.filterMenuItemText}>{c.label}</Text>{businessCategory === c.id && <Check size={17} color="#047857" />}</Pressable>) : EVENT_CATEGORIES.map((c) => <Pressable key={c.id} style={styles.filterMenuItem} onPress={() => { setEventCategory(c.id); setFilterMenu(null); }}><c.Icon size={18} color={eventCategory === c.id ? '#047857' : '#64748b'} /><Text style={styles.filterMenuItemText}>{c.label}</Text>{eventCategory === c.id && <Check size={17} color="#047857" />}</Pressable>)}
             </ScrollView>
             <Pressable style={styles.filterResetBtn} onPress={() => { setActiveType('all'); setBusinessCategory('all'); setEventCategory('all'); setQuick('all'); setFilterMenu(null); }}><Text style={styles.filterResetText}>إعادة ضبط التصفية</Text></Pressable>
           </View>
@@ -1239,7 +1239,7 @@ export default function Market() {
                   <View style={{ alignItems: 'center', marginTop: 10, gap: 4 }}>
                     <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
                       <Text style={styles.detailHeroTitle}>{selectedBusiness.name}</Text>
-                      {selectedBusiness.is_verified && <ShieldCheck size={18} color="#059669" />}
+                      {selectedBusiness.is_verified && <ShieldCheck size={18} color="#047857" />}
                     </View>
                     <View style={styles.detailBadgeRow}>
                       <Text style={[styles.detailCatPill, { color: selectedBusiness.color || '#0284c7' }]}>
@@ -1256,7 +1256,7 @@ export default function Market() {
 
                 <View style={styles.detailStatusBanner}>
                   <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-                    <Clock size={16} color="#059669" />
+                    <Clock size={16} color="#047857" />
                     <Text style={{ fontSize: 13, fontWeight: '800', color: '#0f172a' }}>
                       {selectedBusiness.hours || 'متاح لخدمة الحي'}
                     </Text>
@@ -1269,7 +1269,7 @@ export default function Market() {
                 </View>
 
                 <View style={styles.detailLocationBanner}>
-                  <MapPin size={16} color="#059669" />
+                  <MapPin size={16} color="#047857" />
                   <Text style={styles.detailLocationText}>
                     الموقع: {selectedBusiness.district ? `حي ${selectedBusiness.district}` : ''} {selectedBusiness.city ? `· ${selectedBusiness.city}` : ''}
                   </Text>
@@ -1295,7 +1295,7 @@ export default function Market() {
                     style={styles.detailActionBtnMap}
                     onPress={() => openMaps(`${selectedBusiness.name} ${selectedBusiness.district || ''} ${selectedBusiness.city || ''}`)}
                   >
-                    <Navigation size={16} color="#059669" />
+                    <Navigation size={16} color="#047857" />
                     <Text style={styles.detailActionBtnMapText}>الخريطة</Text>
                   </Pressable>
                   <Pressable style={styles.detailActionBtnShare} onPress={() => void shareBusiness(selectedBusiness)}>
@@ -1317,7 +1317,7 @@ export default function Market() {
                     <View style={{ gap: 8, marginTop: 6 }}>
                       {selectedBusiness.features.map((feat: string, idx: number) => (
                         <View key={idx} style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8 }}>
-                          <CheckCircle2 size={16} color="#059669" />
+                          <CheckCircle2 size={16} color="#047857" />
                           <Text style={{ fontSize: 13, color: '#334155', fontWeight: '700' }}>{feat}</Text>
                         </View>
                       ))}
@@ -1344,7 +1344,7 @@ export default function Market() {
                   <X size={18} color="#0f172a" />
                 </Pressable>
                 <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-                  <Calendar size={18} color="#059669" />
+                  <Calendar size={18} color="#047857" />
                   <Text style={styles.modalTitle}>تفاصيل الفعالية والنشاط</Text>
                 </View>
               </View>
@@ -1352,16 +1352,16 @@ export default function Market() {
               <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
                 <View style={[styles.detailHeroBox, { backgroundColor: selectedEvent.bg || '#ecfdf5' }]}>
                   <View style={styles.detailHeroIconCircle}>
-                    <Text style={{ fontSize: 34 }}><selectedEvent.Icon size={34} color={selectedEvent.color || '#059669'} /></Text>
+                    <Text style={{ fontSize: 34 }}><selectedEvent.Icon size={34} color={selectedEvent.color || '#047857'} /></Text>
                   </View>
                   <View style={{ alignItems: 'center', marginTop: 10, gap: 4 }}>
                     <Text style={styles.detailHeroTitle}>{selectedEvent.title}</Text>
                     <View style={styles.detailBadgeRow}>
-                      <Text style={[styles.detailCatPill, { color: selectedEvent.color || '#059669' }]}>
+                      <Text style={[styles.detailCatPill, { color: selectedEvent.color || '#047857' }]}>
                         {selectedEvent.categoryLabel}
                       </Text>
                       <View style={[styles.detailRatingPill, { backgroundColor: '#ecfdf5', borderColor: '#a7f3d0' }]}>
-                        <Award size={13} color="#059669" />
+                        <Award size={13} color="#047857" />
                         <Text style={{ fontSize: 12, fontWeight: '800', color: '#047857' }}>
                           {selectedEvent.isFree ? 'دخول مجاني' : 'تسجيل مسبق'}
                         </Text>
@@ -1372,15 +1372,15 @@ export default function Market() {
 
                 <View style={styles.detailStatusBanner}>
                   <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8 }}>
-                    <Users size={16} color="#059669" />
+                    <Users size={16} color="#047857" />
                     <View>
                       <Text style={{ fontSize: 11, color: '#64748b' }}>الجهة المنظمة</Text>
                       <Text style={{ fontSize: 13, fontWeight: '800', color: '#0f172a' }}>{selectedEvent.organizer || 'أحد سكان الحي'}</Text>
                     </View>
                   </View>
                   <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}>
-                    <Users size={14} color="#059669" />
-                    <Text style={{ fontSize: 12.5, fontWeight: '900', color: '#059669' }}>
+                    <Users size={14} color="#047857" />
+                    <Text style={{ fontSize: 12.5, fontWeight: '900', color: '#047857' }}>
                       {selectedEvent.attendeesCount || 0} جار مسجل
                     </Text>
                   </View>
@@ -1394,7 +1394,7 @@ export default function Market() {
                 </View>
 
                 <View style={styles.detailLocationBanner}>
-                  <MapPin size={16} color="#059669" />
+                  <MapPin size={16} color="#047857" />
                   <Text style={styles.detailLocationText}>
                     نقطة التجمع: {selectedEvent.location} ({selectedEvent.district ? `حي ${selectedEvent.district}` : selectedEvent.city || ''})
                   </Text>
@@ -1426,7 +1426,7 @@ export default function Market() {
                     style={styles.detailActionBtnMap}
                     onPress={() => openMaps(`${selectedEvent.location} ${selectedEvent.district || ''} ${selectedEvent.city || ''}`)}
                   >
-                    <Navigation size={16} color="#059669" />
+                    <Navigation size={16} color="#047857" />
                     <Text style={styles.detailActionBtnMapText}>عرض الموقع بالخريطة</Text>
                   </Pressable>
                   <Pressable style={styles.detailActionBtnShare} onPress={() => void shareEvent(selectedEvent)}>
@@ -1442,7 +1442,7 @@ export default function Market() {
                 {Array.isArray(selectedEvent.agenda) && selectedEvent.agenda.length > 0 && (
                   <View style={styles.detailSectionBox}>
                     <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 7 }}>
-                      <Calendar size={17} color="#059669" />
+                      <Calendar size={17} color="#047857" />
                       <Text style={styles.detailSectionTitle}>برنامج الفعالية</Text>
                     </View>
                     <View style={{ gap: 9, marginTop: 8 }}>
@@ -1458,7 +1458,7 @@ export default function Market() {
                 {selectedEvent.guidelines ? (
                   <View style={styles.detailSectionBox}>
                     <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 7 }}>
-                      <ShieldCheck size={17} color="#059669" />
+                      <ShieldCheck size={17} color="#047857" />
                       <Text style={styles.detailSectionTitle}>إرشادات المشاركة</Text>
                     </View>
                     <Text style={[styles.detailSectionDesc, { marginTop: 7 }]}>{selectedEvent.guidelines}</Text>
@@ -1469,10 +1469,10 @@ export default function Market() {
                 {selectedEvent.organizerId === profile?.id && (
                   <View style={styles.detailSectionBox}>
                     <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                      <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 7 }}><Users size={17} color="#059669" /><Text style={styles.detailSectionTitle}>قائمة المشاركين في فعاليتك</Text></View>
+                      <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 7 }}><Users size={17} color="#047857" /><Text style={styles.detailSectionTitle}>قائمة المشاركين في فعاليتك</Text></View>
                       <Text style={{ fontSize: 11, color: '#64748b', fontWeight: '700' }}>{eventAttendees.length} مشارك</Text>
                     </View>
-                    {loadingAttendees ? <ActivityIndicator color="#059669" style={{ marginTop: 10 }} /> : eventAttendees.length ? <View style={{ gap: 10, marginTop: 10 }}>{eventAttendees.map((attendee) => <View key={attendee.user_id} style={styles.attendeeRow}><View style={styles.attendeeAvatar}>{attendee.profile?.avatar_url ? <Image source={{ uri: attendee.profile.avatar_url }} style={StyleSheet.absoluteFillObject} /> : <User size={17} color="#64748b" />}</View><View style={{ flex: 1, alignItems: 'flex-end', gap: 2 }}><Text style={{ fontSize: 13, color: '#0f172a', fontWeight: '800' }}>{attendee.profile?.display_name || attendee.profile?.username || 'جارٍ مشارك'}</Text><Text style={{ fontSize: 11, color: '#64748b' }}>مسجل لحضور الفعالية</Text></View><BadgeCheck size={16} color="#059669" /></View>)}</View> : <Text style={[styles.detailSectionDesc, { marginTop: 8 }]}>لا يوجد مشاركون مسجلون حتى الآن.</Text>}
+                    {loadingAttendees ? <ActivityIndicator color="#047857" style={{ marginTop: 10 }} /> : eventAttendees.length ? <View style={{ gap: 10, marginTop: 10 }}>{eventAttendees.map((attendee) => <View key={attendee.user_id} style={styles.attendeeRow}><View style={styles.attendeeAvatar}>{attendee.profile?.avatar_url ? <Image source={{ uri: attendee.profile.avatar_url }} style={StyleSheet.absoluteFillObject} /> : <User size={17} color="#64748b" />}</View><View style={{ flex: 1, alignItems: 'flex-end', gap: 2 }}><Text style={{ fontSize: 13, color: '#0f172a', fontWeight: '800' }}>{attendee.profile?.display_name || attendee.profile?.username || 'جارٍ مشارك'}</Text><Text style={{ fontSize: 11, color: '#64748b' }}>مسجل لحضور الفعالية</Text></View><BadgeCheck size={16} color="#047857" /></View>)}</View> : <Text style={[styles.detailSectionDesc, { marginTop: 8 }]}>لا يوجد مشاركون مسجلون حتى الآن.</Text>}
                   </View>
                 )}
                 <View style={{ height: 20 }} />
@@ -1494,7 +1494,7 @@ export default function Market() {
                   <X size={18} color="#0f172a" />
                 </Pressable>
                 <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-                  <ShoppingBag size={18} color="#059669" />
+                  <ShoppingBag size={18} color="#047857" />
                   <Text style={styles.modalTitle}>تفاصيل العرض والسلعة</Text>
                 </View>
               </View>
@@ -1536,7 +1536,7 @@ export default function Market() {
 
                   {/* Location Info */}
                   <View style={[styles.detailLocationBanner, { marginTop: 12 }]}>
-                    <MapPin size={16} color="#059669" />
+                    <MapPin size={16} color="#047857" />
                     <Text style={styles.detailLocationText}>
                       الموقع: {selectedProduct.district ? `حي ${selectedProduct.district}` : ''} {selectedProduct.city ? `· ${selectedProduct.city}` : 'داخل الحي'}
                     </Text>
@@ -1568,7 +1568,7 @@ export default function Market() {
                             <Text style={{ fontSize: 13, fontWeight: '800', color: '#0f172a' }}>
                               {selectedProduct.profiles.display_name || 'أحد الجيران'}
                             </Text>
-                            {selectedProduct.profiles.is_verified && <ShieldCheck size={14} color="#059669" />}
+                            {selectedProduct.profiles.is_verified && <ShieldCheck size={14} color="#047857" />}
                           </View>
                           <Text style={{ fontSize: 11, color: '#64748b' }}>معلن موثق بالحي</Text>
                         </View>
@@ -1748,7 +1748,7 @@ const styles = StyleSheet.create({
   heroCard: {
     borderRadius: 20,
     padding: 16,
-    shadowColor: '#059669',
+    shadowColor: '#047857',
     shadowOpacity: 0.15,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
@@ -1862,8 +1862,8 @@ const styles = StyleSheet.create({
     borderRadius: 11,
   },
   segmentBtnActive: {
-    backgroundColor: '#059669',
-    shadowColor: '#059669',
+    backgroundColor: '#047857',
+    shadowColor: '#047857',
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 2,
@@ -1898,7 +1898,7 @@ const styles = StyleSheet.create({
   searchRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
   searchBox: { flex: 1, height: 46, borderRadius: 14, backgroundColor: '#f1f5f9', flexDirection: 'row-reverse', alignItems: 'center', paddingHorizontal: 14, gap: 8 },
   searchInput: { flex: 1, color: '#0f172a', fontSize: 13.5, paddingVertical: 0, ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}) },
-  addBtn: { height: 46, minWidth: 46, paddingHorizontal: 14, borderRadius: 14, backgroundColor: '#059669', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 5 },
+  addBtn: { height: 46, minWidth: 46, paddingHorizontal: 14, borderRadius: 14, backgroundColor: '#047857', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 5 },
   addBtnText: { color: '#fff', fontSize: 13, fontWeight: '900' },
 
   // Sort Bar
@@ -1924,8 +1924,8 @@ const styles = StyleSheet.create({
     borderColor: '#e2e8f0',
   },
   sortChipActive: {
-    backgroundColor: '#059669',
-    borderColor: '#059669',
+    backgroundColor: '#047857',
+    borderColor: '#047857',
   },
   sortChipText: { fontSize: 11, fontWeight: '700', color: '#475569' },
   sortChipTextActive: { color: '#fff', fontWeight: '800' },
@@ -1948,7 +1948,7 @@ const styles = StyleSheet.create({
 
   sectionHead: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, marginTop: 8 },
   sectionTitle: { fontSize: 15.5, fontWeight: '900', color: '#0f172a', textAlign: 'right' },
-  seeAll: { fontSize: 12, color: '#059669', fontWeight: '800' },
+  seeAll: { fontSize: 12, color: '#047857', fontWeight: '800' },
   resultCount: { fontSize: 11.5, color: '#94a3b8', fontWeight: '700' },
 
   grid: { flexDirection: 'row-reverse', flexWrap: 'wrap' },
@@ -1988,7 +1988,7 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 13.5, fontWeight: '900', color: '#0f172a', textAlign: 'right' },
   cardSub: { fontSize: 11.5, color: '#64748b', textAlign: 'right', marginTop: 2, lineHeight: 16 },
   cardFooter: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginTop: 7, gap: 4 },
-  cardPrice: { fontSize: 13.5, fontWeight: '900', color: '#059669', flexShrink: 1 },
+  cardPrice: { fontSize: 13.5, fontWeight: '900', color: '#047857', flexShrink: 1 },
   cardModes: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   cardModeIcon: { width: 22, height: 22, borderRadius: 7, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' },
   cardTimeText: { fontSize: 10, color: '#94a3b8', fontWeight: '600' },
@@ -2004,7 +2004,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#f8fafc',
   },
-  cardDetailsHintText: { fontSize: 11, fontWeight: '800', color: '#059669' },
+  cardDetailsHintText: { fontSize: 11, fontWeight: '800', color: '#047857' },
 
   // Business Card Action Buttons
   businessActionsRow: {
@@ -2077,17 +2077,17 @@ const styles = StyleSheet.create({
     borderColor: '#a7f3d0',
   },
   rsvpBtnActive: {
-    backgroundColor: '#059669',
-    borderColor: '#059669',
+    backgroundColor: '#047857',
+    borderColor: '#047857',
   },
-  rsvpBtnText: { fontSize: 11, fontWeight: '900', color: '#059669' },
+  rsvpBtnText: { fontSize: 11, fontWeight: '900', color: '#047857' },
 
   // Empty State
   emptyState: { alignItems: 'center', paddingVertical: 48, paddingHorizontal: 20, backgroundColor: '#fff', borderRadius: 20, borderWidth: 1, borderColor: '#e2e8f0', marginVertical: 8 },
   emptyIcon: { width: 64, height: 64, borderRadius: 22, backgroundColor: '#ecfdf5', alignItems: 'center', justifyContent: 'center' },
   emptyTitle: { fontSize: 15.5, fontWeight: '900', color: '#0f172a', marginTop: 12 },
   emptyText: { fontSize: 12.5, color: '#64748b', marginTop: 6, textAlign: 'center', lineHeight: 19, maxWidth: 380 },
-  emptyBtn: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, backgroundColor: '#059669', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, marginTop: 16 },
+  emptyBtn: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, backgroundColor: '#047857', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, marginTop: 16 },
   emptyBtnText: { color: '#fff', fontSize: 13, fontWeight: '900' },
 
   // Modals Core
@@ -2098,7 +2098,7 @@ const styles = StyleSheet.create({
   modalCloseBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' },
   inputLabel: { fontSize: 12, fontWeight: '800', color: '#334155', textAlign: 'right', marginBottom: 6 },
   modalInput: { backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9, fontSize: 13, color: '#0f172a', textAlign: 'right' },
-  submitEventBtn: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#059669', borderRadius: 14, paddingVertical: 13, marginTop: 18 },
+  submitEventBtn: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#047857', borderRadius: 14, paddingVertical: 13, marginTop: 18 },
   submitEventBtnText: { color: '#fff', fontSize: 13, fontWeight: '900' },
 
   // Detailed Modals Elements
@@ -2162,7 +2162,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 10,
   },
-  detailActionBtnWaText: { fontSize: 12, fontWeight: '800', color: '#059669' },
+  detailActionBtnWaText: { fontSize: 12, fontWeight: '800', color: '#047857' },
   detailActionBtnMap: {
     flex: 1,
     flexDirection: 'row-reverse',
@@ -2175,7 +2175,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 10,
   },
-  detailActionBtnMapText: { fontSize: 12, fontWeight: '800', color: '#059669' },
+  detailActionBtnMapText: { fontSize: 12, fontWeight: '800', color: '#047857' },
   detailActionBtnShare: {
     flex: 0.8,
     flexDirection: 'row-reverse',
@@ -2198,10 +2198,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#059669',
+    backgroundColor: '#047857',
     paddingVertical: 14,
     borderRadius: 14,
-    shadowColor: '#059669',
+    shadowColor: '#047857',
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
@@ -2214,7 +2214,7 @@ const styles = StyleSheet.create({
   // Product Preview Modal Elements
   productModalImgWrap: { width: '100%', height: 210, borderRadius: 18, overflow: 'hidden', marginBottom: 10, backgroundColor: '#f1f5f9' },
   productModalTitle: { fontSize: 18, fontWeight: '900', color: '#0f172a', textAlign: 'right', flex: 1 },
-  productModalPrice: { fontSize: 18, fontWeight: '900', color: '#059669' },
+  productModalPrice: { fontSize: 18, fontWeight: '900', color: '#047857' },
   productModalSub: { fontSize: 13, color: '#64748b', textAlign: 'right', marginTop: 4 },
   deliveryPill: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, backgroundColor: '#f1f5f9', paddingHorizontal: 9, paddingVertical: 4, borderRadius: 10 },
   deliveryPillText: { fontSize: 11, fontWeight: '700', color: '#334155' },
