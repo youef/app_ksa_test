@@ -79,9 +79,8 @@ export function AppHeader({ variant = 'sub', title, subtitle, fallbackRoute = '/
   const avatar = (uri: string | null | undefined) => <View style={styles.avatarRing}>{uri && failedImage !== uri ? <Image source={{ uri }} style={styles.avatar} onError={() => setFailedImage(uri)} /> : <View style={[styles.avatar, styles.avatarFallback]}><UserRound size={20} color="#047857" /></View>}</View>;
   const home = variant === 'home';
   const identity = titleContent || <>
-    {home ? <View style={styles.brand}>
+    {home ? <View accessible accessibilityRole="image" accessibilityLabel="شعار حيّنا" style={styles.brand}>
       {failedLogo ? <Home size={28} color={color} /> : <Image accessible={false} source={{ uri: logoUri || FALLBACK_LOGO_URI }} resizeMode="contain" style={styles.logo} onError={() => setFailedLogo(true)} />}
-      <Text accessibilityRole="header" numberOfLines={1} style={[styles.brandName, dark && styles.lightText]}>{branding.name || 'حيّنا'}</Text>
     </View> : <View style={styles.identityRow}>
       {variant === 'chat' ? <View>{avatar(avatarUrl)}{isOnline ? <View style={styles.onlineDot} /> : null}</View> : null}
       <View style={styles.titleCopy}><Text accessibilityRole="header" numberOfLines={1} style={[styles.title, dark && styles.lightText]}>{displayTitle}</Text>{subtitle ? <Text numberOfLines={1} style={[styles.subtitle, dark && styles.lightSubtitle]}>{subtitle}</Text> : null}</View>
@@ -114,7 +113,6 @@ const styles = StyleSheet.create({
   lightText: { color: '#fff' }, lightSubtitle: { color: '#e2e8f0' },
   identityRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', minWidth: 0 },
   brand: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 7, maxWidth: '100%' },
-  brandName: { color: '#166044', fontSize: 22, fontWeight: '900', lineHeight: 32, textAlign: 'center', flexShrink: 1, writingDirection: 'rtl' },
   logo: { width: 36, height: 40, flexShrink: 0 }, avatarRing: { width: 40, height: 40, borderRadius: 20, borderWidth: 1.5, borderColor: '#047857', padding: 2, backgroundColor: '#ffffff', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }, avatar: { width: 32, height: 32, borderRadius: 16 }, avatarFallback: { backgroundColor: '#ecfdf5', alignItems: 'center', justifyContent: 'center' },
   homeAction: { backgroundColor: '#F2F7F4', borderColor: '#E4EEE7', borderWidth: 1, borderRadius: 14 },
   actionScroll: { flexGrow: 0, maxWidth: HEADER_SIDE_WIDTH }, actions: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
