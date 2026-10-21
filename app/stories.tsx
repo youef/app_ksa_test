@@ -1,5 +1,5 @@
 import { HeaderAction, AppHeader } from '@/components/shared/AppHeader';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Image,
   ActivityIndicator,
   RefreshControl,
+  Animated,
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { requireAccount } from '@/lib/authGate';
@@ -17,21 +18,33 @@ import { useBottomNavInset } from '@/lib/bottomNav';
 import { Plus, ShieldCheck, Sparkles, Settings2, Flame, ChevronDown } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ProfileStories } from '@/components/profile/ProfileStories';
-import { isSameStoryLocation, isActiveStory, type StoryScope } from '@/lib/storyActivity';
+import { matchesStoryScope, isActiveStory, type StoryScope } from '@/lib/storyActivity';
 import { relativeTime } from '@/lib/mapPins';
 
 export default function StoriesScreen() {
   const bottomNavInset = useBottomNavInset();
   const [stories, setStories] = useState<any[]>([]);
   const [viewerId, setViewerId] = useState('');
-  const [scope, setScope] = useState<StoryScope>('district');
+  const [scope, setScope] = useState<StoryScope>('city');
   const [errorText, setErrorText] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [seenStoryIds, setSeenStoryIds] = useState<string[]>([]);
   const [currentCity, setCurrentCity] = useState<string>('');
   const [currentDistrict, setCurrentDistrict] = useState<string>('');
+  const [followingIds, setFollowingIds] = useState<string[]>([]);
   const [visibleTrendingCount, setVisibleTrendingCount] = useState(8);
+  const storyRingPulse = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const pulse = Animated.loop(Animated.sequence([
+      Animated.timing(storyRingPulse, { toValue: 1.06, duration: 850, useNativeDriver: true }),
+      Animated.timing(storyRingPulse, { toValue: 1, duration: 850, useNativeDriver: true }),
+    ]));
+    pulse.start();
+    return () => pulse.stop();
+  }, [storyRingPulse]);
+
   useFocusEffect(useCallback(() => { void loadAllStories(); }, []));
 
   async function loadAllStories() {
@@ -51,18 +64,22 @@ export default function StoriesScreen() {
       }
       let city = '';
       let district = '';
+      let followedIds: string[] = [];
       if (activeViewerId) {
-        const { data: me, error: profileError } = await supabase.from('profiles').select('city,district').eq('id', activeViewerId).maybeSingle();
-        if (profileError) throw profileError;
+        const [{ data: me }, { data: follows }] = await Promise.all([
+          supabase.from('profiles').select('city,district').eq('id', activeViewerId).maybeSingle(),
+          supabase.from('follows').select('following_id').eq('follower_id', activeViewerId),
+        ]);
         city = String(me?.city || '').trim();
         district = String(me?.district || '').trim();
+        followedIds = (follows || []).map((row: any) => String(row.following_id));
       }
       setCurrentCity(city);
       setCurrentDistrict(district);
+      setFollowingIds(followedIds);
       let mutedAuthorIds: string[] = [];
       if (activeViewerId) {
-        const { data: authorPrefs, error: prefsError } = await supabase.from('story_author_preferences').select('author_id').eq('user_id', activeViewerId).eq('muted', true);
-        if (prefsError) throw prefsError;
+        const { data: authorPrefs } = await supabase.from('story_author_preferences').select('author_id').eq('user_id', activeViewerId).eq('muted', true);
         mutedAuthorIds = (authorPrefs || []).map((row: any) => String(row.author_id));
       }
 
@@ -95,7 +112,8 @@ export default function StoriesScreen() {
 
       if (error) throw error;
       const cityRows = (data || []) as any[];
-      const valid = cityRows.filter((story: any) => isActiveStory(story) && (story.author_id === activeViewerId || (isSameStoryLocation(story.profiles, city) && !mutedAuthorIds.includes(String(story.author_id)) && !(story.hidden_user_ids || []).includes(activeViewerId))));
+      const normalize = (value: any) => String(value || '').trim().toLocaleLowerCase('ar');
+      const valid = cityRows.filter((story: any) => isActiveStory(story) && (story.author_id === activeViewerId || (Boolean(city) && normalize(story.profiles?.city) === normalize(city) && !mutedAuthorIds.includes(String(story.author_id)) && !(story.hidden_user_ids || []).includes(activeViewerId))));
       setStories(valid);
       if (activeViewerId && valid.length > 0) {
         const { data: views, error: viewsError } = await supabase
@@ -110,7 +128,6 @@ export default function StoriesScreen() {
       }
 
     } catch (e) {
-      setStories([]);
       setErrorText(e instanceof Error ? e.message : 'تعذر تحميل اليوميات.');
     } finally {
       setLoading(false);
@@ -118,7 +135,7 @@ export default function StoriesScreen() {
     }
   }
 
-  const filtered = stories.filter(story => scope === 'mine' ? story.author_id === viewerId : story.author_id !== viewerId && isSameStoryLocation(story.profiles, currentCity, scope === 'district' ? currentDistrict : undefined) && (scope !== 'district' || Boolean(currentDistrict)));
+  const filtered = stories.filter(story => matchesStoryScope(story, scope, viewerId, followingIds, seenStoryIds, currentDistrict));
 
   const groupedAuthors = Object.values(filtered.reduce((groups: Record<string, any>, story: any) => {
     const key = story.author_id;
@@ -132,8 +149,21 @@ export default function StoriesScreen() {
     return { ...group, stories: ordered, latestStory: ordered[ordered.length - 1], hasUnseen: ordered.some((story: any) => !seenStoryIds.includes(story.id)) };
   });
 
+  const normalizeLocation = (value: any) => String(value || '').trim().toLocaleLowerCase('ar');
+  const neighborhoodAndFollowing = groupedAuthors.filter((group: any) => {
+    const sameDistrict = !!currentDistrict && normalizeLocation(group.author?.district) === normalizeLocation(currentDistrict);
+    const followed = followingIds.includes(String(group.authorId));
+    return sameDistrict || followed;
+  });
+  const storyRings = neighborhoodAndFollowing.slice().sort((a: any, b: any) => {
+    const aFollowed = followingIds.includes(String(a.authorId));
+    const bFollowed = followingIds.includes(String(b.authorId));
+    const aSameDistrict = !!currentDistrict && normalizeLocation(a.author?.district) === normalizeLocation(currentDistrict);
+    const bSameDistrict = !!currentDistrict && normalizeLocation(b.author?.district) === normalizeLocation(currentDistrict);
+    return Number(bFollowed) - Number(aFollowed) || Number(bSameDistrict) - Number(aSameDistrict) || Number(b.hasUnseen) - Number(a.hasUnseen) || new Date(b.newestAt).getTime() - new Date(a.newestAt).getTime();
+  });
   const trendingAuthors = groupedAuthors.slice().sort((a: any, b: any) =>
-    (scope === 'city' ? b.totalViews - a.totalViews : Number(b.hasUnseen) - Number(a.hasUnseen)) || new Date(b.newestAt).getTime() - new Date(a.newestAt).getTime()
+    b.totalViews - a.totalViews || new Date(b.newestAt).getTime() - new Date(a.newestAt).getTime()
   );
 
   function openAuthorStories(authorStories: any[]) {
@@ -161,15 +191,51 @@ export default function StoriesScreen() {
         }
       />
 
-      <View style={styles.discoveryHeader}>
-        <View style={{ flex: 1, alignItems: 'flex-end', gap: 5 }}>
-          <Text style={styles.discoveryTitle}>لحظات قريبة منك</Text>
-          <Text style={styles.sectionSubheading}>{currentCity ? `${currentCity}${currentDistrict ? ` · ${currentDistrict}` : ''}` : 'حدد مدينتك وحيّك في ملفك الشخصي'}</Text>
-        </View>
-        <Pressable accessibilityRole="button" accessibilityLabel="إعدادات اليوميات" onPress={() => router.push('/story-settings')} style={styles.settingsButton}><Settings2 size={21} color="#166044" /></Pressable>
-      </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, flexShrink: 0 }} contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 10, flexDirection: 'row-reverse', gap: 8 }}>{([{ key: 'district', label: 'أهل حيّي' }, { key: 'city', label: 'ترند مدينتي' }, { key: 'mine', label: 'يومياتي' }] as const).map(item => <Pressable accessibilityRole="button" accessibilityState={{ selected: scope === item.key }} key={item.key} onPress={() => { setScope(item.key); setVisibleTrendingCount(8); }} style={{ backgroundColor: scope === item.key ? '#166044' : '#FFFFFF', borderWidth: 1, borderColor: '#DDEAE1', borderRadius: 13, minHeight: 40, paddingHorizontal: 15, justifyContent: 'center' }}><Text style={{ color: scope === item.key ? '#FFFFFF' : '#668373', fontWeight: '700', fontSize: 12 }}>{item.label}</Text></Pressable>)}</ScrollView>
+      <Pressable
+        onPress={() => router.push('/story-settings')}
+        style={styles.storyNotificationToggle}
+        accessibilityRole="button"
+        accessibilityLabel="إعدادات تنبيهات القصص وكتم الحسابات"
+      >
+        <Settings2 size={16} color="#059669" />
+        <Text style={styles.storyNotificationToggleText}>إعدادات تنبيهات القصص وكتم الحسابات</Text>
+        <Text style={styles.storyNotificationToggleAction}>إدارة</Text>
+      </Pressable>
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, flexShrink: 0 }} contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 10, flexDirection: 'row-reverse', gap: 8 }}>{([{ key: 'city', label: 'المدينة' }, { key: 'district', label: 'حيّي' }, { key: 'following', label: 'أتابعهم' }, { key: 'unseen', label: 'غير المشاهدة' }, { key: 'mine', label: 'يومياتي' }] as const).map(item => <Pressable accessibilityRole="button" accessibilityState={{ selected: scope === item.key }} key={item.key} onPress={() => { setScope(item.key); setVisibleTrendingCount(8); }} style={{ backgroundColor: scope === item.key ? '#166044' : '#FFFFFF', borderWidth: 1, borderColor: '#DDEAE1', borderRadius: 13, minHeight: 40, paddingHorizontal: 15, justifyContent: 'center' }}><Text style={{ color: scope === item.key ? '#FFFFFF' : '#668373', fontWeight: '700', fontSize: 12 }}>{item.label}</Text></Pressable>)}</ScrollView>
       {errorText ? <Pressable accessibilityRole="button" onPress={() => void loadAllStories()} style={{ padding: 16 }}><Text style={{ color: '#A65A49', textAlign: 'right' }}>تعذر تحديث اليوميات. اضغط لإعادة المحاولة.</Text></Pressable> : null}
+      {scope !== 'mine' && storyRings.length > 0 && (
+        <View style={styles.ringsSection}>
+          <View style={styles.sectionHeadingRow}>
+            <View style={{ alignItems: 'flex-end', flex: 1 }}>
+              <Text style={styles.sectionHeading}>يوميات الجيران</Text>
+              <Text style={styles.sectionSubheading}>{currentDistrict ? `أهل ${currentDistrict} ومن تتابعهم` : 'الأشخاص الذين تتابعهم في مدينتك'}</Text>
+            </View>
+            <View style={styles.livePill}><View style={styles.liveDot} /><Text style={styles.livePillText}>مباشر</Text></View>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.ringsScroll}>
+            {storyRings.map((group: any) => {
+              const author = group.author;
+              const name = author?.display_name || author?.username || 'جار الحي';
+              return (
+                <Pressable key={group.authorId} style={styles.ringItem}
+                  onPress={() => openAuthorStories(group.stories)}
+                  accessibilityRole="button" accessibilityLabel={`عرض يوميات ${name}`}>
+                  <Animated.View style={[styles.ringOuter, group.hasUnseen ? styles.ringUnseen : styles.ringSeen, group.stories.length > 1 && { transform: [{ scale: storyRingPulse }] }]}>
+                    <View style={styles.ringInner}>
+                      {author?.avatar_url ? <Image source={{ uri: author.avatar_url }} style={styles.ringAvatar} /> :
+                        <View style={styles.ringAvatarFallback}><Text style={styles.ringInitial}>{name[0]}</Text></View>}
+                    </View>
+                    <View style={styles.ringCount}><Text style={styles.ringCountText}>{group.stories.length}</Text></View>
+                  </Animated.View>
+                  <Text style={styles.ringName} numberOfLines={1}>{name}</Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
+
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingBottom: bottomNavInset + 30 }]}
         showsVerticalScrollIndicator={false}
@@ -195,16 +261,16 @@ export default function StoriesScreen() {
             <View style={styles.emptyIconCircle}>
               <Sparkles size={36} color="#059669" />
             </View>
-            <Text style={styles.emptyTitle}>{!currentCity || (scope === 'district' && !currentDistrict) ? 'أكمل موقعك أولاً' : scope === 'district' ? 'حيّك ينتظر أول لحظة' : 'لا توجد يوميات في مدينتك الآن'}</Text>
+            <Text style={styles.emptyTitle}>{scope === 'unseen' ? 'شاهدت كل اليوميات المتاحة' : scope === 'following' ? 'لا توجد يوميات لمن تتابعهم' : 'لا توجد يوميات نشطة حالياً'}</Text>
             <Text style={styles.emptySub}>
-              {!currentCity || (scope === 'district' && !currentDistrict) ? 'أضف المدينة والحي في ملفك الشخصي لعرض أهل منطقتك فقط.' : 'شارك صورة أو لحظة من يومك. تختفي اليوميات بعد ٢٤ ساعة.'}
+              كن أول من يشارك أهل حيه يومياته وتحديثاته اليوم! تظل اليوميات ظاهرة لمدة 24 ساعة.
             </Text>
             <Pressable
               style={styles.emptyActionBtn}
-              onPress={() => router.push(!currentCity || (scope === 'district' && !currentDistrict) ? '/profile' : '/create-story')}
+              onPress={() => router.push('/create-story')}
             >
               <Plus size={16} color="#fff" strokeWidth={2.5} />
-              <Text style={styles.emptyActionBtnText}>{!currentCity || (scope === 'district' && !currentDistrict) ? 'تحديث ملفي الشخصي' : 'شارك لحظتك'}</Text>
+              <Text style={styles.emptyActionBtnText}>نشر أول يوميات في حيك</Text>
             </Pressable>
           </View>
         ) : (
@@ -212,10 +278,10 @@ export default function StoriesScreen() {
             <View style={styles.trendingSectionTitleRow}>
               <View style={styles.trendingSectionAccent} />
               <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                <Text style={styles.sectionHeading}>{scope === 'city' ? `ترند ${currentCity}` : `أهل ${currentDistrict}`}</Text>
-                <Text style={styles.sectionSubheading}>{scope === 'city' ? 'الأكثر مشاهدة خلال آخر ٢٤ ساعة في مدينتك فقط' : 'جيرانك في الحي نفسه · الجديد أولاً'}</Text>
+                <Text style={styles.sectionHeading}>{scope === 'city' ? 'ترند المدينة' : 'يوميات مختارة لك'}</Text>
+                <Text style={styles.sectionSubheading}>أكثر اليوميات رواجاً في مدينتك</Text>
               </View>
-              <View style={styles.trendingBadge}><Flame size={13} color="#fff" /><Text style={styles.trendingBadgeText}>{scope === 'city' ? 'رائج' : 'حيّك'}</Text></View>
+              <View style={styles.trendingBadge}><Flame size={13} color="#fff" /><Text style={styles.trendingBadgeText}>TRENDING</Text></View>
             </View>
             <View style={styles.storiesGrid}>
               {trendingAuthors.slice(0, visibleTrendingCount).map((group: any) => {
@@ -246,7 +312,7 @@ export default function StoriesScreen() {
                         </View>
                         <View style={{ flex: 1, alignItems: 'flex-end' }}>
                           <Text style={styles.cardAuthorName} numberOfLines={1}>{name}</Text>
-                          <Text style={styles.cardTimeText}>{relativeTime(story.created_at)} · {group.stories.length} لحظات</Text>
+                          <Text style={styles.cardTimeText}>{relativeTime(story.created_at)}</Text>
                           <Text style={[styles.storySeenLabel, allSeen ? styles.storySeenLabelSeen : styles.storySeenLabelNew]}>
                             {allSeen ? 'تمت المشاهدة' : 'يوميات جديدة'}
                           </Text>
@@ -271,9 +337,6 @@ export default function StoriesScreen() {
 }
 
 const styles = StyleSheet.create({
-  discoveryHeader: { flexDirection: 'row-reverse', alignItems: 'center', paddingHorizontal: 20, paddingTop: 22, paddingBottom: 12, gap: 12 },
-  discoveryTitle: { fontSize: 27, fontWeight: '900', color: '#173F2F', textAlign: 'right' },
-  settingsButton: { width: 46, height: 46, borderRadius: 23, backgroundColor: '#E7EFE9', alignItems: 'center', justifyContent: 'center' },
   container: {
     flex: 1,
     backgroundColor: '#f8fafc',
@@ -384,7 +447,7 @@ const styles = StyleSheet.create({
   },
   storyCard: {
     width: '48%',
-    aspectRatio: 0.63,
+    aspectRatio: 0.78,
     borderRadius: 22,
     overflow: 'hidden',
     backgroundColor: '#059669',
@@ -433,7 +496,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     zIndex: 2,
-    marginTop: 'auto',
   },
   cardAvatarWrap: {
     position: 'relative',

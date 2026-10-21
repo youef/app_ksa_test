@@ -1,12 +1,13 @@
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
-import { ChevronLeft, Eye, Heart, Plus, Settings2, Sparkles, Trash2 } from 'lucide-react-native';
+import { Archive, ChevronLeft, Eye, Heart, Plus, Settings2, Sparkles, Trash2 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { storyExpiryFilter } from '@/lib/storyActivity';
 
 type Entry = { id: string; content: string | null; type: string; image_url: string | null; bg_color: string | null; created_at: string; expires_at: string; view_count: number; allow_replies: boolean; visibility: string };
 export function ProfileStories({ userId, own = false }: { userId: string; own?: boolean }) {
+  const [archive, setArchive] = useState(false);
   const [rows, setRows] = useState<Entry[]>([]);
   const [likes, setLikes] = useState<Record<string, number>>({});
   const [likesAvailable, setLikesAvailable] = useState(true);
@@ -19,7 +20,7 @@ export function ProfileStories({ userId, own = false }: { userId: string; own?: 
     setLoading(true); setError('');
     (async () => {
       try {
-        const { data, error: failure } = await supabase.from('stories').select('id,content,type,image_url,bg_color,created_at,expires_at,view_count,allow_replies,visibility').eq('author_id', userId).or(storyExpiryFilter()).order('created_at', { ascending: false }).limit(60);
+        const { data, error: failure } = await supabase.from('stories').select('id,content,type,image_url,bg_color,created_at,expires_at,view_count,allow_replies,visibility').eq('author_id', userId).or(storyExpiryFilter(archive && own)).order('created_at', { ascending: false }).limit(60);
         if (failure) throw failure;
         const entries = (data || []) as Entry[];
         const counts: Record<string, number> = {};
@@ -34,7 +35,7 @@ export function ProfileStories({ userId, own = false }: { userId: string; own?: 
       finally { if (active) setLoading(false); }
     })();
     return () => { active = false; };
-  }, [userId, own, revision]));
+  }, [userId, archive, own, revision]));
   async function toggleReplies(row: Entry) {
     if (busy) return;
     setBusy(row.id);
@@ -57,15 +58,15 @@ export function ProfileStories({ userId, own = false }: { userId: string; own?: 
     } }]);
   }
   return <View style={s.card}>
-    <View style={s.heading}><View style={s.icon}><Sparkles size={20} color="#166044" /></View><View style={s.copy}><Text style={s.title}>{own ? 'يومياتي' : 'يوميات الجار'}</Text><Text style={s.hint}>لحظاتك خلال آخر ٢٤ ساعة</Text></View>{own ? <Pressable accessibilityRole="button" accessibilityLabel="إعدادات يومياتي" onPress={() => router.push('/story-settings')} style={s.action}><Settings2 size={18} color="#166044" /></Pressable> : null}</View>
-    {own ? <View style={s.tabs}><Pressable accessibilityRole="button" accessibilityLabel="نشر يومية جديدة" onPress={() => router.push('/create-story')} style={s.add}><Plus size={15} color="#166044" /><Text style={s.addText}>إضافة</Text></Pressable></View> : null}
+    <View style={s.heading}><View style={s.icon}><Sparkles size={20} color="#166044" /></View><View style={s.copy}><Text style={s.title}>{own ? 'يومياتي' : 'يوميات الجار'}</Text><Text style={s.hint}>{archive ? 'أرشيفك الخاص؛ لا يظهر للآخرين' : 'لحظات تظهر لأعضاء المجتمع لمدة ٢٤ ساعة'}</Text></View>{own ? <Pressable accessibilityRole="button" accessibilityLabel="إعدادات يومياتي" onPress={() => router.push('/story-settings')} style={s.action}><Settings2 size={18} color="#166044" /></Pressable> : null}</View>
+    {own ? <View style={s.tabs}><Pressable accessibilityRole="button" accessibilityState={{ selected: !archive }} onPress={() => setArchive(false)} style={[s.tab, !archive && s.selected]}><Text style={[s.tabText, !archive && s.selectedText]}>النشطة</Text></Pressable><Pressable accessibilityRole="button" accessibilityState={{ selected: archive }} onPress={() => setArchive(true)} style={[s.tab, archive && s.selected]}><Archive size={14} color={archive ? '#FFFFFF' : '#64748B'} /><Text style={[s.tabText, archive && s.selectedText]}>الأرشيف</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="نشر يومية جديدة" onPress={() => router.push('/create-story')} style={s.add}><Plus size={15} color="#166044" /><Text style={s.addText}>إضافة</Text></Pressable></View> : null}
     {loading ? <ActivityIndicator color="#166044" style={{ padding: 24 }} /> : error ? <Pressable accessibilityRole="button" onPress={() => setRevision(value => value + 1)} style={s.empty}><Text style={s.error}>{error}</Text><Text style={s.addText}>إعادة المحاولة</Text></Pressable> : rows.length ? <>
       <View style={s.summary}><Text style={s.summaryText}>{rows.length} يومية</Text><Text style={s.summaryText}>{rows.reduce((sum, row) => sum + Number(row.view_count || 0), 0)} مشاهدة</Text><Text style={s.summaryText}>{likesAvailable ? Object.values(likes).reduce((sum, value) => sum + value, 0) : '—'} إعجاب</Text></View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.list}>{rows.map(row => <View key={row.id} style={s.item}><Pressable accessibilityRole="button" accessibilityLabel={row.content || 'مشاهدة اليومية'} onPress={() => router.push({ pathname: '/story', params: { id: row.id } })} style={[s.preview, { backgroundColor: row.bg_color || '#166044' }]}>{row.image_url ? <Image source={{ uri: row.image_url }} style={StyleSheet.absoluteFillObject} resizeMode="cover" /> : null}<View style={s.shade}><Text numberOfLines={3} style={s.previewText}>{row.content || 'لحظة من يومي'}</Text><Text style={s.visibility}>{row.visibility === 'followers' ? 'المتابعون' : row.visibility === 'custom' ? 'جمهور مخصص' : 'أعضاء المجتمع'}</Text></View></Pressable>
         <View style={s.itemStats}><Eye size={12} color="#73857B" /><Text style={s.hint}>{row.view_count || 0}</Text><Heart size={12} color="#73857B" /><Text style={s.hint}>{likesAvailable ? likes[row.id] || 0 : '—'}</Text>{own ? <Pressable accessibilityRole="button" accessibilityLabel="مشاهدات اليومية" onPress={() => router.push({ pathname: '/story-viewers', params: { id: row.id } })}><ChevronLeft size={17} color="#166044" /></Pressable> : null}</View>
-        {own ? <View style={s.itemControls}><Text style={s.hint}>الردود</Text><Switch accessibilityLabel="السماح بالرد على اليومية" value={row.allow_replies} disabled={Boolean(busy)} onValueChange={() => void toggleReplies(row)} trackColor={{ true: '#166044', false: '#D9E4DE' }} /><Pressable disabled={Boolean(busy)} accessibilityRole="button" accessibilityLabel="حذف اليومية" onPress={() => remove(row)} style={s.delete}><Trash2 size={15} color="#B45353" /></Pressable></View> : null}
+        {own ? <View style={s.itemControls}><Text style={s.hint}>الردود</Text><Switch accessibilityLabel="السماح بالرد على اليومية" value={row.allow_replies} disabled={Boolean(busy) || archive} onValueChange={() => void toggleReplies(row)} trackColor={{ true: '#166044', false: '#D9E4DE' }} /><Pressable disabled={Boolean(busy)} accessibilityRole="button" accessibilityLabel="حذف اليومية" onPress={() => remove(row)} style={s.delete}><Trash2 size={15} color="#B45353" /></Pressable></View> : null}
       </View>)}</ScrollView><Text style={s.hint}>آخر {rows.length} يومية في هذا القسم{own ? ' · إعدادات ردود الحساب لها الأولوية' : ''}</Text>
-    </> : <View style={s.empty}><Sparkles size={25} color="#89AA96" /><Text style={s.emptyTitle}>لا توجد يوميات نشطة</Text>{own ? <Pressable accessibilityRole="button" onPress={() => router.push('/create-story')}><Text style={s.addText}>شارك أول لحظة من يومك</Text></Pressable> : null}</View>}
+    </> : <View style={s.empty}><Sparkles size={25} color="#89AA96" /><Text style={s.emptyTitle}>{archive ? 'لا توجد يوميات مؤرشفة بعد' : 'لا توجد يوميات نشطة'}</Text>{own ? <Pressable accessibilityRole="button" onPress={() => router.push('/create-story')}><Text style={s.addText}>شارك أول لحظة من يومك</Text></Pressable> : null}</View>}
   </View>;
 }
 const s = StyleSheet.create({
