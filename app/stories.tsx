@@ -94,7 +94,7 @@ export default function StoriesScreen() {
           created_at,
           expires_at,
           view_count,
-          profiles (
+          profiles:profiles!stories_author_id_fkey (
             id,
             display_name,
             username,
