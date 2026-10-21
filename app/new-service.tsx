@@ -470,6 +470,36 @@ export default function NewService() {
         )}
       </ScrollView>
 
+      <View style={styles.actionBar}>
+        <Pressable
+          disabled={busy}
+          style={({ pressed }) => [styles.backAction, pressed && !busy && styles.actionPressed]}
+          onPress={back}
+        >
+          <ChevronRight size={18} color="#475569" />
+          <Text style={styles.backActionText}>{step === 0 ? 'إلغاء' : 'رجوع'}</Text>
+        </Pressable>
+
+        {step < STEPS.length - 1 ? (
+          <Pressable
+            disabled={busy}
+            style={({ pressed }) => [styles.nextAction, pressed && !busy && styles.actionPressed]}
+            onPress={next}
+          >
+            <Text style={styles.nextActionText}>التالي</Text>
+            <ChevronLeft size={19} color="#fff" />
+          </Pressable>
+        ) : (
+          <Pressable
+            disabled={busy}
+            style={({ pressed }) => [styles.nextAction, busy && styles.actionDisabled, pressed && !busy && styles.actionPressed]}
+            onPress={() => void save()}
+          >
+            {busy ? <ActivityIndicator size="small" color="#fff" /> : <Check size={19} color="#fff" />}
+            <Text style={styles.nextActionText}>{busy ? 'جاري النشر...' : 'نشر العرض'}</Text>
+          </Pressable>
+        )}
+      </View>
 
       <LocationSelectorModal
         visible={showLocationModal}
@@ -552,7 +582,14 @@ const styles = StyleSheet.create({
   stepLabelActive: { color: '#059669', fontWeight: '900' },
   progressTrack: { height: 4, borderRadius: 2, backgroundColor: '#f1f5f9', marginTop: 10, overflow: 'hidden', flexDirection: 'row-reverse' },
   progressFill: { height: 4, backgroundColor: '#059669', borderRadius: 2 },
-  scroll: { padding: 16, paddingBottom: 28, width: '100%', maxWidth: 720, alignSelf: 'center' },
+  scroll: { padding: 16, paddingBottom: 112, width: '100%', maxWidth: 720, alignSelf: 'center' },
+  actionBar: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: 10, paddingBottom: Platform.OS === 'ios' ? 22 : 14, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#e2e8f0' },
+  nextAction: { flex: 1, minHeight: 50, borderRadius: 15, backgroundColor: '#047857', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 16 },
+  nextActionText: { color: '#fff', fontSize: 14, fontWeight: '900' },
+  backAction: { minWidth: 104, minHeight: 50, borderRadius: 15, backgroundColor: '#f1f5f9', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 14 },
+  backActionText: { color: '#475569', fontSize: 13, fontWeight: '900' },
+  actionPressed: { opacity: 0.78 },
+  actionDisabled: { opacity: 0.6 },
 
   stepTitle: { fontSize: 20, fontWeight: '900', color: '#0f172a', textAlign: 'right' },
   stepHint: { fontSize: 13, color: '#64748b', textAlign: 'right', marginTop: 4, marginBottom: 16 },
