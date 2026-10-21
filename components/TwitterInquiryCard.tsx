@@ -472,7 +472,7 @@ export default function TwitterInquiryCard({
             ) : isReq ? (
               <View style={s.xReqBadge}><HeartHandshake size={11} color="#d97706" /><Text style={s.xReqBadgeText}>طلب فزعة</Text></View>
             ) : (
-              <View style={s.xCategoryBadge}><MessageCircle size={11} color="#059669" /><Text style={s.xCategoryBadgeText}>استفسار</Text></View>
+              <View style={s.xCategoryBadge}><MessageCircle size={11} color="#047857" /><Text style={s.xCategoryBadgeText}>استفسار</Text></View>
             )}
 
           </View>
@@ -480,7 +480,7 @@ export default function TwitterInquiryCard({
           {!data.profiles?.hide_name && <Text style={[s.xHandle, { maxWidth: '100%', textAlign: 'right', writingDirection: 'ltr' }]} numberOfLines={1}>@{username}</Text>}
 
           <View style={s.xLocationRow}>
-            <MapPin size={11} color="#059669" />
+            <MapPin size={11} color="#047857" />
             <Text style={s.xLocationText}>
               {data.district ? `حي ${data.district}` : 'الحي'}{data.city ? ` · ${data.city}` : ''}
             </Text>
@@ -549,7 +549,7 @@ export default function TwitterInquiryCard({
             </Text>
             <Text style={s.xRespondersPreviewSub}>انقر للاطلاع على التوصيات والردود 💬</Text>
           </View>
-          <ChevronLeft size={16} color="#059669" />
+          <ChevronLeft size={16} color="#047857" />
         </Pressable>
       )}
 
@@ -559,7 +559,7 @@ export default function TwitterInquiryCard({
           if (isGuest || !currentUserId) return requireAccount('سجّل الدخول لاختيار تفاعلك مع منشورات جيرانك.');
           setReactionPickerOpen(true);
         }} accessibilityRole="button" accessibilityLabel="اختيار التفاعل" accessibilityState={{ expanded: reactionPickerOpen }}>
-          <Heart size={18} color={myReaction ? '#059669' : '#64748b'} />
+          <Heart size={18} color={myReaction ? '#047857' : '#64748b'} />
           <Text style={s.xActionCounter}>{REACTIONS.find(r => r.id === myReaction)?.label || 'تفاعل'}</Text>
           <Text style={s.xActionCounter}>{Object.values(reactionCounts).reduce((sum, count) => sum + count, 0)}</Text>
         </Pressable>
@@ -602,14 +602,14 @@ export default function TwitterInquiryCard({
         <View style={s.xThreadContainer}>
           <View style={s.xThreadHeader}>
             <Pressable onPress={() => setExpanded(false)} style={s.xThreadCloseBtn}>
-              <ChevronUp size={14} color="#059669" />
+              <ChevronUp size={14} color="#047857" />
               <Text style={s.xThreadCloseText}>طي التفاصيل</Text>
             </Pressable>
             <View style={s.xThreadTitleRow}>
               <Text style={s.xThreadTitle}>
                 {isReq ? `عروض وفزعات الجيران (${answersCount})` : `خيط الردود والتوصيات (${answersCount})`}
               </Text>
-              <Sparkles size={14} color="#059669" />
+              <Sparkles size={14} color="#047857" />
             </View>
           </View>
 
@@ -699,7 +699,7 @@ export default function TwitterInquiryCard({
               onPress={() => requireAccount('سجّل الدخول أو أنشئ حساباً للرد على جيرانك.')}
             >
               <Text style={s.xGuestReplyText}>سجّل الدخول للمشاركة في النقاش</Text>
-              <MessageCircle size={16} color="#059669" />
+              <MessageCircle size={16} color="#047857" />
             </Pressable>
           ) : (
             <View style={s.xQuickReplyContainer}>
@@ -759,7 +759,7 @@ export default function TwitterInquiryCard({
             <Text style={s.pickerTitle}>اختر تفاعلك</Text>
             {REACTIONS.map(({ id, Icon, label }) => (
               <Pressable key={id} disabled={reactionBusy} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected: myReaction === id, disabled: reactionBusy }} style={[s.pickerOption, myReaction === id && s.xReactionChipActive]} onPress={() => { setReactionPickerOpen(false); void handleReaction(id); }}>
-                <Icon size={22} color="#059669" />
+                <Icon size={22} color="#047857" />
                 <Text style={s.pickerLabel}>{label}</Text>
                 <Text style={s.xReactionCount}>{reactionCounts[id]}</Text>
               </Pressable>
@@ -853,7 +853,7 @@ const s = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#059669',
+    backgroundColor: '#047857',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -864,7 +864,7 @@ const s = StyleSheet.create({
     width: 16,
     height: 16,
     borderRadius: 8,
-    backgroundColor: '#059669',
+    backgroundColor: '#047857',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
@@ -957,7 +957,7 @@ const s = StyleSheet.create({
   xCategoryBadgeText: {
     fontSize: 10,
     fontWeight: '800',
-    color: '#059669',
+    color: '#047857',
   },
   xLocationRow: {
     flexDirection: 'row-reverse',
@@ -966,19 +966,19 @@ const s = StyleSheet.create({
     marginTop: 2,  },
   xLocationText: {
     fontSize: 11,
-    color: '#059669',
+    color: '#047857',
     fontWeight: '700',
   },
   xContentArea: { marginBottom: 12, minHeight: 0 },
   xCompactStatus: { alignSelf: 'flex-start', flexDirection: 'row-reverse', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, backgroundColor: '#ecfdf5', marginTop: 10, marginBottom: 10 },
-  xCompactStatusDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#059669' },
+  xCompactStatusDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#047857' },
   xCompactStatusDotResolved: { backgroundColor: '#64748b' },
   xCompactStatusText: { fontSize: 10, color: '#047857', fontWeight: '800' },
   xReadMore: { alignSelf: 'flex-end', color: '#047857', fontSize: 12, fontWeight: '800', marginTop: 2, marginBottom: 10, textAlign: 'right' },
   xStatusTrack: { flexDirection: 'row-reverse', alignItems: 'flex-start', justifyContent: 'space-between', gap: 4, marginTop: 10, marginBottom: 8, paddingHorizontal: 2 },
   xStatusStep: { flex: 1, alignItems: 'center', gap: 4 },
   xStatusDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#cbd5e1', borderWidth: 1, borderColor: '#cbd5e1' },
-  xStatusDotActive: { backgroundColor: '#059669', borderColor: '#059669' },
+  xStatusDotActive: { backgroundColor: '#047857', borderColor: '#047857' },
   xStatusLabel: { fontSize: 9, lineHeight: 12, color: '#94a3b8', textAlign: 'center' },
   xStatusLabelActive: { color: '#047857', fontWeight: '800' },
   xReactionsRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 7, marginTop: 12, marginBottom: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#f1f5f9' },
@@ -1051,7 +1051,7 @@ const s = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#059669',
+    backgroundColor: '#047857',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1135,7 +1135,7 @@ const s = StyleSheet.create({
   },
   xThreadCloseText: {
     fontSize: 11,
-    color: '#059669',
+    color: '#047857',
     fontWeight: '700',
   },
   xThreadTitleRow: {
@@ -1218,7 +1218,7 @@ const s = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 3,
-    backgroundColor: '#059669',
+    backgroundColor: '#047857',
     paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: 8,
@@ -1257,7 +1257,7 @@ const s = StyleSheet.create({
     marginTop: 8,
   },
   xMoreRepliesPill: {
-    backgroundColor: '#059669',
+    backgroundColor: '#047857',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 10,
@@ -1312,7 +1312,7 @@ const s = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#059669',
+    backgroundColor: '#047857',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1334,7 +1334,7 @@ const s = StyleSheet.create({
     maxHeight: 80,
   },
   xQuickReplySendBtn: {
-    backgroundColor: '#059669',
+    backgroundColor: '#047857',
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 4,
