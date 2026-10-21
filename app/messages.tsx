@@ -352,12 +352,10 @@ export default function Messages() {
               style={[styles.dndBtn, dndNow && styles.dndBtnActive]}
               onPress={openDndSheet}
               accessibilityRole="button"
-              accessibilityLabel="عدم الإزعاج"
+              accessibilityLabel={dndNow ? "إيقاف عدم الإزعاج" : "إعدادات عدم الإزعاج"}
             >
-              {dndNow ? <BellOff size={13} color="#dc2626" /> : <Bell size={13} color="#64748b" />}
-              <Text style={[styles.dndBtnText, dndNow && { color: '#dc2626' }]}>
-                {dndNow ? 'صامت' : 'تنبيهات'}
-              </Text>
+              {dndNow ? <BellOff size={19} color="#166044" /> : <Bell size={19} color="#166044" />}
+
             </HeaderAction>
 
             <HeaderAction
@@ -366,7 +364,7 @@ export default function Messages() {
               accessibilityRole="button"
               accessibilityLabel="محادثة جديدة"
             >
-              <Plus size={17} color="#059669" />
+              <Plus size={20} color="#166044" />
             </HeaderAction>
           </View>
         }
