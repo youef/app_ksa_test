@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Alert, Pressable, StyleSheet, Text, TextInput, View, KeyboardAvoidingView, Platform, ScrollView, Image } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, TextInput, View, KeyboardAvoidingView, Platform, ScrollView, Image, ImageBackground } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { getBrandingLogo, FALLBACK_LOGO_URI, subscribeBrandingLogo, getCachedBrandingLogo } from '@/lib/branding';
-import { C } from '@/lib/ui';
-import { Mail, Lock, User, ArrowRight, Compass } from 'lucide-react-native';
+import { Mail, Lock, User, ArrowRight, Compass, ShieldCheck } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AppHeader } from '@/components/shared/AppHeader';
+
+const AUTH_BACKGROUND = { uri: 'https://appksatest.vercel.app/welcome/welcome-background.png' };
 
 export default function Auth() {
   const [logoUri, setLogoUri] = useState(getCachedBrandingLogo());
@@ -98,6 +99,8 @@ export default function Auth() {
         subtitle="الشبكة الاجتماعية لجيرانك ومجتمعك المحلي"
         fallbackRoute="/home"
       />
+      <ImageBackground source={AUTH_BACKGROUND} resizeMode="cover" style={styles.background}>
+      <View pointerEvents="none" style={styles.backgroundVeil} />
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} bounces={false}>
         <View style={styles.contentWrap}>
           {/* Segmented Control */}
@@ -124,7 +127,7 @@ export default function Auth() {
                 <Image source={{ uri: logoUri }} style={styles.brandLogoImg} resizeMode="contain" />
               </View>
               <View style={{ alignItems: 'flex-end', flex: 1 }}>
-                <Text style={styles.brandBadgeTitle}>مرحباً بك في حيّنا 🇸🇦</Text>
+                <Text style={styles.brandBadgeTitle}>مرحباً بك في حيّنا</Text>
                 <Text style={styles.brandBadgeSub}>
                   {isLogin ? 'سجّل دخولك للمشاركة والتواصل مع جيرانك' : 'انضم لمجتمع وسوق وخدمات حيك اليوم'}
                 </Text>
@@ -135,7 +138,7 @@ export default function Auth() {
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>معرف المستخدم (اسم المستخدم)</Text>
                 <View style={styles.inputWrapper}>
-                  <User size={19} color="#059669" style={styles.inputIcon} />
+                  <User size={19} color="#047857" style={styles.inputIcon} />
                   <TextInput
                     style={styles.input}
                     autoCapitalize="none"
@@ -151,7 +154,7 @@ export default function Auth() {
             <View style={styles.inputGroup}>
               <Text style={styles.label}>البريد الإلكتروني</Text>
               <View style={styles.inputWrapper}>
-                <Mail size={19} color="#059669" style={styles.inputIcon} />
+                <Mail size={19} color="#047857" style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
                   autoCapitalize="none"
@@ -167,7 +170,7 @@ export default function Auth() {
             <View style={styles.inputGroup}>
               <Text style={styles.label}>كلمة المرور</Text>
               <View style={styles.inputWrapper}>
-                <Lock size={19} color="#059669" style={styles.inputIcon} />
+                <Lock size={19} color="#047857" style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
                   secureTextEntry
@@ -186,7 +189,7 @@ export default function Auth() {
               accessibilityRole="button"
             >
               <LinearGradient
-                colors={['#059669', '#047857']}
+                colors={['#047857', '#047857']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.submitGradient}
@@ -204,7 +207,7 @@ export default function Auth() {
               accessibilityRole="button"
             >
               <Compass size={17} color="#047857" />
-              <Text style={styles.guestBtnText}>تصفح كزائر دون تسجيل 🏠</Text>
+              <Text style={styles.guestBtnText}>تصفح كزائر دون تسجيل</Text>
             </Pressable>
 
             <View style={styles.switchWrapper}>
@@ -217,13 +220,13 @@ export default function Auth() {
             </View>
 
             <View style={styles.securityNote}>
-              <Text style={styles.securityNoteText}>
-                🛡️ بياناتك مشفرة ومحمية وفق أعلى معايير الخصوصية السعودية
-              </Text>
+              <ShieldCheck size={16} color="#047857" />
+              <Text style={styles.securityNoteText}>نحترم خصوصيتك ونحافظ على بيانات حسابك</Text>
             </View>
           </View>
         </View>
       </ScrollView>
+      </ImageBackground>
     </KeyboardAvoidingView>
   );
 }
@@ -231,12 +234,13 @@ export default function Auth() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#F5F3E9',
   },
+  background: { flex: 1, width: '100%' },
+  backgroundVeil: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(250,249,241,0.26)' },
   scroll: {
     flexGrow: 1,
-    backgroundColor: '#f8fafc',
-    paddingVertical: 20,
+    paddingVertical: 24,
     alignItems: 'center',
   },
   contentWrap: {
@@ -247,7 +251,9 @@ const styles = StyleSheet.create({
   },
   segmentContainer: {
     flexDirection: 'row-reverse',
-    backgroundColor: '#e2e8f0',
+    backgroundColor: 'rgba(255,253,247,0.92)',
+    borderWidth: 1,
+    borderColor: '#E2ECE6',
     padding: 4,
     borderRadius: 16,
     gap: 4,
@@ -277,10 +283,10 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   formContainer: {
-    backgroundColor: '#ffffff',
+    backgroundColor: 'rgba(255,253,247,0.95)',
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: 'rgba(255,255,255,0.95)',
     padding: 22,
     shadowColor: '#0f172a',
     shadowOffset: { width: 0, height: 4 },
@@ -337,9 +343,9 @@ const styles = StyleSheet.create({
   inputWrapper: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    backgroundColor: '#f8fafc',
+    backgroundColor: 'rgba(255,255,255,0.88)',
     borderWidth: 1,
-    borderColor: '#cbd5e1',
+    borderColor: '#C8DCD0',
     borderRadius: 14,
     paddingHorizontal: 14,
     height: 48,
@@ -359,7 +365,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     overflow: 'hidden',
     marginTop: 10,
-    shadowColor: '#059669',
+    shadowColor: '#047857',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.25,
     shadowRadius: 6,
@@ -415,7 +421,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   switchBtnText: {
-    color: '#059669',
+    color: '#047857',
     fontWeight: '900',
     fontSize: 13,
     textDecorationLine: 'underline',
@@ -426,6 +432,9 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#f1f5f9',
     alignItems: 'center',
+    flexDirection: 'row-reverse',
+    justifyContent: 'center',
+    gap: 6,
   },
   securityNoteText: {
     color: '#94a3b8',
