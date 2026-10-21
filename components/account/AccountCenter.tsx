@@ -862,11 +862,11 @@ export default function AccountCenter() {
                   <Store size={21} color="#B7791F" />
                 </View>
                 <View style={styles.formStack}>
-                  <Field label="اسم المنشأة" value={business.name || ''} onChangeText={(value) => setBusiness((current: any) => ({ ...current, name: value }))} />
-                  <Field label="نبذة عن المنشأة" value={business.description || ''} onChangeText={(value) => setBusiness((current: any) => ({ ...current, description: value }))} multiline />
+                  <Field label="اسم المنشأة" value={business.name || ''} onChangeText={(value: string) => setBusiness((current: any) => ({ ...current, name: value }))} />
+                  <Field label="نبذة عن المنشأة" value={business.description || ''} onChangeText={(value: string) => setBusiness((current: any) => ({ ...current, description: value }))} multiline />
                   <View style={styles.twoFields}>
-                    <View style={styles.flexField}><Field label="الجوال" value={business.phone || ''} onChangeText={(value) => setBusiness((current: any) => ({ ...current, phone: value }))} keyboardType="phone-pad" /></View>
-                    <View style={styles.flexField}><Field label="واتساب" value={business.whatsapp || ''} onChangeText={(value) => setBusiness((current: any) => ({ ...current, whatsapp: value }))} keyboardType="phone-pad" /></View>
+                    <View style={styles.flexField}><Field label="الجوال" value={business.phone || ''} onChangeText={(value: string) => setBusiness((current: any) => ({ ...current, phone: value }))} keyboardType="phone-pad" /></View>
+                    <View style={styles.flexField}><Field label="واتساب" value={business.whatsapp || ''} onChangeText={(value: string) => setBusiness((current: any) => ({ ...current, whatsapp: value }))} keyboardType="phone-pad" /></View>
                   </View>
                   <Pressable style={styles.outlineButtonWide} onPress={() => void saveBusiness()} disabled={saving}>
                     <Save size={15} color="#0F766E" />
@@ -933,20 +933,20 @@ export default function AccountCenter() {
                 <Lock size={20} color="#0F766E" />
               </View>
 
-              <ToggleRow title="حساب خاص" sub="لا يظهر نشاطك لغير المتابعين" value={profile.profile_privacy === 'private'} onValueChange={(value) => void savePrivacy({ profile_privacy: value ? 'private' : 'public' })} />
-              <ToggleRow title="إخفاء الاسم" sub="يظهر الحساب كجار مجهول في السياقات العامة" value={Boolean(profile.hide_name)} onValueChange={(value) => void savePrivacy({ hide_name: value })} />
+              <ToggleRow title="حساب خاص" sub="لا يظهر نشاطك لغير المتابعين" value={profile.profile_privacy === 'private'} onValueChange={(value: boolean) => void savePrivacy({ profile_privacy: value ? 'private' : 'public' })} />
+              <ToggleRow title="إخفاء الاسم" sub="يظهر الحساب كجار مجهول في السياقات العامة" value={Boolean(profile.hide_name)} onValueChange={(value: boolean) => void savePrivacy({ hide_name: value })} />
 
               <ChoiceGroup
                 label="الرسائل الخاصة"
                 value={profile.allow_dms || 'everyone'}
                 options={[['everyone','الجميع'],['followers','المتابعون'],['nobody','إيقاف الخاص']]}
-                onChange={(value) => void savePrivacy({ allow_dms: value })}
+                onChange={(value: string) => void savePrivacy({ allow_dms: value })}
               />
               <ChoiceGroup
                 label="الرد على القصص"
                 value={profile.allow_story_replies || 'everyone'}
                 options={[['everyone','الجميع'],['followers','المتابعون'],['nobody','إيقاف الردود']]}
-                onChange={(value) => void savePrivacy({ allow_story_replies: value })}
+                onChange={(value: string) => void savePrivacy({ allow_story_replies: value })}
               />
             </SectionCard>
 
@@ -960,7 +960,7 @@ export default function AccountCenter() {
               </View>
 
               <ToggleRow title="إشعارات الجهاز" sub={pushEnabled ? 'التنبيهات مفعلة على هذا الجهاز' : 'فعّل تنبيهات الرسائل والأحداث المهمة'} value={pushEnabled} onValueChange={() => void togglePush()} disabled={pushBusy} />
-              <ToggleRow title="عدم الإزعاج" sub="إيقاف التنبيهات خلال الفترة المحددة" value={Boolean(dnd.enabled)} onValueChange={(value) => void saveDndSettings(value)} />
+              <ToggleRow title="عدم الإزعاج" sub="إيقاف التنبيهات خلال الفترة المحددة" value={Boolean(dnd.enabled)} onValueChange={(value: boolean) => void saveDndSettings(value)} />
               <View style={styles.twoFields}>
                 <View style={styles.flexField}><Field label="من" value={dndStart} onChangeText={setDndStart} placeholder="22:00" /></View>
                 <View style={styles.flexField}><Field label="إلى" value={dndEnd} onChangeText={setDndEnd} placeholder="07:00" /></View>
@@ -997,10 +997,10 @@ export default function AccountCenter() {
                 label="خلفية الملف"
                 value={customization.banner_style || 'emerald'}
                 options={BANNERS.map((item) => [item.id, item.label])}
-                onChange={(value) => void saveCustomization({ banner_style: value })}
+                onChange={(value: string) => void saveCustomization({ banner_style: value })}
               />
-              <ToggleRow title="إظهار الإحصائيات" sub="المتابعون والإسهامات والسمعة" value={customization.show_stats !== false} onValueChange={(value) => void saveCustomization({ show_stats: value })} />
-              <ToggleRow title="إظهار الشارات" sub="الشارات والإنجازات في الملف العام" value={customization.show_badges !== false} onValueChange={(value) => void saveCustomization({ show_badges: value })} />
+              <ToggleRow title="إظهار الإحصائيات" sub="المتابعون والإسهامات والسمعة" value={customization.show_stats !== false} onValueChange={(value: boolean) => void saveCustomization({ show_stats: value })} />
+              <ToggleRow title="إظهار الشارات" sub="الشارات والإنجازات في الملف العام" value={customization.show_badges !== false} onValueChange={(value: boolean) => void saveCustomization({ show_badges: value })} />
             </SectionCard>
 
             <SectionCard>
