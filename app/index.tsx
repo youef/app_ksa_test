@@ -1,34 +1,26 @@
-import { HeaderAction } from '@/components/shared/AppHeader';
 import { useEffect, useState } from 'react';
 import {
-  AccessibilityInfo,
-  ActivityIndicator,
-  Image,
-  Platform,
-  Pressable,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  View,
-  useWindowDimensions,
+  ActivityIndicator, Image, ImageBackground, Platform, Pressable,
+  ScrollView, StatusBar, StyleSheet, Text, View, useWindowDimensions,
 } from 'react-native';
 import { router } from 'expo-router';
-import { ArrowLeft, House, Store, UsersRound } from 'lucide-react-native';
+import { ArrowLeft, ArrowRight, LogIn, UserRoundPlus, UsersRound, ShieldCheck } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import {
-  FALLBACK_LOGO_URI,
-  getBrandingLogo,
-  getCachedBrandingLogo,
-  subscribeBrandingLogo,
+  FALLBACK_LOGO_URI, getBrandingLogo, getCachedBrandingLogo, subscribeBrandingLogo,
 } from '@/lib/branding';
-import AppHeader from '@/components/shared/AppHeader';
+
+// Upload the original background photograph to public/welcome-background.jpg.
+// A public URL (rather than require()) keeps web and native builds working before upload.
+const WELCOME_BACKGROUND = { uri: 'https://appksatest.vercel.app/welcome-background.jpg' };
 
 export default function Index() {
   const [signedIn, setSignedIn] = useState(false);
   const [logoUri, setLogoUri] = useState(getCachedBrandingLogo() || FALLBACK_LOGO_URI);
   const { height, width } = useWindowDimensions();
-  const compact = height < 700 || width < 360;
+  const insets = useSafeAreaInsets();
+  const compact = height < 740 || width < 365;
 
   useEffect(() => {
     let active = true;
@@ -92,295 +84,105 @@ export default function Index() {
     };
   }, []);
 
+
   if (signedIn) {
-    return (
-      <View style={styles.loading}>
-        <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
-        <Image source={{ uri: logoUri }} style={styles.loadingLogo} resizeMode="contain" />
-        <ActivityIndicator color="#ffffff" />
-      </View>
-    );
+    return <View style={styles.loading}>
+      <StatusBar barStyle="dark-content" backgroundColor="#F5F3E9" />
+      <Image source={{ uri: logoUri }} style={styles.loadingLogo} resizeMode="contain" />
+      <ActivityIndicator color="#047857" />
+    </View>;
   }
 
   return (
     <View style={styles.page}>
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
-      <AppHeader
-        variant="sub"
-        title="حيّنا"
-        subtitle="الشبكة الاجتماعية للحي والمدينة"
-        showBack={false}
-        rightAction={
-          <HeaderAction
-            onPress={() => router.replace('/home')}
-            style={styles.headerSkip}
-            accessibilityRole="button"
-            accessibilityLabel="تصفح كزائر"
-            hitSlop={8}
-          >
-            <Text style={styles.headerSkipText}>تصفح كزائر</Text>
-            <ArrowLeft size={14} color="#047857" />
-          </HeaderAction>
-        }
-      />
-
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={[styles.content, compact && styles.contentCompact]}
-        showsVerticalScrollIndicator={false}
-        alwaysBounceVertical={false}
-      >
-        <View style={styles.intro}>
-          <View style={styles.eyebrow}>
-            <View style={styles.dot} />
-            <Text style={styles.eyebrowText}>مجتمعك يبدأ من هنا</Text>
+      <StatusBar barStyle="dark-content" backgroundColor="#F5F3E9" translucent={false} />
+      <ImageBackground source={WELCOME_BACKGROUND} resizeMode="cover" style={styles.background} imageStyle={styles.backgroundImage}>
+        <View pointerEvents="none" style={styles.topVeil} />
+        <View pointerEvents="none" style={styles.bottomVeil} />
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={[styles.content, { paddingTop: Math.max(insets.top, 16) + 14, paddingBottom: Math.max(insets.bottom, 12) + 22 }, compact && styles.compact]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.topRow}>
+            <Pressable accessibilityRole="button" accessibilityLabel="تصفح كزائر" onPress={() => router.replace('/home')} style={styles.guestTop}>
+              <UsersRound size={17} color="#166044" />
+              <Text style={styles.guestTopText}>الدخول كزائر</Text>
+            </Pressable>
+            <View style={styles.languagePill}><Text style={styles.languageText}>العربية</Text></View>
           </View>
 
-          <Text style={[styles.title, compact && styles.titleCompact]}>حيّنا… أقرب لبعض</Text>
-          <Text style={styles.description}>
-            مكان يجمع أهل الحي، ويقرّب الجيران من بعض.
-          </Text>
-        </View>
-
-        <View style={[styles.logoWrap, compact && styles.logoWrapCompact]}>
-          <Image
-            source={{ uri: logoUri }}
-            style={[styles.logo, compact && styles.logoCompact]}
-            resizeMode="contain"
-            accessibilityLabel="شعار حيّنا"
-          />
-        </View>
-
-        <View style={styles.features}>
-          <View style={styles.feature}>
-            <UsersRound size={17} color="#d1fae5" strokeWidth={2} />
-            <Text style={styles.featureText}>جيرانك</Text>
+          <View style={styles.hero}>
+            <Image source={{ uri: logoUri }} resizeMode="contain" style={[styles.logo, compact && styles.logoCompact]} accessibilityLabel="شعار حيّنا" />
+            <Text style={styles.name}>حيّنا</Text>
+            <Text style={styles.tagline}>مجتمعنا .. أقرب</Text>
+            <Text style={styles.description}>منصة تجمع الجيران للتواصل والمساعدة والخدمات في حيّك</Text>
           </View>
-          <View style={styles.featureDivider} />
-          <View style={styles.feature}>
-            <Store size={17} color="#d1fae5" strokeWidth={2} />
-            <Text style={styles.featureText}>سوق الحي</Text>
+
+          <View style={styles.spacer} />
+
+          <View style={styles.bottomPanel}>
+            <View style={styles.panelHandle} />
+            <Text style={styles.panelTitle}>أهلًا بك في حيّنا</Text>
+            <Text style={styles.panelSubtitle}>حيّك وناسك وخدماتك في مكان واحد</Text>
+
+            <Pressable onPress={() => router.push('/auth')} accessibilityRole="button" accessibilityLabel="تسجيل الدخول" style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}>
+              <LogIn size={21} color="#FFFFFF" />
+              <Text style={styles.primaryText}>تسجيل الدخول</Text>
+              <ArrowLeft size={19} color="#FFFFFF" />
+            </Pressable>
+            <Pressable onPress={() => router.push('/auth')} accessibilityRole="button" accessibilityLabel="إنشاء حساب جديد" style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}>
+              <UserRoundPlus size={21} color="#047857" />
+              <Text style={styles.secondaryText}>إنشاء حساب جديد</Text>
+              <ArrowLeft size={19} color="#047857" />
+            </Pressable>
+            <Pressable onPress={() => router.replace('/home')} accessibilityRole="button" accessibilityLabel="استكشاف حيّنا دون تسجيل" style={styles.explore}>
+              <Text style={styles.exploreText}>استكشف حيّنا دون تسجيل</Text>
+              <ArrowRight size={16} color="#166044" />
+            </Pressable>
+            <View style={styles.trustRow}><ShieldCheck size={15} color="#047857" /><Text style={styles.trustText}>مجتمع محلي، خصوصية واحترام للجميع</Text></View>
           </View>
-          <View style={styles.featureDivider} />
-          <View style={styles.feature}>
-            <House size={17} color="#d1fae5" strokeWidth={2} />
-            <Text style={styles.featureText}>خدمات قريبة</Text>
-          </View>
-        </View>
-
-        <View style={styles.actions}>
-          <Pressable
-            onPress={() => router.replace('/auth')}
-            style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
-            accessibilityRole="button"
-            accessibilityLabel="تسجيل الدخول أو إنشاء حساب"
-            hitSlop={6}
-          >
-            <Text style={styles.primaryButtonText}>تسجيل الدخول / إنشاء حساب</Text>
-            <ArrowLeft size={17} color="#065f46" strokeWidth={2.5} />
-          </Pressable>
-
-          <Pressable
-            onPress={() => router.replace('/home')}
-            style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
-            accessibilityRole="button"
-            accessibilityLabel="تصفح حيّنا كزائر دون تسجيل"
-            hitSlop={6}
-          >
-            <Text style={styles.secondaryButtonText}>تصفح كزائر دون تسجيل</Text>
-          </Pressable>
-
-          <Text style={styles.footer}>حيّك، ناسك، وحياتك اليومية في مكان واحد</Text>
-        </View>
-      </ScrollView>
+        </ScrollView>
+      </ImageBackground>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  page: {
-    flex: 1,
-    backgroundColor: '#047857',
-  },
-  scroll: {
-    flex: 1,
-  },
-  content: {
-    flexGrow: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-    paddingTop: 22,
-    paddingBottom: Platform.OS === 'ios' ? 28 : 22,
-  },
-  contentCompact: {
-    paddingTop: 12,
-    paddingBottom: 16,
-  },
-  intro: {
-    width: '100%',
-    alignItems: 'center',
-  },
-  eyebrow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255,255,255,0.10)',
-    marginBottom: 12,
-  },
-  dot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: '#a7f3d0',
-  },
-  eyebrowText: {
-    color: '#d1fae5',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  title: {
-    color: '#ffffff',
-    fontSize: 28,
-    fontWeight: '900',
-    textAlign: 'center',
-    letterSpacing: -0.4,
-  },
-  titleCompact: {
-    fontSize: 24,
-  },
-  description: {
-    color: '#d1fae5',
-    fontSize: 13,
-    lineHeight: 21,
-    textAlign: 'center',
-    marginTop: 8,
-  },
-  logoWrap: {
-    width: 156,
-    height: 156,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 18,
-    marginBottom: 16,
-    borderRadius: 78,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.16)',
-  },
-  logoWrapCompact: {
-    width: 128,
-    height: 128,
-    borderRadius: 64,
-    marginTop: 12,
-    marginBottom: 12,
-  },
-  logo: {
-    width: 124,
-    height: 124,
-  },
-  logoCompact: {
-    width: 102,
-    height: 102,
-  },
-  features: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 14,
-    backgroundColor: 'rgba(2,44,34,0.12)',
-  },
-  feature: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 5,
-  },
-  featureText: {
-    color: '#ffffff',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  featureDivider: {
-    width: 1,
-    height: 18,
-    backgroundColor: 'rgba(255,255,255,0.22)',
-  },
-  actions: {
-    width: '100%',
-    maxWidth: 360,
-    alignItems: 'center',
-    marginTop: 22,
-  },
-  primaryButton: {
-    width: '100%',
-    minHeight: 50,
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    backgroundColor: '#ffffff',
-  },
-  primaryButtonText: {
-    color: '#065f46',
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  secondaryButton: {
-    width: '100%',
-    minHeight: 44,
-    borderRadius: 14,
-    marginTop: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.28)',
-    backgroundColor: 'rgba(255,255,255,0.08)',
-  },
-  secondaryButtonText: {
-    color: '#ffffff',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  pressed: {
-    opacity: 0.84,
-  },
-  footer: {
-    color: 'rgba(236,253,245,0.75)',
-    fontSize: 10,
-    textAlign: 'center',
-    marginTop: 14,
-  },
-  headerSkip: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 10,
-    backgroundColor: '#ecfdf5',
-  },
-  headerSkipText: {
-    color: '#047857',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  loading: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#047857',
-  },
-  loadingLogo: {
-    width: 88,
-    height: 88,
-    marginBottom: 20,
-  },
+  page: { flex: 1, backgroundColor: '#F5F3E9' },
+  background: { flex: 1, width: '100%' },
+  backgroundImage: { width: '100%', height: '100%' },
+  topVeil: { position: 'absolute', top: 0, left: 0, right: 0, height: '47%', backgroundColor: 'rgba(250,249,241,0.25)' },
+  bottomVeil: { position: 'absolute', bottom: 0, left: 0, right: 0, height: '37%', backgroundColor: 'rgba(250,249,241,0.32)' },
+  scroll: { flex: 1 },
+  content: { flexGrow: 1, minHeight: '100%', paddingHorizontal: 22, alignItems: 'center' },
+  compact: { paddingHorizontal: 16 },
+  topRow: { width: '100%', maxWidth: 440, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between' },
+  guestTop: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, borderRadius: 24, paddingHorizontal: 12, minHeight: 38, backgroundColor: 'rgba(255,255,255,0.82)', borderWidth: 1, borderColor: 'rgba(4,120,87,0.16)' },
+  guestTopText: { color: '#166044', fontSize: 12, fontWeight: '800' },
+  languagePill: { paddingHorizontal: 14, minHeight: 36, borderRadius: 20, justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.65)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.85)' },
+  languageText: { color: '#166044', fontSize: 12, fontWeight: '700' },
+  hero: { width: '100%', maxWidth: 390, alignItems: 'center', paddingTop: 30 },
+  logo: { width: 112, height: 112 },
+  logoCompact: { width: 84, height: 84 },
+  name: { fontSize: 49, lineHeight: 64, fontWeight: '900', color: '#176044', textAlign: 'center', marginTop: -4 },
+  tagline: { fontSize: 20, fontWeight: '900', color: '#176044', textAlign: 'center' },
+  description: { fontSize: 14, lineHeight: 23, fontWeight: '600', color: '#53615A', textAlign: 'center', marginTop: 12, maxWidth: 295 },
+  spacer: { flexGrow: 1, minHeight: 100 },
+  bottomPanel: { width: '100%', maxWidth: 440, borderRadius: 28, paddingHorizontal: 18, paddingTop: 15, paddingBottom: 18, backgroundColor: 'rgba(255,253,247,0.91)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.92)', alignItems: 'center', ...Platform.select({ web: { boxShadow: '0px 8px 36px rgba(34,65,48,0.10)' } as any, default: { elevation: 3 } }) },
+  panelHandle: { width: 36, height: 4, borderRadius: 3, backgroundColor: '#D5DED7', marginBottom: 12 },
+  panelTitle: { color: '#173F30', fontSize: 19, fontWeight: '900', textAlign: 'center' },
+  panelSubtitle: { color: '#63766A', fontSize: 12, fontWeight: '600', textAlign: 'center', marginTop: 4, marginBottom: 20 },
+  primaryButton: { width: '100%', minHeight: 54, borderRadius: 18, backgroundColor: '#176044', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18 },
+  primaryText: { color: '#FFFFFF', fontSize: 17, fontWeight: '900' },
+  secondaryButton: { width: '100%', minHeight: 54, borderRadius: 18, borderWidth: 1.5, borderColor: '#176044', backgroundColor: 'rgba(255,255,255,0.82)', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, marginTop: 10 },
+  secondaryText: { color: '#176044', fontSize: 16, fontWeight: '900' },
+  explore: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 43, marginTop: 8 },
+  exploreText: { color: '#166044', fontSize: 12, fontWeight: '800' },
+  trustRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 8 },
+  trustText: { color: '#718176', fontSize: 10, fontWeight: '600' },
+  pressed: { opacity: 0.82, transform: [{ scale: 0.99 }] },
+  loading: { flex: 1, backgroundColor: '#F5F3E9', alignItems: 'center', justifyContent: 'center' },
+  loadingLogo: { width: 88, height: 88, marginBottom: 20 },
 });
