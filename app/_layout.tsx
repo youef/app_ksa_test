@@ -71,7 +71,7 @@ function RootContent() {
   const path = pathname.replace(/\/+$/, '') || '/';
   const liveFullScreen = path === '/live' || path.startsWith('/live/');
   const storyFullScreen = ['/stories', '/create-story', '/story', '/story-viewers', '/story-settings'].some(route => path === route || path.startsWith(route + '/'));
-  const hideBottomNav = ['/service', '/new-service', '/new-listing', '/admin', '/admin-pro', '/admin-support', '/admin-marketplace'].some(route => path === route || path.startsWith(route + '/'));
+  const hideBottomNav = ['/ask', '/service', '/new-service', '/new-listing', '/admin', '/admin-pro', '/admin-support', '/admin-marketplace'].some(route => path === route || path.startsWith(route + '/'));
   const hiddenRoute = Object.entries(flags).some(([key, enabled]) => enabled === false && ({ market: ['/market', '/service', '/new-service', '/new-listing'], directory: ['/directory', '/business'], search: ['/search'], stories: ['/stories', '/story', '/create-story'], weather: ['/weather'], carpooling: ['/carpooling'], urgent_alerts: ['/emergency-alert'], questions: ['/questions', '/question'], live: ['/lives', '/live'], map: ['/map'] }[key] || []).some(route => path === route || path.startsWith(route + '/')));
   const routeBlocked = hiddenRoute && path !== '/admin';
 
