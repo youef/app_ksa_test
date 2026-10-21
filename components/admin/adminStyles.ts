@@ -1,24 +1,24 @@
 import { StyleSheet, Platform } from 'react-native';
 
 export const ADMIN_COLORS = {
-  bg: '#F8FAFC',
+  bg: '#F4F6F3',
   card: '#FFFFFF',
-  ink: '#0F172A',
-  inkMuted: '#475569',
-  muted: '#64748B',
-  subtle: '#94A3B8',
-  border: '#E2E8F0',
-  borderLight: '#F1F5F9',
+  ink: '#233F2C',
+  inkMuted: '#526553',
+  muted: '#7C877C',
+  subtle: '#99A390',
+  border: '#E1E7DE',
+  borderLight: '#EFF2EB',
   
   // Executive Emerald & Saudi Green
-  accent: '#059669',
-  accentLight: '#ECFDF5',
-  accentDark: '#047857',
+  accent: '#38765A',
+  accentLight: '#E9F2E9',
+  accentDark: '#315B3E',
   
   // Luxury Dark Mode Navy
-  navyDark: '#090D16',
-  navyMid: '#0F172A',
-  navyLight: '#1E293B',
+  navyDark: '#132F26',
+  navyMid: '#234535',
+  navyLight: '#355647',
   
   // State colors
   danger: '#EF4444',
@@ -267,7 +267,11 @@ export const adminStyles = StyleSheet.create({
     flex: 1,
   },
   section: {
-    padding: 16,
+    padding: 18,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
   },
   sectionHeaderRow: {
     flexDirection: 'row-reverse',
@@ -276,8 +280,8 @@ export const adminStyles = StyleSheet.create({
     marginBottom: 6,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '900',
+    fontSize: 16,
+    fontWeight: '800',
     color: ADMIN_COLORS.ink,
     textAlign: 'right',
   },
@@ -503,7 +507,8 @@ export const adminStyles = StyleSheet.create({
     fontSize: 13,
     color: ADMIN_COLORS.ink,
     textAlign: 'right',
-    padding: 0,
+    paddingVertical: 8,
+    minHeight: 40,
   },
   filterRow: {
     flexDirection: 'row-reverse',
@@ -512,8 +517,8 @@ export const adminStyles = StyleSheet.create({
   },
   filterPill: {
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 14,
+    paddingVertical: 10,
+    borderRadius: 9,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E2E8F0',
@@ -534,16 +539,11 @@ export const adminStyles = StyleSheet.create({
   // User Cards
   userCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 18,
+    borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: ADMIN_COLORS.border,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 1,
   },
   userCardAdmin: {
     borderColor: '#FDE68A',
@@ -862,10 +862,10 @@ export const adminStyles = StyleSheet.create({
   // Reports
   reportCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 18,
+    borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: ADMIN_COLORS.border,
     marginBottom: 14,
   },
   reportHeader: {

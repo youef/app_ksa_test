@@ -1,4 +1,3 @@
-import { HeaderAction, AppHeader } from '@/components/shared/AppHeader';
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import {
   Alert,
@@ -6,14 +5,12 @@ import {
   ScrollView,
   Text,
   View,
-  RefreshControl,
   ActivityIndicator,
   Platform,
   TextInput,
   Image,
   Linking,
   Animated,
-  useWindowDimensions,
 } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
@@ -28,8 +25,10 @@ import {
 } from '@/lib/branding';
 import { sendAdminBroadcastPush } from '@/lib/pushSender';
 import { useAdminRealtime } from '@/hooks/useAdminRealtime';
-import { TrendChart, InsightCard, bucketByDay, TrendPoint } from '@/components/admin/AdminInsights';
+import { bucketByDay, TrendPoint } from '@/components/admin/AdminInsights';
 import { AdminTaskCenter } from '@/components/admin/AdminTaskCenter';
+import { AdminWorkspace } from '@/components/admin/AdminWorkspace';
+import { AdminOverview } from '@/components/admin/AdminOverview';
 import { AdminGlobalSearch } from '@/components/admin/AdminGlobalSearch';
 import { AdminFeatureFlags } from '@/components/admin/AdminFeatureFlags';
 import { AdminRbacPanel } from '@/components/admin/AdminRbacPanel';
@@ -95,7 +94,7 @@ import {
   AdminActivityLog,
   AdminStats,
 } from '@/components/admin/adminTypes';
-import { adminStyles as styles, ADMIN_COLORS as C, ADMIN_GRADIENTS } from '@/components/admin/adminStyles';
+import { adminStyles as styles, ADMIN_COLORS as C } from '@/components/admin/adminStyles';
 
 function verificationAccountLabel(value?: string | null): string {
   switch (value) {
@@ -170,7 +169,7 @@ interface AdminNavGroup {
 const ADMIN_NAV: AdminNavGroup[] = [
   {
     key: 'command',
-    label: 'القيادة',
+    label: 'الرئيسية',
     emoji: '🎯',
     tabs: [
       { key: 'overview', label: 'نظرة عامة', icon: (a) => <LayoutDashboard size={15} color={a ? C.accentDark : '#64748B'} /> },
@@ -225,31 +224,14 @@ const ADMIN_NAV: AdminNavGroup[] = [
 ];
 
 export default function AdminScreen() {
-  const { width } = useWindowDimensions();
-  const isMobile = width < 768;
-  const isSmallPhone = width < 400;
-  const statCardWidth = isSmallPhone ? '100%' : isMobile ? '48%' : '23.5%';
-
   // Auth and loading state
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const [currentAdmin, setCurrentAdmin] = useState<AdminProfile | null>(null);
 
   // Active navigation tab
   const [activeTab, setActiveTab] = useState<AdminTabKey>('overview');
-
-  // Enhanced navigation state with search and filter
-  const [navSearch, setNavSearch] = useState('');
-  const [navFilter, setNavFilter] = useState('');
-  const navSearchTimer = useRef<any>(null);
-
-  const setNavSearchDebounced = useCallback((value: string) => {
-    clearTimeout(navSearchTimer.current);
-    navSearchTimer.current = setTimeout(() => setNavSearch(value), 300);
-  }, []);
-
-  // --- Responsive sidebar state ---
-  const [sidebarOpened, setSidebarOpened] = useState<boolean>(isMobile ? false : true);
 
   // Core relational data sets
   const [usersList, setUsersList] = useState<AdminProfile[]>([]);
@@ -304,27 +286,13 @@ export default function AdminScreen() {
 
   // Filters & Search
   const [userSearch, setUserSearch] = useState('');
+  const [userSort, setUserSort] = useState<'recent' | 'oldest' | 'name'>('recent');
+  const [loadWarning, setLoadWarning] = useState('');
   const [userRoleFilter, setUserRoleFilter] = useState<'all' | 'admin' | 'user' | 'verified' | 'geoverified' | 'banned'>('all');
   const [selectedCityFilter, setSelectedCityFilter] = useState<string>('all');
   const [platformTabSub, setPlatformTabSub] = useState<'services' | 'borrow' | 'urgent'>('services');
   const [contentFilter, setContentFilter] = useState<'all' | 'questions' | 'requests'>('all');
   const [reportStatusFilter, setReportStatusFilter] = useState<'all' | 'pending' | 'resolved' | 'dismissed'>('pending');
-
-  // --- Unified dashboard metrics ---
-  const dashboardMetrics = useMemo(() => ({
-    users: stats.users,
-    admins: stats.admins,
-    verifiedUsers: stats.verifiedUsers,
-    geoverifiedUsers: stats.geoverifiedUsers,
-    bannedUsers: stats.bannedUsers,
-    pendingVerifications: stats.pendingVerifications,
-    pendingReports: stats.pendingReports,
-    services: stats.services,
-    borrowItems: stats.borrowItems,
-    urgentAlerts: stats.urgentAlerts,
-    questions: stats.questions,
-    requests: stats.requests,
-  }), [stats]);
 
   // Broadcast Center State
   const [broadcastTitle, setBroadcastTitle] = useState('');
@@ -555,8 +523,12 @@ export default function AdminScreen() {
         reports: bucketByDay(trendReports.data as any, 30),
         questions: bucketByDay(trendQuestions.data as any, 30),
       });
+      const failedSections = [profilesRes, verifRes, reportsRes, servicesRes, borrowRes, urgentRes, questionsRes, requestsRes, auditRes, locationsRes, qCountRes, rCountRes, sCountRes, bCountRes, uCountRes, trendUsers, trendReports, trendQuestions].filter(result => result.error).length;
+      setLoadWarning(failedSections ? `تعذر تحميل ${failedSections} من مصادر البيانات. قد تظهر بعض الأقسام ناقصة؛ أعد المحاولة قبل الاعتماد على الملخص.` : '');
+      if (!failedSections) setUpdatedAt(new Date());
     } catch (err: any) {
       console.error('Error loading admin dashboard:', err);
+      setLoadWarning('تعذر تحديث البيانات. تحقق من الاتصال وأعد المحاولة.');
       showToast('تعذر تحميل بيانات لوحة التحكم: ' + (err?.message || 'خطأ في الاتصال'));
     } finally {
       setLoading(false);
@@ -1353,8 +1325,10 @@ export default function AdminScreen() {
       if (userRoleFilter === 'geoverified') return u.is_geoverified;
       if (userRoleFilter === 'banned') return u.is_banned;
       return true;
-    });
-  }, [usersList, userSearch, selectedCityFilter, userRoleFilter]);
+    }).sort((a, b) => userSort === 'name'
+      ? (a.display_name || a.username || '').localeCompare(b.display_name || b.username || '', 'ar')
+      : (new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) * (userSort === 'oldest' ? 1 : -1));
+  }, [usersList, userSearch, selectedCityFilter, userRoleFilter, userSort]);
 
   // Filtered Reports computation
   const filteredReports = useMemo(() => {
@@ -1369,11 +1343,6 @@ export default function AdminScreen() {
   // NOTE: these hooks must run before any early return so the
   // Rules of Hooks stay valid on every render.
   // ============================================================
-  const activeGroup = useMemo(
-    () => ADMIN_NAV.find((g) => g.tabs.some((t) => t.key === activeTab)) || ADMIN_NAV[0],
-    [activeTab]
-  );
-
   const totalPending = stats.pendingReports + stats.pendingVerifications + stats.urgentAlerts;
 
   const tabBadge = useCallback(
@@ -1381,8 +1350,6 @@ export default function AdminScreen() {
       switch (key) {
         case 'tasks':
           return totalPending;
-        case 'users':
-          return usersList.length;
         case 'verifications':
           return stats.pendingVerifications;
         case 'reports':
@@ -1426,149 +1393,20 @@ export default function AdminScreen() {
 
   return (
     <View style={styles.container}>
-      <AppHeader title="إدارة حيّنا" subtitle="مركز العمليات" fallbackRoute="/more" rightAction={<View style={{flexDirection: 'row-reverse'}}><HeaderAction accessibilityLabel="تصدير البيانات" onPress={handleExportData}><Download size={19} color="#047857" /></HeaderAction><HeaderAction accessibilityLabel="تحديث الإدارة" onPress={onRefresh}><RefreshCw size={19} color="#047857" /></HeaderAction></View>} />
-      {/* Toast Banner */}
-      {toastMsg && (
-        <Animated.View style={[styles.toastBanner, { opacity: toastAnim }]}>
-          <Text style={styles.toastBannerText}>{toastMsg}</Text>
-        </Animated.View>
-      )}
-
-      {/* ======================================================== */}
-      {/* 0. COMMAND HERO (gradient)                               */}
-      {/* ======================================================== */}
-      <LinearGradient
-        colors={ADMIN_GRADIENTS.navy}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.heroWrap}
-      >
-        <Text style={styles.heroSub}>{currentAdmin.display_name || currentAdmin.username || 'مدير النظام'}</Text>
-
-        {/* Live operational status pills */}
-        <View style={styles.heroStatusRow}>
-          <View style={styles.heroPill}>
-            <View style={rt.total > 0 ? styles.heroLiveDot : styles.heroLiveDotOff} />
-            <Text style={styles.heroPillText}>{rt.total > 0 ? `${rt.total} تحديث مباشر` : 'متزامن مباشر'}</Text>
-          </View>
-          <Pressable style={styles.heroPill} onPress={() => setActiveTab('reports')}>
-            <Flag size={11} color="#FCA5A5" />
-            <Text style={styles.heroPillText}>{stats.pendingReports} بلاغ معلق</Text>
-          </Pressable>
-          <Pressable style={styles.heroPill} onPress={() => setActiveTab('verifications')}>
-            <Star size={11} color="#FDE68A" />
-            <Text style={styles.heroPillText}>{stats.pendingVerifications} توثيق</Text>
-          </Pressable>
-          <Pressable style={styles.heroPill} onPress={() => setActiveTab('platform')}>
-            <AlertTriangle size={11} color="#FCA5A5" />
-            <Text style={styles.heroPillText}>{stats.urgentAlerts} طارئ</Text>
-          </Pressable>
-        </View>
-
-        {/* Platform KPI chips */}
-        <View style={styles.heroKpiRow}>
-          <HeroKpi value={stats.users} label="مستخدم" />
-          <HeroKpi value={stats.services} label="خدمة" />
-          <HeroKpi value={stats.requests} label="فزعة" />
-          <HeroKpi value={stats.questions} label="استفسار" />
-          <HeroKpi value={stats.verifiedUsers} label="موثّق" />
-          <HeroKpi value={stats.admins} label="مدير" />
-        </View>
-
-        {/* Quick actions */}
-        <View style={styles.heroQuickRow}>
-          <Pressable style={styles.heroQuickBtn} onPress={() => setActiveTab('broadcast')}>
-            <Megaphone size={14} color="#0F172A" />
-            <Text style={styles.heroQuickText}>بث تعميم</Text>
-          </Pressable>
-          <Pressable style={styles.heroQuickBtn} onPress={() => setActiveTab('tasks')}>
-            <ListChecks size={14} color="#0F172A" />
-            <Text style={styles.heroQuickText}>مركز المهام</Text>
-            {totalPending > 0 ? (
-              <View style={styles.heroQuickBadge}>
-                <Text style={styles.heroQuickBadgeText}>{totalPending}</Text>
-              </View>
-            ) : null}
-          </Pressable>
-          <Pressable style={styles.heroQuickBtn} onPress={() => setActiveTab('analytics')}>
-            <TrendingUp size={14} color="#0F172A" />
-            <Text style={styles.heroQuickText}>التحليلات</Text>
-          </Pressable>
-          <Pressable style={styles.heroQuickBtn} onPress={() => setActiveTab('security')}>
-            <Lock size={14} color="#0F172A" />
-            <Text style={styles.heroQuickText}>الأمان</Text>
-          </Pressable>
-        </View>
-
-        {rt.total > 0 ? (
-          <Pressable
-            style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8, backgroundColor: 'rgba(16,185,129,0.18)', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, marginTop: 10 }}
-            onPress={() => { void loadDashboardData(); rt.reset(); }}
-          >
-            <View style={styles.heroLiveDot} />
-            <Text style={{ flex: 1, color: '#D1FAE5', fontSize: 11, fontWeight: '800', textAlign: 'right' }}>
-              {rt.total} تحديث مباشر جديد{rt.lastLabel ? ` · ${rt.lastLabel}` : ''} — اضغط للتحديث الآن
-            </Text>
-          </Pressable>
-        ) : null}
-      </LinearGradient>
-
-      {/* ======================================================== */}
-      {/* 2. GROUPED TWO-LEVEL NAVIGATION                          */}
-      {/* ======================================================== */}
-      <View style={styles.navShell}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.navGroupScroll}>
-          {ADMIN_NAV.map((group) => {
-            const isActiveGroup = group.key === activeGroup.key;
-            const groupCount = group.tabs.reduce((sum, t) => sum + tabBadge(t.key), 0);
-            return (
-              <Pressable
-                key={group.key}
-                style={[styles.navGroupChip, isActiveGroup && styles.navGroupChipActive]}
-                onPress={() => setActiveTab(group.tabs[0].key)}
-              >
-                <Text style={styles.navGroupEmoji}>{group.emoji}</Text>
-                <Text style={[styles.navGroupText, isActiveGroup && styles.navGroupTextActive]}>{group.label}</Text>
-                {groupCount > 0 ? (
-                  <View style={styles.navGroupCount}>
-                    <Text style={styles.navGroupCountText}>{groupCount}</Text>
-                  </View>
-                ) : null}
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.navTabScrollV2}>
-          {activeGroup.tabs.map((tab) => {
-            const isActive = tab.key === activeTab;
-            const count = tabBadge(tab.key);
-            return (
-              <Pressable
-                key={tab.key}
-                style={[styles.navTabV2, isActive && styles.navTabV2Active]}
-                onPress={() => setActiveTab(tab.key)}
-              >
-                {tab.icon(isActive)}
-                <Text style={[styles.navTabV2Text, isActive && styles.navTabV2TextActive]}>{tab.label}</Text>
-                {count > 0 ? (
-                  <View style={styles.navTabV2Badge}>
-                    <Text style={styles.navTabV2BadgeText}>{count}</Text>
-                  </View>
-                ) : null}
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-      </View>
-
-      {/* ======================================================== */}
-      {/* 3. MAIN DASHBOARD CONTENT SCROLL                         */}
-      {/* ======================================================== */}
-      <ScrollView
-        style={styles.scroll}
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}
+      <AdminWorkspace
+        groups={ADMIN_NAV}
+        active={activeTab}
+        onNavigate={setActiveTab}
+        badge={tabBadge}
+        name={currentAdmin.display_name || currentAdmin.username || 'مدير المنصة'}
+        refreshing={refreshing}
+        updatedAt={updatedAt}
+        onRefresh={onRefresh}
+        onExport={handleExportData}
+        onExit={() => router.replace('/more')}
+        updates={rt.total}
+        warning={loadWarning}
+        toast={toastMsg ? <Animated.View style={[styles.toastBanner, { opacity: toastAnim }]}><Text style={styles.toastBannerText}>{toastMsg}</Text></Animated.View> : null}
       >
         {/* TAB 0: UNIFIED TASK CENTER */}
         {activeTab === 'tasks' && (
@@ -1597,179 +1435,18 @@ export default function AdminScreen() {
         {activeTab === 'roles' && <AdminRbacPanel onSaved={showToast} />}
 
         {/* TAB 1: OVERVIEW & ANALYTICS */}
-        {activeTab === 'overview' && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>مؤشرات الأداء اللحظية 📈</Text>
-            <Text style={styles.sectionSubDesc}>نظرة شاملة ومحدثة على حركة ونشاط مجتمع الجيران في المملكة.</Text>
-
-            {/* KPI Cards Grid */}
-            <View style={styles.statsGrid}>
-              <StatCard
-                icon={<Users size={22} color="#0284C7" />}
-                bg="#F0F9FF"
-                value={stats.users}
-                label="إجمالي السكان"
-                sub={`${stats.admins} مدير · ${stats.users - stats.admins} مواطن`}
-                style={{ width: statCardWidth }}
-              />
-              <StatCard
-                icon={<Star size={22} color="#D97706" />}
-                bg="#FFFBEB"
-                value={stats.verifiedUsers}
-                label="حسابات موثقة رسمياً"
-                sub={`${stats.pendingVerifications} طلب معلق`}
-                style={{ width: statCardWidth }}
-              />
-              <StatCard
-                icon={<Truck size={22} color="#059669" />}
-                bg="#ECFDF5"
-                value={stats.services}
-                label="خدمات وحرفيو الحي"
-                sub="عروض عمل معتمدة"
-                style={{ width: statCardWidth }}
-              />
-              <StatCard
-                icon={<Wrench size={22} color="#7C3AED" />}
-                bg="#F5F3FF"
-                value={stats.borrowItems}
-                label="أدوات الإعارة المتاحة"
-                sub="تكاتف وتشارك الجيران"
-                style={{ width: statCardWidth }}
-              />
-            </View>
-
-            {/* 30-day trend analytics */}
-            {analytics.users.length > 0 ? (
-              <View style={{ marginTop: 18 }}>
-                <Text style={styles.sectionTitle}>اتجاهات آخر 30 يومًا 📈</Text>
-                <Text style={styles.sectionSubDesc}>نمو المستخدمين والمنشورات والبلاغات يوميًا خلال الشهر الماضي.</Text>
-
-                <View style={{ marginTop: 12, backgroundColor: C.card, borderRadius: 16, borderWidth: 1, borderColor: C.border, padding: 14 }}>
-                  <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                    <Text style={{ fontSize: 12.5, fontWeight: '900', color: C.ink }}>نمو المستخدمين الجدد</Text>
-                    <Text style={{ fontSize: 11, color: C.muted, fontWeight: '700' }}>
-                      الإجمالي: {analytics.users.reduce((s, d) => s + d.value, 0)}
-                    </Text>
-                  </View>
-                  <TrendChart data={analytics.users} color={C.info} height={140} />
-                </View>
-
-                <View style={{ marginTop: 10 }}>
-                  <InsightCard
-                    title="بلاغات واردة (30 يوم)"
-                    value={analytics.reports.reduce((s, d) => s + d.value, 0)}
-                    color={C.danger}
-                    data={analytics.reports}
-                  />
-                  <InsightCard
-                    title="منشورات ومناقشات (30 يوم)"
-                    value={analytics.questions.reduce((s, d) => s + d.value, 0)}
-                    color={C.accent}
-                    data={analytics.questions}
-                  />
-                </View>
-              </View>
-            ) : null}
-
-            {/* Cities Distribution */}
-            <View style={styles.citiesCard}>
-              <View style={styles.citiesCardHeader}>
-                <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-                  <MapPin size={16} color={C.accent} />
-                  <Text style={styles.citiesCardTitle}>توزيع نشاط مدن المملكة</Text>
-                </View>
-                <Text style={styles.citiesCardSub}>انقر على أي مدينة للتصفية الفورية</Text>
-              </View>
-
-              <View style={styles.cityPillsRow}>
-                {[
-                  { name: 'all', label: '🇸🇦 كامل المملكة', count: usersList.length },
-                  { name: 'الرياض', label: 'الرياض', count: usersList.filter(u => u.city?.includes('الرياض')).length },
-                  { name: 'جدة', label: 'جدة', count: usersList.filter(u => u.city?.includes('جدة')).length },
-                  { name: 'الدمام', label: 'الدمام', count: usersList.filter(u => u.city?.includes('الدمام')).length },
-                  { name: 'مكة', label: 'مكة المكرمة', count: usersList.filter(u => u.city?.includes('مكة')).length },
-                  { name: 'المدينة', label: 'المدينة المنورة', count: usersList.filter(u => u.city?.includes('المدينة')).length },
-                ].map(c => (
-                  <Pressable
-                    key={c.name}
-                    style={[styles.cityPill, selectedCityFilter === c.name && styles.cityPillActive]}
-                    onPress={() => {
-                      setSelectedCityFilter(c.name);
-                      showToast(`تم تحديد نطاق: ${c.label}`);
-                    }}
-                  >
-                    <Text style={[styles.cityPillText, selectedCityFilter === c.name && styles.cityPillTextActive]}>
-                      {c.label} ({c.count})
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-
-            {/* Platform Infrastructure Health */}
-            <View style={styles.healthCard}>
-              <View style={styles.healthHeader}>
-                <View style={styles.healthStatusBadge}>
-                  <View style={styles.healthDot} />
-                  <Text style={styles.healthStatusText}>الخوادم والبنية التحتية نشطة بنسبة 100%</Text>
-                </View>
-                <Activity size={16} color="#10B981" />
-              </View>
-
-              <View style={styles.healthRow}>
-                <Text style={styles.healthLabel}>قاعدة البيانات الموزعة (Supabase PostgreSQL + RLS)</Text>
-                <Text style={styles.healthValueActive}>متصلة ومحمية بالسياسات 🟢</Text>
-              </View>
-              <View style={styles.healthRow}>
-                <Text style={styles.healthLabel}>بوابة الإشعارات الفورية (Push Notification Gateway)</Text>
-                <Text style={styles.healthValueActive}>نشطة (Expo API) ⚡</Text>
-              </View>
-              <View style={styles.healthRow}>
-                <Text style={styles.healthLabel}>مستويات الصلاحيات المعتمدة</Text>
-                <Text style={styles.healthValueRole}>مدير (Admin) · مستخدم (User)</Text>
-              </View>
-            </View>
-
-            {/* Quick Action Shortcuts */}
-            <Text style={[styles.sectionTitle, { marginTop: 14 }]}>إجراءات سريعة لمدير النظام ⚡</Text>
-
-            <Pressable style={styles.quickAction} onPress={() => setActiveTab('verifications')}>
-              <View style={styles.quickActionLeft}>
-                <Star size={18} color="#D97706" />
-                <Text style={styles.quickActionText}>مراجعة واعتماد ملفات التوثيق الرسمية المعلقة</Text>
-              </View>
-              {stats.pendingVerifications > 0 ? (
-                <View style={[styles.qBadge, { backgroundColor: '#FEF3C7' }]}>
-                  <Text style={[styles.qBadgeText, { color: '#D97706' }]}>{stats.pendingVerifications} بانتظارك</Text>
-                </View>
-              ) : (
-                <ChevronRight size={18} color="#94A3B8" />
-              )}
-            </Pressable>
-
-            <Pressable style={styles.quickAction} onPress={() => setActiveTab('reports')}>
-              <View style={styles.quickActionLeft}>
-                <Flag size={18} color={C.danger} />
-                <Text style={styles.quickActionText}>معالجة بلاغات المحتوى المخالف والبت فيها</Text>
-              </View>
-              {stats.pendingReports > 0 ? (
-                <View style={[styles.qBadge, { backgroundColor: '#FEE2E2' }]}>
-                  <Text style={[styles.qBadgeText, { color: '#DC2626' }]}>{stats.pendingReports} بلاغ</Text>
-                </View>
-              ) : (
-                <ChevronRight size={18} color="#94A3B8" />
-              )}
-            </Pressable>
-
-            <Pressable style={styles.quickAction} onPress={() => setActiveTab('broadcast')}>
-              <View style={styles.quickActionLeft}>
-                <Megaphone size={18} color="#0284C7" />
-                <Text style={styles.quickActionText}>إرسال تعميم أو تنبيه عاجل لأهل الحي</Text>
-              </View>
-              <ChevronRight size={18} color="#94A3B8" />
-            </Pressable>
-          </View>
-        )}
+        {activeTab === 'overview' && <AdminOverview
+          stats={stats}
+          users={usersList}
+          reports={reports}
+          verifications={verifications}
+          urgentAlerts={urgentAlertsList}
+          logs={auditLogs}
+          analytics={analytics}
+          onNavigate={setActiveTab}
+          onOpenUser={(user) => void inspectUser(user)}
+          onCity={(city) => { setSelectedCityFilter(city); setActiveTab('users'); }}
+        />}
 
         {/* TAB 2: USERS MANAGEMENT & SECURITY */}
         {activeTab === 'users' && (
@@ -1783,6 +1460,10 @@ export default function AdminScreen() {
             <Text style={styles.sectionSubDesc}>
               إدارة حسابات السكان، ترقية المدراء، توثيق الهوية الوطنية والسكن، وحظر الحسابات المخالفة.
             </Text>
+            {selectedCityFilter !== 'all' ? <Pressable accessibilityRole="button" accessibilityLabel="إلغاء تصفية المدينة" onPress={() => setSelectedCityFilter('all')} style={[styles.filterPill, { alignSelf: 'flex-end', flexDirection: 'row-reverse', gap: 8, marginBottom: 12 }]}><MapPin size={14} color={C.accent} /><Text style={styles.filterPillText}>{selectedCityFilter}</Text><X size={14} color={C.muted} /></Pressable> : null}
+            <View style={[styles.filterRow, { flexWrap: 'wrap' }]}>
+              {([{ key: 'recent', label: 'الأحدث تسجيلًا' }, { key: 'oldest', label: 'الأقدم تسجيلًا' }, { key: 'name', label: 'حسب الاسم' }] as const).map(option => <FilterPill key={option.key} label={option.label} active={userSort === option.key} onPress={() => setUserSort(option.key)} />)}
+            </View>
 
             {/* Search Input */}
             <View style={styles.searchBar}>
@@ -2681,8 +2362,7 @@ export default function AdminScreen() {
         {/* TAB: SECURITY & SESSIONS */}
         {activeTab === 'security' && <AdminSecurityCenter onSaved={showToast} />}
 
-        <View style={{ height: 100 }} />
-      </ScrollView>
+      </AdminWorkspace>
 
       {/* ======================================================== */}
       {/* 4. USER DOSSIER INSPECTOR MODAL                          */}
@@ -2880,40 +2560,6 @@ export default function AdminScreen() {
 }
 
 // Helper Subcomponents
-function HeroKpi({ value, label }: { value: number; label: string }) {
-  return (
-    <View style={styles.heroKpi}>
-      <Text style={styles.heroKpiNum}>{Number(value || 0).toLocaleString('ar-EG')}</Text>
-      <Text style={styles.heroKpiLabel}>{label}</Text>
-    </View>
-  );
-}
-
-function TabPill({
-  label,
-  icon,
-  active,
-  badge,
-  onPress,
-}: {
-  label: string;
-  icon: React.ReactNode;
-  active: boolean;
-  badge?: number;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable style={[styles.navTabPill, active && styles.navTabPillActive]} onPress={onPress}>
-      {icon}
-      <Text style={[styles.navTabPillText, active && styles.navTabPillTextActive]}>{label}</Text>
-      {badge !== undefined && badge > 0 && (
-        <View style={styles.navTabBadge}>
-          <Text style={styles.navTabBadgeText}>{badge}</Text>
-        </View>
-      )}
-    </Pressable>
-  );
-}
 
 function FilterPill({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
   return (
@@ -2923,30 +2569,6 @@ function FilterPill({ label, active, onPress }: { label: string; active: boolean
   );
 }
 
-function StatCard({
-  icon,
-  bg,
-  value,
-  label,
-  sub,
-  style,
-}: {
-  icon: React.ReactNode;
-  bg: string;
-  value: number;
-  label: string;
-  sub?: string;
-  style?: any;
-}) {
-  return (
-    <View style={[styles.statCard, style]}>
-      <View style={[styles.statIconBox, { backgroundColor: bg }]}>{icon}</View>
-      <Text style={styles.statValue}>{value.toLocaleString('ar-SA')}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
-      {sub ? <Text style={styles.statSub}>{sub}</Text> : null}
-    </View>
-  );
-}
 
 function EmptyState({ icon, title, sub }: { icon: React.ReactNode; title: string; sub?: string }) {
   return (
