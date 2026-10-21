@@ -269,16 +269,9 @@ export default function Notifications() {
         rightAction={
           <HeaderAction
             accessibilityLabel="إعدادات الإشعارات" onPress={() => setSettingsOpen(true)}
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: 18,
-              backgroundColor: '#f1f5f9',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
+
           >
-            <SlidersHorizontal size={18} color="#475569" />
+            <SlidersHorizontal size={20} color="#047857" />
           </HeaderAction>
         }
       />
