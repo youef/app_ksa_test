@@ -30,6 +30,7 @@ export function useHomeFeed({ onLocation }: Options) {
   const [requests, setRequests] = useState<HelpRequest[]>([]);
   const [stories, setStories] = useState<Story[]>([]);
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
 
   const [loading, setLoading] = useState(true); // first load only
   const [error, setError] = useState<string | null>(null);
@@ -110,6 +111,33 @@ export function useHomeFeed({ onLocation }: Options) {
       ]);
 
       setUnreadNotifCount(notifRes.count ?? 0);
+
+      // Count unread conversations using the same last-message rule as /messages.
+      // Errors in chat must never break the neighborhood feed.
+      if (user) {
+        try {
+          const { data: memberships, error: membershipError } = await supabase
+            .from('conversation_members').select('conversation_id').eq('user_id', user.id);
+          if (membershipError) throw membershipError;
+          const ids = (memberships ?? []).map(row => row.conversation_id);
+          if (ids.length) {
+            const { data: chatMessages, error: chatError } = await supabase
+              .from('messages').select('conversation_id,sender_id,read_by,created_at')
+              .in('conversation_id', ids).order('created_at', { ascending: false });
+            if (chatError) throw chatError;
+            const latest = new Map<string, { sender_id: string; read_by: string[] | null }>();
+            for (const message of chatMessages ?? []) {
+              if (!latest.has(message.conversation_id)) latest.set(message.conversation_id, message);
+            }
+            setUnreadMessagesCount([...latest.values()].filter(message =>
+              message.sender_id !== user.id && !(message.read_by ?? []).includes(user.id)
+            ).length);
+          } else setUnreadMessagesCount(0);
+        } catch (chatError) {
+          console.warn('Could not refresh unread chat badge:', chatError);
+          setUnreadMessagesCount(0);
+        }
+      } else setUnreadMessagesCount(0);
 
       if (questionsRes.error) throw questionsRes.error;
       if (requestsRes.error) throw requestsRes.error;
@@ -283,6 +311,7 @@ export function useHomeFeed({ onLocation }: Options) {
     requests,
     stories,
     unreadNotifCount,
+    unreadMessagesCount,
     loading,
     loadingMore,
     error,
