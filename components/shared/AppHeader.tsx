@@ -68,7 +68,7 @@ export function AppHeader({ variant = 'sub', title, subtitle, fallbackRoute = '/
   const [failedImage, setFailedImage] = useState<string | null>(null);
   const [failedLogo, setFailedLogo] = useState(false);
   const dark = tone === 'overlay';
-  const color = dark ? '#ffffff' : '#166044';
+  const color = dark ? '#ffffff' : '#047857';
   const headerKey = title?.includes('بحث') ? 'search' : title?.includes('سوق') ? 'market' : title?.includes('يوميات') || title?.includes('قصص') ? 'stories' : undefined;
   const displayTitle = (headerKey && branding.headers?.[headerKey]) || title || branding.name || 'حيّنا';
   const goBack = () => {
@@ -76,7 +76,7 @@ export function AppHeader({ variant = 'sub', title, subtitle, fallbackRoute = '/
     else if (router.canGoBack()) router.back();
     else router.replace(fallbackRoute as never);
   };
-  const avatar = (uri: string | null | undefined) => uri && failedImage !== uri ? <Image source={{ uri }} style={styles.avatar} onError={() => setFailedImage(uri)} /> : <View style={[styles.avatar, styles.avatarFallback]}><UserRound size={20} color="#047857" /></View>;
+  const avatar = (uri: string | null | undefined) => <View style={styles.avatarRing}>{uri && failedImage !== uri ? <Image source={{ uri }} style={styles.avatar} onError={() => setFailedImage(uri)} /> : <View style={[styles.avatar, styles.avatarFallback]}><UserRound size={20} color="#047857" /></View>}</View>;
   const home = variant === 'home';
   const identity = titleContent || <>
     {home ? <View style={styles.brand}>
@@ -96,7 +96,7 @@ export function AppHeader({ variant = 'sub', title, subtitle, fallbackRoute = '/
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.actions} style={styles.actionScroll}>
         {home ? !isGuest ? <>
           <HeaderAction tone={tone} accessibilityLabel="الإشعارات" onPress={() => router.push('/notifications')}><Bell size={20} color={color} />{unreadCount > 0 ? <View style={styles.badge}><Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text></View> : null}</HeaderAction>
-          <HeaderAction tone={tone} accessibilityLabel="الدردشة" onPress={() => router.push('/messages')}><MessageCircle size={20} color="#16865b" />{unreadMessagesCount > 0 ? <View style={styles.badge}><Text style={styles.badgeText}>{unreadMessagesCount > 99 ? "99+" : unreadMessagesCount}</Text></View> : null}</HeaderAction>
+          <HeaderAction tone={tone} accessibilityLabel="الدردشة" onPress={() => router.push('/messages')}><MessageCircle size={20} color={color} />{unreadMessagesCount > 0 ? <View style={styles.badge}><Text style={styles.badgeText}>{unreadMessagesCount > 99 ? "99+" : unreadMessagesCount}</Text></View> : null}</HeaderAction>
         </> : null : rightAction}
       </ScrollView>
     </View>
@@ -116,11 +116,11 @@ const styles = StyleSheet.create({
   lightText: { color: '#fff' }, lightSubtitle: { color: '#e2e8f0' },
   identityRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', minWidth: 0 },
   brand: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  logo: { width: 38, height: 38, borderRadius: 11 }, avatar: { width: 32, height: 32, borderRadius: 16 }, avatarFallback: { backgroundColor: '#ecfdf5', alignItems: 'center', justifyContent: 'center' },
+  logo: { width: 38, height: 38, borderRadius: 11 }, avatarRing: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, borderColor: '#047857', padding: 2, backgroundColor: '#ffffff', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }, avatar: { width: 32, height: 32, borderRadius: 16 }, avatarFallback: { backgroundColor: '#ecfdf5', alignItems: 'center', justifyContent: 'center' },
   actionScroll: { flexGrow: 0, maxWidth: HEADER_SIDE_WIDTH }, actions: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
-  actionButton: { height: HEADER_ACTION_SIZE, minHeight: HEADER_ACTION_SIZE, minWidth: HEADER_ACTION_SIZE, paddingVertical: 0, paddingHorizontal: 8, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row-reverse', gap: 4, backgroundColor: '#f0f7f3', borderWidth: 1, borderColor: '#e0eee6', flexShrink: 0 },
+  actionButton: { height: HEADER_ACTION_SIZE, minHeight: HEADER_ACTION_SIZE, minWidth: HEADER_ACTION_SIZE, paddingVertical: 0, paddingHorizontal: 8, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row-reverse', gap: 4, backgroundColor: '#ecfdf5', borderWidth: 1, borderColor: '#a7f3d0', flexShrink: 0 },
   overlayButton: { backgroundColor: 'rgba(15,23,42,0.35)' }, pressed: { opacity: 0.65 },
-  badge: { position: 'absolute', top: 0, right: 0, minWidth: 18, height: 18, borderRadius: 9, backgroundColor: '#16834A', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, borderWidth: 1.5, borderColor: '#fff' }, badgeText: { color: '#fff', fontSize: 10, fontWeight: '800' },
+  badge: { position: 'absolute', top: 0, right: 0, minWidth: 18, height: 18, borderRadius: 9, backgroundColor: '#047857', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, borderWidth: 1.5, borderColor: '#fff' }, badgeText: { color: '#fff', fontSize: 10, fontWeight: '800' },
   onlineDot: { width: 8, height: 8, borderRadius: 4, position: 'absolute', bottom: 0, left: 0, backgroundColor: '#10b981', borderWidth: 1, borderColor: '#fff' },
 });
 export default AppHeader;
