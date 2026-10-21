@@ -200,6 +200,7 @@ export default function Home() {
         isGuest={!feed.currentUserId}
         logoUri={logoUri}
         unreadCount={feed.unreadNotifCount}
+        unreadMessagesCount={feed.unreadMessagesCount}
       />
 
       <ScrollView
