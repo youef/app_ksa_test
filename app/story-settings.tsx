@@ -15,14 +15,9 @@ export default function StorySettingsScreen() {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState('');
   const [globalEnabled, setGlobalEnabled] = useState(true);
-  const [globalBusy, setGlobalBusy] = useState(false);
-  const [replyPolicy, setReplyPolicy] = useState('everyone');
-  const [replyBusy, setReplyBusy] = useState(false);
-  const [privateAccount, setPrivateAccount] = useState(false);
-  const [errorText, setErrorText] = useState('');
 
   const load = useCallback(async () => {
-    setLoading(true); setErrorText('');
+    setLoading(true);
     try {
       const { data: authData, error: authError } = await supabase.auth.getUser();
       if (authError) throw authError;
@@ -31,19 +26,14 @@ export default function StorySettingsScreen() {
         router.replace('/auth');
         return;
       }
-      const [{ data: follows, error: followsError }, { data: preferenceRows, error: prefError }, { data: globalRow, error: globalError }, profileResult] = await Promise.all([
+      const [{ data: follows, error: followsError }, { data: preferenceRows, error: prefError }, { data: globalRow }] = await Promise.all([
         supabase.from('follows').select('following_id').eq('follower_id', user.id),
         supabase.from('story_author_preferences').select('author_id,notifications_enabled,muted').eq('user_id', user.id),
         supabase.from('story_notification_settings').select('enabled').eq('user_id', user.id).maybeSingle(),
-        supabase.from('profiles').select('allow_story_replies,profile_privacy').eq('id', user.id).single(),
       ]);
       if (followsError) throw followsError;
       if (prefError) throw prefError;
-      if (globalError) throw globalError;
-      if (profileResult.error) throw profileResult.error;
-      setReplyPolicy(profileResult.data.allow_story_replies || 'everyone');
-      setPrivateAccount(profileResult.data.profile_privacy === 'private');
-      const ids = [...new Set([...(follows || []).map((row: any) => String(row.following_id)), ...(preferenceRows || []).map((row: any) => String(row.author_id))])];
+      const ids = [...new Set((follows || []).map((row: any) => String(row.following_id)))];
       let profiles: Person[] = [];
       if (ids.length) {
         const { data, error } = await supabase.from('profiles').select('id,display_name,username,avatar_url').in('id', ids).order('display_name');
@@ -54,7 +44,7 @@ export default function StorySettingsScreen() {
       setPrefs(Object.fromEntries((preferenceRows || []).map((row: any) => [row.author_id, row as Preference])));
       setGlobalEnabled(globalRow?.enabled !== false);
     } catch (e: any) {
-      setErrorText(e?.message || 'تحقق من الاتصال ثم حاول مجددًا.');
+      Alert.alert('تعذر تحميل الإعدادات', e?.message || 'تحقق من الاتصال ثم حاول مجددًا.');
     } finally {
       setLoading(false);
     }
@@ -63,7 +53,6 @@ export default function StorySettingsScreen() {
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   async function updatePreference(authorId: string, patch: Partial<Preference>) {
-    if (busyId || loading || errorText) return;
     const previous = prefs[authorId] || { author_id: authorId, notifications_enabled: true, muted: false };
     const next = { ...previous, ...patch };
     setBusyId(authorId);
@@ -89,8 +78,6 @@ export default function StorySettingsScreen() {
   }
 
   async function toggleGlobal() {
-    if (globalBusy || loading || errorText) return;
-    setGlobalBusy(true);
     const next = !globalEnabled;
     setGlobalEnabled(next);
     try {
@@ -104,20 +91,7 @@ export default function StorySettingsScreen() {
     } catch (e: any) {
       setGlobalEnabled(!next);
       Alert.alert('تعذر حفظ الإعداد', e?.message || 'حاول مرة أخرى.');
-    } finally { setGlobalBusy(false); }
-  }
-
-  async function saveReplyPolicy(value: string) {
-    if (replyBusy || loading || errorText) return;
-    setReplyBusy(true);
-    try {
-      const auth = await supabase.auth.getUser();
-      if (!auth.data.user) throw new Error('سجّل الدخول أولًا.');
-      const result = await supabase.from('profiles').update({ allow_story_replies: value }).eq('id', auth.data.user.id).select('id').single();
-      if (result.error || !result.data) throw result.error || new Error('تعذر حفظ الإعداد.');
-      setReplyPolicy(value);
-    } catch (failure) { Alert.alert('تعذر حفظ صلاحية الرد', failure instanceof Error ? failure.message : 'حاول مرة أخرى.'); }
-    finally { setReplyBusy(false); }
+    }
   }
 
   const normalizedSearch = search.trim().toLocaleLowerCase('ar');
@@ -131,7 +105,7 @@ export default function StorySettingsScreen() {
 
   return (
     <View style={s.screen}>
-      <AppHeader variant="sub" title="إعدادات اليوميات" subtitle="التنبيهات والخصوصية" fallbackRoute="/stories"
+      <AppHeader variant="sub" title="إعدادات القصص" subtitle="التنبيهات والخصوصية" fallbackRoute="/stories"
         rightAction={<View style={s.headerIcon}><Settings2 size={19} color="#047857" /></View>} />
       <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
         <View style={s.heroCard}>
@@ -161,8 +135,6 @@ export default function StorySettingsScreen() {
           </View>
         </View>
 
-        {errorText ? <Pressable accessibilityRole="button" onPress={() => void load()} style={s.footerCard}><Text style={s.hint}>تعذر تحميل الإعدادات: {errorText} · اضغط لإعادة المحاولة</Text></Pressable> : null}
-        <View style={s.heroCard}><Text style={s.sectionTitle}>خصوصية يومياتك</Text><Text style={s.hint}>{privateAccount ? 'حسابك خاص؛ يظهر محتواك للمتابعين المسموح لهم فقط.' : 'يمكن لأعضاء المجتمع مشاهدة يومياتك العامة؛ اختر جمهورًا أضيق أثناء النشر.'}</Text><Text style={s.rowTitle}>من يستطيع الرد على يومياتك؟</Text><View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 }}>{[['everyone', 'الجميع'], ['followers', 'المتابعون'], ['nobody', 'إغلاق الردود']].map(([key, label]) => <Pressable accessibilityRole="button" accessibilityState={{ selected: replyPolicy === key }} disabled={replyBusy || loading || Boolean(errorText)} key={key} onPress={() => void saveReplyPolicy(key)} style={{ padding: 12, borderRadius: 12, backgroundColor: replyPolicy === key ? '#166044' : '#FFFFFF' }}><Text style={{ color: replyPolicy === key ? '#FFFFFF' : '#166044', fontSize: 12, fontWeight: '700' }}>{label}</Text></Pressable>)}</View><Text style={s.hint}>يتزامن هذا الخيار مع إعدادات ملفك، وإغلاق الردود في اليومية نفسها يمنعها أيضًا.</Text><Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/profile', params: { tab: 'settings' } })}><Text style={s.rowTitle}>إدارة خصوصية الحساب ←</Text></Pressable></View>
         <View style={s.globalCard}>
           <View style={[s.iconBox, !globalEnabled && s.iconBoxOff]}>
             {globalEnabled ? <Bell size={20} color="#047857" /> : <BellOff size={20} color="#64748b" />}
@@ -171,7 +143,7 @@ export default function StorySettingsScreen() {
             <Text style={s.rowTitle}>تنبيهات القصص بشكل عام</Text>
             <Text style={s.hint}>{globalEnabled ? 'التنبيهات مفعّلة للحسابات المسموح بها أدناه' : 'تم إيقاف تنبيهات القصص من جميع الحسابات'}</Text>
           </View>
-          <Switch accessibilityLabel="تنبيهات اليوميات بشكل عام" disabled={globalBusy || loading || Boolean(errorText)} value={globalEnabled} onValueChange={toggleGlobal} trackColor={{ true: '#059669', false: '#cbd5e1' }} />
+          <Switch value={globalEnabled} onValueChange={toggleGlobal} trackColor={{ true: '#059669', false: '#cbd5e1' }} />
         </View>
 
         <View style={s.sectionHeading}>
@@ -214,14 +186,14 @@ export default function StorySettingsScreen() {
                     <Text style={s.settingLabel}>تنبيهات هذا الحساب</Text>
                     <Text style={s.settingHint}>{pref.notifications_enabled ? 'إشعار عند نشر قصة جديدة' : 'لن يصلك إشعار من هذا الحساب'}</Text>
                   </View>
-                  <Switch value={pref.notifications_enabled} disabled={Boolean(busyId) || loading || Boolean(errorText)} onValueChange={value => updatePreference(person.id, { notifications_enabled: value })} trackColor={{ true: '#059669', false: '#cbd5e1' }} />
+                  <Switch value={pref.notifications_enabled} disabled={busyId === person.id} onValueChange={value => updatePreference(person.id, { notifications_enabled: value })} trackColor={{ true: '#059669', false: '#cbd5e1' }} />
                 </View>
                 <View style={s.settingRow}>
                   <View style={{ flex: 1, alignItems: 'flex-end', gap: 3 }}>
                     <Text style={s.settingLabel}>كتم قصص الحساب</Text>
                     <Text style={s.settingHint}>{pref.muted ? 'قصص هذا الحساب مخفية عن يومياتك' : 'إخفاء القصص دون إلغاء المتابعة'}</Text>
                   </View>
-                  <Switch value={pref.muted} disabled={Boolean(busyId) || loading || Boolean(errorText)} onValueChange={value => updatePreference(person.id, { muted: value })} trackColor={{ true: '#d97706', false: '#cbd5e1' }} />
+                  <Switch value={pref.muted} disabled={busyId === person.id} onValueChange={value => updatePreference(person.id, { muted: value })} trackColor={{ true: '#d97706', false: '#cbd5e1' }} />
                 </View>
               </View>
             </View>

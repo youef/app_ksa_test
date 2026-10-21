@@ -1,5 +1,5 @@
 import { HeaderAction, AppHeader } from '@/components/shared/AppHeader';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -11,22 +11,17 @@ import {
   RefreshControl,
   Animated,
 } from 'react-native';
-import { router, useFocusEffect } from 'expo-router';
+import { router } from 'expo-router';
 import { requireAccount } from '@/lib/authGate';
 import { supabase } from '@/lib/supabase';
 import { useBottomNavInset } from '@/lib/bottomNav';
 import { Plus, ShieldCheck, Sparkles, Settings2, Flame, ChevronDown } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ProfileStories } from '@/components/profile/ProfileStories';
-import { matchesStoryScope, isActiveStory, type StoryScope } from '@/lib/storyActivity';
 import { relativeTime } from '@/lib/mapPins';
 
 export default function StoriesScreen() {
   const bottomNavInset = useBottomNavInset();
   const [stories, setStories] = useState<any[]>([]);
-  const [viewerId, setViewerId] = useState('');
-  const [scope, setScope] = useState<StoryScope>('city');
-  const [errorText, setErrorText] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [seenStoryIds, setSeenStoryIds] = useState<string[]>([]);
@@ -45,17 +40,18 @@ export default function StoriesScreen() {
     return () => pulse.stop();
   }, [storyRingPulse]);
 
-  useFocusEffect(useCallback(() => { void loadAllStories(); }, []));
+  useEffect(() => {
+    loadAllStories();
+  }, []);
 
   async function loadAllStories() {
     try {
-      setLoading(true); setErrorText('');
+      setLoading(true);
       const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       const nowIso = new Date().toISOString();
 
       const { data: authResult } = await supabase.auth.getUser();
       const activeViewerId = authResult.user?.id || '';
-      setViewerId(activeViewerId);
       if (!activeViewerId) {
         setStories([]);
         requireAccount('سجّل الدخول أو أنشئ حساباً لمشاهدة يوميات أهل الحي.');
@@ -94,7 +90,6 @@ export default function StoriesScreen() {
           bg_color,
           created_at,
           expires_at,
-          hidden_user_ids,
           view_count,
           profiles (
             id,
@@ -113,7 +108,7 @@ export default function StoriesScreen() {
       if (error) throw error;
       const cityRows = (data || []) as any[];
       const normalize = (value: any) => String(value || '').trim().toLocaleLowerCase('ar');
-      const valid = cityRows.filter((story: any) => isActiveStory(story) && (story.author_id === activeViewerId || (Boolean(city) && normalize(story.profiles?.city) === normalize(city) && !mutedAuthorIds.includes(String(story.author_id)) && !(story.hidden_user_ids || []).includes(activeViewerId))));
+      const valid = city ? cityRows.filter((story: any) => normalize(story.profiles?.city) === normalize(city) && !mutedAuthorIds.includes(String(story.author_id))) : [];
       setStories(valid);
       if (activeViewerId && valid.length > 0) {
         const { data: views, error: viewsError } = await supabase
@@ -128,14 +123,14 @@ export default function StoriesScreen() {
       }
 
     } catch (e) {
-      setErrorText(e instanceof Error ? e.message : 'تعذر تحميل اليوميات.');
+      console.warn('loadAllStories error:', e);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }
 
-  const filtered = stories.filter(story => matchesStoryScope(story, scope, viewerId, followingIds, seenStoryIds, currentDistrict));
+  const filtered = stories;
 
   const groupedAuthors = Object.values(filtered.reduce((groups: Record<string, any>, story: any) => {
     const key = story.author_id;
@@ -202,9 +197,7 @@ export default function StoriesScreen() {
         <Text style={styles.storyNotificationToggleAction}>إدارة</Text>
       </Pressable>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, flexShrink: 0 }} contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 10, flexDirection: 'row-reverse', gap: 8 }}>{([{ key: 'city', label: 'المدينة' }, { key: 'district', label: 'حيّي' }, { key: 'following', label: 'أتابعهم' }, { key: 'unseen', label: 'غير المشاهدة' }, { key: 'mine', label: 'يومياتي' }] as const).map(item => <Pressable accessibilityRole="button" accessibilityState={{ selected: scope === item.key }} key={item.key} onPress={() => { setScope(item.key); setVisibleTrendingCount(8); }} style={{ backgroundColor: scope === item.key ? '#166044' : '#FFFFFF', borderWidth: 1, borderColor: '#DDEAE1', borderRadius: 13, minHeight: 40, paddingHorizontal: 15, justifyContent: 'center' }}><Text style={{ color: scope === item.key ? '#FFFFFF' : '#668373', fontWeight: '700', fontSize: 12 }}>{item.label}</Text></Pressable>)}</ScrollView>
-      {errorText ? <Pressable accessibilityRole="button" onPress={() => void loadAllStories()} style={{ padding: 16 }}><Text style={{ color: '#A65A49', textAlign: 'right' }}>تعذر تحديث اليوميات. اضغط لإعادة المحاولة.</Text></Pressable> : null}
-      {scope !== 'mine' && storyRings.length > 0 && (
+      {storyRings.length > 0 && (
         <View style={styles.ringsSection}>
           <View style={styles.sectionHeadingRow}>
             <View style={{ alignItems: 'flex-end', flex: 1 }}>
@@ -251,7 +244,7 @@ export default function StoriesScreen() {
           />
         }
       >
-        {scope === 'mine' && viewerId ? <ProfileStories userId={viewerId} own /> : loading && !refreshing ? (
+        {loading && !refreshing ? (
           <View style={styles.loadingBox}>
             <ActivityIndicator size="large" color="#059669" />
             <Text style={styles.loadingText}>جارٍ جلب يوميات جيرانك...</Text>
@@ -261,7 +254,7 @@ export default function StoriesScreen() {
             <View style={styles.emptyIconCircle}>
               <Sparkles size={36} color="#059669" />
             </View>
-            <Text style={styles.emptyTitle}>{scope === 'unseen' ? 'شاهدت كل اليوميات المتاحة' : scope === 'following' ? 'لا توجد يوميات لمن تتابعهم' : 'لا توجد يوميات نشطة حالياً'}</Text>
+            <Text style={styles.emptyTitle}>لا توجد يوميات نشطة حالياً</Text>
             <Text style={styles.emptySub}>
               كن أول من يشارك أهل حيه يومياته وتحديثاته اليوم! تظل اليوميات ظاهرة لمدة 24 ساعة.
             </Text>
@@ -278,7 +271,7 @@ export default function StoriesScreen() {
             <View style={styles.trendingSectionTitleRow}>
               <View style={styles.trendingSectionAccent} />
               <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                <Text style={styles.sectionHeading}>{scope === 'city' ? 'ترند المدينة' : 'يوميات مختارة لك'}</Text>
+                <Text style={styles.sectionHeading}>ترند المدينة</Text>
                 <Text style={styles.sectionSubheading}>أكثر اليوميات رواجاً في مدينتك</Text>
               </View>
               <View style={styles.trendingBadge}><Flame size={13} color="#fff" /><Text style={styles.trendingBadgeText}>TRENDING</Text></View>
