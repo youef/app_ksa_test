@@ -12,7 +12,7 @@ import {
 import { router, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Home, Compass, Plus, Store, MoreHorizontal } from 'lucide-react-native';
-import { BlurView } from 'expo-blur';
+import Svg, { Path } from 'react-native-svg';
 import Animated, { makeMutable, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { supabase } from '@/lib/supabase';
 import { BOTTOM_NAV_HEIGHT } from '@/lib/bottomNav';
@@ -30,7 +30,7 @@ const TABS = [
 const ROUTE_PARENT: Array<[string, string]> = [
   ['/question', '/home'], ['/questions', '/home'], ['/create-story', '/home'],
   ['/story', '/home'], ['/user', '/more'], ['/settings', '/profile'],
-  ['/account-type', '/profile'], ['/profile-customization', '/profile'], ['/market', '/search'], ['/service', '/search'],
+  ['/account-type', '/profile'], ['/profile-customization', '/profile'], ['/market', '/market'], ['/service', '/market'],
   ['/new-service', '/profile'], ['/new-listing', '/profile'], ['/directory', '/search'], ['/business', '/search'],
   ['/requests', '/home'], ['/conversation', '/messages'], ['/notifications', '/more'],
 ];
@@ -40,7 +40,7 @@ const HIDDEN_PREFIXES = ['/auth', '/questions', '/question', '/conversation', '/
 const HIDDEN_EXACT = ['/', '/index'];
 
 // ───────── منطق إخفاء/إظهار الشريط عند السكرول ─────────
-const HIDE_OFFSET = 120;     // مسافة الإخفاء
+const HIDE_OFFSET = 180;     // مسافة الإخفاء
 const HIDE_AFTER_Y = 60;     // لا يختفي قبل هذا الموضع
 const MIN_DELTA = 8;         // تجاهل الحركات الصغيرة
 
@@ -87,6 +87,7 @@ export default function BottomNav() {
   const [hasSession, setHasSession] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [barWidth, setBarWidth] = useState(0);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: navTranslateY.value }],
@@ -207,9 +208,18 @@ export default function BottomNav() {
 
   const bottomPadding = Math.max(insets.bottom, Platform.OS === 'ios' ? 8 : 7);
 
+  const center = barWidth / 2;
+  // A real transparent cradle: the screen remains visible around the raised button.
+  const cradlePath = `M 28 0 H ${center - 40} C ${center - 32} 0 ${center - 34} 36 ${center} 36 C ${center + 34} 36 ${center + 32} 0 ${center + 40} 0 H ${barWidth - 28} Q ${barWidth} 0 ${barWidth} 28 V 42 Q ${barWidth} 70 ${barWidth - 28} 70 H 28 Q 0 70 0 42 V 28 Q 0 0 28 0 Z`;
+
   return (
     <Animated.View pointerEvents="box-none" style={[styles.dock, { paddingBottom: bottomPadding }, animatedStyle]}>
-      <BlurView intensity={Platform.OS === 'ios' ? 72 : 58} tint="default" style={styles.glass}>
+      <View style={styles.surface} onLayout={event => setBarWidth(event.nativeEvent.layout.width)}>
+        {barWidth > 0 && (
+          <Svg pointerEvents="none" accessible={false} width={barWidth} height={70} style={styles.background}>
+            <Path d={cradlePath} fill="#ffffff" />
+          </Svg>
+        )}
         <View style={styles.row}>
           {TABS.map((tab) => {
             const isCreate = tab.kind === 'create';
@@ -226,27 +236,28 @@ export default function BottomNav() {
                   if (normalize(pathname) !== tab.key) router.navigate(tab.key as never);
                 }}
                 style={({ pressed }) => [styles.tab, isCreate && styles.createTab, pressed && styles.pressed]}
-                hitSlop={4}
               >
                 {isCreate ? (
                   <View style={styles.createButton}>
                     <Icon size={27} color="#ffffff" strokeWidth={2.7} />
                   </View>
                 ) : (
-                  <View style={[styles.iconWrap, isActive && styles.iconWrapActive]}>
+                  <View style={styles.iconWrap}>
                     <Icon size={21} color={isActive ? '#047857' : '#64748b'} strokeWidth={isActive ? 2.4 : 2} />
 
                   </View>
                 )}
-                <Text numberOfLines={1} style={[styles.label, isActive && styles.labelActive, isCreate && styles.createLabel]}>
-                  {tab.label}
-                </Text>
+                {!isCreate && (
+                  <Text numberOfLines={1} style={[styles.label, isActive && styles.labelActive]}>
+                    {tab.label}
+                  </Text>
+                )}
                 {isActive && <View style={styles.activeDot} />}
               </Pressable>
             );
           })}
         </View>
-      </BlurView>
+      </View>
     </Animated.View>
   );
 }
@@ -258,73 +269,62 @@ const styles = StyleSheet.create({
     right: 12,
     bottom: 0,
     zIndex: 100,
-    paddingTop: 7,
+    paddingTop: 0,
     backgroundColor: 'transparent',
   },
-  glass: {
-    overflow: 'hidden',
-    borderRadius: 27,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.24)',
-    backgroundColor: 'rgba(255,255,255,0.10)',
+  surface: {
+    height: 98,
+    overflow: 'visible',
     ...Platform.select({
-      web: { backdropFilter: 'blur(22px)', WebkitBackdropFilter: 'blur(22px)' } as any,
+      ios: { shadowColor: '#064e3b', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.10, shadowRadius: 12 },
+      web: { filter: 'drop-shadow(0px 5px 12px rgba(6,78,59,0.10))' } as any,
       default: {},
     }),
   },
+  background: { position: 'absolute', top: 28, left: 0 },
   row: {
-    minHeight: 67,
-    flexDirection: 'row',
+    height: 98,
+    paddingTop: 28,
+    // Keep the Arabic order identical with or without native RTL enabled.
+    direction: 'ltr',
+    flexDirection: 'row-reverse',
     alignItems: 'center',
-    justifyContent: 'space-around',
-    paddingHorizontal: 5,
-    paddingTop: 3,
+    paddingHorizontal: 4,
   },
   tab: {
     flex: 1,
     minWidth: 0,
-    minHeight: 59,
+    minHeight: 58,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 3,
-    paddingHorizontal: 2,
-    paddingTop: 2,
+    paddingHorizontal: 1,
     position: 'relative',
   },
-  createTab: { transform: [{ translateY: -7 }] },
+  createTab: { transform: [{ translateY: -30 }] },
   iconWrap: {
-    width: 36,
-    height: 32,
-    borderRadius: 13,
+    width: 34,
+    height: 29,
     alignItems: 'center',
     justifyContent: 'center',
-    position: 'relative',
   },
-  iconWrapActive: { backgroundColor: 'rgba(4,120,87,0.10)' },
   createButton: {
     width: 54,
     height: 54,
     borderRadius: 27,
     backgroundColor: '#047857',
-    borderWidth: 4,
-    borderColor: 'rgba(220,252,231,0.98)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: -1,
     ...Platform.select({
-      web: { boxShadow: '0px 5px 14px rgba(4,120,87,0.22)' } as any,
-      default: { elevation: 7 },
+      ios: { shadowColor: '#047857', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.20, shadowRadius: 7 },
+      android: { elevation: 5 },
+      web: { boxShadow: '0px 4px 14px rgba(4,120,87,0.20)' } as any,
     }),
   },
-  label: { fontSize: 10.5, lineHeight: 14, fontWeight: '500', color: '#64748b', textAlign: 'center' },
-  labelActive: { color: '#047857', fontWeight: '700' },
-  createLabel: { color: '#047857', fontWeight: '700' },
-  activeDot: { position: 'absolute', bottom: -1, width: 4, height: 4, borderRadius: 2, backgroundColor: '#047857' },
-  pressed: { opacity: 0.72, transform: [{ scale: 0.96 }] },
-  badge: {
-    position: 'absolute', top: -3, right: -5, minWidth: 16, height: 16, borderRadius: 8,
-    backgroundColor: '#047857', alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.9)', paddingHorizontal: 3,
-  },
-  badgeText: { color: '#ffffff', fontSize: 9, fontWeight: '800' },
+  label: { fontSize: 11, lineHeight: 15, fontWeight: '500', color: '#64748b', textAlign: 'center', writingDirection: 'rtl' },
+  labelActive: { color: '#047857', fontWeight: '600' },
+  activeDot: { position: 'absolute', bottom: 0, width: 4, height: 4, borderRadius: 2, backgroundColor: '#047857' },
+  // Opacity keeps the raised create button in place while it is pressed.
+  pressed: { opacity: 0.65 },
 });
+
