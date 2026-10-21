@@ -234,7 +234,7 @@ export default function BottomNav() {
                   </View>
                 ) : (
                   <View style={[styles.iconWrap, isActive && styles.iconWrapActive]}>
-                    <Icon size={21} color={isActive ? '#16865b' : '#64748b'} strokeWidth={isActive ? 2.4 : 2} />
+                    <Icon size={21} color={isActive ? '#047857' : '#64748b'} strokeWidth={isActive ? 2.4 : 2} />
 
                   </View>
                 )}
@@ -300,30 +300,30 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     position: 'relative',
   },
-  iconWrapActive: { backgroundColor: 'rgba(22,134,91,0.12)' },
+  iconWrapActive: { backgroundColor: 'rgba(4,120,87,0.10)' },
   createButton: {
     width: 54,
     height: 54,
     borderRadius: 27,
-    backgroundColor: '#16865b',
+    backgroundColor: '#047857',
     borderWidth: 4,
     borderColor: 'rgba(220,252,231,0.98)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: -1,
     ...Platform.select({
-      web: { boxShadow: '0px 5px 14px rgba(22,134,91,0.28)' } as any,
+      web: { boxShadow: '0px 5px 14px rgba(4,120,87,0.22)' } as any,
       default: { elevation: 7 },
     }),
   },
   label: { fontSize: 10.5, lineHeight: 14, fontWeight: '500', color: '#64748b', textAlign: 'center' },
-  labelActive: { color: '#16865b', fontWeight: '700' },
-  createLabel: { color: '#16865b', fontWeight: '700' },
-  activeDot: { position: 'absolute', bottom: -1, width: 4, height: 4, borderRadius: 2, backgroundColor: '#16865b' },
+  labelActive: { color: '#047857', fontWeight: '700' },
+  createLabel: { color: '#047857', fontWeight: '700' },
+  activeDot: { position: 'absolute', bottom: -1, width: 4, height: 4, borderRadius: 2, backgroundColor: '#047857' },
   pressed: { opacity: 0.72, transform: [{ scale: 0.96 }] },
   badge: {
     position: 'absolute', top: -3, right: -5, minWidth: 16, height: 16, borderRadius: 8,
-    backgroundColor: '#e11d48', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#047857', alignItems: 'center', justifyContent: 'center',
     borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.9)', paddingHorizontal: 3,
   },
   badgeText: { color: '#ffffff', fontSize: 9, fontWeight: '800' },
