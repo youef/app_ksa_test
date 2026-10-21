@@ -31,7 +31,7 @@ function actionContent(children: ReactNode, color: string): ReactNode {
   return React.Children.map(children, child => {
     if (!React.isValidElement(child)) return child;
     const element = child as React.ReactElement<{ color?: string; style?: unknown; children?: ReactNode; numberOfLines?: number }>;
-    if (element.type === Text) return React.cloneElement(element, { style: [element.props.style, { color, fontSize: 12, lineHeight: 18 }] as never, numberOfLines: 1 });
+    if (element.type === Text) return React.cloneElement(element, { style: [{ color, fontSize: 12, lineHeight: 18 }, element.props.style] as never, numberOfLines: 1 });
     if (element.props.color !== undefined) return React.cloneElement(element, { color });
     if (element.props.children) return React.cloneElement(element, {}, actionContent(element.props.children, color));
     return child;
