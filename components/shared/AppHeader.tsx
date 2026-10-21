@@ -6,6 +6,8 @@ import { ChevronRight, Bell, MessageCircle, LogIn, UserRound, Home } from 'lucid
 import { FALLBACK_LOGO_URI } from '@/lib/branding';
 import { usePlatformConfig } from '@/lib/platformConfig';
 
+// Upload the transparent decoration to public/header/header-background.png.
+export const APP_HEADER_BACKGROUND_URL = 'https://appksatest.vercel.app/header/header-background.png';
 export const APP_HEADER_HEIGHT = 56;
 export const HEADER_ACTION_SIZE = 44;
 export const HEADER_HORIZONTAL_PADDING = 16;
@@ -22,7 +24,9 @@ export function useAppHeaderHeight() {
 /** Shared geometry for page headers and immersive media toolbars. */
 export function AppHeaderFrame({ children, tone = 'light', safeArea = true, style }: { children: ReactNode; tone?: HeaderTone; safeArea?: boolean; style?: StyleProp<ViewStyle> }) {
   const insets = useSafeAreaInsets();
+  const [backgroundFailed, setBackgroundFailed] = useState(false);
   return <View testID="app-header" style={[styles.container, tone === 'overlay' && styles.overlay, { paddingTop: safeArea ? headerTopInset(insets.top) : 0 }, style]}>
+    {tone === 'light' && !backgroundFailed ? <Image pointerEvents="none" source={{ uri: APP_HEADER_BACKGROUND_URL }} resizeMode="stretch" onError={() => setBackgroundFailed(true)} style={styles.backgroundDecoration} accessibilityIgnoresInvertColors /> : null}
     <View testID="app-header-content" style={styles.content}>{children}</View>
   </View>;
 }
@@ -104,9 +108,10 @@ export function AppHeader({ variant = 'sub', title, subtitle, fallbackRoute = '/
 }
 
 const styles = StyleSheet.create({
-  container: { width: '100%', backgroundColor: '#ffffff', borderBottomWidth: 1, borderBottomColor: '#e4eee8', zIndex: 20, flexShrink: 0 },
+  container: { width: '100%', backgroundColor: '#ffffff', borderBottomWidth: 1, borderBottomColor: '#e4eee8', zIndex: 20, flexShrink: 0, overflow: 'hidden' },
+  backgroundDecoration: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%', opacity: 0.68 },
   overlay: { backgroundColor: 'transparent', borderBottomColor: 'transparent' },
-  content: { height: APP_HEADER_HEIGHT, width: '100%', maxWidth: 1100, alignSelf: 'center', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: HEADER_HORIZONTAL_PADDING, gap: 4 },
+  content: { position: 'relative', height: APP_HEADER_HEIGHT, width: '100%', maxWidth: 1100, alignSelf: 'center', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: HEADER_HORIZONTAL_PADDING, gap: 4 },
   side: { width: HEADER_SIDE_WIDTH, flexShrink: 0, alignItems: 'flex-start', justifyContent: 'center', height: HEADER_ACTION_SIZE },
   leading: { alignItems: 'flex-end' },
   center: { flex: 1, minWidth: 0, minHeight: HEADER_ACTION_SIZE, alignItems: 'center', justifyContent: 'center' },
