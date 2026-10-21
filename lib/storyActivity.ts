@@ -14,3 +14,10 @@ export function matchesStoryScope(story: { id: string; author_id: string; profil
   if (scope === 'district') return Boolean(district.trim()) && (story.profiles?.district || '').trim().toLocaleLowerCase('ar') === district.trim().toLocaleLowerCase('ar');
   return true;
 }
+
+/** Discovery fails closed when the account location is missing. */
+export function isSameStoryLocation(profile: { city?: string | null; district?: string | null } | null | undefined, city: string, district?: string) {
+  const normalize = (value: string | null | undefined) => (value || '').normalize('NFKC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('ar');
+  if (!normalize(city) || normalize(profile?.city) !== normalize(city)) return false;
+  return district === undefined || (Boolean(normalize(district)) && normalize(profile?.district) === normalize(district));
+}

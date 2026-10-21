@@ -23,3 +23,14 @@ test('scope filters separate own stories, following and unseen neighbors', () =>
   assert.equal(matches(neighbor, 'district'), true);
   assert.equal(matchesStoryScope(neighbor, 'district', 'me', [], [], ''), false);
 });
+const { isSameStoryLocation } = require('../lib/storyActivity.ts');
+test('discovery restricts city and neighborhood and never falls back to all cities', () => {
+  const local = { city: 'عرعر', district: 'الخليج الشرقي' };
+  assert.equal(isSameStoryLocation(local, ' عرعر '), true);
+  assert.equal(isSameStoryLocation(local, 'عرعر', 'الخليج الشرقي'), true);
+  assert.equal(isSameStoryLocation({ ...local, city: 'الرياض' }, 'عرعر', 'الخليج الشرقي'), false);
+  assert.equal(isSameStoryLocation(local, 'عرعر', 'النخيل'), false);
+  assert.equal(isSameStoryLocation(local, ''), false);
+  assert.equal(isSameStoryLocation(local, 'عرعر', ''), false);
+  assert.equal(isSameStoryLocation(null, 'عرعر'), false);
+});
