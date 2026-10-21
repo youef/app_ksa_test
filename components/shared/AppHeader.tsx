@@ -57,12 +57,13 @@ export interface AppHeaderProps {
   profile?: { avatar_url?: string | null; display_name?: string | null } | null;
   isGuest?: boolean;
   unreadCount?: number;
+  unreadMessagesCount?: number;
   logoUri?: string;
   avatarUrl?: string | null;
   isOnline?: boolean;
 }
 
-export function AppHeader({ variant = 'sub', title, subtitle, fallbackRoute = '/home', rightAction, showBack = true, onBackPress, onTitlePress, titleContent, tone = 'light', safeArea = true, style, profile, isGuest = false, unreadCount = 0, logoUri, avatarUrl, isOnline }: AppHeaderProps) {
+export function AppHeader({ variant = 'sub', title, subtitle, fallbackRoute = '/home', rightAction, showBack = true, onBackPress, onTitlePress, titleContent, tone = 'light', safeArea = true, style, profile, isGuest = false, unreadCount = 0, unreadMessagesCount = 0, logoUri, avatarUrl, isOnline }: AppHeaderProps) {
   const { branding = {} } = usePlatformConfig();
   const [failedImage, setFailedImage] = useState<string | null>(null);
   const [failedLogo, setFailedLogo] = useState(false);
@@ -95,7 +96,7 @@ export function AppHeader({ variant = 'sub', title, subtitle, fallbackRoute = '/
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.actions} style={styles.actionScroll}>
         {home ? !isGuest ? <>
           <HeaderAction tone={tone} accessibilityLabel="الإشعارات" onPress={() => router.push('/notifications')}><Bell size={20} color={color} />{unreadCount > 0 ? <View style={styles.badge}><Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text></View> : null}</HeaderAction>
-          <HeaderAction tone={tone} accessibilityLabel="الدردشة" onPress={() => router.push('/messages')}><MessageCircle size={20} color="#16865b" /></HeaderAction>
+          <HeaderAction tone={tone} accessibilityLabel="الدردشة" onPress={() => router.push('/messages')}><MessageCircle size={20} color="#16865b" />{unreadMessagesCount > 0 ? <View style={styles.badge}><Text style={styles.badgeText}>{unreadMessagesCount > 99 ? "99+" : unreadMessagesCount}</Text></View> : null}</HeaderAction>
         </> : null : rightAction}
       </ScrollView>
     </View>
@@ -119,7 +120,7 @@ const styles = StyleSheet.create({
   actionScroll: { flexGrow: 0, maxWidth: HEADER_SIDE_WIDTH }, actions: { flexDirection: 'row-reverse', alignItems: 'center' },
   actionButton: { height: HEADER_ACTION_SIZE, minHeight: HEADER_ACTION_SIZE, minWidth: HEADER_ACTION_SIZE, paddingVertical: 0, paddingHorizontal: 8, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row-reverse', gap: 4, backgroundColor: '#f1f7f3', borderWidth: 0, flexShrink: 0 },
   overlayButton: { backgroundColor: 'rgba(15,23,42,0.35)' }, pressed: { opacity: 0.65 },
-  badge: { position: 'absolute', top: 2, right: 2, minWidth: 15, height: 15, borderRadius: 8, backgroundColor: '#dc2626', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 }, badgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
+  badge: { position: 'absolute', top: 2, right: 2, minWidth: 15, height: 15, borderRadius: 8, backgroundColor: '#16834A', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 }, badgeText: { color: '#fff', fontSize: 9, fontWeight: '800' },
   onlineDot: { width: 8, height: 8, borderRadius: 4, position: 'absolute', bottom: 0, left: 0, backgroundColor: '#10b981', borderWidth: 1, borderColor: '#fff' },
 });
 export default AppHeader;
