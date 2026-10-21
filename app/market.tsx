@@ -1046,9 +1046,9 @@ export default function Market() {
                 )}
               </View>
 
-              <Pressable id="market-add" style={styles.addBtn} onPress={handleAddPress}>
+              <Pressable id="market-add" accessibilityRole="button" accessibilityLabel={addBtnLabel} style={styles.addBtn} onPress={handleAddPress}>
                 <Plus size={18} color="#fff" />
-                {width > 360 && <Text style={styles.addBtnText}>{addBtnLabel}</Text>}
+                <Text style={styles.addBtnText}>{addBtnLabel}</Text>
               </Pressable>
             </View>
 
