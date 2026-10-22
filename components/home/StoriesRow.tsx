@@ -1,7 +1,7 @@
 import { Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Camera, Plus, ShieldCheck, ChevronLeft } from 'lucide-react-native';
+import { ShieldCheck, ChevronLeft } from 'lucide-react-native';
 import { styles } from './homeStyles';
 import type { Profile, Story } from '@/lib/homeUtils';
 
@@ -12,74 +12,11 @@ type Props = {
 };
 
 export default function StoriesRow({ profile, stories, selectedDistrict }: Props) {
-  const visibleStories = stories.slice(0, 5);
+  const visibleStories = stories.slice(0, 4);
 
   return (
     <View style={styles.storiesContainer}>
-      <View style={styles.storiesHeaderRow}>
-        <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-          <Pressable
-            style={styles.publishStoryHeaderBtn}
-            onPress={() => router.push('/create-story')}
-            accessibilityRole="button"
-            accessibilityLabel="نشر يوميات"
-          >
-            <Plus size={14} color="#059669" />
-            <Text style={styles.publishStoryHeaderText}>نشر يوميات</Text>
-          </Pressable>
-          <Pressable
-            style={{
-              flexDirection: 'row-reverse',
-              alignItems: 'center',
-              gap: 3,
-              paddingHorizontal: 8,
-              paddingVertical: 5,
-              borderRadius: 10,
-              backgroundColor: '#f1f5f9',
-            }}
-            onPress={() => router.push('/stories')}
-            accessibilityRole="button"
-            accessibilityLabel="عرض كل اليوميات"
-          >
-            <Text style={{ fontSize: 11, fontWeight: '800', color: '#475569' }}>عرض الكل</Text>
-            <ChevronLeft size={13} color="#475569" />
-          </Pressable>
-        </View>
-
-        <View style={styles.storiesTitleRow}>
-          <View style={styles.storiesLiveBadge}>
-            <View style={styles.storiesLivePulseDot} />
-            <Text style={styles.storiesLiveText}>مباشر 24س</Text>
-          </View>
-          <Text style={styles.storiesSectionTitle}>يوميات الحي</Text>
-        </View>
-      </View>
-
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.storiesScroll}>
-        <Pressable style={styles.storyBox} onPress={() => router.push('/create-story')}>
-          <LinearGradient
-            colors={['#059669', '#10b981', '#34d399']}
-            style={styles.storyAddRing}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
-            <View style={styles.storyInnerBorder}>
-              {profile?.avatar_url ? (
-                <Image source={{ uri: profile.avatar_url }} style={styles.storyImg} />
-              ) : (
-                <View style={styles.storySelfPlaceholder}>
-                  <Camera size={20} color="#059669" />
-                </View>
-              )}
-              <View style={styles.storySelfPlusBadge}>
-                <Plus size={11} color="#fff" strokeWidth={3} />
-              </View>
-            </View>
-          </LinearGradient>
-          <Text style={styles.storyName}>أضف يومياتك</Text>
-          <Text style={styles.storyDistrictSub}>قصتك أنت</Text>
-        </Pressable>
-
         {visibleStories.map(story => {
           const authorName = story.profiles?.display_name || story.profiles?.username || 'جار';
           const avatarUrl = story.profiles?.avatar_url;
@@ -127,7 +64,7 @@ export default function StoriesRow({ profile, stories, selectedDistrict }: Props
           );
         })}
 
-        {/* View More Stories Button */}
+        {/* Permanent fifth slot: More */}
         <Pressable
           style={styles.storyBox}
           onPress={() => router.push('/stories')}
