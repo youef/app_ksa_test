@@ -209,7 +209,7 @@ export default function Home() {
         keyboardShouldPersistTaps="handled"
         onScroll={handleFeedScroll}
         scrollEventThrottle={300}
-        contentContainerStyle={{ paddingBottom: bottomNavInset + 24, backgroundColor: '#f5f7f6', flexGrow: 1 }}
+        contentContainerStyle={{ paddingBottom: bottomNavInset + 24, backgroundColor: 'transparent', flexGrow: 1 }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -348,7 +348,7 @@ export default function Home() {
 }
 
 const layout = StyleSheet.create({
-  page: { backgroundColor: '#f5f7f6' },
+  page: { backgroundColor: 'transparent' },
   contextRow: { width: '100%', maxWidth: 760, alignSelf: 'center', flexDirection: 'row-reverse', alignItems: 'stretch', gap: 8, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12 },
   stories: { width: '100%', maxWidth: 728, alignSelf: 'center', backgroundColor: '#fff', borderRadius: 22, overflow: 'hidden', marginBottom: 8 },
   feed: { maxWidth: 760, marginTop: 16 },
