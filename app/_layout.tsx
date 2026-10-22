@@ -107,7 +107,7 @@ function RootContent() {
                     // Native gets a short slide; web swaps screens without a blank animation frame.
                     animation: Platform.OS === 'web' ? 'none' : 'slide_from_right',
                     animationDuration: Platform.OS === 'web' ? 0 : 180,
-                    contentStyle: { backgroundColor: C.bg, flex: 1 },
+                    contentStyle: { backgroundColor: 'transparent', flex: 1 },
                     freezeOnBlur: false,
                     gestureEnabled: true,
                   }}
