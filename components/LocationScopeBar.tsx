@@ -59,7 +59,7 @@ export default function LocationScopeBar({ location, onLocationChanged, compact 
 
   return (
     <View style={{ marginHorizontal: compact ? 0 : 12, marginTop: compact ? 0 : 6, marginBottom: compact ? 0 : 6, alignItems: 'stretch', zIndex: 20, flex: compact ? 1 : undefined }}>
-      <OasisGlassFrame style={{ minHeight: compact ? 54 : 46 }}>
+      <OasisGlassFrame variant="location" style={{ minHeight: compact ? 54 : 46 }}>
       <Pressable onPress={() => setOpen((value) => !value)} accessibilityRole="button" accessibilityState={{ expanded: open }}
         style={{ minHeight: compact ? 54 : 36, maxWidth: '100%', flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: compact ? 8 : 11, paddingVertical: 7, borderRadius: 14, backgroundColor: 'transparent', borderWidth: 0 }}>
         <MapPin size={15} color="#176b52" />
