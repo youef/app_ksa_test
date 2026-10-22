@@ -61,9 +61,9 @@ export default function LocationScopeBar({ location, onLocationChanged, compact 
     <View style={{ marginHorizontal: compact ? 0 : 12, marginTop: compact ? 0 : 6, marginBottom: compact ? 0 : 6, alignItems: 'stretch', zIndex: 20, flex: compact ? 1 : undefined }}>
       <OasisGlassFrame variant="location" style={{ minHeight: compact ? 54 : 46 }}>
       <Pressable onPress={() => setOpen((value) => !value)} accessibilityRole="button" accessibilityState={{ expanded: open }}
-        style={{ minHeight: compact ? 54 : 36, maxWidth: '100%', flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: compact ? 8 : 11, paddingVertical: 7, borderRadius: 14, backgroundColor: 'transparent', borderWidth: 0 }}>
+        style={{ minHeight: compact ? 54 : 36, width: '100%', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: compact ? 20 : 14, paddingVertical: 0, borderRadius: 14, backgroundColor: 'transparent', borderWidth: 0 }}>
         <MapPin size={15} color="#176b52" />
-        <Text numberOfLines={compact ? 2 : 1} style={{ color: '#345348', fontSize: compact ? 10.5 : 12, fontWeight: '800', flexShrink: 1, textAlign: 'right' }}>{title}</Text>
+        <Text numberOfLines={1} style={{ color: '#345348', fontSize: compact ? 11 : 12, fontWeight: '800', flexShrink: 1, textAlign: 'center', lineHeight: 17 }}>{title}</Text>
         <ChevronDown size={14} color="#176b52" />
       </Pressable>
       </OasisGlassFrame>
