@@ -16,6 +16,8 @@ export default function Auth() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [viewportHeight, setViewportHeight] = useState(0);
+  const [contentHeight, setContentHeight] = useState(0);
 
   useEffect(() => {
     getBrandingLogo().then(setLogoUri);
@@ -92,16 +94,28 @@ export default function Auth() {
   }
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.container}>
+    <View style={styles.container}>
+      <ImageBackground source={AUTH_BACKGROUND} resizeMode="cover" style={StyleSheet.absoluteFillObject} imageStyle={styles.backgroundImage}>
+        <View style={styles.backgroundVeil} />
+      </ImageBackground>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.background}>
       <AppHeader
         variant="sub"
         title={isLogin ? 'تسجيل الدخول' : 'إنشاء حساب جديد'}
         subtitle="الشبكة الاجتماعية لجيرانك ومجتمعك المحلي"
         fallbackRoute="/home"
       />
-      <ImageBackground source={AUTH_BACKGROUND} resizeMode="cover" style={styles.background}>
-      <View pointerEvents="none" style={styles.backgroundVeil} />
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} bounces={false}>
+      <ScrollView
+        style={styles.background}
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+        overScrollMode="never"
+        keyboardShouldPersistTaps="handled"
+        scrollEnabled={contentHeight > viewportHeight + 1}
+        onLayout={event => setViewportHeight(event.nativeEvent.layout.height)}
+        onContentSizeChange={(_, height) => setContentHeight(height)}
+      >
         <View style={styles.contentWrap}>
           {/* Segmented Control */}
           <View style={styles.segmentContainer}>
@@ -226,8 +240,8 @@ export default function Auth() {
           </View>
         </View>
       </ScrollView>
-      </ImageBackground>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -235,19 +249,22 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F5F3E9',
+    overflow: 'hidden',
   },
   background: { flex: 1, width: '100%' },
-  backgroundVeil: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(250,249,241,0.26)' },
+  backgroundImage: { opacity: 0.32 },
+  backgroundVeil: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(250,249,241,0.18)' },
   scroll: {
     flexGrow: 1,
-    paddingVertical: 24,
+    paddingVertical: 12,
+    justifyContent: 'center',
     alignItems: 'center',
   },
   contentWrap: {
     width: '100%',
     maxWidth: 480,
     paddingHorizontal: 16,
-    gap: 14,
+    gap: 10,
   },
   segmentContainer: {
     flexDirection: 'row-reverse',
@@ -283,11 +300,11 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   formContainer: {
-    backgroundColor: 'rgba(255,253,247,0.95)',
+    backgroundColor: 'rgba(255,253,247,0.88)',
     borderRadius: 24,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.95)',
-    padding: 22,
+    padding: 18,
     shadowColor: '#0f172a',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.04,
@@ -298,8 +315,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 12,
-    marginBottom: 20,
-    paddingBottom: 16,
+    marginBottom: 12,
+    paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
   },
@@ -331,7 +348,7 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   inputGroup: {
-    marginBottom: 16,
+    marginBottom: 12,
   },
   label: {
     fontWeight: '800',
@@ -427,8 +444,8 @@ const styles = StyleSheet.create({
     textDecorationLine: 'underline',
   },
   securityNote: {
-    marginTop: 18,
-    paddingTop: 14,
+    marginTop: 12,
+    paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: '#f1f5f9',
     alignItems: 'center',

@@ -5,19 +5,19 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ArrowLeft, ArrowRight, LogIn, UserRoundPlus, UsersRound, ShieldCheck } from 'lucide-react-native';
+import { ArrowRight, LogIn, UserRoundPlus, UsersRound, ShieldCheck } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import {
   FALLBACK_LOGO_URI, getBrandingLogo, getCachedBrandingLogo, subscribeBrandingLogo,
 } from '@/lib/branding';
 
-// Store the animated background at public/welcome/welcome-background.gif.
+// Static PNG header, separate from the existing logo and controls.
 // The background is separate from the interactive buttons and text below.
 const WELCOME_BACKGROUND = {
   uri: Platform.OS === 'web'
-    ? '/welcome/welcome-background.gif'
-    : 'https://appksatest.vercel.app/welcome/welcome-background.gif',
+    ? '/welcome/welcome-header.png'
+    : 'https://appksatest.vercel.app/welcome/welcome-header.png',
 };
 
 export default function Index() {
@@ -118,9 +118,8 @@ export default function Index() {
             </Pressable>
           </View>
 
-          <View style={[styles.hero, compact && styles.heroCompact]}>
+          <View pointerEvents="none" style={[styles.hero, { top: Math.max(insets.top, 12) }, compact && styles.heroCompact]}>
             <Image source={{ uri: logoUri }} resizeMode="contain" style={[styles.logo, compact && styles.logoCompact]} accessibilityLabel="شعار حيّنا" />
-            <Text style={styles.name}>حيّنا</Text>
           </View>
 
           <View style={styles.spacer} />
@@ -133,12 +132,10 @@ export default function Index() {
             <Pressable onPress={() => router.push('/auth')} accessibilityRole="button" accessibilityLabel="تسجيل الدخول" style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}>
               <LogIn size={21} color="#FFFFFF" />
               <Text style={styles.primaryText}>تسجيل الدخول</Text>
-              <ArrowLeft size={19} color="#FFFFFF" />
             </Pressable>
             <Pressable onPress={() => router.push('/auth')} accessibilityRole="button" accessibilityLabel="إنشاء حساب جديد" style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}>
               <UserRoundPlus size={21} color="#047857" />
               <Text style={styles.secondaryText}>إنشاء حساب جديد</Text>
-              <ArrowLeft size={19} color="#047857" />
             </Pressable>
             <Pressable onPress={() => router.replace('/home')} accessibilityRole="button" accessibilityLabel="استكشاف حيّنا دون تسجيل" style={styles.explore}>
               <Text style={styles.exploreText}>استكشف حيّنا دون تسجيل</Text>
@@ -160,22 +157,21 @@ const styles = StyleSheet.create({
   headerFade: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 120 },
   content: { flex: 1, minHeight: 0, paddingHorizontal: 22, alignItems: 'center' },
   compact: { paddingHorizontal: 16 },
-  topRow: { width: '100%', maxWidth: 440, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between' },
+  topRow: { width: '100%', maxWidth: 440, minHeight: 112, flexDirection: 'row-reverse', alignItems: 'flex-start', justifyContent: 'flex-start' },
   guestTop: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, borderRadius: 24, paddingHorizontal: 12, minHeight: 38, backgroundColor: 'rgba(255,255,255,0.82)', borderWidth: 1, borderColor: 'rgba(4,120,87,0.16)' },
   guestTopText: { color: '#166044', fontSize: 12, fontWeight: '800' },
-  hero: { width: '100%', maxWidth: 390, alignItems: 'center', paddingTop: 30 },
-  heroCompact: { paddingTop: 8 },
+  hero: { position: 'absolute', alignSelf: 'center', alignItems: 'center', zIndex: 1 },
+  heroCompact: {},
   logo: { width: 112, height: 112 },
   logoCompact: { width: 84, height: 84 },
-  name: { fontSize: 49, lineHeight: 64, fontWeight: '900', color: '#176044', textAlign: 'center', marginTop: -4 },
   spacer: { flexGrow: 1, minHeight: 8 },
   bottomPanel: { width: '100%', maxWidth: 440, borderRadius: 28, paddingHorizontal: 18, paddingTop: 15, paddingBottom: 18, backgroundColor: 'rgba(255,253,247,0.91)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.92)', alignItems: 'center', ...Platform.select({ web: { boxShadow: '0px 8px 36px rgba(34,65,48,0.10)' } as any, default: { elevation: 3 } }) },
   panelHandle: { width: 36, height: 4, borderRadius: 3, backgroundColor: '#D5DED7', marginBottom: 12 },
   panelTitle: { color: '#173F30', fontSize: 19, fontWeight: '900', textAlign: 'center' },
   panelSubtitle: { color: '#63766A', fontSize: 12, fontWeight: '600', textAlign: 'center', marginTop: 4, marginBottom: 20 },
-  primaryButton: { width: '100%', minHeight: 54, borderRadius: 18, backgroundColor: '#176044', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18 },
+  primaryButton: { width: '100%', minHeight: 54, borderRadius: 18, backgroundColor: '#176044', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 18 },
   primaryText: { color: '#FFFFFF', fontSize: 17, fontWeight: '900' },
-  secondaryButton: { width: '100%', minHeight: 54, borderRadius: 18, borderWidth: 1.5, borderColor: '#176044', backgroundColor: 'rgba(255,255,255,0.82)', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, marginTop: 10 },
+  secondaryButton: { width: '100%', minHeight: 54, borderRadius: 18, borderWidth: 1.5, borderColor: '#176044', backgroundColor: 'rgba(255,255,255,0.82)', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 18, marginTop: 10 },
   secondaryText: { color: '#176044', fontSize: 16, fontWeight: '900' },
   explore: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 43, marginTop: 8 },
   exploreText: { color: '#166044', fontSize: 12, fontWeight: '800' },
