@@ -85,10 +85,16 @@ function RootContent() {
           @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700;800&display=swap');
           html, body { width: 100%; min-height: 100%; -webkit-text-size-adjust: 100%; font-family: 'IBM Plex Sans Arabic', sans-serif; }
           body, #root, #root * { font-family: 'IBM Plex Sans Arabic', sans-serif; }
+          /* Shared HAYNA heritage wallpaper: all standard app pages, excluding welcome and login. */
+          body:has(#hayna-app-wallpaper) { background-color: #f9fcf8; }
+          body:has(#hayna-app-wallpaper) #root { background: transparent !important; }
+          body:has(#hayna-app-wallpaper) #root > div { background-color: transparent !important; }
+          #hayna-app-wallpaper { position: fixed; inset: 0; z-index: -1; pointer-events: none; background: #f9fcf8 url('/images/backgrounds/hayna-heritage-bg.png') center center / cover no-repeat; }
           input, textarea, select { font-size: 16px !important; }
           input:focus, textarea:focus, select:focus { font-size: 16px !important; }
         `}</style>
       </Head>
+      {Platform.OS === 'web' && !['/auth', '/login', '/welcome', '/onboarding', '/register', '/signup'].some(route => path === route || path.startsWith(route + '/')) && <View nativeID="hayna-app-wallpaper" style={{ position: 'absolute', width: 0, height: 0 }} />}
       <SafeAreaProvider initialMetrics={initialWindowMetrics}>
         <DynamicIslandProvider>
           <DialogProvider>
