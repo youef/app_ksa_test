@@ -12,12 +12,12 @@ import {
   FALLBACK_LOGO_URI, getBrandingLogo, getCachedBrandingLogo, subscribeBrandingLogo,
 } from '@/lib/branding';
 
-// Static PNG header, separate from the existing logo and controls.
+// Animated header background, separate from the logo and controls.
 // The background is separate from the interactive buttons and text below.
 const WELCOME_BACKGROUND = {
   uri: Platform.OS === 'web'
-    ? '/welcome/welcome-header.png'
-    : 'https://appksatest.vercel.app/welcome/welcome-header.png',
+    ? '/welcome/welcome-background.gif'
+    : 'https://appksatest.vercel.app/welcome/welcome-background.gif',
 };
 
 export default function Index() {
