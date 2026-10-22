@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
+  Image,
   Keyboard,
   NativeScrollEvent,
   NativeSyntheticEvent,
@@ -12,7 +13,6 @@ import {
 import { router, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Home, Compass, Plus, Store, MoreHorizontal } from 'lucide-react-native';
-import Svg, { Path } from 'react-native-svg';
 import Animated, { makeMutable, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { supabase } from '@/lib/supabase';
 import { BOTTOM_NAV_HEIGHT } from '@/lib/bottomNav';
@@ -87,7 +87,6 @@ export default function BottomNav() {
   const [hasSession, setHasSession] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
-  const [barWidth, setBarWidth] = useState(0);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: navTranslateY.value }],
@@ -208,18 +207,12 @@ export default function BottomNav() {
 
   const bottomPadding = Math.max(insets.bottom, Platform.OS === 'ios' ? 8 : 7);
 
-  const center = barWidth / 2;
-  // A real transparent cradle: the screen remains visible around the raised button.
-  const cradlePath = `M 28 0 H ${center - 40} C ${center - 32} 0 ${center - 34} 36 ${center} 36 C ${center + 34} 36 ${center + 32} 0 ${center + 40} 0 H ${barWidth - 28} Q ${barWidth} 0 ${barWidth} 28 V 42 Q ${barWidth} 70 ${barWidth - 28} 70 H 28 Q 0 70 0 42 V 28 Q 0 0 28 0 Z`;
-
   return (
     <Animated.View pointerEvents="box-none" style={[styles.dock, { paddingBottom: bottomPadding }, animatedStyle]}>
-      <View style={styles.surface} onLayout={event => setBarWidth(event.nativeEvent.layout.width)}>
-        {barWidth > 0 && (
-          <Svg pointerEvents="none" accessible={false} width={barWidth} height={70} style={styles.background}>
-            <Path d={cradlePath} fill="#ffffff" />
-          </Svg>
-        )}
+      <View style={styles.surface}>
+        <View pointerEvents="none" style={styles.background}>
+          <Image accessible={false} source={require('../assets/navigation/bottom-bar-glass.png')} resizeMode="stretch" style={styles.glassImage} />
+        </View>
         <View style={styles.row}>
           {TABS.map((tab) => {
             const isCreate = tab.kind === 'create';
@@ -239,7 +232,8 @@ export default function BottomNav() {
               >
                 {isCreate ? (
                   <View style={styles.createButton}>
-                    <Icon size={27} color="#ffffff" strokeWidth={2.7} />
+                    <View pointerEvents="none" style={styles.createArtwork}><Image accessible={false} source={require('../assets/navigation/create-button-glass.png')} resizeMode="contain" style={styles.glassImage} /></View>
+                    <View pointerEvents="none" style={styles.createForeground}><Icon size={27} color="#ffffff" strokeWidth={2.7} /></View>
                   </View>
                 ) : (
                   <View style={styles.iconWrap}>
@@ -281,8 +275,11 @@ const styles = StyleSheet.create({
       default: {},
     }),
   },
-  background: { position: 'absolute', top: 28, left: 0 },
+  background: { position: 'absolute', top: -22, left: '-2%', width: '104%', height: 170, zIndex: 0 },
+  glassImage: { width: '100%', height: '100%' },
   row: {
+    position: 'relative',
+    zIndex: 1,
     height: 98,
     paddingTop: 28,
     // Keep the Arabic order identical with or without native RTL enabled.
@@ -312,15 +309,12 @@ const styles = StyleSheet.create({
     width: 54,
     height: 54,
     borderRadius: 27,
-    backgroundColor: '#047857',
+    backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
-    ...Platform.select({
-      ios: { shadowColor: '#047857', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.20, shadowRadius: 7 },
-      android: { elevation: 5 },
-      web: { boxShadow: '0px 4px 14px rgba(4,120,87,0.20)' } as any,
-    }),
   },
+  createArtwork: { position: 'absolute', width: 66, height: 66, top: -6, left: -6, zIndex: 0 },
+  createForeground: { position: 'relative', zIndex: 1, alignItems: 'center', justifyContent: 'center' },
   label: { fontSize: 11, lineHeight: 15, fontWeight: '500', color: '#64748b', textAlign: 'center', writingDirection: 'rtl' },
   labelActive: { color: '#047857', fontWeight: '600' },
   activeDot: { position: 'absolute', bottom: 0, width: 4, height: 4, borderRadius: 2, backgroundColor: '#047857' },

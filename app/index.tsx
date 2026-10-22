@@ -1,3 +1,5 @@
+import { GlassIconArtwork } from '@/components/shared/GlassIconArtwork';
+import { HeaderArtwork } from '@/components/shared/HeaderArtwork';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator, Image, ImageBackground, Platform, Pressable,
@@ -108,14 +110,15 @@ export default function Index() {
           <LinearGradient colors={['rgba(245,243,233,0)', '#F5F3E9']} style={styles.headerFade} />
         </ImageBackground>
         </View>
+        <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: Math.max(insets.top, 12) + (compact ? 96 : 124) }}><HeaderArtwork /></View>
         <View
           style={[styles.content, { paddingTop: Math.max(insets.top, 12), paddingBottom: Math.max(insets.bottom, 12) }, compact && styles.compact]}
         >
           <View style={styles.topRow}>
-            <Pressable accessibilityRole="button" accessibilityLabel="تصفح كزائر" onPress={() => router.replace('/home')} style={styles.guestTop}>
+            <Pressable accessibilityRole="button" accessibilityLabel="تصفح كزائر" onPress={() => router.replace('/home')} style={[styles.guestTop, { backgroundColor: 'transparent', borderWidth: 0 }]}><GlassIconArtwork /><View style={{ position: 'relative', zIndex: 2, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
               <UsersRound size={17} color="#166044" />
               <Text style={styles.guestTopText}>الدخول كزائر</Text>
-            </Pressable>
+            </View></Pressable>
           </View>
 
           <View pointerEvents="none" style={[styles.hero, { top: Math.max(insets.top, 12) }, compact && styles.heroCompact]}>

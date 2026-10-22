@@ -1,3 +1,5 @@
+import { GlassIconArtwork } from './GlassIconArtwork';
+import { HeaderArtwork } from './HeaderArtwork';
 import React, { useState, type ReactNode } from 'react';
 import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, View, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
 import { router } from 'expo-router';
@@ -23,6 +25,7 @@ export function useAppHeaderHeight() {
 export function AppHeaderFrame({ children, tone = 'light', safeArea = true, style }: { children: ReactNode; tone?: HeaderTone; safeArea?: boolean; style?: StyleProp<ViewStyle> }) {
   const insets = useSafeAreaInsets();
   return <View testID="app-header" style={[styles.container, tone === 'overlay' && styles.overlay, { paddingTop: safeArea ? headerTopInset(insets.top) : 0 }, style]}>
+    <HeaderArtwork dark={tone === 'overlay'} />
     <View testID="app-header-content" style={styles.content}>{children}</View>
   </View>;
 }
@@ -38,7 +41,17 @@ function actionContent(children: ReactNode, color: string): ReactNode {
   });
 }
 export function HeaderAction({ children, style, tone = 'light', bare = true, ...props }: PressableProps & { children: ReactNode; tone?: HeaderTone; bare?: boolean }) {
-  return <Pressable {...props} accessibilityRole="button" hitSlop={0} style={state => [styles.actionButton, bare && styles.bareAction, typeof style === 'function' ? style(state) : style, tone === 'overlay' && styles.overlayButton, (state.pressed || props.disabled) && styles.pressed]}>{actionContent(children, tone === 'overlay' ? '#ffffff' : '#047857')}</Pressable>;
+  return <Pressable {...props} accessibilityRole="button" hitSlop={0} style={state => [styles.actionButton, bare && styles.bareAction, typeof style === 'function' ? style(state) : style, styles.glassAction, (state.pressed || props.disabled) && styles.pressed]}><GlassIconArtwork /><View style={styles.actionForeground}>{actionContent(children, '#047857')}</View></Pressable>;
+}
+
+function decorateHeaderActions(children: ReactNode): ReactNode {
+  return React.Children.map(children, child => {
+    if (!React.isValidElement(child)) return child;
+    const element = child as React.ReactElement<PressableProps & { children?: ReactNode }>;
+    if (element.type === React.Fragment) return <React.Fragment>{decorateHeaderActions(element.props.children)}</React.Fragment>;
+    if (element.type === Pressable) return <HeaderAction {...element.props}>{element.props.children}</HeaderAction>;
+    return child;
+  });
 }
 
 export interface AppHeaderProps {
@@ -88,14 +101,14 @@ export function AppHeader({ variant = 'sub', title, subtitle, fallbackRoute = '/
   </>;
   return <AppHeaderFrame tone={tone} safeArea={safeArea} style={style}>
     <View style={[styles.side, styles.leading]}>
-      {home ? isGuest ? <HeaderAction style={!dark && styles.homeAction} tone={tone} accessibilityLabel="تسجيل الدخول" onPress={() => router.push('/auth')}><LogIn size={21} color="#047857" /></HeaderAction> : <HeaderAction bare tone={tone} accessibilityLabel="الملف الشخصي" onPress={() => router.push('/profile')}>{avatar(profile?.avatar_url)}</HeaderAction> : showBack ? <HeaderAction tone={tone} accessibilityLabel="رجوع" onPress={goBack}><ChevronRight size={23} color={color} /></HeaderAction> : null}
+      {home ? isGuest ? <HeaderAction tone={tone} accessibilityLabel="تسجيل الدخول" onPress={() => router.push('/auth')}><LogIn size={21} color="#047857" /></HeaderAction> : <HeaderAction bare tone={tone} accessibilityLabel="الملف الشخصي" onPress={() => router.push('/profile')}>{avatar(profile?.avatar_url)}</HeaderAction> : showBack ? <HeaderAction tone={tone} accessibilityLabel="رجوع" onPress={goBack}><ChevronRight size={23} color={color} /></HeaderAction> : null}
     </View>
     {onTitlePress ? <Pressable accessibilityRole="button" accessibilityLabel={displayTitle} onPress={onTitlePress} style={styles.center}>{identity}</Pressable> : <View style={styles.center}>{identity}</View>}
     <View style={styles.side}>
       {home ? !isGuest ? <View style={styles.actions}>
-          <HeaderAction bare={false} style={!dark && styles.homeAction} tone={tone} accessibilityLabel={unreadCount > 0 ? `الإشعارات، ${unreadCount} غير مقروء` : 'الإشعارات'} onPress={() => router.push('/notifications')}><Bell size={20} color={color} />{unreadCount > 0 ? <View style={styles.badge}><Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text></View> : null}</HeaderAction>
-          <HeaderAction bare={false} style={!dark && styles.homeAction} tone={tone} accessibilityLabel={unreadMessagesCount > 0 ? `الدردشة، ${unreadMessagesCount} غير مقروء` : 'الدردشة'} onPress={() => router.push('/messages')}><MessageCircle size={20} color={color} />{unreadMessagesCount > 0 ? <View style={styles.badge}><Text style={styles.badgeText}>{unreadMessagesCount > 99 ? '99+' : unreadMessagesCount}</Text></View> : null}</HeaderAction>
-        </View> : null : <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.actions} style={styles.actionScroll}>{rightAction}</ScrollView>}
+          <HeaderAction bare style={styles.glassIcon} tone={tone} accessibilityLabel={unreadCount > 0 ? `الإشعارات، ${unreadCount} غير مقروء` : 'الإشعارات'} onPress={() => router.push('/notifications')}><Bell size={20} color={color} />{unreadCount > 0 ? <View style={styles.badge}><Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text></View> : null}</HeaderAction>
+          <HeaderAction bare style={styles.glassIcon} tone={tone} accessibilityLabel={unreadMessagesCount > 0 ? `الدردشة، ${unreadMessagesCount} غير مقروء` : 'الدردشة'} onPress={() => router.push('/messages')}><MessageCircle size={20} color={color} />{unreadMessagesCount > 0 ? <View style={styles.badge}><Text style={styles.badgeText}>{unreadMessagesCount > 99 ? '99+' : unreadMessagesCount}</Text></View> : null}</HeaderAction>
+        </View> : null : <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.actions} style={styles.actionScroll}>{decorateHeaderActions(rightAction)}</ScrollView>}
     </View>
   </AppHeaderFrame>;
 }
@@ -113,8 +126,12 @@ const styles = StyleSheet.create({
   lightText: { color: '#fff' }, lightSubtitle: { color: '#e2e8f0' },
   identityRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', minWidth: 0 },
   brand: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 7, maxWidth: '100%' },
-  logo: { width: 36, height: 40, flexShrink: 0 }, avatarRing: { width: 40, height: 40, borderRadius: 20, borderWidth: 1.5, borderColor: '#047857', padding: 2, backgroundColor: '#ffffff', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }, avatar: { width: 32, height: 32, borderRadius: 16 }, avatarFallback: { backgroundColor: '#ecfdf5', alignItems: 'center', justifyContent: 'center' },
-  homeAction: { backgroundColor: '#F2F7F4', borderColor: '#E4EEE7', borderWidth: 1, borderRadius: 14 },
+  logo: { width: 36, height: 40, flexShrink: 0 }, avatarRing: { width: 40, height: 40, borderRadius: 20, borderWidth: 0, padding: 2, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }, avatar: { width: 32, height: 32, borderRadius: 16 }, avatarFallback: { backgroundColor: '#ecfdf5', alignItems: 'center', justifyContent: 'center' },
+  glass: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  glassTexture: { position: 'absolute', width: 50, height: 50, top: -3, left: -3 },
+  glassIcon: { backgroundColor: 'transparent', borderWidth: 0 },
+  glassAction: { backgroundColor: 'transparent', borderWidth: 0, overflow: 'visible' },
+  actionForeground: { position: 'relative', zIndex: 2, width: '100%', height: '100%', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 4 },
   actionScroll: { flexGrow: 0, maxWidth: HEADER_SIDE_WIDTH }, actions: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
   actionButton: { height: HEADER_ACTION_SIZE, minHeight: HEADER_ACTION_SIZE, minWidth: HEADER_ACTION_SIZE, paddingVertical: 0, paddingHorizontal: 8, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row-reverse', gap: 4, backgroundColor: '#ecfdf5', borderWidth: 1, borderColor: '#a7f3d0', flexShrink: 0 },
   bareAction: { backgroundColor: 'transparent', borderWidth: 0, paddingHorizontal: 0, borderRadius: 22 },
