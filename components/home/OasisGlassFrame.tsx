@@ -33,5 +33,5 @@ export default function OasisGlassFrame({ children, style, variant = 'weather' }
 const styles = StyleSheet.create({
   outer: { position: 'relative', overflow: 'hidden', borderRadius: 25, backgroundColor: 'rgba(240,250,246,0.35)', minHeight: 54 },
   image: { borderRadius: 25 },
-  content: { flex: 1, justifyContent: 'center' },
+  content: { flex: 1, justifyContent: 'center', paddingTop: 12 },
 });
