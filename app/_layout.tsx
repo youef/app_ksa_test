@@ -89,7 +89,8 @@ function RootContent() {
           body:has(#hayna-app-wallpaper) { background-color: #f9fcf8; }
           body:has(#hayna-app-wallpaper) #root { background: transparent !important; }
           body:has(#hayna-app-wallpaper) #root > div { background-color: transparent !important; }
-          #hayna-app-wallpaper { position: fixed; inset: 0; z-index: -1; pointer-events: none; background: #f9fcf8 url('/images/backgrounds/hayna-heritage-bg.png') center center / cover no-repeat; }
+          body:has(#hayna-app-wallpaper) #root > div:not(#hayna-app-wallpaper) { position: relative; z-index: 1; }
+          #hayna-app-wallpaper { position: fixed; inset: 0; z-index: 0; pointer-events: none; background: #f9fcf8 url('/images/backgrounds/hayna-heritage-bg.png') center center / cover no-repeat; }
           input, textarea, select { font-size: 16px !important; }
           input:focus, textarea:focus, select:focus { font-size: 16px !important; }
         `}</style>
