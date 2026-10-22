@@ -85,12 +85,9 @@ function RootContent() {
           @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700;800&display=swap');
           html, body { width: 100%; min-height: 100%; -webkit-text-size-adjust: 100%; font-family: 'IBM Plex Sans Arabic', sans-serif; }
           body, #root, #root * { font-family: 'IBM Plex Sans Arabic', sans-serif; }
-          /* Shared HAYNA heritage wallpaper: all standard app pages, excluding welcome and login. */
-          body:has(#hayna-app-wallpaper) { background-color: #f9fcf8; }
-          body:has(#hayna-app-wallpaper) #root { background: transparent !important; }
-          body:has(#hayna-app-wallpaper) #root > div { background-color: transparent !important; }
-          body:has(#hayna-app-wallpaper) #root > div:not(#hayna-app-wallpaper) { position: relative; z-index: 1; }
-          #hayna-app-wallpaper { position: fixed; inset: 0; z-index: 0; pointer-events: none; background: #f9fcf8 url('/images/backgrounds/hayna-heritage-bg.png') center center / cover no-repeat; }
+          /* Web fallback for the real shared background layer. */
+          html, body, #root { background-color: #f9fcf8; }
+          #root { isolation: isolate; }
           input, textarea, select { font-size: 16px !important; }
           input:focus, textarea:focus, select:focus { font-size: 16px !important; }
         `}</style>
