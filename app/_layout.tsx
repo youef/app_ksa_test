@@ -82,7 +82,9 @@ function RootContent() {
         <meta name="description" content={branding.description || 'منصة أهل الحي للتواصل والخدمات المحلية'} />
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <style type="text/css">{`
-          html, body { width: 100%; min-height: 100%; -webkit-text-size-adjust: 100%; }
+          @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700;800&display=swap');
+          html, body { width: 100%; min-height: 100%; -webkit-text-size-adjust: 100%; font-family: 'IBM Plex Sans Arabic', sans-serif; }
+          body, #root, #root * { font-family: 'IBM Plex Sans Arabic', sans-serif; }
           input, textarea, select { font-size: 16px !important; }
           input:focus, textarea:focus, select:focus { font-size: 16px !important; }
         `}</style>
