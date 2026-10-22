@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Platform, Pressable, Text, View } from 'react-native';
+import { ImageBackground, Platform, Pressable, Text, View } from 'react-native';
 import { Redirect, router, Stack, usePathname } from 'expo-router';
 import Head from 'expo-router/head';
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
@@ -95,11 +95,19 @@ function RootContent() {
           input:focus, textarea:focus, select:focus { font-size: 16px !important; }
         `}</style>
       </Head>
-      {Platform.OS === 'web' && !['/auth', '/login', '/welcome', '/onboarding', '/register', '/signup'].some(route => path === route || path.startsWith(route + '/')) && <View nativeID="hayna-app-wallpaper" style={{ position: 'absolute', width: 0, height: 0 }} />}
+
       <SafeAreaProvider initialMetrics={initialWindowMetrics}>
         <DynamicIslandProvider>
           <DialogProvider>
-            <View style={{ flex: 1 }}>
+            <View style={{ flex: 1, position: 'relative' }}>
+              {!['/auth', '/login', '/welcome', '/onboarding', '/register', '/signup'].some(route => path === route || path.startsWith(route + '/')) && (
+                <ImageBackground
+                  source={Platform.OS === 'web' ? { uri: '/images/backgrounds/hayna-heritage-bg.png' } : { uri: 'https://appksatest.vercel.app/images/backgrounds/hayna-heritage-bg.png' }}
+                  resizeMode="cover"
+                  style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}
+                  imageStyle={{ opacity: 0.72 }}
+                />
+              )}
               {!configReady ? <View style={{ flex: 1, backgroundColor: C.bg }} /> : maintenance.enabled && sessionReady && !isAdmin && path !== '/auth' ? <View style={{ flex: 1, backgroundColor: '#f8fafc', alignItems: 'center', justifyContent: 'center', padding: 28 }}><Text style={{ fontSize: 42 }}>🛠️</Text><Text style={{ fontSize: 24, fontWeight: '900', color: '#0f172a', marginTop: 14 }}>نعتذر، المنصة تحت الصيانة</Text><Text style={{ fontSize: 15, color: '#64748b', textAlign: 'center', lineHeight: 25, marginTop: 10 }}>{maintenance.message || 'نعمل على تحسين تجربتكم، يرجى العودة لاحقاً.'}</Text><Pressable onPress={() => router.push('/auth')} style={{ marginTop: 24, backgroundColor: '#059669', paddingHorizontal: 22, paddingVertical: 12, borderRadius: 14 }}><Text style={{ color: '#fff', fontWeight: '800' }}>دخول المدير</Text></Pressable></View> : maintenance.enabled && isAdmin && path !== '/admin' ? <Redirect href="/admin" /> : protectCurrentRoute ? (sessionReady ? <Redirect href="/auth" /> : <View style={{ flex: 1, backgroundColor: C.bg }} />) : routeBlocked ? <Redirect href="/home" /> : (
                 <Stack
                   screenOptions={{
