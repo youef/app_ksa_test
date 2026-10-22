@@ -20,10 +20,10 @@ export default function AtmosphereBar({ weather, weatherLoading, compact = false
 
   return (
     <OasisGlassFrame style={{ flex: compact ? 1 : undefined, minHeight: compact ? 54 : 62 }}>
-    <Pressable onPress={() => router.push('/weather')} accessibilityRole="button" accessibilityLabel="فتح صفحة الطقس" style={[styles.atmosphereBar, compact && { marginHorizontal: 0, marginTop: 0, marginBottom: 0, paddingHorizontal: 8, paddingVertical: 7, minHeight: 54, borderRadius: 14, flex: 1 }, { justifyContent: 'flex-start', backgroundColor: 'transparent', borderWidth: 0 }]}>
-      <View style={[styles.atmoItem, { flex: 1, minWidth: 0 }]}>
+    <Pressable onPress={() => router.push('/weather')} accessibilityRole="button" accessibilityLabel="فتح صفحة الطقس" style={[styles.atmosphereBar, compact && { marginHorizontal: 0, marginTop: 0, marginBottom: 0, paddingHorizontal: 18, paddingVertical: 0, minHeight: 54, borderRadius: 14, flex: 1 }, { justifyContent: 'center', alignItems: 'center', backgroundColor: 'transparent', borderWidth: 0 }]}>
+      <View style={[styles.atmoItem, { flex: 1, minWidth: 0, alignItems: 'center', justifyContent: 'center', flexDirection: 'row-reverse', gap: 5 }]}>
         <CloudSun size={16} color="#059669" />
-        <Text style={[styles.atmoText, compact && { fontSize: 10.5, flexShrink: 1 }]} numberOfLines={compact ? 2 : 1}>{compact && weather ? `${Math.round(weather.temperature)}° · ${describeWeatherCode(weather.weatherCode)}` : weatherText}</Text>
+        <Text style={[styles.atmoText, compact && { fontSize: 11, flexShrink: 1, textAlign: 'center', lineHeight: 16 }]} numberOfLines={1}>{compact && weather ? `${Math.round(weather.temperature)}° · ${describeWeatherCode(weather.weatherCode)}` : weatherText}</Text>
       </View>
     </Pressable>
     </OasisGlassFrame>
