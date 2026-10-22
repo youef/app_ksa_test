@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import OasisGlassFrame from './home/OasisGlassFrame';
 import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 import { Building2, ChevronDown, MapPin } from 'lucide-react-native';
 import { getCurrentDeviceLocation, reverseGeocodeDeviceLocation } from '@/lib/deviceLocation';
@@ -58,12 +59,14 @@ export default function LocationScopeBar({ location, onLocationChanged, compact 
 
   return (
     <View style={{ marginHorizontal: compact ? 0 : 12, marginTop: compact ? 0 : 6, marginBottom: compact ? 0 : 6, alignItems: 'stretch', zIndex: 20, flex: compact ? 1 : undefined }}>
+      <OasisGlassFrame style={{ minHeight: compact ? 54 : 46 }}>
       <Pressable onPress={() => setOpen((value) => !value)} accessibilityRole="button" accessibilityState={{ expanded: open }}
-        style={{ minHeight: compact ? 54 : 36, maxWidth: '100%', flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: compact ? 8 : 11, paddingVertical: 7, borderRadius: 14, backgroundColor: '#f7faf8', borderWidth: 1, borderColor: '#dce9e1' }}>
+        style={{ minHeight: compact ? 54 : 36, maxWidth: '100%', flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: compact ? 8 : 11, paddingVertical: 7, borderRadius: 14, backgroundColor: 'transparent', borderWidth: 0 }}>
         <MapPin size={15} color="#176b52" />
         <Text numberOfLines={compact ? 2 : 1} style={{ color: '#345348', fontSize: compact ? 10.5 : 12, fontWeight: '800', flexShrink: 1, textAlign: 'right' }}>{title}</Text>
         <ChevronDown size={14} color="#176b52" />
       </Pressable>
+      </OasisGlassFrame>
       {open && (
         <View style={{ marginTop: 5, width: 180, padding: 5, borderRadius: 12, backgroundColor: '#fff', borderWidth: 1, borderColor: '#dce9e1', elevation: 4, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 8, shadowOffset: { width: 0, height: 3 } }}>
           <Pressable onPress={() => { setOpen(false); void chooseScope('district'); }} disabled={Boolean(busy)} accessibilityRole="button" accessibilityState={{ selected: districtMode, disabled: Boolean(busy) }}
