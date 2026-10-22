@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import OasisGlassFrame from './home/OasisGlassFrame';
-import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Pressable, Text, View } from 'react-native';
 import { Building2, ChevronDown, MapPin } from 'lucide-react-native';
 import { getCurrentDeviceLocation, reverseGeocodeDeviceLocation } from '@/lib/deviceLocation';
 import { savePermanentMyLocation, type HaynaLocation } from '@/lib/locationSync';
@@ -59,16 +59,19 @@ export default function LocationScopeBar({ location, onLocationChanged, compact 
 
   return (
     <View style={{ marginHorizontal: compact ? 0 : 12, marginTop: compact ? 0 : 6, marginBottom: compact ? 0 : 6, alignItems: 'stretch', zIndex: 20, flex: compact ? 1 : undefined }}>
-      <OasisGlassFrame variant="location" style={{ minHeight: compact ? 54 : 46 }}>
+      <OasisGlassFrame variant="location" style={{ height: compact ? 68 : 68 }}>
       <Pressable onPress={() => setOpen((value) => !value)} accessibilityRole="button" accessibilityState={{ expanded: open }}
-        style={{ minHeight: compact ? 54 : 36, width: '100%', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: compact ? 20 : 14, paddingVertical: 0, borderRadius: 14, backgroundColor: 'transparent', borderWidth: 0 }}>
+        style={{ height: compact ? 68 : 68, width: '100%', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: compact ? 25 : 18, paddingVertical: 0, borderRadius: 14, backgroundColor: 'transparent', borderWidth: 0 }}>
         <MapPin size={15} color="#176b52" />
         <Text numberOfLines={1} style={{ color: '#345348', fontSize: compact ? 11 : 12, fontWeight: '800', flexShrink: 1, textAlign: 'center', lineHeight: 17 }}>{title}</Text>
         <ChevronDown size={14} color="#176b52" />
       </Pressable>
       </OasisGlassFrame>
-      {open && (
-        <View style={{ marginTop: 5, width: 180, padding: 5, borderRadius: 12, backgroundColor: '#fff', borderWidth: 1, borderColor: '#dce9e1', elevation: 4, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 8, shadowOffset: { width: 0, height: 3 } }}>
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        <Pressable onPress={() => setOpen(false)} style={{ flex: 1, backgroundColor: 'rgba(8,35,25,0.25)', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+          <Pressable onPress={() => {}} style={{ width: '100%', maxWidth: 320, padding: 14, borderRadius: 20, backgroundColor: '#fff', gap: 8 }}>
+            <Text style={{ fontSize: 15, fontWeight: '800', color: '#064e3b', textAlign: 'center', marginBottom: 8 }}>نطاق الموقع</Text>
+
           <Pressable onPress={() => { setOpen(false); void chooseScope('district'); }} disabled={Boolean(busy)} accessibilityRole="button" accessibilityState={{ selected: districtMode, disabled: Boolean(busy) }}
             style={{ minHeight: 38, flexDirection: 'row-reverse', alignItems: 'center', gap: 8, paddingHorizontal: 9, borderRadius: 8, backgroundColor: districtMode ? '#e8f4ee' : '#fff' }}>
             {busy === 'district' ? <ActivityIndicator size="small" color="#176b52" /> : <MapPin size={15} color="#176b52" />}
@@ -79,8 +82,9 @@ export default function LocationScopeBar({ location, onLocationChanged, compact 
             {busy === 'city' ? <ActivityIndicator size="small" color="#176b52" /> : <Building2 size={15} color="#176b52" />}
             <Text style={{ color: '#345348', fontSize: 12, fontWeight: !districtMode && location.city !== 'كل المدن' ? '900' : '600' }}>المدينة كاملة</Text>
           </Pressable>
-        </View>
-      )}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
