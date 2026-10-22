@@ -19,7 +19,7 @@ export const styles = StyleSheet.create({
   locationPromptHelp: { marginTop: 14, fontSize: 11.5, color: '#059669', fontWeight: '800', textAlign: 'center' },
   container: {
     flex: 1,
-    backgroundColor: '#eaf3ee',
+    backgroundColor: 'transparent',
   },
   hero: {
     width: '100%',
