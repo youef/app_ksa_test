@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Alert, Pressable, StyleSheet, Text, TextInput, View, KeyboardAvoidingView, Platform, ScrollView, Image, ImageBackground } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
+import { isAllKingdom } from '@/lib/locationSync';
+import { isKnownSaudiCity } from '@/lib/saudiLocations';
 import { getBrandingLogo, FALLBACK_LOGO_URI, subscribeBrandingLogo, getCachedBrandingLogo } from '@/lib/branding';
 import { Mail, Lock, User, ArrowRight, Compass, ShieldCheck } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -59,7 +61,7 @@ export default function Auth() {
           options: { data: { username: username.trim(), display_name: username.trim() } }
         });
         if (r.error) throw r.error;
-        if (r.data.session) router.replace('/home');
+        if (r.data.session) router.replace('/set-location');
         else Alert.alert('نجاح', 'تم التسجيل بنجاح. يرجى مراجعة بريدك الإلكتروني لتفعيله إن لزم الأمر.');
       } else {
         const r = await supabase.auth.signInWithPassword({ email: email.trim(), password });
@@ -70,7 +72,8 @@ export default function Auth() {
         const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
         if (sessionError) throw sessionError;
         if (!sessionData.session?.user) throw new Error('تعذر حفظ جلسة الدخول، يرجى المحاولة مرة أخرى.');
-        router.replace('/home');
+        const { data: profile } = await supabase.from('profiles').select('city').eq('id', sessionData.session.user.id).maybeSingle();
+        router.replace(profile?.city && !isAllKingdom(profile.city) && isKnownSaudiCity(profile.city) ? '/home' : '/set-location');
       }
     } catch (e: any) {
       let errorMsg = e.message ?? 'حدث خطأ غير متوقع.';
