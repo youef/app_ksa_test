@@ -1,4 +1,4 @@
-import { AppHeader, HeaderAction, headerTopInset } from '@/components/shared/AppHeader';
+import { headerTopInset } from '@/components/shared/AppHeader';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useEffect, useState, useRef } from 'react';
 import {
@@ -22,7 +22,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/lib/supabase';
 import { requireAccount } from '@/lib/authGate';
 import { LinearGradient } from 'expo-linear-gradient';
-import { X, Send, Eye, Heart, Trash2, ChevronLeft, ChevronRight, Flag, Ban } from 'lucide-react-native';
+import { X, Send, Eye, Heart, Trash2, ChevronLeft, ChevronRight, Flag, Ban, MoreVertical, UserRound } from 'lucide-react-native';
 
 const { width, height } = Dimensions.get('window');
 const STORY_DURATION = 7000; // 7 seconds per story
@@ -597,7 +597,35 @@ export default function StoryViewer() {
           {/* ======================================================== */}
           {/* TOP HEADER                                               */}
           {/* ======================================================== */}
-          {uiVisible && <AppHeader tone="overlay" safeArea={false} variant="chat" title={author?.display_name || author?.username || 'جار'} subtitle={`${currentIndex + 1} / ${storiesList.length} · تنتهي بعد ${timeLeft}س`} avatarUrl={author?.avatar_url} fallbackRoute="/stories" rightAction={<>{isOwn ? <HeaderAction tone="overlay" accessibilityLabel="حذف القصة" onPress={confirmDeleteStory}><Trash2 size={19} color="#fff" /></HeaderAction> : currentUserId ? <HeaderAction tone="overlay" accessibilityLabel="الإبلاغ أو حظر الحساب" onPress={openStorySafetyMenu}><Flag size={19} color="#fff" /></HeaderAction> : null}</>} />}
+          {uiVisible && (
+            <View style={styles.storyOverlayHeader}>
+              <View style={styles.storyOverlayIdentity}>
+                <View style={styles.storyOverlayAvatar}>
+                  {!author?.hide_name && author?.avatar_url
+                    ? <Image source={{ uri: author.avatar_url }} style={styles.storyOverlayAvatarImage} />
+                    : <UserRound size={19} color="#fff" />}
+                </View>
+                <View style={styles.storyOverlayNameBox}>
+                  <Text numberOfLines={1} style={styles.storyOverlayName}>{author?.hide_name ? 'مجهول' : (author?.display_name || author?.username || 'جار')}</Text>
+                  <Text style={styles.storyOverlayMeta}>{currentIndex + 1} / {storiesList.length}</Text>
+                </View>
+              </View>
+              <View style={styles.storyOverlayActions}>
+                {isOwn ? (
+                  <Pressable accessibilityRole="button" accessibilityLabel="حذف اليومية" onPress={confirmDeleteStory} style={styles.storyOverlayIcon}>
+                    <Trash2 size={21} color="#fff" />
+                  </Pressable>
+                ) : currentUserId ? (
+                  <Pressable accessibilityRole="button" accessibilityLabel="خيارات اليومية" onPress={openStorySafetyMenu} style={styles.storyOverlayIcon}>
+                    <MoreVertical size={22} color="#fff" />
+                  </Pressable>
+                ) : null}
+                <Pressable accessibilityRole="button" accessibilityLabel="إغلاق اليومية" onPress={() => router.back()} style={styles.storyOverlayIcon}>
+                  <X size={24} color="#fff" />
+                </Pressable>
+              </View>
+            </View>
+          )}
 
           {/* ======================================================== */}
           {/* INTERACTIVE TAP ZONES (Left / Right Navigation)          */}
@@ -836,6 +864,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 2,
   },
+  storyOverlayHeader: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingTop: 9, paddingBottom: 7, zIndex: 30, backgroundColor: 'transparent' },
+  storyOverlayIdentity: { flexDirection: 'row-reverse', alignItems: 'center', gap: 9, flex: 1, minWidth: 0 },
+  storyOverlayAvatar: { width: 36, height: 36, borderRadius: 18, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.9)', backgroundColor: 'rgba(0,0,0,0.16)', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  storyOverlayAvatarImage: { width: '100%', height: '100%' },
+  storyOverlayNameBox: { flex: 1, alignItems: 'flex-end' },
+  storyOverlayName: { fontSize: 14, color: '#fff', fontWeight: '800', textAlign: 'right' },
+  storyOverlayMeta: { fontSize: 11, color: 'rgba(255,255,255,0.8)', textAlign: 'right', marginTop: 2 },
+  storyOverlayActions: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5 },
+  storyOverlayIcon: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
   header: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
