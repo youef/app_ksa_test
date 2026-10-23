@@ -1,4 +1,5 @@
-import { AppHeader, HeaderAction } from '@/components/shared/AppHeader';
+import { HeaderAction } from '@/components/shared/AppHeader';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useCallback, useEffect } from 'react';
 import {
   Alert,
@@ -51,6 +52,7 @@ const WHATSAPP_FONTS = [
 const STORY_TEXT_COLORS = ['#FFFFFF', '#111827', '#F87171', '#FBBF24', '#34D399', '#60A5FA', '#C084FC', '#FB7185'];
 
 export default function CreateStory() {
+  const safeInsets = useSafeAreaInsets();
   const composer = useStoryComposer();
   const publisher = useStoryPublisher();
   const { activeSlide } = composer;
@@ -264,24 +266,20 @@ export default function CreateStory() {
           )}
 
           {/* Top WhatsApp Status Bar */}
-          <AppHeader tone="overlay" title="إنشاء قصة" fallbackRoute="/stories" titleContent={<View style={s.modeSwitcherPill}>
-              <Pressable
-                onPress={() => composer.setActiveSlideType('text')}
-                style={[s.modeOption, !isImageSlide && s.modeOptionActive]}
-              >
-                <Text style={[s.modeOptionText, !isImageSlide && s.modeOptionTextActive]}>
-                  نص
-                </Text>
+          <View style={[s.composerTopBar, { paddingTop: Math.max(12, safeInsets.top + 4) }]}>
+            <Pressable onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="إغلاق إنشاء اليومية" style={s.composerCloseButton}>
+              <X size={24} color="#fff" />
+            </Pressable>
+            <View style={s.modeSwitcherPill}>
+              <Pressable onPress={() => composer.setActiveSlideType('text')} style={[s.modeOption, !isImageSlide && s.modeOptionActive]} accessibilityRole="button" accessibilityLabel="يومية نصية">
+                <Text style={[s.modeOptionText, !isImageSlide && s.modeOptionTextActive]}>نص</Text>
               </Pressable>
-              <Pressable
-                onPress={() => composer.setActiveSlideType('image')}
-                style={[s.modeOption, isImageSlide && s.modeOptionActive]}
-              >
-                <Text style={[s.modeOptionText, isImageSlide && s.modeOptionTextActive]}>
-                  صورة
-                </Text>
+              <Pressable onPress={() => composer.setActiveSlideType('image')} style={[s.modeOption, isImageSlide && s.modeOptionActive]} accessibilityRole="button" accessibilityLabel="يومية مصورة">
+                <Text style={[s.modeOptionText, isImageSlide && s.modeOptionTextActive]}>صورة</Text>
               </Pressable>
-            </View>} />
+            </View>
+            <View style={s.composerTopSpacer} />
+          </View>
           <View style={{paddingHorizontal: 16, alignItems: 'flex-end'}}><View style={s.topToolsRow}>
               {!isImageSlide ? (
                 <>
@@ -712,6 +710,9 @@ export default function CreateStory() {
 }
 
 const s = StyleSheet.create({
+  composerTopBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingBottom: 8, backgroundColor: 'transparent', zIndex: 20 },
+  composerCloseButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  composerTopSpacer: { width: 40, height: 40 },
   container: {
     flex: 1,
     backgroundColor: '#000',
