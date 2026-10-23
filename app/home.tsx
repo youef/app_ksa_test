@@ -246,14 +246,14 @@ export default function Home() {
                 ['engaged', 'الأكثر تفاعلاً'],
                 ['nearby', 'الأقرب'],
               ] as const).map(([key, label]) => (
-                <Pressable key={key} onPress={() => setSortBy(key)} style={{ minHeight: 44, minWidth: key === 'engaged' ? 100 : 76, borderRadius: 14, overflow: 'hidden', justifyContent: 'center' }} accessibilityRole="button" accessibilityState={{ selected: sortBy === key }}>
+                <Pressable key={key} onPress={() => setSortBy(key)} style={{ height: 44, width: 98, borderRadius: 22, overflow: 'hidden', justifyContent: 'center' }} accessibilityRole="button" accessibilityState={{ selected: sortBy === key }}>
                   {sortBy === key ? (
-                    <ImageBackground source={{ uri: Platform.OS === 'web' ? '/images/buttons/sort-active-bg.png' : 'https://appksatest.vercel.app/images/buttons/sort-active-bg.png' }} resizeMode="stretch" style={{ minHeight: 44, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 12, backgroundColor: '#e7f5ed' }}>
+                    <ImageBackground source={{ uri: Platform.OS === 'web' ? '/images/buttons/sort-active-bg.png' : 'https://appksatest.vercel.app/images/buttons/sort-active-bg.png' }} resizeMode="stretch" style={{ height: 44, width: '100%', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 8, backgroundColor: '#e7f5ed' }}>
                       <Text style={{ color: '#064e3b', fontSize: 12, fontWeight: '900' }}>{label}</Text>
                     </ImageBackground>
                   ) : (
-                    <View style={{ minHeight: 44, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 12 }}>
-                      <Text style={{ color: '#78857f', fontSize: 12, fontWeight: '800' }}>{label}</Text>
+                    <View style={{ height: 44, width: '100%', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 8 }}>
+                      <Text style={{ color: '#78857f', fontSize: 12, fontWeight: '900' }}>{label}</Text>
                     </View>
                   )}
                 </Pressable>
