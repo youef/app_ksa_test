@@ -213,7 +213,7 @@ export default function StoriesScreen() {
       <ImageBackground source={{ uri: Platform.OS === 'web' ? '/welcome/hayna-heritage-bg.png' : 'https://appksatest.vercel.app/welcome/hayna-heritage-bg.png' }} resizeMode="cover" pointerEvents="none" style={StyleSheet.absoluteFillObject} imageStyle={{ opacity: 0.15 }} />
       <AppHeader
         variant="sub"
-        title="يوميات أهل الحي"
+        title="اليوميات"
         fallbackRoute="/home"
         rightAction={
           <Pressable
@@ -229,11 +229,7 @@ export default function StoriesScreen() {
 
       <View style={styles.ringsSection}>
         <Image source={{ uri: Platform.OS === 'web' ? '/welcome/hayna-stories-background.png' : 'https://appksatest.vercel.app/welcome/hayna-stories-background.png' }} resizeMode="cover" pointerEvents="none" style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%', opacity: 0.55 }]} />
-          <View style={styles.sectionHeadingRow}>
-            <View style={{ alignItems: 'flex-end', flex: 1 }}>
-              <Text style={styles.sectionHeading}>يوميات أهل الحي</Text>
-            </View>
-          </View>
+
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.ringsScroll}>
             <Pressable style={styles.ringItem} accessibilityRole="button" accessibilityLabel="أضف يومياتك" onPress={() => router.push(needsLogin ? '/auth' : '/create-story')}><View style={[styles.ringOuter, styles.ringSeen]}><Plus size={27} color="#059669" /></View><Text style={styles.ringName}>أضف يومياتك</Text></Pressable>
             {storyRings.map((group: any) => {
