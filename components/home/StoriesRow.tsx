@@ -15,14 +15,15 @@ export default function StoriesRow({ profile, stories, selectedDistrict }: Props
   const visibleStories = stories.slice(0, 4);
 
   return (
-    <View style={[styles.storiesContainer, { position: 'relative', overflow: 'hidden' }]}>
+    <View style={[styles.storiesContainer, { position: 'relative', overflow: 'hidden', backgroundColor: 'transparent', borderBottomWidth: 0, justifyContent: 'center' }]}>
       <ImageBackground
         source={{ uri: Platform.OS === 'web' ? '/welcome/hayna-stories-background.png' : 'https://appksatest.vercel.app/welcome/hayna-stories-background.png' }}
         resizeMode="stretch"
         pointerEvents="none"
         style={StyleSheet.absoluteFillObject}
+        imageStyle={{ opacity: 1 }}
       />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.storiesScroll}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.storiesScroll, { flexGrow: 1, justifyContent: 'center', alignItems: 'center' }]}>
         {visibleStories.map(story => {
           const authorName = story.profiles?.display_name || story.profiles?.username || 'جار';
           const avatarUrl = story.profiles?.avatar_url;
@@ -90,7 +91,7 @@ export default function StoriesRow({ profile, stories, selectedDistrict }: Props
             <ChevronLeft size={22} color="#059669" />
           </View>
           <Text style={styles.storyName}>المزيد</Text>
-          <Text style={styles.storyDistrictSub}>كل اليوميات</Text>
+
         </Pressable>
       </ScrollView>
     </View>
