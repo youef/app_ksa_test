@@ -184,6 +184,7 @@ export function useStoryComposer() {
     removeSlide,
     pickImages,
     takePhoto,
+    cropActiveImage,
     setActiveSlideType,
   };
 }
