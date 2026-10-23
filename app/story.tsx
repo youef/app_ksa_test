@@ -29,7 +29,7 @@ const STORY_DURATION = 7000; // 7 seconds per story
 
 export default function StoryViewer() {
   const headerInsets = useSafeAreaInsets();
-  const { id, resume } = useLocalSearchParams<{ id: string; resume?: string }>();
+  const { id, resume, next } = useLocalSearchParams<{ id: string; resume?: string; next?: string }>();
   const [storiesList, setStoriesList] = useState<any[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [author, setAuthor] = useState<any>(null);
@@ -381,7 +381,9 @@ export default function StoryViewer() {
     if (currentIndex < storiesList.length - 1) {
       setCurrentIndex(prev => prev + 1);
     } else {
-      router.back();
+      const queue = typeof next === 'string' ? next.split(',').filter(Boolean) : [];
+      if (queue.length) router.replace({ pathname: '/story', params: { id: queue[0], next: queue.slice(1).join(',') } });
+      else router.back();
     }
   }
 
