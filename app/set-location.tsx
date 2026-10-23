@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import * as Location from 'expo-location';
 import { MapPin, LocateFixed, ShieldCheck, ArrowLeft, RefreshCw } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
-import { savePermanentMyLocation, getPermanentMyLocation, isAllKingdom } from '@/lib/locationSync';
+import { savePermanentMyLocation, isAllKingdom } from '@/lib/locationSync';
 import { isInsideSaudiArabia, isKnownSaudiCity, SAUDI_REGIONS } from '@/lib/saudiLocations';
 
 const ENGLISH_CITIES: Record<string, string> = {
@@ -12,30 +12,20 @@ const ENGLISH_CITIES: Record<string, string> = {
   mecca: 'مكة المكرمة', madinah: 'المدينة المنورة', medina: 'المدينة المنورة',
   dammam: 'الدمام', khobar: 'الخبر', alkhobar: 'الخبر', dhahran: 'الظهران',
   arar: 'عرعر', rafha: 'رفحاء', tabuk: 'تبوك', hail: 'حائل',
-  abha: 'أبها', khamis mushait: 'خميس مشيط', taif: 'الطائف',
+  abha: 'أبها', 'khamis mushait': 'خميس مشيط', taif: 'الطائف',
   yanbu: 'ينبع', jubail: 'الجبيل', najran: 'نجران', jazan: 'جازان',
   sakaka: 'سكاكا', buraydah: 'بريدة', unaizah: 'عنيزة',
-  al baha: 'الباحة', al ahsa: 'الأحساء', hofuf: 'الهفوف',
+  'al baha': 'الباحة', 'al ahsa': 'الأحساء', hofuf: 'الهفوف',
 };
-function resolveCity(raw: string, latitude: number, longitude: number): { city: string; region: string } | null {
+function resolveCity(raw: string): { city: string; region: string } | null {
   const cleaned = raw.trim().toLowerCase().replace(/^al[ -]/, '').replace(/[-_]/g, ' ');
   const translated = ENGLISH_CITIES[cleaned] || raw.trim();
   if (isKnownSaudiCity(translated) && translated !== 'المملكة') {
     const matched = SAUDI_REGIONS.find(r => r.cities.some(c => c.name === translated || c.name === 'مدينة ' + translated));
     return { city: matched?.cities.find(c => c.name === translated || c.name === 'مدينة ' + translated)?.name || translated, region: matched?.name || '' };
   }
-  // Reverse geocoding on Safari can return English or administrative names.
-  // Use a nearby verified Saudi city, but never guess a distant location.
-  let nearest: { city: string; region: string; distance: number } | null = null;
-  for (const region of SAUDI_REGIONS) for (const city of region.cities) {
-    if (typeof city.lat !== 'number' || typeof city.lng !== 'number') continue;
-    const a = Math.sin((city.lat - latitude) * Math.PI / 360) ** 2 +
-      Math.cos(latitude * Math.PI / 180) * Math.cos(city.lat * Math.PI / 180) *
-      Math.sin((city.lng - longitude) * Math.PI / 360) ** 2;
-    const distance = 12742 * Math.asin(Math.min(1, Math.sqrt(a)));
-    if (!nearest || distance < nearest.distance) nearest = { city: city.name, region: region.name, distance };
-  }
-  return nearest && nearest.distance <= 35 ? { city: nearest.city, region: nearest.region } : null;
+  // Do not substitute a nearby city: the address must come from GPS reverse geocoding.
+  return null;
 }
 
 export default function SetLocationScreen() {
@@ -68,14 +58,16 @@ export default function SetLocationScreen() {
     try {
       const permission = await Location.requestForegroundPermissionsAsync();
       if (permission.status !== 'granted') throw new Error('يجب السماح بالوصول للموقع من إعدادات الجهاز لإكمال الإعداد.');
-      const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+      const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest });
+      if (position.coords.accuracy != null && position.coords.accuracy > 250) throw new Error('دقة الموقع غير كافية لتحديد الحي. فعّل الموقع الدقيق في إعدادات الجهاز ثم حاول مجددًا.');
       if (!isInsideSaudiArabia(position.coords.latitude, position.coords.longitude)) throw new Error('الخدمة متاحة للمواقع داخل المملكة العربية السعودية فقط.');
       const results = await Location.reverseGeocodeAsync({ latitude: position.coords.latitude, longitude: position.coords.longitude });
       const result = results[0];
-      const resolved = resolveCity(result?.city || result?.subregion || '', position.coords.latitude, position.coords.longitude);
+      const resolved = resolveCity(result?.city || result?.subregion || '');
       const city = resolved?.city || '';
       const region = resolved?.region || result?.region || 'المملكة العربية السعودية';
-      const district = (result?.district || result?.name || 'كل الأحياء').trim();
+      const district = (result?.district || '').trim();
+      if (!district) throw new Error('تعذر تحديد الحي من الموقع الحالي. فعّل الموقع الدقيق ثم أعد المحاولة.');
       if (!city || !isKnownSaudiCity(city)) throw new Error('تم السماح بالموقع، لكن تعذر مطابقة المدينة. فعّل الموقع الدقيق وأعد المحاولة.');
       setLocation({ city, region, district });
     } catch (e) {
