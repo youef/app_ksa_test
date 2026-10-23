@@ -193,16 +193,16 @@ export default function Home() {
   }, [feed.hasMore, feed.loadingMore, feed.loading, feed.loadMore]);
 
   return (
-    <View style={[styles.container, layout.page, Platform.OS === 'web' ? ({ backgroundImage: 'url(/images/backgrounds/hayna-heritage-bg.png)', backgroundSize: 'cover', backgroundPosition: 'center center', backgroundRepeat: 'no-repeat' } as any) : null]}>
-      {Platform.OS !== 'web' && (
-        <ImageBackground
-          source={{ uri: 'https://appksatest.vercel.app/images/backgrounds/hayna-heritage-bg.png' }}
-          resizeMode="cover"
-          pointerEvents="none"
-          style={StyleSheet.absoluteFillObject}
-          imageStyle={{ opacity: 1 }}
-        />
-      )}
+    <View style={[styles.container, layout.page]}>
+      <ImageBackground
+        source={Platform.OS === 'web'
+          ? { uri: '/welcome/welcome-background.png' }
+          : { uri: 'https://appksatest.vercel.app/welcome/welcome-background.png' }}
+        resizeMode="cover"
+        pointerEvents="none"
+        style={StyleSheet.absoluteFillObject}
+        imageStyle={{ opacity: 1 }}
+      />
       <AppHeader
         variant="home"
         profile={feed.profile}
