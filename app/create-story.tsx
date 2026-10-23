@@ -1,6 +1,6 @@
 import { HeaderAction } from '@/components/shared/AppHeader';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   Alert,
   Dimensions,
@@ -14,6 +14,7 @@ import {
   TextInput,
   View,
   ActivityIndicator,
+  PanResponder,
 } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -34,6 +35,9 @@ import {
   Check,
   SlidersHorizontal,
   ShieldCheck,
+  Move,
+  Crop,
+  LayoutTemplate,
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useStoryComposer } from '@/hooks/useStoryComposer';
@@ -49,6 +53,12 @@ const WHATSAPP_FONTS = [
   { id: 'italic', name: 'مائل', fontWeight: '700' as const, fontStyle: 'italic' as const, isPill: false },
 ];
 
+const STORY_TEMPLATES = [
+  { label: 'إعلان', text: 'إعلان لأهل الحي\n\nاكتب تفاصيل الإعلان هنا', gradient: 0, color: '#FFFFFF', size: 30 },
+  { label: 'مناسبة', text: 'مناسبة سعيدة\n\nشارك أهل الحي فرحتك', gradient: 2, color: '#FFFFFF', size: 32 },
+  { label: 'استفسار', text: 'عندي استفسار لأهل الحي\n\n', gradient: 3, color: '#FFFFFF', size: 28 },
+  { label: 'تنبيه', text: 'تنبيه مهم لأهل الحي\n\n', gradient: 1, color: '#FFFFFF', size: 30 },
+] as const;
 const STORY_TEXT_COLORS = ['#FFFFFF', '#111827', '#F87171', '#FBBF24', '#34D399', '#60A5FA', '#C084FC', '#FB7185'];
 
 export default function CreateStory() {
@@ -60,6 +70,7 @@ export default function CreateStory() {
   const [fontIndex, setFontIndex] = useState(0); // default bold
   const [textAlign, setTextAlign] = useState<'center' | 'right' | 'left'>('center');
   const [showPalette, setShowPalette] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
   const [showStoryOptions, setShowStoryOptions] = useState(false);
   const [settingsSection, setSettingsSection] = useState<'privacy' | 'interactive' | 'format'>('privacy');
   const [audience, setAudience] = useState<'public' | 'followers' | 'custom'>('public');
@@ -97,6 +108,32 @@ export default function CreateStory() {
   const [fontSize, setFontSize] = useState(28);
   const [textRotation, setTextRotation] = useState(0);
   const [textOffset, setTextOffset] = useState({ x: 0, y: 0 });
+  const offsetRef = useRef(textOffset);
+  offsetRef.current = textOffset;
+  const dragStart = useRef({ x: 0, y: 0 });
+  const dragResponder = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onPanResponderGrant: () => { dragStart.current = { ...offsetRef.current }; },
+    onPanResponderMove: (_event, gesture) => {
+      setTextOffset({
+        x: Math.max(-140, Math.min(140, dragStart.current.x + gesture.dx)),
+        y: Math.max(-260, Math.min(260, dragStart.current.y + gesture.dy)),
+      });
+    },
+  }), []);
+  const applyTemplate = (template: typeof STORY_TEMPLATES[number]) => {
+    composer.patchActiveSlide({
+      type: 'text',
+      content: template.text,
+      bgGradId: BG_GRADIENTS[template.gradient]?.id || BG_GRADIENTS[0].id,
+    });
+    setTextColor(template.color);
+    setFontSize(template.size);
+    setTextOffset({ x: 0, y: 0 });
+    setTextRotation(0);
+    setShowTemplates(false);
+  };
 
   const withAssetErrors = useCallback(async (fn: () => Promise<unknown>, label: string) => {
     try {
@@ -292,6 +329,9 @@ export default function CreateStory() {
                   >
                     <Palette size={19} color="#fff" />
                   </HeaderAction>
+                  <HeaderAction tone="overlay" onPress={() => setShowTemplates(v => !v)} style={[s.toolIconBtn, showTemplates && s.toolIconBtnActive]} accessibilityRole="button" accessibilityLabel="قوالب جاهزة">
+                    <LayoutTemplate size={19} color="#fff" />
+                  </HeaderAction>
                   <HeaderAction tone="overlay"
                     onPress={handleCycleFont}
                     style={s.toolIconBtn}
@@ -328,6 +368,9 @@ export default function CreateStory() {
                   >
                     <ImageIcon size={19} color="#fff" />
                   </HeaderAction>
+                  {hasImage && <HeaderAction tone="overlay" onPress={() => void withAssetErrors(composer.cropActiveImage, 'قص الصورة')} style={s.toolIconBtn} accessibilityRole="button" accessibilityLabel="قص الصورة بنسبة تسعة إلى ستة عشر">
+                    <Crop size={19} color="#fff" />
+                  </HeaderAction>}
                   <HeaderAction tone="overlay"
                     onPress={handleTakePhoto}
                     style={s.toolIconBtn}
@@ -386,10 +429,26 @@ export default function CreateStory() {
             </View>
           )}
 
+          {showTemplates && !isImageSlide && (
+            <View style={s.templatePanel}>
+              <Text style={s.templateHeading}>قوالب جاهزة</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.templateRow}>
+                {STORY_TEMPLATES.map(template => (
+                  <Pressable key={template.label} onPress={() => applyTemplate(template)} style={s.templateChip} accessibilityRole="button" accessibilityLabel={`قالب ${template.label}`}>
+                    <Text style={s.templateChipText}>{template.label}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          )}
           {/* Central Content Area */}
           <View style={s.centralCanvas}>
             {!isImageSlide ? (
               <View style={[s.textCanvasCard, currentFont.isPill && s.textCanvasCardPill]}>
+                <View {...dragResponder.panHandlers} style={[s.dragHandle, { transform: [{ translateX: textOffset.x }, { translateY: textOffset.y }] }]}>
+                  <Move size={16} color="#fff" />
+                  <Text style={s.dragHandleText}>اسحب لتحريك النص</Text>
+                </View>
                 <TextInput
                   style={[
                     s.whatsAppTextInput,
@@ -710,6 +769,13 @@ export default function CreateStory() {
 }
 
 const s = StyleSheet.create({
+  templatePanel: { marginHorizontal: 14, padding: 10, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.42)', zIndex: 30 },
+  templateHeading: { color: '#fff', fontSize: 12, fontWeight: '800', textAlign: 'right', marginBottom: 7 },
+  templateRow: { flexDirection: 'row-reverse', gap: 8 },
+  templateChip: { paddingHorizontal: 13, paddingVertical: 9, borderRadius: 11, backgroundColor: 'rgba(255,255,255,0.18)' },
+  templateChipText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  dragHandle: { alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 13, paddingVertical: 8, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.35)', zIndex: 12 },
+  dragHandleText: { color: '#fff', fontSize: 11, fontWeight: '700' },
   composerTopBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingBottom: 8, backgroundColor: 'transparent', zIndex: 20 },
   composerCloseButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   composerTopSpacer: { width: 40, height: 40 },
