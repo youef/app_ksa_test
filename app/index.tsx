@@ -157,7 +157,7 @@ const styles = StyleSheet.create({
   panelHandle: { width: 36, height: 4, borderRadius: 3, backgroundColor: '#D5DED7', marginBottom: 12 },
   panelTitle: { color: '#173F30', fontSize: 19, fontWeight: '900', textAlign: 'center' },
   panelSubtitle: { color: '#63766A', fontSize: 12, fontWeight: '600', textAlign: 'center', marginTop: 4, marginBottom: 20 },
-  primaryButton: { width: '100%', minHeight: 54, borderRadius: 18, overflow: 'hidden', backgroundColor: '#176044', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 18 },
+  primaryButton: { width: '100%', minHeight: 54, borderRadius: 18, overflow: 'hidden', backgroundColor: 'transparent', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 18 },
   primaryButtonArtwork: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
   primaryButtonContent: { zIndex: 1 },
   primaryText: { color: '#FFFFFF', fontSize: 17, fontWeight: '900' },
