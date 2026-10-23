@@ -251,10 +251,12 @@ export default function Home() {
                 </Pressable>
               ))}
             </ScrollView>
-            <Pressable onPress={() => { setDraftKind(appliedFilters.kind); setDraftStatus(appliedFilters.status); setDraftPeriod(appliedFilters.period); setFilterOpen(true); }} style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6, minHeight: 44, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 14, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#b7d8c8' }} accessibilityRole="button" accessibilityLabel="تصفية المنشورات">
-              <SlidersHorizontal size={15} color="#176b52" />
-              <Text style={{ color: '#176b52', fontSize: 12, fontWeight: '900' }}>تصفية</Text>
-              {(appliedFilters.kind !== 'الكل' || appliedFilters.status !== 'الكل' || appliedFilters.period !== 'كل الأوقات') && <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#dc2626' }} />}
+            <Pressable onPress={() => { setDraftKind(appliedFilters.kind); setDraftStatus(appliedFilters.status); setDraftPeriod(appliedFilters.period); setFilterOpen(true); }} style={{ minHeight: 44, minWidth: 98, borderRadius: 22, overflow: 'hidden', justifyContent: 'center' }} accessibilityRole="button" accessibilityLabel="تصفية المنشورات">
+              <ImageBackground source={{ uri: Platform.OS === 'web' ? '/images/buttons/filter-glass-bg.svg' : 'https://appksatest.vercel.app/images/buttons/filter-glass-bg.svg' }} resizeMode="stretch" style={{ minHeight: 44, paddingHorizontal: 14, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                <SlidersHorizontal size={15} color="#176b52" />
+                <Text style={{ color: '#176b52', fontSize: 12, fontWeight: '900' }}>تصفية</Text>
+                {(appliedFilters.kind !== 'الكل' || appliedFilters.status !== 'الكل' || appliedFilters.period !== 'كل الأوقات') && <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#dc2626' }} />}
+              </ImageBackground>
             </Pressable>
           </View>
 
