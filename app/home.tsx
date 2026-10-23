@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, ImageBackground, Modal, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SlidersHorizontal, X, Check } from 'lucide-react-native';
+import { SlidersHorizontal, X, Check, Clock3, TrendingUp, MapPin } from 'lucide-react-native';
 
 import { supabase } from '@/lib/supabase';
 import { getBrandingLogo, subscribeBrandingLogo, getCachedBrandingLogo } from '@/lib/branding';
@@ -248,12 +248,14 @@ export default function Home() {
               ] as const).map(([key, label]) => (
                 <Pressable key={key} onPress={() => setSortBy(key)} style={{ height: 44, width: 98, borderRadius: 22, overflow: 'hidden', justifyContent: 'center' }} accessibilityRole="button" accessibilityState={{ selected: sortBy === key }}>
                   {sortBy === key ? (
-                    <ImageBackground source={{ uri: Platform.OS === 'web' ? '/images/buttons/sort-active-bg.png' : 'https://appksatest.vercel.app/images/buttons/sort-active-bg.png' }} resizeMode="stretch" style={{ height: 44, width: 98, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 8, backgroundColor: '#e7f5ed' }}>
-                      <Text style={{ color: '#064e3b', fontSize: 12, fontWeight: '900' }}>{label}</Text>
+                    <ImageBackground source={{ uri: Platform.OS === 'web' ? '/images/buttons/sort-active-bg.png' : 'https://appksatest.vercel.app/images/buttons/sort-active-bg.png' }} resizeMode="stretch" imageStyle={{ height: 34, top: 5, width: 98 }} style={{ height: 44, width: 98, flexDirection: 'row-reverse', justifyContent: 'center', alignItems: 'center', gap: 4, paddingHorizontal: 5 }}>
+                      {key === 'newest' ? <Clock3 size={13} color="#064e3b" /> : key === 'engaged' ? <TrendingUp size={13} color="#064e3b" /> : <MapPin size={13} color="#064e3b" />}
+                      <Text numberOfLines={1} style={{ color: '#064e3b', fontSize: key === 'engaged' ? 10 : 12, fontWeight: '900' }}>{label}</Text>
                     </ImageBackground>
                   ) : (
-                    <View style={{ height: 44, width: '100%', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 8 }}>
-                      <Text style={{ color: '#78857f', fontSize: 12, fontWeight: '900' }}>{label}</Text>
+                    <View style={{ height: 44, width: 98, flexDirection: 'row-reverse', justifyContent: 'center', alignItems: 'center', gap: 4, paddingHorizontal: 5 }}>
+                      {key === 'newest' ? <Clock3 size={13} color="#78857f" /> : key === 'engaged' ? <TrendingUp size={13} color="#78857f" /> : <MapPin size={13} color="#78857f" />}
+                      <Text numberOfLines={1} style={{ color: '#78857f', fontSize: key === 'engaged' ? 10 : 12, fontWeight: '900' }}>{label}</Text>
                     </View>
                   )}
                 </Pressable>
