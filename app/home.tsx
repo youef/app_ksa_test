@@ -1,6 +1,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, ImageBackground, Modal, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SlidersHorizontal, X, Check, Clock3, TrendingUp, MapPin } from 'lucide-react-native';
+import { SlidersHorizontal, X, Check, Clock3, TrendingUp, MapPin, LayoutGrid, HandHelping, PackageOpen, CircleHelp, Store, Siren, UserRound, Hourglass, MessageCircle, CircleCheck, CalendarDays, CalendarRange, CalendarClock, RotateCcw, ListFilter } from 'lucide-react-native';
+
+const FILTER_OPTION_ICONS: Record<string, typeof Check> = {
+  'الكل': LayoutGrid,
+  'مساعدة وطلبات': HandHelping,
+  'إعارة أغراض': PackageOpen,
+  'أسئلة واستفسارات': CircleHelp,
+  'خدمات الحي': Store,
+  'الطوارئ': Siren,
+  'منشوراتي': UserRound,
+  'بانتظار المساعدة': Hourglass,
+  'تم الرد': MessageCircle,
+  'مكتمل': CircleCheck,
+  'كل الأوقات': CalendarDays,
+  'اليوم': Clock3,
+  'هذا الأسبوع': CalendarRange,
+  'هذا الشهر': CalendarClock,
+};
 
 import { supabase } from '@/lib/supabase';
 import { getBrandingLogo, subscribeBrandingLogo, getCachedBrandingLogo } from '@/lib/branding';
@@ -339,9 +356,10 @@ export default function Home() {
                   <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 }}>
                     {section.options.map(option => {
                       const selected = section.value === option;
+                      const OptionIcon = FILTER_OPTION_ICONS[option] || ListFilter;
                       return (
                         <Pressable key={option} onPress={() => section.setter(option)} style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 14, backgroundColor: selected ? '#176b52' : '#ffffff', borderWidth: 1, borderColor: selected ? '#176b52' : '#dbe5df' }} accessibilityRole="button" accessibilityState={{ selected }}>
-                          {selected && <Check size={13} color="#ffffff" />}
+                          <OptionIcon size={14} color={selected ? '#ffffff' : '#176b52'} />
                           <Text style={{ color: selected ? '#ffffff' : '#475569', fontSize: 12, fontWeight: '800' }}>{option}</Text>
                         </Pressable>
                       );
@@ -352,10 +370,10 @@ export default function Home() {
             </ScrollView>
             <View style={{ flexDirection: 'row-reverse', gap: 10, marginTop: 12 }}>
               <Pressable onPress={() => { setDraftKind('الكل'); setDraftStatus('الكل'); setDraftPeriod('كل الأوقات'); setAppliedFilters({ kind: 'الكل', status: 'الكل', period: 'كل الأوقات' }); setFilterOpen(false); }} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 48, borderRadius: 15, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#cbd5e1' }}>
-                <Text style={{ color: '#475569', fontSize: 13, fontWeight: '900' }}>مسح الكل</Text>
+                <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 7 }}><RotateCcw size={16} color="#475569" /><Text style={{ color: '#475569', fontSize: 13, fontWeight: '900' }}>مسح الكل</Text></View>
               </Pressable>
               <Pressable onPress={() => { setAppliedFilters({ kind: draftKind, status: draftStatus, period: draftPeriod }); setFilterOpen(false); }} style={{ flex: 1.4, alignItems: 'center', justifyContent: 'center', minHeight: 48, borderRadius: 15, backgroundColor: '#176b52' }}>
-                <Text style={{ color: '#ffffff', fontSize: 13, fontWeight: '900' }}>اعتماد التصفية</Text>
+                <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 7 }}><Check size={16} color="#ffffff" /><Text style={{ color: '#ffffff', fontSize: 13, fontWeight: '900' }}>اعتماد التصفية</Text></View>
               </Pressable>
             </View>
           </View>
