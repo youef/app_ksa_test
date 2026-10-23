@@ -46,33 +46,78 @@ export default function SetLocationScreen() {
         return;
       }
       setChecking(false);
-      void detect();
+
     })().catch(() => { if (active) { setChecking(false); setError('تعذر التحقق من الحساب. حاول مرة أخرى.'); } });
     return () => { active = false; };
   }, []);
 
-  async function detect() {
+  function detect() {
     if (loading) return;
     setLoading(true);
     setError('');
-    try {
-      const permission = await Location.requestForegroundPermissionsAsync();
-      if (permission.status !== 'granted') throw new Error('يجب السماح بالوصول للموقع من إعدادات الجهاز لإكمال الإعداد.');
-      const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest });
-      if (position.coords.accuracy != null && position.coords.accuracy > 250) throw new Error('دقة الموقع غير كافية لتحديد الحي. فعّل الموقع الدقيق في إعدادات الجهاز ثم حاول مجددًا.');
-      if (!isInsideSaudiArabia(position.coords.latitude, position.coords.longitude)) throw new Error('الخدمة متاحة للمواقع داخل المملكة العربية السعودية فقط.');
-      const results = await Location.reverseGeocodeAsync({ latitude: position.coords.latitude, longitude: position.coords.longitude });
-      const result = results[0];
-      const resolved = resolveCity(result?.city || result?.subregion || '');
-      const city = resolved?.city || '';
-      const region = resolved?.region || result?.region || 'المملكة العربية السعودية';
-      const district = (result?.district || '').trim();
-      if (!district) throw new Error('تعذر تحديد الحي من الموقع الحالي. فعّل الموقع الدقيق ثم أعد المحاولة.');
-      if (!city || !isKnownSaudiCity(city)) throw new Error('تم السماح بالموقع، لكن تعذر مطابقة المدينة. فعّل الموقع الدقيق وأعد المحاولة.');
-      setLocation({ city, region, district });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'تعذر تحديد موقعك، حاول مجددًا.');
-    } finally { setLoading(false); }
+    setLocation(null);
+
+    // On mobile browsers the OS permission prompt must be initiated directly
+    // from a user gesture, not after an awaited Supabase/Expo permission call.
+    const webGeo = Platform.OS === 'web'
+      ? (globalThis as any).navigator?.geolocation
+      : null;
+
+    const obtainPosition: Promise<{ latitude: number; longitude: number; accuracy: number | null }> =
+      Platform.OS === 'web'
+        ? new Promise((resolve, reject) => {
+            if (!webGeo) { reject(new Error('المتصفح لا يدعم تحديد الموقع. افتح الرابط في Safari أو Chrome عبر HTTPS.')); return; }
+            webGeo.getCurrentPosition(
+              (p: any) => resolve({ latitude: p.coords.latitude, longitude: p.coords.longitude, accuracy: p.coords.accuracy }),
+              (e: any) => reject(new Error(e?.code === 1
+                ? 'تم رفض إذن الموقع أو حظره سابقًا. اسمح بالموقع من إعدادات Safari أو Chrome ثم أعد المحاولة.'
+                : e?.code === 3 ? 'انتهت مهلة تحديد الموقع. تأكد من تشغيل خدمات الموقع وحاول مرة أخرى.'
+                : 'تعذر الحصول على إحداثيات الجهاز. تحقق من تشغيل خدمات الموقع.')),
+              { enableHighAccuracy: true, timeout: 25000, maximumAge: 0 }
+            );
+          })
+        : Location.requestForegroundPermissionsAsync().then(async permission => {
+            if (permission.status !== 'granted') throw new Error('يرجى السماح بالوصول للموقع من إعدادات الجهاز.');
+            const p = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest });
+            return { latitude: p.coords.latitude, longitude: p.coords.longitude, accuracy: p.coords.accuracy };
+          });
+
+    void obtainPosition.then(async coords => {
+      if (!isInsideSaudiArabia(coords.latitude, coords.longitude)) {
+        throw new Error('الموقع المستخرج خارج نطاق المملكة العربية السعودية.');
+      }
+      let address: Location.LocationGeocodedAddress | undefined;
+      try {
+        const results = await Location.reverseGeocodeAsync({ latitude: coords.latitude, longitude: coords.longitude });
+        address = results[0];
+      } catch { /* Try the secondary geocoder below. */ }
+
+      let resolved = resolveCity(address?.city || address?.subregion || '');
+      let district = (address?.district || '').trim();
+      let region = resolved?.region || address?.region || '';
+
+      // Some devices return city only; query an address geocoder rather than
+      // guessing a neighborhood from coordinates or a nearby city.
+      if ((!resolved || !district) && Platform.OS === 'web') {
+        try {
+          const url = 'https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&accept-language=ar&zoom=18&lat='
+            + encodeURIComponent(String(coords.latitude)) + '&lon=' + encodeURIComponent(String(coords.longitude));
+          const response = await fetch(url, { headers: { Accept: 'application/json' } });
+          if (response.ok) {
+            const data = await response.json();
+            const addr = data?.address || {};
+            resolved = resolved || resolveCity(addr.city || addr.town || addr.village || addr.municipality || '');
+            district = district || String(addr.suburb || addr.neighbourhood || addr.quarter || addr.residential || '').trim();
+            region = resolved?.region || region || String(addr.state || '');
+          }
+        } catch { /* Show verified city without inventing a district. */ }
+      }
+
+      if (!resolved) throw new Error('تم الحصول على إحداثياتك، لكن تعذر تحديد اسم المدينة من خدمات العناوين. حاول مجددًا.');
+      setLocation({ city: resolved.city, region: resolved.region || region || 'المملكة العربية السعودية', district });
+    }).catch(e => {
+      setError(e instanceof Error ? e.message : 'تعذر استخراج الموقع، حاول مجددًا.');
+    }).finally(() => setLoading(false));
   }
 
   async function confirm() {
@@ -97,7 +142,7 @@ export default function SetLocationScreen() {
         <Text style={styles.heading}>موقعك أولًا</Text>
         <Text style={styles.body}>نستخدم موقعك لتحديد مدينتك وحيّك وعرض اليوميات والخدمات القريبة منك. هذه الخطوة مطلوبة قبل الدخول للصفحة الرئيسية.</Text>
         {checking ? <ActivityIndicator color="#047857" style={{ marginVertical: 22 }} /> : <>
-          {location ? <View style={styles.result}><MapPin size={22} color="#047857" /><View style={{ flex: 1 }}><Text style={styles.city}>{location.city}</Text><Text style={styles.district}>{location.district} · {location.region}</Text></View></View> : null}
+          {location ? <View style={styles.result}><MapPin size={22} color="#047857" /><View style={{ flex: 1 }}><Text style={styles.city}>{location.city}</Text><Text style={styles.district}>{location.district ? location.district + ' · ' : 'لم تتوفر تسمية الحي · '}{location.region}</Text></View></View> : null}
           {error ? <Text style={styles.error}>{error}</Text> : null}
           <Pressable accessibilityRole="button" disabled={loading} onPress={location ? confirm : detect} style={[styles.button, loading && { opacity: 0.6 }]}>
             {loading ? <ActivityIndicator color="#fff" /> : location ? <ArrowLeft size={20} color="#fff" /> : <LocateFixed size={20} color="#fff" />}
@@ -111,7 +156,7 @@ export default function SetLocationScreen() {
   </View>;
 }
 const styles = StyleSheet.create({
-  page: { flex: 1, backgroundColor: '#f7fbf7' },
+  page: { flex: 1, backgroundColor: 'transparent' },
   scroll: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: 22, paddingVertical: 55 },
   iconWrap: { width: 82, height: 82, borderRadius: 27, backgroundColor: '#d1fae5', alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
   title: { fontSize: 29, fontWeight: '900', color: '#064e3b', textAlign: 'center' },
