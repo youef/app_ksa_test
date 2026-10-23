@@ -246,8 +246,16 @@ export default function Home() {
                 ['engaged', 'الأكثر تفاعلاً'],
                 ['nearby', 'الأقرب'],
               ] as const).map(([key, label]) => (
-                <Pressable key={key} onPress={() => setSortBy(key)} style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: 10, borderRadius: 12, backgroundColor: sortBy === key ? '#e7efea' : 'transparent' }} accessibilityRole="button" accessibilityState={{ selected: sortBy === key }}>
-                  <Text style={{ color: sortBy === key ? '#176b52' : '#78857f', fontSize: 12, fontWeight: '800' }}>{label}</Text>
+                <Pressable key={key} onPress={() => setSortBy(key)} style={{ minHeight: 44, minWidth: key === 'engaged' ? 100 : 76, borderRadius: 14, overflow: 'hidden', justifyContent: 'center' }} accessibilityRole="button" accessibilityState={{ selected: sortBy === key }}>
+                  {sortBy === key ? (
+                    <ImageBackground source={{ uri: Platform.OS === 'web' ? '/images/buttons/sort-active-bg.png' : 'https://appksatest.vercel.app/images/buttons/sort-active-bg.png' }} resizeMode="stretch" style={{ minHeight: 44, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 12, backgroundColor: '#e7f5ed' }}>
+                      <Text style={{ color: '#064e3b', fontSize: 12, fontWeight: '900' }}>{label}</Text>
+                    </ImageBackground>
+                  ) : (
+                    <View style={{ minHeight: 44, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 12 }}>
+                      <Text style={{ color: '#78857f', fontSize: 12, fontWeight: '800' }}>{label}</Text>
+                    </View>
+                  )}
                 </Pressable>
               ))}
             </ScrollView>
