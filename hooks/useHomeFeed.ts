@@ -95,7 +95,7 @@ export function useHomeFeed({ onLocation }: Options) {
         user ? supabase
           .from('stories')
           .select(
-            '*, profiles:author_id(id, display_name, username, avatar_url, is_verified, is_geoverified, city, district)',
+            '*, profiles:author_id(id, display_name, username, avatar_url, is_verified, is_geoverified, city, district, account_type, role)',
           )
           .or(`expires_at.gt.${new Date().toISOString()},and(expires_at.is.null,created_at.gte.${new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()})`)
           .order('created_at', { ascending: false })
