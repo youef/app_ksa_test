@@ -366,7 +366,7 @@ const styles = StyleSheet.create({
   homeStoryName: { color: '#064e3b', fontSize: 11, fontWeight: '800', textAlign: 'center', maxWidth: 72 },
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: 'transparent',
   },
   addStoryBtn: {
     flexDirection: 'row-reverse',
