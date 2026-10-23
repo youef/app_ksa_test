@@ -20,13 +20,13 @@ export async function getCurrentDeviceLocation(): Promise<DeviceLocation | null>
       return await new Promise((resolve) => navigator.geolocation.getCurrentPosition(
         (position) => resolve({ latitude: position.coords.latitude, longitude: position.coords.longitude, accuracy: position.coords.accuracy }),
         () => resolve(null),
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 },
+        { enableHighAccuracy: true, timeout: 25000, maximumAge: 0 },
       ));
     }
     const current = await Location.getForegroundPermissionsAsync();
     const permission = current.granted ? current : await Location.requestForegroundPermissionsAsync();
     if (!permission.granted) return null;
-    const result = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+    const result = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest });
     const location = { latitude: result.coords.latitude, longitude: result.coords.longitude, accuracy: result.coords.accuracy };
     await AsyncStorage.setItem(KEY, JSON.stringify(location));
     return location;
