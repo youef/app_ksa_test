@@ -111,9 +111,9 @@ export default function CreateStory() {
   const offsetRef = useRef(textOffset);
   offsetRef.current = textOffset;
   const dragStart = useRef({ x: 0, y: 0 });
-  const dragResponder = useMemo(() => PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: () => true,
+  const dragResponder = useMemo(() => Platform.OS === 'web' ? null : PanResponder.create({
+    onStartShouldSetPanResponder: () => false,
+    onMoveShouldSetPanResponder: (_event, gesture) => Math.abs(gesture.dx) + Math.abs(gesture.dy) > 6,
     onPanResponderGrant: () => { dragStart.current = { ...offsetRef.current }; },
     onPanResponderMove: (_event, gesture) => {
       setTextOffset({
@@ -445,9 +445,9 @@ export default function CreateStory() {
           <View style={s.centralCanvas}>
             {!isImageSlide ? (
               <View style={[s.textCanvasCard, currentFont.isPill && s.textCanvasCardPill]}>
-                <View {...dragResponder.panHandlers} style={[s.dragHandle, { transform: [{ translateX: textOffset.x }, { translateY: textOffset.y }] }]}>
+                <View {...(dragResponder?.panHandlers ?? {})} style={[s.dragHandle, { transform: [{ translateX: textOffset.x }, { translateY: textOffset.y }] }]}>
                   <Move size={16} color="#fff" />
-                  <Text style={s.dragHandleText}>اسحب لتحريك النص</Text>
+                  <Text style={s.dragHandleText}>{Platform.OS === 'web' ? 'حرّك النص من إعدادات التنسيق' : 'اسحب لتحريك النص'}</Text>
                 </View>
                 <TextInput
                   style={[
