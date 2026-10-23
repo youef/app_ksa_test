@@ -607,6 +607,7 @@ export default function StoryViewer() {
                 </View>
                 <View style={styles.storyOverlayNameBox}>
                   <Text numberOfLines={1} style={styles.storyOverlayName}>{author?.hide_name ? 'مجهول' : (author?.display_name || author?.username || 'جار')}</Text>
+                  {author?.hide_name && Boolean(author?.username) && <Text style={styles.storyOverlayMeta} numberOfLines={1}>@{String(author.username).replace(/^@/, '')}</Text>}
                   <Text style={styles.storyOverlayMeta}>{currentIndex + 1} / {storiesList.length}</Text>
                 </View>
               </View>
