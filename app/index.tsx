@@ -14,6 +14,8 @@ import {
 
 // Animated header background, separate from the logo and controls.
 // The background is separate from the interactive buttons and text below.
+const LOGIN_BUTTON_BACKGROUND = { uri: Platform.OS === 'web' ? '/images/buttons/hayna-login-button-bg.png' : 'https://appksatest.vercel.app/images/buttons/hayna-login-button-bg.png' };
+
 const WELCOME_BACKGROUND = {
   uri: Platform.OS === 'web'
     ? '/welcome/welcome-background.gif'
@@ -122,8 +124,9 @@ export default function Index() {
             <Text style={styles.panelSubtitle}>حيّك وناسك وخدماتك في مكان واحد</Text>
 
             <Pressable onPress={() => router.push('/auth')} accessibilityRole="button" accessibilityLabel="تسجيل الدخول" style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}>
-              <LogIn size={21} color="#FFFFFF" />
-              <Text style={styles.primaryText}>تسجيل الدخول</Text>
+              <Image source={LOGIN_BUTTON_BACKGROUND} resizeMode="stretch" style={styles.primaryButtonArtwork} pointerEvents="none" />
+              <LogIn size={21} color="#FFFFFF" style={styles.primaryButtonContent} />
+              <Text style={[styles.primaryText, styles.primaryButtonContent]}>تسجيل الدخول</Text>
             </Pressable>
             <Pressable onPress={() => router.replace('/home')} accessibilityRole="button" accessibilityLabel="استكشاف حيّنا دون تسجيل" style={styles.explore}>
               <Text style={styles.exploreText}>استكشف حيّنا دون تسجيل</Text>
@@ -154,7 +157,9 @@ const styles = StyleSheet.create({
   panelHandle: { width: 36, height: 4, borderRadius: 3, backgroundColor: '#D5DED7', marginBottom: 12 },
   panelTitle: { color: '#173F30', fontSize: 19, fontWeight: '900', textAlign: 'center' },
   panelSubtitle: { color: '#63766A', fontSize: 12, fontWeight: '600', textAlign: 'center', marginTop: 4, marginBottom: 20 },
-  primaryButton: { width: '100%', minHeight: 54, borderRadius: 18, backgroundColor: '#176044', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 18 },
+  primaryButton: { width: '100%', minHeight: 54, borderRadius: 18, overflow: 'hidden', backgroundColor: '#176044', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 18 },
+  primaryButtonArtwork: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
+  primaryButtonContent: { zIndex: 1 },
   primaryText: { color: '#FFFFFF', fontSize: 17, fontWeight: '900' },
   explore: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 43, marginTop: 8 },
   exploreText: { color: '#166044', fontSize: 12, fontWeight: '800' },
