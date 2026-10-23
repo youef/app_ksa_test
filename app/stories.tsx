@@ -183,7 +183,7 @@ export default function StoriesScreen() {
     trendingScore(b) - trendingScore(a) || new Date(b.newestAt).getTime() - new Date(a.newestAt).getTime()
   );
   const ringColor = (author: any) => author?.account_type === 'freelance' ? '#8B5CF6' : ['business', 'merchant'].includes(author?.account_type) ? '#F59E0B' : author?.role === 'admin' ? '#065F46' : '#10B981';
-  const displayName = (author: any) => author?.hide_name ? 'مجهول' : (author?.display_name || author?.username || 'جار الحي');
+  const displayName = (author: any) => author?.hide_name ? 'مجهول' : (author?.display_name?.trim() || 'جار الحي');
   async function toggleFollow(authorId: string) {
     if (!viewerId || authorId === viewerId) return;
     const following = followingIds.includes(authorId);
@@ -220,7 +220,6 @@ export default function StoriesScreen() {
             accessibilityLabel="نشر قصة جديدة"
           >
             <Plus size={15} color="#fff" strokeWidth={2.5} />
-            <Text style={styles.addStoryBtnText}>إضافة</Text>
           </Pressable>
         }
       />
@@ -229,9 +228,7 @@ export default function StoriesScreen() {
           <View style={styles.sectionHeadingRow}>
             <View style={{ alignItems: 'flex-end', flex: 1 }}>
               <Text style={styles.sectionHeading}>يوميات أهل الحي والمتابَعين</Text>
-              <Text style={styles.sectionSubheading}>{currentDistrict ? `أهل ${currentDistrict} ومن تتابعهم` : 'من تتابعهم · أضف حيّك في ملفك الشخصي لعرض الجيران'}</Text>
             </View>
-            <View style={styles.livePill}><View style={styles.liveDot} /><Text style={styles.livePillText}>مباشر</Text></View>
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.ringsScroll}>
             <Pressable style={styles.ringItem} accessibilityRole="button" accessibilityLabel="أضف يومياتك" onPress={() => router.push(needsLogin ? '/auth' : '/create-story')}><View style={[styles.ringOuter, styles.ringSeen]}><Plus size={27} color="#059669" /></View><Text style={styles.ringName}>أضف يومياتك</Text></Pressable>
@@ -250,7 +247,6 @@ export default function StoriesScreen() {
                     <View style={styles.ringCount}><Text style={styles.ringCountText}>{group.stories.length}</Text></View>
                   </Animated.View>
                   <Text style={styles.ringName} numberOfLines={1}>{name}</Text>
-                  {author?.hide_name && author?.username ? <Text style={[styles.ringName, { fontSize: 9 }]} numberOfLines={1}>@{String(author.username).replace(/^@/, '')}</Text> : null}
                 </Pressable>
               );
             })}
@@ -273,7 +269,7 @@ export default function StoriesScreen() {
           />
         }
       >
-        <View style={styles.trendingSectionTitleRow}><View style={styles.trendingSectionAccent} /><View style={{ flex: 1, alignItems: 'flex-end' }}><Text style={styles.sectionHeading}>ترند المدينة</Text><Text style={styles.sectionSubheading}>{currentCity ? `الأكثر تفاعلًا في جميع أحياء ${currentCity} خلال ٢٤ ساعة` : 'حدد مدينتك من ملفك الشخصي'}</Text></View></View>
+        <View style={styles.trendingSectionTitleRow}><View style={styles.trendingSectionAccent} /><View style={{ flex: 1, alignItems: 'flex-end' }}><Text style={styles.sectionHeading}>ترند المدينة</Text></View></View>
         {errorText ? <Pressable accessibilityRole="button" onPress={() => void loadAllStories()} style={{ padding: 16 }}><Text style={{ color: '#A65A49', textAlign: 'right' }}>تعذر تحميل اليوميات. اضغط لإعادة المحاولة.</Text></Pressable> : null}
         {loading && !refreshing ? (
           <View style={styles.loadingBox}>
@@ -328,8 +324,7 @@ export default function StoriesScreen() {
                         </View>
                         <View style={{ flex: 1, alignItems: 'flex-end' }}>
                           <Text style={styles.cardAuthorName} numberOfLines={1}>{name}</Text>
-                          {author?.hide_name && author?.username ? <Text style={styles.cardTimeText}>@{String(author.username).replace(/^@/, '')}</Text> : null}
-                          <Text style={styles.cardTimeText}>{relativeTime(story.created_at)} · {group.totalViews} مشاهدة · {group.totalLikes} إعجاب</Text>
+                          <Text style={styles.cardTimeText}>{relativeTime(story.created_at)}</Text>
                           {group.authorId !== viewerId && <Pressable accessibilityRole="button" accessibilityLabel={followingIds.includes(group.authorId) ? 'إلغاء المتابعة' : 'متابعة'} onPress={(event) => { event.stopPropagation(); void toggleFollow(group.authorId); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4 }}>
                             {followingIds.includes(group.authorId) ? <Check size={13} color="#D1FAE5" /> : <UserPlus size={13} color="#D1FAE5" />}
                             <Text style={{ color: '#D1FAE5', fontSize: 11, fontWeight: '800' }}>{followingIds.includes(group.authorId) ? 'تتابعه' : 'متابعة'}</Text>
