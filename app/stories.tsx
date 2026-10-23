@@ -228,7 +228,7 @@ export default function StoriesScreen() {
       />
 
       <View style={styles.ringsSection}>
-        <ImageBackground source={{ uri: Platform.OS === 'web' ? '/welcome/hayna-stories-background.png' : 'https://appksatest.vercel.app/welcome/hayna-stories-background.png' }} resizeMode="cover" pointerEvents="none" style={StyleSheet.absoluteFillObject} imageStyle={{ opacity: 0.86 }} />
+        <Image source={{ uri: Platform.OS === 'web' ? '/welcome/hayna-stories-background.png' : 'https://appksatest.vercel.app/welcome/hayna-stories-background.png' }} resizeMode="cover" pointerEvents="none" style={[StyleSheet.absoluteFillObject, { width: '100%', height: '100%', opacity: 0.55 }]} />
           <View style={styles.sectionHeadingRow}>
             <View style={{ alignItems: 'flex-end', flex: 1 }}>
               <Text style={styles.sectionHeading}>يوميات أهل الحي</Text>
