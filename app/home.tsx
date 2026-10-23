@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, ImageBackground, Modal, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SlidersHorizontal, X, Check } from 'lucide-react-native';
 
 import { supabase } from '@/lib/supabase';
@@ -194,6 +194,13 @@ export default function Home() {
 
   return (
     <View style={[styles.container, layout.page]}>
+      <ImageBackground
+        source={{ uri: Platform.OS === 'web' ? '/welcome/hayna-heritage-bg.png' : 'https://appksatest.vercel.app/welcome/hayna-heritage-bg.png' }}
+        resizeMode="cover"
+        pointerEvents="none"
+        style={StyleSheet.absoluteFillObject}
+        imageStyle={{ opacity: 0.32 }}
+      />
       <AppHeader
         variant="home"
         profile={feed.profile}
