@@ -160,7 +160,7 @@ function MenuGroup({ title, items }: { title: string; items: MenuItem[] }) {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#F7F9F8' },
+  screen: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: 14, gap: 16, maxWidth: 820, width: '100%', alignSelf: 'center' },
   accountCard: { minHeight: 92, borderRadius: 20, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#DDEAE4', padding: 13, flexDirection: 'row-reverse', alignItems: 'center', gap: 11 },
   avatarWrap: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#ECFDF5', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderWidth: 2, borderColor: '#D1FAE5' },
