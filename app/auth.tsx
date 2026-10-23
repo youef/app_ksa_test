@@ -3,10 +3,10 @@ import { Alert, Pressable, StyleSheet, Text, TextInput, View, KeyboardAvoidingVi
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { getBrandingLogo, FALLBACK_LOGO_URI, subscribeBrandingLogo, getCachedBrandingLogo } from '@/lib/branding';
-import { Mail, Lock, User, ArrowRight, Compass, ShieldCheck } from 'lucide-react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Mail, Lock, User, ArrowRight, Compass, ShieldCheck, Eye, EyeOff, LogIn, UserRoundPlus } from 'lucide-react-native';
 import { AppHeader } from '@/components/shared/AppHeader';
 
+const LOGIN_BUTTON_BACKGROUND = { uri: Platform.OS === 'web' ? '/images/buttons/hayna-login-button-bg.png' : 'https://appksatest.vercel.app/images/buttons/hayna-login-button-bg.png' };
 const AUTH_BACKGROUND = { uri: 'https://appksatest.vercel.app/welcome/welcome-background.png' };
 
 export default function Auth() {
@@ -15,6 +15,7 @@ export default function Auth() {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [viewportHeight, setViewportHeight] = useState(0);
   const [contentHeight, setContentHeight] = useState(0);
@@ -124,14 +125,14 @@ export default function Auth() {
               style={[styles.segmentBtn, isLogin && styles.segmentBtnActive]}
               accessibilityRole="button"
             >
-              <Text style={[styles.segmentBtnText, isLogin && styles.segmentBtnTextActive]}>تسجيل الدخول</Text>
+              <View style={styles.segmentContent}><LogIn size={16} color={isLogin ? "#047857" : "#64748b"} /><Text style={[styles.segmentBtnText, isLogin && styles.segmentBtnTextActive]}>تسجيل الدخول</Text></View>
             </Pressable>
             <Pressable
               onPress={() => setIsLogin(false)}
               style={[styles.segmentBtn, !isLogin && styles.segmentBtnActive]}
               accessibilityRole="button"
             >
-              <Text style={[styles.segmentBtnText, !isLogin && styles.segmentBtnTextActive]}>إنشاء حساب جديد</Text>
+              <View style={styles.segmentContent}><UserRoundPlus size={16} color={!isLogin ? "#047857" : "#64748b"} /><Text style={[styles.segmentBtnText, !isLogin && styles.segmentBtnTextActive]}>إنشاء حساب</Text></View>
             </Pressable>
           </View>
 
@@ -187,12 +188,15 @@ export default function Auth() {
                 <Lock size={19} color="#047857" style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
-                  secureTextEntry
+                  secureTextEntry={!showPassword}
                   value={password}
                   onChangeText={setPassword}
                   placeholder="••••••••"
                   placeholderTextColor="#94a3b8"
                 />
+                <Pressable onPress={() => setShowPassword(v => !v)} accessibilityRole="button" accessibilityLabel={showPassword ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"} hitSlop={10} style={styles.eyeButton}>
+                  {showPassword ? <EyeOff size={19} color="#047857" /> : <Eye size={19} color="#64748b" />}
+                </Pressable>
               </View>
             </View>
 
@@ -202,17 +206,13 @@ export default function Auth() {
               disabled={loading}
               accessibilityRole="button"
             >
-              <LinearGradient
-                colors={['#059669', '#047857', '#065f46']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.submitGradient}
-              >
+              <View style={styles.submitGradient}>
+                <Image source={LOGIN_BUTTON_BACKGROUND} resizeMode="stretch" style={styles.submitArtwork} pointerEvents="none" />
                 <Text style={styles.submitBtnText}>
                   {loading ? 'جاري التنفيذ...' : isLogin ? 'تسجيل الدخول' : 'إنشاء الحساب والانضمام'}
                 </Text>
-                {!loading && <ArrowRight size={18} color="#fff" style={{ marginRight: 6 }} />}
-              </LinearGradient>
+                {!loading && (isLogin ? <LogIn size={19} color="#fff" /> : <UserRoundPlus size={19} color="#fff" />)}
+              </View>
             </Pressable>
 
             <Pressable
@@ -275,6 +275,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     gap: 4,
   },
+  segmentContent: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 7 },
   segmentBtn: {
     flex: 1,
     paddingVertical: 10,
@@ -378,11 +379,13 @@ const styles = StyleSheet.create({
     height: '100%',
     fontWeight: '600',
   },
+  eyeButton: { padding: 7, marginLeft: 2 },
+  submitArtwork: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
   submitBtn: {
     borderRadius: 16,
     overflow: 'hidden',
     marginTop: 10,
-    backgroundColor: '#047857',
+    backgroundColor: 'transparent',
     shadowColor: '#047857',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.25,
@@ -394,7 +397,7 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.99 }],
   },
   submitGradient: {
-    height: 52,
+    height: 62,
     width: '100%',
     flexDirection: 'row-reverse',
     justifyContent: 'center',
