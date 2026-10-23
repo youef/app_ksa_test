@@ -199,7 +199,7 @@ export default function Home() {
         resizeMode="cover"
         pointerEvents="none"
         style={StyleSheet.absoluteFillObject}
-        imageStyle={{ opacity: 0.32 }}
+        imageStyle={{ opacity: 0.15 }}
       />
       <AppHeader
         variant="home"
