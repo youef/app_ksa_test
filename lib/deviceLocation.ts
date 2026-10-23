@@ -46,6 +46,13 @@ export async function reverseGeocodeDeviceLocation(location: DeviceLocation): Pr
 
   const clean = (value: unknown) => typeof value === 'string' ? value.trim() : '';
   const pick = (...values: unknown[]) => values.map(clean).find(Boolean) || '';
+  const cleanNeighborhood = (value: unknown) => {
+    const name = clean(value);
+    // Geocoder administrative/continental labels are not residential neighborhoods.
+    if (!name || /^(آسيا|asia|asia\/riyadh|السعودية|المملكة العربية السعودية|منطقة الحدود الشمالية|northern borders|saudi arabia)$/i.test(name)) return '';
+    return name;
+  };
+  const pickNeighborhood = (...values: unknown[]) => values.map(cleanNeighborhood).find(Boolean) || '';
 
   try {
     if (Platform.OS === 'web') {
@@ -76,9 +83,9 @@ export async function reverseGeocodeDeviceLocation(location: DeviceLocation): Pr
       const city = pick(
         na.city, na.town, na.village, na.municipality, aa.City, aa.Subregion,
       );
-      const district = pick(
-        na.neighbourhood, na.suburb, na.quarter, na.residential, na.hamlet,
-        na.city_district, na.district, aa.Neighborhood, aa.District,
+      const district = pickNeighborhood(
+        na.neighbourhood, na.suburb, na.quarter, na.residential,
+        na.city_district, aa.Neighborhood,
       );
 
       if (city && !isKnownSaudiCity(city)) {
@@ -108,7 +115,7 @@ export async function reverseGeocodeDeviceLocation(location: DeviceLocation): Pr
     // Keep administrative levels separate: a street or landmark is not a neighborhood.
     let region = pick(place.region);
     let city = pick(place.city, place.subregion);
-    let district = pick(place.district, place.suburb);
+    let district = pickNeighborhood(place.district, place.suburb);
 
     // Native reverse geocoders often return a street/landmark instead of a
     // neighborhood. Ask two address providers for administrative neighborhood
@@ -132,9 +139,9 @@ export async function reverseGeocodeDeviceLocation(location: DeviceLocation): Pr
       }
       region = region || pick(na.state, na.region, na.province, na.state_district, aa.Region);
       city = city || pick(na.city, na.town, na.village, na.municipality, aa.City, aa.Subregion);
-      district = district || pick(
-        na.neighbourhood, na.suburb, na.quarter, na.residential, na.hamlet,
-        na.city_district, na.district, aa.Neighborhood, aa.District,
+      district = district || pickNeighborhood(
+        na.neighbourhood, na.suburb, na.quarter, na.residential,
+        na.city_district, aa.Neighborhood,
       );
     }
 
