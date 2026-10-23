@@ -13,17 +13,25 @@ type Props = {
 
 export default function StoriesRow({ profile, stories, selectedDistrict }: Props) {
   const visibleStories = stories.slice(0, 4);
+  const ringColors = (p: Profile | null | undefined): [string, string, string] => {
+    const type = String(p?.account_type || 'standard').toLowerCase();
+    if (type === 'business' || type === 'merchant' || type === 'commercial') return ['#D97706', '#F59E0B', '#FDE68A'];
+    if (type === 'freelance' || type === 'professional') return ['#7C3AED', '#A78BFA', '#DDD6FE'];
+    if (type === 'organization' || type === 'government') return ['#1D4ED8', '#60A5FA', '#BFDBFE'];
+    if (p?.role === 'admin') return ['#064E3B', '#047857', '#34D399'];
+    return ['#047857', '#10B981', '#6EE7B7'];
+  };
 
   return (
     <View style={[styles.storiesContainer, { position: 'relative', overflow: 'hidden', backgroundColor: 'transparent', borderBottomWidth: 0, justifyContent: 'center' }]}>
       <ImageBackground
         source={{ uri: Platform.OS === 'web' ? '/welcome/hayna-stories-background.png' : 'https://appksatest.vercel.app/welcome/hayna-stories-background.png' }}
-        resizeMode="stretch"
+        resizeMode="cover"
         pointerEvents="none"
         style={StyleSheet.absoluteFillObject}
         imageStyle={{ opacity: 1 }}
       />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.storiesScroll, { flexGrow: 1, justifyContent: 'center', alignItems: 'center' }]}>
+      <ScrollView horizontal inverted showsHorizontalScrollIndicator={false} style={{ direction: 'rtl' }} contentContainerStyle={[styles.storiesScroll, { flexGrow: 1, justifyContent: 'center', alignItems: 'center', flexDirection: 'row-reverse' }]}>
         {visibleStories.map(story => {
           const authorName = story.profiles?.display_name || story.profiles?.username || 'جار';
           const avatarUrl = story.profiles?.avatar_url;
@@ -39,7 +47,7 @@ export default function StoriesRow({ profile, stories, selectedDistrict }: Props
               accessibilityLabel={`يوميات ${authorName}`}
             >
               <LinearGradient
-                colors={['#059669', '#10b981', '#3b82f6']}
+                colors={ringColors(story.profiles)}
                 style={styles.storyGradientRing}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
@@ -64,9 +72,6 @@ export default function StoriesRow({ profile, stories, selectedDistrict }: Props
                 )}
               </LinearGradient>
               <Text style={styles.storyName} numberOfLines={1}>{authorName}</Text>
-              <Text style={styles.storyDistrictSub} numberOfLines={1}>
-                {selectedDistrict !== 'كل الأحياء' ? selectedDistrict : 'جار الحي'}
-              </Text>
             </Pressable>
           );
         })}
