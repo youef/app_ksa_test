@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { isActiveStory } from '@/lib/storyActivity';
+import { BG_GRADIENTS } from '@/lib/storyGradients';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/lib/supabase';
 import { requireAccount } from '@/lib/authGate';
@@ -547,9 +548,12 @@ export default function StoryViewer() {
   const isOwn = currentUserId === currentStory.author_id;
   const timeLeft = Math.max(0, Math.floor((new Date(currentStory.expires_at).getTime() - Date.now()) / (1000 * 60 * 60)));
 
-  const gradColors = currentStory.bg_color
-    ? [currentStory.bg_color, shiftColor(currentStory.bg_color)] as [string, string]
-    : ['#065f46', '#059669'] as [string, string];
+  const matchingGradient = BG_GRADIENTS.find((gradient) => gradient.colors[0].toLowerCase() === String(currentStory.bg_color || '').toLowerCase());
+  const gradColors = matchingGradient
+    ? matchingGradient.colors as [string, string]
+    : currentStory.bg_color
+      ? [currentStory.bg_color, shiftColor(currentStory.bg_color)] as [string, string]
+      : ['#065f46', '#059669'] as [string, string];
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -747,9 +751,9 @@ export default function StoryViewer() {
           {/* ======================================================== */}
           {(uiVisible || showReplyBox || isPaused) && (isOwn ? (
             <View style={styles.ownerStats}>
-              <Pressable style={styles.statBadge} onPress={showStoryViewers} accessibilityRole="button" accessibilityLabel="عرض قائمة مشاهدي القصة">
+              <Pressable style={styles.statBadge} onPress={showStoryViewers} accessibilityRole="button" accessibilityLabel="عرض مشاهدي اليومية">
                 <Eye size={16} color="#fff" />
-                <Text style={styles.statBadgeText}>{currentStory.view_count || 0} مشاهدة · {likesReady ? likeCount : '—'} إعجاب · عرض القائمة</Text>
+                <Text style={styles.statBadgeText}>{currentStory.view_count || 0} مشاهدة · {likesReady ? likeCount : '—'} إعجاب</Text>
               </Pressable>
             </View>
           ) : (
