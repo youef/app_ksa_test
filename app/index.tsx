@@ -10,6 +10,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowRight, LogIn, UserRoundPlus, UsersRound, ShieldCheck } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
+import { isAllKingdom } from '@/lib/locationSync';
+import { isKnownSaudiCity } from '@/lib/saudiLocations';
 import {
   FALLBACK_LOGO_URI, getBrandingLogo, getCachedBrandingLogo, subscribeBrandingLogo,
 } from '@/lib/branding';
@@ -74,10 +76,11 @@ export default function Index() {
     const unsubscribeBranding = subscribeBrandingLogo(applyBranding);
 
     void supabase.auth.getSession()
-      .then(({ data }) => {
+      .then(async ({ data }) => {
         if (active && data.session?.user) {
           setSignedIn(true);
-          router.replace('/home');
+          const { data: profile } = await supabase.from('profiles').select('city').eq('id', data.session.user.id).maybeSingle();
+          if (active) router.replace(profile?.city && !isAllKingdom(profile.city) && isKnownSaudiCity(profile.city) ? '/home' : '/set-location');
         }
       })
       .catch(() => {
