@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, ImageBackground, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ImageBackground, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 import * as Location from 'expo-location';
 import { MapPin, LocateFixed, ShieldCheck, ArrowLeft, RefreshCw } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { savePermanentMyLocation, isAllKingdom } from '@/lib/locationSync';
-import { isInsideSaudiArabia, isKnownSaudiCity, SAUDI_REGIONS } from '@/lib/saudiLocations';
+import { isInsideSaudiArabia, isKnownSaudiCity, SAUDI_REGIONS, buildSaudiLocations, normalizeSaudiLocationName } from '@/lib/saudiLocations';
 import { reverseGeocodeDeviceLocation } from '@/lib/deviceLocation';
 
 const ENGLISH_CITIES: Record<string, string> = {
@@ -33,6 +33,8 @@ export default function SetLocationScreen() {
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
   const [error, setError] = useState('');
+  const [districtQuery, setDistrictQuery] = useState('');
+  const [needsDistrict, setNeedsDistrict] = useState(false);
   const [location, setLocation] = useState<{ region: string; city: string; district: string } | null>(null);
   useEffect(() => {
     let active = true;
@@ -57,6 +59,8 @@ export default function SetLocationScreen() {
     setLoading(true);
     setError('');
     setLocation(null);
+    setNeedsDistrict(false);
+    setDistrictQuery('');
 
     // On mobile browsers the OS permission prompt must be initiated directly
     // from a user gesture, not after an awaited Supabase/Expo permission call.
@@ -93,17 +97,16 @@ export default function SetLocationScreen() {
       const resolved = resolveCity(place.city);
       const district = place.district.trim();
       const region = resolved?.region || place.region;
-      if (!district) throw new Error('تم تحديد المدينة لكن لم يرجع اسم الحي من خدمات الخرائط. أعد تحديد الموقع من مكان مكشوف مع تفعيل الموقع الدقيق.');
-
       if (!resolved) throw new Error('تم الحصول على إحداثياتك، لكن تعذر تحديد اسم المدينة من خدمات العناوين. حاول مجددًا.');
       setLocation({ city: resolved.city, region: resolved.region || region || 'المملكة العربية السعودية', district });
+      setNeedsDistrict(!district);
     }).catch(e => {
       setError(e instanceof Error ? e.message : 'تعذر استخراج الموقع، حاول مجددًا.');
     }).finally(() => setLoading(false));
   }
 
   async function confirm() {
-    if (!location || loading) return;
+    if (!location || !location.district || loading) return;
     setLoading(true);
     setError('');
     try {
@@ -125,10 +128,17 @@ export default function SetLocationScreen() {
         <Text style={styles.body}>نستخدم موقعك لتحديد مدينتك وحيّك وعرض اليوميات والخدمات القريبة منك. هذه الخطوة مطلوبة قبل الدخول للصفحة الرئيسية.</Text>
         {checking ? <ActivityIndicator color="#047857" style={{ marginVertical: 22 }} /> : <>
           {location ? <View style={styles.result}><MapPin size={22} color="#047857" /><View style={{ flex: 1 }}><Text style={styles.city}>{location.city}</Text><Text style={styles.district}>{location.district ? location.district + ' · ' : 'لم تتوفر تسمية الحي · '}{location.region}</Text></View></View> : null}
+          {location && needsDistrict ? <View style={{ marginBottom: 16 }}>
+            <Text style={styles.body}>تم تحديد مدينتك من GPS، لكن خدمات الخرائط لم تحدد الحي. اختر اسم حيّك من أحياء {location.city} المعروفة؛ لن نختار حيًا بالنيابة عنك.</Text>
+            <TextInput value={districtQuery} onChangeText={setDistrictQuery} placeholder="ابحث عن اسم حيّك" placeholderTextColor="#71867a" style={styles.districtInput} textAlign="right" />
+            <ScrollView nestedScrollEnabled style={{ maxHeight: 210 }}>
+              {buildSaudiLocations().flatMap(region => region.cities.filter(city => normalizeSaudiLocationName(city.name) === normalizeSaudiLocationName(location.city)).flatMap(city => city.districts)).filter(d => normalizeSaudiLocationName(d.name).includes(normalizeSaudiLocationName(districtQuery))).slice(0, 45).map(d => <Pressable key={d.id} style={styles.districtOption} onPress={() => { setLocation(current => current ? { ...current, district: d.name } : current); setNeedsDistrict(false); setDistrictQuery(''); }}><Text style={{ color: '#064e3b', textAlign: 'right' }}>{d.name}</Text></Pressable>)}
+            </ScrollView>
+          </View> : null}
           {error ? <Text style={styles.error}>{error}</Text> : null}
-          <Pressable accessibilityRole="button" disabled={loading} onPress={location ? confirm : detect} style={[styles.button, loading && { opacity: 0.6 }]}>
+          <Pressable accessibilityRole="button" disabled={loading} onPress={location && location.district ? confirm : detect} style={[styles.button, loading && { opacity: 0.6 }]}>
             {loading ? <ActivityIndicator color="#fff" /> : location ? <ArrowLeft size={20} color="#fff" /> : <LocateFixed size={20} color="#fff" />}
-            <Text style={styles.buttonText}>{location ? 'تأكيد الموقع والدخول' : 'تحديد موقعي الآن'}</Text>
+            <Text style={styles.buttonText}>{location && location.district ? 'تأكيد الموقع والدخول' : location ? 'إعادة محاولة GPS' : 'تحديد موقعي الآن'}</Text>
           </Pressable>
           {location ? <Pressable onPress={() => { setLocation(null); void detect(); }} style={styles.retry}><RefreshCw size={15} color="#047857" /><Text style={styles.retryText}>إعادة تحديد الموقع</Text></Pressable> : null}
         </>}
@@ -153,6 +163,8 @@ const styles = StyleSheet.create({
   buttonText: { color: '#fff', fontSize: 16, fontWeight: '900' },
   retry: { flexDirection: 'row-reverse', justifyContent: 'center', alignItems: 'center', gap: 7, padding: 15 },
   retryText: { color: '#047857', fontWeight: '800' },
+  districtInput: { borderWidth: 1, borderColor: '#bbd8c7', borderRadius: 12, padding: 13, color: '#064e3b', backgroundColor: '#fff', marginBottom: 8 },
+  districtOption: { padding: 13, borderBottomWidth: 1, borderBottomColor: '#e5efe9' },
   error: { color: '#b91c1c', textAlign: 'right', marginBottom: 15, lineHeight: 22 },
   privacy: { flexDirection: 'row-reverse', gap: 8, alignItems: 'center', marginTop: 25 },
   privacyText: { fontSize: 12, color: '#4b6d5d' },
