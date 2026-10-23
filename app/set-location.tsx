@@ -6,6 +6,7 @@ import { MapPin, LocateFixed, ShieldCheck, ArrowLeft, RefreshCw } from 'lucide-r
 import { supabase } from '@/lib/supabase';
 import { savePermanentMyLocation, isAllKingdom } from '@/lib/locationSync';
 import { isInsideSaudiArabia, isKnownSaudiCity, SAUDI_REGIONS } from '@/lib/saudiLocations';
+import { reverseGeocodeDeviceLocation } from '@/lib/deviceLocation';
 
 const ENGLISH_CITIES: Record<string, string> = {
   riyadh: 'الرياض', jeddah: 'جدة', jiddah: 'جدة', makkah: 'مكة المكرمة',
@@ -86,57 +87,14 @@ export default function SetLocationScreen() {
       if (!isInsideSaudiArabia(coords.latitude, coords.longitude)) {
         throw new Error('الموقع المستخرج خارج نطاق المملكة العربية السعودية.');
       }
-      let address: Location.LocationGeocodedAddress | undefined;
-      try {
-        const results = await Location.reverseGeocodeAsync({ latitude: coords.latitude, longitude: coords.longitude });
-        address = results[0];
-      } catch { /* Try the secondary geocoder below. */ }
+      // Use the exact same reverse-geocoding pipeline as Home's location selector.
+      const place = await reverseGeocodeDeviceLocation(coords);
+      if (!place || place.isOutsideKSA) throw new Error('تعذر التحقق من العنوان باستخدام خدمة موقع الصفحة الرئيسية.');
+      const resolved = resolveCity(place.city);
+      const district = place.district.trim();
+      const region = resolved?.region || place.region;
+      if (!district) throw new Error('تم تحديد المدينة لكن لم يرجع اسم الحي من خدمات الخرائط. أعد تحديد الموقع من مكان مكشوف مع تفعيل الموقع الدقيق.');
 
-      let resolved = resolveCity(address?.city || address?.subregion || '');
-      let district = (address?.district || '').trim();
-      let region = resolved?.region || address?.region || '';
-
-      // Some devices return city only; query an address geocoder rather than
-      // guessing a neighborhood from coordinates or a nearby city.
-      if ((!resolved || !district) && Platform.OS === 'web') {
-        try {
-          const url = 'https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&accept-language=ar&zoom=18&lat='
-            + encodeURIComponent(String(coords.latitude)) + '&lon=' + encodeURIComponent(String(coords.longitude));
-          const response = await fetch(url, { headers: { Accept: 'application/json' } });
-          if (response.ok) {
-            const data = await response.json();
-            const addr = data?.address || {};
-            resolved = resolved || resolveCity(addr.city || addr.town || addr.village || addr.municipality || '');
-            district = district || String(addr.suburb || addr.neighbourhood || addr.quarter || addr.residential || '').trim();
-            region = resolved?.region || region || String(addr.state || '');
-          }
-        } catch { /* Show verified city without inventing a district. */ }
-      }
-
-      // Independent address provider: some Saudi neighborhoods are not present
-      // in Apple's/Android's reverse geocoder or Nominatim response.
-      if (!district) {
-        try {
-          const url = 'https://api.bigdatacloud.net/data/reverse-geocode-client?latitude='
-            + encodeURIComponent(String(coords.latitude))
-            + '&longitude=' + encodeURIComponent(String(coords.longitude))
-            + '&localityLanguage=ar';
-          const response = await fetch(url);
-          if (response.ok) {
-            const data = await response.json();
-            const entries: Array<{ name?: string; description?: string }> = Array.isArray(data.localityInfo?.informative)
-              ? data.localityInfo.informative : [];
-            const neighborhood = entries.find(entry =>
-              /neighbou?rhood|suburb|quarter|district|حي|ضاحية/i.test(entry.description || '')
-              && entry.name && entry.name.trim() !== resolved?.city
-            );
-            district = String(neighborhood?.name || '').trim();
-            resolved = resolved || resolveCity(String(data.city || data.locality || ''));
-          }
-        } catch { /* No unsupported neighborhood guess. */ }
-      }
-      // A city alone is not a verified neighborhood; never save it as if it were.
-      if (!district) throw new Error('تم تحديد المدينة من GPS لكن مزودي الخرائط لم يرجعوا اسم الحي. تأكد من تفعيل الموقع الدقيق ثم أعد المحاولة.');
       if (!resolved) throw new Error('تم الحصول على إحداثياتك، لكن تعذر تحديد اسم المدينة من خدمات العناوين. حاول مجددًا.');
       setLocation({ city: resolved.city, region: resolved.region || region || 'المملكة العربية السعودية', district });
     }).catch(e => {
