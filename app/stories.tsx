@@ -311,7 +311,7 @@ export default function StoriesScreen() {
                 return (
                   <Pressable key={group.authorId}
                     style={[styles.storyCard, { borderWidth: allSeen ? 1 : 2.5, borderColor: allSeen ? '#94A3B8' : ringColor(author) }]}
-                    onPress={() => openAuthorStories(group.stories)}
+                    onPress={() => openAuthorStories(group.stories, trendingAuthors)}
                     accessibilityRole="button" accessibilityLabel={"فتح يوميات " + name}>
                     <View style={[styles.storyCardMedia, { backgroundColor: bg }, allSeen && styles.storyCardMediaSeen]}>
                       {hasMedia ? <Image source={{ uri: story.image_url }} style={styles.storyCardImage} resizeMode="cover" /> :
