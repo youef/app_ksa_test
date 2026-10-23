@@ -1724,7 +1724,7 @@ function TypeCircle({ label, active, color, bg, Icon, count, onPress }: {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc', width: '100%' },
+  container: { flex: 1, backgroundColor: 'transparent', width: '100%' },
   inner: { width: '100%', maxWidth: 1100, alignSelf: 'center', paddingHorizontal: 16 },
 
   headerAddBtn: {
