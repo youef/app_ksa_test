@@ -206,7 +206,7 @@ export default function Auth() {
                 source={{ uri: Platform.OS === 'web' ? '/images/buttons/hayna-login-button-bg.png' : 'https://appksatest.vercel.app/images/buttons/hayna-login-button-bg.png' }}
                 resizeMode="stretch"
                 style={styles.submitGradient}
-                imageStyle={{ borderRadius: 14 }}
+                imageStyle={{ borderRadius: 26, transform: [{ scaleX: 1.13 }, { scaleY: 1.32 }] }}
               >
                 <Text style={styles.submitBtnText}>
                   {loading ? 'جاري التنفيذ...' : isLogin ? 'تسجيل الدخول' : 'إنشاء الحساب والانضمام'}
@@ -379,9 +379,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   submitBtn: {
-    borderRadius: 25,
+    borderRadius: 26,
     overflow: 'hidden',
     marginTop: 10,
+    backgroundColor: '#047857',
     shadowColor: '#047857',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.25,
@@ -393,7 +394,8 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.99 }],
   },
   submitGradient: {
-    height: 56,
+    height: 52,
+    width: '100%',
     flexDirection: 'row-reverse',
     justifyContent: 'center',
     alignItems: 'center',
