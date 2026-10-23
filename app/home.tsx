@@ -207,13 +207,7 @@ export default function Home() {
 
   return (
     <View style={[styles.container, layout.page]}>
-      <ImageBackground
-        source={{ uri: Platform.OS === 'web' ? '/welcome/hayna-heritage-bg.png' : 'https://appksatest.vercel.app/welcome/hayna-heritage-bg.png' }}
-        resizeMode="cover"
-        pointerEvents="none"
-        style={StyleSheet.absoluteFillObject}
-        imageStyle={{ opacity: 0.15 }}
-      />
+      
       <AppHeader
         variant="home"
         profile={feed.profile}
