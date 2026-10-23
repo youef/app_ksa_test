@@ -1,7 +1,7 @@
 import { Image, ImageBackground, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ShieldCheck, ChevronLeft } from 'lucide-react-native';
+import { ShieldCheck, ChevronLeft, UserRound } from 'lucide-react-native';
 import { styles } from './homeStyles';
 import type { Profile, Story } from '@/lib/homeUtils';
 
@@ -33,7 +33,9 @@ export default function StoriesRow({ profile, stories, selectedDistrict }: Props
       />
       <ScrollView horizontal inverted showsHorizontalScrollIndicator={false} style={{ direction: 'rtl' }} contentContainerStyle={[styles.storiesScroll, { flexGrow: 1, justifyContent: 'center', alignItems: 'center', flexDirection: 'row-reverse' }]}>
         {visibleStories.map(story => {
-          const authorName = story.profiles?.display_name || story.profiles?.username || 'جار';
+          const isAnonymous = story.profiles?.hide_name === true;
+          const authorName = isAnonymous ? 'مجهول' : (story.profiles?.display_name || story.profiles?.username || 'جار');
+          const username = story.profiles?.username ? `@${String(story.profiles.username).replace(/^@/, '')}` : '';
           const avatarUrl = story.profiles?.avatar_url;
           const verified = story.profiles?.is_verified || story.profiles?.is_geoverified;
           const bg = story.bg_color || '#059669';
@@ -53,7 +55,9 @@ export default function StoriesRow({ profile, stories, selectedDistrict }: Props
                 end={{ x: 1, y: 1 }}
               >
                 <View style={styles.storyInnerBorder}>
-                  {story.type === 'text' ? (
+                  {isAnonymous ? (
+                    <View style={[styles.storyTextPreview, { backgroundColor: '#D1FAE5' }]}><UserRound size={25} color="#047857" /></View>
+                  ) : story.type === 'text' ? (
                     <View style={[styles.storyTextPreview, { backgroundColor: bg }]}>
                       <Text style={styles.storyTextPreviewLetter} numberOfLines={1}>{story.content?.[0] || 'ق'}</Text>
                     </View>
@@ -72,6 +76,7 @@ export default function StoriesRow({ profile, stories, selectedDistrict }: Props
                 )}
               </LinearGradient>
               <Text style={styles.storyName} numberOfLines={1}>{authorName}</Text>
+              {isAnonymous && Boolean(username) && <Text style={[styles.storyDistrictSub, { textAlign: 'center' }]} numberOfLines={1}>{username}</Text>}
             </Pressable>
           );
         })}
