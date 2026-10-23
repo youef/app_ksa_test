@@ -228,6 +228,7 @@ export default function StoriesScreen() {
       />
 
       <View style={styles.ringsSection}>
+        <ImageBackground source={{ uri: Platform.OS === 'web' ? '/welcome/hayna-stories-background.png' : 'https://appksatest.vercel.app/welcome/hayna-stories-background.png' }} resizeMode="cover" pointerEvents="none" style={StyleSheet.absoluteFillObject} imageStyle={{ opacity: 0.86 }} />
           <View style={styles.sectionHeadingRow}>
             <View style={{ alignItems: 'flex-end', flex: 1 }}>
               <Text style={styles.sectionHeading}>يوميات أهل الحي</Text>
@@ -272,32 +273,6 @@ export default function StoriesScreen() {
           />
         }
       >
-        <View style={styles.homeStoriesSection}>
-          <ImageBackground source={{ uri: Platform.OS === 'web' ? '/welcome/hayna-stories-background.png' : 'https://appksatest.vercel.app/welcome/hayna-stories-background.png' }} resizeMode="cover" style={styles.homeStoriesBackground} imageStyle={{ opacity: 0.92 }}>
-            <Text style={styles.homeStoriesHeading}>يوميات الجيران</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.homeStoriesScroll}>
-              {storyRings.map((group: any) => {
-                const story = group.latestStory;
-                const author = group.author;
-                const name = displayName(author);
-                return (
-                  <Pressable key={group.authorId} style={styles.homeStoryItem} onPress={() => openAuthorStories(group.stories, storyRings)} accessibilityRole="button" accessibilityLabel={`مشاهدة يوميات ${name}`}>
-                    <View style={[styles.homeStoryRing, { borderColor: group.hasUnseen ? ringColor(author) : '#94A3B8' }]}>
-                      <View style={styles.homeStoryInner}>
-                        {story?.type === 'image' && story?.image_url
-                          ? <Image source={{ uri: story.image_url }} style={styles.homeStoryImage} />
-                          : !author?.hide_name && author?.avatar_url
-                            ? <Image source={{ uri: author.avatar_url }} style={styles.homeStoryImage} />
-                            : <View style={styles.homeStoryFallback}><Text style={styles.homeStoryInitial}>{author?.hide_name ? '؟' : name[0]}</Text></View>}
-                      </View>
-                    </View>
-                    <Text numberOfLines={1} style={styles.homeStoryName}>{name}</Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-          </ImageBackground>
-        </View>
         <View style={styles.trendingSectionTitleRow}><View style={styles.trendingSectionAccent} /><View style={{ flex: 1, alignItems: 'flex-end' }}><Text style={styles.sectionHeading}>ترند المدينة</Text></View></View>
         {errorText ? <Pressable accessibilityRole="button" onPress={() => void loadAllStories()} style={{ padding: 16 }}><Text style={{ color: '#A65A49', textAlign: 'right' }}>تعذر تحميل اليوميات. اضغط لإعادة المحاولة.</Text></Pressable> : null}
         {loading && !refreshing ? (
@@ -472,7 +447,7 @@ const styles = StyleSheet.create({
   storyNotificationToggle: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginHorizontal: 16, marginTop: 8, marginBottom: 4, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 13, backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0' },
   storyNotificationToggleText: { flex: 1, textAlign: 'right', color: '#334155', fontSize: 11, fontWeight: '800' },
   storyNotificationToggleAction: { color: '#047857', fontSize: 11, fontWeight: '900' },
-  ringsSection: { backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e2e8f0', paddingTop: 14, paddingBottom: 12 },
+  ringsSection: { position: 'relative', overflow: 'hidden', backgroundColor: '#f0f8f1', borderBottomWidth: 1, borderBottomColor: '#e2e8f0', paddingTop: 14, paddingBottom: 12 },
   sectionHeadingRow: { flexDirection: 'row-reverse', alignItems: 'center', paddingHorizontal: 16, gap: 10, marginBottom: 10 },
   sectionHeading: { color: '#0f172a', fontSize: 16, fontWeight: '900' },
   sectionSubheading: { color: '#64748b', fontSize: 11, marginTop: 2, fontWeight: '600' },
