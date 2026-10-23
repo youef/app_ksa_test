@@ -6,6 +6,8 @@ import {
   ScrollView,
   Pressable,
   Image,
+  ImageBackground,
+  Platform,
   ActivityIndicator,
   RefreshControl,
   Animated,
@@ -208,6 +210,7 @@ export default function StoriesScreen() {
 
   return (
     <View style={styles.container}>
+      <ImageBackground source={{ uri: Platform.OS === 'web' ? '/welcome/hayna-heritage-bg.png' : 'https://appksatest.vercel.app/welcome/hayna-heritage-bg.png' }} resizeMode="cover" pointerEvents="none" style={StyleSheet.absoluteFillObject} imageStyle={{ opacity: 0.15 }} />
       <AppHeader
         variant="sub"
         title="يوميات أهل الحي"
@@ -227,7 +230,7 @@ export default function StoriesScreen() {
       <View style={styles.ringsSection}>
           <View style={styles.sectionHeadingRow}>
             <View style={{ alignItems: 'flex-end', flex: 1 }}>
-              <Text style={styles.sectionHeading}>يوميات أهل الحي والمتابَعين</Text>
+              <Text style={styles.sectionHeading}>يوميات أهل الحي</Text>
             </View>
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.ringsScroll}>
@@ -269,6 +272,32 @@ export default function StoriesScreen() {
           />
         }
       >
+        <View style={styles.homeStoriesSection}>
+          <ImageBackground source={{ uri: Platform.OS === 'web' ? '/welcome/hayna-stories-background.png' : 'https://appksatest.vercel.app/welcome/hayna-stories-background.png' }} resizeMode="cover" style={styles.homeStoriesBackground} imageStyle={{ opacity: 0.92 }}>
+            <Text style={styles.homeStoriesHeading}>يوميات الجيران</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.homeStoriesScroll}>
+              {storyRings.map((group: any) => {
+                const story = group.latestStory;
+                const author = group.author;
+                const name = displayName(author);
+                return (
+                  <Pressable key={group.authorId} style={styles.homeStoryItem} onPress={() => openAuthorStories(group.stories, storyRings)} accessibilityRole="button" accessibilityLabel={`مشاهدة يوميات ${name}`}>
+                    <View style={[styles.homeStoryRing, { borderColor: group.hasUnseen ? ringColor(author) : '#94A3B8' }]}>
+                      <View style={styles.homeStoryInner}>
+                        {story?.type === 'image' && story?.image_url
+                          ? <Image source={{ uri: story.image_url }} style={styles.homeStoryImage} />
+                          : !author?.hide_name && author?.avatar_url
+                            ? <Image source={{ uri: author.avatar_url }} style={styles.homeStoryImage} />
+                            : <View style={styles.homeStoryFallback}><Text style={styles.homeStoryInitial}>{author?.hide_name ? '؟' : name[0]}</Text></View>}
+                      </View>
+                    </View>
+                    <Text numberOfLines={1} style={styles.homeStoryName}>{name}</Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </ImageBackground>
+        </View>
         <View style={styles.trendingSectionTitleRow}><View style={styles.trendingSectionAccent} /><View style={{ flex: 1, alignItems: 'flex-end' }}><Text style={styles.sectionHeading}>ترند المدينة</Text></View></View>
         {errorText ? <Pressable accessibilityRole="button" onPress={() => void loadAllStories()} style={{ padding: 16 }}><Text style={{ color: '#A65A49', textAlign: 'right' }}>تعذر تحميل اليوميات. اضغط لإعادة المحاولة.</Text></Pressable> : null}
         {loading && !refreshing ? (
@@ -353,6 +382,17 @@ export default function StoriesScreen() {
 }
 
 const styles = StyleSheet.create({
+  homeStoriesSection: { marginHorizontal: 12, marginTop: 14, marginBottom: 18, borderRadius: 20, overflow: 'hidden', backgroundColor: '#eaf5ed' },
+  homeStoriesBackground: { minHeight: 142, paddingTop: 15, paddingBottom: 14 },
+  homeStoriesHeading: { color: '#064e3b', textAlign: 'right', fontSize: 14, fontWeight: '900', marginHorizontal: 16, marginBottom: 12 },
+  homeStoriesScroll: { flexDirection: 'row-reverse', alignItems: 'center', gap: 14, paddingHorizontal: 15 },
+  homeStoryItem: { width: 72, alignItems: 'center', gap: 6 },
+  homeStoryRing: { width: 62, height: 62, borderRadius: 31, borderWidth: 3, padding: 3, backgroundColor: 'rgba(255,255,255,0.85)' },
+  homeStoryInner: { flex: 1, borderRadius: 28, overflow: 'hidden' },
+  homeStoryImage: { width: '100%', height: '100%' },
+  homeStoryFallback: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#d1fae5' },
+  homeStoryInitial: { color: '#047857', fontSize: 24, fontWeight: '900' },
+  homeStoryName: { color: '#064e3b', fontSize: 11, fontWeight: '800', textAlign: 'center', maxWidth: 72 },
   container: {
     flex: 1,
     backgroundColor: '#f8fafc',
