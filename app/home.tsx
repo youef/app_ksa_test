@@ -3,6 +3,9 @@ import { ActivityIndicator, Alert, ImageBackground, Modal, Platform, Pressable, 
 import { SlidersHorizontal, X, Check } from 'lucide-react-native';
 
 import { supabase } from '@/lib/supabase';
+import { router } from 'expo-router';
+import { isAllKingdom } from '@/lib/locationSync';
+import { isKnownSaudiCity } from '@/lib/saudiLocations';
 import { getBrandingLogo, subscribeBrandingLogo, getCachedBrandingLogo } from '@/lib/branding';
 import { isLocationMatching, type HaynaLocation } from '@/lib/locationSync';
 import {
@@ -50,6 +53,16 @@ export default function Home() {
   const feed = useHomeFeed({ onLocation: loc => applyLocationRef.current(loc) });
   const loc = useHomeLocation({ setProfile: feed.setProfile, showToast });
   applyLocationRef.current = loc.apply;
+
+  useEffect(() => {
+    let active = true;
+    void supabase.auth.getUser().then(async ({ data }) => {
+      if (!data.user) return;
+      const { data: profile, error } = await supabase.from('profiles').select('city').eq('id', data.user.id).maybeSingle();
+      if (active && !error && (!profile?.city || isAllKingdom(profile.city) || !isKnownSaudiCity(profile.city))) router.replace('/set-location');
+    }).catch(() => {});
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     getBrandingLogo().then(setLogoUri);
