@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Platform, Pressable, Text, View } from 'react-native';
+import { ImageBackground, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Redirect, router, Stack, usePathname } from 'expo-router';
 import Head from 'expo-router/head';
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
@@ -96,7 +96,8 @@ function RootContent() {
       <SafeAreaProvider initialMetrics={initialWindowMetrics}>
         <DynamicIslandProvider>
           <DialogProvider>
-            <View style={{ flex: 1, position: 'relative' }}>
+            <View style={{ flex: 1, position: 'relative', backgroundColor: '#f9fcf8' }}>
+              <ImageBackground pointerEvents="none" source={{ uri: Platform.OS === 'web' ? '/welcome/hayna-heritage-bg.png' : 'https://appksatest.vercel.app/welcome/hayna-heritage-bg.png' }} resizeMode="cover" style={StyleSheet.absoluteFillObject} imageStyle={{ opacity: 0.15 }} />
               {!configReady ? <View style={{ flex: 1, backgroundColor: C.bg }} /> : maintenance.enabled && sessionReady && !isAdmin && path !== '/auth' ? <View style={{ flex: 1, backgroundColor: '#f8fafc', alignItems: 'center', justifyContent: 'center', padding: 28 }}><Text style={{ fontSize: 42 }}>🛠️</Text><Text style={{ fontSize: 24, fontWeight: '900', color: '#0f172a', marginTop: 14 }}>نعتذر، المنصة تحت الصيانة</Text><Text style={{ fontSize: 15, color: '#64748b', textAlign: 'center', lineHeight: 25, marginTop: 10 }}>{maintenance.message || 'نعمل على تحسين تجربتكم، يرجى العودة لاحقاً.'}</Text><Pressable onPress={() => router.push('/auth')} style={{ marginTop: 24, backgroundColor: '#059669', paddingHorizontal: 22, paddingVertical: 12, borderRadius: 14 }}><Text style={{ color: '#fff', fontWeight: '800' }}>دخول المدير</Text></Pressable></View> : maintenance.enabled && isAdmin && path !== '/admin' ? <Redirect href="/admin" /> : protectCurrentRoute ? (sessionReady ? <Redirect href="/auth" /> : <View style={{ flex: 1, backgroundColor: C.bg }} />) : routeBlocked ? <Redirect href="/home" /> : (
                 <Stack
                   screenOptions={{
