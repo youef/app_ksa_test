@@ -1,4 +1,4 @@
-import { Image, Pressable, ScrollView, Text, View } from 'react-native';
+import { Image, ImageBackground, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ShieldCheck, ChevronLeft } from 'lucide-react-native';
@@ -15,7 +15,13 @@ export default function StoriesRow({ profile, stories, selectedDistrict }: Props
   const visibleStories = stories.slice(0, 4);
 
   return (
-    <View style={styles.storiesContainer}>
+    <View style={[styles.storiesContainer, { position: 'relative', overflow: 'hidden' }]}>
+      <ImageBackground
+        source={{ uri: Platform.OS === 'web' ? '/welcome/hayna-stories-background.png' : 'https://appksatest.vercel.app/welcome/hayna-stories-background.png' }}
+        resizeMode="stretch"
+        pointerEvents="none"
+        style={StyleSheet.absoluteFillObject}
+      />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.storiesScroll}>
         {visibleStories.map(story => {
           const authorName = story.profiles?.display_name || story.profiles?.username || 'جار';
