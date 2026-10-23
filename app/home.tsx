@@ -196,8 +196,8 @@ export default function Home() {
     <View style={[styles.container, layout.page]}>
       <ImageBackground
         source={Platform.OS === 'web'
-          ? { uri: '/welcome/welcome-background.png' }
-          : { uri: 'https://appksatest.vercel.app/welcome/welcome-background.png' }}
+          ? { uri: '/images/backgrounds/hayna-heritage-bg.png' }
+          : { uri: 'https://appksatest.vercel.app/images/backgrounds/hayna-heritage-bg.png' }}
         resizeMode="cover"
         pointerEvents="none"
         style={StyleSheet.absoluteFillObject}
