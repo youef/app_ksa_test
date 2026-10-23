@@ -14,7 +14,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { AppHeader } from '@/components/shared/AppHeader';
 import { useBottomNavInset } from '@/lib/bottomNav';
-import { Plus, ShieldCheck, Sparkles, ChevronDown } from 'lucide-react-native';
+import { Plus, ShieldCheck, Sparkles, ChevronDown, UserPlus, Check } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getActiveLocation, isAllKingdom } from '@/lib/locationSync';
 import { isActiveStory, storyDiscoveryMembership } from '@/lib/storyActivity';
@@ -32,6 +32,8 @@ export default function StoriesScreen() {
   const [currentCity, setCurrentCity] = useState<string>('');
   const [currentDistrict, setCurrentDistrict] = useState<string>('');
   const [followingIds, setFollowingIds] = useState<string[]>([]);
+  const [likeCounts, setLikeCounts] = useState<Record<string, number>>({});
+  const [followerCounts, setFollowerCounts] = useState<Record<string, number>>({});
   const [visibleTrendingCount, setVisibleTrendingCount] = useState(8);
   const storyRingPulse = useRef(new Animated.Value(1)).current;
 
@@ -102,7 +104,10 @@ export default function StoriesScreen() {
             is_verified,
             is_geoverified,
             city,
-            district
+            district,
+            hide_name,
+            account_type,
+            role
           )
         `)
         .or(`expires_at.gt.${nowIso},and(expires_at.is.null,created_at.gte.${yesterday})`)
@@ -112,6 +117,18 @@ export default function StoriesScreen() {
       const cityRows = (data || []) as any[];
       const valid = cityRows.filter((story: any) => isActiveStory(story) && !mutedAuthorIds.includes(String(story.author_id)));
       setStories(valid);
+      const storyIds = valid.map((row: any) => row.id);
+      const authorIds = [...new Set(valid.map((row: any) => String(row.author_id)))];
+      const [likesResult, followersResult] = await Promise.all([
+        storyIds.length ? supabase.from('story_likes').select('story_id').in('story_id', storyIds) : Promise.resolve({ data: [], error: null }),
+        authorIds.length ? supabase.from('follows').select('following_id').in('following_id', authorIds) : Promise.resolve({ data: [], error: null }),
+      ]);
+      const likes: Record<string, number> = {};
+      for (const row of likesResult.data || []) likes[row.story_id] = (likes[row.story_id] || 0) + 1;
+      setLikeCounts(likes);
+      const followers: Record<string, number> = {};
+      for (const row of followersResult.data || []) followers[row.following_id] = (followers[row.following_id] || 0) + 1;
+      setFollowerCounts(followers);
       if (activeViewerId && valid.length > 0) {
         const { data: views, error: viewsError } = await supabase
           .from('story_views')
@@ -137,9 +154,10 @@ export default function StoriesScreen() {
 
   const groupedAuthors = Object.values(filtered.reduce((groups: Record<string, any>, story: any) => {
     const key = story.author_id;
-    if (!groups[key]) groups[key] = { authorId: key, author: story.profiles, stories: [], totalViews: 0, newestAt: story.created_at };
+    if (!groups[key]) groups[key] = { authorId: key, author: story.profiles, stories: [], totalViews: 0, totalLikes: 0, newestAt: story.created_at };
     groups[key].stories.push(story);
     groups[key].totalViews += Math.max(0, Number(story.view_count) || 0);
+    groups[key].totalLikes += likeCounts[story.id] || 0;
     if (new Date(story.created_at).getTime() > new Date(groups[key].newestAt).getTime()) groups[key].newestAt = story.created_at;
     return groups;
   }, {})).map((group: any) => {
@@ -156,14 +174,36 @@ export default function StoriesScreen() {
     const bSameDistrict = membership(b).ring && !bFollowed;
     return Number(bFollowed) - Number(aFollowed) || Number(bSameDistrict) - Number(aSameDistrict) || Number(b.hasUnseen) - Number(a.hasUnseen) || new Date(b.newestAt).getTime() - new Date(a.newestAt).getTime();
   });
+  const trendingScore = (group: any) => {
+    const ageHours = Math.max(0, (Date.now() - new Date(group.newestAt).getTime()) / 3600000);
+    const engagement = group.totalViews + group.totalLikes * 4 + (followerCounts[group.authorId] || 0) * 0.15;
+    return (engagement + (group.hasUnseen ? 2 : 0)) / Math.pow(1 + ageHours / 8, 1.35);
+  };
   const trendingAuthors = groupedAuthors.filter((group: any) => membership(group).trending).slice().sort((a: any, b: any) =>
-    b.totalViews - a.totalViews || new Date(b.newestAt).getTime() - new Date(a.newestAt).getTime()
+    trendingScore(b) - trendingScore(a) || new Date(b.newestAt).getTime() - new Date(a.newestAt).getTime()
   );
+  const ringColor = (author: any) => author?.account_type === 'freelance' ? '#8B5CF6' : ['business', 'merchant'].includes(author?.account_type) ? '#F59E0B' : author?.role === 'admin' ? '#065F46' : '#10B981';
+  const displayName = (author: any) => author?.hide_name ? 'مجهول' : (author?.display_name || author?.username || 'جار الحي');
+  async function toggleFollow(authorId: string) {
+    if (!viewerId || authorId === viewerId) return;
+    const following = followingIds.includes(authorId);
+    const result = following
+      ? await supabase.from('follows').delete().eq('follower_id', viewerId).eq('following_id', authorId)
+      : await supabase.from('follows').insert({ follower_id: viewerId, following_id: authorId });
+    if (!result.error) setFollowingIds(prev => following ? prev.filter(id => id !== authorId) : [...prev, authorId]);
+  }
 
-  function openAuthorStories(authorStories: any[]) {
+  function openAuthorStories(authorStories: any[], collection: any[] = storyRings) {
     const firstUnseen = authorStories.find((story: any) => !seenStoryIds.includes(story.id));
     const target = firstUnseen || authorStories[0];
-    if (target?.id) router.push({ pathname: '/story', params: { id: target.id, resume: '1' } });
+    if (target?.id) {
+      const pos = collection.findIndex((group: any) => group.authorId === target.author_id);
+      const queue = [...collection.slice(pos + 1), ...collection.slice(0, Math.max(0, pos))]
+        .filter((group: any) => group.authorId !== target.author_id)
+        .map((group: any) => (group.stories.find((story: any) => !seenStoryIds.includes(story.id)) || group.stories[0])?.id)
+        .filter(Boolean);
+      router.push({ pathname: '/story', params: { id: target.id, resume: '1', next: queue.join(',') } });
+    }
   }
 
   return (
@@ -188,7 +228,7 @@ export default function StoriesScreen() {
       <View style={styles.ringsSection}>
           <View style={styles.sectionHeadingRow}>
             <View style={{ alignItems: 'flex-end', flex: 1 }}>
-              <Text style={styles.sectionHeading}>أهل الحي ومن أتابعهم</Text>
+              <Text style={styles.sectionHeading}>يوميات أهل الحي والمتابَعين</Text>
               <Text style={styles.sectionSubheading}>{currentDistrict ? `أهل ${currentDistrict} ومن تتابعهم` : 'من تتابعهم · أضف حيّك في ملفك الشخصي لعرض الجيران'}</Text>
             </View>
             <View style={styles.livePill}><View style={styles.liveDot} /><Text style={styles.livePillText}>مباشر</Text></View>
@@ -197,19 +237,20 @@ export default function StoriesScreen() {
             <Pressable style={styles.ringItem} accessibilityRole="button" accessibilityLabel="أضف يومياتك" onPress={() => router.push(needsLogin ? '/auth' : '/create-story')}><View style={[styles.ringOuter, styles.ringSeen]}><Plus size={27} color="#059669" /></View><Text style={styles.ringName}>أضف يومياتك</Text></Pressable>
             {storyRings.map((group: any) => {
               const author = group.author;
-              const name = author?.display_name || author?.username || 'جار الحي';
+              const name = displayName(author);
               return (
                 <Pressable key={group.authorId} style={styles.ringItem}
-                  onPress={() => openAuthorStories(group.stories)}
+                  onPress={() => openAuthorStories(group.stories, storyRings)}
                   accessibilityRole="button" accessibilityLabel={`عرض يوميات ${name}`}>
-                  <Animated.View style={[styles.ringOuter, group.hasUnseen ? styles.ringUnseen : styles.ringSeen, group.stories.length > 1 && { transform: [{ scale: storyRingPulse }] }]}>
+                  <Animated.View style={[styles.ringOuter, group.hasUnseen ? { borderColor: ringColor(author), borderWidth: 3.5 } : styles.ringSeen, group.stories.length > 1 && { transform: [{ scale: storyRingPulse }] }]}>
                     <View style={styles.ringInner}>
-                      {author?.avatar_url ? <Image source={{ uri: author.avatar_url }} style={styles.ringAvatar} /> :
-                        <View style={styles.ringAvatarFallback}><Text style={styles.ringInitial}>{name[0]}</Text></View>}
+                      {!author?.hide_name && author?.avatar_url ? <Image source={{ uri: author.avatar_url }} style={styles.ringAvatar} /> :
+                        <View style={styles.ringAvatarFallback}><Text style={styles.ringInitial}>{author?.hide_name ? '؟' : name[0]}</Text></View>}
                     </View>
                     <View style={styles.ringCount}><Text style={styles.ringCountText}>{group.stories.length}</Text></View>
                   </Animated.View>
                   <Text style={styles.ringName} numberOfLines={1}>{name}</Text>
+                  {author?.hide_name && author?.username ? <Text style={[styles.ringName, { fontSize: 9 }]} numberOfLines={1}>@{String(author.username).replace(/^@/, '')}</Text> : null}
                 </Pressable>
               );
             })}
@@ -232,7 +273,7 @@ export default function StoriesScreen() {
           />
         }
       >
-        <View style={styles.trendingSectionTitleRow}><View style={styles.trendingSectionAccent} /><View style={{ flex: 1, alignItems: 'flex-end' }}><Text style={styles.sectionHeading}>ترند المدينة</Text><Text style={styles.sectionSubheading}>{currentCity ? `الأكثر مشاهدة في ${currentCity} خلال ٢٤ ساعة` : 'حدد مدينتك من ملفك الشخصي'}</Text></View></View>
+        <View style={styles.trendingSectionTitleRow}><View style={styles.trendingSectionAccent} /><View style={{ flex: 1, alignItems: 'flex-end' }}><Text style={styles.sectionHeading}>ترند المدينة</Text><Text style={styles.sectionSubheading}>{currentCity ? `الأكثر تفاعلًا في جميع أحياء ${currentCity} خلال ٢٤ ساعة` : 'حدد مدينتك من ملفك الشخصي'}</Text></View></View>
         {errorText ? <Pressable accessibilityRole="button" onPress={() => void loadAllStories()} style={{ padding: 16 }}><Text style={{ color: '#A65A49', textAlign: 'right' }}>تعذر تحميل اليوميات. اضغط لإعادة المحاولة.</Text></Pressable> : null}
         {loading && !refreshing ? (
           <View style={styles.loadingBox}>
@@ -262,14 +303,14 @@ export default function StoriesScreen() {
               {trendingAuthors.slice(0, visibleTrendingCount).map((group: any) => {
                 const story = group.latestStory;
                 const author = group.author;
-                const name = author?.display_name || author?.username || 'جار الحي';
+                const name = displayName(author);
                 const verified = author?.is_verified || author?.is_geoverified;
                 const bg = story.bg_color || '#059669';
                 const hasMedia = story.type === 'image' && Boolean(story.image_url);
                 const allSeen = !group.hasUnseen;
                 return (
                   <Pressable key={group.authorId}
-                    style={[styles.storyCard, allSeen ? styles.storyCardSeen : styles.storyCardNew]}
+                    style={[styles.storyCard, { borderWidth: allSeen ? 1 : 2.5, borderColor: allSeen ? '#94A3B8' : ringColor(author) }]}
                     onPress={() => openAuthorStories(group.stories)}
                     accessibilityRole="button" accessibilityLabel={"فتح يوميات " + name}>
                     <View style={[styles.storyCardMedia, { backgroundColor: bg }, allSeen && styles.storyCardMediaSeen]}>
@@ -281,13 +322,18 @@ export default function StoriesScreen() {
                       <LinearGradient colors={['rgba(0,0,0,0.55)', 'transparent', 'rgba(0,0,0,0.82)']} style={StyleSheet.absoluteFillObject} />
                       <View style={styles.storyCardTopRow}>
                         <View style={styles.cardAvatarWrap}>
-                          {author?.avatar_url ? <Image source={{ uri: author.avatar_url }} style={styles.cardAvatar} /> :
-                            <View style={styles.cardAvatarFallback}><Text style={styles.cardAvatarLetter}>{name[0]}</Text></View>}
+                          {!author?.hide_name && author?.avatar_url ? <Image source={{ uri: author.avatar_url }} style={styles.cardAvatar} /> :
+                            <View style={styles.cardAvatarFallback}><Text style={styles.cardAvatarLetter}>{author?.hide_name ? '؟' : name[0]}</Text></View>}
                           {verified && <View style={styles.cardVerifyBadge}><ShieldCheck size={9} color="#fff" /></View>}
                         </View>
                         <View style={{ flex: 1, alignItems: 'flex-end' }}>
                           <Text style={styles.cardAuthorName} numberOfLines={1}>{name}</Text>
-                          <Text style={styles.cardTimeText}>{relativeTime(story.created_at)}</Text>
+                          {author?.hide_name && author?.username ? <Text style={styles.cardTimeText}>@{String(author.username).replace(/^@/, '')}</Text> : null}
+                          <Text style={styles.cardTimeText}>{relativeTime(story.created_at)} · {group.totalViews} مشاهدة · {group.totalLikes} إعجاب</Text>
+                          {group.authorId !== viewerId && <Pressable accessibilityRole="button" accessibilityLabel={followingIds.includes(group.authorId) ? 'إلغاء المتابعة' : 'متابعة'} onPress={(event) => { event.stopPropagation(); void toggleFollow(group.authorId); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4 }}>
+                            {followingIds.includes(group.authorId) ? <Check size={13} color="#D1FAE5" /> : <UserPlus size={13} color="#D1FAE5" />}
+                            <Text style={{ color: '#D1FAE5', fontSize: 11, fontWeight: '800' }}>{followingIds.includes(group.authorId) ? 'تتابعه' : 'متابعة'}</Text>
+                          </Pressable>}
                           <Text style={[styles.storySeenLabel, allSeen ? styles.storySeenLabelSeen : styles.storySeenLabelNew]}>
                             {allSeen ? 'تمت المشاهدة' : 'يوميات جديدة'}
                           </Text>
