@@ -248,7 +248,7 @@ export default function Home() {
               ] as const).map(([key, label]) => (
                 <Pressable key={key} onPress={() => setSortBy(key)} style={{ height: 44, width: 98, borderRadius: 22, overflow: 'hidden', justifyContent: 'center' }} accessibilityRole="button" accessibilityState={{ selected: sortBy === key }}>
                   {sortBy === key ? (
-                    <ImageBackground source={{ uri: Platform.OS === 'web' ? '/images/buttons/sort-active-bg.png' : 'https://appksatest.vercel.app/images/buttons/sort-active-bg.png' }} resizeMode="stretch" style={{ height: 44, width: '100%', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 8, backgroundColor: '#e7f5ed' }}>
+                    <ImageBackground source={{ uri: Platform.OS === 'web' ? '/images/buttons/sort-active-bg.png' : 'https://appksatest.vercel.app/images/buttons/sort-active-bg.png' }} resizeMode="stretch" style={{ height: 44, width: 98, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 8, backgroundColor: '#e7f5ed' }}>
                       <Text style={{ color: '#064e3b', fontSize: 12, fontWeight: '900' }}>{label}</Text>
                     </ImageBackground>
                   ) : (
@@ -259,8 +259,8 @@ export default function Home() {
                 </Pressable>
               ))}
             </ScrollView>
-            <Pressable onPress={() => { setDraftKind(appliedFilters.kind); setDraftStatus(appliedFilters.status); setDraftPeriod(appliedFilters.period); setFilterOpen(true); }} style={{ minHeight: 44, minWidth: 98, borderRadius: 22, overflow: 'hidden', justifyContent: 'center' }} accessibilityRole="button" accessibilityLabel="تصفية المنشورات">
-              <ImageBackground source={{ uri: Platform.OS === 'web' ? '/images/buttons/filter-glass-bg.png' : 'https://appksatest.vercel.app/images/buttons/filter-glass-bg.png' }} resizeMode="stretch" style={{ minHeight: 44, paddingHorizontal: 14, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            <Pressable onPress={() => { setDraftKind(appliedFilters.kind); setDraftStatus(appliedFilters.status); setDraftPeriod(appliedFilters.period); setFilterOpen(true); }} style={{ width: 98, height: 44, borderRadius: 22, overflow: 'hidden', justifyContent: 'center' }} accessibilityRole="button" accessibilityLabel="تصفية المنشورات">
+              <ImageBackground source={{ uri: Platform.OS === 'web' ? '/images/buttons/filter-glass-bg.png' : 'https://appksatest.vercel.app/images/buttons/filter-glass-bg.png' }} resizeMode="stretch" style={{ height: 44, width: 98, paddingHorizontal: 8, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                 <SlidersHorizontal size={15} color="#176b52" />
                 <Text style={{ color: '#176b52', fontSize: 12, fontWeight: '900' }}>تصفية</Text>
                 {(appliedFilters.kind !== 'الكل' || appliedFilters.status !== 'الكل' || appliedFilters.period !== 'كل الأوقات') && <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#dc2626' }} />}
