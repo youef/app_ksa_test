@@ -96,7 +96,7 @@ export default function SetLocationScreen() {
   }
 
   return <View style={styles.page}>
-    <ImageBackground source={{ uri: Platform.OS === 'web' ? '/welcome/hayna-heritage-bg.png' : 'https://appksatest.vercel.app/welcome/hayna-heritage-bg.png' }} style={StyleSheet.absoluteFillObject} resizeMode="cover" imageStyle={{ opacity: 0.22 }} />
+
     <ScrollView contentContainerStyle={styles.scroll}>
       <View style={styles.iconWrap}><MapPin size={35} color="#047857" strokeWidth={1.8} /></View>
       <Text style={styles.title}>أهلًا بك في حيّنا</Text>
