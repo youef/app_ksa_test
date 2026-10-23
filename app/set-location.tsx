@@ -113,6 +113,30 @@ export default function SetLocationScreen() {
         } catch { /* Show verified city without inventing a district. */ }
       }
 
+      // Independent address provider: some Saudi neighborhoods are not present
+      // in Apple's/Android's reverse geocoder or Nominatim response.
+      if (!district) {
+        try {
+          const url = 'https://api.bigdatacloud.net/data/reverse-geocode-client?latitude='
+            + encodeURIComponent(String(coords.latitude))
+            + '&longitude=' + encodeURIComponent(String(coords.longitude))
+            + '&localityLanguage=ar';
+          const response = await fetch(url);
+          if (response.ok) {
+            const data = await response.json();
+            const entries: Array<{ name?: string; description?: string }> = Array.isArray(data.localityInfo?.informative)
+              ? data.localityInfo.informative : [];
+            const neighborhood = entries.find(entry =>
+              /neighbou?rhood|suburb|quarter|district|حي|ضاحية/i.test(entry.description || '')
+              && entry.name && entry.name.trim() !== resolved?.city
+            );
+            district = String(neighborhood?.name || '').trim();
+            resolved = resolved || resolveCity(String(data.city || data.locality || ''));
+          }
+        } catch { /* No unsupported neighborhood guess. */ }
+      }
+      // A city alone is not a verified neighborhood; never save it as if it were.
+      if (!district) throw new Error('تم تحديد المدينة من GPS لكن مزودي الخرائط لم يرجعوا اسم الحي. تأكد من تفعيل الموقع الدقيق ثم أعد المحاولة.');
       if (!resolved) throw new Error('تم الحصول على إحداثياتك، لكن تعذر تحديد اسم المدينة من خدمات العناوين. حاول مجددًا.');
       setLocation({ city: resolved.city, region: resolved.region || region || 'المملكة العربية السعودية', district });
     }).catch(e => {
