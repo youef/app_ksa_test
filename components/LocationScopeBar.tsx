@@ -35,8 +35,8 @@ export default function LocationScopeBar({ location, onLocationChanged, compact 
       const region = place?.region?.trim() || '';
       const city = place?.city?.trim() || '';
       const district = place?.district?.trim() || '';
-      if (!place || place.isOutsideKSA || !region || !city || !district || !isKnownSaudiCity(city)) {
-        Alert.alert('تعذر التحقق من الموقع', 'لم نستطع تأكيد المنطقة والمدينة والحي من بيانات الموقع الحقيقية. أعد المحاولة بعد تفعيل GPS.');
+      if (!place || place.isOutsideKSA || !region || !city || (scope === 'district' && !district) || !isKnownSaudiCity(city)) {
+        Alert.alert('تعذر التحقق من الموقع', scope === 'city' ? 'لم نستطع تحديد المدينة من الموقع الحالي. تحقق من صلاحية الموقع وأعد المحاولة.' : 'لم نستطع تحديد اسم الحي من بيانات الخرائط. يمكنك اختيار «المدينة كاملة» دون الحاجة إلى اسم الحي.');
         return;
       }
       const next: HaynaLocation = {
