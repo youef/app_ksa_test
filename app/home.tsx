@@ -358,9 +358,11 @@ export default function Home() {
                       const selected = section.value === option;
                       const OptionIcon = FILTER_OPTION_ICONS[option] || ListFilter;
                       return (
-                        <Pressable key={option} onPress={() => section.setter(option)} style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 14, backgroundColor: selected ? '#176b52' : '#ffffff', borderWidth: 1, borderColor: selected ? '#176b52' : '#dbe5df' }} accessibilityRole="button" accessibilityState={{ selected }}>
-                          <OptionIcon size={14} color={selected ? '#ffffff' : '#176b52'} />
-                          <Text style={{ color: selected ? '#ffffff' : '#475569', fontSize: 12, fontWeight: '800' }}>{option}</Text>
+                        <Pressable key={option} onPress={() => section.setter(option)} style={{ borderRadius: 16, overflow: 'hidden', minHeight: 42, justifyContent: 'center' }} accessibilityRole="button" accessibilityState={{ selected }}>
+                          <ImageBackground source={{ uri: Platform.OS === 'web' ? (selected ? '/images/buttons/sort-active-bg.png' : '/images/buttons/filter-glass-bg.png') : (selected ? 'https://appksatest.vercel.app/images/buttons/sort-active-bg.png' : 'https://appksatest.vercel.app/images/buttons/filter-glass-bg.png') }} resizeMode="stretch" style={{ minHeight: 42, paddingHorizontal: 14, paddingVertical: 9, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6 }} imageStyle={{ borderRadius: 16 }}>
+                            <OptionIcon size={14} color="#064e3b" />
+                            <Text style={{ color: '#064e3b', fontSize: 12, fontWeight: selected ? '900' : '800' }}>{option}</Text>
+                          </ImageBackground>
                         </Pressable>
                       );
                     })}
