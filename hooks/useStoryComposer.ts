@@ -140,6 +140,19 @@ export function useStoryComposer() {
     return true;
   }, [requestAddImages]);
 
+  const cropActiveImage = useCallback(async (): Promise<boolean> => {
+    const res = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [9, 16],
+      quality: 1,
+      base64: true,
+    });
+    if (res.canceled || !res.assets?.length) return false;
+    attachImageToActiveSlide(res.assets[0]);
+    return true;
+  }, [attachImageToActiveSlide]);
+
   const takePhoto = useCallback(async (): Promise<boolean> => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') return false;
