@@ -202,17 +202,17 @@ export default function Auth() {
               disabled={loading}
               accessibilityRole="button"
             >
-              <LinearGradient
-                colors={['#047857', '#047857']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
+              <ImageBackground
+                source={{ uri: Platform.OS === 'web' ? '/images/buttons/hayna-login-button-bg.png' : 'https://appksatest.vercel.app/images/buttons/hayna-login-button-bg.png' }}
+                resizeMode="stretch"
                 style={styles.submitGradient}
+                imageStyle={{ borderRadius: 14 }}
               >
                 <Text style={styles.submitBtnText}>
                   {loading ? 'جاري التنفيذ...' : isLogin ? 'تسجيل الدخول' : 'إنشاء الحساب والانضمام'}
                 </Text>
                 {!loading && <ArrowRight size={18} color="#fff" style={{ marginRight: 6 }} />}
-              </LinearGradient>
+              </ImageBackground>
             </Pressable>
 
             <Pressable
@@ -379,7 +379,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   submitBtn: {
-    borderRadius: 14,
+    borderRadius: 25,
     overflow: 'hidden',
     marginTop: 10,
     shadowColor: '#047857',
@@ -393,7 +393,7 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.99 }],
   },
   submitGradient: {
-    height: 50,
+    height: 56,
     flexDirection: 'row-reverse',
     justifyContent: 'center',
     alignItems: 'center',
