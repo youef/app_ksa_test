@@ -358,10 +358,10 @@ export default function Home() {
                       const selected = section.value === option;
                       const OptionIcon = FILTER_OPTION_ICONS[option] || ListFilter;
                       return (
-                        <Pressable key={option} onPress={() => section.setter(option)} style={{ borderRadius: 16, overflow: 'hidden', minHeight: 42, justifyContent: 'center' }} accessibilityRole="button" accessibilityState={{ selected }}>
-                          <ImageBackground source={{ uri: Platform.OS === 'web' ? (selected ? '/images/buttons/sort-active-bg.png' : '/images/buttons/filter-glass-bg.png') : (selected ? 'https://appksatest.vercel.app/images/buttons/sort-active-bg.png' : 'https://appksatest.vercel.app/images/buttons/filter-glass-bg.png') }} resizeMode="stretch" style={{ minHeight: 42, paddingHorizontal: 14, paddingVertical: 9, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6 }} imageStyle={{ borderRadius: 16 }}>
+                        <Pressable key={option} onPress={() => section.setter(option)} style={{ width: '48%', height: 50, borderRadius: 16, overflow: 'hidden', justifyContent: 'center', flexShrink: 0 }} accessibilityRole="button" accessibilityState={{ selected }}>
+                          <ImageBackground source={{ uri: Platform.OS === 'web' ? (selected ? '/images/buttons/sort-active-bg.png' : '/images/buttons/filter-glass-bg.png') : (selected ? 'https://appksatest.vercel.app/images/buttons/sort-active-bg.png' : 'https://appksatest.vercel.app/images/buttons/filter-glass-bg.png') }} resizeMode="stretch" style={{ width: '100%', height: 50, paddingHorizontal: 8, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 5 }} imageStyle={{ borderRadius: 16 }}>
                             <OptionIcon size={14} color="#064e3b" />
-                            <Text style={{ color: '#064e3b', fontSize: 12, fontWeight: selected ? '900' : '800' }}>{option}</Text>
+                            <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75} style={{ flexShrink: 1, color: '#064e3b', fontSize: 12, fontWeight: '900', textAlign: 'center' }}>{option}</Text>
                           </ImageBackground>
                         </Pressable>
                       );
