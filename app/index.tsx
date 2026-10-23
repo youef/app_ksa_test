@@ -119,7 +119,6 @@ export default function Index() {
           <View style={styles.spacer} />
 
           <View style={styles.bottomPanel}>
-            <View style={styles.panelHandle} />
             <Text style={styles.panelTitle}>أهلًا بك في حيّنا</Text>
             <Text style={styles.panelSubtitle}>حيّك وناسك وخدماتك في مكان واحد</Text>
 
@@ -153,8 +152,7 @@ const styles = StyleSheet.create({
   logo: { width: 112, height: 112 },
   logoCompact: { width: 84, height: 84 },
   spacer: { flexGrow: 1, minHeight: 8 },
-  bottomPanel: { width: '100%', maxWidth: 440, borderRadius: 28, paddingHorizontal: 18, paddingTop: 15, paddingBottom: 18, backgroundColor: 'rgba(255,253,247,0.91)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.92)', alignItems: 'center', ...Platform.select({ web: { boxShadow: '0px 8px 36px rgba(34,65,48,0.10)' } as any, default: { elevation: 3 } }) },
-  panelHandle: { width: 36, height: 4, borderRadius: 3, backgroundColor: '#D5DED7', marginBottom: 12 },
+  bottomPanel: { width: '100%', maxWidth: 440, paddingHorizontal: 18, paddingTop: 15, paddingBottom: 18, backgroundColor: 'transparent', borderWidth: 0, alignItems: 'center' },
   panelTitle: { color: '#173F30', fontSize: 19, fontWeight: '900', textAlign: 'center' },
   panelSubtitle: { color: '#63766A', fontSize: 12, fontWeight: '600', textAlign: 'center', marginTop: 4, marginBottom: 20 },
   primaryButton: { width: '100%', minHeight: 62, borderRadius: 18, overflow: 'hidden', backgroundColor: 'transparent', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 18 },
