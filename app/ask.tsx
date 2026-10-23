@@ -391,7 +391,7 @@ export default function AskScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#ffffff' },
+  screen: { flex: 1, backgroundColor: 'transparent' },
   scroll: { flex: 1 },
   content: { flexGrow: 1, padding: 22, paddingBottom: 28, width: '100%', maxWidth: 560, alignSelf: 'center' },
   progress: { direction: 'ltr', flexDirection: 'row-reverse', gap: 7, marginBottom: 27 },
