@@ -15,6 +15,7 @@ import {
 // Animated header background, separate from the logo and controls.
 // The background is separate from the interactive buttons and text below.
 const LOGIN_BUTTON_BACKGROUND = { uri: Platform.OS === 'web' ? '/images/buttons/hayna-login-button-bg.png' : 'https://appksatest.vercel.app/images/buttons/hayna-login-button-bg.png' };
+const SECONDARY_BUTTON_BACKGROUND = { uri: Platform.OS === 'web' ? '/images/buttons/hayna-secondary-button-transparent.png' : 'https://appksatest.vercel.app/images/buttons/hayna-secondary-button-transparent.png' };
 
 const WELCOME_BACKGROUND = {
   uri: Platform.OS === 'web'
@@ -128,8 +129,9 @@ export default function Index() {
               <Text style={[styles.primaryText, styles.primaryButtonContent]}>تسجيل الدخول</Text>
             </Pressable>
             <Pressable onPress={() => router.replace('/home')} accessibilityRole="button" accessibilityLabel="استكشاف حيّنا دون تسجيل" style={styles.explore}>
-              <Text style={styles.exploreText}>استكشف حيّنا دون تسجيل</Text>
-              <ArrowRight size={16} color="#166044" />
+              <Image source={SECONDARY_BUTTON_BACKGROUND} resizeMode="stretch" pointerEvents="none" style={styles.exploreArtwork} />
+              <Text style={[styles.exploreText, styles.exploreContent]}>استكشف حيّنا دون تسجيل</Text>
+              <ArrowRight size={16} color="#166044" style={styles.exploreContent} />
             </Pressable>
             <View style={styles.trustRow}><ShieldCheck size={15} color="#047857" /><Text style={styles.trustText}>مجتمع محلي، خصوصية واحترام للجميع</Text></View>
           </View>
@@ -159,7 +161,9 @@ const styles = StyleSheet.create({
   primaryButtonArtwork: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
   primaryButtonContent: { zIndex: 1 },
   primaryText: { color: '#FFFFFF', fontSize: 17, fontWeight: '900' },
-  explore: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 43, marginTop: 8 },
+  explore: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, height: 62, width: '100%', marginTop: 8, backgroundColor: 'transparent', borderWidth: 0 },
+  exploreArtwork: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
+  exploreContent: { zIndex: 1 },
   exploreText: { color: '#166044', fontSize: 12, fontWeight: '800' },
   trustRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 8 },
   trustText: { color: '#718176', fontSize: 10, fontWeight: '600' },
