@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
+  Platform,
   Alert,
   RefreshControl,
   ScrollView,
@@ -9,6 +11,8 @@ import {
   Text,
   View,
 } from 'react-native';
+const HAYNA_ACTION_ART = { uri: Platform.OS === 'web' ? '/images/buttons/hayna-login-button-bg.png' : 'https://appksatest.vercel.app/images/buttons/hayna-login-button-bg.png' };
+
 import { router } from 'expo-router';
 import { Sparkles, SlidersHorizontal } from 'lucide-react-native';
 
@@ -244,7 +248,8 @@ export default function Questions() {
         <LocationScopeBar location={activeLoc} />
         <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', alignItems: 'center', gap: 7, marginTop: 8, marginBottom: 12 }}>
           {([['newest', 'الأحدث'], ['engaged', 'الأكثر تفاعلاً'], ['nearby', 'الأقرب']] as const).map(([key, label]) => (
-            <Pressable key={key} accessibilityRole="button" accessibilityState={{ selected: sortBy === key }} onPress={() => setSortBy(key)} style={{ paddingHorizontal: 13, paddingVertical: 8, borderRadius: 18, backgroundColor: sortBy === key ? '#176b52' : '#ffffff', borderWidth: 1, borderColor: sortBy === key ? '#176b52' : '#dbe5df' }}>
+            <Pressable key={key} accessibilityRole="button" accessibilityState={{ selected: sortBy === key }} onPress={() => setSortBy(key)} style={{ paddingHorizontal: 13, paddingVertical: 8, borderRadius: 18, overflow: 'hidden', backgroundColor: '#ffffff', borderWidth: sortBy === key ? 0 : 1, borderColor: '#dbe5df' }}>
+              {sortBy === key && <Image source={HAYNA_ACTION_ART} resizeMode="stretch" pointerEvents="none" style={StyleSheet.absoluteFillObject} />}
               <Text style={{ color: sortBy === key ? '#ffffff' : '#475569', fontSize: 12, fontWeight: '800' }}>{label}</Text>
             </Pressable>
           ))}
