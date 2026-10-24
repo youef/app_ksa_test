@@ -1,15 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import {
+import { ImageBackground,
   ActivityIndicator,
   Alert,
   Image,
   Pressable,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+const HAYNA_ACTION_ART = { uri: Platform.OS === 'web' ? '/images/buttons/hayna-login-button-bg.png' : 'https://appksatest.vercel.app/images/buttons/hayna-login-button-bg.png' };
 import { router, useLocalSearchParams } from 'expo-router';
 import {
   Camera,
@@ -239,7 +241,8 @@ export default function NewListing() {
           <Text style={styles.hint}>يمكنك تعديل الموقع الأساسي من مركز حسابك، وهو المصدر الرئيسي لكل المحتوى.</Text>
         </View>
 
-        <Pressable style={styles.submit} onPress={() => void saveProduct()} disabled={busy}>
+        <Pressable style={styles.submit} onPress={() =>
+          <ImageBackground source={HAYNA_ACTION_ART} resizeMode="stretch" pointerEvents="none" style={StyleSheet.absoluteFillObject} /> void saveProduct()} disabled={busy}>
           {busy ? <ActivityIndicator color="#FFFFFF" /> : <ShoppingBag size={18} color="#FFFFFF" />}
           <Text style={styles.submitText}>نشر المنتج</Text>
         </Pressable>
@@ -293,6 +296,6 @@ const styles = StyleSheet.create({
   input: { minHeight: 44, borderRadius: 12, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', paddingHorizontal: 11, color: '#0F172A', fontSize: 12, fontWeight: '700' },
   multiline: { minHeight: 96, textAlignVertical: 'top', paddingTop: 10 },
   hint: { color: '#94A3B8', fontSize: 9.5, lineHeight: 15, textAlign: 'right' },
-  submit: { minHeight: 52, borderRadius: 15, backgroundColor: '#0F766E', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 7 },
+  submit: { minHeight: 52, borderRadius: 0, backgroundColor: 'transparent', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 7 },
   submitText: { color: '#FFFFFF', fontSize: 13, fontWeight: '900' },
 });
