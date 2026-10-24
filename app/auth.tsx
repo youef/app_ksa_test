@@ -5,10 +5,10 @@ import { supabase } from '@/lib/supabase';
 import { getBrandingLogo, FALLBACK_LOGO_URI, subscribeBrandingLogo, getCachedBrandingLogo } from '@/lib/branding';
 import { Mail, Lock, User, ArrowRight, Compass, ShieldCheck, Eye, EyeOff, LogIn, UserRoundPlus } from 'lucide-react-native';
 import { AppHeader } from '@/components/shared/AppHeader';
-import { HAYNA_BUTTON } from '@/components/shared/haynaButtonTokens';
+import { HAYNA_BUTTON, HAYNA_BUTTON_IMAGES } from '@/components/shared/haynaButtonTokens';
 
-const LOGIN_BUTTON_BACKGROUND = { uri: Platform.OS === 'web' ? '/images/buttons/hayna-login-button-bg.png' : 'https://appksatest.vercel.app/images/buttons/hayna-login-button-bg.png' };
-const SECONDARY_BUTTON_BACKGROUND = { uri: Platform.OS === 'web' ? '/images/buttons/hayna-secondary-button-transparent.png' : 'https://appksatest.vercel.app/images/buttons/hayna-secondary-button-transparent.png' };
+const LOGIN_BUTTON_BACKGROUND = { uri: Platform.OS === 'web' ? HAYNA_BUTTON_IMAGES.primary : 'https://appksatest.vercel.app' + HAYNA_BUTTON_IMAGES.primary };
+const SECONDARY_BUTTON_BACKGROUND = { uri: Platform.OS === 'web' ? HAYNA_BUTTON_IMAGES.secondary : 'https://appksatest.vercel.app' + HAYNA_BUTTON_IMAGES.secondary };
 const AUTH_BACKGROUND = { uri: 'https://appksatest.vercel.app/welcome/welcome-background.png' };
 
 export default function Auth() {
@@ -385,6 +385,7 @@ const styles = StyleSheet.create({
   eyeButton: { padding: 7, marginLeft: 2 },
   submitArtwork: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
   submitBtn: {
+    height: HAYNA_BUTTON.heroHeight,
     marginTop: HAYNA_BUTTON.verticalGap,
     width: '100%',
     backgroundColor: 'transparent',
@@ -410,7 +411,7 @@ const styles = StyleSheet.create({
   submitBtnText: {
     color: '#fff',
     fontWeight: '900',
-    fontSize: 15,
+    fontSize: HAYNA_BUTTON.fontSize,
   },
   guestBtn: {
     height: HAYNA_BUTTON.heroHeight,
