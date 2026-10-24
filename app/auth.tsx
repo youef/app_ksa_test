@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { getBrandingLogo, FALLBACK_LOGO_URI, subscribeBrandingLogo, getCachedBrandingLogo } from '@/lib/branding';
 import { Mail, Lock, User, ArrowRight, Compass, ShieldCheck, Eye, EyeOff, LogIn, UserRoundPlus } from 'lucide-react-native';
 import { AppHeader } from '@/components/shared/AppHeader';
+import { HAYNA_BUTTON } from '@/components/shared/haynaButtonTokens';
 
 const LOGIN_BUTTON_BACKGROUND = { uri: Platform.OS === 'web' ? '/images/buttons/hayna-login-button-bg.png' : 'https://appksatest.vercel.app/images/buttons/hayna-login-button-bg.png' };
 const SECONDARY_BUTTON_BACKGROUND = { uri: Platform.OS === 'web' ? '/images/buttons/hayna-secondary-button-transparent.png' : 'https://appksatest.vercel.app/images/buttons/hayna-secondary-button-transparent.png' };
@@ -384,7 +385,8 @@ const styles = StyleSheet.create({
   eyeButton: { padding: 7, marginLeft: 2 },
   submitArtwork: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
   submitBtn: {
-    marginTop: 10,
+    marginTop: HAYNA_BUTTON.verticalGap,
+    width: '100%',
     backgroundColor: 'transparent',
     borderWidth: 0,
     borderRadius: 0,
@@ -397,7 +399,7 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.99 }],
   },
   submitGradient: {
-    height: 62,
+    height: HAYNA_BUTTON.heroHeight,
     width: '100%',
     backgroundColor: 'transparent',
     flexDirection: 'row-reverse',
@@ -411,12 +413,13 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   guestBtn: {
-    height: 46,
+    height: HAYNA_BUTTON.heroHeight,
+    width: '100%',
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    marginTop: 10,
+    marginTop: HAYNA_BUTTON.verticalGap,
     borderWidth: 0,
     backgroundColor: 'transparent',
   },
@@ -424,7 +427,7 @@ const styles = StyleSheet.create({
   guestContent: { zIndex: 1 },
   guestBtnText: {
     color: '#047857',
-    fontSize: 13,
+    fontSize: HAYNA_BUTTON.fontSize,
     fontWeight: '800',
   },
   switchWrapper: {
