@@ -8,15 +8,15 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowRight, LogIn, ShieldCheck } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
-import { HAYNA_BUTTON } from '@/components/shared/haynaButtonTokens';
+import { HAYNA_BUTTON, HAYNA_BUTTON_IMAGES } from '@/components/shared/haynaButtonTokens';
 import {
   FALLBACK_LOGO_URI, getBrandingLogo, getCachedBrandingLogo, subscribeBrandingLogo,
 } from '@/lib/branding';
 
 // Animated header background, separate from the logo and controls.
 // The background is separate from the interactive buttons and text below.
-const LOGIN_BUTTON_BACKGROUND = { uri: Platform.OS === 'web' ? '/images/buttons/hayna-login-button-bg.png' : 'https://appksatest.vercel.app/images/buttons/hayna-login-button-bg.png' };
-const SECONDARY_BUTTON_BACKGROUND = { uri: Platform.OS === 'web' ? '/images/buttons/hayna-secondary-button-transparent.png' : 'https://appksatest.vercel.app/images/buttons/hayna-secondary-button-transparent.png' };
+const LOGIN_BUTTON_BACKGROUND = { uri: Platform.OS === 'web' ? HAYNA_BUTTON_IMAGES.primary : 'https://appksatest.vercel.app' + HAYNA_BUTTON_IMAGES.primary };
+const SECONDARY_BUTTON_BACKGROUND = { uri: Platform.OS === 'web' ? HAYNA_BUTTON_IMAGES.secondary : 'https://appksatest.vercel.app' + HAYNA_BUTTON_IMAGES.secondary };
 
 const WELCOME_BACKGROUND = {
   uri: Platform.OS === 'web'
