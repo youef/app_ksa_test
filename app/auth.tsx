@@ -7,6 +7,7 @@ import { Mail, Lock, User, ArrowRight, Compass, ShieldCheck, Eye, EyeOff, LogIn,
 import { AppHeader } from '@/components/shared/AppHeader';
 
 const LOGIN_BUTTON_BACKGROUND = { uri: Platform.OS === 'web' ? '/images/buttons/hayna-login-button-bg.png' : 'https://appksatest.vercel.app/images/buttons/hayna-login-button-bg.png' };
+const SECONDARY_BUTTON_BACKGROUND = { uri: Platform.OS === 'web' ? '/images/buttons/hayna-secondary-button-transparent.png' : 'https://appksatest.vercel.app/images/buttons/hayna-secondary-button-transparent.png' };
 const AUTH_BACKGROUND = { uri: 'https://appksatest.vercel.app/welcome/welcome-background.png' };
 
 export default function Auth() {
@@ -220,8 +221,9 @@ export default function Auth() {
               onPress={() => router.replace('/home')}
               accessibilityRole="button"
             >
-              <Compass size={17} color="#047857" />
-              <Text style={styles.guestBtnText}>تصفح كزائر دون تسجيل</Text>
+              <Image source={SECONDARY_BUTTON_BACKGROUND} resizeMode="stretch" pointerEvents="none" style={styles.guestArtwork} />
+              <Compass size={17} color="#047857" style={styles.guestContent} />
+              <Text style={[styles.guestBtnText, styles.guestContent]}>تصفح كزائر دون تسجيل</Text>
             </Pressable>
 
             <View style={styles.switchWrapper}>
@@ -415,11 +417,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     marginTop: 10,
-    borderWidth: 1,
-    borderColor: '#a7f3d0',
-    borderRadius: 14,
-    backgroundColor: '#ecfdf5',
+    borderWidth: 0,
+    backgroundColor: 'transparent',
   },
+  guestArtwork: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
+  guestContent: { zIndex: 1 },
   guestBtnText: {
     color: '#047857',
     fontSize: 13,
