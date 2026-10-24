@@ -704,8 +704,8 @@ export default function AccountCenter() {
                   <Field label="الاسم الظاهر" value={displayName} onChangeText={setDisplayName} placeholder="اسمك أو اسمك الشخصي" />
                   <Field label="اسم المستخدم" value={username} onChangeText={setUsername} placeholder="username" autoCapitalize="none" />
                   <Field label="النبذة" value={bio} onChangeText={setBio} placeholder="عرّف بنفسك باختصار" multiline />
-                  <Pressable style={styles.primaryButton} onPress={() =>
-                    <ImageBackground source={HAYNA_ACTION_ART} resizeMode="stretch" pointerEvents="none" style={StyleSheet.absoluteFillObject} /> void saveProfile()} disabled={saving}>
+                  <Pressable style={styles.primaryButton} onPress={() => void saveProfile()} disabled={saving}>
+                    <ImageBackground source={HAYNA_ACTION_ART} resizeMode="stretch" pointerEvents="none" style={StyleSheet.absoluteFillObject} />
                     {saving ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Save size={16} color="#FFFFFF" />}
                     <Text style={styles.primaryButtonText}>حفظ الملف</Text>
                   </Pressable>
@@ -797,8 +797,8 @@ export default function AccountCenter() {
                     </View>
                   </Pressable>
 
-                  <Pressable style={styles.primaryButton} onPress={() =>
-                    <ImageBackground source={HAYNA_ACTION_ART} resizeMode="stretch" pointerEvents="none" style={StyleSheet.absoluteFillObject} /> void submitIdentityRequest()} disabled={identitySaving || verificationPending}>
+                  <Pressable style={styles.primaryButton} onPress={() => void submitIdentityRequest()} disabled={identitySaving || verificationPending}>
+                    <ImageBackground source={HAYNA_ACTION_ART} resizeMode="stretch" pointerEvents="none" style={StyleSheet.absoluteFillObject} />
                     {identitySaving ? <ActivityIndicator size="small" color="#FFFFFF" /> : <ShieldCheck size={16} color="#FFFFFF" />}
                     <Text style={styles.primaryButtonText}>{verificationPending ? 'بانتظار مراجعة الإدارة' : 'إرسال طلب المراجعة'}</Text>
                   </Pressable>
