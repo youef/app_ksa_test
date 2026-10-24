@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ImageBackground,
+import {
   View,
   Text,
   StyleSheet,
@@ -14,6 +14,7 @@ import { ImageBackground,
   Linking,
   Modal,
   Alert,
+  ImageBackground,
   ActivityIndicator,
 } from 'react-native';
 const HAYNA_ACTION_ART = { uri: Platform.OS === 'web' ? '/images/buttons/hayna-login-button-bg.png' : 'https://appksatest.vercel.app/images/buttons/hayna-login-button-bg.png' };
