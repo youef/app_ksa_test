@@ -14,8 +14,10 @@ import {
   ActivityIndicator,
   Share,
   Image,
+  ImageBackground,
   Modal,
 } from 'react-native';
+const HAYNA_ACTION_ART = { uri: Platform.OS === 'web' ? '/images/buttons/hayna-login-button-bg.png' : 'https://appksatest.vercel.app/images/buttons/hayna-login-button-bg.png' };
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
@@ -947,7 +949,7 @@ export default function Question() {
             <TextInput style={styles.reportDetailsInput} value={reportDetails} onChangeText={setReportDetails} placeholder="تفاصيل إضافية (اختياري)" placeholderTextColor="#94a3b8" multiline maxLength={350} textAlign="right" />
             <View style={styles.modalFooter}>
               <Pressable style={styles.modalCancelBtn} onPress={() => setReportOpen(false)} disabled={reportBusy}><Text style={styles.modalCancelBtnText}>إلغاء</Text></Pressable>
-              <Pressable style={[styles.modalSubmitBtn, reportBusy && styles.modalSubmitBtnDisabled]} onPress={submitReport} disabled={reportBusy}>{reportBusy ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.modalSubmitBtnText}>إرسال البلاغ</Text>}</Pressable>
+              <Pressable style={[styles.modalSubmitBtn, reportBusy && styles.modalSubmitBtnDisabled]} onPress={submitReport} disabled={reportBusy}><ImageBackground source={HAYNA_ACTION_ART} resizeMode="stretch" pointerEvents="none" style={StyleSheet.absoluteFillObject} />{reportBusy ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.modalSubmitBtnText}>إرسال البلاغ</Text>}</Pressable>
             </View>
           </View>
         </View>
@@ -958,7 +960,7 @@ export default function Question() {
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}><View><Text style={styles.modalTitle}>تعديل الرد</Text><Text style={styles.modalSubtitle}>يمكنك تعديل ردك أنت فقط</Text></View><Pressable style={styles.modalCloseBtn} onPress={() => setEditingAnswer(null)} disabled={savingAnswerEdit}><X size={18} color="#64748b" /></Pressable></View>
             <TextInput style={[styles.modalInput, styles.modalTextArea]} value={editAnswerBody} onChangeText={setEditAnswerBody} placeholder="اكتب الرد بعد التعديل..." placeholderTextColor="#94a3b8" textAlign="right" multiline maxLength={500} />
-            <View style={styles.modalFooter}><Pressable style={styles.modalCancelBtn} onPress={() => setEditingAnswer(null)} disabled={savingAnswerEdit}><Text style={styles.modalCancelBtnText}>إلغاء</Text></Pressable><Pressable style={[styles.modalSubmitBtn, (!editAnswerBody.trim() || savingAnswerEdit) && styles.modalSubmitBtnDisabled]} onPress={saveAnswerEdit} disabled={!editAnswerBody.trim() || savingAnswerEdit}>{savingAnswerEdit ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.modalSubmitBtnText}>حفظ الرد</Text>}</Pressable></View>
+            <View style={styles.modalFooter}><Pressable style={styles.modalCancelBtn} onPress={() => setEditingAnswer(null)} disabled={savingAnswerEdit}><Text style={styles.modalCancelBtnText}>إلغاء</Text></Pressable><Pressable style={[styles.modalSubmitBtn, (!editAnswerBody.trim() || savingAnswerEdit) && styles.modalSubmitBtnDisabled]} onPress={saveAnswerEdit} disabled={!editAnswerBody.trim() || savingAnswerEdit}><ImageBackground source={HAYNA_ACTION_ART} resizeMode="stretch" pointerEvents="none" style={StyleSheet.absoluteFillObject} />{savingAnswerEdit ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.modalSubmitBtnText}>حفظ الرد</Text>}</Pressable></View>
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -1895,9 +1897,9 @@ const styles = StyleSheet.create({
   },
   modalSubmitBtn: {
     flex: 2,
-    backgroundColor: '#059669',
+    backgroundColor: 'transparent',
     paddingVertical: 12,
-    borderRadius: 14,
+    borderRadius: 0,
     alignItems: 'center',
     justifyContent: 'center',
   },
