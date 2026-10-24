@@ -1,5 +1,6 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { ImageBackground, useState, useEffect, useMemo, useRef } from 'react';
 import { Alert, BackHandler, KeyboardAvoidingView, Pressable, ScrollView, Text, TextInput, View, StyleSheet, ActivityIndicator, Platform } from 'react-native';
+const HAYNA_ACTION_ART = { uri: Platform.OS === 'web' ? '/images/buttons/hayna-login-button-bg.png' : 'https://appksatest.vercel.app/images/buttons/hayna-login-button-bg.png' };
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MessageSquare, HeartHandshake, Wrench, Gift, AlertTriangle, Check, ArrowLeft, Users, ShieldAlert } from 'lucide-react-native';
@@ -379,7 +380,8 @@ export default function AskScreen() {
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) }]}>
         <View style={styles.footerContent}>
           <View style={styles.audience}><Users size={15} color="#73877a" /><Text style={styles.audienceText}>لجيران حيّك</Text></View>
-          <Pressable testID="ask-primary" accessibilityRole="button" accessibilityLabel={step === 1 ? 'التالي، كتابة التفاصيل' : 'نشر في الحي'} accessibilityState={{ disabled: busy, busy }} disabled={busy} onPress={() => { if (step === 1) changeStep(2); else void save(); }} style={({ pressed }) => [styles.primary, (busy || pressed) && styles.pressed]}>
+          <Pressable testID="ask-primary" accessibilityRole="button" accessibilityLabel={step === 1 ? 'التالي، كتابة التفاصيل' : 'نشر في الحي'} accessibilityState={{ disabled: busy, busy }} disabled={busy} onPress={() =>
+            <ImageBackground source={HAYNA_ACTION_ART} resizeMode="stretch" pointerEvents="none" style={StyleSheet.absoluteFillObject} /> { if (step === 1) changeStep(2); else void save(); }} style={({ pressed }) => [styles.primary, (busy || pressed) && styles.pressed]}>
             {busy ? <ActivityIndicator color="#ffffff" size="small" /> : null}
             <Text style={styles.primaryText}>{busy ? 'جارٍ النشر…' : step === 1 ? 'التالي' : 'نشر في الحي'}</Text>
             {!busy && step === 1 ? <ArrowLeft size={18} color="#ffffff" /> : null}
@@ -437,7 +439,7 @@ const styles = StyleSheet.create({
   footerContent: { width: '100%', maxWidth: 516, alignSelf: 'center', gap: 11 },
   audience: { direction: 'ltr', flexDirection: 'row-reverse', gap: 5, alignItems: 'center', justifyContent: 'center' },
   audienceText: { fontSize: 11, color: '#73877a' },
-  primary: { direction: 'ltr', flexDirection: 'row-reverse', gap: 9, alignItems: 'center', justifyContent: 'center', minHeight: 52, padding: 14, backgroundColor: '#047857', borderRadius: 17 },
+  primary: { direction: 'ltr', flexDirection: 'row-reverse', gap: 9, alignItems: 'center', justifyContent: 'center', minHeight: 52, padding: 14, backgroundColor: 'transparent', borderRadius: 0 },
   primaryText: { color: '#ffffff', fontSize: 16, fontWeight: '600' },
   pressed: { opacity: 0.65 },
 });
