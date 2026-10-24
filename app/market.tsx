@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import {
+import { ImageBackground,
   View,
   Text,
   StyleSheet,
@@ -16,6 +16,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
+const HAYNA_ACTION_ART = { uri: Platform.OS === 'web' ? '/images/buttons/hayna-login-button-bg.png' : 'https://appksatest.vercel.app/images/buttons/hayna-login-button-bg.png' };
 import { supabase } from '@/lib/supabase';
 import { useBottomNavInset } from '@/lib/bottomNav';
 import ScreenState from '@/components/shared/ScreenState';
@@ -1047,6 +1048,7 @@ export default function Market() {
               </View>
 
               <Pressable id="market-add" accessibilityRole="button" accessibilityLabel={addBtnLabel} style={styles.addBtn} onPress={handleAddPress}>
+                <ImageBackground source={HAYNA_ACTION_ART} resizeMode="stretch" pointerEvents="none" style={StyleSheet.absoluteFillObject} />
                 <Plus size={18} color="#fff" />
                 <Text style={styles.addBtnText}>{addBtnLabel}</Text>
               </Pressable>
@@ -1118,7 +1120,8 @@ export default function Market() {
                       <Text style={styles.emptyText}>
                         كن أول جار يشارك منتجاته أو خدماته مع أهالي {locationLabel} وبدون أي عمولات.
                       </Text>
-                      <Pressable style={styles.emptyBtn} onPress={() => router.push('/new-service')}>
+                      <Pressable style={styles.emptyBtn} onPress={() =>
+                        <ImageBackground source={HAYNA_ACTION_ART} resizeMode="stretch" pointerEvents="none" style={StyleSheet.absoluteFillObject} /> router.push('/new-service')}>
                         <Plus size={16} color="#fff" />
                         <Text style={styles.emptyBtnText}>أضف أول عرض في الحي</Text>
                       </Pressable>
@@ -1898,7 +1901,7 @@ const styles = StyleSheet.create({
   searchRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
   searchBox: { flex: 1, height: 46, borderRadius: 14, backgroundColor: '#f1f5f9', flexDirection: 'row-reverse', alignItems: 'center', paddingHorizontal: 14, gap: 8 },
   searchInput: { flex: 1, color: '#0f172a', fontSize: 13.5, paddingVertical: 0, ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}) },
-  addBtn: { height: 46, minWidth: 46, paddingHorizontal: 14, borderRadius: 14, backgroundColor: '#047857', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 5 },
+  addBtn: { height: 46, minWidth: 46, paddingHorizontal: 14, borderRadius: 0, backgroundColor: 'transparent', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 5 },
   addBtnText: { color: '#fff', fontSize: 13, fontWeight: '900' },
 
   // Sort Bar
@@ -2087,7 +2090,7 @@ const styles = StyleSheet.create({
   emptyIcon: { width: 64, height: 64, borderRadius: 22, backgroundColor: '#ecfdf5', alignItems: 'center', justifyContent: 'center' },
   emptyTitle: { fontSize: 15.5, fontWeight: '900', color: '#0f172a', marginTop: 12 },
   emptyText: { fontSize: 12.5, color: '#64748b', marginTop: 6, textAlign: 'center', lineHeight: 19, maxWidth: 380 },
-  emptyBtn: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, backgroundColor: '#047857', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, marginTop: 16 },
+  emptyBtn: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, backgroundColor: 'transparent', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 0, marginTop: 16 },
   emptyBtnText: { color: '#fff', fontSize: 13, fontWeight: '900' },
 
   // Modals Core
