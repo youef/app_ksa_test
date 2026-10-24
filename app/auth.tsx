@@ -382,15 +382,13 @@ const styles = StyleSheet.create({
   eyeButton: { padding: 7, marginLeft: 2 },
   submitArtwork: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
   submitBtn: {
-    borderRadius: 16,
-    overflow: 'hidden',
     marginTop: 10,
     backgroundColor: 'transparent',
-    shadowColor: '#047857',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 3,
+    borderWidth: 0,
+    borderRadius: 0,
+    overflow: 'visible',
+    elevation: 0,
+    shadowOpacity: 0,
   },
   submitBtnPressed: {
     opacity: 0.9,
@@ -399,6 +397,7 @@ const styles = StyleSheet.create({
   submitGradient: {
     height: 62,
     width: '100%',
+    backgroundColor: 'transparent',
     flexDirection: 'row-reverse',
     justifyContent: 'center',
     alignItems: 'center',
