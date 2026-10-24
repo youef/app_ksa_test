@@ -12,6 +12,8 @@ import {
   Platform,
   Linking,
 } from 'react-native';
+const HAYNA_ACTION_ART = { uri: Platform.OS === 'web' ? '/images/buttons/hayna-login-button-bg.png' : 'https://appksatest.vercel.app/images/buttons/hayna-login-button-bg.png' };
+
 import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import {
@@ -494,6 +496,7 @@ export default function SearchPage() {
             style={[styles.tab, activeTab === 'all' && styles.tabActive]}
             onPress={() => setActiveTab('all')}
           >
+            {activeTab === 'all' && <Image source={HAYNA_ACTION_ART} resizeMode="stretch" pointerEvents="none" style={StyleSheet.absoluteFillObject} />}
             <Text style={[styles.tabText, activeTab === 'all' && styles.tabTextActive]}>
               الكل {total > 0 ? `(${total})` : ''}
             </Text>
@@ -503,6 +506,7 @@ export default function SearchPage() {
             style={[styles.tab, activeTab === 'users' && styles.tabActive]}
             onPress={() => setActiveTab('users')}
           >
+            {activeTab === 'users' && <Image source={HAYNA_ACTION_ART} resizeMode="stretch" pointerEvents="none" style={StyleSheet.absoluteFillObject} />}
             <Users size={13} color={activeTab === 'users' ? '#ffffff' : '#64748b'} />
             <Text style={[styles.tabText, activeTab === 'users' && styles.tabTextActive]}>
               الجيران {results.users.length > 0 ? `(${results.users.length})` : ''}
@@ -513,6 +517,7 @@ export default function SearchPage() {
             style={[styles.tab, activeTab === 'questions' && styles.tabActive]}
             onPress={() => setActiveTab('questions')}
           >
+            {activeTab === 'questions' && <Image source={HAYNA_ACTION_ART} resizeMode="stretch" pointerEvents="none" style={StyleSheet.absoluteFillObject} />}
             <MessageCircle size={13} color={activeTab === 'questions' ? '#ffffff' : '#64748b'} />
             <Text style={[styles.tabText, activeTab === 'questions' && styles.tabTextActive]}>
               أسئلة {results.questions.length > 0 ? `(${results.questions.length})` : ''}
@@ -523,6 +528,7 @@ export default function SearchPage() {
             style={[styles.tab, activeTab === 'requests' && styles.tabActive]}
             onPress={() => setActiveTab('requests')}
           >
+            {activeTab === 'requests' && <Image source={HAYNA_ACTION_ART} resizeMode="stretch" pointerEvents="none" style={StyleSheet.absoluteFillObject} />}
             <Truck size={13} color={activeTab === 'requests' ? '#ffffff' : '#64748b'} />
             <Text style={[styles.tabText, activeTab === 'requests' && styles.tabTextActive]}>
               فزعات {results.requests.length > 0 ? `(${results.requests.length})` : ''}
@@ -533,6 +539,7 @@ export default function SearchPage() {
             style={[styles.tab, activeTab === 'shops' && styles.tabActive]}
             onPress={() => setActiveTab('shops')}
           >
+            {activeTab === 'shops' && <Image source={HAYNA_ACTION_ART} resizeMode="stretch" pointerEvents="none" style={StyleSheet.absoluteFillObject} />}
             <Store size={13} color={activeTab === 'shops' ? '#ffffff' : '#64748b'} />
             <Text style={[styles.tabText, activeTab === 'shops' && styles.tabTextActive]}>
               محلات {results.shops.length > 0 ? `(${results.shops.length})` : ''}
@@ -886,18 +893,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 7.5,
     borderRadius: 12,
+    overflow: 'hidden',
     backgroundColor: '#f1f5f9',
     borderWidth: 1,
     borderColor: '#e2e8f0',
   },
   tabActive: {
-    backgroundColor: '#059669',
-    borderColor: '#059669',
-    shadowColor: '#059669',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 2,
+    backgroundColor: 'transparent',
+    borderColor: 'transparent',
+    shadowOpacity: 0,
+    elevation: 0,
   },
   tabText: {
     fontSize: 12.5,
