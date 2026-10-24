@@ -8,6 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowRight, LogIn, ShieldCheck } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
+import { HAYNA_BUTTON } from '@/components/shared/haynaButtonTokens';
 import {
   FALLBACK_LOGO_URI, getBrandingLogo, getCachedBrandingLogo, subscribeBrandingLogo,
 } from '@/lib/branding';
@@ -157,14 +158,14 @@ const styles = StyleSheet.create({
   bottomPanel: { width: '100%', maxWidth: 440, paddingHorizontal: 18, paddingTop: 15, paddingBottom: 18, backgroundColor: 'transparent', borderWidth: 0, alignItems: 'center' },
   panelTitle: { color: '#173F30', fontSize: 19, fontWeight: '900', textAlign: 'center' },
   panelSubtitle: { color: '#63766A', fontSize: 12, fontWeight: '600', textAlign: 'center', marginTop: 4, marginBottom: 20 },
-  primaryButton: { width: '100%', minHeight: 62, borderRadius: 18, overflow: 'hidden', backgroundColor: 'transparent', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 18 },
+  primaryButton: { width: '100%', height: HAYNA_BUTTON.heroHeight, borderRadius: 0, overflow: 'visible', backgroundColor: 'transparent', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 18 },
   primaryButtonArtwork: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
   primaryButtonContent: { zIndex: 1 },
   primaryText: { color: '#FFFFFF', fontSize: 17, fontWeight: '900' },
-  explore: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, height: 62, width: '100%', marginTop: 8, backgroundColor: 'transparent', borderWidth: 0 },
+  explore: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: HAYNA_BUTTON.contentGap, height: HAYNA_BUTTON.heroHeight, width: '100%', marginTop: HAYNA_BUTTON.verticalGap, backgroundColor: 'transparent', borderWidth: 0 },
   exploreArtwork: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
   exploreContent: { zIndex: 1 },
-  exploreText: { color: '#166044', fontSize: 12, fontWeight: '800' },
+  exploreText: { color: '#166044', fontSize: HAYNA_BUTTON.fontSize, fontWeight: '800' },
   trustRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 8 },
   trustText: { color: '#718176', fontSize: 10, fontWeight: '600' },
   pressed: { opacity: 0.82 },
