@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  ImageBackground,
   Platform,
   Pressable,
   RefreshControl,
@@ -14,6 +15,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+const HAYNA_ACTION_ART = { uri: Platform.OS === 'web' ? '/images/buttons/hayna-login-button-bg.png' : 'https://appksatest.vercel.app/images/buttons/hayna-login-button-bg.png' };
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
@@ -702,7 +704,8 @@ export default function AccountCenter() {
                   <Field label="الاسم الظاهر" value={displayName} onChangeText={setDisplayName} placeholder="اسمك أو اسمك الشخصي" />
                   <Field label="اسم المستخدم" value={username} onChangeText={setUsername} placeholder="username" autoCapitalize="none" />
                   <Field label="النبذة" value={bio} onChangeText={setBio} placeholder="عرّف بنفسك باختصار" multiline />
-                  <Pressable style={styles.primaryButton} onPress={() => void saveProfile()} disabled={saving}>
+                  <Pressable style={styles.primaryButton} onPress={() =>
+                    <ImageBackground source={HAYNA_ACTION_ART} resizeMode="stretch" pointerEvents="none" style={StyleSheet.absoluteFillObject} /> void saveProfile()} disabled={saving}>
                     {saving ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Save size={16} color="#FFFFFF" />}
                     <Text style={styles.primaryButtonText}>حفظ الملف</Text>
                   </Pressable>
@@ -794,7 +797,8 @@ export default function AccountCenter() {
                     </View>
                   </Pressable>
 
-                  <Pressable style={styles.primaryButton} onPress={() => void submitIdentityRequest()} disabled={identitySaving || verificationPending}>
+                  <Pressable style={styles.primaryButton} onPress={() =>
+                    <ImageBackground source={HAYNA_ACTION_ART} resizeMode="stretch" pointerEvents="none" style={StyleSheet.absoluteFillObject} /> void submitIdentityRequest()} disabled={identitySaving || verificationPending}>
                     {identitySaving ? <ActivityIndicator size="small" color="#FFFFFF" /> : <ShieldCheck size={16} color="#FFFFFF" />}
                     <Text style={styles.primaryButtonText}>{verificationPending ? 'بانتظار مراجعة الإدارة' : 'إرسال طلب المراجعة'}</Text>
                   </Pressable>
@@ -1241,7 +1245,7 @@ const styles = StyleSheet.create({
   fieldLabel: { color: '#475569', fontSize: 10.5, fontWeight: '900', textAlign: 'right' },
   input: { minHeight: 43, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#F8FAFC', borderRadius: 12, paddingHorizontal: 11, color: '#0F172A', fontSize: 12, fontWeight: '700' },
   inputMultiline: { minHeight: 86, textAlignVertical: 'top', paddingTop: 10 },
-  primaryButton: { minHeight: 46, borderRadius: 13, backgroundColor: '#0F766E', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 7 },
+  primaryButton: { minHeight: 54, borderRadius: 0, backgroundColor: 'transparent', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 7 },
   primaryButtonText: { color: '#FFFFFF', fontSize: 12, fontWeight: '900' },
   identitySquare: { width: 43, height: 43, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   identitySummary: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, backgroundColor: '#F8FAFC', borderRadius: 14, padding: 11 },
