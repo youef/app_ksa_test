@@ -1120,8 +1120,8 @@ export default function Market() {
                       <Text style={styles.emptyText}>
                         كن أول جار يشارك منتجاته أو خدماته مع أهالي {locationLabel} وبدون أي عمولات.
                       </Text>
-                      <Pressable style={styles.emptyBtn} onPress={() =>
-                        <ImageBackground source={HAYNA_ACTION_ART} resizeMode="stretch" pointerEvents="none" style={StyleSheet.absoluteFillObject} /> router.push('/new-service')}>
+                      <Pressable style={styles.emptyBtn} onPress={() => router.push('/new-service')}>
+                        <ImageBackground source={HAYNA_ACTION_ART} resizeMode="stretch" pointerEvents="none" style={StyleSheet.absoluteFillObject} />
                         <Plus size={16} color="#fff" />
                         <Text style={styles.emptyBtnText}>أضف أول عرض في الحي</Text>
                       </Pressable>
