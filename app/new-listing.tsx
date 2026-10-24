@@ -241,8 +241,8 @@ export default function NewListing() {
           <Text style={styles.hint}>يمكنك تعديل الموقع الأساسي من مركز حسابك، وهو المصدر الرئيسي لكل المحتوى.</Text>
         </View>
 
-        <Pressable style={styles.submit} onPress={() =>
-          <ImageBackground source={HAYNA_ACTION_ART} resizeMode="stretch" pointerEvents="none" style={StyleSheet.absoluteFillObject} /> void saveProduct()} disabled={busy}>
+        <Pressable style={styles.submit} onPress={() => void saveProduct()} disabled={busy}>
+          <ImageBackground source={HAYNA_ACTION_ART} resizeMode="stretch" pointerEvents="none" style={StyleSheet.absoluteFillObject} />
           {busy ? <ActivityIndicator color="#FFFFFF" /> : <ShoppingBag size={18} color="#FFFFFF" />}
           <Text style={styles.submitText}>نشر المنتج</Text>
         </Pressable>
