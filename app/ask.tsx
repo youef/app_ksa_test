@@ -215,8 +215,7 @@ export default function AskScreen() {
     if (detected) {
       const { data: u } = await supabase.auth.getUser();
       if (u.user) await banAccountOnViolation(u.user.id, 'question', combinedText, detected);
-      Alert.alert('تم حظر الحساب', 'تم اكتشاف محتوى مخالف (مغازل/محتوى جنسي/سب/إساءة). تم إغلاق حسابك.');
-      router.replace('/banned');
+      Alert.alert('محتوى غير مسموح', 'لا يمكن نشر هذا المحتوى. راجع النص أو تواصل مع الإدارة عند وجود خطأ.');
       return;
     }
 
@@ -313,8 +312,12 @@ export default function AskScreen() {
           .single();
 
         if (error) throw error;
+        if (!data?.id) throw new Error('لم يُنشر المنشور. قد يكون المحتوى مرفوضًا وفق سياسة المجتمع.');
         insertedQuestionId = data.id;
-      } catch (errCol) {
+      } catch (errCol: any) {
+        // Never retry an insert after a moderation rejection or a single-row coercion error.
+        if (errCol?.code === 'PGRST116' || errCol?.code === 'PGRST204' && !/column/i.test(errCol?.message || '')) throw errCol;
+        if (!/column .* does not exist|could not find .* column|schema cache/i.test(errCol?.message || '')) throw errCol;
         // Fallback for schema variations
         const { lat: _lat, lng: _lng, ...basicPayload } = payload;
         const { data: fallbackData, error: fallbackError } = await supabase
@@ -324,6 +327,7 @@ export default function AskScreen() {
           .single();
 
         if (fallbackError) throw fallbackError;
+        if (!fallbackData?.id) throw new Error('لم يُنشر المنشور. راجع سياسة المحتوى ثم حاول مجددًا.');
         insertedQuestionId = fallbackData.id;
       }
 
@@ -332,7 +336,8 @@ export default function AskScreen() {
         router.replace({ pathname: '/question', params: { id: insertedQuestionId } });
       }
     } catch (err: any) {
-      Alert.alert('خطأ', err.message || 'تعذر نشر السؤال، حاول ثانية.');
+      const moderationRejected = err?.code === 'PGRST116' || /Cannot coerce the result to a single JSON object/i.test(err?.message || '');
+      Alert.alert(moderationRejected ? 'تعذر نشر المنشور' : 'خطأ', moderationRejected ? 'لم تُنشأ أي بيانات للمنشور. قد يكون المحتوى مخالفًا أو تم رفضه. راجع النص وحالة الحساب.' : (err?.message || 'تعذر نشر السؤال، حاول ثانية.'));
     } finally {
       submittingRef.current = false;
       setBusy(false);
