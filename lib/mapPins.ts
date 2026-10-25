@@ -421,8 +421,8 @@ export async function loadMapPins(limit = 220): Promise<MapPin[]> {
     const position = resolvePinPosition(
       {
         id: `service-${row.id}`,
-        lat: row.details?.latitude,
-        lng: row.details?.longitude,
+        lat: row.latitude ?? row.lat ?? row.details?.latitude,
+        lng: row.longitude ?? row.lng ?? row.details?.longitude,
         city: row.city,
         district: row.district,
       },
@@ -478,11 +478,12 @@ export async function loadMapPins(limit = 220): Promise<MapPin[]> {
     pins.push({ id: `alert-${row.id}`, kind: 'alert', title: cleanText(row.title, 90) || 'تنبيه في الحي', body: cleanText(row.description), city: row.city || 'كل المملكة', district: row.district || '', area: areaLabel({ district: row.district, city: row.city }), lat: position.lat, lng: position.lng, approximate: true, exact: false, href: '', createdAt: row.created_at || '', author: '', ownerId: row.creator_id || '', category: cleanText(row.alert_type || 'تنبيه', 40), verified: false, isOpen: row.status === 'active', urgent: true, rating: null, price: null, phone: '' });
   });
 
+  // Keep distinct listings even when they share a building or approximate neighbourhood centre.
+  // The map renderer may cluster overlapping coordinates; dropping records here loses content.
   const seen = new Set<string>();
   return pins.filter((pin) => {
-    const key = `${pin.lat.toFixed(4)},${pin.lng.toFixed(4)}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
+    if (seen.has(pin.id)) return false;
+    seen.add(pin.id);
     return true;
   });
 }
