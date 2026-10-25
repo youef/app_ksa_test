@@ -64,8 +64,6 @@ export const MAP_PIN_ORDER: MapPinKind[] = [
   'alert',
 ];
 
-const ALL_KINDS: MapPinKind = 'question';
-
 type Center = { lat: number; lng: number; label: string; regionId: string; regionName: string };
 
 const CITY_INDEX: Center[] = [];
@@ -497,7 +495,7 @@ export function filterPins(
   pins: MapPin[],
   options: { kind?: MapPinKind | 'all'; city?: string | null; query?: string },
 ): MapPin[] {
-  const kind = options.kind ?? ALL_KINDS;
+  const kind = options.kind ?? 'all';
   const query = (options.query || '').trim().toLowerCase();
   const cityKey = options.city ? normalizeSaudiLocationName(options.city) : '';
 
