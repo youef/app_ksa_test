@@ -127,6 +127,7 @@ export default function More() {
               ? [
                   { title: 'لوحة الإدارة', subtitle: 'إدارة المنصة والصلاحيات', href: '/admin', Icon: ShieldCheck },
                   { title: 'إدارة الفلترة والمخالفين', subtitle: 'الكلمات المحظورة والمتابعات', href: '/admin-moderation', Icon: FileText },
+                  { title: 'رسائل المنصة (Broadcast)', subtitle: 'إرسال ترحيب/تحديثات للجميع', href: '/admin-broadcast', Icon: FileText },
                 ]
               : []),
           ]}

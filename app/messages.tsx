@@ -78,6 +78,7 @@ export default function Messages() {
   const [target, setTarget] = useState<Conv | null>(null);
   const [busy, setBusy] = useState(false);
   const [onlyUnread, setOnlyUnread] = useState(false);
+  const [platformMessages, setPlatformMessages] = useState<any[]>([]);
 
   const dndNow = isDndActiveNow(dnd);
 
@@ -85,6 +86,19 @@ export default function Messages() {
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) return router.replace('/auth');
     setCurrentUserId(u.user.id);
+
+    // Platform messages (welcome/updates)
+    try {
+      const { data: pm } = await supabase
+        .from('platform_messages')
+        .select('*')
+        .eq('recipient_id', u.user.id)
+        .order('created_at', { ascending: false })
+        .limit(50);
+      setPlatformMessages(pm || []);
+    } catch {
+      setPlatformMessages([]);
+    }
 
     // 1. DND state (with schedule)
     const dndSettings = await loadDnd(u.user.id);
@@ -465,6 +479,33 @@ export default function Messages() {
               </View>
             ) : (
               <>
+                {platformMessages.length > 0 && (
+                  <View style={styles.pmSection}>
+                    <Text style={styles.sectionLabel}>رسائل المنصة 📬</Text>
+                    {platformMessages.map((pm) => (
+                      <Pressable
+                        key={pm.id}
+                        style={[styles.pmCard, !pm.read && styles.pmUnread]}
+                        onPress={async () => {
+                          if (!pm.read) {
+                            await supabase.from('platform_messages').update({ read: true }).eq('id', pm.id);
+                            setPlatformMessages((prev) => prev.map((x) => (x.id === pm.id ? { ...x, read: true } : x)));
+                          }
+                        }}
+                      >
+                        <View style={styles.pmIcon}>
+                          <MessageCircle size={16} color={OASIS.colors.primary} />
+                        </View>
+                        <View style={styles.pmCopy}>
+                          <Text style={styles.pmTitle}>{pm.title || 'رسالة من فريق حيّنا'}</Text>
+                          <Text style={styles.pmBody} numberOfLines={3}>{pm.body}</Text>
+                          <Text style={styles.pmDate}>{new Date(pm.created_at).toLocaleString('ar-SA')}</Text>
+                        </View>
+                      </Pressable>
+                    ))}
+                  </View>
+                )}
+
                 {filtered.some(c => c.isUnread && !c.isMuted && !dndNow) && (
                   <View style={styles.sectionHeaderRow}>
                     <Text style={styles.sectionLabel}>غير مقروء 🔔</Text>
@@ -1012,6 +1053,14 @@ const styles = StyleSheet.create({
     color: OASIS.colors.muted,
     textAlign: 'right',
   },
+  pmSection: { gap: 8, marginBottom: 8 },
+  pmCard: { flexDirection: 'row-reverse', gap: 10, padding: 12, borderRadius: 12, backgroundColor: OASIS.colors.surface, borderWidth: 1, borderColor: OASIS.colors.line, alignItems: 'flex-start' },
+  pmUnread: { borderColor: OASIS.colors.primary, backgroundColor: OASIS.colors.soft },
+  pmIcon: { width: 32, height: 32, borderRadius: 10, backgroundColor: OASIS.colors.soft, alignItems: 'center', justifyContent: 'center' },
+  pmCopy: { flex: 1, alignItems: 'flex-end', gap: 2 },
+  pmTitle: { color: OASIS.colors.ink, fontSize: 13, fontWeight: '800', textAlign: 'right' },
+  pmBody: { color: OASIS.colors.muted, fontSize: 12, lineHeight: 18, textAlign: 'right' },
+  pmDate: { color: OASIS.colors.muted, fontSize: 10, textAlign: 'right' },
   convCard: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
