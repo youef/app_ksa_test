@@ -130,7 +130,7 @@ export default function SearchPage() {
   const params = useLocalSearchParams<{ q?: string; tab?: Tab }>();
   const bottomNavInset = useBottomNavInset();
   const [query, setQuery] = useState(params.q || '');
-  const [activeTab, setActiveTab] = useState<Tab>(params.tab || 'all');
+  const [activeTab, setActiveTab] = useState<Tab>(['all', 'users', 'questions', 'requests', 'shops'].includes(params.tab || '') ? params.tab! : 'all');
   const [loading, setLoading] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const searchSequence = useRef(0);
@@ -164,12 +164,12 @@ export default function SearchPage() {
     if (params.q !== undefined && params.q !== query) {
       setQuery(params.q);
     }
-  }, [params.q]);
+  }, [params.q, query]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       if (query.trim().length > 0) {
-        performSearch();
+        void performSearch();
       } else {
         searchSequence.current += 1;
         setLoading(false);
@@ -193,12 +193,14 @@ export default function SearchPage() {
     const sequence = ++searchSequence.current;
     const searchTerm = query.trim();
     if (!searchTerm) {
+      searchSequence.current += 1;
       setResults({ users: [], questions: [], requests: [], shops: [] });
       setLoading(false);
       return;
     }
 
     setLoading(true);
+    setResults({ users: [], questions: [], requests: [], shops: [] });
     try {
       // Query the live Supabase tables directly. Each table query respects its
       // own RLS policies; one missing/optional table must not cancel all results.
