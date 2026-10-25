@@ -15,6 +15,8 @@ import {
   ShoppingBag,
   Store,
   UserRound,
+  LogOut,
+  FileText,
 } from 'lucide-react-native';
 
 import { AppHeader } from '@/components/shared/AppHeader';
@@ -41,6 +43,7 @@ const DISCOVER: MenuItem[] = [
 
 const HELP: MenuItem[] = [
   { title: 'الدعم والمساعدة', subtitle: 'التواصل مع فريق حيّنا وتذاكرك', href: '/support', Icon: LifeBuoy },
+  { title: 'الشروط والسياسات', subtitle: 'جميع بنود منصة حيّنا (صارمة)', href: '/terms', Icon: FileText },
   { title: 'حول حيّنا', subtitle: 'معلومات المنصة والسياسات', href: '/about', Icon: Info },
 ];
 
@@ -126,6 +129,21 @@ export default function More() {
           ]}
         />
 
+        <View style={styles.logoutWrap}>
+          <Pressable
+            oasisKind="action"
+            oasisVariant="danger"
+            style={styles.logoutBtn}
+            onPress={() => void (async () => {
+              await supabase.auth.signOut();
+              router.replace('/auth');
+            })()}
+          >
+            <LogOut size={17} color={OASIS.colors.danger} />
+            <Text style={styles.logoutText}>تسجيل الخروج</Text>
+          </Pressable>
+        </View>
+
         <View style={styles.note}>
           <CircleHelp size={17} color={OASIS.colors.muted} />
           <Text style={styles.noteText}>
@@ -185,4 +203,7 @@ const styles = StyleSheet.create({
   divider: { height: 1, backgroundColor: '#F1F5F9', marginHorizontal: 12 },
   note: { flexDirection: 'row-reverse', alignItems: 'flex-start', gap: 8, backgroundColor: '#F1F5F9', padding: 12, borderRadius: 14 },
   noteText: { flex: 1, color: OASIS.colors.muted, fontSize: 11, lineHeight: 19, fontWeight: '700', textAlign: 'right' },
+  logoutWrap: { paddingHorizontal: 4 },
+  logoutBtn: { minHeight: 46, borderRadius: 12, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 7, backgroundColor: OASIS.colors.dangerSoft, borderWidth: 1, borderColor: '#FECACA' },
+  logoutText: { color: OASIS.colors.danger, fontSize: 12, fontWeight: '800' },
 });

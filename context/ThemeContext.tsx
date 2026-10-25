@@ -2,8 +2,8 @@
  * ThemeContext — Dark / Light mode for the entire platform.
  * Persisted to AsyncStorage. Consumed via `useTheme()`.
  */
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { useColorScheme } from 'react-native';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { Platform, useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
@@ -90,12 +90,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const systemScheme = useColorScheme();
   const [mode, setModeState] = useState<ThemeMode>('system');
   const [loaded, setLoaded] = useState(false);
+  const modeRef = useRef<ThemeMode>('system');
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY)
       .then((saved) => {
         if (saved === 'light' || saved === 'dark' || saved === 'system') {
           setModeState(saved);
+          modeRef.current = saved;
         }
       })
       .catch(() => {})
@@ -103,17 +105,19 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const setMode = useCallback((next: ThemeMode) => {
+    if (next === modeRef.current) return;
+    modeRef.current = next;
     setModeState(next);
     AsyncStorage.setItem(STORAGE_KEY, next).catch(() => {});
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.setTimeout(() => window.location.reload(), 80);
+    }
   }, []);
 
   const toggle = useCallback(() => {
-    setModeState((prev) => {
-      const next = prev === 'dark' ? 'light' : 'dark';
-      AsyncStorage.setItem(STORAGE_KEY, next).catch(() => {});
-      return next;
-    });
-  }, []);
+    const next = modeRef.current === 'dark' ? 'light' : 'dark';
+    setMode(next);
+  }, [setMode]);
 
   const isDark =
     mode === 'dark' || (mode === 'system' && systemScheme === 'dark');
