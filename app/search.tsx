@@ -441,8 +441,8 @@ export default function SearchPage() {
     <View style={styles.container}>
       <AppHeader
         variant="tab"
-        title="البحث الشامل"
-        subtitle={query.trim() ? `النتائج لكلمة: «${query.trim()}»` : 'ابحث في كل ما يخص حيك'}
+        title="استكشف"
+        subtitle={undefined}
         rightAction={
           <HeaderAction
             accessibilityLabel="فتح الخريطة" onPress={() => router.push('/map')}
@@ -501,7 +501,7 @@ export default function SearchPage() {
           >
 
             <Text style={[styles.tabText, activeTab === 'all' && styles.tabTextActive]}>
-              الكل {total > 0 ? `(${total})` : ''}
+              الكل
             </Text>
           </Pressable>
 
@@ -512,7 +512,7 @@ export default function SearchPage() {
 
             <Users size={13} color={activeTab === 'users' ? OASIS.colors.surface : OASIS.colors.muted} />
             <Text style={[styles.tabText, activeTab === 'users' && styles.tabTextActive]}>
-              الجيران {results.users.length > 0 ? `(${results.users.length})` : ''}
+              الجيران
             </Text>
           </Pressable>
 
@@ -523,7 +523,7 @@ export default function SearchPage() {
 
             <MessageCircle size={13} color={activeTab === 'questions' ? OASIS.colors.surface : OASIS.colors.muted} />
             <Text style={[styles.tabText, activeTab === 'questions' && styles.tabTextActive]}>
-              أسئلة {results.questions.length > 0 ? `(${results.questions.length})` : ''}
+              الأسئلة
             </Text>
           </Pressable>
 
@@ -534,7 +534,7 @@ export default function SearchPage() {
 
             <Truck size={13} color={activeTab === 'requests' ? OASIS.colors.surface : OASIS.colors.muted} />
             <Text style={[styles.tabText, activeTab === 'requests' && styles.tabTextActive]}>
-              فزعات {results.requests.length > 0 ? `(${results.requests.length})` : ''}
+              الطلبات
             </Text>
           </Pressable>
 
@@ -545,7 +545,7 @@ export default function SearchPage() {
 
             <Store size={13} color={activeTab === 'shops' ? OASIS.colors.surface : OASIS.colors.muted} />
             <Text style={[styles.tabText, activeTab === 'shops' && styles.tabTextActive]}>
-              محلات {results.shops.length > 0 ? `(${results.shops.length})` : ''}
+              المحلات
             </Text>
           </Pressable>
         </ScrollView>
@@ -566,30 +566,13 @@ export default function SearchPage() {
 
         {!loading && query.trim().length > 0 && (
           <View style={styles.resultsContainer}>
-            {/* Search Summary Header */}
-            <View style={styles.summaryBanner}>
-              <View style={styles.summaryRight}>
-                <Sparkles size={16} color={OASIS.colors.primary} />
-                <Text style={styles.summaryTitle}>
-                  نتائج البحث عن: «{query.trim()}»
-                </Text>
-              </View>
-              <View style={styles.summaryBadge}>
-                <Text style={styles.summaryBadgeText}>{total} نتيجة</Text>
-              </View>
+            <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <Text style={{ color: OASIS.colors.ink, fontWeight: '800', fontSize: 14, textAlign: 'right' }}>نتائج الاستكشاف</Text>
+              <Text style={{ color: OASIS.colors.muted, fontSize: 11 }}>{selectedCount} نتيجة</Text>
             </View>
-
-            {/* Users Section */}
+            {/* Compact results without redundant section headers */}
             {(activeTab === 'all' || activeTab === 'users') && results.users.length > 0 && (
               <View style={styles.section}>
-                <View style={styles.sectionHeader}>
-                  <View style={styles.sectionHeaderTitle}>
-                    <Users size={16} color={OASIS.colors.primary} />
-                    <Text style={styles.sectionTitle}>الجيران في الحي</Text>
-                  </View>
-                  <View style={styles.badgeCount}>
-                    <Text style={styles.badgeText}>{results.users.length}</Text>
-                  </View>
                 </View>
                 {results.users.map(renderUser)}
               </View>
@@ -598,14 +581,6 @@ export default function SearchPage() {
             {/* Questions Section */}
             {(activeTab === 'all' || activeTab === 'questions') && results.questions.length > 0 && (
               <View style={styles.section}>
-                <View style={styles.sectionHeader}>
-                  <View style={styles.sectionHeaderTitle}>
-                    <MessageCircle size={16} color={OASIS.colors.primary} />
-                    <Text style={styles.sectionTitle}>الأسئلة والاستفسارات</Text>
-                  </View>
-                  <View style={styles.badgeCount}>
-                    <Text style={styles.badgeText}>{results.questions.length}</Text>
-                  </View>
                 </View>
                 {results.questions.map(renderQuestion)}
               </View>
@@ -614,14 +589,6 @@ export default function SearchPage() {
             {/* Requests Section */}
             {(activeTab === 'all' || activeTab === 'requests') && results.requests.length > 0 && (
               <View style={styles.section}>
-                <View style={styles.sectionHeader}>
-                  <View style={styles.sectionHeaderTitle}>
-                    <Truck size={16} color="#ea580c" />
-                    <Text style={styles.sectionTitle}>طلبات الفزعة والمساعدة</Text>
-                  </View>
-                  <View style={[styles.badgeCount, { backgroundColor: '#fff7ed' }]}>
-                    <Text style={[styles.badgeText, { color: '#ea580c' }]}>{results.requests.length}</Text>
-                  </View>
                 </View>
                 {results.requests.map(renderRequest)}
               </View>
@@ -630,14 +597,6 @@ export default function SearchPage() {
             {/* Shops Section */}
             {(activeTab === 'all' || activeTab === 'shops') && results.shops.length > 0 && (
               <View style={styles.section}>
-                <View style={styles.sectionHeader}>
-                  <View style={styles.sectionHeaderTitle}>
-                    <Store size={16} color="#0f766e" />
-                    <Text style={styles.sectionTitle}>المحلات والخدمات</Text>
-                  </View>
-                  <View style={[styles.badgeCount, { backgroundColor: '#f0fdfa' }]}>
-                    <Text style={[styles.badgeText, { color: '#0f766e' }]}>{results.shops.length}</Text>
-                  </View>
                 </View>
                 {results.shops.map(renderShop)}
               </View>
@@ -664,140 +623,19 @@ export default function SearchPage() {
           </View>
         )}
 
-        {/* Discovery Hub when query is empty */}
-        {!loading && query.trim().length === 0 && (
-          <View style={styles.discoveryWrapper}>
-            {/* Friendly Neighborhood Welcome Capsule */}
-            <View style={styles.welcomeBanner}>
-              <View style={styles.welcomeBannerIcon}>
-                <Sparkles size={20} color={OASIS.colors.primary} />
-              </View>
-              <View style={styles.welcomeBannerContent}>
-                <Text style={styles.welcomeBannerTitle}>ابحث عن أي شيء في حيك</Text>
-                <Text style={styles.welcomeBannerSub}>
-                  تواصل مع الجيران، استعر أدوات، أو استفسر عن خدمات قريبة منك بكل سهولة.
-                </Text>
-              </View>
-            </View>
-
-            {/* Trending Keywords */}
-            <View style={styles.discoverySection}>
-              <View style={styles.discoverySectionTitleRow}>
-                <Flame size={18} color="#ea580c" />
-                <Text style={styles.discoverySectionTitle}>اقتراحات للبحث</Text>
-              </View>
-              <View style={styles.tagsGrid}>
-                {TRENDING_KEYWORDS.map((kw) => (
-                  <Pressable
-                    key={kw}
-                    onPress={() => handleSelectKeyword(kw)}
-                    style={styles.keywordTag}
-                  >
-                    <Text style={styles.keywordTagText}>{kw}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-
-            {/* Quick Explore Hub (4 Categories) */}
-            <View style={styles.discoverySection}>
-              <View style={styles.discoverySectionTitleRow}>
-                <Sparkles size={18} color={OASIS.colors.primary} />
-                <Text style={styles.discoverySectionTitle}>استكشف حسب القسم</Text>
-              </View>
-              <View style={styles.categoryGrid}>
-                <Pressable oasisKind="card"
-                  style={styles.categoryCard}
-                  onPress={() => {
-                    setActiveTab('users');
-                    setQuery('حي');
-                  }}
-                >
-                  <View style={[styles.categoryIconBox, { backgroundColor: OASIS.colors.soft }]}>
-                    <Users size={20} color={OASIS.colors.primary} />
-                  </View>
-                  <Text style={styles.categoryCardTitle}>جيران الحي</Text>
-                  <Text style={styles.categoryCardSub}>أهل حيك وأصحاب المهارات</Text>
-                </Pressable>
-
-                <Pressable oasisKind="card"
-                  style={styles.categoryCard}
-                  onPress={() => {
-                    router.push('/questions');
-                  }}
-                >
-                  <View style={[styles.categoryIconBox, { backgroundColor: OASIS.colors.infoSoft }]}>
-                    <MessageCircle size={20} color="#2563eb" />
-                  </View>
-                  <Text style={styles.categoryCardTitle}>أسئلة واستفسارات</Text>
-                  <Text style={styles.categoryCardSub}>تجارب وتوصيات الجيران</Text>
-                </Pressable>
-
-                <Pressable oasisKind="card"
-                  style={styles.categoryCard}
-                  onPress={() => {
-                    router.push('/home');
-                  }}
-                >
-                  <View style={[styles.categoryIconBox, { backgroundColor: '#fff7ed' }]}>
-                    <Truck size={20} color="#ea580c" />
-                  </View>
-                  <Text style={styles.categoryCardTitle}>فزعات وطلبات</Text>
-                  <Text style={styles.categoryCardSub}>إعارة ومساعدات الجيران</Text>
-                </Pressable>
-
-                <Pressable oasisKind="card"
-                  style={styles.categoryCard}
-                  onPress={() => {
-                    router.push('/market');
-                  }}
-                >
-                  <View style={[styles.categoryIconBox, { backgroundColor: '#f0fdfa' }]}>
-                    <Store size={20} color="#0f766e" />
-                  </View>
-                  <Text style={styles.categoryCardTitle}>محلات وخدمات</Text>
-                  <Text style={styles.categoryCardSub}>المتاجر والفنيين القريبين</Text>
-                </Pressable>
-              </View>
-            </View>
-
-            {/* Recent Searches */}
+        {!loading && !query.trim() && (
+          <View style={{ paddingTop: 12, gap: 12 }}>
+            <Text style={{ color: OASIS.colors.muted, textAlign: 'right', fontSize: 12 }}>ابحث في حيّك أو اختر تصنيفًا بالأعلى.</Text>
             {recentSearches.length > 0 && (
-              <OasisSurface oasisSurface="card" style={styles.recentSearchesCard}>
-                <View style={styles.recentHeader}>
-                  <View style={styles.recentHeaderTitleRow}>
-                    <Clock size={16} color={OASIS.colors.muted} />
-                    <Text style={styles.recentTitle}>سجل البحث الأخير</Text>
-                  </View>
-                  <Pressable oasisKind="action"
-                    onPress={() => saveRecentSearches([])}
-                    hitSlop={8}
-                    style={styles.clearRecentBtn}
-                  >
-                    <Trash2 size={13} color={OASIS.colors.danger} />
-                    <Text style={styles.clearRecentText}>مسح السجل</Text>
-                  </Pressable>
+              <View style={{ gap: 8 }}>
+                <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ color: OASIS.colors.ink, fontWeight: '700', fontSize: 13 }}>آخر عمليات البحث</Text>
+                  <Pressable onPress={() => saveRecentSearches([])}><Text style={{ color: OASIS.colors.muted, fontSize: 11 }}>مسح</Text></Pressable>
                 </View>
-                <View style={styles.recentChipsRow}>
-                  {recentSearches.map((item, idx) => (
-                    <View key={idx} style={styles.recentChipWrapper}>
-                      <Pressable oasisKind="chip"
-                        onPress={() => handleSelectKeyword(item)}
-                        style={styles.recentChip}
-                      >
-                        <Text style={styles.recentChipText}>{item}</Text>
-                      </Pressable>
-                      <Pressable oasisKind="chip"
-                        onPress={() => removeRecentSearch(item)}
-                        style={styles.recentChipDelete}
-                        hitSlop={6}
-                      >
-                        <X size={12} color="#94a3b8" />
-                      </Pressable>
-                    </View>
-                  ))}
+                <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 7 }}>
+                  {recentSearches.slice(0, 4).map(item => <Pressable key={item} oasisKind="chip" onPress={() => handleSelectKeyword(item)} style={styles.recentChip}><Text style={styles.recentChipText}>{item}</Text></Pressable>)}
                 </View>
-              </OasisSurface>
+              </View>
             )}
           </View>
         )}
