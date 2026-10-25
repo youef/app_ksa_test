@@ -76,6 +76,28 @@ export function useLiveModeration(streamId: string | undefined, enabled: boolean
 
   useEffect(() => { void refresh(); }, [refresh]);
 
+  // Keep moderator permissions and filters synchronized across the host's devices.
+  // Refresh on app foreground/reconnect through the existing refresh action as well.
+  useEffect(() => {
+    if (!streamId || !enabled) {
+      setSettings(DEFAULT_SETTINGS);
+      setModerators([]);
+      setError('');
+      return;
+    }
+    const channel = supabase.channel(`live-moderation-${streamId}`)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'live_stream_moderation_settings',
+        filter: `stream_id=eq.${streamId}`,
+      }, () => { void refresh(); })
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'live_stream_moderators',
+        filter: `stream_id=eq.${streamId}`,
+      }, () => { void refresh(); })
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [streamId, enabled, refresh]);
+
   const saveSettings = useCallback(async (next: LiveModerationSettings) => {
     if (!streamId) throw new Error('البث غير محدد.');
     const { error: saveError } = await supabase.rpc('update_live_moderation_settings', {
