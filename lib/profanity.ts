@@ -2,14 +2,10 @@
 // Used client-side before publishing questions, products, and private messages.
 // Any violation triggers an automatic account ban.
 
+// Keep client hints conservative; Supabase is the authoritative moderation source.
 const BAD_WORDS: string[] = [
-  // Arabic (common profanity / sexual / harassing)
-  'كس', 'طيز', 'شرموط', 'قحبه', 'قواد', 'لعين', 'يلعن', 'يلعنك', 'ياكلب', 'ياحمار', 'ياحمير', 'ياابن', 'ياابنة', 'ياولده', 'ياولدة',
-  'فاسق', 'فاجره', 'فاجر', 'زاني', 'زانية', 'لواط', 'سحاق', 'استمناء', '自慰', 'جنس', 'جنسية', 'مثير', 'إثارة', 'عارية', 'عاري', 'صدر', 'أرداف', 'فخذ',
-  'تعارف', 'مغازل', 'مغازلة', 'مواعدة', 'موعد', 'حبيب', 'حبيبة', 'عشيق', 'عشيقه', 'زنا', 'لواط', 'سحاق', 'اباحي', 'إباحي', 'اباحية', 'إباحية', 'اباحي', 'اباحيات',
-  'fuck', 'shit', 'bitch', 'asshole', 'dick', 'pussy', 'cock', 'slut', 'whore', 'cunt', 'nigger', 'faggot',
-  // Variants / leetspeak
-  'f*ck', 'sh*t', 'b*tch', 'a$$', 'fck', 'sht',
+  'شرموط', 'شرموطة', 'قحبة', 'قحبه', 'قواد', 'متناك', 'منيوك', 'ديوث',
+  'fuck', 'fucking', 'motherfucker', 'bitch', 'asshole', 'cunt', 'whore', 'slut',
 ];
 
 function normalize(input: string): string {
@@ -22,24 +18,19 @@ function normalize(input: string): string {
 }
 
 export function containsProfanity(text: string): boolean {
-  const t = normalize(text);
-  if (!t) return false;
-  for (const w of getCachedBannedWords()) {
-    const nw = normalize(w);
-    if (!nw) continue;
-    if (nw.length < 3) continue;
-    if (t.includes(nw)) return true;
-  }
-  return false;
+  return findProfanity(text) !== null;
 }
 
 export function findProfanity(text: string): string | null {
-  const t = normalize(text);
-  if (!t) return null;
-  for (const w of getCachedBannedWords()) {
-    const nw = normalize(w);
-    if (!nw || nw.length < 3) continue;
-    if (t.includes(nw)) return w;
+  const normalized = normalize(text)
+    .replace(/[أإآٱ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه')
+    .replace(/[^\\p{L}\\p{N}_]+/gu, ' ');
+  const padded = ` ${normalized} `;
+  for (const word of getCachedBannedWords()) {
+    const candidate = normalize(word)
+      .replace(/[أإآٱ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه')
+      .replace(/[^\\p{L}\\p{N}_]+/gu, ' ').trim();
+    if (candidate.length >= 3 && padded.includes(` ${candidate} `)) return word;
   }
   return null;
 }
