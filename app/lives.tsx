@@ -1,4 +1,5 @@
-import { OasisPressable as Pressable, OasisSurface } from '@/components/oasis/OasisPrimitives';
+import { OasisPressable as Pressable, OasisSurface, OasisTextInput as TextInput } from '@/components/oasis/OasisPrimitives';
+import { discoverLives } from '@/lib/liveDiscovery';
 import { OASIS } from '@/lib/oasis';
 import { HeaderAction, AppHeader } from '@/components/shared/AppHeader';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -117,8 +118,13 @@ export default function LivesScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sort, setSort] = useState<'popular' | 'newest'>('popular');
+  const [gridWidth, setGridWidth] = useState(0);
+  const generation = useRef(0);
 
   const load = useCallback(async (period: LiveLeaderboardPeriod = leaderboardPeriod) => {
+    const request = ++generation.current;
     try {
       setError('');
       const { data: auth } = await supabase.auth.getUser();
@@ -127,19 +133,23 @@ export default function LivesScreen() {
         auth.user ? supabase.from('profiles').select('city').eq('id', auth.user.id).maybeSingle() : Promise.resolve({ data: null }),
         auth.user ? supabase.from('follows').select('following_id').eq('follower_id', auth.user.id) : Promise.resolve({ data: [] }),
       ]);
+      if (request !== generation.current) return;
       setStreams(rows);
       setCity(profile.data?.city || null);
       setFollowing((follows.data || []).map((row: any) => row.following_id));
       setCurrentUserId(auth.user?.id || null);
       if (auth.user?.id) {
-        try { setAchievements(await fetchLiveHostAchievements(auth.user.id)); }
-        catch { setAchievements([]); }
+        try { const awards = await fetchLiveHostAchievements(auth.user.id); if (request !== generation.current) return; setAchievements(awards); }
+        catch { if (request !== generation.current) return; setAchievements([]); }
       } else { setAchievements([]); }
       if (auth.user?.id) {
         try {
-          setTopHosts(await fetchLiveHostLeaderboard(period));
+          const leaders = await fetchLiveHostLeaderboard(period);
+          if (request !== generation.current) return;
+          setTopHosts(leaders);
           setLeaderboardError('');
         } catch (leaderError) {
+          if (request !== generation.current) return;
           setTopHosts([]);
           setLeaderboardError('قائمة نجوم البث تحتاج إلى تحديث قاعدة البيانات.');
           console.error('Unable to load live host leaderboard.', leaderError);
@@ -149,20 +159,21 @@ export default function LivesScreen() {
         setLeaderboardError('');
       }
     } catch (e) {
+      if (request !== generation.current) return;
       setError(e instanceof Error ? e.message : 'تعذر تحميل البثوث.');
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (request === generation.current) { setLoading(false); setRefreshing(false); }
     }
   }, [leaderboardPeriod]);
 
-  useEffect(() => { void load(leaderboardPeriod); }, [leaderboardPeriod, load]);
   useFocusEffect(useCallback(() => {
+    void load(leaderboardPeriod);
+    let debounce: ReturnType<typeof setTimeout> | undefined;
     const channel = supabase.channel('live-directory-refresh')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'live_streams' }, () => { void load(leaderboardPeriod); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'live_streams' }, () => { clearTimeout(debounce); debounce = setTimeout(() => { void load(leaderboardPeriod); }, 800); })
       .subscribe();
-    const timer = setInterval(() => { void load(leaderboardPeriod); }, 20_000);
-    return () => { clearInterval(timer); void supabase.removeChannel(channel); };
+    const timer = setInterval(() => { void load(leaderboardPeriod); }, 30_000);
+    return () => { ++generation.current; clearTimeout(debounce); clearInterval(timer); void supabase.removeChannel(channel); };
   }, [load, leaderboardPeriod]));
 
   const isFollowing = useCallback((stream: LiveStream) => following.includes(stream.host_id), [following]);
@@ -183,15 +194,15 @@ export default function LivesScreen() {
     return ['all', ...Array.from(set)];
   }, [streams]);
 
-  const visible = useMemo(() => streams.filter((stream) => {
+  const visible = useMemo(() => discoverLives(streams.filter((stream) => {
     if (category !== 'all' && stream.category !== category) return false;
     if (filter === 'following') return isFollowing(stream);
     if (filter === 'nearby') return isNearby(stream);
     return true;
-  }), [streams, filter, category, isFollowing, isNearby]);
+  }), searchQuery, sort), [streams, filter, category, isFollowing, isNearby, searchQuery, sort]);
 
   const trending = useMemo(() => {
-    if (streams.length < 2) return [];
+    if (!streams.length) return [];
     return [...streams]
       .sort((a, b) => ((b.viewer_count || 0) - (a.viewer_count || 0)) || ((b.peak_viewer_count || 0) - (a.peak_viewer_count || 0)))
       .slice(0, 8);
@@ -272,6 +283,10 @@ export default function LivesScreen() {
         contentContainerStyle={[styles.content, { paddingBottom: bottomNavInset + 28 }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load(leaderboardPeriod); }} tintColor={C.accent} />}
       >
+        {tab === 'live' ? <View style={{ gap: 10, marginBottom: 14 }}>
+          <TextInput accessibilityLabel="ابحث عن بث أو مضيف" value={searchQuery} onChangeText={setSearchQuery} placeholder="ابحث عن بث، مضيف، أو مدينة…" style={{ minHeight: 44, borderRadius: 12, borderWidth: 1, borderColor: OASIS.colors.line, backgroundColor: OASIS.colors.surface, paddingHorizontal: 12, textAlign: 'right', color: OASIS.colors.ink }} />
+          <View style={{ flexDirection: 'row-reverse', gap: 8 }}>{([['popular', 'الأكثر مشاهدة'], ['newest', 'بدأ حديثًا']] as const).map(([key, label]) => <Pressable key={key} oasisKind="chip" oasisVariant={sort === key ? 'primary' : 'secondary'} accessibilityState={{ selected: sort === key }} onPress={() => setSort(key)}><Text style={{ color: sort === key ? '#fff' : OASIS.colors.primary, fontSize: 12 }}>{label}</Text></Pressable>)}</View>
+        </View> : null}
         {/* ================= LIVE TAB ================= */}
         {tab === 'live' && (
           <View>
@@ -332,16 +347,17 @@ export default function LivesScreen() {
             ) : visible.length === 0 ? (
               <View style={styles.empty}>
                 <Radio color={OASIS.colors.primary} size={34} />
-                <Text style={styles.emptyTitle}>{filter === 'following' ? 'لا يوجد بث لمتابَعيك الآن' : filter === 'nearby' ? 'لا يوجد بث قريب الآن' : 'ما فيه بث مباشر الآن'}</Text>
-                <Text style={styles.emptyText}>{category !== 'all' ? 'جرّب فئة أخرى أو' : 'ابدأ بثك الأول وخل جيرانك ينضمون لك.'}</Text>
+                <Text style={styles.emptyTitle}>{searchQuery.trim() ? 'لا توجد بثوث تطابق بحثك' : filter === 'following' ? 'لا يوجد بث لمتابَعيك الآن' : filter === 'nearby' ? 'لا يوجد بث قريب الآن' : 'ما فيه بث مباشر الآن'}</Text>
+                <Text style={styles.emptyText}>{searchQuery.trim() || category !== 'all' ? 'جرّب كلمات أخرى أو أعد ضبط الفلاتر.' : 'ابدأ بثك الأول وخل جيرانك ينضمون لك.'}</Text>
+                {searchQuery.trim() || category !== 'all' || filter !== 'all' ? <Pressable oasisKind="action" onPress={() => { setSearchQuery(''); setCategory('all'); setFilter('all'); }}><Text style={{ color: OASIS.colors.primary }}>عرض كل البثوث</Text></Pressable> : null}
                 <Pressable onPress={() => router.push('/live/create')} style={styles.emptyCreate}><Text style={styles.emptyCreateText}>ابدأ بثك الأول</Text></Pressable>
               </View>
             ) : (
               <View>
                 {spotlight && <SpotlightCard stream={spotlight} onPress={() => openStream(spotlight)} />}
                 {gridStreams.length > 0 && (
-                  <View style={styles.grid}>
-                    {gridStreams.map((stream) => <LiveCard key={stream.id} stream={stream} onPress={() => openStream(stream)} />)}
+                  <View style={styles.grid} onLayout={event => setGridWidth(event.nativeEvent.layout.width)}>
+                    {gridStreams.map((stream) => <View key={stream.id} style={{ width: gridWidth ? Math.floor((gridWidth - (gridWidth >= 700 ? 24 : 12) - 1) / (gridWidth >= 700 ? 3 : 2)) : '48%' }}><LiveCard stream={stream} onPress={() => openStream(stream)} /></View>)}
                   </View>
                 )}
               </View>
@@ -733,7 +749,7 @@ const styles = StyleSheet.create({
 
   // Live grid card
   grid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 12 },
-  card: { width: '48%', flexGrow: 1, maxWidth: '49%', backgroundColor: OASIS.colors.surface, borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: OASIS.colors.line, shadowColor: OASIS.colors.ink, shadowOpacity: 0, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 3 },
+  card: { width: '100%', backgroundColor: OASIS.colors.surface, borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: OASIS.colors.line, shadowColor: OASIS.colors.ink, shadowOpacity: 0, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 3 },
   cardTopRow: { position: 'absolute', top: 9, right: 9, left: 9, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between' },
   viewersPill: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, backgroundColor: 'rgba(2,6,23,0.42)', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 },
   viewersPillText: { color: OASIS.colors.surface, fontSize: 11, fontWeight: '700' },

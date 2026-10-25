@@ -43,6 +43,7 @@ import AtmosphereBar from '@/components/home/AtmosphereBar';
 import StoriesRow from '@/components/home/StoriesRow';
 import { usePlatformConfig } from '@/lib/platformConfig';
 import EmptyState from '@/components/home/EmptyState';
+import CommunityShortcuts from '@/components/home/CommunityShortcuts';
 import { FeedSkeleton, ErrorBanner } from '@/components/home/HomeStates';
 import { styles } from '@/components/home/homeStyles';
 import { requireAccount } from '@/lib/authGate';
@@ -243,6 +244,7 @@ export default function Home() {
           />
         }
       >
+        <CommunityShortcuts signedIn={Boolean(feed.currentUserId)} />
         <View style={layout.contextRow}>
           <View style={{ flex: 1, minWidth: 0 }}>
             <LocationScopeBar compact location={{ region: loc.region, city: loc.city, district: loc.district }} />
@@ -260,7 +262,7 @@ export default function Home() {
               {([['newest', 'الأحدث'], ['engaged', 'الأكثر تفاعلاً'], ['nearby', 'الأقرب']] as const).map(([key, label]) => (
                 <Pressable oasisKind="chip" oasisVariant={sortBy === key ? 'primary' : 'ghost'} key={key} onPress={() => setSortBy(key)} style={{ flexDirection: 'row-reverse', gap: 4, paddingHorizontal: 10 }} accessibilityRole="button" accessibilityState={{ selected: sortBy === key }}>
                   {key === 'newest' ? <Clock3 size={14} color={OASIS.colors.primary} /> : key === 'engaged' ? <TrendingUp size={14} color={OASIS.colors.primary} /> : <MapPin size={14} color={OASIS.colors.primary} />}
-                  <Text style={{ fontSize: 12, fontWeight: '600' }}>{label}</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: sortBy === key ? '#FFFFFF' : colors.ink }}>{label}</Text>
                 </Pressable>
               ))}
             </ScrollView>

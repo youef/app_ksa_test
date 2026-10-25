@@ -38,6 +38,7 @@ import {
   XCircle,
   RefreshCw,
   ChevronRight,
+  ChevronLeft,
   AlertTriangle,
   Star,
   BarChart3,
@@ -1398,6 +1399,11 @@ export default function AdminScreen() {
         warning={loadWarning}
         toast={toastMsg ? <Animated.View style={[styles.toastBanner, { opacity: toastAnim }]}><Text style={styles.toastBannerText}>{toastMsg}</Text></Animated.View> : null}
       >
+        {(activeTab === 'overview' || activeTab === 'broadcast') && <Pressable oasisKind="card" accessibilityRole="button" onPress={() => router.push('/admin-broadcast')} style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 12, padding: 16, marginBottom: 16, backgroundColor: OASIS.colors.soft, borderRadius: 14 }}>
+          <Megaphone size={24} color={OASIS.colors.primary} />
+          <View style={{ flex: 1, gap: 5 }}><Text style={{ fontSize: 16, fontWeight: '700', color: OASIS.colors.deep, textAlign: 'right' }}>مركز تواصل منصة حيّنا</Text><Text style={{ fontSize: 12, lineHeight: 20, color: OASIS.colors.muted, textAlign: 'right' }}>الترحيب التلقائي · التحديثات الرسمية · معاينة الرسائل وسجل التسليم</Text></View>
+          <ChevronLeft size={18} color={OASIS.colors.primary} />
+        </Pressable>}
         {/* TAB 0: UNIFIED TASK CENTER */}
         {activeTab === 'tasks' && (
           <AdminTaskCenter

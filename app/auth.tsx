@@ -64,34 +64,8 @@ export default function Auth() {
         });
         if (r.error) throw r.error;
         if (r.data.session) {
-          // Send welcome platform message (if a template exists)
-          try {
-            const { data: tpl } = await supabase
-              .from('platform_messages')
-              .select('title,body,type')
-              .is('recipient_id', null)
-              .eq('type', 'welcome')
-              .order('created_at', { ascending: false })
-              .limit(1)
-              .maybeSingle();
-            if (tpl) {
-              await supabase.from('platform_messages').insert({
-                recipient_id: r.data.session.user.id,
-                sender_label: 'فريق حيّنا',
-                title: tpl.title,
-                body: tpl.body,
-                type: 'welcome',
-              });
-            } else {
-              await supabase.from('platform_messages').insert({
-                recipient_id: r.data.session.user.id,
-                sender_label: 'فريق حيّنا',
-                title: 'مرحبًا بك في حيّنا',
-                body: 'أهلاً بك في منصة حيّنا! نحن سعداء بانضمامك. استكشف السوق، الاستفسارات، والخدمات في حيك.',
-                type: 'welcome',
-              });
-            }
-          } catch {}
+          // The profile trigger delivers the official welcome on the server,
+          // including email-confirmation and OAuth registrations.
           router.replace('/home');
         } else Alert.alert('نجاح', 'تم التسجيل بنجاح. يرجى مراجعة بريدك الإلكتروني لتفعيله إن لزم الأمر.');
       } else {

@@ -1,4 +1,5 @@
-import { OasisPressable as Pressable, OasisSurface } from '@/components/oasis/OasisPrimitives';
+import { OasisPressable as Pressable, OasisSurface, OasisTextInput as TextInput } from '@/components/oasis/OasisPrimitives';
+import { usePlatformConfig } from '@/lib/platformConfig';
 import { OASIS } from '@/lib/oasis';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -17,6 +18,7 @@ import {
   UserRound,
   LogOut,
   FileText,
+  Mail,
 } from 'lucide-react-native';
 
 import { AppHeader } from '@/components/shared/AppHeader';
@@ -42,8 +44,9 @@ const DISCOVER: MenuItem[] = [
 ];
 
 const HELP: MenuItem[] = [
+  { title: 'حساب منصة حيّنا', subtitle: 'رسائلك الرسمية وآخر تحديثات المنصة', href: '/platform-inbox', Icon: ShieldCheck },
   { title: 'الدعم والمساعدة', subtitle: 'التواصل مع فريق حيّنا وتذاكرك', href: '/support', Icon: LifeBuoy },
-  { title: 'الشروط والسياسات', subtitle: 'جميع بنود منصة حيّنا (صارمة)', href: '/terms', Icon: FileText },
+  { title: 'الشروط والسياسات', subtitle: 'حقوقك وخصوصيتك وإرشادات المجتمع', href: '/terms', Icon: FileText },
   { title: 'حول حيّنا', subtitle: 'معلومات المنصة والسياسات', href: '/about', Icon: Info },
 ];
 
@@ -53,6 +56,8 @@ export default function More() {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<any>(null);
   const [userId, setUserId] = useState('');
+  const [query, setQuery] = useState('');
+  const { flags } = usePlatformConfig();
 
   useEffect(() => {
     void (async () => {
@@ -78,7 +83,7 @@ export default function More() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      <AppHeader variant="tab" title="المزيد" subtitle="وصول سريع بدون تكرار" />
+      <AppHeader variant="tab" title="المزيد" subtitle="حسابك وخدمات حيّك في مكان واحد" />
 
       <ScrollView
         contentContainerStyle={[styles.content, { paddingBottom: bottomInset + 28 }]}
@@ -117,23 +122,25 @@ export default function More() {
           <ChevronLeft size={19} color="#94A3B8" />
         </Pressable>
 
-        <MenuGroup title="استكشف حيّنا" items={DISCOVER} />
+        <TextInput accessibilityLabel="البحث في الخدمات والإعدادات" value={query} onChangeText={setQuery} placeholder="ابحث عن خدمة أو إعداد…" style={{ minHeight: 44, paddingHorizontal: 12, borderWidth: 1, borderColor: colors.line, borderRadius: 12, backgroundColor: colors.surface, color: colors.ink, textAlign: 'right' }} />
+        <MenuGroup title="استكشف حيّنا" query={query} items={DISCOVER.filter(item => !((item.href === '/lives' && flags.live === false) || (item.href === '/market' && flags.market === false) || (item.href === '/map' && flags.map === false) || (item.href === '/directory' && flags.directory === false) || (item.href === '/questions' && flags.questions === false)))} />
 
         <MenuGroup
           title="المساعدة"
+          query={query}
           items={[
             ...HELP.map((item) => profile || item.href !== '/support' ? item : { ...item, href: '/contact-us' }),
             ...(profile?.role === 'admin'
               ? [
                   { title: 'لوحة الإدارة', subtitle: 'إدارة المنصة والصلاحيات', href: '/admin', Icon: ShieldCheck },
                   { title: 'إدارة الفلترة والمخالفين', subtitle: 'الكلمات المحظورة والمتابعات', href: '/admin-moderation', Icon: FileText },
-                  { title: 'رسائل المنصة (Broadcast)', subtitle: 'إرسال ترحيب/تحديثات للجميع', href: '/admin-broadcast', Icon: FileText },
+                  { title: 'مركز تواصل المنصة', subtitle: 'الترحيب التلقائي والتحديثات الرسمية', href: '/admin-broadcast', Icon: Mail },
                 ]
               : []),
           ]}
         />
 
-        <View style={styles.logoutWrap}>
+        {userId ? <View style={styles.logoutWrap}>
           <Pressable
             oasisKind="action"
             oasisVariant="danger"
@@ -146,7 +153,7 @@ export default function More() {
             <LogOut size={17} color={OASIS.colors.danger} />
             <Text style={styles.logoutText}>تسجيل الخروج</Text>
           </Pressable>
-        </View>
+        </View> : null}
 
         <View style={styles.note}>
           <CircleHelp size={17} color={OASIS.colors.muted} />
@@ -159,13 +166,15 @@ export default function More() {
   );
 }
 
-function MenuGroup({ title, items }: { title: string; items: MenuItem[] }) {
+function MenuGroup({ title, items, query = '' }: { title: string; items: MenuItem[]; query?: string }) {
   const { colors, isDark } = useTheme();
+  const visible = items.filter(item => `${item.title} ${item.subtitle}`.includes(query.trim()));
+  if (!visible.length) return null;
   return (
     <View style={styles.group}>
       <Text style={[styles.groupTitle, isDark && { color: colors.muted }]}>{title}</Text>
       <OasisSurface oasisSurface="card" style={[styles.groupCard, isDark && { backgroundColor: colors.surface, borderColor: colors.line }]}>
-        {items.map((item, index) => {
+        {visible.map((item, index) => {
           const Icon = item.Icon;
           return (
             <React.Fragment key={item.href + item.title}>

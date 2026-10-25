@@ -79,6 +79,7 @@ export default function Messages() {
   const [busy, setBusy] = useState(false);
   const [onlyUnread, setOnlyUnread] = useState(false);
   const [platformMessages, setPlatformMessages] = useState<any[]>([]);
+  const [platformUnreadCount, setPlatformUnreadCount] = useState(0);
 
   const dndNow = isDndActiveNow(dnd);
 
@@ -89,15 +90,17 @@ export default function Messages() {
 
     // Platform messages (welcome/updates)
     try {
-      const { data: pm } = await supabase
-        .from('platform_messages')
-        .select('*')
-        .eq('recipient_id', u.user.id)
-        .order('created_at', { ascending: false })
-        .limit(50);
-      setPlatformMessages(pm || []);
+      const [latest, unread] = await Promise.all([
+        supabase.from('platform_messages').select('id,body,created_at').eq('recipient_id', u.user.id).order('created_at', { ascending: false }).limit(1),
+        supabase.from('platform_messages').select('id', { count: 'exact', head: true }).eq('recipient_id', u.user.id).eq('read', false),
+      ]);
+      if (latest.error) throw latest.error;
+      if (unread.error) throw unread.error;
+      setPlatformMessages(latest.data || []);
+      setPlatformUnreadCount(unread.count || 0);
     } catch {
       setPlatformMessages([]);
+      setPlatformUnreadCount(0);
     }
 
     // 1. DND state (with schedule)
@@ -197,7 +200,14 @@ export default function Messages() {
 
   useFocusEffect(
     useCallback(() => {
-      load();
+      void load();
+      let debounce: ReturnType<typeof setTimeout> | undefined;
+      const channel = supabase.channel('official-chat-list')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'platform_messages' }, () => {
+          clearTimeout(debounce);
+          debounce = setTimeout(() => { void load(); }, 500);
+        }).subscribe();
+      return () => { clearTimeout(debounce); void supabase.removeChannel(channel); };
     }, [load])
   );
 
@@ -460,6 +470,14 @@ export default function Messages() {
           }
         >
           <View style={styles.inner}>
+            {(!searchQuery.trim() || 'منصة حيّنا رسائل المنصة الرسمية'.includes(searchQuery.trim())) && (!onlyUnread || platformUnreadCount > 0) ? (
+              <Pressable oasisKind="card" accessibilityRole="button" accessibilityLabel="محادثة منصة حيّنا الرسمية" onPress={() => router.push('/platform-inbox')} style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 12, padding: 14, marginBottom: 14, backgroundColor: OASIS.colors.surface, borderRadius: 14, borderWidth: 1, borderColor: OASIS.colors.line }}>
+                <View style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: OASIS.colors.soft, alignItems: 'center', justifyContent: 'center' }}><CheckCircle2 size={24} color={OASIS.colors.primary} /></View>
+                <View style={{ flex: 1, gap: 5 }}><Text style={{ textAlign: 'right', fontSize: 15, fontWeight: '700', color: OASIS.colors.ink }}>منصة حيّنا ✓</Text><Text numberOfLines={1} style={{ textAlign: 'right', fontSize: 12, color: OASIS.colors.muted }}>{platformMessages[0]?.body || 'الحساب الرسمي · الترحيب وأخبار المنصة'}</Text></View>
+                {platformUnreadCount > 0 ? <View style={{ minWidth: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: OASIS.colors.primary }}><Text style={{ fontSize: 11, color: '#fff' }}>جديد</Text></View> : <ChevronLeft size={18} color={OASIS.colors.muted} />}
+              </Pressable>
+            ) : null}
+
             {filtered.length === 0 ? (
               <View style={styles.emptyState}>
                 <View style={{ alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}><OasisEmptyIllustration kind="empty-chat" /></View>
@@ -479,43 +497,6 @@ export default function Messages() {
               </View>
             ) : (
               <>
-                {platformMessages.length > 0 && (
-                  <View style={styles.pmSection}>
-                    <View style={styles.pmHeader}>
-                      <Text style={styles.sectionLabel}>رسائل المنصة 📬</Text>
-                      <Pressable onPress={async () => {
-                        const unreadIds = platformMessages.filter((x) => !x.read).map((x) => x.id);
-                        if (!unreadIds.length) return;
-                        await supabase.from('platform_messages').update({ read: true }).in('id', unreadIds);
-                        setPlatformMessages((prev) => prev.map((x) => ({ ...x, read: true })));
-                      }}>
-                        <Text style={styles.pmMarkAll}>تعليم الكل كمقروء</Text>
-                      </Pressable>
-                    </View>
-                    {platformMessages.map((pm) => (
-                      <Pressable
-                        key={pm.id}
-                        style={[styles.pmCard, !pm.read && styles.pmUnread]}
-                        onPress={async () => {
-                          if (!pm.read) {
-                            await supabase.from('platform_messages').update({ read: true }).eq('id', pm.id);
-                            setPlatformMessages((prev) => prev.map((x) => (x.id === pm.id ? { ...x, read: true } : x)));
-                          }
-                        }}
-                      >
-                        <View style={styles.pmIcon}>
-                          <MessageCircle size={16} color={OASIS.colors.primary} />
-                        </View>
-                        <View style={styles.pmCopy}>
-                          <Text style={styles.pmTitle}>{pm.title || 'رسالة من فريق حيّنا'}</Text>
-                          <Text style={styles.pmBody} numberOfLines={3}>{pm.body}</Text>
-                          <Text style={styles.pmDate}>{new Date(pm.created_at).toLocaleString('ar-SA')}</Text>
-                        </View>
-                      </Pressable>
-                    ))}
-                  </View>
-                )}
-
                 {filtered.some(c => c.isUnread && !c.isMuted && !dndNow) && (
                   <View style={styles.sectionHeaderRow}>
                     <Text style={styles.sectionLabel}>غير مقروء 🔔</Text>

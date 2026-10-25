@@ -18,14 +18,14 @@ import { installDarkModeWebFixes } from '@/lib/darkModeWeb';
 import { loadBannedWords } from '@/lib/profanity';
 
 const ACCOUNT_ONLY_ROUTES = [
-  '/profile', '/settings', '/market', '/messages', '/conversation', '/search',
+  '/profile', '/settings', '/market', '/messages', '/platform-inbox', '/conversation', '/search',
   '/ask', '/create-story', '/story', '/stories', '/story-settings', '/story-viewers', '/notifications',
   '/new-service', '/new-listing', '/service', '/business', '/directory', '/user', '/report', '/admin', '/support',
   '/live',
 ];
 
 function needsAccount(pathname: string) {
-  return ACCOUNT_ONLY_ROUTES.some(route => pathname === route || pathname.startsWith(`${route}/`));
+  return pathname.startsWith('/admin-') || ACCOUNT_ONLY_ROUTES.some(route => pathname === route || pathname.startsWith(`${route}/`));
 }
 
 export default function RootLayout() {
@@ -67,7 +67,7 @@ function RootContent() {
           router.replace('/banned');
           return;
         }
-        setIsAdmin(profile?.role === 'admin' || (data.session.user.email || '').toLowerCase() === 'root@gmail.com');
+        setIsAdmin(profile?.role === 'admin');
       } else setIsAdmin(false);
       setSessionReady(true);
       // Background sync: never let a denied notification permission surface
@@ -82,7 +82,7 @@ function RootContent() {
       if (!session?.user) setIsAdmin(false);
       else void supabase.from('profiles').select('role,is_banned').eq('id', session.user.id).maybeSingle().then(({ data: profile }) => {
         if (profile?.is_banned) { void supabase.auth.signOut(); router.replace('/banned'); return; }
-        setIsAdmin(profile?.role === 'admin' || (session.user?.email || '').toLowerCase() === 'root@gmail.com');
+        setIsAdmin(profile?.role === 'admin');
       });
       setSessionReady(true);
       if (session?.user) void registerPushToken().catch(() => {});

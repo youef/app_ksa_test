@@ -86,7 +86,7 @@ export function useHomeFeed({ onLocation }: Options) {
       const limit = limitRef.current;
 
       // Stage 1: every independent query in parallel.
-      const [notifRes, storiesRes, questionsRes, requestsRes] = await Promise.all([
+      const [notifRes, storiesRes, questionsRes, requestsRes, platformUnread] = await Promise.all([
         user ? supabase
           .from('notifications')
           .select('id', { count: 'exact', head: true })
@@ -109,6 +109,7 @@ export function useHomeFeed({ onLocation }: Options) {
           .eq('status', 'open')
           .order('created_at', { ascending: false })
           .limit(limit) : supabase.rpc('hayna_guest_requests', { p_city: loc.city, p_district: loc.district, p_limit: limit }),
+        user ? supabase.from('platform_messages').select('id', { count: 'exact', head: true }).eq('recipient_id', user.id).eq('read', false) : Promise.resolve({ count: 0, error: null }),
       ]);
 
       setUnreadNotifCount(notifRes.count ?? 0);
@@ -132,11 +133,11 @@ export function useHomeFeed({ onLocation }: Options) {
             }
             setUnreadMessagesCount([...latest.values()].filter(message =>
               message.sender_id !== user.id && !(message.read_by ?? []).includes(user.id)
-            ).length);
-          } else setUnreadMessagesCount(0);
+            ).length + ((platformUnread.count || 0) > 0 ? 1 : 0));
+          } else setUnreadMessagesCount((platformUnread.count || 0) > 0 ? 1 : 0);
         } catch (chatError) {
           console.warn('Could not refresh unread chat badge:', chatError);
-          setUnreadMessagesCount(0);
+          setUnreadMessagesCount((platformUnread.count || 0) > 0 ? 1 : 0);
         }
       } else setUnreadMessagesCount(0);
 

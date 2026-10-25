@@ -20,7 +20,7 @@ test('failed image uploads never publish a local device URL as a success', async
 test('publishing obeys account-wide disabled replies even when the composer requests replies', async () => {
   let inserted;
   const profileQuery = { select() { return this; }, eq() { return this; }, async single() { return { data: { allow_story_replies: 'nobody' }, error: null }; } };
-  const supabase = { auth: { getUser: async () => ({ data: { user: { id: 'owner' } } }) }, from: table => table === 'profiles' ? profileQuery : { insert: async rows => { inserted = rows; return { error: null }; } } };
+  const supabase = { auth: { getUser: async () => ({ data: { user: { id: 'owner' } } }) }, from: table => table === 'profiles' ? profileQuery : { insert: rows => { inserted = rows; return { select: async () => ({ data: rows.map((_, i) => ({ id: 'published-' + i })), error: null }) }; } } };
   const api = load('../lib/storyPublish.ts', { './supabase': { supabase }, './storyGradients': { getGradient: () => ({ colors: ['#166044'] }) }, './storySlides': { selectPublishableSlides: rows => rows }, './storyTypes': { STORY_LIMITS: { ttlMs: 86400000 } }, './storyUpload': { uploadStoryImage: async () => { throw Error('text should not upload'); } } });
   const result = await api.publishStorySlides([{ type: 'text', content: 'يومي في الحي', bgGradId: 0 }], undefined, { audience: 'followers', allowedUserIds: [], hiddenUserIds: [], allowReplies: true, interactiveType: 'none' });
   assert.equal(result.publishedCount, 1);
