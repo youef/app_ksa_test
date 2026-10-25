@@ -164,7 +164,7 @@ export default function SearchPage() {
     if (params.q !== undefined && params.q !== query) {
       setQuery(params.q);
     }
-  }, [params.q, query]);
+  }, [params.q]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
