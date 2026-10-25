@@ -1,8 +1,9 @@
 import { OasisArtwork } from '@/components/oasis/OasisPrimitives';
 import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Image, ImageBackground, Platform, RefreshControl, ScrollView, Share, StyleSheet, Switch, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Image, ImageBackground, Platform, RefreshControl, ScrollView, Share, StyleSheet, Switch, Text, View, useWindowDimensions } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
@@ -49,6 +50,9 @@ import {
   type AccountKind,
 } from '@/components/profile/AccountIdentityBadge';
 import { supabase } from '@/lib/supabase';
+import { ProfileDesignStudio, type FeaturedType, type StudioItem, type FeaturedRow } from '@/components/profile/ProfileDesignStudio';
+import { bannerColors, DEFAULT_FEATURED_TITLE, DEFAULT_SECTION_VISIBILITY, DEFAULT_SECTION_ORDER, DEFAULT_PROFILE_TYPE, MAX_FEATURED } from '@/lib/profileTheme';
+import { profileCoverUrl, uploadProfileCover, removeProfileCover } from '@/lib/profileCover';
 import { useBottomNavInset } from '@/lib/bottomNav';
 import { registerPushToken, syncDndWithNotifications, unregisterPushToken } from '@/lib/notifications';
 import { getCurrentDeviceLocation, reverseGeocodeDeviceLocation } from '@/lib/deviceLocation';
@@ -87,13 +91,7 @@ const ACCOUNT_TYPES: { key: AccountKind; label: string; description: string }[] 
   { key: 'idea', label: 'مبادرة', description: 'مشروع أو مبادرة مجتمعية' },
 ];
 
-const ACCENTS = [OASIS.colors.primary, OASIS.colors.primary, '#2563EB', '#7C3AED', '#B45309', OASIS.colors.ink];
-const BANNERS = [
-  { id: 'emerald', label: 'حيّنا' },
-  { id: 'ocean', label: 'أزرق' },
-  { id: 'sunset', label: 'دافئ' },
-  { id: 'midnight', label: 'ليلي' },
-];
+
 
 function normalizeTab(value?: string): HubTab {
   if (value === 'content' || value === 'business' || value === 'commerce') return 'content';
@@ -120,6 +118,11 @@ function statusLabel(value?: string | null) {
 export default function AccountCenter() {
   const params = useLocalSearchParams<{ tab?: string; section?: string }>();
   const bottomInset = useBottomNavInset();
+  const { width } = useWindowDimensions();
+  const wide = width >= 860;
+  const scrollRef = useRef<ScrollView>(null);
+  const designY = useRef(0);
+  const designScrolled = useRef(false);
   const requestedTab = normalizeTab(Array.isArray(params.tab) ? params.tab[0] : params.tab);
   const [tab, setTab] = useState<HubTab>(requestedTab);
 
@@ -157,7 +160,15 @@ export default function AccountCenter() {
     banner_style: 'emerald',
     show_stats: true,
     show_badges: true,
+    featured_title: DEFAULT_FEATURED_TITLE,
+    section_visibility: DEFAULT_SECTION_VISIBILITY,
+    section_order: DEFAULT_SECTION_ORDER,
+    profile_type: DEFAULT_PROFILE_TYPE,
   });
+  const [featured, setFeatured] = useState<FeaturedRow[]>([]);
+  const [coverVersion, setCoverVersion] = useState<number | null>(null);
+  const [coverState, setCoverState] = useState<'loading' | 'ready' | 'missing'>('loading');
+  const [coverBusy, setCoverBusy] = useState(false);
 
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
@@ -178,6 +189,7 @@ export default function AccountCenter() {
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
+    setCoverState('loading');
     try {
       const { data: auth, error: authError } = await supabase.auth.getUser();
       if (authError) throw authError;
@@ -205,6 +217,7 @@ export default function AccountCenter() {
         followingRes,
         reputationRes,
         pushRes,
+        featuredRes,
       ] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', uid).maybeSingle(),
         supabase.rpc('hayna_my_account_capabilities'),
@@ -219,6 +232,7 @@ export default function AccountCenter() {
         supabase.from('follows').select('id', { count: 'exact', head: true }).eq('follower_id', uid),
         supabase.from('reputation').select('points').eq('user_id', uid).maybeSingle(),
         supabase.from('push_tokens').select('id').eq('user_id', uid).eq('platform', Platform.OS).limit(1),
+        supabase.from('profile_featured_items').select('item_type,item_id,position').eq('user_id', uid).order('position', { ascending: true }),
       ]);
 
       if (profileRes.error) throw profileRes.error;
@@ -243,7 +257,12 @@ export default function AccountCenter() {
         banner_style: 'emerald',
         show_stats: true,
         show_badges: true,
+        featured_title: DEFAULT_FEATURED_TITLE,
+        section_visibility: DEFAULT_SECTION_VISIBILITY,
+        section_order: DEFAULT_SECTION_ORDER,
+        profile_type: DEFAULT_PROFILE_TYPE,
       });
+      setFeatured((featuredRes.data || []) as FeaturedRow[]);
       setStats({
         followers: followersRes.count || 0,
         following: followingRes.count || 0,
@@ -274,6 +293,19 @@ export default function AccountCenter() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const sectionParam = Array.isArray(params.section) ? params.section[0] : params.section;
+  useEffect(() => {
+    if (sectionParam === 'design' && !designScrolled.current) {
+      const id = setTimeout(() => {
+        if (designY.current) {
+          scrollRef.current?.scrollTo({ y: Math.max(0, designY.current - 10), animated: true });
+          designScrolled.current = true;
+        }
+      }, 400);
+      return () => clearTimeout(id);
+    }
+  }, [sectionParam, loading]);
 
   const identityMeta = useMemo(
     () => getAccountIdentityMeta(profile?.role, profile?.account_type, Boolean(profile?.is_verified)),
@@ -343,6 +375,82 @@ export default function AccountCenter() {
     }
   }
 
+  async function pickCover() {
+    if (!userId || coverBusy) return;
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [16, 9],
+      quality: 0.82,
+    });
+    if (result.canceled || !result.assets?.[0]) return;
+    setCoverBusy(true);
+    try {
+      const asset = result.assets[0];
+      await uploadProfileCover(userId, asset);
+      setCoverVersion(Date.now());
+      setCoverState('ready');
+      Alert.alert('تم حفظ الغلاف', 'ستظهر الصورة كخلفية لملفك العام.');
+    } catch (error: any) {
+      Alert.alert('تعذر حفظ الغلاف', error?.message || 'حاول مرة أخرى.');
+    } finally {
+      setCoverBusy(false);
+    }
+  }
+
+  async function removeCover() {
+    if (!userId || coverBusy) return;
+    setCoverBusy(true);
+    try {
+      await removeProfileCover(userId);
+      setCoverVersion(null);
+      setCoverState('missing');
+    } catch (error: any) {
+      Alert.alert('تعذر إزالة الغلاف', error?.message || 'حاول مرة أخرى.');
+    } finally {
+      setCoverBusy(false);
+    }
+  }
+
+  async function toggleFeatured(type: FeaturedType, id: string) {
+    if (!userId) return;
+    const exists = featured.some((row) => row.item_type === type && row.item_id === id);
+    if (!exists && featured.length >= MAX_FEATURED) {
+      Alert.alert('الحد الأقصى', `يمكن تثبيت حتى ${MAX_FEATURED} عناصر.`);
+      return;
+    }
+    try {
+      if (exists) {
+        const { error } = await supabase.from('profile_featured_items').delete().match({ user_id: userId, item_type: type, item_id: id });
+        if (error) throw error;
+        setFeatured((current) => current.filter((row) => !(row.item_type === type && row.item_id === id)));
+      } else {
+        const { data, error } = await supabase.from('profile_featured_items').insert({
+          user_id: userId,
+          item_type: type,
+          item_id: id,
+          position: featured.length,
+        }).select().maybeSingle();
+        if (error) throw error;
+        setFeatured((current) => [...current, (data as FeaturedRow) || { item_type: type, item_id: id, position: current.length }]);
+      }
+    } catch (error: any) {
+      Alert.alert('تعذر تحديث الأعمال المميزة', error?.message || 'حاول مرة أخرى.');
+    }
+  }
+
+  async function resetDesign() {
+    await saveCustomization({
+      accent_color: OASIS.colors.primary,
+      banner_style: 'emerald',
+      show_stats: true,
+      show_badges: true,
+      featured_title: DEFAULT_FEATURED_TITLE,
+      section_visibility: DEFAULT_SECTION_VISIBILITY,
+      section_order: DEFAULT_SECTION_ORDER,
+      profile_type: DEFAULT_PROFILE_TYPE,
+    });
+  }
   async function updateCurrentLocation() {
     if (!userId || locationBusy) return;
     setLocationBusy(true);
@@ -487,7 +595,10 @@ export default function AccountCenter() {
       banner_style: next.banner_style || 'emerald',
       show_stats: next.show_stats !== false,
       show_badges: next.show_badges !== false,
-      featured_title: next.featured_title || 'أعمالي المميزة',
+      featured_title: next.featured_title || DEFAULT_FEATURED_TITLE,
+      section_visibility: next.section_visibility || DEFAULT_SECTION_VISIBILITY,
+      section_order: next.section_order || DEFAULT_SECTION_ORDER,
+      profile_type: next.profile_type || DEFAULT_PROFILE_TYPE,
     }, { onConflict: 'user_id' });
     if (saved.error) Alert.alert('تعذر حفظ المظهر', saved.error.message);
   }
@@ -629,11 +740,17 @@ export default function AccountCenter() {
       />
 
       <ScrollView
+        ref={scrollRef}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load(true); }} tintColor={OASIS.colors.primary} />}
-        contentContainerStyle={[styles.content, { paddingBottom: bottomInset + 28 }]}
+        contentContainerStyle={[styles.content, { paddingBottom: bottomInset + 28, maxWidth: wide ? 1120 : 920 }]}
       >
-        <View style={styles.profileHero}>
+        <View style={[styles.profileHero, wide && styles.profileHeroWide]}>
+          <LinearGradient colors={bannerColors(customization?.banner_style)} style={StyleSheet.absoluteFillObject} />
+          {profileCoverUrl(userId, coverVersion) && coverState !== 'missing' ? (
+            <Image source={{ uri: profileCoverUrl(userId, coverVersion) }} style={StyleSheet.absoluteFillObject} resizeMode="cover" onLoad={() => setCoverState('ready')} onError={() => setCoverState('missing')} />
+          ) : null}
+          <LinearGradient colors={['rgba(4,10,8,0.12)', 'rgba(4,10,8,0.62)']} style={StyleSheet.absoluteFillObject} />
           <Pressable oasisKind="plain" onPress={pickAvatar} style={styles.avatarWrap}>
             {profile.avatar_url ? (
               <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
@@ -655,11 +772,16 @@ export default function AccountCenter() {
             </View>
             {(profile.city || profile.district) ? (
               <View style={styles.locationLine}>
-                <MapPin size={13} color={OASIS.colors.muted} />
+                <MapPin size={13} color="rgba(255,255,255,0.82)" />
                 <Text style={styles.locationText}>{[profile.district && 'حي ' + profile.district, profile.city].filter(Boolean).join(' · ')}</Text>
               </View>
             ) : null}
           </View>
+
+          <Pressable style={styles.heroCoverButton} onPress={() => void pickCover()} disabled={coverBusy}>
+            {coverBusy ? <ActivityIndicator size="small" color={OASIS.colors.surface} /> : <Camera size={14} color={OASIS.colors.surface} />}
+            <Text style={styles.heroCoverButtonText}>{coverState === 'ready' ? 'تغيير الغلاف' : 'غلاف'}</Text>
+          </Pressable>
         </View>
 
         <View style={styles.statsBar}>
@@ -977,37 +1099,50 @@ export default function AccountCenter() {
               </View>
             </SectionCard>
 
-            <SectionCard>
-              <View style={styles.sectionHeader}>
-                <View style={styles.sectionHeaderCopy}>
-                  <Text style={styles.sectionTitle}>مظهر الملف</Text>
-                  <Text style={styles.sectionSub}>تخصيص بسيط بدون صفحات إعدادات إضافية</Text>
+            <View onLayout={(event) => {
+              designY.current = event.nativeEvent.layout.y;
+              if ((Array.isArray(params.section) ? params.section[0] : params.section) === 'design' && !designScrolled.current) {
+                setTimeout(() => {
+                  scrollRef.current?.scrollTo({ y: Math.max(0, designY.current - 10), animated: true });
+                  designScrolled.current = true;
+                }, 120);
+              }
+            }}>
+              <SectionCard>
+                <View style={styles.sectionHeader}>
+                  <View style={styles.sectionHeaderCopy}>
+                    <Text style={styles.sectionTitle}>استوديو المظهر</Text>
+                    <Text style={styles.sectionSub}>الألوان والخلفية والأقسام — مربوطة بملفك العام</Text>
+                  </View>
+                  <Palette size={20} color="#7C3AED" />
                 </View>
-                <Palette size={20} color="#7C3AED" />
-              </View>
+              </SectionCard>
+            </View>
 
-              <Text style={styles.fieldLabel}>لون الملف</Text>
-              <View style={styles.colorRow}>
-                {ACCENTS.map((color) => (
-                  <Pressable
-                    key={color}
-                    onPress={() => void saveCustomization({ accent_color: color })}
-                    style={[styles.colorDot, { backgroundColor: color }, customization.accent_color === color && styles.colorDotActive]}
-                  >
-                    {customization.accent_color === color ? <Check size={13} color={OASIS.colors.surface} /> : null}
-                  </Pressable>
-                ))}
-              </View>
-
-              <ChoiceGroup
-                label="خلفية الملف"
-                value={customization.banner_style || 'emerald'}
-                options={BANNERS.map((item) => [item.id, item.label])}
-                onChange={(value: string) => void saveCustomization({ banner_style: value })}
-              />
-              <ToggleRow title="إظهار الإحصائيات" sub="المتابعون والإسهامات والسمعة" value={customization.show_stats !== false} onValueChange={(value: boolean) => void saveCustomization({ show_stats: value })} />
-              <ToggleRow title="إظهار الشارات" sub="الشارات والإنجازات في الملف العام" value={customization.show_badges !== false} onValueChange={(value: boolean) => void saveCustomization({ show_badges: value })} />
-            </SectionCard>
+            <ProfileDesignStudio
+              userId={userId}
+              profile={profile}
+              customization={customization}
+              displayName={publicName}
+              stats={{ followers: stats.followers, following: stats.following, content: totalOwned, reputation: stats.reputation }}
+              coverUri={profileCoverUrl(userId, coverVersion)}
+              coverVisible={coverState !== 'missing'}
+              coverBusy={coverBusy}
+              items={[
+                ...products.map((item) => ({ type: 'market' as FeaturedType, id: item.id, title: item.title, subtitle: item.status, image: item.image_url })),
+                ...services.map((item) => ({ type: 'service' as FeaturedType, id: item.id, title: item.name, subtitle: item.moderation_status || item.activity_status, image: item.cover_url })),
+                ...questions.map((item) => ({ type: 'question' as FeaturedType, id: item.id, title: item.title, subtitle: item.status, image: null })),
+                ...requests.map((item) => ({ type: 'request' as FeaturedType, id: item.id, title: item.title, subtitle: item.status, image: null })),
+              ]}
+              featured={featured}
+              wide={wide}
+              onPickCover={() => void pickCover()}
+              onRemoveCover={() => void removeCover()}
+              onChange={(patch) => void saveCustomization(patch)}
+              onToggleFeatured={(type, id) => void toggleFeatured(type, id)}
+              onSaveFeaturedTitle={(title) => void saveCustomization({ featured_title: title })}
+              onReset={() => void resetDesign()}
+            />
 
             <SectionCard>
               <View style={styles.sectionHeader}>
@@ -1207,7 +1342,10 @@ const styles = StyleSheet.create({
   loadingText: { color: OASIS.colors.muted, fontSize: 12, fontWeight: '700' },
   headerAction: { width: 36, height: 36, borderRadius: 14, backgroundColor: OASIS.colors.soft, alignItems: 'center', justifyContent: 'center' },
   content: { paddingHorizontal: 14, paddingTop: 12, gap: 14, maxWidth: 920, width: '100%', alignSelf: 'center' },
-  profileHero: { backgroundColor: OASIS.colors.surface, borderWidth: 1, borderColor: OASIS.colors.line, flexDirection: 'row-reverse', alignItems: 'center', gap: 12, padding: 16, minHeight: 108, borderRadius: 14, overflow: 'hidden' },
+  profileHero: { borderWidth: 1, borderColor: OASIS.colors.line, flexDirection: 'row-reverse', alignItems: 'center', gap: 12, padding: 16, minHeight: 138, borderRadius: 18, overflow: 'hidden' },
+  profileHeroWide: { minHeight: 156, padding: 20 },
+  heroCoverButton: { position: 'absolute', left: 12, top: 12, minHeight: 32, borderRadius: 10, paddingHorizontal: 9, backgroundColor: 'rgba(0,0,0,0.42)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)', flexDirection: 'row-reverse', alignItems: 'center', gap: 5, zIndex: 3 },
+  heroCoverButtonText: { color: '#FFFFFF', fontSize: 10.5, fontWeight: '800' },
   avatarWrap: { width: 64, height: 64, borderRadius: 32, position: 'relative', borderWidth: 3, borderColor: OASIS.colors.soft },
   avatar: { width: '100%', height: '100%', borderRadius: 40 },
   avatarFallback: { flex: 1, borderRadius: 40, alignItems: 'center', justifyContent: 'center', backgroundColor: OASIS.colors.soft },
@@ -1215,11 +1353,11 @@ const styles = StyleSheet.create({
   cameraBadge: { position: 'absolute', left: -2, bottom: -2, width: 27, height: 27, borderRadius: 14, backgroundColor: OASIS.colors.primary, borderWidth: 2, borderColor: OASIS.colors.surface, alignItems: 'center', justifyContent: 'center' },
   identityIcon: { position: 'absolute', right: -4, top: -4 },
   heroCopy: { flex: 1, alignItems: 'flex-end', minWidth: 0 },
-  publicName: { color: OASIS.colors.ink, fontSize: 21, fontWeight: '700', textAlign: 'right', maxWidth: '100%' },
-  handle: { color: OASIS.colors.muted, fontSize: 12.5, fontWeight: '700', marginTop: 2 },
+  publicName: { color: '#FFFFFF', fontSize: 21, fontWeight: '700', textAlign: 'right', maxWidth: '100%' },
+  handle: { color: 'rgba(255,255,255,0.82)', fontSize: 12.5, fontWeight: '700', marginTop: 2 },
   badgeRow: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 5, marginTop: 7 },
   locationLine: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, marginTop: 7 },
-  locationText: { color: OASIS.colors.muted, fontSize: 11, fontWeight: '700' },
+  locationText: { color: 'rgba(255,255,255,0.82)', fontSize: 11, fontWeight: '700' },
   statsBar: { flexDirection: 'row-reverse', backgroundColor: OASIS.colors.surface, borderRadius: 14, borderWidth: 1, borderColor: OASIS.colors.line, overflow: 'hidden' },
   stat: { flex: 1, alignItems: 'center', paddingVertical: 11, borderLeftWidth: 1, borderLeftColor: '#F1F5F9' },
   statValue: { color: OASIS.colors.ink, fontSize: 16, fontWeight: '700' },

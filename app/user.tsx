@@ -1,6 +1,8 @@
 import { OasisEmptyIllustration } from '@/components/oasis/OasisEmptyIllustration';
 import { OasisPressable as Pressable, OasisSurface } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
+import { bannerColors } from '@/lib/profileTheme';
+import { profileCoverUrl } from '@/lib/profileCover';
 import { HeaderAction, AppHeader } from '@/components/shared/AppHeader';
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Platform, RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions, Share } from 'react-native';
@@ -30,6 +32,7 @@ import {
   Star,
   User,
   Edit3,
+  Palette,
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { ProfileCustomizationEntry } from '@/components/profile/ProfileCustomizationEntry';
@@ -57,6 +60,7 @@ export default function UserProfile() {
   const [resolvedProfileId, setResolvedProfileId] = useState<string>('');
   const id = resolvedProfileId || routeId;
   const { width } = useWindowDimensions();
+  const [coverFailed, setCoverFailed] = useState(false);
   const [profile, setProfile] = useState<any>(null);
   const [hasActiveStories, setHasActiveStories] = useState(false);
   const [stats, setStats] = useState({
@@ -201,6 +205,7 @@ export default function UserProfile() {
       if (error) throw error;
       setCurrentUserId(me);
       setProfile(p);
+      setCoverFailed(false);
       if (!p) return;
       setResolvedProfileId(p.id);
       if (p.is_banned === true && me !== p.id) {
@@ -545,14 +550,10 @@ export default function UserProfile() {
   const totalContributions = stats.market + stats.services + stats.requests + stats.questions + (own ? stats.answers : 0);
   const identityMeta = getAccountIdentityMeta(profile.role, profile.account_type, Boolean(profile.is_verified));
   const accentColor = profileCustomization?.accent_color || identityMeta.color;
-  const heroColors: [string, string, string] =
-    profileCustomization?.banner_style === 'ocean'
-      ? ['#0c4a6e', '#0369a1', '#0ea5e9']
-      : profileCustomization?.banner_style === 'sunset'
-        ? ['#7c2d12', '#c2410c', '#f97316']
-        : profileCustomization?.banner_style === 'midnight'
-          ? [OASIS.colors.ink, OASIS.colors.ink, OASIS.colors.ink]
-          : identityMeta.heroColors;
+  const heroColors: [string, string, string] = (profileCustomization?.banner_style || 'emerald') === 'emerald'
+    ? identityMeta.heroColors
+    : bannerColors(profileCustomization?.banner_style);
+  const coverUrl = profileCoverUrl(id);
   const identityDescriptor =
     profile.freelance_trade ||
     (profile.account_type === 'merchant'
@@ -624,8 +625,12 @@ export default function UserProfile() {
             colors={heroColors}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.hero}
+            style={[styles.hero, width < 720 && styles.heroCompact]}
           >
+            {coverUrl && !coverFailed && (
+              <Image source={{ uri: coverUrl }} style={StyleSheet.absoluteFillObject} resizeMode="cover" onError={() => setCoverFailed(true)} />
+            )}
+            <LinearGradient colors={['rgba(4,10,8,0.16)', 'rgba(4,10,8,0.62)']} style={[StyleSheet.absoluteFillObject, { pointerEvents: 'none' }]} />
             <View style={styles.heroGlowOne} />
             <View style={styles.heroGlowTwo} />
 
@@ -658,15 +663,24 @@ export default function UserProfile() {
               </Pressable>
 
               {/* Action Buttons in Hero */}
-              <View style={styles.heroActions}>
+              <View style={[styles.heroActions, width < 720 && { maxWidth: '100%' }]}>
                 {own ? (
-                  <Pressable oasisKind="action"
-                    style={styles.editProfileBtn}
-                    onPress={() => router.push('/profile')}
-                  >
-                    <Edit3 size={15} color={OASIS.colors.surface} />
-                    <Text style={styles.editProfileText}>تعديل ملفي</Text>
-                  </Pressable>
+                  <View style={styles.ownHeroActions}>
+                    <Pressable oasisKind="action"
+                      style={styles.editProfileBtn}
+                      onPress={() => router.push('/profile')}
+                    >
+                      <Edit3 size={15} color={OASIS.colors.surface} />
+                      <Text style={styles.editProfileText}>تعديل ملفي</Text>
+                    </Pressable>
+                    <Pressable oasisKind="action"
+                      style={styles.designProfileBtn}
+                      onPress={() => router.push({ pathname: '/profile', params: { tab: 'settings', section: 'design' } })}
+                    >
+                      <Palette size={15} color={OASIS.colors.surface} />
+                      <Text style={styles.editProfileText}>تخصيص</Text>
+                    </Pressable>
+                  </View>
                 ) : (
                   <>
                     {!blocked && !blockedByOther && (
@@ -805,7 +819,7 @@ export default function UserProfile() {
           {/* Activity Category Tabs */}
           <OasisSurface oasisSurface="card" style={styles.tabsCard}>
             <ScrollView style={{ direction: 'rtl' }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.tabs, { direction: 'ltr' }]}>
-              {TABS.filter(({ id: key }) => (key !== 'answers' || own) && (key !== 'services' || (profileCustomization && profileCustomization.section_visibility && profileCustomization.section_visibility.services !== false)) && (key !== 'questions' || !(profileCustomization && profileCustomization.section_visibility && profileCustomization.section_visibility.questions === false)) && (key !== 'market' || !(profileCustomization && profileCustomization.section_visibility && profileCustomization.section_visibility.products === false)) && (key !== 'requests' || !(profileCustomization && profileCustomization.section_visibility && profileCustomization.section_visibility.services === false)) && (key !== 'reviews' || !(profileCustomization && profileCustomization.section_visibility && profileCustomization.section_visibility.reviews === false))).sort((a, b) => {
+              {TABS.filter(({ id: key }) => (key !== 'answers' || own) && (key !== 'services' || (profileCustomization && profileCustomization.section_visibility && profileCustomization.section_visibility.services !== false)) && (key !== 'questions' || !(profileCustomization && profileCustomization.section_visibility && profileCustomization.section_visibility.questions === false)) && (key !== 'market' || !(profileCustomization && profileCustomization.section_visibility && profileCustomization.section_visibility.products === false)) && (key !== 'requests' || !(profileCustomization && profileCustomization.section_visibility && profileCustomization.section_visibility.requests === false)) && (key !== 'reviews' || !(profileCustomization && profileCustomization.section_visibility && profileCustomization.section_visibility.reviews === false))).sort((a, b) => {
                 const customOrder = (profileCustomization && profileCustomization.section_order) || [];
                 if (customOrder.length) {
                   const aKey = a.id === 'market' ? 'products' : a.id === 'answers' ? 'questions' : a.id === 'requests' ? 'services' : a.id;
@@ -1106,6 +1120,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: OASIS.colors.background, padding: 16 },
   loadingText: { marginTop: 10, color: OASIS.colors.primary, fontWeight: '600', fontSize: 13 },
   hero: { borderRadius: 14, padding: 18, overflow: 'hidden', minHeight: 250 },
+  heroCompact: { padding: 14, minHeight: 220 },
   heroGlowOne: {
     position: 'absolute',
     width: 200,
@@ -1124,7 +1139,7 @@ const styles = StyleSheet.create({
     bottom: -80,
     right: -30,
   },
-  heroTop: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'flex-start' },
+  heroTop: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 10 },
   avatarRing: {
     position: 'relative',
     width: 80,
@@ -1228,6 +1243,18 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   messageText: { color: OASIS.colors.surface, fontWeight: '700', fontSize: 12.5 },
+  ownHeroActions: { flexDirection: 'row-reverse', gap: 8 },
+  designProfileBtn: {
+    height: 38,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.35)',
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 6,
+  },
   editProfileBtn: {
     height: 38,
     paddingHorizontal: 14,
