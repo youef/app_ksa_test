@@ -95,7 +95,13 @@ export function useLiveModeration(streamId: string | undefined, enabled: boolean
         filter: `stream_id=eq.${streamId}`,
       }, () => { void refresh(); })
       .subscribe();
-    return () => { void supabase.removeChannel(channel); };
+    // Postgres Changes requires replication publication; periodic refresh is a fallback
+    // when Realtime is not configured for these tables.
+    const refreshInterval = setInterval(() => { void refresh(); }, 30_000);
+    return () => {
+      clearInterval(refreshInterval);
+      void supabase.removeChannel(channel);
+    };
   }, [streamId, enabled, refresh]);
 
   const saveSettings = useCallback(async (next: LiveModerationSettings) => {
