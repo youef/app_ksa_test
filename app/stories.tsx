@@ -1,7 +1,7 @@
 import { OasisPressable as Pressable } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, ActivityIndicator, RefreshControl, Platform, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, ImageBackground, ActivityIndicator, RefreshControl, Platform, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { AppHeader } from '@/components/shared/AppHeader';
@@ -245,7 +245,9 @@ export default function StoriesScreen() {
 
   return (
     <View style={styles.container}>
-      <ImageBackground source={{ uri: Platform.OS === 'web' ? '/welcome/hayna-heritage-bg.png' : 'https://appksatest.vercel.app/welcome/hayna-heritage-bg.png' }} resizeMode="cover" pointerEvents="none" style={StyleSheet.absoluteFillObject} imageStyle={{ opacity: 0.15 }} />
+      <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
+        <ImageBackground source={{ uri: Platform.OS === 'web' ? '/welcome/hayna-heritage-bg.png' : 'https://appksatest.vercel.app/welcome/hayna-heritage-bg.png' }} resizeMode="cover" style={StyleSheet.absoluteFillObject} imageStyle={{ opacity: 0.15 }} />
+      </View>
       <AppHeader
         variant="sub"
         title="اليوميات"
