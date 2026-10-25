@@ -1,14 +1,15 @@
 import { OASIS } from '@/lib/oasis';
 import { useEffect, useState } from 'react';
 import {
-  ActivityIndicator, Image, ImageBackground, Platform,
+  ActivityIndicator, Image, ImageBackground, Platform, Pressable,
   StatusBar, StyleSheet, Text, View, useWindowDimensions,
 } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ArrowRight, LogIn, ShieldCheck } from 'lucide-react-native';
+import { ArrowRight, LogIn, ShieldCheck, Moon, Sun } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
+import { useTheme } from '@/context/ThemeContext';
 import { HAYNA_BUTTON } from '@/components/shared/haynaButtonTokens';
 import { HaynaActionButton } from '@/components/shared/HaynaActionButton';
 import {
@@ -21,6 +22,7 @@ import {
 const WELCOME_BACKGROUND = require('../public/design-system/hayna-v1/artwork/welcome-art.png');
 
 export default function Index() {
+  const { isDark, colors, setMode } = useTheme();
   const [signedIn, setSignedIn] = useState(false);
   const [logoUri, setLogoUri] = useState(getCachedBrandingLogo() || FALLBACK_LOGO_URI);
   const { height, width } = useWindowDimensions();
@@ -99,26 +101,37 @@ export default function Index() {
   }
 
   return (
-    <View style={styles.page}>
-      <StatusBar barStyle="dark-content" backgroundColor={OASIS.colors.background} translucent={false} />
+    <View style={[styles.page, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={colors.background} translucent={false} />
       <View style={styles.background}>
         <View pointerEvents="none" style={[styles.headerBackground, { height: Math.min(height * 0.6, 520) }]}>
         <ImageBackground source={WELCOME_BACKGROUND} resizeMode="cover" style={StyleSheet.absoluteFillObject}>
-          <View style={styles.topVeil} />
-          <LinearGradient colors={['rgba(245,243,233,0)', OASIS.colors.background]} style={styles.headerFade} />
+          <View style={[styles.topVeil, isDark && { backgroundColor: "rgba(5,12,10,0.65)" }]} />
+          <LinearGradient colors={isDark ? ['rgba(15,15,16,0)', colors.background] : ['rgba(245,243,233,0)', colors.background]} style={styles.headerFade} />
         </ImageBackground>
         </View>
         <View
           style={[styles.content, { paddingTop: Math.max(insets.top, 12), paddingBottom: Math.max(insets.bottom, 12) }, compact && styles.compact]}
-        ><View pointerEvents="none" style={[styles.hero, { top: Math.max(insets.top, 12) }, compact && styles.heroCompact]}>
+        >
+          <View style={styles.themeSwitcher}>
+            <Pressable onPress={() => setMode('light')} accessibilityRole="button" accessibilityLabel="الوضع الفاتح" accessibilityState={{ selected: !isDark }} style={[styles.themeOption, !isDark && styles.themeOptionActive, !isDark && { backgroundColor: colors.primary }]}>
+              <Sun size={17} color={!isDark ? '#FFFFFF' : colors.ink} />
+              <Text style={[styles.themeLabel, { color: !isDark ? '#FFFFFF' : colors.ink }]}>فاتح</Text>
+            </Pressable>
+            <Pressable onPress={() => setMode('dark')} accessibilityRole="button" accessibilityLabel="الوضع الداكن" accessibilityState={{ selected: isDark }} style={[styles.themeOption, isDark && { backgroundColor: colors.primary }]}>
+              <Moon size={17} color={isDark ? '#0F0F10' : colors.ink} />
+              <Text style={[styles.themeLabel, { color: isDark ? '#0F0F10' : colors.ink }]}>داكن</Text>
+            </Pressable>
+          </View>
+          <View pointerEvents="none" style={[styles.hero, { top: Math.max(insets.top, 12) }, compact && styles.heroCompact]}>
             <Image source={{ uri: logoUri }} resizeMode="contain" style={[styles.logo, compact && styles.logoCompact]} accessibilityLabel="شعار حيّنا" />
           </View>
 
           <View style={styles.spacer} />
 
           <View style={styles.bottomPanel}>
-            <Text style={styles.panelTitle}>أهلًا بك في حيّنا</Text>
-            <Text style={styles.panelSubtitle}>حيّك وناسك وخدماتك في مكان واحد</Text>
+            <Text style={[styles.panelTitle, { color: colors.ink }]}>أهلًا بك في حيّنا</Text>
+            <Text style={[styles.panelSubtitle, { color: colors.muted }]}>حيّك وناسك وخدماتك في مكان واحد</Text>
 
             <HaynaActionButton
               title="تسجيل الدخول"
@@ -132,7 +145,7 @@ export default function Index() {
               icon={<ArrowRight size={HAYNA_BUTTON.iconSize} color={OASIS.colors.primary} />}
               style={styles.secondaryAction}
             />
-            <View style={styles.trustRow}><ShieldCheck size={15} color={OASIS.colors.primary} /><Text style={styles.trustText}>مجتمع محلي، خصوصية واحترام للجميع</Text></View>
+            <View style={styles.trustRow}><ShieldCheck size={15} color={OASIS.colors.primary} /><Text style={[styles.trustText, { color: colors.muted }]}>مجتمع محلي، خصوصية واحترام للجميع</Text></View>
           </View>
         </View>
       </View>
@@ -148,6 +161,10 @@ const styles = StyleSheet.create({
   headerFade: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 120 },
   content: { flex: 1, minHeight: 0, paddingHorizontal: 16, alignItems: 'center' },
   compact: { paddingHorizontal: 16 },
+  themeSwitcher: { alignSelf: 'flex-end', flexDirection: 'row-reverse', gap: 4, padding: 4, borderRadius: 18, backgroundColor: 'rgba(120,130,125,0.16)', zIndex: 4 },
+  themeOption: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 11, paddingVertical: 9, borderRadius: 14, minHeight: 38 },
+  themeOptionActive: {},
+  themeLabel: { fontSize: 12, fontWeight: '700' },
   hero: { position: 'absolute', alignSelf: 'center', alignItems: 'center', zIndex: 1 },
   heroCompact: {},
   logo: { width: 112, height: 112 },
