@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MessageSquare, HeartHandshake, Wrench, Gift, AlertTriangle, Check, ArrowLeft, Users, ShieldAlert } from 'lucide-react-native';
 import { AppHeader } from '@/components/shared/AppHeader';
 import { supabase } from '@/lib/supabase';
+import { containsProfanity, banAccountOnViolation } from '@/lib/profanity';
 import { getCurrentDeviceLocation, reverseGeocodeDeviceLocation } from '@/lib/deviceLocation';
 import { getActiveLocation, getPermanentMyLocation, savePermanentMyLocation, subscribeLocation, isAllKingdom } from '@/lib/locationSync';
 import { detectEmergencyAndSafetyAI } from '@/lib/aiAssistant';
@@ -207,6 +208,15 @@ export default function AskScreen() {
 
     if (safetyCheck?.isSpam) {
       return Alert.alert('تنبيه أمان المجتمع', safetyCheck.spamReason || 'المحتوى ترويجي أو عشوائي وغير مصرح به.');
+    }
+
+    const combinedText = `${title} ${body}`.trim();
+    if (containsProfanity(combinedText)) {
+      const { data: u } = await supabase.auth.getUser();
+      if (u.user) await banAccountOnViolation(u.user.id);
+      Alert.alert('تم حظر الحساب', 'تم اكتشاف محتوى مخالف (مغازل/محتوى جنسي/سب/إساءة). تم إغلاق حسابك.');
+      router.replace('/banned');
+      return;
     }
 
     submittingRef.current = true;

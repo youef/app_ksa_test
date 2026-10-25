@@ -18,6 +18,7 @@ import {
 
 import { AppHeader } from '@/components/shared/AppHeader';
 import { supabase } from '@/lib/supabase';
+import { containsProfanity, banAccountOnViolation } from '@/lib/profanity';
 import { getPermanentMyLocation, isAllKingdom } from '@/lib/locationSync';
 import {
   type LocalServiceImage,
@@ -110,6 +111,13 @@ export default function NewListing() {
     if (!title.trim()) return Alert.alert('العنوان مطلوب', 'اكتب اسم المنتج أو السلعة.');
     if (!description.trim()) return Alert.alert('التفاصيل مطلوبة', 'اكتب وصفًا واضحًا للمنتج.');
     if (!city.trim()) return Alert.alert('المدينة مطلوبة', 'حدّث موقع حسابك من مركز الحساب أولًا.');
+
+    if (containsProfanity(`${title} ${description}`)) {
+      await banAccountOnViolation(profile.id);
+      Alert.alert('تم حظر الحساب', 'تم اكتشاف محتوى مخالف. تم إغلاق حسابك.');
+      router.replace('/banned');
+      return;
+    }
     if (mode === 'بيع' && price.trim() && !/^\d+(\.\d{1,2})?$/.test(price.trim())) {
       return Alert.alert('السعر غير صحيح', 'اكتب رقمًا صحيحًا مثل 50 أو 75.50.');
     }

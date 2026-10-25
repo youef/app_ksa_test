@@ -60,7 +60,12 @@ function RootContent() {
       const { data } = await supabase.auth.getSession();
       setHasSession(Boolean(data.session?.user));
       if (data.session?.user) {
-        const { data: profile } = await supabase.from('profiles').select('role').eq('id', data.session.user.id).maybeSingle();
+        const { data: profile } = await supabase.from('profiles').select('role,is_banned').eq('id', data.session.user.id).maybeSingle();
+        if (profile?.is_banned) {
+          await supabase.auth.signOut();
+          router.replace('/banned');
+          return;
+        }
         setIsAdmin(profile?.role === 'admin' || (data.session.user.email || '').toLowerCase() === 'root@gmail.com');
       } else setIsAdmin(false);
       setSessionReady(true);
@@ -73,7 +78,10 @@ function RootContent() {
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setHasSession(Boolean(session?.user));
       if (!session?.user) setIsAdmin(false);
-      else void supabase.from('profiles').select('role').eq('id', session.user.id).maybeSingle().then(({ data: profile }) => setIsAdmin(profile?.role === 'admin' || (session.user?.email || '').toLowerCase() === 'root@gmail.com'));
+      else void supabase.from('profiles').select('role,is_banned').eq('id', session.user.id).maybeSingle().then(({ data: profile }) => {
+        if (profile?.is_banned) { void supabase.auth.signOut(); router.replace('/banned'); return; }
+        setIsAdmin(profile?.role === 'admin' || (session.user?.email || '').toLowerCase() === 'root@gmail.com');
+      });
       setSessionReady(true);
       if (session?.user) void registerPushToken().catch(() => {});
     });

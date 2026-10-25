@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
+import { containsProfanity, banAccountOnViolation } from '@/lib/profanity';
 import {
   clearForMe,
   deleteConversationForEveryone,
@@ -538,6 +539,13 @@ export default function Conversation() {
           ? 'قم بإلغاء حظر هذا المستخدم أولاً لتتمكن من المراسلة.'
           : 'هذا المستخدم حظرك. لا يمكنك إرسال رسائل إليه.'
       );
+    }
+
+    if (containsProfanity(body)) {
+      await banAccountOnViolation(currentUserId);
+      Alert.alert('تم حظر الحساب', 'تم اكتشاف محتوى مخالف. تم إغلاق حسابك.');
+      router.replace('/banned');
+      return;
     }
 
     setSending(true);
