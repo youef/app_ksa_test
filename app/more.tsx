@@ -124,7 +124,10 @@ export default function More() {
           items={[
             ...HELP.map((item) => profile || item.href !== '/support' ? item : { ...item, href: '/contact-us' }),
             ...(profile?.role === 'admin'
-              ? [{ title: 'لوحة الإدارة', subtitle: 'إدارة المنصة والصلاحيات', href: '/admin', Icon: ShieldCheck }]
+              ? [
+                  { title: 'لوحة الإدارة', subtitle: 'إدارة المنصة والصلاحيات', href: '/admin', Icon: ShieldCheck },
+                  { title: 'إدارة الفلترة والمخالفين', subtitle: 'الكلمات المحظورة والمتابعات', href: '/admin-moderation', Icon: FileText },
+                ]
               : []),
           ]}
         />
