@@ -3,6 +3,7 @@ import { OasisTextInput as TextInput, OasisPressable as Pressable, OasisSurface 
 import { OASIS } from '@/lib/oasis';
 import { HeaderAction } from '@/components/shared/AppHeader';
 import { useState, useEffect, useRef } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Image, Platform, Linking } from 'react-native';
 
 import { router, useLocalSearchParams } from 'expo-router';
@@ -43,10 +44,8 @@ async function searchRows(
 ): Promise<Row[]> {
   // Keep the search scoped to literal text; PostgREST's .or() syntax uses commas
   // as separators, so strip filter-control characters before building the query.
-  const pattern = (term.includes('%') ? term : `%${term}%`)
-    .replace(/[(),]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  const cleaned = term.replace(/[(),.%*_\\]/g, ' ').replace(/\s+/g, ' ').trim();
+  const pattern = `%${cleaned}%`;
   if (!pattern || pattern === '%%') return [];
 
   const run = async (order: boolean, cols: string[]) => {
@@ -73,7 +72,7 @@ async function searchRows(
 }
 
 async function searchUsers(term: string, limit = 15): Promise<Row[]> {
-  const pattern = `%${term.replace(/[(),]/g, ' ').trim()}%`;
+  const pattern = `%${term.replace(/[(),.%*_\\]/g, ' ').trim()}%`;
   const { data, error } = await supabase
     .from('profiles')
     .select('id,username,display_name,avatar_url,city,district,is_verified,show_in_search,profile_privacy,created_at')
@@ -104,7 +103,7 @@ async function searchBusinesses(term: string, limit = 20): Promise<Row[]> {
   ];
   const unique = new Map<string, Row>();
   for (const item of taggedItems) {
-    const key = `${item.id ?? ''}:${item.name ?? item.shop_name ?? ''}`;
+    const key = `${item.__sourceTable}:${item.id ?? ''}`;
     if (!unique.has(key)) {
       unique.set(key, {
         ...item,
@@ -135,17 +134,30 @@ export default function SearchPage() {
   const [loading, setLoading] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const searchSequence = useRef(0);
-  const [recentSearches, setRecentSearches] = useState<string[]>([
-    'سباك بالحي',
-    'توصيل مدارس',
-    'إعارة سلم',
-  ]);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [results, setResults] = useState<{
     users: Row[];
     questions: Row[];
     requests: Row[];
     shops: Row[];
   }>({ users: [], questions: [], requests: [], shops: [] });
+
+  useEffect(() => {
+    let mounted = true;
+    void AsyncStorage.getItem('hayna_recent_searches').then(value => {
+      if (!mounted || !value) return;
+      try {
+        const saved = JSON.parse(value);
+        if (Array.isArray(saved)) setRecentSearches(saved.filter((s): s is string => typeof s === 'string').slice(0, 8));
+      } catch { /* Ignore corrupt local search history. */ }
+    }).catch(() => {});
+    return () => { mounted = false; };
+  }, []);
+
+  const saveRecentSearches = (items: string[]) => {
+    setRecentSearches(items);
+    void AsyncStorage.setItem('hayna_recent_searches', JSON.stringify(items)).catch(() => {});
+  };
 
   // Update query if params change
   useEffect(() => {
@@ -170,14 +182,11 @@ export default function SearchPage() {
   const handleSelectKeyword = (rawKeyword: string) => {
     const cleanWord = rawKeyword.replace(/[🔧⚡🚗🛠️❄️🛒✂️🚙]/gu, '').trim();
     setQuery(cleanWord);
-    setRecentSearches((prev) => {
-      const filtered = prev.filter((s) => s !== cleanWord);
-      return [cleanWord, ...filtered].slice(0, 8);
-    });
+    saveRecentSearches([cleanWord, ...recentSearches.filter(s => s !== cleanWord)].slice(0, 8));
   };
 
   const removeRecentSearch = (itemToRemove: string) => {
-    setRecentSearches((prev) => prev.filter((item) => item !== itemToRemove));
+    saveRecentSearches(recentSearches.filter((item) => item !== itemToRemove));
   };
 
   const performSearch = async () => {
@@ -247,6 +256,7 @@ export default function SearchPage() {
   };
 
   const total = results.users.length + results.questions.length + results.requests.length + results.shops.length;
+  const selectedCount = activeTab === 'all' ? total : results[activeTab].length;
 
   const renderUser = (u: any) => (
     <Pressable oasisKind="card"
@@ -630,10 +640,10 @@ export default function SearchPage() {
               </View>
             )}
 
-            {total === 0 && (
+            {selectedCount === 0 && (
               <View style={styles.emptyContainer}>
                 <View style={{ alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}><OasisEmptyIllustration kind="empty-search" /></View>
-                <Text style={styles.emptyText}>لم نجد نتائج تطابق «{query}»</Text>
+                <Text style={styles.emptyText}>لا توجد نتائج في هذا القسم تطابق «{query}»</Text>
                 <Text style={styles.emptySub}>
                   جرب البحث بكلمات عامة مثل (سباك، توصيل، كهرباء، إعارة) أو تصفح الأقسام المقترحة أدناه.
                 </Text>
