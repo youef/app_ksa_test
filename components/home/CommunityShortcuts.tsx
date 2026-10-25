@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View, Image } from 'react-native';
 import { Megaphone } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useTheme } from '@/context/ThemeContext';
 
-type Announcement = { id: string; title: string; message: string; expires_at: string };
+type Announcement = { id: string; title: string | null; message: string | null; image_url: string | null; expires_at: string };
 
 export default function CommunityShortcuts({ signedIn: _signedIn }: { signedIn: boolean }) {
   const { colors } = useTheme();
@@ -13,7 +13,7 @@ export default function CommunityShortcuts({ signedIn: _signedIn }: { signedIn: 
 
   const refresh = useCallback(async () => {
     const { data, error } = await supabase.from('home_announcements')
-      .select('id,title,message,expires_at')
+      .select('id,title,message,image_url,expires_at')
       .gt('expires_at', new Date().toISOString())
       .order('created_at', { ascending: false }).limit(30);
     if (!error) setItems((data || []) as Announcement[]);
@@ -39,8 +39,9 @@ export default function CommunityShortcuts({ signedIn: _signedIn }: { signedIn: 
         <Text style={[s.headingText, { color: colors.primary }]}>إعلانات حيّنا</Text>
         <Text style={[s.counter, { color: colors.muted }]}>{visible.length > 1 ? `${(active % visible.length) + 1} / ${visible.length}` : 'إعلان عام'}</Text>
       </View>
-      <Text style={[s.title, { color: colors.ink }]}>{announcement.title}</Text>
-      <Text style={[s.message, { color: colors.muted }]}>{announcement.message}</Text>
+      {announcement.title ? <Text style={[s.title, { color: colors.ink }]}>{announcement.title}</Text> : null}
+      {announcement.image_url ? <Image source={{ uri: announcement.image_url }} resizeMode="contain" style={s.image} accessibilityLabel={announcement.title || 'صورة إعلان حيّنا'} /> : null}
+      {announcement.message ? <Text style={[s.message, { color: colors.muted }]}>{announcement.message}</Text> : null}
       <Text style={[s.footer, { color: colors.muted }]}>يختفي الإعلان تلقائيًا خلال 24 ساعة من نشره{visible.length > 1 ? ' · يتغير كل 30 ثانية' : ''}</Text>
     </View>
   );
@@ -52,5 +53,6 @@ const s = StyleSheet.create({
   counter: { marginLeft: 'auto', fontSize: 11 },
   title: { fontSize: 16, fontWeight: '800', textAlign: 'right' },
   message: { fontSize: 13, lineHeight: 21, textAlign: 'right' },
+  image: { width: '100%', height: 190, borderRadius: 12, backgroundColor: 'transparent' },
   footer: { fontSize: 10, textAlign: 'right', marginTop: 3 },
 });
