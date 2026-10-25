@@ -116,14 +116,14 @@ async function searchBusinesses(term: string, limit = 20): Promise<Row[]> {
 }
 
 const TRENDING_KEYWORDS = [
-  'سباك 🔧',
-  'كهربائي ⚡',
-  'توصيل مدارس 🚗',
-  'إعارة دريل 🛠️',
-  'صيانة مكيفات ❄️',
-  'بقالة قريبة 🛒',
-  'حلاق ✂️',
-  'غسيل سيارات 🚙',
+  'سباك',
+  'كهربائي',
+  'توصيل مدارس',
+  'إعارة أدوات',
+  'صيانة مكيفات',
+  'بقالة قريبة',
+  'حلاق',
+  'غسيل سيارات',
 ];
 
 export default function SearchPage() {
@@ -681,7 +681,7 @@ export default function SearchPage() {
             <View style={styles.discoverySection}>
               <View style={styles.discoverySectionTitleRow}>
                 <Flame size={18} color="#ea580c" />
-                <Text style={styles.discoverySectionTitle}>الأكثر بحثاً في الحي الآن</Text>
+                <Text style={styles.discoverySectionTitle}>اقتراحات للبحث</Text>
               </View>
               <View style={styles.tagsGrid}>
                 {TRENDING_KEYWORDS.map((kw) => (
@@ -720,8 +720,7 @@ export default function SearchPage() {
                 <Pressable oasisKind="card"
                   style={styles.categoryCard}
                   onPress={() => {
-                    setActiveTab('questions');
-                    setQuery('توصية');
+                    router.push('/questions');
                   }}
                 >
                   <View style={[styles.categoryIconBox, { backgroundColor: OASIS.colors.infoSoft }]}>
@@ -734,8 +733,7 @@ export default function SearchPage() {
                 <Pressable oasisKind="card"
                   style={styles.categoryCard}
                   onPress={() => {
-                    setActiveTab('requests');
-                    setQuery('مساعدة');
+                    router.push('/home');
                   }}
                 >
                   <View style={[styles.categoryIconBox, { backgroundColor: '#fff7ed' }]}>
@@ -748,8 +746,7 @@ export default function SearchPage() {
                 <Pressable oasisKind="card"
                   style={styles.categoryCard}
                   onPress={() => {
-                    setActiveTab('shops');
-                    setQuery('محل');
+                    router.push('/market');
                   }}
                 >
                   <View style={[styles.categoryIconBox, { backgroundColor: '#f0fdfa' }]}>
@@ -770,7 +767,7 @@ export default function SearchPage() {
                     <Text style={styles.recentTitle}>سجل البحث الأخير</Text>
                   </View>
                   <Pressable oasisKind="action"
-                    onPress={() => setRecentSearches([])}
+                    onPress={() => saveRecentSearches([])}
                     hitSlop={8}
                     style={styles.clearRecentBtn}
                   >
