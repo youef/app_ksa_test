@@ -24,12 +24,12 @@ export function containsProfanity(text: string): boolean {
 export function findProfanity(text: string): string | null {
   const normalized = normalize(text)
     .replace(/[أإآٱ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه')
-    .replace(/[^\\p{L}\\p{N}_]+/gu, ' ');
+    .replace(/[^\p{L}\p{N}_]+/gu, ' ');
   const padded = ` ${normalized} `;
   for (const word of getCachedBannedWords()) {
     const candidate = normalize(word)
       .replace(/[أإآٱ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه')
-      .replace(/[^\\p{L}\\p{N}_]+/gu, ' ').trim();
+      .replace(/[^\p{L}\p{N}_]+/gu, ' ').trim();
     if (candidate.length >= 3 && padded.includes(` ${candidate} `)) return word;
   }
   return null;
