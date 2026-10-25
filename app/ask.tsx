@@ -1,98 +1,64 @@
-import { useState, useEffect } from 'react';
-import {
-  Alert,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-  StyleSheet,
-  ActivityIndicator,
-  Platform,
-} from 'react-native';
+import { OasisPressable as Pressable, OasisTextInput as TextInput } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { ImageBackground, Alert, BackHandler, KeyboardAvoidingView, ScrollView, Text, View, StyleSheet, ActivityIndicator, Platform } from 'react-native';
 import { router } from 'expo-router';
-import { supabase } from '@/lib/supabase';
-import {
-  ChevronRight,
-  Sparkles,
-  MapPin,
-  Tag,
-  Lightbulb,
-  CheckCircle2,
-  ChevronDown,
-  ExternalLink,
-  HelpCircle,
-  AlertTriangle,
-  Flame,
-  Wrench,
-  Gift,
-  MessageSquare,
-  Bot,
-  ShieldAlert,
-  HeartHandshake,
-  Compass,
-  Zap,
-} from 'lucide-react-native';
-import LocationSelectorModal from '@/components/LocationSelectorModal';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { MessageSquare, HeartHandshake, Wrench, Gift, AlertTriangle, Check, ArrowLeft, Users, ShieldAlert } from 'lucide-react-native';
 import { AppHeader } from '@/components/shared/AppHeader';
-import { useBottomNavInset } from '@/lib/bottomNav';
+import { supabase } from '@/lib/supabase';
 import { getCurrentDeviceLocation, reverseGeocodeDeviceLocation } from '@/lib/deviceLocation';
-import {
-  getActiveLocation,
-  getPermanentMyLocation,
-  savePermanentMyLocation,
-  subscribeLocation,
-  isAllKingdom,
-} from '@/lib/locationSync';
-import {
-  analyzeQuestionWithAI,
-  enhanceQuestionContentAI,
-  generateInstantResidentAnswerAI,
-  detectEmergencyAndSafetyAI,
-  AISmartAnalysis,
-  InstantResidentAnswer,
-  SafetyAndSpamCheck,
-} from '@/lib/aiAssistant';
+import { getActiveLocation, getPermanentMyLocation, savePermanentMyLocation, subscribeLocation, isAllKingdom } from '@/lib/locationSync';
+import { detectEmergencyAndSafetyAI } from '@/lib/aiAssistant';
+
+const POST_TYPES = [
+  { key: 'inquiry', label: 'استفسار', hint: 'اسأل أهل الخبرة في حيّك', icon: MessageSquare },
+  { key: 'help', label: 'فزعة', hint: 'اطلب مساعدة من جيرانك', icon: HeartHandshake },
+  { key: 'tool_sharing', label: 'إعارة', hint: 'استعر أداة أو شاركها', icon: Wrench },
+  { key: 'donate', label: 'تبرع', hint: 'شارك ما يزيد عن حاجتك', icon: Gift },
+  { key: 'emergency', label: 'طارئ', hint: 'بلّغ جيرانك عن حالة عاجلة', icon: AlertTriangle },
+] as const;
+type PostType = typeof POST_TYPES[number]['key'];
 
 const QUICK_TEMPLATES = [
   {
-    label: '🚗 اشتراك بطارية سيارة',
+    label: 'اشتراك بطارية سيارة',
     type: 'help',
     title: 'فزعة اشتراك بطارية سيارة بالحي',
     body: 'السلام عليكم يا جيران، سيارتي متوقفة وتحتاج اشتراك بطارية سريع، متواجد عند المربع وسأكون شاكراً لمن يفزع لي.',
   },
   {
-    label: '🔧 مفتاح عجل وبنشر',
+    label: 'مفتاح عجل وبنشر',
     type: 'help',
     title: 'طلب مساعدة مفتاح عجل أو منفاخ كفرات بالحي',
     body: 'السلام عليكم، معي بنشر وأحتاج مفتاح عجل مقاس مناسب أو منفاخ سفري لدقائق معدودة.',
   },
   {
-    label: '🧰 استعارة دريل أو سلّم',
+    label: 'استعارة دريل أو سلّم',
     type: 'tool_sharing',
     title: 'طلب استعارة سلّم ألمنيوم أو دريل تخريم لساعات',
     body: 'أحتاج سلّم طويل أو دريل لتركيب رف بالبيت وسأعيده بنفس اليوم بإذن الله ونظيفاً كما كان.',
   },
   {
-    label: '❄️ فني تكييف أو سباكة',
+    label: 'فني تكييف أو سباكة',
     type: 'inquiry',
     title: 'استفسار عن فني تكييف وسباكة مجرب وأمين بالحي',
     body: 'من منكم جرب فني تكييف ممتاز وأسعاره معقولة ويخدم حيّنا؟ أرجو تزويدي بالرقم وتجربتكم معه.',
   },
   {
-    label: '📦 نقل غرض ثقيل',
+    label: 'نقل غرض ثقيل',
     type: 'help',
     title: 'مساعدة في نقل غرض ثقيل لمدة 10 دقائق',
     body: 'أحتاج فزعة من أحد الجيران لمساعدتي في حمل ونقل دولاب لـ 10 دقائق فقط وله جزيل الشكر.',
   },
   {
-    label: '🐱 حيوان أليف مفقود بالحي',
+    label: 'حيوان أليف مفقود',
     type: 'emergency',
     title: 'قطة مفقودة بالحي اليوم - أرجو التواصل لمن رآها',
     body: 'فقدنا قطة أليفة بيضاء بالقرب من الحديقة، يرجى ممن شاهدها مراسلتي أو التواصل سريعاً.',
   },
   {
-    label: '🎁 أثاث أو أغراض لوجه الله',
+    label: 'أغراض مجانية',
     type: 'donate',
     title: 'أغراض وأثاث بحالة جيدة متاح مجاناً لمن يحتاجه بالحي',
     body: 'لدينا بعض القطع المنزلية الصالحة للاستخدام، متاحة مجاناً لأي جار أو أسرة محتاجة بالحي.',
@@ -100,26 +66,42 @@ const QUICK_TEMPLATES = [
 ];
 
 export default function AskScreen() {
-  const bottomNavInset = useBottomNavInset();
+  const insets = useSafeAreaInsets();
+  const scrollRef = useRef<ScrollView>(null);
+  const submittingRef = useRef(false);
+  const [step, setStep] = useState<1 | 2>(1);
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [budget, setBudget] = useState('');
   const [city, setCity] = useState('');
   const [district, setDistrict] = useState('');
   const [region, setRegion] = useState('');
-  const [showLocationModal, setShowLocationModal] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [enhancing, setEnhancing] = useState(false);
-  const [locatingGps, setLocatingGps] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<{ title?: string; city?: string; budget?: string }>({});
+  const [postType, setPostType] = useState<PostType>('inquiry');
+  const safetyCheck = useMemo(() => detectEmergencyAndSafetyAI(`${title} ${body}`.trim()), [title, body]);
+  const selectedType = POST_TYPES.find(type => type.key === postType)!;
 
-  // Post category type
-  const [postType, setPostType] = useState<'inquiry' | 'help' | 'tool_sharing' | 'donate' | 'emergency'>('inquiry');
+  function changeStep(next: 1 | 2) {
+    setStep(next);
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+  }
 
-  // AI analysis state
-  const [aiAnalysis, setAiAnalysis] = useState<AISmartAnalysis | null>(null);
-  const [instantAnswer, setInstantAnswer] = useState<InstantResidentAnswer | null>(null);
-  const [safetyCheck, setSafetyCheck] = useState<SafetyAndSpamCheck | null>(null);
-  const [similarQuestions, setSimilarQuestions] = useState<any[]>([]);
+  function goBack() {
+    if (busy) return;
+    if (step === 2) changeStep(1);
+    else if (router.canGoBack()) router.back();
+    else router.replace('/home');
+  }
+
+  useEffect(() => {
+    const listener = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (busy) return true;
+      if (step === 2) { changeStep(1); return true; }
+      return false;
+    });
+    return () => listener.remove();
+  }, [step, busy]);
 
   // 1. Auto-link location immediately from device permanent storage / settings, and sync with profile
   useEffect(() => {
@@ -207,100 +189,15 @@ export default function AskScreen() {
     };
   }, []);
 
-  // Quick GPS Refresh Handler
-  const handleQuickGps = async () => {
-    setLocatingGps(true);
-    try {
-      const device = await getCurrentDeviceLocation();
-      if (device) {
-        const place = await reverseGeocodeDeviceLocation(device as any);
-        if (place?.city) {
-          setCity(place.city);
-          if (place.district) setDistrict(place.district);
-          if (place.region) setRegion(place.region);
-          await savePermanentMyLocation({
-            region: place.region || 'المملكة',
-            city: place.city,
-            district: place.district || 'كل الأحياء',
-          }, true);
-          Alert.alert('تم التحديد بنجاح 🛰️', `تم ربط موقع السؤال بـ: ${place.city} · حي ${place.district || 'الحي'}`);
-        }
-      }
-    } catch (err) {
-      console.warn('GPS error', err);
-    } finally {
-      setLocatingGps(false);
-    }
-  };
-
-  // 2. Real-time AI Analysis & Safety Check on title/body change
-  useEffect(() => {
-    const fullText = `${title} ${body}`.trim();
-    if (title.trim().length >= 3) {
-      const analysis = analyzeQuestionWithAI(title, body);
-      setAiAnalysis(analysis);
-
-      // Emergency & Anti-Spam Safety Check
-      const safety = detectEmergencyAndSafetyAI(fullText);
-      setSafetyCheck(safety);
-
-      if (safety.isEmergency && postType !== 'emergency') {
-        setPostType('emergency');
-      }
-
-      // Generate Instant Resident AI Answer if sufficient context
-      if (title.trim().length >= 5) {
-        const answer = generateInstantResidentAnswerAI(title, city, district);
-        setInstantAnswer(answer);
-      } else {
-        setInstantAnswer(null);
-      }
-
-      findSimilarQuestions(title.trim());
-    } else {
-      setAiAnalysis(null);
-      setInstantAnswer(null);
-      setSafetyCheck(null);
-      setSimilarQuestions([]);
-    }
-  }, [title, body, city, district]);
-
-  async function findSimilarQuestions(queryText: string) {
-    try {
-      let q = supabase
-        .from('questions')
-        .select('id, title, city, district')
-        .ilike('title', `%${queryText.split(' ')[0]}%`)
-        .limit(3);
-
-      if (city && city !== 'كل المدن') {
-        q = q.eq('city', city);
-      }
-
-      const { data } = await q;
-      setSimilarQuestions(data ?? []);
-    } catch (e) {}
-  }
-
-  // 3. AI Question Enhancement
-  function handleAIEnhance() {
-    if (!title.trim()) {
-      return Alert.alert('تنبيه', 'اكتب سؤالك أولاً وسيقوم الذكاء الاصطناعي بصياغته وتحسينه لك.');
-    }
-
-    setEnhancing(true);
-    setTimeout(() => {
-      const result = enhanceQuestionContentAI(title, body, city, district);
-      setTitle(result.enhancedTitle);
-      if (result.enhancedBody) {
-        setBody(result.enhancedBody);
-      }
-      setEnhancing(false);
-    }, 350);
-  }
-
   // 4. Save & Publish
   async function save() {
+    if (submittingRef.current || step !== 2) return;
+    const nextErrors: { title?: string; city?: string; budget?: string } = {};
+    if (!title.trim()) nextErrors.title = 'اكتب عنواناً مختصراً قبل النشر.';
+    if (!city.trim()) nextErrors.city = 'لم نتمكن من تحديد موقعك تلقائيًا. فعّل إذن الموقع أو راجع موقعك في إعدادات الحساب ثم أعد المحاولة.';
+    if (postType === 'help' && budget.trim() && (!Number.isFinite(Number(budget)) || Number(budget) < 0)) nextErrors.budget = 'اكتب مبلغًا صحيحًا بالريال أو اتركه فارغًا.';
+    setFieldErrors(nextErrors);
+    if (Object.keys(nextErrors).length) return;
     if (!title.trim()) {
       return Alert.alert('مطلوب', postType === 'help' ? 'يرجى كتابة عنوان لطلب المساعدة.' : 'يرجى كتابة عنوان السؤال.');
     }
@@ -312,6 +209,7 @@ export default function AskScreen() {
       return Alert.alert('تنبيه أمان المجتمع', safetyCheck.spamReason || 'المحتوى ترويجي أو عشوائي وغير مصرح به.');
     }
 
+    submittingRef.current = true;
     setBusy(true);
     try {
       const { data: u } = await supabase.auth.getUser();
@@ -373,7 +271,7 @@ export default function AskScreen() {
           throw reqResult.error || new Error('تعذر نشر طلب المساعدة.');
         }
 
-        Alert.alert('تم النشر بنجاح! 🤝', 'تم نشر طلبك لأهالي الحي وسيتواصل معك من يقدر على المساعدة فوراً.');
+        Alert.alert('تم النشر بنجاح', 'تم نشر طلبك لأهالي الحي وسيتواصل معك من يقدر على المساعدة فوراً.');
         return router.replace({ pathname: '/request', params: { id: reqResult.data.id } });
       }
 
@@ -419,921 +317,130 @@ export default function AskScreen() {
       }
 
       if (insertedQuestionId) {
-        Alert.alert('تم النشر بنجاح! ✨', 'نُشر سؤالك لأهل الحي وسيصلك إشعار فور تفاعل الجيران معه.');
+        Alert.alert('تم النشر بنجاح', 'نُشر سؤالك لأهل الحي وسيصلك إشعار فور تفاعل الجيران معه.');
         router.replace({ pathname: '/question', params: { id: insertedQuestionId } });
       }
     } catch (err: any) {
       Alert.alert('خطأ', err.message || 'تعذر نشر السؤال، حاول ثانية.');
     } finally {
+      submittingRef.current = false;
       setBusy(false);
     }
   }
-
   return (
-    <View style={styles.container}>
-      <AppHeader
-        variant="sub"
-        title="اسأل أهل حيك"
-        subtitle={[district && `حي ${district}`, city].filter(Boolean).join(' · ') || 'مجتمع حيّنا • تواصل الجيران'}
-        fallbackRoute="/home"
-        rightAction={
-          <View style={styles.headerBadgeWrap}>
-            <Sparkles size={13} color="#059669" />
-            <Text style={styles.headerBadgeText}>مدعوم بالذكاء</Text>
-          </View>
-        }
-      />
-
-      <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomNavInset + 40 }]}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Post Type Selector Tabs */}
-        <View style={styles.postTypeContainer}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.postTypeTabs}>
-            <Pressable
-              style={[styles.typeTab, postType === 'inquiry' && styles.typeTabActive]}
-              onPress={() => setPostType('inquiry')}
-            >
-              <MessageSquare size={15} color={postType === 'inquiry' ? '#fff' : '#059669'} />
-              <Text style={[styles.typeTabText, postType === 'inquiry' && styles.typeTabTextActive]}>
-                استفسار للحي 💬
-              </Text>
-            </Pressable>
-
-            <Pressable
-              style={[styles.typeTab, postType === 'help' && styles.typeTabActiveAmber]}
-              onPress={() => setPostType('help')}
-            >
-              <HeartHandshake size={15} color={postType === 'help' ? '#fff' : '#d97706'} />
-              <Text style={[styles.typeTabText, postType === 'help' && styles.typeTabTextActive]}>
-                طلب فزعة ومساعدة 🤝
-              </Text>
-            </Pressable>
-
-            <Pressable
-              style={[styles.typeTab, postType === 'tool_sharing' && styles.typeTabActiveGreen]}
-              onPress={() => setPostType('tool_sharing')}
-            >
-              <Wrench size={15} color={postType === 'tool_sharing' ? '#fff' : '#16a34a'} />
-              <Text style={[styles.typeTabText, postType === 'tool_sharing' && styles.typeTabTextActive]}>
-                إعارة أدوات 🛠️
-              </Text>
-            </Pressable>
-
-            <Pressable
-              style={[styles.typeTab, postType === 'donate' && styles.typeTabActivePurple]}
-              onPress={() => setPostType('donate')}
-            >
-              <Gift size={15} color={postType === 'donate' ? '#fff' : '#9333ea'} />
-              <Text style={[styles.typeTabText, postType === 'donate' && styles.typeTabTextActive]}>
-                تبادل مجاني 🎁
-              </Text>
-            </Pressable>
-
-            <Pressable
-              style={[styles.typeTab, postType === 'emergency' && styles.typeTabActiveRed]}
-              onPress={() => setPostType('emergency')}
-            >
-              <Flame size={15} color={postType === 'emergency' ? '#fff' : '#dc2626'} />
-              <Text style={[styles.typeTabText, postType === 'emergency' && styles.typeTabTextActive]}>
-                بلاغ طارئ 🚨
-              </Text>
-            </Pressable>
-          </ScrollView>
+    <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <AppHeader variant="sub" title="منشور جديد" subtitle={`الخطوة ${step === 1 ? '١' : '٢'} من ٢`} fallbackRoute="/home" onBackPress={goBack} />
+      <ScrollView ref={scrollRef} style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'} showsVerticalScrollIndicator={false}>
+        <View style={styles.progress} accessible accessibilityLabel={`الخطوة ${step} من 2`}>
+          <View style={[styles.progressSegment, styles.progressActive]} />
+          <View style={[styles.progressSegment, step === 2 && styles.progressActive]} />
         </View>
+        <Text accessibilityRole="header" style={styles.heading}>{step === 1 ? 'وش ودّك تشارك؟' : 'اكتب التفاصيل'}</Text>
+        <Text style={styles.subtitle}>{step === 1 ? 'اختر نوع المنشور المناسب لك.' : 'عنوان واضح وتفاصيل بسيطة توصل طلبك.'}</Text>
 
-        {/* Dedicated Notice Banner when adding a Help Request */}
-        {postType === 'help' && (
-          <View style={styles.helpNoticeCard}>
-            <View style={styles.helpNoticeHeader}>
-              <HeartHandshake size={18} color="#d97706" />
-              <Text style={styles.helpNoticeTitle}>طلب فزعة وتعاون من أهل حيّك 🤝</Text>
+        {step === 1 ? (
+          <View style={styles.typeGrid}>
+            {POST_TYPES.map(type => {
+              const active = type.key === postType;
+              const Icon = type.icon;
+              return (
+                <Pressable oasisKind="card" key={type.key} testID={`post-type-${type.key}`} accessibilityRole="button" accessibilityLabel={`${type.label}، ${type.hint}`} accessibilityState={{ selected: active }} onPress={() => setPostType(type.key)} style={({ pressed }) => [styles.typeCard, type.key === 'emergency' && styles.emergencyType, active && styles.typeSelected, pressed && styles.pressed]}>
+                  <View style={styles.typeTop}><View style={[styles.typeIcon, active && styles.typeIconSelected]}><Icon size={25} color={active ? OASIS.colors.primary : '#52685d'} strokeWidth={1.8} /></View><View style={[styles.selection, active && styles.selectionActive]}>{active ? <Check size={13} color={OASIS.colors.surface} strokeWidth={3} /> : null}</View></View>
+                  <Text style={[styles.typeLabel, active && styles.selectedText]}>{type.label}</Text>
+                  <Text style={styles.typeHint}>{type.hint}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : (
+          <View style={styles.details}>
+            <Pressable accessibilityRole="button" accessibilityLabel={`نوع المنشور ${selectedType.label}، تغيير`} onPress={() => changeStep(1)} disabled={busy} style={styles.selectedRow}>
+              <View style={styles.selectedIdentity}><selectedType.icon size={19} color={OASIS.colors.primary} /><Text style={styles.selectedName}>{selectedType.label}</Text></View>
+              <Text style={styles.changeText}>تغيير</Text>
+            </Pressable>
+            <View style={styles.field}>
+              <View style={styles.labelRow}><Text style={styles.label}>العنوان</Text><Text style={styles.count}>{title.length.toLocaleString('ar-SA')} / ١٢٠</Text></View>
+              <TextInput testID="post-title" accessibilityLabel="عنوان المنشور" editable={!busy} maxLength={120} value={title} onChangeText={value => { setTitle(value); setFieldErrors(previous => ({ ...previous, title: undefined })); }} placeholder={postType === 'help' ? 'مثال: أحتاج فزعة لاشتراك بطارية' : postType === 'tool_sharing' ? 'مثال: أحتاج استعارة دريل اليوم' : postType === 'donate' ? 'مثال: أثاث بحالة جيدة للتبرع' : postType === 'emergency' ? 'اكتب وصفًا مختصرًا للحالة' : 'وش تبي تسأل جيرانك؟'} placeholderTextColor="#8a9b91" style={[styles.titleInput, fieldErrors.title && styles.invalidInput]} returnKeyType="next" />
+              {fieldErrors.title ? <Text accessibilityRole="alert" style={styles.error}>{fieldErrors.title}</Text> : null}
             </View>
-            <Text style={styles.helpNoticeText}>
-              طلبك سيُنشر مباشرة لأهالي حيك في صفحة «فزعات وطلبات الحي» ويظهر على خريطة الحي ليتواصل معك الجيران القادرون على المساعدة فوراً.
-            </Text>
+            <View style={styles.field}>
+              <View style={styles.labelRow}><Text style={styles.label}>التفاصيل <Text style={styles.optional}>(اختياري)</Text></Text><Text style={styles.count}>{body.length.toLocaleString('ar-SA')} / ١٢٠٠</Text></View>
+              <TextInput testID="post-body" accessibilityLabel="تفاصيل المنشور" editable={!busy} multiline maxLength={1200} value={body} onChangeText={setBody} placeholder="اكتب التفاصيل اللي تساعد جيرانك يفهمون طلبك…" placeholderTextColor="#8a9b91" style={styles.bodyInput} textAlignVertical="top" />
+            </View>
+            {postType === 'help' ? <View style={styles.field}><Text style={styles.label}>مكافأة رمزية بالريال <Text style={styles.optional}>(اختياري)</Text></Text><TextInput testID="post-budget" accessibilityLabel="مكافأة اختيارية بالريال السعودي" editable={!busy} keyboardType="decimal-pad" value={budget} onChangeText={value => { setBudget(value); setFieldErrors(previous => ({ ...previous, budget: undefined })); }} placeholder="بدون مقابل" placeholderTextColor="#8a9b91" style={[styles.budgetInput, fieldErrors.budget && styles.invalidInput]} />{fieldErrors.budget ? <Text accessibilityRole="alert" style={styles.error}>{fieldErrors.budget}</Text> : null}</View> : null}
+            <View style={styles.templates}>
+              <Text style={styles.templatesLabel}>ابدأ بقالب جاهز</Text>
+              <View style={styles.templateList}>{QUICK_TEMPLATES.filter(template => template.type === postType).map(template => <Pressable oasisKind="chip" key={template.title} accessibilityRole="button" accessibilityLabel={`استخدام قالب ${template.label}`} disabled={busy} onPress={() => { setTitle(template.title); setBody(template.body); setFieldErrors(previous => ({ ...previous, title: undefined })); }} style={({ pressed }) => [styles.templateChip, pressed && styles.pressed]}><Text style={styles.templateText}>{template.label}</Text></Pressable>)}</View>
+            </View>
+            {safetyCheck?.isEmergency || postType === 'emergency' ? <View style={styles.notice}><AlertTriangle size={18} color="#9a5b12" /><Text style={styles.noticeText}>إذا كانت هناك خطورة مباشرة، تواصل مع الجهة المختصة أولًا.</Text></View> : null}
+            {safetyCheck?.isSpam ? <View style={styles.notice}><ShieldAlert size={18} color="#9a5b12" /><Text style={styles.noticeText}>{safetyCheck.spamReason || 'راجع المحتوى قبل النشر.'}</Text></View> : null}
+            {fieldErrors.city ? <Text accessibilityRole="alert" style={styles.error}>{fieldErrors.city}</Text> : null}
           </View>
         )}
+      </ScrollView>
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+        <View style={styles.footerContent}>
+          <View style={styles.audience}><Users size={15} color="#73877a" /><Text style={styles.audienceText}>لجيران حيّك</Text></View>
+          <Pressable oasisVariant="primary" oasisKind="action" testID="ask-primary" accessibilityRole="button" accessibilityLabel={step === 1 ? 'التالي، كتابة التفاصيل' : 'نشر في الحي'} accessibilityState={{ disabled: busy, busy }} disabled={busy} onPress={() => { if (step === 1) changeStep(2); else void save(); }} style={({ pressed }) => [styles.primary, (busy || pressed) && styles.pressed]}>
 
-        {/* Location Selector Card (Auto-linked to user with GPS shortcut) */}
-        <View style={styles.locationCard}>
-          <View style={styles.locationCardHeader}>
-            <Pressable
-              style={styles.gpsAutoBtn}
-              onPress={handleQuickGps}
-              disabled={locatingGps}
-            >
-              {locatingGps ? (
-                <ActivityIndicator size="small" color="#059669" />
-              ) : (
-                <>
-                  <Compass size={13} color="#059669" />
-                  <Text style={styles.gpsAutoBtnText}>تحديث بالـ GPS</Text>
-                </>
-              )}
-            </Pressable>
-            <Text style={styles.locationLabel}>موقع السؤال والحي المستهدف</Text>
-          </View>
-
-          <Pressable
-            style={styles.locationBtn}
-            onPress={() => setShowLocationModal(true)}
-          >
-            <ChevronDown size={18} color="#059669" />
-            <View style={{ flex: 1, alignItems: 'flex-end' }}>
-              <Text style={styles.locationValue}>
-                {city ? `${city} ${district ? `· حي ${district}` : ''}` : 'اختر مدينتك وحيك...'}
-              </Text>
-              <Text style={styles.locationHint}>
-                {city ? 'مربوط تلقائياً بحسابك وإعداداتك · اضغط لتغيير الحي' : 'حدد موقعك ليصل السؤال لجيرانك فقط'}
-              </Text>
-            </View>
-            <View style={styles.mapPinWrap}>
-              <MapPin size={18} color="#059669" />
-            </View>
+            {busy ? <ActivityIndicator color={OASIS.colors.surface} size="small" /> : null}
+            <Text style={styles.primaryText}>{busy ? 'جارٍ النشر…' : step === 1 ? 'التالي' : 'نشر في الحي'}</Text>
+            {!busy && step === 1 ? <ArrowLeft size={18} color={OASIS.colors.surface} /> : null}
           </Pressable>
         </View>
-
-        {/* Quick Suggested Templates */}
-        <View style={styles.templatesContainer}>
-          <Text style={styles.templatesTitle}>💡 أفكار ونماذج سريعة بنقرة زر:</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.templatesScroll}>
-            {QUICK_TEMPLATES.map((tmpl, idx) => (
-              <Pressable
-                key={idx}
-                style={styles.templateChip}
-                onPress={() => {
-                  setPostType(tmpl.type as any);
-                  setTitle(tmpl.title);
-                  setBody(tmpl.body);
-                }}
-              >
-                <Text style={styles.templateChipText}>{tmpl.label}</Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* Emergency Alert Banner */}
-        {(safetyCheck?.isEmergency || postType === 'emergency') && (
-          <View style={styles.emergencyCard}>
-            <View style={styles.emergencyHeader}>
-              <Flame size={18} color="#dc2626" />
-              <Text style={styles.emergencyTitle}>تنبيه حالة طارئة بأولوية قصوى لأهل الحي 🚨</Text>
-            </View>
-            <Text style={styles.emergencyDesc}>
-              سيتم تثبيت هذا البلاغ في أعلى خلاصة الحي وإرسال إشعار فوري لجميع الجيران المتواجدين حالياً للمساعدة السريعة.
-            </Text>
-          </View>
-        )}
-
-        {/* Anti-Spam Warning if detected */}
-        {safetyCheck?.isSpam && (
-          <View style={styles.spamWarningCard}>
-            <ShieldAlert size={18} color="#ea580c" />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.spamWarningTitle}>تنبيه أمان المجتمع</Text>
-              <Text style={styles.spamWarningDesc}>{safetyCheck.spamReason}</Text>
-            </View>
-          </View>
-        )}
-
-        {/* AI Enhancement Action Banner */}
-        <Pressable
-          style={styles.aiBanner}
-          onPress={handleAIEnhance}
-          disabled={enhancing}
-        >
-          {enhancing ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <Sparkles size={17} color="#fff" />
-          )}
-          <View style={{ flex: 1, alignItems: 'flex-end' }}>
-            <Text style={styles.aiBannerTitle}>تحسين وتنسيق السؤال بالذكاء الاصطناعي ✨</Text>
-            <Text style={styles.aiBannerSub}>
-              صياغة مهذبة وواضحة وإضافة تحية جيران الحي تلقائياً بنقرة زر
-            </Text>
-          </View>
-        </Pressable>
-
-        {/* Input: Title */}
-        <View style={styles.inputGroup}>
-          <View style={styles.labelRow}>
-            <Text style={styles.charCounter}>{title.length}/120</Text>
-            <Text style={styles.label}>
-              {postType === 'help'
-                ? 'عنوان طلب الفزعة والمساعدة *'
-                : postType === 'tool_sharing'
-                ? 'اسم الأداة أو المعدة المعارة *'
-                : postType === 'donate'
-                ? 'الشيء المعروض للتبادل المجاني *'
-                : postType === 'emergency'
-                ? 'عنوان البلاغ الطارئ *'
-                : 'عنوان السؤال *'}
-            </Text>
-          </View>
-          <TextInput
-            style={styles.titleInput}
-            value={title}
-            onChangeText={setTitle}
-            placeholder={
-              postType === 'help'
-                ? 'مثال: أحتاج أحد يساعدني باشتراك بطارية سيارة، نقل غرض ثقيل، أو بنشر...'
-                : postType === 'tool_sharing'
-                ? 'مثال: دريل تخريم خرسانة للإعارة المجانية بالحي'
-                : postType === 'emergency'
-                ? 'مثال: طفل مفقود بالقرب من حديقة الحي'
-                : 'مثال: وين أفضل ورشة صيانة سيارات أو سباك مجرب في الحي؟'
-            }
-            placeholderTextColor="#94a3b8"
-            maxLength={120}
-          />
-        </View>
-
-        {/* Input: Body */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>
-            {postType === 'help' ? 'تفاصيل المساعدة المطلوبة بدقة *' : 'التفاصيل والشرح (اختياري)'}
-          </Text>
-          <TextInput
-            style={[styles.titleInput, styles.bodyInput]}
-            multiline
-            scrollEnabled
-            maxLength={1200}
-            value={body}
-            onChangeText={setBody}
-            placeholder={
-              postType === 'help'
-                ? 'اشرح ما تحتاجه، موقعك التقريبي داخل الحي، والوقت المناسب لتلقي المساعدة...'
-                : 'اكتب أي معلومات إضافية تفيد الجيران في مساعدتك أو الإجابة على سؤالك...'
-            }
-            placeholderTextColor="#94a3b8"
-          />
-        </View>
-
-        {/* Optional Budget/Reward when postType === 'help' */}
-        {postType === 'help' && (
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>مكافأة أو شكر رمزي للمساعد (اختياري)</Text>
-            <TextInput
-              style={styles.titleInput}
-              value={budget}
-              onChangeText={setBudget}
-              keyboardType="numeric"
-              placeholder="مثال: 30 ر.س (اتركه فارغاً إذا كان فزعة وتطوع بدون مقابل)"
-              placeholderTextColor="#94a3b8"
-            />
-          </View>
-        )}
-
-        {/* INSTANT AI RESIDENT ANSWER */}
-        {instantAnswer && (
-          <View style={styles.instantAnswerCard}>
-            <View style={styles.instantAnswerHeader}>
-              <View style={styles.confidenceBadge}>
-                <Text style={styles.confidenceText}>دقة {instantAnswer.confidenceScore}%</Text>
-              </View>
-              <View style={styles.instantAnswerTitleRow}>
-                <Text style={styles.instantAnswerTitle}>إجابة فورية من أرشيف تجارب الجيران</Text>
-                <Bot size={18} color="#059669" />
-              </View>
-            </View>
-            <Text style={styles.instantAnswerSub}>
-              ملخص ذكي ومختصر ريثما يرد الجيران الفعليون في الحي:
-            </Text>
-
-            <Text style={styles.instantSummaryText}>{instantAnswer.summary}</Text>
-
-            <View style={styles.keyPointsBox}>
-              {instantAnswer.keyPoints.map((pt, idx) => (
-                <View key={idx} style={styles.pointRow}>
-                  <Text style={styles.pointText}>{pt}</Text>
-                  <Text style={styles.bulletDot}>•</Text>
-                </View>
-              ))}
-            </View>
-
-            <View style={styles.actionBox}>
-              <Lightbulb size={15} color="#d97706" />
-              <Text style={styles.actionText}>{instantAnswer.recommendedAction}</Text>
-            </View>
-          </View>
-        )}
-
-        {/* AI Smart Insights */}
-        {aiAnalysis && (
-          <View style={styles.aiInsightCard}>
-            <View style={styles.aiInsightHeader}>
-              <View style={styles.aiBadge}>
-                <Sparkles size={13} color="#059669" />
-                <Text style={styles.aiBadgeText}>تصنيف الذكاء</Text>
-              </View>
-              <Text style={styles.aiInsightCategory}>{aiAnalysis.category}</Text>
-            </View>
-
-            {/* Smart Tags */}
-            <View style={styles.tagsRow}>
-              {aiAnalysis.tags.map((t, idx) => (
-                <View key={idx} style={styles.tagPill}>
-                  <Tag size={11} color="#059669" />
-                  <Text style={styles.tagPillText}>#{t}</Text>
-                </View>
-              ))}
-            </View>
-
-            {/* Instant Tip */}
-            <View style={styles.tipBox}>
-              <Text style={styles.tipText}>{aiAnalysis.instantTip}</Text>
-            </View>
-          </View>
-        )}
-
-        {/* AI Similar Questions Found */}
-        {similarQuestions.length > 0 && (
-          <View style={styles.similarCard}>
-            <View style={styles.similarHeader}>
-              <HelpCircle size={16} color="#d97706" />
-              <Text style={styles.similarTitle}>أسئلة مشابهة سألها جيرانك سابقاً</Text>
-            </View>
-            {similarQuestions.map(sq => (
-              <Pressable
-                key={sq.id}
-                style={styles.similarItem}
-                onPress={() => router.push({ pathname: '/question', params: { id: sq.id } })}
-              >
-                <ExternalLink size={15} color="#059669" />
-                <Text style={styles.similarItemText} numberOfLines={1}>
-                  {sq.title}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        )}
-
-        {/* Submit Button */}
-        <Pressable
-          style={[styles.submitBtn, busy && { opacity: 0.7 }]}
-          onPress={save}
-          disabled={busy}
-        >
-          {busy ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <CheckCircle2 size={20} color="#fff" />
-          )}
-          <Text style={styles.submitBtnText}>
-            {busy
-              ? 'جاري النشر في الحي...'
-              : postType === 'help'
-              ? '🤝 نشر طلب الفزعة في الحي الآن'
-              : postType === 'emergency'
-              ? '🚨 نشر البلاغ الطارئ في الحي فوراً'
-              : postType === 'tool_sharing'
-              ? '🛠️ نشر عرض إعارة الأداة في الحي'
-              : postType === 'donate'
-              ? '🎁 نشر عرض التبادل المجاني'
-              : 'نشر السؤال في الحي الآن ✨'}
-          </Text>
-        </Pressable>
-      </ScrollView>
-
-      {/* Location Selector Modal */}
-      <LocationSelectorModal
-        visible={showLocationModal}
-        onClose={() => setShowLocationModal(false)}
-        selectedCity={city || 'كل المدن'}
-        selectedDistrict={district || 'كل الأحياء'}
-        onSelect={async (r, c, d) => {
-          const cleanCity = c === 'كل المدن' ? '' : c;
-          const cleanDist = (d === 'كل الأحياء' || d === 'كل أحياء المدينة') ? '' : d;
-          setRegion(r);
-          setCity(cleanCity);
-          setDistrict(cleanDist);
-
-          if (cleanCity) {
-            await savePermanentMyLocation({
-              region: r || 'المملكة',
-              city: cleanCity,
-              district: cleanDist || 'كل الأحياء',
-            });
-          }
-        }}
-      />
-    </View>
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8fafc',
-  },
-  headerBadgeWrap: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#ecfdf5',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#a7f3d0',
-  },
-  headerBadgeText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#059669',
-  },
-  scrollContent: {
-    padding: 16,
-  },
-  postTypeContainer: {
-    marginBottom: 14,
-  },
-  postTypeTabs: {
-    flexDirection: 'row-reverse',
-    gap: 8,
-  },
-  typeTab: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-    backgroundColor: '#fff',
-    borderWidth: 1.5,
-    borderColor: '#e2e8f0',
-    gap: 5,
-  },
-  typeTabActive: {
-    backgroundColor: '#059669',
-    borderColor: '#059669',
-  },
-  typeTabActiveGreen: {
-    backgroundColor: '#16a34a',
-    borderColor: '#16a34a',
-  },
-  typeTabActiveAmber: {
-    backgroundColor: '#d97706',
-    borderColor: '#d97706',
-  },
-  typeTabActivePurple: {
-    backgroundColor: '#9333ea',
-    borderColor: '#9333ea',
-  },
-  typeTabActiveRed: {
-    backgroundColor: '#dc2626',
-    borderColor: '#dc2626',
-  },
-  typeTabText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#475569',
-  },
-  typeTabTextActive: {
-    color: '#fff',
-  },
-  helpNoticeCard: {
-    backgroundColor: '#fffbeb',
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 14,
-    borderWidth: 1.5,
-    borderColor: '#fde68a',
-  },
-  helpNoticeHeader: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 6,
-  },
-  helpNoticeTitle: {
-    fontSize: 13.5,
-    fontWeight: '900',
-    color: '#92400e',
-    textAlign: 'right',
-  },
-  helpNoticeText: {
-    fontSize: 12,
-    lineHeight: 18,
-    color: '#78350f',
-    textAlign: 'right',
-  },
-  templatesContainer: {
-    marginBottom: 14,
-  },
-  templatesTitle: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#475569',
-    textAlign: 'right',
-    marginBottom: 8,
-  },
-  templatesScroll: {
-    flexDirection: 'row-reverse',
-    gap: 8,
-    paddingBottom: 2,
-  },
-  templateChip: {
-    backgroundColor: '#fff',
-    paddingHorizontal: 11,
-    paddingVertical: 7,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  templateChipText: {
-    fontSize: 11.5,
-    fontWeight: '700',
-    color: '#334155',
-  },
-  locationCard: {
-    backgroundColor: '#fff',
-    borderRadius: 18,
-    padding: 14,
-    marginBottom: 14,
-    borderWidth: 1.5,
-    borderColor: '#e2e8f0',
-  },
-  locationCardHeader: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  locationLabel: {
-    fontSize: 13.5,
-    fontWeight: '800',
-    color: '#0f172a',
-  },
-  gpsAutoBtn: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#ecfdf5',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#a7f3d0',
-  },
-  gpsAutoBtnText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#059669',
-  },
-  locationBtn: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    backgroundColor: '#f8fafc',
-    borderRadius: 14,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    gap: 10,
-  },
-  locationValue: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#0f172a',
-    textAlign: 'right',
-  },
-  locationHint: {
-    fontSize: 11,
-    color: '#64748b',
-    textAlign: 'right',
-    marginTop: 2,
-  },
-  mapPinWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    backgroundColor: '#ecfdf5',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emergencyCard: {
-    backgroundColor: '#fef2f2',
-    borderWidth: 1.5,
-    borderColor: '#fca5a5',
-    borderRadius: 16,
-    padding: 12,
-    marginBottom: 14,
-  },
-  emergencyHeader: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 4,
-  },
-  emergencyTitle: {
-    fontSize: 13,
-    fontWeight: '900',
-    color: '#b91c1c',
-    textAlign: 'right',
-  },
-  emergencyDesc: {
-    fontSize: 11.5,
-    color: '#991b1b',
-    textAlign: 'right',
-    lineHeight: 17,
-  },
-  spamWarningCard: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    backgroundColor: '#fff7ed',
-    borderWidth: 1.5,
-    borderColor: '#fed7aa',
-    borderRadius: 16,
-    padding: 12,
-    marginBottom: 14,
-    gap: 8,
-  },
-  spamWarningTitle: {
-    fontSize: 12.5,
-    fontWeight: '800',
-    color: '#c2410c',
-    textAlign: 'right',
-  },
-  spamWarningDesc: {
-    fontSize: 11.5,
-    color: '#9a3412',
-    textAlign: 'right',
-    marginTop: 2,
-  },
-  aiBanner: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    backgroundColor: '#059669',
-    borderRadius: 16,
-    padding: 12,
-    marginBottom: 14,
-    gap: 10,
-    shadowColor: '#059669',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  aiBannerTitle: {
-    fontSize: 13.5,
-    fontWeight: '800',
-    color: '#fff',
-    textAlign: 'right',
-  },
-  aiBannerSub: {
-    fontSize: 11,
-    color: '#ecfdf5',
-    textAlign: 'right',
-    marginTop: 2,
-  },
-  inputGroup: {
-    marginBottom: 14,
-  },
-  labelRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#0f172a',
-    textAlign: 'right',
-  },
-  charCounter: {
-    fontSize: 11,
-    color: '#94a3b8',
-    fontWeight: '600',
-  },
-  titleInput: {
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    padding: 12,
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#0f172a',
-    borderWidth: 1.5,
-    borderColor: '#e2e8f0',
-    textAlign: 'right',
-  },
-  bodyInput: {
-    height: 148,
-    minHeight: 148,
-    fontSize: 16,
-    textAlignVertical: 'top',
-  },
-  instantAnswerCard: {
-    backgroundColor: '#f0fdfa',
-    borderWidth: 1.5,
-    borderColor: '#99f6e4',
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 14,
-  },
-  instantAnswerHeader: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  instantAnswerTitleRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 6,
-  },
-  instantAnswerTitle: {
-    fontSize: 13,
-    fontWeight: '900',
-    color: '#0f766e',
-  },
-  confidenceBadge: {
-    backgroundColor: '#ccfbf1',
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#5eead4',
-  },
-  confidenceText: {
-    fontSize: 10.5,
-    fontWeight: '800',
-    color: '#0f766e',
-  },
-  instantAnswerSub: {
-    fontSize: 11.5,
-    color: '#115e59',
-    textAlign: 'right',
-    marginBottom: 8,
-  },
-  instantSummaryText: {
-    fontSize: 12.5,
-    fontWeight: '700',
-    color: '#134e4a',
-    textAlign: 'right',
-    lineHeight: 18,
-    marginBottom: 8,
-  },
-  keyPointsBox: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 10,
-    marginBottom: 8,
-    gap: 4,
-  },
-  pointRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'flex-start',
-    gap: 5,
-  },
-  bulletDot: {
-    fontSize: 14,
-    color: '#0d9488',
-    lineHeight: 16,
-  },
-  pointText: {
-    flex: 1,
-    fontSize: 11.5,
-    color: '#334155',
-    textAlign: 'right',
-    lineHeight: 16,
-  },
-  actionBox: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    backgroundColor: '#fef3c7',
-    padding: 8,
-    borderRadius: 8,
-    gap: 6,
-  },
-  actionText: {
-    flex: 1,
-    fontSize: 11.5,
-    fontWeight: '700',
-    color: '#92400e',
-    textAlign: 'right',
-  },
-  aiInsightCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 12,
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  aiInsightHeader: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  aiBadge: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#ecfdf5',
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  aiBadgeText: {
-    fontSize: 10.5,
-    fontWeight: '700',
-    color: '#059669',
-  },
-  aiInsightCategory: {
-    fontSize: 12.5,
-    fontWeight: '800',
-    color: '#0f172a',
-  },
-  tagsRow: {
-    flexDirection: 'row-reverse',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: 8,
-  },
-  tagPill: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: '#f1f5f9',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  tagPillText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#059669',
-  },
-  tipBox: {
-    backgroundColor: '#f8fafc',
-    borderRadius: 8,
-    padding: 8,
-    borderRightWidth: 3,
-    borderRightColor: '#059669',
-  },
-  tipText: {
-    fontSize: 11.5,
-    color: '#475569',
-    textAlign: 'right',
-    lineHeight: 16,
-  },
-  similarCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 12,
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: '#fed7aa',
-  },
-  similarHeader: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 8,
-  },
-  similarTitle: {
-    fontSize: 12.5,
-    fontWeight: '800',
-    color: '#9a3412',
-  },
-  similarItem: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 7,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-  },
-  similarItemText: {
-    flex: 1,
-    fontSize: 12,
-    color: '#0f172a',
-    textAlign: 'right',
-    marginLeft: 6,
-  },
-  submitBtn: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#059669',
-    height: 50,
-    borderRadius: 16,
-    gap: 8,
-    marginTop: 6,
-    shadowColor: '#059669',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  submitBtnText: {
-    fontSize: 15,
-    fontWeight: '900',
-    color: '#fff',
-  },
+  screen: { flex: 1, backgroundColor: OASIS.colors.surface },
+  scroll: { flex: 1 },
+  content: { flexGrow: 1, padding: 14, paddingBottom: 16, width: '100%', maxWidth: 560, alignSelf: 'center' },
+  progress: { direction: 'ltr', flexDirection: 'row-reverse', gap: 7, marginBottom: 16 },
+  progressSegment: { flex: 1, height: 4, borderRadius: 4, backgroundColor: '#eaf0ec' },
+  progressActive: { backgroundColor: OASIS.colors.primary },
+  heading: { color: '#17372a', fontSize: 22, lineHeight: 31, fontWeight: '700', textAlign: 'right', writingDirection: 'rtl' },
+  subtitle: { color: '#74867a', fontSize: 14, lineHeight: 23, textAlign: 'right', marginTop: 5, marginBottom: 16, writingDirection: 'rtl' },
+  typeGrid: { direction: 'ltr', flexDirection: 'row-reverse', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 12 },
+  typeCard: { width: '48%', minHeight: 116, backgroundColor: '#f6f8f6', borderRadius: 14, borderWidth: 1.5, borderColor: '#f0f4f1', padding: 14, alignItems: 'flex-end' },
+  emergencyType: { width: '100%', minHeight: 104 },
+  typeSelected: { backgroundColor: '#edf7f1', borderColor: OASIS.colors.primary },
+  typeTop: { direction: 'ltr', flexDirection: 'row-reverse', width: '100%', justifyContent: 'space-between', alignItems: 'center', marginBottom: 13 },
+  typeIcon: { width: 32, height: 32, backgroundColor: '#eaf0ec', borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  typeIconSelected: { backgroundColor: '#d7eddf' },
+  selection: { width: 19, height: 19, borderRadius: 10, borderWidth: 1, borderColor: '#cedbd2', alignItems: 'center', justifyContent: 'center' },
+  selectionActive: { backgroundColor: OASIS.colors.primary, borderColor: OASIS.colors.primary },
+  typeLabel: { color: '#254333', fontSize: 17, fontWeight: '600', textAlign: 'right' },
+  selectedText: { color: OASIS.colors.primary },
+  typeHint: { fontSize: 11, lineHeight: 18, color: '#74867a', textAlign: 'right', marginTop: 4, writingDirection: 'rtl' },
+  details: { gap: 14 },
+  selectedRow: { direction: 'ltr', flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#edf7f1', borderRadius: 15, paddingHorizontal: 14, minHeight: 52 },
+  selectedIdentity: { direction: 'ltr', flexDirection: 'row-reverse', gap: 8, alignItems: 'center' },
+  selectedName: { fontSize: 14, fontWeight: '600', color: OASIS.colors.primary },
+  changeText: { fontSize: 12, color: OASIS.colors.primary },
+  field: { gap: 9 },
+  labelRow: { direction: 'ltr', flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
+  label: { fontSize: 13, fontWeight: '600', color: '#254333', textAlign: 'right' },
+  optional: { fontWeight: '400', color: '#839287', fontSize: 11 },
+  count: { fontSize: 11, color: '#839287' },
+  titleInput: { fontSize: 17, lineHeight: 27, minHeight: 44, borderBottomWidth: 1, borderColor: '#e1e9e3', paddingVertical: 12, color: '#17372a', textAlign: 'right', writingDirection: 'rtl' },
+  bodyInput: { minHeight: 120, borderRadius: 17, backgroundColor: '#f6f8f6', padding: 14, fontSize: 16, lineHeight: 27, color: '#17372a', textAlign: 'right', writingDirection: 'rtl' },
+  budgetInput: { borderWidth: 1, borderColor: '#e1e9e3', borderRadius: 14, minHeight: 44, padding: 12, fontSize: 16, color: '#17372a', textAlign: 'right' },
+  invalidInput: { borderColor: '#c2413a' },
+  templates: { gap: 10 },
+  templatesLabel: { fontSize: 12, color: '#74867a', textAlign: 'right' },
+  templateList: { direction: 'ltr', flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 },
+  templateChip: { minHeight: 44, borderWidth: 1, borderColor: '#e1e9e3', borderRadius: 13, paddingHorizontal: 12, paddingVertical: 10, justifyContent: 'center' },
+  templateText: { fontSize: 12, color: '#52685d', textAlign: 'right' },
+  notice: { direction: 'ltr', flexDirection: 'row-reverse', alignItems: 'flex-start', gap: 9, backgroundColor: '#fff8eb', borderRadius: 14, padding: 13 },
+  noticeText: { flex: 1, fontSize: 12, lineHeight: 21, color: '#855d25', textAlign: 'right', writingDirection: 'rtl' },
+  error: { fontSize: 12, lineHeight: 21, color: '#b73535', textAlign: 'right', writingDirection: 'rtl' },
+  footer: { borderTopWidth: 1, borderTopColor: '#eef2ef', backgroundColor: OASIS.colors.surface, paddingHorizontal: 22, paddingTop: 12 },
+  footerContent: { width: '100%', maxWidth: 516, alignSelf: 'center', gap: 11 },
+  audience: { direction: 'ltr', flexDirection: 'row-reverse', gap: 5, alignItems: 'center', justifyContent: 'center' },
+  audienceText: { fontSize: 11, color: '#73877a' },
+  primary: { direction: 'ltr', flexDirection: 'row-reverse', gap: 9, alignItems: 'center', justifyContent: 'center', minHeight: 52, padding: 14, backgroundColor: 'transparent', borderRadius: 0 },
+  primaryText: { color: OASIS.colors.surface, fontSize: 16, fontWeight: '600' },
+  pressed: { opacity: 0.65 },
 });

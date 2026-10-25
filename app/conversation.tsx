@@ -1,3 +1,4 @@
+import { OASIS } from '@/lib/oasis';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import {
   ScrollView,
@@ -675,7 +676,7 @@ export default function Conversation() {
   if (loading || resolvingConv) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#059669" />
+        <ActivityIndicator size="large" color={OASIS.colors.primary} />
       </View>
     );
   }
@@ -708,7 +709,7 @@ export default function Conversation() {
       <ScrollView
         ref={scrollRef}
         style={styles.messagesList}
-        contentContainerStyle={[styles.messagesContent, { paddingBottom: 24 }]}
+        contentContainerStyle={[styles.messagesContent, { paddingBottom: 16 }]}
         showsVerticalScrollIndicator={false}
         onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}
       >

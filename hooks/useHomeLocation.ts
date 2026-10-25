@@ -6,6 +6,7 @@ import {
   savePermanentMyLocation,
   subscribeLocation,
   isExactDistrictMatching,
+  isLocationMatching,
   getLockedCity,
   type HaynaLocation,
   type LockedCity,
@@ -223,7 +224,10 @@ export function useHomeLocation({ setProfile, showToast }: Options) {
     city !== 'كل المدن' && district !== 'كل الأحياء' && district !== 'كل أحياء المدينة';
 
   const matchesLocation = useCallback(
-    (item: { city?: string | null; district?: string | null }) => isExactDistrictMatching(item, city, district),
+    (item: { city?: string | null; district?: string | null }) =>
+      district && !['كل الأحياء', 'كل أحياء المدينة', 'جميع الأحياء', 'الكل'].includes(district.trim())
+        ? isExactDistrictMatching(item, city, district)
+        : isLocationMatching(item, city, 'كل الأحياء'),
     [city, district],
   );
 

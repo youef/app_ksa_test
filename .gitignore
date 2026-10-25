@@ -2,6 +2,7 @@ node_modules/
 .expo/
 dist/
 web-build/
+build/
 .env.local
 *.log
 .DS_Store
@@ -13,3 +14,4 @@ local_tests_and_docs/
 .vscode/settings.json
 .vscode/
 .env
+supabase/.temp/

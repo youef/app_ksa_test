@@ -1,5 +1,7 @@
+import { OasisPressable as Pressable, OasisSurface } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
 import React, { useMemo } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { Activity, AlertTriangle, ArrowUpLeft, BarChart3, CheckCircle2, Clock3, MapPin, ShieldCheck, TrendingUp, Users, Zap } from 'lucide-react-native';
 
 type Props = {
@@ -16,14 +18,14 @@ type Props = {
 };
 
 const COLORS = {
-  ink: '#0F172A',
-  muted: '#64748B',
-  line: '#E2E8F0',
-  soft: '#F8FAFC',
-  green: '#059669',
-  blue: '#0284C7',
+  ink: OASIS.colors.ink,
+  muted: OASIS.colors.muted,
+  line: OASIS.colors.line,
+  soft: OASIS.colors.background,
+  green: OASIS.colors.primary,
+  blue: OASIS.colors.info,
   amber: '#D97706',
-  red: '#DC2626',
+  red: OASIS.colors.danger,
   purple: '#7C3AED',
 };
 
@@ -103,35 +105,35 @@ export default function AdminCommandCenter({ stats, users, reports, verification
         <Kpi icon={<BarChart3 size={19} color={COLORS.purple}/>} value={stats.businesses + stats.marketplace + stats.events} label="موارد المنصة" sub="أعمال + سوق + فعاليات" tone={COLORS.purple}/>
       </View>
 
-      <View style={s.card}>
+      <OasisSurface oasisSurface="card" style={s.card}>
         <View style={s.cardHead}><View><Text style={s.cardTitle}>مركز الأولويات</Text><Text style={s.cardSub}>ابدأ بما قد يؤثر على الثقة والسلامة.</Text></View><Activity size={19} color={COLORS.green}/></View>
         {priorities.length ? priorities.map((p, i) => (
           <Pressable key={i} onPress={() => onTab(p.tab)} style={s.priority}>
             <View style={[s.priorityIcon, { backgroundColor: p.tone + '12' }]}>{p.icon}</View>
             <View style={{ flex: 1 }}><Text style={s.priorityTitle}>{p.title}</Text><Text style={s.prioritySub}>فتح القسم ومراجعة العناصر فوراً</Text></View>
-            <View style={s.priorityCount}><Text style={{ color: p.tone, fontWeight: '900', fontSize: 14 }}>{p.value}</Text><ArrowUpLeft size={14} color={COLORS.muted}/></View>
+            <View style={s.priorityCount}><Text style={{ color: p.tone, fontWeight: '700', fontSize: 14 }}>{p.value}</Text><ArrowUpLeft size={14} color={COLORS.muted}/></View>
           </Pressable>
         )) : (
           <View style={s.clear}><CheckCircle2 size={22} color={COLORS.green}/><View><Text style={s.priorityTitle}>لا توجد مهام حرجة حالياً</Text><Text style={s.prioritySub}>مركز العمليات نظيف — استمر بالمراقبة.</Text></View></View>
         )}
-      </View>
+      </OasisSurface>
 
       <View style={s.twoCol}>
-        <View style={[s.card, s.flexCard]}>
+        <OasisSurface oasisSurface="card" style={[s.card, s.flexCard]}>
           <View style={s.cardHead}><View><Text style={s.cardTitle}>التوزيع الجغرافي</Text><Text style={s.cardSub}>أكثر المدن حضوراً في البيانات الحالية.</Text></View><MapPin size={18} color={COLORS.blue}/></View>
           {cityStats.length ? cityStats.map(([city, count]) => <MiniBar key={city} value={count} max={maxCity} label={city} meta={String(count)}/>) : <Text style={s.empty}>لا توجد بيانات مدن.</Text>}
-        </View>
+        </OasisSurface>
 
-        <View style={[s.card, s.flexCard]}>
+        <OasisSurface oasisSurface="card" style={[s.card, s.flexCard]}>
           <View style={s.cardHead}><View><Text style={s.cardTitle}>صحة المجتمع</Text><Text style={s.cardSub}>مؤشرات الثقة والإدارة.</Text></View><ShieldCheck size={18} color={COLORS.green}/></View>
           <MiniBar value={verified} max={Math.max(1, users.length)} label="توثيق رسمي" meta={users.length ? Math.round(verified / users.length * 100) + '%' : '0%'}/>
           <MiniBar value={geoVerified} max={Math.max(1, users.length)} label="توثيق السكن" meta={users.length ? Math.round(geoVerified / users.length * 100) + '%' : '0%'}/>
           <MiniBar value={banned} max={Math.max(1, users.length)} label="حسابات محظورة" meta={users.length ? Math.round(banned / users.length * 100) + '%' : '0%'}/>
           <MiniBar value={pendingReports.length} max={Math.max(1, users.length)} label="ضغط البلاغات" meta={String(pendingReports.length)}/>
-        </View>
+        </OasisSurface>
       </View>
 
-      <View style={s.card}>
+      <OasisSurface oasisSurface="card" style={s.card}>
         <View style={s.cardHead}><View><Text style={s.cardTitle}>تشغيل المنصة</Text><Text style={s.cardSub}>لقطة واحدة لكل مورد رئيسي.</Text></View><Clock3 size={18} color={COLORS.muted}/></View>
         <View style={s.opsGrid}>
           {[['الأعمال', businesses.length, COLORS.blue, 'platform'], ['السوق', marketplace.length, COLORS.green, 'platform'], ['الفعاليات', events.length, COLORS.purple, 'platform'], ['البلاغات', pendingReports.length, COLORS.red, 'reports']].map(([label, value, tone, tab]: any) => (
@@ -141,7 +143,7 @@ export default function AdminCommandCenter({ stats, users, reports, verification
             </Pressable>
           ))}
         </View>
-      </View>
+      </OasisSurface>
 
       <Text style={s.note}>ملاحظة: لا توجد أرقام وهمية أو اتصال اصطناعي؛ هذه اللوحة تعيد تنظيم البيانات التي تم تحميلها بالفعل من قاعدة بيانات الإدارة.</Text>
     </View>
@@ -149,32 +151,32 @@ export default function AdminCommandCenter({ stats, users, reports, verification
 }
 
 const s = StyleSheet.create({
-  hero:{backgroundColor:'#0B1220',borderRadius:22,padding:18,marginBottom:12},
+  hero:{backgroundColor:'#0B1220',borderRadius:14,padding:18,marginBottom:12},
   heroTop:{flexDirection:'row-reverse',justifyContent:'space-between',alignItems:'flex-start',gap:12},
-  eyebrow:{color:'#5EEAD4',fontSize:9,fontWeight:'900',letterSpacing:1.2,textAlign:'right'},
-  heroTitle:{color:'#fff',fontSize:20,fontWeight:'900',textAlign:'right',marginTop:4},
+  eyebrow:{color:'#5EEAD4',fontSize:11,fontWeight:'700',letterSpacing:1.2,textAlign:'right'},
+  heroTitle:{color:OASIS.colors.surface,fontSize:20,fontWeight:'700',textAlign:'right',marginTop:4},
   heroSub:{color:'#94A3B8',fontSize:11,lineHeight:18,textAlign:'right',marginTop:4,maxWidth:420},
-  score:{width:72,height:72,borderRadius:20,borderWidth:1,borderColor:'rgba(94,234,212,.3)',backgroundColor:'rgba(16,185,129,.08)',alignItems:'center',justifyContent:'center'},
-  scoreValue:{color:'#5EEAD4',fontSize:22,fontWeight:'900'},scoreLabel:{color:'#CBD5E1',fontSize:8,fontWeight:'800'},
-  heroStats:{flexDirection:'row-reverse',justifyContent:'space-between',marginTop:18,paddingTop:14,borderTopWidth:1,borderTopColor:'#1E293B'},
-  heroStatValue:{color:'#fff',fontSize:17,fontWeight:'900',textAlign:'center'},heroStatLabel:{color:'#94A3B8',fontSize:9,textAlign:'center',marginTop:2},
-  footnote:{color:'#64748B',fontSize:8,textAlign:'right',marginTop:12},
+  score:{width:72,height:72,borderRadius:14,borderWidth:1,borderColor:'rgba(94,234,212,.3)',backgroundColor:'rgba(16,185,129,.08)',alignItems:'center',justifyContent:'center'},
+  scoreValue:{color:'#5EEAD4',fontSize:22,fontWeight:'700'},scoreLabel:{color:'#CBD5E1',fontSize:11,fontWeight:'600'},
+  heroStats:{flexDirection:'row-reverse',justifyContent:'space-between',marginTop:18,paddingTop:14,borderTopWidth:1,borderTopColor:OASIS.colors.ink},
+  heroStatValue:{color:OASIS.colors.surface,fontSize:17,fontWeight:'700',textAlign:'center'},heroStatLabel:{color:'#94A3B8',fontSize:11,textAlign:'center',marginTop:2},
+  footnote:{color:OASIS.colors.muted,fontSize:11,textAlign:'right',marginTop:12},
   grid:{flexDirection:'row-reverse',flexWrap:'wrap',gap:8,marginBottom:12},
-  kpi:{flexGrow:1,flexBasis:150,backgroundColor:'#fff',borderWidth:1,borderColor:COLORS.line,borderRadius:18,padding:12,minWidth:145},
-  kpiIcon:{width:36,height:36,borderRadius:12,alignItems:'center',justifyContent:'center',marginBottom:7},kpiValue:{fontSize:21,fontWeight:'900',color:COLORS.ink},kpiLabel:{fontSize:11,fontWeight:'900',color:'#334155',marginTop:2,textAlign:'right'},kpiSub:{fontSize:9,color:'#94A3B8',marginTop:2,textAlign:'right'},
-  card:{backgroundColor:'#fff',borderWidth:1,borderColor:COLORS.line,borderRadius:18,padding:14,marginBottom:12},
+  kpi:{flexGrow:1,flexBasis:150,backgroundColor:OASIS.colors.surface,borderWidth:1,borderColor:COLORS.line,borderRadius:14,padding:12,minWidth:145},
+  kpiIcon:{width:36,height:36,borderRadius:12,alignItems:'center',justifyContent:'center',marginBottom:7},kpiValue:{fontSize:21,fontWeight:'700',color:COLORS.ink},kpiLabel:{fontSize:11,fontWeight:'700',color:OASIS.colors.ink,marginTop:2,textAlign:'right'},kpiSub:{fontSize:11,color:'#94A3B8',marginTop:2,textAlign:'right'},
+  card:{backgroundColor:OASIS.colors.surface,borderWidth:1,borderColor:COLORS.line,borderRadius:14,padding:14,marginBottom:12},
   cardHead:{flexDirection:'row-reverse',alignItems:'center',justifyContent:'space-between',marginBottom:11},
-  cardTitle:{fontSize:14,fontWeight:'900',color:COLORS.ink,textAlign:'right'},cardSub:{fontSize:10,color:COLORS.muted,textAlign:'right',marginTop:2},
+  cardTitle:{fontSize:14,fontWeight:'700',color:COLORS.ink,textAlign:'right'},cardSub:{fontSize:11,color:COLORS.muted,textAlign:'right',marginTop:2},
   priority:{flexDirection:'row-reverse',alignItems:'center',gap:10,paddingVertical:10,borderTopWidth:1,borderTopColor:'#F1F5F9'},
-  priorityIcon:{width:36,height:36,borderRadius:12,alignItems:'center',justifyContent:'center'},priorityTitle:{fontSize:12,fontWeight:'900',color:COLORS.ink,textAlign:'right'},prioritySub:{fontSize:9,color:COLORS.muted,textAlign:'right',marginTop:2},
-  priorityCount:{flexDirection:'row-reverse',alignItems:'center',gap:4,paddingHorizontal:8,paddingVertical:6,borderRadius:10,backgroundColor:'#F8FAFC'},
+  priorityIcon:{width:36,height:36,borderRadius:12,alignItems:'center',justifyContent:'center'},priorityTitle:{fontSize:12,fontWeight:'700',color:COLORS.ink,textAlign:'right'},prioritySub:{fontSize:11,color:COLORS.muted,textAlign:'right',marginTop:2},
+  priorityCount:{flexDirection:'row-reverse',alignItems:'center',gap:4,paddingHorizontal:8,paddingVertical:6,borderRadius:10,backgroundColor:OASIS.colors.background},
   clear:{flexDirection:'row-reverse',alignItems:'center',gap:10,paddingVertical:10},
   twoCol:{flexDirection:'row-reverse',gap:12},flexCard:{flex:1,minWidth:280},
-  barRow:{marginBottom:10},barMeta:{flexDirection:'row-reverse',justifyContent:'space-between',marginBottom:5},barLabel:{fontSize:10,color:'#475569',fontWeight:'800'},barValue:{fontSize:10,color:'#0F172A',fontWeight:'900'},
+  barRow:{marginBottom:10},barMeta:{flexDirection:'row-reverse',justifyContent:'space-between',marginBottom:5},barLabel:{fontSize:11,color:OASIS.colors.muted,fontWeight:'600'},barValue:{fontSize:11,color:OASIS.colors.ink,fontWeight:'700'},
   barTrack:{height:7,backgroundColor:'#F1F5F9',borderRadius:7,overflow:'hidden'},barFill:{height:7,backgroundColor:'#0EA5A4',borderRadius:7},
   empty:{color:'#94A3B8',fontSize:11,textAlign:'right',paddingVertical:10},
   opsGrid:{flexDirection:'row-reverse',flexWrap:'wrap',gap:8},
-  opItem:{flexGrow:1,flexBasis:120,backgroundColor:'#F8FAFC',borderRadius:14,padding:12,alignItems:'flex-end',borderWidth:1,borderColor:'#EEF2F7'},
-  opDot:{width:7,height:7,borderRadius:4,marginBottom:7},opValue:{fontSize:18,fontWeight:'900',color:COLORS.ink},opLabel:{fontSize:10,fontWeight:'800',color:COLORS.muted,marginTop:2},
-  note:{fontSize:9,color:'#94A3B8',textAlign:'right',lineHeight:15,marginBottom:18}
+  opItem:{flexGrow:1,flexBasis:120,backgroundColor:OASIS.colors.background,borderRadius:14,padding:12,alignItems:'flex-end',borderWidth:1,borderColor:'#EEF2F7'},
+  opDot:{width:7,height:7,borderRadius:4,marginBottom:7},opValue:{fontSize:18,fontWeight:'700',color:COLORS.ink},opLabel:{fontSize:11,fontWeight:'600',color:COLORS.muted,marginTop:2},
+  note:{fontSize:11,color:'#94A3B8',textAlign:'right',lineHeight:18,marginBottom:18}
 });

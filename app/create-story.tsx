@@ -1,18 +1,9 @@
-import { useState, useCallback } from 'react';
-import {
-  Alert,
-  Dimensions,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  ActivityIndicator,
-} from 'react-native';
+import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
+import { HeaderAction } from '@/components/shared/AppHeader';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { Alert, Dimensions, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View, ActivityIndicator, PanResponder } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -32,6 +23,9 @@ import {
   Check,
   SlidersHorizontal,
   ShieldCheck,
+  Move,
+  Crop,
+  LayoutTemplate,
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useStoryComposer } from '@/hooks/useStoryComposer';
@@ -47,9 +41,16 @@ const WHATSAPP_FONTS = [
   { id: 'italic', name: 'مائل', fontWeight: '700' as const, fontStyle: 'italic' as const, isPill: false },
 ];
 
-const STORY_TEXT_COLORS = ['#FFFFFF', '#111827', '#F87171', '#FBBF24', '#34D399', '#60A5FA', '#C084FC', '#FB7185'];
+const STORY_TEMPLATES = [
+  { label: 'إعلان', text: 'إعلان لأهل الحي\n\nاكتب تفاصيل الإعلان هنا', gradient: 0, color: OASIS.colors.surface, size: 30 },
+  { label: 'مناسبة', text: 'مناسبة سعيدة\n\nشارك أهل الحي فرحتك', gradient: 2, color: OASIS.colors.surface, size: 32 },
+  { label: 'استفسار', text: 'عندي استفسار لأهل الحي\n\n', gradient: 3, color: OASIS.colors.surface, size: 28 },
+  { label: 'تنبيه', text: 'تنبيه مهم لأهل الحي\n\n', gradient: 1, color: OASIS.colors.surface, size: 30 },
+] as const;
+const STORY_TEXT_COLORS = [OASIS.colors.surface, OASIS.colors.ink, '#F87171', '#FBBF24', '#34D399', '#60A5FA', '#C084FC', '#FB7185'];
 
 export default function CreateStory() {
+  const safeInsets = useSafeAreaInsets();
   const composer = useStoryComposer();
   const publisher = useStoryPublisher();
   const { activeSlide } = composer;
@@ -57,6 +58,7 @@ export default function CreateStory() {
   const [fontIndex, setFontIndex] = useState(0); // default bold
   const [textAlign, setTextAlign] = useState<'center' | 'right' | 'left'>('center');
   const [showPalette, setShowPalette] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
   const [showStoryOptions, setShowStoryOptions] = useState(false);
   const [settingsSection, setSettingsSection] = useState<'privacy' | 'interactive' | 'format'>('privacy');
   const [audience, setAudience] = useState<'public' | 'followers' | 'custom'>('public');
@@ -64,16 +66,62 @@ export default function CreateStory() {
   const [allowedUserIds, setAllowedUserIds] = useState<string[]>([]);
   const [hiddenUserIds, setHiddenUserIds] = useState<string[]>([]);
   const [allowStoryReplies, setAllowStoryReplies] = useState(true);
+  const [defaultsReady, setDefaultsReady] = useState(false);
+  const [accountRepliesDisabled, setAccountRepliesDisabled] = useState(false);
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const auth = await supabase.auth.getUser();
+        if (auth.error) throw auth.error;
+        if (!auth.data.user) { router.replace('/auth'); return; }
+        const result = await supabase.from('profiles').select('profile_privacy,allow_story_replies').eq('id', auth.data.user.id).single();
+        if (result.error) throw result.error;
+        if (!active) return;
+        setAudience(result.data.profile_privacy === 'private' ? 'followers' : 'public');
+        setAllowStoryReplies(result.data.allow_story_replies !== 'nobody');
+        setAccountRepliesDisabled(result.data.allow_story_replies === 'nobody');
+        setDefaultsReady(true);
+      } catch { if (active) Alert.alert('تعذر تحميل إعدادات حسابك', 'أعد فتح الصفحة بعد التحقق من الاتصال.'); }
+    })();
+    return () => { active = false; };
+  }, []);
   const [audienceLoading, setAudienceLoading] = useState(false);
   const [interactiveType, setInteractiveType] = useState<'none' | 'poll' | 'question'>('none');
   const [pollQuestion, setPollQuestion] = useState('');
   const [pollOptionA, setPollOptionA] = useState('نعم');
   const [pollOptionB, setPollOptionB] = useState('لا');
   const [questionPrompt, setQuestionPrompt] = useState('');
-  const [textColor, setTextColor] = useState('#FFFFFF');
+  const [textColor, setTextColor] = useState<string>(OASIS.colors.surface);
   const [fontSize, setFontSize] = useState(28);
   const [textRotation, setTextRotation] = useState(0);
   const [textOffset, setTextOffset] = useState({ x: 0, y: 0 });
+  const offsetRef = useRef(textOffset);
+  offsetRef.current = textOffset;
+  const dragStart = useRef({ x: 0, y: 0 });
+  const dragResponder = useMemo(() => Platform.OS === 'web' ? null : PanResponder.create({
+    onStartShouldSetPanResponder: () => false,
+    onMoveShouldSetPanResponder: (_event, gesture) => Math.abs(gesture.dx) + Math.abs(gesture.dy) > 6,
+    onPanResponderGrant: () => { dragStart.current = { ...offsetRef.current }; },
+    onPanResponderMove: (_event, gesture) => {
+      setTextOffset({
+        x: Math.max(-140, Math.min(140, dragStart.current.x + gesture.dx)),
+        y: Math.max(-260, Math.min(260, dragStart.current.y + gesture.dy)),
+      });
+    },
+  }), []);
+  const applyTemplate = (template: typeof STORY_TEMPLATES[number]) => {
+    composer.patchActiveSlide({
+      type: 'text',
+      content: template.text,
+      bgGradId: BG_GRADIENTS[template.gradient]?.id || BG_GRADIENTS[0].id,
+    });
+    setTextColor(template.color);
+    setFontSize(template.size);
+    setTextOffset({ x: 0, y: 0 });
+    setTextRotation(0);
+    setShowTemplates(false);
+  };
 
   const withAssetErrors = useCallback(async (fn: () => Promise<unknown>, label: string) => {
     try {
@@ -145,6 +193,7 @@ export default function CreateStory() {
   }, [audienceCandidates.length, loadAudienceCandidates]);
 
   const handlePublish = useCallback(async () => {
+    if (!defaultsReady) return;
     if (!composer.isReady) {
       return Alert.alert(
         'تنبيه',
@@ -196,6 +245,16 @@ export default function CreateStory() {
       return Alert.alert('خطأ', outcome.failures[0] ?? 'تعذر نشر القصص، يرجى المحاولة مرة أخرى.');
     }
 
+    // انتقل مباشرة لعارض اليومية المنشورة إن توفّر ID
+    if (outcome.firstPublishedId) {
+      const degradeNote = outcome.degradedUploads > 0
+        ? `\nتنبيه: تعذر رفع ${outcome.degradedUploads} صورة إلى التخزين السحابي.`
+        : '';
+      if (degradeNote) Alert.alert('تنبيه رفع الصورة', degradeNote.trim());
+      router.replace({ pathname: '/story', params: { id: outcome.firstPublishedId, resume: '1', next: '' } });
+      return;
+    }
+
     const noun = outcome.publishedCount === 1 ? 'قصة' : 'قصص';
     const body = [
       outcome.failures.length > 0
@@ -209,7 +268,7 @@ export default function CreateStory() {
     Alert.alert('تم النشر بنجاح!', body, [
       { text: 'مشاهدة في الحي', onPress: () => router.replace('/stories') },
     ]);
-  }, [composer, publisher, audience, allowedUserIds, hiddenUserIds, allowStoryReplies, interactiveType,, pollOptionA, pollOptionB, questionPrompt, textColor, fontSize, fontIndex, textRotation, textOffset]);
+  }, [composer, publisher, defaultsReady, audience, allowedUserIds, hiddenUserIds, allowStoryReplies, interactiveType, pollQuestion, pollOptionA, pollOptionB, questionPrompt, textColor, fontSize, fontIndex, textRotation, textOffset]);
 
   if (!activeSlide) return null;
 
@@ -242,60 +301,45 @@ export default function CreateStory() {
           )}
 
           {/* Top WhatsApp Status Bar */}
-          <View style={s.topBar}>
-            <Pressable
-              onPress={() => router.back()}
-              style={s.circleIconBtn}
-              hitSlop={10}
-              accessibilityRole="button"
-              accessibilityLabel="إغلاق"
-            >
-              <X size={20} color="#fff" />
+          <View style={[s.composerTopBar, { paddingTop: Math.max(12, safeInsets.top + 4) }]}>
+            <Pressable oasisKind="icon" onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="إغلاق إنشاء اليومية" style={s.composerCloseButton}>
+              <X size={24} color={OASIS.colors.surface} />
             </Pressable>
-
-            {/* Mode Toggle: Text status vs Image status */}
             <View style={s.modeSwitcherPill}>
-              <Pressable
-                onPress={() => composer.setActiveSlideType('text')}
-                style={[s.modeOption, !isImageSlide && s.modeOptionActive]}
-              >
-                <Text style={[s.modeOptionText, !isImageSlide && s.modeOptionTextActive]}>
-                  نص
-                </Text>
+              <Pressable onPress={() => composer.setActiveSlideType('text')} style={[s.modeOption, !isImageSlide && s.modeOptionActive]} accessibilityRole="button" accessibilityLabel="يومية نصية">
+                <Text style={[s.modeOptionText, !isImageSlide && s.modeOptionTextActive]}>نص</Text>
               </Pressable>
-              <Pressable
-                onPress={() => composer.setActiveSlideType('image')}
-                style={[s.modeOption, isImageSlide && s.modeOptionActive]}
-              >
-                <Text style={[s.modeOptionText, isImageSlide && s.modeOptionTextActive]}>
-                  صورة
-                </Text>
+              <Pressable onPress={() => composer.setActiveSlideType('image')} style={[s.modeOption, isImageSlide && s.modeOptionActive]} accessibilityRole="button" accessibilityLabel="يومية مصورة">
+                <Text style={[s.modeOptionText, isImageSlide && s.modeOptionTextActive]}>صورة</Text>
               </Pressable>
             </View>
-
-            {/* Creative Top Tools */}
-            <View style={s.topToolsRow}>
+            <View style={s.composerTopSpacer} />
+          </View>
+          <View style={{paddingHorizontal: 16, alignItems: 'flex-end'}}><View style={s.topToolsRow}>
               {!isImageSlide ? (
                 <>
-                  <Pressable
+                  <HeaderAction tone="overlay"
                     onPress={() => setShowPalette(!showPalette)}
                     style={[s.toolIconBtn, showPalette && s.toolIconBtnActive]}
                     hitSlop={8}
                     accessibilityRole="button"
                     accessibilityLabel="تغيير لون الخلفية"
                   >
-                    <Palette size={19} color="#fff" />
-                  </Pressable>
-                  <Pressable
+                    <Palette size={19} color={OASIS.colors.surface} />
+                  </HeaderAction>
+                  <HeaderAction tone="overlay" onPress={() => setShowTemplates(v => !v)} style={[s.toolIconBtn, showTemplates && s.toolIconBtnActive]} accessibilityRole="button" accessibilityLabel="قوالب جاهزة">
+                    <LayoutTemplate size={19} color={OASIS.colors.surface} />
+                  </HeaderAction>
+                  <HeaderAction tone="overlay"
                     onPress={handleCycleFont}
                     style={s.toolIconBtn}
                     hitSlop={8}
                     accessibilityRole="button"
                     accessibilityLabel="تغيير نمط الخط"
                   >
-                    <Type size={19} color="#fff" />
-                  </Pressable>
-                  <Pressable
+                    <Type size={19} color={OASIS.colors.surface} />
+                  </HeaderAction>
+                  <HeaderAction tone="overlay"
                     onPress={handleCycleAlign}
                     style={s.toolIconBtn}
                     hitSlop={8}
@@ -303,52 +347,54 @@ export default function CreateStory() {
                     accessibilityLabel="محاذاة النص"
                   >
                     {textAlign === 'center' ? (
-                      <AlignCenter size={18} color="#fff" />
+                      <AlignCenter size={18} color={OASIS.colors.surface} />
                     ) : textAlign === 'right' ? (
-                      <AlignRight size={18} color="#fff" />
+                      <AlignRight size={18} color={OASIS.colors.surface} />
                     ) : (
-                      <AlignLeft size={18} color="#fff" />
+                      <AlignLeft size={18} color={OASIS.colors.surface} />
                     )}
-                  </Pressable>
+                  </HeaderAction>
                 </>
               ) : (
                 <>
-                  <Pressable
+                  <HeaderAction tone="overlay"
                     onPress={handlePickImages}
                     style={s.toolIconBtn}
                     hitSlop={8}
                     accessibilityRole="button"
                     accessibilityLabel="اختيار صورة"
                   >
-                    <ImageIcon size={19} color="#fff" />
-                  </Pressable>
-                  <Pressable
+                    <ImageIcon size={19} color={OASIS.colors.surface} />
+                  </HeaderAction>
+                  {hasImage && <HeaderAction tone="overlay" onPress={() => void withAssetErrors(composer.cropActiveImage, 'قص الصورة')} style={s.toolIconBtn} accessibilityRole="button" accessibilityLabel="قص الصورة بنسبة تسعة إلى ستة عشر">
+                    <Crop size={19} color={OASIS.colors.surface} />
+                  </HeaderAction>}
+                  <HeaderAction tone="overlay"
                     onPress={handleTakePhoto}
                     style={s.toolIconBtn}
                     hitSlop={8}
                     accessibilityRole="button"
                     accessibilityLabel="التقاط بالكاميرا"
                   >
-                    <Camera size={19} color="#fff" />
-                  </Pressable>
+                    <Camera size={19} color={OASIS.colors.surface} />
+                  </HeaderAction>
                 </>
               )}
-              <Pressable
+              <HeaderAction tone="overlay"
                 onPress={() => setShowStoryOptions((value) => !value)}
                 style={[s.toolIconBtn, showStoryOptions && s.toolIconBtnActive]}
                 hitSlop={8}
                 accessibilityRole="button"
                 accessibilityLabel="خيارات القصة والخصوصية"
               >
-                <SlidersHorizontal size={18} color="#fff" />
-              </Pressable>
-            </View>
-          </View>
+                <SlidersHorizontal size={18} color={OASIS.colors.surface} />
+              </HeaderAction>
+            </View></View>
 
           {/* 24H Badge & Slide Info Notice */}
           <View style={s.badge24hRow}>
             <View style={s.badge24h}>
-              <Clock size={11} color="#d1fae5" />
+              <Clock size={11} color={OASIS.colors.soft} />
               <Text style={s.badge24hText}>تختفي تلقائياً بعد 24 ساعة في الحي</Text>
             </View>
             {!isImageSlide && (
@@ -361,7 +407,7 @@ export default function CreateStory() {
           {/* Expandable Palette Selector Bar */}
           {!isImageSlide && showPalette && (
             <View style={s.paletteSelectorBox}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.paletteScroll}>
+              <ScrollView style={{ direction: 'rtl' }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[s.paletteScroll, { direction: 'ltr' }]}>
                 {BG_GRADIENTS.map((g) => {
                   const isSelected = activeSlide.bgGradId === g.id;
                   return (
@@ -371,7 +417,7 @@ export default function CreateStory() {
                       style={[s.paletteCircleWrap, isSelected && s.paletteCircleWrapActive]}
                     >
                       <LinearGradient colors={g.colors} style={s.paletteCircle}>
-                        {isSelected && <Check size={14} color="#fff" strokeWidth={3} />}
+                        {isSelected && <Check size={14} color={OASIS.colors.surface} strokeWidth={3} />}
                       </LinearGradient>
                       <Text style={[s.paletteName, isSelected && s.paletteNameActive]}>{g.name}</Text>
                     </Pressable>
@@ -381,10 +427,26 @@ export default function CreateStory() {
             </View>
           )}
 
+          {showTemplates && !isImageSlide && (
+            <View style={s.templatePanel}>
+              <Text style={s.templateHeading}>قوالب جاهزة</Text>
+              <ScrollView style={{ direction: 'rtl' }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[s.templateRow, { direction: 'ltr' }]}>
+                {STORY_TEMPLATES.map(template => (
+                  <Pressable oasisKind="chip" key={template.label} onPress={() => applyTemplate(template)} style={s.templateChip} accessibilityRole="button" accessibilityLabel={`قالب ${template.label}`}>
+                    <Text style={s.templateChipText}>{template.label}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          )}
           {/* Central Content Area */}
           <View style={s.centralCanvas}>
             {!isImageSlide ? (
-              <View style={[s.textCanvasCard, currentFont.isPill && s.textCanvasCardPill]}>
+              <OasisSurface oasisSurface="card" style={[s.textCanvasCard, currentFont.isPill && s.textCanvasCardPill]}>
+                <View {...(dragResponder?.panHandlers ?? {})} style={[s.dragHandle, { transform: [{ translateX: textOffset.x }, { translateY: textOffset.y }] }]}>
+                  <Move size={16} color={OASIS.colors.surface} />
+                  <Text style={s.dragHandleText}>{Platform.OS === 'web' ? 'حرّك النص من إعدادات التنسيق' : 'اسحب لتحريك النص'}</Text>
+                </View>
                 <TextInput
                   style={[
                     s.whatsAppTextInput,
@@ -409,20 +471,20 @@ export default function CreateStory() {
                   multiline
                   maxLength={300}
                 />
-              </View>
+              </OasisSurface>
             ) : hasImage ? (
               <View style={s.imageCenterPlaceholder} />
             ) : (
-              <View style={s.emptyPhotoCard}>
+              <OasisSurface oasisSurface="card" style={s.emptyPhotoCard}>
                 <View style={s.emptyPhotoIconWrap}>
-                  <UploadCloud size={34} color="#059669" />
+                  <UploadCloud size={34} color={OASIS.colors.primary} />
                 </View>
                 <Text style={s.emptyPhotoTitle}>أضف صورة ليومياتك</Text>
                 <Text style={s.emptyPhotoSub}>
                   شارك صور مشاريع، معالم الحي، أو نشاطاتك اليومية مع جيرانك
                 </Text>
 
-              </View>
+              </OasisSurface>
             )}
           </View>
 
@@ -452,7 +514,7 @@ export default function CreateStory() {
                   ['followers', 'المتابعون'],
                   ['custom', 'قائمة مخصصة'],
                 ] as const).map(([value, label]) => (
-                  <Pressable key={value} onPress={() => handleAudienceChange(value)}
+                  <Pressable oasisKind="chip" key={value} onPress={() => handleAudienceChange(value)}
                     style={[s.optionsChip, audience === value && s.optionsChipActive]}>
                     <Text style={s.optionsChipText}>{label}</Text>
                   </Pressable>
@@ -464,11 +526,11 @@ export default function CreateStory() {
                     audienceCandidates.length === 0 ? (
                       <Text style={s.optionsHint}>لا يوجد متابعون متاحون للاختيار حاليًا.</Text>
                     ) : (
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.optionsChipRow}>
+                      <ScrollView style={{ direction: 'rtl' }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[s.optionsChipRow, { direction: 'ltr' }]}>
                         {audienceCandidates.map((person) => {
                           const selected = allowedUserIds.includes(person.id);
                           return (
-                            <Pressable key={person.id}
+                            <Pressable oasisKind="chip" key={person.id}
                               onPress={() => setAllowedUserIds((ids) => selected ? ids.filter((id) => id !== person.id) : [...ids, person.id])}
                               style={[s.personChip, selected && s.optionsChipActive]}>
                               <Text style={s.optionsChipText}>{person.display_name || person.username || 'مستخدم'}</Text>
@@ -485,9 +547,9 @@ export default function CreateStory() {
                 <ShieldCheck size={15} color="#a7f3d0" />
                 <Text style={s.optionsSectionTitle}>الردود على القصة</Text>
               </View>
-              <Pressable onPress={() => setAllowStoryReplies((value) => !value)} style={[s.optionsChip, allowStoryReplies && s.optionsChipActive]}>
+              <Pressable oasisKind="chip" disabled={accountRepliesDisabled} onPress={() => setAllowStoryReplies((value) => !value)} style={[s.optionsChip, allowStoryReplies && s.optionsChipActive]}>
                 <Text style={s.optionsChipText}>{allowStoryReplies ? 'الردود مسموحة' : 'الردود مغلقة'}</Text>
-                <Text style={s.optionsHint}>{allowStoryReplies ? 'يمكن للمشاهدين المسموح لهم الرد على القصة' : 'لن يتمكن أحد من الرد على هذه القصة'}</Text>
+                <Text style={s.optionsHint}>{accountRepliesDisabled ? 'الردود مغلقة من إعدادات حسابك. غيّرها من إعدادات اليوميات.' : allowStoryReplies ? 'تطبق صلاحيات الرد من إعدادات حسابك' : 'لن يتمكن أحد من الرد على هذه القصة'}</Text>
               </Pressable>
 
               <View style={s.optionsSectionHeader}>
@@ -496,15 +558,15 @@ export default function CreateStory() {
               </View>
               <Text style={s.optionsHint}>الأشخاص المحددون هنا لن تظهر لهم هذه القصة، حتى لو كانوا ضمن جمهورها.</Text>
               {audienceCandidates.length === 0 ? (
-                <Pressable onPress={loadAudienceCandidates} style={s.personChip}>
+                <Pressable oasisKind="chip" onPress={loadAudienceCandidates} style={s.personChip}>
                   <Text style={s.optionsChipText}>تحميل قائمة المتابعين</Text>
                 </Pressable>
               ) : (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.optionsChipRow}>
+                <ScrollView style={{ direction: 'rtl' }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[s.optionsChipRow, { direction: 'ltr' }]}>
                   {audienceCandidates.map((person) => {
                     const selected = hiddenUserIds.includes(person.id);
                     return (
-                      <Pressable key={`hidden-${person.id}`}
+                      <Pressable oasisKind="chip" key={`hidden-${person.id}`}
                         onPress={() => setHiddenUserIds((ids) => selected ? ids.filter((id) => id !== person.id) : [...ids, person.id])}
                         style={[s.personChip, selected && s.optionsChipActive]}>
                         <Text style={s.optionsChipText}>{person.display_name || person.username || 'مستخدم'}</Text>
@@ -524,7 +586,7 @@ export default function CreateStory() {
                   ['poll', 'استطلاع'],
                   ['question', 'سؤال'],
                 ] as const).map(([value, label]) => (
-                  <Pressable key={value} onPress={() => setInteractiveType(value)}
+                  <Pressable oasisKind="chip" key={value} onPress={() => setInteractiveType(value)}
                     style={[s.optionsChip, interactiveType === value && s.optionsChipActive]}>
                     <Text style={s.optionsChipText}>{label}</Text>
                   </Pressable>
@@ -552,17 +614,17 @@ export default function CreateStory() {
                   <Pressable key={color} onPress={() => setTextColor(color)}
                     style={[s.storyTextColorDot, { backgroundColor: color }, textColor === color && s.storyTextColorDotActive]} />
                 ))}
-                <Pressable style={s.optionsChip} onPress={() => setFontSize((n) => Math.max(16, n - 2))}>
+                <Pressable oasisKind="chip" style={s.optionsChip} onPress={() => setFontSize((n) => Math.max(16, n - 2))}>
                   <Text style={s.optionsChipText}>A−</Text>
                 </Pressable>
                 <Text style={s.optionsChipText}>{fontSize}</Text>
-                <Pressable style={s.optionsChip} onPress={() => setFontSize((n) => Math.min(48, n + 2))}>
+                <Pressable oasisKind="chip" style={s.optionsChip} onPress={() => setFontSize((n) => Math.min(48, n + 2))}>
                   <Text style={s.optionsChipText}>A+</Text>
                 </Pressable>
-                <Pressable style={s.optionsChip} onPress={() => setTextRotation((n) => (n + 5) % 360)}>
+                <Pressable oasisKind="chip" style={s.optionsChip} onPress={() => setTextRotation((n) => (n + 5) % 360)}>
                   <Text style={s.optionsChipText}>تدوير ↻</Text>
                 </Pressable>
-                <Pressable style={s.optionsChip} onPress={() => setTextRotation((n) => (n - 5 + 360) % 360)}>
+                <Pressable oasisKind="chip" style={s.optionsChip} onPress={() => setTextRotation((n) => (n - 5 + 360) % 360)}>
                   <Text style={s.optionsChipText}>↺</Text>
                 </Pressable>
               </View>
@@ -570,12 +632,12 @@ export default function CreateStory() {
                 {([
                   ['↑', 0, -12], ['↓', 0, 12], ['←', -12, 0], ['→', 12, 0],
                 ] as const).map(([label, dx, dy]) => (
-                  <Pressable key={label} style={s.optionsChip}
+                  <Pressable oasisKind="chip" key={label} style={s.optionsChip}
                     onPress={() => setTextOffset((pos) => ({ x: Math.max(-140, Math.min(140, pos.x + dx)), y: Math.max(-260, Math.min(260, pos.y + dy)) }))}>
                     <Text style={s.optionsChipText}>{label}</Text>
                   </Pressable>
                 ))}
-                <Pressable style={s.optionsChip} onPress={() => { setTextRotation(0); setTextOffset({ x: 0, y: 0 }); }}>
+                <Pressable oasisKind="chip" style={s.optionsChip} onPress={() => { setTextRotation(0); setTextOffset({ x: 0, y: 0 }); }}>
                   <Text style={s.optionsChipText}>إعادة ضبط الموضع</Text>
                 </Pressable>
               </View>
@@ -587,7 +649,7 @@ export default function CreateStory() {
           {/* Multi-slide carousel indicator strip */}
           {composer.slides.length > 1 && (
             <View style={s.slideIndicatorStrip}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.thumbsScroll}>
+              <ScrollView style={{ direction: 'rtl' }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[s.thumbsScroll, { direction: 'ltr' }]}>
                 {composer.slides.map((sItem, idx) => (
                   <Pressable
                     key={idx}
@@ -607,17 +669,17 @@ export default function CreateStory() {
                         onPress={() => composer.removeSlide(idx)}
                         hitSlop={6}
                       >
-                        <Trash2 size={10} color="#fff" />
+                        <Trash2 size={10} color={OASIS.colors.surface} />
                       </Pressable>
                     )}
                   </Pressable>
                 ))}
                 {!composer.atCapacity && (
-                  <Pressable
+                  <Pressable oasisKind="icon"
                     style={s.thumbAddBtn}
                     onPress={isImageSlide ? handlePickImages : composer.addTextSlide}
                   >
-                    <Plus size={16} color="#fff" />
+                    <Plus size={16} color={OASIS.colors.surface} />
                   </Pressable>
                 )}
               </ScrollView>
@@ -662,20 +724,20 @@ export default function CreateStory() {
                 (!composer.isReady || publisher.publishing) && s.whatsAppSendFabDisabled,
               ]}
               onPress={handlePublish}
-              disabled={!composer.isReady || publisher.publishing}
+              disabled={!defaultsReady || !composer.isReady || publisher.publishing}
               accessibilityRole="button"
               accessibilityLabel="نشر الحالة"
             >
               <LinearGradient
-                colors={composer.isReady ? ['#059669', '#10b981'] : ['#475569', '#334155']}
+                colors={composer.isReady ? [OASIS.colors.primary, OASIS.colors.primary] : [OASIS.colors.muted, OASIS.colors.ink]}
                 style={s.whatsAppSendFabGrad}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
               >
                 {publisher.publishing ? (
-                  <ActivityIndicator size="small" color="#fff" />
+                  <ActivityIndicator size="small" color={OASIS.colors.surface} />
                 ) : (
-                  <Send size={22} color="#fff" />
+                  <Send size={22} color={OASIS.colors.surface} />
                 )}
               </LinearGradient>
             </Pressable>
@@ -687,7 +749,7 @@ export default function CreateStory() {
       {publisher.publishing && (
         <View style={s.publishingOverlay}>
           <View style={s.publishingModal}>
-            <ActivityIndicator size="large" color="#059669" />
+            <ActivityIndicator size="large" color={OASIS.colors.primary} />
             <Text style={s.publishingTitle}>جارٍ نشر يومياتك في الحي...</Text>
             {publisher.status ? (
               <Text style={s.publishingStatus}>{publisher.status}</Text>
@@ -705,6 +767,16 @@ export default function CreateStory() {
 }
 
 const s = StyleSheet.create({
+  templatePanel: { marginHorizontal: 14, padding: 10, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.42)', zIndex: 30 },
+  templateHeading: { color: OASIS.colors.surface, fontSize: 12, fontWeight: '600', textAlign: 'right', marginBottom: 7 },
+  templateRow: { flexDirection: 'row-reverse', gap: 8 },
+  templateChip: { paddingHorizontal: 13, paddingVertical: 9, borderRadius: 11, backgroundColor: 'rgba(255,255,255,0.18)' },
+  templateChipText: { color: OASIS.colors.surface, fontSize: 12, fontWeight: '700' },
+  dragHandle: { alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 13, paddingVertical: 8, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.35)', zIndex: 12 },
+  dragHandleText: { color: OASIS.colors.surface, fontSize: 11, fontWeight: '700' },
+  composerTopBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingBottom: 8, backgroundColor: 'transparent', zIndex: 20 },
+  composerCloseButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  composerTopSpacer: { width: 40, height: 40 },
   container: {
     flex: 1,
     backgroundColor: '#000',
@@ -737,7 +809,7 @@ const s = StyleSheet.create({
   circleIconBtn: {
     width: 38,
     height: 38,
-    borderRadius: 19,
+    borderRadius: 14,
     backgroundColor: 'rgba(0,0,0,0.4)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -746,7 +818,7 @@ const s = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.45)',
-    borderRadius: 24,
+    borderRadius: 14,
     padding: 3,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.18)',
@@ -754,10 +826,10 @@ const s = StyleSheet.create({
   modeOption: {
     paddingHorizontal: 14,
     paddingVertical: 6,
-    borderRadius: 20,
+    borderRadius: 14,
   },
   modeOptionActive: {
-    backgroundColor: '#059669',
+    backgroundColor: OASIS.colors.primary,
   },
   modeOptionText: {
     color: '#cbd5e1',
@@ -765,8 +837,8 @@ const s = StyleSheet.create({
     fontWeight: '700',
   },
   modeOptionTextActive: {
-    color: '#fff',
-    fontWeight: '900',
+    color: OASIS.colors.surface,
+    fontWeight: '700',
   },
   topToolsRow: {
     flexDirection: 'row-reverse',
@@ -776,7 +848,7 @@ const s = StyleSheet.create({
   toolIconBtn: {
     width: 38,
     height: 38,
-    borderRadius: 19,
+    borderRadius: 14,
     backgroundColor: 'rgba(0,0,0,0.4)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -784,7 +856,7 @@ const s = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.2)',
   },
   toolIconBtnActive: {
-    backgroundColor: '#059669',
+    backgroundColor: OASIS.colors.primary,
     borderColor: '#34d399',
   },
   badge24hRow: {
@@ -804,7 +876,7 @@ const s = StyleSheet.create({
     borderRadius: 20,
   },
   badge24hText: {
-    color: '#d1fae5',
+    color: OASIS.colors.soft,
     fontSize: 11,
     fontWeight: '700',
   },
@@ -815,9 +887,9 @@ const s = StyleSheet.create({
     borderRadius: 12,
   },
   fontBadgeText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '800',
+    color: OASIS.colors.surface,
+    fontSize: 11,
+    fontWeight: '600',
   },
   paletteSelectorBox: {
     backgroundColor: 'rgba(0,0,0,0.6)',
@@ -842,20 +914,20 @@ const s = StyleSheet.create({
   paletteCircle: {
     width: 36,
     height: 36,
-    borderRadius: 18,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: '#fff',
+    borderColor: OASIS.colors.surface,
   },
   paletteName: {
     color: '#94a3b8',
-    fontSize: 9.5,
+    fontSize: 11,
     fontWeight: '700',
   },
   paletteNameActive: {
     color: '#34d399',
-    fontWeight: '900',
+    fontWeight: '700',
   },
   centralCanvas: {
     flex: 1,
@@ -877,7 +949,7 @@ const s = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.2)',
   },
   whatsAppTextInput: {
-    color: '#fff',
+    color: OASIS.colors.surface,
     lineHeight: 38,
     width: '100%',
     paddingHorizontal: 10,
@@ -903,18 +975,18 @@ const s = StyleSheet.create({
     shadowRadius: 16,
   },
   emptyPhotoIconWrap: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#ecfdf5',
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: OASIS.colors.soft,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 14,
   },
   emptyPhotoTitle: {
-    color: '#fff',
+    color: OASIS.colors.surface,
     fontSize: 17,
-    fontWeight: '900',
+    fontWeight: '700',
     marginBottom: 6,
   },
   emptyPhotoSub: {
@@ -943,7 +1015,7 @@ const s = StyleSheet.create({
     position: 'relative',
   },
   thumbItemActive: {
-    borderColor: '#059669',
+    borderColor: OASIS.colors.primary,
     transform: [{ scale: 1.08 }],
   },
   thumbImg: {
@@ -953,31 +1025,31 @@ const s = StyleSheet.create({
   thumbTextPlaceholder: {
     width: '100%',
     height: '100%',
-    backgroundColor: '#334155',
+    backgroundColor: OASIS.colors.ink,
     alignItems: 'center',
     justifyContent: 'center',
   },
   thumbTextLetter: {
-    color: '#fff',
+    color: OASIS.colors.surface,
     fontSize: 16,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   thumbDeleteBadge: {
     position: 'absolute',
     top: 2,
     left: 2,
-    backgroundColor: '#dc2626',
+    backgroundColor: OASIS.colors.danger,
     borderRadius: 7,
     padding: 2,
   },
   thumbAddBtn: {
     width: 48,
-    height: 48,
+    height: 44,
     borderRadius: 12,
     backgroundColor: 'rgba(255,255,255,0.2)',
     borderWidth: 1,
     borderStyle: 'dashed',
-    borderColor: '#fff',
+    borderColor: OASIS.colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -992,14 +1064,14 @@ const s = StyleSheet.create({
   whatsAppCaptionInputWrap: {
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.8)',
-    borderRadius: 24,
+    borderRadius: 14,
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.25)',
   },
   whatsAppCaptionInput: {
-    color: '#fff',
+    color: OASIS.colors.surface,
     fontSize: 14,
     textAlign: 'right',
   },
@@ -1017,11 +1089,11 @@ const s = StyleSheet.create({
   whatsAppSendFab: {
     width: 52,
     height: 52,
-    borderRadius: 26,
+    borderRadius: 14,
     overflow: 'hidden',
-    shadowColor: '#059669',
+    shadowColor: OASIS.colors.primary,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
+    shadowOpacity: 0,
     shadowRadius: 8,
     elevation: 6,
   },
@@ -1046,26 +1118,26 @@ const s = StyleSheet.create({
   },
   settingsTabs: { flexDirection: 'row-reverse', gap: 6, marginBottom: 6 },
   settingsTab: { flex: 1, paddingVertical: 8, paddingHorizontal: 4, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center' },
-  settingsTabActive: { backgroundColor: '#065f46', borderWidth: 1, borderColor: '#34d399' },
+  settingsTabActive: { backgroundColor: OASIS.colors.deep, borderWidth: 1, borderColor: '#34d399' },
   settingsTabText: { color: '#cbd5e1', fontSize: 11, fontWeight: '700' },
-  settingsTabTextActive: { color: '#fff', fontWeight: '900' },
+  settingsTabTextActive: { color: OASIS.colors.surface, fontWeight: '700' },
   settingsSectionScroll: { maxHeight: 150 },
   storyOptionsContent: { paddingHorizontal: 4, paddingVertical: 5, gap: 9 },
   optionsSectionHeader: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
-  optionsSectionTitle: { color: '#fff', fontSize: 11, fontWeight: '900', textAlign: 'right' },
+  optionsSectionTitle: { color: OASIS.colors.surface, fontSize: 11, fontWeight: '700', textAlign: 'right' },
   optionsChipRow: { flexDirection: 'row-reverse', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
-  optionsChip: { paddingHorizontal: 9, paddingVertical: 6, borderRadius: 10, backgroundColor: '#334155', flexDirection: 'row-reverse', alignItems: 'center', gap: 4 },
-  optionsChipActive: { backgroundColor: '#065f46', borderWidth: 1, borderColor: '#34d399' },
-  optionsChipText: { color: '#fff', fontSize: 10, fontWeight: '800' },
-  optionsHint: { color: '#cbd5e1', fontSize: 10, textAlign: 'right' },
+  optionsChip: { paddingHorizontal: 9, paddingVertical: 6, borderRadius: 10, backgroundColor: OASIS.colors.ink, flexDirection: 'row-reverse', alignItems: 'center', gap: 4 },
+  optionsChipActive: { backgroundColor: OASIS.colors.deep, borderWidth: 1, borderColor: '#34d399' },
+  optionsChipText: { color: OASIS.colors.surface, fontSize: 11, fontWeight: '600' },
+  optionsHint: { color: '#cbd5e1', fontSize: 11, textAlign: 'right' },
   audiencePicker: { maxHeight: 42 },
-  personChip: { paddingHorizontal: 9, paddingVertical: 6, borderRadius: 10, backgroundColor: '#334155', flexDirection: 'row-reverse', alignItems: 'center', gap: 4 },
+  personChip: { paddingHorizontal: 9, paddingVertical: 6, borderRadius: 10, backgroundColor: OASIS.colors.ink, flexDirection: 'row-reverse', alignItems: 'center', gap: 4 },
   optionsFields: { gap: 5 },
-  optionsInput: { minHeight: 32, color: '#fff', backgroundColor: 'rgba(255,255,255,0.08)', borderColor: 'rgba(255,255,255,0.2)', borderWidth: 1, borderRadius: 9, paddingHorizontal: 9, paddingVertical: 5, fontSize: 12, textAlign: 'right' },
+  optionsInput: { minHeight: 32, color: OASIS.colors.surface, backgroundColor: 'rgba(255,255,255,0.08)', borderColor: 'rgba(255,255,255,0.2)', borderWidth: 1, borderRadius: 9, paddingHorizontal: 9, paddingVertical: 5, fontSize: 12, textAlign: 'right' },
   storyTextColorDot: { width: 19, height: 19, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)' },
   storyTextColorDotActive: { borderWidth: 3, borderColor: '#34d399' },
-  publishProgressTrack: { height: 5, width: '100%', backgroundColor: '#e2e8f0', borderRadius: 5, overflow: 'hidden', marginTop: 4 },
-  publishProgressFill: { height: '100%', backgroundColor: '#059669', borderRadius: 5 },
+  publishProgressTrack: { height: 5, width: '100%', backgroundColor: OASIS.colors.line, borderRadius: 5, overflow: 'hidden', marginTop: 4 },
+  publishProgressFill: { height: '100%', backgroundColor: OASIS.colors.primary, borderRadius: 5 },
   publishingOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.75)',
@@ -1074,22 +1146,22 @@ const s = StyleSheet.create({
     zIndex: 100,
   },
   publishingModal: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 24,
+    backgroundColor: OASIS.colors.surface,
+    borderRadius: 14,
+    padding: 16,
     alignItems: 'center',
     gap: 12,
     width: 260,
   },
   publishingTitle: {
     fontSize: 14,
-    fontWeight: '900',
-    color: '#0f172a',
+    fontWeight: '700',
+    color: OASIS.colors.ink,
     textAlign: 'center',
   },
   publishingStatus: {
     fontSize: 12,
-    color: '#64748b',
+    color: OASIS.colors.muted,
     textAlign: 'center',
   },
 });

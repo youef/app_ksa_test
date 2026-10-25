@@ -1,3 +1,4 @@
+import { OASIS } from '@/lib/oasis';
 import { useEffect } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import {
@@ -60,19 +61,19 @@ function RoomTracks({ participantOrder = [] }: { participantOrder?: string[] }) 
     return (aIndex < 0 ? Number.MAX_SAFE_INTEGER : aIndex) - (bIndex < 0 ? Number.MAX_SAFE_INTEGER : bIndex);
   });
   if (!videos.length) {
-    return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color="#fff" /><Text style={{ color: '#fff', marginTop: 10 }}>بانتظار صورة المشاركين…</Text></View>;
+    return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={OASIS.colors.surface} /><Text style={{ color: OASIS.colors.surface, marginTop: 10 }}>بانتظار صورة المشاركين…</Text></View>;
   }
   const columns = videos.length <= 1 ? 1 : videos.length <= 4 ? 2 : 3;
   const tileHeight = videos.length <= 2 ? '100%' : videos.length <= 4 ? '50%' : '33.333%';
   return (
-    <View style={{ flex: 1, flexDirection: 'row', flexWrap: 'wrap', alignContent: 'stretch', backgroundColor: '#020617' }}>
+    <View style={{ flex: 1, flexDirection: 'row', flexWrap: 'wrap', alignContent: 'stretch', backgroundColor: OASIS.colors.live }}>
       {videos.map((track, index) => {
         const participantName = track.participant.name || track.participant.identity || 'مشارك';
         return (
           <View key={`${track.participant.identity}-${track.publication.trackSid || index}`} style={{ width: columns === 1 ? '100%' : `${100 / columns}%`, height: tileHeight, padding: 2, position: 'relative' }}>
             <VideoTrack trackRef={track} style={{ flex: 1, width: '100%', height: '100%', borderRadius: 12, overflow: 'hidden' }} />
             <View pointerEvents="none" style={{ position: 'absolute', left: 10, bottom: 10, maxWidth: '88%', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 14, backgroundColor: 'rgba(2,6,23,0.72)' }}>
-              <Text numberOfLines={1} style={{ color: '#fff', fontSize: 11, fontWeight: '800' }}>{participantName}</Text>
+              <Text numberOfLines={1} style={{ color: OASIS.colors.surface, fontSize: 11, fontWeight: '600' }}>{participantName}</Text>
             </View>
           </View>
         );
@@ -140,7 +141,7 @@ export default function LiveMedia({ url, token, canPublish, participantOrder, on
   }, []);
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#020617', minHeight: 280 }}>
+    <View style={{ flex: 1, backgroundColor: OASIS.colors.live, minHeight: 280 }}>
       <LiveKitRoom
         serverUrl={url}
         token={token}

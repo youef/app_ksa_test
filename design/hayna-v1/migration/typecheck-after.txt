@@ -1,0 +1,4 @@
+
+> hayna@1.0.0 typecheck
+> node --stack-size=65000 --max-old-space-size=4096 ./node_modules/typescript/bin/tsc --noEmit
+

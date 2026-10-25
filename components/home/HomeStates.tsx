@@ -1,5 +1,6 @@
+import { OasisPressable as Pressable } from '@/components/oasis/OasisPrimitives';
 import { useEffect, useRef } from 'react';
-import { Animated, Pressable, Text, View } from 'react-native';
+import { Animated, Text, View } from 'react-native';
 import { styles } from './homeStyles';
 
 export function FeedSkeleton({ count = 3 }: { count?: number }) {
@@ -32,7 +33,7 @@ export function FeedSkeleton({ count = 3 }: { count?: number }) {
 export function ErrorBanner({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
     <View style={styles.errorBanner} accessibilityRole="alert">
-      <Pressable style={styles.errorRetryBtn} onPress={onRetry} accessibilityRole="button">
+      <Pressable oasisKind="action" style={styles.errorRetryBtn} onPress={onRetry} accessibilityRole="button">
         <Text style={styles.errorRetryText}>إعادة المحاولة</Text>
       </Pressable>
       <Text style={styles.errorBannerText}>{message}</Text>

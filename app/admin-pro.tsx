@@ -1,9 +1,11 @@
+import { OasisPressable as Pressable, OasisSurface } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
+import { HeaderAction, AppHeader } from '@/components/shared/AppHeader';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { BarChart3, Building2, CalendarDays, Check, Flag, MapPin, RefreshCw, ShieldCheck, Store, Users, X, Zap } from 'lucide-react-native';
-import { AppHeader } from '@/components/shared/AppHeader';
 import AdminCommandCenter from '@/components/AdminCommandCenter';
 
 export default function AdminPro() {
@@ -73,7 +75,7 @@ export default function AdminPro() {
     }
   };
 
-  if (loading) return <View style={s.center}><ActivityIndicator size="large" color="#059669"/><Text style={s.loading}>جاري تجهيز مركز العمليات المتقدم...</Text></View>;
+  if (loading) return <View style={s.center}><ActivityIndicator size="large" color={OASIS.colors.primary}/><Text style={s.loading}>جاري تجهيز مركز العمليات المتقدم...</Text></View>;
 
   return (
     <View style={s.page}>
@@ -83,26 +85,26 @@ export default function AdminPro() {
         subtitle={`${profile?.display_name || profile?.username || 'مدير النظام'} · ADMIN PRO`}
         fallbackRoute="/home"
         rightAction={
-          <Pressable
-            onPress={onRefresh}
+          <HeaderAction
+            accessibilityLabel="تحديث البيانات" onPress={onRefresh}
             style={{
               width: 36,
               height: 36,
-              borderRadius: 18,
+              borderRadius: 14,
               backgroundColor: '#f1f5f9',
               alignItems: 'center',
               justifyContent: 'center',
             }}
           >
-            <RefreshCw size={16} color="#059669" />
-          </Pressable>
+            <RefreshCw size={16} color={OASIS.colors.primary} />
+          </HeaderAction>
         }
       />
 
       <ScrollView
         style={{flex:1}}
         contentContainerStyle={s.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#059669"/>}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={OASIS.colors.primary}/>}
       >
         <AdminCommandCenter
           stats={stats} users={users} reports={reports} verifications={verifications}
@@ -121,14 +123,14 @@ export default function AdminPro() {
           ].map(({ table, row, title, owner }) => {
             const key = `${table}:${row.id}`;
             return (
-              <View key={key} style={s.reviewCard}>
+              <OasisSurface oasisSurface="card" key={key} style={s.reviewCard}>
                 <View style={s.reviewCopy}>
                   <Text style={s.reviewTitle}>{title}</Text>
                   <Text style={s.reviewMeta}>{table === 'services' ? 'عرض سوق' : table === 'businesses' ? 'منشأة' : 'فعالية'} · {owner}</Text>
                 </View>
-                <Pressable disabled={reviewBusy === key} onPress={() => void reviewEntry(table, row, false)} style={[s.reviewAction, s.reject]}><X size={16} color="#b91c1c" /></Pressable>
-                <Pressable disabled={reviewBusy === key} onPress={() => void reviewEntry(table, row, true)} style={[s.reviewAction, s.approve]}><Check size={16} color="#047857" /></Pressable>
-              </View>
+                <Pressable disabled={reviewBusy === key} onPress={() => void reviewEntry(table, row, false)} style={[s.reviewAction, s.reject]}><X size={16} color={OASIS.colors.danger} /></Pressable>
+                <Pressable disabled={reviewBusy === key} onPress={() => void reviewEntry(table, row, true)} style={[s.reviewAction, s.approve]}><Check size={16} color={OASIS.colors.primary} /></Pressable>
+              </OasisSurface>
             );
           })}
           {!services.some((x) => x.moderation_status === 'pending') && !businesses.some((x) => x.moderation_status === 'pending') && !events.some((x) => x.moderation_status === 'pending') ? <Text style={s.emptyReview}>لا توجد طلبات اعتماد معلقة.</Text> : null}
@@ -136,14 +138,14 @@ export default function AdminPro() {
 
         <Text style={s.sectionTitle}>خريطة التحكم السريعة</Text>
         <View style={s.quickGrid}>
-          <Quick icon={<Users size={19} color="#0284C7"/>} value={users.length} label="المستخدمون"/>
-          <Quick icon={<Flag size={19} color="#DC2626"/>} value={reports.filter(x=>x.status==='pending').length} label="بلاغات معلقة"/>
+          <Quick icon={<Users size={19} color={OASIS.colors.info}/>} value={users.length} label="المستخدمون"/>
+          <Quick icon={<Flag size={19} color={OASIS.colors.danger}/>} value={reports.filter(x=>x.status==='pending').length} label="بلاغات معلقة"/>
           <Quick icon={<ShieldCheck size={19} color="#D97706"/>} value={verifications.filter(x=>x.status==='pending').length} label="توثيق معلق"/>
-          <Quick icon={<Building2 size={19} color="#0284C7"/>} value={businesses.length} label="الأعمال"/>
-          <Quick icon={<Store size={19} color="#059669"/>} value={marketplace.length} label="السوق"/>
+          <Quick icon={<Building2 size={19} color={OASIS.colors.info}/>} value={businesses.length} label="الأعمال"/>
+          <Quick icon={<Store size={19} color={OASIS.colors.primary}/>} value={marketplace.length} label="السوق"/>
           <Quick icon={<CalendarDays size={19} color="#7C3AED"/>} value={events.length} label="الفعاليات"/>
         </View>
-        <View style={s.tip}><Zap size={17} color="#059669"/><Text style={s.tipText}>هذه النسخة مبنية فوق البيانات الحقيقية المحملة من Supabase، بدون أرقام تجريبية.</Text></View>
+        <View style={s.tip}><Zap size={17} color={OASIS.colors.primary}/><Text style={s.tipText}>هذه النسخة مبنية فوق البيانات الحقيقية المحملة من Supabase، بدون أرقام تجريبية.</Text></View>
       </ScrollView>
     </View>
   );
@@ -155,12 +157,12 @@ function Quick({icon,value,label}:any){
 
 const s=StyleSheet.create({
  page:{flex:1,backgroundColor:'#F1F5F9'},
- top:{paddingTop:48,paddingHorizontal:16,paddingBottom:14,backgroundColor:'#08111F',flexDirection:'row-reverse',alignItems:'center',gap:10},
- kicker:{fontSize:9,fontWeight:'900',color:'#5EEAD4',letterSpacing:1.2},title:{fontSize:21,fontWeight:'900',color:'#fff',marginTop:2},sub:{fontSize:10,color:'#94A3B8',marginTop:3},
- back:{paddingHorizontal:11,paddingVertical:8,borderRadius:11,backgroundColor:'#1E293B'},backText:{fontSize:10,fontWeight:'800',color:'#CBD5E1'},
- refresh:{width:38,height:38,borderRadius:12,backgroundColor:'#059669',alignItems:'center',justifyContent:'center'},
- content:{padding:14,paddingBottom:40},center:{flex:1,alignItems:'center',justifyContent:'center',backgroundColor:'#F8FAFC'},loading:{marginTop:12,fontSize:13,fontWeight:'800',color:'#475569'},
- reviewHint:{fontSize:12,color:'#64748B',textAlign:'right',marginTop:-5,marginBottom:10},reviewList:{gap:8},reviewCard:{flexDirection:'row-reverse',alignItems:'center',gap:8,backgroundColor:'#fff',padding:12,borderRadius:16,borderWidth:1,borderColor:'#E2E8F0'},reviewCopy:{flex:1},reviewTitle:{fontSize:14,fontWeight:'900',color:'#0F172A',textAlign:'right'},reviewMeta:{fontSize:11,color:'#64748B',textAlign:'right',marginTop:3},reviewAction:{width:36,height:36,borderRadius:12,alignItems:'center',justifyContent:'center'},approve:{backgroundColor:'#ECFDF5'},reject:{backgroundColor:'#FEF2F2'},emptyReview:{fontSize:12,color:'#64748B',textAlign:'center',padding:14,backgroundColor:'#fff',borderRadius:14},
- sectionTitle:{fontSize:16,fontWeight:'900',color:'#0F172A',textAlign:'right',marginTop:5,marginBottom:10},
- quickGrid:{flexDirection:'row-reverse',flexWrap:'wrap',gap:8},quick:{flexGrow:1,flexBasis:145,minWidth:140,backgroundColor:'#fff',borderRadius:17,padding:13,borderWidth:1,borderColor:'#E2E8F0'},qIcon:{width:36,height:36,borderRadius:12,backgroundColor:'#F8FAFC',alignItems:'center',justifyContent:'center',marginBottom:8},qValue:{fontSize:20,fontWeight:'900',color:'#0F172A'},qLabel:{fontSize:10,fontWeight:'800',color:'#64748B',marginTop:2,textAlign:'right'},tip:{marginTop:12,backgroundColor:'#ECFDF5',borderRadius:14,padding:12,flexDirection:'row-reverse',alignItems:'center',gap:8,borderWidth:1,borderColor:'#A7F3D0'},tipText:{flex:1,fontSize:10,fontWeight:'700',color:'#047857',textAlign:'right',lineHeight:16}
+ top:{paddingTop:24,paddingHorizontal:16,paddingBottom:14,backgroundColor:'#08111F',flexDirection:'row-reverse',alignItems:'center',gap:10},
+ kicker:{fontSize:11,fontWeight:'700',color:'#5EEAD4',letterSpacing:1.2},title:{fontSize:21,fontWeight:'700',color:OASIS.colors.surface,marginTop:2},sub:{fontSize:11,color:'#94A3B8',marginTop:3},
+ back:{paddingHorizontal:11,paddingVertical:8,borderRadius:11,backgroundColor:OASIS.colors.ink},backText:{fontSize:11,fontWeight:'600',color:'#CBD5E1'},
+ refresh:{width:38,height:38,borderRadius:12,backgroundColor:OASIS.colors.primary,alignItems:'center',justifyContent:'center'},
+ content:{padding:14,paddingBottom:24},center:{flex:1,alignItems:'center',justifyContent:'center',backgroundColor:OASIS.colors.background},loading:{marginTop:12,fontSize:13,fontWeight:'600',color:OASIS.colors.muted},
+ reviewHint:{fontSize:12,color:OASIS.colors.muted,textAlign:'right',marginTop:-5,marginBottom:10},reviewList:{gap:8},reviewCard:{flexDirection:'row-reverse',alignItems:'center',gap:8,backgroundColor:OASIS.colors.surface,padding:12,borderRadius:16,borderWidth:1,borderColor:OASIS.colors.line},reviewCopy:{flex:1},reviewTitle:{fontSize:14,fontWeight:'700',color:OASIS.colors.ink,textAlign:'right'},reviewMeta:{fontSize:11,color:OASIS.colors.muted,textAlign:'right',marginTop:3},reviewAction:{width:36,height:36,borderRadius:12,alignItems:'center',justifyContent:'center'},approve:{backgroundColor:OASIS.colors.soft},reject:{backgroundColor:OASIS.colors.dangerSoft},emptyReview:{fontSize:12,color:OASIS.colors.muted,textAlign:'center',padding:14,backgroundColor:OASIS.colors.surface,borderRadius:14},
+ sectionTitle:{fontSize:16,fontWeight:'700',color:OASIS.colors.ink,textAlign:'right',marginTop:5,marginBottom:10},
+ quickGrid:{flexDirection:'row-reverse',flexWrap:'wrap',gap:8},quick:{flexGrow:1,flexBasis:145,minWidth:140,backgroundColor:OASIS.colors.surface,borderRadius:17,padding:13,borderWidth:1,borderColor:OASIS.colors.line},qIcon:{width:36,height:36,borderRadius:12,backgroundColor:OASIS.colors.background,alignItems:'center',justifyContent:'center',marginBottom:8},qValue:{fontSize:20,fontWeight:'700',color:OASIS.colors.ink},qLabel:{fontSize:11,fontWeight:'600',color:OASIS.colors.muted,marginTop:2,textAlign:'right'},tip:{marginTop:12,backgroundColor:OASIS.colors.soft,borderRadius:14,padding:12,flexDirection:'row-reverse',alignItems:'center',gap:8,borderWidth:1,borderColor:'#A7F3D0'},tipText:{flex:1,fontSize:11,fontWeight:'700',color:OASIS.colors.primary,textAlign:'right',lineHeight:18}
 });

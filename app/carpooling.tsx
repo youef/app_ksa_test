@@ -1,20 +1,9 @@
+import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
+import { HeaderAction, AppHeader } from '@/components/shared/AppHeader';
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-  ScrollView,
-  TextInput,
-  Modal,
-  Alert,
-  ActivityIndicator,
-  Platform,
-  Linking,
-  RefreshControl,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Modal, Alert, ActivityIndicator, Platform, Linking, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
-import { AppHeader } from '@/components/shared/AppHeader';
 import {
   Car,
   Users,
@@ -420,15 +409,15 @@ export default function CarpoolingScreen() {
         subtitle="مشاركة المقاعد وتخفيف الزحام بين أولياء الأمور"
         fallbackRoute="/home"
         rightAction={
-          <Pressable
+          <HeaderAction
             style={styles.headerActionBtn}
             onPress={() => setModalOpen(true)}
             accessibilityRole="button"
             accessibilityLabel="شارك مقعداً"
           >
-            <Plus size={14} color="#059669" />
+            <Plus size={14} color={OASIS.colors.primary} />
             <Text style={styles.headerActionBtnText}>شارك مقعداً</Text>
-          </Pressable>
+          </HeaderAction>
         }
       />
 
@@ -442,13 +431,13 @@ export default function CarpoolingScreen() {
             placeholder="ابحث باسم المدرسة، الحي، أو ولي الأمر..."
             placeholderTextColor="#9ca3af"
           />
-          <Search size={18} color="#059669" />
+          <Search size={18} color={OASIS.colors.primary} />
         </View>
       </View>
 
       {/* Filter Tabs */}
       <View style={styles.tabsRow}>
-        <Pressable
+        <Pressable oasisKind="chip"
           style={[styles.tabChip, filterType === 'all' && styles.tabChipActive]}
           onPress={() => setFilterType('all')}
         >
@@ -456,7 +445,7 @@ export default function CarpoolingScreen() {
             كل الرحلات ({carpools.length})
           </Text>
         </Pressable>
-        <Pressable
+        <Pressable oasisKind="chip"
           style={[styles.tabChip, filterType === 'morning' && styles.tabChipActive]}
           onPress={() => setFilterType('morning')}
         >
@@ -464,7 +453,7 @@ export default function CarpoolingScreen() {
             ☀️ صباحاً (ذهاب)
           </Text>
         </Pressable>
-        <Pressable
+        <Pressable oasisKind="chip"
           style={[styles.tabChip, filterType === 'return' && styles.tabChipActive]}
           onPress={() => setFilterType('return')}
         >
@@ -482,36 +471,36 @@ export default function CarpoolingScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor="#059669"
-            colors={['#059669']}
+            tintColor={OASIS.colors.primary}
+            colors={[OASIS.colors.primary]}
           />
         }
       >
         {loading ? (
           <View style={styles.loadingBox}>
-            <ActivityIndicator size="large" color="#059669" />
+            <ActivityIndicator size="large" color={OASIS.colors.primary} />
             <Text style={styles.loadingText}>جاري تحميل رحلات المدارس بالحي...</Text>
           </View>
         ) : filtered.length === 0 ? (
-          <View style={styles.emptyCard}>
+          <OasisSurface oasisSurface="card" style={styles.emptyCard}>
             <Car size={44} color="#94a3b8" />
             <Text style={styles.emptyTitle}>لا توجد رحلات توصيل مسجلة</Text>
             <Text style={styles.emptySub}>
               شارك مقاعد سيارتك الفارغة مع أولياء أمور مدرستكم بالحي ووفر وقتك وزحامك.
             </Text>
-            <Pressable style={styles.emptyAddBtn} onPress={() => setModalOpen(true)}>
-              <Plus size={16} color="#fff" />
+            <Pressable oasisKind="action" style={styles.emptyAddBtn} onPress={() => setModalOpen(true)}>
+              <Plus size={16} color={OASIS.colors.surface} />
               <Text style={styles.emptyAddBtnText}>أضف أول رحلة مشاركة</Text>
             </Pressable>
-          </View>
+          </OasisSurface>
         ) : (
           filtered.map(item => {
             const isChatLoading = openingChatId === item.id;
             return (
-              <View key={item.id} style={styles.carpoolCard}>
+              <OasisSurface oasisSurface="card" key={item.id} style={styles.carpoolCard}>
                 <View style={styles.cardHeader}>
                   <View style={styles.seatsBadge}>
-                    <Users size={12} color="#065f46" />
+                    <Users size={12} color={OASIS.colors.deep} />
                     <Text style={styles.seatsBadgeText}>
                       {item.participants_count || 0} / {item.max_participants || item.seats_available} مقعد
                     </Text>
@@ -528,10 +517,10 @@ export default function CarpoolingScreen() {
                     <View style={{ alignItems: 'flex-end' }}>
                       <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}>
                         <Text style={styles.parentName}>{item.parent_name}</Text>
-                        {item.is_verified && <ShieldCheck size={13} color="#059669" />}
+                        {item.is_verified && <ShieldCheck size={13} color={OASIS.colors.primary} />}
                       </View>
                       <View style={styles.locRow}>
-                        <MapPin size={11} color="#64748b" />
+                        <MapPin size={11} color={OASIS.colors.muted} />
                         <Text style={styles.locText}>حي {item.district}</Text>
                       </View>
                     </View>
@@ -544,7 +533,7 @@ export default function CarpoolingScreen() {
                 </View>
 
                 <View style={styles.schoolRow}>
-                  <GraduationCap size={16} color="#047857" />
+                  <GraduationCap size={16} color={OASIS.colors.primary} />
                   <Text style={styles.schoolName}>{item.school_name}</Text>
                 </View>
 
@@ -559,40 +548,40 @@ export default function CarpoolingScreen() {
 
                 <View style={styles.cardActions}>
                   {item.phone ? (
-                    <Pressable
+                    <Pressable oasisKind="action"
                       style={styles.contactBtn}
                       onPress={() => Linking.openURL(`tel:${item.phone}`)}
                     >
-                      <Phone size={14} color="#059669" />
+                      <Phone size={14} color={OASIS.colors.primary} />
                       <Text style={styles.contactBtnText}>اتصال للتنسيق</Text>
                     </Pressable>
                   ) : null}
 
-                  <Pressable
+                  <Pressable oasisVariant="primary" oasisKind="action"
                     style={[styles.joinBtn, isChatLoading && { opacity: 0.8 }]}
                     onPress={() => handleJoinCarpool(item)}
                     disabled={isChatLoading}
                   >
-                    <Users size={14} color="#fff" />
+                    <Users size={14} color={OASIS.colors.surface} />
                     <Text style={styles.joinBtnText}>الانضمام للرحلة</Text>
                   </Pressable>
 
-                  <Pressable
+                  <Pressable oasisKind="action"
                     style={[styles.chatBtn, isChatLoading && { opacity: 0.8 }]}
                     onPress={() => handleOpenChat(item)}
                     disabled={isChatLoading}
                   >
                     {isChatLoading ? (
-                      <ActivityIndicator size="small" color="#fff" />
+                      <ActivityIndicator size="small" color={OASIS.colors.surface} />
                     ) : (
                       <>
-                        <MessageCircle size={14} color="#fff" />
+                        <MessageCircle size={14} color={OASIS.colors.surface} />
                         <Text style={styles.chatBtnText}>محادثة خاصة</Text>
                       </>
                     )}
                   </Pressable>
                 </View>
-              </View>
+              </OasisSurface>
             );
           })
         )}
@@ -601,10 +590,10 @@ export default function CarpoolingScreen() {
       {/* Modal: Add School Carpool */}
       <Modal visible={modalOpen} transparent animationType="slide" onRequestClose={() => setModalOpen(false)}>
         <Pressable style={styles.modalBackdrop} onPress={() => setModalOpen(false)}>
-          <Pressable style={styles.modalCard} onPress={e => e.stopPropagation?.()}>
+          <Pressable oasisKind="card" style={styles.modalCard} onPress={e => e.stopPropagation?.()}>
             <View style={styles.modalHeader}>
-              <Pressable onPress={() => setModalOpen(false)} style={styles.modalCloseBtn}>
-                <X size={18} color="#64748b" />
+              <Pressable oasisKind="icon" onPress={() => setModalOpen(false)} style={styles.modalCloseBtn}>
+                <X size={18} color={OASIS.colors.muted} />
               </Pressable>
               <Text style={styles.modalTitle}>مشاركة مقعد توصيل للمدرسة 🚗</Text>
             </View>
@@ -626,7 +615,7 @@ export default function CarpoolingScreen() {
                   { id: 'return', label: 'ظهراً (عودة)' },
                   { id: 'both', label: 'ذهاب وعودة' },
                 ].map(t => (
-                  <Pressable
+                  <Pressable oasisKind="chip"
                     key={t.id}
                     style={[styles.tabChip, tripType === t.id && styles.tabChipActive]}
                     onPress={() => setTripType(t.id)}
@@ -666,16 +655,16 @@ export default function CarpoolingScreen() {
                 multiline
               />
 
-              <Pressable
+              <Pressable oasisVariant="primary" oasisKind="action"
                 style={[styles.submitBtn, submitting && { opacity: 0.7 }]}
                 onPress={handleAddCarpool}
                 disabled={submitting}
               >
                 {submitting ? (
-                  <ActivityIndicator size="small" color="#fff" />
+                  <ActivityIndicator size="small" color={OASIS.colors.surface} />
                 ) : (
                   <>
-                    <Car size={18} color="#fff" />
+                    <Car size={18} color={OASIS.colors.surface} />
                     <Text style={styles.submitBtnText}>نشر المقعد في قاعدة البيانات 🤝</Text>
                   </>
                 )}
@@ -689,34 +678,34 @@ export default function CarpoolingScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
+  container: { flex: 1, backgroundColor: OASIS.colors.background },
   headerActionBtn: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#ecfdf5',
+    backgroundColor: OASIS.colors.soft,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: '#a7f3d0',
   },
-  headerActionBtnText: { fontSize: 12, fontWeight: '800', color: '#059669' },
+  headerActionBtnText: { fontSize: 12, fontWeight: '600', color: OASIS.colors.primary },
   searchSection: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 6 },
   searchBar: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: OASIS.colors.surface,
     borderRadius: 14,
     paddingHorizontal: 12,
     height: 44,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
   },
   searchInput: {
     flex: 1,
     fontSize: 13,
-    color: '#0f172a',
+    color: OASIS.colors.ink,
     textAlign: 'right',
     paddingHorizontal: 8,
   },
@@ -725,7 +714,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     gap: 8,
-    backgroundColor: '#fff',
+    backgroundColor: OASIS.colors.surface,
     borderBottomWidth: 1,
     borderColor: '#f1f5f9',
   },
@@ -733,48 +722,48 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 12,
-    backgroundColor: '#f8fafc',
+    backgroundColor: OASIS.colors.background,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
   },
-  tabChipActive: { backgroundColor: '#059669', borderColor: '#059669' },
-  tabText: { fontSize: 11.5, fontWeight: '700', color: '#64748b' },
-  tabTextActive: { color: '#ffffff', fontWeight: '900' },
+  tabChipActive: { backgroundColor: OASIS.colors.primary, borderColor: OASIS.colors.primary },
+  tabText: { fontSize: 11.5, fontWeight: '700', color: OASIS.colors.muted },
+  tabTextActive: { color: OASIS.colors.surface, fontWeight: '700' },
   scroll: { flex: 1 },
-  scrollContent: { padding: 16, gap: 12 },
+  scrollContent: { padding: 14, gap: 12 },
   loadingBox: { paddingVertical: 50, alignItems: 'center', gap: 10 },
-  loadingText: { fontSize: 13, color: '#64748b', fontWeight: '700' },
+  loadingText: { fontSize: 13, color: OASIS.colors.muted, fontWeight: '700' },
   emptyCard: {
-    backgroundColor: '#fff',
-    borderRadius: 18,
-    padding: 28,
+    backgroundColor: OASIS.colors.surface,
+    borderRadius: 14,
+    padding: 16,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
     marginTop: 10,
   },
-  emptyTitle: { fontSize: 16, fontWeight: '900', color: '#0f172a', marginTop: 10 },
-  emptySub: { fontSize: 12, color: '#64748b', textAlign: 'center', marginTop: 4, lineHeight: 18 },
+  emptyTitle: { fontSize: 16, fontWeight: '700', color: OASIS.colors.ink, marginTop: 10 },
+  emptySub: { fontSize: 12, color: OASIS.colors.muted, textAlign: 'center', marginTop: 4, lineHeight: 18 },
   emptyAddBtn: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#059669',
+    backgroundColor: OASIS.colors.primary,
     paddingHorizontal: 18,
     paddingVertical: 10,
     borderRadius: 14,
     marginTop: 16,
   },
-  emptyAddBtnText: { color: '#fff', fontSize: 13, fontWeight: '800' },
+  emptyAddBtnText: { color: OASIS.colors.surface, fontSize: 13, fontWeight: '600' },
   carpoolCard: {
-    backgroundColor: '#fff',
-    borderRadius: 18,
-    padding: 16,
+    backgroundColor: OASIS.colors.surface,
+    borderRadius: 14,
+    padding: 14,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
+    shadowOpacity: 0,
     shadowRadius: 6,
     elevation: 2,
   },
@@ -788,14 +777,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#ecfdf5',
+    backgroundColor: OASIS.colors.soft,
     borderWidth: 1,
     borderColor: '#a7f3d0',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 10,
   },
-  seatsBadgeText: { fontSize: 11, fontWeight: '800', color: '#065f46' },
+  seatsBadgeText: { fontSize: 11, fontWeight: '600', color: OASIS.colors.deep },
   parentProfilePressable: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
@@ -805,7 +794,7 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: '#ecfdf5',
+    backgroundColor: OASIS.colors.soft,
     borderWidth: 1,
     borderColor: '#a7f3d0',
     alignItems: 'center',
@@ -813,32 +802,32 @@ const styles = StyleSheet.create({
   },
   parentAvatarInitial: {
     fontSize: 14,
-    fontWeight: '900',
-    color: '#059669',
+    fontWeight: '700',
+    color: OASIS.colors.primary,
   },
-  parentName: { fontSize: 13.5, fontWeight: '900', color: '#0f172a' },
+  parentName: { fontSize: 13.5, fontWeight: '700', color: OASIS.colors.ink },
   locRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 2, marginTop: 1 },
-  locText: { fontSize: 11, color: '#64748b', fontWeight: '600' },
+  locText: { fontSize: 11, color: OASIS.colors.muted, fontWeight: '600' },
   schoolRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#f0fdf4',
+    backgroundColor: OASIS.colors.soft,
     padding: 10,
     borderRadius: 12,
     marginBottom: 8,
   },
-  schoolName: { fontSize: 13.5, fontWeight: '800', color: '#047857', textAlign: 'right' },
+  schoolName: { fontSize: 13.5, fontWeight: '600', color: OASIS.colors.primary, textAlign: 'right' },
   tripTypeRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, marginBottom: 8 },
   tripTypeText: { fontSize: 12, fontWeight: '700', color: '#92400e' },
-  notesText: { fontSize: 12, color: '#475569', lineHeight: 18, textAlign: 'right', marginBottom: 10 },
+  notesText: { fontSize: 12, color: OASIS.colors.muted, lineHeight: 18, textAlign: 'right', marginBottom: 10 },
   cardActions: {
     flexDirection: 'row-reverse',
     gap: 8,
     marginTop: 4,
     paddingTop: 10,
     borderTopWidth: 1,
-    borderColor: '#f8fafc',
+    borderColor: OASIS.colors.background,
   },
   contactBtn: {
     flex: 1,
@@ -846,47 +835,47 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 5,
-    backgroundColor: '#f0fdf4',
+    backgroundColor: OASIS.colors.soft,
     borderWidth: 1,
     borderColor: '#bbf7d0',
     borderRadius: 12,
     paddingVertical: 8,
   },
-  contactBtnText: { fontSize: 12, fontWeight: '800', color: '#059669' },
+  contactBtnText: { fontSize: 12, fontWeight: '600', color: OASIS.colors.primary },
   chatBtn: {
     flex: 1,
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 5,
-    backgroundColor: '#059669',
+    backgroundColor: OASIS.colors.primary,
     borderRadius: 12,
     paddingVertical: 8,
     minHeight: 38,
   },
-  chatBtnText: { fontSize: 12, fontWeight: '800', color: '#fff' },
+  chatBtnText: { fontSize: 12, fontWeight: '600', color: OASIS.colors.surface },
   joinBtn: {
     flex: 1,
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 5,
-    backgroundColor: '#047857',
+    backgroundColor: OASIS.colors.primary,
     borderRadius: 12,
     paddingVertical: 8,
     minHeight: 38,
   },
-  joinBtnText: { fontSize: 12, fontWeight: '800', color: '#fff' },
+  joinBtnText: { fontSize: 12, fontWeight: '600', color: OASIS.colors.surface },
   departureRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#f0fdf4',
+    backgroundColor: OASIS.colors.soft,
     padding: 8,
     borderRadius: 10,
     marginBottom: 8,
   },
-  departureText: { fontSize: 12, fontWeight: '700', color: '#047857', textAlign: 'right' },
+  departureText: { fontSize: 12, fontWeight: '700', color: OASIS.colors.primary, textAlign: 'right' },
   priceRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
@@ -900,20 +889,20 @@ const styles = StyleSheet.create({
 
   /* Modal */
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalCard: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20 },
+  modalCard: { backgroundColor: OASIS.colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 14 },
   modalHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  modalTitle: { fontSize: 16, fontWeight: '900', color: '#0f172a' },
+  modalTitle: { fontSize: 16, fontWeight: '700', color: OASIS.colors.ink },
   modalCloseBtn: { padding: 4 },
-  fieldLabel: { fontSize: 12, fontWeight: '800', color: '#334155', textAlign: 'right', marginBottom: 6 },
+  fieldLabel: { fontSize: 12, fontWeight: '600', color: OASIS.colors.ink, textAlign: 'right', marginBottom: 6 },
   input: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: OASIS.colors.background,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 9,
     fontSize: 13,
-    color: '#0f172a',
+    color: OASIS.colors.ink,
     textAlign: 'right',
     marginBottom: 10,
   },
@@ -922,11 +911,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#059669',
+    backgroundColor: OASIS.colors.primary,
     paddingVertical: 13,
     borderRadius: 14,
     marginTop: 6,
     marginBottom: 14,
   },
-  submitBtnText: { color: '#fff', fontSize: 13.5, fontWeight: '900' },
+  submitBtnText: { color: OASIS.colors.surface, fontSize: 13.5, fontWeight: '700' },
 });

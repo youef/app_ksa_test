@@ -8,6 +8,9 @@ export interface AdminProfile {
   role: 'admin' | 'user';
   is_verified: boolean;
   is_geoverified: boolean;
+  account_type?: 'standard' | 'merchant' | 'freelance' | 'provider' | 'idea' | null;
+  freelance_trade?: string | null;
+  is_verified_merchant?: boolean;
   is_banned: boolean;
   verification_status?: string | null;
   bio?: string | null;
@@ -20,6 +23,10 @@ export interface AdminVerificationRequest {
   id: string;
   user_id: string;
   note: string | null;
+  subject?: string | null;
+  verification_type?: 'identity' | 'freelance' | 'business' | null;
+  attachment_url?: string | null;
+  document_url?: string | null;
   status: 'pending' | 'approved' | 'rejected';
   reviewed_by: string | null;
   reviewed_at: string | null;

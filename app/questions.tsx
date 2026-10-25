@@ -1,23 +1,19 @@
-import { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  RefreshControl,
-  ScrollView,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { OasisEmptyIllustration } from '@/components/oasis/OasisEmptyIllustration';
+import { OasisPressable as Pressable } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Image, Platform, Alert, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+
 import { router } from 'expo-router';
-import { MapPin, Sparkles } from 'lucide-react-native';
+import { Sparkles, SlidersHorizontal } from 'lucide-react-native';
 
 import { supabase } from '@/lib/supabase';
 import AppHeader from '@/components/shared/AppHeader';
-import LocationSelectorModal from '@/components/LocationSelectorModal';
+import QuestionFilterSheet from '@/components/QuestionFilterSheet';
+import { DEFAULT_QUESTION_FILTERS, filterQuestions, type QuestionFilters } from '@/lib/questionFilters';
+import LocationScopeBar from '@/components/LocationScopeBar';
 import TwitterInquiryCard from '@/components/TwitterInquiryCard';
-import { getActiveLocation, subscribeLocation, isLocationMatching, savePermanentMyLocation, type HaynaLocation } from '@/lib/locationSync';
-import { getBrandingLogo, getCachedBrandingLogo, subscribeBrandingLogo } from '@/lib/branding';
+import { getActiveLocation, subscribeLocation, isLocationMatching, type HaynaLocation } from '@/lib/locationSync';
 import { useBottomNavInset } from '@/lib/bottomNav';
 
 export default function Questions() {
@@ -29,8 +25,12 @@ export default function Questions() {
   const [loadError, setLoadError] = useState('');
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [profile, setProfile] = useState<any>(null);
-  const [logoUri, setLogoUri] = useState(getCachedBrandingLogo());
-  const [showLocationModal, setShowLocationModal] = useState(false);
+  const [sortBy, setSortBy] = useState<'newest' | 'engaged' | 'nearby'>('newest');
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [filters, setFilters] = useState<QuestionFilters>(DEFAULT_QUESTION_FILTERS);
+  const [draftFilters, setDraftFilters] = useState<QuestionFilters>(DEFAULT_QUESTION_FILTERS);
+  const [queryLimit, setQueryLimit] = useState(80);
+  const [hasMore, setHasMore] = useState(false);
   const [activeLoc, setActiveLoc] = useState<HaynaLocation>({
     region: 'كل المملكة',
     city: 'كل المدن',
@@ -57,23 +57,12 @@ export default function Questions() {
       }
 
       let questions: any[] = [];
-      const { data, error } = await supabase
-        .from('questions')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(80);
-
-      if (!error && data) {
-        questions = data;
-      } else {
-        const fallback = await supabase.rpc('hayna_guest_questions', {
-          p_city: location.city,
-          p_district: location.district,
-          p_limit: 60,
-        });
-        if (fallback.error) throw fallback.error;
-        questions = fallback.data ?? [];
-      }
+      const result = user
+        ? await supabase.from('questions').select('*').order('created_at', { ascending: false }).limit(queryLimit)
+        : await supabase.rpc('hayna_guest_questions', { p_city: location.city, p_district: location.district, p_limit: queryLimit });
+      if (result.error) throw result.error;
+      questions = result.data ?? [];
+      setHasMore(questions.length >= queryLimit);
 
       if (questions.length) {
         const authorIds = Array.from(new Set(questions.map(q => q.author_id).filter(Boolean)));
@@ -128,12 +117,15 @@ export default function Questions() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [activeLoc]);
+  }, [activeLoc, queryLimit]);
+
+  const activeLocRef = useRef(activeLoc);
+  activeLocRef.current = activeLoc;
+  const loadRef = useRef(loadQuestions);
+  loadRef.current = loadQuestions;
 
   useEffect(() => {
     let active = true;
-    void getBrandingLogo().then(uri => { if (active) setLogoUri(uri); }).catch(() => undefined);
-    const unsubscribeBranding = subscribeBrandingLogo(uri => { if (active) setLogoUri(uri); });
     void getActiveLocation().then(location => {
       if (!active) return;
       setActiveLoc(location);
@@ -146,11 +138,10 @@ export default function Questions() {
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!active) return;
       setCurrentUserId(session?.user?.id ?? null);
-      void loadQuestions();
+      setTimeout(() => { if (active) void loadRef.current(activeLocRef.current); }, 0);
     });
     return () => {
       active = false;
-      unsubscribeBranding();
       unsubscribeLocation();
       authListener.subscription.unsubscribe();
     };
@@ -161,13 +152,27 @@ export default function Questions() {
     await loadQuestions(activeLoc);
   }, [activeLoc, loadQuestions]);
 
-  const onSelectLocation = useCallback(async (region: string, city: string, district: string) => {
-    const location = { region, city, district };
-    await savePermanentMyLocation(location, true);
-    setActiveLoc(location);
-    setShowLocationModal(false);
-    void loadQuestions(location);
-  }, [loadQuestions]);
+  // Keep the questions screen fresh without requiring a manual page reload.
+  useEffect(() => {
+    let disposed = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const refreshSoon = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (!disposed) void loadQuestions(activeLoc);
+      }, 900);
+    };
+    const channel = supabase
+      .channel(`questions-live-${Math.random().toString(36).slice(2)}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'questions' }, refreshSoon)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'answers' }, refreshSoon);
+    channel.subscribe();
+    return () => {
+      disposed = true;
+      if (timer) clearTimeout(timer);
+      void supabase.removeChannel(channel);
+    };
+  }, [activeLoc, loadQuestions]);
 
   const onQuickReply = useCallback(async (questionId: string, text: string) => {
     const body = text.trim();
@@ -195,22 +200,18 @@ export default function Questions() {
     Alert.alert('حيّنا', message);
   }, []);
 
+  const filteredItems = useMemo(() => filterQuestions(items, filters, currentUserId, sortBy, activeLoc.district), [items, filters, currentUserId, sortBy, activeLoc.district]);
+  const filtersActive = Object.keys(DEFAULT_QUESTION_FILTERS).some(key => filters[key as keyof QuestionFilters] !== DEFAULT_QUESTION_FILTERS[key as keyof QuestionFilters]);
+  useEffect(() => { setVisibleCount(10); }, [filters, sortBy]);
+  useEffect(() => { if (queryLimit > 80) void loadQuestions(activeLoc); }, [queryLimit]);
+
   return (
     <View style={styles.container}>
       <AppHeader
         variant="sub"
         title="استفسارات الجيران"
         fallbackRoute="/home"
-        rightAction={
-          <Pressable
-            onPress={() => setShowLocationModal(true)}
-            style={styles.locationButton}
-            accessibilityRole="button"
-            accessibilityLabel="تغيير المدينة والحي"
-          >
-            <MapPin size={17} color="#176b52" />
-          </Pressable>
-        }
+
       />
 
       <ScrollView
@@ -221,20 +222,34 @@ export default function Questions() {
         onMomentumScrollEnd={({ nativeEvent }) => {
           const { contentOffset, contentSize, layoutMeasurement } = nativeEvent;
           const nearBottom = contentOffset.y + layoutMeasurement.height >= contentSize.height - 180;
-          if (nearBottom && visibleCount < items.length) {
-            setVisibleCount(current => Math.min(current + 10, items.length));
+          if (nearBottom && visibleCount < filteredItems.length) {
+            setVisibleCount(current => Math.min(current + 10, filteredItems.length));
           }
         }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor="#059669"
-            colors={['#059669']}
-            progressBackgroundColor="#ecfdf5"
+            tintColor={OASIS.colors.primary}
+            colors={[OASIS.colors.primary]}
+            progressBackgroundColor={OASIS.colors.soft}
           />
         }
       >
+        <LocationScopeBar location={activeLoc} />
+        <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', alignItems: 'center', gap: 7, marginTop: 8, marginBottom: 12 }}>
+          {([['newest', 'الأحدث'], ['engaged', 'الأكثر تفاعلاً'], ['nearby', 'الأقرب']] as const).map(([key, label]) => (
+            <Pressable oasisKind="chip" oasisVariant={sortBy === key ? 'primary' : 'secondary'} key={key} accessibilityRole="button" accessibilityState={{ selected: sortBy === key }} onPress={() => setSortBy(key)} style={{ paddingHorizontal: 13, paddingVertical: 8, borderRadius: 14, overflow: 'hidden', backgroundColor: OASIS.colors.surface, borderWidth: sortBy === key ? 0 : 1, borderColor: '#dbe5df' }}>
+
+              <Text style={{ color: sortBy === key ? OASIS.colors.surface : OASIS.colors.muted, fontSize: 12, fontWeight: '600' }}>{label}</Text>
+            </Pressable>
+          ))}
+          <Pressable accessibilityRole="button" accessibilityLabel="تصفية المنشورات" onPress={() => { setDraftFilters(filters); setFilterOpen(true); }} style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 11, paddingVertical: 9, borderRadius: 14, backgroundColor: OASIS.colors.surface, borderWidth: 1, borderColor: '#b7d8c8' }}>
+            {filtersActive && <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#176b52' }} />}
+            <SlidersHorizontal size={15} color='#176b52' />
+            <Text style={{ color: '#176b52', fontSize: 12, fontWeight: '700' }}>تصفية</Text>
+          </Pressable>
+        </View>
         {loading && items.length === 0 ? (
           <View style={styles.stateBox}>
             <ActivityIndicator size="large" color="#16845f" />
@@ -245,18 +260,17 @@ export default function Questions() {
             <Text style={styles.stateTitle}>{loadError}</Text>
             <Text onPress={() => void loadQuestions(activeLoc)} style={styles.retryText}>إعادة المحاولة</Text>
           </View>
-        ) : items.length === 0 ? (
+        ) : filteredItems.length === 0 ? (
           <View style={styles.stateBox}>
-            <View style={styles.emptyIcon}>
-              <Sparkles size={28} color="#16845f" />
-            </View>
-            <Text style={styles.stateTitle}>كن أول من يبدأ النقاش</Text>
-            <Text style={styles.stateText}>لا توجد استفسارات ظاهرة حالياً. شارك سؤالك ليستفيد جيرانك من خبرتك وتستفيد من تجاربهم.</Text>
+            <View style={{ alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}><OasisEmptyIllustration kind="empty-feed" /></View>
+            <Text style={styles.stateTitle}>{filtersActive ? 'لا توجد نتائج تطابق التصفية' : 'كن أول من يبدأ النقاش'}</Text>
+            <Text style={styles.stateText}>{filtersActive ? 'جرّب تغيير الخيارات أو مسح التصفية.' : 'شارك استفسارك مع جيرانك.'}</Text>
+            {filtersActive && <Pressable accessibilityRole="button" onPress={() => setFilters(DEFAULT_QUESTION_FILTERS)}><Text style={styles.askLink}>مسح التصفية</Text></Pressable>}
             <Text onPress={() => router.push('/ask')} style={styles.askLink}>+ اطرح استفسارك</Text>
           </View>
         ) : (
           <View style={styles.posts}>
-            {items.slice(0, visibleCount).map(question => (
+            {filteredItems.slice(0, visibleCount).map(question => (
               <TwitterInquiryCard
                 key={String(question.id)}
                 type="question"
@@ -269,7 +283,7 @@ export default function Questions() {
                 onDeleted={() => { void loadQuestions(activeLoc); }}
               />
             ))}
-            {visibleCount < items.length && (
+            {visibleCount < filteredItems.length && (
               <View style={styles.moreLoading}>
                 <ActivityIndicator size="small" color="#16845f" />
                 <Text style={styles.moreLoadingText}>اسحب للأسفل لعرض المزيد</Text>
@@ -277,15 +291,10 @@ export default function Questions() {
             )}
           </View>
         )}
+        {hasMore && <Pressable disabled={loading} accessibilityRole="button" onPress={() => setQueryLimit(limit => limit + 80)} style={styles.moreLoading}><Text style={styles.askLink}>{loading ? 'جارٍ التحميل...' : 'تحميل منشورات أقدم'}</Text></Pressable>}
       </ScrollView>
 
-      <LocationSelectorModal
-        visible={showLocationModal}
-        selectedCity={activeLoc.city}
-        selectedDistrict={activeLoc.district}
-        onSelect={onSelectLocation}
-        onClose={() => setShowLocationModal(false)}
-      />
+      <QuestionFilterSheet visible={filterOpen} value={draftFilters} isMember={Boolean(currentUserId)} onChange={setDraftFilters} onClose={() => setFilterOpen(false)} onApply={() => { setFilters(draftFilters); setFilterOpen(false); }} onReset={() => { setFilters(DEFAULT_QUESTION_FILTERS); setDraftFilters(DEFAULT_QUESTION_FILTERS); setFilterOpen(false); }} />
     </View>
   );
 }
@@ -297,6 +306,7 @@ const styles = StyleSheet.create({
   },
   feedContent: {
     flexGrow: 1,
+    width: '100%', maxWidth: 760, alignSelf: 'center',
     paddingTop: 8,
     paddingHorizontal: 12,
     backgroundColor: '#f4f7f5',
@@ -331,17 +341,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 10,
     paddingHorizontal: 28,
-    paddingVertical: 44,
+    paddingVertical: 24,
     marginHorizontal: 2,
-    borderRadius: 22,
-    backgroundColor: '#ffffff',
+    borderRadius: 14,
+    backgroundColor: OASIS.colors.surface,
     borderWidth: 1,
     borderColor: '#e0ebe4',
   },
   emptyIcon: {
     width: 58,
     height: 58,
-    borderRadius: 20,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#e6f5ec',
@@ -349,7 +359,7 @@ const styles = StyleSheet.create({
   stateTitle: {
     color: '#17382c',
     fontSize: 16,
-    fontWeight: '900',
+    fontWeight: '700',
     textAlign: 'center',
   },
   stateText: {
@@ -361,13 +371,13 @@ const styles = StyleSheet.create({
   retryText: {
     color: '#087f5b',
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '700',
     padding: 8,
   },
   askLink: {
     color: '#087f5b',
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '700',
     padding: 8,
   },
 });

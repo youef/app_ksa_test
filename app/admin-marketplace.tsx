@@ -1,5 +1,7 @@
+import { OasisPressable as Pressable, OasisSurface } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { CheckCircle2, Clock, Megaphone, RefreshCw, ShieldCheck, XCircle } from 'lucide-react-native';
 import { AppHeader } from '@/components/shared/AppHeader';
@@ -63,24 +65,24 @@ export default function AdminMarketplace() {
 
   const refresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
 
-  if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="#047857" /><Text style={styles.muted}>نحمّل قائمة المراجعة…</Text></View>;
+  if (loading) return <View style={styles.center}><ActivityIndicator size="large" color={OASIS.colors.primary} /><Text style={styles.muted}>نحمّل قائمة المراجعة…</Text></View>;
 
   return (
     <View style={styles.root}>
       <AppHeader variant="sub" title="مراجعة إعلانات السوق" subtitle="لوحة الإدارة" fallbackRoute="/marketplace-dashboard" />
-      <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor="#047857" />}>
+      <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={OASIS.colors.primary} />}>
         <View style={styles.hero}>
-          <View style={styles.heroIcon}><ShieldCheck size={23} color="#fff" /></View>
+          <View style={styles.heroIcon}><ShieldCheck size={23} color={OASIS.colors.surface} /></View>
           <Text style={styles.heroTitle}>اعتماد الإعلانات المدفوعة</Text>
           <Text style={styles.heroText}>لا يبدأ الترويج إلا بعد نجاح الدفع ومراجعة المحتوى. الموافقة تبدأ مدة الحملة من وقت الاعتماد.</Text>
           <View style={styles.counter}><Clock size={15} color="#a7f3d0" /><Text style={styles.counterText}>{campaigns.length} إعلان بانتظار المراجعة</Text></View>
         </View>
         {campaigns.length === 0 ? (
-          <View style={styles.empty}><CheckCircle2 size={30} color="#059669" /><Text style={styles.emptyTitle}>لا توجد إعلانات معلّقة</Text><Text style={styles.muted}>اسحب للأسفل لتحديث القائمة.</Text><Pressable onPress={() => void refresh()} style={styles.refreshButton}><RefreshCw size={16} color="#047857" /><Text style={styles.refreshText}>تحديث</Text></Pressable></View>
+          <View style={styles.empty}><CheckCircle2 size={30} color={OASIS.colors.primary} /><Text style={styles.emptyTitle}>لا توجد إعلانات معلّقة</Text><Text style={styles.muted}>اسحب للأسفل لتحديث القائمة.</Text><Pressable oasisKind="action" onPress={() => void refresh()} style={styles.refreshButton}><RefreshCw size={16} color={OASIS.colors.primary} /><Text style={styles.refreshText}>تحديث</Text></Pressable></View>
         ) : campaigns.map(campaign => (
-          <View key={campaign.id} style={styles.card}>
+          <OasisSurface oasisSurface="card" key={campaign.id} style={styles.card}>
             <View style={styles.cardTop}>
-              <View style={styles.iconBox}><Megaphone size={20} color="#047857" /></View>
+              <OasisSurface oasisSurface="icon" style={styles.iconBox}><Megaphone size={20} color={OASIS.colors.primary} /></OasisSurface>
               <View style={{ flex: 1, alignItems: 'flex-end' }}>
                 <Text style={styles.cardTitle}>{campaign.title}</Text>
                 <Text style={styles.muted}>صاحب الإعلان: {campaign.owner?.display_name || campaign.owner?.username || 'مستخدم'}</Text>
@@ -94,15 +96,15 @@ export default function AdminMarketplace() {
             <Text style={styles.muted}>تاريخ الدفع/الإنشاء: {new Date(campaign.created_at).toLocaleString('ar-SA')}</Text>
             <View style={styles.actions}>
               <Pressable disabled={!!busyId} onPress={() => void review(campaign, 'reject')} style={[styles.reject, !!busyId && styles.disabled]}>
-                {busyId === campaign.id ? <ActivityIndicator color="#b91c1c" /> : <XCircle size={17} color="#b91c1c" />}
+                {busyId === campaign.id ? <ActivityIndicator color={OASIS.colors.danger} /> : <XCircle size={17} color={OASIS.colors.danger} />}
                 <Text style={styles.rejectText}>رفض</Text>
               </Pressable>
               <Pressable disabled={!!busyId} onPress={() => void review(campaign, 'approve')} style={[styles.approve, !!busyId && styles.disabled]}>
-                {busyId === campaign.id ? <ActivityIndicator color="#fff" /> : <CheckCircle2 size={17} color="#fff" />}
+                {busyId === campaign.id ? <ActivityIndicator color={OASIS.colors.surface} /> : <CheckCircle2 size={17} color={OASIS.colors.surface} />}
                 <Text style={styles.approveText}>اعتماد وتفعيل</Text>
               </Pressable>
             </View>
-          </View>
+          </OasisSurface>
         ))}
       </ScrollView>
     </View>
@@ -110,31 +112,31 @@ export default function AdminMarketplace() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#f8fafc' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: '#f8fafc' },
-  content: { padding: 16, gap: 14, maxWidth: 900, width: '100%', alignSelf: 'center' },
-  hero: { backgroundColor: '#064e3b', borderRadius: 22, padding: 18, alignItems: 'flex-end', gap: 8 },
-  heroIcon: { width: 46, height: 46, borderRadius: 14, backgroundColor: '#047857', alignItems: 'center', justifyContent: 'center' },
-  heroTitle: { color: '#fff', fontSize: 20, fontWeight: '900', textAlign: 'right' },
-  heroText: { color: '#d1fae5', fontSize: 12, lineHeight: 20, textAlign: 'right' },
+  root: { flex: 1, backgroundColor: OASIS.colors.background },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: OASIS.colors.background },
+  content: { padding: 14, gap: 14, maxWidth: 900, width: '100%', alignSelf: 'center' },
+  hero: { backgroundColor: OASIS.colors.deep, borderRadius: 14, padding: 18, alignItems: 'flex-end', gap: 8 },
+  heroIcon: { width: 46, height: 46, borderRadius: 14, backgroundColor: OASIS.colors.primary, alignItems: 'center', justifyContent: 'center' },
+  heroTitle: { color: OASIS.colors.surface, fontSize: 20, fontWeight: '700', textAlign: 'right' },
+  heroText: { color: OASIS.colors.soft, fontSize: 12, lineHeight: 20, textAlign: 'right' },
   counter: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, marginTop: 4 },
-  counterText: { color: '#a7f3d0', fontSize: 12, fontWeight: '800' },
-  card: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 18, padding: 15, gap: 12 },
+  counterText: { color: '#a7f3d0', fontSize: 12, fontWeight: '600' },
+  card: { backgroundColor: OASIS.colors.surface, borderWidth: 1, borderColor: OASIS.colors.line, borderRadius: 14, padding: 15, gap: 12 },
   cardTop: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10 },
-  iconBox: { width: 42, height: 42, borderRadius: 13, backgroundColor: '#ecfdf5', alignItems: 'center', justifyContent: 'center' },
-  cardTitle: { color: '#0f172a', fontSize: 14, fontWeight: '900', textAlign: 'right' },
-  muted: { color: '#64748b', fontSize: 11.5, lineHeight: 18, textAlign: 'right' },
-  description: { color: '#334155', fontSize: 12, lineHeight: 19, textAlign: 'right' },
+  iconBox: { width: 36, height: 36, borderRadius: 10, backgroundColor: OASIS.colors.soft, alignItems: 'center', justifyContent: 'center' },
+  cardTitle: { color: OASIS.colors.ink, fontSize: 14, fontWeight: '700', textAlign: 'right' },
+  muted: { color: OASIS.colors.muted, fontSize: 11.5, lineHeight: 18, textAlign: 'right' },
+  description: { color: OASIS.colors.ink, fontSize: 12, lineHeight: 19, textAlign: 'right' },
   metaRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', gap: 8 },
-  meta: { color: '#047857', fontSize: 11.5, fontWeight: '800' },
+  meta: { color: OASIS.colors.primary, fontSize: 11.5, fontWeight: '600' },
   actions: { flexDirection: 'row-reverse', gap: 8 },
-  approve: { flex: 1, backgroundColor: '#047857', borderRadius: 12, padding: 12, flexDirection: 'row-reverse', justifyContent: 'center', alignItems: 'center', gap: 7 },
-  approveText: { color: '#fff', fontSize: 12, fontWeight: '900' },
-  reject: { backgroundColor: '#fef2f2', borderColor: '#fecaca', borderWidth: 1, borderRadius: 12, padding: 12, flexDirection: 'row-reverse', justifyContent: 'center', alignItems: 'center', gap: 7, minWidth: 90 },
-  rejectText: { color: '#b91c1c', fontSize: 12, fontWeight: '900' },
+  approve: { flex: 1, backgroundColor: OASIS.colors.primary, borderRadius: 12, padding: 12, flexDirection: 'row-reverse', justifyContent: 'center', alignItems: 'center', gap: 7 },
+  approveText: { color: OASIS.colors.surface, fontSize: 12, fontWeight: '700' },
+  reject: { backgroundColor: OASIS.colors.dangerSoft, borderColor: '#fecaca', borderWidth: 1, borderRadius: 12, padding: 12, flexDirection: 'row-reverse', justifyContent: 'center', alignItems: 'center', gap: 7, minWidth: 90 },
+  rejectText: { color: OASIS.colors.danger, fontSize: 12, fontWeight: '700' },
   disabled: { opacity: 0.55 },
-  empty: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 18, padding: 26, alignItems: 'center', gap: 10 },
-  emptyTitle: { color: '#0f172a', fontSize: 16, fontWeight: '900' },
-  refreshButton: { marginTop: 6, flexDirection: 'row-reverse', alignItems: 'center', gap: 6, backgroundColor: '#ecfdf5', borderRadius: 11, paddingHorizontal: 14, paddingVertical: 9 },
-  refreshText: { color: '#047857', fontSize: 12, fontWeight: '800' },
+  empty: { backgroundColor: OASIS.colors.surface, borderWidth: 1, borderColor: OASIS.colors.line, borderRadius: 14, padding: 16, alignItems: 'center', gap: 10 },
+  emptyTitle: { color: OASIS.colors.ink, fontSize: 16, fontWeight: '700' },
+  refreshButton: { marginTop: 6, flexDirection: 'row-reverse', alignItems: 'center', gap: 6, backgroundColor: OASIS.colors.soft, borderRadius: 11, paddingHorizontal: 14, paddingVertical: 9 },
+  refreshText: { color: OASIS.colors.primary, fontSize: 12, fontWeight: '600' },
 });

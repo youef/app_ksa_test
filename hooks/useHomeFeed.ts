@@ -1,3 +1,4 @@
+import { storyDiscoveryMembership } from '@/lib/storyActivity';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { supabase } from '@/lib/supabase';
@@ -5,6 +6,7 @@ import {
   getActiveLocation,
   setActiveLocation,
   isAllKingdom,
+  isLocationMatching,
   type HaynaLocation,
 } from '@/lib/locationSync';
 import {
@@ -29,6 +31,7 @@ export function useHomeFeed({ onLocation }: Options) {
   const [requests, setRequests] = useState<HelpRequest[]>([]);
   const [stories, setStories] = useState<Story[]>([]);
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
 
   const [loading, setLoading] = useState(true); // first load only
   const [error, setError] = useState<string | null>(null);
@@ -89,14 +92,14 @@ export function useHomeFeed({ onLocation }: Options) {
           .select('id', { count: 'exact', head: true })
           .eq('user_id', user.id)
           .is('read_at', null) : Promise.resolve({ count: 0, error: null }),
-        supabase
+        user ? supabase
           .from('stories')
           .select(
-            '*, profiles:author_id(id, display_name, username, avatar_url, is_verified, is_geoverified, city, district)',
+            '*, profiles:author_id(id, display_name, username, avatar_url, is_verified, is_geoverified, city, district, account_type, role, hide_name)',
           )
           .or(`expires_at.gt.${new Date().toISOString()},and(expires_at.is.null,created_at.gte.${new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()})`)
           .order('created_at', { ascending: false })
-          .limit(40),
+          .limit(40) : Promise.resolve({ data: [], error: null }),
         user
           ? supabase.from('questions').select('*').order('created_at', { ascending: false }).limit(limit)
           : supabase.rpc('hayna_guest_questions', { p_city: loc.city, p_district: loc.district, p_limit: limit }),
@@ -110,37 +113,57 @@ export function useHomeFeed({ onLocation }: Options) {
 
       setUnreadNotifCount(notifRes.count ?? 0);
 
+      // Count unread conversations using the same last-message rule as /messages.
+      // Errors in chat must never break the neighborhood feed.
+      if (user) {
+        try {
+          const { data: memberships, error: membershipError } = await supabase
+            .from('conversation_members').select('conversation_id').eq('user_id', user.id);
+          if (membershipError) throw membershipError;
+          const ids = (memberships ?? []).map(row => row.conversation_id);
+          if (ids.length) {
+            const { data: chatMessages, error: chatError } = await supabase
+              .from('messages').select('conversation_id,sender_id,read_by,created_at')
+              .in('conversation_id', ids).order('created_at', { ascending: false });
+            if (chatError) throw chatError;
+            const latest = new Map<string, { sender_id: string; read_by: string[] | null }>();
+            for (const message of chatMessages ?? []) {
+              if (!latest.has(message.conversation_id)) latest.set(message.conversation_id, message);
+            }
+            setUnreadMessagesCount([...latest.values()].filter(message =>
+              message.sender_id !== user.id && !(message.read_by ?? []).includes(user.id)
+            ).length);
+          } else setUnreadMessagesCount(0);
+        } catch (chatError) {
+          console.warn('Could not refresh unread chat badge:', chatError);
+          setUnreadMessagesCount(0);
+        }
+      } else setUnreadMessagesCount(0);
+
       if (questionsRes.error) throw questionsRes.error;
       if (requestsRes.error) throw requestsRes.error;
 
-      // Stories: one per author, prioritizing current user's area, with neighbor fallback
+      // Story rings include the owner, followed authors and exact neighborhood matches.
       const rawStories = ((storiesRes.data ?? []) as Story[]);
-      const seen = new Set<string>();
-      const areaStories: Story[] = [];
-      const neighborStories: Story[] = [];
-
-      for (const s of rawStories) {
-        if (!s.author_id || seen.has(s.author_id)) continue;
-        const c = s.profiles?.city || '';
-        const d = s.profiles?.district || '';
-        let isLocal = true;
-        if (!isAllKingdom(loc.city)) {
-          if (loc.city && c && c !== loc.city) isLocal = false;
-          if (loc.district && loc.district !== 'كل الأحياء' && d && d !== loc.district) isLocal = false;
-        }
-        if (isLocal) {
-          areaStories.push(s);
-        } else {
-          neighborStories.push(s);
-        }
-        seen.add(s.author_id);
+      const mutedAuthors = new Set<string>();
+      if (user) {
+        const preferences = await supabase.from('story_author_preferences').select('author_id').eq('user_id', user.id).eq('muted', true);
+        if (preferences.error) { setStories([]); } else (preferences.data || []).forEach(row => mutedAuthors.add(row.author_id));
+        if (preferences.error) rawStories.length = 0;
       }
-
-      // Prioritize local district, then supplement with city/neighbors
-      const combined = areaStories.length > 0
-        ? [...areaStories, ...neighborStories.slice(0, Math.max(0, 8 - areaStories.length))]
-        : neighborStories.slice(0, 10);
-      setStories(combined);
+      const follows = user ? await supabase.from('follows').select('following_id').eq('follower_id', user.id) : { data: [], error: null };
+      if (storiesRes.error) throw storiesRes.error;
+      if (follows.error) throw follows.error;
+      const following = (follows.data || []).map(row => String(row.following_id));
+      const seen = new Set<string>();
+      const localStories: Story[] = [];
+      for (const story of rawStories) {
+        if (!story.author_id || seen.has(story.author_id) || mutedAuthors.has(story.author_id)) continue;
+        if (!storyDiscoveryMembership(story.profiles, story.author_id, user?.id || '', following, loc.city, loc.district).ring) continue;
+        localStories.push(story);
+        seen.add(story.author_id);
+      }
+      setStories(localStories.slice(0, 10));
 
       const qRows = dedupe((questionsRes.data ?? []) as Question[], 'author_id');
       const rRows = dedupe((requestsRes.data ?? []) as HelpRequest[], 'requester_id');
@@ -233,8 +256,7 @@ export function useHomeFeed({ onLocation }: Options) {
   // Realtime: new posts refresh the feed (debounced), new notifications bump the badge.
   const channelRef = useRef<any>(null);
   useEffect(() => {
-    if (!currentUserId) return;
-
+    // Public feed updates are subscribed for guests too; notifications remain account-only.
     let disposed = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -251,15 +273,18 @@ export function useHomeFeed({ onLocation }: Options) {
 
       // Unique topic per subscription: the realtime client reuses a still-registered
       // channel with the same topic, and adding bindings to a joined channel throws.
-      const channel = supabase
-        .channel(`home-live-${currentUserId}-${Math.random().toString(36).slice(2)}`)
+      let channel = supabase
+        .channel(`home-live-${currentUserId || 'guest'}-${Math.random().toString(36).slice(2)}`)
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'questions' }, refresh)
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'requests' }, refresh)
-        .on(
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'requests' }, refresh);
+
+      if (currentUserId) {
+        channel = channel.on(
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${currentUserId}` },
           () => setUnreadNotifCount(c => c + 1),
         );
+      }
 
       channel.subscribe();
       if (disposed) {
@@ -292,6 +317,7 @@ export function useHomeFeed({ onLocation }: Options) {
     requests,
     stories,
     unreadNotifCount,
+    unreadMessagesCount,
     loading,
     loadingMore,
     error,

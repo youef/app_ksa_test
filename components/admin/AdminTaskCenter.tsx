@@ -1,5 +1,7 @@
+import { OasisPressable as Pressable, OasisSurface } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { Flag, Star, AlertTriangle, MessageCircle, ChevronLeft, Inbox } from 'lucide-react-native';
 import { ADMIN_COLORS as C } from './adminStyles';
 import { SupportEmptyState } from '@/components/shared/SupportUI';
@@ -144,7 +146,7 @@ export function AdminTaskCenter({
 
   return (
     <View style={styles.wrap}>
-      <View style={styles.headerCard}>
+      <OasisSurface oasisSurface="card" style={styles.headerCard}>
         <View style={styles.headerTop}>
           <View style={{ flex: 1 }}>
             <Text style={styles.headerTitle}>مركز المهام الموحّد 🎯</Text>
@@ -177,7 +179,7 @@ export function AdminTaskCenter({
             </Text>
           </View>
         ) : null}
-      </View>
+      </OasisSurface>
 
       {tasks.length === 0 ? (
         <SupportEmptyState
@@ -235,20 +237,20 @@ const styles = StyleSheet.create({
   wrap: { paddingHorizontal: 14, paddingTop: 12, gap: 10 },
   headerCard: {
     backgroundColor: C.navyMid,
-    borderRadius: 18,
-    padding: 16,
+    borderRadius: 14,
+    padding: 14,
     gap: 12,
   },
   headerTop: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12 },
-  headerTitle: { fontSize: 16, fontWeight: '900', color: '#FFFFFF', textAlign: 'right' },
+  headerTitle: { fontSize: 16, fontWeight: '700', color: OASIS.colors.surface, textAlign: 'right' },
   headerSub: { fontSize: 11, color: '#94A3B8', textAlign: 'right', marginTop: 3, lineHeight: 17 },
   totalBadge: { width: 62, height: 62, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  totalBadgeNum: { fontSize: 22, fontWeight: '900' },
-  totalBadgeLabel: { fontSize: 10, fontWeight: '800' },
+  totalBadgeNum: { fontSize: 22, fontWeight: '700' },
+  totalBadgeLabel: { fontSize: 11, fontWeight: '600' },
   chipsRow: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 6 },
   chip: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 9 },
   chipDot: { width: 7, height: 7, borderRadius: 4 },
-  chipText: { fontSize: 10.5, fontWeight: '900' },
+  chipText: { fontSize: 11, fontWeight: '700' },
   slaWarning: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
@@ -259,8 +261,8 @@ const styles = StyleSheet.create({
   },
   slaWarningText: { flex: 1, color: '#FECACA', fontSize: 11, textAlign: 'right', lineHeight: 17 },
 
-  empty: { alignItems: 'center', paddingVertical: 44, gap: 8 },
-  emptyTitle: { fontSize: 15, fontWeight: '900', color: C.ink },
+  empty: { alignItems: 'center', paddingVertical: 24, gap: 8 },
+  emptyTitle: { fontSize: 15, fontWeight: '700', color: C.ink },
   emptySub: { fontSize: 12, color: C.muted, textAlign: 'center' },
 
   taskRow: {
@@ -279,12 +281,12 @@ const styles = StyleSheet.create({
   taskBar: { position: 'absolute', right: 0, top: 0, bottom: 0, width: 4 },
   taskIcon: { width: 34, height: 34, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
   taskCopy: { flex: 1, gap: 2, alignItems: 'flex-end', paddingRight: 4 },
-  taskTitle: { fontSize: 12.5, fontWeight: '900', color: C.ink, textAlign: 'right' },
-  taskSub: { fontSize: 10.5, color: C.muted, textAlign: 'right' },
+  taskTitle: { fontSize: 12.5, fontWeight: '700', color: C.ink, textAlign: 'right' },
+  taskSub: { fontSize: 11, color: C.muted, textAlign: 'right' },
   taskRight: { alignItems: 'center', gap: 4 },
   sevPill: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 7 },
-  sevPillText: { fontSize: 9.5, fontWeight: '900' },
-  taskAge: { fontSize: 9.5, color: C.subtle, fontWeight: '700' },
+  sevPillText: { fontSize: 11, fontWeight: '700' },
+  taskAge: { fontSize: 11, color: C.subtle, fontWeight: '700' },
 
   resolveAll: {
     alignSelf: 'center',
@@ -293,7 +295,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 10,
     marginTop: 4,
-    marginBottom: 24,
+    marginBottom: 16,
   },
-  resolveAllText: { color: C.accentDark, fontSize: 12, fontWeight: '900' },
+  resolveAllText: { color: C.accentDark, fontSize: 12, fontWeight: '700' },
 });

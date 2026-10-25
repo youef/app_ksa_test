@@ -1,15 +1,7 @@
+import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
 import { useEffect, useState } from 'react';
-import {
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  ActivityIndicator,
-  Platform,
-} from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, View, ActivityIndicator, Platform } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
@@ -97,7 +89,7 @@ export default function Report() {
       />
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
 
-        <View style={styles.card}>
+        <OasisSurface oasisSurface="card" style={styles.card}>
           <Text style={styles.sectionTitle}>اختر سبب البلاغ:</Text>
 
           <View style={styles.reasonsList}>
@@ -129,35 +121,35 @@ export default function Report() {
             />
           </View>
 
-          <Pressable
+          <Pressable oasisVariant="primary" oasisKind="action"
             style={[styles.submitBtn, submitting && { opacity: 0.6 }]}
             onPress={send}
             disabled={submitting}
           >
             {submitting ? (
-              <ActivityIndicator size="small" color="#fff" />
+              <ActivityIndicator size="small" color={OASIS.colors.surface} />
             ) : (
               <Text style={styles.submitBtnText}>إرسال البلاغ للإدارة</Text>
             )}
           </Pressable>
-        </View>
+        </OasisSurface>
 
         {myReports.length > 0 && (
-          <View style={[styles.card, { marginTop: 16 }]}>
+          <OasisSurface oasisSurface="card" style={[styles.card, { marginTop: 16 }]}>
             <Text style={styles.sectionTitle}>متابعة بلاغاتي</Text>
-            <Text style={{ color: '#64748b', fontSize: 12, textAlign: 'right', marginBottom: 12 }}>حالة آخر البلاغات التي أرسلتها، ولا تظهر هذه القائمة للآخرين.</Text>
+            <Text style={{ color: OASIS.colors.muted, fontSize: 12, textAlign: 'right', marginBottom: 12 }}>حالة آخر البلاغات التي أرسلتها، ولا تظهر هذه القائمة للآخرين.</Text>
             {myReports.map(report => (
-              <View key={report.id} style={{ paddingVertical: 11, borderTopWidth: 1, borderTopColor: '#e2e8f0', gap: 5 }}>
+              <View key={report.id} style={{ paddingVertical: 11, borderTopWidth: 1, borderTopColor: OASIS.colors.line, gap: 5 }}>
                 <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                  <Text style={{ color: '#334155', fontSize: 12, fontWeight: '800', flex: 1, textAlign: 'right' }} numberOfLines={2}>{String(report.reason || '').split(' - تفاصيل:')[0]}</Text>
+                  <Text style={{ color: OASIS.colors.ink, fontSize: 12, fontWeight: '600', flex: 1, textAlign: 'right' }} numberOfLines={2}>{String(report.reason || '').split(' - تفاصيل:')[0]}</Text>
                   <View style={{ backgroundColor: report.status === 'resolved' ? '#dcfce7' : report.status === 'dismissed' || report.status === 'rejected' ? '#fee2e2' : '#fef3c7', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5 }}>
-                    <Text style={{ color: '#334155', fontSize: 10, fontWeight: '900' }}>{reportStatusLabels[report.status] || report.status || 'قيد المراجعة'}</Text>
+                    <Text style={{ color: OASIS.colors.ink, fontSize: 11, fontWeight: '700' }}>{reportStatusLabels[report.status] || report.status || 'قيد المراجعة'}</Text>
                   </View>
                 </View>
-                <Text style={{ color: '#94a3b8', fontSize: 10, textAlign: 'right' }}>{new Date(report.created_at).toLocaleDateString('ar-SA')}</Text>
+                <Text style={{ color: '#94a3b8', fontSize: 11, textAlign: 'right' }}>{new Date(report.created_at).toLocaleDateString('ar-SA')}</Text>
               </View>
             ))}
-          </View>
+          </OasisSurface>
         )}
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -168,15 +160,15 @@ export default function Report() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: OASIS.colors.background,
   },
   scroll: {
-    paddingBottom: 20,
+    paddingBottom: 14,
   },
   hero: {
     paddingTop: Platform.OS === 'ios' ? 52 : 40,
     paddingHorizontal: 20,
-    paddingBottom: 24,
+    paddingBottom: 16,
     borderBottomLeftRadius: 28,
     borderBottomRightRadius: 28,
   },
@@ -190,9 +182,9 @@ const styles = StyleSheet.create({
     padding: 6,
   },
   navTitle: {
-    color: '#fff',
+    color: OASIS.colors.surface,
     fontSize: 18,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   heroSub: {
     color: 'rgba(255,255,255,0.85)',
@@ -201,23 +193,23 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 22,
+    backgroundColor: OASIS.colors.surface,
+    borderRadius: 14,
     marginHorizontal: 16,
     marginTop: -10,
-    padding: 20,
+    padding: 14,
     borderWidth: 1,
     borderColor: '#f1f5f9',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0,
     shadowRadius: 8,
     elevation: 3,
   },
   sectionTitle: {
-    color: '#0f172a',
+    color: OASIS.colors.ink,
     fontSize: 15,
-    fontWeight: '900',
+    fontWeight: '700',
     textAlign: 'right',
     marginBottom: 12,
   },
@@ -229,16 +221,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: '#f8fafc',
+    backgroundColor: OASIS.colors.background,
     paddingHorizontal: 14,
     paddingVertical: 12,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
   },
   reasonOptionActive: {
-    borderColor: '#059669',
-    backgroundColor: '#ecfdf5',
+    borderColor: OASIS.colors.primary,
+    backgroundColor: OASIS.colors.soft,
   },
   radioCircle: {
     width: 20,
@@ -250,62 +242,62 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   radioCircleActive: {
-    borderColor: '#059669',
+    borderColor: OASIS.colors.primary,
   },
   radioInner: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#059669',
+    backgroundColor: OASIS.colors.primary,
   },
   reasonText: {
-    color: '#475569',
+    color: OASIS.colors.muted,
     fontSize: 13,
     fontWeight: '700',
     flex: 1,
     textAlign: 'right',
   },
   reasonTextActive: {
-    color: '#059669',
-    fontWeight: '800',
+    color: OASIS.colors.primary,
+    fontWeight: '600',
   },
   label: {
-    color: '#334155',
+    color: OASIS.colors.ink,
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
     textAlign: 'right',
     marginBottom: 8,
   },
   inputContainer: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: OASIS.colors.background,
     borderRadius: 14,
     padding: 12,
     height: 100,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    marginBottom: 20,
+    borderColor: OASIS.colors.line,
+    marginBottom: 14,
   },
   input: {
-    color: '#0f172a',
+    color: OASIS.colors.ink,
     fontSize: 13,
     textAlign: 'right',
     height: 80,
     textAlignVertical: 'top',
   },
   submitBtn: {
-    backgroundColor: '#dc2626',
+    backgroundColor: OASIS.colors.danger,
     borderRadius: 16,
     paddingVertical: 15,
     alignItems: 'center',
-    shadowColor: '#dc2626',
+    shadowColor: OASIS.colors.danger,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0,
     shadowRadius: 8,
     elevation: 4,
   },
   submitBtnText: {
-    color: '#fff',
+    color: OASIS.colors.surface,
     fontSize: 15,
-    fontWeight: '900',
+    fontWeight: '700',
   },
 });

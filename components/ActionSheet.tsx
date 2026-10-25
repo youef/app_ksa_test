@@ -1,6 +1,7 @@
+import { OasisPressable as Pressable } from '@/components/oasis/OasisPrimitives';
 import React from 'react';
-import { View, StyleSheet, Modal, Pressable, Platform, Dimensions } from 'react-native';
-import type { DimensionValue } from 'react-native';
+import { View, StyleSheet, Modal, Platform, Dimensions } from 'react-native';
+import { DimensionValue } from 'react-native';
 import Animated, { useAnimatedStyle, withSpring, useSharedValue, withTiming, runOnJS } from 'react-native-reanimated';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BlurView } from 'expo-blur';
@@ -104,7 +105,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0,
     shadowRadius: 10,
     elevation: 10,
   },

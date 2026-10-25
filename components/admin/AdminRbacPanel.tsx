@@ -1,5 +1,7 @@
+import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, TextInput, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { ShieldCheck, Plus, X, DatabaseZap, Search, Crown } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { ADMIN_COLORS as C } from './adminStyles';
@@ -117,7 +119,7 @@ export function AdminRbacPanel({ onSaved }: { onSaved: (msg: string) => void }) 
   if (unavailable) {
     return (
       <View style={styles.wrap}>
-        <View style={styles.noticeCard}>
+        <OasisSurface oasisSurface="card" style={styles.noticeCard}>
           <DatabaseZap size={26} color={C.warning} />
           <Text style={styles.noticeTitle}>جداول الأدوار غير مفعّلة بعد</Text>
           <Text style={styles.noticeText}>
@@ -127,7 +129,7 @@ export function AdminRbacPanel({ onSaved }: { onSaved: (msg: string) => void }) 
             {' '}
             في Supabase لتشغيل نظام الأدوار والصلاحيات.
           </Text>
-        </View>
+        </OasisSurface>
       </View>
     );
   }
@@ -140,7 +142,7 @@ export function AdminRbacPanel({ onSaved }: { onSaved: (msg: string) => void }) 
       <Text style={styles.sectionTitle}>الأدوار المتاحة</Text>
       <View style={{ gap: 8 }}>
         {roles.map((r) => (
-          <View key={r.key} style={styles.roleCard}>
+          <OasisSurface oasisSurface="card" key={r.key} style={styles.roleCard}>
             <View style={styles.roleHead}>
               <View style={styles.roleTitleRow}>
                 <Crown size={15} color={C.purple} />
@@ -158,12 +160,12 @@ export function AdminRbacPanel({ onSaved }: { onSaved: (msg: string) => void }) 
                   </View>
                 ))}
             </View>
-          </View>
+          </OasisSurface>
         ))}
       </View>
 
       {/* Assign */}
-      <View style={styles.card}>
+      <OasisSurface oasisSurface="card" style={styles.card}>
         <Text style={styles.sectionTitle}>إسناد دور لمستخدم</Text>
         <View style={styles.inputRow}>
           <TextInput
@@ -175,8 +177,8 @@ export function AdminRbacPanel({ onSaved }: { onSaved: (msg: string) => void }) 
             style={styles.input}
             returnKeyType="search"
           />
-          <Pressable style={styles.searchBtn} onPress={searchUsers}>
-            <Search size={16} color="#fff" />
+          <Pressable oasisKind="icon" style={styles.searchBtn} onPress={searchUsers}>
+            <Search size={16} color={OASIS.colors.surface} />
           </Pressable>
         </View>
 
@@ -201,24 +203,24 @@ export function AdminRbacPanel({ onSaved }: { onSaved: (msg: string) => void }) 
                   style={[styles.rolePick, selectedRole === r.key && { backgroundColor: C.accent, borderColor: C.accent }]}
                   onPress={() => setSelectedRole(r.key)}
                 >
-                  <Text style={[styles.rolePickText, selectedRole === r.key && { color: '#fff' }]}>{r.label}</Text>
+                  <Text style={[styles.rolePickText, selectedRole === r.key && { color: OASIS.colors.surface }]}>{r.label}</Text>
                 </Pressable>
               ))}
             </View>
-            <Pressable
+            <Pressable oasisKind="action"
               style={[styles.assignBtn, (!selectedRole || busy) && { opacity: 0.5 }]}
               onPress={assign}
               disabled={!selectedRole || busy}
             >
-              <Plus size={15} color="#fff" />
+              <Plus size={15} color={OASIS.colors.surface} />
               <Text style={styles.assignText}>إسناد الدور</Text>
             </Pressable>
           </>
         ) : null}
-      </View>
+      </OasisSurface>
 
       {/* Assignments */}
-      <View style={styles.card}>
+      <OasisSurface oasisSurface="card" style={styles.card}>
         <Text style={styles.sectionTitle}>الأدوار المُسنَدة ({assignments.length})</Text>
         {assignments.length === 0 ? (
           <Text style={styles.emptyText}>لا توجد أدوار مُسنَدة بعد.</Text>
@@ -232,51 +234,51 @@ export function AdminRbacPanel({ onSaved }: { onSaved: (msg: string) => void }) 
                   <Text style={styles.assignRoleText}>{roleLabel(a.role_key)}</Text>
                 </View>
               </View>
-              <Pressable style={styles.revokeBtn} onPress={() => revoke(a)} disabled={busy}>
+              <Pressable oasisKind="icon" style={styles.revokeBtn} onPress={() => revoke(a)} disabled={busy}>
                 <X size={14} color={C.danger} />
               </Pressable>
             </View>
           ))
         )}
-      </View>
+      </OasisSurface>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { padding: 14, gap: 12, paddingBottom: 40 },
+  wrap: { padding: 14, gap: 12, paddingBottom: 24 },
   center: { paddingVertical: 60, alignItems: 'center' },
-  sectionTitle: { fontSize: 13.5, fontWeight: '900', color: C.ink, textAlign: 'right', marginBottom: 4 },
+  sectionTitle: { fontSize: 13.5, fontWeight: '700', color: C.ink, textAlign: 'right', marginBottom: 4 },
   card: { backgroundColor: C.card, borderRadius: 16, borderWidth: 1, borderColor: C.border, padding: 14, gap: 10 },
   roleCard: { backgroundColor: C.card, borderRadius: 14, borderWidth: 1, borderColor: C.border, padding: 12, gap: 6 },
   roleHead: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between' },
   roleTitleRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
-  roleName: { fontSize: 13.5, fontWeight: '900', color: C.ink },
-  roleKey: { fontSize: 10, color: C.subtle, fontWeight: '700' },
+  roleName: { fontSize: 13.5, fontWeight: '700', color: C.ink },
+  roleKey: { fontSize: 11, color: C.subtle, fontWeight: '700' },
   roleDesc: { fontSize: 11, color: C.muted, textAlign: 'right', lineHeight: 17 },
   permRow: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 6 },
   permChip: { backgroundColor: C.purpleLight, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
-  permChipText: { fontSize: 10, fontWeight: '800', color: C.purple },
+  permChipText: { fontSize: 11, fontWeight: '600', color: C.purple },
   inputRow: { flexDirection: 'row-reverse', gap: 8 },
   input: { flex: 1, backgroundColor: C.bg, borderRadius: 12, borderWidth: 1, borderColor: C.border, paddingHorizontal: 12, paddingVertical: 10, fontSize: 12.5, color: C.ink, textAlign: 'right' },
   searchBtn: { width: 44, borderRadius: 12, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' },
   candidate: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10 },
-  candidateName: { fontSize: 12.5, fontWeight: '800', color: C.ink, textAlign: 'right' },
-  candidateSub: { fontSize: 10.5, color: C.muted },
-  picked: { fontSize: 12, fontWeight: '800', color: C.accentDark, textAlign: 'right' },
+  candidateName: { fontSize: 12.5, fontWeight: '600', color: C.ink, textAlign: 'right' },
+  candidateSub: { fontSize: 11, color: C.muted },
+  picked: { fontSize: 12, fontWeight: '600', color: C.accentDark, textAlign: 'right' },
   rolePick: { borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 7 },
-  rolePickText: { fontSize: 11, fontWeight: '800', color: C.inkMuted },
+  rolePickText: { fontSize: 11, fontWeight: '600', color: C.inkMuted },
   assignBtn: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: C.accent, borderRadius: 12, paddingVertical: 12 },
-  assignText: { color: '#fff', fontSize: 13, fontWeight: '900' },
+  assignText: { color: OASIS.colors.surface, fontSize: 13, fontWeight: '700' },
   assignRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', backgroundColor: C.bg, borderRadius: 12, padding: 10 },
   assignInfo: { flex: 1, gap: 4, alignItems: 'flex-end' },
-  assignName: { fontSize: 12.5, fontWeight: '800', color: C.ink, textAlign: 'right' },
+  assignName: { fontSize: 12.5, fontWeight: '600', color: C.ink, textAlign: 'right' },
   assignRoleChip: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, backgroundColor: C.accentLight, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
-  assignRoleText: { fontSize: 10, fontWeight: '800', color: C.accentDark },
+  assignRoleText: { fontSize: 11, fontWeight: '600', color: C.accentDark },
   revokeBtn: { width: 34, height: 34, borderRadius: 10, backgroundColor: C.dangerLight, alignItems: 'center', justifyContent: 'center' },
   emptyText: { fontSize: 12, color: C.muted, textAlign: 'right' },
   noticeCard: { backgroundColor: C.warningLight, borderRadius: 16, padding: 18, alignItems: 'center', gap: 8 },
-  noticeTitle: { fontSize: 14, fontWeight: '900', color: '#92400E', textAlign: 'center' },
+  noticeTitle: { fontSize: 14, fontWeight: '700', color: '#92400E', textAlign: 'center' },
   noticeText: { fontSize: 12, color: '#92400E', textAlign: 'center', lineHeight: 20 },
-  code: { fontWeight: '900', color: '#7C2D12' },
+  code: { fontWeight: '700', color: '#7C2D12' },
 });

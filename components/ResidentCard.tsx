@@ -1,5 +1,7 @@
+import { OasisPressable as Pressable } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
 import React from 'react';
-import { View, Text, StyleSheet, Dimensions, Animated, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ShieldCheck, QrCode } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
@@ -18,7 +20,7 @@ export default function ResidentCard({ name, district, city, isVerified, onPress
   return (
     <View style={styles.cardContainer}>
       <LinearGradient
-        colors={isVerified ? ['#052E16', '#065F46', '#10B981'] : ['#1E293B', '#334155', '#475569']}
+        colors={isVerified ? ['#052E16', OASIS.colors.deep, OASIS.colors.primary] : [OASIS.colors.ink, OASIS.colors.ink, OASIS.colors.muted]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.card}
@@ -50,16 +52,16 @@ export default function ResidentCard({ name, district, city, isVerified, onPress
             <View style={styles.badgeContainer}>
               {isVerified ? (
                 <>
-                  <ShieldCheck size={20} color="#D1FAE5" />
+                  <ShieldCheck size={20} color={OASIS.colors.soft} />
                   <Text style={styles.badgeText}>ابن الحي المعتمد</Text>
                 </>
               ) : (
                 <Text style={styles.badgeTextUnverified}>غير موثق</Text>
               )}
             </View>
-            
-            <Pressable onPress={onPressQR} style={styles.qrButton}>
-              <QrCode size={40} color="#fff" strokeWidth={1.5} />
+
+            <Pressable oasisKind="icon" onPress={onPressQR} style={styles.qrButton}>
+              <QrCode size={40} color={OASIS.colors.surface} strokeWidth={1.5} />
             </Pressable>
           </View>
         </BlurView>
@@ -75,18 +77,18 @@ const styles = StyleSheet.create({
     marginVertical: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0,
     shadowRadius: 16,
     elevation: 15,
   },
   card: {
-    borderRadius: 24,
+    borderRadius: 14,
     height: 200,
     overflow: 'hidden',
   },
   glassOverlay: {
     flex: 1,
-    padding: 20,
+    padding: 14,
     justifyContent: 'space-between',
   },
   headerRow: {
@@ -97,7 +99,7 @@ const styles = StyleSheet.create({
   emblemContainer: {
     width: 48,
     height: 48,
-    borderRadius: 24,
+    borderRadius: 14,
     backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -105,20 +107,20 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.3)',
   },
   emblem: {
-    fontSize: 24,
+    fontSize: 20,
   },
   brandContainer: {
     alignItems: 'flex-start',
   },
   brandTitle: {
-    color: '#fff',
+    color: OASIS.colors.surface,
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '600',
     letterSpacing: 0.5,
   },
   brandSubtitle: {
     color: 'rgba(255,255,255,0.7)',
-    fontSize: 10,
+    fontSize: 11,
     letterSpacing: 1,
     marginTop: 2,
   },
@@ -126,9 +128,9 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   userName: {
-    color: '#fff',
-    fontSize: 26,
-    fontWeight: '800',
+    color: OASIS.colors.surface,
+    fontSize: 20,
+    fontWeight: '600',
     marginBottom: 4,
   },
   locationRow: {
@@ -161,13 +163,13 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.2)',
   },
   badgeText: {
-    color: '#D1FAE5',
+    color: OASIS.colors.soft,
     fontWeight: '700',
     fontSize: 13,
     marginLeft: 6,
   },
   badgeTextUnverified: {
-    color: '#E2E8F0',
+    color: OASIS.colors.line,
     fontWeight: '600',
     fontSize: 13,
   },

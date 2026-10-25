@@ -1,5 +1,8 @@
+import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
+import { AppHeader, HeaderAction, useAppHeaderHeight } from '@/components/shared/AppHeader';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Modal, PanResponder, Platform, Pressable, ScrollView, Share, StatusBar, Text, TextInput, View, type GestureResponderHandlers } from 'react-native';
+import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Modal, PanResponder, Platform, ScrollView, Share, StatusBar, Text, View, type GestureResponderHandlers } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '@/lib/supabase';
@@ -44,6 +47,7 @@ type Supporter = { user: AudienceMember; gifts: number };
 type HostSheetTab = 'comments' | 'guests' | 'requests';
 
 export default function LiveRoomScreen() {
+  const appHeaderHeight = useAppHeaderHeight();
   const { id, role: roleParam } = useLocalSearchParams<{ id: string; role?: string }>();
   const insets = useSafeAreaInsets();
   const [stream, setStream] = useState<LiveStream | null>(null);
@@ -685,7 +689,7 @@ export default function LiveRoomScreen() {
 
   if (loading) return <View style={styles.loadingScreen}><StatusBar hidden /><ActivityIndicator size="large" color="#34d399" /><Text style={styles.loadingText}>جارٍ تجهيز البث…</Text></View>;
   if (ending) return <EndedOverlay reason={endReason} countdown={endCountdown} hostName={hostName} nextStream={nextStream} noMoreStreams={noMoreStreams} onNext={goToNextStream} onBrowse={() => router.replace('/lives')} panHandlers={endSwipe.panHandlers} />;
-  if (error || !stream) return <View style={styles.errorScreen}><StatusBar hidden /><View style={styles.errorIcon}><Radio color="#fff" size={30} /></View><Text style={styles.errorTitle}>{error || 'تعذر فتح البث'}</Text><Text style={styles.errorHint}>تأكد من الاتصال بالإنترنت وحاول مرة أخرى.</Text><Pressable onPress={() => router.replace('/lives')} style={styles.returnButton}><Text style={styles.returnText}>العودة للبثوث</Text></Pressable></View>;
+  if (error || !stream) return <View style={styles.errorScreen}><StatusBar hidden /><View style={styles.errorIcon}><Radio color={OASIS.colors.surface} size={30} /></View><Text style={styles.errorTitle}>{error || 'تعذر فتح البث'}</Text><Text style={styles.errorHint}>تأكد من الاتصال بالإنترنت وحاول مرة أخرى.</Text><Pressable oasisKind="action" onPress={() => router.replace('/lives')} style={styles.returnButton}><Text style={styles.returnText}>العودة للبثوث</Text></Pressable></View>;
 
   return (
     <View style={styles.screen}>
@@ -729,9 +733,7 @@ export default function LiveRoomScreen() {
 
         {overlayVisible ? (
           <>
-            <View pointerEvents="box-none" style={[styles.topBar, { top: Math.max(insets.top, 12) }]}>
-              <Pressable accessibilityLabel="إغلاق البث" onPress={() => void handleBack()} style={styles.roundButton}><X color="#fff" size={21} /></Pressable>
-              <View style={styles.topCenter}>
+            <AppHeader tone="overlay" title="بث مباشر" fallbackRoute="/lives" onBackPress={() => { void handleBack(); }} style={{position: 'absolute', top: 0}} titleContent={<View style={styles.topCenter}>
                 <View style={styles.livePill}><View style={styles.redDot} /><Text style={styles.liveText}>مباشر</Text></View>
                 {connection === 'connected' && quality !== 'unknown' && (
                   <View style={styles.qualityPill}>
@@ -739,13 +741,11 @@ export default function LiveRoomScreen() {
                     <Text style={styles.qualityText}>{quality === 'excellent' ? 'جودة ممتازة' : quality === 'good' ? 'جودة جيدة' : 'جودة ضعيفة'}</Text>
                   </View>
                 )}
-              </View>
-              <Pressable onPress={() => setPeoplePanel('viewers')} style={styles.viewerPill}><Users color="#fff" size={14} /><Text style={styles.viewerCount}>{viewerCount}</Text></Pressable>
-            </View>
+              </View>} rightAction={<HeaderAction tone="overlay" accessibilityLabel="مشاهدو البث" onPress={() => setPeoplePanel('viewers')}><Users color={OASIS.colors.surface} size={17}/><Text style={styles.viewerCount}>{viewerCount}</Text></HeaderAction>} />
 
-            <View pointerEvents="box-none" style={[styles.hostOverlay, { top: Math.max(insets.top, 12) + 52 }]}>
+            <View pointerEvents="box-none" style={[styles.hostOverlay, { top: appHeaderHeight + 8 }]}>
               <View style={styles.hostMeta}>
-                {stream.profiles?.avatar_url ? <Image source={{ uri: stream.profiles.avatar_url }} style={styles.hostAvatar} /> : <View style={styles.hostAvatarFallback}><Text style={{ color: '#047857', fontWeight: '900' }}>ح</Text></View>}
+                {stream.profiles?.avatar_url ? <Image source={{ uri: stream.profiles.avatar_url }} style={styles.hostAvatar} /> : <View style={styles.hostAvatarFallback}><Text style={{ color: OASIS.colors.primary, fontWeight: '700' }}>ح</Text></View>}
                 <View style={{ alignItems: 'flex-end', maxWidth: 175 }}>
                   <View style={styles.hostNameRow}>
                     <Text numberOfLines={1} style={styles.hostName}>{hostName}</Text>
@@ -754,13 +754,13 @@ export default function LiveRoomScreen() {
                   </View>
                   <Text numberOfLines={1} style={styles.hostTitle}>{stream.title}</Text>
                 </View>
-                {role !== 'host' && <Pressable onPress={() => void toggleFollow()} style={styles.followButton}><Text style={styles.followText}>{isFollowing ? 'تتابع' : 'متابعة +'}</Text></Pressable>}
+                {role !== 'host' && <Pressable oasisKind="action" onPress={() => void toggleFollow()} style={styles.followButton}><Text style={styles.followText}>{isFollowing ? 'تتابع' : 'متابعة +'}</Text></Pressable>}
               </View>
-              {role === 'host' ? <Pressable onPress={confirmEnd} style={styles.endButton}><Text style={styles.endText}>إنهاء</Text></Pressable> : <Pressable onPress={showReport} style={styles.roundButton}><MoreHorizontal color="#fff" size={20} /></Pressable>}
+              {role === 'host' ? <Pressable oasisKind="action" onPress={confirmEnd} style={styles.endButton}><Text style={styles.endText}>إنهاء</Text></Pressable> : <Pressable oasisKind="icon" onPress={showReport} style={styles.roundButton}><MoreHorizontal color={OASIS.colors.surface} size={20} /></Pressable>}
             </View>
 
             {topSupporters.length > 0 && (
-              <Pressable onPress={() => setPeoplePanel('supporters')} style={[styles.supportersPill, { top: Math.max(insets.top, 12) + 104 }]}>
+              <Pressable oasisKind="chip" onPress={() => setPeoplePanel('supporters')} style={[styles.supportersPill, { top: appHeaderHeight + 60 }]}>
                 <Trophy size={14} color="#fde68a" />
                 <Text numberOfLines={1} style={styles.supportersPillText}>الأكثر دعمًا: {topSupporters[0].user.display_name || topSupporters[0].user.username}</Text>
               </Pressable>
@@ -769,18 +769,18 @@ export default function LiveRoomScreen() {
         ) : (
           <View pointerEvents="box-none" style={[styles.hiddenBar, { top: Math.max(insets.top, 12) }]}>
             {role === 'host' ? (
-              <Pressable onPress={confirmEnd} style={styles.emergencyButton}><Radio color="#fff" size={16} /><Text style={styles.emergencyText}>إنهاء</Text></Pressable>
+              <Pressable oasisKind="action" onPress={confirmEnd} style={styles.emergencyButton}><Radio color={OASIS.colors.surface} size={16} /><Text style={styles.emergencyText}>إنهاء</Text></Pressable>
             ) : <View style={styles.roundButtonSpacer} />}
-            <Pressable onPress={() => setOverlayVisible(true)} style={styles.hiddenHint}><Eye size={15} color="#fff" /><Text style={styles.hiddenHintText}>اضغط لإظهار الواجهة</Text></Pressable>
+            <Pressable onPress={() => setOverlayVisible(true)} style={styles.hiddenHint}><Eye size={15} color={OASIS.colors.surface} /><Text style={styles.hiddenHintText}>اضغط لإظهار الواجهة</Text></Pressable>
             <View style={styles.roundButtonSpacer} />
           </View>
         )}
 
         {connection === 'reconnecting' && (
-          <View pointerEvents="none" style={styles.connectionBanner}><ActivityIndicator color="#fff" size="small" /><Text style={styles.connectionBannerText}>جارٍ إعادة الاتصال…</Text></View>
+          <View pointerEvents="none" style={styles.connectionBanner}><ActivityIndicator color={OASIS.colors.surface} size="small" /><Text style={styles.connectionBannerText}>جارٍ إعادة الاتصال…</Text></View>
         )}
         {connection === 'connecting' && !connected && (
-          <View pointerEvents="none" style={styles.connectionBanner}><ActivityIndicator color="#fff" size="small" /><Text style={styles.connectionBannerText}>جارٍ الاتصال…</Text></View>
+          <View pointerEvents="none" style={styles.connectionBanner}><ActivityIndicator color={OASIS.colors.surface} size="small" /><Text style={styles.connectionBannerText}>جارٍ الاتصال…</Text></View>
         )}
 
         {mediaAlerts.length > 0 && (
@@ -802,7 +802,7 @@ export default function LiveRoomScreen() {
             <Pressable style={styles.peopleSheet} onPress={(event) => event.stopPropagation()}>
               <View style={styles.peopleSheetHeader}>
                 <Text style={styles.peopleSheetTitle}>{peoplePanel === 'supporters' ? 'أكثر الداعمين' : `المشاهدون (${viewerCount})`}</Text>
-                <Pressable onPress={() => setPeoplePanel(null)} style={styles.modalClose}><X color="#fff" size={19} /></Pressable>
+                <Pressable onPress={() => setPeoplePanel(null)} style={styles.modalClose}><X color={OASIS.colors.surface} size={19} /></Pressable>
               </View>
               <View style={styles.peopleTabs}>
                 <Pressable onPress={() => setPeoplePanel('viewers')} style={[styles.peopleTab, peoplePanel === 'viewers' && styles.peopleTabActive]}><Text style={styles.peopleTabText}>المشاهدون</Text></Pressable>
@@ -836,7 +836,7 @@ export default function LiveRoomScreen() {
             <Pressable style={styles.hostSheet} onPress={(event) => event.stopPropagation()}>
               <View style={styles.peopleSheetHeader}>
                 <Text style={styles.peopleSheetTitle}>أدوات المضيف</Text>
-                <Pressable onPress={() => setHostSheet(null)} style={styles.modalClose}><X color="#fff" size={19} /></Pressable>
+                <Pressable onPress={() => setHostSheet(null)} style={styles.modalClose}><X color={OASIS.colors.surface} size={19} /></Pressable>
               </View>
               <View style={styles.peopleTabs}>
                 <Pressable onPress={() => setHostSheet('comments')} style={[styles.peopleTab, hostSheet === 'comments' && styles.peopleTabActive]}><Text style={styles.peopleTabText}>التعليقات</Text></Pressable>
@@ -850,13 +850,13 @@ export default function LiveRoomScreen() {
                       <Text style={styles.hostCommentName}>{message.profiles?.display_name || message.profiles?.username || 'جارٍ'}</Text>
                       <Text numberOfLines={2} style={styles.hostCommentBody}>{message.body}</Text>
                     </View>
-                    <Pressable onPress={() => void pinMessage(message)} style={[styles.hostAction, message.is_pinned && styles.hostActionActive]}><Pin size={15} color={message.is_pinned ? '#020617' : '#fff'} /></Pressable>
-                    <Pressable onPress={() => void hideMessage(message)} style={styles.hostActionDanger}><EyeOff size={15} color="#fff" /></Pressable>
+                    <Pressable onPress={() => void pinMessage(message)} style={[styles.hostAction, message.is_pinned && styles.hostActionActive]}><Pin size={15} color={message.is_pinned ? OASIS.colors.live : OASIS.colors.surface} /></Pressable>
+                    <Pressable onPress={() => void hideMessage(message)} style={styles.hostActionDanger}><EyeOff size={15} color={OASIS.colors.surface} /></Pressable>
                   </View>
                 ))}
                 {hostSheet === 'comments' && messages.length === 0 && <Text style={styles.peopleEmpty}>لا توجد تعليقات بعد.</Text>}
                 {hostSheet === 'guests' && (
-                  <Pressable onPress={() => void openInviteSheet()} style={styles.inviteRowButton}><UserPlus size={15} color="#a7f3d0" /><Text style={styles.inviteRowButtonText}>دعوة صديق للصعود</Text></Pressable>
+                  <Pressable oasisKind="action" onPress={() => void openInviteSheet()} style={styles.inviteRowButton}><UserPlus size={15} color="#a7f3d0" /><Text style={styles.inviteRowButtonText}>دعوة صديق للصعود</Text></Pressable>
                 )}
                 {hostSheet === 'guests' && (
                   <View style={styles.seatLimitRow}>
@@ -873,17 +873,17 @@ export default function LiveRoomScreen() {
                   <View key={guest.id} style={styles.peopleRow}>
                     {guest.profiles?.avatar_url ? <Image source={{ uri: guest.profiles.avatar_url }} style={styles.peopleAvatar} /> : <View style={styles.peopleAvatarFallback}><Text style={styles.peopleInitial}>{(guest.profiles?.display_name || guest.profiles?.username || 'ح').slice(0, 1)}</Text></View>}
                     <Text numberOfLines={1} style={styles.peopleName}>{guestIndex + 1}. {guest.profiles?.display_name || guest.profiles?.username || 'ضيف'}</Text>
-                    <Pressable accessibilityLabel="رفع ترتيب الضيف" disabled={guestIndex === 0} onPress={() => void moveGuest(guest, -1)} style={[styles.hostAction, guestIndex === 0 && { opacity: 0.35 }]}><ChevronUp size={15} color="#fff" /></Pressable>
-                    <Pressable accessibilityLabel="خفض ترتيب الضيف" disabled={guestIndex === guests.length - 1} onPress={() => void moveGuest(guest, 1)} style={[styles.hostAction, guestIndex === guests.length - 1 && { opacity: 0.35 }]}><ChevronDown size={15} color="#fff" /></Pressable>
-                    <Pressable onPress={() => void toggleGuestMute(guest)} style={[styles.hostAction, guest.is_muted && styles.hostActionActive]}>{guest.is_muted ? <MicOff size={15} color="#020617" /> : <Mic size={15} color="#fff" />}</Pressable>
-                    <Pressable onPress={() => removeGuest(guest)} style={styles.hostActionDanger}><UserMinus size={15} color="#fff" /></Pressable>
+                    <Pressable accessibilityLabel="رفع ترتيب الضيف" disabled={guestIndex === 0} onPress={() => void moveGuest(guest, -1)} style={[styles.hostAction, guestIndex === 0 && { opacity: 0.35 }]}><ChevronUp size={15} color={OASIS.colors.surface} /></Pressable>
+                    <Pressable accessibilityLabel="خفض ترتيب الضيف" disabled={guestIndex === guests.length - 1} onPress={() => void moveGuest(guest, 1)} style={[styles.hostAction, guestIndex === guests.length - 1 && { opacity: 0.35 }]}><ChevronDown size={15} color={OASIS.colors.surface} /></Pressable>
+                    <Pressable onPress={() => void toggleGuestMute(guest)} style={[styles.hostAction, guest.is_muted && styles.hostActionActive]}>{guest.is_muted ? <MicOff size={15} color={OASIS.colors.live} /> : <Mic size={15} color={OASIS.colors.surface} />}</Pressable>
+                    <Pressable onPress={() => removeGuest(guest)} style={styles.hostActionDanger}><UserMinus size={15} color={OASIS.colors.surface} /></Pressable>
                   </View>
                 ))}
                 {hostSheet === 'guests' && guests.length === 0 && <Text style={styles.peopleEmpty}>لا يوجد ضيوف في البث الآن.</Text>}
                 {hostSheet === 'requests' && (
                   <View style={styles.hostPanelHeader}>
                     <Text style={styles.hostPanelTitle}>طابور طلبات الصعود</Text>
-                    <Pressable onPress={() => void openInviteSheet()} style={styles.hostPanelCta}><UserPlus size={14} color="#fff" /><Text style={styles.hostPanelCtaText}>دعوة صديق</Text></Pressable>
+                    <Pressable onPress={() => void openInviteSheet()} style={styles.hostPanelCta}><UserPlus size={14} color={OASIS.colors.surface} /><Text style={styles.hostPanelCtaText}>دعوة صديق</Text></Pressable>
                   </View>
                 )}
                 {hostSheet === 'requests' && pendingRequests.map((request, index) => (
@@ -894,8 +894,8 @@ export default function LiveRoomScreen() {
                       <Text numberOfLines={1} style={styles.peopleName}>{request.profiles?.display_name || request.profiles?.username || 'مستخدم'}</Text>
                       {request.created_at && <Text style={styles.requestWait}>بانتظار {waitingLabel(request.created_at)}</Text>}
                     </View>
-                    <Pressable accessibilityLabel="قبول" onPress={() => void decideGuest(request, 'accepted')} style={styles.acceptButton}><Check color="#fff" size={15} /></Pressable>
-                    <Pressable accessibilityLabel="رفض" onPress={() => void decideGuest(request, 'rejected')} style={styles.rejectButton}><X color="#fff" size={15} /></Pressable>
+                    <Pressable oasisKind="icon" accessibilityLabel="قبول" onPress={() => void decideGuest(request, 'accepted')} style={styles.acceptButton}><Check color={OASIS.colors.surface} size={15} /></Pressable>
+                    <Pressable oasisKind="icon" accessibilityLabel="رفض" onPress={() => void decideGuest(request, 'rejected')} style={styles.rejectButton}><X color={OASIS.colors.surface} size={15} /></Pressable>
                   </View>
                 ))}
                 {hostSheet === 'requests' && pendingRequests.length === 0 && <Text style={styles.peopleEmpty}>لا توجد طلبات صعود الآن. يمكنك دعوة صديق مباشرة.</Text>}
@@ -909,7 +909,7 @@ export default function LiveRoomScreen() {
             <Pressable style={styles.hostSheet} onPress={(event) => event.stopPropagation()}>
               <View style={styles.peopleSheetHeader}>
                 <Text style={styles.peopleSheetTitle}>دعوة ضيف</Text>
-                <Pressable onPress={() => setInviteOpen(false)} style={styles.modalClose}><X color="#fff" size={19} /></Pressable>
+                <Pressable onPress={() => setInviteOpen(false)} style={styles.modalClose}><X color={OASIS.colors.surface} size={19} /></Pressable>
               </View>
               <Text style={styles.hostPanelHint}>اختر شخصًا من متابَعيك لدعوته للصعود كضيف على الهواء.</Text>
               <ScrollView style={styles.hostSheetList}>
@@ -917,7 +917,7 @@ export default function LiveRoomScreen() {
                   <View key={person.id} style={styles.peopleRow}>
                     {person.avatar_url ? <Image source={{ uri: person.avatar_url }} style={styles.peopleAvatar} /> : <View style={styles.peopleAvatarFallback}><Text style={styles.peopleInitial}>{(person.display_name || person.username || 'ح').slice(0, 1)}</Text></View>}
                     <Text numberOfLines={1} style={styles.peopleName}>{person.display_name || person.username || 'صديق'}</Text>
-                    <Pressable disabled={inviteBusy === person.id} onPress={() => void invitePerson(person)} style={[styles.invitePersonButton, inviteBusy === person.id && { opacity: 0.5 }]}><UserPlus size={15} color="#fff" /><Text style={styles.invitePersonText}>دعوة</Text></Pressable>
+                    <Pressable oasisKind="action" disabled={inviteBusy === person.id} onPress={() => void invitePerson(person)} style={[styles.invitePersonButton, inviteBusy === person.id && { opacity: 0.5 }]}><UserPlus size={15} color={OASIS.colors.surface} /><Text style={styles.invitePersonText}>دعوة</Text></Pressable>
                   </View>
                 ))}
                 {inviteCandidates.length === 0 && <Text style={styles.peopleEmpty}>لا يوجد متابَعون بعد. تابع أحدهم أولًا لتدعوه.</Text>}
@@ -949,14 +949,14 @@ export default function LiveRoomScreen() {
             {role === 'host' && controlsOpen && pendingRequests.length > 0 && (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.requestRow}>
                 {pendingRequests.map((request) => (
-                  <View key={request.id} style={styles.requestCard}>
+                  <OasisSurface oasisSurface="card" key={request.id} style={styles.requestCard}>
                     <Text style={styles.requestName}>{request.profiles?.display_name || request.profiles?.username || 'مستخدم'} يطلب الصعود</Text>
                     {request.created_at && <Text style={styles.requestWait}>بانتظار {waitingLabel(request.created_at)}</Text>}
-                    <Pressable accessibilityLabel="قبول" onPress={() => void decideGuest(request, 'accepted')} style={styles.acceptButton}><Check color="#fff" size={15} /></Pressable>
-                    <Pressable accessibilityLabel="رفض" onPress={() => void decideGuest(request, 'rejected')} style={styles.rejectButton}><X color="#fff" size={15} /></Pressable>
-                  </View>
+                    <Pressable oasisKind="icon" accessibilityLabel="قبول" onPress={() => void decideGuest(request, 'accepted')} style={styles.acceptButton}><Check color={OASIS.colors.surface} size={15} /></Pressable>
+                    <Pressable oasisKind="icon" accessibilityLabel="رفض" onPress={() => void decideGuest(request, 'rejected')} style={styles.rejectButton}><X color={OASIS.colors.surface} size={15} /></Pressable>
+                  </OasisSurface>
                 ))}
-                <Pressable onPress={() => void openInviteSheet()} style={styles.requestInviteButton}><UserPlus size={15} color="#fff" /><Text style={styles.requestInviteText}>دعوة صديق</Text></Pressable>
+                <Pressable oasisKind="action" onPress={() => void openInviteSheet()} style={styles.requestInviteButton}><UserPlus size={15} color={OASIS.colors.surface} /><Text style={styles.requestInviteText}>دعوة صديق</Text></Pressable>
               </ScrollView>
             )}
 
@@ -1012,25 +1012,25 @@ export default function LiveRoomScreen() {
                   </View>
                 )}
                 <View style={[styles.actionRow, { paddingBottom: Math.max(insets.bottom, 10) }]}>
-                  <Pressable onPress={() => setShowReactions((value) => !value)} style={[styles.actionButton, showReactions && styles.actionButtonActive]}><Heart size={22} color="#fff" fill="#fb7185" /><Text style={styles.actionLabel}>تفاعل</Text></Pressable>
-                  <Pressable onPress={() => void sendGift()} style={styles.actionButton}><Gift size={21} color="#fde68a" /><Text style={styles.actionLabel}>هدية</Text></Pressable>
-                  <Pressable onPress={() => setShowChat((value) => !value)} style={styles.actionButton}><MessageCircle size={20} color="#fff" /><Text style={styles.actionLabel}>{showChat ? 'إخفاء' : 'التعليقات'}</Text></Pressable>
-                  <Pressable onPress={() => setOverlayVisible(false)} style={styles.actionButton}><EyeOff size={20} color="#fff" /><Text style={styles.actionLabel}>وضع</Text></Pressable>
+                  <Pressable oasisKind="action" onPress={() => setShowReactions((value) => !value)} style={[styles.actionButton, showReactions && styles.actionButtonActive]}><Heart size={22} color={OASIS.colors.surface} fill="#fb7185" /><Text style={styles.actionLabel}>تفاعل</Text></Pressable>
+                  <Pressable oasisKind="action" onPress={() => void sendGift()} style={styles.actionButton}><Gift size={21} color="#fde68a" /><Text style={styles.actionLabel}>هدية</Text></Pressable>
+                  <Pressable oasisKind="action" onPress={() => setShowChat((value) => !value)} style={styles.actionButton}><MessageCircle size={20} color={OASIS.colors.surface} /><Text style={styles.actionLabel}>{showChat ? 'إخفاء' : 'التعليقات'}</Text></Pressable>
+                  <Pressable oasisKind="action" onPress={() => setOverlayVisible(false)} style={styles.actionButton}><EyeOff size={20} color={OASIS.colors.surface} /><Text style={styles.actionLabel}>وضع</Text></Pressable>
                   {guestState !== 'accepted' && (
-                    <Pressable disabled={guestState !== 'idle'} onPress={startGuestRequest} style={[styles.actionButton, guestState !== 'idle' && { opacity: 0.7 }]}><UserPlus size={21} color="#fff" /><Text style={styles.actionLabel}>{guestState === 'pending' ? 'بانتظار المضيف' : 'اطلب الصعود'}</Text></Pressable>
+                    <Pressable oasisKind="action" disabled={guestState !== 'idle'} onPress={startGuestRequest} style={[styles.actionButton, guestState !== 'idle' && { opacity: 0.7 }]}><UserPlus size={21} color={OASIS.colors.surface} /><Text style={styles.actionLabel}>{guestState === 'pending' ? 'بانتظار المضيف' : 'اطلب الصعود'}</Text></Pressable>
                   )}
-                  {moderatorPermissions && <Pressable onPress={() => setModerationOpen(true)} style={styles.actionButton}><ShieldAlert size={20} color="#a7f3d0" /><Text style={styles.actionLabel}>إشراف</Text></Pressable>}
-                  <Pressable onPress={showReport} style={styles.actionButton}><ShieldAlert size={20} color="#fff" /><Text style={styles.actionLabel}>إبلاغ</Text></Pressable>
-                  <Pressable onPress={() => void shareLive()} style={styles.actionButton}><Share2 size={19} color="#fff" /><Text style={styles.actionLabel}>مشاركة</Text></Pressable>
+                  {moderatorPermissions && <Pressable oasisKind="action" onPress={() => setModerationOpen(true)} style={styles.actionButton}><ShieldAlert size={20} color="#a7f3d0" /><Text style={styles.actionLabel}>إشراف</Text></Pressable>}
+                  <Pressable oasisKind="action" onPress={showReport} style={styles.actionButton}><ShieldAlert size={20} color={OASIS.colors.surface} /><Text style={styles.actionLabel}>إبلاغ</Text></Pressable>
+                  <Pressable oasisKind="action" onPress={() => void shareLive()} style={styles.actionButton}><Share2 size={19} color={OASIS.colors.surface} /><Text style={styles.actionLabel}>مشاركة</Text></Pressable>
                   <View style={styles.durationPill}><Text style={styles.durationText}>{duration}</Text></View>
                 </View>
               </>
             )}
 
             <View style={[styles.inputBar, { marginBottom: Math.max(insets.bottom, 8) }]}>
-              <Pressable onPress={() => void sendMessage()} disabled={!chatInput.trim() || sending} style={[styles.sendButton, (!chatInput.trim() || sending) && { opacity: 0.5 }]}><Send color="#fff" size={16} /></Pressable>
+              <Pressable oasisVariant="primary" oasisKind="action" onPress={() => void sendMessage()} disabled={!chatInput.trim() || sending} style={[styles.sendButton, (!chatInput.trim() || sending) && { opacity: 0.5 }]}><Send color={OASIS.colors.surface} size={16} /></Pressable>
               <TextInput value={chatInput} onChangeText={setChatInput} placeholder="أضف تعليقًا…" placeholderTextColor="#cbd5e1" maxLength={300} style={styles.chatInput} returnKeyType="send" onSubmitEditing={() => void sendMessage()} />
-              <View style={styles.commentIcon}><MessageCircle size={18} color="#fff" /></View>
+              <View style={styles.commentIcon}><MessageCircle size={18} color={OASIS.colors.surface} /></View>
             </View>
           </KeyboardAvoidingView>
         )}
@@ -1060,12 +1060,12 @@ function EndedOverlay({ reason, countdown, hostName, nextStream, noMoreStreams, 
   return (
     <View style={styles.endedScreen} {...panHandlers}>
       <StatusBar hidden />
-      <View style={styles.endedBadge}><Radio color="#fff" size={32} /></View>
+      <View style={styles.endedBadge}><Radio color={OASIS.colors.surface} size={32} /></View>
       <Text style={styles.endedTitle}>تم انتهاء البث</Text>
       <Text style={styles.endedHint}>{reason === 'تم انتهاء البث' ? `أنهى ${hostName} البث. يمكنك الانتقال إلى بث آخر.` : reason}</Text>
       <View style={styles.endedCountdownRing}><Text style={styles.endedCountdownText}>{countdown}</Text></View>
       {nextStream ? (
-        <View style={styles.endedNextCard}>
+        <OasisSurface oasisSurface="card" style={styles.endedNextCard}>
           <Text style={styles.endedNextLabel}>بث مباشر آخر</Text>
           <View style={styles.endedNextRow}>
             {nextStream.profiles?.avatar_url ? <Image source={{ uri: nextStream.profiles.avatar_url }} style={styles.endedNextAvatar} /> : <View style={styles.endedNextAvatarFallback}><Text style={styles.endedNextInitial}>{(nextStream.profiles?.display_name || nextStream.profiles?.username || 'ح').slice(0, 1)}</Text></View>}
@@ -1074,8 +1074,8 @@ function EndedOverlay({ reason, countdown, hostName, nextStream, noMoreStreams, 
               <Text numberOfLines={1} style={styles.endedNextTitle}>{nextStream.title}</Text>
             </View>
           </View>
-          <Pressable onPress={onNext} style={styles.endedNextButton}><ChevronUp size={16} color="#047857" /><Text style={styles.endedNextButtonText}>انتقل إلى هذا البث</Text></Pressable>
-        </View>
+          <Pressable oasisKind="action" onPress={onNext} style={styles.endedNextButton}><ChevronUp size={16} color={OASIS.colors.primary} /><Text style={styles.endedNextButtonText}>انتقل إلى هذا البث</Text></Pressable>
+        </OasisSurface>
       ) : (
         <View style={styles.endedEmpty}>
           <Text style={styles.endedEmptyText}>{noMoreStreams ? 'لا يوجد بثوث أخرى' : 'جارٍ البحث عن بث آخر…'}</Text>
@@ -1087,4 +1087,3 @@ function EndedOverlay({ reason, countdown, hostName, nextStream, noMoreStreams, 
     </View>
   );
 }
-

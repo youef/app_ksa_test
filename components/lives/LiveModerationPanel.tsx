@@ -1,5 +1,7 @@
+import { OasisPressable as Pressable, OasisTextInput as TextInput } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { ShieldCheck, UserMinus, X } from 'lucide-react-native';
 import type { LiveModerationSettings, LiveModerator } from '@/hooks/useLiveModeration';
 
@@ -75,7 +77,7 @@ export default function LiveModerationPanel(props: Props) {
         <Pressable style={styles.sheet} onPress={(event) => event.stopPropagation()}>
           <View style={styles.header}>
             <View style={styles.titleWrap}><ShieldCheck color="#6ee7b7" size={21} /><Text style={styles.title}>إشراف التعليقات</Text></View>
-            <Pressable onPress={onClose} style={styles.close}><X color="#fff" size={19} /></Pressable>
+            <Pressable onPress={onClose} style={styles.close}><X color={OASIS.colors.surface} size={19} /></Pressable>
           </View>
           <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
             {loading && <ActivityIndicator color="#34d399" />}
@@ -86,7 +88,7 @@ export default function LiveModerationPanel(props: Props) {
             {isHost && <View style={styles.permissionRow}><Text style={styles.label}>إخفاء التعليقات</Text><Switch value={canHide} onValueChange={setCanHide} /></View>}
             {isHost && <View style={styles.permissionRow}><Text style={styles.label}>حظر مؤقت للمستخدمين</Text><Switch value={canTimeout} onValueChange={setCanTimeout} /></View>}
             {isHost && <View style={styles.permissionRow}><Text style={styles.label}>إدارة الفلاتر والإبطاء</Text><Switch value={canFilters} onValueChange={setCanFilters} /></View>}
-            {isHost && <Pressable onPress={() => void addModerator()} disabled={!username.trim() || (!canHide && !canTimeout && !canFilters)} style={[styles.primaryButton, (!username.trim() || (!canHide && !canTimeout && !canFilters)) && styles.disabled]}>
+            {isHost && <Pressable oasisVariant="primary" oasisKind="action" onPress={() => void addModerator()} disabled={!username.trim() || (!canHide && !canTimeout && !canFilters)} style={[styles.primaryButton, (!username.trim() || (!canHide && !canTimeout && !canFilters)) && styles.disabled]}>
               <Text style={styles.primaryText}>تعيين / تحديث المشرف</Text>
             </Pressable>}
             {isHost && moderators.map((moderator) => (
@@ -99,7 +101,7 @@ export default function LiveModerationPanel(props: Props) {
                     moderator.can_manage_filters && 'فلاتر',
                   ].filter(Boolean).join('، ')}</Text>
                 </View>
-                <Pressable onPress={() => removeModerator(moderator)} style={styles.removeButton}><UserMinus color="#fecaca" size={17} /></Pressable>
+                <Pressable oasisKind="icon" onPress={() => removeModerator(moderator)} style={styles.removeButton}><UserMinus color="#fecaca" size={17} /></Pressable>
               </View>
             ))}
             {isHost && !moderators.length && <Text style={styles.hint}>لم يُعيّن مشرفون لهذا البث.</Text>}
@@ -111,17 +113,17 @@ export default function LiveModerationPanel(props: Props) {
             <Text style={styles.label}>وضع الإبطاء</Text>
             <Text style={styles.hint}>الحد الأدنى بين تعليقات الشخص الواحد.</Text>
             <View style={styles.chips}>
-              {slowModes.map((seconds) => <Pressable key={seconds} onPress={() => setDraft((current) => ({ ...current, slow_mode_seconds: seconds }))} style={[styles.chip, draft.slow_mode_seconds === seconds && styles.chipActive]}><Text style={[styles.chipText, draft.slow_mode_seconds === seconds && styles.chipTextActive]}>{seconds === 0 ? 'إيقاف' : `${seconds}ث`}</Text></Pressable>)}
+              {slowModes.map((seconds) => <Pressable oasisVariant={draft.slow_mode_seconds === seconds ? 'primary' : 'secondary'} oasisKind="chip" key={seconds} onPress={() => setDraft((current) => ({ ...current, slow_mode_seconds: seconds }))} style={[styles.chip, draft.slow_mode_seconds === seconds && styles.chipActive]}><Text style={[styles.chipText, draft.slow_mode_seconds === seconds && styles.chipTextActive]}>{seconds === 0 ? 'إيقاف' : `${seconds}ث`}</Text></Pressable>)}
             </View>
             <View style={styles.permissionRow}><View style={styles.settingCopy}><Text style={styles.label}>حظر الروابط</Text><Text style={styles.hint}>يُرفض التعليق الذي يحتوي على روابط شائعة.</Text></View><Switch value={draft.block_links} onValueChange={(value) => setDraft((current) => ({ ...current, block_links: value }))} /></View>
             <Text style={styles.label}>الكلمات أو العبارات المحظورة</Text>
             <TextInput value={termsText} onChangeText={setTermsText} multiline placeholder="افصل بين الكلمات بفاصلة" placeholderTextColor="#94a3b8" style={[styles.input, styles.termsInput]} />
             <View style={styles.permissionRow}><View style={styles.settingCopy}><Text style={styles.label}>التقييد التلقائي عند الضغط</Text><Text style={styles.hint}>يزيد الإبطاء تلقائيًا عند ارتفاع التعليقات أو عدد المشاهدين.</Text></View><Switch value={draft.adaptive_enabled} onValueChange={(value) => setDraft((current) => ({ ...current, adaptive_enabled: value }))} /></View>
-            <Pressable onPress={() => void save()} disabled={saving} style={[styles.primaryButton, saving && styles.disabled]}>
+            <Pressable oasisVariant="primary" oasisKind="action" onPress={() => void save()} disabled={saving} style={[styles.primaryButton, saving && styles.disabled]}>
               {saving ? <ActivityIndicator color="#052e24" /> : <Text style={styles.primaryText}>حفظ إعدادات الإشراف</Text>}
             </Pressable>
             </> : <Text style={styles.hint}>إعدادات الفلاتر والإبطاء متاحة للمضيف أو للمشرف الذي مُنح صلاحيتها.</Text>}
-            {isHost && <Pressable onPress={() => void onRefresh()} style={styles.refreshButton}><Text style={styles.refreshText}>تحديث قائمة المشرفين</Text></Pressable>}
+            {isHost && <Pressable oasisKind="action" onPress={() => void onRefresh()} style={styles.refreshButton}><Text style={styles.refreshText}>تحديث قائمة المشرفين</Text></Pressable>}
           </ScrollView>
         </Pressable>
       </Pressable>
@@ -131,32 +133,32 @@ export default function LiveModerationPanel(props: Props) {
 
 const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(2,6,23,0.75)', justifyContent: 'flex-end' },
-  sheet: { maxHeight: '88%', backgroundColor: '#0f172a', borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', paddingBottom: 22 },
+  sheet: { maxHeight: '88%', backgroundColor: OASIS.colors.ink, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', paddingBottom: 14 },
   header: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', padding: 18, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)' },
   titleWrap: { flexDirection: 'row-reverse', alignItems: 'center', gap: 9 },
-  title: { color: '#fff', fontSize: 17, fontWeight: '900' },
-  close: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#1e293b', alignItems: 'center', justifyContent: 'center' },
+  title: { color: OASIS.colors.surface, fontSize: 17, fontWeight: '700' },
+  close: { width: 36, height: 36, borderRadius: 14, backgroundColor: OASIS.colors.ink, alignItems: 'center', justifyContent: 'center' },
   content: { padding: 18, gap: 10 },
-  sectionTitle: { color: '#a7f3d0', fontSize: 14, fontWeight: '900', textAlign: 'right', marginTop: 6 },
-  label: { color: '#f8fafc', fontSize: 13, fontWeight: '800', textAlign: 'right' },
+  sectionTitle: { color: '#a7f3d0', fontSize: 14, fontWeight: '700', textAlign: 'right', marginTop: 6 },
+  label: { color: OASIS.colors.background, fontSize: 13, fontWeight: '600', textAlign: 'right' },
   hint: { color: '#94a3b8', fontSize: 11, textAlign: 'right', lineHeight: 17 },
-  input: { color: '#fff', backgroundColor: '#1e293b', borderWidth: 1, borderColor: '#334155', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, textAlign: 'right' },
+  input: { color: OASIS.colors.surface, backgroundColor: OASIS.colors.ink, borderWidth: 1, borderColor: OASIS.colors.ink, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, textAlign: 'right' },
   termsInput: { minHeight: 76, textAlignVertical: 'top' },
   permissionRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingVertical: 7 },
   settingCopy: { flex: 1, gap: 3 },
   primaryButton: { backgroundColor: '#6ee7b7', borderRadius: 12, paddingVertical: 13, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
-  primaryText: { color: '#052e24', fontWeight: '900', fontSize: 13 },
+  primaryText: { color: '#052e24', fontWeight: '700', fontSize: 13 },
   disabled: { opacity: 0.45 },
   moderatorRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' },
   moderatorInfo: { flex: 1, gap: 4 },
   removeButton: { padding: 10, borderRadius: 10, backgroundColor: 'rgba(190,18,60,0.2)' },
   divider: { height: 1, backgroundColor: 'rgba(255,255,255,0.12)', marginVertical: 12 },
   chips: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 7, marginVertical: 6 },
-  chip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#475569', backgroundColor: '#1e293b' },
+  chip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 14, borderWidth: 1, borderColor: OASIS.colors.muted, backgroundColor: OASIS.colors.ink },
   chipActive: { backgroundColor: '#6ee7b7', borderColor: '#6ee7b7' },
-  chipText: { color: '#cbd5e1', fontSize: 12, fontWeight: '800' },
+  chipText: { color: '#cbd5e1', fontSize: 12, fontWeight: '600' },
   chipTextActive: { color: '#052e24' },
   error: { color: '#fda4af', textAlign: 'right' },
   refreshButton: { padding: 10, alignItems: 'center' },
-  refreshText: { color: '#a7f3d0', fontWeight: '800' },
+  refreshText: { color: '#a7f3d0', fontWeight: '600' },
 });

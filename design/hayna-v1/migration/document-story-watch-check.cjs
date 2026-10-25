@@ -1,0 +1,1 @@
+const fs=require('fs');const p='docs/IOS_UI_ROUTE_AUDIT.md';fs.appendFileSync(p,'\nتحقق فعلي من السلوك: فتح يومية الحساب الحالي ثم الرجوع أخفى بطاقتها من الترند، غيّر الإطار إلى الرمادي، ونقل الحساب خلف الحساب الآخر. لقطتا قبل/بعد في design/hayna-v1/migration/stories-unseen-before.png وstories-unseen-after.png.\n');

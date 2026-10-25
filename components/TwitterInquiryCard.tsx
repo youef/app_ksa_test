@@ -1,16 +1,7 @@
+import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
 import { useState, useEffect } from 'react';
-import {
-  Alert,
-  Image,
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  Platform,
-  Share,
-} from 'react-native';
+import { Alert, Image, Modal, StyleSheet, Text, View, Platform, Share } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -38,6 +29,7 @@ import {
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { requireAccount } from '@/lib/authGate';
+import { showDialog } from '@/lib/dialog';
 
 export function formatArabicTimeAgo(dateStr: string): string {
   if (!dateStr) return '';
@@ -66,6 +58,7 @@ export interface TwitterInquiryCardProps {
   onQuickReply: (id: string, text: string) => Promise<void>;
   onToast: (msg: string) => void;
   onDeleted?: () => void;
+  detailMode?: boolean;
 }
 
 export default function TwitterInquiryCard({
@@ -78,14 +71,14 @@ export default function TwitterInquiryCard({
   onQuickReply,
   onToast,
   onDeleted,
+  detailMode = false,
 }: TwitterInquiryCardProps) {
   const isReq = type === 'request';
+  const isAdmin = Boolean(currentUserId && currentUserProfile?.role === 'admin');
   const isOwner = Boolean(currentUserId && currentUserId === (isReq ? data.requester_id : data.author_id));
   const name = data.profiles?.hide_name ? 'جار مجهول 🕶️' : (data.profiles?.display_name || data.profiles?.username || 'ابن الحي');
   const username = data.profiles?.username || 'neighbor';
   const avatar = data.profiles?.avatar_url;
-  const isVerifiedNeighbor = data.profiles?.is_geoverified;
-  const isIdVerified = data.profiles?.is_verified;
   const isEmergency = data.is_urgent || data.is_emergency || data.urgency_level === 'emergency' || (data.title && (data.title.includes('مفقود') || data.title.includes('طارئ')));
   const isToolSharing = data.is_tool_sharing || data.item_type === 'tool_sharing' || (data.title && (data.title.includes('إعارة') || data.title.includes('دريل')));
 
@@ -93,26 +86,40 @@ export default function TwitterInquiryCard({
   const [quickReplyText, setQuickReplyText] = useState('');
   const [replyLoading, setReplyLoading] = useState(false);
   type ReactionType = 'like' | 'help' | 'useful' | 'thanks';
-  const REACTIONS: { id: ReactionType; emoji: string; label: string }[] = [
-    { id: 'like', emoji: '❤️', label: 'أعجبني' },
-    { id: 'help', emoji: '🤝', label: 'أبشر بالفزعة' },
-    { id: 'useful', emoji: '💡', label: 'معلومة مفيدة' },
-    { id: 'thanks', emoji: '🙏', label: 'الله يعطيك العافية' },
+  const REACTIONS: { id: ReactionType; Icon: typeof Heart; label: string }[] = [
+    { id: 'like', Icon: Heart, label: 'أعجبني' },
+    { id: 'help', Icon: HeartHandshake, label: 'أبشر بالفزعة' },
+    { id: 'useful', Icon: Sparkles, label: 'معلومة مفيدة' },
+    { id: 'thanks', Icon: Coffee, label: 'الله يعطيك العافية' },
   ];
   const [myReaction, setMyReaction] = useState<ReactionType | null>(null);
   const [reactionCounts, setReactionCounts] = useState<Record<ReactionType, number>>({
     like: Number(data.likes_count ?? data.likes ?? 0), help: 0, useful: 0, thanks: 0,
   });
   const [reactionBusy, setReactionBusy] = useState(false);
+  const [reactionPickerOpen, setReactionPickerOpen] = useState(false);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editTitle, setEditTitle] = useState(String(data.title || ''));
+  const [editBody, setEditBody] = useState(String(isReq ? data.description || '' : data.body || ''));
+  const [editBusy, setEditBusy] = useState(false);
+  const [editNotes, setEditNotes] = useState(String(data.notes || ''));
   const [bookmarked, setBookmarked] = useState(false);
   const [viewsCount, setViewsCount] = useState<number>(() => Number(data.views_count ?? data.views ?? data.view_count ?? 0));
   const [savesCount, setSavesCount] = useState(0);
   const [isPinned, setIsPinned] = useState(Boolean(data.is_pinned));
   const [isFeatured, setIsFeatured] = useState(Boolean(data.is_featured));
-  const [resolutionStatus, setResolutionStatus] = useState(String(data.resolution_status || 'open'));
+  const [resolutionStatus, setResolutionStatus] = useState(String(data.status === 'completed' ? 'helped' : data.status === 'accepted' ? 'accepted' : data.resolution_status || 'open'));
   const [bestAnswerId, setBestAnswerId] = useState<string | null>(data.best_answer_id || null);
   const [statusPickerOpen, setStatusPickerOpen] = useState(false);
-  const statusLabels: Record<string, string> = { open: 'بانتظار المساعدة', found: 'تم العثور على الغرض', helped: 'تمت المساعدة', resolved: 'تم حل المشكلة', not_needed: 'لم أعد بحاجة للمساعدة' };
+  const statusLabels: Record<string, string> = { accepted: 'جارٍ تنفيذ الطلب', open: 'بانتظار المساعدة', found: 'تم العثور على الغرض', helped: 'تمت المساعدة', resolved: 'تم حل المشكلة', not_needed: 'لم أعد بحاجة للمساعدة' };
+
+  // Detail screens reload after accepting an answer or completing a request.
+  useEffect(() => {
+    setResolutionStatus(String(data.status === 'completed' ? 'helped' : data.status === 'accepted' ? 'accepted' : data.resolution_status || 'open'));
+    setBestAnswerId(data.best_answer_id || null);
+    setIsPinned(Boolean(data.is_pinned));
+    setIsFeatured(Boolean(data.is_featured));
+  }, [data.status, data.resolution_status, data.best_answer_id, data.is_pinned, data.is_featured]);
 
   // Track real view count on mount
   useEffect(() => {
@@ -242,7 +249,7 @@ export default function TwitterInquiryCard({
         if (error) throw error;
       }
       const selected = REACTIONS.find(item => item.id === next);
-      onToast(next ? (selected?.label || 'تم التفاعل') + ' ' + (selected?.emoji || '') : 'تم إلغاء التفاعل');
+      onToast(next ? (selected?.label || 'تم التفاعل') : 'تم إلغاء التفاعل');
     } catch (error: any) {
       setMyReaction(previous);
       setReactionCounts(current => {
@@ -293,10 +300,7 @@ export default function TwitterInquiryCard({
   }
 
   async function confirmDeletePost() {
-    Alert.alert(
-      'حذف المنشور نهائياً',
-      'هل أنت متأكد؟ لا يمكن التراجع عن حذف المنشور.',
-      [
+    showDialog({ title: 'حذف المنشور نهائياً', message: 'هل أنت متأكد؟ لا يمكن التراجع عن حذف المنشور.', buttons: [
         { text: 'إلغاء', style: 'cancel' },
         {
           text: 'حذف المنشور',
@@ -304,15 +308,12 @@ export default function TwitterInquiryCard({
           onPress: async () => {
             try {
               const table = isReq ? 'requests' : 'questions';
-              let result: any;
-              if (isReq) {
-                await supabase.from('help_matches').delete().eq('request_id', data.id);
-                result = await supabase.from(table).delete().eq('id', data.id).eq('requester_id', currentUserId);
-              } else {
-                await supabase.from('answers').delete().eq('question_id', data.id);
-                result = await supabase.from(table).delete().eq('id', data.id).eq('author_id', currentUserId);
-              }
-              if (result?.error) throw result.error;
+              if (!currentUserId || (!isOwner && !isAdmin)) return;
+              let query = supabase.from(table).delete().eq('id', data.id);
+              if (!isAdmin) query = query.eq(isReq ? 'requester_id' : 'author_id', currentUserId);
+              const { data: removed, error } = await query.select('id');
+              if (error) throw error;
+              if (!removed?.length) throw new Error('لا تملك صلاحية حذف هذا المنشور.');
               onToast('تم حذف المنشور بنجاح');
               onDeleted?.();
             } catch (err: any) {
@@ -321,14 +322,17 @@ export default function TwitterInquiryCard({
           },
         },
       ],
-    );
+    });
   }
 
   async function updateResolutionStatus(nextStatus: string) {
-    if (!isOwner || !currentUserId) return;
+    if ((!isOwner && !isAdmin) || !currentUserId) return;
     const table = isReq ? 'requests' : 'questions';
     const ownerColumn = isReq ? 'requester_id' : 'author_id';
-    const { error } = await supabase.from(table).update({ resolution_status: nextStatus, updated_at: new Date().toISOString() }).eq('id', data.id).eq(ownerColumn, currentUserId);
+    let query = supabase.from(table).update({ resolution_status: nextStatus, updated_at: new Date().toISOString() }).eq('id', data.id);
+    if (!isAdmin) query = query.eq(ownerColumn, currentUserId);
+    const { data: updated, error } = await query.select('id').maybeSingle();
+    if (!error && !updated) return Alert.alert('تعذر تحديث الحالة', 'لا تملك صلاحية تعديل هذا المنشور.');
     if (error) return Alert.alert('تعذر تحديث الحالة', error.message || 'حاول مرة أخرى.');
     setResolutionStatus(nextStatus);
     data.resolution_status = nextStatus;
@@ -366,10 +370,10 @@ export default function TwitterInquiryCard({
 
   function handleMoreOptions() {
     const options: any[] = [];
-    if (isOwner) {
+    if (isOwner || isAdmin) {
       options.push({
         text: 'تعديل المنشور',
-        onPress: () => router.push({ pathname: isReq ? '/request' : '/question', params: { id: data.id } }),
+        onPress: () => { setEditTitle(String(data.title || '')); setEditBody(String(isReq ? data.description || '' : data.body || '')); setEditNotes(String(data.notes || '')); setEditorOpen(true); },
       });
       options.push({ text: 'حذف المنشور', style: 'destructive', onPress: confirmDeletePost });
       options.push({ text: 'تحديث حالة المنشور', onPress: openStatusOptions });
@@ -380,7 +384,6 @@ export default function TwitterInquiryCard({
     }
     options.push({ text: 'نسخ رابط المنشور', onPress: handleShare });
     if (!isGuest) {
-      options.push({ text: 'كتم إشعارات هذا المنشور', onPress: () => onToast('تم كتم الإشعارات 🔕') });
       options.push({
         text: 'إبلاغ عن محتوى غير لائق',
         onPress: () => router.push({ pathname: '/report', params: { id: data.id, type: isReq ? 'request' : 'question' } }),
@@ -388,7 +391,26 @@ export default function TwitterInquiryCard({
       });
     }
     options.push({ text: 'إلغاء', style: 'cancel' });
-    Alert.alert('خيارات المنشور', data.title, options);
+    showDialog({ title: 'خيارات المنشور', message: data.title, buttons: options });
+  }
+
+  async function savePostEdit() {
+    if (!currentUserId || (!isOwner && !isAdmin) || !editTitle.trim() || editBusy) return;
+    setEditBusy(true);
+    try {
+      const changes = { ...(isReq ? { notes: editNotes.trim() } : {}), title: editTitle.trim(), [isReq ? 'description' : 'body']: editBody.trim(), updated_at: new Date().toISOString() };
+      let query = supabase.from(isReq ? 'requests' : 'questions').update(changes).eq('id', data.id);
+      if (!isAdmin) query = query.eq(isReq ? 'requester_id' : 'author_id', currentUserId);
+      const { data: updated, error } = await query.select('id').maybeSingle();
+      if (error) throw error;
+      if (!updated) throw new Error('لا تملك صلاحية تعديل هذا المنشور.');
+      Object.assign(data, changes);
+      setEditorOpen(false);
+      onToast('تم حفظ التعديلات');
+      onDeleted?.();
+    } catch (error: any) {
+      Alert.alert('تعذر حفظ التعديلات', error?.message || 'حاول مرة أخرى.');
+    } finally { setEditBusy(false); }
   }
 
   async function handleSendReply() {
@@ -411,7 +433,7 @@ export default function TwitterInquiryCard({
   }
 
   return (
-    <View style={[s.xCard, !expanded && s.xCardCollapsed, isEmergency && s.xCardEmergency, isToolSharing && s.xCardToolSharing]}>
+    <OasisSurface oasisSurface="card" style={[s.xCard, !expanded && s.xCardCollapsed, isEmergency && s.xCardEmergency, isToolSharing && s.xCardToolSharing]}>
       {/* Top Header */}
       <View style={s.xHeader}>
         <Pressable
@@ -423,59 +445,55 @@ export default function TwitterInquiryCard({
           {avatar ? (
             <Image source={{ uri: avatar }} style={s.xAvatarImg} />
           ) : (
-            <View style={[s.xAvatarFallback, isEmergency && { backgroundColor: '#dc2626' }]}>
-              <User size={20} color="#fff" />
+            <View style={[s.xAvatarFallback, isEmergency && { backgroundColor: OASIS.colors.danger }]}>
+              <User size={20} color={OASIS.colors.surface} />
             </View>
           )}
-          {isVerifiedNeighbor && (
-            <View style={s.xGeoBadge}><ShieldCheck size={9} color="#fff" /></View>
-          )}
+
         </Pressable>
 
         <View style={s.xAuthorMeta}>
           <View style={s.xAuthorRow}>
+            <Pressable onPress={() => isGuest ? requireAccount() : data.profiles?.id && router.push({ pathname: '/user', params: { id: data.profiles.id } })}>              <Text style={s.xAuthorName} numberOfLines={1}>{name}</Text>
+            </Pressable>
             {isEmergency ? (
-              <View style={s.xEmergencyBadge}><Flame size={11} color="#dc2626" /><Text style={s.xEmergencyBadgeText}>عاجل</Text></View>
+              <View style={s.xEmergencyBadge}><Flame size={11} color={OASIS.colors.danger} /><Text style={s.xEmergencyBadgeText}>عاجل</Text></View>
             ) : isToolSharing ? (
-              <View style={s.xToolBadge}><Wrench size={11} color="#16a34a" /><Text style={s.xToolBadgeText}>إعارة</Text></View>
+              <View style={s.xToolBadge}><Wrench size={11} color={OASIS.colors.primary} /><Text style={s.xToolBadgeText}>إعارة</Text></View>
             ) : isReq ? (
               <View style={s.xReqBadge}><HeartHandshake size={11} color="#d97706" /><Text style={s.xReqBadgeText}>طلب فزعة</Text></View>
             ) : (
-              <View style={s.xCategoryBadge}><MessageCircle size={11} color="#059669" /><Text style={s.xCategoryBadgeText}>استفسار</Text></View>
+              <View style={s.xCategoryBadge}><MessageCircle size={11} color={OASIS.colors.primary} /><Text style={s.xCategoryBadgeText}>استفسار</Text></View>
             )}
-            <Text style={s.xTimeAgo}>{formatArabicTimeAgo(data.created_at)}</Text>
-            <Text style={s.xDot}>·</Text>
-            <Text style={s.xHandle} numberOfLines={1}>@{username}</Text>
-            {isIdVerified && <CheckCircle2 size={13} color="#059669" />}
-            <Pressable onPress={() => isGuest ? requireAccount() : data.profiles?.id && router.push({ pathname: '/user', params: { id: data.profiles.id } })}>
-              <Text style={s.xAuthorName} numberOfLines={1}>{name}</Text>
-            </Pressable>
+
           </View>
 
+          {!data.profiles?.hide_name && <Text style={[s.xHandle, { maxWidth: '100%', textAlign: 'right', writingDirection: 'ltr' }]} numberOfLines={1}>@{username}</Text>}
+
           <View style={s.xLocationRow}>
-            <MapPin size={11} color="#059669" />
+            <MapPin size={11} color={OASIS.colors.primary} />
             <Text style={s.xLocationText}>
               {data.district ? `حي ${data.district}` : 'الحي'}{data.city ? ` · ${data.city}` : ''}
             </Text>
           </View>
         </View>
 
-        <Pressable onPress={handleMoreOptions} style={s.xMoreBtn} accessibilityRole="button" accessibilityLabel="خيارات">
+        <Pressable oasisKind="icon" onPress={handleMoreOptions} style={s.xMoreBtn} accessibilityRole="button" accessibilityLabel="خيارات">
           <MoreHorizontal size={18} color="#94a3b8" />
         </Pressable>
       </View>
 
       {/* Main Content Area */}
-      <Pressable onPress={navigateToDetails} style={s.xContentArea} accessibilityRole="button" accessibilityLabel="فتح تفاصيل المنشور">
-        <Text style={[s.xTitle, isEmergency && { color: '#991b1b' }]} numberOfLines={2}>{data.title}</Text>
+      <Pressable onPress={detailMode ? undefined : navigateToDetails} style={s.xContentArea} accessibilityRole={detailMode ? undefined : "button"} accessibilityLabel={detailMode ? undefined : "فتح تفاصيل المنشور"}>
+        <Text style={[s.xTitle, isEmergency && { color: '#991b1b' }]} numberOfLines={detailMode ? undefined : 2}>{data.title}</Text>
         {(data.body || data.description) && (
           <>
-            <Text style={s.xBodyText} numberOfLines={2}>{isReq ? data.description : data.body}</Text>
-            {String(isReq ? data.description : data.body || '').length > 130 && <Text style={s.xReadMore}>عرض المزيد وفتح التفاصيل ←</Text>}
+            <Text style={s.xBodyText} numberOfLines={detailMode ? undefined : 2}>{isReq ? data.description : data.body}</Text>
+            {!detailMode && String(isReq ? data.description : data.body || '').length > 130 && <Text style={s.xReadMore}>عرض المزيد وفتح التفاصيل ←</Text>}
           </>
         )}
-        {isPinned && <View style={{ alignSelf: 'flex-start', flexDirection: 'row-reverse', alignItems: 'center', gap: 4, backgroundColor: '#fff7ed', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5, marginTop: 8 }}><Text style={{ color: '#c2410c', fontSize: 11, fontWeight: '800' }}>📌 مثبت في الملف الشخصي</Text></View>}
-        {isFeatured && <View style={{ alignSelf: 'flex-start', backgroundColor: '#fee2e2', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5, marginTop: 7 }}><Text style={{ color: '#991b1b', fontSize: 11, fontWeight: '900' }}>📢 تنبيه مثبت من إدارة الحي</Text></View>}
+        {isPinned && <View style={{ alignSelf: 'flex-start', flexDirection: 'row-reverse', alignItems: 'center', gap: 4, backgroundColor: '#fff7ed', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5, marginTop: 8 }}><Text style={{ color: '#c2410c', fontSize: 11, fontWeight: '600' }}>📌 مثبت في الملف الشخصي</Text></View>}
+        {isFeatured && <View style={{ alignSelf: 'flex-start', backgroundColor: '#fee2e2', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5, marginTop: 7 }}><Text style={{ color: '#991b1b', fontSize: 11, fontWeight: '700' }}>📢 تنبيه مثبت من إدارة الحي</Text></View>}
         <View style={s.xCompactStatus}>
           <View style={[s.xCompactStatusDot, resolutionStatus !== 'open' && s.xCompactStatusDotResolved]} />
           <Text style={s.xCompactStatusText}>{statusLabels[resolutionStatus] || 'مفتوح'}</Text>
@@ -486,18 +504,18 @@ export default function TwitterInquiryCard({
           )}
           <View style={s.xHashPill}><Text style={s.xHashText}>#أهل_الحي</Text></View>
           {isToolSharing && (
-            <View style={[s.xHashPill, { backgroundColor: '#f0fdf4' }]}><Text style={[s.xHashText, { color: '#16a34a' }]}>#إعارة_مجانية</Text></View>
+            <View style={[s.xHashPill, { backgroundColor: OASIS.colors.soft }]}><Text style={[s.xHashText, { color: OASIS.colors.primary }]}>#إعارة_مجانية</Text></View>
           )}
           {Boolean(data.best_answer_id) && (
             <View style={[s.xHashPill, { backgroundColor: '#fef3c7' }]}>
-              <Text style={[s.xHashText, { color: '#b45309', fontWeight: '800' }]}>⭐ تم الحل</Text>
+              <Text style={[s.xHashText, { color: '#b45309', fontWeight: '600' }]}>⭐ تم الحل</Text>
             </View>
           )}
         </View>
       </Pressable>
 
       {/* Interactive Responders Preview (Collapsed Strip) */}
-      {!expanded && answers.length > 0 && (
+      {!detailMode && !expanded && answers.length > 0 && (
         <Pressable style={s.xRespondersPreview} onPress={navigateToDetails} accessibilityRole="button" accessibilityLabel="عرض جميع الردود">
           <View style={s.xRespondersAvatars}>
             {answers.slice(0, 4).map((ans: any, i: number) => {
@@ -522,36 +540,38 @@ export default function TwitterInquiryCard({
             </Text>
             <Text style={s.xRespondersPreviewSub}>انقر للاطلاع على التوصيات والردود 💬</Text>
           </View>
-          <ChevronLeft size={16} color="#059669" />
+          <ChevronLeft size={16} color={OASIS.colors.primary} />
         </Pressable>
       )}
 
-      {/* Community reactions persisted in Supabase */}
-      <View style={s.xReactionsRow}>
-        {REACTIONS.map(reaction => {
-          const active = myReaction === reaction.id;
-          return <Pressable key={reaction.id} style={[s.xReactionChip, active && s.xReactionChipActive]} onPress={() => void handleReaction(reaction.id)} disabled={reactionBusy} accessibilityRole="button" accessibilityLabel={reaction.label} accessibilityState={{ selected: active, disabled: reactionBusy }}>
-            <Text style={s.xReactionEmoji}>{reaction.emoji}</Text><Text style={[s.xReactionCount, active && s.xReactionCountActive]}>{reactionCounts[reaction.id]}</Text>
-          </Pressable>;
-        })}
+      <View style={[s.xReactionsRow, { justifyContent: 'space-between' }]}>
+        <Text style={s.xTimeAgo}>{formatArabicTimeAgo(data.created_at)}</Text>
+        <Pressable oasisKind="action" style={[s.xActionBtn, myReaction && s.xActionBtnActive]} onPress={() => {
+          if (isGuest || !currentUserId) return requireAccount('سجّل الدخول لاختيار تفاعلك مع منشورات جيرانك.');
+          setReactionPickerOpen(true);
+        }} accessibilityRole="button" accessibilityLabel="اختيار التفاعل" accessibilityState={{ expanded: reactionPickerOpen }}>
+          <Heart size={18} color={myReaction ? OASIS.colors.primary : OASIS.colors.muted} />
+          <Text style={s.xActionCounter}>{REACTIONS.find(r => r.id === myReaction)?.label || 'تفاعل'}</Text>
+          <Text style={s.xActionCounter}>{Object.values(reactionCounts).reduce((sum, count) => sum + count, 0)}</Text>
+        </Pressable>
       </View>
 
       {/* Action Bar */}
       <View style={s.xActionBar}>
-        <Pressable style={s.xActionBtn} onPress={navigateToDetails} accessibilityRole="button" accessibilityLabel="فتح الردود في صفحة المنشور">
-          <MessageCircle size={17} color="#64748b" />
+        <Pressable oasisKind="action" style={s.xActionBtn} onPress={detailMode ? undefined : navigateToDetails} accessibilityRole={detailMode ? undefined : "button"} accessibilityLabel={detailMode ? "عدد الردود" : "فتح الردود في صفحة المنشور"}>
+          <MessageCircle size={17} color={OASIS.colors.muted} />
           <Text style={s.xActionCounter}>{answersCount}</Text>
         </Pressable>
 
         {!isGuest && (
-          <Pressable style={s.xActionBtn} onPress={handleBookmark}>
-            <Bookmark size={17} color={bookmarked ? '#f59e0b' : '#64748b'} fill={bookmarked ? '#f59e0b' : 'none'} />
-            {bookmarked && <Text style={[s.xActionCounter, { color: '#f59e0b', fontSize: 10 }]}>محفوظ</Text>}
+          <Pressable oasisKind="action" style={s.xActionBtn} onPress={handleBookmark}>
+            <Bookmark size={17} color={bookmarked ? OASIS.colors.warning : OASIS.colors.muted} fill={bookmarked ? OASIS.colors.warning : 'none'} />
+            {bookmarked && <Text style={[s.xActionCounter, { color: OASIS.colors.warning, fontSize: 11 }]}>محفوظ</Text>}
           </Pressable>
         )}
 
-        <Pressable style={s.xActionBtn} onPress={handleShare}>
-          <Share2 size={17} color="#64748b" />
+        <Pressable oasisKind="icon" style={s.xActionBtn} onPress={handleShare}>
+          <Share2 size={17} color={OASIS.colors.muted} />
         </Pressable>
 
         <View style={s.xActionBtn}>
@@ -561,10 +581,10 @@ export default function TwitterInquiryCard({
       </View>
 
       {isOwner && expanded && (
-        <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-around', gap: 8, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: '#f0fdf4', borderTopWidth: 1, borderTopColor: '#dcfce7' }}>
-          <View style={{ alignItems: 'center', gap: 3 }}><Eye size={15} color="#166534" /><Text style={{ color: '#166534', fontSize: 11, fontWeight: '800' }}>{viewsCount} مشاهدة</Text></View>
-          <View style={{ alignItems: 'center', gap: 3 }}><MessageCircle size={15} color="#166534" /><Text style={{ color: '#166534', fontSize: 11, fontWeight: '800' }}>{answersCount} رد</Text></View>
-          <View style={{ alignItems: 'center', gap: 3 }}><Bookmark size={15} color="#166534" /><Text style={{ color: '#166534', fontSize: 11, fontWeight: '800' }}>{savesCount} حفظ</Text></View>
+        <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-around', gap: 8, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: OASIS.colors.soft, borderTopWidth: 1, borderTopColor: '#dcfce7' }}>
+          <View style={{ alignItems: 'center', gap: 3 }}><Eye size={15} color="#166534" /><Text style={{ color: '#166534', fontSize: 11, fontWeight: '600' }}>{viewsCount} مشاهدة</Text></View>
+          <View style={{ alignItems: 'center', gap: 3 }}><MessageCircle size={15} color="#166534" /><Text style={{ color: '#166534', fontSize: 11, fontWeight: '600' }}>{answersCount} رد</Text></View>
+          <View style={{ alignItems: 'center', gap: 3 }}><Bookmark size={15} color="#166534" /><Text style={{ color: '#166534', fontSize: 11, fontWeight: '600' }}>{savesCount} حفظ</Text></View>
         </View>
       )}
 
@@ -572,15 +592,15 @@ export default function TwitterInquiryCard({
       {expanded && (
         <View style={s.xThreadContainer}>
           <View style={s.xThreadHeader}>
-            <Pressable onPress={() => setExpanded(false)} style={s.xThreadCloseBtn}>
-              <ChevronUp size={14} color="#059669" />
+            <Pressable oasisKind="action" onPress={() => setExpanded(false)} style={s.xThreadCloseBtn}>
+              <ChevronUp size={14} color={OASIS.colors.primary} />
               <Text style={s.xThreadCloseText}>طي التفاصيل</Text>
             </Pressable>
             <View style={s.xThreadTitleRow}>
               <Text style={s.xThreadTitle}>
                 {isReq ? `عروض وفزعات الجيران (${answersCount})` : `خيط الردود والتوصيات (${answersCount})`}
               </Text>
-              <Sparkles size={14} color="#059669" />
+              <Sparkles size={14} color={OASIS.colors.primary} />
             </View>
           </View>
 
@@ -609,10 +629,10 @@ export default function TwitterInquiryCard({
                         <Text style={s.xAnswerTime}>{formatArabicTimeAgo(ans.created_at)}</Text>
                         <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 5 }}>
                           <Text style={s.xAnswerAuthorName}>{ansName}</Text>
-                          {ans.profiles?.is_geoverified && <ShieldCheck size={11} color="#16a34a" />}
+
                           {isAccepted && (
                             <View style={s.xAcceptedBadge}>
-                              <Award size={10} color="#fff" />
+                              <Award size={10} color={OASIS.colors.surface} />
                               <Text style={s.xAcceptedBadgeText}>
                                 {isReq ? 'فزعة معتمدة 🤝' : 'أفضل إجابة ⭐'}
                               </Text>
@@ -624,12 +644,12 @@ export default function TwitterInquiryCard({
                       {isOwner && !isReq && bestAnswerId !== ans.id && (
                         <Pressable
                           onPress={() => void markBestAnswer(ans.id)}
-                          style={{ alignSelf: 'flex-start', flexDirection: 'row-reverse', alignItems: 'center', gap: 5, marginTop: 8, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, backgroundColor: '#ecfdf5', borderWidth: 1, borderColor: '#a7f3d0' }}
+                          style={{ alignSelf: 'flex-start', flexDirection: 'row-reverse', alignItems: 'center', gap: 5, marginTop: 8, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, backgroundColor: OASIS.colors.soft, borderWidth: 1, borderColor: '#a7f3d0' }}
                           accessibilityRole="button"
                           accessibilityLabel="اعتماد الرد كأفضل إجابة"
                         >
-                          <Award size={13} color="#047857" />
-                          <Text style={{ color: '#047857', fontSize: 11, fontWeight: '800' }}>هل أفادك الرد؟ اعتمده كأفضل إجابة</Text>
+                          <Award size={13} color={OASIS.colors.primary} />
+                          <Text style={{ color: OASIS.colors.primary, fontSize: 11, fontWeight: '600' }}>هل أفادك الرد؟ اعتمده كأفضل إجابة</Text>
                         </Pressable>
                       )}
                     </View>
@@ -647,7 +667,7 @@ export default function TwitterInquiryCard({
 
           {/* Prompt when more than 4 responders exist */}
           {remainingCount > 0 && (
-            <Pressable
+            <Pressable oasisKind="card"
               style={s.xMoreRepliesCard}
               onPress={navigateToDetails}
               accessibilityRole="button"
@@ -659,7 +679,7 @@ export default function TwitterInquiryCard({
               <Text style={s.xMoreRepliesCardText}>
                 انقر لعرض باقي ردود وتوصيات الجيران في الصفحة كاملة
               </Text>
-              <ChevronLeft size={16} color="#047857" />
+              <ChevronLeft size={16} color={OASIS.colors.primary} />
             </Pressable>
           )}
 
@@ -670,7 +690,7 @@ export default function TwitterInquiryCard({
               onPress={() => requireAccount('سجّل الدخول أو أنشئ حساباً للرد على جيرانك.')}
             >
               <Text style={s.xGuestReplyText}>سجّل الدخول للمشاركة في النقاش</Text>
-              <MessageCircle size={16} color="#059669" />
+              <MessageCircle size={16} color={OASIS.colors.primary} />
             </Pressable>
           ) : (
             <View style={s.xQuickReplyContainer}>
@@ -691,31 +711,31 @@ export default function TwitterInquiryCard({
                 onChangeText={setQuickReplyText}
                 multiline
               />
-              <Pressable
+              <Pressable oasisKind="chip"
                 style={[s.xQuickReplySendBtn, (!quickReplyText.trim() || replyLoading) && s.xQuickReplySendBtnDisabled]}
                 onPress={handleSendReply}
                 disabled={!quickReplyText.trim() || replyLoading}
               >
-                <Send size={15} color="#fff" />
+                <Send size={15} color={OASIS.colors.surface} />
                 <Text style={s.xQuickReplySendText}>رد</Text>
               </Pressable>
             </View>
           )}
 
           {/* Full Page Redirection Button */}
-          <Pressable
+          <Pressable oasisKind="action"
             style={s.xOpenFullThreadBtn}
             onPress={navigateToDetails}
             accessibilityRole="button"
             accessibilityLabel={isReq ? 'فتح صفحة طلب الفزعة بالكامل' : 'فتح صفحة الاستفسار بالكامل'}
           >
             <LinearGradient
-              colors={['#064e3b', '#065f46', '#047857']}
+              colors={[OASIS.colors.deep, OASIS.colors.deep, OASIS.colors.primary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={s.xOpenFullThreadGrad}
             >
-              <ExternalLink size={14} color="#fff" />
+              <ExternalLink size={14} color={OASIS.colors.surface} />
               <Text style={s.xOpenFullThreadText}>
                 {isReq ? 'فتح صفحة طلب الفزعة كاملة والمتابعة ←' : 'فتح صفحة الاستفسار كاملة والتفاعل ←'}
               </Text>
@@ -723,72 +743,108 @@ export default function TwitterInquiryCard({
           </Pressable>
         </View>
       )}
+      <Modal visible={reactionPickerOpen} transparent animationType="fade" onRequestClose={() => setReactionPickerOpen(false)}>
+        <View style={s.pickerBackdrop}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setReactionPickerOpen(false)} accessibilityRole="button" accessibilityLabel="إغلاق التفاعلات" />
+          <View style={s.pickerPanel}>
+            <Text style={s.pickerTitle}>اختر تفاعلك</Text>
+            {REACTIONS.map(({ id, Icon, label }) => (
+              <Pressable oasisKind="chip" key={id} disabled={reactionBusy} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected: myReaction === id, disabled: reactionBusy }} style={[s.pickerOption, myReaction === id && s.xReactionChipActive]} onPress={() => { setReactionPickerOpen(false); void handleReaction(id); }}>
+                <Icon size={22} color={OASIS.colors.primary} />
+                <Text style={s.pickerLabel}>{label}</Text>
+                <Text style={s.xReactionCount}>{reactionCounts[id]}</Text>
+              </Pressable>
+            ))}
+            <Text style={s.xTimeAgo}>اختيار تفاعلك الحالي مرة أخرى يزيله</Text>
+          </View>
+        </View>
+      </Modal>
+      <Modal visible={editorOpen} transparent animationType="fade" onRequestClose={() => { if (!editBusy) setEditorOpen(false); }}>
+        <View style={s.pickerBackdrop}>
+          <View style={s.pickerPanel}>
+            <Text style={s.pickerTitle}>تعديل المنشور</Text>
+            <TextInput accessibilityLabel="عنوان المنشور" value={editTitle} onChangeText={setEditTitle} maxLength={200} style={s.editInput} />
+            <TextInput accessibilityLabel="نص المنشور" value={editBody} onChangeText={setEditBody} multiline maxLength={5000} style={[s.editInput, { minHeight: 100 }]} />
+            {isReq && <TextInput accessibilityLabel="ملاحظات الطلب" value={editNotes} onChangeText={setEditNotes} multiline maxLength={2000} style={s.editInput} />}
+            <Pressable accessibilityRole="button" disabled={editBusy || !editTitle.trim()} onPress={() => void savePostEdit()} style={[s.pickerOption, { backgroundColor: OASIS.colors.soft }]}><Text style={s.pickerLabel}>{editBusy ? 'جارٍ الحفظ...' : 'حفظ التعديلات'}</Text></Pressable>
+            <Pressable accessibilityRole="button" disabled={editBusy} onPress={() => setEditorOpen(false)} style={s.pickerOption}><Text style={s.pickerLabel}>إلغاء</Text></Pressable>
+          </View>
+        </View>
+      </Modal>
       <Modal visible={statusPickerOpen} transparent animationType="fade" onRequestClose={() => setStatusPickerOpen(false)}>
-        <View style={{ flex: 1, justifyContent: 'center', padding: 24, backgroundColor: 'rgba(15,23,42,0.45)' }}>
+        <View style={{ flex: 1, justifyContent: 'center', padding: 16, backgroundColor: 'rgba(15,23,42,0.45)' }}>
           <Pressable style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }} onPress={() => setStatusPickerOpen(false)} accessibilityLabel="إغلاق اختيار الحالة" />
-          <View style={{ backgroundColor: '#ffffff', borderRadius: 22, padding: 18, gap: 9 }}>
-            <Text style={{ color: '#0f172a', fontSize: 16, fontWeight: '900', textAlign: 'right', marginBottom: 4 }}>تحديث حالة المنشور</Text>
-            {Object.entries(statusLabels).map(([value, label]) => (
-              <Pressable key={value} onPress={() => { setStatusPickerOpen(false); void updateResolutionStatus(value); }} style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 13, paddingVertical: 12, borderRadius: 13, backgroundColor: resolutionStatus === value ? '#dcfce7' : '#f8fafc', borderWidth: 1, borderColor: resolutionStatus === value ? '#86efac' : '#e2e8f0' }}>
-                <Text style={{ color: resolutionStatus === value ? '#166534' : '#334155', fontSize: 13, fontWeight: '800', textAlign: 'right' }}>{label}</Text>
+          <View style={{ backgroundColor: OASIS.colors.surface, borderRadius: 14, padding: 18, gap: 9 }}>
+            <Text style={{ color: OASIS.colors.ink, fontSize: 16, fontWeight: '700', textAlign: 'right', marginBottom: 4 }}>تحديث حالة المنشور</Text>
+            {Object.entries(statusLabels).filter(([value]) => value !== 'accepted').map(([value, label]) => (
+              <Pressable key={value} onPress={() => { setStatusPickerOpen(false); void updateResolutionStatus(value); }} style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 13, paddingVertical: 12, borderRadius: 13, backgroundColor: resolutionStatus === value ? '#dcfce7' : OASIS.colors.background, borderWidth: 1, borderColor: resolutionStatus === value ? '#86efac' : OASIS.colors.line }}>
+                <Text style={{ color: resolutionStatus === value ? '#166534' : OASIS.colors.ink, fontSize: 13, fontWeight: '600', textAlign: 'right' }}>{label}</Text>
                 {resolutionStatus === value && <Check size={16} color="#166534" />}
               </Pressable>
             ))}
             <Pressable onPress={() => setStatusPickerOpen(false)} style={{ alignItems: 'center', padding: 10 }}>
-              <Text style={{ color: '#64748b', fontSize: 12, fontWeight: '800' }}>إلغاء</Text>
+              <Text style={{ color: OASIS.colors.muted, fontSize: 12, fontWeight: '600' }}>إلغاء</Text>
             </Pressable>
           </View>
         </View>
       </Modal>
-    </View>
+    </OasisSurface>
   );
 }
 
 const s = StyleSheet.create({
+  pickerBackdrop: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 14, backgroundColor: 'rgba(15,23,42,0.4)' },
+  pickerPanel: { width: '100%', maxWidth: 420, borderRadius: 14, backgroundColor: OASIS.colors.surface, padding: 14, gap: 10 },
+  pickerTitle: { color: '#173c2c', fontSize: 16, fontWeight: '600', textAlign: 'right', marginBottom: 4 },
+  pickerOption: { minHeight: 48, borderRadius: 14, paddingHorizontal: 12, flexDirection: 'row-reverse', alignItems: 'center', gap: 12, backgroundColor: '#f7faf8' },
+  pickerLabel: { flex: 1, textAlign: 'right', color: '#254b39', fontSize: 14, fontWeight: '700' },
+  editInput: { borderWidth: 1, borderColor: '#dbe5df', borderRadius: 12, padding: 12, color: '#173c2c', textAlign: 'right', fontSize: 14 },
   xCard: {
-    backgroundColor: '#fff',
-    borderRadius: 22,
-    minHeight: 330,
-    padding: 16,
+    backgroundColor: OASIS.colors.surface,
+    borderRadius: 14,
+    padding: 14,
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
+    borderColor: OASIS.colors.line,
+    shadowColor: OASIS.colors.ink,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0,
+    shadowRadius: 12,
     elevation: 3,
   },
-  // Uniform compact cards; full text and replies live on the post details page.
-  xCardCollapsed: { height: 440, overflow: 'hidden' },
+  // Natural height prevents text, chips and actions from being clipped on different devices.
+  xCardCollapsed: {},
   xCardEmergency: {
     borderColor: '#fca5a5',
     backgroundColor: '#fffafa',
   },
   xCardToolSharing: {
     borderColor: '#bbf7d0',
-    backgroundColor: '#f0fdf4',
+    backgroundColor: OASIS.colors.soft,
   },
   xHeader: {
     flexDirection: 'row-reverse',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 14,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
   },
   xAvatarWrap: {
     position: 'relative',
     marginLeft: 10,
   },
   xAvatarImg: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
   },
   xAvatarFallback: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#059669',
+    backgroundColor: OASIS.colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -799,16 +855,17 @@ const s = StyleSheet.create({
     width: 16,
     height: 16,
     borderRadius: 8,
-    backgroundColor: '#059669',
+    backgroundColor: OASIS.colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
-    borderColor: '#fff',
+    borderColor: OASIS.colors.surface,
   },
   xAuthorMeta: {
     flex: 1,
+    minWidth: 0,
     alignItems: 'flex-end',
-    gap: 3,
+    gap: 5,
   },
   xAuthorRow: {
     flexDirection: 'row-reverse',
@@ -818,8 +875,8 @@ const s = StyleSheet.create({
   },
   xAuthorName: {
     fontSize: 14,
-    fontWeight: '900',
-    color: '#0f172a',
+    fontWeight: '700',
+    color: OASIS.colors.ink,
   },
   xHandle: {
     fontSize: 11,
@@ -847,9 +904,9 @@ const s = StyleSheet.create({
     borderRadius: 10,
   },
   xEmergencyBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#dc2626',
+    fontSize: 11,
+    fontWeight: '600',
+    color: OASIS.colors.danger,
   },
   xToolBadge: {
     flexDirection: 'row-reverse',
@@ -861,9 +918,9 @@ const s = StyleSheet.create({
     borderRadius: 10,
   },
   xToolBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#16a34a',
+    fontSize: 11,
+    fontWeight: '600',
+    color: OASIS.colors.primary,
   },
   xReqBadge: {
     flexDirection: 'row-reverse',
@@ -875,67 +932,67 @@ const s = StyleSheet.create({
     borderRadius: 10,
   },
   xReqBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
+    fontSize: 11,
+    fontWeight: '600',
     color: '#d97706',
   },
   xCategoryBadge: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 3,
-    backgroundColor: '#ecfdf5',
+    backgroundColor: OASIS.colors.soft,
     paddingHorizontal: 8,
     paddingVertical: 2.5,
     borderRadius: 10,
   },
   xCategoryBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#059669',
+    fontSize: 11,
+    fontWeight: '600',
+    color: OASIS.colors.primary,
   },
   xLocationRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 4,
-    marginTop: 2,
-  },
+    marginTop: 2,  },
   xLocationText: {
     fontSize: 11,
-    color: '#059669',
+    color: OASIS.colors.primary,
     fontWeight: '700',
   },
-  xContentArea: { marginBottom: 8, minHeight: 96 },
-  xCompactStatus: { alignSelf: 'flex-start', flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 10, backgroundColor: '#ecfdf5', marginTop: 5, marginBottom: 3 },
-  xCompactStatusDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#059669' },
-  xCompactStatusDotResolved: { backgroundColor: '#64748b' },
-  xCompactStatusText: { fontSize: 10, color: '#047857', fontWeight: '800' },
-  xReadMore: { alignSelf: 'flex-end', color: '#047857', fontSize: 12, fontWeight: '800', marginTop: -3, marginBottom: 8, textAlign: 'right' },
+  xContentArea: { marginBottom: 12, minHeight: 0 },
+  xCompactStatus: { alignSelf: 'flex-start', flexDirection: 'row-reverse', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, backgroundColor: OASIS.colors.soft, marginTop: 10, marginBottom: 10 },
+  xCompactStatusDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: OASIS.colors.primary },
+  xCompactStatusDotResolved: { backgroundColor: OASIS.colors.muted },
+  xCompactStatusText: { fontSize: 11, color: OASIS.colors.primary, fontWeight: '600' },
+  xReadMore: { alignSelf: 'flex-end', color: OASIS.colors.primary, fontSize: 12, fontWeight: '600', marginTop: 2, marginBottom: 10, textAlign: 'right' },
   xStatusTrack: { flexDirection: 'row-reverse', alignItems: 'flex-start', justifyContent: 'space-between', gap: 4, marginTop: 10, marginBottom: 8, paddingHorizontal: 2 },
   xStatusStep: { flex: 1, alignItems: 'center', gap: 4 },
   xStatusDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#cbd5e1', borderWidth: 1, borderColor: '#cbd5e1' },
-  xStatusDotActive: { backgroundColor: '#059669', borderColor: '#059669' },
-  xStatusLabel: { fontSize: 9, lineHeight: 12, color: '#94a3b8', textAlign: 'center' },
-  xStatusLabelActive: { color: '#047857', fontWeight: '800' },
-  xReactionsRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 5, marginTop: 2, marginBottom: 8 },
-  xReactionChip: { flex: 1, minHeight: 34, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 4, paddingVertical: 6, borderRadius: 12, backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0' },
-  xReactionChipActive: { backgroundColor: '#ecfdf5', borderColor: '#6ee7b7' },
+  xStatusDotActive: { backgroundColor: OASIS.colors.primary, borderColor: OASIS.colors.primary },
+  xStatusLabel: { fontSize: 11, lineHeight: 15, color: '#94a3b8', textAlign: 'center' },
+  xStatusLabelActive: { color: OASIS.colors.primary, fontWeight: '600' },
+  xReactionsRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 7, marginTop: 12, marginBottom: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#f1f5f9' },
+  xReactionChip: { flex: 1, minHeight: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 5, paddingVertical: 7, borderRadius: 14, backgroundColor: OASIS.colors.background, borderWidth: 1, borderColor: OASIS.colors.line },
+  xReactionChipActive: { backgroundColor: OASIS.colors.soft, borderColor: '#6ee7b7' },
   xReactionEmoji: { fontSize: 13 },
-  xReactionCount: { color: '#64748b', fontSize: 11, fontWeight: '800' },
-  xReactionCountActive: { color: '#047857' },
+  xReactionCount: { color: OASIS.colors.muted, fontSize: 11, fontWeight: '600' },
+  xReactionCountActive: { color: OASIS.colors.primary },
   xTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#0f172a',
+    fontSize: 18,
+    fontWeight: '700',
+    color: OASIS.colors.ink,
     textAlign: 'right',
-    lineHeight: 23,
-    marginBottom: 6,
+    lineHeight: 24,
+    marginBottom: 8,
+    letterSpacing: -0.2,
   },
   xBodyText: {
-    fontSize: 13.5,
-    color: '#475569',
+    fontSize: 14,
+    color: OASIS.colors.muted,
     textAlign: 'right',
-    lineHeight: 21,
-    marginBottom: 10,
+    lineHeight: 23,
+    marginBottom: 4,
   },
   xHashtagRow: {
     flexDirection: 'row-reverse',
@@ -944,26 +1001,28 @@ const s = StyleSheet.create({
   },
   xHashPill: {
     backgroundColor: '#f1f5f9',
-    paddingHorizontal: 9,
-    paddingVertical: 3.5,
-    borderRadius: 10,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: OASIS.colors.line,
   },
   xHashText: {
     fontSize: 11,
-    color: '#64748b',
+    color: OASIS.colors.muted,
     fontWeight: '700',
   },
   xRespondersPreview: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#f8fafc',
-    borderRadius: 14,
+    backgroundColor: OASIS.colors.background,
+    borderRadius: 16,
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginBottom: 10,
+    paddingVertical: 10,
+    marginBottom: 4,
     borderWidth: 1,
-    borderColor: '#edf2f7',
+    borderColor: OASIS.colors.line,
   },
   xRespondersAvatars: {
     flexDirection: 'row-reverse',
@@ -971,7 +1030,7 @@ const s = StyleSheet.create({
   },
   xMiniStackAvatarWrap: {
     borderWidth: 2,
-    borderColor: '#fff',
+    borderColor: OASIS.colors.surface,
     borderRadius: 13,
   },
   xMiniStackAvatar: {
@@ -983,14 +1042,14 @@ const s = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#059669',
+    backgroundColor: OASIS.colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   xMiniStackAvatarLetter: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '800',
+    color: OASIS.colors.surface,
+    fontSize: 11,
+    fontWeight: '600',
   },
   xRespondersPreviewTextCol: {
     flex: 1,
@@ -999,35 +1058,45 @@ const s = StyleSheet.create({
   },
   xRespondersPreviewText: {
     fontSize: 12,
-    fontWeight: '800',
-    color: '#1e293b',
+    fontWeight: '600',
+    color: OASIS.colors.ink,
   },
   xRespondersPreviewSub: {
-    fontSize: 10.5,
-    color: '#64748b',
+    fontSize: 11,
+    color: OASIS.colors.muted,
   },
   xActionBar: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 10,
+    justifyContent: 'space-around',
+    marginHorizontal: -16,
+    marginBottom: -16,
+    marginTop: 2,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     borderTopWidth: 1,
     borderTopColor: '#f1f5f9',
+    backgroundColor: '#fcfdff',
+    borderBottomLeftRadius: 22,
+    borderBottomRightRadius: 22,
   },
   xActionBtn: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    gap: 4,
-    padding: 6,
+    justifyContent: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
   },
   xActionBtnActive: {
-    backgroundColor: '#ecfdf5',
+    backgroundColor: OASIS.colors.soft,
     borderRadius: 16,
     paddingHorizontal: 8,
   },
   xActionCounter: {
     fontSize: 12,
-    color: '#64748b',
+    color: OASIS.colors.muted,
     fontWeight: '700',
   },
   xActionViews: {
@@ -1038,7 +1107,7 @@ const s = StyleSheet.create({
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1.5,
-    borderTopColor: '#e2e8f0',
+    borderTopColor: OASIS.colors.line,
   },
   xThreadHeader: {
     flexDirection: 'row-reverse',
@@ -1050,14 +1119,14 @@ const s = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#ecfdf5',
+    backgroundColor: OASIS.colors.soft,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 12,
   },
   xThreadCloseText: {
     fontSize: 11,
-    color: '#059669',
+    color: OASIS.colors.primary,
     fontWeight: '700',
   },
   xThreadTitleRow: {
@@ -1067,8 +1136,8 @@ const s = StyleSheet.create({
   },
   xThreadTitle: {
     fontSize: 13,
-    fontWeight: '800',
-    color: '#334155',
+    fontWeight: '600',
+    color: OASIS.colors.ink,
   },
   xAnswersList: {
     gap: 8,
@@ -1084,7 +1153,7 @@ const s = StyleSheet.create({
     top: 36,
     width: 1.5,
     height: '100%',
-    backgroundColor: '#e2e8f0',
+    backgroundColor: OASIS.colors.line,
   },
   xAnswerAvatarWrap: {
     width: 34,
@@ -1099,25 +1168,25 @@ const s = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: '#e2e8f0',
+    backgroundColor: OASIS.colors.line,
     alignItems: 'center',
     justifyContent: 'center',
   },
   xAnswerAvatarLetter: {
     fontSize: 13,
-    fontWeight: '800',
-    color: '#475569',
+    fontWeight: '600',
+    color: OASIS.colors.muted,
   },
   xAnswerBubble: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: OASIS.colors.background,
     borderRadius: 14,
     padding: 10,
     borderWidth: 1,
     borderColor: '#edf2f7',
   },
   xAnswerBubbleAccepted: {
-    backgroundColor: '#f0fdf4',
+    backgroundColor: OASIS.colors.soft,
     borderWidth: 1.5,
     borderColor: '#86efac',
   },
@@ -1129,35 +1198,35 @@ const s = StyleSheet.create({
   },
   xAnswerAuthorName: {
     fontSize: 12,
-    fontWeight: '800',
-    color: '#334155',
+    fontWeight: '600',
+    color: OASIS.colors.ink,
   },
   xAnswerTime: {
-    fontSize: 10,
+    fontSize: 11,
     color: '#94a3b8',
   },
   xAcceptedBadge: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 3,
-    backgroundColor: '#059669',
+    backgroundColor: OASIS.colors.primary,
     paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: 8,
   },
   xAcceptedBadgeText: {
-    fontSize: 9.5,
-    fontWeight: '800',
-    color: '#fff',
+    fontSize: 11,
+    fontWeight: '600',
+    color: OASIS.colors.surface,
   },
   xAnswerBodyText: {
     fontSize: 13,
-    color: '#1e293b',
+    color: OASIS.colors.ink,
     textAlign: 'right',
     lineHeight: 19,
   },
   xNoAnswersBox: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: OASIS.colors.background,
     borderRadius: 14,
     padding: 14,
     alignItems: 'center',
@@ -1171,7 +1240,7 @@ const s = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#ecfdf5',
+    backgroundColor: OASIS.colors.soft,
     borderWidth: 1,
     borderColor: '#a7f3d0',
     borderRadius: 14,
@@ -1179,21 +1248,21 @@ const s = StyleSheet.create({
     marginTop: 8,
   },
   xMoreRepliesPill: {
-    backgroundColor: '#059669',
+    backgroundColor: OASIS.colors.primary,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 10,
   },
   xMoreRepliesPillText: {
-    color: '#fff',
+    color: OASIS.colors.surface,
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   xMoreRepliesCardText: {
     flex: 1,
     fontSize: 12,
     fontWeight: '700',
-    color: '#065f46',
+    color: OASIS.colors.deep,
     textAlign: 'right',
     marginHorizontal: 8,
   },
@@ -1214,12 +1283,12 @@ const s = StyleSheet.create({
     marginTop: 12,
     padding: 12,
     borderRadius: 12,
-    backgroundColor: '#ecfdf5',
+    backgroundColor: OASIS.colors.soft,
   },
   xGuestReplyText: {
-    color: '#047857',
+    color: OASIS.colors.primary,
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   xQuickReplyAvatar: {
     width: 32,
@@ -1234,14 +1303,14 @@ const s = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#059669',
+    backgroundColor: OASIS.colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   xMiniAvatarLetter: {
     fontSize: 13,
-    fontWeight: '800',
-    color: '#fff',
+    fontWeight: '600',
+    color: OASIS.colors.surface,
   },
   xQuickReplyInput: {
     flex: 1,
@@ -1250,13 +1319,13 @@ const s = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     fontSize: 13,
-    color: '#0f172a',
+    color: OASIS.colors.ink,
     textAlign: 'right',
     minHeight: 38,
     maxHeight: 80,
   },
   xQuickReplySendBtn: {
-    backgroundColor: '#059669',
+    backgroundColor: OASIS.colors.primary,
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 4,
@@ -1268,9 +1337,9 @@ const s = StyleSheet.create({
     backgroundColor: '#cbd5e1',
   },
   xQuickReplySendText: {
-    color: '#fff',
+    color: OASIS.colors.surface,
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   xOpenFullThreadBtn: {
     marginTop: 12,
@@ -1287,7 +1356,7 @@ const s = StyleSheet.create({
   },
   xOpenFullThreadText: {
     fontSize: 12.5,
-    color: '#fff',
-    fontWeight: '800',
+    color: OASIS.colors.surface,
+    fontWeight: '600',
   },
 });

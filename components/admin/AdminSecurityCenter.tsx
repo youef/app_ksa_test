@@ -1,5 +1,7 @@
+import { OasisPressable as Pressable, OasisSurface } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, Pressable, ActivityIndicator, StyleSheet, Linking } from 'react-native';
+import { View, Text, ActivityIndicator, StyleSheet, Linking } from 'react-native';
 import {
   ShieldCheck,
   ShieldAlert,
@@ -158,7 +160,7 @@ export function AdminSecurityCenter({ onSaved }: { onSaved: (msg: string) => voi
             مراقبة التحقق بخطوتين، محاولات الدخول، صلاحية كلمات المرور، وسجل الوصول وتغييرات الإعدادات.
           </Text>
         </View>
-        <Pressable style={styles.refreshBtn} onPress={() => void load()}>
+        <Pressable oasisKind="icon" style={styles.refreshBtn} onPress={() => void load()}>
           <RefreshCw size={15} color={C.accentDark} />
         </Pressable>
       </View>
@@ -183,7 +185,7 @@ export function AdminSecurityCenter({ onSaved }: { onSaved: (msg: string) => voi
       </View>
 
       {/* Admins security posture */}
-      <View style={styles.card}>
+      <OasisSurface oasisSurface="card" style={styles.card}>
         <View style={styles.cardHead}>
           <Text style={styles.cardTitle}>وضع المدراء أمنيًا 🛡️</Text>
           <Text style={styles.cardSub}>{admins.length} حساب</Text>
@@ -222,7 +224,7 @@ export function AdminSecurityCenter({ onSaved }: { onSaved: (msg: string) => voi
                     </View>
                   ) : null}
                   {(a.failed_login_attempts || 0) > 0 ? (
-                    <Pressable
+                    <Pressable oasisKind="chip"
                       style={[styles.chip, { backgroundColor: C.roseLight }]}
                       onPress={() => void resetAttempts(a.id)}
                       disabled={busyId === a.id}
@@ -238,10 +240,10 @@ export function AdminSecurityCenter({ onSaved }: { onSaved: (msg: string) => voi
             );
           })
         )}
-      </View>
+      </OasisSurface>
 
       {/* Access log */}
-      <View style={styles.card}>
+      <OasisSurface oasisSurface="card" style={styles.card}>
         <View style={styles.cardHead}>
           <LogIn size={14} color={C.muted} />
           <Text style={styles.cardTitle}>سجل الوصول الأخير</Text>
@@ -266,10 +268,10 @@ export function AdminSecurityCenter({ onSaved }: { onSaved: (msg: string) => voi
             </View>
           ))
         )}
-      </View>
+      </OasisSurface>
 
       {/* Config changes */}
-      <View style={styles.card}>
+      <OasisSurface oasisSurface="card" style={styles.card}>
         <View style={styles.cardHead}>
           <History size={14} color={C.muted} />
           <Text style={styles.cardTitle}>سجل تعديلات الإعدادات</Text>
@@ -287,7 +289,7 @@ export function AdminSecurityCenter({ onSaved }: { onSaved: (msg: string) => voi
             </View>
           ))
         )}
-      </View>
+      </OasisSurface>
 
       <Pressable
         style={styles.helpRow}
@@ -326,51 +328,51 @@ function Metric({
 }
 
 const styles = StyleSheet.create({
-  wrap: { padding: 14, paddingBottom: 48, gap: 2 },
+  wrap: { padding: 14, paddingBottom: 24, gap: 2 },
   center: { paddingVertical: 60, alignItems: 'center' },
   loadingText: { marginTop: 10, fontSize: 12.5, color: C.muted, fontWeight: '700' },
   headRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, marginBottom: 10 },
-  sectionTitle: { fontSize: 17, fontWeight: '900', color: C.ink, textAlign: 'right' },
+  sectionTitle: { fontSize: 17, fontWeight: '700', color: C.ink, textAlign: 'right' },
   sectionSub: { fontSize: 11, color: C.muted, textAlign: 'right', lineHeight: 17, marginTop: 3 },
   refreshBtn: { width: 38, height: 38, borderRadius: 12, backgroundColor: C.accentLight, alignItems: 'center', justifyContent: 'center' },
 
   metricGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 10, marginBottom: 4 },
-  metricTile: { flexGrow: 1, flexBasis: 150, minWidth: 140, backgroundColor: '#fff', borderRadius: 16, borderWidth: 1, borderColor: C.border, padding: 14 },
+  metricTile: { flexGrow: 1, flexBasis: 150, minWidth: 140, backgroundColor: OASIS.colors.surface, borderRadius: 16, borderWidth: 1, borderColor: C.border, padding: 14 },
   metricTileHead: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, marginBottom: 6 },
-  metricTileLabel: { flex: 1, fontSize: 11, fontWeight: '800', color: C.muted, textAlign: 'right' },
-  metricTileNum: { fontSize: 22, fontWeight: '900', color: C.ink, textAlign: 'right' },
-  metricTileSub: { fontSize: 10.5, color: C.subtle, fontWeight: '700', textAlign: 'right', marginTop: 2 },
+  metricTileLabel: { flex: 1, fontSize: 11, fontWeight: '600', color: C.muted, textAlign: 'right' },
+  metricTileNum: { fontSize: 22, fontWeight: '700', color: C.ink, textAlign: 'right' },
+  metricTileSub: { fontSize: 11, color: C.subtle, fontWeight: '700', textAlign: 'right', marginTop: 2 },
 
-  card: { backgroundColor: '#fff', borderRadius: 18, borderWidth: 1, borderColor: C.border, padding: 14, marginBottom: 12 },
+  card: { backgroundColor: OASIS.colors.surface, borderRadius: 14, borderWidth: 1, borderColor: C.border, padding: 14, marginBottom: 12 },
   cardHead: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, marginBottom: 10 },
-  cardTitle: { flex: 1, fontSize: 13.5, fontWeight: '900', color: C.ink, textAlign: 'right' },
-  cardSub: { fontSize: 10.5, color: C.subtle, fontWeight: '700' },
+  cardTitle: { flex: 1, fontSize: 13.5, fontWeight: '700', color: C.ink, textAlign: 'right' },
+  cardSub: { fontSize: 11, color: C.subtle, fontWeight: '700' },
 
   adminRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: '#F1F5F9', gap: 8 },
   adminInfo: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, flex: 1 },
   avatarBox: { width: 34, height: 34, borderRadius: 11, backgroundColor: C.navyMid, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: '#fff', fontWeight: '900', fontSize: 14 },
-  adminName: { fontSize: 12.5, fontWeight: '900', color: C.ink, textAlign: 'right' },
-  adminMeta: { fontSize: 10, color: C.subtle, fontWeight: '700', textAlign: 'right', marginTop: 1 },
+  avatarText: { color: OASIS.colors.surface, fontWeight: '700', fontSize: 14 },
+  adminName: { fontSize: 12.5, fontWeight: '700', color: C.ink, textAlign: 'right' },
+  adminMeta: { fontSize: 11, color: C.subtle, fontWeight: '700', textAlign: 'right', marginTop: 1 },
   chipCol: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 5, maxWidth: 190, justifyContent: 'flex-start' },
   chip: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 9 },
-  chipText: { fontSize: 9.5, fontWeight: '900' },
+  chipText: { fontSize: 11, fontWeight: '700' },
 
   logRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
   logDot: { width: 8, height: 8, borderRadius: 4 },
-  logPath: { fontSize: 11.5, fontWeight: '800', color: C.ink, textAlign: 'right' },
-  logMeta: { fontSize: 9.5, color: C.subtle, fontWeight: '700', textAlign: 'right', marginTop: 1 },
-  logStatus: { fontSize: 10.5, fontWeight: '900' },
+  logPath: { fontSize: 11.5, fontWeight: '600', color: C.ink, textAlign: 'right' },
+  logMeta: { fontSize: 11, color: C.subtle, fontWeight: '700', textAlign: 'right', marginTop: 1 },
+  logStatus: { fontSize: 11, fontWeight: '700' },
 
   changeRow: { paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
-  changeKey: { fontSize: 11.5, fontWeight: '900', color: C.ink, textAlign: 'right' },
-  changeMeta: { fontSize: 10, color: C.subtle, fontWeight: '700', textAlign: 'right', marginTop: 2 },
+  changeKey: { fontSize: 11.5, fontWeight: '700', color: C.ink, textAlign: 'right' },
+  changeMeta: { fontSize: 11, color: C.subtle, fontWeight: '700', textAlign: 'right', marginTop: 2 },
 
   emptyHint: { fontSize: 11.5, color: C.subtle, textAlign: 'right', lineHeight: 18, paddingVertical: 6 },
   notice: { backgroundColor: C.warningLight, borderRadius: 16, padding: 18, alignItems: 'center', gap: 8, marginBottom: 14 },
-  noticeTitle: { fontSize: 14, fontWeight: '900', color: '#92400E', textAlign: 'center' },
+  noticeTitle: { fontSize: 14, fontWeight: '700', color: '#92400E', textAlign: 'center' },
   noticeText: { fontSize: 12, color: '#92400E', textAlign: 'center', lineHeight: 20 },
-  code: { fontWeight: '900', color: '#7C2D12' },
+  code: { fontWeight: '700', color: '#7C2D12' },
   helpRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 4 },
-  helpText: { fontSize: 10.5, color: C.subtle, fontWeight: '700', textAlign: 'center' },
+  helpText: { fontSize: 11, color: C.subtle, fontWeight: '700', textAlign: 'center' },
 });

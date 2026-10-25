@@ -1,18 +1,10 @@
+import { OasisEmptyIllustration } from '@/components/oasis/OasisEmptyIllustration';
+import { OasisPressable as Pressable } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
+import { HeaderAction } from '@/components/shared/AppHeader';
 import { useEffect, useState, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-  StyleSheet,
-  ActivityIndicator,
-  Alert,
-  Modal,
-  Switch,
-  Platform,
-  Image,
-} from 'react-native';
+import { ScrollView, Text, View, StyleSheet, ActivityIndicator, Alert, Modal, Switch, Platform, Image } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -266,19 +258,12 @@ export default function Notifications() {
         fallbackRoute="/home"
         subtitle={unreadCount > 0 ? `${unreadCount} إشعار جديد` : 'تنبيهات وتفاعلات أهالي حيك'}
         rightAction={
-          <Pressable
-            onPress={() => setSettingsOpen(true)}
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: 18,
-              backgroundColor: '#f1f5f9',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
+          <HeaderAction
+            accessibilityLabel="إعدادات الإشعارات" onPress={() => setSettingsOpen(true)}
+
           >
-            <SlidersHorizontal size={18} color="#475569" />
-          </Pressable>
+            <SlidersHorizontal size={20} color={OASIS.colors.primary} />
+          </HeaderAction>
         }
       />
 
@@ -289,7 +274,7 @@ export default function Notifications() {
         justifyContent: 'space-between',
         paddingHorizontal: 16,
         paddingVertical: 10,
-        backgroundColor: '#ffffff',
+        backgroundColor: OASIS.colors.surface,
         borderBottomWidth: 1,
         borderBottomColor: '#f1f5f9',
       }}>
@@ -302,15 +287,15 @@ export default function Notifications() {
               paddingHorizontal: 12,
               paddingVertical: 6,
               borderRadius: 16,
-              backgroundColor: onlyUnread ? '#ecfdf5' : '#f1f5f9',
+              backgroundColor: onlyUnread ? OASIS.colors.soft : '#f1f5f9',
               borderWidth: 1,
-              borderColor: onlyUnread ? '#a7f3d0' : '#e2e8f0',
+              borderColor: onlyUnread ? '#a7f3d0' : OASIS.colors.line,
             },
           ]}
           onPress={() => setOnlyUnread(!onlyUnread)}
         >
           <View style={[styles.filterDot, onlyUnread && styles.filterDotActive]} />
-          <Text style={{ fontSize: 12, fontWeight: '800', color: onlyUnread ? '#047857' : '#64748b' }}>
+          <Text style={{ fontSize: 12, fontWeight: '600', color: onlyUnread ? OASIS.colors.primary : OASIS.colors.muted }}>
             غير المقروء ({unreadCount})
           </Text>
         </Pressable>
@@ -325,12 +310,12 @@ export default function Notifications() {
                 paddingHorizontal: 10,
                 paddingVertical: 6,
                 borderRadius: 14,
-                backgroundColor: '#ecfdf5',
+                backgroundColor: OASIS.colors.soft,
               }}
               onPress={markAllAsRead}
             >
-              <CheckCheck size={14} color="#059669" />
-              <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#059669' }}>قراءة الكل</Text>
+              <CheckCheck size={14} color={OASIS.colors.primary} />
+              <Text style={{ fontSize: 11.5, fontWeight: '600', color: OASIS.colors.primary }}>قراءة الكل</Text>
             </Pressable>
           )}
 
@@ -356,7 +341,7 @@ export default function Notifications() {
       {/* 2. CATEGORY TABS (SCROLLABLE PILLS)                      */}
       {/* ======================================================== */}
       <View style={styles.tabsWrapper}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsScroll}>
+        <ScrollView style={{ direction: 'rtl' }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.tabsScroll, { direction: 'ltr' }]}>
           {[
             { key: 'all', label: 'الكل', count: items.length },
             {
@@ -382,7 +367,7 @@ export default function Notifications() {
           ].map(tab => {
             const isActive = activeTab === tab.key;
             return (
-              <Pressable
+              <Pressable oasisKind="chip" oasisVariant={isActive ? "primary" : "secondary"} accessibilityRole="tab" accessibilityState={{ selected: isActive }}
                 key={tab.key}
                 style={[styles.tabItem, isActive && styles.tabItemActive]}
                 onPress={() => setActiveTab(tab.key as NotificationCategory)}
@@ -408,7 +393,7 @@ export default function Notifications() {
       {/* ======================================================== */}
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#059669" />
+          <ActivityIndicator size="large" color={OASIS.colors.primary} />
           <Text style={styles.loadingText}>جاري مزامنة الإشعارات...</Text>
         </View>
       ) : (
@@ -419,9 +404,7 @@ export default function Notifications() {
         >
           {filteredItems.length === 0 ? (
             <View style={styles.emptyContainer}>
-              <View style={styles.emptyIconCircle}>
-                <Bell size={42} color="#94a3b8" />
-              </View>
+              <View style={{ alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}><OasisEmptyIllustration kind="empty-notifications" /></View>
               <Text style={styles.emptyTitle}>
                 {onlyUnread ? 'لا توجد إشعارات غير مقروءة' : 'لا توجد إشعارات في هذا التصنيف'}
               </Text>
@@ -437,7 +420,7 @@ export default function Notifications() {
               const typeConfig = getTypeVisuals(item);
 
               return (
-                <Pressable
+                <Pressable oasisKind="card" oasisSurfaceState={isRead ? "default" : item.type === "emergency" ? "error" : "unread"}
                   key={item.id}
                   style={[
                     styles.notifCard,
@@ -448,41 +431,6 @@ export default function Notifications() {
                 >
                   {/* Left Action & Menu Buttons */}
                   <View style={styles.cardHeaderRow}>
-                    <View style={styles.actionIconGroup}>
-                      <Pressable
-                        style={styles.smallActionBtn}
-                        onPress={e => {
-                          e.stopPropagation();
-                          toggleReadStatus(item);
-                        }}
-                        hitSlop={8}
-                      >
-                        <CheckCheck size={16} color={isRead ? '#94a3b8' : '#059669'} />
-                      </Pressable>
-
-                      <Pressable
-                        style={styles.smallActionBtn}
-                        onPress={e => {
-                          e.stopPropagation();
-                          deleteNotification(item.id);
-                        }}
-                        hitSlop={8}
-                      >
-                        <Trash2 size={15} color="#cbd5e1" />
-                      </Pressable>
-                    </View>
-
-                    {/* Notification Category Tag & Time */}
-                    <View style={styles.cardTagRow}>
-                      <Text style={styles.timeText}>{formatTimeAgo(item.created_at)}</Text>
-                      <View style={[styles.typeBadge, { backgroundColor: typeConfig.bgColor }]}>
-                        <Text style={[styles.typeBadgeText, { color: typeConfig.textColor }]}>
-                          {typeConfig.label}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-
                   {/* Actor identity: tap the avatar/name to open the author's profile. */}
                   {item.actor && (
                     <Pressable
@@ -503,12 +451,41 @@ export default function Notifications() {
                         <View style={styles.actorAvatarFallback}><Text style={styles.actorAvatarInitial}>{(item.actor.display_name || item.actor.username || 'م')[0]}</Text></View>
                       )}
                       <View style={styles.actorCopy}>
-                        <Text style={styles.actorName}>{item.actor.display_name || item.actor.username || 'مستخدم'} {item.actor.is_verified ? '✓' : ''}</Text>
-                        {!!item.actor.username && <Text style={styles.actorHandle}>@{item.actor.username}</Text>}
+                        <Text numberOfLines={1} style={styles.actorName}>{item.actor.display_name || item.actor.username || 'مستخدم'} {item.actor.is_verified ? '✓' : ''}</Text>
+                        {!!item.actor.username && <Text numberOfLines={1} style={styles.actorHandle}>@{item.actor.username}</Text>}
                       </View>
-                      <Text style={styles.actorLink}>عرض الملف</Text>
+                      
                     </Pressable>
                   )}
+
+                    <View style={styles.actionIconGroup}>
+                      <Pressable oasisKind="icon"
+                        style={styles.smallActionBtn}
+                        accessibilityLabel={isRead ? 'تحديد كغير مقروء' : 'تحديد كمقروء'}
+                        onPress={e => {
+                          e.stopPropagation();
+                          toggleReadStatus(item);
+                        }}
+                        hitSlop={8}
+                      >
+                        <CheckCheck size={16} color={isRead ? '#94a3b8' : OASIS.colors.primary} />
+                      </Pressable>
+
+                      <Pressable oasisKind="plain"
+                        style={styles.smallActionBtn}
+                        accessibilityLabel="حذف الإشعار"
+                        onPress={e => {
+                          e.stopPropagation();
+                          deleteNotification(item.id);
+                        }}
+                        hitSlop={8}
+                      >
+                        <Trash2 size={15} color={OASIS.colors.danger} />
+                      </Pressable>
+                    </View>
+
+
+                  </View>
 
                   {/* Body Content */}
                   <View style={styles.cardBodyRow}>
@@ -533,15 +510,17 @@ export default function Notifications() {
                     </LinearGradient>
                   </View>
 
-                  {/* Target Action Link if available */}
-                  {item.target_type && (
-                    <View style={styles.cardFooterAction}>
-                      <Text style={styles.footerActionText}>
-                        {getActionText(item.target_type)}
-                      </Text>
-                      <ArrowLeft size={13} color="#059669" />
-                    </View>
-                  )}
+                  <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
+                    {/* Notification Category Tag & Time */}
+                    <View style={styles.cardTagRow}>
+                      <Text style={styles.timeText}>{formatTimeAgo(item.created_at)}</Text>
+                      <View style={[styles.typeBadge, { backgroundColor: typeConfig.bgColor }]}>
+                        <Text style={[styles.typeBadgeText, { color: typeConfig.textColor }]}>
+                          {typeConfig.label}
+                        </Text>
+                      </View>
+                    </View>                  </View>
+
                 </Pressable>
               );
             })
@@ -558,8 +537,8 @@ export default function Notifications() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Pressable onPress={() => setSettingsOpen(false)} style={styles.modalCloseBtn}>
-                <X size={20} color="#64748b" />
+              <Pressable oasisKind="icon" onPress={() => setSettingsOpen(false)} style={styles.modalCloseBtn}>
+                <X size={20} color={OASIS.colors.muted} />
               </Pressable>
               <Text style={styles.modalTitle}>إعدادات التنبيهات</Text>
             </View>
@@ -574,7 +553,7 @@ export default function Notifications() {
                 <Switch
                   value={notifPrefEmergency}
                   onValueChange={setNotifPrefEmergency}
-                  trackColor={{ false: '#e2e8f0', true: '#ef4444' }}
+                  trackColor={{ false: OASIS.colors.line, true: OASIS.colors.danger }}
                 />
                 <View style={styles.settingInfo}>
                   <Text style={styles.settingLabel}>🚨 طوارئ وبلاغات الحي العاجلة (SOS)</Text>
@@ -587,8 +566,8 @@ export default function Notifications() {
                 <Switch
                   value={notifPrefAnswers}
                   onValueChange={setNotifPrefAnswers}
-                  trackColor={{ false: '#e2e8f0', true: '#a7f3d0' }}
-                  thumbColor={notifPrefAnswers ? '#059669' : '#9ca3af'}
+                  trackColor={{ false: OASIS.colors.line, true: '#a7f3d0' }}
+                  thumbColor={notifPrefAnswers ? OASIS.colors.primary : '#9ca3af'}
                 />
                 <View style={styles.settingInfo}>
                   <Text style={styles.settingLabel}>💬 إجابات وردود أهل الحي</Text>
@@ -601,8 +580,8 @@ export default function Notifications() {
                 <Switch
                   value={notifPrefCommunity}
                   onValueChange={setNotifPrefCommunity}
-                  trackColor={{ false: '#e2e8f0', true: '#a7f3d0' }}
-                  thumbColor={notifPrefCommunity ? '#059669' : '#9ca3af'}
+                  trackColor={{ false: OASIS.colors.line, true: '#a7f3d0' }}
+                  thumbColor={notifPrefCommunity ? OASIS.colors.primary : '#9ca3af'}
                 />
                 <View style={styles.settingInfo}>
                   <Text style={styles.settingLabel}>🤝 إعارة الأدوات ومساعدة الجيران</Text>
@@ -615,8 +594,8 @@ export default function Notifications() {
                 <Switch
                   value={notifPrefStories}
                   onValueChange={setNotifPrefStories}
-                  trackColor={{ false: '#e2e8f0', true: '#a7f3d0' }}
-                  thumbColor={notifPrefStories ? '#059669' : '#9ca3af'}
+                  trackColor={{ false: OASIS.colors.line, true: '#a7f3d0' }}
+                  thumbColor={notifPrefStories ? OASIS.colors.primary : '#9ca3af'}
                 />
                 <View style={styles.settingInfo}>
                   <Text style={styles.settingLabel}>📸 يوميات وقصص الجيران</Text>
@@ -625,19 +604,19 @@ export default function Notifications() {
               </View>
 
               <View style={styles.settingRow}>
-                <Switch value={notifPrefFollows} onValueChange={v => { setNotifPrefFollows(v); void savePreferences({ follows: v }); }} trackColor={{ false: '#e2e8f0', true: '#a7f3d0' }} thumbColor={notifPrefFollows ? '#059669' : '#9ca3af'} />
+                <Switch value={notifPrefFollows} onValueChange={v => { setNotifPrefFollows(v); void savePreferences({ follows: v }); }} trackColor={{ false: OASIS.colors.line, true: '#a7f3d0' }} thumbColor={notifPrefFollows ? OASIS.colors.primary : '#9ca3af'} />
                 <View style={styles.settingInfo}><Text style={styles.settingLabel}>👤 متابع جديد</Text><Text style={styles.settingDesc}>عندما يبدأ شخص بمتابعتك</Text></View>
               </View>
               <View style={styles.settingRow}>
-                <Switch value={notifPrefReviews} onValueChange={v => { setNotifPrefReviews(v); void savePreferences({ reviews: v }); }} trackColor={{ false: '#e2e8f0', true: '#a7f3d0' }} thumbColor={notifPrefReviews ? '#059669' : '#9ca3af'} />
+                <Switch value={notifPrefReviews} onValueChange={v => { setNotifPrefReviews(v); void savePreferences({ reviews: v }); }} trackColor={{ false: OASIS.colors.line, true: '#a7f3d0' }} thumbColor={notifPrefReviews ? OASIS.colors.primary : '#9ca3af'} />
                 <View style={styles.settingInfo}><Text style={styles.settingLabel}>⭐ التقييمات والشكر</Text><Text style={styles.settingDesc}>تقييم جديد أو تقدير لمساهماتك</Text></View>
               </View>
               <View style={styles.settingRow}>
                 <View style={styles.settingInfo}><Text style={styles.settingLabel}>💬 رسائل الدردشة</Text><Text style={styles.settingDesc}>لا تظهر هنا؛ راجع قسم الدردشة لتفادي تكرار التنبيه.</Text></View>
-                <Switch value={false} disabled trackColor={{ false: '#e2e8f0', true: '#a7f3d0' }} />
+                <Switch value={false} disabled trackColor={{ false: OASIS.colors.line, true: '#a7f3d0' }} />
               </View>
 
-              <Pressable
+              <Pressable oasisKind="action"
                 style={styles.modalSaveBtn}
                 onPress={async () => {
                   await savePreferences();
@@ -665,9 +644,9 @@ function getTypeVisuals(item: NotificationItem) {
     return {
       label: 'بلاغ طارئ',
       bgColor: '#fee2e2',
-      textColor: '#dc2626',
-      gradColors: ['#ef4444', '#b91c1c'] as [string, string],
-      icon: <AlertTriangle size={20} color="#fff" />,
+      textColor: OASIS.colors.danger,
+      gradColors: [OASIS.colors.danger, OASIS.colors.danger] as [string, string],
+      icon: <AlertTriangle size={20} color={OASIS.colors.surface} />,
     };
   }
 
@@ -681,17 +660,17 @@ function getTypeVisuals(item: NotificationItem) {
       bgColor: '#fef3c7',
       textColor: '#92400e',
       gradColors: ['#d97706', '#92400e'] as [string, string],
-      icon: <Coffee size={20} color="#fff" />,
+      icon: <Coffee size={20} color={OASIS.colors.surface} />,
     };
   }
 
   if (item.type === 'answer' || item.target_type === 'question') {
     return {
       label: 'إجابة وتفاعل',
-      bgColor: '#ecfdf5',
-      textColor: '#059669',
-      gradColors: ['#059669', '#065f46'] as [string, string],
-      icon: <MessageCircle size={20} color="#fff" />,
+      bgColor: OASIS.colors.soft,
+      textColor: OASIS.colors.primary,
+      gradColors: [OASIS.colors.primary, OASIS.colors.deep] as [string, string],
+      icon: <MessageCircle size={20} color={OASIS.colors.surface} />,
     };
   }
 
@@ -699,9 +678,9 @@ function getTypeVisuals(item: NotificationItem) {
     return {
       label: 'إعارة ومجتمع',
       bgColor: '#dcfce7',
-      textColor: '#16a34a',
-      gradColors: ['#10b981', '#059669'] as [string, string],
-      icon: <Share2 size={20} color="#fff" />,
+      textColor: OASIS.colors.primary,
+      gradColors: [OASIS.colors.primary, OASIS.colors.primary] as [string, string],
+      icon: <Share2 size={20} color={OASIS.colors.surface} />,
     };
   }
 
@@ -711,7 +690,7 @@ function getTypeVisuals(item: NotificationItem) {
       bgColor: '#f3e8ff',
       textColor: '#9333ea',
       gradColors: ['#a855f7', '#7e22ce'] as [string, string],
-      icon: <Sparkles size={20} color="#fff" />,
+      icon: <Sparkles size={20} color={OASIS.colors.surface} />,
     };
   }
 
@@ -719,8 +698,8 @@ function getTypeVisuals(item: NotificationItem) {
     label: 'تحديث حيّنا',
     bgColor: '#fef3c7',
     textColor: '#d97706',
-    gradColors: ['#f59e0b', '#d97706'] as [string, string],
-    icon: <ShieldCheck size={20} color="#fff" />,
+    gradColors: [OASIS.colors.warning, '#d97706'] as [string, string],
+    icon: <ShieldCheck size={20} color={OASIS.colors.surface} />,
   };
 }
 
@@ -755,17 +734,17 @@ function formatTimeAgo(dateStr: string) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: OASIS.colors.background,
   },
   headerHero: {
     paddingTop: Platform.OS === 'ios' ? 52 : 40,
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingBottom: 14,
     borderBottomLeftRadius: 28,
     borderBottomRightRadius: 28,
     shadowColor: '#0369a1',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0,
     shadowRadius: 16,
     elevation: 8,
   },
@@ -778,7 +757,7 @@ const styles = StyleSheet.create({
   headerBtn: {
     width: 42,
     height: 42,
-    borderRadius: 21,
+    borderRadius: 14,
     backgroundColor: 'rgba(255,255,255,0.18)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -793,20 +772,20 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   headerTitle: {
-    color: '#fff',
+    color: OASIS.colors.surface,
     fontSize: 20,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   unreadCounterBadge: {
-    backgroundColor: '#ef4444',
+    backgroundColor: OASIS.colors.danger,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 12,
   },
   unreadCounterText: {
-    color: '#fff',
+    color: OASIS.colors.surface,
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   headerSubtitle: {
     color: 'rgba(255,255,255,0.8)',
@@ -837,7 +816,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.12)',
   },
   quickPillActive: {
-    backgroundColor: '#fff',
+    backgroundColor: OASIS.colors.surface,
   },
   filterDot: {
     width: 7,
@@ -846,7 +825,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.5)',
   },
   filterDotActive: {
-    backgroundColor: '#059669',
+    backgroundColor: OASIS.colors.primary,
   },
   quickPillText: {
     color: 'rgba(255,255,255,0.9)',
@@ -854,8 +833,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   quickPillTextActive: {
-    color: '#059669',
-    fontWeight: '900',
+    color: OASIS.colors.primary,
+    fontWeight: '700',
   },
   headerRightButtons: {
     flexDirection: 'row-reverse',
@@ -872,9 +851,9 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   markAllText: {
-    color: '#fff',
+    color: OASIS.colors.surface,
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   clearBtn: {
     padding: 5,
@@ -882,9 +861,9 @@ const styles = StyleSheet.create({
 
   // Tabs
   tabsWrapper: {
-    backgroundColor: '#fff',
+    backgroundColor: OASIS.colors.surface,
     borderBottomWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
     paddingVertical: 10,
   },
   tabsScroll: {
@@ -899,24 +878,24 @@ const styles = StyleSheet.create({
     backgroundColor: '#f1f5f9',
     paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 20,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
   },
   tabItemActive: {
-    backgroundColor: '#059669',
-    borderColor: '#059669',
+    backgroundColor: OASIS.colors.primary,
+    borderColor: OASIS.colors.primary,
   },
   tabLabel: {
-    color: '#64748b',
+    color: OASIS.colors.muted,
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   tabLabelActive: {
-    color: '#fff',
+    color: OASIS.colors.surface,
   },
   tabCountBadge: {
-    backgroundColor: '#e2e8f0',
+    backgroundColor: OASIS.colors.line,
     paddingHorizontal: 6,
     paddingVertical: 1,
     borderRadius: 8,
@@ -925,12 +904,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.3)',
   },
   tabCountText: {
-    color: '#64748b',
-    fontSize: 10,
-    fontWeight: '800',
+    color: OASIS.colors.muted,
+    fontSize: 11,
+    fontWeight: '600',
   },
   tabCountTextActive: {
-    color: '#fff',
+    color: OASIS.colors.surface,
   },
 
   // Feed
@@ -938,7 +917,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   feedContent: {
-    padding: 16,
+    padding: 14,
   },
   loadingContainer: {
     flex: 1,
@@ -947,52 +926,52 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   loadingText: {
-    color: '#64748b',
+    color: OASIS.colors.muted,
     fontSize: 14,
     fontWeight: '700',
   },
 
   // Cards
-  actorRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 9, marginBottom: 10, padding: 9, borderRadius: 13, backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#edf2f7' },
-  actorAvatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#e2e8f0' },
-  actorAvatarFallback: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#d1fae5', alignItems: 'center', justifyContent: 'center' },
-  actorAvatarInitial: { color: '#047857', fontWeight: '900', fontSize: 15 },
-  actorCopy: { flex: 1, alignItems: 'flex-end' },
-  actorName: { color: '#0f172a', fontSize: 12.5, fontWeight: '900', textAlign: 'right' },
-  actorHandle: { color: '#64748b', fontSize: 10.5, marginTop: 2, textAlign: 'right' },
-  actorLink: { color: '#059669', fontSize: 10.5, fontWeight: '800' },
+  actorRow: { flex: 1, minWidth: 0, minHeight: 44, flexDirection: 'row-reverse', alignItems: 'center', gap: 7 },
+  actorAvatar: { width: 28, height: 28, borderRadius: 14, backgroundColor: OASIS.colors.line },
+  actorAvatarFallback: { width: 28, height: 28, borderRadius: 14, backgroundColor: OASIS.colors.soft, alignItems: 'center', justifyContent: 'center' },
+  actorAvatarInitial: { color: OASIS.colors.primary, fontWeight: '700', fontSize: 15 },
+  actorCopy: { flex: 1, minWidth: 0, alignItems: 'flex-end' },
+  actorName: { color: OASIS.colors.ink, fontSize: 12.5, fontWeight: '700', textAlign: 'right' },
+  actorHandle: { color: OASIS.colors.muted, fontSize: 11, marginTop: 2, textAlign: 'right' },
+  actorLink: { color: OASIS.colors.primary, fontSize: 11, fontWeight: '600' },
   notifCard: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1.5,
+    backgroundColor: OASIS.colors.surface,
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 1,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
+    shadowOpacity: 0,
     shadowRadius: 8,
     elevation: 2,
   },
   notifCardUnread: {
-    borderColor: '#059669',
-    backgroundColor: '#ffffff',
-    shadowColor: '#059669',
-    shadowOpacity: 0.08,
+    borderColor: OASIS.colors.primary,
+    backgroundColor: OASIS.colors.surface,
+    shadowColor: OASIS.colors.primary,
+    shadowOpacity: 0,
   },
   notifCardRead: {
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
     backgroundColor: 'rgba(255,255,255,0.7)',
     opacity: 0.85,
   },
   notifCardEmergency: {
-    borderColor: '#ef4444',
+    borderColor: OASIS.colors.danger,
     backgroundColor: '#fff5f5',
   },
   cardHeaderRow: {
     flexDirection: 'row-reverse',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 4,
   },
   cardTagRow: {
     flexDirection: 'row-reverse',
@@ -1006,7 +985,7 @@ const styles = StyleSheet.create({
   },
   typeBadgeText: {
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   timeText: {
     color: '#94a3b8',
@@ -1019,6 +998,10 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   smallActionBtn: {
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
     padding: 4,
   },
   cardBodyRow: {
@@ -1027,14 +1010,14 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   leadingIconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
+    width: 28,
+    height: 28,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0,
     shadowRadius: 4,
     elevation: 3,
   },
@@ -1052,27 +1035,27 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#059669',
+    backgroundColor: OASIS.colors.primary,
   },
   cardTitle: {
-    color: '#0f172a',
+    color: OASIS.colors.ink,
     fontSize: 15,
-    fontWeight: '900',
+    fontWeight: '700',
     textAlign: 'right',
   },
   cardTitleRead: {
-    color: '#475569',
+    color: OASIS.colors.muted,
     fontWeight: '700',
   },
   cardBody: {
-    color: '#334155',
+    color: OASIS.colors.ink,
     fontSize: 13,
     fontWeight: '500',
     lineHeight: 20,
     textAlign: 'right',
   },
   cardBodyRead: {
-    color: '#64748b',
+    color: OASIS.colors.muted,
   },
   cardFooterAction: {
     flexDirection: 'row-reverse',
@@ -1085,9 +1068,9 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   footerActionText: {
-    color: '#059669',
+    color: OASIS.colors.primary,
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
   },
 
   // Empty State
@@ -1101,20 +1084,20 @@ const styles = StyleSheet.create({
     width: 88,
     height: 88,
     borderRadius: 44,
-    backgroundColor: '#e2e8f0',
+    backgroundColor: OASIS.colors.line,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 18,
   },
   emptyTitle: {
-    color: '#1e293b',
+    color: OASIS.colors.ink,
     fontSize: 18,
-    fontWeight: '900',
+    fontWeight: '700',
     marginBottom: 8,
     textAlign: 'center',
   },
   emptySub: {
-    color: '#64748b',
+    color: OASIS.colors.muted,
     fontSize: 13,
     fontWeight: '500',
     textAlign: 'center',
@@ -1129,10 +1112,10 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#fff',
+    backgroundColor: OASIS.colors.surface,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    padding: 24,
+    padding: 16,
     maxHeight: '80%',
   },
   modalHeader: {
@@ -1142,23 +1125,23 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   modalTitle: {
-    color: '#0f172a',
+    color: OASIS.colors.ink,
     fontSize: 18,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   modalCloseBtn: {
     width: 36,
     height: 36,
-    borderRadius: 18,
+    borderRadius: 20,
     backgroundColor: '#f1f5f9',
     alignItems: 'center',
     justifyContent: 'center',
   },
   settingsSectionSub: {
-    color: '#64748b',
+    color: OASIS.colors.muted,
     fontSize: 12,
     textAlign: 'right',
-    marginBottom: 20,
+    marginBottom: 14,
   },
   settingRow: {
     flexDirection: 'row-reverse',
@@ -1174,29 +1157,29 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   settingLabel: {
-    color: '#0f172a',
+    color: OASIS.colors.ink,
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '600',
     marginBottom: 3,
     textAlign: 'right',
   },
   settingDesc: {
-    color: '#64748b',
+    color: OASIS.colors.muted,
     fontSize: 11,
     textAlign: 'right',
     lineHeight: 16,
   },
   modalSaveBtn: {
-    backgroundColor: '#059669',
+    backgroundColor: OASIS.colors.primary,
     borderRadius: 16,
     paddingVertical: 14,
     alignItems: 'center',
-    marginTop: 24,
+    marginTop: 16,
     marginBottom: 10,
   },
   modalSaveBtnText: {
-    color: '#fff',
+    color: OASIS.colors.surface,
     fontSize: 15,
-    fontWeight: '900',
+    fontWeight: '700',
   },
 });

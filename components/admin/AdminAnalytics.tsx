@@ -1,5 +1,7 @@
+import { OasisPressable as Pressable, OasisSurface } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, Pressable, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import {
   BarChart3,
   Users,
@@ -183,14 +185,14 @@ export function AdminAnalytics({ onSaved }: { onSaved: (msg: string) => void }) 
             مستخدمون نشطون، مسار التحويل، الاحتفاظ، الإيرادات التقديرية والخريطة الحرارية للمدن.
           </Text>
         </View>
-        <Pressable style={styles.refreshBtn} onPress={() => void load()}>
+        <Pressable oasisKind="icon" style={styles.refreshBtn} onPress={() => void load()}>
           <RefreshCw size={15} color={C.accentDark} />
         </Pressable>
       </View>
 
       <View style={styles.rangeRow}>
         {([7, 14, 30] as Range[]).map((r) => (
-          <Pressable
+          <Pressable oasisKind="chip"
             key={r}
             style={[styles.rangeChip, range === r && styles.rangeChipActive]}
             onPress={() => setRange(r)}
@@ -228,7 +230,7 @@ export function AdminAnalytics({ onSaved }: { onSaved: (msg: string) => void }) 
       </View>
 
       {/* DAU trend */}
-      <View style={styles.card}>
+      <OasisSurface oasisSurface="card" style={styles.card}>
         <View style={styles.cardHead}>
           <Text style={styles.cardTitle}>نشاط المستخدمين اليومي (DAU) 📈</Text>
           <Text style={styles.cardSub}>{dauSeries.length} نقطة</Text>
@@ -238,10 +240,10 @@ export function AdminAnalytics({ onSaved }: { onSaved: (msg: string) => void }) 
         ) : (
           <Text style={styles.emptyHint}>لا توجد بيانات DAU محسوبة بعد.</Text>
         )}
-      </View>
+      </OasisSurface>
 
       {/* Funnel */}
-      <View style={styles.card}>
+      <OasisSurface oasisSurface="card" style={styles.card}>
         <View style={styles.cardHead}>
           <Text style={styles.cardTitle}>مسار التحويل (Funnel) 🔻</Text>
           <Text style={styles.cardSub}>آخر {range} يوم</Text>
@@ -265,10 +267,10 @@ export function AdminAnalytics({ onSaved }: { onSaved: (msg: string) => void }) 
         ) : (
           <Text style={styles.emptyHint}>لا توجد أحداث مسار محسوبة بعد. تأكد من تشغيل compute_funnel_daily.</Text>
         )}
-      </View>
+      </OasisSurface>
 
       {/* Revenue + growth fallback */}
-      <View style={styles.card}>
+      <OasisSurface oasisSurface="card" style={styles.card}>
         <View style={styles.cardHead}>
           <Text style={styles.cardTitle}>الإيرادات التقديرية 💰</Text>
           <Text style={styles.cardSub}>إجمالي {money(revTotal)}</Text>
@@ -283,10 +285,10 @@ export function AdminAnalytics({ onSaved }: { onSaved: (msg: string) => void }) 
         ) : (
           <Text style={styles.emptyHint}>لا توجد بيانات بعد.</Text>
         )}
-      </View>
+      </OasisSurface>
 
       {/* Heatmap top cities */}
-      <View style={styles.card}>
+      <OasisSurface oasisSurface="card" style={styles.card}>
         <View style={styles.cardHead}>
           <Text style={styles.cardTitle}>الخريطة الحرارية — أعلى المدن نشاطًا 🗺️</Text>
           <Text style={styles.cardSub}>آخر {range} يوم</Text>
@@ -307,10 +309,10 @@ export function AdminAnalytics({ onSaved }: { onSaved: (msg: string) => void }) 
         ) : (
           <Text style={styles.emptyHint}>لا توجد بيانات خريطة حرارية بعد.</Text>
         )}
-      </View>
+      </OasisSurface>
 
       {/* Retention */}
-      <View style={styles.card}>
+      <OasisSurface oasisSurface="card" style={styles.card}>
         <View style={styles.cardHead}>
           <Text style={styles.cardTitle}>الاحتفاظ الأسبوعي (Retention) 🔁</Text>
           <Text style={styles.cardSub}>{retention.length} سجل</Text>
@@ -337,7 +339,7 @@ export function AdminAnalytics({ onSaved }: { onSaved: (msg: string) => void }) 
         ) : (
           <Text style={styles.emptyHint}>لا توجد بيانات احتفاظ بعد.</Text>
         )}
-      </View>
+      </OasisSurface>
 
       {!hasData && !unavailable ? (
         <Text style={styles.emptyHint}>لا توجد بيانات تحليلات مسجّلة بعد. ابدأ بتسجيل الأحداث عبر log_analytics_event.</Text>
@@ -386,51 +388,51 @@ function money_(n: number): string {
 }
 
 const styles = StyleSheet.create({
-  wrap: { padding: 14, paddingBottom: 48, gap: 2 },
+  wrap: { padding: 14, paddingBottom: 24, gap: 2 },
   center: { paddingVertical: 60, alignItems: 'center' },
   loadingText: { marginTop: 10, fontSize: 12.5, color: C.muted, fontWeight: '700' },
   headRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, marginBottom: 10 },
-  sectionTitle: { fontSize: 17, fontWeight: '900', color: C.ink, textAlign: 'right' },
+  sectionTitle: { fontSize: 17, fontWeight: '700', color: C.ink, textAlign: 'right' },
   sectionSub: { fontSize: 11, color: C.muted, textAlign: 'right', lineHeight: 17, marginTop: 3 },
   refreshBtn: { width: 38, height: 38, borderRadius: 12, backgroundColor: C.accentLight, alignItems: 'center', justifyContent: 'center' },
 
   rangeRow: { flexDirection: 'row-reverse', gap: 8, marginBottom: 14 },
-  rangeChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: C.border },
+  rangeChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, backgroundColor: OASIS.colors.background, borderWidth: 1, borderColor: C.border },
   rangeChipActive: { backgroundColor: C.navyMid, borderColor: C.navyMid },
-  rangeText: { fontSize: 11.5, fontWeight: '800', color: '#64748B' },
-  rangeTextActive: { color: '#fff' },
+  rangeText: { fontSize: 11.5, fontWeight: '600', color: OASIS.colors.muted },
+  rangeTextActive: { color: OASIS.colors.surface },
 
   metricGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 10, marginBottom: 4 },
-  metricTile: { flexGrow: 1, flexBasis: 150, minWidth: 140, backgroundColor: '#fff', borderRadius: 16, borderWidth: 1, borderColor: C.border, padding: 14 },
+  metricTile: { flexGrow: 1, flexBasis: 150, minWidth: 140, backgroundColor: OASIS.colors.surface, borderRadius: 16, borderWidth: 1, borderColor: C.border, padding: 14 },
   metricTileHead: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, marginBottom: 6 },
-  metricTileLabel: { flex: 1, fontSize: 11, fontWeight: '800', color: C.muted, textAlign: 'right' },
-  metricTileNum: { fontSize: 22, fontWeight: '900', color: C.ink, textAlign: 'right' },
+  metricTileLabel: { flex: 1, fontSize: 11, fontWeight: '600', color: C.muted, textAlign: 'right' },
+  metricTileNum: { fontSize: 22, fontWeight: '700', color: C.ink, textAlign: 'right' },
   metricSuffix: { fontSize: 12, color: C.muted },
-  metricTileSub: { fontSize: 10.5, color: C.subtle, fontWeight: '700', textAlign: 'right', marginTop: 2 },
+  metricTileSub: { fontSize: 11, color: C.subtle, fontWeight: '700', textAlign: 'right', marginTop: 2 },
 
-  card: { backgroundColor: '#fff', borderRadius: 18, borderWidth: 1, borderColor: C.border, padding: 14, marginBottom: 12 },
+  card: { backgroundColor: OASIS.colors.surface, borderRadius: 14, borderWidth: 1, borderColor: C.border, padding: 14, marginBottom: 12 },
   cardHead: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-  cardTitle: { fontSize: 13.5, fontWeight: '900', color: C.ink, textAlign: 'right' },
-  cardSub: { fontSize: 10.5, color: C.subtle, fontWeight: '700' },
+  cardTitle: { fontSize: 13.5, fontWeight: '700', color: C.ink, textAlign: 'right' },
+  cardSub: { fontSize: 11, color: C.subtle, fontWeight: '700' },
 
   miniBarRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginBottom: 8 },
-  miniBarLabel: { flex: 1, fontSize: 11, fontWeight: '800', color: C.inkMuted, textAlign: 'right' },
+  miniBarLabel: { flex: 1, fontSize: 11, fontWeight: '600', color: C.inkMuted, textAlign: 'right' },
   miniBarTrack: { flex: 2, height: 10, borderRadius: 6, backgroundColor: '#F1F5F9', overflow: 'hidden' },
   miniBarFill: { height: '100%', borderRadius: 6 },
-  miniBarVal: { width: 52, fontSize: 11, fontWeight: '900', color: C.ink, textAlign: 'left' },
-  funnelConv: { width: 38, fontSize: 10.5, fontWeight: '800', color: C.subtle, textAlign: 'left' },
+  miniBarVal: { width: 52, fontSize: 11, fontWeight: '700', color: C.ink, textAlign: 'left' },
+  funnelConv: { width: 38, fontSize: 11, fontWeight: '600', color: C.subtle, textAlign: 'left' },
   cityLabelRow: { flex: 1, flexDirection: 'row-reverse', alignItems: 'center', gap: 4 },
 
-  tableHead: { flexDirection: 'row-reverse', paddingVertical: 8, paddingHorizontal: 10, backgroundColor: '#F8FAFC', borderRadius: 10, marginBottom: 4 },
-  tableHeadText: { flex: 1, fontSize: 10.5, fontWeight: '900', color: '#64748B', textAlign: 'right' },
+  tableHead: { flexDirection: 'row-reverse', paddingVertical: 8, paddingHorizontal: 10, backgroundColor: OASIS.colors.background, borderRadius: 10, marginBottom: 4 },
+  tableHeadText: { flex: 1, fontSize: 11, fontWeight: '700', color: OASIS.colors.muted, textAlign: 'right' },
   tableRow: { flexDirection: 'row-reverse', alignItems: 'center', paddingVertical: 9, paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
   tableCell: { flex: 1, fontSize: 11.5, color: C.ink, fontWeight: '700', textAlign: 'right' },
 
   emptyHint: { fontSize: 11.5, color: C.subtle, textAlign: 'right', lineHeight: 18, paddingVertical: 6 },
   notice: { backgroundColor: C.warningLight, borderRadius: 16, padding: 18, alignItems: 'center', gap: 8, marginBottom: 14 },
-  noticeTitle: { fontSize: 14, fontWeight: '900', color: '#92400E', textAlign: 'center' },
+  noticeTitle: { fontSize: 14, fontWeight: '700', color: '#92400E', textAlign: 'center' },
   noticeText: { fontSize: 12, color: '#92400E', textAlign: 'center', lineHeight: 20 },
-  code: { fontWeight: '900', color: '#7C2D12' },
+  code: { fontWeight: '700', color: '#7C2D12' },
   exportRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 4 },
-  exportText: { fontSize: 10.5, color: C.subtle, fontWeight: '700', textAlign: 'center' },
+  exportText: { fontSize: 11, color: C.subtle, fontWeight: '700', textAlign: 'center' },
 });

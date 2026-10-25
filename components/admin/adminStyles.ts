@@ -1,33 +1,34 @@
+import { OASIS } from '@/lib/oasis';
 import { StyleSheet, Platform } from 'react-native';
 
 export const ADMIN_COLORS = {
-  bg: '#F8FAFC',
-  card: '#FFFFFF',
-  ink: '#0F172A',
-  inkMuted: '#475569',
-  muted: '#64748B',
-  subtle: '#94A3B8',
-  border: '#E2E8F0',
-  borderLight: '#F1F5F9',
-  
+  bg: '#F4F6F3',
+  card: OASIS.colors.surface,
+  ink: '#233F2C',
+  inkMuted: '#526553',
+  muted: '#7C877C',
+  subtle: '#99A390',
+  border: '#E1E7DE',
+  borderLight: '#EFF2EB',
+
   // Executive Emerald & Saudi Green
-  accent: '#059669',
-  accentLight: '#ECFDF5',
-  accentDark: '#047857',
-  
+  accent: '#38765A',
+  accentLight: '#E9F2E9',
+  accentDark: '#315B3E',
+
   // Luxury Dark Mode Navy
-  navyDark: '#090D16',
-  navyMid: '#0F172A',
-  navyLight: '#1E293B',
-  
+  navyDark: '#132F26',
+  navyMid: '#234535',
+  navyLight: '#355647',
+
   // State colors
-  danger: '#EF4444',
+  danger: OASIS.colors.danger,
   dangerLight: '#FEE2E2',
-  success: '#10B981',
-  successLight: '#D1FAE5',
-  warning: '#F59E0B',
+  success: OASIS.colors.primary,
+  successLight: OASIS.colors.soft,
+  warning: OASIS.colors.warning,
   warningLight: '#FEF3C7',
-  info: '#0284C7',
+  info: OASIS.colors.info,
   infoLight: '#E0F2FE',
   purple: '#7C3AED',
   purpleLight: '#F5F3FF',
@@ -39,17 +40,17 @@ export const ADMIN_COLORS = {
   tealLight: '#CCFBF1',
   rose: '#E11D48',
   roseLight: '#FFE4E6',
-  slate: '#334155',
+  slate: OASIS.colors.ink,
   glass: 'rgba(255,255,255,0.10)',
   glassBorder: 'rgba(255,255,255,0.16)',
 };
 
 /** Gradient presets reused across the command center chrome. */
 export const ADMIN_GRADIENTS = {
-  emerald: ['#064E3B', '#047857', '#10B981'] as const,
-  navy: ['#0B1220', '#0F172A', '#1E293B'] as const,
+  emerald: [OASIS.colors.deep, OASIS.colors.primary, OASIS.colors.primary] as const,
+  navy: ['#0B1220', OASIS.colors.ink, OASIS.colors.ink] as const,
   royal: ['#1E3A8A', '#1D4ED8', '#3B82F6'] as const,
-  sunset: ['#7C2D12', '#C2410C', '#F59E0B'] as const,
+  sunset: ['#7C2D12', '#C2410C', OASIS.colors.warning] as const,
   violet: ['#4C1D95', '#6D28D9', '#8B5CF6'] as const,
 };
 
@@ -62,7 +63,7 @@ export const adminStyles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    padding: 16,
     backgroundColor: ADMIN_COLORS.bg,
   },
   loadingText: {
@@ -83,7 +84,7 @@ export const adminStyles = StyleSheet.create({
   },
   unauthorizedTitle: {
     fontSize: 22,
-    fontWeight: '900',
+    fontWeight: '700',
     color: ADMIN_COLORS.ink,
     textAlign: 'center',
     marginBottom: 8,
@@ -94,7 +95,7 @@ export const adminStyles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 22,
     maxWidth: 420,
-    marginBottom: 24,
+    marginBottom: 16,
   },
   backBtn: {
     backgroundColor: ADMIN_COLORS.navyMid,
@@ -103,7 +104,7 @@ export const adminStyles = StyleSheet.create({
     borderRadius: 14,
   },
   backBtnText: {
-    color: '#FFFFFF',
+    color: OASIS.colors.surface,
     fontWeight: '700',
     fontSize: 14,
   },
@@ -115,21 +116,21 @@ export const adminStyles = StyleSheet.create({
     left: 20,
     right: 20,
     zIndex: 9999,
-    backgroundColor: '#0F172A',
+    backgroundColor: OASIS.colors.ink,
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: OASIS.colors.ink,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
+    shadowOpacity: 0,
     shadowRadius: 10,
     elevation: 8,
     alignItems: 'center',
   },
   toastBannerText: {
-    color: '#FFFFFF',
+    color: OASIS.colors.surface,
     fontSize: 13,
     fontWeight: '700',
     textAlign: 'center',
@@ -138,13 +139,13 @@ export const adminStyles = StyleSheet.create({
   // 1. Executive Dark Command Header
   headerGrad: {
     paddingTop: Platform.OS === 'ios' ? 52 : 36,
-    paddingBottom: 20,
+    paddingBottom: 14,
     paddingHorizontal: 20,
     borderBottomLeftRadius: 28,
     borderBottomRightRadius: 28,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0,
     shadowRadius: 14,
     elevation: 10,
   },
@@ -170,8 +171,8 @@ export const adminStyles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 20,
-    fontWeight: '900',
-    color: '#FFFFFF',
+    fontWeight: '700',
+    color: OASIS.colors.surface,
     letterSpacing: -0.3,
   },
   headerSub: {
@@ -204,22 +205,22 @@ export const adminStyles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 5,
-    borderRadius: 20,
+    borderRadius: 14,
   },
   alertPillText: {
-    color: '#FFFFFF',
+    color: OASIS.colors.surface,
     fontSize: 11,
     fontWeight: '700',
   },
 
   // 2. Navigation Tab Bar
   tabBarWrapper: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: OASIS.colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: OASIS.colors.line,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
+    shadowOpacity: 0,
     shadowRadius: 4,
     elevation: 2,
   },
@@ -235,7 +236,7 @@ export const adminStyles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 22,
+    borderRadius: 14,
     backgroundColor: '#F1F5F9',
   },
   navTabPillActive: {
@@ -244,10 +245,10 @@ export const adminStyles = StyleSheet.create({
   navTabPillText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#64748B',
+    color: OASIS.colors.muted,
   },
   navTabPillTextActive: {
-    color: '#FFFFFF',
+    color: OASIS.colors.surface,
   },
   navTabBadge: {
     backgroundColor: ADMIN_COLORS.danger,
@@ -257,9 +258,9 @@ export const adminStyles = StyleSheet.create({
     marginLeft: 2,
   },
   navTabBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '900',
+    color: OASIS.colors.surface,
+    fontSize: 11,
+    fontWeight: '700',
   },
 
   // Scroll Container
@@ -267,7 +268,11 @@ export const adminStyles = StyleSheet.create({
     flex: 1,
   },
   section: {
-    padding: 16,
+    padding: 18,
+    backgroundColor: OASIS.colors.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
   },
   sectionHeaderRow: {
     flexDirection: 'row-reverse',
@@ -276,8 +281,8 @@ export const adminStyles = StyleSheet.create({
     marginBottom: 6,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '900',
+    fontSize: 16,
+    fontWeight: '600',
     color: ADMIN_COLORS.ink,
     textAlign: 'right',
   },
@@ -296,7 +301,7 @@ export const adminStyles = StyleSheet.create({
   },
   countBadgeText: {
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
     color: ADMIN_COLORS.info,
   },
 
@@ -308,21 +313,21 @@ export const adminStyles = StyleSheet.create({
     marginBottom: 18,
   },
   statCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    padding: 16,
+    backgroundColor: OASIS.colors.surface,
+    borderRadius: 14,
+    padding: 14,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: OASIS.colors.line,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0,
     shadowRadius: 8,
     elevation: 2,
   },
   statIconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
     alignSelf: 'flex-end',
@@ -330,13 +335,13 @@ export const adminStyles = StyleSheet.create({
   },
   statValue: {
     fontSize: 22,
-    fontWeight: '900',
+    fontWeight: '700',
     color: ADMIN_COLORS.ink,
     textAlign: 'right',
   },
   statLabel: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
     color: ADMIN_COLORS.inkMuted,
     textAlign: 'right',
     marginTop: 2,
@@ -350,11 +355,11 @@ export const adminStyles = StyleSheet.create({
 
   // Saudi Cities Distribution Card
   citiesCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    padding: 16,
+    backgroundColor: OASIS.colors.surface,
+    borderRadius: 14,
+    padding: 14,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: OASIS.colors.line,
     marginBottom: 16,
   },
   citiesCardHeader: {
@@ -365,7 +370,7 @@ export const adminStyles = StyleSheet.create({
   },
   citiesCardTitle: {
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '600',
     color: ADMIN_COLORS.ink,
   },
   citiesCardSub: {
@@ -381,9 +386,9 @@ export const adminStyles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 14,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: OASIS.colors.background,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: OASIS.colors.line,
   },
   cityPillActive: {
     backgroundColor: ADMIN_COLORS.accent,
@@ -395,16 +400,16 @@ export const adminStyles = StyleSheet.create({
     color: ADMIN_COLORS.inkMuted,
   },
   cityPillTextActive: {
-    color: '#FFFFFF',
+    color: OASIS.colors.surface,
   },
 
   // Health Card
   healthCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    padding: 16,
+    backgroundColor: OASIS.colors.surface,
+    borderRadius: 14,
+    padding: 14,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: OASIS.colors.line,
     marginBottom: 18,
   },
   healthHeader: {
@@ -425,12 +430,12 @@ export const adminStyles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#10B981',
+    backgroundColor: OASIS.colors.primary,
   },
   healthStatusText: {
     fontSize: 12,
-    fontWeight: '800',
-    color: '#10B981',
+    fontWeight: '600',
+    color: OASIS.colors.primary,
   },
   healthRow: {
     flexDirection: 'row-reverse',
@@ -458,11 +463,11 @@ export const adminStyles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: OASIS.colors.surface,
     padding: 14,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: OASIS.colors.line,
     marginBottom: 10,
   },
   quickActionLeft: {
@@ -472,7 +477,7 @@ export const adminStyles = StyleSheet.create({
   },
   quickActionText: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
     color: ADMIN_COLORS.ink,
   },
   qBadge: {
@@ -482,19 +487,19 @@ export const adminStyles = StyleSheet.create({
   },
   qBadgeText: {
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '600',
   },
 
   // Search & Filter rows
   searchBar: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: OASIS.colors.surface,
     borderRadius: 14,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: OASIS.colors.line,
     marginBottom: 12,
     gap: 8,
   },
@@ -503,7 +508,8 @@ export const adminStyles = StyleSheet.create({
     fontSize: 13,
     color: ADMIN_COLORS.ink,
     textAlign: 'right',
-    padding: 0,
+    paddingVertical: 8,
+    minHeight: 40,
   },
   filterRow: {
     flexDirection: 'row-reverse',
@@ -512,11 +518,11 @@ export const adminStyles = StyleSheet.create({
   },
   filterPill: {
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 14,
-    backgroundColor: '#FFFFFF',
+    paddingVertical: 10,
+    borderRadius: 9,
+    backgroundColor: OASIS.colors.surface,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: OASIS.colors.line,
   },
   filterPillActive: {
     backgroundColor: ADMIN_COLORS.navyMid,
@@ -525,25 +531,20 @@ export const adminStyles = StyleSheet.create({
   filterPillText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#64748B',
+    color: OASIS.colors.muted,
   },
   filterPillTextActive: {
-    color: '#FFFFFF',
+    color: OASIS.colors.surface,
   },
 
   // User Cards
   userCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    padding: 16,
+    backgroundColor: OASIS.colors.surface,
+    borderRadius: 12,
+    padding: 14,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: ADMIN_COLORS.border,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 1,
   },
   userCardAdmin: {
     borderColor: '#FDE68A',
@@ -551,7 +552,7 @@ export const adminStyles = StyleSheet.create({
   },
   userCardBanned: {
     borderColor: '#FECACA',
-    backgroundColor: '#FEF2F2',
+    backgroundColor: OASIS.colors.dangerSoft,
   },
   userCardHeader: {
     flexDirection: 'row-reverse',
@@ -576,14 +577,14 @@ export const adminStyles = StyleSheet.create({
   },
   userAvatarLetter: {
     fontSize: 18,
-    fontWeight: '900',
-    color: '#FFFFFF',
+    fontWeight: '700',
+    color: OASIS.colors.surface,
   },
   adminCrownBadge: {
     position: 'absolute',
     top: -4,
     right: -4,
-    backgroundColor: '#F59E0B',
+    backgroundColor: OASIS.colors.warning,
     borderRadius: 8,
     padding: 2,
   },
@@ -593,7 +594,7 @@ export const adminStyles = StyleSheet.create({
   },
   userName: {
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '600',
     color: ADMIN_COLORS.ink,
   },
   userHandle: {
@@ -619,13 +620,13 @@ export const adminStyles = StyleSheet.create({
   },
   roleBadgeText: {
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   roleBadgeTextAdmin: {
     color: '#D97706',
   },
   roleBadgeTextUser: {
-    color: '#64748B',
+    color: OASIS.colors.muted,
   },
   userActionsRow: {
     flexDirection: 'row-reverse',
@@ -643,9 +644,9 @@ export const adminStyles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 12,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: OASIS.colors.background,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: OASIS.colors.line,
   },
   userActionBtnText: {
     fontSize: 11,
@@ -653,33 +654,33 @@ export const adminStyles = StyleSheet.create({
     color: ADMIN_COLORS.inkMuted,
   },
   btnDemote: {
-    backgroundColor: '#FFFBEB',
+    backgroundColor: OASIS.colors.warningSoft,
     borderColor: '#FDE68A',
   },
   btnPromote: {
-    backgroundColor: '#F0F9FF',
+    backgroundColor: OASIS.colors.infoSoft,
     borderColor: '#BAE6FD',
   },
   btnActiveSuccess: {
-    backgroundColor: '#ECFDF5',
+    backgroundColor: OASIS.colors.soft,
     borderColor: '#A7F3D0',
   },
   btnBan: {
-    backgroundColor: '#FEF2F2',
+    backgroundColor: OASIS.colors.dangerSoft,
     borderColor: '#FECACA',
   },
   btnBannedActive: {
-    backgroundColor: '#DC2626',
-    borderColor: '#DC2626',
+    backgroundColor: OASIS.colors.danger,
+    borderColor: OASIS.colors.danger,
   },
 
   // Verification Dossier Cards
   verifCardDossier: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    padding: 16,
+    backgroundColor: OASIS.colors.surface,
+    borderRadius: 14,
+    padding: 14,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: OASIS.colors.line,
     marginBottom: 14,
   },
   dossierTop: {
@@ -705,14 +706,14 @@ export const adminStyles = StyleSheet.create({
   },
   dossierAvatarLetter: {
     fontSize: 18,
-    fontWeight: '900',
-    color: '#FFFFFF',
+    fontWeight: '700',
+    color: OASIS.colors.surface,
   },
   verifiedCheckBadge: {
     position: 'absolute',
     bottom: -2,
     right: -2,
-    backgroundColor: '#0284C7',
+    backgroundColor: OASIS.colors.info,
     borderRadius: 8,
     padding: 2,
   },
@@ -722,7 +723,7 @@ export const adminStyles = StyleSheet.create({
   },
   dossierUserName: {
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '600',
     color: ADMIN_COLORS.ink,
   },
   dossierHandle: {
@@ -744,7 +745,7 @@ export const adminStyles = StyleSheet.create({
     backgroundColor: '#FEF3C7',
   },
   verifApproved: {
-    backgroundColor: '#D1FAE5',
+    backgroundColor: OASIS.colors.soft,
   },
   verifRejected: {
     backgroundColor: '#FEE2E2',
@@ -752,29 +753,29 @@ export const adminStyles = StyleSheet.create({
   verifPendingText: {
     color: '#D97706',
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   verifApprovedText: {
-    color: '#059669',
+    color: OASIS.colors.primary,
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   verifRejectedText: {
-    color: '#DC2626',
+    color: OASIS.colors.danger,
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   dossierNoteBox: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: OASIS.colors.background,
     borderRadius: 12,
     padding: 12,
     marginTop: 12,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: OASIS.colors.line,
   },
   dossierNoteTitle: {
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '600',
     color: ADMIN_COLORS.ink,
     textAlign: 'right',
   },
@@ -788,7 +789,7 @@ export const adminStyles = StyleSheet.create({
   dossierFootprintRow: {
     flexDirection: 'row-reverse',
     justifyContent: 'space-between',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: OASIS.colors.background,
     borderRadius: 12,
     padding: 10,
     marginTop: 12,
@@ -797,12 +798,12 @@ export const adminStyles = StyleSheet.create({
     alignItems: 'center',
   },
   footprintLabel: {
-    fontSize: 10,
+    fontSize: 11,
     color: ADMIN_COLORS.muted,
   },
   footprintVal: {
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
     color: ADMIN_COLORS.ink,
     marginTop: 2,
   },
@@ -822,9 +823,9 @@ export const adminStyles = StyleSheet.create({
     borderRadius: 12,
   },
   btnApproveVerifText: {
-    color: '#FFFFFF',
+    color: OASIS.colors.surface,
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   btnRejectVerif: {
     paddingHorizontal: 14,
@@ -835,9 +836,9 @@ export const adminStyles = StyleSheet.create({
     alignItems: 'center',
   },
   btnRejectVerifText: {
-    color: '#DC2626',
+    color: OASIS.colors.danger,
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   btnInspectCitizen: {
     width: 38,
@@ -861,11 +862,11 @@ export const adminStyles = StyleSheet.create({
 
   // Reports
   reportCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    padding: 16,
+    backgroundColor: OASIS.colors.surface,
+    borderRadius: 12,
+    padding: 14,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: ADMIN_COLORS.border,
     marginBottom: 14,
   },
   reportHeader: {
@@ -883,21 +884,21 @@ export const adminStyles = StyleSheet.create({
     backgroundColor: '#FEE2E2',
   },
   repDoneTag: {
-    backgroundColor: '#D1FAE5',
+    backgroundColor: OASIS.colors.soft,
   },
   reportStatusText: {
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   repPendingText: {
-    color: '#DC2626',
+    color: OASIS.colors.danger,
   },
   repDoneText: {
-    color: '#059669',
+    color: OASIS.colors.primary,
   },
   reportType: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
     color: ADMIN_COLORS.ink,
   },
   reportReason: {
@@ -934,14 +935,14 @@ export const adminStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#DC2626',
+    backgroundColor: OASIS.colors.danger,
     paddingVertical: 9,
     borderRadius: 12,
   },
   btnActionTextWhite: {
-    color: '#FFFFFF',
+    color: OASIS.colors.surface,
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   resolveBtn: {
     flex: 1,
@@ -949,14 +950,14 @@ export const adminStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#10B981',
+    backgroundColor: OASIS.colors.primary,
     paddingVertical: 8,
     borderRadius: 12,
   },
   resolveBtnText: {
-    color: '#FFFFFF',
+    color: OASIS.colors.surface,
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   dismissBtn: {
     paddingHorizontal: 14,
@@ -967,18 +968,18 @@ export const adminStyles = StyleSheet.create({
     alignItems: 'center',
   },
   dismissBtnText: {
-    color: '#64748B',
+    color: OASIS.colors.muted,
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
   },
 
   // Platform items (Services, Borrow Items, Urgent Alerts)
   platformItemCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: OASIS.colors.surface,
     borderRadius: 16,
     padding: 14,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: OASIS.colors.line,
     marginBottom: 10,
   },
   platformItemTop: {
@@ -988,7 +989,7 @@ export const adminStyles = StyleSheet.create({
   },
   platformItemTitle: {
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '600',
     color: ADMIN_COLORS.ink,
     textAlign: 'right',
     flex: 1,
@@ -1015,9 +1016,9 @@ export const adminStyles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 10,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: OASIS.colors.background,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: OASIS.colors.line,
   },
   smallActionText: {
     fontSize: 11,
@@ -1026,7 +1027,7 @@ export const adminStyles = StyleSheet.create({
   },
   subSectionTitle: {
     fontSize: 15,
-    fontWeight: '900',
+    fontWeight: '700',
     color: ADMIN_COLORS.ink,
     textAlign: 'right',
     marginTop: 16,
@@ -1035,11 +1036,11 @@ export const adminStyles = StyleSheet.create({
 
   // Community Content (Questions & Requests)
   contentItemCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: OASIS.colors.surface,
     borderRadius: 16,
     padding: 14,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: OASIS.colors.line,
     marginBottom: 10,
   },
   contentItemHeader: {
@@ -1050,7 +1051,7 @@ export const adminStyles = StyleSheet.create({
   },
   contentAuthorName: {
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
     color: ADMIN_COLORS.ink,
   },
   contentItemCity: {
@@ -1059,7 +1060,7 @@ export const adminStyles = StyleSheet.create({
   },
   contentItemTitle: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
     color: ADMIN_COLORS.ink,
     textAlign: 'right',
   },
@@ -1090,8 +1091,8 @@ export const adminStyles = StyleSheet.create({
   },
   btnDeleteSmText: {
     fontSize: 11,
-    fontWeight: '800',
-    color: '#DC2626',
+    fontWeight: '600',
+    color: OASIS.colors.danger,
   },
   btnViewSm: {
     flexDirection: 'row-reverse',
@@ -1104,31 +1105,31 @@ export const adminStyles = StyleSheet.create({
   },
   btnViewSmText: {
     fontSize: 11,
-    fontWeight: '800',
-    color: '#0284C7',
+    fontWeight: '600',
+    color: OASIS.colors.info,
   },
 
   // Broadcast Box
   broadcastBox: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
+    backgroundColor: OASIS.colors.surface,
+    borderRadius: 14,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: OASIS.colors.line,
     marginTop: 8,
   },
   inputLabel: {
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
     color: ADMIN_COLORS.ink,
     textAlign: 'right',
     marginBottom: 6,
   },
   formInput: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: OASIS.colors.background,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: OASIS.colors.line,
     padding: 12,
     fontSize: 13,
     color: ADMIN_COLORS.ink,
@@ -1152,26 +1153,26 @@ export const adminStyles = StyleSheet.create({
     color: ADMIN_COLORS.ink,
   },
   previewBox: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: OASIS.colors.background,
     borderRadius: 14,
     padding: 12,
     marginTop: 14,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: OASIS.colors.line,
   },
   previewHeading: {
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '600',
     color: ADMIN_COLORS.muted,
     textAlign: 'right',
     marginBottom: 8,
   },
   previewNotificationCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: OASIS.colors.surface,
     borderRadius: 12,
     padding: 12,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: OASIS.colors.line,
   },
   previewCardHeader: {
     flexDirection: 'row-reverse',
@@ -1180,13 +1181,13 @@ export const adminStyles = StyleSheet.create({
     marginBottom: 4,
   },
   previewAppName: {
-    fontSize: 10,
-    fontWeight: '800',
+    fontSize: 11,
+    fontWeight: '600',
     color: ADMIN_COLORS.muted,
   },
   previewTitleText: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
     color: ADMIN_COLORS.ink,
     textAlign: 'right',
   },
@@ -1208,20 +1209,20 @@ export const adminStyles = StyleSheet.create({
     marginTop: 16,
   },
   btnSendBroadcastText: {
-    color: '#FFFFFF',
+    color: OASIS.colors.surface,
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '600',
   },
 
   // Audit Logs
   auditLogCard: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: OASIS.colors.surface,
     padding: 14,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: OASIS.colors.line,
     marginBottom: 8,
   },
   auditLogIconBox: {
@@ -1239,7 +1240,7 @@ export const adminStyles = StyleSheet.create({
   },
   auditLogAction: {
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
     color: ADMIN_COLORS.ink,
   },
   auditLogTarget: {
@@ -1248,7 +1249,7 @@ export const adminStyles = StyleSheet.create({
     marginTop: 2,
   },
   auditLogTime: {
-    fontSize: 10,
+    fontSize: 11,
     color: ADMIN_COLORS.subtle,
     fontWeight: '600',
   },
@@ -1264,18 +1265,18 @@ export const adminStyles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 10000,
-    padding: 16,
+    padding: 14,
   },
   modalDossierBox: {
     width: '100%',
     maxWidth: 540,
     maxHeight: '90%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 20,
+    backgroundColor: OASIS.colors.surface,
+    borderRadius: 20,
+    padding: 14,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0,
     shadowRadius: 20,
     elevation: 12,
   },
@@ -1297,7 +1298,7 @@ export const adminStyles = StyleSheet.create({
   },
   modalDossierTitle: {
     fontSize: 16,
-    fontWeight: '900',
+    fontWeight: '700',
     color: ADMIN_COLORS.ink,
   },
   modalDossierScroll: {
@@ -1306,7 +1307,7 @@ export const adminStyles = StyleSheet.create({
   modalProfileCard: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: OASIS.colors.background,
     padding: 14,
     borderRadius: 16,
   },
@@ -1329,14 +1330,14 @@ export const adminStyles = StyleSheet.create({
   },
   modalAvatarLetter: {
     fontSize: 20,
-    fontWeight: '900',
-    color: '#FFFFFF',
+    fontWeight: '700',
+    color: OASIS.colors.surface,
   },
   modalAdminBadge: {
     position: 'absolute',
     top: -4,
     right: -4,
-    backgroundColor: '#F59E0B',
+    backgroundColor: OASIS.colors.warning,
     borderRadius: 8,
     padding: 2,
   },
@@ -1346,7 +1347,7 @@ export const adminStyles = StyleSheet.create({
   },
   modalName: {
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '600',
     color: ADMIN_COLORS.ink,
   },
   modalHandle: {
@@ -1362,7 +1363,7 @@ export const adminStyles = StyleSheet.create({
   modalFootprintRow: {
     flexDirection: 'row-reverse',
     justifyContent: 'space-around',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: OASIS.colors.background,
     borderRadius: 14,
     padding: 12,
     marginTop: 12,
@@ -1372,7 +1373,7 @@ export const adminStyles = StyleSheet.create({
   },
   modalFootprintNum: {
     fontSize: 16,
-    fontWeight: '900',
+    fontWeight: '700',
     color: ADMIN_COLORS.ink,
   },
   modalFootprintLabel: {
@@ -1382,7 +1383,7 @@ export const adminStyles = StyleSheet.create({
   },
   modalSectionLabel: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
     color: ADMIN_COLORS.ink,
     textAlign: 'right',
     marginTop: 16,
@@ -1394,50 +1395,50 @@ export const adminStyles = StyleSheet.create({
     gap: 12,
     padding: 12,
     borderRadius: 14,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: OASIS.colors.background,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: OASIS.colors.line,
     marginBottom: 8,
   },
   modalActionTitle: {
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   modalActionSub: {
-    fontSize: 10,
+    fontSize: 11,
     color: ADMIN_COLORS.muted,
     marginTop: 2,
   },
   itemDemote: {
-    backgroundColor: '#FFFBEB',
+    backgroundColor: OASIS.colors.warningSoft,
     borderColor: '#FDE68A',
   },
   itemPromote: {
-    backgroundColor: '#F0F9FF',
+    backgroundColor: OASIS.colors.infoSoft,
     borderColor: '#BAE6FD',
   },
   itemSuccess: {
-    backgroundColor: '#ECFDF5',
+    backgroundColor: OASIS.colors.soft,
     borderColor: '#A7F3D0',
   },
   itemBan: {
-    backgroundColor: '#FEF2F2',
+    backgroundColor: OASIS.colors.dangerSoft,
     borderColor: '#FECACA',
   },
   itemBanned: {
-    backgroundColor: '#DC2626',
-    borderColor: '#DC2626',
+    backgroundColor: OASIS.colors.danger,
+    borderColor: OASIS.colors.danger,
   },
   modalDirectMsgInput: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: OASIS.colors.background,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: OASIS.colors.line,
     padding: 12,
     fontSize: 12,
     color: ADMIN_COLORS.ink,
     textAlign: 'right',
-    height: 70,
+    height: 44,
     textAlignVertical: 'top',
   },
   btnSendNotice: {
@@ -1451,21 +1452,21 @@ export const adminStyles = StyleSheet.create({
     marginTop: 10,
   },
   btnSendNoticeText: {
-    color: '#FFFFFF',
+    color: OASIS.colors.surface,
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
   },
 
   // Empty state
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 40,
+    paddingVertical: 24,
     paddingHorizontal: 20,
   },
   emptyTitle: {
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '600',
     color: ADMIN_COLORS.ink,
     marginTop: 12,
   },
@@ -1518,20 +1519,20 @@ export const adminStyles = StyleSheet.create({
   heroLogoImg: { width: 36, height: 36 },
   heroTexts: { flex: 1, alignItems: 'flex-end' },
   heroKicker: {
-    fontSize: 9,
-    fontWeight: '900',
+    fontSize: 11,
+    fontWeight: '700',
     letterSpacing: 1.4,
     color: '#6EE7B7',
   },
   heroTitle: {
     fontSize: 19,
-    fontWeight: '900',
-    color: '#FFFFFF',
+    fontWeight: '700',
+    color: OASIS.colors.surface,
     letterSpacing: -0.3,
     marginTop: 1,
   },
   heroSub: {
-    fontSize: 10.5,
+    fontSize: 11,
     color: '#CBD5E1',
     fontWeight: '700',
     marginTop: 2,
@@ -1560,12 +1561,12 @@ export const adminStyles = StyleSheet.create({
     gap: 5,
     paddingHorizontal: 9,
     paddingVertical: 4,
-    borderRadius: 20,
+    borderRadius: 14,
     backgroundColor: 'rgba(255,255,255,0.12)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.15)',
   },
-  heroPillText: { fontSize: 10, fontWeight: '800', color: '#E2E8F0' },
+  heroPillText: { fontSize: 11, fontWeight: '600', color: OASIS.colors.line },
   heroLiveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#34D399' },
   heroLiveDotOff: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#94A3B8' },
   heroKpiRow: {
@@ -1585,8 +1586,8 @@ export const adminStyles = StyleSheet.create({
     paddingVertical: 9,
     paddingHorizontal: 10,
   },
-  heroKpiNum: { fontSize: 17, fontWeight: '900', color: '#FFFFFF', textAlign: 'right' },
-  heroKpiLabel: { fontSize: 9.5, fontWeight: '800', color: '#CBD5E1', textAlign: 'right', marginTop: 1 },
+  heroKpiNum: { fontSize: 17, fontWeight: '700', color: OASIS.colors.surface, textAlign: 'right' },
+  heroKpiLabel: { fontSize: 11, fontWeight: '600', color: '#CBD5E1', textAlign: 'right', marginTop: 1 },
   heroQuickRow: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8, marginTop: 12 },
   heroQuickBtn: {
     flexGrow: 1,
@@ -1600,9 +1601,9 @@ export const adminStyles = StyleSheet.create({
     paddingVertical: 9,
     paddingHorizontal: 12,
   },
-  heroQuickText: { fontSize: 11.5, fontWeight: '900', color: '#0F172A' },
+  heroQuickText: { fontSize: 11.5, fontWeight: '700', color: OASIS.colors.ink },
   heroQuickBadge: {
-    backgroundColor: '#DC2626',
+    backgroundColor: OASIS.colors.danger,
     borderRadius: 9,
     minWidth: 18,
     paddingHorizontal: 5,
@@ -1610,16 +1611,16 @@ export const adminStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  heroQuickBadgeText: { color: '#FFFFFF', fontSize: 9.5, fontWeight: '900' },
+  heroQuickBadgeText: { color: OASIS.colors.surface, fontSize: 11, fontWeight: '700' },
 
   // Grouped two-level navigation
   navShell: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: OASIS.colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: OASIS.colors.line,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0,
     shadowRadius: 6,
     elevation: 2,
   },
@@ -1639,15 +1640,15 @@ export const adminStyles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: '#F1F5F9',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: OASIS.colors.line,
   },
   navGroupChipActive: {
     backgroundColor: ADMIN_COLORS.navyMid,
     borderColor: ADMIN_COLORS.navyMid,
   },
   navGroupEmoji: { fontSize: 13 },
-  navGroupText: { fontSize: 12, fontWeight: '800', color: '#475569' },
-  navGroupTextActive: { color: '#FFFFFF' },
+  navGroupText: { fontSize: 12, fontWeight: '600', color: OASIS.colors.muted },
+  navGroupTextActive: { color: OASIS.colors.surface },
   navGroupCount: {
     backgroundColor: ADMIN_COLORS.danger,
     borderRadius: 9,
@@ -1657,7 +1658,7 @@ export const adminStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  navGroupCountText: { color: '#FFFFFF', fontSize: 9, fontWeight: '900' },
+  navGroupCountText: { color: OASIS.colors.surface, fontSize: 11, fontWeight: '700' },
   navTabScrollV2: {
     paddingHorizontal: 12,
     paddingBottom: 10,
@@ -1671,7 +1672,7 @@ export const adminStyles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 11,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: OASIS.colors.background,
     borderWidth: 1,
     borderColor: '#EDF1F6',
   },
@@ -1679,7 +1680,7 @@ export const adminStyles = StyleSheet.create({
     backgroundColor: ADMIN_COLORS.accentLight,
     borderColor: '#A7F3D0',
   },
-  navTabV2Text: { fontSize: 11.5, fontWeight: '800', color: '#64748B' },
+  navTabV2Text: { fontSize: 11.5, fontWeight: '600', color: OASIS.colors.muted },
   navTabV2TextActive: { color: ADMIN_COLORS.accentDark },
   navTabV2Badge: {
     backgroundColor: ADMIN_COLORS.danger,
@@ -1690,7 +1691,7 @@ export const adminStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  navTabV2BadgeText: { color: '#FFFFFF', fontSize: 9, fontWeight: '900' },
+  navTabV2BadgeText: { color: OASIS.colors.surface, fontSize: 11, fontWeight: '700' },
 
   // Generic metric tiles / mini bars / notices used by new tabs
   metricGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 10, marginBottom: 14 },
@@ -1698,21 +1699,21 @@ export const adminStyles = StyleSheet.create({
     flexGrow: 1,
     flexBasis: 150,
     minWidth: 140,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: OASIS.colors.surface,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: OASIS.colors.line,
     padding: 14,
   },
   metricTileHead: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, marginBottom: 6 },
-  metricTileLabel: { fontSize: 11, fontWeight: '800', color: '#64748B' },
-  metricTileNum: { fontSize: 22, fontWeight: '900', color: ADMIN_COLORS.ink, textAlign: 'right' },
-  metricTileSub: { fontSize: 10.5, color: '#94A3B8', fontWeight: '700', textAlign: 'right', marginTop: 2 },
+  metricTileLabel: { fontSize: 11, fontWeight: '600', color: OASIS.colors.muted },
+  metricTileNum: { fontSize: 22, fontWeight: '700', color: ADMIN_COLORS.ink, textAlign: 'right' },
+  metricTileSub: { fontSize: 11, color: '#94A3B8', fontWeight: '700', textAlign: 'right', marginTop: 2 },
   chartCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
+    backgroundColor: OASIS.colors.surface,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: OASIS.colors.line,
     padding: 14,
     marginBottom: 14,
   },
@@ -1722,35 +1723,35 @@ export const adminStyles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 8,
   },
-  chartCardTitle: { fontSize: 13.5, fontWeight: '900', color: ADMIN_COLORS.ink },
-  chartCardSub: { fontSize: 10.5, color: '#94A3B8', fontWeight: '700' },
+  chartCardTitle: { fontSize: 13.5, fontWeight: '700', color: ADMIN_COLORS.ink },
+  chartCardSub: { fontSize: 11, color: '#94A3B8', fontWeight: '700' },
   miniBarRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginBottom: 8 },
-  miniBarLabel: { width: 96, fontSize: 11, fontWeight: '800', color: ADMIN_COLORS.inkMuted, textAlign: 'right' },
+  miniBarLabel: { width: 96, fontSize: 11, fontWeight: '600', color: ADMIN_COLORS.inkMuted, textAlign: 'right' },
   miniBarTrack: { flex: 1, height: 10, borderRadius: 6, backgroundColor: '#F1F5F9', overflow: 'hidden' },
   miniBarFill: { height: '100%', borderRadius: 6 },
-  miniBarVal: { width: 42, fontSize: 11, fontWeight: '900', color: ADMIN_COLORS.ink, textAlign: 'left' },
+  miniBarVal: { width: 42, fontSize: 11, fontWeight: '700', color: ADMIN_COLORS.ink, textAlign: 'left' },
   noticeBox: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: '#FFFBEB',
+    backgroundColor: OASIS.colors.warningSoft,
     borderWidth: 1,
     borderColor: '#FDE68A',
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
   },
-  noticeBoxTitle: { flex: 1, fontSize: 12.5, fontWeight: '900', color: '#92400E', textAlign: 'right' },
+  noticeBoxTitle: { flex: 1, fontSize: 12.5, fontWeight: '700', color: '#92400E', textAlign: 'right' },
   noticeBoxText: { fontSize: 11, color: '#92400E', textAlign: 'right', lineHeight: 17, marginTop: 3 },
   tableHead: {
     flexDirection: 'row-reverse',
     paddingVertical: 8,
     paddingHorizontal: 10,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: OASIS.colors.background,
     borderRadius: 10,
     marginBottom: 4,
   },
-  tableHeadText: { flex: 1, fontSize: 10.5, fontWeight: '900', color: '#64748B', textAlign: 'right' },
+  tableHeadText: { flex: 1, fontSize: 11, fontWeight: '700', color: OASIS.colors.muted, textAlign: 'right' },
   tableRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
@@ -1766,34 +1767,34 @@ export const adminStyles = StyleSheet.create({
     borderRadius: 9,
     alignSelf: 'flex-end',
   },
-  statusChipText: { fontSize: 10, fontWeight: '900' },
+  statusChipText: { fontSize: 11, fontWeight: '700' },
   badgeGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 10, marginBottom: 14 },
   badgeCard: {
     flexGrow: 1,
     flexBasis: 140,
     minWidth: 132,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: OASIS.colors.surface,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: OASIS.colors.line,
     padding: 14,
     alignItems: 'center',
     gap: 4,
   },
   badgeEmoji: { fontSize: 26 },
-  badgeName: { fontSize: 12, fontWeight: '900', color: ADMIN_COLORS.ink, textAlign: 'center' },
-  badgeCount: { fontSize: 11, fontWeight: '800', color: ADMIN_COLORS.accentDark },
-  badgeHint: { fontSize: 9.5, color: '#94A3B8', textAlign: 'center', lineHeight: 14 },
+  badgeName: { fontSize: 12, fontWeight: '700', color: ADMIN_COLORS.ink, textAlign: 'center' },
+  badgeCount: { fontSize: 11, fontWeight: '600', color: ADMIN_COLORS.accentDark },
+  badgeHint: { fontSize: 11, color: '#94A3B8', textAlign: 'center', lineHeight: 16 },
   selectRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginBottom: 8 },
   selectChip: {
     paddingHorizontal: 11,
     paddingVertical: 6,
     borderRadius: 11,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: OASIS.colors.background,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: OASIS.colors.line,
   },
   selectChipActive: { backgroundColor: ADMIN_COLORS.navyMid, borderColor: ADMIN_COLORS.navyMid },
-  selectChipText: { fontSize: 11, fontWeight: '800', color: '#64748B' },
-  selectChipTextActive: { color: '#FFFFFF' },
+  selectChipText: { fontSize: 11, fontWeight: '600', color: OASIS.colors.muted },
+  selectChipTextActive: { color: OASIS.colors.surface },
 });

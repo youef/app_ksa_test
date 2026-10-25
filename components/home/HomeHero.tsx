@@ -1,5 +1,7 @@
+import { OasisPressable as Pressable, OasisTextInput as TextInput } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
 import { useState, useEffect } from 'react';
-import { Image, Pressable, Text, TextInput, View } from 'react-native';
+import { Image, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Bell, LogIn, ShieldCheck, MapPin, ChevronDown, Search, X } from 'lucide-react-native';
@@ -41,7 +43,7 @@ export default function HomeHero({
 
   return (
     <LinearGradient
-      colors={['#064e3b', '#065f46', '#047857']}
+      colors={[OASIS.colors.deep, OASIS.colors.deep, OASIS.colors.primary]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={styles.hero}
@@ -50,20 +52,20 @@ export default function HomeHero({
         {/* Right side (in RTL): User avatar and greeting */}
         <View style={styles.heroUserSection}>
           {isGuest ? (
-            <Pressable
+            <Pressable oasisKind="chip"
               onPress={() => router.push('/auth')}
               style={styles.loginPill}
               accessibilityRole="button"
               accessibilityLabel="تسجيل الدخول"
             >
-              <LogIn size={16} color="#d1fae5" />
+              <LogIn size={16} color={OASIS.colors.soft} />
               <View style={styles.greetingTextCol}>
                 <Text style={styles.heroGreetingSmall}>تصفح كزائر</Text>
                 <Text style={styles.heroGreetingBold}>تسجيل الدخول</Text>
               </View>
             </Pressable>
           ) : (
-            <Pressable
+            <Pressable oasisKind="action"
               onPress={() => router.push('/profile')}
               style={styles.userProfileBtn}
               accessibilityRole="button"
@@ -79,7 +81,7 @@ export default function HomeHero({
                 )}
                 {profile?.is_geoverified && (
                   <View style={styles.avatarVerifiedBadge}>
-                    <ShieldCheck size={10} color="#fff" />
+                    <ShieldCheck size={10} color={OASIS.colors.surface} />
                   </View>
                 )}
               </View>
@@ -96,13 +98,13 @@ export default function HomeHero({
         {/* Left side (in RTL): Notification Bell & Platform Logo */}
         <View style={styles.heroBrandSection}>
           {!isGuest && (
-            <Pressable
+            <Pressable oasisKind="action"
               onPress={() => (isGuest ? requireAccount() : router.push('/notifications'))}
               style={styles.iconCircleBtn}
               accessibilityRole="button"
               accessibilityLabel={unreadCount > 0 ? `الإشعارات، ${unreadCount} غير مقروء` : 'الإشعارات'}
             >
-              <Bell size={19} color="#d1fae5" />
+              <Bell size={19} color={OASIS.colors.soft} />
               {unreadCount > 0 && (
                 <View style={styles.notifBadge}>
                   <Text style={styles.notifBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
@@ -149,7 +151,7 @@ export default function HomeHero({
             }}
           >
             <MapPin size={16} color="#6ee7b7" />
-            <Text style={{ flex: 1, color: '#ffffff', fontSize: 13, fontWeight: '800', textAlign: 'right' }} numberOfLines={1}>
+            <Text style={{ flex: 1, color: OASIS.colors.surface, fontSize: 13, fontWeight: '600', textAlign: 'right' }} numberOfLines={1}>
               {locationDisplay}
             </Text>
             <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}>
@@ -166,23 +168,23 @@ export default function HomeHero({
           <View style={{
             flexDirection: 'row-reverse',
             alignItems: 'center',
-            backgroundColor: '#ffffff',
+            backgroundColor: OASIS.colors.surface,
             borderRadius: 14,
             paddingHorizontal: 12,
             height: 46,
             shadowColor: '#000',
             shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.12,
+            shadowOpacity: 0,
             shadowRadius: 6,
             elevation: 2,
             gap: 8,
           }}>
-            <Search size={18} color="#059669" />
+            <Search size={18} color={OASIS.colors.primary} />
             <TextInput
               style={{
                 flex: 1,
                 fontSize: 13,
-                color: '#0f172a',
+                color: OASIS.colors.ink,
                 textAlign: 'right',
                 height: 40,
                 padding: 0,

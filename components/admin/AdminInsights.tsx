@@ -1,3 +1,4 @@
+import { OasisSurface } from '@/components/oasis/OasisPrimitives';
 import React, { useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Svg, {
@@ -170,7 +171,7 @@ export function InsightCard({
 }) {
   const delta = trendDelta(data);
   return (
-    <View style={styles.insightCard}>
+    <OasisSurface oasisSurface="card" style={styles.insightCard}>
       <View style={styles.insightHead}>
         <View style={[styles.insightDot, { backgroundColor: color }]} />
         <Text style={styles.insightTitle}>{title}</Text>
@@ -184,7 +185,7 @@ export function InsightCard({
         </View>
       </View>
       <TrendChart data={data} color={color} height={54} showLabels={false} />
-    </View>
+    </OasisSurface>
   );
 }
 
@@ -195,14 +196,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     marginTop: 2,
   },
-  axisText: { fontSize: 9.5, color: C.subtle, fontWeight: '700' },
+  axisText: { fontSize: 11, color: C.subtle, fontWeight: '700' },
 
   barsRow: { flexDirection: 'row-reverse', alignItems: 'flex-end', justifyContent: 'space-between', gap: 8 },
   barCol: { flex: 1, alignItems: 'center', gap: 4 },
   barTrack: { width: '100%', height: 74, borderRadius: 8, backgroundColor: C.borderLight, overflow: 'hidden', justifyContent: 'flex-end' },
   barFill: { width: '100%', borderRadius: 8 },
-  barValue: { fontSize: 11, fontWeight: '900', color: C.ink },
-  barLabel: { fontSize: 9, color: C.subtle, fontWeight: '700', textAlign: 'center' },
+  barValue: { fontSize: 11, fontWeight: '700', color: C.ink },
+  barLabel: { fontSize: 11, color: C.subtle, fontWeight: '700', textAlign: 'center' },
 
   insightCard: {
     backgroundColor: C.card,
@@ -215,10 +216,10 @@ const styles = StyleSheet.create({
   },
   insightHead: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
   insightDot: { width: 8, height: 8, borderRadius: 4 },
-  insightTitle: { fontSize: 12, fontWeight: '800', color: C.inkMuted, textAlign: 'right' },
+  insightTitle: { fontSize: 12, fontWeight: '600', color: C.inkMuted, textAlign: 'right' },
   insightValueRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between' },
-  insightValue: { fontSize: 22, fontWeight: '900', color: C.ink },
+  insightValue: { fontSize: 22, fontWeight: '700', color: C.ink },
   insightSuffix: { fontSize: 11, color: C.muted, fontWeight: '700' },
   deltaChip: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
-  deltaText: { fontSize: 10, fontWeight: '900' },
+  deltaText: { fontSize: 11, fontWeight: '700' },
 });

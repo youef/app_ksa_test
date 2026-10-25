@@ -1,3 +1,4 @@
+import { OASIS } from '@/lib/oasis';
 import { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
@@ -32,6 +33,6 @@ export default function FloatingEffect({ emoji, name, style, duration = 1900 }: 
 
 const styles = StyleSheet.create({
   effectBubble: { alignItems: 'center' },
-  effectName: { color: '#fff', fontSize: 9, fontWeight: '800', maxWidth: 62, backgroundColor: 'rgba(2,6,23,0.55)', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 7, marginBottom: 2 },
+  effectName: { color: OASIS.colors.surface, fontSize: 11, fontWeight: '600', maxWidth: 62, backgroundColor: 'rgba(2,6,23,0.55)', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 7, marginBottom: 2 },
   giftBurstText: { fontSize: 22 },
 });

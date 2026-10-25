@@ -1,5 +1,7 @@
+import { OasisPressable as Pressable, OasisSurface } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, Pressable, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import {
   FileText,
   CalendarDays,
@@ -137,7 +139,7 @@ export function AdminWeeklyReport({ onSaved }: { onSaved: (msg: string) => void 
             ملخّص أسبوعي للنمو والمحتوى والإيرادات التقديرية، يُرسل للمدراء ويُحفظ في قاعدة البيانات.
           </Text>
         </View>
-        <Pressable style={styles.refreshBtn} onPress={() => void load()}>
+        <Pressable oasisKind="icon" style={styles.refreshBtn} onPress={() => void load()}>
           <RefreshCw size={15} color={C.accentDark} />
         </Pressable>
       </View>
@@ -154,11 +156,11 @@ export function AdminWeeklyReport({ onSaved }: { onSaved: (msg: string) => void 
       ) : null}
 
       <View style={styles.actionsRow}>
-        <Pressable style={[styles.generateBtn, generating && { opacity: 0.6 }]} onPress={() => void generate()} disabled={generating}>
-          {generating ? <ActivityIndicator color="#fff" size="small" /> : <Play size={15} color="#fff" />}
+        <Pressable oasisKind="action" style={[styles.generateBtn, generating && { opacity: 0.6 }]} onPress={() => void generate()} disabled={generating}>
+          {generating ? <ActivityIndicator color={OASIS.colors.surface} size="small" /> : <Play size={15} color={OASIS.colors.surface} />}
           <Text style={styles.generateText}>إنشاء تقرير هذا الأسبوع</Text>
         </Pressable>
-        <Pressable style={styles.exportBtn} onPress={exportReport} disabled={!payload}>
+        <Pressable oasisKind="action" style={styles.exportBtn} onPress={exportReport} disabled={!payload}>
           <Download size={15} color={C.accentDark} />
           <Text style={styles.exportText}>تصدير CSV</Text>
         </Pressable>
@@ -168,12 +170,12 @@ export function AdminWeeklyReport({ onSaved }: { onSaved: (msg: string) => void 
       {reports.length > 1 ? (
         <View style={styles.historyWrap}>
           {reports.map((r) => (
-            <Pressable
+            <Pressable oasisKind="chip"
               key={r.id}
               style={[styles.historyChip, selected?.id === r.id && styles.historyChipActive]}
               onPress={() => setSelected(r)}
             >
-              <CalendarDays size={12} color={selected?.id === r.id ? '#fff' : C.muted} />
+              <CalendarDays size={12} color={selected?.id === r.id ? OASIS.colors.surface : C.muted} />
               <Text style={[styles.historyText, selected?.id === r.id && styles.historyTextActive]}>
                 {r.report_week}
               </Text>
@@ -183,13 +185,13 @@ export function AdminWeeklyReport({ onSaved }: { onSaved: (msg: string) => void 
       ) : null}
 
       {!payload ? (
-        <View style={styles.card}>
+        <OasisSurface oasisSurface="card" style={styles.card}>
           <FileText size={30} color={C.subtle} />
           <Text style={styles.emptyHint}>لا يوجد تقرير محفوظ بعد. اضغط «إنشاء تقرير هذا الأسبوع».</Text>
-        </View>
+        </OasisSurface>
       ) : (
         <>
-          <View style={styles.heroCard}>
+          <OasisSurface oasisSurface="card" style={styles.heroCard}>
             <View style={styles.heroTop}>
               <Text style={styles.heroWeek}>أسبوع {payload.week}</Text>
               <View style={[styles.statusChip, { backgroundColor: selected?.status === 'sent' ? C.successLight : C.warningLight }]}>
@@ -202,12 +204,12 @@ export function AdminWeeklyReport({ onSaved }: { onSaved: (msg: string) => void 
               {payload.week_start} ← {payload.week_end}
             </Text>
             <View style={styles.heroRevenueRow}>
-              <Wallet size={16} color="#fff" />
+              <Wallet size={16} color={OASIS.colors.surface} />
               <Text style={styles.heroRevenue}>
                 إيراد تقديري: {money((revenue.services || 0) + (revenue.requests || 0))}
               </Text>
             </View>
-          </View>
+          </OasisSurface>
 
           {/* Summary grid */}
           <View style={styles.metricGrid}>
@@ -222,7 +224,7 @@ export function AdminWeeklyReport({ onSaved }: { onSaved: (msg: string) => void 
           </View>
 
           {/* Top cities */}
-          <View style={styles.card}>
+          <OasisSurface oasisSurface="card" style={styles.card}>
             <Text style={styles.cardTitle}>أعلى المدن نموًا</Text>
             {topCities.length ? (
               topCities.map((c) => (
@@ -237,10 +239,10 @@ export function AdminWeeklyReport({ onSaved }: { onSaved: (msg: string) => void 
             ) : (
               <Text style={styles.emptyHint}>لا توجد بيانات مدن في هذا التقرير.</Text>
             )}
-          </View>
+          </OasisSurface>
 
           {/* Funnel */}
-          <View style={styles.card}>
+          <OasisSurface oasisSurface="card" style={styles.card}>
             <Text style={styles.cardTitle}>مسار التحويل الأسبوعي</Text>
             {funnel.length ? (
               funnel.map((f) => (
@@ -255,11 +257,11 @@ export function AdminWeeklyReport({ onSaved }: { onSaved: (msg: string) => void 
             ) : (
               <Text style={styles.emptyHint}>لا توجد بيانات مسار في هذا التقرير.</Text>
             )}
-          </View>
+          </OasisSurface>
 
           {/* Retention */}
           {retention.length ? (
-            <View style={styles.card}>
+            <OasisSurface oasisSurface="card" style={styles.card}>
               <Text style={styles.cardTitle}>الاحتفاظ (Retention)</Text>
               {retention.map((r) => (
                 <View key={r.week} style={styles.retentionRow}>
@@ -270,7 +272,7 @@ export function AdminWeeklyReport({ onSaved }: { onSaved: (msg: string) => void 
                   <Text style={styles.miniBarVal}>{Math.round((r.rate || 0) * 100)}%</Text>
                 </View>
               ))}
-            </View>
+            </OasisSurface>
           ) : null}
         </>
       )}
@@ -300,55 +302,55 @@ function Metric({ icon, label, value }: { icon: React.ReactNode; label: string; 
 }
 
 const styles = StyleSheet.create({
-  wrap: { padding: 14, paddingBottom: 48, gap: 2 },
+  wrap: { padding: 14, paddingBottom: 24, gap: 2 },
   center: { paddingVertical: 60, alignItems: 'center' },
   loadingText: { marginTop: 10, fontSize: 12.5, color: C.muted, fontWeight: '700' },
   headRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, marginBottom: 10 },
-  sectionTitle: { fontSize: 17, fontWeight: '900', color: C.ink, textAlign: 'right' },
+  sectionTitle: { fontSize: 17, fontWeight: '700', color: C.ink, textAlign: 'right' },
   sectionSub: { fontSize: 11, color: C.muted, textAlign: 'right', lineHeight: 17, marginTop: 3 },
   refreshBtn: { width: 38, height: 38, borderRadius: 12, backgroundColor: C.accentLight, alignItems: 'center', justifyContent: 'center' },
 
   actionsRow: { flexDirection: 'row-reverse', gap: 8, marginBottom: 12 },
   generateBtn: { flex: 1, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: C.accent, borderRadius: 14, paddingVertical: 12 },
-  generateText: { color: '#fff', fontWeight: '900', fontSize: 12.5 },
+  generateText: { color: OASIS.colors.surface, fontWeight: '700', fontSize: 12.5 },
   exportBtn: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: C.accentLight, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12 },
-  exportText: { color: C.accentDark, fontWeight: '900', fontSize: 12 },
+  exportText: { color: C.accentDark, fontWeight: '700', fontSize: 12 },
 
   historyWrap: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 6, marginBottom: 12 },
-  historyChip: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 11, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: C.border },
+  historyChip: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 11, backgroundColor: OASIS.colors.background, borderWidth: 1, borderColor: C.border },
   historyChipActive: { backgroundColor: C.navyMid, borderColor: C.navyMid },
-  historyText: { fontSize: 11, fontWeight: '800', color: C.muted },
-  historyTextActive: { color: '#fff' },
+  historyText: { fontSize: 11, fontWeight: '600', color: C.muted },
+  historyTextActive: { color: OASIS.colors.surface },
 
-  heroCard: { backgroundColor: C.navyMid, borderRadius: 18, padding: 16, marginBottom: 12 },
+  heroCard: { backgroundColor: C.navyMid, borderRadius: 14, padding: 14, marginBottom: 12 },
   heroTop: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between' },
-  heroWeek: { fontSize: 16, fontWeight: '900', color: '#fff' },
+  heroWeek: { fontSize: 16, fontWeight: '700', color: OASIS.colors.surface },
   statusChip: { paddingHorizontal: 9, paddingVertical: 3, borderRadius: 9 },
-  statusText: { fontSize: 10, fontWeight: '900' },
+  statusText: { fontSize: 11, fontWeight: '700' },
   heroRange: { fontSize: 11, color: '#CBD5E1', fontWeight: '700', textAlign: 'right', marginTop: 4 },
   heroRevenueRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, marginTop: 10 },
-  heroRevenue: { fontSize: 14, fontWeight: '900', color: '#6EE7B7' },
+  heroRevenue: { fontSize: 14, fontWeight: '700', color: '#6EE7B7' },
 
   metricGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 10, marginBottom: 12 },
-  metricTile: { flexGrow: 1, flexBasis: 150, minWidth: 140, backgroundColor: '#fff', borderRadius: 16, borderWidth: 1, borderColor: C.border, padding: 14 },
+  metricTile: { flexGrow: 1, flexBasis: 150, minWidth: 140, backgroundColor: OASIS.colors.surface, borderRadius: 16, borderWidth: 1, borderColor: C.border, padding: 14 },
   metricTileHead: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, marginBottom: 6 },
-  metricTileLabel: { flex: 1, fontSize: 11, fontWeight: '800', color: C.muted, textAlign: 'right' },
-  metricTileNum: { fontSize: 22, fontWeight: '900', color: C.ink, textAlign: 'right' },
+  metricTileLabel: { flex: 1, fontSize: 11, fontWeight: '600', color: C.muted, textAlign: 'right' },
+  metricTileNum: { fontSize: 22, fontWeight: '700', color: C.ink, textAlign: 'right' },
 
-  card: { backgroundColor: '#fff', borderRadius: 18, borderWidth: 1, borderColor: C.border, padding: 14, marginBottom: 12, gap: 4 },
-  cardTitle: { fontSize: 13.5, fontWeight: '900', color: C.ink, textAlign: 'right', marginBottom: 6 },
+  card: { backgroundColor: OASIS.colors.surface, borderRadius: 14, borderWidth: 1, borderColor: C.border, padding: 14, marginBottom: 12, gap: 4 },
+  cardTitle: { fontSize: 13.5, fontWeight: '700', color: C.ink, textAlign: 'right', marginBottom: 6 },
 
   miniBarRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginBottom: 8 },
-  miniBarLabel: { width: 110, fontSize: 11, fontWeight: '800', color: C.inkMuted, textAlign: 'right' },
+  miniBarLabel: { width: 110, fontSize: 11, fontWeight: '600', color: C.inkMuted, textAlign: 'right' },
   miniBarTrack: { flex: 1, height: 10, borderRadius: 6, backgroundColor: '#F1F5F9', overflow: 'hidden' },
   miniBarFill: { height: '100%', borderRadius: 6 },
-  miniBarVal: { width: 44, fontSize: 11, fontWeight: '900', color: C.ink, textAlign: 'left' },
+  miniBarVal: { width: 44, fontSize: 11, fontWeight: '700', color: C.ink, textAlign: 'left' },
   retentionRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginBottom: 8 },
-  retentionWeek: { width: 78, fontSize: 11, fontWeight: '800', color: C.inkMuted, textAlign: 'right' },
+  retentionWeek: { width: 78, fontSize: 11, fontWeight: '600', color: C.inkMuted, textAlign: 'right' },
 
   emptyHint: { fontSize: 11.5, color: C.subtle, textAlign: 'center', lineHeight: 18, paddingVertical: 12 },
   notice: { backgroundColor: C.warningLight, borderRadius: 16, padding: 18, alignItems: 'center', gap: 8, marginBottom: 14 },
-  noticeTitle: { fontSize: 14, fontWeight: '900', color: '#92400E', textAlign: 'center' },
+  noticeTitle: { fontSize: 14, fontWeight: '700', color: '#92400E', textAlign: 'center' },
   noticeText: { fontSize: 12, color: '#92400E', textAlign: 'center', lineHeight: 20 },
-  code: { fontWeight: '900', color: '#7C2D12' },
+  code: { fontWeight: '700', color: '#7C2D12' },
 });

@@ -1,5 +1,7 @@
+import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, Pressable, ActivityIndicator, StyleSheet, TextInput } from 'react-native';
+import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import {
   Award,
   Search,
@@ -47,7 +49,7 @@ const CATALOG: CatalogEntry[] = [
 
 const TIERS: Record<number, { label: string; color: string; bg: string }> = {
   1: { label: 'برونزي', color: '#B45309', bg: '#FEF3C7' },
-  2: { label: 'فضي', color: '#475569', bg: '#F1F5F9' },
+  2: { label: 'فضي', color: OASIS.colors.muted, bg: '#F1F5F9' },
   3: { label: 'ذهبي', color: '#A16207', bg: '#FEF9C3' },
 };
 
@@ -172,7 +174,7 @@ export function AdminBadges({ onSaved }: { onSaved: (msg: string) => void }) {
             منح وتتبّع أوسمة الجيران: مزوّدو الخدمات، منجزو الفزعات، الجيران المفيدون وسفراء الحي.
           </Text>
         </View>
-        <Pressable style={styles.refreshBtn} onPress={() => void load()}>
+        <Pressable oasisKind="icon" style={styles.refreshBtn} onPress={() => void load()}>
           <RefreshCw size={15} color={C.accentDark} />
         </Pressable>
       </View>
@@ -195,13 +197,13 @@ export function AdminBadges({ onSaved }: { onSaved: (msg: string) => void }) {
         </View>
       ) : null}
 
-      <Pressable style={styles.awardBtn} onPress={() => setShowForm((v) => !v)}>
-        {showForm ? <X size={16} color="#fff" /> : <Plus size={16} color="#fff" />}
+      <Pressable oasisKind="action" style={styles.awardBtn} onPress={() => setShowForm((v) => !v)}>
+        {showForm ? <X size={16} color={OASIS.colors.surface} /> : <Plus size={16} color={OASIS.colors.surface} />}
         <Text style={styles.awardBtnText}>{showForm ? 'إغلاق نموذج المنح' : 'منح وسام لمستخدم'}</Text>
       </Pressable>
 
       {showForm ? (
-        <View style={styles.card}>
+        <OasisSurface oasisSurface="card" style={styles.card}>
           <Text style={styles.cardTitle}>منح وسام جديد</Text>
 
           <Text style={styles.fieldLabel}>1) ابحث عن المستخدم</Text>
@@ -215,8 +217,8 @@ export function AdminBadges({ onSaved }: { onSaved: (msg: string) => void }) {
               onSubmitEditing={() => void searchUsers()}
               accessibilityLabel="بحث المستخدم"
             />
-            <Pressable style={styles.searchBtn} onPress={() => void searchUsers()}>
-              {searching ? <ActivityIndicator color="#fff" size="small" /> : <Search size={16} color="#fff" />}
+            <Pressable oasisKind="icon" style={styles.searchBtn} onPress={() => void searchUsers()}>
+              {searching ? <ActivityIndicator color={OASIS.colors.surface} size="small" /> : <Search size={16} color={OASIS.colors.surface} />}
             </Pressable>
           </View>
 
@@ -241,7 +243,7 @@ export function AdminBadges({ onSaved }: { onSaved: (msg: string) => void }) {
           <Text style={styles.fieldLabel}>2) اختر الوسام</Text>
           <View style={styles.catGrid}>
             {CATALOG.map((b) => (
-              <Pressable
+              <Pressable oasisKind="chip"
                 key={b.key}
                 style={[styles.catChip, selectedBadge.key === b.key && styles.catChipActive]}
                 onPress={() => setSelectedBadge(b)}
@@ -257,7 +259,7 @@ export function AdminBadges({ onSaved }: { onSaved: (msg: string) => void }) {
           <Text style={styles.fieldLabel}>3) اختر المستوى</Text>
           <View style={styles.tierRow}>
             {[1, 2, 3].map((t) => (
-              <Pressable
+              <Pressable oasisKind="chip"
                 key={t}
                 style={[styles.tierChip, tier === t && { backgroundColor: TIERS[t].bg, borderColor: TIERS[t].color }]}
                 onPress={() => setTier(t)}
@@ -267,15 +269,15 @@ export function AdminBadges({ onSaved }: { onSaved: (msg: string) => void }) {
             ))}
           </View>
 
-          <Pressable style={[styles.submitBtn, awarding && { opacity: 0.6 }]} onPress={() => void award()} disabled={awarding}>
-            {awarding ? <ActivityIndicator color="#fff" size="small" /> : <Award size={16} color="#fff" />}
+          <Pressable oasisVariant="primary" oasisKind="action" style={[styles.submitBtn, awarding && { opacity: 0.6 }]} onPress={() => void award()} disabled={awarding}>
+            {awarding ? <ActivityIndicator color={OASIS.colors.surface} size="small" /> : <Award size={16} color={OASIS.colors.surface} />}
             <Text style={styles.submitText}>منح الوسام</Text>
           </Pressable>
-        </View>
+        </OasisSurface>
       ) : null}
 
       {/* Catalog overview */}
-      <View style={styles.card}>
+      <OasisSurface oasisSurface="card" style={styles.card}>
         <View style={styles.cardHead}>
           <Text style={styles.cardTitle}>كتالوج الأوسمة</Text>
           <Text style={styles.cardSub}>توزيع الممنوح</Text>
@@ -289,10 +291,10 @@ export function AdminBadges({ onSaved }: { onSaved: (msg: string) => void }) {
             </View>
           ))}
         </View>
-      </View>
+      </OasisSurface>
 
       {/* Recent awards */}
-      <View style={styles.card}>
+      <OasisSurface oasisSurface="card" style={styles.card}>
         <View style={styles.cardHead}>
           <Text style={styles.cardTitle}>أحدث الأوسمة</Text>
           <Text style={styles.cardSub}>{badges.length} سجل</Text>
@@ -321,7 +323,7 @@ export function AdminBadges({ onSaved }: { onSaved: (msg: string) => void }) {
             );
           })
         )}
-      </View>
+      </OasisSurface>
     </View>
   );
 }
@@ -339,69 +341,69 @@ function Metric({ icon, label, value }: { icon: React.ReactNode; label: string; 
 }
 
 const styles = StyleSheet.create({
-  wrap: { padding: 14, paddingBottom: 48, gap: 2 },
+  wrap: { padding: 14, paddingBottom: 24, gap: 2 },
   center: { paddingVertical: 60, alignItems: 'center' },
   loadingText: { marginTop: 10, fontSize: 12.5, color: C.muted, fontWeight: '700' },
   headRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, marginBottom: 10 },
-  sectionTitle: { fontSize: 17, fontWeight: '900', color: C.ink, textAlign: 'right' },
+  sectionTitle: { fontSize: 17, fontWeight: '700', color: C.ink, textAlign: 'right' },
   sectionSub: { fontSize: 11, color: C.muted, textAlign: 'right', lineHeight: 17, marginTop: 3 },
   refreshBtn: { width: 38, height: 38, borderRadius: 12, backgroundColor: C.accentLight, alignItems: 'center', justifyContent: 'center' },
 
   metricGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 10, marginBottom: 10 },
-  metricTile: { flexGrow: 1, flexBasis: 150, minWidth: 140, backgroundColor: '#fff', borderRadius: 16, borderWidth: 1, borderColor: C.border, padding: 14 },
+  metricTile: { flexGrow: 1, flexBasis: 150, minWidth: 140, backgroundColor: OASIS.colors.surface, borderRadius: 16, borderWidth: 1, borderColor: C.border, padding: 14 },
   metricTileHead: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, marginBottom: 6 },
-  metricTileLabel: { flex: 1, fontSize: 11, fontWeight: '800', color: C.muted, textAlign: 'right' },
-  metricTileNum: { fontSize: 22, fontWeight: '900', color: C.ink, textAlign: 'right' },
+  metricTileLabel: { flex: 1, fontSize: 11, fontWeight: '600', color: C.muted, textAlign: 'right' },
+  metricTileNum: { fontSize: 22, fontWeight: '700', color: C.ink, textAlign: 'right' },
 
   awardBtn: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: C.accent, borderRadius: 14, paddingVertical: 12, marginBottom: 12 },
-  awardBtnText: { color: '#fff', fontWeight: '900', fontSize: 13 },
+  awardBtnText: { color: OASIS.colors.surface, fontWeight: '700', fontSize: 13 },
 
-  card: { backgroundColor: '#fff', borderRadius: 18, borderWidth: 1, borderColor: C.border, padding: 14, marginBottom: 12 },
+  card: { backgroundColor: OASIS.colors.surface, borderRadius: 14, borderWidth: 1, borderColor: C.border, padding: 14, marginBottom: 12 },
   cardHead: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
-  cardTitle: { fontSize: 13.5, fontWeight: '900', color: C.ink, textAlign: 'right' },
-  cardSub: { fontSize: 10.5, color: C.subtle, fontWeight: '700' },
+  cardTitle: { fontSize: 13.5, fontWeight: '700', color: C.ink, textAlign: 'right' },
+  cardSub: { fontSize: 11, color: C.subtle, fontWeight: '700' },
 
-  fieldLabel: { fontSize: 11.5, fontWeight: '900', color: C.inkMuted, textAlign: 'right', marginTop: 10, marginBottom: 6 },
+  fieldLabel: { fontSize: 11.5, fontWeight: '700', color: C.inkMuted, textAlign: 'right', marginTop: 10, marginBottom: 6 },
   searchRow: { flexDirection: 'row-reverse', gap: 8 },
-  input: { flex: 1, backgroundColor: '#F8FAFC', borderRadius: 12, borderWidth: 1, borderColor: C.border, paddingHorizontal: 12, paddingVertical: 9, fontSize: 12.5, textAlign: 'right', color: C.ink },
+  input: { flex: 1, backgroundColor: OASIS.colors.background, borderRadius: 12, borderWidth: 1, borderColor: C.border, paddingHorizontal: 12, paddingVertical: 9, fontSize: 12.5, textAlign: 'right', color: C.ink },
   searchBtn: { width: 44, borderRadius: 12, backgroundColor: C.navyMid, alignItems: 'center', justifyContent: 'center' },
   selectedUser: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', backgroundColor: C.accentLight, borderRadius: 12, padding: 10, marginTop: 8 },
-  selectedUserText: { fontSize: 12, fontWeight: '900', color: C.accentDark },
+  selectedUserText: { fontSize: 12, fontWeight: '700', color: C.accentDark },
   candidatesWrap: { marginTop: 8, gap: 6 },
-  candidate: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F8FAFC', borderRadius: 10, padding: 10, borderWidth: 1, borderColor: C.border },
-  candidateName: { fontSize: 12, fontWeight: '800', color: C.ink },
-  candidateMeta: { fontSize: 10, color: C.subtle, fontWeight: '700' },
+  candidate: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', backgroundColor: OASIS.colors.background, borderRadius: 10, padding: 10, borderWidth: 1, borderColor: C.border },
+  candidateName: { fontSize: 12, fontWeight: '600', color: C.ink },
+  candidateMeta: { fontSize: 11, color: C.subtle, fontWeight: '700' },
 
   catGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 },
-  catChip: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 11, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: C.border, maxWidth: '100%' },
+  catChip: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 11, backgroundColor: OASIS.colors.background, borderWidth: 1, borderColor: C.border, maxWidth: '100%' },
   catChipActive: { backgroundColor: C.navyMid, borderColor: C.navyMid },
   catEmoji: { fontSize: 14 },
-  catText: { fontSize: 11, fontWeight: '800', color: C.inkMuted },
-  catTextActive: { color: '#fff' },
+  catText: { fontSize: 11, fontWeight: '600', color: C.inkMuted },
+  catTextActive: { color: OASIS.colors.surface },
 
   tierRow: { flexDirection: 'row-reverse', gap: 8 },
-  tierChip: { flex: 1, paddingVertical: 9, borderRadius: 12, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: C.border, alignItems: 'center' },
-  tierText: { fontSize: 11.5, fontWeight: '900', color: C.muted },
+  tierChip: { flex: 1, paddingVertical: 9, borderRadius: 12, backgroundColor: OASIS.colors.background, borderWidth: 1, borderColor: C.border, alignItems: 'center' },
+  tierText: { fontSize: 11.5, fontWeight: '700', color: C.muted },
 
   submitBtn: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: C.navyMid, borderRadius: 14, paddingVertical: 12, marginTop: 14 },
-  submitText: { color: '#fff', fontWeight: '900', fontSize: 13 },
+  submitText: { color: OASIS.colors.surface, fontWeight: '700', fontSize: 13 },
 
   catOverviewGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 },
-  catOverview: { flexGrow: 1, flexBasis: 100, minWidth: 96, backgroundColor: '#F8FAFC', borderRadius: 14, padding: 10, alignItems: 'center', borderWidth: 1, borderColor: C.border },
+  catOverview: { flexGrow: 1, flexBasis: 100, minWidth: 96, backgroundColor: OASIS.colors.background, borderRadius: 14, padding: 10, alignItems: 'center', borderWidth: 1, borderColor: C.border },
   catOverviewEmoji: { fontSize: 22 },
-  catOverviewName: { fontSize: 10, fontWeight: '800', color: C.inkMuted, textAlign: 'center', marginTop: 2 },
-  catOverviewCount: { fontSize: 15, fontWeight: '900', color: C.accentDark, marginTop: 2 },
+  catOverviewName: { fontSize: 11, fontWeight: '600', color: C.inkMuted, textAlign: 'center', marginTop: 2 },
+  catOverviewCount: { fontSize: 15, fontWeight: '700', color: C.accentDark, marginTop: 2 },
 
   awardRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
   awardEmoji: { fontSize: 22 },
-  awardTitle: { fontSize: 12, fontWeight: '900', color: C.ink, textAlign: 'right' },
-  awardSub: { fontSize: 10, color: C.subtle, fontWeight: '700', textAlign: 'right', marginTop: 1 },
+  awardTitle: { fontSize: 12, fontWeight: '700', color: C.ink, textAlign: 'right' },
+  awardSub: { fontSize: 11, color: C.subtle, fontWeight: '700', textAlign: 'right', marginTop: 1 },
   tierBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 9 },
-  tierBadgeText: { fontSize: 9.5, fontWeight: '900' },
+  tierBadgeText: { fontSize: 11, fontWeight: '700' },
 
   emptyHint: { fontSize: 11.5, color: C.subtle, textAlign: 'right', lineHeight: 18, paddingVertical: 6 },
   notice: { backgroundColor: C.warningLight, borderRadius: 16, padding: 18, alignItems: 'center', gap: 8, marginBottom: 14 },
-  noticeTitle: { fontSize: 14, fontWeight: '900', color: '#92400E', textAlign: 'center' },
+  noticeTitle: { fontSize: 14, fontWeight: '700', color: '#92400E', textAlign: 'center' },
   noticeText: { fontSize: 12, color: '#92400E', textAlign: 'center', lineHeight: 20 },
-  code: { fontWeight: '900', color: '#7C2D12' },
+  code: { fontWeight: '700', color: '#7C2D12' },
 });

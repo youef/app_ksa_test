@@ -1,15 +1,8 @@
+import { OasisPressable as Pressable, OasisTextInput as TextInput } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
 import { useBottomNavInset } from '@/lib/bottomNav';
 import { useState, useMemo } from 'react';
-import {
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  Platform,
-} from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, View, Platform } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { buildSaudiLocations, normalizeSaudiLocationName } from '@/lib/saudiLocations';
 import { supabase } from '@/lib/supabase';
@@ -99,7 +92,7 @@ export default function Districts() {
       />
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: bottomNavInset }]} showsVerticalScrollIndicator={false}>
         <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 6 }}>
-          <View style={[styles.searchBar, { borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#fff' }]}>
+          <View style={[styles.searchBar, { borderWidth: 1, borderColor: OASIS.colors.line, backgroundColor: OASIS.colors.surface }]}>
             <TextInput
               style={styles.searchInput}
               value={search}
@@ -107,24 +100,24 @@ export default function Districts() {
               placeholder="ابحث عن اسم الحي..."
               placeholderTextColor="#94a3b8"
             />
-            <Search size={20} color="#059669" />
+            <Search size={20} color={OASIS.colors.primary} />
           </View>
         </View>
 
         <View style={styles.content}>
           {districts.map(d => (
-            <Pressable
+            <Pressable oasisKind="card"
               key={d.id}
               style={styles.districtCard}
               onPress={() => selectDistrict(d.name)}
             >
-              <CheckCircle2 size={18} color="#059669" />
+              <CheckCircle2 size={18} color={OASIS.colors.primary} />
               <View style={{ flex: 1, alignItems: 'flex-end' }}>
                 <Text style={styles.districtTitle}>حي {d.name}</Text>
                 <Text style={styles.districtSub}>{city.name} · السعودية</Text>
               </View>
               <View style={styles.pinBox}>
-                <MapPin size={18} color="#059669" />
+                <MapPin size={18} color={OASIS.colors.primary} />
               </View>
             </Pressable>
           ))}
@@ -133,7 +126,7 @@ export default function Districts() {
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      
+
     </View>
   );
 }
@@ -141,15 +134,15 @@ export default function Districts() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: OASIS.colors.background,
   },
   scroll: {
-    paddingBottom: 20,
+    paddingBottom: 14,
   },
   hero: {
     paddingTop: Platform.OS === 'ios' ? 52 : 40,
     paddingHorizontal: 20,
-    paddingBottom: 24,
+    paddingBottom: 16,
     borderBottomLeftRadius: 28,
     borderBottomRightRadius: 28,
   },
@@ -163,9 +156,9 @@ const styles = StyleSheet.create({
     padding: 6,
   },
   navTitle: {
-    color: '#fff',
+    color: OASIS.colors.surface,
     fontSize: 20,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   heroSub: {
     color: 'rgba(255,255,255,0.85)',
@@ -177,20 +170,20 @@ const styles = StyleSheet.create({
   searchBar: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: OASIS.colors.surface,
     borderRadius: 16,
     paddingHorizontal: 14,
     height: 48,
     gap: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0,
     shadowRadius: 6,
     elevation: 3,
   },
   searchInput: {
     flex: 1,
-    color: '#0f172a',
+    color: OASIS.colors.ink,
     fontSize: 13,
     textAlign: 'right',
   },
@@ -202,15 +195,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#fff',
-    borderRadius: 18,
-    padding: 16,
+    backgroundColor: OASIS.colors.surface,
+    borderRadius: 14,
+    padding: 14,
     marginBottom: 10,
     borderWidth: 1,
     borderColor: '#f1f5f9',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
+    shadowOpacity: 0,
     shadowRadius: 6,
     elevation: 2,
     gap: 12,
@@ -218,18 +211,18 @@ const styles = StyleSheet.create({
   pinBox: {
     width: 38,
     height: 38,
-    borderRadius: 19,
-    backgroundColor: '#ecfdf5',
+    borderRadius: 14,
+    backgroundColor: OASIS.colors.soft,
     alignItems: 'center',
     justifyContent: 'center',
   },
   districtTitle: {
-    color: '#0f172a',
+    color: OASIS.colors.ink,
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   districtSub: {
-    color: '#64748b',
+    color: OASIS.colors.muted,
     fontSize: 11,
     marginTop: 2,
   },

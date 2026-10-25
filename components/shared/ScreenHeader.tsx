@@ -1,3 +1,4 @@
+import { OASIS } from '@/lib/oasis';
 import type { ReactNode } from 'react';
 import { StyleSheet } from 'react-native';
 import { AppHeader } from './AppHeader';
@@ -37,7 +38,7 @@ const styles = StyleSheet.create({
   action: {
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: 14,
     backgroundColor: 'rgba(255,255,255,0.16)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -47,7 +48,7 @@ const styles = StyleSheet.create({
     height: 40,
   },
   plainAction: {
-    backgroundColor: '#ecfdf5',
+    backgroundColor: OASIS.colors.soft,
   },
   rightAction: {
     minWidth: 40,
@@ -59,13 +60,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   title: {
-    color: '#fff',
+    color: OASIS.colors.surface,
     fontSize: 18,
-    fontWeight: '900',
+    fontWeight: '700',
     textAlign: 'center',
   },
   plainTitle: {
-    color: '#0f172a',
+    color: OASIS.colors.ink,
   },
   subtitle: {
     color: 'rgba(255,255,255,0.8)',
@@ -73,6 +74,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   plainSubtitle: {
-    color: '#64748b',
+    color: OASIS.colors.muted,
   },
 });

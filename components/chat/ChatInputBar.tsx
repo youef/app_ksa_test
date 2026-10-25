@@ -1,6 +1,8 @@
-import React from 'react';
-import { View, Text, Pressable, ScrollView, TextInput, ActivityIndicator } from 'react-native';
-import { Paperclip, MapPin, Coffee, Smile, Send } from 'lucide-react-native';
+import { OasisSurface, OasisPressable as Pressable, OasisTextInput as TextInput } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
+import React, { useState } from 'react';
+import { View, Text, ScrollView, ActivityIndicator } from 'react-native';
+import { Plus, X, Paperclip, MapPin, Coffee, Smile, Send } from 'lucide-react-native';
 import { chatStyles as styles } from './chatStyles';
 
 const QUICK_PROMPTS = [
@@ -54,6 +56,7 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
   onOpenAppreciation,
   bottomSafe,
 }) => {
+  const [toolsOpen, setToolsOpen] = useState(false);
   if (anyBlock) {
     return (
       <View style={[styles.blockedInputArea, { paddingBottom: bottomSafe + 8 }]}>
@@ -63,7 +66,7 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
             : 'هذا المستخدم حظرك، الإرسال متوقف'}
         </Text>
         {blockedByMe && (
-          <Pressable style={styles.unblockActionBtn} onPress={onUnblock}>
+          <Pressable oasisKind="action" style={styles.unblockActionBtn} onPress={onUnblock}>
             <Text style={styles.unblockActionBtnText}>إلغاء الحظر للمراسلة</Text>
           </Pressable>
         )}
@@ -73,13 +76,14 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
 
   return (
     <View style={[styles.composerWrap, { paddingBottom: Math.max(bottomSafe, 8) }]}>
+      {toolsOpen && <View>
       {/* Quick Prompts Row */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.quickPromptsRow}
       >
-        <Pressable
+        <Pressable oasisKind="chip"
           style={[styles.quickPromptPill, styles.quickPromptPillCoffee]}
           onPress={onOpenAppreciation}
           accessibilityRole="button"
@@ -89,7 +93,7 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
         </Pressable>
 
         {QUICK_PROMPTS.map((prompt, idx) => (
-          <Pressable
+          <Pressable oasisKind="chip"
             key={idx}
             style={styles.quickPromptPill}
             onPress={() => onBodyChange(body ? `${body} ${prompt}` : prompt)}
@@ -101,6 +105,11 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
         ))}
       </ScrollView>
 
+      <View style={{ flexDirection: 'row-reverse', gap: 8, paddingHorizontal: 12, paddingBottom: 8 }}>
+        <Pressable oasisKind="plain" onPress={onPickImages} accessibilityLabel="إرفاق صورة" style={{ flex: 1, minHeight: 44, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6 }}><Paperclip size={18} color={OASIS.colors.primary} /><Text style={{ fontSize: 12, color: OASIS.colors.ink }}>صورة</Text></Pressable>
+        <Pressable oasisKind="plain" onPress={onShareLocation} disabled={sharingLocation} accessibilityLabel="مشاركة موقعي" style={{ flex: 1, minHeight: 44, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6 }}>{sharingLocation ? <ActivityIndicator size="small" color={OASIS.colors.primary} /> : <MapPin size={18} color={OASIS.colors.primary} />}<Text style={{ fontSize: 12, color: OASIS.colors.ink }}>موقع</Text></Pressable>
+        <Pressable oasisKind="plain" onPress={onOpenAppreciation} accessibilityLabel="إهداء قهوة وشكر" style={{ flex: 1, minHeight: 44, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6 }}><Coffee size={18} color={OASIS.colors.warning} /><Text style={{ fontSize: 12, color: OASIS.colors.ink }}>شكر</Text></Pressable>
+      </View></View>}
       {/* Neighbor Emoji / Sticker Panel */}
       {stickersOpen && (
         <View style={styles.stickerPanel}>
@@ -128,39 +137,9 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
 
       {/* Main Input Controls */}
       <View style={styles.inputArea}>
-        <Pressable
-          style={styles.attachCircleBtn}
-          onPress={onPickImages}
-          accessibilityRole="button"
-          accessibilityLabel="إرفاق صورة"
-        >
-          <Paperclip size={18} color="#64748b" />
-        </Pressable>
+        <Pressable oasisKind="icon" oasisVariant="ghost" style={styles.attachCircleBtn} onPress={() => setToolsOpen(value => !value)} accessibilityLabel={toolsOpen ? 'إغلاق أدوات المحادثة' : 'فتح أدوات المحادثة'} accessibilityState={{ expanded: toolsOpen }}>{toolsOpen ? <X size={21} color={OASIS.colors.primary} /> : <Plus size={23} color={OASIS.colors.primary} />}</Pressable>
 
-        <Pressable
-          style={[styles.attachCircleBtn, sharingLocation && styles.attachCircleBtnBusy]}
-          onPress={onShareLocation}
-          disabled={sharingLocation}
-          accessibilityRole="button"
-          accessibilityLabel="مشاركة موقعي"
-        >
-          {sharingLocation ? (
-            <ActivityIndicator size="small" color="#059669" />
-          ) : (
-            <MapPin size={18} color="#059669" />
-          )}
-        </Pressable>
-
-        <Pressable
-          style={[styles.attachCircleBtn, styles.coffeeCircleBtn]}
-          onPress={onOpenAppreciation}
-          accessibilityRole="button"
-          accessibilityLabel="إهداء قهوة وشكر"
-        >
-          <Coffee size={18} color="#b45309" />
-        </Pressable>
-
-        <View style={styles.inputCapsule}>
+        <OasisSurface oasisSurface="field" style={styles.inputCapsule}>
           <TextInput
             style={styles.textInput}
             value={body}
@@ -170,17 +149,17 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
             multiline
             maxLength={1000}
           />
-          <Pressable
+          <Pressable oasisKind="icon"
             style={styles.emojiInsideBtn}
             onPress={onToggleStickers}
             accessibilityRole="button"
             accessibilityLabel="إيموجي وملصقات"
           >
-            <Smile size={19} color={stickersOpen ? '#059669' : '#94a3b8'} />
+            <Smile size={19} color={stickersOpen ? OASIS.colors.primary : '#94a3b8'} />
           </Pressable>
-        </View>
+        </OasisSurface>
 
-        <Pressable
+        <Pressable oasisVariant="primary" oasisKind="icon"
           style={({ pressed }) => [
             styles.sendButton,
             !body.trim() && !uploadingMedia && styles.sendButtonDisabled,
@@ -192,9 +171,9 @@ export const ChatInputBar: React.FC<ChatInputBarProps> = ({
           accessibilityLabel="إرسال الرسالة"
         >
           {uploadingMedia || sending ? (
-            <ActivityIndicator size="small" color="#ffffff" />
+            <ActivityIndicator size="small" color={OASIS.colors.surface} />
           ) : (
-            <Send size={18} color="#ffffff" style={{ marginLeft: 2 }} />
+            <Send size={18} color={OASIS.colors.surface} style={{ marginLeft: 2 }} />
           )}
         </Pressable>
       </View>

@@ -1,33 +1,31 @@
+import { OASIS } from '@/lib/oasis';
 import { useEffect, useState } from 'react';
 import {
-  AccessibilityInfo,
-  ActivityIndicator,
-  Image,
-  Platform,
-  Pressable,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  View,
-  useWindowDimensions,
+  ActivityIndicator, Image, ImageBackground, Platform,
+  StatusBar, StyleSheet, Text, View, useWindowDimensions,
 } from 'react-native';
 import { router } from 'expo-router';
-import { ArrowLeft, House, Store, UsersRound } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { ArrowRight, LogIn, ShieldCheck } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
+import { HAYNA_BUTTON } from '@/components/shared/haynaButtonTokens';
+import { HaynaActionButton } from '@/components/shared/HaynaActionButton';
 import {
-  FALLBACK_LOGO_URI,
-  getBrandingLogo,
-  getCachedBrandingLogo,
-  subscribeBrandingLogo,
+  FALLBACK_LOGO_URI, getBrandingLogo, getCachedBrandingLogo, subscribeBrandingLogo,
 } from '@/lib/branding';
-import AppHeader from '@/components/shared/AppHeader';
+
+// Animated header background, separate from the logo and controls.
+// The background is separate from the interactive buttons and text below.
+
+const WELCOME_BACKGROUND = require('../public/design-system/hayna-v1/artwork/welcome-art.png');
 
 export default function Index() {
   const [signedIn, setSignedIn] = useState(false);
   const [logoUri, setLogoUri] = useState(getCachedBrandingLogo() || FALLBACK_LOGO_URI);
   const { height, width } = useWindowDimensions();
-  const compact = height < 700 || width < 360;
+  const insets = useSafeAreaInsets();
+  const compact = height < 740 || width < 365;
 
   useEffect(() => {
     let active = true;
@@ -58,8 +56,8 @@ export default function Index() {
         short_name: 'حيّنا',
         start_url: '/',
         display: 'standalone',
-        background_color: '#047857',
-        theme_color: '#047857',
+        background_color: OASIS.colors.primary,
+        theme_color: OASIS.colors.primary,
         dir: 'rtl',
         lang: 'ar',
         icons: [{ src: uri, sizes: '512x512', type: 'image/png', purpose: 'any maskable' }],
@@ -91,295 +89,76 @@ export default function Index() {
     };
   }, []);
 
+
   if (signedIn) {
-    return (
-      <View style={styles.loading}>
-        <StatusBar barStyle="light-content" backgroundColor="#047857" />
-        <Image source={{ uri: logoUri }} style={styles.loadingLogo} resizeMode="contain" />
-        <ActivityIndicator color="#ffffff" />
-      </View>
-    );
+    return <View style={styles.loading}>
+      <StatusBar barStyle="dark-content" backgroundColor={OASIS.colors.background} />
+      <Image source={{ uri: logoUri }} style={styles.loadingLogo} resizeMode="contain" />
+      <ActivityIndicator color={OASIS.colors.primary} />
+    </View>;
   }
 
   return (
     <View style={styles.page}>
-      <StatusBar barStyle="light-content" backgroundColor="#047857" />
-      <AppHeader
-        variant="sub"
-        title="حيّنا 🇸🇦"
-        subtitle="الشبكة الاجتماعية للحي والمدينة"
-        showBack={false}
-        rightAction={
-          <Pressable
-            onPress={() => router.replace('/home')}
-            style={styles.headerSkip}
-            accessibilityRole="button"
-            accessibilityLabel="تصفح كزائر"
-            hitSlop={8}
-          >
-            <Text style={styles.headerSkipText}>تصفح كزائر</Text>
-            <ArrowLeft size={14} color="#047857" />
-          </Pressable>
-        }
-      />
-
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={[styles.content, compact && styles.contentCompact]}
-        showsVerticalScrollIndicator={false}
-        alwaysBounceVertical={false}
-      >
-        <View style={styles.intro}>
-          <View style={styles.eyebrow}>
-            <View style={styles.dot} />
-            <Text style={styles.eyebrowText}>مجتمعك يبدأ من هنا</Text>
+      <StatusBar barStyle="dark-content" backgroundColor={OASIS.colors.background} translucent={false} />
+      <View style={styles.background}>
+        <View pointerEvents="none" style={[styles.headerBackground, { height: Math.min(height * 0.6, 520) }]}>
+        <ImageBackground source={WELCOME_BACKGROUND} resizeMode="cover" style={StyleSheet.absoluteFillObject}>
+          <View style={styles.topVeil} />
+          <LinearGradient colors={['rgba(245,243,233,0)', OASIS.colors.background]} style={styles.headerFade} />
+        </ImageBackground>
+        </View>
+        <View
+          style={[styles.content, { paddingTop: Math.max(insets.top, 12), paddingBottom: Math.max(insets.bottom, 12) }, compact && styles.compact]}
+        ><View pointerEvents="none" style={[styles.hero, { top: Math.max(insets.top, 12) }, compact && styles.heroCompact]}>
+            <Image source={{ uri: logoUri }} resizeMode="contain" style={[styles.logo, compact && styles.logoCompact]} accessibilityLabel="شعار حيّنا" />
           </View>
 
-          <Text style={[styles.title, compact && styles.titleCompact]}>حيّنا… أقرب لبعض</Text>
-          <Text style={styles.description}>
-            مكان يجمع أهل الحي، ويقرّب الجيران من بعض.
-          </Text>
-        </View>
+          <View style={styles.spacer} />
 
-        <View style={[styles.logoWrap, compact && styles.logoWrapCompact]}>
-          <Image
-            source={{ uri: logoUri }}
-            style={[styles.logo, compact && styles.logoCompact]}
-            resizeMode="contain"
-            accessibilityLabel="شعار حيّنا"
-          />
-        </View>
+          <View style={styles.bottomPanel}>
+            <Text style={styles.panelTitle}>أهلًا بك في حيّنا</Text>
+            <Text style={styles.panelSubtitle}>حيّك وناسك وخدماتك في مكان واحد</Text>
 
-        <View style={styles.features}>
-          <View style={styles.feature}>
-            <UsersRound size={17} color="#d1fae5" strokeWidth={2} />
-            <Text style={styles.featureText}>جيرانك</Text>
-          </View>
-          <View style={styles.featureDivider} />
-          <View style={styles.feature}>
-            <Store size={17} color="#d1fae5" strokeWidth={2} />
-            <Text style={styles.featureText}>سوق الحي</Text>
-          </View>
-          <View style={styles.featureDivider} />
-          <View style={styles.feature}>
-            <House size={17} color="#d1fae5" strokeWidth={2} />
-            <Text style={styles.featureText}>خدمات قريبة</Text>
+            <HaynaActionButton
+              title="تسجيل الدخول"
+              onPress={() => router.push('/auth')}
+              icon={<LogIn size={HAYNA_BUTTON.iconSize} color={OASIS.colors.surface} />}
+            />
+            <HaynaActionButton
+              title="استكشف حيّنا دون تسجيل"
+              variant="secondary"
+              onPress={() => router.replace('/home')}
+              icon={<ArrowRight size={HAYNA_BUTTON.iconSize} color={OASIS.colors.primary} />}
+              style={styles.secondaryAction}
+            />
+            <View style={styles.trustRow}><ShieldCheck size={15} color={OASIS.colors.primary} /><Text style={styles.trustText}>مجتمع محلي، خصوصية واحترام للجميع</Text></View>
           </View>
         </View>
-
-        <View style={styles.actions}>
-          <Pressable
-            onPress={() => router.replace('/auth')}
-            style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
-            accessibilityRole="button"
-            accessibilityLabel="تسجيل الدخول أو إنشاء حساب"
-            hitSlop={6}
-          >
-            <Text style={styles.primaryButtonText}>تسجيل الدخول / إنشاء حساب</Text>
-            <ArrowLeft size={17} color="#065f46" strokeWidth={2.5} />
-          </Pressable>
-
-          <Pressable
-            onPress={() => router.replace('/home')}
-            style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
-            accessibilityRole="button"
-            accessibilityLabel="تصفح حيّنا كزائر دون تسجيل"
-            hitSlop={6}
-          >
-            <Text style={styles.secondaryButtonText}>تصفح كزائر دون تسجيل</Text>
-          </Pressable>
-
-          <Text style={styles.footer}>حيّك، ناسك، وحياتك اليومية في مكان واحد</Text>
-        </View>
-      </ScrollView>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  page: {
-    flex: 1,
-    backgroundColor: '#047857',
-  },
-  scroll: {
-    flex: 1,
-  },
-  content: {
-    flexGrow: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-    paddingTop: 22,
-    paddingBottom: Platform.OS === 'ios' ? 28 : 22,
-  },
-  contentCompact: {
-    paddingTop: 12,
-    paddingBottom: 16,
-  },
-  intro: {
-    width: '100%',
-    alignItems: 'center',
-  },
-  eyebrow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255,255,255,0.10)',
-    marginBottom: 12,
-  },
-  dot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: '#a7f3d0',
-  },
-  eyebrowText: {
-    color: '#d1fae5',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  title: {
-    color: '#ffffff',
-    fontSize: 28,
-    fontWeight: '900',
-    textAlign: 'center',
-    letterSpacing: -0.4,
-  },
-  titleCompact: {
-    fontSize: 24,
-  },
-  description: {
-    color: '#d1fae5',
-    fontSize: 13,
-    lineHeight: 21,
-    textAlign: 'center',
-    marginTop: 8,
-  },
-  logoWrap: {
-    width: 156,
-    height: 156,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 18,
-    marginBottom: 16,
-    borderRadius: 78,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.16)',
-  },
-  logoWrapCompact: {
-    width: 128,
-    height: 128,
-    borderRadius: 64,
-    marginTop: 12,
-    marginBottom: 12,
-  },
-  logo: {
-    width: 124,
-    height: 124,
-  },
-  logoCompact: {
-    width: 102,
-    height: 102,
-  },
-  features: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 14,
-    backgroundColor: 'rgba(2,44,34,0.12)',
-  },
-  feature: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 5,
-  },
-  featureText: {
-    color: '#ffffff',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  featureDivider: {
-    width: 1,
-    height: 18,
-    backgroundColor: 'rgba(255,255,255,0.22)',
-  },
-  actions: {
-    width: '100%',
-    maxWidth: 360,
-    alignItems: 'center',
-    marginTop: 22,
-  },
-  primaryButton: {
-    width: '100%',
-    minHeight: 50,
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    backgroundColor: '#ffffff',
-  },
-  primaryButtonText: {
-    color: '#065f46',
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  secondaryButton: {
-    width: '100%',
-    minHeight: 44,
-    borderRadius: 14,
-    marginTop: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.28)',
-    backgroundColor: 'rgba(255,255,255,0.08)',
-  },
-  secondaryButtonText: {
-    color: '#ffffff',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  pressed: {
-    opacity: 0.84,
-  },
-  footer: {
-    color: 'rgba(236,253,245,0.75)',
-    fontSize: 10,
-    textAlign: 'center',
-    marginTop: 14,
-  },
-  headerSkip: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 10,
-    backgroundColor: '#ecfdf5',
-  },
-  headerSkipText: {
-    color: '#047857',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  loading: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#047857',
-  },
-  loadingLogo: {
-    width: 88,
-    height: 88,
-    marginBottom: 20,
-  },
+  page: { flex: 1, overflow: 'hidden', backgroundColor: OASIS.colors.background },
+  background: { flex: 1, width: '100%' },
+  headerBackground: { position: 'absolute', top: 0, left: 0, right: 0, overflow: 'hidden' },
+  topVeil: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(250,249,241,0.25)' },
+  headerFade: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 120 },
+  content: { flex: 1, minHeight: 0, paddingHorizontal: 16, alignItems: 'center' },
+  compact: { paddingHorizontal: 16 },
+  hero: { position: 'absolute', alignSelf: 'center', alignItems: 'center', zIndex: 1 },
+  heroCompact: {},
+  logo: { width: 112, height: 112 },
+  logoCompact: { width: 84, height: 84 },
+  spacer: { flexGrow: 1, minHeight: 8 },
+  bottomPanel: { width: '100%', maxWidth: HAYNA_BUTTON.maxContentWidth, paddingHorizontal: 19, paddingTop: 15, paddingBottom: 18, backgroundColor: 'transparent', borderWidth: 0, alignItems: 'center' },
+  panelTitle: { color: OASIS.colors.ink, fontSize: 19, fontWeight: '700', textAlign: 'center' },
+  panelSubtitle: { color: OASIS.colors.muted, fontSize: 12, fontWeight: '600', textAlign: 'center', marginTop: 4, marginBottom: 14 },
+  secondaryAction: { marginTop: HAYNA_BUTTON.verticalGap },
+  trustRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 8 },
+  trustText: { color: '#718176', fontSize: 11, fontWeight: '600' },
+  loading: { flex: 1, backgroundColor: OASIS.colors.background, alignItems: 'center', justifyContent: 'center' },
+  loadingLogo: { width: 88, height: 88, marginBottom: 20 },
 });

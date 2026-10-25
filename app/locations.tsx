@@ -1,15 +1,7 @@
+import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
 import { useState, useEffect, useMemo } from 'react';
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  Platform,
-  ActivityIndicator,
-  Alert,
-} from 'react-native';
+import { ScrollView, StyleSheet, Text, View, Platform, ActivityIndicator, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { buildSaudiLocations, normalizeSaudiLocationName, isInsideSaudiArabia, isKnownSaudiCity } from '@/lib/saudiLocations';
 import { AppHeader } from '@/components/shared/AppHeader';
@@ -217,9 +209,9 @@ export default function Locations() {
       >
         <View style={styles.contentWrap}>
           {/* 1. CURRENT ACTIVE LOCATION CARD */}
-          <View style={styles.currentLocCard}>
+          <OasisSurface oasisSurface="card" style={styles.currentLocCard}>
             <View style={[styles.currentLocIconBox, hasLock && { backgroundColor: '#fef3c7' }]}>
-              {hasLock ? <Lock size={20} color="#b45309" /> : <MapPin size={22} color="#059669" />}
+              {hasLock ? <Lock size={20} color="#b45309" /> : <MapPin size={22} color={OASIS.colors.primary} />}
             </View>
             <View style={{ flex: 1, alignItems: 'flex-end', gap: 2 }}>
               <Text style={styles.currentLocLabel}>موقعك الحالي للتصفح</Text>
@@ -229,42 +221,42 @@ export default function Locations() {
                   : 'لم يتم تثبيت مدينتك بعد'}
               </Text>
             </View>
-          </View>
+          </OasisSurface>
 
           {/* 2. MANDATORY GPS BUTTON */}
-          <View style={styles.mandatoryCard}>
+          <OasisSurface oasisSurface="card" style={styles.mandatoryCard}>
             <View style={styles.mandatoryHeader}>
-              <Crosshair size={17} color="#b91c1c" />
+              <Crosshair size={17} color={OASIS.colors.danger} />
               <Text style={styles.mandatoryTitle}>تحديد موقعك الحقيقي إلزامي</Text>
             </View>
             <Text style={styles.mandatoryText}>
               نقرأ موقعك الفعلي عبر GPS لتثبيت مدينتك تلقائياً. لا يمكن تغيير المدينة يدوياً لاحقاً، وهذا يضمن
               وصول منشورات وتنبيهات جيرانك الحقيقيين إليك بدقة.
             </Text>
-            <Pressable
+            <Pressable oasisKind="action"
               style={[styles.gpsBtn, detectingGps && { opacity: 0.6 }]}
               onPress={handleAutoDetectGPS}
               disabled={detectingGps}
               accessibilityRole="button"
             >
               {detectingGps ? (
-                <ActivityIndicator size="small" color="#fff" />
+                <ActivityIndicator size="small" color={OASIS.colors.surface} />
               ) : (
                 <>
-                  <Crosshair size={18} color="#fff" />
+                  <Crosshair size={18} color={OASIS.colors.surface} />
                   <Text style={styles.gpsBtnText}>
                     {hasLock ? 'تحديث موقعي الحقيقي عبر GPS' : 'تثبيت موقعي عبر GPS الآن'}
                   </Text>
                 </>
               )}
             </Pressable>
-          </View>
+          </OasisSurface>
 
           {/* 3. DISTRICT PICKER INSIDE THE LOCKED CITY */}
           {hasLock && (
             <>
               <View style={styles.sectionHeader}>
-                <Building2 size={18} color="#0284c7" />
+                <Building2 size={18} color={OASIS.colors.info} />
                 <Text style={styles.sectionTitle}>تصفّح داخل مدينة {locked?.city}</Text>
               </View>
 
@@ -274,12 +266,12 @@ export default function Locations() {
                 disabled={applyingDistrict}
                 accessibilityRole="button"
               >
-                <Globe size={18} color="#059669" />
+                <Globe size={18} color={OASIS.colors.primary} />
                 <View style={{ flex: 1, alignItems: 'flex-end' }}>
                   <Text style={styles.allDistrictsTitle}>كل أحياء {locked?.city} 🏙️</Text>
                   <Text style={styles.allDistrictsSub}>عرض شامل لكافة المنشورات والخدمات في مدينتك</Text>
                 </View>
-                {isAllDistricts && <Check size={18} color="#059669" />}
+                {isAllDistricts && <Check size={18} color={OASIS.colors.primary} />}
               </Pressable>
 
               {lockedDistricts.length > 0 && (
@@ -312,7 +304,7 @@ export default function Locations() {
                           disabled={applyingDistrict}
                           accessibilityRole="button"
                         >
-                          {isSelected ? <Check size={16} color="#059669" /> : <ChevronLeft size={16} color="#94a3b8" />}
+                          {isSelected ? <Check size={16} color={OASIS.colors.primary} /> : <ChevronLeft size={16} color="#94a3b8" />}
                           <Text style={[styles.districtName, isSelected && styles.districtNameActive]}>
                             حي {dName}
                           </Text>
@@ -330,7 +322,7 @@ export default function Locations() {
 
           {/* 4. BROWSE OTHER CITIES (READ-ONLY) */}
           <View style={[styles.sectionHeader, { marginTop: 14 }]}>
-            <Eye size={18} color="#64748b" />
+            <Eye size={18} color={OASIS.colors.muted} />
             <Text style={styles.sectionTitle}>تصفّح باقي مناطق ومدن المملكة (عرض فقط)</Text>
           </View>
           <Text style={styles.browseHint}>
@@ -342,7 +334,7 @@ export default function Locations() {
             {ALL_SAUDI_REGIONS.map(r => {
               const isCurrentRegion = hasLock && currentLoc.region === r.name;
               return (
-                <Pressable
+                <Pressable oasisKind="card"
                   key={r.name}
                   style={[styles.regionCard, isCurrentRegion && styles.regionCardActive]}
                   onPress={() => router.push({ pathname: '/cities', params: { regionName: r.name } })}
@@ -354,8 +346,8 @@ export default function Locations() {
                       {r.cities.length} مدينة ومحافظة · {r.cities.reduce((total, city) => total + city.districts.length, 0)} حي
                     </Text>
                   </View>
-                  <View style={[styles.regionIconBox, isCurrentRegion && { backgroundColor: '#ecfdf5' }]}>
-                    {isCurrentRegion ? <MapPin size={18} color="#059669" /> : <Eye size={18} color="#94a3b8" />}
+                  <View style={[styles.regionIconBox, isCurrentRegion && { backgroundColor: OASIS.colors.soft }]}>
+                    {isCurrentRegion ? <MapPin size={18} color={OASIS.colors.primary} /> : <Eye size={18} color="#94a3b8" />}
                   </View>
                 </Pressable>
               );
@@ -368,11 +360,11 @@ export default function Locations() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
+  container: { flex: 1, backgroundColor: OASIS.colors.background },
 
   // Navbar
   navbar: {
-    backgroundColor: '#fff',
+    backgroundColor: OASIS.colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
     paddingTop: Platform.OS === 'ios' ? 48 : 16,
@@ -397,8 +389,8 @@ const styles = StyleSheet.create({
   },
   navTitle: {
     fontSize: 16,
-    fontWeight: '900',
-    color: '#0f172a',
+    fontWeight: '700',
+    color: OASIS.colors.ink,
   },
 
   // Body Content
@@ -416,34 +408,34 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: '#fff',
-    borderRadius: 18,
-    padding: 16,
+    backgroundColor: OASIS.colors.surface,
+    borderRadius: 14,
+    padding: 14,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
     shadowColor: '#000',
-    shadowOpacity: 0.03,
+    shadowOpacity: 0,
     shadowRadius: 8,
     elevation: 2,
   },
   currentLocIconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: '#ecfdf5',
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: OASIS.colors.soft,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  currentLocLabel: { fontSize: 11.5, color: '#64748b', fontWeight: '700' },
-  currentLocValue: { fontSize: 16, fontWeight: '900', color: '#0f172a' },
+  currentLocLabel: { fontSize: 11.5, color: OASIS.colors.muted, fontWeight: '700' },
+  currentLocValue: { fontSize: 16, fontWeight: '700', color: OASIS.colors.ink },
 
   // Mandatory GPS card
   mandatoryCard: {
-    backgroundColor: '#fff',
-    borderRadius: 18,
+    backgroundColor: OASIS.colors.surface,
+    borderRadius: 14,
     borderWidth: 1.5,
     borderColor: '#fecaca',
-    padding: 16,
+    padding: 14,
     gap: 10,
   },
   mandatoryHeader: {
@@ -451,22 +443,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  mandatoryTitle: { fontSize: 14.5, fontWeight: '900', color: '#b91c1c' },
-  mandatoryText: { fontSize: 12.5, lineHeight: 20, color: '#475569', textAlign: 'right' },
+  mandatoryTitle: { fontSize: 14.5, fontWeight: '700', color: OASIS.colors.danger },
+  mandatoryText: { fontSize: 12.5, lineHeight: 20, color: OASIS.colors.muted, textAlign: 'right' },
   gpsBtn: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#059669',
+    backgroundColor: OASIS.colors.primary,
     paddingVertical: 14,
     borderRadius: 14,
-    shadowColor: '#059669',
-    shadowOpacity: 0.25,
+    shadowColor: OASIS.colors.primary,
+    shadowOpacity: 0,
     shadowRadius: 6,
     elevation: 3,
   },
-  gpsBtnText: { color: '#fff', fontSize: 13.5, fontWeight: '900' },
+  gpsBtnText: { color: OASIS.colors.surface, fontSize: 13.5, fontWeight: '700' },
 
   // Section headers
   sectionHeader: {
@@ -475,7 +467,7 @@ const styles = StyleSheet.create({
     gap: 6,
     marginTop: 6,
   },
-  sectionTitle: { fontSize: 15, fontWeight: '900', color: '#0f172a', flex: 1, textAlign: 'right' },
+  sectionTitle: { fontSize: 15, fontWeight: '700', color: OASIS.colors.ink, flex: 1, textAlign: 'right' },
   browseHint: { fontSize: 11.5, lineHeight: 18, color: '#94a3b8', textAlign: 'right', marginTop: -4 },
 
   // All districts row
@@ -483,31 +475,31 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: '#ecfdf5',
+    backgroundColor: OASIS.colors.soft,
     borderWidth: 1,
     borderColor: '#a7f3d0',
     borderRadius: 16,
     padding: 14,
   },
-  allDistrictsRowActive: { borderColor: '#059669', borderWidth: 1.5 },
-  allDistrictsTitle: { fontSize: 14, fontWeight: '900', color: '#047857' },
-  allDistrictsSub: { fontSize: 11, color: '#059669', marginTop: 1 },
+  allDistrictsRowActive: { borderColor: OASIS.colors.primary, borderWidth: 1.5 },
+  allDistrictsTitle: { fontSize: 14, fontWeight: '700', color: OASIS.colors.primary },
+  allDistrictsSub: { fontSize: 11, color: OASIS.colors.primary, marginTop: 1 },
 
   // Search
   searchBar: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#fff',
+    backgroundColor: OASIS.colors.surface,
     borderRadius: 14,
     paddingHorizontal: 14,
     height: 48,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
   },
   searchInput: {
     flex: 1,
-    color: '#0f172a',
+    color: OASIS.colors.ink,
     fontSize: 13.5,
     paddingVertical: 0,
     ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}),
@@ -522,17 +514,17 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 14,
     borderRadius: 12,
-    backgroundColor: '#fff',
+    backgroundColor: OASIS.colors.surface,
     borderWidth: 1,
     borderColor: '#f1f5f9',
   },
   districtRowActive: {
-    backgroundColor: '#ecfdf5',
+    backgroundColor: OASIS.colors.soft,
     borderWidth: 1,
     borderColor: '#a7f3d0',
   },
-  districtName: { fontSize: 13.5, fontWeight: '800', color: '#0f172a', flex: 1, textAlign: 'right' },
-  districtNameActive: { color: '#059669', fontWeight: '900' },
+  districtName: { fontSize: 13.5, fontWeight: '600', color: OASIS.colors.ink, flex: 1, textAlign: 'right' },
+  districtNameActive: { color: OASIS.colors.primary, fontWeight: '700' },
   noDistrictsText: { textAlign: 'center', color: '#94a3b8', fontSize: 12.5, paddingVertical: 16 },
 
   // Regions list
@@ -541,18 +533,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#fff',
+    backgroundColor: OASIS.colors.surface,
     borderRadius: 16,
     padding: 14,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
   },
   regionCardActive: {
-    borderColor: '#059669',
-    backgroundColor: '#f0fdf4',
+    borderColor: OASIS.colors.primary,
+    backgroundColor: OASIS.colors.soft,
   },
-  regionTitle: { fontSize: 14.5, fontWeight: '900', color: '#0f172a' },
-  regionSub: { fontSize: 11.5, color: '#64748b', marginTop: 1 },
+  regionTitle: { fontSize: 14.5, fontWeight: '700', color: OASIS.colors.ink },
+  regionSub: { fontSize: 11.5, color: OASIS.colors.muted, marginTop: 1 },
   regionIconBox: {
     width: 36,
     height: 36,

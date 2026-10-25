@@ -1,5 +1,7 @@
+import { OasisPressable as Pressable, OasisTextInput as TextInput } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Modal, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Check, ChevronDown, MapPin, Pencil, Plus, Search, Trash2, X } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { buildSaudiLocations, CustomLocation, LocationOverride, Region } from '@/lib/saudiLocations';
@@ -178,17 +180,17 @@ export default function AdminLocationManager({ profileId, notify, audit }: { pro
       <TextInput style={styles.input} placeholder={editing ? 'الاسم الجديد' : level === 'region' ? 'اسم المنطقة الجديدة' : level === 'city' ? 'اسم المدينة أو المحافظة' : 'اسم الحي'} value={name} onChangeText={setName} />
       {!editing && <View style={styles.row}><TextInput style={[styles.input, styles.coordinate]} placeholder="خط العرض (اختياري)" value={latitude} onChangeText={setLatitude} keyboardType="decimal-pad" /><TextInput style={[styles.input, styles.coordinate]} placeholder="خط الطول (اختياري)" value={longitude} onChangeText={setLongitude} keyboardType="decimal-pad" /></View>}
       <View style={styles.row}>
-        <Pressable style={[styles.saveButton, saving && styles.disabled]} onPress={editing ? saveEdit : saveNew} disabled={saving}><Check size={16} color="#fff" /><Text style={styles.saveText}>{saving ? 'جارٍ الحفظ…' : editing ? 'حفظ التعديل' : 'إضافة'}</Text></Pressable>
-        {editing && <Pressable style={[styles.saveButton, styles.cancel]} onPress={() => { setEditing(null); setName(''); }}><X size={16} color="#fff" /><Text style={styles.saveText}>إلغاء</Text></Pressable>}
+        <Pressable oasisVariant="primary" oasisKind="action" style={[styles.saveButton, saving && styles.disabled]} onPress={editing ? saveEdit : saveNew} disabled={saving}><Check size={16} color={OASIS.colors.surface} /><Text style={styles.saveText}>{saving ? 'جارٍ الحفظ…' : editing ? 'حفظ التعديل' : 'إضافة'}</Text></Pressable>
+        {editing && <Pressable oasisVariant="primary" oasisKind="action" style={[styles.saveButton, styles.cancel]} onPress={() => { setEditing(null); setName(''); }}><X size={16} color={OASIS.colors.surface} /><Text style={styles.saveText}>إلغاء</Text></Pressable>}
       </View>
     </View>
     <Text style={styles.subtitle}>{selectedCity ? `الأحياء (${totalRows.toLocaleString('ar-SA')})` : selectedRegion ? `مدن ومحافظات المنطقة (${totalRows.toLocaleString('ar-SA')})` : `مناطق المملكة (${totalRows})`}</Text>
     {loading ? <Text style={styles.muted}>جارٍ تحميل الدليل…</Text> : <ScrollView style={styles.rows} nestedScrollEnabled>
       {rows.map(item => <View key={`${item.level}:${item.id}`} style={styles.item}>
-        <MapPin size={17} color="#059669" />
+        <MapPin size={17} color={OASIS.colors.primary} />
         <Pressable style={styles.itemText} onPress={() => { if (item.level === 'region') { setSelectedRegionId(item.id); setSelectedCityId(''); } else if (item.level === 'city') setSelectedCityId(item.id); }}><Text style={styles.itemName}>{item.name}</Text><Text style={styles.itemPath}>{item.path.join(' · ')}</Text></Pressable>
-        <Pressable accessibilityLabel={`تعديل ${item.name}`} style={styles.iconButton} onPress={() => { setEditing(item); setName(item.name); }}><Pencil size={16} color="#0369A1" /></Pressable>
-        <Pressable accessibilityLabel={`حذف ${item.name}`} style={styles.iconButton} onPress={() => remove(item)}><Trash2 size={16} color="#DC2626" /></Pressable>
+        <Pressable oasisKind="icon" accessibilityLabel={`تعديل ${item.name}`} style={styles.iconButton} onPress={() => { setEditing(item); setName(item.name); }}><Pencil size={16} color="#0369A1" /></Pressable>
+        <Pressable oasisKind="icon" accessibilityLabel={`حذف ${item.name}`} style={styles.iconButton} onPress={() => remove(item)}><Trash2 size={16} color={OASIS.colors.danger} /></Pressable>
       </View>)}
       {totalRows > visibleCount && <Pressable style={styles.more} onPress={() => setVisibleCount(count => count + 100)}><Text style={styles.moreText}>عرض ١٠٠ موقع إضافي ({(totalRows - visibleCount).toLocaleString('ar-SA')} متبقٍ)</Text></Pressable>}
     </ScrollView>}
@@ -197,7 +199,7 @@ export default function AdminLocationManager({ profileId, notify, audit }: { pro
 }
 
 function Action({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
-  return <Pressable onPress={onPress} style={[styles.action, active && styles.actionActive]}><Plus size={14} color={active ? '#fff' : '#475569'} /><Text style={[styles.actionText, active && styles.actionTextActive]}>{label}</Text></Pressable>;
+  return <Pressable onPress={onPress} style={[styles.action, active && styles.actionActive]}><Plus size={14} color={active ? OASIS.colors.surface : OASIS.colors.muted} /><Text style={[styles.actionText, active && styles.actionTextActive]}>{label}</Text></Pressable>;
 }
 
 function Picker({ label, value, placeholder, options, onSelect }: { label: string; value: string; placeholder: string; options: Option[]; onSelect: (id: string) => void }) {
@@ -208,13 +210,13 @@ function Picker({ label, value, placeholder, options, onSelect }: { label: strin
   useEffect(() => { setLimit(100); }, [search, options.length]);
   return <View style={styles.pickerWrap}>
     <Text style={styles.label}>{label}</Text>
-    <Pressable style={styles.picker} onPress={() => setOpen(true)}><Text style={[styles.pickerValue, !value && styles.placeholder]}>{value || placeholder}</Text><ChevronDown size={17} color="#64748B" /></Pressable>
+    <Pressable style={styles.picker} onPress={() => setOpen(true)}><Text style={[styles.pickerValue, !value && styles.placeholder]}>{value || placeholder}</Text><ChevronDown size={17} color={OASIS.colors.muted} /></Pressable>
     <Modal transparent visible={open} animationType="fade" onRequestClose={() => setOpen(false)}>
       <View style={styles.backdrop}><View style={styles.modal}>
-        <View style={styles.modalHeader}><Text style={styles.modalTitle}>اختر {label}</Text><Pressable onPress={() => setOpen(false)}><X size={22} color="#64748B" /></Pressable></View>
-        <View style={styles.search}><Search size={17} color="#64748B" /><TextInput value={search} onChangeText={setSearch} placeholder={`ابحث عن ${label}`} style={styles.searchInput} /></View>
+        <View style={styles.modalHeader}><Text style={styles.modalTitle}>اختر {label}</Text><Pressable onPress={() => setOpen(false)}><X size={22} color={OASIS.colors.muted} /></Pressable></View>
+        <View style={styles.search}><Search size={17} color={OASIS.colors.muted} /><TextInput value={search} onChangeText={setSearch} placeholder={`ابحث عن ${label}`} style={styles.searchInput} /></View>
         <ScrollView keyboardShouldPersistTaps="handled" style={{ maxHeight: 450 }}>
-          {results.slice(0, limit).map(option => <Pressable key={option.id} style={styles.option} onPress={() => { onSelect(option.id); setSearch(''); setOpen(false); }}><View style={styles.optionText}><Text style={styles.itemName}>{option.name}</Text>{!!option.detail && <Text style={styles.itemPath}>{option.detail}</Text>}</View>{value === option.name && <Check size={17} color="#059669" />}</Pressable>)}
+          {results.slice(0, limit).map(option => <Pressable key={option.id} style={styles.option} onPress={() => { onSelect(option.id); setSearch(''); setOpen(false); }}><View style={styles.optionText}><Text style={styles.itemName}>{option.name}</Text>{!!option.detail && <Text style={styles.itemPath}>{option.detail}</Text>}</View>{value === option.name && <Check size={17} color={OASIS.colors.primary} />}</Pressable>)}
           {!results.length && <Text style={styles.muted}>لا توجد نتائج</Text>}
           {results.length > limit && <Pressable style={styles.more} onPress={() => setLimit(count => count + 100)}><Text style={styles.moreText}>عرض المزيد من النتائج</Text></Pressable>}
         </ScrollView>
@@ -224,23 +226,23 @@ function Picker({ label, value, placeholder, options, onSelect }: { label: strin
 }
 
 const styles = StyleSheet.create({
-  container: { backgroundColor: '#fff', borderRadius: 18, padding: 16, margin: 14, borderWidth: 1, borderColor: '#E2E8F0' },
-  title: { color: '#0F172A', fontSize: 18, fontWeight: '900', textAlign: 'right' },
-  description: { color: '#64748B', fontSize: 12, lineHeight: 19, textAlign: 'right', marginTop: 5, marginBottom: 12 },
-  pickerWrap: { marginBottom: 10 }, label: { textAlign: 'right', fontSize: 12, fontWeight: '800', color: '#64748B', marginBottom: 4 },
-  picker: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 12 },
-  pickerValue: { flex: 1, textAlign: 'right', fontWeight: '800', color: '#0F172A' }, placeholder: { color: '#94A3B8' },
+  container: { backgroundColor: OASIS.colors.surface, borderRadius: 14, padding: 14, margin: 14, borderWidth: 1, borderColor: OASIS.colors.line },
+  title: { color: OASIS.colors.ink, fontSize: 18, fontWeight: '700', textAlign: 'right' },
+  description: { color: OASIS.colors.muted, fontSize: 12, lineHeight: 19, textAlign: 'right', marginTop: 5, marginBottom: 12 },
+  pickerWrap: { marginBottom: 10 }, label: { textAlign: 'right', fontSize: 12, fontWeight: '600', color: OASIS.colors.muted, marginBottom: 4 },
+  picker: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, backgroundColor: OASIS.colors.background, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 12 },
+  pickerValue: { flex: 1, textAlign: 'right', fontWeight: '600', color: OASIS.colors.ink }, placeholder: { color: '#94A3B8' },
   row: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 7, alignItems: 'center' },
-  action: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, borderRadius: 16, paddingHorizontal: 10, paddingVertical: 7, backgroundColor: '#F1F5F9' }, actionActive: { backgroundColor: '#059669' },
-  actionText: { color: '#475569', fontSize: 11, fontWeight: '800' }, actionTextActive: { color: '#fff' },
+  action: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, borderRadius: 16, paddingHorizontal: 10, paddingVertical: 7, backgroundColor: '#F1F5F9' }, actionActive: { backgroundColor: OASIS.colors.primary },
+  actionText: { color: OASIS.colors.muted, fontSize: 11, fontWeight: '600' }, actionTextActive: { color: OASIS.colors.surface },
   editor: { backgroundColor: '#F0FDFA', borderWidth: 1, borderColor: '#99F6E4', borderRadius: 15, padding: 12, marginVertical: 10 },
-  subtitle: { textAlign: 'right', color: '#334155', fontSize: 13, fontWeight: '900', marginVertical: 8 },
-  input: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 11, padding: 10, textAlign: 'right', color: '#0F172A', marginBottom: 7, flex: 1 }, coordinate: { minWidth: '40%' },
-  saveButton: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, flex: 1, backgroundColor: '#0F172A', borderRadius: 11, padding: 10 }, cancel: { backgroundColor: '#64748B' }, disabled: { opacity: 0.6 }, saveText: { color: '#fff', fontSize: 12, fontWeight: '900' },
+  subtitle: { textAlign: 'right', color: OASIS.colors.ink, fontSize: 13, fontWeight: '700', marginVertical: 8 },
+  input: { backgroundColor: OASIS.colors.surface, borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 11, padding: 10, textAlign: 'right', color: OASIS.colors.ink, marginBottom: 7, flex: 1 }, coordinate: { minWidth: '40%' },
+  saveButton: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, flex: 1, backgroundColor: OASIS.colors.ink, borderRadius: 11, padding: 10 }, cancel: { backgroundColor: OASIS.colors.muted }, disabled: { opacity: 0.6 }, saveText: { color: OASIS.colors.surface, fontSize: 12, fontWeight: '700' },
   rows: { maxHeight: 470, marginTop: 4 }, item: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
-  itemText: { flex: 1, alignItems: 'flex-end' }, itemName: { color: '#0F172A', fontWeight: '800', textAlign: 'right' }, itemPath: { color: '#64748B', fontSize: 10, textAlign: 'right', marginTop: 2 },
-  iconButton: { width: 34, height: 34, borderRadius: 10, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' }, more: { backgroundColor: '#ECFDF5', borderRadius: 11, padding: 11, marginVertical: 8 }, moreText: { color: '#047857', fontWeight: '900', textAlign: 'center' },
-  back: { marginTop: 8, padding: 8, alignSelf: 'flex-end' }, backText: { color: '#059669', fontWeight: '800', textAlign: 'right' }, muted: { textAlign: 'center', color: '#64748B', padding: 12 },
-  backdrop: { flex: 1, justifyContent: 'center', padding: 20, backgroundColor: 'rgba(15,23,42,.55)' }, modal: { backgroundColor: '#fff', borderRadius: 20, padding: 15, maxHeight: '85%' }, modalHeader: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }, modalTitle: { fontSize: 17, fontWeight: '900', color: '#0F172A' },
-  search: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 11, paddingHorizontal: 10, marginBottom: 7, minHeight: 42 }, searchInput: { flex: 1, textAlign: 'right', color: '#0F172A' }, option: { flexDirection: 'row-reverse', alignItems: 'center', gap: 9, borderBottomWidth: 1, borderBottomColor: '#F1F5F9', paddingVertical: 10 }, optionText: { flex: 1, alignItems: 'flex-end' },
+  itemText: { flex: 1, alignItems: 'flex-end' }, itemName: { color: OASIS.colors.ink, fontWeight: '600', textAlign: 'right' }, itemPath: { color: OASIS.colors.muted, fontSize: 11, textAlign: 'right', marginTop: 2 },
+  iconButton: { width: 34, height: 34, borderRadius: 10, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' }, more: { backgroundColor: OASIS.colors.soft, borderRadius: 11, padding: 11, marginVertical: 8 }, moreText: { color: OASIS.colors.primary, fontWeight: '700', textAlign: 'center' },
+  back: { marginTop: 8, padding: 8, alignSelf: 'flex-end' }, backText: { color: OASIS.colors.primary, fontWeight: '600', textAlign: 'right' }, muted: { textAlign: 'center', color: OASIS.colors.muted, padding: 12 },
+  backdrop: { flex: 1, justifyContent: 'center', padding: 14, backgroundColor: 'rgba(15,23,42,.55)' }, modal: { backgroundColor: OASIS.colors.surface, borderRadius: 20, padding: 15, maxHeight: '85%' }, modalHeader: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }, modalTitle: { fontSize: 17, fontWeight: '700', color: OASIS.colors.ink },
+  search: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: OASIS.colors.line, borderRadius: 11, paddingHorizontal: 10, marginBottom: 7, minHeight: 42 }, searchInput: { flex: 1, textAlign: 'right', color: OASIS.colors.ink }, option: { flexDirection: 'row-reverse', alignItems: 'center', gap: 9, borderBottomWidth: 1, borderBottomColor: '#F1F5F9', paddingVertical: 10 }, optionText: { flex: 1, alignItems: 'flex-end' },
 });

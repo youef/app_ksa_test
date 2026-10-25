@@ -1,8 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  ActivityIndicator, Alert, Linking, Pressable, RefreshControl, ScrollView,
-  StyleSheet, Text, TextInput, View,
-} from 'react-native';
+import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Linking, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { BadgeCheck, Briefcase, CreditCard, Crown, Megaphone, RefreshCw, ShieldCheck, ShoppingBag, Star } from 'lucide-react-native';
 import { AppHeader } from '@/components/shared/AppHeader';
@@ -26,8 +25,7 @@ export default function MarketplaceDashboard() {
   const params = useLocalSearchParams<{ service_id?: string; payment?: string }>();
   const [userId, setUserId] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [tab, setTab] = useState<'services' | 'plans' | 'ads' | 'orders'>('services');
-  const [services, setServices] = useState<Service[]>([]);
+  const [tab, setTab] = useState<'plans' | 'ads' | 'orders'>('plans');
   const [myServices, setMyServices] = useState<Service[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [packages, setPackages] = useState<AdPackage[]>([]);
@@ -50,10 +48,8 @@ export default function MarketplaceDashboard() {
     }
     setUserId(auth.user.id);
     const { data: ownProfile } = await supabase.from('profiles').select('role').eq('id', auth.user.id).maybeSingle();
-    setIsAdmin(ownProfile?.role === 'admin' || (auth.user.email || '').toLowerCase() === 'root@gmail.com');
-    const [servicesRes, myServicesRes, plansRes, packagesRes, ordersRes, subscriptionRes] = await Promise.all([
-      supabase.from('services').select('id,name,description,price_from,price_type,provider_id,city,district')
-        .eq('moderation_status', 'approved').eq('available_now', true).order('created_at', { ascending: false }).limit(30),
+    setIsAdmin(ownProfile?.role === 'admin');
+    const [myServicesRes, plansRes, packagesRes, ordersRes, subscriptionRes] = await Promise.all([
       supabase.from('services').select('id,name,description,price_from,price_type,provider_id,city,district')
         .eq('provider_id', auth.user.id).order('created_at', { ascending: false }).limit(50),
       supabase.from('marketplace_plans').select('id,slug,name,description,price_halalas,period_days,features')
@@ -65,7 +61,6 @@ export default function MarketplaceDashboard() {
       supabase.from('marketplace_subscriptions').select('id,status,current_period_end,plan:marketplace_plans(name,slug)')
         .eq('user_id', auth.user.id).eq('status', 'active').order('current_period_end', { ascending: false }).limit(1).maybeSingle(),
     ]);
-    setServices(servicesRes.data || []);
     setMyServices(myServicesRes.data || []);
     setPlans(plansRes.data || []);
     setPackages(packagesRes.data || []);
@@ -79,7 +74,6 @@ export default function MarketplaceDashboard() {
     if (params.payment === 'success') Alert.alert('تمت العودة من الدفع', 'سيظهر الطلب مدفوعًا بعد تأكيد بوابة الدفع. اسحب للتحديث إذا لزم الأمر.');
   }, [params.payment]);
 
-  const fixedServices = useMemo(() => services.filter(s => s.price_type !== 'negotiable' && Number(s.price_from) > 0), [services]);
 
   async function checkout(body: Record<string, unknown>, key: string) {
     if (!userId || busyId) return;
@@ -122,99 +116,74 @@ export default function MarketplaceDashboard() {
     setRefreshing(false);
   };
 
-  if (loading) return <View style={styles.loading}><ActivityIndicator size="large" color="#047857" /><Text style={styles.muted}>نجهز سوق الخدمات والدفع الآمن…</Text></View>;
+  if (loading) return <View style={styles.loading}><ActivityIndicator size="large" color={OASIS.colors.primary} /><Text style={styles.muted}>نجهز المزايا التجارية والمدفوعات…</Text></View>;
 
   return (
     <View style={styles.root}>
-      <AppHeader variant="sub" title="سوق خدمات الحي" subtitle="الخدمات · الاشتراكات · الترويج" fallbackRoute="/market" />
+      <AppHeader variant="sub" title="المزايا التجارية" subtitle="الاشتراكات · الترويج · المدفوعات" fallbackRoute="/profile?tab=content" />
       <ScrollView
         contentContainerStyle={[styles.content, { paddingBottom: bottomInset + 28 }]}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor="#047857" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={OASIS.colors.primary} />}
       >
         <View style={styles.hero}>
-          <View style={styles.heroIcon}><ShoppingBag size={26} color="#fff" /></View>
-          <Text style={styles.heroTitle}>سوق حيّنا التجاري</Text>
-          <Text style={styles.heroText}>اطلب خدمة، طوّر نشاطك، أو روّج عرضك. لا يُعتمد الدفع إلا بعد التحقق من بوابة الدفع على الخادم.</Text>
+          <View style={styles.heroIcon}><ShoppingBag size={26} color={OASIS.colors.surface} /></View>
+          <Text style={styles.heroTitle}>مزايا الحساب المهني</Text>
+          <Text style={styles.heroText}>الاشتراكات والترويج وسجل المدفوعات في مكان واحد. استكشاف المنتجات والخدمات يبقى في سوق حيّنا.</Text>
           <View style={styles.secureLine}><ShieldCheck size={15} color="#a7f3d0" /><Text style={styles.secureText}>دفع مستضاف وآمن · لا نخزن بيانات البطاقات</Text></View>
         </View>
 
         {isAdmin && (
-          <Pressable onPress={() => router.push('/admin-marketplace')} style={styles.adminButton}>
-            <ShieldCheck size={17} color="#fff" />
+          <Pressable oasisKind="action" onPress={() => router.push('/admin-marketplace')} style={styles.adminButton}>
+            <ShieldCheck size={17} color={OASIS.colors.surface} />
             <Text style={styles.primaryButtonText}>مراجعة الإعلانات المدفوعة (الإدارة)</Text>
           </Pressable>
         )}
 
         {subscription && (
           <View style={styles.activePlan}>
-            <View style={styles.planIcon}><Crown size={20} color="#047857" /></View>
+            <View style={styles.planIcon}><Crown size={20} color={OASIS.colors.primary} /></View>
             <View style={{ flex: 1, alignItems: 'flex-end' }}>
               <Text style={styles.activePlanTitle}>اشتراكك الحالي: {subscription.plan?.name || 'احترافي'}</Text>
               <Text style={styles.muted}>ينتهي في {subscription.current_period_end ? new Date(subscription.current_period_end).toLocaleDateString('ar-SA') : '—'}</Text>
             </View>
-            <BadgeCheck size={22} color="#059669" />
+            <BadgeCheck size={22} color={OASIS.colors.primary} />
           </View>
         )}
 
         <View style={styles.tabs}>
           {([
-            ['services', 'الخدمات', ShoppingBag],
             ['plans', 'الاشتراكات', Crown],
             ['ads', 'الترويج', Megaphone],
             ['orders', 'طلباتي', CreditCard],
           ] as const).map(([id, label, Icon]) => (
-            <Pressable key={id} onPress={() => setTab(id)} style={[styles.tab, tab === id && styles.tabActive]}>
-              <Icon size={16} color={tab === id ? '#fff' : '#475569'} />
+            <Pressable oasisVariant={tab === id ? 'primary' : 'secondary'} oasisKind="chip" key={id} onPress={() => setTab(id)} style={[styles.tab, tab === id && styles.tabActive]}>
+              <Icon size={16} color={tab === id ? OASIS.colors.surface : OASIS.colors.muted} />
               <Text style={[styles.tabText, tab === id && styles.tabTextActive]}>{label}</Text>
             </Pressable>
           ))}
         </View>
-
-        {tab === 'services' && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>خدمات متاحة للطلب</Text>
-            <Text style={styles.muted}>الدفع متاح للخدمات ذات السعر الثابت فقط. الخدمات القابلة للتفاوض تحتاج اتفاقًا على السعر أولًا.</Text>
-            {fixedServices.length === 0 ? <Empty text="لا توجد حاليًا خدمات بسعر ثابت متاحة للدفع." /> : fixedServices.map(service => (
-              <View key={service.id} style={styles.card}>
-                <View style={styles.cardTop}>
-                  <View style={styles.pricePill}><Text style={styles.priceText}>{money(Math.round(Number(service.price_from) * 100))}</Text></View>
-                  <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                    <Text style={styles.cardTitle}>{service.name}</Text>
-                    <Text style={styles.muted}>{[service.district, service.city].filter(Boolean).join(' · ') || 'خدمة محلية'}</Text>
-                  </View>
-                  <View style={styles.smallIcon}><Briefcase size={19} color="#047857" /></View>
-                </View>
-                {!!service.description && <Text style={styles.description}>{service.description}</Text>}
-                <Pressable disabled={!!busyId} style={[styles.primaryButton, !!busyId && styles.disabled]} onPress={() => void checkout({ kind: 'service_order', service_id: service.id }, `service-${service.id}`)}>
-                  {busyId === `service-${service.id}` ? <ActivityIndicator color="#fff" /> : <CreditCard size={17} color="#fff" />}
-                  <Text style={styles.primaryButtonText}>اطلب وادفع الآن</Text>
-                </Pressable>
-              </View>
-            ))}
-          </View>
-        )}
 
         {tab === 'plans' && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>باقات مقدمي الخدمات</Text>
             <Text style={styles.muted}>تفعيل المزايا يتم بعد تأكيد الدفع من الخادم. التجديد التلقائي غير مفعل حتى يتم ربط منتج recurring لدى مزود الدفع.</Text>
             {plans.map(plan => (
-              <View key={plan.id} style={styles.card}>
+              <OasisSurface oasisSurface="card" key={plan.id} style={styles.card}>
                 <View style={styles.cardTop}>
                   <View style={styles.pricePill}><Text style={styles.priceText}>{plan.price_halalas === 0 ? 'مجانية' : money(plan.price_halalas)}</Text></View>
                   <View style={{ flex: 1, alignItems: 'flex-end' }}>
                     <Text style={styles.cardTitle}>{plan.name}</Text>
                     <Text style={styles.muted}>{plan.period_days} يومًا</Text>
                   </View>
-                  <View style={styles.smallIcon}><Crown size={19} color="#047857" /></View>
+                  <View style={styles.smallIcon}><Crown size={19} color={OASIS.colors.primary} /></View>
                 </View>
                 <Text style={styles.description}>{plan.description}</Text>
                 {(plan.features || []).map((feature, i) => <Text key={i} style={styles.feature}>✓  {feature}</Text>)}
-                {plan.price_halalas > 0 && <Pressable disabled={!!busyId} style={[styles.primaryButton, !!busyId && styles.disabled]} onPress={() => void checkout({ kind: 'subscription', plan_slug: plan.slug }, `plan-${plan.slug}`)}>
-                  {busyId === `plan-${plan.slug}` ? <ActivityIndicator color="#fff" /> : <Crown size={17} color="#fff" />}
+                {plan.price_halalas > 0 && <Pressable oasisVariant="primary" oasisKind="action" disabled={!!busyId} style={[styles.primaryButton, !!busyId && styles.disabled]} onPress={() => void checkout({ kind: 'subscription', plan_slug: plan.slug }, `plan-${plan.slug}`)}>
+                  {busyId === `plan-${plan.slug}` ? <ActivityIndicator color={OASIS.colors.surface} /> : <Crown size={17} color={OASIS.colors.surface} />}
                   <Text style={styles.primaryButtonText}>اشترك الآن</Text>
                 </Pressable>}
-              </View>
+              </OasisSurface>
             ))}
           </View>
         )}
@@ -223,7 +192,7 @@ export default function MarketplaceDashboard() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>الإعلانات والترويج المدفوع</Text>
             <Text style={styles.muted}>تُراجع الإعلانات بعد الدفع ولا تظهر تلقائيًا قبل الموافقة.</Text>
-            <View style={styles.card}>
+            <OasisSurface oasisSurface="card" style={styles.card}>
               <Text style={styles.fieldLabel}>اختر عرضًا تملكه (اختياري)</Text>
               <View style={styles.choiceWrap}>
                 <Pressable onPress={() => setSelectedServiceId('')} style={[styles.choice, !selectedServiceId && styles.choiceActive]}><Text style={[styles.choiceText, !selectedServiceId && styles.choiceTextActive]}>إعلان عام</Text></Pressable>
@@ -233,23 +202,23 @@ export default function MarketplaceDashboard() {
               <TextInput value={adTitle} onChangeText={setAdTitle} placeholder="مثال: خصم خاص لسكان الحي" placeholderTextColor="#94a3b8" style={styles.input} textAlign="right" maxLength={100} />
               <Text style={styles.fieldLabel}>وصف الإعلان (اختياري)</Text>
               <TextInput value={adDescription} onChangeText={setAdDescription} placeholder="اكتب تفاصيل العرض" placeholderTextColor="#94a3b8" style={[styles.input, styles.multiline]} textAlign="right" multiline maxLength={1000} />
-            </View>
+            </OasisSurface>
             {packages.map(pkg => (
-              <View key={pkg.id} style={styles.card}>
+              <OasisSurface oasisSurface="card" key={pkg.id} style={styles.card}>
                 <View style={styles.cardTop}>
                   <View style={styles.pricePill}><Text style={styles.priceText}>{money(pkg.price_halalas)}</Text></View>
                   <View style={{ flex: 1, alignItems: 'flex-end' }}>
                     <Text style={styles.cardTitle}>{pkg.name}</Text>
                     <Text style={styles.muted}>{pkg.duration_days} يومًا</Text>
                   </View>
-                  <View style={styles.smallIcon}><Megaphone size={19} color="#047857" /></View>
+                  <View style={styles.smallIcon}><Megaphone size={19} color={OASIS.colors.primary} /></View>
                 </View>
                 <Text style={styles.description}>{pkg.description}</Text>
-                <Pressable disabled={!!busyId} style={[styles.primaryButton, !!busyId && styles.disabled]} onPress={() => void createAd(pkg)}>
-                  {busyId === `ad-${pkg.slug}` ? <ActivityIndicator color="#fff" /> : <Star size={17} color="#fff" />}
+                <Pressable oasisVariant="primary" oasisKind="action" disabled={!!busyId} style={[styles.primaryButton, !!busyId && styles.disabled]} onPress={() => void createAd(pkg)}>
+                  {busyId === `ad-${pkg.slug}` ? <ActivityIndicator color={OASIS.colors.surface} /> : <Star size={17} color={OASIS.colors.surface} />}
                   <Text style={styles.primaryButtonText}>روّج بهذا العرض</Text>
                 </Pressable>
-              </View>
+              </OasisSurface>
             ))}
           </View>
         )}
@@ -258,7 +227,7 @@ export default function MarketplaceDashboard() {
           <View style={styles.section}>
             <View style={styles.rowTitle}>
               <Text style={styles.sectionTitle}>سجل الطلبات والمدفوعات</Text>
-              <Pressable onPress={() => void refresh()}><RefreshCw size={18} color="#047857" /></Pressable>
+              <Pressable onPress={() => void refresh()}><RefreshCw size={18} color={OASIS.colors.primary} /></Pressable>
             </View>
             {orders.length === 0 ? <Empty text="لا توجد عمليات بعد. ستظهر هنا الاشتراكات وطلبات الخدمات وحملات الترويج." /> : orders.map(order => (
               <View key={order.id} style={styles.orderRow}>
@@ -274,7 +243,7 @@ export default function MarketplaceDashboard() {
         )}
 
         <View style={styles.notice}>
-          <ShieldCheck size={19} color="#047857" />
+          <ShieldCheck size={19} color={OASIS.colors.primary} />
           <Text style={styles.noticeText}>لا تُفعّل الاشتراكات ولا تُعتمد الطلبات من رابط الرجوع فقط؛ يعتمد النظام على إشعار موثّق من بوابة الدفع والتحقق من الفاتورة على الخادم.</Text>
         </View>
       </ScrollView>
@@ -287,50 +256,50 @@ function Empty({ text }: { text: string }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#f8fafc' },
-  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: '#f8fafc' },
-  content: { padding: 16, gap: 14, maxWidth: 920, width: '100%', alignSelf: 'center' },
-  hero: { backgroundColor: '#064e3b', borderRadius: 24, padding: 20, alignItems: 'flex-end', gap: 8 },
-  heroIcon: { width: 52, height: 52, borderRadius: 16, backgroundColor: '#047857', alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-end' },
-  heroTitle: { color: '#fff', fontSize: 22, fontWeight: '900', textAlign: 'right' },
-  heroText: { color: '#d1fae5', fontSize: 13, lineHeight: 21, textAlign: 'right' },
+  root: { flex: 1, backgroundColor: OASIS.colors.background },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: OASIS.colors.background },
+  content: { padding: 14, gap: 14, maxWidth: 920, width: '100%', alignSelf: 'center' },
+  hero: { backgroundColor: OASIS.colors.deep, borderRadius: 14, padding: 14, alignItems: 'flex-end', gap: 8 },
+  heroIcon: { width: 52, height: 52, borderRadius: 16, backgroundColor: OASIS.colors.primary, alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-end' },
+  heroTitle: { color: OASIS.colors.surface, fontSize: 22, fontWeight: '700', textAlign: 'right' },
+  heroText: { color: OASIS.colors.soft, fontSize: 13, lineHeight: 21, textAlign: 'right' },
   secureLine: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, marginTop: 4 },
   secureText: { color: '#a7f3d0', fontSize: 11, fontWeight: '700' },
   adminButton: { backgroundColor: '#7c3aed', borderRadius: 13, paddingVertical: 12, paddingHorizontal: 14, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  activePlan: { backgroundColor: '#ecfdf5', borderColor: '#a7f3d0', borderWidth: 1, borderRadius: 17, padding: 14, flexDirection: 'row-reverse', alignItems: 'center', gap: 10 },
-  planIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#d1fae5', alignItems: 'center', justifyContent: 'center' },
-  activePlanTitle: { color: '#065f46', fontWeight: '900', fontSize: 14, textAlign: 'right' },
-  tabs: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 7, backgroundColor: '#e2e8f0', padding: 5, borderRadius: 16 },
+  activePlan: { backgroundColor: OASIS.colors.soft, borderColor: '#a7f3d0', borderWidth: 1, borderRadius: 17, padding: 14, flexDirection: 'row-reverse', alignItems: 'center', gap: 10 },
+  planIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: OASIS.colors.soft, alignItems: 'center', justifyContent: 'center' },
+  activePlanTitle: { color: OASIS.colors.deep, fontWeight: '700', fontSize: 14, textAlign: 'right' },
+  tabs: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 7, backgroundColor: OASIS.colors.line, padding: 5, borderRadius: 16 },
   tab: { flexGrow: 1, minWidth: '22%', borderRadius: 12, paddingVertical: 10, paddingHorizontal: 8, alignItems: 'center', justifyContent: 'center', gap: 5, flexDirection: 'row-reverse' },
-  tabActive: { backgroundColor: '#047857' },
-  tabText: { color: '#475569', fontSize: 11.5, fontWeight: '800' },
-  tabTextActive: { color: '#fff' },
+  tabActive: { backgroundColor: OASIS.colors.primary },
+  tabText: { color: OASIS.colors.muted, fontSize: 11.5, fontWeight: '600' },
+  tabTextActive: { color: OASIS.colors.surface },
   section: { gap: 12 },
-  sectionTitle: { color: '#0f172a', fontSize: 17, fontWeight: '900', textAlign: 'right' },
-  card: { backgroundColor: '#fff', borderRadius: 18, padding: 15, borderWidth: 1, borderColor: '#e2e8f0', gap: 10 },
+  sectionTitle: { color: OASIS.colors.ink, fontSize: 17, fontWeight: '700', textAlign: 'right' },
+  card: { backgroundColor: OASIS.colors.surface, borderRadius: 14, padding: 15, borderWidth: 1, borderColor: OASIS.colors.line, gap: 10 },
   cardTop: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10 },
-  smallIcon: { width: 42, height: 42, borderRadius: 13, backgroundColor: '#ecfdf5', alignItems: 'center', justifyContent: 'center' },
-  cardTitle: { color: '#0f172a', fontSize: 14, fontWeight: '900', textAlign: 'right' },
-  muted: { color: '#64748b', fontSize: 11.5, lineHeight: 18, textAlign: 'right' },
-  pricePill: { backgroundColor: '#ecfdf5', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8 },
-  priceText: { color: '#047857', fontSize: 13, fontWeight: '900' },
-  description: { color: '#475569', fontSize: 12, lineHeight: 19, textAlign: 'right' },
-  feature: { color: '#334155', fontSize: 12, textAlign: 'right' },
-  primaryButton: { backgroundColor: '#047857', borderRadius: 13, paddingVertical: 12, paddingHorizontal: 14, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  primaryButtonText: { color: '#fff', fontSize: 13, fontWeight: '900' },
+  smallIcon: { width: 42, height: 42, borderRadius: 13, backgroundColor: OASIS.colors.soft, alignItems: 'center', justifyContent: 'center' },
+  cardTitle: { color: OASIS.colors.ink, fontSize: 14, fontWeight: '700', textAlign: 'right' },
+  muted: { color: OASIS.colors.muted, fontSize: 11.5, lineHeight: 18, textAlign: 'right' },
+  pricePill: { backgroundColor: OASIS.colors.soft, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8 },
+  priceText: { color: OASIS.colors.primary, fontSize: 13, fontWeight: '700' },
+  description: { color: OASIS.colors.muted, fontSize: 12, lineHeight: 19, textAlign: 'right' },
+  feature: { color: OASIS.colors.ink, fontSize: 12, textAlign: 'right' },
+  primaryButton: { backgroundColor: OASIS.colors.primary, borderRadius: 13, paddingVertical: 12, paddingHorizontal: 14, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  primaryButtonText: { color: OASIS.colors.surface, fontSize: 13, fontWeight: '700' },
   disabled: { opacity: 0.55 },
-  fieldLabel: { color: '#334155', fontSize: 12, fontWeight: '800', textAlign: 'right' },
-  input: { borderWidth: 1, borderColor: '#cbd5e1', backgroundColor: '#f8fafc', borderRadius: 12, padding: 12, color: '#0f172a', fontSize: 13, minHeight: 44 },
+  fieldLabel: { color: OASIS.colors.ink, fontSize: 12, fontWeight: '600', textAlign: 'right' },
+  input: { borderWidth: 1, borderColor: '#cbd5e1', backgroundColor: OASIS.colors.background, borderRadius: 12, padding: 12, color: OASIS.colors.ink, fontSize: 13, minHeight: 44 },
   multiline: { minHeight: 82, textAlignVertical: 'top' },
   choiceWrap: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 7 },
-  choice: { borderWidth: 1, borderColor: '#cbd5e1', backgroundColor: '#f8fafc', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 11 },
-  choiceActive: { backgroundColor: '#d1fae5', borderColor: '#059669' },
-  choiceText: { color: '#475569', fontSize: 11.5, fontWeight: '700' },
-  choiceTextActive: { color: '#065f46' },
-  orderRow: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 15, padding: 13, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
-  status: { color: '#047857', fontSize: 11, fontWeight: '800', textAlign: 'right', marginTop: 3 },
+  choice: { borderWidth: 1, borderColor: '#cbd5e1', backgroundColor: OASIS.colors.background, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 11 },
+  choiceActive: { backgroundColor: OASIS.colors.soft, borderColor: OASIS.colors.primary },
+  choiceText: { color: OASIS.colors.muted, fontSize: 11.5, fontWeight: '700' },
+  choiceTextActive: { color: OASIS.colors.deep },
+  orderRow: { backgroundColor: OASIS.colors.surface, borderWidth: 1, borderColor: OASIS.colors.line, borderRadius: 15, padding: 13, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  status: { color: OASIS.colors.primary, fontSize: 11, fontWeight: '600', textAlign: 'right', marginTop: 3 },
   rowTitle: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between' },
-  empty: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 16, padding: 24, alignItems: 'center', gap: 12 },
-  notice: { backgroundColor: '#f0fdf4', borderWidth: 1, borderColor: '#bbf7d0', borderRadius: 15, padding: 13, flexDirection: 'row-reverse', alignItems: 'flex-start', gap: 9 },
+  empty: { backgroundColor: OASIS.colors.surface, borderWidth: 1, borderColor: OASIS.colors.line, borderRadius: 16, padding: 16, alignItems: 'center', gap: 12 },
+  notice: { backgroundColor: OASIS.colors.soft, borderWidth: 1, borderColor: '#bbf7d0', borderRadius: 15, padding: 13, flexDirection: 'row-reverse', alignItems: 'flex-start', gap: 9 },
   noticeText: { flex: 1, color: '#166534', fontSize: 11.5, lineHeight: 18, textAlign: 'right' },
 });

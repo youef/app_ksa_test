@@ -1,0 +1,137 @@
+
+> hayna@1.0.0 typecheck
+> node --stack-size=65000 --max-old-space-size=4096 ./node_modules/typescript/bin/tsc --noEmit
+
+app/ask.tsx(384,77): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: ImageBackgroundProps): ImageBackground', gave the following error.
+    Type '{ source: { uri: string; }; resizeMode: "stretch"; pointerEvents: string; style: AbsoluteFillStyle; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<ImageBackground> & Readonly<ImageBackgroundProps>'.
+      Property 'pointerEvents' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<ImageBackground> & Readonly<ImageBackgroundProps>'.
+  Overload 2 of 2, '(props: ImageBackgroundProps, context: any): ImageBackground', gave the following error.
+    Type '{ source: { uri: string; }; resizeMode: "stretch"; pointerEvents: string; style: AbsoluteFillStyle; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<ImageBackground> & Readonly<ImageBackgroundProps>'.
+      Property 'pointerEvents' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<ImageBackground> & Readonly<ImageBackgroundProps>'.
+app/home.tsx(217,9): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: ImageBackgroundProps): ImageBackground', gave the following error.
+    Type '{ source: { uri: string; }; resizeMode: "cover"; pointerEvents: string; style: AbsoluteFillStyle; imageStyle: { opacity: number; }; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<ImageBackground> & Readonly<ImageBackgroundProps>'.
+      Property 'pointerEvents' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<ImageBackground> & Readonly<ImageBackgroundProps>'.
+  Overload 2 of 2, '(props: ImageBackgroundProps, context: any): ImageBackground', gave the following error.
+    Type '{ source: { uri: string; }; resizeMode: "cover"; pointerEvents: string; style: AbsoluteFillStyle; imageStyle: { opacity: number; }; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<ImageBackground> & Readonly<ImageBackgroundProps>'.
+      Property 'pointerEvents' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<ImageBackground> & Readonly<ImageBackgroundProps>'.
+app/market.tsx(1052,81): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: ImageBackgroundProps): ImageBackground', gave the following error.
+    Type '{ source: { uri: string; }; resizeMode: "stretch"; pointerEvents: string; style: AbsoluteFillStyle; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<ImageBackground> & Readonly<ImageBackgroundProps>'.
+      Property 'pointerEvents' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<ImageBackground> & Readonly<ImageBackgroundProps>'.
+  Overload 2 of 2, '(props: ImageBackgroundProps, context: any): ImageBackground', gave the following error.
+    Type '{ source: { uri: string; }; resizeMode: "stretch"; pointerEvents: string; style: AbsoluteFillStyle; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<ImageBackground> & Readonly<ImageBackgroundProps>'.
+      Property 'pointerEvents' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<ImageBackground> & Readonly<ImageBackgroundProps>'.
+app/market.tsx(1125,89): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: ImageBackgroundProps): ImageBackground', gave the following error.
+    Type '{ source: { uri: string; }; resizeMode: "stretch"; pointerEvents: string; style: AbsoluteFillStyle; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<ImageBackground> & Readonly<ImageBackgroundProps>'.
+      Property 'pointerEvents' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<ImageBackground> & Readonly<ImageBackgroundProps>'.
+  Overload 2 of 2, '(props: ImageBackgroundProps, context: any): ImageBackground', gave the following error.
+    Type '{ source: { uri: string; }; resizeMode: "stretch"; pointerEvents: string; style: AbsoluteFillStyle; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<ImageBackground> & Readonly<ImageBackgroundProps>'.
+      Property 'pointerEvents' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<ImageBackground> & Readonly<ImageBackgroundProps>'.
+app/new-listing.tsx(246,75): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: ImageBackgroundProps): ImageBackground', gave the following error.
+    Type '{ source: { uri: string; }; resizeMode: "stretch"; pointerEvents: string; style: AbsoluteFillStyle; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<ImageBackground> & Readonly<ImageBackgroundProps>'.
+      Property 'pointerEvents' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<ImageBackground> & Readonly<ImageBackgroundProps>'.
+  Overload 2 of 2, '(props: ImageBackgroundProps, context: any): ImageBackground', gave the following error.
+    Type '{ source: { uri: string; }; resizeMode: "stretch"; pointerEvents: string; style: AbsoluteFillStyle; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<ImageBackground> & Readonly<ImageBackgroundProps>'.
+      Property 'pointerEvents' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<ImageBackground> & Readonly<ImageBackgroundProps>'.
+app/question.tsx(952,212): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: ImageBackgroundProps): ImageBackground', gave the following error.
+    Type '{ source: { uri: string; }; resizeMode: "stretch"; pointerEvents: string; style: AbsoluteFillStyle; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<ImageBackground> & Readonly<ImageBackgroundProps>'.
+      Property 'pointerEvents' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<ImageBackground> & Readonly<ImageBackgroundProps>'.
+  Overload 2 of 2, '(props: ImageBackgroundProps, context: any): ImageBackground', gave the following error.
+    Type '{ source: { uri: string; }; resizeMode: "stretch"; pointerEvents: string; style: AbsoluteFillStyle; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<ImageBackground> & Readonly<ImageBackgroundProps>'.
+      Property 'pointerEvents' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<ImageBackground> & Readonly<ImageBackgroundProps>'.
+app/question.tsx(963,483): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: ImageBackgroundProps): ImageBackground', gave the following error.
+    Type '{ source: { uri: string; }; resizeMode: "stretch"; pointerEvents: string; style: AbsoluteFillStyle; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<ImageBackground> & Readonly<ImageBackgroundProps>'.
+      Property 'pointerEvents' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<ImageBackground> & Readonly<ImageBackgroundProps>'.
+  Overload 2 of 2, '(props: ImageBackgroundProps, context: any): ImageBackground', gave the following error.
+    Type '{ source: { uri: string; }; resizeMode: "stretch"; pointerEvents: string; style: AbsoluteFillStyle; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<ImageBackground> & Readonly<ImageBackgroundProps>'.
+      Property 'pointerEvents' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<ImageBackground> & Readonly<ImageBackgroundProps>'.
+app/questions.tsx(252,88): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: ImageProps): Image', gave the following error.
+    Type '{ source: { uri: string; }; resizeMode: "stretch"; pointerEvents: string; style: AbsoluteFillStyle; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<Image> & Readonly<ImageProps>'.
+      Property 'pointerEvents' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<Image> & Readonly<ImageProps>'.
+  Overload 2 of 2, '(props: ImageProps, context: any): Image', gave the following error.
+    Type '{ source: { uri: string; }; resizeMode: "stretch"; pointerEvents: string; style: AbsoluteFillStyle; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<Image> & Readonly<ImageProps>'.
+      Property 'pointerEvents' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<Image> & Readonly<ImageProps>'.
+app/search.tsx(499,91): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: ImageProps): Image', gave the following error.
+    Type '{ source: { uri: string; }; resizeMode: "stretch"; pointerEvents: string; style: AbsoluteFillStyle; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<Image> & Readonly<ImageProps>'.
+      Property 'pointerEvents' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<Image> & Readonly<ImageProps>'.
+  Overload 2 of 2, '(props: ImageProps, context: any): Image', gave the following error.
+    Type '{ source: { uri: string; }; resizeMode: "stretch"; pointerEvents: string; style: AbsoluteFillStyle; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<Image> & Readonly<ImageProps>'.
+      Property 'pointerEvents' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<Image> & Readonly<ImageProps>'.
+app/search.tsx(509,93): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: ImageProps): Image', gave the following error.
+    Type '{ source: { uri: string; }; resizeMode: "stretch"; pointerEvents: string; style: AbsoluteFillStyle; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<Image> & Readonly<ImageProps>'.
+      Property 'pointerEvents' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<Image> & Readonly<ImageProps>'.
+  Overload 2 of 2, '(props: ImageProps, context: any): Image', gave the following error.
+    Type '{ source: { uri: string; }; resizeMode: "stretch"; pointerEvents: string; style: AbsoluteFillStyle; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<Image> & Readonly<ImageProps>'.
+      Property 'pointerEvents' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<Image> & Readonly<ImageProps>'.
+app/search.tsx(520,97): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: ImageProps): Image', gave the following error.
+    Type '{ source: { uri: string; }; resizeMode: "stretch"; pointerEvents: string; style: AbsoluteFillStyle; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<Image> & Readonly<ImageProps>'.
+      Property 'pointerEvents' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<Image> & Readonly<ImageProps>'.
+  Overload 2 of 2, '(props: ImageProps, context: any): Image', gave the following error.
+    Type '{ source: { uri: string; }; resizeMode: "stretch"; pointerEvents: string; style: AbsoluteFillStyle; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<Image> & Readonly<ImageProps>'.
+      Property 'pointerEvents' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<Image> & Readonly<ImageProps>'.
+app/search.tsx(531,96): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: ImageProps): Image', gave the following error.
+    Type '{ source: { uri: string; }; resizeMode: "stretch"; pointerEvents: string; style: AbsoluteFillStyle; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<Image> & Readonly<ImageProps>'.
+      Property 'pointerEvents' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<Image> & Readonly<ImageProps>'.
+  Overload 2 of 2, '(props: ImageProps, context: any): Image', gave the following error.
+    Type '{ source: { uri: string; }; resizeMode: "stretch"; pointerEvents: string; style: AbsoluteFillStyle; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<Image> & Readonly<ImageProps>'.
+      Property 'pointerEvents' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<Image> & Readonly<ImageProps>'.
+app/search.tsx(542,93): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: ImageProps): Image', gave the following error.
+    Type '{ source: { uri: string; }; resizeMode: "stretch"; pointerEvents: string; style: AbsoluteFillStyle; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<Image> & Readonly<ImageProps>'.
+      Property 'pointerEvents' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<Image> & Readonly<ImageProps>'.
+  Overload 2 of 2, '(props: ImageProps, context: any): Image', gave the following error.
+    Type '{ source: { uri: string; }; resizeMode: "stretch"; pointerEvents: string; style: AbsoluteFillStyle; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<Image> & Readonly<ImageProps>'.
+      Property 'pointerEvents' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<Image> & Readonly<ImageProps>'.
+app/stories.tsx(213,182): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: ImageBackgroundProps): ImageBackground', gave the following error.
+    Type '{ source: { uri: string; }; resizeMode: "cover"; pointerEvents: string; style: AbsoluteFillStyle; imageStyle: { opacity: number; }; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<ImageBackground> & Readonly<ImageBackgroundProps>'.
+      Property 'pointerEvents' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<ImageBackground> & Readonly<ImageBackgroundProps>'.
+  Overload 2 of 2, '(props: ImageBackgroundProps, context: any): ImageBackground', gave the following error.
+    Type '{ source: { uri: string; }; resizeMode: "cover"; pointerEvents: string; style: AbsoluteFillStyle; imageStyle: { opacity: number; }; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<ImageBackground> & Readonly<ImageBackgroundProps>'.
+      Property 'pointerEvents' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<ImageBackground> & Readonly<ImageBackgroundProps>'.
+app/stories.tsx(231,188): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: ImageProps): Image', gave the following error.
+    Type '{ source: { uri: string; }; resizeMode: "cover"; pointerEvents: string; style: (AbsoluteFillStyle | { width: "100%"; height: "100%"; opacity: number; })[]; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<Image> & Readonly<ImageProps>'.
+      Property 'pointerEvents' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<Image> & Readonly<ImageProps>'.
+  Overload 2 of 2, '(props: ImageProps, context: any): Image', gave the following error.
+    Type '{ source: { uri: string; }; resizeMode: "cover"; pointerEvents: string; style: (AbsoluteFillStyle | { width: "100%"; height: "100%"; opacity: number; })[]; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<Image> & Readonly<ImageProps>'.
+      Property 'pointerEvents' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<Image> & Readonly<ImageProps>'.
+components/account/AccountCenter.tsx(708,85): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: ImageBackgroundProps): ImageBackground', gave the following error.
+    Type '{ source: { uri: string; }; resizeMode: "stretch"; pointerEvents: string; style: AbsoluteFillStyle; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<ImageBackground> & Readonly<ImageBackgroundProps>'.
+      Property 'pointerEvents' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<ImageBackground> & Readonly<ImageBackgroundProps>'.
+  Overload 2 of 2, '(props: ImageBackgroundProps, context: any): ImageBackground', gave the following error.
+    Type '{ source: { uri: string; }; resizeMode: "stretch"; pointerEvents: string; style: AbsoluteFillStyle; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<ImageBackground> & Readonly<ImageBackgroundProps>'.
+      Property 'pointerEvents' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<ImageBackground> & Readonly<ImageBackgroundProps>'.
+components/account/AccountCenter.tsx(801,85): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: ImageBackgroundProps): ImageBackground', gave the following error.
+    Type '{ source: { uri: string; }; resizeMode: "stretch"; pointerEvents: string; style: AbsoluteFillStyle; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<ImageBackground> & Readonly<ImageBackgroundProps>'.
+      Property 'pointerEvents' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<ImageBackground> & Readonly<ImageBackgroundProps>'.
+  Overload 2 of 2, '(props: ImageBackgroundProps, context: any): ImageBackground', gave the following error.
+    Type '{ source: { uri: string; }; resizeMode: "stretch"; pointerEvents: string; style: AbsoluteFillStyle; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<ImageBackground> & Readonly<ImageBackgroundProps>'.
+      Property 'pointerEvents' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<ImageBackground> & Readonly<ImageBackgroundProps>'.
+components/home/StoriesRow.tsx(30,9): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: ImageBackgroundProps): ImageBackground', gave the following error.
+    Type '{ source: { uri: string; }; resizeMode: "cover"; pointerEvents: string; style: AbsoluteFillStyle; imageStyle: { opacity: number; }; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<ImageBackground> & Readonly<ImageBackgroundProps>'.
+      Property 'pointerEvents' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<ImageBackground> & Readonly<ImageBackgroundProps>'.
+  Overload 2 of 2, '(props: ImageBackgroundProps, context: any): ImageBackground', gave the following error.
+    Type '{ source: { uri: string; }; resizeMode: "cover"; pointerEvents: string; style: AbsoluteFillStyle; imageStyle: { opacity: number; }; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<ImageBackground> & Readonly<ImageBackgroundProps>'.
+      Property 'pointerEvents' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<ImageBackground> & Readonly<ImageBackgroundProps>'.
+components/home/StoriesRow.tsx(34,30): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: ScrollViewProps): ScrollView', gave the following error.
+    Type '{ children: (Element | Element[])[]; horizontal: true; inverted: true; showsHorizontalScrollIndicator: false; style: { direction: "rtl"; }; contentContainerStyle: ({ paddingHorizontal: number; gap: number; alignItems: "flex-start"; } | { ...; })[]; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<ScrollView> & Readonly<ScrollViewProps>'.
+      Property 'inverted' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<ScrollView> & Readonly<ScrollViewProps>'.
+  Overload 2 of 2, '(props: ScrollViewProps, context: any): ScrollView', gave the following error.
+    Type '{ children: (Element | Element[])[]; horizontal: true; inverted: true; showsHorizontalScrollIndicator: false; style: { direction: "rtl"; }; contentContainerStyle: ({ paddingHorizontal: number; gap: number; alignItems: "flex-start"; } | { ...; })[]; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<ScrollView> & Readonly<ScrollViewProps>'.
+      Property 'inverted' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<ScrollView> & Readonly<ScrollViewProps>'.

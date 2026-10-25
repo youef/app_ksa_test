@@ -1,4 +1,6 @@
-import { ActivityIndicator, Modal, Pressable, Text, View } from 'react-native';
+import { OasisPressable as Pressable, OasisSurface } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
+import { ActivityIndicator, Modal, Text, View } from 'react-native';
 import { MapPin } from 'lucide-react-native';
 import { styles } from './homeStyles';
 
@@ -22,8 +24,8 @@ export function LocationGateModal({
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={() => {}}>
       <View style={styles.locationGateOverlay}>
-        <View style={styles.locationGateCard}>
-          <View style={styles.locationGateIcon}><MapPin size={28} color="#059669" /></View>
+        <OasisSurface oasisSurface="card" style={styles.locationGateCard}>
+          <View style={styles.locationGateIcon}><MapPin size={28} color={OASIS.colors.primary} /></View>
           <Text style={styles.locationGateTitle}>نحتاج موقعك قبل البدء</Text>
           <Text style={styles.locationGateText}>
             حدّد موقعك تلقائياً لربط حسابك بالمنطقة والمدينة والحي، ثم فعّل الإشعارات لتصلك أخبار وتنبيهات حيّك فوراً.
@@ -31,7 +33,7 @@ export function LocationGateModal({
 
           <View style={styles.locationGateStatus}>
             <View style={styles.locationGateStatusRow}>
-              <MapPin size={17} color="#059669" />
+              <MapPin size={17} color={OASIS.colors.primary} />
               <Text style={styles.locationGateStatusText}>
                 {hasExactLocation ? `الموقع: ${region} · ${city} · حي ${district}` : 'الموقع غير مكتمل'}
               </Text>
@@ -47,7 +49,7 @@ export function LocationGateModal({
             accessibilityRole="button"
           >
             {busy ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={OASIS.colors.surface} />
             ) : (
               <Text style={styles.locationGatePrimaryText}>
                 {hasExactLocation ? 'تفعيل الإشعارات والمتابعة' : 'تحديد موقعي تلقائياً'}
@@ -58,7 +60,7 @@ export function LocationGateModal({
           <Text style={styles.locationGateRequired}>
             تحديد الموقع مطلوب. الإشعارات يمكن تفعيلها الآن أو لاحقاً من الإعدادات.
           </Text>
-        </View>
+        </OasisSurface>
       </View>
     </Modal>
   );
@@ -87,15 +89,15 @@ export function WeeklyLocationPrompt({
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={() => {}}>
       <View style={styles.locationPromptBackdrop}>
-        <View style={styles.locationPromptCard}>
-          <View style={styles.locationGateIcon}><MapPin size={26} color="#059669" /></View>
+        <OasisSurface oasisSurface="card" style={styles.locationPromptCard}>
+          <View style={styles.locationGateIcon}><MapPin size={26} color={OASIS.colors.primary} /></View>
           <Text style={styles.locationPromptTitle}>تحديث موقعك الأسبوعي</Text>
           <Text style={styles.locationPromptText}>
             هل ما زلت في نفس الحي؟ حدّث موقعك لتصلك منشورات وتنبيهات جيرانك بدقة.
           </Text>
 
           <View style={styles.locationPromptLockRow}>
-            <MapPin size={15} color="#059669" />
+            <MapPin size={15} color={OASIS.colors.primary} />
             <Text style={styles.locationPromptLockText}>
               {hasCity
                 ? `مدينتك الحالية عبر GPS: ${city}${district && district !== 'كل الأحياء' ? ` · حي ${district}` : ''}`
@@ -117,7 +119,7 @@ export function WeeklyLocationPrompt({
               accessibilityRole="button"
             >
               {busy ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={OASIS.colors.surface} />
               ) : (
                 <Text style={styles.locationPromptAllowText}>تحديث الآن عبر GPS</Text>
               )}
@@ -127,7 +129,7 @@ export function WeeklyLocationPrompt({
           <Pressable onPress={onOpenSettings} accessibilityRole="button" hitSlop={6}>
             <Text style={styles.locationPromptHelp}>المتصفح لا يدعم الموقع أو رفضت الإذن؟ اضغط هنا لطريقة التفعيل</Text>
           </Pressable>
-        </View>
+        </OasisSurface>
       </View>
     </Modal>
   );

@@ -1,17 +1,19 @@
-import { Text, View, Pressable } from 'react-native';
+import { OasisPressable as Pressable } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
+import { Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { CloudSun, ShieldCheck } from 'lucide-react-native';
+import { CloudSun } from 'lucide-react-native';
 import { styles } from './homeStyles';
+import OasisGlassFrame from './OasisGlassFrame';
 import { describeWeatherCode, type CurrentWeather } from '@/lib/weather';
 
 type Props = {
   weather: CurrentWeather | null;
   weatherLoading: boolean;
-  activeNeighbors?: number;
-  emergencyCount: number;
+  compact?: boolean;
 };
 
-export default function AtmosphereBar({ weather, weatherLoading, emergencyCount }: Props) {
+export default function AtmosphereBar({ weather, weatherLoading, compact = false }: Props) {
   const weatherText = weather
     ? `${Math.round(weather.temperature)}°C · ${describeWeatherCode(weather.weatherCode)} · ${weather.locationName}`
     : weatherLoading
@@ -19,23 +21,13 @@ export default function AtmosphereBar({ weather, weatherLoading, emergencyCount 
       : 'الطقس غير متاح حالياً';
 
   return (
-    <View style={styles.atmosphereBar}>
-      <View style={styles.atmoItem}>
-        <CloudSun size={15} color="#059669" />
-        <Text style={styles.atmoText} numberOfLines={1}>{weatherText}</Text>
+    <OasisGlassFrame style={{ flex: compact ? 1 : undefined, height: 44 }}>
+    <Pressable onPress={() => router.push('/weather')} accessibilityRole="button" accessibilityLabel="فتح صفحة الطقس" style={[styles.atmosphereBar, compact && { marginHorizontal: 0, marginTop: 0, marginBottom: 0, paddingHorizontal: 10, paddingVertical: 0, height: 44, borderRadius: 14, flex: 1 }, { justifyContent: 'center', alignItems: 'center', backgroundColor: 'transparent', borderWidth: 0 }]}>
+      <View style={[styles.atmoItem, { flex: 1, minWidth: 0, alignItems: 'center', justifyContent: 'center', flexDirection: 'row-reverse', gap: 5 }]}>
+        <CloudSun size={16} color={OASIS.colors.primary} />
+        <Text style={[styles.atmoText, compact && { fontSize: 11, flexShrink: 1, textAlign: 'center', lineHeight: 16 }]} numberOfLines={1}>{compact && weather ? `${Math.round(weather.temperature)}° · ${describeWeatherCode(weather.weatherCode)}` : weatherText}</Text>
       </View>
-      <View style={styles.atmoDivider} />
-      <Pressable
-        style={styles.atmoItem}
-        onPress={() => router.push('/emergency-alert')}
-        accessibilityRole="button"
-        accessibilityLabel="تنبيه الحي العاجل"
-      >
-        <ShieldCheck size={15} color={emergencyCount > 0 ? '#dc2626' : '#059669'} />
-        <Text style={styles.atmoText}>
-          {emergencyCount > 0 ? `${emergencyCount} بلاغ طارئ` : 'تنبيه طارئ 🚨'}
-        </Text>
-      </Pressable>
-    </View>
+    </Pressable>
+    </OasisGlassFrame>
   );
 }

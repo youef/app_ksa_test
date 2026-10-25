@@ -1,20 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Linking,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { oasisAssets } from '@/components/oasis/assets';
+import { OasisPressable as Pressable, OasisTextInput as TextInput } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
+import { HeaderAction, AppHeader } from '@/components/shared/AppHeader';
+import { MapPin as PinIcon, Store, Search, Navigation, Plus, X, Clock, RefreshCw, TriangleAlert, MessageCircle, Wrench, HandHelping, Car, Calendar, ShoppingBag, LocateFixed } from 'lucide-react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Image, ActivityIndicator, Linking, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 const Map = Platform.OS !== 'web' ? require('@maplibre/maplibre-react-native').Map : View;
 const Camera = Platform.OS !== 'web' ? require('@maplibre/maplibre-react-native').Camera : View;
 const Marker = Platform.OS !== 'web' ? require('@maplibre/maplibre-react-native').Marker : View;
 import { router } from 'expo-router';
-import { AppHeader } from '@/components/shared/AppHeader';
 import NeighborhoodWebMap from '@/components/shared/NeighborhoodWebMap';
 import { C, S } from '@/lib/ui';
 import { getCurrentDeviceLocation, type DeviceLocation } from '@/lib/deviceLocation';
@@ -34,15 +28,18 @@ import {
   searchNearbyPlaces,
   type NearbyPlace,
 } from '@/lib/places';
-import { formatDistance, navigationUrl } from '@/lib/privacy';
+import { distanceMeters, formatDistance, navigationUrl } from '@/lib/privacy';
 import { getActiveLocation, isAllKingdom, subscribeLocation } from '@/lib/locationSync';
 
 const STYLE_URL = 'https://demotiles.maplibre.org/style.json';
 const DEFAULT_CENTER = [46.6753, 24.7136];
 
+const pinIcons = { question: MessageCircle, tool: Wrench, emergency: TriangleAlert, request: HandHelping, business: Store, carpool: Car, event: Calendar, marketplace: ShoppingBag, alert: TriangleAlert };
 type KindFilter = MapPinKind | 'all';
 
 export default function MapScreen() {
+  const searchId = useRef(0);
+  const [locationError, setLocationError] = useState('');
   const [pins, setPins] = useState<MapPin[]>([]);
   const [kind, setKind] = useState<KindFilter>('all');
   const [city, setCity] = useState<string | null>(null);
@@ -89,38 +86,40 @@ export default function MapScreen() {
     };
   }, []);
 
-  const runPlaceSearch = async (category: string) => {
+  const runPlaceSearch = async (category: string, originOverride?: DeviceLocation) => {
+    const id = ++searchId.current;
     const active = await getActiveLocation();
-    if (isAllKingdom(active.city)) return;
+    if (isAllKingdom(active.city) && !originOverride && !myLocation) return;
     const center = findPlaceCenter(active.city);
-    const origin = center
-      ? { latitude: center.lat, longitude: center.lng }
-      : myLocation ?? (await getCurrentDeviceLocation());
+    const origin = originOverride ?? myLocation ?? (center ? { latitude: center.lat, longitude: center.lng } : null);
     if (!origin) return;
     setPlacesLoading(true);
+    try {
     const results = await searchNearbyPlaces({
       lat: origin.latitude,
       lng: origin.longitude,
       category: category === ALL_PLACES_KEY ? null : category,
+      text: query.trim() || null,
     });
-    setPlaces(results);
-    setLastUpdated(new Date());
-    setPlacesLoading(false);
+    if (id === searchId.current) { setPlaces(results); setLastUpdated(new Date()); }
+    } catch { if (id === searchId.current) setLocationError('تعذر تحميل الأماكن. حاول مجددًا.'); }
+    finally { if (id === searchId.current) setPlacesLoading(false); }
   };
 
   const locateMe = async () => {
     setLocating(true);
     const location = await getCurrentDeviceLocation();
     setLocating(false);
-    if (!location) return;
+    if (!location) { setLocationError('تعذر تحديد موقعك. اسمح بالوصول إلى الموقع ثم أعد المحاولة.'); return; }
+    setLocationError('');
     setMyLocation(location);
-    void runPlaceSearch(placeCategory);
+    void runPlaceSearch(placeCategory, location);
   };
 
   useEffect(() => {
     void runPlaceSearch(ALL_PLACES_KEY);
     // Searches the neighbourhood once when the screen opens.
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [city]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -131,14 +130,14 @@ export default function MapScreen() {
   }, [placeCategory]);
 
   const visiblePlaces = useMemo(() => {
-    let result = [...places];
+    let result = places.map(p => myLocation ? {...p, distance: distanceMeters({lat: myLocation.latitude, lng: myLocation.longitude}, p)} : p).filter(p => !query.trim() || (p.name + ' ' + p.address + ' ' + p.categoryLabel).includes(query.trim()));
     if (openOnly) result = result.filter((place) => place.openNow === true);
     if (ratedOnly) result = result.filter((place) => place.rating != null);
     if (sortMode === 'open') result.sort((a, b) => Number(b.openNow === true) - Number(a.openNow === true) || a.distance - b.distance);
     else if (sortMode === 'rating') result.sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1) || a.distance - b.distance);
     else result.sort((a, b) => a.distance - b.distance);
     return result;
-  }, [places, openOnly, ratedOnly, sortMode]);
+  }, [places, openOnly, ratedOnly, sortMode, query, myLocation]);
 
   const visiblePins = useMemo(
     () => city ? filterPins(pins, { kind, city, query }) : [],
@@ -148,14 +147,16 @@ export default function MapScreen() {
   const kindCounts = useMemo(() => countByKind(scopedPins), [scopedPins]);
 
   const chip = (value: KindFilter, label: string, color: string, count: number) => {
+    const Icon = value === 'all' ? PinIcon : pinIcons[value];
     const active = kind === value;
     return (
-      <Pressable
+      <Pressable oasisKind="chip"
         key={value}
         onPress={() => setKind(value)}
-        style={[styles.chip, active && { backgroundColor: color, borderColor: color }]}
+        style={[styles.chip, { flexDirection: 'row-reverse', gap: 6, alignItems: 'center' }, active && { backgroundColor: color, borderColor: color }]}
       >
-        <Text style={[styles.chipText, active && { color: '#fff' }]}>
+        <Icon size={15} color={active ? OASIS.colors.surface : color} />
+        <Text style={[styles.chipText, active && { color: OASIS.colors.surface }]}>
           {label} ({count})
         </Text>
       </Pressable>
@@ -165,7 +166,7 @@ export default function MapScreen() {
   const placeChip = (key: string, label: string) => {
     const active = placeCategory === key;
     return (
-      <Pressable
+      <Pressable oasisKind="chip"
         key={key}
         onPress={() => {
           setPlaceCategory(key);
@@ -173,18 +174,18 @@ export default function MapScreen() {
         }}
         style={[styles.placeChip, active && styles.placeChipActive]}
       >
-        <Text style={[styles.placeChipText, active && { color: '#fff' }]}>{label}</Text>
+        <Text style={[styles.placeChipText, active && { color: OASIS.colors.surface }]}>{label}</Text>
       </Pressable>
     );
   };
 
   const filters = (
     <View style={styles.filters}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+      <ScrollView style={{ direction: 'rtl' }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.chipRow, { direction: 'ltr' }]}>
         {chip('all', 'الكل', C.ink, kindCounts.all || 0)}
         {MAP_PIN_ORDER.map((value) => {
           const meta = MAP_PIN_KINDS[value];
-          return chip(value, `${meta.emoji} ${meta.short}`, meta.color, kindCounts[value] || 0);
+          return chip(value, `${meta.short}`, meta.color, kindCounts[value] || 0);
         })}
       </ScrollView>
 
@@ -193,9 +194,9 @@ export default function MapScreen() {
   );
 
   const placeCard = (place: NearbyPlace) => (
-    <Pressable key={place.id} style={styles.placeCard} onPress={() => { setSelectedPlace(place); setSelected(null); }}>
+    <Pressable oasisKind="card" key={place.id} style={styles.placeCard} onPress={() => { setSelectedPlace(place); setSelected(null); }}>
       <View style={styles.placeBadge}>
-        <Text style={{ fontSize: 17 }}>{PLACE_CATEGORIES.find((c) => c.key === place.categoryKey)?.emoji ?? '🏬'}</Text>
+        <Store size={20} color="#0F766E" />
       </View>
       <View style={styles.placeBody}>
         <Text style={styles.placeName} numberOfLines={1}>{place.name}</Text>
@@ -203,103 +204,105 @@ export default function MapScreen() {
           {place.categoryLabel} · {formatDistance(place.distance)}{place.address ? ` · ${place.address}` : ''}
         </Text>
         <View style={styles.placeChips}>
-          {place.openNow != null ? <Text style={[styles.miniChip, place.openNow ? { color: '#15803d', backgroundColor: '#dcfce7' } : { color: '#b91c1c', backgroundColor: '#fee2e2' }]}>{place.openNow ? 'مفتوح' : 'مغلق'}</Text> : null}
-          {place.rating != null ? <Text style={styles.miniChip}>★ {place.rating.toFixed(1)} ({place.reviews})</Text> : null}
-          {place.phone ? <Text style={[styles.miniChip, { color: '#1d4ed8', backgroundColor: '#eff6ff' }]}>اتصال متاح</Text> : null}
+          {place.openNow != null ? <Text style={[styles.miniChip, place.openNow ? { color: '#15803d', backgroundColor: '#dcfce7' } : { color: OASIS.colors.danger, backgroundColor: '#fee2e2' }]}>{place.openNow ? 'مفتوح' : 'مغلق'}</Text> : null}
+          {place.rating != null ? <Text style={styles.miniChip}> {place.rating.toFixed(1)} ({place.reviews})</Text> : null}
+          {place.phone ? <Text style={[styles.miniChip, { color: '#1d4ed8', backgroundColor: OASIS.colors.infoSoft }]}>اتصال متاح</Text> : null}
         </View>
       </View>
     </Pressable>
   );
 
-  const addAction = (label: string, emoji: string, route: string) => (
-    <Pressable key={route} style={styles.addAction} onPress={() => { setAddMenuOpen(false); router.push(route as never); }}>
-      <Text style={styles.addActionText}>{emoji}  {label}</Text>
+  const addAction = (label: string, _icon: string, route: string) => (
+    <Pressable key={label} style={styles.addAction} onPress={() => { setAddMenuOpen(false); router.push(route as never); }}>
+      <View style={{flexDirection: 'row-reverse', gap: 8, alignItems: 'center'}}><Plus size={18} color="#0f766e" /><Text style={styles.addActionText}>{label}</Text></View>
     </Pressable>
   );
 
   if (Platform.OS === 'web') {
-    const webPins = visiblePins.slice(0, 12);
+    const webPins = visiblePins;
     return (
       <View style={{ flex: 1, backgroundColor: '#F4F7F5', minHeight: '100vh' as never }}>
-        <View style={{ backgroundColor: '#123F35', paddingHorizontal: 24, paddingTop: 22, paddingBottom: 22, borderBottomLeftRadius: 26, borderBottomRightRadius: 26 }}>
-          <View style={{ maxWidth: 1240, width: '100%', alignSelf: 'center' }}>
+        <View style={{ backgroundColor: '#123F35', paddingHorizontal: 24, paddingTop: 14, paddingBottom: 14, borderBottomLeftRadius: 26, borderBottomRightRadius: 26 }}>
+          {locationError ? <Text accessibilityRole="alert" style={{ color: OASIS.colors.danger, padding: 12, textAlign: 'right' }}>{locationError}</Text> : null}
+        <View style={{ maxWidth: 1240, width: '100%', alignSelf: 'center' }}>
             <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
               <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 12 }}>
-                <View style={{ width: 48, height: 48, borderRadius: 16, backgroundColor: '#FFFFFF20', alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 26, color: '#fff' }}>⌖</Text></View>
-                <View><Text style={{ color: '#fff', fontSize: 25, fontWeight: '900', textAlign: 'right' }}>خريطة الحي</Text><Text style={{ color: '#D1E6DD', fontSize: 12, marginTop: 3, textAlign: 'right' }}>كل ما حولك، في مكان واحد</Text></View>
+                <View style={{ width: 48, height: 48, borderRadius: 16, backgroundColor: '#FFFFFF20', alignItems: 'center', justifyContent: 'center' }}><PinIcon size={26} color={OASIS.colors.surface} /></View>
+                <View><Text style={{ color: OASIS.colors.surface, fontSize: 20, fontWeight: '700', textAlign: 'right' }}>خريطة الحي</Text><Text style={{ color: '#D1E6DD', fontSize: 12, marginTop: 3, textAlign: 'right' }}>كل ما حولك، في مكان واحد</Text></View>
               </View>
               <View style={{ flexDirection: 'row-reverse', gap: 8, flexWrap: 'wrap' }}>
-                <Pressable onPress={locateMe} disabled={locating} style={{ backgroundColor: '#FFFFFF18', borderWidth: 1, borderColor: '#FFFFFF50', borderRadius: 14, paddingHorizontal: 16, paddingVertical: 11 }}><Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }}>{locating ? 'جارٍ تحديد الموقع…' : '◎ موقعي الحالي'}</Text></Pressable>
-                <Pressable onPress={() => setAddMenuOpen(v => !v)} style={{ backgroundColor: '#E4B76A', borderRadius: 14, paddingHorizontal: 18, paddingVertical: 11 }}><Text style={{ color: '#173B31', fontWeight: '900', fontSize: 13 }}>＋ إضافة للحي</Text></Pressable>
+                <Pressable onPress={locateMe} disabled={locating} style={{ backgroundColor: '#FFFFFF18', borderWidth: 1, borderColor: '#FFFFFF50', borderRadius: 14, paddingHorizontal: 16, paddingVertical: 11 }}><Text style={{ color: OASIS.colors.surface, fontWeight: '600', fontSize: 13 }}>{locating ? 'جارٍ تحديد الموقع…' : 'موقعي الحالي'}</Text></Pressable>
+                <Pressable onPress={() => setAddMenuOpen(v => !v)} style={{ backgroundColor: '#E4B76A', borderRadius: 14, paddingHorizontal: 18, paddingVertical: 11 }}><Text style={{ color: '#173B31', fontWeight: '700', fontSize: 13 }}>إضافة للحي</Text></Pressable>
               </View>
             </View>
-            <View style={{ marginTop: 22, flexDirection: 'row-reverse', alignItems: 'center', gap: 10, backgroundColor: '#FFFFFF', borderRadius: 16, paddingHorizontal: 15, paddingVertical: 3, maxWidth: 700, alignSelf: 'flex-end', width: '100%', boxShadow: '0 8px 25px #092c2015' as never }}>
-              <Text style={{ color: '#648076', fontSize: 20 }}>⌕</Text>
-              <TextInput value={query} onChangeText={setQuery} placeholder="ابحث عن فعالية، متجر، خدمة أو تنبيه..." placeholderTextColor="#82928C" style={{ flex: 1, color: '#173B31', textAlign: 'right', fontSize: 14, paddingVertical: 13, outlineStyle: 'none' as never }} />
-              <Text style={{ color: '#82928C' }}>☷</Text>
+            <View style={{ marginTop: 14, flexDirection: 'row-reverse', alignItems: 'center', gap: 10, backgroundColor: OASIS.colors.surface, borderRadius: 16, paddingHorizontal: 15, paddingVertical: 3, maxWidth: 700, alignSelf: 'flex-end', width: '100%', boxShadow: '0 8px 25px #092c2015' as never }}>
+              <Search size={20} color="#648076" />
+              <TextInput value={query} onChangeText={setQuery} onSubmitEditing={() => void runPlaceSearch(placeCategory)} returnKeyType="search" placeholder="ابحث عن فعالية، متجر، خدمة أو تنبيه..." placeholderTextColor="#82928C" style={{ flex: 1, color: '#173B31', textAlign: 'right', fontSize: 14, paddingVertical: 13, outlineStyle: 'none' as never }} />
+              <Pressable accessibilityLabel="البحث عن وجهة" onPress={() => void runPlaceSearch(placeCategory)}><Navigation size={20} color="#0f766e" /></Pressable>
             </View>
           </View>
         </View>
 
-        <View style={{ maxWidth: 1240, width: '100%', alignSelf: 'center', paddingHorizontal: 18, paddingTop: 20, paddingBottom: 40 }}>
+        <View style={{ maxWidth: 1240, width: '100%', alignSelf: 'center', paddingHorizontal: 12, paddingTop: 12, paddingBottom: 24 }}>
           <View style={{ flexDirection: 'row-reverse', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
             {[
-              { label: 'منشورات الحي', value: String(visiblePins.length), icon: '✦', bg: '#E7F4ED' },
+              { label: 'منشورات الحي', value: String(visiblePins.length), icon: '', bg: '#E7F4ED' },
               { label: 'أماكن قريبة', value: String(visiblePlaces.length), icon: '⌖', bg: '#E8F0FB' },
               { label: 'تنبيهات عاجلة', value: String(scopedPins.filter(p => p.urgent || p.kind === 'alert' || p.kind === 'emergency').length), icon: '!', bg: '#FCE9E7' },
               { label: 'آخر تحديث', value: lastUpdated ? lastUpdated.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }) : 'الآن', icon: '↻', bg: '#FFF2D9' },
-            ].map((stat) => <View key={stat.label} style={{ flexGrow: 1, minWidth: 145, backgroundColor: '#fff', borderRadius: 18, borderWidth: 1, borderColor: '#E4EBE6', padding: 15, flexDirection: 'row-reverse', alignItems: 'center', gap: 12 }}><View style={{ width: 42, height: 42, borderRadius: 14, backgroundColor: stat.bg, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 20, fontWeight: '900', color: '#174A3B' }}>{stat.icon}</Text></View><View><Text style={{ fontSize: 20, fontWeight: '900', color: '#173B31', textAlign: 'right' }}>{stat.value}</Text><Text style={{ fontSize: 11, color: '#77877F', marginTop: 3, textAlign: 'right' }}>{stat.label}</Text></View></View>)}
+            ].map((stat) => <View key={stat.label} style={{ flexGrow: 1, minWidth: 145, backgroundColor: OASIS.colors.surface, borderRadius: 14, borderWidth: 1, borderColor: '#E4EBE6', padding: 15, flexDirection: 'row-reverse', alignItems: 'center', gap: 12 }}><View style={{ width: 42, height: 42, borderRadius: 14, backgroundColor: stat.bg, alignItems: 'center', justifyContent: 'center' }}><PinIcon size={22} color="#174A3B" /></View><View><Text style={{ fontSize: 20, fontWeight: '700', color: '#173B31', textAlign: 'right' }}>{stat.value}</Text><Text style={{ fontSize: 11, color: '#77877F', marginTop: 3, textAlign: 'right' }}>{stat.label}</Text></View></View>)}
           </View>
 
           <View style={{ flexDirection: 'row-reverse', gap: 18, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-            <View style={{ flex: 2, minWidth: 320, gap: 14 }}>
-              <View style={{ backgroundColor: '#fff', borderRadius: 22, borderWidth: 1, borderColor: '#E2EAE4', padding: 15 }}>
+            <View style={{ flex: 2, minWidth: 0, flexBasis: 360, gap: 14 }}>
+              <View style={{ backgroundColor: OASIS.colors.surface, borderRadius: 14, borderWidth: 1, borderColor: '#E2EAE4', padding: 15 }}>
                 <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 13, flexWrap: 'wrap' }}>
-                  <View><Text style={{ fontSize: 17, fontWeight: '900', color: '#173B31', textAlign: 'right' }}>استكشف على الخريطة</Text><Text style={{ color: '#788980', fontSize: 11, marginTop: 4, textAlign: 'right' }}>{city ? 'المحتوى القريب من ' + city : 'عرض عام للمحتوى المنشور'}</Text></View>
-                  <View style={{ backgroundColor: '#E8F5ED', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 7 }}><Text style={{ color: '#19704E', fontSize: 11, fontWeight: '800' }}>● بيانات الحي</Text></View>
+                  <View><Text style={{ fontSize: 17, fontWeight: '700', color: '#173B31', textAlign: 'right' }}>استكشف على الخريطة</Text><Text style={{ color: '#788980', fontSize: 11, marginTop: 4, textAlign: 'right' }}>{city ? 'المحتوى القريب من ' + city : 'عرض عام للمحتوى المنشور'}</Text></View>
+                  <View style={{ backgroundColor: '#E8F5ED', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 7 }}><Text style={{ color: '#19704E', fontSize: 11, fontWeight: '600' }}>● بيانات الحي</Text></View>
                 </View>
-                <View style={{ height: 390, borderRadius: 17, overflow: 'hidden', borderWidth: 1, borderColor: '#D8E3DA' }}>
+                <View style={{ height: 510, borderRadius: 17, overflow: 'hidden', borderWidth: 1, borderColor: '#D8E3DA' }}>
                   <NeighborhoodWebMap
                     pins={webPins}
                     places={visiblePlaces}
                     center={findPlaceCenter(city)}
                     city={city}
+                    myLocation={myLocation}
+                    destination={selectedPlace ?? selected}
+                    onLocation={setMyLocation}
                     onSelectPin={(pin) => setSelected(pin)}
                     onSelectPlace={(place) => { setSelectedPlace(place); setSelected(null); }}
                     onLocate={locateMe}
                   />
                 </View>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row-reverse', gap: 7, paddingTop: 13 }}>
+                <ScrollView style={{ direction: 'rtl' }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[{ flexDirection: 'row-reverse', gap: 7, paddingTop: 13 }, { direction: 'ltr' }]}>
                   {chip('all', 'الكل', '#173B31', kindCounts.all || 0)}
-                  {MAP_PIN_ORDER.map(value => { const meta = MAP_PIN_KINDS[value]; return chip(value, meta.emoji + ' ' + meta.short, meta.color, kindCounts[value] || 0); })}
+                  {MAP_PIN_ORDER.map(value => { const meta = MAP_PIN_KINDS[value]; return chip(value, meta.short, meta.color, kindCounts[value] || 0); })}
                 </ScrollView>
               </View>
 
-              <View style={{ backgroundColor: '#fff', borderRadius: 22, borderWidth: 1, borderColor: '#E2EAE4', padding: 16 }}>
-                <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}><Text style={{ fontSize: 17, fontWeight: '900', color: '#173B31' }}>الأماكن القريبة</Text><Text style={{ fontSize: 12, color: '#6B8176' }}>{visiblePlaces.length} نتيجة</Text></View>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row-reverse', gap: 8, paddingBottom: 12 }}>
+              <View style={{ backgroundColor: OASIS.colors.surface, borderRadius: 14, borderWidth: 1, borderColor: '#E2EAE4', padding: 16 }}>
+                <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}><Text style={{ fontSize: 17, fontWeight: '700', color: '#173B31' }}>الأماكن القريبة</Text><Text style={{ fontSize: 12, color: '#6B8176' }}>{visiblePlaces.length} نتيجة</Text></View>
+                <ScrollView style={{ direction: 'rtl' }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[{ flexDirection: 'row-reverse', gap: 8, paddingBottom: 12 }, { direction: 'ltr' }]}>
                   {placeChip(ALL_PLACES_KEY, 'كل الأماكن')}
-                  {PLACE_CATEGORIES.map(category => placeChip(category.key, category.emoji + ' ' + category.label))}
+                  {PLACE_CATEGORIES.map(category => placeChip(category.key, category.label))}
                 </ScrollView>
                 <View style={{ flexDirection: 'row-reverse', gap: 7, flexWrap: 'wrap', marginBottom: 13 }}>
-                  {([['distance','الأقرب'],['open','مفتوح أولاً'],['rating','الأعلى تقييماً']] as const).map(([value,label]) => <Pressable key={value} onPress={() => setSortMode(value)} style={{ borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: sortMode === value ? '#173B31' : '#F0F4F1' }}><Text style={{ color: sortMode === value ? '#fff' : '#53675D', fontSize: 11, fontWeight: '800' }}>{label}</Text></Pressable>)}
-                  <Pressable onPress={() => setOpenOnly(v => !v)} style={{ borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: openOnly ? '#173B31' : '#F0F4F1' }}><Text style={{ color: openOnly ? '#fff' : '#53675D', fontSize: 11, fontWeight: '800' }}>مفتوح الآن</Text></Pressable>
-                  <Pressable onPress={() => setRatedOnly(v => !v)} style={{ borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: ratedOnly ? '#173B31' : '#F0F4F1' }}><Text style={{ color: ratedOnly ? '#fff' : '#53675D', fontSize: 11, fontWeight: '800' }}>له تقييم</Text></Pressable>
+                  {([['distance','الأقرب'],['open','مفتوح أولاً'],['rating','الأعلى تقييماً']] as const).map(([value,label]) => <Pressable key={value} onPress={() => setSortMode(value)} style={{ borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: sortMode === value ? '#173B31' : '#F0F4F1' }}><Text style={{ color: sortMode === value ? OASIS.colors.surface : '#53675D', fontSize: 11, fontWeight: '600' }}>{label}</Text></Pressable>)}
+                  <Pressable onPress={() => setOpenOnly(v => !v)} style={{ borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: openOnly ? '#173B31' : '#F0F4F1' }}><Text style={{ color: openOnly ? OASIS.colors.surface : '#53675D', fontSize: 11, fontWeight: '600' }}>مفتوح الآن</Text></Pressable>
+                  <Pressable onPress={() => setRatedOnly(v => !v)} style={{ borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: ratedOnly ? '#173B31' : '#F0F4F1' }}><Text style={{ color: ratedOnly ? OASIS.colors.surface : '#53675D', fontSize: 11, fontWeight: '600' }}>له تقييم</Text></Pressable>
                 </View>
                 {visiblePlaces.slice(0, 8).map(placeCard)}
-                {!visiblePlaces.length && <Text style={{ color: '#829188', textAlign: 'center', padding: 22, fontSize: 13 }}>{placesLoading ? 'جارٍ تحميل الأماكن القريبة…' : 'لا توجد أماكن مطابقة. اختر مدينة أو حدّث الموقع.'}</Text>}
+                {!visiblePlaces.length && <Text style={{ color: '#829188', textAlign: 'center', padding: 14, fontSize: 13 }}>{placesLoading ? 'جارٍ تحميل الأماكن القريبة…' : 'لا توجد أماكن مطابقة. اختر مدينة أو حدّث الموقع.'}</Text>}
               </View>
             </View>
 
-            <View style={{ flex: 1, minWidth: 280, gap: 14 }}>
-              {addMenuOpen ? <View style={{ backgroundColor: '#fff', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: '#E0E9E2' }}><View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}><Text style={{ fontSize: 16, color: '#173B31', fontWeight: '900' }}>أضف للحي</Text><Pressable onPress={() => setAddMenuOpen(false)}><Text style={{ color: '#7A8A81' }}>إغلاق ✕</Text></Pressable></View>{addAction('محل أو خدمة', '🏪', '/new-service')}{addAction('تنبيه طارئ', '🚨', '/emergency-alert')}{addAction('طلب مساعدة', '🤝', '/new-request')}{addAction('إعلان أو منتج', '🛍️', '/marketplace-dashboard')}{addAction('فعالية للحي', '🎉', '/market?section=events')}</View> : null}
-              {selectedPlace ? <View style={{ backgroundColor: '#fff', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: '#DDE7E0' }}><View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 10 }}><View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: '#E8F5ED', alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 22 }}>{PLACE_CATEGORIES.find(c => c.key === selectedPlace.categoryKey)?.emoji ?? '🏬'}</Text></View><View style={{ flex: 1 }}><Text style={{ color: '#173B31', fontSize: 15, fontWeight: '900', textAlign: 'right' }}>{selectedPlace.name}</Text><Text style={{ color: '#73847A', fontSize: 11, textAlign: 'right', marginTop: 4 }}>{selectedPlace.categoryLabel} · {formatDistance(selectedPlace.distance)}</Text></View><Pressable onPress={() => setSelectedPlace(null)}><Text>✕</Text></Pressable></View>{selectedPlace.address ? <Text style={{ color: '#66786E', fontSize: 12, textAlign: 'right', marginTop: 12 }}>{selectedPlace.address}</Text> : null}{selectedPlace.hoursText ? <Text style={{ color: '#66786E', fontSize: 12, textAlign: 'right', marginTop: 8 }}>◷ {selectedPlace.hoursText}</Text> : null}<View style={{ flexDirection: 'row-reverse', gap: 8, marginTop: 14 }}><Pressable onPress={() => Linking.openURL(selectedPlace.mapsUrl)} style={{ backgroundColor: '#173B31', borderRadius: 12, padding: 11, flex: 1, alignItems: 'center' }}><Text style={{ color: '#fff', fontWeight: '800' }}>الاتجاهات ↗</Text></Pressable>{selectedPlace.phone ? <Pressable onPress={() => Linking.openURL('tel:' + selectedPlace.phone)} style={{ backgroundColor: '#EEF4EF', borderRadius: 12, padding: 11, alignItems: 'center' }}><Text style={{ color: '#173B31', fontWeight: '800' }}>اتصال</Text></Pressable> : null}</View></View> : null}
-              {selected ? <View style={{ backgroundColor: '#fff', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: '#DDE7E0' }}><Text style={{ fontSize: 16, color: '#173B31', fontWeight: '900', textAlign: 'right' }}>{MAP_PIN_KINDS[selected.kind].emoji} {selected.title}</Text><Text style={{ fontSize: 12, color: '#6C8075', textAlign: 'right', marginTop: 7 }}>{MAP_PIN_KINDS[selected.kind].label} · {selected.area}</Text>{selected.body ? <Text style={{ fontSize: 13, color: '#53675D', textAlign: 'right', lineHeight: 21, marginTop: 9 }}>{selected.body}</Text> : null}{selected.approximate ? <Text style={{ color: '#9A6B22', fontSize: 11, textAlign: 'right', marginTop: 8 }}>الموقع تقريبي لحماية الخصوصية</Text> : null}<View style={{ flexDirection: 'row-reverse', gap: 8, marginTop: 13 }}><Pressable onPress={() => router.push(selected.href as never)} style={{ backgroundColor: '#173B31', borderRadius: 12, padding: 11, flex: 1, alignItems: 'center' }}><Text style={{ color: '#fff', fontWeight: '800' }}>فتح التفاصيل</Text></Pressable><Pressable onPress={() => setSelected(null)} style={{ backgroundColor: '#EEF4EF', borderRadius: 12, padding: 11 }}><Text style={{ color: '#173B31', fontWeight: '800' }}>إغلاق</Text></Pressable></View></View> : null}
-              <View style={{ backgroundColor: '#173F35', borderRadius: 22, padding: 20 }}><Text style={{ fontSize: 20, color: '#fff', fontWeight: '900', textAlign: 'right' }}>خلّ الحي أفضل ✨</Text><Text style={{ fontSize: 12, color: '#D0E2D9', lineHeight: 21, textAlign: 'right', marginTop: 7 }}>شارك جيرانك خدمة أو فعالية أو بلاغًا يفيد المجتمع.</Text><Pressable onPress={() => setAddMenuOpen(v => !v)} style={{ backgroundColor: '#E4B76A', borderRadius: 13, padding: 13, alignItems: 'center', marginTop: 14 }}><Text style={{ color: '#173B31', fontWeight: '900' }}>＋ أضف محتوى للحي</Text></Pressable></View>
-              <View style={{ backgroundColor: '#fff', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: '#E1E9E3' }}><Text style={{ fontSize: 15, color: '#173B31', fontWeight: '900', textAlign: 'right', marginBottom: 12 }}>تصفّح حسب النوع</Text>{MAP_PIN_ORDER.map(value => { const meta = MAP_PIN_KINDS[value]; return <Pressable key={value} onPress={() => setKind(value)} style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F0F3F0' }}><View style={{ width: 34, height: 34, borderRadius: 11, backgroundColor: meta.color + '18', alignItems: 'center', justifyContent: 'center' }}><Text>{meta.emoji}</Text></View><Text style={{ flex: 1, color: '#43584D', fontSize: 12, fontWeight: '700', textAlign: 'right' }}>{meta.label}</Text><Text style={{ color: '#839087', fontSize: 11 }}>{kindCounts[value] || 0}</Text></Pressable>})}</View>
+            <View style={{ flex: 1, minWidth: 0, flexBasis: 280, gap: 14 }}>
+              {addMenuOpen ? <View style={{ backgroundColor: OASIS.colors.surface, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#E0E9E2' }}><View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}><Text style={{ fontSize: 16, color: '#173B31', fontWeight: '700' }}>أضف للحي</Text><Pressable onPress={() => setAddMenuOpen(false)}><Text style={{ color: '#7A8A81' }}>إغلاق </Text></Pressable></View>{addAction('منتج أو خدمة', '', '/new-listing')}{addAction('تنبيه طارئ', '', '/ask')}{addAction('إدارة أعمالي', '', '/profile?tab=content')}{addAction('فعالية للحي', '', '/market?section=events')}</View> : null}
+              {selectedPlace ? <View style={{ backgroundColor: OASIS.colors.surface, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#DDE7E0' }}><View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 10 }}><View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: '#E8F5ED', alignItems: 'center', justifyContent: 'center' }}><Store size={22} color="#0f766e" /></View><View style={{ flex: 1 }}><Text style={{ color: '#173B31', fontSize: 15, fontWeight: '700', textAlign: 'right' }}>{selectedPlace.name}</Text><Text style={{ color: '#73847A', fontSize: 11, textAlign: 'right', marginTop: 4 }}>{selectedPlace.categoryLabel} · {formatDistance(selectedPlace.distance)}</Text></View><Pressable accessibilityLabel="إغلاق تفاصيل المكان" onPress={() => setSelectedPlace(null)}><X size={22} color="#64746b" /></Pressable></View>{selectedPlace.address ? <Text style={{ color: '#66786E', fontSize: 12, textAlign: 'right', marginTop: 12 }}>{selectedPlace.address}</Text> : null}{selectedPlace.hoursText ? <Text style={{ color: '#66786E', fontSize: 12, textAlign: 'right', marginTop: 8 }}>{selectedPlace.hoursText}</Text> : null}<View style={{ flexDirection: 'row-reverse', gap: 8, marginTop: 14 }}><Pressable onPress={() => Linking.openURL(navigationUrl(selectedPlace.lat, selectedPlace.lng))} style={{ backgroundColor: '#173B31', borderRadius: 12, padding: 11, flex: 1, alignItems: 'center' }}><Text style={{ color: OASIS.colors.surface, fontWeight: '600' }}>الاتجاهات</Text></Pressable>{selectedPlace.phone ? <Pressable onPress={() => Linking.openURL('tel:' + selectedPlace.phone)} style={{ backgroundColor: '#EEF4EF', borderRadius: 12, padding: 11, alignItems: 'center' }}><Text style={{ color: '#173B31', fontWeight: '600' }}>اتصال</Text></Pressable> : null}</View></View> : null}
+              {selected ? <View style={{ backgroundColor: OASIS.colors.surface, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#DDE7E0' }}><Text style={{ fontSize: 16, color: '#173B31', fontWeight: '700', textAlign: 'right' }}>{selected.title}</Text><Text style={{ fontSize: 12, color: '#6C8075', textAlign: 'right', marginTop: 7 }}>{MAP_PIN_KINDS[selected.kind].label} · {selected.area}</Text>{selected.body ? <Text style={{ fontSize: 13, color: '#53675D', textAlign: 'right', lineHeight: 21, marginTop: 9 }}>{selected.body}</Text> : null}{selected.approximate ? <Text style={{ color: '#9A6B22', fontSize: 11, textAlign: 'right', marginTop: 8 }}>الموقع تقريبي لحماية الخصوصية</Text> : null}<View style={{ flexDirection: 'row-reverse', gap: 8, marginTop: 13 }}><Pressable onPress={() => router.push(selected.href as never)} style={{ backgroundColor: '#173B31', borderRadius: 12, padding: 11, flex: 1, alignItems: 'center' }}><Text style={{ color: OASIS.colors.surface, fontWeight: '600' }}>فتح التفاصيل</Text></Pressable><Pressable onPress={() => setSelected(null)} style={{ backgroundColor: '#EEF4EF', borderRadius: 12, padding: 11 }}><Text style={{ color: '#173B31', fontWeight: '600' }}>إغلاق</Text></Pressable></View></View> : null}
             </View>
           </View>
-          <Text style={{ textAlign: 'center', color: '#94A198', fontSize: 11, marginTop: 22 }}>تُعرض مواقع المنشورات بشكل تقريبي لحماية خصوصية أصحابها.</Text>
+          <Text style={{ textAlign: 'center', color: '#94A198', fontSize: 11, marginTop: 14 }}>تُعرض مواقع المنشورات بشكل تقريبي لحماية خصوصية أصحابها.</Text>
         </View>
       </View>
     );
@@ -313,49 +316,43 @@ export default function MapScreen() {
         subtitle={`${visiblePins.length} نشاط · ${places.length} محل قريب`}
         fallbackRoute="/home"
         rightAction={
-          <Pressable
+          <HeaderAction
             style={{
               paddingHorizontal: 10,
               paddingVertical: 5,
               borderRadius: 14,
-              backgroundColor: '#ecfdf5',
+              backgroundColor: OASIS.colors.soft,
               borderWidth: 1,
               borderColor: '#a7f3d0',
             }}
-            onPress={locateMe}
+            accessibilityLabel="تحديد موقعي" onPress={locateMe}
             disabled={locating}
           >
-            <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#059669' }}>
-              {locating ? 'جارٍ التحديد…' : 'موقعي 📍'}
+            <Text style={{ fontSize: 11.5, fontWeight: '600', color: OASIS.colors.primary }}>
+              {locating ? 'جارٍ التحديد…' : 'موقعي'}
             </Text>
-          </Pressable>
+          </HeaderAction>
         }
       />
       <Map style={styles.map} mapStyle={STYLE_URL}>
         <Camera
-          key={city || 'location-required'}
+          key={`${city}:${selectedPlace?.id || selected?.id || ''}:${myLocation?.latitude || ''}:${myLocation?.longitude || ''}`}
           defaultSettings={{
-            centerCoordinate: findPlaceCenter(city)
-              ? [findPlaceCenter(city)!.lng, findPlaceCenter(city)!.lat]
-                : DEFAULT_CENTER,
-            zoomLevel: city ? 11 : 5.5,
+            centerCoordinate: selectedPlace ? [selectedPlace.lng, selectedPlace.lat] : selected ? [selected.lng, selected.lat] : myLocation ? [myLocation.longitude, myLocation.latitude] : findPlaceCenter(city) ? [findPlaceCenter(city)!.lng, findPlaceCenter(city)!.lat] : DEFAULT_CENTER,
+            zoomLevel: selectedPlace || selected || myLocation ? 15 : city ? 11 : 5.5,
           }}
         />
 
         {myLocation ? (
           <Marker id="my-location" lngLat={[myLocation.longitude, myLocation.latitude]} anchor="center">
-            <View style={styles.myLocationDot}>
-              <View style={styles.myLocationInner} />
-            </View>
+            <Image source={oasisAssets["map/current-location"]} style={{ width: 40, height: 40 }} />
           </Marker>
         ) : null}
 
         {places.slice(0, 60).map((place) => (
           <Marker key={`place-${place.id}`} id={`place-${place.id}`} lngLat={[place.lng, place.lat]} anchor="bottom" onPress={() => { setSelectedPlace(place); setSelected(null); }}>
             <View style={styles.pinWrap}>
-              <View style={[styles.pin, { backgroundColor: '#0F766E' }]}>
-                <Text style={styles.pinEmoji}>🏬</Text>
-              </View>
+              <Image source={oasisAssets["map/pin-market"]} style={{ width: 48, height: 60 }} />
             </View>
           </Marker>
         ))}
@@ -372,9 +369,7 @@ export default function MapScreen() {
             >
               <View style={styles.pinWrap}>
                 {pin.urgent ? <View style={[styles.pinPulse, { borderColor: meta.color }]} /> : null}
-                <View style={[styles.pin, { backgroundColor: meta.color }]}>
-                  <Text style={styles.pinEmoji}>{meta.emoji}</Text>
-                </View>
+                {pin.kind === 'emergency' || pin.kind === 'alert' ? <View style={[styles.pin, { backgroundColor: meta.color }]}><TriangleAlert size={17} color={OASIS.colors.surface} /></View> : <Image source={oasisAssets[pin.kind === 'business' || pin.kind === 'marketplace' ? 'map/pin-market' : pin.kind === 'tool' || pin.kind === 'request' ? 'map/pin-service' : 'map/pin-neighbor']} style={{ width: 48, height: 60 }} />}
               </View>
             </Marker>
           );
@@ -389,24 +384,24 @@ export default function MapScreen() {
           placeholderTextColor={C.muted}
           style={styles.search}
         />
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+        <ScrollView style={{ direction: 'rtl' }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.chipRow, { direction: 'ltr' }]}>
           {placeChip(ALL_PLACES_KEY, 'الكل')}
           {PLACE_CATEGORIES.map((category) =>
-            placeChip(category.key, `${category.emoji} ${category.label}`),
+            placeChip(category.key, `${category.label}`),
           )}
         </ScrollView>
         {filters}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-          <Pressable onPress={() => setSortMode('distance')} style={[styles.sortChip, sortMode === 'distance' && styles.sortChipActive]}><Text style={[styles.sortText, sortMode === 'distance' && styles.sortTextActive]}>الأقرب</Text></Pressable>
-          <Pressable onPress={() => setSortMode('open')} style={[styles.sortChip, sortMode === 'open' && styles.sortChipActive]}><Text style={[styles.sortText, sortMode === 'open' && styles.sortTextActive]}>مفتوح أولاً</Text></Pressable>
-          <Pressable onPress={() => setSortMode('rating')} style={[styles.sortChip, sortMode === 'rating' && styles.sortChipActive]}><Text style={[styles.sortText, sortMode === 'rating' && styles.sortTextActive]}>الأعلى تقييماً</Text></Pressable>
-          <Pressable onPress={() => setOpenOnly((v) => !v)} style={[styles.sortChip, openOnly && styles.sortChipActive]}><Text style={[styles.sortText, openOnly && styles.sortTextActive]}>مفتوح الآن</Text></Pressable>
-          <Pressable onPress={() => setRatedOnly((v) => !v)} style={[styles.sortChip, ratedOnly && styles.sortChipActive]}><Text style={[styles.sortText, ratedOnly && styles.sortTextActive]}>له تقييم</Text></Pressable>
+        <ScrollView style={{ direction: 'rtl' }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.chipRow, { direction: 'ltr' }]}>
+          <Pressable oasisVariant={sortMode === 'distance' ? 'primary' : 'secondary'} oasisKind="chip" onPress={() => setSortMode('distance')} style={[styles.sortChip, sortMode === 'distance' && styles.sortChipActive]}><Text style={[styles.sortText, sortMode === 'distance' && styles.sortTextActive]}>الأقرب</Text></Pressable>
+          <Pressable oasisVariant={sortMode === 'open' ? 'primary' : 'secondary'} oasisKind="chip" onPress={() => setSortMode('open')} style={[styles.sortChip, sortMode === 'open' && styles.sortChipActive]}><Text style={[styles.sortText, sortMode === 'open' && styles.sortTextActive]}>مفتوح أولاً</Text></Pressable>
+          <Pressable oasisVariant={sortMode === 'rating' ? 'primary' : 'secondary'} oasisKind="chip" onPress={() => setSortMode('rating')} style={[styles.sortChip, sortMode === 'rating' && styles.sortChipActive]}><Text style={[styles.sortText, sortMode === 'rating' && styles.sortTextActive]}>الأعلى تقييماً</Text></Pressable>
+          <Pressable oasisVariant={openOnly ? 'primary' : 'secondary'} oasisKind="chip" onPress={() => setOpenOnly((v) => !v)} style={[styles.sortChip, openOnly && styles.sortChipActive]}><Text style={[styles.sortText, openOnly && styles.sortTextActive]}>مفتوح الآن</Text></Pressable>
+          <Pressable oasisVariant={ratedOnly ? 'primary' : 'secondary'} oasisKind="chip" onPress={() => setRatedOnly((v) => !v)} style={[styles.sortChip, ratedOnly && styles.sortChipActive]}><Text style={[styles.sortText, ratedOnly && styles.sortTextActive]}>له تقييم</Text></Pressable>
         </ScrollView>
         <View style={styles.filtersRow}>
           <Text style={styles.count}>{visiblePins.length} نشاط · {visiblePlaces.length} مكان قريب</Text>
-          <Pressable style={styles.addButton} onPress={() => setAddMenuOpen((v) => !v)}><Text style={styles.addButtonText}>＋ إضافة موقع</Text></Pressable>
-          <Pressable style={styles.locationButton} onPress={locateMe} disabled={locating}>
+          <Pressable oasisKind="action" style={styles.addButton} onPress={() => setAddMenuOpen((v) => !v)}><Text style={styles.addButtonText}>إضافة موقع</Text></Pressable>
+          <Pressable oasisKind="action" style={styles.locationButton} onPress={locateMe} disabled={locating}>
             <Text style={styles.locationButtonText}>
               {locating ? 'جارٍ تحديد موقعي…' : 'موقعي'}
             </Text>
@@ -435,26 +430,26 @@ export default function MapScreen() {
 
       {addMenuOpen ? (
         <View style={styles.addMenu}>
-          <View style={styles.addMenuHead}><Text style={styles.addMenuTitle}>وش حاب تضيف للخريطة؟</Text><Pressable onPress={() => setAddMenuOpen(false)}><Text style={styles.closeMenuText}>إغلاق ✕</Text></Pressable></View>
-          {addAction('محل أو خدمة', '🏪', '/new-service')}
-          {addAction('تنبيه طارئ', '🚨', '/emergency-alert')}
-          {addAction('طلب مساعدة', '🤝', '/new-request')}
-          {addAction('إعلان أو منتج', '🛍️', '/marketplace-dashboard')}
-          {addAction('فعالية للحي', '🎉', '/market?section=events')}
+          <View style={styles.addMenuHead}><Text style={styles.addMenuTitle}>وش حاب تضيف للخريطة؟</Text><Pressable onPress={() => setAddMenuOpen(false)}><Text style={styles.closeMenuText}>إغلاق </Text></Pressable></View>
+          {addAction('منتج أو خدمة', '', '/new-listing')}
+          {addAction('تنبيه طارئ', '', '/ask')}
+          {addAction('طلب مساعدة', '', '/ask')}
+          {addAction('إدارة أعمالي', '', '/profile?tab=content')}
+          {addAction('فعالية للحي', '', '/market?section=events')}
         </View>
       ) : null}
 
       {selectedPlace ? (
         <View style={styles.placeDetailSheet}>
-          <View style={styles.detailHead}><View style={styles.placeBadge}><Text style={{ fontSize: 20 }}>{PLACE_CATEGORIES.find((c) => c.key === selectedPlace.categoryKey)?.emoji ?? '🏬'}</Text></View><View style={{ flex: 1 }}><Text style={styles.selectedTitle}>{selectedPlace.name}</Text><Text style={styles.selectedMeta}>{selectedPlace.categoryLabel} · {formatDistance(selectedPlace.distance)}</Text></View><Pressable onPress={() => setSelectedPlace(null)}><Text style={styles.closeMenuText}>✕</Text></Pressable></View>
+          <View style={styles.detailHead}><View style={styles.placeBadge}><Store size={20} color="#0F766E" /></View><View style={{ flex: 1 }}><Text style={styles.selectedTitle}>{selectedPlace.name}</Text><Text style={styles.selectedMeta}>{selectedPlace.categoryLabel} · {formatDistance(selectedPlace.distance)}</Text></View><Pressable onPress={() => setSelectedPlace(null)}><X size={20} color="#64746b" /></Pressable></View>
           {selectedPlace.address ? <Text style={styles.description}>{selectedPlace.address}</Text> : null}
           <View style={styles.detailFacts}>
-            {selectedPlace.openNow != null ? <Text style={[styles.miniChip, selectedPlace.openNow ? { color: '#15803d', backgroundColor: '#dcfce7' } : { color: '#b91c1c', backgroundColor: '#fee2e2' }]}>{selectedPlace.openNow ? 'مفتوح الآن' : 'مغلق حالياً'}</Text> : null}
-            {selectedPlace.rating != null ? <Text style={styles.miniChip}>★ {selectedPlace.rating.toFixed(1)} · {selectedPlace.reviews} تقييم</Text> : null}
+            {selectedPlace.openNow != null ? <Text style={[styles.miniChip, selectedPlace.openNow ? { color: '#15803d', backgroundColor: '#dcfce7' } : { color: OASIS.colors.danger, backgroundColor: '#fee2e2' }]}>{selectedPlace.openNow ? 'مفتوح الآن' : 'مغلق حالياً'}</Text> : null}
+            {selectedPlace.rating != null ? <Text style={styles.miniChip}> {selectedPlace.rating.toFixed(1)} · {selectedPlace.reviews} تقييم</Text> : null}
           </View>
-          {selectedPlace.hoursText ? <Text style={styles.description}>🕒 {selectedPlace.hoursText}</Text> : null}
+          {selectedPlace.hoursText ? <Text style={styles.description}> {selectedPlace.hoursText}</Text> : null}
           <View style={styles.actions}>
-            <Pressable style={styles.primaryAction} onPress={() => Linking.openURL(selectedPlace.mapsUrl)}><Text style={styles.primaryActionText}>الاتجاهات ↗</Text></Pressable>
+            <Pressable style={styles.primaryAction} onPress={() => Linking.openURL(navigationUrl(selectedPlace.lat, selectedPlace.lng))}><Text style={styles.primaryActionText}>الاتجاهات</Text></Pressable>
             {selectedPlace.phone ? <Pressable style={styles.secondaryAction} onPress={() => Linking.openURL(`tel:${selectedPlace.phone}`)}><Text style={styles.secondaryActionText}>اتصال</Text></Pressable> : null}
             <Pressable style={styles.secondaryAction} onPress={() => setSelectedPlace(null)}><Text style={styles.secondaryActionText}>إغلاق</Text></Pressable>
           </View>
@@ -485,7 +480,7 @@ export default function MapScreen() {
               style={styles.secondaryAction}
               onPress={() => Linking.openURL(navigationUrl(selected.lat, selected.lng))}
             >
-              <Text style={styles.secondaryActionText}>الاتجاهات ↗</Text>
+              <Text style={styles.secondaryActionText}>الاتجاهات</Text>
             </Pressable>
             {selected.phone ? (
               <Pressable
@@ -517,8 +512,8 @@ const styles = StyleSheet.create({
     top: 42,
     left: 12,
     right: 12,
-    backgroundColor: '#fff',
-    borderRadius: 18,
+    backgroundColor: OASIS.colors.surface,
+    borderRadius: 14,
     padding: 10,
     elevation: 5,
   },
@@ -536,12 +531,12 @@ const styles = StyleSheet.create({
   chip: {
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 20,
-    backgroundColor: '#fff',
+    borderRadius: 14,
+    backgroundColor: OASIS.colors.surface,
     borderWidth: 1.5,
     borderColor: C.line,
   },
-  chipText: { fontSize: 11, fontWeight: '800', color: C.muted },
+  chipText: { fontSize: 11, fontWeight: '600', color: C.muted },
   cityChip: {
     paddingHorizontal: 12,
     paddingVertical: 5,
@@ -551,20 +546,20 @@ const styles = StyleSheet.create({
     borderColor: '#a7f3d0',
   },
   cityChipActive: { backgroundColor: C.accent, borderColor: C.accent },
-  cityChipText: { fontSize: 11.5, fontWeight: '800', color: C.accent },
-  cityScope: { fontSize: 12, fontWeight: '800', color: C.muted, textAlign: 'right', paddingHorizontal: 8 },
+  cityChipText: { fontSize: 11.5, fontWeight: '600', color: C.accent },
+  cityScope: { fontSize: 12, fontWeight: '600', color: C.muted, textAlign: 'right', paddingHorizontal: 8 },
   placeChip: {
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderRadius: 14,
-    backgroundColor: '#ecfdf5',
+    backgroundColor: OASIS.colors.soft,
     borderWidth: 1,
     borderColor: '#5eead4',
   },
   placeChipActive: { backgroundColor: '#134e4a', borderColor: '#134e4a' },
-  placeChipText: { fontSize: 11.5, fontWeight: '800', color: '#0F766E' },
+  placeChipText: { fontSize: 11.5, fontWeight: '600', color: '#0F766E' },
   filtersRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginTop: 4 },
-  count: { flex: 1, color: C.muted, fontSize: 12, fontWeight: '800' },
+  count: { flex: 1, color: C.muted, fontSize: 12, fontWeight: '600' },
   locationButton: {
     borderRadius: 10,
     paddingHorizontal: 10,
@@ -573,8 +568,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#bfdbfe',
   },
-  locationButtonText: { color: '#1769aa', fontSize: 12, fontWeight: '800' },
-  pinWrap: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
+  locationButtonText: { color: '#1769aa', fontSize: 12, fontWeight: '600' },
+  pinWrap: { width: 48, height: 60, alignItems: 'center', justifyContent: 'center' },
   pin: {
     width: 30,
     height: 30,
@@ -582,7 +577,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2.5,
-    borderColor: '#fff',
+    borderColor: OASIS.colors.surface,
   },
   pinEmoji: { fontSize: 13 },
   pinPulse: {
@@ -601,13 +596,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: '#fff',
+    borderColor: OASIS.colors.surface,
   },
   myLocationInner: { width: 11, height: 11, borderRadius: 6, backgroundColor: '#2563eb' },
   listCard: {
     flexDirection: 'row-reverse',
     gap: 10,
-    backgroundColor: '#fff',
+    backgroundColor: OASIS.colors.surface,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: C.line,
@@ -616,23 +611,23 @@ const styles = StyleSheet.create({
   },
   listBadge: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   listBody: { flex: 1 },
-  listTitle: { fontSize: 13.5, fontWeight: '800', color: C.ink, lineHeight: 20 },
+  listTitle: { fontSize: 13.5, fontWeight: '600', color: C.ink, lineHeight: 20 },
   listMeta: { fontSize: 11.5, color: C.muted, marginTop: 3, fontWeight: '600' },
-  sortChip: { paddingHorizontal: 11, paddingVertical: 6, borderRadius: 14, backgroundColor: '#f8fafc', borderWidth: 1, borderColor: C.line },
+  sortChip: { paddingHorizontal: 11, paddingVertical: 6, borderRadius: 14, backgroundColor: OASIS.colors.background, borderWidth: 1, borderColor: C.line },
   sortChipActive: { backgroundColor: '#134e4a', borderColor: '#134e4a' },
-  sortText: { fontSize: 11, fontWeight: '800', color: C.muted },
-  sortTextActive: { color: '#fff' },
+  sortText: { fontSize: 11, fontWeight: '600', color: C.muted },
+  sortTextActive: { color: OASIS.colors.surface },
   addButton: { borderRadius: 11, paddingHorizontal: 11, paddingVertical: 8, backgroundColor: '#0f766e' },
-  addButtonText: { color: '#fff', fontSize: 12, fontWeight: '900' },
-  addMenuWeb: { backgroundColor: '#fff', borderRadius: 16, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: C.line },
-  placeDetailWeb: { backgroundColor: '#fff', borderRadius: 16, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: C.line },
-  addMenu: { position: 'absolute', left: 14, right: 14, bottom: 70, backgroundColor: '#fff', borderRadius: 20, padding: 14, elevation: 12, zIndex: 20, borderWidth: 1, borderColor: C.line },
+  addButtonText: { color: OASIS.colors.surface, fontSize: 12, fontWeight: '700' },
+  addMenuWeb: { backgroundColor: OASIS.colors.surface, borderRadius: 16, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: C.line },
+  placeDetailWeb: { backgroundColor: OASIS.colors.surface, borderRadius: 16, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: C.line },
+  addMenu: { position: 'absolute', left: 14, right: 14, bottom: 70, backgroundColor: OASIS.colors.surface, borderRadius: 14, padding: 14, elevation: 12, zIndex: 20, borderWidth: 1, borderColor: C.line },
   addMenuHead: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  addMenuTitle: { fontSize: 15, fontWeight: '900', color: C.ink, textAlign: 'right' },
-  closeMenuText: { color: C.muted, fontSize: 12, fontWeight: '800', padding: 5 },
-  addAction: { paddingVertical: 12, paddingHorizontal: 12, backgroundColor: '#f8fafc', borderRadius: 12, marginTop: 6 },
-  addActionText: { color: C.ink, fontWeight: '800', textAlign: 'right' },
-  placeDetailSheet: { position: 'absolute', left: 12, right: 12, bottom: 250, backgroundColor: '#fff', borderRadius: 20, padding: 16, elevation: 12, zIndex: 10, borderWidth: 1, borderColor: C.line },
+  addMenuTitle: { fontSize: 15, fontWeight: '700', color: C.ink, textAlign: 'right' },
+  closeMenuText: { color: C.muted, fontSize: 12, fontWeight: '600', padding: 5 },
+  addAction: { paddingVertical: 12, paddingHorizontal: 12, backgroundColor: OASIS.colors.background, borderRadius: 12, marginTop: 6 },
+  addActionText: { color: C.ink, fontWeight: '600', textAlign: 'right' },
+  placeDetailSheet: { position: 'absolute', left: 12, right: 12, bottom: 250, backgroundColor: OASIS.colors.surface, borderRadius: 14, padding: 14, elevation: 12, zIndex: 10, borderWidth: 1, borderColor: C.line },
   detailHead: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10 },
   detailFacts: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 6, marginTop: 10 },
   selectedPanel: {
@@ -640,9 +635,9 @@ const styles = StyleSheet.create({
     left: 12,
     right: 12,
     bottom: 250,
-    backgroundColor: '#fff',
-    borderRadius: 18,
-    padding: 16,
+    backgroundColor: OASIS.colors.surface,
+    borderRadius: 14,
+    padding: 14,
     elevation: 8,
   },
   privacyHint: { fontSize: 11.5, color: '#b45309', fontWeight: '700', textAlign: 'right', marginTop: 7 },
@@ -652,21 +647,21 @@ const styles = StyleSheet.create({
     right: 12,
     bottom: 62,
     maxHeight: 240,
-    backgroundColor: '#fff',
-    borderRadius: 18,
+    backgroundColor: OASIS.colors.surface,
+    borderRadius: 14,
     paddingHorizontal: 12,
     paddingTop: 10,
     paddingBottom: 8,
     elevation: 7,
   },
   placesHead: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginBottom: 6 },
-  placesTitle: { flex: 1, fontSize: 12.5, fontWeight: '900', color: C.ink, textAlign: 'right' },
+  placesTitle: { flex: 1, fontSize: 12.5, fontWeight: '700', color: C.ink, textAlign: 'right' },
   placesScroll: { maxHeight: 190 },
   placesContent: { gap: 8, paddingBottom: 4 },
   placeCard: {
     flexDirection: 'row-reverse',
     gap: 10,
-    backgroundColor: '#f8fafc',
+    backgroundColor: OASIS.colors.background,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: C.line,
@@ -674,12 +669,12 @@ const styles = StyleSheet.create({
   },
   placeBadge: { width: 38, height: 38, borderRadius: 12, backgroundColor: '#ccfbf1', alignItems: 'center', justifyContent: 'center' },
   placeBody: { flex: 1, gap: 3 },
-  placeName: { fontSize: 13.5, fontWeight: '900', color: C.ink },
+  placeName: { fontSize: 13.5, fontWeight: '700', color: C.ink },
   placeMeta: { fontSize: 11.5, color: C.muted, fontWeight: '600' },
   placeChips: { flexDirection: 'row-reverse', gap: 5, marginTop: 2 },
   miniChip: {
-    fontSize: 10.5,
-    fontWeight: '800',
+    fontSize: 11,
+    fontWeight: '600',
     color: C.muted,
     backgroundColor: '#f1f5f9',
     borderRadius: 8,
@@ -687,15 +682,15 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     overflow: 'hidden',
   },
-  selectedTitle: { fontSize: 16, fontWeight: '900', color: C.ink, textAlign: 'right' },
-  selectedMeta: { fontSize: 12, color: C.accent, fontWeight: '800', marginTop: 4, textAlign: 'right' },
+  selectedTitle: { fontSize: 16, fontWeight: '700', color: C.ink, textAlign: 'right' },
+  selectedMeta: { fontSize: 12, color: C.accent, fontWeight: '600', marginTop: 4, textAlign: 'right' },
   description: { fontSize: 13, color: C.muted, textAlign: 'right', marginTop: 7, lineHeight: 20 },
   actions: { flexDirection: 'row-reverse', gap: 8, marginTop: 12 },
   primaryAction: { flex: 1, backgroundColor: C.accent, borderRadius: 12, paddingVertical: 11, alignItems: 'center' },
-  primaryActionText: { color: '#fff', fontWeight: '800' },
+  primaryActionText: { color: OASIS.colors.surface, fontWeight: '600' },
   secondaryAction: { paddingHorizontal: 14, borderRadius: 12, paddingVertical: 11, backgroundColor: '#f1f5f9', alignItems: 'center' },
-  secondaryActionText: { color: C.ink, fontWeight: '800' },
-  empty: { textAlign: 'center', color: C.muted, paddingVertical: 30 },
+  secondaryActionText: { color: C.ink, fontWeight: '600' },
+  empty: { textAlign: 'center', color: C.muted, paddingVertical: 16 },
   close: {
     position: 'absolute',
     bottom: 12,
@@ -706,5 +701,5 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     elevation: 6,
   },
-  closeText: { color: '#fff', fontWeight: '800' },
+  closeText: { color: OASIS.colors.surface, fontWeight: '600' },
 });

@@ -1,5 +1,7 @@
+import { OasisPressable as Pressable, OasisSurface } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Pressable, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { ShieldCheck, Award, Sparkles, CheckCircle, MapPin, ChevronLeft } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '@/lib/supabase';
@@ -66,18 +68,18 @@ export const NeighborBadgesCard: React.FC<NeighborBadgesCardProps> = ({
   };
 
   return (
-    <View style={styles.card}>
+    <OasisSurface oasisSurface="card" style={styles.card}>
       {/* 1. Verified Neighbor Status Banner */}
       {isVerifiedNeighbor ? (
         <LinearGradient
-          colors={['#ecfdf5', '#d1fae5']}
+          colors={[OASIS.colors.soft, OASIS.colors.soft]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.verifiedBanner}
         >
           <View style={styles.verifiedLeftCol}>
             <View style={styles.checkCircleWrap}>
-              <CheckCircle size={14} color="#059669" />
+              <CheckCircle size={14} color={OASIS.colors.primary} />
             </View>
             <View>
               <Text style={styles.verifiedTitle}>جار موثق بالحي 🛡️</Text>
@@ -99,9 +101,9 @@ export const NeighborBadgesCard: React.FC<NeighborBadgesCardProps> = ({
           <View style={styles.unverifiedLeftCol}>
             <View style={styles.shieldIconWrap}>
               {verifying ? (
-                <ActivityIndicator size="small" color="#059669" />
+                <ActivityIndicator size="small" color={OASIS.colors.primary} />
               ) : (
-                <ShieldCheck size={20} color="#059669" />
+                <ShieldCheck size={20} color={OASIS.colors.primary} />
               )}
             </View>
             <View style={{ flex: 1 }}>
@@ -111,7 +113,7 @@ export const NeighborBadgesCard: React.FC<NeighborBadgesCardProps> = ({
               </Text>
             </View>
           </View>
-          <ChevronLeft size={16} color="#059669" />
+          <ChevronLeft size={16} color={OASIS.colors.primary} />
         </Pressable>
       )}
 
@@ -134,22 +136,22 @@ export const NeighborBadgesCard: React.FC<NeighborBadgesCardProps> = ({
           </View>
         </View>
       </View>
-    </View>
+    </OasisSurface>
   );
 };
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#ffffff',
-    borderRadius: 20,
-    padding: 16,
+    backgroundColor: OASIS.colors.surface,
+    borderRadius: 14,
+    padding: 14,
     marginHorizontal: 16,
     marginTop: -22,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0,
     shadowRadius: 10,
     elevation: 4,
     zIndex: 10,
@@ -165,11 +167,11 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   verifiedLeftCol: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10 },
-  checkCircleWrap: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
-  verifiedTitle: { fontSize: 13.5, fontWeight: '900', color: '#065f46', textAlign: 'right' },
-  verifiedSub: { fontSize: 11, color: '#047857', fontWeight: '600', marginTop: 1, textAlign: 'right' },
-  verifiedBadgePill: { backgroundColor: '#059669', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  verifiedBadgeText: { color: '#ffffff', fontSize: 11, fontWeight: '900' },
+  checkCircleWrap: { width: 28, height: 28, borderRadius: 14, backgroundColor: OASIS.colors.surface, alignItems: 'center', justifyContent: 'center' },
+  verifiedTitle: { fontSize: 13.5, fontWeight: '700', color: OASIS.colors.deep, textAlign: 'right' },
+  verifiedSub: { fontSize: 11, color: OASIS.colors.primary, fontWeight: '600', marginTop: 1, textAlign: 'right' },
+  verifiedBadgePill: { backgroundColor: OASIS.colors.primary, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  verifiedBadgeText: { color: OASIS.colors.surface, fontSize: 11, fontWeight: '700' },
 
   unverifiedBanner: {
     flexDirection: 'row-reverse',
@@ -177,20 +179,20 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 12,
     borderRadius: 14,
-    backgroundColor: '#f0fdf4',
+    backgroundColor: OASIS.colors.soft,
     borderWidth: 1.5,
     borderColor: '#bbf7d0',
     marginBottom: 14,
   },
   unverifiedLeftCol: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, flex: 1 },
-  shieldIconWrap: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#ecfdf5', alignItems: 'center', justifyContent: 'center' },
-  unverifiedTitle: { fontSize: 13, fontWeight: '900', color: '#065f46', textAlign: 'right' },
-  unverifiedSub: { fontSize: 11, color: '#047857', fontWeight: '600', marginTop: 2, textAlign: 'right' },
+  shieldIconWrap: { width: 36, height: 36, borderRadius: 14, backgroundColor: OASIS.colors.soft, alignItems: 'center', justifyContent: 'center' },
+  unverifiedTitle: { fontSize: 13, fontWeight: '700', color: OASIS.colors.deep, textAlign: 'right' },
+  unverifiedSub: { fontSize: 11, color: OASIS.colors.primary, fontWeight: '600', marginTop: 2, textAlign: 'right' },
 
   karmaRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 14 },
   karmaBox: {
     alignItems: 'center',
-    backgroundColor: '#fffbeb',
+    backgroundColor: OASIS.colors.warningSoft,
     borderWidth: 1,
     borderColor: '#fde68a',
     borderRadius: 14,
@@ -198,19 +200,19 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     minWidth: 110,
   },
-  karmaNum: { fontSize: 18, fontWeight: '900', color: '#92400e', marginTop: 2 },
-  karmaLabel: { fontSize: 10.5, fontWeight: '700', color: '#b45309', marginTop: 2 },
+  karmaNum: { fontSize: 18, fontWeight: '700', color: '#92400e', marginTop: 2 },
+  karmaLabel: { fontSize: 11, fontWeight: '700', color: '#b45309', marginTop: 2 },
 
   badgesCol: { flex: 1, alignItems: 'flex-end' },
-  badgesHeading: { fontSize: 11.5, fontWeight: '800', color: '#475569', marginBottom: 6 },
+  badgesHeading: { fontSize: 11.5, fontWeight: '600', color: OASIS.colors.muted, marginBottom: 6 },
   badgesWrap: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 6 },
   badgeChip: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: OASIS.colors.background,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
     paddingHorizontal: 9,
     paddingVertical: 4,
     borderRadius: 10,
   },
-  badgeChipText: { fontSize: 11, fontWeight: '800', color: '#334155' },
+  badgeChipText: { fontSize: 11, fontWeight: '600', color: OASIS.colors.ink },
 });

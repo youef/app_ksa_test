@@ -1,4 +1,5 @@
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { OasisPressable as Pressable, OasisTextInput as TextInput } from '@/components/oasis/OasisPrimitives';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Camera, ChevronLeft, ChevronRight, Image as ImageIcon, Sparkles, Type, UploadCloud } from 'lucide-react-native';
 import { BG_GRADIENTS } from '@/lib/storyGradients';
@@ -78,10 +79,10 @@ export function StoryControls(props: Props) {
       ) : (
         <View style={styles.optionBox}>
           <Text style={styles.bgLabel}>لون خلفية الحالة النصية:</Text>
-          <ScrollView
+          <ScrollView style={{ direction: 'rtl' }}
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.gradsScroll}
+            contentContainerStyle={[styles.gradsScroll, { direction: 'ltr' }]}
           >
             {BG_GRADIENTS.map((g) => (
               <Pressable
@@ -102,7 +103,7 @@ export function StoryControls(props: Props) {
 
       {props.slideCount > 1 ? (
         <View style={styles.navRow}>
-          <Pressable
+          <Pressable oasisKind="action"
             style={[styles.navBtn, props.activeIdx === 0 && styles.navBtnDisabled]}
             onPress={() => props.onStep(-1)}
             disabled={props.activeIdx === 0}
@@ -119,7 +120,7 @@ export function StoryControls(props: Props) {
             {props.activeIdx + 1} / {props.slideCount}
           </Text>
 
-          <Pressable
+          <Pressable oasisKind="action"
             style={[
               styles.navBtn,
               props.activeIdx === props.slideCount - 1 && styles.navBtnDisabled,
@@ -224,7 +225,7 @@ function ActionPill({
   onPress: () => void;
 }) {
   return (
-    <Pressable style={styles.actionPill} onPress={onPress} accessibilityRole="button">
+    <Pressable oasisKind="chip" style={styles.actionPill} onPress={onPress} accessibilityRole="button">
       {icon}
       <Text style={styles.actionPillText}>{label}</Text>
     </Pressable>
@@ -239,7 +240,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 14,
   },
-  sectionHeader: { color: SC.muted, fontSize: 13, fontWeight: '800', textAlign: 'right' },
+  sectionHeader: { color: SC.muted, fontSize: 13, fontWeight: '600', textAlign: 'right' },
   modeGroup: {
     flexDirection: 'row-reverse',
     backgroundColor: SC.panel,
@@ -257,7 +258,7 @@ const styles = StyleSheet.create({
   },
   modeItemActive: { backgroundColor: SC.panelDeep },
   modeText: { color: SC.muted, fontSize: 12, fontWeight: '700' },
-  modeTextActive: { color: SC.primary, fontWeight: '800' },
+  modeTextActive: { color: SC.primary, fontWeight: '600' },
   optionBox: { marginBottom: 14 },
   captionWrap: {
     backgroundColor: SC.panel,
@@ -293,7 +294,7 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   gradPreviewSelected: { borderColor: SC.white, transform: [{ scale: 1.1 }] },
-  gradName: { color: SC.mutedSoft, fontSize: 10, marginTop: 4, fontWeight: '700' },
+  gradName: { color: SC.mutedSoft, fontSize: 11, marginTop: 4, fontWeight: '700' },
   navRow: {
     flexDirection: 'row-reverse',
     justifyContent: 'space-between',
@@ -306,9 +307,9 @@ const styles = StyleSheet.create({
   },
   navBtn: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, paddingVertical: 4, paddingHorizontal: 8 },
   navBtnDisabled: { opacity: 0.4 },
-  navText: { color: SC.white, fontSize: 12, fontWeight: '800' },
+  navText: { color: SC.white, fontSize: 12, fontWeight: '600' },
   navTextDisabled: { color: SC.border },
-  navCounter: { color: SC.mint, fontSize: 13, fontWeight: '900' },
+  navCounter: { color: SC.mint, fontSize: 13, fontWeight: '700' },
   infoBanner: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
@@ -323,12 +324,12 @@ const styles = StyleSheet.create({
   infoText: { flex: 1, color: SC.mintSoft, fontSize: 12, fontWeight: '600', textAlign: 'right', lineHeight: 18 },
   publishFull: {
     backgroundColor: SC.primary,
-    borderRadius: 30,
+    borderRadius: 14,
     paddingVertical: 15,
     alignItems: 'center',
   },
   publishFullDisabled: { backgroundColor: SC.border },
-  publishFullText: { color: SC.white, fontSize: 15, fontWeight: '900' },
+  publishFullText: { color: SC.white, fontSize: 15, fontWeight: '700' },
   uploading: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
-  uploadingText: { color: SC.white, fontSize: 14, fontWeight: '800' },
+  uploadingText: { color: SC.white, fontSize: 14, fontWeight: '600' },
 });

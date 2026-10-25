@@ -1,21 +1,10 @@
+import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
+import { HeaderAction, AppHeader } from '@/components/shared/AppHeader';
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-  ScrollView,
-  TextInput,
-  Modal,
-  Alert,
-  ActivityIndicator,
-  Platform,
-  RefreshControl,
-  Image,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Modal, Alert, ActivityIndicator, Platform, RefreshControl, Image } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { AppHeader } from '@/components/shared/AppHeader';
 import {
   Wrench,
   Search,
@@ -231,12 +220,12 @@ export default function ToolsLendingScreen() {
         subtitle="سوق إعارة الأدوات والمعدات بين الجيران مجاناً"
         fallbackRoute="/home"
         rightAction={
-          <Pressable
+          <HeaderAction
             style={{
               flexDirection: 'row-reverse',
               alignItems: 'center',
               gap: 4,
-              backgroundColor: '#ecfdf5',
+              backgroundColor: OASIS.colors.soft,
               paddingHorizontal: 12,
               paddingVertical: 6,
               borderRadius: 16,
@@ -247,15 +236,15 @@ export default function ToolsLendingScreen() {
             accessibilityRole="button"
             accessibilityLabel="أعِر أداتك للحي"
           >
-            <Plus size={14} color="#059669" />
-            <Text style={{ fontSize: 12, fontWeight: '800', color: '#059669' }}>أعِر أداة</Text>
-          </Pressable>
+            <Plus size={14} color={OASIS.colors.primary} />
+            <Text style={{ fontSize: 12, fontWeight: '600', color: OASIS.colors.primary }}>أعِر أداة</Text>
+          </HeaderAction>
         }
       />
 
       {/* Search Input */}
       <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 6 }}>
-        <View style={[styles.searchBar, { borderWidth: 1, borderColor: '#e2e8f0' }]}>
+        <View style={[styles.searchBar, { borderWidth: 1, borderColor: OASIS.colors.line }]}>
           <TextInput
             style={styles.searchInput}
             value={search}
@@ -263,17 +252,17 @@ export default function ToolsLendingScreen() {
             placeholder="ابحث عن: سُلّم، دريل، منفاخ كفرات، عربة نقل..."
             placeholderTextColor="#9ca3af"
           />
-          <Search size={18} color="#059669" />
+          <Search size={18} color={OASIS.colors.primary} />
         </View>
       </View>
 
       {/* Category Pills */}
       <View style={styles.categoriesWrap}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.catScroll}>
+        <ScrollView style={{ direction: 'rtl' }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.catScroll, { direction: 'ltr' }]}>
           {TOOL_CATEGORIES.map(cat => {
             const isSelected = selectedCat === cat.id;
             return (
-              <Pressable
+              <Pressable oasisKind="chip"
                 key={cat.id}
                 onPress={() => setSelectedCat(cat.id)}
                 style={[styles.catPill, isSelected && styles.catPillActive]}
@@ -297,33 +286,33 @@ export default function ToolsLendingScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor="#059669"
-            colors={['#059669']}
+            tintColor={OASIS.colors.primary}
+            colors={[OASIS.colors.primary]}
           />
         }
       >
         {loading ? (
           <View style={styles.loadingCenter}>
-            <ActivityIndicator size="large" color="#059669" />
+            <ActivityIndicator size="large" color={OASIS.colors.primary} />
             <Text style={styles.loadingText}>جارٍ تحميل الأدوات المتاحة بالحي...</Text>
           </View>
         ) : filteredItems.length === 0 ? (
-          <View style={styles.emptyCard}>
+          <OasisSurface oasisSurface="card" style={styles.emptyCard}>
             <View style={styles.emptyIconWrap}>
-              <Wrench size={36} color="#059669" />
+              <Wrench size={36} color={OASIS.colors.primary} />
             </View>
             <Text style={styles.emptyTitle}>لا توجد أدوات معروضة حالياً</Text>
             <Text style={styles.emptySub}>
               كن أول من يبادر بإعارة أدواتك التي لا تستخدمها يومياً، واكسب أجر وفزعة جيرانك 🤍
             </Text>
-            <Pressable style={styles.emptyActionBtn} onPress={() => setAddModalOpen(true)}>
-              <Plus size={16} color="#fff" />
+            <Pressable oasisKind="action" style={styles.emptyActionBtn} onPress={() => setAddModalOpen(true)}>
+              <Plus size={16} color={OASIS.colors.surface} />
               <Text style={styles.emptyActionBtnText}>أضف أول أداة للإعارة</Text>
             </Pressable>
-          </View>
+          </OasisSurface>
         ) : (
           filteredItems.map(item => (
-            <View key={item.id} style={styles.toolCard}>
+            <OasisSurface oasisSurface="card" key={item.id} style={styles.toolCard}>
               <View style={styles.toolCardHeader}>
                 <View style={styles.toolBadge}>
                   <Text style={styles.toolBadgeText}>
@@ -337,7 +326,7 @@ export default function ToolsLendingScreen() {
                       {item.profiles?.display_name || 'أحد الجيران'}
                     </Text>
                     <View style={styles.toolLocRow}>
-                      <MapPin size={11} color="#64748b" />
+                      <MapPin size={11} color={OASIS.colors.muted} />
                       <Text style={styles.toolLocText}>
                         {item.district ? `حي ${item.district}` : item.city}
                       </Text>
@@ -358,11 +347,11 @@ export default function ToolsLendingScreen() {
 
               <View style={styles.toolMetaRow}>
                 <View style={styles.toolMetaPill}>
-                  <Clock size={12} color="#059669" />
+                  <Clock size={12} color={OASIS.colors.primary} />
                   <Text style={styles.toolMetaText}>أقصى مدة: {item.max_days || 3} أيام</Text>
                 </View>
                 <View style={styles.toolMetaPill}>
-                  <ShieldCheck size={12} color="#0284c7" />
+                  <ShieldCheck size={12} color={OASIS.colors.info} />
                   <Text style={styles.toolMetaText}>إعارة مجانية بدون مقابل 🤝</Text>
                 </View>
               </View>
@@ -372,7 +361,7 @@ export default function ToolsLendingScreen() {
               ) : null}
 
               <View style={styles.toolCardFooter}>
-                <Pressable
+                <Pressable oasisKind="action"
                   style={[styles.borrowBtn, item.status !== 'available' && styles.borrowBtnDisabled]}
                   onPress={() => {
                     setActiveItem(item);
@@ -380,11 +369,11 @@ export default function ToolsLendingScreen() {
                   }}
                   disabled={item.status !== 'available'}
                 >
-                  <HandMetal size={16} color="#fff" />
+                  <HandMetal size={16} color={OASIS.colors.surface} />
                   <Text style={styles.borrowBtnText}>طلب استعارة الأداة</Text>
                 </Pressable>
               </View>
-            </View>
+            </OasisSurface>
           ))
         )}
       </ScrollView>
@@ -392,10 +381,10 @@ export default function ToolsLendingScreen() {
       {/* Modal: Add Tool */}
       <Modal visible={addModalOpen} transparent animationType="slide" onRequestClose={() => setAddModalOpen(false)}>
         <Pressable style={styles.modalBackdrop} onPress={() => setAddModalOpen(false)}>
-          <Pressable style={styles.modalCard} onPress={e => e.stopPropagation?.()}>
+          <Pressable oasisKind="card" style={styles.modalCard} onPress={e => e.stopPropagation?.()}>
             <View style={styles.modalHeader}>
-              <Pressable onPress={() => setAddModalOpen(false)} style={styles.modalCloseBtn}>
-                <X size={18} color="#64748b" />
+              <Pressable oasisKind="icon" onPress={() => setAddModalOpen(false)} style={styles.modalCloseBtn}>
+                <X size={18} color={OASIS.colors.muted} />
               </Pressable>
               <Text style={styles.modalTitle}>إضافة أداة للإعارة في الحي 🛠️</Text>
             </View>
@@ -413,7 +402,7 @@ export default function ToolsLendingScreen() {
               <Text style={styles.fieldLabel}>التصنيف</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginBottom: 12 }}>
                 {TOOL_CATEGORIES.filter(c => c.id !== 'all').map(c => (
-                  <Pressable
+                  <Pressable oasisKind="chip"
                     key={c.id}
                     style={[styles.catPill, newCategory === c.id && styles.catPillActive]}
                     onPress={() => setNewCategory(c.id)}
@@ -455,16 +444,16 @@ export default function ToolsLendingScreen() {
                 placeholderTextColor="#9ca3af"
               />
 
-              <Pressable
+              <Pressable oasisVariant="primary" oasisKind="action"
                 style={[styles.submitBtn, savingItem && { opacity: 0.6 }]}
                 onPress={handleAddItem}
                 disabled={savingItem}
               >
                 {savingItem ? (
-                  <ActivityIndicator size="small" color="#fff" />
+                  <ActivityIndicator size="small" color={OASIS.colors.surface} />
                 ) : (
                   <>
-                    <Plus size={18} color="#fff" />
+                    <Plus size={18} color={OASIS.colors.surface} />
                     <Text style={styles.submitBtnText}>نشر الأداة لجيران الحي</Text>
                   </>
                 )}
@@ -477,22 +466,22 @@ export default function ToolsLendingScreen() {
       {/* Modal: Request Borrow */}
       <Modal visible={borrowModalOpen} transparent animationType="slide" onRequestClose={() => setBorrowModalOpen(false)}>
         <Pressable style={styles.modalBackdrop} onPress={() => setBorrowModalOpen(false)}>
-          <Pressable style={styles.modalCard} onPress={e => e.stopPropagation?.()}>
+          <Pressable oasisKind="card" style={styles.modalCard} onPress={e => e.stopPropagation?.()}>
             <View style={styles.modalHeader}>
-              <Pressable onPress={() => setBorrowModalOpen(false)} style={styles.modalCloseBtn}>
-                <X size={18} color="#64748b" />
+              <Pressable oasisKind="icon" onPress={() => setBorrowModalOpen(false)} style={styles.modalCloseBtn}>
+                <X size={18} color={OASIS.colors.muted} />
               </Pressable>
               <Text style={styles.modalTitle}>طلب استعارة: {activeItem?.title}</Text>
             </View>
 
-            <View style={styles.borrowSummaryCard}>
+            <OasisSurface oasisSurface="card" style={styles.borrowSummaryCard}>
               <Text style={styles.borrowSummaryOwner}>
                 صاحب الأداة: {activeItem?.profiles?.display_name || 'الجار'}
               </Text>
               <Text style={styles.borrowSummaryLoc}>
                 الحي: {activeItem?.district || activeItem?.city}
               </Text>
-            </View>
+            </OasisSurface>
 
             <Text style={styles.fieldLabel}>المدة المطلوبة (بالأيام)</Text>
             <TextInput
@@ -514,16 +503,16 @@ export default function ToolsLendingScreen() {
               multiline
             />
 
-            <Pressable
+            <Pressable oasisVariant="primary" oasisKind="action"
               style={[styles.submitBtn, sendingRequest && { opacity: 0.6 }]}
               onPress={handleSendBorrowRequest}
               disabled={sendingRequest}
             >
               {sendingRequest ? (
-                <ActivityIndicator size="small" color="#fff" />
+                <ActivityIndicator size="small" color={OASIS.colors.surface} />
               ) : (
                 <>
-                  <HandMetal size={18} color="#fff" />
+                  <HandMetal size={18} color={OASIS.colors.surface} />
                   <Text style={styles.submitBtnText}>إرسال طلب الاستعارة للجار 🤝</Text>
                 </>
               )}
@@ -536,7 +525,7 @@ export default function ToolsLendingScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
+  container: { flex: 1, backgroundColor: OASIS.colors.background },
   hero: {
     paddingTop: Platform.OS === 'ios' ? 52 : 24,
     paddingHorizontal: 16,
@@ -560,22 +549,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   heroTitleWrap: { flex: 1, alignItems: 'flex-end' },
-  heroTitle: { fontSize: 20, fontWeight: '900', color: '#fff', textAlign: 'right' },
+  heroTitle: { fontSize: 20, fontWeight: '700', color: OASIS.colors.surface, textAlign: 'right' },
   heroSubtitle: { fontSize: 11.5, color: '#a7f3d0', fontWeight: '600', marginTop: 2, textAlign: 'right' },
   addBtnHeader: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#ffffff',
+    backgroundColor: OASIS.colors.surface,
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 12,
   },
-  addBtnHeaderText: { fontSize: 12, fontWeight: '900', color: '#064e3b' },
+  addBtnHeaderText: { fontSize: 12, fontWeight: '700', color: OASIS.colors.deep },
   searchBar: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: OASIS.colors.surface,
     borderRadius: 14,
     paddingHorizontal: 12,
     height: 44,
@@ -583,12 +572,12 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 13,
-    color: '#0f172a',
+    color: OASIS.colors.ink,
     textAlign: 'right',
     paddingHorizontal: 8,
   },
 
-  categoriesWrap: { backgroundColor: '#fff', paddingVertical: 10, borderBottomWidth: 1, borderColor: '#f1f5f9' },
+  categoriesWrap: { backgroundColor: OASIS.colors.surface, paddingVertical: 10, borderBottomWidth: 1, borderColor: '#f1f5f9' },
   catScroll: { flexDirection: 'row-reverse', paddingHorizontal: 14, gap: 8 },
   catPill: {
     flexDirection: 'row-reverse',
@@ -597,61 +586,61 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 14,
-    backgroundColor: '#f8fafc',
+    backgroundColor: OASIS.colors.background,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
   },
-  catPillActive: { backgroundColor: '#059669', borderColor: '#059669' },
+  catPillActive: { backgroundColor: OASIS.colors.primary, borderColor: OASIS.colors.primary },
   catEmoji: { fontSize: 14 },
-  catLabel: { fontSize: 12, fontWeight: '700', color: '#475569' },
-  catLabelActive: { color: '#ffffff', fontWeight: '900' },
+  catLabel: { fontSize: 12, fontWeight: '700', color: OASIS.colors.muted },
+  catLabelActive: { color: OASIS.colors.surface, fontWeight: '700' },
 
   scroll: { flex: 1 },
-  scrollContent: { padding: 16, gap: 12 },
+  scrollContent: { padding: 14, gap: 12 },
   loadingCenter: { paddingVertical: 60, alignItems: 'center', gap: 10 },
-  loadingText: { fontSize: 13, color: '#64748b', fontWeight: '700' },
+  loadingText: { fontSize: 13, color: OASIS.colors.muted, fontWeight: '700' },
 
   emptyCard: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 28,
+    backgroundColor: OASIS.colors.surface,
+    borderRadius: 14,
+    padding: 16,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    marginTop: 20,
+    borderColor: OASIS.colors.line,
+    marginTop: 14,
   },
   emptyIconWrap: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    backgroundColor: '#ecfdf5',
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: OASIS.colors.soft,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
   },
-  emptyTitle: { fontSize: 17, fontWeight: '900', color: '#0f172a', textAlign: 'center' },
-  emptySub: { fontSize: 12.5, color: '#64748b', textAlign: 'center', lineHeight: 20, marginTop: 6, marginHorizontal: 16 },
+  emptyTitle: { fontSize: 17, fontWeight: '700', color: OASIS.colors.ink, textAlign: 'center' },
+  emptySub: { fontSize: 12.5, color: OASIS.colors.muted, textAlign: 'center', lineHeight: 20, marginTop: 6, marginHorizontal: 16 },
   emptyActionBtn: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#059669',
+    backgroundColor: OASIS.colors.primary,
     paddingHorizontal: 18,
     paddingVertical: 11,
     borderRadius: 14,
     marginTop: 18,
   },
-  emptyActionBtnText: { color: '#fff', fontSize: 13, fontWeight: '900' },
+  emptyActionBtnText: { color: OASIS.colors.surface, fontSize: 13, fontWeight: '700' },
 
   toolCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 18,
-    padding: 16,
+    backgroundColor: OASIS.colors.surface,
+    borderRadius: 14,
+    padding: 14,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
+    shadowOpacity: 0,
     shadowRadius: 6,
     elevation: 2,
   },
@@ -662,76 +651,76 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   toolBadge: {
-    backgroundColor: '#ecfdf5',
+    backgroundColor: OASIS.colors.soft,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: '#a7f3d0',
   },
-  toolBadgeText: { fontSize: 11, fontWeight: '800', color: '#065f46' },
+  toolBadgeText: { fontSize: 11, fontWeight: '600', color: OASIS.colors.deep },
   toolOwnerRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
   ownerAvatarFallback: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#ecfdf5',
+    backgroundColor: OASIS.colors.soft,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: '#a7f3d0',
   },
-  ownerAvatarLetter: { fontSize: 13, fontWeight: '900', color: '#059669' },
-  toolOwnerName: { fontSize: 12.5, fontWeight: '800', color: '#0f172a' },
+  ownerAvatarLetter: { fontSize: 13, fontWeight: '700', color: OASIS.colors.primary },
+  toolOwnerName: { fontSize: 12.5, fontWeight: '600', color: OASIS.colors.ink },
   toolLocRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 2, marginTop: 1 },
-  toolLocText: { fontSize: 10.5, color: '#64748b', fontWeight: '600' },
+  toolLocText: { fontSize: 11, color: OASIS.colors.muted, fontWeight: '600' },
 
-  toolTitle: { fontSize: 15, fontWeight: '900', color: '#0f172a', textAlign: 'right', marginBottom: 4 },
-  toolDesc: { fontSize: 12.5, color: '#475569', lineHeight: 18, textAlign: 'right', marginBottom: 10 },
+  toolTitle: { fontSize: 15, fontWeight: '700', color: OASIS.colors.ink, textAlign: 'right', marginBottom: 4 },
+  toolDesc: { fontSize: 12.5, color: OASIS.colors.muted, lineHeight: 18, textAlign: 'right', marginBottom: 10 },
   toolMetaRow: { flexDirection: 'row-reverse', gap: 8, marginBottom: 8 },
   toolMetaPill: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#f8fafc',
+    backgroundColor: OASIS.colors.background,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
   },
-  toolMetaText: { fontSize: 11, fontWeight: '700', color: '#334155' },
-  depositNotice: { fontSize: 11, color: '#b45309', backgroundColor: '#fffbeb', padding: 8, borderRadius: 10, textAlign: 'right', marginBottom: 10 },
+  toolMetaText: { fontSize: 11, fontWeight: '700', color: OASIS.colors.ink },
+  depositNotice: { fontSize: 11, color: '#b45309', backgroundColor: OASIS.colors.warningSoft, padding: 8, borderRadius: 10, textAlign: 'right', marginBottom: 10 },
 
-  toolCardFooter: { marginTop: 4, paddingTop: 10, borderTopWidth: 1, borderColor: '#f8fafc' },
+  toolCardFooter: { marginTop: 4, paddingTop: 10, borderTopWidth: 1, borderColor: OASIS.colors.background },
   borrowBtn: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#059669',
+    backgroundColor: OASIS.colors.primary,
     paddingVertical: 10,
     borderRadius: 12,
   },
   borrowBtnDisabled: { backgroundColor: '#cbd5e1' },
-  borrowBtnText: { color: '#ffffff', fontSize: 12.5, fontWeight: '900' },
+  borrowBtnText: { color: OASIS.colors.surface, fontSize: 12.5, fontWeight: '700' },
 
   /* Modal */
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalCard: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20 },
+  modalCard: { backgroundColor: OASIS.colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 14 },
   modalHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  modalTitle: { fontSize: 16, fontWeight: '900', color: '#0f172a' },
+  modalTitle: { fontSize: 16, fontWeight: '700', color: OASIS.colors.ink },
   modalCloseBtn: { padding: 4 },
-  fieldLabel: { fontSize: 12, fontWeight: '800', color: '#334155', textAlign: 'right', marginBottom: 6 },
+  fieldLabel: { fontSize: 12, fontWeight: '600', color: OASIS.colors.ink, textAlign: 'right', marginBottom: 6 },
   input: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: OASIS.colors.background,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 9,
     fontSize: 13,
-    color: '#0f172a',
+    color: OASIS.colors.ink,
     textAlign: 'right',
     marginBottom: 12,
   },
@@ -740,15 +729,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#059669',
+    backgroundColor: OASIS.colors.primary,
     paddingVertical: 13,
     borderRadius: 14,
     marginTop: 8,
     marginBottom: 16,
   },
-  submitBtnText: { color: '#ffffff', fontSize: 13.5, fontWeight: '900' },
+  submitBtnText: { color: OASIS.colors.surface, fontSize: 13.5, fontWeight: '700' },
 
-  borrowSummaryCard: { backgroundColor: '#f0fdf4', padding: 12, borderRadius: 12, marginBottom: 12 },
-  borrowSummaryOwner: { fontSize: 13, fontWeight: '800', color: '#065f46', textAlign: 'right' },
-  borrowSummaryLoc: { fontSize: 11, color: '#047857', textAlign: 'right', marginTop: 2 },
+  borrowSummaryCard: { backgroundColor: OASIS.colors.soft, padding: 12, borderRadius: 12, marginBottom: 12 },
+  borrowSummaryOwner: { fontSize: 13, fontWeight: '600', color: OASIS.colors.deep, textAlign: 'right' },
+  borrowSummaryLoc: { fontSize: 11, color: OASIS.colors.primary, textAlign: 'right', marginTop: 2 },
 });

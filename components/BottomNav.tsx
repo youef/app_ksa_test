@@ -1,21 +1,15 @@
+import { OasisArtwork } from '@/components/oasis/OasisPrimitives';
+import { OasisPressable as Pressable, OasisSurface } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
 import { useCallback, useEffect, useState } from 'react';
-import {
-  Keyboard,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Image, Keyboard, NativeScrollEvent, NativeSyntheticEvent, Platform, StyleSheet, Text, View } from 'react-native';
 import { router, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Home, Compass, Plus, MessageCircle, MoreHorizontal } from 'lucide-react-native';
-import { BlurView } from 'expo-blur';
+import { Home, Compass, Plus, Store, MoreHorizontal } from 'lucide-react-native';
 import Animated, { makeMutable, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { supabase } from '@/lib/supabase';
 import { BOTTOM_NAV_HEIGHT } from '@/lib/bottomNav';
+import { useTheme } from '@/context/ThemeContext';
 
 export { BOTTOM_NAV_HEIGHT };
 
@@ -23,24 +17,24 @@ const TABS = [
   { key: '/home', label: 'الرئيسية', icon: Home, kind: 'tab' },
   { key: '/search', label: 'استكشف', icon: Compass, kind: 'tab' },
   { key: '/ask', label: 'إضافة', icon: Plus, kind: 'create' },
-  { key: '/messages', label: 'الدردشة', icon: MessageCircle, kind: 'tab' },
+  { key: '/market', label: 'السوق', icon: Store, kind: 'tab' },
   { key: '/more', label: 'المزيد', icon: MoreHorizontal, kind: 'tab' },
 ] as const;
 
 const ROUTE_PARENT: Array<[string, string]> = [
   ['/question', '/home'], ['/questions', '/home'], ['/create-story', '/home'],
-  ['/story', '/home'], ['/user', '/more'], ['/settings', '/more'],
-  ['/account-type', '/more'], ['/market', '/search'], ['/service', '/search'],
-  ['/new-service', '/search'], ['/directory', '/search'], ['/business', '/search'],
+  ['/story', '/home'], ['/user', '/more'], ['/settings', '/profile'],
+  ['/account-type', '/profile'], ['/profile-customization', '/profile'], ['/market', '/market'], ['/service', '/market'],
+  ['/new-service', '/profile'], ['/new-listing', '/profile'], ['/directory', '/search'], ['/business', '/search'],
   ['/requests', '/home'], ['/conversation', '/messages'], ['/notifications', '/more'],
 ];
 
 // المسارات التي يجب إخفاء شريط التنقل فيها بالكامل
-const HIDDEN_PREFIXES = ['/auth', '/questions', '/question', '/conversation'];
+const HIDDEN_PREFIXES = ['/auth', '/questions', '/question', '/conversation', '/ask'];
 const HIDDEN_EXACT = ['/', '/index'];
 
 // ───────── منطق إخفاء/إظهار الشريط عند السكرول ─────────
-const HIDE_OFFSET = 120;     // مسافة الإخفاء
+const HIDE_OFFSET = 180;     // مسافة الإخفاء
 const HIDE_AFTER_Y = 60;     // لا يختفي قبل هذا الموضع
 const MIN_DELTA = 8;         // تجاهل الحركات الصغيرة
 
@@ -82,6 +76,7 @@ function activeFor(pathname: string, key: string) {
 }
 
 export default function BottomNav() {
+  const { colors } = useTheme();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const [hasSession, setHasSession] = useState(false);
@@ -208,8 +203,8 @@ export default function BottomNav() {
   const bottomPadding = Math.max(insets.bottom, Platform.OS === 'ios' ? 8 : 7);
 
   return (
-    <Animated.View pointerEvents="box-none" style={[styles.dock, { paddingBottom: bottomPadding }, animatedStyle]}>
-      <BlurView intensity={Platform.OS === 'ios' ? 72 : 58} tint="default" style={styles.glass}>
+    <Animated.View pointerEvents="box-none" style={[styles.dock, { backgroundColor: colors.surface, borderTopColor: colors.line, paddingBottom: bottomPadding }, animatedStyle]}>
+      <View style={styles.surface}>
         <View style={styles.row}>
           {TABS.map((tab) => {
             const isCreate = tab.kind === 'create';
@@ -226,29 +221,14 @@ export default function BottomNav() {
                   if (normalize(pathname) !== tab.key) router.navigate(tab.key as never);
                 }}
                 style={({ pressed }) => [styles.tab, isCreate && styles.createTab, pressed && styles.pressed]}
-                hitSlop={4}
               >
-                {isCreate ? (
-                  <View style={styles.createButton}>
-                    <Icon size={27} color="#ffffff" strokeWidth={2.7} />
-                  </View>
-                ) : (
-                  <View style={[styles.iconWrap, isActive && styles.iconWrapActive]}>
-                    <Icon size={21} color={isActive ? '#16865b' : '#64748b'} strokeWidth={isActive ? 2.4 : 2} />
-                    {tab.key === '/messages' && unreadCount > 0 && (
-                      <View style={styles.badge}><Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text></View>
-                    )}
-                  </View>
-                )}
-                <Text numberOfLines={1} style={[styles.label, isActive && styles.labelActive, isCreate && styles.createLabel]}>
-                  {tab.label}
-                </Text>
-                {isActive && <View style={styles.activeDot} />}
+                <View style={styles.iconWrap}><Icon size={23} color={isActive ? colors.primary : colors.muted} strokeWidth={isActive ? 2.3 : 1.8} /></View>
+                <Text numberOfLines={1} style={[styles.label, { color: isActive ? colors.primary : colors.muted }, isActive && styles.labelActive]}>{tab.label}</Text>
               </Pressable>
             );
           })}
         </View>
-      </BlurView>
+      </View>
     </Animated.View>
   );
 }
@@ -256,77 +236,58 @@ export default function BottomNav() {
 const styles = StyleSheet.create({
   dock: {
     position: 'absolute',
-    left: 12,
-    right: 12,
+    left: 0,
+    right: 0,
     bottom: 0,
     zIndex: 100,
-    paddingTop: 7,
-    backgroundColor: 'transparent',
+    paddingTop: 0,
+    backgroundColor: OASIS.colors.surface,
+    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: OASIS.colors.line,
   },
-  glass: {
-    overflow: 'hidden',
-    borderRadius: 27,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.24)',
-    backgroundColor: 'rgba(255,255,255,0.10)',
-    ...Platform.select({
-      web: { backdropFilter: 'blur(22px)', WebkitBackdropFilter: 'blur(22px)' } as any,
-      default: {},
-    }),
-  },
+  surface: { height: 56, maxWidth: 720, width: '100%', alignSelf: 'center' },
+  background: { ...StyleSheet.absoluteFillObject, zIndex: 0 },
+  glassImage: { width: '100%', height: '100%' },
   row: {
-    minHeight: 67,
-    flexDirection: 'row',
+    position: 'relative',
+    zIndex: 1,
+    height: 56,
+    paddingTop: 2,
+    // Keep the Arabic order identical with or without native RTL enabled.
+    direction: 'ltr',
+    flexDirection: 'row-reverse',
     alignItems: 'center',
-    justifyContent: 'space-around',
-    paddingHorizontal: 5,
-    paddingTop: 3,
+    paddingHorizontal: 4,
   },
   tab: {
     flex: 1,
     minWidth: 0,
-    minHeight: 59,
+    minHeight: 50,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 3,
-    paddingHorizontal: 2,
-    paddingTop: 2,
+    gap: 1,
+    paddingHorizontal: 1,
     position: 'relative',
   },
-  createTab: { transform: [{ translateY: -7 }] },
+  createTab: {},
   iconWrap: {
-    width: 36,
-    height: 32,
-    borderRadius: 13,
+    width: 44,
+    height: 26,
     alignItems: 'center',
     justifyContent: 'center',
-    position: 'relative',
   },
-  iconWrapActive: { backgroundColor: 'rgba(22,134,91,0.12)' },
   createButton: {
     width: 54,
-    height: 54,
-    borderRadius: 27,
-    backgroundColor: '#16865b',
-    borderWidth: 4,
-    borderColor: 'rgba(220,252,231,0.98)',
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: -1,
-    ...Platform.select({
-      web: { boxShadow: '0px 5px 14px rgba(22,134,91,0.28)' } as any,
-      default: { elevation: 7 },
-    }),
   },
-  label: { fontSize: 10.5, lineHeight: 14, fontWeight: '500', color: '#64748b', textAlign: 'center' },
-  labelActive: { color: '#16865b', fontWeight: '700' },
-  createLabel: { color: '#16865b', fontWeight: '700' },
-  activeDot: { position: 'absolute', bottom: -1, width: 4, height: 4, borderRadius: 2, backgroundColor: '#16865b' },
-  pressed: { opacity: 0.72, transform: [{ scale: 0.96 }] },
-  badge: {
-    position: 'absolute', top: -3, right: -5, minWidth: 16, height: 16, borderRadius: 8,
-    backgroundColor: '#e11d48', alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.9)', paddingHorizontal: 3,
-  },
-  badgeText: { color: '#ffffff', fontSize: 9, fontWeight: '800' },
+  createArtwork: { ...StyleSheet.absoluteFillObject, zIndex: 0 },
+  createForeground: { position: 'relative', zIndex: 1, alignItems: 'center', justifyContent: 'center' },
+  label: { fontSize: 11, lineHeight: 15, fontWeight: '500', color: OASIS.colors.muted, textAlign: 'center', writingDirection: 'rtl' },
+  labelActive: { color: OASIS.colors.primary, fontWeight: '600' },
+  activeDot: { position: 'absolute', bottom: 0, width: 4, height: 4, borderRadius: 2, backgroundColor: OASIS.colors.primary },
+  // Opacity keeps the raised create button in place while it is pressed.
+  pressed: { opacity: 0.65 },
 });

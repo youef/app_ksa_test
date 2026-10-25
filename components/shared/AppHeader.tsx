@@ -1,18 +1,61 @@
-import type { ReactNode } from 'react';
-import { Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { OasisPressable as Pressable } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
+import { GlassIconArtwork } from './GlassIconArtwork';
+import { HeaderArtwork } from './HeaderArtwork';
+import React, { useState, type ReactNode } from 'react';
+import { Image, Platform, ScrollView, StyleSheet, Text, View, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BlurView } from 'expo-blur';
-import {
-  ChevronRight,
-  Bell,
-  ShieldCheck,
-  LogIn,
-} from 'lucide-react-native';
+import { ChevronRight, Bell, MessageCircle, LogIn, UserRound, Home } from 'lucide-react-native';
 import { FALLBACK_LOGO_URI } from '@/lib/branding';
 import { usePlatformConfig } from '@/lib/platformConfig';
+import { useTheme } from '@/context/ThemeContext';
 
-export const APP_HEADER_HEIGHT = 52;
+export const APP_HEADER_HEIGHT = Platform.OS === 'ios' ? 44 : 48;
+export const HEADER_ACTION_SIZE = 44;
+export const HEADER_HORIZONTAL_PADDING = 16;
+export const HEADER_SIDE_WIDTH = 88;
+export type HeaderTone = 'light' | 'overlay';
+
+export function headerTopInset(top: number) {
+  return Math.max(0, top);
+}
+export function useAppHeaderHeight() {
+  return APP_HEADER_HEIGHT + headerTopInset(useSafeAreaInsets().top) + 1;
+}
+
+export function AppHeaderFrame({ children, tone = 'light', safeArea = true, style }: { children: ReactNode; tone?: HeaderTone; safeArea?: boolean; style?: StyleProp<ViewStyle> }) {
+  const insets = useSafeAreaInsets();
+  const { colors, isDark } = useTheme();
+  return <View testID="app-header" style={[styles.container, { backgroundColor: colors.surface, borderBottomColor: colors.line }, tone === 'overlay' && styles.overlay, { paddingTop: safeArea ? headerTopInset(insets.top) : 0 }, style]}>
+    <HeaderArtwork dark={tone === 'overlay' || isDark} />
+    <View testID="app-header-content" style={styles.content}>{children}</View>
+  </View>;
+}
+
+function actionContent(children: ReactNode, color: string): ReactNode {
+  return React.Children.map(children, child => {
+    if (!React.isValidElement(child)) return child;
+    const element = child as React.ReactElement<{ color?: string; style?: unknown; children?: ReactNode; numberOfLines?: number }>;
+    if (element.type === Text) return React.cloneElement(element, { style: [{ color, fontSize: 12, lineHeight: 18 }, element.props.style] as never, numberOfLines: 1 });
+    if (element.props.color !== undefined) return React.cloneElement(element, { color });
+    if (element.props.children) return React.cloneElement(element, {}, actionContent(element.props.children, color));
+    return child;
+  });
+}
+export function HeaderAction({ children, style, tone = 'light', bare = true, ...props }: PressableProps & { children: ReactNode; tone?: HeaderTone; bare?: boolean }) {
+  return <Pressable oasisKind="plain" {...props} accessibilityRole="button" hitSlop={0} style={state => [styles.actionButton, bare && styles.bareAction, typeof style === 'function' ? style(state) : style, styles.glassAction, (state.pressed || props.disabled) && styles.pressed]}><GlassIconArtwork dark={tone === 'overlay'} /><View style={styles.actionForeground}>{actionContent(children, tone === 'overlay' ? OASIS.colors.surface : OASIS.colors.primary)}</View></Pressable>;
+}
+
+function decorateHeaderActions(children: ReactNode): ReactNode {
+  return React.Children.map(children, child => {
+    if (!React.isValidElement(child)) return child;
+    const element = child as React.ReactElement<PressableProps & { children?: ReactNode }>;
+    if (element.type === React.Fragment) return <React.Fragment>{decorateHeaderActions(element.props.children)}</React.Fragment>;
+    if (element.type === Pressable) return <HeaderAction {...element.props}>{element.props.children}</HeaderAction>;
+    return child;
+  });
+}
 
 export interface AppHeaderProps {
   variant?: 'home' | 'tab' | 'sub' | 'chat';
@@ -21,438 +64,83 @@ export interface AppHeaderProps {
   fallbackRoute?: string;
   rightAction?: ReactNode;
   showBack?: boolean;
-
-  // Home variant props
-  profile?: any;
+  onBackPress?: () => void;
+  onTitlePress?: () => void;
+  titleContent?: ReactNode;
+  tone?: HeaderTone;
+  safeArea?: boolean;
+  style?: StyleProp<ViewStyle>;
+  profile?: { avatar_url?: string | null; display_name?: string | null } | null;
   isGuest?: boolean;
   unreadCount?: number;
+  unreadMessagesCount?: number;
   logoUri?: string;
-
-  // Chat variant props
   avatarUrl?: string | null;
   isOnline?: boolean;
 }
 
-export function AppHeader({
-  variant = 'sub',
-  title,
-  subtitle,
-  fallbackRoute = '/home',
-  rightAction,
-  showBack = true,
-  profile,
-  isGuest = false,
-  unreadCount = 0,
-  logoUri,
-  avatarUrl,
-  isOnline,
-}: AppHeaderProps) {
-  const insets = useSafeAreaInsets();
-  const { branding } = usePlatformConfig();
+export function AppHeader({ variant = 'sub', title, subtitle, fallbackRoute = '/home', rightAction, showBack = true, onBackPress, onTitlePress, titleContent, tone = 'light', safeArea = true, style, profile, isGuest = false, unreadCount = 0, unreadMessagesCount = 0, logoUri, avatarUrl, isOnline }: AppHeaderProps) {
+  const { branding = {} } = usePlatformConfig();
+  const { colors, isDark } = useTheme();
+  const [failedImage, setFailedImage] = useState<string | null>(null);
+  const [failedLogo, setFailedLogo] = useState(false);
+  const dark = tone === 'overlay';
+  const color = dark ? OASIS.colors.surface : colors.primary;
   const headerKey = title?.includes('بحث') ? 'search' : title?.includes('سوق') ? 'market' : title?.includes('يوميات') || title?.includes('قصص') ? 'stories' : undefined;
-  const displayTitle = (headerKey && branding.headers?.[headerKey]) || title;
-  const topInset = Math.max(insets.top, Platform.OS === 'ios' ? 44 : Platform.OS === 'android' ? 24 : 0);
-
+  const displayTitle = (headerKey && branding.headers?.[headerKey]) || title || branding.name || 'حيّنا';
   const goBack = () => {
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace(fallbackRoute as never);
-    }
+    if (onBackPress) onBackPress();
+    else if (router.canGoBack()) router.back();
+    else router.replace(fallbackRoute as never);
   };
-
-  const renderContent = () => {
-    // 1. HOME VARIANT
-    if (variant === 'home') {
-      return (
-        <View style={styles.content}>
-          {/* Right side in RTL: Avatar / User greeting or Login */}
-          <View style={styles.sideGroup}>
-            {isGuest ? (
-              <Pressable
-                onPress={() => router.push('/auth')}
-                style={styles.pillButton}
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityLabel="تسجيل الدخول"
-              >
-                <LogIn size={15} color="#059669" />
-                <Text style={styles.pillText}>دخول</Text>
-              </Pressable>
-            ) : (
-              <Pressable
-                onPress={() => router.push('/profile')}
-                style={styles.avatarButton}
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityLabel="الملف الشخصي"
-              >
-                <View style={styles.avatarWrap}>
-                  {profile?.avatar_url ? (
-                    <Image source={{ uri: profile.avatar_url }} style={styles.avatarImg} />
-                  ) : (
-                    <View style={styles.avatarPlaceholder}>
-                      <Text style={styles.avatarLetter}>{profile?.display_name?.[0] || 'ح'}</Text>
-                    </View>
-                  )}
-                  {profile?.is_geoverified && (
-                    <View style={styles.verifiedBadge}>
-                      <ShieldCheck size={9} color="#fff" />
-                    </View>
-                  )}
-                </View>
-              </Pressable>
-            )}
-          </View>
-
-          {/* Left side in RTL: Notifications & Brand Logo */}
-          <View style={styles.sideGroup}>
-            {!isGuest && (
-              <>
-                <Pressable
-                  onPress={() => router.push('/notifications')}
-                  style={styles.iconCircle}
-                  hitSlop={8}
-                  accessibilityRole="button"
-                  accessibilityLabel="الإشعارات"
-                >
-                  <Bell size={18} color="#334155" />
-                  {unreadCount > 0 && (
-                    <View style={styles.badge}>
-                      <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
-                    </View>
-                  )}
-                </Pressable>
-              </>
-            )}
-            <Pressable
-              onPress={() => router.push('/home')}
-              style={styles.logoWrap}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel="حيّنا"
-            >
-              <Image source={{ uri: logoUri || FALLBACK_LOGO_URI }} style={styles.logoImg} />
-            </Pressable>
-          </View>
-        </View>
-      );
-    }
-
-    // 2. TAB VARIANT (Market, Search, Messages, More)
-    if (variant === 'tab') {
-      return (
-        <View style={styles.content}>
-          <View style={styles.titleArea}>
-            <Text style={styles.pageTitle} numberOfLines={1}>
-              {displayTitle}
-            </Text>
-            {subtitle ? (
-              <Text style={styles.pageSubtitle} numberOfLines={1}>
-                {subtitle}
-              </Text>
-            ) : null}
-          </View>
-
-          {rightAction ? (
-            <View style={styles.actionSlot}>{rightAction}</View>
-          ) : (
-            <View style={styles.actionSpacer} />
-          )}
-        </View>
-      );
-    }
-
-    // 3. CHAT VARIANT
-    if (variant === 'chat') {
-      return (
-        <View style={styles.content}>
-          <Pressable
-            onPress={goBack}
-            style={styles.iconCircle}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel="رجوع"
-          >
-            <ChevronRight size={22} color="#0f172a" />
-          </Pressable>
-
-          <View style={styles.chatInfoWrap}>
-            <View style={styles.chatAvatarWrap}>
-              {avatarUrl ? (
-                <Image source={{ uri: avatarUrl }} style={styles.chatAvatar} />
-              ) : (
-                <View style={styles.chatAvatarPlaceholder}>
-                  <Text style={styles.avatarLetter}>{title?.[0] || '💬'}</Text>
-                </View>
-              )}
-              {isOnline && <View style={styles.onlineDot} />}
-            </View>
-            <View style={styles.chatTextWrap}>
-              <Text style={styles.pageTitle} numberOfLines={1}>
-                {displayTitle}
-              </Text>
-              {subtitle ? (
-                <Text style={styles.chatStatusText} numberOfLines={1}>
-                  {subtitle}
-                </Text>
-              ) : null}
-            </View>
-          </View>
-
-          {rightAction ? (
-            <View style={styles.actionSlot}>{rightAction}</View>
-          ) : (
-            <View style={styles.actionSpacer} />
-          )}
-        </View>
-      );
-    }
-
-    // 4. SUB-PAGE VARIANT (Default for detail/action pages)
-    return (
-      <View style={styles.content}>
-        {showBack ? (
-          <Pressable
-            onPress={goBack}
-            style={styles.iconCircle}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel="رجوع"
-          >
-            <ChevronRight size={22} color="#0f172a" />
-          </Pressable>
-        ) : <View style={styles.actionSpacer} />}
-
-        <View style={styles.centerTitleArea}>
-          <Text style={styles.pageTitle} numberOfLines={1}>
-            {displayTitle || branding.name || 'حيّنا'}
-          </Text>
-          {subtitle ? (
-            <Text style={styles.pageSubtitle} numberOfLines={1}>
-              {subtitle}
-            </Text>
-          ) : null}
-        </View>
-
-        {rightAction ? (
-          <View style={styles.actionSlot}>{rightAction}</View>
-        ) : (
-          <View style={styles.actionSpacer} />
-        )}
-      </View>
-    );
-  };
-
-  return (
-    <View style={[styles.container, { paddingTop: topInset }]}>
-      <BlurView intensity={Platform.OS === 'ios' ? 24 : 0} tint="light" style={styles.surface}>
-        {renderContent()}
-      </BlurView>
+  const avatar = (uri: string | null | undefined) => <View style={styles.avatarRing}>{uri && failedImage !== uri ? <Image source={{ uri }} style={styles.avatar} onError={() => setFailedImage(uri)} /> : <View style={[styles.avatar, styles.avatarFallback]}><UserRound size={20} color={OASIS.colors.primary} /></View>}</View>;
+  const home = variant === 'home';
+  const identity = titleContent || <>
+    {home ? <View accessible accessibilityRole="image" accessibilityLabel="شعار حيّنا" style={styles.brand}>
+      {failedLogo ? <Home size={28} color={color} /> : <Image accessible={false} source={{ uri: logoUri || FALLBACK_LOGO_URI }} resizeMode="contain" style={styles.logo} onError={() => setFailedLogo(true)} />}
+    </View> : <View style={styles.identityRow}>
+      {variant === 'chat' ? <View>{avatar(avatarUrl)}{isOnline ? <View style={styles.onlineDot} /> : null}</View> : null}
+      <View style={styles.titleCopy}><Text accessibilityRole="header" numberOfLines={1} style={[styles.title, { color: colors.ink }, dark && styles.lightText]}>{displayTitle}</Text>{subtitle ? <Text numberOfLines={1} style={[styles.subtitle, { color: colors.muted }, dark && styles.lightSubtitle]}>{subtitle}</Text> : null}</View>
+    </View>}
+  </>;
+  return <AppHeaderFrame tone={tone} safeArea={safeArea} style={style}>
+    <View style={[styles.side, styles.leading]}>
+      {home ? isGuest ? <HeaderAction tone={tone} accessibilityLabel="تسجيل الدخول" onPress={() => router.push('/auth')}><LogIn size={21} color={OASIS.colors.primary} /></HeaderAction> : <HeaderAction bare tone={tone} accessibilityLabel="الملف الشخصي" onPress={() => router.push('/profile')}>{avatar(profile?.avatar_url)}</HeaderAction> : showBack ? <HeaderAction tone={tone} accessibilityLabel="رجوع" onPress={goBack}><ChevronRight size={23} color={color} /></HeaderAction> : null}
     </View>
-  );
+    {onTitlePress ? <Pressable accessibilityRole="button" accessibilityLabel={displayTitle} onPress={onTitlePress} style={styles.center}>{identity}</Pressable> : <View style={styles.center}>{identity}</View>}
+    <View style={styles.side}>
+      {home ? !isGuest ? <View style={styles.actions}>
+          <HeaderAction bare style={styles.glassIcon} tone={tone} accessibilityLabel={unreadCount > 0 ? `الإشعارات، ${unreadCount} غير مقروء` : 'الإشعارات'} onPress={() => router.push('/notifications')}><Bell size={20} color={color} />{unreadCount > 0 ? <View style={styles.badge}><Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text></View> : null}</HeaderAction>
+          <HeaderAction bare style={styles.glassIcon} tone={tone} accessibilityLabel={unreadMessagesCount > 0 ? `الدردشة، ${unreadMessagesCount} غير مقروء` : 'الدردشة'} onPress={() => router.push('/messages')}><MessageCircle size={20} color={color} />{unreadMessagesCount > 0 ? <View style={styles.badge}><Text style={styles.badgeText}>{unreadMessagesCount > 99 ? '99+' : unreadMessagesCount}</Text></View> : null}</HeaderAction>
+        </View> : null : <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.actions, { direction: 'ltr' }]} style={[styles.actionScroll, { direction: 'rtl' }]}>{decorateHeaderActions(rightAction)}</ScrollView>}
+    </View>
+  </AppHeaderFrame>;
 }
 
 const styles = StyleSheet.create({
-  container: {
-    width: '100%',
-    backgroundColor: 'rgba(255, 255, 255, 0.96)',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(226, 232, 240, 0.85)',
-    zIndex: 100,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
-  },
-  surface: {
-    width: '100%',
-    backgroundColor: 'transparent',
-  },
-  content: {
-    height: APP_HEADER_HEIGHT,
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    gap: 8,
-  },
-  sideGroup: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 8,
-  },
-  pillButton: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: '#ecfdf5',
-    borderWidth: 1,
-    borderColor: '#a7f3d0',
-  },
-  pillText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#047857',
-  },
-  avatarButton: {
-    padding: 2,
-  },
-  avatarWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    position: 'relative',
-  },
-  avatarImg: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-  },
-  avatarPlaceholder: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: '#059669',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarLetter: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  verifiedBadge: {
-    position: 'absolute',
-    bottom: -1,
-    left: -1,
-    width: 13,
-    height: 13,
-    borderRadius: 7,
-    backgroundColor: '#059669',
-    borderWidth: 1.5,
-    borderColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#f1f5f9',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  badge: {
-    position: 'absolute',
-    top: 2,
-    right: 2,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: '#ef4444',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 3,
-    borderWidth: 1.5,
-    borderColor: '#fff',
-  },
-  badgeText: {
-    color: '#fff',
-    fontSize: 9,
-    fontWeight: '900',
-  },
-  logoWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
-  logoImg: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-  },
-  titleArea: {
-    flex: 1,
-    alignItems: 'flex-start',
-    justifyContent: 'center',
-  },
-  centerTitleArea: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pageTitle: {
-    fontSize: 15.5,
-    fontWeight: '800',
-    color: '#0f172a',
-    textAlign: 'center',
-  },
-  pageSubtitle: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#64748b',
-    marginTop: 1,
-    textAlign: 'center',
-  },
-  actionSlot: {
-    minWidth: 36,
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-  },
-  actionSpacer: {
-    width: 36,
-    height: 36,
-  },
-  chatInfoWrap: {
-    flex: 1,
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 9,
-  },
-  chatAvatarWrap: {
-    width: 34,
-    height: 34,
-    position: 'relative',
-  },
-  chatAvatar: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-  },
-  chatAvatarPlaceholder: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: '#059669',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  onlineDot: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#10b981',
-    borderWidth: 2,
-    borderColor: '#fff',
-  },
-  chatTextWrap: {
-    flex: 1,
-    alignItems: 'flex-start',
-  },
-  chatStatusText: {
-    fontSize: 10.5,
-    fontWeight: '600',
-    color: '#10b981',
-  },
+  container: { width: '100%', backgroundColor: OASIS.colors.surface, borderBottomWidth: 1, borderBottomColor: OASIS.colors.line, zIndex: 20, flexShrink: 0, overflow: 'hidden' },
+  overlay: { backgroundColor: 'transparent', borderBottomColor: 'transparent' },
+  content: { position: 'relative', height: APP_HEADER_HEIGHT, width: '100%', maxWidth: 1100, alignSelf: 'center', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: HEADER_HORIZONTAL_PADDING, gap: 4 },
+  side: { width: HEADER_SIDE_WIDTH, flexShrink: 0, alignItems: 'flex-start', justifyContent: 'center', height: HEADER_ACTION_SIZE },
+  leading: { alignItems: 'flex-end' },
+  center: { flex: 1, minWidth: 0, minHeight: HEADER_ACTION_SIZE, alignItems: 'center', justifyContent: 'center' },
+  titleCopy: { flexShrink: 1, minWidth: 0, alignItems: 'center' },
+  title: { color: OASIS.colors.ink, fontSize: 17, lineHeight: 23, fontWeight: '600', textAlign: 'center', writingDirection: 'rtl' },
+  subtitle: { color: OASIS.colors.muted, fontSize: 12, lineHeight: 16, textAlign: 'center', writingDirection: 'rtl' },
+  lightText: { color: OASIS.colors.surface }, lightSubtitle: { color: OASIS.colors.line },
+  identityRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', minWidth: 0 },
+  brand: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 7, maxWidth: '100%' },
+  logo: { width: 36, height: 40, flexShrink: 0 }, avatarRing: { width: 40, height: 40, borderRadius: 20, borderWidth: 0, padding: 2, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }, avatar: { width: 32, height: 32, borderRadius: 16 }, avatarFallback: { backgroundColor: OASIS.colors.soft, alignItems: 'center', justifyContent: 'center' },
+  glass: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  glassTexture: { position: 'absolute', width: 50, height: 50, top: -3, left: -3 },
+  glassIcon: { backgroundColor: 'transparent', borderWidth: 0 },
+  glassAction: { backgroundColor: 'transparent', borderWidth: 0, overflow: 'visible' },
+  actionForeground: { position: 'relative', zIndex: 2, width: '100%', height: '100%', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 4 },
+  actionScroll: { flexGrow: 0, maxWidth: HEADER_SIDE_WIDTH }, actions: { flexDirection: 'row-reverse', alignItems: 'center', gap: 0 },
+  actionButton: { height: HEADER_ACTION_SIZE, minHeight: HEADER_ACTION_SIZE, minWidth: HEADER_ACTION_SIZE, paddingVertical: 0, paddingHorizontal: 8, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row-reverse', gap: 4, backgroundColor: OASIS.colors.soft, borderWidth: 1, borderColor: '#a7f3d0', flexShrink: 0 },
+  bareAction: { backgroundColor: 'transparent', borderWidth: 0, paddingHorizontal: 0, borderRadius: 14 },
+  overlayButton: { backgroundColor: 'rgba(15,23,42,0.35)' }, pressed: { opacity: 0.65 },
+  badge: { position: 'absolute', top: 2, right: 1, minWidth: 18, height: 18, borderRadius: 9, backgroundColor: OASIS.colors.primary, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, borderWidth: 1.5, borderColor: OASIS.colors.surface }, badgeText: { color: OASIS.colors.surface, fontSize: 11, lineHeight: 13, fontWeight: '700', textAlign: 'center', includeFontPadding: false },
+  onlineDot: { width: 8, height: 8, borderRadius: 4, position: 'absolute', bottom: 0, left: 0, backgroundColor: OASIS.colors.primary, borderWidth: 1, borderColor: OASIS.colors.surface },
 });
-
 export default AppHeader;

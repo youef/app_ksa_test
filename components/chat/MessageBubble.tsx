@@ -1,5 +1,7 @@
+import { OasisSurface, OasisPressable as Pressable } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
 import React from 'react';
-import { View, Text, Pressable, Image, Linking } from 'react-native';
+import { View, Text, Image, Linking } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MapPin, ExternalLink, Award, Coffee, Sparkles, Check, CheckCheck } from 'lucide-react-native';
 import { navigationUrl } from '@/lib/privacy';
@@ -135,7 +137,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             )}
           </View>
         )}
-        <View style={[styles.msgBubble, isMine ? styles.msgBubbleMine : styles.msgBubbleOther]}>
+        <OasisSurface oasisSurface={isMine ? "bubble-out" : "bubble-in"} style={[styles.msgBubble, isMine ? styles.msgBubbleMine : styles.msgBubbleOther]}>
           {(() => {
             const place = parseLocationMessage(msg.body);
             if (place) {
@@ -143,7 +145,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 <View style={[styles.locationCardOuter, isMine && styles.locationCardOuterMine]}>
                   <View style={styles.locationCardHeader}>
                     <View style={[styles.locationPinIconWrap, isMine && styles.locationPinIconWrapMine]}>
-                      <MapPin size={18} color="#059669" />
+                      <MapPin size={18} color={OASIS.colors.primary} />
                     </View>
                     <View style={styles.locationInfoCol}>
                       <Text style={styles.locationHeaderTitle}>
@@ -155,13 +157,13 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                     </View>
                   </View>
 
-                  <Pressable
+                  <Pressable oasisKind="action"
                     style={styles.locationNavBtn}
                     onPress={() => Linking.openURL(navigationUrl(place.lat, place.lng))}
                     accessibilityRole="button"
                     accessibilityLabel="فتح في خرائط Google"
                   >
-                    <ExternalLink size={13} color="#ffffff" />
+                    <ExternalLink size={13} color={OASIS.colors.surface} />
                     <Text style={styles.locationNavBtnText}>فتح في خرائط Google</Text>
                   </Pressable>
                 </View>
@@ -199,7 +201,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               return (
                 <View style={[styles.appreciationCardOuter, isMine && styles.appreciationCardOuterMine]}>
                   <LinearGradient
-                    colors={['#fffbeb', '#fef3c7', '#fde68a']}
+                    colors={[OASIS.colors.warningSoft, '#fef3c7', '#fde68a']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.appreciationGrad}
@@ -245,12 +247,12 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             </Text>
             {isMine &&
               (isRead ? (
-                <CheckCheck size={12} color="rgba(255,255,255,0.8)" style={{ marginRight: 4 }} />
+                <CheckCheck size={12} color={OASIS.colors.primary} style={{ marginRight: 4 }} />
               ) : (
-                <Check size={12} color="rgba(255,255,255,0.6)" style={{ marginRight: 4 }} />
+                <Check size={12} color={OASIS.colors.muted} style={{ marginRight: 4 }} />
               ))}
           </View>
-        </View>
+        </OasisSurface>
       </View>
     </View>
   );

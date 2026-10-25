@@ -1,25 +1,23 @@
-import { useEffect, useRef, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Pressable,
-  Image,
-  ActivityIndicator,
-  RefreshControl,
-  Animated,
-} from 'react-native';
-import { router } from 'expo-router';
+import { OasisPressable as Pressable } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, Image, ActivityIndicator, RefreshControl, Platform, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { AppHeader } from '@/components/shared/AppHeader';
 import { useBottomNavInset } from '@/lib/bottomNav';
-import { Plus, ShieldCheck, Sparkles, Settings2, Flame, ChevronDown } from 'lucide-react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Plus, ShieldCheck, UserPlus, Check, Eye } from 'lucide-react-native';
+import { getActiveLocation, isAllKingdom } from '@/lib/locationSync';
+import { isActiveStory, storyDiscoveryMembership } from '@/lib/storyActivity';
+import { getCachedSeenStoryIds, getLocalSeenStoryIds, rememberSeenStories } from '@/lib/storySeen';
+import { prioritizeUnseenStoryGroups, unseenStories } from '@/lib/storyActivity';
 import { relativeTime } from '@/lib/mapPins';
 
 export default function StoriesScreen() {
   const bottomNavInset = useBottomNavInset();
+  const [viewerId, setViewerId] = useState('');
+  const [errorText, setErrorText] = useState('');
+  const [needsLogin, setNeedsLogin] = useState(false);
   const [stories, setStories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -27,40 +25,68 @@ export default function StoriesScreen() {
   const [currentCity, setCurrentCity] = useState<string>('');
   const [currentDistrict, setCurrentDistrict] = useState<string>('');
   const [followingIds, setFollowingIds] = useState<string[]>([]);
+  const [likeCounts, setLikeCounts] = useState<Record<string, number>>({});
+  const [followerCounts, setFollowerCounts] = useState<Record<string, number>>({});
   const [visibleTrendingCount, setVisibleTrendingCount] = useState(8);
-  const storyRingPulse = useRef(new Animated.Value(1)).current;
+  const [gridWidth, setGridWidth] = useState(0);
+  const columns = gridWidth >= 640 ? 3 : 2;
+  // Reserve one pixel for onLayout rounding on fractional browser viewports.
+  const cardWidth = gridWidth ? Math.floor((gridWidth - 10 * (columns - 1) - 1) / columns) : undefined;
+  const mediaHeight = cardWidth ? Math.min(160, Math.round(cardWidth * .88)) : 144;
+
+  const loadInFlight = useRef(false);
+  const lastRefreshAt = useRef(0);
+  const viewerRef = useRef(viewerId);
+  viewerRef.current = viewerId;
+  const discoveryScroll = useRef<ScrollView>(null);
+  const loadMoreRef = useRef(() => {});
+  useFocusEffect(useCallback(() => {
+    if (viewerRef.current) setSeenStoryIds(getCachedSeenStoryIds(viewerRef.current));
+    void loadAllStories(true);
+  }, []));
 
   useEffect(() => {
-    const pulse = Animated.loop(Animated.sequence([
-      Animated.timing(storyRingPulse, { toValue: 1.06, duration: 850, useNativeDriver: true }),
-      Animated.timing(storyRingPulse, { toValue: 1, duration: 850, useNativeDriver: true }),
-    ]));
-    pulse.start();
-    return () => pulse.stop();
-  }, [storyRingPulse]);
-
-  useEffect(() => {
-    loadAllStories();
+    if (Platform.OS !== 'web') return;
+    const node = discoveryScroll.current?.getScrollableNode?.() as HTMLElement | undefined;
+    if (!node?.addEventListener) return;
+    const onWheel = (event: WheelEvent) => {
+      if (event.deltaY > 0 && node.scrollTop + node.clientHeight >= node.scrollHeight - 240) loadMoreRef.current();
+      if (event.deltaY < -40 && node.scrollTop <= 0 && Date.now() - lastRefreshAt.current > 3000) void loadAllStories(true);
+    };
+    node.addEventListener('wheel', onWheel, { passive: true });
+    return () => node.removeEventListener('wheel', onWheel);
   }, []);
 
-  async function loadAllStories() {
+  async function loadAllStories(quiet = false) {
+    if (loadInFlight.current) return;
+    loadInFlight.current = true;
+    lastRefreshAt.current = Date.now();
     try {
-      setLoading(true);
+      if (!quiet) setLoading(true);
+      setErrorText('');
       const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       const nowIso = new Date().toISOString();
 
-      const { data: authResult } = await supabase.auth.getUser();
+      const { data: authResult, error: authError } = await supabase.auth.getUser();
       const activeViewerId = authResult.user?.id || '';
+      if (authError) throw authError;
+      setViewerId(activeViewerId); setNeedsLogin(!activeViewerId);
+      if (!activeViewerId) { setStories([]); return; }
+      const localSeen = await getLocalSeenStoryIds(activeViewerId);
+      setSeenStoryIds(localSeen);
       let city = '';
       let district = '';
       let followedIds: string[] = [];
       if (activeViewerId) {
-        const [{ data: me }, { data: follows }] = await Promise.all([
+        const [{ data: me, error: meError }, { data: follows, error: followsError }] = await Promise.all([
           supabase.from('profiles').select('city,district').eq('id', activeViewerId).maybeSingle(),
           supabase.from('follows').select('following_id').eq('follower_id', activeViewerId),
         ]);
-        city = String(me?.city || '').trim();
-        district = String(me?.district || '').trim();
+        if (meError) throw meError;
+        if (followsError) throw followsError;
+        const location = await getActiveLocation();
+        city = String(me?.city || (!isAllKingdom(location.city) ? location.city : '')).trim();
+        district = String(me?.district || (location.city === city ? location.district : '')).trim();
         followedIds = (follows || []).map((row: any) => String(row.following_id));
       }
       setCurrentCity(city);
@@ -68,7 +94,8 @@ export default function StoriesScreen() {
       setFollowingIds(followedIds);
       let mutedAuthorIds: string[] = [];
       if (activeViewerId) {
-        const { data: authorPrefs } = await supabase.from('story_author_preferences').select('author_id').eq('user_id', activeViewerId).eq('muted', true);
+        const { data: authorPrefs, error: prefsError } = await supabase.from('story_author_preferences').select('author_id').eq('user_id', activeViewerId).eq('muted', true);
+        if (prefsError) throw prefsError;
         mutedAuthorIds = (authorPrefs || []).map((row: any) => String(row.author_id));
       }
 
@@ -84,7 +111,7 @@ export default function StoriesScreen() {
           created_at,
           expires_at,
           view_count,
-          profiles (
+          profiles:profiles!stories_author_id_fkey (
             id,
             display_name,
             username,
@@ -92,7 +119,10 @@ export default function StoriesScreen() {
             is_verified,
             is_geoverified,
             city,
-            district
+            district,
+            hide_name,
+            account_type,
+            role
           )
         `)
         .or(`expires_at.gt.${nowIso},and(expires_at.is.null,created_at.gte.${yesterday})`)
@@ -100,24 +130,40 @@ export default function StoriesScreen() {
 
       if (error) throw error;
       const cityRows = (data || []) as any[];
-      const normalize = (value: any) => String(value || '').trim().toLocaleLowerCase('ar');
-      const valid = city ? cityRows.filter((story: any) => normalize(story.profiles?.city) === normalize(city) && !mutedAuthorIds.includes(String(story.author_id))) : [];
+      const valid = cityRows.filter((story: any) => isActiveStory(story) && !mutedAuthorIds.includes(String(story.author_id)));
       setStories(valid);
+      const storyIds = valid.map((row: any) => row.id);
+      const authorIds = [...new Set(valid.map((row: any) => String(row.author_id)))];
+      const [likesResult, followersResult] = await Promise.all([
+        storyIds.length ? supabase.from('story_likes').select('story_id').in('story_id', storyIds) : Promise.resolve({ data: [], error: null }),
+        authorIds.length ? supabase.from('follows').select('following_id').in('following_id', authorIds) : Promise.resolve({ data: [], error: null }),
+      ]);
+      const likes: Record<string, number> = {};
+      for (const row of likesResult.data || []) likes[row.story_id] = (likes[row.story_id] || 0) + 1;
+      setLikeCounts(likes);
+      const followers: Record<string, number> = {};
+      for (const row of followersResult.data || []) followers[row.following_id] = (followers[row.following_id] || 0) + 1;
+      setFollowerCounts(followers);
       if (activeViewerId && valid.length > 0) {
         const { data: views, error: viewsError } = await supabase
           .from('story_views')
           .select('story_id')
           .eq('viewer_id', activeViewerId)
           .in('story_id', valid.map((story) => story.id));
-        if (!viewsError) setSeenStoryIds([...new Set((views || []).map((view: { story_id: string }) => view.story_id))]);
-        else setSeenStoryIds([]);
+        if (!viewsError) {
+          const ids = [...new Set([...await getLocalSeenStoryIds(activeViewerId), ...(views || []).map((view: { story_id: string }) => view.story_id)])];
+          rememberSeenStories(activeViewerId, ids);
+          setSeenStoryIds(ids);
+        }
       } else {
         setSeenStoryIds([]);
       }
 
     } catch (e) {
-      console.warn('loadAllStories error:', e);
+      if (!quiet) setStories([]);
+      setErrorText(e instanceof Error ? e.message : 'تعذر تحميل اليوميات');
     } finally {
+      loadInFlight.current = false;
       setLoading(false);
       setRefreshing(false);
     }
@@ -127,194 +173,202 @@ export default function StoriesScreen() {
 
   const groupedAuthors = Object.values(filtered.reduce((groups: Record<string, any>, story: any) => {
     const key = story.author_id;
-    if (!groups[key]) groups[key] = { authorId: key, author: story.profiles, stories: [], totalViews: 0, newestAt: story.created_at };
+    if (!groups[key]) groups[key] = { authorId: key, author: story.profiles, stories: [], totalViews: 0, totalLikes: 0, newestAt: story.created_at };
     groups[key].stories.push(story);
     groups[key].totalViews += Math.max(0, Number(story.view_count) || 0);
+    groups[key].totalLikes += likeCounts[story.id] || 0;
     if (new Date(story.created_at).getTime() > new Date(groups[key].newestAt).getTime()) groups[key].newestAt = story.created_at;
     return groups;
   }, {})).map((group: any) => {
     const ordered = group.stories.slice().sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-    return { ...group, stories: ordered, latestStory: ordered[ordered.length - 1], hasUnseen: ordered.some((story: any) => !seenStoryIds.includes(story.id)) };
+    const unseen = unseenStories(ordered, seenStoryIds);
+    return { ...group, stories: ordered, latestStory: unseen[unseen.length - 1] || ordered[ordered.length - 1], hasUnseen: unseen.length > 0 };
   });
 
-  const normalizeLocation = (value: any) => String(value || '').trim().toLocaleLowerCase('ar');
-  const neighborhoodAndFollowing = groupedAuthors.filter((group: any) => {
-    const sameDistrict = !!currentDistrict && normalizeLocation(group.author?.district) === normalizeLocation(currentDistrict);
-    const followed = followingIds.includes(String(group.authorId));
-    return sameDistrict || followed;
-  });
-  const storyRings = neighborhoodAndFollowing.slice().sort((a: any, b: any) => {
+  const membership = (group: any) => storyDiscoveryMembership(group.author, group.authorId, viewerId, followingIds, currentCity, currentDistrict);
+  const neighborhoodAndFollowing = groupedAuthors.filter((group: any) => membership(group).ring);
+  const storyRings = prioritizeUnseenStoryGroups(neighborhoodAndFollowing, (a: any, b: any) => {
     const aFollowed = followingIds.includes(String(a.authorId));
     const bFollowed = followingIds.includes(String(b.authorId));
-    const aSameDistrict = !!currentDistrict && normalizeLocation(a.author?.district) === normalizeLocation(currentDistrict);
-    const bSameDistrict = !!currentDistrict && normalizeLocation(b.author?.district) === normalizeLocation(currentDistrict);
+    const aSameDistrict = membership(a).ring && !aFollowed;
+    const bSameDistrict = membership(b).ring && !bFollowed;
     return Number(bFollowed) - Number(aFollowed) || Number(bSameDistrict) - Number(aSameDistrict) || Number(b.hasUnseen) - Number(a.hasUnseen) || new Date(b.newestAt).getTime() - new Date(a.newestAt).getTime();
   });
-  const trendingAuthors = groupedAuthors.slice().sort((a: any, b: any) =>
-    b.totalViews - a.totalViews || new Date(b.newestAt).getTime() - new Date(a.newestAt).getTime()
-  );
+  const trendingScore = (group: any) => {
+    const ageHours = Math.max(0, (Date.now() - new Date(group.newestAt).getTime()) / 3600000);
+    const engagement = group.totalViews + group.totalLikes * 4 + (followerCounts[group.authorId] || 0) * 0.15;
+    return (engagement + (group.hasUnseen ? 2 : 0)) / Math.pow(1 + ageHours / 8, 1.35);
+  };
+  // عرض الجميع في الترند: الجديد (غير المشاهَد) في الأعلى بإطار أخضر، المشاهَد في الأسفل بإطار رمادي
+  const trendingAuthors = groupedAuthors.filter((group: any) => membership(group).trending).slice().sort((a: any, b: any) => {
+    // الجديد أولاً، ثم حسب نقاط الترند
+    const aUnseen = a.hasUnseen ? 1 : 0;
+    const bUnseen = b.hasUnseen ? 1 : 0;
+    return bUnseen - aUnseen || trendingScore(b) - trendingScore(a) || new Date(b.newestAt).getTime() - new Date(a.newestAt).getTime();
+  });
+  // ألوان الإطار: أخضر للجديد، رمادي للمشاهَد
+  const trendBorderColor = (hasUnseen: boolean) => hasUnseen ? '#22c55e' : '#8E8E93';
+  const ringColor = (hasUnseen: boolean) => hasUnseen ? OASIS.colors.primary : '#8E8E93';
+  const displayName = (author: any) => author?.hide_name ? 'مجهول' : (author?.display_name?.trim() || 'جار الحي');
+  async function toggleFollow(authorId: string) {
+    if (!viewerId || authorId === viewerId) return;
+    const following = followingIds.includes(authorId);
+    const result = following
+      ? await supabase.from('follows').delete().eq('follower_id', viewerId).eq('following_id', authorId)
+      : await supabase.from('follows').insert({ follower_id: viewerId, following_id: authorId });
+    if (!result.error) setFollowingIds(prev => following ? prev.filter(id => id !== authorId) : [...prev, authorId]);
+  }
 
-  function openAuthorStories(authorStories: any[]) {
+  function openAuthorStories(authorStories: any[], collection: any[] = storyRings) {
     const firstUnseen = authorStories.find((story: any) => !seenStoryIds.includes(story.id));
     const target = firstUnseen || authorStories[0];
-    if (target?.id) router.push({ pathname: '/story', params: { id: target.id, resume: '1' } });
+    if (target?.id) {
+      const pos = collection.findIndex((group: any) => group.authorId === target.author_id);
+      const queue = [...collection.slice(pos + 1), ...collection.slice(0, Math.max(0, pos))]
+        .filter((group: any) => group.authorId !== target.author_id && group.hasUnseen)
+        .map((group: any) => (group.stories.find((story: any) => !seenStoryIds.includes(story.id)) || group.stories[0])?.id)
+        .filter(Boolean);
+      router.push({ pathname: '/story', params: { id: target.id, resume: '0', next: queue.join(',') } });
+    }
   }
+
+  function handleDiscoveryScroll({ nativeEvent }: NativeSyntheticEvent<NativeScrollEvent>) {
+    const { contentOffset, contentSize, layoutMeasurement } = nativeEvent;
+    if (contentOffset.y + layoutMeasurement.height < contentSize.height - 240 || loadInFlight.current) return;
+    loadMoreRef.current();
+  }
+  loadMoreRef.current = () => {
+    if (loadInFlight.current) return;
+    if (visibleTrendingCount < trendingAuthors.length) setVisibleTrendingCount(count => Math.min(count + 8, trendingAuthors.length));
+    else if (Date.now() - lastRefreshAt.current > 3000) void loadAllStories(true);
+  };
 
   return (
     <View style={styles.container}>
       <AppHeader
         variant="sub"
-        title="يوميات أهل الحي"
+        title="اليوميات"
         fallbackRoute="/home"
-        rightAction={
-          <Pressable
-            onPress={() => router.push('/create-story')}
-            style={styles.addStoryBtn}
-            accessibilityRole="button"
-            accessibilityLabel="نشر قصة جديدة"
-          >
-            <Plus size={15} color="#fff" strokeWidth={2.5} />
-            <Text style={styles.addStoryBtnText}>إضافة</Text>
-          </Pressable>
-        }
+
       />
 
-      <Pressable
-        onPress={() => router.push('/story-settings')}
-        style={styles.storyNotificationToggle}
-        accessibilityRole="button"
-        accessibilityLabel="إعدادات تنبيهات القصص وكتم الحسابات"
-      >
-        <Settings2 size={16} color="#059669" />
-        <Text style={styles.storyNotificationToggleText}>إعدادات تنبيهات القصص وكتم الحسابات</Text>
-        <Text style={styles.storyNotificationToggleAction}>إدارة</Text>
-      </Pressable>
+      <View style={styles.ringsSection}>
 
-      {storyRings.length > 0 && (
-        <View style={styles.ringsSection}>
-          <View style={styles.sectionHeadingRow}>
-            <View style={{ alignItems: 'flex-end', flex: 1 }}>
-              <Text style={styles.sectionHeading}>يوميات الجيران</Text>
-              <Text style={styles.sectionSubheading}>{currentDistrict ? `أهل ${currentDistrict} ومن تتابعهم` : 'الأشخاص الذين تتابعهم في مدينتك'}</Text>
-            </View>
-            <View style={styles.livePill}><View style={styles.liveDot} /><Text style={styles.livePillText}>مباشر</Text></View>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.ringsScroll}>
+          <ScrollView style={{ direction: 'rtl' }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.ringsScroll, { direction: 'ltr' }]}>
+            <Pressable style={styles.ringItem} accessibilityRole="button" accessibilityLabel="أضف يومياتك" onPress={() => router.push(needsLogin ? '/auth' : '/create-story')}><View style={[styles.ringOuter, styles.ringSeen]}><Plus size={22} color={OASIS.colors.primary} /></View><Text numberOfLines={1} style={styles.ringName}>يومياتك</Text></Pressable>
             {storyRings.map((group: any) => {
               const author = group.author;
-              const name = author?.display_name || author?.username || 'جار الحي';
+              const name = displayName(author);
               return (
                 <Pressable key={group.authorId} style={styles.ringItem}
-                  onPress={() => openAuthorStories(group.stories)}
-                  accessibilityRole="button" accessibilityLabel={`عرض يوميات ${name}`}>
-                  <Animated.View style={[styles.ringOuter, group.hasUnseen ? styles.ringUnseen : styles.ringSeen, group.stories.length > 1 && { transform: [{ scale: storyRingPulse }] }]}>
+                  onPress={() => openAuthorStories(group.stories, storyRings)}
+                  accessibilityRole="button" accessibilityLabel={`عرض يوميات ${name}`} accessibilityHint={group.hasUnseen ? 'توجد يوميات لم تشاهدها' : 'سبق أن شاهدت هذه اليوميات'}>
+                  <View style={[styles.ringOuter, { borderColor: ringColor(group.hasUnseen) }]}>
                     <View style={styles.ringInner}>
-                      {author?.avatar_url ? <Image source={{ uri: author.avatar_url }} style={styles.ringAvatar} /> :
-                        <View style={styles.ringAvatarFallback}><Text style={styles.ringInitial}>{name[0]}</Text></View>}
+                      {!author?.hide_name && author?.avatar_url ? <Image source={{ uri: author.avatar_url }} style={styles.ringAvatar} /> :
+                        <View style={styles.ringAvatarFallback}><Text style={styles.ringInitial}>{author?.hide_name ? '؟' : name[0]}</Text></View>}
                     </View>
-                    <View style={styles.ringCount}><Text style={styles.ringCountText}>{group.stories.length}</Text></View>
-                  </Animated.View>
+                    
+                  </View>
                   <Text style={styles.ringName} numberOfLines={1}>{name}</Text>
                 </Pressable>
               );
             })}
           </ScrollView>
-        </View>
-      )}
+          {!loading && !errorText && !storyRings.length ? <Text style={[styles.sectionSubheading, { paddingHorizontal: 16, textAlign: 'right', marginTop: 10 }]}>{needsLogin ? 'سجل الدخول لمشاهدة اليوميات' : 'لا توجد يوميات نشطة لأهل حيّك أو من تتابعهم الآن'}</Text> : null}
+      </View>
 
       <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingBottom: bottomNavInset + 30 }]}
+        ref={discoveryScroll}
+        onScroll={handleDiscoveryScroll}
+        scrollEventThrottle={200}
+        contentContainerStyle={[styles.scroll, { paddingBottom: bottomNavInset + 12 }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={() => {
               setRefreshing(true);
-              loadAllStories();
+              setVisibleTrendingCount(8);
+              void loadAllStories(true);
             }}
-            tintColor="#059669"
-            colors={['#059669']}
+            tintColor={OASIS.colors.primary}
+            colors={[OASIS.colors.primary]}
           />
         }
       >
+        <View style={styles.trendingSectionTitleRow}><View style={styles.trendingSectionAccent} /><View style={{ flex: 1, alignItems: 'flex-end' }}><Text style={styles.sectionHeading}>ترند المدينة</Text></View></View>
+        {errorText ? <Pressable accessibilityRole="button" onPress={() => void loadAllStories()} style={{ padding: 16 }}><Text style={{ color: '#A65A49', textAlign: 'right' }}>تعذر تحميل اليوميات. اضغط لإعادة المحاولة.</Text></Pressable> : null}
         {loading && !refreshing ? (
           <View style={styles.loadingBox}>
-            <ActivityIndicator size="large" color="#059669" />
+            <ActivityIndicator size="large" color={OASIS.colors.primary} />
             <Text style={styles.loadingText}>جارٍ جلب يوميات جيرانك...</Text>
           </View>
-        ) : filtered.length === 0 ? (
+        ) : errorText ? null : trendingAuthors.length === 0 ? (
           <View style={styles.emptyBox}>
-            <View style={styles.emptyIconCircle}>
-              <Sparkles size={36} color="#059669" />
-            </View>
-            <Text style={styles.emptyTitle}>لا توجد يوميات نشطة حالياً</Text>
+            <Text style={styles.emptyTitle}>{needsLogin ? 'سجل الدخول لمشاهدة اليوميات' : !currentCity ? 'حدد مدينتك أولاً' : 'أنت مطّلع على يوميات مدينتك'}</Text>
             <Text style={styles.emptySub}>
-              كن أول من يشارك أهل حيه يومياته وتحديثاته اليوم! تظل اليوميات ظاهرة لمدة 24 ساعة.
+              ستظهر هنا اليوميات التي لم تشاهدها. اسحب للتحديث واكتشاف الجديد.
             </Text>
-            <Pressable
+            <Pressable oasisKind="action"
               style={styles.emptyActionBtn}
-              onPress={() => router.push('/create-story')}
+              onPress={() => router.push(needsLogin ? '/auth' : !currentCity ? '/profile' : '/create-story')}
             >
-              <Plus size={16} color="#fff" strokeWidth={2.5} />
-              <Text style={styles.emptyActionBtnText}>نشر أول يوميات في حيك</Text>
+              <Plus size={16} color={OASIS.colors.surface} strokeWidth={2.5} />
+              <Text style={styles.emptyActionBtnText}>{needsLogin ? 'تسجيل الدخول' : !currentCity ? 'تحديث ملفي' : 'شارك يومياتك'}</Text>
             </Pressable>
           </View>
         ) : (
           <>
-            <View style={styles.trendingSectionTitleRow}>
-              <View style={styles.trendingSectionAccent} />
-              <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                <Text style={styles.sectionHeading}>ترند المدينة</Text>
-                <Text style={styles.sectionSubheading}>أكثر اليوميات رواجاً في مدينتك</Text>
-              </View>
-              <View style={styles.trendingBadge}><Flame size={13} color="#fff" /><Text style={styles.trendingBadgeText}>TRENDING</Text></View>
-            </View>
-            <View style={styles.storiesGrid}>
+            <View style={styles.storiesGrid} onLayout={event => setGridWidth(event.nativeEvent.layout.width)}>
               {trendingAuthors.slice(0, visibleTrendingCount).map((group: any) => {
                 const story = group.latestStory;
                 const author = group.author;
-                const name = author?.display_name || author?.username || 'جار الحي';
+                const name = displayName(author);
                 const verified = author?.is_verified || author?.is_geoverified;
-                const bg = story.bg_color || '#059669';
+                const bg = story.bg_color || OASIS.colors.primary;
                 const hasMedia = story.type === 'image' && Boolean(story.image_url);
-                const allSeen = !group.hasUnseen;
+                const isSeen = !group.hasUnseen;
+                const cardBorder = trendBorderColor(group.hasUnseen);
                 return (
-                  <Pressable key={group.authorId}
-                    style={[styles.storyCard, allSeen ? styles.storyCardSeen : styles.storyCardNew]}
-                    onPress={() => openAuthorStories(group.stories)}
+                  <Pressable oasisKind="plain" key={group.authorId}
+                    style={[styles.storyCard, { width: cardWidth || '48%', borderColor: cardBorder, opacity: isSeen ? 0.82 : 1 }]}
+                    onPress={() => openAuthorStories(group.stories, trendingAuthors)}
                     accessibilityRole="button" accessibilityLabel={"فتح يوميات " + name}>
-                    <View style={[styles.storyCardMedia, { backgroundColor: bg }, allSeen && styles.storyCardMediaSeen]}>
-                      {hasMedia ? <Image source={{ uri: story.image_url }} style={styles.storyCardImage} resizeMode="cover" /> :
+                    <View style={[styles.storyCardMedia, { backgroundColor: bg, height: mediaHeight }]}>
+                      {hasMedia ? <Image accessible={false} source={{ uri: story.image_url }} style={styles.storyCardImage} resizeMode="cover" /> :
                         <View style={styles.storyTextCard}>
-                          <Text style={styles.storyTextQuote}>“</Text>
-                          <Text style={styles.storyTextSnippet} numberOfLines={4}>{story.content || 'يوميات جديدة'}</Text>
+                          <Text style={[styles.storyTextSnippet, { color: previewTextColor(bg) }]} numberOfLines={4}>{story.content || '…'}</Text>
                         </View>}
-                      <LinearGradient colors={['rgba(0,0,0,0.55)', 'transparent', 'rgba(0,0,0,0.82)']} style={StyleSheet.absoluteFillObject} />
-                      <View style={styles.storyCardTopRow}>
-                        <View style={styles.cardAvatarWrap}>
-                          {author?.avatar_url ? <Image source={{ uri: author.avatar_url }} style={styles.cardAvatar} /> :
-                            <View style={styles.cardAvatarFallback}><Text style={styles.cardAvatarLetter}>{name[0]}</Text></View>}
-                          {verified && <View style={styles.cardVerifyBadge}><ShieldCheck size={9} color="#fff" /></View>}
-                        </View>
-                        <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                          <Text style={styles.cardAuthorName} numberOfLines={1}>{name}</Text>
-                          <Text style={styles.cardTimeText}>{relativeTime(story.created_at)}</Text>
-                          <Text style={[styles.storySeenLabel, allSeen ? styles.storySeenLabelSeen : styles.storySeenLabelNew]}>
-                            {allSeen ? 'تمت المشاهدة' : 'يوميات جديدة'}
-                          </Text>
-                        </View>
+                      {/* شارة الحالة: جديد/مشاهَد */}
+                      <View style={[styles.seenBadge, { backgroundColor: isSeen ? 'rgba(142,142,147,0.85)' : 'rgba(34,197,94,0.92)' }]}>
+                        <Text style={styles.seenBadgeText}>{isSeen ? 'شاهدته' : 'جديد'}</Text>
                       </View>
+                    </View>
+                    {/* عدد المشاهدات */}
+                    <View style={styles.viewCountRow}>
+                      <Eye size={11} color={OASIS.colors.muted} />
+                      <Text style={styles.viewCountText}>{group.totalViews > 0 ? group.totalViews.toLocaleString('ar-SA') : '٠'} مشاهدة</Text>
+                    </View>
+                    <View style={styles.cardFooter}>
+                      <View style={styles.cardAvatarWrap}>
+                        {!author?.hide_name && author?.avatar_url ? <Image source={{ uri: author.avatar_url }} style={styles.cardAvatar} /> :
+                          <View style={styles.cardAvatarFallback}><Text style={styles.cardAvatarLetter}>{author?.hide_name ? '؟' : name[0]}</Text></View>}
+                        {verified && <View style={styles.cardVerifyBadge}><ShieldCheck size={9} color={OASIS.colors.surface} /></View>}
+                      </View>
+                      <View style={styles.cardCopy}>
+                        <Text style={styles.cardAuthorName} numberOfLines={1}>{name}</Text>
+                        <Text style={styles.cardTimeText} numberOfLines={1}>{relativeTime(story.created_at)}</Text>
+                      </View>
+                      {group.authorId !== viewerId ? <Pressable oasisKind="plain" accessibilityRole="button" accessibilityState={{ selected: followingIds.includes(group.authorId) }} accessibilityLabel={(followingIds.includes(group.authorId) ? 'إلغاء متابعة ' : 'متابعة ') + name} onPress={event => { event.stopPropagation(); void toggleFollow(group.authorId); }} style={styles.followButton}>
+                        {followingIds.includes(group.authorId) ? <Check size={17} color={OASIS.colors.primary} /> : <UserPlus size={17} color={OASIS.colors.primary} />}
+                      </Pressable> : null}
                     </View>
                   </Pressable>
                 );
               })}
             </View>
-            {trendingAuthors.length > visibleTrendingCount && (
-              <Pressable style={styles.loadMoreButton} onPress={() => setVisibleTrendingCount((count) => count + 8)} accessibilityRole="button" accessibilityLabel="عرض المزيد من ترند المدينة">
-                <Text style={styles.loadMoreButtonText}>عرض المزيد</Text>
-                <ChevronDown size={16} color="#047857" />
-              </Pressable>
-            )}
+
           </>
         )}
       </ScrollView>
@@ -322,250 +376,57 @@ export default function StoriesScreen() {
   );
 }
 
+/** Keep text readable on the author's chosen story background. */
+function previewTextColor(background: string) {
+  const hex = background.replace('#', '');
+  const normalized = hex.length === 3 ? hex.split('').map(c => c + c).join('') : hex;
+  if (!/^[0-9a-f]{6}$/i.test(normalized)) return '#FFFFFF';
+  const rgb = [0, 2, 4].map(i => parseInt(normalized.slice(i, i + 2), 16) / 255).map(c => c <= .04045 ? c / 12.92 : ((c + .055) / 1.055) ** 2.4);
+  return rgb[0] * .2126 + rgb[1] * .7152 + rgb[2] * .0722 > .179 ? '#1C1C1E' : '#FFFFFF';
+}
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8fafc',
-  },
-  addStoryBtn: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#059669',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 14,
-  },
-  addStoryBtnText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  scroll: {
-    padding: 16,
-  },
-  loadingBox: {
-    paddingVertical: 60,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-  },
-  loadingText: {
-    fontSize: 13,
-    color: '#64748b',
-    fontWeight: '700',
-  },
-  emptyBox: {
-    backgroundColor: '#fff',
-    borderRadius: 24,
-    padding: 28,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    marginTop: 20,
-    gap: 12,
-  },
-  emptyIconCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#ecfdf5',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyTitle: {
-    fontSize: 17,
-    fontWeight: '900',
-    color: '#0f172a',
-  },
-  emptySub: {
-    fontSize: 13,
-    color: '#64748b',
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  emptyActionBtn: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#059669',
-    paddingHorizontal: 18,
-    paddingVertical: 11,
-    borderRadius: 14,
-    marginTop: 6,
-  },
-  emptyActionBtnText: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  storyNotificationToggle: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginHorizontal: 16, marginTop: 8, marginBottom: 4, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 13, backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0' },
-  storyNotificationToggleText: { flex: 1, textAlign: 'right', color: '#334155', fontSize: 11, fontWeight: '800' },
-  storyNotificationToggleAction: { color: '#047857', fontSize: 11, fontWeight: '900' },
-  ringsSection: { backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e2e8f0', paddingTop: 14, paddingBottom: 12 },
-  sectionHeadingRow: { flexDirection: 'row-reverse', alignItems: 'center', paddingHorizontal: 16, gap: 10, marginBottom: 10 },
-  sectionHeading: { color: '#0f172a', fontSize: 16, fontWeight: '900' },
-  sectionSubheading: { color: '#64748b', fontSize: 11, marginTop: 2, fontWeight: '600' },
-  livePill: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 12, backgroundColor: '#ecfdf5' },
-  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#10b981' },
-  livePillText: { color: '#047857', fontSize: 10, fontWeight: '900' },
-  ringsScroll: { flexDirection: 'row-reverse', paddingHorizontal: 14, gap: 14 },
-  ringItem: { width: 66, alignItems: 'center', gap: 5 },
-  ringOuter: { width: 62, height: 62, borderRadius: 31, padding: 3, borderWidth: 2.5, alignItems: 'center', justifyContent: 'center', position: 'relative' },
-  ringUnseen: { borderColor: '#D4A72C', borderWidth: 3.5, shadowColor: '#D4A72C', shadowOpacity: 0.38, shadowRadius: 5, elevation: 5 },
-  ringSeen: { borderColor: '#94a3b8', borderWidth: 2 },
-  ringInner: { width: 50, height: 50, borderRadius: 25, overflow: 'hidden', backgroundColor: '#f1f5f9' },
+  container: { flex: 1, backgroundColor: OASIS.colors.background },
+  scroll: { padding: 12 },
+  loadingBox: { paddingVertical: 36, alignItems: 'center', justifyContent: 'center', gap: 10 },
+  loadingText: { fontSize: 13, color: OASIS.colors.muted },
+  emptyBox: { backgroundColor: OASIS.colors.surface, borderRadius: 14, padding: 16, alignItems: 'center', borderWidth: 1, borderColor: OASIS.colors.line, gap: 10 },
+  emptyTitle: { fontSize: 16, fontWeight: '600', color: OASIS.colors.ink, textAlign: 'center' },
+  emptySub: { fontSize: 13, color: OASIS.colors.muted, textAlign: 'center', lineHeight: 20 },
+  emptyActionBtn: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, backgroundColor: OASIS.colors.primary, paddingHorizontal: 16, marginTop: 4 },
+  emptyActionBtnText: { color: OASIS.colors.surface, fontSize: 14, fontWeight: '600' },
+  ringsSection: { backgroundColor: OASIS.colors.surface, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: OASIS.colors.line, paddingVertical: 10 },
+  sectionHeading: { color: OASIS.colors.ink, fontSize: 17, fontWeight: '600' },
+  sectionSubheading: { color: OASIS.colors.muted, fontSize: 12, lineHeight: 18 },
+  ringsScroll: { flexDirection: 'row-reverse', paddingHorizontal: 12, gap: 12, paddingVertical: 2 },
+  ringItem: { width: 60, alignItems: 'center', gap: 5 },
+  ringOuter: { width: 48, height: 48, borderRadius: 24, padding: 2, borderWidth: 2, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  ringSeen: { borderColor: OASIS.colors.line },
+  ringInner: { width: 40, height: 40, borderRadius: 20, overflow: 'hidden', backgroundColor: OASIS.colors.background },
   ringAvatar: { width: '100%', height: '100%' },
-  ringAvatarFallback: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#d1fae5' },
-  ringInitial: { color: '#047857', fontSize: 20, fontWeight: '900' },
-  ringCount: { position: 'absolute', bottom: -3, right: -2, minWidth: 19, height: 19, borderRadius: 10, backgroundColor: '#D4A72C', borderWidth: 2, borderColor: '#fff', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
-  ringCountText: { color: '#fff', fontSize: 9, fontWeight: '900' },
-  ringName: { color: '#334155', fontSize: 10, fontWeight: '800', maxWidth: 66 },
-  trendingSectionTitleRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 9, marginBottom: 13 },
-  trendingSectionAccent: { width: 4, height: 30, borderRadius: 3, backgroundColor: '#10B981' },
-  trendingBadge: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 7, borderRadius: 10, backgroundColor: '#0f172a' },
-  trendingBadgeText: { color: '#fff', fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
-  storiesGrid: {
-    flexDirection: 'row-reverse',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    rowGap: 12,
-  },
-  storyCard: {
-    width: '48%',
-    aspectRatio: 0.78,
-    borderRadius: 22,
-    overflow: 'hidden',
-    backgroundColor: '#059669',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.6)',
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-  storyCardNew: { borderColor: '#10b981' },
-  storyCardSeen: { borderColor: '#94a3b8', opacity: 0.72 },
-  storyCardMediaSeen: { opacity: 0.82 },
-  storySeenLabel: { fontSize: 9, fontWeight: '900', marginTop: 3, textAlign: 'right' },
-  storySeenLabelNew: { color: '#a7f3d0' },
-  storySeenLabelSeen: { color: '#e2e8f0' },
-  loadMoreButton: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 7, alignSelf: 'center', marginTop: 18, marginBottom: 8, paddingHorizontal: 20, paddingVertical: 11, borderRadius: 14, backgroundColor: '#ecfdf5', borderWidth: 1, borderColor: '#a7f3d0' },
-  loadMoreButtonText: { color: '#047857', fontSize: 12, fontWeight: '900' },
-  storyCardMedia: {
-    flex: 1,
-    position: 'relative',
-    justifyContent: 'space-between',
-    padding: 10,
-  },
-  storyCardImage: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  storyTextCard: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 8,
-  },
-  storyTextSnippet: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '800',
-    textAlign: 'center',
-    lineHeight: 20,
-    textShadowColor: 'rgba(0,0,0,0.3)',
-    textShadowRadius: 4,
-  },
-  storyCardTopRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 8,
-    zIndex: 2,
-  },
-  cardAvatarWrap: {
-    position: 'relative',
-  },
-  cardAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: '#fff',
-  },
-  cardAvatarFallback: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: '#fff',
-  },
-  cardAvatarLetter: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  cardVerifyBadge: {
-    position: 'absolute',
-    bottom: -2,
-    left: -2,
-    width: 13,
-    height: 13,
-    borderRadius: 7,
-    backgroundColor: '#059669',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#fff',
-  },
-  cardAuthorName: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '900',
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowRadius: 4,
-  },
-  cardTimeText: {
-    color: 'rgba(255,255,255,0.85)',
-    fontSize: 9.5,
-    fontWeight: '700',
-    marginTop: 1,
-  },
-  storyCardBottomRow: {
-    zIndex: 2,
-    alignItems: 'flex-start',
-  },
-  districtBadge: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 10,
-    maxWidth: '100%',
-  },
-  districtBadgeText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  storyTextQuote: {
-    fontSize: 28,
-    lineHeight: 28,
-    color: 'rgba(255,255,255,0.4)',
-    fontWeight: '900',
-    marginBottom: -4,
-  },
-  mediaTypeBadge: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  ringAvatarFallback: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: OASIS.colors.soft },
+  ringInitial: { color: OASIS.colors.primary, fontSize: 17, fontWeight: '600' },
+  ringName: { color: OASIS.colors.ink, fontSize: 11, textAlign: 'center', maxWidth: 60 },
+  trendingSectionTitleRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 7, marginBottom: 12 },
+  trendingSectionAccent: { width: 3, height: 18, borderRadius: 2, backgroundColor: OASIS.colors.primary },
+  storiesGrid: { direction: 'ltr', flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 10 },
+  storyCard: { borderRadius: 14, overflow: 'hidden', backgroundColor: OASIS.colors.surface, borderWidth: 2, borderColor: OASIS.colors.primary },
+  storyCardMedia: { position: 'relative', overflow: 'hidden' },
+  storyCardImage: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
+  storyTextCard: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12, paddingVertical: 12 },
+  storyTextSnippet: { fontSize: 14, fontWeight: '500', textAlign: 'center', lineHeight: 21 },
+  seenBadge: { position: 'absolute', top: 8, right: 8, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 },
+  seenBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
+  viewCountRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: OASIS.colors.background, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: OASIS.colors.line },
+  viewCountText: { color: OASIS.colors.muted, fontSize: 11, fontWeight: '600' },
+  cardFooter: { flexDirection: 'row-reverse', alignItems: 'center', paddingRight: 8, paddingLeft: 2, gap: 6, minHeight: 52 },
+  cardAvatarWrap: { position: 'relative' },
+  cardAvatar: { width: 26, height: 26, borderRadius: 13 },
+  cardAvatarFallback: { width: 26, height: 26, borderRadius: 13, backgroundColor: OASIS.colors.soft, alignItems: 'center', justifyContent: 'center' },
+  cardAvatarLetter: { color: OASIS.colors.primary, fontSize: 12, fontWeight: '600' },
+  cardVerifyBadge: { position: 'absolute', bottom: -2, left: -2, width: 12, height: 12, borderRadius: 6, backgroundColor: OASIS.colors.primary, alignItems: 'center', justifyContent: 'center' },
+  cardCopy: { flex: 1, minWidth: 0, alignItems: 'flex-end' },
+  cardAuthorName: { color: OASIS.colors.ink, fontSize: 12, fontWeight: '600' },
+  cardTimeText: { color: OASIS.colors.muted, fontSize: 11, marginTop: 2 },
+  followButton: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
 });

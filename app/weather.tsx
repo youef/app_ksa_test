@@ -1,16 +1,7 @@
+import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
 import { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Pressable,
-  Platform,
-  TextInput,
-  ActivityIndicator,
-  RefreshControl,
-  Alert,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Platform, ActivityIndicator, RefreshControl, Alert } from 'react-native';
 import { router } from 'expo-router';
 import * as Location from 'expo-location';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -150,11 +141,11 @@ async function resolvePlace(latitude: number, longitude: number): Promise<{ regi
 
 function aqiInfo(aqi?: number | null) {
   const value = aqi ?? 0;
-  if (value <= 50) return { label: 'هواء نظيف', color: '#047857', bg: '#dcfce7', bar: '#10b981' };
-  if (value <= 100) return { label: 'هواء مقبول', color: '#b45309', bg: '#fef3c7', bar: '#f59e0b' };
+  if (value <= 50) return { label: 'هواء نظيف', color: OASIS.colors.primary, bg: '#dcfce7', bar: OASIS.colors.primary };
+  if (value <= 100) return { label: 'هواء مقبول', color: '#b45309', bg: '#fef3c7', bar: OASIS.colors.warning };
   if (value <= 150) return { label: 'غير صحي للفئات الحساسة', color: '#c2410c', bg: '#ffedd5', bar: '#f97316' };
-  if (value <= 200) return { label: 'غير صحي', color: '#b91c1c', bg: '#fee2e2', bar: '#ef4444' };
-  return { label: 'ضار بالصحة', color: '#7f1d1d', bg: '#fecaca', bar: '#dc2626' };
+  if (value <= 200) return { label: 'غير صحي', color: OASIS.colors.danger, bg: '#fee2e2', bar: OASIS.colors.danger };
+  return { label: 'ضار بالصحة', color: '#7f1d1d', bg: '#fecaca', bar: OASIS.colors.danger };
 }
 
 function formatClock(value?: string | null) {
@@ -211,9 +202,9 @@ function buildAlerts(weather: WeatherData | null): WeatherAlert[] {
 }
 
 function severityTheme(severity: string) {
-  if (severity === 'danger') return { bg: '#fef2f2', border: '#fecaca', text: '#991b1b', accent: '#dc2626', label: 'تحذير' };
+  if (severity === 'danger') return { bg: OASIS.colors.dangerSoft, border: '#fecaca', text: '#991b1b', accent: OASIS.colors.danger, label: 'تحذير' };
   if (severity === 'warning') return { bg: '#fff7ed', border: '#fed7aa', text: '#9a3412', accent: '#ea580c', label: 'تنبيه' };
-  return { bg: '#ecfdf5', border: '#a7f3d0', text: '#065f46', accent: '#059669', label: 'معلومة' };
+  return { bg: OASIS.colors.soft, border: '#a7f3d0', text: OASIS.colors.deep, accent: OASIS.colors.primary, label: 'معلومة' };
 }
 
 function AlertIcon({ kind, size, color }: { kind: string; size: number; color: string }) {
@@ -480,13 +471,13 @@ export default function WeatherScreen() {
               flexDirection: 'row-reverse',
               alignItems: 'center',
               gap: 4,
-              backgroundColor: '#ecfdf5',
+              backgroundColor: OASIS.colors.soft,
               paddingHorizontal: 10,
               paddingVertical: 5,
               borderRadius: 14,
             }}>
-              <Sun size={14} color="#059669" />
-              <Text style={{ fontSize: 13, fontWeight: '900', color: '#059669' }}>{round(weather.current.temperature_2m)}°</Text>
+              <Sun size={14} color={OASIS.colors.primary} />
+              <Text style={{ fontSize: 13, fontWeight: '700', color: OASIS.colors.primary }}>{round(weather.current.temperature_2m)}°</Text>
             </View>
           ) : undefined
         }
@@ -495,14 +486,14 @@ export default function WeatherScreen() {
       <ScrollView
         contentContainerStyle={[screenStyles.scroll, { paddingBottom: bottomNavInset + 28 }]}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor="#047857" colors={['#047857']} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={OASIS.colors.primary} colors={[OASIS.colors.primary]} />}
       >
         <View style={screenStyles.content}>
           {weather && topAlert ? (
             <View style={[styles.alertBanner, { backgroundColor: bannerMeta.bg, borderColor: bannerMeta.border }]}>
               <View style={styles.alertBannerTop}>
                 <View style={[styles.alertIconWrap, { backgroundColor: bannerMeta.accent }]}>
-                  <AlertIcon kind={topAlert.icon} size={16} color="#fff" />
+                  <AlertIcon kind={topAlert.icon} size={16} color={OASIS.colors.surface} />
                 </View>
                 <View style={styles.alertBannerCopy}>
                   <Text style={[styles.alertBadge, { color: bannerMeta.accent }]}>{bannerMeta.label} · {alerts.length}</Text>
@@ -524,14 +515,14 @@ export default function WeatherScreen() {
           ) : null}
 
           {/* City search */}
-          <View style={styles.searchCard}>
+          <OasisSurface oasisSurface="card" style={styles.searchCard}>
             <View style={styles.citySearchRow}>
-              <Pressable style={styles.locationButton} onPress={useDeviceLocation} disabled={loading}>
-                <Navigation size={15} color="#047857" />
+              <Pressable oasisKind="action" style={styles.locationButton} onPress={useDeviceLocation} disabled={loading}>
+                <Navigation size={15} color={OASIS.colors.primary} />
                 <Text style={styles.locationButtonText}>موقعي</Text>
               </Pressable>
-              <Pressable style={styles.searchButton} onPress={() => loadWeatherForCity(cityInput)} disabled={loading || !cityInput.trim()}>
-                <Search size={15} color="#fff" />
+              <Pressable oasisKind="icon" style={styles.searchButton} onPress={() => loadWeatherForCity(cityInput)} disabled={loading || !cityInput.trim()}>
+                <Search size={15} color={OASIS.colors.surface} />
               </Pressable>
               <TextInput
                 value={cityInput}
@@ -546,12 +537,12 @@ export default function WeatherScreen() {
               <MapPin size={16} color="#94a3b8" />
             </View>
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
-          </View>
+          </OasisSurface>
 
           {weather ? (
-            <View style={styles.locationCard}>
+            <OasisSurface oasisSurface="card" style={styles.locationCard}>
               <View style={styles.locationCardHeader}>
-                <MapPin size={15} color="#047857" />
+                <MapPin size={15} color={OASIS.colors.primary} />
                 <Text style={styles.locationCardTitle}>الموقع المستخدم لحساب الطقس</Text>
               </View>
               <View style={styles.locationGrid}>
@@ -560,13 +551,13 @@ export default function WeatherScreen() {
                 <LocationItem label="الحي" value={weather.district} />
                 <LocationItem label="الإحداثيات" value={weather.latitude.toFixed(3) + '، ' + weather.longitude.toFixed(3)} />
               </View>
-            </View>
+            </OasisSurface>
           ) : null}
 
           {/* Current conditions */}
-          <View style={styles.card}>
+          <OasisSurface oasisSurface="card" style={styles.card}>
             <LinearGradient
-              colors={weather?.current?.is_day ? ['#0f766e', '#0e7490', '#155e75'] : ['#1e3a5f', '#334155', '#475569']}
+              colors={weather?.current?.is_day ? ['#0f766e', '#0e7490', '#155e75'] : ['#1e3a5f', OASIS.colors.ink, OASIS.colors.muted]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.currentPanel}
@@ -574,13 +565,13 @@ export default function WeatherScreen() {
               {weather ? (
                 <>
                   <View style={styles.panelTop}>
-                    <Pressable onPress={refresh} disabled={loading} style={styles.refreshButton} accessibilityLabel="تحديث الطقس">
-                      {loading ? <ActivityIndicator size="small" color="#fff" /> : <RefreshCw size={16} color="#fff" />}
+                    <Pressable oasisKind="icon" onPress={refresh} disabled={loading} style={styles.refreshButton} accessibilityLabel="تحديث الطقس">
+                      {loading ? <ActivityIndicator size="small" color={OASIS.colors.surface} /> : <RefreshCw size={16} color={OASIS.colors.surface} />}
                     </Pressable>
                     <Text style={styles.panelUpdated}>آخر تحديث {lastUpdated ? lastUpdated.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }) : ''}</Text>
                   </View>
                   <View style={styles.panelLocation}>
-                    <MapPin size={13} color="#d1fae5" />
+                    <MapPin size={13} color={OASIS.colors.soft} />
                     <Text style={styles.panelLocationText}>{[weather.district, weather.city, weather.region].filter(Boolean).join(' · ')}</Text>
                   </View>
                   <View style={styles.currentMain}>
@@ -602,7 +593,7 @@ export default function WeatherScreen() {
                 </>
               ) : (
                 <View style={styles.emptyWeather}>
-                  {loading ? <ActivityIndicator size="large" color="#fff" /> : <><CloudSun size={40} color="#fde68a" /><Text style={styles.emptyTitle}>اعرف أجواء مدينتك</Text><Text style={styles.emptySub}>طقس فعلي وتوقعات محدثة من Open-Meteo</Text></>}
+                  {loading ? <ActivityIndicator size="large" color={OASIS.colors.surface} /> : <><CloudSun size={40} color="#fde68a" /><Text style={styles.emptyTitle}>اعرف أجواء مدينتك</Text><Text style={styles.emptySub}>طقس فعلي وتوقعات محدثة من Open-Meteo</Text></>}
                 </View>
               )}
             </LinearGradient>
@@ -610,27 +601,27 @@ export default function WeatherScreen() {
             {weather && (
               <>
                 <View style={styles.metricsGrid}>
-                  <Metric icon={<Thermometer size={17} color="#2563eb" />} bg="#eff6ff" label="المحسوسة" value={round(weather.current.apparent_temperature)} unit="°" />
+                  <Metric icon={<Thermometer size={17} color="#2563eb" />} bg={OASIS.colors.infoSoft} label="المحسوسة" value={round(weather.current.apparent_temperature)} unit="°" />
                   <Metric icon={<Droplets size={17} color="#0891b2" />} bg="#ecfeff" label="الرطوبة" value={round(weather.current.relative_humidity_2m)} unit="%" />
-                  <Metric icon={<Wind size={17} color="#16a34a" />} bg="#f0fdf4" label={'الرياح' + (windDir(weather.current.wind_direction_10m) ? ' · ' + windDir(weather.current.wind_direction_10m) : '')} value={round(weather.current.wind_speed_10m)} unit="كم/س" />
+                  <Metric icon={<Wind size={17} color={OASIS.colors.primary} />} bg={OASIS.colors.soft} label={'الرياح' + (windDir(weather.current.wind_direction_10m) ? ' · ' + windDir(weather.current.wind_direction_10m) : '')} value={round(weather.current.wind_speed_10m)} unit="كم/س" />
                   <Metric icon={<Gauge size={17} color="#7c3aed" />} bg="#f5f3ff" label="هبّات الرياح" value={round(weather.current.wind_gusts_10m)} unit="كم/س" />
-                  <Metric icon={<Cloud size={17} color="#0891b2" />} bg="#f0f9ff" label="الغيوم" value={round(weather.current.cloud_cover)} unit="%" />
-                  <Metric icon={<Gauge size={17} color="#b45309" />} bg="#fffbeb" label="الضغط" value={round(weather.current.pressure_msl)} unit="hPa" />
+                  <Metric icon={<Cloud size={17} color="#0891b2" />} bg={OASIS.colors.infoSoft} label="الغيوم" value={round(weather.current.cloud_cover)} unit="%" />
+                  <Metric icon={<Gauge size={17} color="#b45309" />} bg={OASIS.colors.warningSoft} label="الضغط" value={round(weather.current.pressure_msl)} unit="hPa" />
                   <Metric icon={<Sun size={17} color="#d97706" />} bg="#fff7ed" label="مؤشر UV" value={round(weather.daily.uv_index_max?.[0])} unit="" />
                   <Metric icon={<Umbrella size={17} color="#ea580c" />} bg="#fff7ed" label="احتمال الهطول" value={round(weather.daily.precipitation_probability_max?.[0])} unit="%" />
                 </View>
 
                 {/* Hourly */}
                 <View style={styles.blockHeader}><Text style={styles.blockTitle}>توقعات الساعات القادمة</Text><Text style={styles.blockHint}>12 ساعة</Text></View>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hourlyList}>
+                <ScrollView style={{ direction: 'rtl' }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.hourlyList, { direction: 'ltr' }]}>
                   {hourlyIndices.map((index) => (
-                    <View key={weather.hourly.time[index]} style={styles.hourCard}>
+                    <OasisSurface oasisSurface="card" key={weather.hourly.time[index]} style={styles.hourCard}>
                       <Text style={styles.hourText}>{new Date(weather.hourly.time[index]).toLocaleTimeString('ar-SA', { hour: '2-digit', hour12: true })}</Text>
                       <WeatherGlyph code={weather.hourly.weather_code[index]} size={23} />
                       <Text style={styles.hourTemp}>{round(weather.hourly.temperature_2m[index])}°</Text>
-                      <View style={styles.hourMeta}><Droplets size={10} color="#0284c7" /><Text style={styles.hourMetaText}>{weather.hourly.precipitation_probability[index] ?? 0}%</Text></View>
-                      <View style={styles.hourMeta}><Wind size={10} color="#16a34a" /><Text style={styles.hourMetaText}>{round(weather.hourly.wind_speed_10m?.[index])}</Text></View>
-                    </View>
+                      <View style={styles.hourMeta}><Droplets size={10} color={OASIS.colors.info} /><Text style={styles.hourMetaText}>{weather.hourly.precipitation_probability[index] ?? 0}%</Text></View>
+                      <View style={styles.hourMeta}><Wind size={10} color={OASIS.colors.primary} /><Text style={styles.hourMetaText}>{round(weather.hourly.wind_speed_10m?.[index])}</Text></View>
+                    </OasisSurface>
                   ))}
                 </ScrollView>
 
@@ -682,42 +673,42 @@ export default function WeatherScreen() {
                     <View style={styles.metricsGrid}>
                       <Metric icon={<Gauge size={17} color="#0f766e" />} bg="#f0fdfa" label="PM2.5 · جسيمات دقيقة" value={weather.air.pm2_5 == null ? '--' : Number(weather.air.pm2_5).toFixed(1)} unit="µg/m³" />
                       <Metric icon={<Gauge size={17} color="#0f766e" />} bg="#f0fdfa" label="PM10 · جسيمات عالقة" value={weather.air.pm10 == null ? '--' : Number(weather.air.pm10).toFixed(1)} unit="µg/m³" />
-                      <Metric icon={<Waves size={17} color="#b45309" />} bg="#fffbeb" label="الغبار" value={weather.air.dust == null ? '--' : Number(weather.air.dust).toFixed(1)} unit="µg/m³" />
+                      <Metric icon={<Waves size={17} color="#b45309" />} bg={OASIS.colors.warningSoft} label="الغبار" value={weather.air.dust == null ? '--' : Number(weather.air.dust).toFixed(1)} unit="µg/m³" />
                       <Metric icon={<Sun size={17} color="#d97706" />} bg="#fff7ed" label="ذروة UV اليوم" value={round(weather.daily.uv_index_max?.[0])} unit="" />
                     </View>
                   </>
                 ) : (
-                  <View style={styles.airUnavailable}><Info size={17} color="#64748b" /><Text style={styles.airDescription}>بيانات جودة الهواء غير متاحة حالياً لهذا الموقع.</Text></View>
+                  <View style={styles.airUnavailable}><Info size={17} color={OASIS.colors.muted} /><Text style={styles.airDescription}>بيانات جودة الهواء غير متاحة حالياً لهذا الموقع.</Text></View>
                 )}
 
                 {/* Guidance */}
-                <View style={styles.tipsCard}>
-                  <View style={styles.tipsHeader}><Eye size={16} color="#065f46" /><Text style={styles.tipsTitle}>إرشادات عامة</Text></View>
+                <OasisSurface oasisSurface="card" style={styles.tipsCard}>
+                  <View style={styles.tipsHeader}><Eye size={16} color={OASIS.colors.deep} /><Text style={styles.tipsTitle}>إرشادات عامة</Text></View>
                   {tips.map((tip, i) => <Text key={i} style={styles.tipText}>• {tip}</Text>)}
                   <Text style={styles.disclaimer}>البيانات والإرشادات تقديرية ولا تغني عن التنبيهات الرسمية.</Text>
-                </View>
+                </OasisSurface>
 
                 {/* Share / notify neighbors */}
-                <View style={styles.actionsCard}>
+                <OasisSurface oasisSurface="card" style={styles.actionsCard}>
                   <View style={styles.actionsHeader}>
-                    <Megaphone size={16} color="#065f46" />
+                    <Megaphone size={16} color={OASIS.colors.deep} />
                     <Text style={styles.actionsTitle}>شارك حالة الطقس مع جيرانك</Text>
                   </View>
                   <Pressable style={[styles.actionPrimary, sharing && styles.actionDisabled]} onPress={shareWeatherPost} disabled={sharing}>
                     {sharing ? (
-                      <ActivityIndicator size="small" color="#fff" />
+                      <ActivityIndicator size="small" color={OASIS.colors.surface} />
                     ) : (
                       <>
-                        <Send size={16} color="#fff" />
+                        <Send size={16} color={OASIS.colors.surface} />
                         <Text style={styles.actionPrimaryText}>انشر حالة الطقس في حيّك</Text>
                       </>
                     )}
                   </Pressable>
                   <Pressable style={[styles.actionSecondary, sharing && styles.actionDisabled]} onPress={notifyNeighbors} disabled={sharing}>
-                    <Bell size={16} color="#b91c1c" />
+                    <Bell size={16} color={OASIS.colors.danger} />
                     <Text style={styles.actionSecondaryText}>نبّه جيرانك بإشعار</Text>
                   </Pressable>
-                </View>
+                </OasisSurface>
 
                 <View style={styles.weatherFooter}>
                   <Text style={styles.sourceText}>المصدر: Open-Meteo · آخر تحديث {lastUpdated ? lastUpdated.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }) : ''}</Text>
@@ -725,12 +716,12 @@ export default function WeatherScreen() {
                 </View>
               </>
             )}
-          </View>
+          </OasisSurface>
 
-          <View style={styles.infoCard}>
+          <OasisSurface oasisSurface="card" style={styles.infoCard}>
             <Text style={styles.infoTitle}>عن بيانات الطقس</Text>
             <Text style={styles.infoText}>تعرض هذه الصفحة بيانات الطقس والتوقعات من Open-Meteo، وجودة الهواء من Open-Meteo Air Quality. قد تختلف التوقعات عن الظروف الفعلية، ويظهر وقت آخر تحديث أعلى البطاقة.</Text>
-          </View>
+          </OasisSurface>
         </View>
       </ScrollView>
     </View>
@@ -739,11 +730,11 @@ export default function WeatherScreen() {
 
 function Metric({ icon, bg, label, value, unit }: { icon: any; bg: string; label: string; value: string; unit: string }) {
   return (
-    <View style={styles.metricCard}>
+    <OasisSurface oasisSurface="card" style={styles.metricCard}>
       <View style={[styles.metricIcon, { backgroundColor: bg }]}>{icon}</View>
       <Text style={styles.metricLabel} numberOfLines={1}>{label}</Text>
       <Text style={styles.metricValue}>{value}{unit ? <Text style={styles.metricUnit}> {unit}</Text> : null}</Text>
-    </View>
+    </OasisSurface>
   );
 }
 
@@ -757,127 +748,127 @@ function LocationItem({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
-  searchCard: { backgroundColor: '#fff', borderRadius: 18, borderWidth: 1, borderColor: '#e2e8f0', overflow: 'hidden' },
+  searchCard: { backgroundColor: OASIS.colors.surface, borderRadius: 14, borderWidth: 1, borderColor: OASIS.colors.line, overflow: 'hidden' },
   citySearchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12 },
-  locationButton: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, backgroundColor: '#ecfdf5', borderRadius: 11, paddingHorizontal: 11, paddingVertical: 10 },
-  locationButtonText: { color: '#047857', fontSize: 11.5, fontWeight: '900' },
-  searchButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', backgroundColor: '#047857', borderRadius: 11 },
-  cityInput: { flex: 1, minWidth: 80, backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 11, paddingHorizontal: 11, paddingVertical: 9, color: '#0f172a', fontSize: 12.5 },
-  errorText: { color: '#b91c1c', fontSize: 11.5, textAlign: 'right', paddingHorizontal: 14, paddingBottom: 10, lineHeight: 17 },
+  locationButton: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, backgroundColor: OASIS.colors.soft, borderRadius: 11, paddingHorizontal: 11, paddingVertical: 10 },
+  locationButtonText: { color: OASIS.colors.primary, fontSize: 11.5, fontWeight: '700' },
+  searchButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', backgroundColor: OASIS.colors.primary, borderRadius: 11 },
+  cityInput: { flex: 1, minWidth: 80, backgroundColor: OASIS.colors.background, borderWidth: 1, borderColor: OASIS.colors.line, borderRadius: 11, paddingHorizontal: 11, paddingVertical: 9, color: OASIS.colors.ink, fontSize: 12.5 },
+  errorText: { color: OASIS.colors.danger, fontSize: 11.5, textAlign: 'right', paddingHorizontal: 14, paddingBottom: 10, lineHeight: 17 },
 
-  locationCard: { backgroundColor: '#fff', borderRadius: 18, borderWidth: 1, borderColor: '#e2e8f0', padding: 14, gap: 10 },
+  locationCard: { backgroundColor: OASIS.colors.surface, borderRadius: 14, borderWidth: 1, borderColor: OASIS.colors.line, padding: 14, gap: 10 },
   locationCardHeader: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
-  locationCardTitle: { color: '#0f172a', fontSize: 12.5, fontWeight: '900', textAlign: 'right' },
+  locationCardTitle: { color: OASIS.colors.ink, fontSize: 12.5, fontWeight: '700', textAlign: 'right' },
   locationGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 },
-  locationItem: { flexGrow: 1, flexBasis: '44%', backgroundColor: '#f8fafc', borderRadius: 13, padding: 10, gap: 3, alignItems: 'flex-end' },
-  locationItemLabel: { color: '#64748b', fontSize: 10.5, fontWeight: '700' },
-  locationItemValue: { color: '#0f172a', fontSize: 12.5, fontWeight: '900', textAlign: 'right' },
+  locationItem: { flexGrow: 1, flexBasis: '44%', backgroundColor: OASIS.colors.background, borderRadius: 13, padding: 10, gap: 3, alignItems: 'flex-end' },
+  locationItemLabel: { color: OASIS.colors.muted, fontSize: 11, fontWeight: '700' },
+  locationItemValue: { color: OASIS.colors.ink, fontSize: 12.5, fontWeight: '700', textAlign: 'right' },
   panelLocation: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, marginTop: 8 },
-  panelLocationText: { color: '#d1fae5', fontSize: 11, fontWeight: '700', textAlign: 'right' },
+  panelLocationText: { color: OASIS.colors.soft, fontSize: 11, fontWeight: '700', textAlign: 'right' },
 
-  card: { backgroundColor: '#fff', borderRadius: 23, borderWidth: 1, borderColor: '#e2e8f0', overflow: 'hidden', shadowColor: '#0f172a', shadowOpacity: 0.05, shadowRadius: 12, elevation: 2 },
+  card: { backgroundColor: OASIS.colors.surface, borderRadius: 14, borderWidth: 1, borderColor: OASIS.colors.line, overflow: 'hidden', shadowColor: OASIS.colors.ink, shadowOpacity: 0, shadowRadius: 12, elevation: 2 },
   currentPanel: { padding: 17, minHeight: 196 },
   panelTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  panelUpdated: { color: '#d1fae5', fontSize: 10.5, fontWeight: '700' },
+  panelUpdated: { color: OASIS.colors.soft, fontSize: 11, fontWeight: '700' },
   refreshButton: { width: 34, height: 34, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
   currentMain: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 16 },
   tempAndIcon: { flexDirection: 'row-reverse', alignItems: 'center', gap: 9 },
-  temperature: { color: '#fff', fontSize: 51, fontWeight: '300', letterSpacing: -2 },
+  temperature: { color: OASIS.colors.surface, fontSize: 51, fontWeight: '300', letterSpacing: -2 },
   tempCopy: { alignItems: 'flex-end', gap: 5 },
-  conditionText: { color: '#fff', fontSize: 16, fontWeight: '900' },
+  conditionText: { color: OASIS.colors.surface, fontSize: 16, fontWeight: '700' },
   feelsLike: { color: '#dbeafe', fontSize: 11.5 },
   hiLo: { color: '#c7f9e5', fontSize: 11, fontWeight: '700' },
   sunTimes: { flexDirection: 'row-reverse', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 13, padding: 10, gap: 13 },
   sunTimeItem: { flex: 1, flexDirection: 'row-reverse', alignItems: 'center', gap: 5 },
-  sunTimeText: { color: '#e2e8f0', fontSize: 10 },
-  sunTimeValue: { color: '#fff', fontSize: 10.5, fontWeight: '800' },
+  sunTimeText: { color: OASIS.colors.line, fontSize: 11 },
+  sunTimeValue: { color: OASIS.colors.surface, fontSize: 11, fontWeight: '600' },
   sunTimeDivider: { width: 1, height: 20, backgroundColor: 'rgba(255,255,255,0.25)' },
-  emptyWeather: { alignItems: 'center', justifyContent: 'center', gap: 9, paddingVertical: 24 },
-  emptyTitle: { color: '#fff', fontSize: 16, fontWeight: '900' },
+  emptyWeather: { alignItems: 'center', justifyContent: 'center', gap: 9, paddingVertical: 16 },
+  emptyTitle: { color: OASIS.colors.surface, fontSize: 16, fontWeight: '700' },
   emptySub: { color: '#e0f2fe', fontSize: 11, textAlign: 'center', lineHeight: 17 },
 
   metricsGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', padding: 11, gap: 8 },
-  metricCard: { width: '48%', flexGrow: 1, flexBasis: '44%', backgroundColor: '#fff', borderWidth: 1, borderColor: '#f1f5f9', borderRadius: 15, padding: 11, alignItems: 'flex-end', gap: 5 },
+  metricCard: { width: '48%', flexGrow: 1, flexBasis: '44%', backgroundColor: OASIS.colors.surface, borderWidth: 1, borderColor: '#f1f5f9', borderRadius: 15, padding: 11, alignItems: 'flex-end', gap: 5 },
   metricIcon: { width: 30, height: 30, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  metricLabel: { color: '#64748b', fontSize: 10.5, fontWeight: '700' },
-  metricValue: { color: '#0f172a', fontSize: 18, fontWeight: '900' },
-  metricUnit: { color: '#64748b', fontSize: 9.5, fontWeight: '700' },
+  metricLabel: { color: OASIS.colors.muted, fontSize: 11, fontWeight: '700' },
+  metricValue: { color: OASIS.colors.ink, fontSize: 18, fontWeight: '700' },
+  metricUnit: { color: OASIS.colors.muted, fontSize: 11, fontWeight: '700' },
 
   blockHeader: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingTop: 8, paddingBottom: 10 },
-  blockTitle: { color: '#0f172a', fontSize: 13.5, fontWeight: '900' },
-  blockHint: { color: '#94a3b8', fontSize: 10.5 },
+  blockTitle: { color: OASIS.colors.ink, fontSize: 13.5, fontWeight: '700' },
+  blockHint: { color: '#94a3b8', fontSize: 11 },
 
   hourlyList: { flexDirection: 'row-reverse', gap: 8, paddingHorizontal: 12, paddingBottom: 14 },
-  hourCard: { minWidth: 68, alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 11, paddingHorizontal: 8, borderRadius: 14, backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#f1f5f9' },
-  hourText: { color: '#64748b', fontSize: 10 },
-  hourTemp: { color: '#0f172a', fontSize: 15, fontWeight: '900' },
+  hourCard: { minWidth: 68, alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 11, paddingHorizontal: 8, borderRadius: 14, backgroundColor: OASIS.colors.background, borderWidth: 1, borderColor: '#f1f5f9' },
+  hourText: { color: OASIS.colors.muted, fontSize: 11 },
+  hourTemp: { color: OASIS.colors.ink, fontSize: 15, fontWeight: '700' },
   hourMeta: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  hourMetaText: { color: '#64748b', fontSize: 9.5, fontWeight: '800' },
+  hourMetaText: { color: OASIS.colors.muted, fontSize: 11, fontWeight: '600' },
 
-  divider: { height: 1, backgroundColor: '#e2e8f0', marginTop: 6, marginBottom: 4 },
+  divider: { height: 1, backgroundColor: OASIS.colors.line, marginTop: 6, marginBottom: 4 },
 
   dayRow: { flexDirection: 'row-reverse', alignItems: 'center', paddingHorizontal: 15, paddingVertical: 12, borderTopWidth: 1, borderTopColor: '#f1f5f9', gap: 9 },
-  dayName: { color: '#334155', fontSize: 11.5, fontWeight: '800', width: 44, textAlign: 'right' },
+  dayName: { color: OASIS.colors.ink, fontSize: 11.5, fontWeight: '600', width: 44, textAlign: 'right' },
   dayCondition: { flex: 1, flexDirection: 'row-reverse', alignItems: 'center', gap: 7 },
-  dayConditionText: { color: '#64748b', fontSize: 11 },
-  dayHigh: { color: '#0f172a', fontSize: 12, fontWeight: '900', width: 26, textAlign: 'center' },
+  dayConditionText: { color: OASIS.colors.muted, fontSize: 11 },
+  dayHigh: { color: OASIS.colors.ink, fontSize: 12, fontWeight: '700', width: 26, textAlign: 'center' },
   dayLow: { color: '#94a3b8', fontSize: 12, fontWeight: '700', width: 26, textAlign: 'center' },
   dayTrack: { width: 74, height: 6, borderRadius: 3, backgroundColor: '#eef2f7', overflow: 'hidden' },
-  dayRangeBar: { height: 6, borderRadius: 3, backgroundColor: '#f59e0b' },
+  dayRangeBar: { height: 6, borderRadius: 3, backgroundColor: OASIS.colors.warning },
 
   sectionTag: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, backgroundColor: '#f0fdfa', paddingHorizontal: 8, paddingVertical: 5, borderRadius: 10 },
-  sectionTagText: { color: '#0f766e', fontSize: 9.5, fontWeight: '800' },
-  airSummary: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, marginHorizontal: 12, marginBottom: 6, padding: 12, borderRadius: 16, borderWidth: 1, borderColor: '#e2e8f0' },
+  sectionTagText: { color: '#0f766e', fontSize: 11, fontWeight: '600' },
+  airSummary: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, marginHorizontal: 12, marginBottom: 6, padding: 12, borderRadius: 16, borderWidth: 1, borderColor: OASIS.colors.line },
   aqiBadge: { width: 62, height: 62, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  aqiNumber: { fontSize: 22, fontWeight: '900' },
-  aqiLabel: { color: '#64748b', fontSize: 9, fontWeight: '800' },
+  aqiNumber: { fontSize: 22, fontWeight: '700' },
+  aqiLabel: { color: OASIS.colors.muted, fontSize: 11, fontWeight: '600' },
   airCopy: { flex: 1, alignItems: 'flex-end', gap: 6 },
-  airTitle: { fontSize: 12.5, fontWeight: '900', textAlign: 'right' },
+  airTitle: { fontSize: 12.5, fontWeight: '700', textAlign: 'right' },
   aqiTrack: { width: '100%', height: 6, borderRadius: 3, backgroundColor: '#ffffffaa', overflow: 'hidden' },
   aqiFill: { height: 6, borderRadius: 3 },
-  airDescription: { color: '#64748b', fontSize: 10.5, lineHeight: 17, textAlign: 'right', flex: 1 },
-  airUnavailable: { flexDirection: 'row-reverse', alignItems: 'center', gap: 9, padding: 14, marginHorizontal: 12, backgroundColor: '#f8fafc', borderRadius: 13 },
+  airDescription: { color: OASIS.colors.muted, fontSize: 11, lineHeight: 18, textAlign: 'right', flex: 1 },
+  airUnavailable: { flexDirection: 'row-reverse', alignItems: 'center', gap: 9, padding: 14, marginHorizontal: 12, backgroundColor: OASIS.colors.background, borderRadius: 13 },
 
-  tipsCard: { marginHorizontal: 12, marginTop: 10, marginBottom: 12, padding: 13, backgroundColor: '#f0fdf4', borderRadius: 15, borderWidth: 1, borderColor: '#dcfce7', gap: 8 },
+  tipsCard: { marginHorizontal: 12, marginTop: 10, marginBottom: 12, padding: 13, backgroundColor: OASIS.colors.soft, borderRadius: 15, borderWidth: 1, borderColor: '#dcfce7', gap: 8 },
   tipsHeader: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
-  tipsTitle: { color: '#065f46', fontSize: 12.5, fontWeight: '900', textAlign: 'right' },
-  tipText: { color: '#334155', fontSize: 11.5, textAlign: 'right', lineHeight: 18 },
-  disclaimer: { color: '#64748b', fontSize: 9.5, textAlign: 'right', lineHeight: 16, borderTopWidth: 1, borderTopColor: '#bbf7d0', paddingTop: 8 },
-  weatherFooter: { paddingHorizontal: 14, paddingVertical: 12, backgroundColor: '#f8fafc', gap: 4, borderTopWidth: 1, borderTopColor: '#e2e8f0' },
-  sourceText: { color: '#94a3b8', fontSize: 9.5, textAlign: 'right' },
-  uvText: { color: '#64748b', fontSize: 10.5, textAlign: 'right', fontWeight: '700' },
+  tipsTitle: { color: OASIS.colors.deep, fontSize: 12.5, fontWeight: '700', textAlign: 'right' },
+  tipText: { color: OASIS.colors.ink, fontSize: 11.5, textAlign: 'right', lineHeight: 18 },
+  disclaimer: { color: OASIS.colors.muted, fontSize: 11, textAlign: 'right', lineHeight: 19, borderTopWidth: 1, borderTopColor: '#bbf7d0', paddingTop: 8 },
+  weatherFooter: { paddingHorizontal: 14, paddingVertical: 12, backgroundColor: OASIS.colors.background, gap: 4, borderTopWidth: 1, borderTopColor: OASIS.colors.line },
+  sourceText: { color: '#94a3b8', fontSize: 11, textAlign: 'right' },
+  uvText: { color: OASIS.colors.muted, fontSize: 11, textAlign: 'right', fontWeight: '700' },
 
-  alertBanner: { marginHorizontal: 12, marginTop: 10, marginBottom: 2, borderRadius: 18, borderWidth: 1, padding: 14, gap: 8 },
+  alertBanner: { marginHorizontal: 12, marginTop: 10, marginBottom: 2, borderRadius: 14, borderWidth: 1, padding: 14, gap: 8 },
   alertBannerTop: { flexDirection: 'row-reverse', alignItems: 'center', gap: 9 },
   alertIconWrap: { width: 34, height: 34, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   alertBannerCopy: { flex: 1, alignItems: 'flex-end', gap: 2 },
-  alertBadge: { fontSize: 10, fontWeight: '900' },
-  alertTitle: { fontSize: 14.5, fontWeight: '900', textAlign: 'right' },
+  alertBadge: { fontSize: 11, fontWeight: '700' },
+  alertTitle: { fontSize: 14.5, fontWeight: '700', textAlign: 'right' },
   alertMessage: { fontSize: 11.5, lineHeight: 18, textAlign: 'right' },
   alertList: { gap: 6, marginTop: 4, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.06)', paddingTop: 8 },
   alertRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 7 },
   alertRowText: { fontSize: 11, fontWeight: '700', textAlign: 'right', flex: 1 },
 
-  actionsCard: { marginHorizontal: 12, marginTop: 0, marginBottom: 12, padding: 14, backgroundColor: '#fff', borderRadius: 18, borderWidth: 1, borderColor: '#e2e8f0', gap: 10 },
+  actionsCard: { marginHorizontal: 12, marginTop: 0, marginBottom: 12, padding: 14, backgroundColor: OASIS.colors.surface, borderRadius: 14, borderWidth: 1, borderColor: OASIS.colors.line, gap: 10 },
   actionsHeader: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
-  actionsTitle: { color: '#0f172a', fontSize: 13, fontWeight: '900', textAlign: 'right' },
-  actionPrimary: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#047857', borderRadius: 13, paddingVertical: 12 },
-  actionPrimaryText: { color: '#fff', fontSize: 13, fontWeight: '900' },
-  actionSecondary: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fecaca', borderRadius: 13, paddingVertical: 12 },
-  actionSecondaryText: { color: '#b91c1c', fontSize: 13, fontWeight: '900' },
+  actionsTitle: { color: OASIS.colors.ink, fontSize: 13, fontWeight: '700', textAlign: 'right' },
+  actionPrimary: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: OASIS.colors.primary, borderRadius: 13, paddingVertical: 12 },
+  actionPrimaryText: { color: OASIS.colors.surface, fontSize: 13, fontWeight: '700' },
+  actionSecondary: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: OASIS.colors.dangerSoft, borderWidth: 1, borderColor: '#fecaca', borderRadius: 13, paddingVertical: 12 },
+  actionSecondaryText: { color: OASIS.colors.danger, fontSize: 13, fontWeight: '700' },
   actionDisabled: { opacity: 0.55 },
 
-  infoCard: { backgroundColor: '#fff', borderRadius: 16, padding: 15, borderWidth: 1, borderColor: '#e2e8f0', gap: 6 },
-  infoTitle: { color: '#0f172a', fontSize: 13, fontWeight: '900', textAlign: 'right' },
-  infoText: { color: '#64748b', fontSize: 11.5, lineHeight: 19, textAlign: 'right' },
+  infoCard: { backgroundColor: OASIS.colors.surface, borderRadius: 16, padding: 15, borderWidth: 1, borderColor: OASIS.colors.line, gap: 6 },
+  infoTitle: { color: OASIS.colors.ink, fontSize: 13, fontWeight: '700', textAlign: 'right' },
+  infoText: { color: OASIS.colors.muted, fontSize: 11.5, lineHeight: 19, textAlign: 'right' },
 });
 
 const screenStyles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
+  container: { flex: 1, backgroundColor: OASIS.colors.background },
   hero: {
     paddingTop: Platform.OS === 'ios' ? 54 : 40,
     paddingHorizontal: 16,
-    paddingBottom: 22,
+    paddingBottom: 14,
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 12,
@@ -893,20 +884,20 @@ const screenStyles = StyleSheet.create({
     justifyContent: 'center',
   },
   heroCopy: { flex: 1, alignItems: 'flex-end', gap: 4 },
-  livePill: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, backgroundColor: 'rgba(255,255,255,0.16)', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 20 },
+  livePill: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, backgroundColor: 'rgba(255,255,255,0.16)', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 14 },
   liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#6ee7b7' },
-  liveText: { color: '#d1fae5', fontSize: 10, fontWeight: '800' },
-  title: { color: '#fff', fontSize: 27, fontWeight: '900' },
-  subtitle: { color: '#d1fae5', fontSize: 12, fontWeight: '600', textAlign: 'right' },
+  liveText: { color: OASIS.colors.soft, fontSize: 11, fontWeight: '600' },
+  title: { color: OASIS.colors.surface, fontSize: 20, fontWeight: '700' },
+  subtitle: { color: OASIS.colors.soft, fontSize: 12, fontWeight: '600', textAlign: 'right' },
   heroIcon: {
     width: 58,
     height: 58,
-    borderRadius: 18,
+    borderRadius: 14,
     backgroundColor: 'rgba(255,255,255,0.14)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  heroTemp: { color: '#fff', fontSize: 24, fontWeight: '900' },
+  heroTemp: { color: OASIS.colors.surface, fontSize: 24, fontWeight: '700' },
   scroll: { paddingTop: 16 },
   content: { width: '100%', maxWidth: 800, alignSelf: 'center', paddingHorizontal: 16, gap: 16 },
 });

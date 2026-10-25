@@ -1,17 +1,25 @@
+import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
+import { useAppHeaderHeight } from '@/components/shared/AppHeader';
+import { HeaderAction } from '@/components/shared/AppHeader';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  useWindowDimensions,
-} from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import {
   Flame,
+  LocateFixed,
+  Coffee,
+  Pill,
+  ShoppingCart,
+  Shirt,
+  Scissors,
+  Wrench,
+  Utensils,
+  WashingMachine,
+  Croissant,
+  SlidersHorizontal,
+  ChevronDown,
+  ChevronUp,
   Globe,
   Layers,
   MapPin as MapPinIcon,
@@ -23,6 +31,7 @@ import {
   X,
 } from 'lucide-react-native';
 
+import { mapSymbolSvg } from '@/lib/mapSymbols';
 import { C } from '@/lib/ui';
 import { AppHeader } from '@/components/shared/AppHeader';
 import { supabase } from '@/lib/supabase';
@@ -54,16 +63,18 @@ const KSA_BOUNDS = { north: 32.6, south: 15.9, east: 56.1, west: 34.4 };
 const MAP_ID = process.env.EXPO_PUBLIC_GOOGLE_MAPS_MAP_ID || '';
 
 const MAP_STYLES: any[] = [
-  { elementType: 'geometry', stylers: [{ color: '#eef2f6' }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: '#475569' }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#f8fafc' }] },
+  { elementType: 'geometry', stylers: [{ color: OASIS.colors.background }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: OASIS.colors.muted }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: OASIS.colors.background }] },
   { featureType: 'poi.business', stylers: [{ visibility: 'off' }] },
   { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#dcfce7' }] },
   { featureType: 'transit', stylers: [{ visibility: 'off' }] },
-  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#ffffff' }] },
-  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#f1f5f9' }] },
-  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#dbeafe' }] },
+  { featureType: 'road', elementType: 'geometry', stylers: [{ color: OASIS.colors.surface }] },
+  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#EFE9D9' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#DDEBDD' }] },
 ];
+
+const categoryIcons: Record<string, typeof Store> = { grocery: ShoppingCart, pharmacy: Pill, clothing: Shirt, salon: Scissors, hardware: Wrench, cafe: Coffee, restaurant: Utensils, laundry: WashingMachine, bakery: Croissant, market: Store };
 
 type KindFilter = MapPinKind | 'all';
 type MapEngine = 'leaflet' | 'google';
@@ -88,7 +99,7 @@ function injectLeafletAssets() {
     style.id = 'hayna-leaflet-custom-style';
     style.textContent = `
       .leaflet-popup-content-wrapper {
-        border-radius: 16px !important;
+        border-radius: 20px !important; background: #FFFEFA !important; color: #173F30 !important;
         box-shadow: 0 12px 30px -6px rgba(15, 23, 42, 0.2) !important;
         padding: 4px !important;
         direction: rtl !important;
@@ -139,7 +150,10 @@ function buildPinInfoWindow(pin: MapPin, onOpen: () => void, onClose: () => void
     'font-family:inherit;min-width:230px;max-width:280px;padding:2px 4px;direction:rtl;';
 
   const tag = document.createElement('div');
-  tag.textContent = `${kind.emoji} ${kind.short}`;
+  tag.innerHTML = mapSymbolSvg(pin.kind, kind.color);
+  tag.appendChild(document.createTextNode(' ' + kind.short));
+  tag.style.display = 'inline-flex';
+  tag.style.alignItems = 'center';
   tag.style.cssText = `display:inline-block;background:${kind.color}1a;color:${kind.color};font-weight:800;font-size:11px;padding:3px 9px;border-radius:999px;margin-bottom:6px;`;
   wrap.appendChild(tag);
 
@@ -150,7 +164,7 @@ function buildPinInfoWindow(pin: MapPin, onOpen: () => void, onClose: () => void
   wrap.appendChild(title);
 
   const area = document.createElement('div');
-  area.textContent = `📍 ${pin.area}`;
+  area.textContent = pin.area;
   area.style.cssText = 'font-size:12px;font-weight:700;color:#059669;';
   wrap.appendChild(area);
 
@@ -278,7 +292,7 @@ function buildPlaceInfoWindow(place: NearbyPlace, onClose: () => void) {
 
   if (place.hoursText) {
     const hours = document.createElement('div');
-    hours.textContent = `🕒 ${place.hoursText}`;
+    hours.textContent = place.hoursText;
     hours.style.cssText = 'font-size:11px;color:#334155;font-weight:700;margin-top:6px;';
     wrap.appendChild(hours);
   }
@@ -309,6 +323,7 @@ function buildPlaceInfoWindow(place: NearbyPlace, onClose: () => void) {
 }
 
 export default function WebMap() {
+  const appHeaderHeight = useAppHeaderHeight();
   const { width } = useWindowDimensions();
   const isWide = width >= 980;
 
@@ -340,6 +355,8 @@ export default function WebMap() {
   const [places, setPlaces] = useState<NearbyPlace[]>([]);
   const [placeCategory, setPlaceCategory] = useState<string>(ALL_PLACES_KEY);
   const [placesLoading, setPlacesLoading] = useState(false);
+  const [categoriesOpen, setCategoriesOpen] = useState(false);
+  const searchSequence = useRef(0);
   const [sheetOpen, setSheetOpen] = useState(false);
 
   useEffect(() => {
@@ -406,7 +423,7 @@ export default function WebMap() {
     // Handle Google auth failures gracefully
     if (typeof window !== 'undefined') {
       (window as any).gm_authFailure = () => {
-        setMapNotice('تعذّر تفعيل خرائط Google (تحتاج تفعيل Maps API والفوترة في Google Cloud). تم التبديل تلقائياً لخريطة حيّنا المباشرة.');
+        setMapNotice('تعذر تحميل الخريطة البديلة. تم استعادة الخريطة الأساسية.');
         setEngine('leaflet');
       };
     }
@@ -510,7 +527,7 @@ export default function WebMap() {
         const kindMeta = MAP_PIN_KINDS[pin.kind];
         const icon = L.divIcon({
           className: 'hayna-custom-pin',
-          html: pinElement(kindMeta.color, kindMeta.emoji, pin.urgent).outerHTML,
+          html: pinElement(kindMeta.color, pin.kind, pin.urgent).outerHTML,
           iconSize: [40, 52],
           iconAnchor: [20, 50],
           popupAnchor: [0, -45],
@@ -543,7 +560,7 @@ export default function WebMap() {
           position: { lat: pin.lat, lng: pin.lng },
           title: pin.title,
           icon: {
-            url: pinSvg(kindMeta.color, kindMeta.emoji),
+            url: pinSvg(kindMeta.color, pin.kind),
             scaledSize: new api.Size(38, 50),
             anchor: new api.Point(19, 48),
           },
@@ -577,7 +594,7 @@ export default function WebMap() {
       places.forEach((place) => {
         const icon = L.divIcon({
           className: 'hayna-custom-place',
-          html: pinElement('#0F766E', '🏬', false).outerHTML,
+          html: pinElement('#0F766E', 'business', false).outerHTML,
           iconSize: [40, 52],
           iconAnchor: [20, 50],
           popupAnchor: [0, -45],
@@ -604,7 +621,7 @@ export default function WebMap() {
           position: { lat: place.lat, lng: place.lng },
           title: place.name,
           icon: {
-            url: pinSvg('#0F766E', '🏬'),
+            url: pinSvg('#0F766E', 'business'),
             scaledSize: new api.Size(38, 50),
             anchor: new api.Point(19, 48),
           },
@@ -626,41 +643,37 @@ export default function WebMap() {
   // ---------------------------------------------------------------- Nearby Places Search
   const runPlaceSearch = useCallback(
     async (nextCategory: string, nextQuery: string) => {
+      const sequence = ++searchSequence.current;
       let origin: { latitude: number; longitude: number };
       const active = await getActiveLocation();
       if (isAllKingdom(active.city)) return;
       const center = findPlaceCenter(active.city);
-      if (center) {
-        origin = { latitude: center.lat, longitude: center.lng };
-      } else if (myLocation) {
+      if (myLocation) {
         origin = myLocation;
+      } else if (center) {
+        origin = { latitude: center.lat, longitude: center.lng };
       } else {
         const device = await getCurrentDeviceLocation();
-        origin = device ?? { latitude: KSA_CENTER.lat, longitude: KSA_CENTER.lng };
+        if (!device) { setMapNotice('حدد مدينتك أو اسمح بالوصول إلى موقعك لعرض أماكن قريبة.'); return; }
+        origin = device;
         setMyLocation(origin);
       }
 
       setPlacesLoading(true);
-      setSheetOpen(true);
+      try {
       const results = await searchNearbyPlaces({
         lat: origin.latitude,
         lng: origin.longitude,
         category: nextCategory === ALL_PLACES_KEY ? null : nextCategory,
         text: nextQuery,
       });
-      setPlaces(results);
-      setPlacesLoading(false);
+      if (sequence === searchSequence.current) setPlaces(results);
+      } catch { if (sequence === searchSequence.current) setMapNotice('تعذر تحميل الأماكن. حاول مجددًا.'); }
+      finally { if (sequence === searchSequence.current) setPlacesLoading(false); }
     },
     [myLocation],
   );
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (places.length || placesLoading) return;
-      void runPlaceSearch(placeCategory, query);
-    }, 600);
-    return () => clearTimeout(timer);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---------------------------------------------------------------- Actions
   const focusCity = useCallback(
@@ -695,7 +708,7 @@ export default function WebMap() {
     setLocating(true);
     const location = await getCurrentDeviceLocation();
     setLocating(false);
-    if (!location) return;
+    if (!location) { setMapNotice('اسمح بالوصول إلى موقعك ثم أعد المحاولة.'); return; }
     setMyLocation(location);
 
     if (engine === 'leaflet' && leafletInstanceRef.current) {
@@ -705,7 +718,7 @@ export default function WebMap() {
       }
       const myIcon = L.divIcon({
         className: 'hayna-my-pin',
-        html: pinElement('#2563EB', '📍', true).outerHTML,
+        html: pinElement('#2563EB', 'location', true).outerHTML,
         iconSize: [40, 52],
         iconAnchor: [20, 50],
       });
@@ -714,7 +727,7 @@ export default function WebMap() {
       );
       const active = await getActiveLocation();
       const center = findPlaceCenter(active.city);
-      leafletInstanceRef.current.flyTo(center ? [center.lat, center.lng] : [location.latitude, location.longitude], center ? 11 : 6, { duration: 1.2 });
+      leafletInstanceRef.current.flyTo([location.latitude, location.longitude], 16, { duration: 1.2 });
     } else if (googleMapRef.current && googleApiRef.current) {
       if (googleMyMarkerRef.current) {
         googleMyMarkerRef.current.setMap(null);
@@ -724,18 +737,17 @@ export default function WebMap() {
         position: { lat: location.latitude, lng: location.longitude },
         title: 'موقعي',
         icon: {
-          url: pinSvg('#2563EB', '📍'),
+          url: pinSvg('#2563EB', 'location'),
           scaledSize: new googleApiRef.current.Size(38, 50),
           anchor: new googleApiRef.current.Point(19, 48),
         },
       });
       const active = await getActiveLocation();
       const center = findPlaceCenter(active.city);
-      googleMapRef.current.panTo(center ? { lat: center.lat, lng: center.lng } : KSA_CENTER);
-      googleMapRef.current.setZoom(center ? 11 : 6);
+      googleMapRef.current.panTo({lat:location.latitude,lng:location.longitude});
+      googleMapRef.current.setZoom(16);
     }
 
-    void runPlaceSearch(placeCategory, query);
   }, [engine, placeCategory, query, runPlaceSearch]);
 
   const focusPlace = useCallback(
@@ -754,7 +766,7 @@ export default function WebMap() {
   const kindChip = (value: KindFilter, label: string, color: string, count: number) => {
     const active = kind === value;
     return (
-      <Pressable
+      <Pressable oasisKind="chip"
         key={value}
         onPress={() => setKind(value)}
         style={[styles.chip, active && { backgroundColor: color, borderColor: color }]}
@@ -768,6 +780,7 @@ export default function WebMap() {
 
   const placeRow = (place: NearbyPlace) => {
     const open = place.openNow;
+    const CategoryIcon = categoryIcons[place.categoryKey] || Store;
     return (
       <Pressable
         key={place.id}
@@ -775,9 +788,7 @@ export default function WebMap() {
         style={styles.placeRow}
       >
         <View style={styles.placeBadge}>
-          <Text style={{ fontSize: 17 }}>
-            {PLACE_CATEGORIES.find((c) => c.key === place.categoryKey)?.emoji ?? '🏬'}
-          </Text>
+<CategoryIcon size={20} color={C.accent} />
         </View>
         <View style={styles.placeBody}>
           <Text style={styles.placeName} numberOfLines={1}>
@@ -794,7 +805,7 @@ export default function WebMap() {
                   styles.miniChip,
                   open
                     ? { color: '#15803d', backgroundColor: '#dcfce7' }
-                    : { color: '#b91c1c', backgroundColor: '#fee2e2' },
+                    : { color: OASIS.colors.danger, backgroundColor: '#fee2e2' },
                 ]}
               >
                 {open ? 'مفتوح' : 'مغلق'}
@@ -802,14 +813,14 @@ export default function WebMap() {
             ) : null}
             {place.rating != null ? <Text style={styles.miniChip}>★ {place.rating.toFixed(1)}</Text> : null}
             {place.phone ? (
-              <Text style={[styles.miniChip, { color: '#1d4ed8', backgroundColor: '#eff6ff' }]}>
+              <Text style={[styles.miniChip, { color: '#1d4ed8', backgroundColor: OASIS.colors.infoSoft }]}>
                 {place.phone}
               </Text>
             ) : null}
           </View>
         </View>
         <View style={styles.placeActions}>
-          <Pressable
+          <Pressable oasisKind="icon"
             hitSlop={8}
             onPress={() => window.open(navigationUrl(place.lat, place.lng), '_blank', 'noopener')}
             style={styles.placeActionBtn}
@@ -817,7 +828,7 @@ export default function WebMap() {
             <Navigation size={15} color={C.accent} />
           </Pressable>
           {place.phone ? (
-            <Pressable
+            <Pressable oasisKind="icon"
               hitSlop={8}
               onPress={() => window.open(`tel:${place.phone}`, '_self')}
               style={styles.placeActionBtn}
@@ -831,20 +842,15 @@ export default function WebMap() {
   };
 
   const placesSheet = (
-    <View style={[styles.sheet, isWide ? styles.sheetWide : styles.sheetMobile]}>
+    <OasisSurface oasisSurface="sheet" style={[styles.sheet, isWide ? styles.sheetWide : styles.sheetMobile]}>
       <View style={styles.sheetHandle} />
       <View style={styles.sheetHead}>
         <Store size={17} color={C.accent} />
         <Text style={styles.sheetTitle}>
           {placesLoading ? 'جارٍ البحث عن المحلات القريبة…' : `أقرب المحلات (${places.length})`}
         </Text>
-        {placesLoading ? (
-          <ActivityIndicator size="small" color={C.accent} />
-        ) : (
-          <Pressable onPress={() => setSheetOpen(false)} hitSlop={8}>
-            <X size={16} color={C.muted} />
-          </Pressable>
-        )}
+        {placesLoading ? <ActivityIndicator size="small" color={C.accent} /> : null}
+        <Pressable accessibilityLabel="إغلاق أقرب المحلات" onPress={() => setSheetOpen(false)} hitSlop={8}><X size={20} color={C.muted} /></Pressable>
       </View>
       <ScrollView
         style={styles.sheetScroll}
@@ -858,7 +864,7 @@ export default function WebMap() {
           </Text>
         ) : null}
       </ScrollView>
-    </View>
+    </OasisSurface>
   );
 
   return (
@@ -866,30 +872,31 @@ export default function WebMap() {
       {/* 1. FIXED APP HEADER */}
       <AppHeader
         variant="sub"
-        title="خريطة حيّنا 🗺️"
-        subtitle={`${visiblePins.length} نشاط · ${places.length} محل قريب`}
+        title="خريطة الحي"
+        subtitle={city || 'استكشف ما حولك'}
         fallbackRoute="/home"
         rightAction={
           <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-            <Pressable
+            <HeaderAction
               onPress={() => {
                 setMapNotice(null);
                 setEngine((prev) => (prev === 'leaflet' ? 'google' : 'leaflet'));
               }}
+              accessibilityLabel="تبديل الخريطة"
               style={[styles.engineBtn, engine === 'google' && styles.engineBtnGoogle]}
             >
               {engine === 'leaflet' ? (
                 <>
-                  <Layers size={13} color="#059669" />
-                  <Text style={styles.engineBtnText}>خريطة حيّنا</Text>
+                  <Layers size={13} color={OASIS.colors.primary} />
+
                 </>
               ) : (
                 <>
                   <Globe size={13} color="#2563eb" />
-                  <Text style={[styles.engineBtnText, { color: '#2563eb' }]}>Google</Text>
+
                 </>
               )}
-            </Pressable>
+            </HeaderAction>
           </View>
         }
       />
@@ -901,7 +908,7 @@ export default function WebMap() {
         }}
         style={{
           position: 'absolute',
-          top: 52,
+          top: appHeaderHeight,
           left: 0,
           right: 0,
           bottom: 0,
@@ -915,12 +922,12 @@ export default function WebMap() {
       <View pointerEvents="box-none" style={styles.floatingTopContainer}>
         {/* Google Maps Search Capsule */}
         <View style={styles.floatingSearchCapsule}>
-          <Search size={18} color="#059669" />
+          <Search size={18} color={OASIS.colors.primary} />
           <TextInput
             value={query}
             onChangeText={setQuery}
             onSubmitEditing={() => void runPlaceSearch(placeCategory, query)}
-            placeholder="ابحث في الخريطة عن بقالة، صيدلية، سباك..."
+            placeholder="ابحث عن مكان أو خدمة"
             placeholderTextColor="#94a3b8"
             style={styles.floatingSearchInput}
             returnKeyType="search"
@@ -932,14 +939,16 @@ export default function WebMap() {
           ) : null}
         </View>
 
-        {/* Floating Google Maps Category Chips */}
-        <ScrollView
+        <Pressable accessibilityRole="button" accessibilityState={{ expanded: categoriesOpen }} onPress={() => setCategoriesOpen(v => !v)} style={styles.filterToggle}>
+          <SlidersHorizontal size={17} color={C.accent} /><Text style={styles.floatingChipText}>فئات الأماكن</Text>{categoriesOpen ? <ChevronUp size={16} color={C.muted}/> : <ChevronDown size={16} color={C.muted}/>}
+        </Pressable>
+        {categoriesOpen ? <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.floatingChipsScroll}
-          style={styles.floatingChipsRow}
+          contentContainerStyle={[styles.floatingChipsScroll, { direction: 'ltr' }]}
+          style={[styles.floatingChipsRow, { direction: 'rtl' }]}
         >
-          <Pressable
+          <Pressable oasisKind="chip"
             onPress={() => {
               setPlaceCategory(ALL_PLACES_KEY);
               void runPlaceSearch(ALL_PLACES_KEY, query);
@@ -955,11 +964,11 @@ export default function WebMap() {
                 placeCategory === ALL_PLACES_KEY && styles.floatingChipTextActive,
               ]}
             >
-              🌟 الكل ({places.length})
+              كل الأماكن
             </Text>
           </Pressable>
-          {PLACE_CATEGORIES.map((category) => (
-            <Pressable
+          {PLACE_CATEGORIES.map((category) => { const CategoryIcon = categoryIcons[category.key] || Store; return (
+            <Pressable oasisKind="chip"
               key={category.key}
               onPress={() => {
                 setPlaceCategory(category.key);
@@ -970,36 +979,37 @@ export default function WebMap() {
                 placeCategory === category.key && styles.floatingChipActive,
               ]}
             >
+              <CategoryIcon size={16} color={placeCategory === category.key ? OASIS.colors.surface : C.accent} />
               <Text
                 style={[
                   styles.floatingChipText,
                   placeCategory === category.key && styles.floatingChipTextActive,
                 ]}
               >
-                {category.emoji} {category.label}
+                {category.label}
               </Text>
             </Pressable>
-          ))}
-        </ScrollView>
+          ); })}
+        </ScrollView> : null}
       </View>
 
       {/* 4. FLOATING GOOGLE MAPS ACTION BUTTONS (BOTTOM-RIGHT FABs) */}
       <View style={styles.floatingFabCol}>
-        <Pressable
+        <Pressable oasisKind="icon"
           onPress={() => void locateMe()}
           style={styles.floatingFabBtn}
           accessibilityRole="button"
           accessibilityLabel="تحديد موقعي"
         >
-          <Navigation size={18} color={locating ? '#94a3b8' : '#059669'} />
+          <LocateFixed size={20} color={locating ? '#94a3b8' : OASIS.colors.primary} />
         </Pressable>
-        <Pressable
+        <Pressable oasisKind="icon"
           onPress={() => setHeatOn((v) => !v)}
           style={[styles.floatingFabBtn, heatOn && { backgroundColor: '#ea580c' }]}
           accessibilityRole="button"
           accessibilityLabel="خريطة التفاعل"
         >
-          <Flame size={18} color={heatOn ? '#fff' : '#ea580c'} />
+          <Flame size={18} color={heatOn ? OASIS.colors.surface : '#ea580c'} />
         </Pressable>
       </View>
 
@@ -1023,14 +1033,14 @@ export default function WebMap() {
 
       {/* Floating Button to Re-open Nearby Places */}
       {!sheetOpen && (
-        <Pressable
+        <Pressable oasisKind="action"
           style={styles.openSheetBtn}
-          onPress={() => setSheetOpen(true)}
+          onPress={() => { setSheetOpen(true); void runPlaceSearch(placeCategory, query); }}
           accessibilityRole="button"
         >
-          <Store size={17} color="#fff" />
+          <Store size={17} color={OASIS.colors.surface} />
           <Text style={styles.openSheetBtnText}>
-            أقرب المحلات ({places.length})
+            أقرب المحلات
           </Text>
         </Pressable>
       )}
@@ -1038,7 +1048,7 @@ export default function WebMap() {
       {sheetOpen ? placesSheet : null}
 
       <View style={styles.legend}>
-        <Text style={styles.legendText}>📍 نطاق الحي فقط — الموقع الدقيق بالخاص</Text>
+        <Text style={styles.legendText}>مواقع المنشورات تقريبية لحماية الخصوصية</Text>
       </View>
     </View>
   );
@@ -1047,7 +1057,7 @@ export default function WebMap() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#e2e8f0',
+    backgroundColor: OASIS.colors.line,
     position: 'relative',
     overflow: 'hidden',
   },
@@ -1065,15 +1075,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: '#ffffff',
-    borderRadius: 24,
+    backgroundColor: OASIS.colors.surface,
+    borderRadius: 14,
     paddingHorizontal: 16,
     height: 48,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    shadowColor: '#0f172a',
+    borderColor: OASIS.colors.line,
+    shadowColor: OASIS.colors.ink,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
+    shadowOpacity: 0,
     shadowRadius: 10,
     elevation: 6,
   },
@@ -1082,7 +1092,7 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     fontSize: 13.5,
     fontWeight: '600',
-    color: '#0f172a',
+    color: OASIS.colors.ink,
     height: 44,
     padding: 0,
   },
@@ -1095,30 +1105,34 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     paddingVertical: 2,
   },
+  filterToggle: { alignSelf: 'flex-end', flexDirection: 'row-reverse', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: OASIS.colors.surface, borderRadius: 14, borderWidth: 1, borderColor: OASIS.colors.line },
   floatingChip: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 6,
     paddingHorizontal: 13,
     paddingVertical: 7,
-    borderRadius: 20,
+    borderRadius: 14,
     backgroundColor: 'rgba(255, 255, 255, 0.96)',
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0,
     shadowRadius: 4,
     elevation: 3,
   },
   floatingChipActive: {
-    backgroundColor: '#059669',
-    borderColor: '#059669',
+    backgroundColor: OASIS.colors.primary,
+    borderColor: OASIS.colors.primary,
   },
   floatingChipText: {
     fontSize: 11.5,
-    fontWeight: '800',
-    color: '#334155',
+    fontWeight: '600',
+    color: OASIS.colors.ink,
   },
   floatingChipTextActive: {
-    color: '#ffffff',
+    color: OASIS.colors.surface,
   },
   floatingFabCol: {
     position: 'absolute',
@@ -1130,20 +1144,20 @@ const styles = StyleSheet.create({
   floatingFabBtn: {
     width: 46,
     height: 46,
-    borderRadius: 23,
-    backgroundColor: '#ffffff',
+    borderRadius: 14,
+    backgroundColor: OASIS.colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.16,
+    shadowOpacity: 0,
     shadowRadius: 6,
     elevation: 5,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
   },
-  placeChipText: { fontSize: 11.5, fontWeight: '800', color: C.ink },
-  placeChipTextActive: { color: '#fff' },
+  placeChipText: { fontSize: 11.5, fontWeight: '600', color: C.ink },
+  placeChipTextActive: { color: OASIS.colors.surface },
   cityChip: {
     paddingHorizontal: 12,
     paddingVertical: 5,
@@ -1151,17 +1165,17 @@ const styles = StyleSheet.create({
     backgroundColor: C.accentSoft,
   },
   cityChipActive: { backgroundColor: C.accent },
-  cityChipText: { fontSize: 11, fontWeight: '800', color: C.accent },
-  cityChipTextActive: { color: '#fff' },
+  cityChipText: { fontSize: 11, fontWeight: '600', color: C.accent },
+  cityChipTextActive: { color: OASIS.colors.surface },
   divider: { width: 1, height: 20, backgroundColor: C.line, alignSelf: 'center', marginHorizontal: 2 },
   sheet: {
     position: 'absolute',
-    backgroundColor: '#fff',
+    backgroundColor: OASIS.colors.surface,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.12,
+    shadowOpacity: 0,
     shadowRadius: 18,
     elevation: 12,
     zIndex: 998,
@@ -1177,7 +1191,7 @@ const styles = StyleSheet.create({
     bottom: 20,
     width: 380,
     maxHeight: '65%',
-    borderRadius: 24,
+    borderRadius: 20,
   },
   sheetHandle: {
     width: 36,
@@ -1197,7 +1211,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
   },
-  sheetTitle: { flex: 1, fontSize: 14, fontWeight: '800', color: C.ink, textAlign: 'right' },
+  sheetTitle: { flex: 1, fontSize: 14, fontWeight: '600', color: C.ink, textAlign: 'right' },
   sheetScroll: { flex: 1 },
   sheetContent: { padding: 12, gap: 10 },
   placeRow: {
@@ -1206,25 +1220,25 @@ const styles = StyleSheet.create({
     gap: 10,
     padding: 10,
     borderRadius: 16,
-    backgroundColor: '#f8fafc',
+    backgroundColor: OASIS.colors.background,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
   },
   placeBadge: {
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: '#ecfdf5',
+    backgroundColor: OASIS.colors.soft,
     alignItems: 'center',
     justifyContent: 'center',
   },
   placeBody: { flex: 1, gap: 2 },
-  placeName: { fontSize: 13.5, fontWeight: '800', color: C.ink, textAlign: 'right' },
+  placeName: { fontSize: 13.5, fontWeight: '600', color: C.ink, textAlign: 'right' },
   placeMeta: { fontSize: 11, color: C.muted, fontWeight: '600', textAlign: 'right' },
   placeChips: { flexDirection: 'row-reverse', gap: 5, flexWrap: 'wrap', marginTop: 4 },
   miniChip: {
-    fontSize: 10,
-    fontWeight: '800',
+    fontSize: 11,
+    fontWeight: '600',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
@@ -1234,11 +1248,11 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 10,
-    backgroundColor: '#ecfdf5',
+    backgroundColor: OASIS.colors.soft,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  emptyText: { textAlign: 'center', fontSize: 12, color: C.muted, fontWeight: '700', paddingVertical: 20 },
+  emptyText: { textAlign: 'center', fontSize: 12, color: C.muted, fontWeight: '700', paddingVertical: 14 },
   openSheetBtn: {
     position: 'absolute',
     bottom: 30,
@@ -1249,17 +1263,17 @@ const styles = StyleSheet.create({
     backgroundColor: C.accent,
     paddingHorizontal: 18,
     paddingVertical: 12,
-    borderRadius: 30,
+    borderRadius: 14,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0,
     shadowRadius: 10,
     elevation: 8,
     zIndex: 997,
   },
   openSheetBtnText: {
-    color: '#fff',
-    fontWeight: '800',
+    color: OASIS.colors.surface,
+    fontWeight: '600',
     fontSize: 13,
   },
   legend: {
@@ -1272,13 +1286,13 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     zIndex: 996,
   },
-  legendText: { fontSize: 10, color: C.muted, fontWeight: '700' },
+  legendText: { fontSize: 11, color: C.muted, fontWeight: '700' },
   mapNotice: {
     position: 'absolute',
     top: 185,
     left: 14,
     right: 14,
-    backgroundColor: '#fffbeb',
+    backgroundColor: OASIS.colors.warningSoft,
     borderWidth: 1,
     borderColor: '#fde68a',
     borderRadius: 12,
@@ -1300,11 +1314,11 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     zIndex: 995,
   },
-  mapHintText: { color: '#fff', fontSize: 12, fontWeight: '700' },
-  chip: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 18, paddingHorizontal: 10, paddingVertical: 7, backgroundColor: '#fff' },
-  chipText: { color: '#475569', fontSize: 11, fontWeight: '700' },
-  chipTextActive: { color: '#fff' },
-  engineBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 12, backgroundColor: '#ecfdf5', borderWidth: 1, borderColor: '#a7f3d0' },
-  engineBtnGoogle: { backgroundColor: '#eff6ff', borderColor: '#bfdbfe' },
-  engineBtnText: { color: '#047857', fontSize: 11, fontWeight: '800' },
+  mapHintText: { color: OASIS.colors.surface, fontSize: 12, fontWeight: '700' },
+  chip: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: OASIS.colors.line, borderRadius: 14, paddingHorizontal: 10, paddingVertical: 7, backgroundColor: OASIS.colors.surface },
+  chipText: { color: OASIS.colors.muted, fontSize: 11, fontWeight: '700' },
+  chipTextActive: { color: OASIS.colors.surface },
+  engineBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 12, backgroundColor: OASIS.colors.soft, borderWidth: 1, borderColor: '#a7f3d0' },
+  engineBtnGoogle: { backgroundColor: OASIS.colors.infoSoft, borderColor: '#bfdbfe' },
+  engineBtnText: { color: OASIS.colors.primary, fontSize: 11, fontWeight: '600' },
 });

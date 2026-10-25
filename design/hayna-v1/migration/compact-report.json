@@ -1,0 +1,393 @@
+{
+  "backup": "C:\\Users\\Go\\AppData\\Local\\Temp\\hayna-compact-ios-aPCI43",
+  "files": [
+    {
+      "file": "app\\about.tsx",
+      "adjustments": 20
+    },
+    {
+      "file": "app\\admin-marketplace.tsx",
+      "adjustments": 16
+    },
+    {
+      "file": "app\\admin-pro.tsx",
+      "adjustments": 17
+    },
+    {
+      "file": "app\\admin.tsx",
+      "adjustments": 19
+    },
+    {
+      "file": "app\\ask.tsx",
+      "adjustments": 10
+    },
+    {
+      "file": "app\\auth.tsx",
+      "adjustments": 8
+    },
+    {
+      "file": "app\\business.tsx",
+      "adjustments": 24
+    },
+    {
+      "file": "app\\carpooling.tsx",
+      "adjustments": 21
+    },
+    {
+      "file": "app\\cities.tsx",
+      "adjustments": 11
+    },
+    {
+      "file": "app\\connected-social.tsx",
+      "adjustments": 23
+    },
+    {
+      "file": "app\\contact-us.tsx",
+      "adjustments": 5
+    },
+    {
+      "file": "app\\conversation.tsx",
+      "adjustments": 1
+    },
+    {
+      "file": "app\\create-story.tsx",
+      "adjustments": 29
+    },
+    {
+      "file": "app\\directory.tsx",
+      "adjustments": 18
+    },
+    {
+      "file": "app\\districts.tsx",
+      "adjustments": 9
+    },
+    {
+      "file": "app\\favorites.tsx",
+      "adjustments": 33
+    },
+    {
+      "file": "app\\home.tsx",
+      "adjustments": 14
+    },
+    {
+      "file": "app\\index.tsx",
+      "adjustments": 3
+    },
+    {
+      "file": "app\\live\\create.tsx",
+      "adjustments": 8
+    },
+    {
+      "file": "app\\live\\[id].tsx",
+      "adjustments": 1
+    },
+    {
+      "file": "app\\lives.tsx",
+      "adjustments": 79
+    },
+    {
+      "file": "app\\locations.tsx",
+      "adjustments": 18
+    },
+    {
+      "file": "app\\map.tsx",
+      "adjustments": 61
+    },
+    {
+      "file": "app\\map.web.tsx",
+      "adjustments": 22
+    },
+    {
+      "file": "app\\market.tsx",
+      "adjustments": 90
+    },
+    {
+      "file": "app\\marketplace-dashboard.tsx",
+      "adjustments": 14
+    },
+    {
+      "file": "app\\marketplace-item.tsx",
+      "adjustments": 10
+    },
+    {
+      "file": "app\\messages.tsx",
+      "adjustments": 29
+    },
+    {
+      "file": "app\\more.tsx",
+      "adjustments": 11
+    },
+    {
+      "file": "app\\new-listing.tsx",
+      "adjustments": 18
+    },
+    {
+      "file": "app\\new-service.tsx",
+      "adjustments": 28
+    },
+    {
+      "file": "app\\notifications.tsx",
+      "adjustments": 38
+    },
+    {
+      "file": "app\\question.tsx",
+      "adjustments": 65
+    },
+    {
+      "file": "app\\questions.tsx",
+      "adjustments": 9
+    },
+    {
+      "file": "app\\rate-app.tsx",
+      "adjustments": 28
+    },
+    {
+      "file": "app\\report.tsx",
+      "adjustments": 16
+    },
+    {
+      "file": "app\\request.tsx",
+      "adjustments": 85
+    },
+    {
+      "file": "app\\safety-center.tsx",
+      "adjustments": 23
+    },
+    {
+      "file": "app\\search.tsx",
+      "adjustments": 44
+    },
+    {
+      "file": "app\\service.tsx",
+      "adjustments": 56
+    },
+    {
+      "file": "app\\stories.tsx",
+      "adjustments": 36
+    },
+    {
+      "file": "app\\story-settings.tsx",
+      "adjustments": 23
+    },
+    {
+      "file": "app\\story-viewers.tsx",
+      "adjustments": 7
+    },
+    {
+      "file": "app\\story.tsx",
+      "adjustments": 23
+    },
+    {
+      "file": "app\\support.tsx",
+      "adjustments": 17
+    },
+    {
+      "file": "app\\tools.tsx",
+      "adjustments": 27
+    },
+    {
+      "file": "app\\user.tsx",
+      "adjustments": 43
+    },
+    {
+      "file": "app\\weather.tsx",
+      "adjustments": 57
+    },
+    {
+      "file": "app\\_layout.tsx",
+      "adjustments": 6
+    },
+    {
+      "file": "components\\account\\AccountCenter.tsx",
+      "adjustments": 68
+    },
+    {
+      "file": "components\\ActionSheet.tsx",
+      "adjustments": 1
+    },
+    {
+      "file": "components\\admin\\AdminAnalytics.tsx",
+      "adjustments": 18
+    },
+    {
+      "file": "components\\admin\\AdminBadges.tsx",
+      "adjustments": 24
+    },
+    {
+      "file": "components\\admin\\AdminFeatureFlags.tsx",
+      "adjustments": 7
+    },
+    {
+      "file": "components\\admin\\AdminGlobalSearch.tsx",
+      "adjustments": 15
+    },
+    {
+      "file": "components\\admin\\AdminInsights.tsx",
+      "adjustments": 7
+    },
+    {
+      "file": "components\\admin\\AdminOverview.tsx",
+      "adjustments": 30
+    },
+    {
+      "file": "components\\admin\\AdminPulse.tsx",
+      "adjustments": 30
+    },
+    {
+      "file": "components\\admin\\AdminRbacPanel.tsx",
+      "adjustments": 16
+    },
+    {
+      "file": "components\\admin\\AdminSecurityCenter.tsx",
+      "adjustments": 22
+    },
+    {
+      "file": "components\\admin\\adminStyles.ts",
+      "adjustments": 120
+    },
+    {
+      "file": "components\\admin\\AdminSupportCenter.tsx",
+      "adjustments": 38
+    },
+    {
+      "file": "components\\admin\\AdminTaskCenter.tsx",
+      "adjustments": 17
+    },
+    {
+      "file": "components\\admin\\AdminWeeklyReport.tsx",
+      "adjustments": 20
+    },
+    {
+      "file": "components\\admin\\AdminWorkspace.tsx",
+      "adjustments": 25
+    },
+    {
+      "file": "components\\AdminCommandCenter.tsx",
+      "adjustments": 30
+    },
+    {
+      "file": "components\\AdminLocationManager.tsx",
+      "adjustments": 14
+    },
+    {
+      "file": "components\\BottomNav.tsx",
+      "adjustments": 2
+    },
+    {
+      "file": "components\\chat\\chatStyles.ts",
+      "adjustments": 46
+    },
+    {
+      "file": "components\\home\\HomeHero.tsx",
+      "adjustments": 2
+    },
+    {
+      "file": "components\\home\\homeStyles.ts",
+      "adjustments": 90
+    },
+    {
+      "file": "components\\home\\StoriesRow.tsx",
+      "adjustments": 1
+    },
+    {
+      "file": "components\\lives\\FloatingEffect.tsx",
+      "adjustments": 2
+    },
+    {
+      "file": "components\\lives\\LiveCommentCard.tsx",
+      "adjustments": 5
+    },
+    {
+      "file": "components\\lives\\LiveMedia.native.tsx",
+      "adjustments": 1
+    },
+    {
+      "file": "components\\lives\\LiveModerationPanel.tsx",
+      "adjustments": 9
+    },
+    {
+      "file": "components\\lives\\liveRoomStyles.ts",
+      "adjustments": 92
+    },
+    {
+      "file": "components\\LocationScopeBar.tsx",
+      "adjustments": 4
+    },
+    {
+      "file": "components\\LocationSelectorModal.tsx",
+      "adjustments": 15
+    },
+    {
+      "file": "components\\profile\\AccountIdentityBadge.tsx",
+      "adjustments": 4
+    },
+    {
+      "file": "components\\profile\\NeighborBadgesCard.tsx",
+      "adjustments": 11
+    },
+    {
+      "file": "components\\profile\\ProfileCustomizationEntry.tsx",
+      "adjustments": 4
+    },
+    {
+      "file": "components\\profile\\ProfileIdentityCard.tsx",
+      "adjustments": 18
+    },
+    {
+      "file": "components\\profile\\ProfileStories.tsx",
+      "adjustments": 10
+    },
+    {
+      "file": "components\\QuestionFilterSheet.tsx",
+      "adjustments": 6
+    },
+    {
+      "file": "components\\ResidentCard.tsx",
+      "adjustments": 9
+    },
+    {
+      "file": "components\\shared\\AppHeader.tsx",
+      "adjustments": 2
+    },
+    {
+      "file": "components\\shared\\Card.tsx",
+      "adjustments": 3
+    },
+    {
+      "file": "components\\shared\\ScreenHeader.tsx",
+      "adjustments": 2
+    },
+    {
+      "file": "components\\shared\\ScreenState.tsx",
+      "adjustments": 2
+    },
+    {
+      "file": "components\\shared\\SupportUI.tsx",
+      "adjustments": 6
+    },
+    {
+      "file": "components\\story\\StoryCarousel.tsx",
+      "adjustments": 5
+    },
+    {
+      "file": "components\\story\\StoryControls.tsx",
+      "adjustments": 8
+    },
+    {
+      "file": "components\\story\\StoryPreview.tsx",
+      "adjustments": 21
+    },
+    {
+      "file": "components\\TwitterInquiryCard.tsx",
+      "adjustments": 52
+    },
+    {
+      "file": "lib/dialog.tsx",
+      "adjustments": 6
+    },
+    {
+      "file": "lib/ui.ts",
+      "adjustments": 5
+    }
+  ]
+}

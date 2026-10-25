@@ -48,7 +48,8 @@ export function isLocationMatching(
   activeDistrict: string
 ): boolean {
   if (isAllKingdom(activeCity)) {
-    return true;
+    // Unknown location is not permission to expose posts from every neighborhood.
+    return false;
   }
 
   // Must have a city
@@ -59,7 +60,7 @@ export function isLocationMatching(
   const itemC = normalizeLoc(item.city);
   const actC = normalizeLoc(activeCity);
 
-  if (!itemC.includes(actC) && !actC.includes(itemC)) {
+  if (itemC !== actC) {
     return false;
   }
 
@@ -75,7 +76,7 @@ export function isLocationMatching(
     }
     const itemD = normalizeLoc(item.district);
     const actD = normalizeLoc(activeDistrict);
-    if (!itemD.includes(actD) && !actD.includes(itemD)) {
+    if (itemD !== actD) {
       return false;
     }
   }

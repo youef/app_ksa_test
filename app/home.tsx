@@ -1,13 +1,31 @@
+import { oasisAssets } from '@/components/oasis/assets';
+import { OasisPressable as Pressable } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, RefreshControl, ScrollView, StatusBar, Text, View } from 'react-native';
-import { router } from 'expo-router';
-import { ChevronLeft, Flame, Sparkles, HeartHandshake, MessageCircle, SlidersHorizontal, X, Check } from 'lucide-react-native';
+import { ActivityIndicator, Alert, ImageBackground, Modal, Platform, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SlidersHorizontal, X, Check, Clock3, TrendingUp, MapPin, LayoutGrid, HandHelping, PackageOpen, CircleHelp, Store, Siren, UserRound, Hourglass, MessageCircle, CircleCheck, CalendarDays, CalendarRange, CalendarClock, RotateCcw, ListFilter } from 'lucide-react-native';
+
+const FILTER_OPTION_ICONS: Record<string, typeof Check> = {
+  'الكل': LayoutGrid,
+  'مساعدة وطلبات': HandHelping,
+  'إعارة أغراض': PackageOpen,
+  'أسئلة واستفسارات': CircleHelp,
+  'خدمات الحي': Store,
+  'الطوارئ': Siren,
+  'منشوراتي': UserRound,
+  'بانتظار المساعدة': Hourglass,
+  'تم الرد': MessageCircle,
+  'مكتمل': CircleCheck,
+  'كل الأوقات': CalendarDays,
+  'اليوم': Clock3,
+  'هذا الأسبوع': CalendarRange,
+  'هذا الشهر': CalendarClock,
+};
 
 import { supabase } from '@/lib/supabase';
 import { getBrandingLogo, subscribeBrandingLogo, getCachedBrandingLogo } from '@/lib/branding';
 import { isLocationMatching, type HaynaLocation } from '@/lib/locationSync';
 import {
-  getGreeting,
   isEmergencyQuestion,
   isToolQuestion,
   toFeed,
@@ -19,6 +37,7 @@ import { useHomeFeed } from '@/hooks/useHomeFeed';
 import { useHomeLocation } from '@/hooks/useHomeLocation';
 import { useBottomNavInset } from '@/lib/bottomNav';
 import TwitterInquiryCard from '@/components/TwitterInquiryCard';
+import LocationScopeBar from '@/components/LocationScopeBar';
 import AppHeader from '@/components/shared/AppHeader';
 import AtmosphereBar from '@/components/home/AtmosphereBar';
 import StoriesRow from '@/components/home/StoriesRow';
@@ -28,7 +47,6 @@ import { FeedSkeleton, ErrorBanner } from '@/components/home/HomeStates';
 import { styles } from '@/components/home/homeStyles';
 import { requireAccount } from '@/lib/authGate';
 
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 export default function Home() {
   const { flags } = usePlatformConfig();
@@ -37,7 +55,6 @@ export default function Home() {
   const showToast = useCallback((msg: string) => showIsland(msg, undefined, 'success'), [showIsland]);
 
   const [logoUri, setLogoUri] = useState(getCachedBrandingLogo());
-  const [activeTab, setActiveTab] = useState<HomeTab>('all');
   const [sortBy, setSortBy] = useState<'newest' | 'engaged' | 'nearby'>('newest');
   const [filterOpen, setFilterOpen] = useState(false);
   const [draftKind, setDraftKind] = useState('الكل');
@@ -45,7 +62,7 @@ export default function Home() {
   const [draftPeriod, setDraftPeriod] = useState('كل الأوقات');
   const [appliedFilters, setAppliedFilters] = useState({ kind: 'الكل', status: 'الكل', period: 'كل الأوقات' });
   const [refreshing, setRefreshing] = useState(false);
-  const [greeting] = useState(() => getGreeting());
+  const activeTab: HomeTab = appliedFilters.kind === 'منشوراتي' ? 'mine' : 'all';
 
   // The feed hook resolves the saved location; the location hook owns it.
   // A ref breaks the circular dependency between the two hooks.
@@ -94,7 +111,7 @@ export default function Home() {
       );
       showToast('تم نشر الرد بنجاح في المحادثة');
     },
-    [feed.profile, feed.setQuestions, showToast],
+    [feed.currentUserId, feed.profile, feed.setQuestions, showToast],
   );
 
   // ---------- Filtering ----------
@@ -121,20 +138,15 @@ export default function Home() {
       myCount: myQuestions.length + myRequests.length,
       filteredMyQuestions: myQuestions,
       filteredMyRequests: myRequests,
-      emergency: filteredQuestions.filter(isEmergencyQuestion),
+      emergency: filteredQuestions.filter(isEmergencyQuestion).slice(0, 5),
       tools: filteredQuestions.filter(isToolQuestion),
     };
   }, [questions, requests, currentUserId, matchesVisibleLocation]);
 
   const items: FeedItem[] = useMemo(() => {
-    switch (activeTab) {
-      case 'emergency': return toFeed(derived.emergency, []);
-      case 'tools': return toFeed(derived.tools, []);
-      case 'questions': return toFeed(derived.filteredQuestions, []);
-      case 'requests': return toFeed([], derived.filteredRequests);
-      case 'mine': return toFeed(derived.filteredMyQuestions, derived.filteredMyRequests);
-      default: return toFeed(derived.filteredQuestions, derived.filteredRequests);
-    }
+    return activeTab === 'mine'
+      ? toFeed(derived.filteredMyQuestions, derived.filteredMyRequests)
+      : toFeed(derived.filteredQuestions, derived.filteredRequests);
   }, [activeTab, derived]);
 
   const filteredItems = useMemo(() => {
@@ -185,97 +197,74 @@ export default function Home() {
     });
   }, [items, appliedFilters, sortBy, loc.city, loc.district]);
 
-  // Real activity: distinct neighbours who posted in the visible area during the last 24h.
-  const activeNeighbors = useMemo(() => {
-    const since = Date.now() - DAY_MS;
-    const ids = new Set<string>();
-    derived.filteredQuestions.forEach(x => new Date(x.created_at).getTime() > since && ids.add(x.author_id));
-    derived.filteredRequests.forEach(x => new Date(x.created_at).getTime() > since && ids.add(x.requester_id));
-    feed.stories.forEach(s => s.author_id && ids.add(s.author_id));
-    return ids.size;
-  }, [derived.filteredQuestions, derived.filteredRequests, feed.stories]);
-
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await feed.reload();
     setRefreshing(false);
   }, [feed.reload]);
 
-  const emergencyTop = derived.emergency[0];
+  // Infinite feed: fetch the next batch when the user scrolls near the end.
+  const handleFeedScroll = useCallback(({ nativeEvent }: any) => {
+    const { contentOffset, contentSize, layoutMeasurement } = nativeEvent;
+    const nearEnd = contentOffset.y + layoutMeasurement.height >= contentSize.height - 520;
+    if (nearEnd && feed.hasMore && !feed.loadingMore && !feed.loading) {
+      void feed.loadMore();
+    }
+  }, [feed.hasMore, feed.loadingMore, feed.loading, feed.loadMore]);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, layout.page]}>
+
       <AppHeader
         variant="home"
         profile={feed.profile}
         isGuest={!feed.currentUserId}
         logoUri={logoUri}
         unreadCount={feed.unreadNotifCount}
+        unreadMessagesCount={feed.unreadMessagesCount}
       />
 
       <ScrollView
         style={styles.container}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ paddingBottom: bottomNavInset + 24, backgroundColor: '#eaf3ee', flexGrow: 1 }}
+        onScroll={handleFeedScroll}
+        scrollEventThrottle={300}
+        contentContainerStyle={{ paddingBottom: bottomNavInset + 24, backgroundColor: 'transparent', flexGrow: 1 }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor="#059669"
-            colors={['#059669']}
-            progressBackgroundColor="#ecfdf5"
+            tintColor={OASIS.colors.primary}
+            colors={[OASIS.colors.primary]}
+            progressBackgroundColor={OASIS.colors.soft}
           />
         }
       >
-        <AtmosphereBar
-          weather={loc.weather}
-          weatherLoading={loc.weatherLoading}
-          activeNeighbors={activeNeighbors}
-          emergencyCount={derived.emergency.length}
-        />
-
-        {flags.stories !== false && <StoriesRow profile={feed.profile} stories={feed.stories} selectedDistrict={loc.district} />}
-
-        {emergencyTop && (
-          <View style={styles.emergencyHomeCard}>
-            <View style={styles.emergencyHomeHeader}>
-              <View style={styles.emergencyLiveBadge}>
-                <Text style={styles.emergencyLiveText}>تنبيه مباشر</Text>
-              </View>
-              <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-                <Flame size={18} color="#dc2626" />
-                <Text style={styles.emergencyHomeTitle}>تنبيه طارئ عاجل في حيك</Text>
-              </View>
-            </View>
-            <Pressable
-              onPress={() => router.push({ pathname: '/question', params: { id: emergencyTop.id } })}
-              style={styles.emergencyContentBox}
-              accessibilityRole="button"
-              accessibilityLabel={`تنبيه طارئ: ${emergencyTop.title}`}
-            >
-              <Text style={styles.emergencyQuestionTitle}>{emergencyTop.title}</Text>
-            </Pressable>
+        <View style={layout.contextRow}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <LocationScopeBar compact location={{ region: loc.region, city: loc.city, district: loc.district }} />
           </View>
-        )}
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <AtmosphereBar compact weather={loc.weather} weatherLoading={loc.weatherLoading} />
+          </View>
+        </View>
 
-        <View style={styles.feedSection}>
+        {flags.stories !== false && Boolean(feed.currentUserId) && <View style={layout.stories}><StoriesRow profile={feed.profile} stories={feed.stories} selectedDistrict={loc.district} /></View>}
+
+        <View style={[styles.feedSection, layout.feed]}>
           <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, gap: 8 }}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 7 }}>
-              {([
-                ['newest', 'الأحدث'],
-                ['engaged', 'الأكثر تفاعلاً'],
-                ['nearby', 'الأقرب'],
-              ] as const).map(([key, label]) => (
-                <Pressable key={key} onPress={() => setSortBy(key)} style={{ paddingHorizontal: 13, paddingVertical: 8, borderRadius: 18, backgroundColor: sortBy === key ? '#176b52' : '#ffffff', borderWidth: 1, borderColor: sortBy === key ? '#176b52' : '#dbe5df' }} accessibilityRole="button" accessibilityState={{ selected: sortBy === key }}>
-                  <Text style={{ color: sortBy === key ? '#ffffff' : '#475569', fontSize: 12, fontWeight: '800' }}>{label}</Text>
+            <ScrollView horizontal style={{ flex: 1, minWidth: 0, direction: 'rtl' }} showsHorizontalScrollIndicator={false} contentContainerStyle={{ direction: 'ltr', flexDirection: 'row-reverse', alignItems: 'center', gap: 6, paddingVertical: 6 }}>
+              {([['newest', 'الأحدث'], ['engaged', 'الأكثر تفاعلاً'], ['nearby', 'الأقرب']] as const).map(([key, label]) => (
+                <Pressable oasisKind="chip" oasisVariant={sortBy === key ? 'primary' : 'ghost'} key={key} onPress={() => setSortBy(key)} style={{ flexDirection: 'row-reverse', gap: 4, paddingHorizontal: 10 }} accessibilityRole="button" accessibilityState={{ selected: sortBy === key }}>
+                  {key === 'newest' ? <Clock3 size={14} color={OASIS.colors.primary} /> : key === 'engaged' ? <TrendingUp size={14} color={OASIS.colors.primary} /> : <MapPin size={14} color={OASIS.colors.primary} />}
+                  <Text style={{ fontSize: 12, fontWeight: '600' }}>{label}</Text>
                 </Pressable>
               ))}
             </ScrollView>
-            <Pressable onPress={() => { setDraftKind(appliedFilters.kind); setDraftStatus(appliedFilters.status); setDraftPeriod(appliedFilters.period); setFilterOpen(true); }} style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 14, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#b7d8c8' }} accessibilityRole="button" accessibilityLabel="تصفية المنشورات">
-              <SlidersHorizontal size={15} color="#176b52" />
-              <Text style={{ color: '#176b52', fontSize: 12, fontWeight: '900' }}>تصفية</Text>
-              {(appliedFilters.kind !== 'الكل' || appliedFilters.status !== 'الكل' || appliedFilters.period !== 'كل الأوقات') && <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#dc2626' }} />}
+            <Pressable oasisKind="icon" oasisVariant="ghost" onPress={() => { setDraftKind(appliedFilters.kind); setDraftStatus(appliedFilters.status); setDraftPeriod(appliedFilters.period); setFilterOpen(true); }} accessibilityRole="button" accessibilityLabel="تصفية المنشورات">
+              <SlidersHorizontal size={20} color={OASIS.colors.primary} />
+              {(appliedFilters.kind !== 'الكل' || appliedFilters.status !== 'الكل' || appliedFilters.period !== 'كل الأوقات') && <View style={{ position: 'absolute', top: 5, right: 5, width: 6, height: 6, borderRadius: 3, backgroundColor: OASIS.colors.danger }} />}
             </Pressable>
           </View>
 
@@ -304,7 +293,7 @@ export default function Home() {
           )}
 
           {!feed.loading && feed.hasMore && items.length > 0 && (
-            <Pressable
+            <Pressable oasisKind="action"
               style={styles.loadMoreBtn}
               onPress={feed.loadMore}
               disabled={feed.loadingMore}
@@ -312,46 +301,49 @@ export default function Home() {
               accessibilityLabel="تحميل المزيد"
             >
               {feed.loadingMore ? (
-                <ActivityIndicator color="#059669" />
+                <ActivityIndicator color={OASIS.colors.primary} />
               ) : (
                 <Text style={styles.loadMoreText}>حمّل المزيد</Text>
               )}
             </Pressable>
           )}
 
-          <View style={{ height: bottomNavInset }} />
+
         </View>
       </ScrollView>
 
       <Modal visible={filterOpen} transparent animationType="slide" onRequestClose={() => setFilterOpen(false)}>
         <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(15,23,42,0.38)' }}>
           <Pressable style={{ flex: 1 }} onPress={() => setFilterOpen(false)} accessibilityLabel="إغلاق لوحة التصفية" />
-          <View style={{ backgroundColor: '#f8fbf9', borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingHorizontal: 20, paddingTop: 18, paddingBottom: 28, maxHeight: '82%' }}>
+          <View style={{ backgroundColor: '#f8fbf9', borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingHorizontal: 20, paddingTop: 18, paddingBottom: 16, maxHeight: '82%' }}>
             <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
               <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 9 }}>
                 <View style={{ width: 38, height: 38, borderRadius: 13, backgroundColor: '#dff4e9', alignItems: 'center', justifyContent: 'center' }}><SlidersHorizontal size={18} color="#176b52" /></View>
                 <View>
-                  <Text style={{ color: '#102a22', fontSize: 18, fontWeight: '900', textAlign: 'right' }}>تصفية المنشورات</Text>
+                  <Text style={{ color: '#102a22', fontSize: 18, fontWeight: '700', textAlign: 'right' }}>تصفية المنشورات</Text>
                   <Text style={{ color: '#718078', fontSize: 11, marginTop: 2, textAlign: 'right' }}>اعرض ما يناسبك من منشورات الحي</Text>
                 </View>
               </View>
-              <Pressable onPress={() => setFilterOpen(false)} style={{ padding: 8, borderRadius: 12, backgroundColor: '#eaf1ed' }} accessibilityLabel="إغلاق"><X size={18} color="#475569" /></Pressable>
+              <Pressable onPress={() => setFilterOpen(false)} style={{ padding: 8, borderRadius: 12, backgroundColor: '#eaf1ed' }} accessibilityLabel="إغلاق"><X size={18} color={OASIS.colors.muted} /></Pressable>
             </View>
             <ScrollView showsVerticalScrollIndicator={false}>
               {([
-                { title: 'نوع المنشور', value: draftKind, setter: setDraftKind, options: ['الكل', 'مساعدة وطلبات', 'إعارة أغراض', 'أسئلة واستفسارات', 'خدمات الحي', 'الطوارئ'] },
+                { title: 'نوع المنشور', value: draftKind, setter: setDraftKind, options: ['الكل', 'مساعدة وطلبات', 'إعارة أغراض', 'أسئلة واستفسارات', 'خدمات الحي', 'الطوارئ', ...(currentUserId ? ['منشوراتي'] : [])] },
                 { title: 'حالة الطلب', value: draftStatus, setter: setDraftStatus, options: ['الكل', 'بانتظار المساعدة', 'تم الرد', 'مكتمل'] },
                 { title: 'تاريخ النشر', value: draftPeriod, setter: setDraftPeriod, options: ['كل الأوقات', 'اليوم', 'هذا الأسبوع', 'هذا الشهر'] },
               ] as const).map(section => (
                 <View key={section.title} style={{ marginBottom: 18 }}>
-                  <Text style={{ color: '#334155', fontSize: 13, fontWeight: '900', textAlign: 'right', marginBottom: 9 }}>{section.title}</Text>
+                  <Text style={{ color: OASIS.colors.ink, fontSize: 13, fontWeight: '700', textAlign: 'right', marginBottom: 9 }}>{section.title}</Text>
                   <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 }}>
                     {section.options.map(option => {
                       const selected = section.value === option;
+                      const OptionIcon = FILTER_OPTION_ICONS[option] || ListFilter;
                       return (
-                        <Pressable key={option} onPress={() => section.setter(option)} style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 14, backgroundColor: selected ? '#176b52' : '#ffffff', borderWidth: 1, borderColor: selected ? '#176b52' : '#dbe5df' }} accessibilityRole="button" accessibilityState={{ selected }}>
-                          {selected && <Check size={13} color="#ffffff" />}
-                          <Text style={{ color: selected ? '#ffffff' : '#475569', fontSize: 12, fontWeight: '800' }}>{option}</Text>
+                        <Pressable oasisKind="chip" oasisVariant={selected ? 'primary' : 'secondary'} key={option} onPress={() => section.setter(option)} style={{ width: '48%', minHeight: 36, borderRadius: 10, overflow: 'hidden', justifyContent: 'center', flexShrink: 0 }} accessibilityRole="button" accessibilityState={{ selected }}>
+                          <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+                            <OptionIcon size={14} color={(selected ? OASIS.colors.surface : OASIS.colors.deep)} />
+                            <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75} style={{ flexShrink: 1, color: (selected ? OASIS.colors.surface : OASIS.colors.deep), fontSize: 12, fontWeight: '700', textAlign: 'center' }}>{option}</Text>
+                          </View>
                         </Pressable>
                       );
                     })}
@@ -360,11 +352,11 @@ export default function Home() {
               ))}
             </ScrollView>
             <View style={{ flexDirection: 'row-reverse', gap: 10, marginTop: 12 }}>
-              <Pressable onPress={() => { setDraftKind('الكل'); setDraftStatus('الكل'); setDraftPeriod('كل الأوقات'); setAppliedFilters({ kind: 'الكل', status: 'الكل', period: 'كل الأوقات' }); setFilterOpen(false); }} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 48, borderRadius: 15, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#cbd5e1' }}>
-                <Text style={{ color: '#475569', fontSize: 13, fontWeight: '900' }}>مسح الكل</Text>
+              <Pressable onPress={() => { setDraftKind('الكل'); setDraftStatus('الكل'); setDraftPeriod('كل الأوقات'); setAppliedFilters({ kind: 'الكل', status: 'الكل', period: 'كل الأوقات' }); setFilterOpen(false); }} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 48, borderRadius: 15, backgroundColor: OASIS.colors.surface, borderWidth: 1, borderColor: '#cbd5e1' }}>
+                <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 7 }}><RotateCcw size={16} color={OASIS.colors.muted} /><Text style={{ color: OASIS.colors.muted, fontSize: 13, fontWeight: '700' }}>مسح الكل</Text></View>
               </Pressable>
               <Pressable onPress={() => { setAppliedFilters({ kind: draftKind, status: draftStatus, period: draftPeriod }); setFilterOpen(false); }} style={{ flex: 1.4, alignItems: 'center', justifyContent: 'center', minHeight: 48, borderRadius: 15, backgroundColor: '#176b52' }}>
-                <Text style={{ color: '#ffffff', fontSize: 13, fontWeight: '900' }}>اعتماد التصفية</Text>
+                <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 7 }}><Check size={16} color={OASIS.colors.surface} /><Text style={{ color: OASIS.colors.surface, fontSize: 13, fontWeight: '700' }}>اعتماد التصفية</Text></View>
               </Pressable>
             </View>
           </View>
@@ -374,3 +366,11 @@ export default function Home() {
     </View>
   );
 }
+
+const layout = StyleSheet.create({
+  page: { backgroundColor: 'transparent' },
+  contextRow: { width: '100%', maxWidth: 760, alignSelf: 'center', flexDirection: 'row-reverse', alignItems: 'stretch', gap: 8, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8 },
+  stories: { width: '100%', maxWidth: 728, alignSelf: 'center', backgroundColor: 'transparent', borderRadius: 14, overflow: 'hidden', marginBottom: 8 },
+  feed: { maxWidth: 760, marginTop: 4 },
+
+});

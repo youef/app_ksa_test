@@ -1,16 +1,10 @@
+import { OasisEmptyIllustration } from '@/components/oasis/OasisEmptyIllustration';
+import { OasisTextInput as TextInput, OasisPressable as Pressable, OasisSurface } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
+import { HeaderAction } from '@/components/shared/AppHeader';
 import { useState, useEffect, useRef } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  StyleSheet,
-  ScrollView,
-  Pressable,
-  ActivityIndicator,
-  Image,
-  Platform,
-  Linking,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Image, Platform, Linking } from 'react-native';
+
 import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import {
@@ -99,15 +93,13 @@ async function searchUsers(term: string, limit = 15): Promise<Row[]> {
 }
 
 async function searchBusinesses(term: string, limit = 20): Promise<Row[]> {
-  const [businesses, directory, services] = await Promise.all([
+  const [businesses, services] = await Promise.all([
     searchRows('businesses', term, ['name', 'description', 'city', 'district'], ['name'], limit),
-    searchRows('business_directory', term, ['name', 'description', 'city', 'district'], ['name'], limit),
     searchRows('services', term, ['name', 'description', 'category', 'subcategory', 'shop_name', 'city', 'district'], ['name'], limit),
   ]);
 
   const taggedItems: Row[] = [
     ...businesses.map((item: Row) => ({ ...item, __sourceTable: 'businesses' } as Row)),
-    ...directory.map((item: Row) => ({ ...item, __sourceTable: 'business_directory' } as Row)),
     ...services.map((item: Row) => ({ ...item, __sourceTable: 'services' } as Row)),
   ];
   const unique = new Map<string, Row>();
@@ -257,7 +249,7 @@ export default function SearchPage() {
   const total = results.users.length + results.questions.length + results.requests.length + results.shops.length;
 
   const renderUser = (u: any) => (
-    <Pressable
+    <Pressable oasisKind="card"
       key={`u-${u.id}`}
       style={styles.userCard}
       onPress={() => router.push({ pathname: '/user', params: { id: u.id } })}
@@ -280,7 +272,7 @@ export default function SearchPage() {
               {u.display_name || u.username}
             </Text>
             <View style={styles.neighborBadge}>
-              <CheckCircle2 size={11} color="#059669" />
+              <CheckCircle2 size={11} color={OASIS.colors.primary} />
               <Text style={styles.neighborBadgeText}>جار</Text>
             </View>
           </View>
@@ -291,21 +283,21 @@ export default function SearchPage() {
 
         <View style={styles.visitProfileBtn}>
           <Text style={styles.visitProfileText}>زيارة</Text>
-          <ChevronLeft size={14} color="#059669" />
+          <ChevronLeft size={14} color={OASIS.colors.primary} />
         </View>
       </View>
     </Pressable>
   );
 
   const renderQuestion = (q: Row) => (
-    <Pressable
+    <Pressable oasisKind="card"
       key={`q-${q.id}`}
       style={styles.postCard}
       onPress={() => router.push({ pathname: '/question', params: { id: q.id } })}
     >
       <View style={styles.cardTopRow}>
         <View style={styles.iconBoxGreen}>
-          <MessageCircle size={18} color="#059669" />
+          <MessageCircle size={18} color={OASIS.colors.primary} />
         </View>
         <View style={styles.cardMainText}>
           <Text style={styles.cardTitle} numberOfLines={2}>
@@ -322,7 +314,7 @@ export default function SearchPage() {
 
       <View style={styles.cardBottomRow}>
         <View style={styles.locationPill}>
-          <MapPin size={12} color="#059669" />
+          <MapPin size={12} color={OASIS.colors.primary} />
           <Text style={styles.locationPillText} numberOfLines={1}>
             {metaText(q)}
           </Text>
@@ -335,7 +327,7 @@ export default function SearchPage() {
   const renderRequest = (r: Row) => {
     const isClosed = r.status === 'completed' || r.status === 'closed';
     return (
-      <Pressable
+      <Pressable oasisKind="card"
         key={`r-${r.id}`}
         style={styles.postCard}
         onPress={() => router.push({ pathname: '/request', params: { id: r.id } })}
@@ -379,7 +371,7 @@ export default function SearchPage() {
   };
 
   const renderShop = (s: Row) => (
-    <Pressable
+    <Pressable oasisKind="card"
       key={`s-${s.id}`}
       style={styles.postCard}
       onPress={() => router.push({ pathname: s.__sourceTable === 'services' ? '/service' : '/business', params: { id: s.id } })}
@@ -395,7 +387,7 @@ export default function SearchPage() {
             </Text>
             {s.rating != null ? (
               <View style={styles.ratingBadge}>
-                <Star size={11} color="#f59e0b" fill="#f59e0b" />
+                <Star size={11} color={OASIS.colors.warning} fill={OASIS.colors.warning} />
                 <Text style={styles.ratingBadgeText}>{Number(s.rating).toFixed(1)}</Text>
               </View>
             ) : null}
@@ -417,14 +409,14 @@ export default function SearchPage() {
           </Text>
         </View>
         {s.phone ? (
-          <Pressable
+          <Pressable oasisKind="action"
             style={styles.phoneActionBtn}
             onPress={(e) => {
               e.stopPropagation();
               Linking.openURL(`tel:${s.phone}`);
             }}
           >
-            <Phone size={12} color="#0284c7" />
+            <Phone size={12} color={OASIS.colors.info} />
             <Text style={styles.phoneActionText}>{s.phone}</Text>
           </Pressable>
         ) : null}
@@ -439,20 +431,20 @@ export default function SearchPage() {
         title="البحث الشامل"
         subtitle={query.trim() ? `النتائج لكلمة: «${query.trim()}»` : 'ابحث في كل ما يخص حيك'}
         rightAction={
-          <Pressable
-            onPress={() => router.push('/map')}
+          <HeaderAction
+            accessibilityLabel="فتح الخريطة" onPress={() => router.push('/map')}
             style={styles.headerMapBtn}
           >
-            <MapPin size={17} color="#059669" />
-          </Pressable>
+            <MapPin size={17} color={OASIS.colors.primary} />
+          </HeaderAction>
         }
       />
 
       {/* Modern Search Input Capsule */}
       <View style={styles.searchBarContainer}>
-        <View style={[styles.searchBox, isFocused && styles.searchBoxFocused]}>
+        <OasisSurface oasisSurface="field" style={[styles.searchBox, isFocused && styles.searchBoxFocused]}>
           <View style={styles.searchIconBadge}>
-            <SearchIcon size={17} color="#059669" />
+            <SearchIcon size={17} color={OASIS.colors.primary} />
           </View>
 
           <TextInput
@@ -463,8 +455,7 @@ export default function SearchPage() {
             onChangeText={setQuery}
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}
-            autoFocus={!params.q}
-            selectionColor="#059669"
+            selectionColor={OASIS.colors.primary}
             returnKeyType="search"
             onSubmitEditing={() => {
               if (query.trim()) {
@@ -474,7 +465,7 @@ export default function SearchPage() {
           />
 
           {query.length > 0 && (
-            <Pressable
+            <Pressable oasisKind="icon"
               onPress={() => {
                 setQuery('');
                 setResults({ users: [], questions: [], requests: [], shops: [] });
@@ -482,59 +473,64 @@ export default function SearchPage() {
               style={styles.clearBtn}
               hitSlop={8}
             >
-              <X size={15} color="#64748b" />
+              <X size={15} color={OASIS.colors.muted} />
             </Pressable>
           )}
-        </View>
+        </OasisSurface>
       </View>
 
       {/* Modern Pills Filter Tabs */}
       <View style={styles.tabsWrapper}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsScroll}>
-          <Pressable
+        <ScrollView style={{ direction: 'rtl' }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.tabsScroll, { direction: 'ltr' }]}>
+          <Pressable oasisKind="chip" oasisVariant={activeTab === 'all' ? 'primary' : 'secondary'}
             style={[styles.tab, activeTab === 'all' && styles.tabActive]}
             onPress={() => setActiveTab('all')}
           >
+
             <Text style={[styles.tabText, activeTab === 'all' && styles.tabTextActive]}>
               الكل {total > 0 ? `(${total})` : ''}
             </Text>
           </Pressable>
 
-          <Pressable
+          <Pressable oasisKind="chip" oasisVariant={activeTab === 'users' ? 'primary' : 'secondary'}
             style={[styles.tab, activeTab === 'users' && styles.tabActive]}
             onPress={() => setActiveTab('users')}
           >
-            <Users size={13} color={activeTab === 'users' ? '#ffffff' : '#64748b'} />
+
+            <Users size={13} color={activeTab === 'users' ? OASIS.colors.surface : OASIS.colors.muted} />
             <Text style={[styles.tabText, activeTab === 'users' && styles.tabTextActive]}>
               الجيران {results.users.length > 0 ? `(${results.users.length})` : ''}
             </Text>
           </Pressable>
 
-          <Pressable
+          <Pressable oasisKind="chip" oasisVariant={activeTab === 'questions' ? 'primary' : 'secondary'}
             style={[styles.tab, activeTab === 'questions' && styles.tabActive]}
             onPress={() => setActiveTab('questions')}
           >
-            <MessageCircle size={13} color={activeTab === 'questions' ? '#ffffff' : '#64748b'} />
+
+            <MessageCircle size={13} color={activeTab === 'questions' ? OASIS.colors.surface : OASIS.colors.muted} />
             <Text style={[styles.tabText, activeTab === 'questions' && styles.tabTextActive]}>
               أسئلة {results.questions.length > 0 ? `(${results.questions.length})` : ''}
             </Text>
           </Pressable>
 
-          <Pressable
+          <Pressable oasisKind="chip" oasisVariant={activeTab === 'requests' ? 'primary' : 'secondary'}
             style={[styles.tab, activeTab === 'requests' && styles.tabActive]}
             onPress={() => setActiveTab('requests')}
           >
-            <Truck size={13} color={activeTab === 'requests' ? '#ffffff' : '#64748b'} />
+
+            <Truck size={13} color={activeTab === 'requests' ? OASIS.colors.surface : OASIS.colors.muted} />
             <Text style={[styles.tabText, activeTab === 'requests' && styles.tabTextActive]}>
               فزعات {results.requests.length > 0 ? `(${results.requests.length})` : ''}
             </Text>
           </Pressable>
 
-          <Pressable
+          <Pressable oasisKind="chip" oasisVariant={activeTab === 'shops' ? 'primary' : 'secondary'}
             style={[styles.tab, activeTab === 'shops' && styles.tabActive]}
             onPress={() => setActiveTab('shops')}
           >
-            <Store size={13} color={activeTab === 'shops' ? '#ffffff' : '#64748b'} />
+
+            <Store size={13} color={activeTab === 'shops' ? OASIS.colors.surface : OASIS.colors.muted} />
             <Text style={[styles.tabText, activeTab === 'shops' && styles.tabTextActive]}>
               محلات {results.shops.length > 0 ? `(${results.shops.length})` : ''}
             </Text>
@@ -550,7 +546,7 @@ export default function SearchPage() {
       >
         {loading && (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#059669" />
+            <ActivityIndicator size="large" color={OASIS.colors.primary} />
             <Text style={styles.loadingText}>جارٍ البحث في قاعدة بيانات حيك...</Text>
           </View>
         )}
@@ -560,7 +556,7 @@ export default function SearchPage() {
             {/* Search Summary Header */}
             <View style={styles.summaryBanner}>
               <View style={styles.summaryRight}>
-                <Sparkles size={16} color="#059669" />
+                <Sparkles size={16} color={OASIS.colors.primary} />
                 <Text style={styles.summaryTitle}>
                   نتائج البحث عن: «{query.trim()}»
                 </Text>
@@ -575,7 +571,7 @@ export default function SearchPage() {
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
                   <View style={styles.sectionHeaderTitle}>
-                    <Users size={16} color="#059669" />
+                    <Users size={16} color={OASIS.colors.primary} />
                     <Text style={styles.sectionTitle}>الجيران في الحي</Text>
                   </View>
                   <View style={styles.badgeCount}>
@@ -591,7 +587,7 @@ export default function SearchPage() {
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
                   <View style={styles.sectionHeaderTitle}>
-                    <MessageCircle size={16} color="#059669" />
+                    <MessageCircle size={16} color={OASIS.colors.primary} />
                     <Text style={styles.sectionTitle}>الأسئلة والاستفسارات</Text>
                   </View>
                   <View style={styles.badgeCount}>
@@ -636,14 +632,12 @@ export default function SearchPage() {
 
             {total === 0 && (
               <View style={styles.emptyContainer}>
-                <View style={styles.emptyIconBg}>
-                  <SearchIcon size={36} color="#94a3b8" />
-                </View>
+                <View style={{ alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}><OasisEmptyIllustration kind="empty-search" /></View>
                 <Text style={styles.emptyText}>لم نجد نتائج تطابق «{query}»</Text>
                 <Text style={styles.emptySub}>
                   جرب البحث بكلمات عامة مثل (سباك، توصيل، كهرباء، إعارة) أو تصفح الأقسام المقترحة أدناه.
                 </Text>
-                <Pressable
+                <Pressable oasisKind="action"
                   style={styles.clearSearchBtn}
                   onPress={() => {
                     setQuery('');
@@ -663,7 +657,7 @@ export default function SearchPage() {
             {/* Friendly Neighborhood Welcome Capsule */}
             <View style={styles.welcomeBanner}>
               <View style={styles.welcomeBannerIcon}>
-                <Sparkles size={20} color="#059669" />
+                <Sparkles size={20} color={OASIS.colors.primary} />
               </View>
               <View style={styles.welcomeBannerContent}>
                 <Text style={styles.welcomeBannerTitle}>ابحث عن أي شيء في حيك</Text>
@@ -695,39 +689,39 @@ export default function SearchPage() {
             {/* Quick Explore Hub (4 Categories) */}
             <View style={styles.discoverySection}>
               <View style={styles.discoverySectionTitleRow}>
-                <Sparkles size={18} color="#059669" />
+                <Sparkles size={18} color={OASIS.colors.primary} />
                 <Text style={styles.discoverySectionTitle}>استكشف حسب القسم</Text>
               </View>
               <View style={styles.categoryGrid}>
-                <Pressable
+                <Pressable oasisKind="card"
                   style={styles.categoryCard}
                   onPress={() => {
                     setActiveTab('users');
                     setQuery('حي');
                   }}
                 >
-                  <View style={[styles.categoryIconBox, { backgroundColor: '#ecfdf5' }]}>
-                    <Users size={20} color="#059669" />
+                  <View style={[styles.categoryIconBox, { backgroundColor: OASIS.colors.soft }]}>
+                    <Users size={20} color={OASIS.colors.primary} />
                   </View>
                   <Text style={styles.categoryCardTitle}>جيران الحي</Text>
                   <Text style={styles.categoryCardSub}>أهل حيك وأصحاب المهارات</Text>
                 </Pressable>
 
-                <Pressable
+                <Pressable oasisKind="card"
                   style={styles.categoryCard}
                   onPress={() => {
                     setActiveTab('questions');
                     setQuery('توصية');
                   }}
                 >
-                  <View style={[styles.categoryIconBox, { backgroundColor: '#eff6ff' }]}>
+                  <View style={[styles.categoryIconBox, { backgroundColor: OASIS.colors.infoSoft }]}>
                     <MessageCircle size={20} color="#2563eb" />
                   </View>
                   <Text style={styles.categoryCardTitle}>أسئلة واستفسارات</Text>
                   <Text style={styles.categoryCardSub}>تجارب وتوصيات الجيران</Text>
                 </Pressable>
 
-                <Pressable
+                <Pressable oasisKind="card"
                   style={styles.categoryCard}
                   onPress={() => {
                     setActiveTab('requests');
@@ -741,7 +735,7 @@ export default function SearchPage() {
                   <Text style={styles.categoryCardSub}>إعارة ومساعدات الجيران</Text>
                 </Pressable>
 
-                <Pressable
+                <Pressable oasisKind="card"
                   style={styles.categoryCard}
                   onPress={() => {
                     setActiveTab('shops');
@@ -759,31 +753,31 @@ export default function SearchPage() {
 
             {/* Recent Searches */}
             {recentSearches.length > 0 && (
-              <View style={styles.recentSearchesCard}>
+              <OasisSurface oasisSurface="card" style={styles.recentSearchesCard}>
                 <View style={styles.recentHeader}>
                   <View style={styles.recentHeaderTitleRow}>
-                    <Clock size={16} color="#64748b" />
+                    <Clock size={16} color={OASIS.colors.muted} />
                     <Text style={styles.recentTitle}>سجل البحث الأخير</Text>
                   </View>
-                  <Pressable
+                  <Pressable oasisKind="action"
                     onPress={() => setRecentSearches([])}
                     hitSlop={8}
                     style={styles.clearRecentBtn}
                   >
-                    <Trash2 size={13} color="#ef4444" />
+                    <Trash2 size={13} color={OASIS.colors.danger} />
                     <Text style={styles.clearRecentText}>مسح السجل</Text>
                   </Pressable>
                 </View>
                 <View style={styles.recentChipsRow}>
                   {recentSearches.map((item, idx) => (
                     <View key={idx} style={styles.recentChipWrapper}>
-                      <Pressable
+                      <Pressable oasisKind="chip"
                         onPress={() => handleSelectKeyword(item)}
                         style={styles.recentChip}
                       >
                         <Text style={styles.recentChipText}>{item}</Text>
                       </Pressable>
-                      <Pressable
+                      <Pressable oasisKind="chip"
                         onPress={() => removeRecentSearch(item)}
                         style={styles.recentChipDelete}
                         hitSlop={6}
@@ -793,7 +787,7 @@ export default function SearchPage() {
                     </View>
                   ))}
                 </View>
-              </View>
+              </OasisSurface>
             )}
           </View>
         )}
@@ -805,13 +799,13 @@ export default function SearchPage() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: OASIS.colors.background,
   },
   headerMapBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#ecfdf5',
+    backgroundColor: OASIS.colors.soft,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -821,25 +815,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 10,
     paddingBottom: 8,
-    backgroundColor: '#ffffff',
+    backgroundColor: OASIS.colors.surface,
   },
   searchBox: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    backgroundColor: '#f8fafc',
+    backgroundColor: OASIS.colors.background,
     borderRadius: 16,
     paddingHorizontal: 12,
-    height: 48,
+    height: 44,
     borderWidth: 1.5,
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
     gap: 10,
   },
   searchBoxFocused: {
-    borderColor: '#059669',
-    backgroundColor: '#ffffff',
-    shadowColor: '#059669',
+    borderColor: OASIS.colors.primary,
+    backgroundColor: OASIS.colors.surface,
+    shadowColor: OASIS.colors.primary,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0,
     shadowRadius: 6,
     elevation: 2,
   },
@@ -847,14 +841,14 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 9,
-    backgroundColor: '#ecfdf5',
+    backgroundColor: OASIS.colors.soft,
     alignItems: 'center',
     justifyContent: 'center',
   },
   searchInput: {
     flex: 1,
     fontSize: 13.5,
-    color: '#0f172a',
+    color: OASIS.colors.ink,
     fontWeight: '700',
     textAlign: 'right',
     height: 44,
@@ -864,12 +858,12 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#e2e8f0',
+    backgroundColor: OASIS.colors.line,
     alignItems: 'center',
     justifyContent: 'center',
   },
   tabsWrapper: {
-    backgroundColor: '#ffffff',
+    backgroundColor: OASIS.colors.surface,
     paddingHorizontal: 16,
     paddingBottom: 10,
     borderBottomWidth: 1,
@@ -887,26 +881,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 7.5,
     borderRadius: 12,
+    overflow: 'hidden',
     backgroundColor: '#f1f5f9',
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
   },
   tabActive: {
-    backgroundColor: '#059669',
-    borderColor: '#059669',
-    shadowColor: '#059669',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 2,
+    backgroundColor: 'transparent',
+    borderColor: 'transparent',
+    shadowOpacity: 0,
+    elevation: 0,
   },
   tabText: {
     fontSize: 12.5,
-    fontWeight: '800',
-    color: '#64748b',
+    fontWeight: '600',
+    color: OASIS.colors.muted,
   },
   tabTextActive: {
-    color: '#ffffff',
+    color: OASIS.colors.surface,
   },
   content: {
     flex: 1,
@@ -921,8 +913,8 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 13,
-    color: '#059669',
-    fontWeight: '800',
+    color: OASIS.colors.primary,
+    fontWeight: '600',
   },
   resultsContainer: {
     paddingHorizontal: 16,
@@ -931,12 +923,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#ffffff',
+    backgroundColor: OASIS.colors.surface,
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: OASIS.colors.line,
     marginBottom: 12
   },
   summaryRight: {
@@ -946,11 +938,11 @@ const styles = StyleSheet.create({
   },
   summaryTitle: {
     fontSize: 13,
-    fontWeight: '800',
-    color: '#0f172a',
+    fontWeight: '600',
+    color: OASIS.colors.ink,
   },
   summaryBadge: {
-    backgroundColor: '#ecfdf5',
+    backgroundColor: OASIS.colors.soft,
     paddingHorizontal: 9,
     paddingVertical: 3,
     borderRadius: 10,
@@ -959,11 +951,11 @@ const styles = StyleSheet.create({
   },
   summaryBadgeText: {
     fontSize: 11.5,
-    fontWeight: '900',
-    color: '#059669',
+    fontWeight: '700',
+    color: OASIS.colors.primary,
   },
   section: {
-    marginBottom: 20,
+    marginBottom: 14,
   },
   sectionHeader: {
     flexDirection: 'row-reverse',
@@ -979,27 +971,27 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 15,
-    fontWeight: '900',
-    color: '#0f172a',
+    fontWeight: '700',
+    color: OASIS.colors.ink,
   },
   badgeCount: {
-    backgroundColor: '#ecfdf5',
+    backgroundColor: OASIS.colors.soft,
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 10,
   },
   badgeText: {
-    color: '#059669',
+    color: OASIS.colors.primary,
     fontSize: 11.5,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   userCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: OASIS.colors.surface,
     borderRadius: 12,
     padding: 12,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#e5e7eb'
+    borderColor: OASIS.colors.line
   },
   cardHeaderRow: {
     flexDirection: 'row-reverse',
@@ -1014,13 +1006,13 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 24,
     borderWidth: 1.5,
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
   },
   userAvatarFallback: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#ecfdf5',
+    backgroundColor: OASIS.colors.soft,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
@@ -1028,8 +1020,8 @@ const styles = StyleSheet.create({
   },
   userAvatarLetter: {
     fontSize: 20,
-    fontWeight: '900',
-    color: '#059669',
+    fontWeight: '700',
+    color: OASIS.colors.primary,
   },
   onlineBadge: {
     position: 'absolute',
@@ -1038,9 +1030,9 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#10b981',
+    backgroundColor: OASIS.colors.primary,
     borderWidth: 2,
-    borderColor: '#ffffff',
+    borderColor: OASIS.colors.surface,
   },
   userInfo: {
     flex: 1,
@@ -1054,27 +1046,27 @@ const styles = StyleSheet.create({
   },
   userName: {
     fontSize: 14.5,
-    fontWeight: '900',
-    color: '#0f172a',
+    fontWeight: '700',
+    color: OASIS.colors.ink,
     textAlign: 'right',
   },
   neighborBadge: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 3,
-    backgroundColor: '#ecfdf5',
+    backgroundColor: OASIS.colors.soft,
     paddingHorizontal: 6,
     paddingVertical: 1.5,
     borderRadius: 8,
   },
   neighborBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#059669',
+    fontSize: 11,
+    fontWeight: '600',
+    color: OASIS.colors.primary,
   },
   userHandle: {
     fontSize: 12,
-    color: '#64748b',
+    color: OASIS.colors.muted,
     fontWeight: '600',
     textAlign: 'right',
   },
@@ -1082,7 +1074,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 2,
-    backgroundColor: '#f0fdf4',
+    backgroundColor: OASIS.colors.soft,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 10,
@@ -1091,17 +1083,17 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   visitProfileText: {
-    color: '#059669',
+    color: OASIS.colors.primary,
     fontSize: 11.5,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   postCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: OASIS.colors.surface,
     borderRadius: 12,
     padding: 12,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#e5e7eb'
+    borderColor: OASIS.colors.line
   },
   cardTopRow: {
     flexDirection: 'row-reverse',
@@ -1109,19 +1101,19 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   iconBoxGreen: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: '#ecfdf5',
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: OASIS.colors.soft,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: '#a7f3d0',
   },
   iconBoxOrange: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     backgroundColor: '#fff7ed',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1129,9 +1121,9 @@ const styles = StyleSheet.create({
     borderColor: '#fed7aa',
   },
   iconBoxTeal: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     backgroundColor: '#f0fdfa',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1150,14 +1142,14 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     fontSize: 14.5,
-    fontWeight: '800',
-    color: '#0f172a',
+    fontWeight: '600',
+    color: OASIS.colors.ink,
     textAlign: 'right',
   },
   cardAuthor: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#64748b',
+    color: OASIS.colors.muted,
     textAlign: 'right',
     marginTop: 2,
   },
@@ -1170,7 +1162,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   statusPillOpen: {
-    backgroundColor: '#ecfdf5',
+    backgroundColor: OASIS.colors.soft,
   },
   statusPillClosed: {
     backgroundColor: '#f1f5f9',
@@ -1181,20 +1173,20 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   statusDotOpen: {
-    backgroundColor: '#10b981',
+    backgroundColor: OASIS.colors.primary,
   },
   statusDotClosed: {
     backgroundColor: '#94a3b8',
   },
   statusPillText: {
-    fontSize: 10.5,
-    fontWeight: '800',
+    fontSize: 11,
+    fontWeight: '600',
   },
   statusPillTextOpen: {
-    color: '#059669',
+    color: OASIS.colors.primary,
   },
   statusPillTextClosed: {
-    color: '#64748b',
+    color: OASIS.colors.muted,
   },
   ratingBadge: {
     flexDirection: 'row-reverse',
@@ -1207,7 +1199,7 @@ const styles = StyleSheet.create({
   },
   ratingBadgeText: {
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#d97706',
   },
   cardDivider: {
@@ -1230,12 +1222,12 @@ const styles = StyleSheet.create({
   locationPillText: {
     fontSize: 11.5,
     fontWeight: '700',
-    color: '#475569',
+    color: OASIS.colors.muted,
     textAlign: 'right',
   },
   privacyTag: {
-    fontSize: 10.5,
-    fontWeight: '800',
+    fontSize: 11,
+    fontWeight: '600',
     color: '#b45309',
     backgroundColor: '#fef3c7',
     borderRadius: 8,
@@ -1246,7 +1238,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#f0f9ff',
+    backgroundColor: OASIS.colors.infoSoft,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,
@@ -1255,18 +1247,18 @@ const styles = StyleSheet.create({
   },
   phoneActionText: {
     fontSize: 11,
-    fontWeight: '800',
-    color: '#0284c7',
+    fontWeight: '600',
+    color: OASIS.colors.info,
   },
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 32,
+    paddingVertical: 24,
     paddingHorizontal: 20,
-    backgroundColor: '#ffffff',
+    backgroundColor: OASIS.colors.surface,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: OASIS.colors.line,
     marginTop: 8
   },
   emptyIconBg: {
@@ -1280,21 +1272,21 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 15.5,
-    fontWeight: '900',
-    color: '#0f172a',
+    fontWeight: '700',
+    color: OASIS.colors.ink,
     textAlign: 'center',
     marginBottom: 6,
   },
   emptySub: {
     fontSize: 12.5,
-    color: '#64748b',
+    color: OASIS.colors.muted,
     fontWeight: '600',
     textAlign: 'center',
     lineHeight: 18,
     marginBottom: 18,
   },
   clearSearchBtn: {
-    backgroundColor: '#ecfdf5',
+    backgroundColor: OASIS.colors.soft,
     paddingHorizontal: 16,
     paddingVertical: 9,
     borderRadius: 12,
@@ -1302,9 +1294,9 @@ const styles = StyleSheet.create({
     borderColor: '#a7f3d0',
   },
   clearSearchBtnText: {
-    color: '#059669',
+    color: OASIS.colors.primary,
     fontSize: 12.5,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   discoveryWrapper: {
     paddingHorizontal: 16,
@@ -1313,18 +1305,18 @@ const styles = StyleSheet.create({
   welcomeBanner: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: OASIS.colors.surface,
     borderRadius: 12,
     padding: 12,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: OASIS.colors.line,
     gap: 10
   },
   welcomeBannerIcon: {
     width: 44,
     height: 44,
     borderRadius: 14,
-    backgroundColor: '#ecfdf5',
+    backgroundColor: OASIS.colors.soft,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -1336,14 +1328,14 @@ const styles = StyleSheet.create({
   },
   welcomeBannerTitle: {
     fontSize: 14,
-    fontWeight: '900',
-    color: '#0f172a',
+    fontWeight: '700',
+    color: OASIS.colors.ink,
     textAlign: 'right',
     marginBottom: 3,
   },
   welcomeBannerSub: {
     fontSize: 11.5,
-    color: '#64748b',
+    color: OASIS.colors.muted,
     fontWeight: '600',
     textAlign: 'right',
     lineHeight: 16,
@@ -1358,8 +1350,8 @@ const styles = StyleSheet.create({
   },
   discoverySectionTitle: {
     fontSize: 14,
-    fontWeight: '900',
-    color: '#0f172a',
+    fontWeight: '700',
+    color: OASIS.colors.ink,
   },
   tagsGrid: {
     flexDirection: 'row-reverse',
@@ -1367,22 +1359,22 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   keywordTag: {
-    backgroundColor: '#ffffff',
+    backgroundColor: OASIS.colors.surface,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.02,
+    shadowOpacity: 0,
     shadowRadius: 2,
     elevation: 1,
   },
   keywordTagText: {
     fontSize: 12.5,
     fontWeight: '700',
-    color: '#334155',
+    color: OASIS.colors.ink,
   },
   categoryGrid: {
     flexDirection: 'row-reverse',
@@ -1391,48 +1383,48 @@ const styles = StyleSheet.create({
   },
   categoryCard: {
     width: '48%',
-    backgroundColor: '#ffffff',
+    backgroundColor: OASIS.colors.surface,
     borderRadius: 16,
     padding: 14,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
     gap: 6,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.02,
+    shadowOpacity: 0,
     shadowRadius: 3,
     elevation: 1,
   },
   categoryIconBox: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 4,
   },
   categoryCardTitle: {
     fontSize: 13.5,
-    fontWeight: '900',
-    color: '#0f172a',
+    fontWeight: '700',
+    color: OASIS.colors.ink,
     textAlign: 'right',
   },
   categoryCardSub: {
     fontSize: 11,
-    color: '#64748b',
+    color: OASIS.colors.muted,
     fontWeight: '600',
     textAlign: 'right',
   },
   recentSearchesCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: OASIS.colors.surface,
     borderRadius: 16,
     padding: 14,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
     gap: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.02,
+    shadowOpacity: 0,
     shadowRadius: 3,
     elevation: 1,
   },
@@ -1448,8 +1440,8 @@ const styles = StyleSheet.create({
   },
   recentTitle: {
     fontSize: 13,
-    fontWeight: '900',
-    color: '#0f172a',
+    fontWeight: '700',
+    color: OASIS.colors.ink,
   },
   clearRecentBtn: {
     flexDirection: 'row-reverse',
@@ -1458,8 +1450,8 @@ const styles = StyleSheet.create({
   },
   clearRecentText: {
     fontSize: 11,
-    fontWeight: '800',
-    color: '#ef4444',
+    fontWeight: '600',
+    color: OASIS.colors.danger,
   },
   recentChipsRow: {
     flexDirection: 'row-reverse',
@@ -1469,10 +1461,10 @@ const styles = StyleSheet.create({
   recentChipWrapper: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    backgroundColor: '#f8fafc',
+    backgroundColor: OASIS.colors.background,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
     paddingLeft: 6,
   },
   recentChip: {
@@ -1482,7 +1474,7 @@ const styles = StyleSheet.create({
   recentChipText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#334155',
+    color: OASIS.colors.ink,
   },
   recentChipDelete: {
     padding: 3,

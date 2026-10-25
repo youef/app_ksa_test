@@ -1,0 +1,921 @@
+{
+  "backup": "C:\\Users\\Go\\AppData\\Local\\Temp\\hayna-oasis-ui-hR5FIM",
+  "files": [
+    {
+      "file": "app\\+html.tsx",
+      "tokens": 1,
+      "taggedElements": 0,
+      "primitives": []
+    },
+    {
+      "file": "app\\about.tsx",
+      "tokens": 12,
+      "taggedElements": 9,
+      "primitives": [
+        "OasisPressable as Pressable"
+      ]
+    },
+    {
+      "file": "app\\admin-marketplace.tsx",
+      "tokens": 32,
+      "taggedElements": 3,
+      "primitives": [
+        "OasisPressable as Pressable"
+      ]
+    },
+    {
+      "file": "app\\admin-pro.tsx",
+      "tokens": 32,
+      "taggedElements": 1,
+      "primitives": [
+        "OasisPressable as Pressable"
+      ]
+    },
+    {
+      "file": "app\\admin.tsx",
+      "tokens": 100,
+      "taggedElements": 32,
+      "primitives": [
+        "OasisPressable as Pressable",
+        "OasisTextInput as TextInput"
+      ]
+    },
+    {
+      "file": "app\\ask.tsx",
+      "tokens": 15,
+      "taggedElements": 2,
+      "primitives": [
+        "OasisPressable as Pressable",
+        "OasisTextInput as TextInput"
+      ]
+    },
+    {
+      "file": "app\\auth.tsx",
+      "tokens": 26,
+      "taggedElements": 8,
+      "primitives": [
+        "OasisPressable as Pressable",
+        "OasisTextInput as TextInput"
+      ]
+    },
+    {
+      "file": "app\\business.tsx",
+      "tokens": 46,
+      "taggedElements": 6,
+      "primitives": [
+        "OasisPressable as Pressable",
+        "OasisTextInput as TextInput"
+      ]
+    },
+    {
+      "file": "app\\carpooling.tsx",
+      "tokens": 65,
+      "taggedElements": 13,
+      "primitives": [
+        "OasisPressable as Pressable",
+        "OasisTextInput as TextInput"
+      ]
+    },
+    {
+      "file": "app\\cities.tsx",
+      "tokens": 12,
+      "taggedElements": 1,
+      "primitives": [
+        "OasisPressable as Pressable",
+        "OasisTextInput as TextInput"
+      ]
+    },
+    {
+      "file": "app\\connected-social.tsx",
+      "tokens": 27,
+      "taggedElements": 3,
+      "primitives": [
+        "OasisPressable as Pressable",
+        "OasisTextInput as TextInput"
+      ]
+    },
+    {
+      "file": "app\\contact-us.tsx",
+      "tokens": 12,
+      "taggedElements": 1,
+      "primitives": [
+        "OasisPressable as Pressable",
+        "OasisTextInput as TextInput"
+      ]
+    },
+    {
+      "file": "app\\conversation.tsx",
+      "tokens": 1,
+      "taggedElements": 0,
+      "primitives": []
+    },
+    {
+      "file": "app\\create-story.tsx",
+      "tokens": 63,
+      "taggedElements": 17,
+      "primitives": [
+        "OasisPressable as Pressable",
+        "OasisTextInput as TextInput"
+      ]
+    },
+    {
+      "file": "app\\directory.tsx",
+      "tokens": 22,
+      "taggedElements": 1,
+      "primitives": [
+        "OasisPressable as Pressable",
+        "OasisTextInput as TextInput"
+      ]
+    },
+    {
+      "file": "app\\districts.tsx",
+      "tokens": 13,
+      "taggedElements": 1,
+      "primitives": [
+        "OasisPressable as Pressable",
+        "OasisTextInput as TextInput"
+      ]
+    },
+    {
+      "file": "app\\favorites.tsx",
+      "tokens": 38,
+      "taggedElements": 15,
+      "primitives": [
+        "OasisPressable as Pressable",
+        "OasisTextInput as TextInput"
+      ]
+    },
+    {
+      "file": "app\\home.tsx",
+      "tokens": 18,
+      "taggedElements": 1,
+      "primitives": [
+        "OasisPressable as Pressable"
+      ]
+    },
+    {
+      "file": "app\\index.tsx",
+      "tokens": 13,
+      "taggedElements": 0,
+      "primitives": []
+    },
+    {
+      "file": "app\\live\\create.tsx",
+      "tokens": 28,
+      "taggedElements": 2,
+      "primitives": [
+        "OasisPressable as Pressable",
+        "OasisTextInput as TextInput"
+      ]
+    },
+    {
+      "file": "app\\live\\[id].tsx",
+      "tokens": 36,
+      "taggedElements": 25,
+      "primitives": [
+        "OasisPressable as Pressable",
+        "OasisTextInput as TextInput"
+      ]
+    },
+    {
+      "file": "app\\lives.tsx",
+      "tokens": 126,
+      "taggedElements": 6,
+      "primitives": [
+        "OasisPressable as Pressable"
+      ]
+    },
+    {
+      "file": "app\\locations.tsx",
+      "tokens": 43,
+      "taggedElements": 4,
+      "primitives": [
+        "OasisPressable as Pressable",
+        "OasisTextInput as TextInput"
+      ]
+    },
+    {
+      "file": "app\\map.tsx",
+      "tokens": 45,
+      "taggedElements": 10,
+      "primitives": [
+        "OasisPressable as Pressable",
+        "OasisTextInput as TextInput"
+      ]
+    },
+    {
+      "file": "app\\map.web.tsx",
+      "tokens": 42,
+      "taggedElements": 9,
+      "primitives": [
+        "OasisPressable as Pressable",
+        "OasisTextInput as TextInput"
+      ]
+    },
+    {
+      "file": "app\\market.tsx",
+      "tokens": 267,
+      "taggedElements": 23,
+      "primitives": [
+        "OasisPressable as Pressable",
+        "OasisTextInput as TextInput"
+      ]
+    },
+    {
+      "file": "app\\marketplace-dashboard.tsx",
+      "tokens": 55,
+      "taggedElements": 6,
+      "primitives": [
+        "OasisPressable as Pressable",
+        "OasisTextInput as TextInput"
+      ]
+    },
+    {
+      "file": "app\\marketplace-item.tsx",
+      "tokens": 28,
+      "taggedElements": 4,
+      "primitives": [
+        "OasisPressable as Pressable"
+      ]
+    },
+    {
+      "file": "app\\messages.tsx",
+      "tokens": 86,
+      "taggedElements": 14,
+      "primitives": [
+        "OasisPressable as Pressable",
+        "OasisTextInput as TextInput"
+      ]
+    },
+    {
+      "file": "app\\more.tsx",
+      "tokens": 14,
+      "taggedElements": 2,
+      "primitives": [
+        "OasisPressable as Pressable"
+      ]
+    },
+    {
+      "file": "app\\new-listing.tsx",
+      "tokens": 36,
+      "taggedElements": 7,
+      "primitives": [
+        "OasisPressable as Pressable",
+        "OasisTextInput as TextInput"
+      ]
+    },
+    {
+      "file": "app\\new-service.tsx",
+      "tokens": 71,
+      "taggedElements": 6,
+      "primitives": [
+        "OasisPressable as Pressable",
+        "OasisTextInput as TextInput"
+      ]
+    },
+    {
+      "file": "app\\notifications.tsx",
+      "tokens": 91,
+      "taggedElements": 5,
+      "primitives": [
+        "OasisPressable as Pressable"
+      ]
+    },
+    {
+      "file": "app\\question.tsx",
+      "tokens": 125,
+      "taggedElements": 26,
+      "primitives": [
+        "OasisPressable as Pressable",
+        "OasisTextInput as TextInput"
+      ]
+    },
+    {
+      "file": "app\\questions.tsx",
+      "tokens": 8,
+      "taggedElements": 0,
+      "primitives": [
+        "OasisPressable as Pressable"
+      ]
+    },
+    {
+      "file": "app\\rate-app.tsx",
+      "tokens": 32,
+      "taggedElements": 7,
+      "primitives": [
+        "OasisPressable as Pressable",
+        "OasisTextInput as TextInput"
+      ]
+    },
+    {
+      "file": "app\\report.tsx",
+      "tokens": 24,
+      "taggedElements": 3,
+      "primitives": [
+        "OasisPressable as Pressable",
+        "OasisTextInput as TextInput"
+      ]
+    },
+    {
+      "file": "app\\request.tsx",
+      "tokens": 166,
+      "taggedElements": 20,
+      "primitives": [
+        "OasisPressable as Pressable",
+        "OasisTextInput as TextInput"
+      ]
+    },
+    {
+      "file": "app\\safety-center.tsx",
+      "tokens": 32,
+      "taggedElements": 6,
+      "primitives": [
+        "OasisPressable as Pressable"
+      ]
+    },
+    {
+      "file": "app\\search.tsx",
+      "tokens": 105,
+      "taggedElements": 16,
+      "primitives": [
+        "OasisTextInput as TextInput",
+        "OasisPressable as Pressable"
+      ]
+    },
+    {
+      "file": "app\\service.tsx",
+      "tokens": 125,
+      "taggedElements": 19,
+      "primitives": [
+        "OasisPressable as Pressable",
+        "OasisTextInput as TextInput"
+      ]
+    },
+    {
+      "file": "app\\stories.tsx",
+      "tokens": 63,
+      "taggedElements": 4,
+      "primitives": [
+        "OasisPressable as Pressable"
+      ]
+    },
+    {
+      "file": "app\\story-settings.tsx",
+      "tokens": 43,
+      "taggedElements": 6,
+      "primitives": [
+        "OasisPressable as Pressable",
+        "OasisTextInput as TextInput"
+      ]
+    },
+    {
+      "file": "app\\story-viewers.tsx",
+      "tokens": 11,
+      "taggedElements": 0,
+      "primitives": [
+        "OasisPressable as Pressable"
+      ]
+    },
+    {
+      "file": "app\\story.tsx",
+      "tokens": 47,
+      "taggedElements": 5,
+      "primitives": [
+        "OasisTextInput as TextInput",
+        "OasisPressable as Pressable"
+      ]
+    },
+    {
+      "file": "app\\support.tsx",
+      "tokens": 32,
+      "taggedElements": 0,
+      "primitives": [
+        "OasisPressable as Pressable",
+        "OasisTextInput as TextInput"
+      ]
+    },
+    {
+      "file": "app\\tools.tsx",
+      "tokens": 69,
+      "taggedElements": 13,
+      "primitives": [
+        "OasisPressable as Pressable",
+        "OasisTextInput as TextInput"
+      ]
+    },
+    {
+      "file": "app\\user.tsx",
+      "tokens": 92,
+      "taggedElements": 13,
+      "primitives": [
+        "OasisPressable as Pressable"
+      ]
+    },
+    {
+      "file": "app\\weather.tsx",
+      "tokens": 106,
+      "taggedElements": 11,
+      "primitives": [
+        "OasisPressable as Pressable",
+        "OasisTextInput as TextInput"
+      ]
+    },
+    {
+      "file": "app\\_layout.tsx",
+      "tokens": 5,
+      "taggedElements": 0,
+      "primitives": [
+        "OasisPressable as Pressable"
+      ]
+    },
+    {
+      "file": "components\\account\\AccountCenter.tsx",
+      "tokens": 104,
+      "taggedElements": 14,
+      "primitives": [
+        "OasisPressable as Pressable",
+        "OasisTextInput as TextInput"
+      ]
+    },
+    {
+      "file": "components\\ActionSheet.tsx",
+      "tokens": 0,
+      "taggedElements": 0,
+      "primitives": [
+        "OasisPressable as Pressable"
+      ]
+    },
+    {
+      "file": "components\\admin\\AdminAnalytics.tsx",
+      "tokens": 7,
+      "taggedElements": 7,
+      "primitives": [
+        "OasisPressable as Pressable"
+      ]
+    },
+    {
+      "file": "components\\admin\\AdminBadges.tsx",
+      "tokens": 17,
+      "taggedElements": 9,
+      "primitives": [
+        "OasisPressable as Pressable",
+        "OasisTextInput as TextInput"
+      ]
+    },
+    {
+      "file": "components\\admin\\AdminFeatureFlags.tsx",
+      "tokens": 6,
+      "taggedElements": 7,
+      "primitives": [
+        "OasisPressable as Pressable",
+        "OasisTextInput as TextInput"
+      ]
+    },
+    {
+      "file": "components\\admin\\AdminGlobalSearch.tsx",
+      "tokens": 6,
+      "taggedElements": 9,
+      "primitives": [
+        "OasisTextInput as TextInput",
+        "OasisPressable as Pressable"
+      ]
+    },
+    {
+      "file": "components\\admin\\AdminInsights.tsx",
+      "tokens": 0,
+      "taggedElements": 1,
+      "primitives": []
+    },
+    {
+      "file": "components\\admin\\AdminOverview.tsx",
+      "tokens": 3,
+      "taggedElements": 6,
+      "primitives": [
+        "OasisPressable as Pressable"
+      ]
+    },
+    {
+      "file": "components\\admin\\AdminPulse.tsx",
+      "tokens": 2,
+      "taggedElements": 1,
+      "primitives": [
+        "OasisPressable as Pressable"
+      ]
+    },
+    {
+      "file": "components\\admin\\AdminRbacPanel.tsx",
+      "tokens": 4,
+      "taggedElements": 7,
+      "primitives": [
+        "OasisPressable as Pressable",
+        "OasisTextInput as TextInput"
+      ]
+    },
+    {
+      "file": "components\\admin\\AdminSecurityCenter.tsx",
+      "tokens": 3,
+      "taggedElements": 5,
+      "primitives": [
+        "OasisPressable as Pressable"
+      ]
+    },
+    {
+      "file": "components\\admin\\adminStyles.ts",
+      "tokens": 142,
+      "taggedElements": 0,
+      "primitives": []
+    },
+    {
+      "file": "components\\admin\\AdminSupportCenter.tsx",
+      "tokens": 57,
+      "taggedElements": 0,
+      "primitives": [
+        "OasisPressable as Pressable",
+        "OasisTextInput as TextInput"
+      ]
+    },
+    {
+      "file": "components\\admin\\AdminTaskCenter.tsx",
+      "tokens": 1,
+      "taggedElements": 1,
+      "primitives": [
+        "OasisPressable as Pressable"
+      ]
+    },
+    {
+      "file": "components\\admin\\AdminWeeklyReport.tsx",
+      "tokens": 10,
+      "taggedElements": 9,
+      "primitives": [
+        "OasisPressable as Pressable"
+      ]
+    },
+    {
+      "file": "components\\admin\\AdminWorkspace.tsx",
+      "tokens": 7,
+      "taggedElements": 4,
+      "primitives": [
+        "OasisPressable as Pressable",
+        "OasisTextInput as TextInput"
+      ]
+    },
+    {
+      "file": "components\\AdminCommandCenter.tsx",
+      "tokens": 18,
+      "taggedElements": 4,
+      "primitives": [
+        "OasisPressable as Pressable"
+      ]
+    },
+    {
+      "file": "components\\AdminLocationManager.tsx",
+      "tokens": 36,
+      "taggedElements": 4,
+      "primitives": [
+        "OasisPressable as Pressable",
+        "OasisTextInput as TextInput"
+      ]
+    },
+    {
+      "file": "components\\BottomNav.tsx",
+      "tokens": 7,
+      "taggedElements": 1,
+      "primitives": [
+        "OasisPressable as Pressable"
+      ]
+    },
+    {
+      "file": "components\\chat\\ChatHeader.tsx",
+      "tokens": 3,
+      "taggedElements": 1,
+      "primitives": [
+        "OasisPressable as Pressable"
+      ]
+    },
+    {
+      "file": "components\\chat\\ChatInputBar.tsx",
+      "tokens": 6,
+      "taggedElements": 8,
+      "primitives": [
+        "OasisPressable as Pressable",
+        "OasisTextInput as TextInput"
+      ]
+    },
+    {
+      "file": "components\\chat\\ChatModals.tsx",
+      "tokens": 14,
+      "taggedElements": 6,
+      "primitives": [
+        "OasisPressable as Pressable",
+        "OasisTextInput as TextInput"
+      ]
+    },
+    {
+      "file": "components\\chat\\chatStyles.ts",
+      "tokens": 82,
+      "taggedElements": 0,
+      "primitives": []
+    },
+    {
+      "file": "components\\chat\\MessageBubble.tsx",
+      "tokens": 3,
+      "taggedElements": 1,
+      "primitives": [
+        "OasisPressable as Pressable"
+      ]
+    },
+    {
+      "file": "components\\home\\AtmosphereBar.tsx",
+      "tokens": 1,
+      "taggedElements": 0,
+      "primitives": [
+        "OasisPressable as Pressable"
+      ]
+    },
+    {
+      "file": "components\\home\\EmptyState.tsx",
+      "tokens": 9,
+      "taggedElements": 1,
+      "primitives": [
+        "OasisPressable as Pressable"
+      ]
+    },
+    {
+      "file": "components\\home\\FeedTabs.tsx",
+      "tokens": 2,
+      "taggedElements": 1,
+      "primitives": [
+        "OasisPressable as Pressable"
+      ]
+    },
+    {
+      "file": "components\\home\\HomeHero.tsx",
+      "tokens": 10,
+      "taggedElements": 3,
+      "primitives": [
+        "OasisPressable as Pressable",
+        "OasisTextInput as TextInput"
+      ]
+    },
+    {
+      "file": "components\\home\\HomeStates.tsx",
+      "tokens": 0,
+      "taggedElements": 1,
+      "primitives": [
+        "OasisPressable as Pressable"
+      ]
+    },
+    {
+      "file": "components\\home\\homeStyles.ts",
+      "tokens": 110,
+      "taggedElements": 0,
+      "primitives": []
+    },
+    {
+      "file": "components\\home\\LocationModals.tsx",
+      "tokens": 6,
+      "taggedElements": 2,
+      "primitives": [
+        "OasisPressable as Pressable"
+      ]
+    },
+    {
+      "file": "components\\home\\ServicesGrid.tsx",
+      "tokens": 12,
+      "taggedElements": 2,
+      "primitives": [
+        "OasisPressable as Pressable"
+      ]
+    },
+    {
+      "file": "components\\home\\StoriesRow.tsx",
+      "tokens": 11,
+      "taggedElements": 0,
+      "primitives": [
+        "OasisPressable as Pressable"
+      ]
+    },
+    {
+      "file": "components\\lives\\FloatingEffect.tsx",
+      "tokens": 1,
+      "taggedElements": 0,
+      "primitives": []
+    },
+    {
+      "file": "components\\lives\\LiveCommentCard.tsx",
+      "tokens": 1,
+      "taggedElements": 1,
+      "primitives": [
+        "OasisPressable as Pressable"
+      ]
+    },
+    {
+      "file": "components\\lives\\LiveHostControlBar.tsx",
+      "tokens": 8,
+      "taggedElements": 1,
+      "primitives": [
+        "OasisPressable as Pressable"
+      ]
+    },
+    {
+      "file": "components\\lives\\LiveMedia.native.tsx",
+      "tokens": 5,
+      "taggedElements": 0,
+      "primitives": []
+    },
+    {
+      "file": "components\\lives\\LiveMedia.web.tsx",
+      "tokens": 5,
+      "taggedElements": 0,
+      "primitives": []
+    },
+    {
+      "file": "components\\lives\\LiveModerationPanel.tsx",
+      "tokens": 10,
+      "taggedElements": 5,
+      "primitives": [
+        "OasisPressable as Pressable",
+        "OasisTextInput as TextInput"
+      ]
+    },
+    {
+      "file": "components\\lives\\liveRoomStyles.ts",
+      "tokens": 76,
+      "taggedElements": 0,
+      "primitives": []
+    },
+    {
+      "file": "components\\LocationScopeBar.tsx",
+      "tokens": 4,
+      "taggedElements": 0,
+      "primitives": [
+        "OasisPressable as Pressable"
+      ]
+    },
+    {
+      "file": "components\\LocationSelectorModal.tsx",
+      "tokens": 39,
+      "taggedElements": 9,
+      "primitives": [
+        "OasisPressable as Pressable",
+        "OasisTextInput as TextInput"
+      ]
+    },
+    {
+      "file": "components\\oasis\\OasisPrimitives.tsx",
+      "tokens": 13,
+      "taggedElements": 0,
+      "primitives": [
+        "OasisPressable as NativePressable",
+        "OasisTextInput as NativeTextInput"
+      ]
+    },
+    {
+      "file": "components\\profile\\AccountIdentityBadge.tsx",
+      "tokens": 11,
+      "taggedElements": 0,
+      "primitives": []
+    },
+    {
+      "file": "components\\profile\\NeighborBadgesCard.tsx",
+      "tokens": 22,
+      "taggedElements": 1,
+      "primitives": [
+        "OasisPressable as Pressable"
+      ]
+    },
+    {
+      "file": "components\\profile\\ProfileCustomizationEntry.tsx",
+      "tokens": 3,
+      "taggedElements": 2,
+      "primitives": [
+        "OasisPressable as Pressable"
+      ]
+    },
+    {
+      "file": "components\\profile\\ProfileIdentityCard.tsx",
+      "tokens": 15,
+      "taggedElements": 3,
+      "primitives": [
+        "OasisPressable as Pressable"
+      ]
+    },
+    {
+      "file": "components\\profile\\ProfileStories.tsx",
+      "tokens": 5,
+      "taggedElements": 1,
+      "primitives": [
+        "OasisPressable as Pressable"
+      ]
+    },
+    {
+      "file": "components\\QuestionFilterSheet.tsx",
+      "tokens": 12,
+      "taggedElements": 0,
+      "primitives": [
+        "OasisPressable as Pressable"
+      ]
+    },
+    {
+      "file": "components\\ResidentCard.tsx",
+      "tokens": 11,
+      "taggedElements": 1,
+      "primitives": [
+        "OasisPressable as Pressable"
+      ]
+    },
+    {
+      "file": "components\\shared\\AppHeader.tsx",
+      "tokens": 17,
+      "taggedElements": 1,
+      "primitives": [
+        "OasisPressable as Pressable"
+      ]
+    },
+    {
+      "file": "components\\shared\\MapJourney.web.tsx",
+      "tokens": 5,
+      "taggedElements": 0,
+      "primitives": []
+    },
+    {
+      "file": "components\\shared\\NeighborhoodWebMap.web.tsx",
+      "tokens": 5,
+      "taggedElements": 0,
+      "primitives": []
+    },
+    {
+      "file": "components\\shared\\ScreenHeader.tsx",
+      "tokens": 4,
+      "taggedElements": 0,
+      "primitives": []
+    },
+    {
+      "file": "components\\shared\\ScreenState.tsx",
+      "tokens": 5,
+      "taggedElements": 0,
+      "primitives": []
+    },
+    {
+      "file": "components\\shared\\SupportUI.tsx",
+      "tokens": 10,
+      "taggedElements": 0,
+      "primitives": []
+    },
+    {
+      "file": "components\\story\\StoryCarousel.tsx",
+      "tokens": 0,
+      "taggedElements": 3,
+      "primitives": [
+        "OasisPressable as Pressable"
+      ]
+    },
+    {
+      "file": "components\\story\\StoryControls.tsx",
+      "tokens": 0,
+      "taggedElements": 3,
+      "primitives": [
+        "OasisPressable as Pressable",
+        "OasisTextInput as TextInput"
+      ]
+    },
+    {
+      "file": "components\\story\\StoryPreview.tsx",
+      "tokens": 11,
+      "taggedElements": 11,
+      "primitives": [
+        "OasisPressable as Pressable",
+        "OasisTextInput as TextInput"
+      ]
+    },
+    {
+      "file": "components\\story\\theme.ts",
+      "tokens": 11,
+      "taggedElements": 0,
+      "primitives": []
+    },
+    {
+      "file": "components\\TwitterInquiryCard.tsx",
+      "tokens": 105,
+      "taggedElements": 11,
+      "primitives": [
+        "OasisPressable as Pressable",
+        "OasisTextInput as TextInput"
+      ]
+    },
+    {
+      "file": "lib/ui.ts",
+      "tokens": 15,
+      "taggedElements": 0,
+      "primitives": []
+    },
+    {
+      "file": "lib/dialog.tsx",
+      "tokens": 9,
+      "taggedElements": 1,
+      "primitives": [
+        "OasisPressable as Pressable"
+      ]
+    }
+  ]
+}

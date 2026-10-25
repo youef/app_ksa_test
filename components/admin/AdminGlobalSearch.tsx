@@ -1,5 +1,7 @@
+import { OasisTextInput as TextInput, OasisPressable as Pressable, OasisSurface } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import {
   Search,
   Download,
@@ -125,7 +127,7 @@ export function AdminGlobalSearch({
   return (
     <View style={styles.wrap}>
       {/* Search bar */}
-      <View style={styles.searchCard}>
+      <OasisSurface oasisSurface="card" style={styles.searchCard}>
         <Text style={styles.title}>البحث الشامل 🔎</Text>
         <Text style={styles.subtitle}>ابحث عن مستخدم أو منشور أو خدمة أو طلب في كل أنحاء المنصة.</Text>
         <View style={styles.inputRow}>
@@ -138,11 +140,11 @@ export function AdminGlobalSearch({
             style={styles.input}
             returnKeyType="search"
           />
-          <Pressable style={styles.searchBtn} onPress={runSearch} disabled={loading}>
-            {loading ? <ActivityIndicator size="small" color="#fff" /> : <Search size={16} color="#fff" />}
+          <Pressable oasisKind="icon" style={styles.searchBtn} onPress={runSearch} disabled={loading}>
+            {loading ? <ActivityIndicator size="small" color={OASIS.colors.surface} /> : <Search size={16} color={OASIS.colors.surface} />}
           </Pressable>
         </View>
-      </View>
+      </OasisSurface>
 
       {searched && !loading ? (
         <Text style={styles.totalLine}>النتائج: {total} عنصر</Text>
@@ -153,23 +155,23 @@ export function AdminGlobalSearch({
         <View style={styles.bulkBar}>
           <Text style={styles.bulkCount}>تم تحديد {selected.length} مستخدم</Text>
           <View style={styles.bulkBtns}>
-            <Pressable style={[styles.bulkBtn, { backgroundColor: C.successLight }]} disabled={busy} onPress={() => applyBulk({ is_verified: true })}>
+            <Pressable oasisKind="action" style={[styles.bulkBtn, { backgroundColor: C.successLight }]} disabled={busy} onPress={() => applyBulk({ is_verified: true })}>
               <ShieldCheck size={14} color={C.accentDark} />
               <Text style={[styles.bulkBtnText, { color: C.accentDark }]}>توثيق</Text>
             </Pressable>
-            <Pressable style={[styles.bulkBtn, { backgroundColor: C.warningLight }]} disabled={busy} onPress={() => applyBulk({ is_verified: false })}>
+            <Pressable oasisKind="action" style={[styles.bulkBtn, { backgroundColor: C.warningLight }]} disabled={busy} onPress={() => applyBulk({ is_verified: false })}>
               <X size={14} color="#B45309" />
               <Text style={[styles.bulkBtnText, { color: '#B45309' }]}>إلغاء التوثيق</Text>
             </Pressable>
-            <Pressable style={[styles.bulkBtn, { backgroundColor: C.dangerLight }]} disabled={busy} onPress={() => applyBulk({ is_banned: true })}>
+            <Pressable oasisKind="action" style={[styles.bulkBtn, { backgroundColor: C.dangerLight }]} disabled={busy} onPress={() => applyBulk({ is_banned: true })}>
               <Ban size={14} color={C.danger} />
               <Text style={[styles.bulkBtnText, { color: C.danger }]}>حظر</Text>
             </Pressable>
-            <Pressable style={[styles.bulkBtn, { backgroundColor: C.borderLight }]} disabled={busy} onPress={() => applyBulk({ is_banned: false })}>
+            <Pressable oasisKind="action" style={[styles.bulkBtn, { backgroundColor: C.borderLight }]} disabled={busy} onPress={() => applyBulk({ is_banned: false })}>
               <Check size={14} color={C.inkMuted} />
               <Text style={[styles.bulkBtnText, { color: C.inkMuted }]}>فك الحظر</Text>
             </Pressable>
-            <Pressable style={[styles.bulkBtn, { backgroundColor: C.borderLight }]} onPress={() => setSelected([])}>
+            <Pressable oasisKind="action" style={[styles.bulkBtn, { backgroundColor: C.borderLight }]} onPress={() => setSelected([])}>
               <Text style={[styles.bulkBtnText, { color: C.inkMuted }]}>إلغاء</Text>
             </Pressable>
           </View>
@@ -190,7 +192,7 @@ export function AdminGlobalSearch({
             return (
               <View key={u.id} style={[styles.row, active && { borderColor: C.accent }]}>
                 <Pressable style={[styles.checkbox, active && { backgroundColor: C.accent, borderColor: C.accent }]} onPress={() => toggleSelect(u.id)}>
-                  {active ? <Check size={13} color="#fff" /> : null}
+                  {active ? <Check size={13} color={OASIS.colors.surface} /> : null}
                 </Pressable>
                 <View style={styles.rowBody}>
                   <View style={styles.rowTitleRow}>
@@ -202,7 +204,7 @@ export function AdminGlobalSearch({
                     @{u.username || '—'} · {u.city || 'غير محدد'}{u.district ? ' · ' + u.district : ''} · {u.role === 'admin' ? 'مدير' : 'مواطن'}
                   </Text>
                 </View>
-                <Pressable style={styles.openBtn} onPress={() => onOpenUser(u)}>
+                <Pressable oasisKind="action" style={styles.openBtn} onPress={() => onOpenUser(u)}>
                   <Text style={styles.openBtnText}>الملف</Text>
                 </Pressable>
               </View>
@@ -300,7 +302,7 @@ function Section({
           {icon}
           <Text style={styles.sectionTitle}>{title}</Text>
         </View>
-        <Pressable style={styles.exportBtn} onPress={onExport}>
+        <Pressable oasisKind="action" style={styles.exportBtn} onPress={onExport}>
           <Download size={13} color={C.accentDark} />
           <Text style={styles.exportText}>CSV</Text>
         </Pressable>
@@ -311,14 +313,14 @@ function Section({
 }
 
 const styles = StyleSheet.create({
-  wrap: { padding: 14, gap: 12, paddingBottom: 40 },
-  searchCard: { backgroundColor: C.navyMid, borderRadius: 18, padding: 16, gap: 6 },
-  title: { fontSize: 16, fontWeight: '900', color: '#fff', textAlign: 'right' },
+  wrap: { padding: 14, gap: 12, paddingBottom: 24 },
+  searchCard: { backgroundColor: C.navyMid, borderRadius: 14, padding: 14, gap: 6 },
+  title: { fontSize: 16, fontWeight: '700', color: OASIS.colors.surface, textAlign: 'right' },
   subtitle: { fontSize: 11, color: '#94A3B8', textAlign: 'right', lineHeight: 17, marginBottom: 6 },
   inputRow: { flexDirection: 'row-reverse', gap: 8 },
   input: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: OASIS.colors.surface,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 11,
@@ -328,20 +330,20 @@ const styles = StyleSheet.create({
   },
   searchBtn: { width: 46, borderRadius: 12, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' },
 
-  totalLine: { fontSize: 12, fontWeight: '800', color: C.inkMuted, textAlign: 'right' },
+  totalLine: { fontSize: 12, fontWeight: '600', color: C.inkMuted, textAlign: 'right' },
 
   bulkBar: { backgroundColor: C.navyMid, borderRadius: 14, padding: 12, gap: 10 },
-  bulkCount: { color: '#fff', fontSize: 12.5, fontWeight: '900', textAlign: 'right' },
+  bulkCount: { color: OASIS.colors.surface, fontSize: 12.5, fontWeight: '700', textAlign: 'right' },
   bulkBtns: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 6 },
   bulkBtn: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10 },
-  bulkBtnText: { fontSize: 11, fontWeight: '900' },
+  bulkBtnText: { fontSize: 11, fontWeight: '700' },
 
   section: { gap: 8 },
   sectionHead: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between' },
   sectionTitleRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
-  sectionTitle: { fontSize: 13.5, fontWeight: '900', color: C.ink },
+  sectionTitle: { fontSize: 13.5, fontWeight: '700', color: C.ink },
   exportBtn: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, backgroundColor: C.accentLight, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 9 },
-  exportText: { fontSize: 10.5, fontWeight: '900', color: C.accentDark },
+  exportText: { fontSize: 11, fontWeight: '700', color: C.accentDark },
 
   row: {
     flexDirection: 'row-reverse',
@@ -356,12 +358,12 @@ const styles = StyleSheet.create({
   checkbox: { width: 22, height: 22, borderRadius: 7, borderWidth: 2, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
   rowBody: { flex: 1, gap: 3, alignItems: 'flex-end' },
   rowTitleRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5 },
-  rowTitle: { fontSize: 12.5, fontWeight: '900', color: C.ink, textAlign: 'right' },
-  rowSub: { fontSize: 10.5, color: C.muted, textAlign: 'right' },
+  rowTitle: { fontSize: 12.5, fontWeight: '700', color: C.ink, textAlign: 'right' },
+  rowSub: { fontSize: 11, color: C.muted, textAlign: 'right' },
   openBtn: { backgroundColor: C.infoLight, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 9 },
-  openBtnText: { fontSize: 11, fontWeight: '900', color: C.info },
+  openBtnText: { fontSize: 11, fontWeight: '700', color: C.info },
 
-  empty: { alignItems: 'center', paddingVertical: 40, gap: 8 },
-  emptyTitle: { fontSize: 15, fontWeight: '900', color: C.ink },
+  empty: { alignItems: 'center', paddingVertical: 24, gap: 8 },
+  emptyTitle: { fontSize: 15, fontWeight: '700', color: C.ink },
   emptySub: { fontSize: 12, color: C.muted, textAlign: 'center' },
 });

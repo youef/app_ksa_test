@@ -1,5 +1,8 @@
+import { OasisPressable as Pressable } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
+import { AppHeader } from '@/components/shared/AppHeader';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ArrowRight, UserRound } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
@@ -84,17 +87,11 @@ export default function StoryViewersScreen() {
 
   return (
     <View style={styles.screen}>
-      <View style={styles.header}>
-        <Pressable style={styles.backButton} onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="رجوع">
-          <ArrowRight size={22} color="#0f172a" />
-        </Pressable>
-        <Text style={styles.title}>مشاهدو القصة</Text>
-        <View style={styles.countPill}><Text style={styles.countText}>{viewers.length}</Text></View>
-      </View>
+      <AppHeader title="مشاهدو القصة" fallbackRoute="/stories" rightAction={<View style={styles.countPill}><Text style={styles.countText}>{viewers.length}</Text></View>} />
 
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#059669" />
+          <ActivityIndicator size="large" color={OASIS.colors.primary} />
         </View>
       ) : errorText ? (
         <View style={styles.center}>
@@ -118,7 +115,7 @@ export default function StoryViewersScreen() {
               {viewer.avatar_url ? (
                 <Image source={{ uri: viewer.avatar_url }} style={styles.avatar} />
               ) : (
-                <View style={styles.avatarFallback}><UserRound size={22} color="#64748b" /></View>
+                <View style={styles.avatarFallback}><UserRound size={22} color={OASIS.colors.muted} /></View>
               )}
               <View style={styles.viewerInfo}>
                 <Text style={styles.displayName} numberOfLines={1}>{viewer.display_name?.trim() || 'مستخدم'}</Text>
@@ -133,30 +130,30 @@ export default function StoryViewersScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, width: '100%', minHeight: '100%', backgroundColor: '#f8fafc' },
+  screen: { flex: 1, width: '100%', minHeight: '100%', backgroundColor: OASIS.colors.background },
   header: {
     minHeight: 64, paddingHorizontal: 18, paddingTop: 8, paddingBottom: 10,
     flexDirection: 'row-reverse', alignItems: 'center', gap: 12,
-    backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e8edf2',
+    backgroundColor: OASIS.colors.surface, borderBottomWidth: 1, borderBottomColor: '#e8edf2',
   },
   backButton: {
-    width: 42, height: 42, borderRadius: 21, backgroundColor: '#f1f5f9',
+    width: 42, height: 42, borderRadius: 14, backgroundColor: '#f1f5f9',
     alignItems: 'center', justifyContent: 'center',
   },
-  title: { flex: 1, textAlign: 'right', color: '#0f172a', fontSize: 18, fontWeight: '900' },
+  title: { flex: 1, textAlign: 'right', color: OASIS.colors.ink, fontSize: 18, fontWeight: '700' },
   countPill: { minWidth: 34, height: 30, paddingHorizontal: 9, borderRadius: 15, backgroundColor: '#e7f7ef', alignItems: 'center', justifyContent: 'center' },
-  countText: { color: '#047857', fontSize: 13, fontWeight: '900' },
-  list: { paddingHorizontal: 18, paddingTop: 10, paddingBottom: 28 },
+  countText: { color: OASIS.colors.primary, fontSize: 13, fontWeight: '700' },
+  list: { paddingHorizontal: 18, paddingTop: 10, paddingBottom: 16 },
   viewerRow: {
-    minHeight: 76, paddingHorizontal: 4, paddingVertical: 10,
+    minHeight: 56, paddingHorizontal: 4, paddingVertical: 10,
     flexDirection: 'row-reverse', alignItems: 'center', gap: 14,
     borderBottomWidth: 1, borderBottomColor: '#e9eef3',
   },
-  avatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: '#e2e8f0' },
-  avatarFallback: { width: 52, height: 52, borderRadius: 26, backgroundColor: '#e2e8f0', alignItems: 'center', justifyContent: 'center' },
+  avatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: OASIS.colors.line },
+  avatarFallback: { width: 52, height: 52, borderRadius: 26, backgroundColor: OASIS.colors.line, alignItems: 'center', justifyContent: 'center' },
   viewerInfo: { flex: 1, marginLeft: 'auto', alignItems: 'flex-end', gap: 4 },
-  displayName: { color: '#0f172a', fontSize: 14, fontWeight: '800', textAlign: 'right', maxWidth: '100%' },
-  time: { color: '#64748b', fontSize: 12, fontWeight: '700', textAlign: 'right' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28, gap: 10 },
-  message: { color: '#64748b', fontSize: 14, fontWeight: '700', textAlign: 'center' },
+  displayName: { color: OASIS.colors.ink, fontSize: 14, fontWeight: '600', textAlign: 'right', maxWidth: '100%' },
+  time: { color: OASIS.colors.muted, fontSize: 12, fontWeight: '700', textAlign: 'right' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 16, gap: 10 },
+  message: { color: OASIS.colors.muted, fontSize: 14, fontWeight: '700', textAlign: 'center' },
 });

@@ -1,4 +1,7 @@
-import { Pressable, Text, View } from 'react-native';
+import { OasisEmptyIllustration } from '@/components/oasis/OasisEmptyIllustration';
+import { OasisPressable as Pressable } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
+import { Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { MessageCircle, ShieldCheck, Sparkles, Truck, User, Wrench } from 'lucide-react-native';
 import { styles } from './homeStyles';
@@ -17,31 +20,31 @@ export default function EmptyState({ tab, searching, city, hasExactLocation }: P
     switch (tab) {
       case 'mine':
         return {
-          Icon: User, color: '#059669',
+          Icon: User, color: OASIS.colors.primary,
           title: searching ? 'لا توجد منشورات تطابق البحث' : 'لا توجد منشورات بعد',
           sub: searching ? searchSub : 'استفساراتك وطلباتك ستظهر هنا عند نشرها في الحي.',
-          cta: searching ? null : { label: 'انشر أول استفسار لك', bg: '#059669' },
+          cta: searching ? null : { label: 'انشر أول استفسار لك', bg: OASIS.colors.primary },
         };
       case 'emergency':
         return {
-          Icon: ShieldCheck, color: '#16a34a',
+          Icon: ShieldCheck, color: OASIS.colors.primary,
           title: searching ? 'لا توجد نتائج طوارئ مطابقة' : 'الحمد لله، لا توجد طوارئ',
           sub: searching ? searchSub : 'الحي آمن ومستقر بفضل الله.',
           cta: null,
         };
       case 'tools':
         return {
-          Icon: Wrench, color: '#16a34a',
+          Icon: Wrench, color: OASIS.colors.primary,
           title: searching ? 'لا توجد عروض إعارة مطابقة' : 'لا توجد عروض إعارة حالياً',
           sub: searching ? searchSub : 'هل لديك سلم أو دريل أو أدوات ترغب بإعارتها لجيرانك؟',
-          cta: searching ? null : { label: 'اعرض أداة للإعارة المجانية', bg: '#16a34a' },
+          cta: searching ? null : { label: 'اعرض أداة للإعارة المجانية', bg: OASIS.colors.primary },
         };
       case 'questions':
         return {
-          Icon: MessageCircle, color: '#059669',
+          Icon: MessageCircle, color: OASIS.colors.primary,
           title: searching ? 'لا توجد استفسارات مطابقة' : 'لا توجد استفسارات حالياً',
           sub: searching ? searchSub : 'اطرح سؤالك الأول لأهل الحي وتلقَّ ردوداً وتوصيات مجرّبة.',
-          cta: searching ? null : { label: 'اطرح سؤالك الآن', bg: '#059669' },
+          cta: searching ? null : { label: 'اطرح سؤالك الآن', bg: OASIS.colors.primary },
         };
       case 'requests':
         return {
@@ -52,7 +55,7 @@ export default function EmptyState({ tab, searching, city, hasExactLocation }: P
         };
       default:
         return {
-          Icon: Sparkles, color: '#059669',
+          Icon: Sparkles, color: OASIS.colors.primary,
           title: searching
             ? 'لا توجد نتائج مطابقة للبحث'
             : !hasExactLocation
@@ -63,7 +66,7 @@ export default function EmptyState({ tab, searching, city, hasExactLocation }: P
             : !hasExactLocation
               ? 'تُعرض المنشورات حسب الحي فقط لحماية خصوصية الجميع. اختر منطقتك ومدينتك وحيّك من الأعلى.'
               : 'كن المبادر الأول في حيك واطرح سؤالاً أو اعرض مساعدة لجيرانك.',
-          cta: searching || !hasExactLocation ? null : { label: 'اسأل أهل حيك الآن', bg: '#059669' },
+          cta: searching || !hasExactLocation ? null : { label: 'اسأل أهل حيك الآن', bg: OASIS.colors.primary },
         };
     }
   })();
@@ -71,13 +74,11 @@ export default function EmptyState({ tab, searching, city, hasExactLocation }: P
   const { Icon } = cfg;
   return (
     <View style={styles.emptyContainer}>
-      <View style={styles.emptyIconBg}>
-        <Icon size={36} color={cfg.color} />
-      </View>
+      <View style={{ alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}><OasisEmptyIllustration kind="empty-feed" /></View>
       <Text style={styles.emptyTitle}>{cfg.title}</Text>
       <Text style={styles.emptySub}>{cfg.sub}</Text>
       {cfg.cta && (
-        <Pressable
+        <Pressable oasisKind="action"
           style={[styles.emptyAskBtn, { backgroundColor: cfg.cta.bg }]}
           onPress={() => router.push('/ask')}
           accessibilityRole="button"

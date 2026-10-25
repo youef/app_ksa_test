@@ -1,5 +1,7 @@
+import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
 import { useState } from 'react';
-import { ScrollView, View, Text, Pressable, StyleSheet, TextInput, Alert, ActivityIndicator } from 'react-native';
+import { ScrollView, View, Text, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { AppHeader } from '@/components/shared/AppHeader';
 import { useBottomNavInset } from '@/lib/bottomNav';
@@ -31,17 +33,17 @@ export default function ContactUsScreen() {
     <View style={styles.screen}>
       <AppHeader variant="sub" title="اتصل بنا" subtitle="الرسائل تصل إدارة حيّنا" fallbackRoute="/more" />
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: bottomNavInset + 24 }]}>
-        <View style={styles.card}>
-          <Mail size={22} color="#059669" />
+        <OasisSurface oasisSurface="card" style={styles.card}>
+          <Mail size={22} color={OASIS.colors.primary} />
           <Text style={styles.title}>نموذج الدعم</Text>
           <Field label="الاسم" value={name} onChange={setName} placeholder="اسمك" />
           <Field label="البريد (اختياري)" value={email} onChange={setEmail} placeholder="email@domain.com" keyboard="email-address" />
           <Field label="الموضوع" value={subject} onChange={setSubject} placeholder="موضوع الرسالة" />
           <TextInput style={styles.textArea} placeholder="اكتب الرسالة" placeholderTextColor="#94a3b8" value={message} onChangeText={setMessage} multiline textAlign="right" textAlignVertical="top" />
           <Pressable style={[styles.btn, sending && { opacity: 0.7 }]} onPress={submit} disabled={sending}>
-            {sending ? <ActivityIndicator color="#fff" /> : (<View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><Send size={14} color="#fff" /><Text style={styles.btnText}>إرسال</Text></View>)}
+            {sending ? <ActivityIndicator color={OASIS.colors.surface} /> : (<View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><Send size={14} color={OASIS.colors.surface} /><Text style={styles.btnText}>إرسال</Text></View>)}
           </Pressable>
-        </View>
+        </OasisSurface>
       </ScrollView>
     </View>
   );
@@ -57,13 +59,13 @@ function Field({ label, value, onChange, placeholder, keyboard = 'default' }: an
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#f8fafc' },
-  content: { padding: 16 },
-  card: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 18, padding: 16, gap: 10 },
-  title: { fontSize: 15, fontWeight: '900', color: '#0f172a', textAlign: 'right' },
-  label: { fontSize: 11.5, fontWeight: '700', color: '#475569', textAlign: 'right' },
-  input: { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingVertical: 10, paddingHorizontal: 12, color: '#0f172a', textAlign: 'right' },
-  textArea: { minHeight: 110, borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingVertical: 10, paddingHorizontal: 12, color: '#0f172a', textAlign: 'right', textAlignVertical: 'top' },
-  btn: { backgroundColor: '#059669', borderRadius: 12, paddingVertical: 13, alignItems: 'center', marginTop: 6 },
-  btnText: { color: '#fff', fontWeight: '900', fontSize: 13 },
+  screen: { flex: 1, backgroundColor: OASIS.colors.background },
+  content: { padding: 14 },
+  card: { backgroundColor: OASIS.colors.surface, borderWidth: 1, borderColor: OASIS.colors.line, borderRadius: 14, padding: 14, gap: 10 },
+  title: { fontSize: 15, fontWeight: '700', color: OASIS.colors.ink, textAlign: 'right' },
+  label: { fontSize: 11.5, fontWeight: '700', color: OASIS.colors.muted, textAlign: 'right' },
+  input: { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingVertical: 10, paddingHorizontal: 12, color: OASIS.colors.ink, textAlign: 'right' },
+  textArea: { minHeight: 110, borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingVertical: 10, paddingHorizontal: 12, color: OASIS.colors.ink, textAlign: 'right', textAlignVertical: 'top' },
+  btn: { backgroundColor: OASIS.colors.primary, borderRadius: 12, paddingVertical: 13, alignItems: 'center', marginTop: 6 },
+  btnText: { color: OASIS.colors.surface, fontWeight: '700', fontSize: 13 },
 });

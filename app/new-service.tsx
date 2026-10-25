@@ -1,17 +1,7 @@
+import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
 import React, { useState, useEffect, useMemo } from 'react';
-import {
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  Switch,
-  ActivityIndicator,
-  Platform,
-  Image,
-} from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, View, Switch, ActivityIndicator, Platform, Image } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import {
@@ -51,6 +41,7 @@ export default function NewService() {
   const [step, setStep] = useState(0);
   const [authChecking, setAuthChecking] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [capabilities, setCapabilities] = useState<any>({});
 
   const [typeId, setTypeId] = useState<ListingTypeId | null>(null);
   const [subcategory, setSubcategory] = useState('');
@@ -83,18 +74,30 @@ export default function NewService() {
         router.replace('/auth');
         return;
       }
-      const loc = await getPermanentMyLocation();
+      const [loc, profileRes, capsRes] = await Promise.all([
+        getPermanentMyLocation(),
+        supabase.from('profiles').select('region,city,district,account_type,is_verified,freelance_trade,display_name').eq('id', authData.user.id).maybeSingle(),
+        supabase.rpc('hayna_my_account_capabilities'),
+      ]);
+      if (!capsRes.data?.can_publish_services) {
+        setAuthChecking(false);
+        Alert.alert('يتطلب حسابًا مهنيًا معتمدًا', 'إضافة الخدمات متاحة للحساب التجاري أو العمل الحر أو مقدم الخدمة بعد موافقة الإدارة.');
+        router.replace({ pathname: '/profile', params: { tab: 'profile' } });
+        return;
+      }
+      setCapabilities(capsRes.data || {});
       if (loc?.city && !isAllKingdom(loc.city)) {
         if (loc.region) setRegion(loc.region);
         setCity(loc.city);
         if (loc.district && loc.district !== 'كل الأحياء' && loc.district !== 'كل أحياء المدينة') setDistrict(loc.district);
       }
-      const { data: p } = await supabase.from('profiles').select('region, city, district').eq('id', authData.user.id).maybeSingle();
+      const p = profileRes.data;
       if (p?.region) setRegion(p.region);
       if (p?.city) {
         setCity(p.city);
         if (p?.district) setDistrict(p.district);
       }
+      if (p?.account_type === 'merchant' && p?.freelance_trade) setShopName(p.freelance_trade);
       setAuthChecking(false);
     })();
   }, []);
@@ -219,7 +222,7 @@ export default function NewService() {
         Alert.alert('تعذر نشر العرض', result.error.message);
       } else {
         Alert.alert('تم استلام العرض للمراجعة', 'سيظهر في سوق الحي بعد اعتماده من الإدارة.');
-        router.replace('/market');
+        router.replace({ pathname: '/profile', params: { tab: 'content' } });
       }
     } catch (e: any) {
       setBusy(false);
@@ -231,7 +234,7 @@ export default function NewService() {
   if (authChecking) {
     return (
       <View style={styles.loadingScreen}>
-        <ActivityIndicator size="large" color="#059669" />
+        <ActivityIndicator size="large" color={OASIS.colors.primary} />
         <Text style={styles.loadingText}>نجهز صفحة إضافة العرض…</Text>
       </View>
     );
@@ -247,9 +250,9 @@ export default function NewService() {
     <View style={styles.container}>
       <AppHeader
         variant="sub"
-        title="أضف عرضك في السوق"
+        title="إضافة خدمة"
         subtitle={`خطوة ${step + 1} من ${STEPS.length}: ${STEPS[step]}`}
-        fallbackRoute="/market"
+        fallbackRoute="/profile?tab=content"
       />
       <View style={styles.header}>
         <View style={styles.stepper}>
@@ -260,7 +263,7 @@ export default function NewService() {
               onPress={() => { if (i < step) setStep(i); }}
             >
               <View style={[styles.stepDot, i <= step && styles.stepDotActive]}>
-                {i < step ? <Check size={12} color="#fff" /> : <Text style={[styles.stepNum, i <= step && { color: '#fff' }]}>{i + 1}</Text>}
+                {i < step ? <Check size={12} color={OASIS.colors.surface} /> : <Text style={[styles.stepNum, i <= step && { color: OASIS.colors.surface }]}>{i + 1}</Text>}
               </View>
               <Text style={[styles.stepLabel, i === step && styles.stepLabelActive]} numberOfLines={1}>{label}</Text>
             </Pressable>
@@ -278,7 +281,7 @@ export default function NewService() {
               {LISTING_TYPES.map((t) => {
                 const active = t.id === typeId;
                 return (
-                  <Pressable
+                  <Pressable oasisKind="card"
                     key={t.id}
                     id={`type-${t.id}`}
                     style={({ pressed }) => [styles.typeCard, active && { borderColor: t.color, backgroundColor: t.bg }, pressed && { transform: [{ scale: 0.97 }] }]}
@@ -287,7 +290,7 @@ export default function NewService() {
                     <View style={[styles.typeIcon, { backgroundColor: t.bg }]}><t.Icon size={22} color={t.color} /></View>
                     <Text style={styles.typeLabel}>{t.label}</Text>
                     <Text style={styles.typeHint} numberOfLines={2}>{t.hint}</Text>
-                    {active && <View style={[styles.typeCheck, { backgroundColor: t.color }]}><Check size={11} color="#fff" /></View>}
+                    {active && <View style={[styles.typeCheck, { backgroundColor: t.color }]}><Check size={11} color={OASIS.colors.surface} /></View>}
                   </Pressable>
                 );
               })}
@@ -304,16 +307,16 @@ export default function NewService() {
             </View>
 
             <Section title={`الصور (${images.length}/${MAX_SERVICE_IMAGES})`} hint="أول صورة هي الغلاف. الصور الواضحة تضاعف التواصل.">
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.imagesRow}>
+              <ScrollView style={{ direction: 'rtl' }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.imagesRow, { direction: 'ltr' }]}>
                 {images.length < MAX_SERVICE_IMAGES && (
                   <View style={styles.addImageCol}>
                     <Pressable id="add-images-gallery" style={styles.addImageBtn} onPress={() => addImages(false)}>
-                      <ImagePlus size={22} color="#059669" />
+                      <ImagePlus size={22} color={OASIS.colors.primary} />
                       <Text style={styles.addImageText}>من المعرض</Text>
                     </Pressable>
                     {Platform.OS !== 'web' && (
-                      <Pressable style={styles.cameraBtn} onPress={() => addImages(true)}>
-                        <Camera size={14} color="#047857" />
+                      <Pressable oasisKind="action" style={styles.cameraBtn} onPress={() => addImages(true)}>
+                        <Camera size={14} color={OASIS.colors.primary} />
                         <Text style={styles.cameraText}>كاميرا</Text>
                       </Pressable>
                     )}
@@ -323,13 +326,13 @@ export default function NewService() {
                   <View key={img.uri + i} style={styles.thumbWrap}>
                     <Image source={{ uri: img.uri }} style={styles.thumb} />
                     <Pressable style={styles.thumbRemove} onPress={() => setImages((p) => p.filter((_, x) => x !== i))}>
-                      <X size={12} color="#fff" />
+                      <X size={12} color={OASIS.colors.surface} />
                     </Pressable>
                     {i === 0 ? (
                       <View style={styles.coverBadge}><Text style={styles.coverBadgeText}>الغلاف</Text></View>
                     ) : (
-                      <Pressable style={styles.makeCoverBtn} onPress={() => makeCover(i)}>
-                        <Star size={10} color="#fff" />
+                      <Pressable oasisKind="action" style={styles.makeCoverBtn} onPress={() => makeCover(i)}>
+                        <Star size={10} color={OASIS.colors.surface} />
                         <Text style={styles.coverBadgeText}>غلاف</Text>
                       </Pressable>
                     )}
@@ -412,14 +415,14 @@ export default function NewService() {
             <Section title="طريقة التقديم *" hint="اختر كل ما ينطبق">
               <View style={styles.chipsWrap}>
                 {DELIVERY_MODES.map((m) => (
-                  <Chip key={m.id} label={`${m.emoji}  ${m.label}`} active={modes.includes(m.id)} color="#059669" onPress={() => toggleMode(m.id)} />
+                  <Chip key={m.id} label={`${m.emoji}  ${m.label}`} active={modes.includes(m.id)} color={OASIS.colors.primary} onPress={() => toggleMode(m.id)} />
                 ))}
               </View>
             </Section>
 
             <Section title={type.nationwide ? 'موقعك (الخدمة تظهر لكل المملكة)' : 'الموقع والحي'}>
-              <Pressable style={styles.locationBtn} onPress={() => setShowLocationModal(true)}>
-                <MapPin size={18} color="#059669" />
+              <Pressable oasisKind="action" style={styles.locationBtn} onPress={() => setShowLocationModal(true)}>
+                <MapPin size={18} color={OASIS.colors.primary} />
                 <Text style={styles.locationBtnText}>{city ? `${city}${district ? ` · حي ${district}` : ''}` : 'اختر مدينتك وحيك...'}</Text>
                 <ChevronLeft size={16} color="#94a3b8" />
               </Pressable>
@@ -438,11 +441,11 @@ export default function NewService() {
                 <Text style={styles.switchTitle}>متاح الآن</Text>
                 <Text style={styles.switchSub}>يظهر وسم "متاح" على بطاقتك</Text>
               </View>
-              <Switch value={available} onValueChange={setAvailable} trackColor={{ false: '#e2e8f0', true: '#a7f3d0' }} thumbColor={available ? '#059669' : '#9ca3af'} />
+              <Switch value={available} onValueChange={setAvailable} trackColor={{ false: OASIS.colors.line, true: '#a7f3d0' }} thumbColor={available ? OASIS.colors.primary : '#9ca3af'} />
             </View>
 
             <Text style={styles.previewTitle}>معاينة البطاقة</Text>
-            <View style={styles.previewCard}>
+            <OasisSurface oasisSurface="card" style={styles.previewCard}>
               <View style={[styles.previewImage, { backgroundColor: type.bg }]}>
                 {images[0] ? <Image source={{ uri: images[0].uri }} style={StyleSheet.absoluteFillObject} /> : <type.Icon size={34} color={type.color} />}
                 <View style={styles.previewTypeBadge}><Text style={[styles.previewTypeText, { color: type.color }]}>{type.short}</Text></View>
@@ -452,27 +455,39 @@ export default function NewService() {
                 <Text style={styles.previewPrice}>{previewPrice}</Text>
                 <Text style={styles.previewModes}>{modes.map((m) => DELIVERY_MODES.find((d) => d.id === m)?.emoji).join(' ')}</Text>
               </View>
-            </View>
+            </OasisSurface>
           </View>
         )}
       </ScrollView>
 
-      <View style={styles.footer}>
-        <Pressable style={styles.backBtn} onPress={back}>
-          <ChevronRight size={18} color="#334155" />
-          <Text style={styles.backBtnText}>{step === 0 ? 'إلغاء' : 'رجوع'}</Text>
+      <View style={styles.actionBar}>
+        <Pressable
+          disabled={busy}
+          style={({ pressed }) => [styles.backAction, pressed && !busy && styles.actionPressed]}
+          onPress={back}
+        >
+          <ChevronRight size={18} color={OASIS.colors.muted} />
+          <Text style={styles.backActionText}>{step === 0 ? 'إلغاء' : 'رجوع'}</Text>
         </Pressable>
-        {step > 0 && (
-          step < STEPS.length - 1 ? (
-            <Pressable id="wizard-next" style={styles.nextBtn} onPress={next}>
-              <Text style={styles.nextBtnText}>التالي</Text>
-              <ChevronLeft size={18} color="#fff" />
-            </Pressable>
-          ) : (
-            <Pressable id="publish-service" style={[styles.nextBtn, busy && { opacity: 0.6 }]} onPress={save} disabled={busy}>
-              {busy ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.nextBtnText}>نشر العرض ✨</Text>}
-            </Pressable>
-          )
+
+        {step < STEPS.length - 1 ? (
+          <Pressable
+            disabled={busy}
+            style={({ pressed }) => [styles.nextAction, pressed && !busy && styles.actionPressed]}
+            onPress={next}
+          >
+            <Text style={styles.nextActionText}>التالي</Text>
+            <ChevronLeft size={19} color={OASIS.colors.surface} />
+          </Pressable>
+        ) : (
+          <Pressable
+            disabled={busy}
+            style={({ pressed }) => [styles.nextAction, busy && styles.actionDisabled, pressed && !busy && styles.actionPressed]}
+            onPress={() => void save()}
+          >
+            {busy ? <ActivityIndicator size="small" color={OASIS.colors.surface} /> : <Check size={19} color={OASIS.colors.surface} />}
+            <Text style={styles.nextActionText}>{busy ? 'جاري النشر...' : 'نشر العرض'}</Text>
+          </Pressable>
         )}
       </View>
 
@@ -512,8 +527,8 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
 
 function Chip({ label, active, color, onPress }: { label: string; active: boolean; color: string; onPress: () => void }) {
   return (
-    <Pressable onPress={onPress} style={[styles.chip, active && { backgroundColor: color, borderColor: color }]}>
-      <Text style={[styles.chipText, active && { color: '#fff' }]}>{label}</Text>
+    <Pressable oasisKind="chip" onPress={onPress} style={[styles.chip, active && { backgroundColor: color, borderColor: color }]}>
+      <Text style={[styles.chipText, active && { color: OASIS.colors.surface }]}>{label}</Text>
     </Pressable>
   );
 }
@@ -538,91 +553,98 @@ function Field({ multiline, suffix, icon, ...props }: React.ComponentProps<typeo
 }
 
 const styles = StyleSheet.create({
-  loadingScreen: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f8fafc', gap: 12 },
-  loadingText: { color: '#64748b', fontSize: 13, fontWeight: '700' },
-  container: { flex: 1, backgroundColor: '#f8fafc' },
+  loadingScreen: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: OASIS.colors.background, gap: 12 },
+  loadingText: { color: OASIS.colors.muted, fontSize: 13, fontWeight: '700' },
+  container: { flex: 1, backgroundColor: OASIS.colors.background },
   header: {
-    backgroundColor: '#ffffff',
+    backgroundColor: OASIS.colors.surface,
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    borderBottomColor: OASIS.colors.line,
   },
   stepper: { flexDirection: 'row-reverse', justifyContent: 'space-between', marginTop: 2, gap: 6 },
   stepItem: { flex: 1, flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
   stepDot: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' },
-  stepDotActive: { backgroundColor: '#059669' },
-  stepNum: { color: '#64748b', fontSize: 11, fontWeight: '900' },
+  stepDotActive: { backgroundColor: OASIS.colors.primary },
+  stepNum: { color: OASIS.colors.muted, fontSize: 11, fontWeight: '700' },
   stepLabel: { color: '#94a3b8', fontSize: 11, fontWeight: '700', flexShrink: 1 },
-  stepLabelActive: { color: '#059669', fontWeight: '900' },
+  stepLabelActive: { color: OASIS.colors.primary, fontWeight: '700' },
   progressTrack: { height: 4, borderRadius: 2, backgroundColor: '#f1f5f9', marginTop: 10, overflow: 'hidden', flexDirection: 'row-reverse' },
-  progressFill: { height: 4, backgroundColor: '#059669', borderRadius: 2 },
-  scroll: { padding: 16, paddingBottom: 120, width: '100%', maxWidth: 720, alignSelf: 'center' },
+  progressFill: { height: 4, backgroundColor: OASIS.colors.primary, borderRadius: 2 },
+  scroll: { padding: 16, paddingBottom: 112, width: '100%', maxWidth: 720, alignSelf: 'center' },
+  actionBar: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: 10, paddingBottom: Platform.OS === 'ios' ? 22 : 14, backgroundColor: OASIS.colors.surface, borderTopWidth: 1, borderTopColor: OASIS.colors.line },
+  nextAction: { flex: 1, minHeight: 50, borderRadius: 15, backgroundColor: OASIS.colors.primary, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 16 },
+  nextActionText: { color: OASIS.colors.surface, fontSize: 14, fontWeight: '700' },
+  backAction: { minWidth: 104, minHeight: 50, borderRadius: 15, backgroundColor: '#f1f5f9', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 14 },
+  backActionText: { color: OASIS.colors.muted, fontSize: 13, fontWeight: '700' },
+  actionPressed: { opacity: 0.78 },
+  actionDisabled: { opacity: 0.6 },
 
-  stepTitle: { fontSize: 20, fontWeight: '900', color: '#0f172a', textAlign: 'right' },
-  stepHint: { fontSize: 13, color: '#64748b', textAlign: 'right', marginTop: 4, marginBottom: 16 },
+  stepTitle: { fontSize: 20, fontWeight: '700', color: OASIS.colors.ink, textAlign: 'right' },
+  stepHint: { fontSize: 13, color: OASIS.colors.muted, textAlign: 'right', marginTop: 4, marginBottom: 16 },
   typeGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 12 },
   typeCard: {
-    width: '48.5%', backgroundColor: '#fff', borderRadius: 18, padding: 14, borderWidth: 1.5, borderColor: '#eef2f7',
+    width: '48.5%', backgroundColor: OASIS.colors.surface, borderRadius: 14, padding: 14, borderWidth: 1.5, borderColor: '#eef2f7',
     alignItems: 'flex-end', minHeight: 128, position: 'relative',
   },
   typeIcon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
-  typeLabel: { fontSize: 15, fontWeight: '900', color: '#0f172a', textAlign: 'right' },
-  typeHint: { fontSize: 11.5, color: '#64748b', textAlign: 'right', marginTop: 4, lineHeight: 17 },
+  typeLabel: { fontSize: 15, fontWeight: '700', color: OASIS.colors.ink, textAlign: 'right' },
+  typeHint: { fontSize: 11.5, color: OASIS.colors.muted, textAlign: 'right', marginTop: 4, lineHeight: 17 },
   typeCheck: { position: 'absolute', top: 10, left: 10, width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
 
   typeBanner: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14, marginBottom: 14 },
-  typeBannerText: { flex: 1, fontSize: 14, fontWeight: '900', textAlign: 'right' },
-  changeLink: { color: '#475569', fontSize: 12, fontWeight: '800', textDecorationLine: 'underline' },
+  typeBannerText: { flex: 1, fontSize: 14, fontWeight: '700', textAlign: 'right' },
+  changeLink: { color: OASIS.colors.muted, fontSize: 12, fontWeight: '600', textDecorationLine: 'underline' },
 
-  section: { backgroundColor: '#fff', borderRadius: 18, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#f1f5f9' },
-  sectionTitle: { fontSize: 14, fontWeight: '900', color: '#1e293b', textAlign: 'right' },
+  section: { backgroundColor: OASIS.colors.surface, borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#f1f5f9' },
+  sectionTitle: { fontSize: 14, fontWeight: '700', color: OASIS.colors.ink, textAlign: 'right' },
   sectionHint: { fontSize: 11.5, color: '#94a3b8', textAlign: 'right', marginTop: 3 },
 
   imagesRow: { flexDirection: 'row-reverse', gap: 10 },
   addImageCol: { gap: 6 },
-  addImageBtn: { width: 96, height: 96, borderRadius: 16, borderWidth: 1.5, borderStyle: 'dashed', borderColor: '#6ee7b7', backgroundColor: '#f0fdf4', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  addImageText: { fontSize: 11, color: '#047857', fontWeight: '800' },
-  cameraBtn: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 5, borderRadius: 10, backgroundColor: '#ecfdf5' },
-  cameraText: { fontSize: 11, color: '#047857', fontWeight: '800' },
+  addImageBtn: { width: 96, height: 96, borderRadius: 16, borderWidth: 1.5, borderStyle: 'dashed', borderColor: '#6ee7b7', backgroundColor: OASIS.colors.soft, alignItems: 'center', justifyContent: 'center', gap: 6 },
+  addImageText: { fontSize: 11, color: OASIS.colors.primary, fontWeight: '600' },
+  cameraBtn: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 5, borderRadius: 10, backgroundColor: OASIS.colors.soft },
+  cameraText: { fontSize: 11, color: OASIS.colors.primary, fontWeight: '600' },
   thumbWrap: { width: 96, height: 96, borderRadius: 16, overflow: 'hidden', backgroundColor: '#f1f5f9' },
   thumb: { width: '100%', height: '100%' },
   thumbRemove: { position: 'absolute', top: 6, left: 6, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(15,23,42,0.65)', alignItems: 'center', justifyContent: 'center' },
-  coverBadge: { position: 'absolute', bottom: 6, right: 6, backgroundColor: '#059669', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 },
+  coverBadge: { position: 'absolute', bottom: 6, right: 6, backgroundColor: OASIS.colors.primary, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 },
   makeCoverBtn: { position: 'absolute', bottom: 6, right: 6, flexDirection: 'row-reverse', alignItems: 'center', gap: 3, backgroundColor: 'rgba(15,23,42,0.6)', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 },
-  coverBadgeText: { color: '#fff', fontSize: 10, fontWeight: '900' },
+  coverBadgeText: { color: OASIS.colors.surface, fontSize: 11, fontWeight: '700' },
 
   chipsWrap: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 },
-  chip: { paddingHorizontal: 13, paddingVertical: 8, borderRadius: 12, backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0' },
-  chipText: { fontSize: 12.5, color: '#475569', fontWeight: '700' },
+  chip: { paddingHorizontal: 13, paddingVertical: 8, borderRadius: 12, backgroundColor: OASIS.colors.background, borderWidth: 1, borderColor: OASIS.colors.line },
+  chipText: { fontSize: 12.5, color: OASIS.colors.muted, fontWeight: '700' },
 
-  field: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, backgroundColor: '#f8fafc', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 11, borderWidth: 1, borderColor: '#e2e8f0' },
-  fieldFocused: { borderColor: '#10b981', backgroundColor: '#fff' },
-  input: { flex: 1, color: '#0f172a', fontSize: 14, padding: 0, ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}) },
-  suffix: { color: '#64748b', fontSize: 12, fontWeight: '800' },
-  counter: { color: '#cbd5e1', fontSize: 10.5, fontWeight: '700', textAlign: 'left', marginTop: 5 },
+  field: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, backgroundColor: OASIS.colors.background, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 11, borderWidth: 1, borderColor: OASIS.colors.line },
+  fieldFocused: { borderColor: OASIS.colors.primary, backgroundColor: OASIS.colors.surface },
+  input: { flex: 1, color: OASIS.colors.ink, fontSize: 14, padding: 0, ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}) },
+  suffix: { color: OASIS.colors.muted, fontSize: 12, fontWeight: '600' },
+  counter: { color: '#cbd5e1', fontSize: 11, fontWeight: '700', textAlign: 'left', marginTop: 5 },
 
   segment: { flexDirection: 'row-reverse', backgroundColor: '#f1f5f9', borderRadius: 12, padding: 3, marginBottom: 10 },
   segmentItem: { flex: 1, paddingVertical: 9, borderRadius: 10, alignItems: 'center' },
-  segmentItemActive: { backgroundColor: '#fff', shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 4, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
-  segmentText: { fontSize: 12.5, color: '#64748b', fontWeight: '700' },
-  segmentTextActive: { color: '#047857', fontWeight: '900' },
+  segmentItemActive: { backgroundColor: OASIS.colors.surface, shadowColor: '#000', shadowOpacity: 0, shadowRadius: 4, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
+  segmentText: { fontSize: 12.5, color: OASIS.colors.muted, fontWeight: '700' },
+  segmentTextActive: { color: OASIS.colors.primary, fontWeight: '700' },
   priceRow: { flexDirection: 'row-reverse', gap: 10 },
 
-  locationBtn: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, backgroundColor: '#f8fafc', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 13, borderWidth: 1, borderColor: '#e2e8f0' },
-  locationBtnText: { flex: 1, color: '#0f172a', fontSize: 13.5, fontWeight: '700', textAlign: 'right' },
+  locationBtn: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, backgroundColor: OASIS.colors.background, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 13, borderWidth: 1, borderColor: OASIS.colors.line },
+  locationBtnText: { flex: 1, color: OASIS.colors.ink, fontSize: 13.5, fontWeight: '700', textAlign: 'right' },
 
-  switchRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, backgroundColor: '#fff', borderRadius: 18, padding: 14, marginBottom: 18, borderWidth: 1, borderColor: '#f1f5f9' },
-  switchTitle: { color: '#0f172a', fontSize: 14, fontWeight: '900', textAlign: 'right' },
-  switchSub: { color: '#64748b', fontSize: 11.5, textAlign: 'right', marginTop: 2 },
+  switchRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, backgroundColor: OASIS.colors.surface, borderRadius: 14, padding: 14, marginBottom: 18, borderWidth: 1, borderColor: '#f1f5f9' },
+  switchTitle: { color: OASIS.colors.ink, fontSize: 14, fontWeight: '700', textAlign: 'right' },
+  switchSub: { color: OASIS.colors.muted, fontSize: 11.5, textAlign: 'right', marginTop: 2 },
 
-  previewTitle: { fontSize: 13, fontWeight: '900', color: '#64748b', textAlign: 'right', marginBottom: 8 },
-  previewCard: { width: 180, alignSelf: 'flex-end', backgroundColor: '#fff', borderRadius: 18, overflow: 'hidden', borderWidth: 1, borderColor: '#eef2f7' },
+  previewTitle: { fontSize: 13, fontWeight: '700', color: OASIS.colors.muted, textAlign: 'right', marginBottom: 8 },
+  previewCard: { width: 180, alignSelf: 'flex-end', backgroundColor: OASIS.colors.surface, borderRadius: 18, overflow: 'hidden', borderWidth: 1, borderColor: '#eef2f7' },
   previewImage: { height: 130, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  previewTypeBadge: { position: 'absolute', top: 8, right: 8, backgroundColor: '#fff', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 },
-  previewTypeText: { fontSize: 10, fontWeight: '900' },
-  previewName: { fontSize: 13.5, fontWeight: '900', color: '#0f172a', textAlign: 'right' },
-  previewPrice: { fontSize: 13, fontWeight: '900', color: '#059669', textAlign: 'right', marginTop: 4 },
+  previewTypeBadge: { position: 'absolute', top: 8, right: 8, backgroundColor: OASIS.colors.surface, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 },
+  previewTypeText: { fontSize: 11, fontWeight: '700' },
+  previewName: { fontSize: 13.5, fontWeight: '700', color: OASIS.colors.ink, textAlign: 'right' },
+  previewPrice: { fontSize: 13, fontWeight: '700', color: OASIS.colors.primary, textAlign: 'right', marginTop: 4 },
   previewModes: { fontSize: 12, textAlign: 'right', marginTop: 4 },
 
   footer: {
@@ -631,7 +653,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.96)', borderTopWidth: 1, borderTopColor: '#eef2f7',
   },
   backBtn: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, paddingHorizontal: 18, paddingVertical: 14, borderRadius: 14, backgroundColor: '#f1f5f9' },
-  backBtnText: { color: '#334155', fontSize: 14, fontWeight: '800' },
-  nextBtn: { flex: 1, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 14, borderRadius: 14, backgroundColor: '#059669' },
-  nextBtnText: { color: '#fff', fontSize: 15, fontWeight: '900' },
+  backBtnText: { color: OASIS.colors.ink, fontSize: 14, fontWeight: '600' },
+  nextBtn: { flex: 1, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 14, borderRadius: 14, backgroundColor: OASIS.colors.primary },
+  nextBtnText: { color: OASIS.colors.surface, fontSize: 15, fontWeight: '700' },
 });

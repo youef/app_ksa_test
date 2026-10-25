@@ -72,6 +72,8 @@ export interface PublishOutcome {
   failures: string[];
   degradedUploads: number;
   unauthenticated: boolean;
+  /** ID of the first successfully published story (for direct navigation). */
+  firstPublishedId?: string;
 }
 
 export async function publishStorySlides(
@@ -120,20 +122,26 @@ export async function publishStorySlides(
     };
   }
 
+  const account = await supabase.from('profiles').select('allow_story_replies').eq('id', user.id).single();
+  if (account.error) throw account.error;
+  if (account.data.allow_story_replies === 'nobody') options = { ...options, allowReplies: false };
   const { urls, degraded } = await resolveImageUrls(publishable, user.id, onProgress);
   const payloads = publishable.map((slide, i) => buildPayload(slide, user.id, urls[i], options));
 
-  const { error } = await supabase.from('stories').insert(payloads);
+  const insertResult = await supabase.from('stories').insert(payloads).select('id');
 
-  if (!error) {
+  if (!insertResult.error) {
+    const firstId = insertResult.data?.[0]?.id as string | undefined;
     return {
       publishedCount: payloads.length,
       requestedCount: payloads.length,
       failures: [],
       degradedUploads: degraded,
       unauthenticated: false,
+      firstPublishedId: firstId,
     };
   }
+  const error = insertResult.error;
 
   if (__DEV__) console.warn('[story] batch insert rejected, retrying row by row:', error.message);
 

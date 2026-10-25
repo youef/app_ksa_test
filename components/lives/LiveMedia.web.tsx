@@ -1,3 +1,4 @@
+import { OASIS } from '@/lib/oasis';
 import { useEffect, useRef, useState } from 'react';
 import { ConnectionQuality, ConnectionState, Room, RoomEvent, Track, type TrackPublication, type RemoteTrack } from 'livekit-client';
 import { ActivityIndicator, Text, View } from 'react-native';
@@ -92,10 +93,10 @@ export default function LiveMedia({ url, token, canPublish, participantOrder = [
       tile = document.createElement('div');
       tile.dataset.liveParticipantTile = 'true';
       tile.dataset.participantId = participantIdentity;
-      Object.assign(tile.style, { position: 'relative', minWidth: '0', minHeight: '0', overflow: 'hidden', borderRadius: '12px', background: '#0f172a', border: '1px solid rgba(255,255,255,.12)' });
+      Object.assign(tile.style, { position: 'relative', minWidth: '0', minHeight: '0', overflow: 'hidden', borderRadius: '12px', background: OASIS.colors.ink, border: '1px solid rgba(255,255,255,.12)' });
       const label = document.createElement('div');
       label.textContent = participantName || 'مشارك';
-      Object.assign(label.style, { position: 'absolute', left: '8px', bottom: '8px', zIndex: '2', color: '#fff', fontSize: '12px', fontWeight: '700', background: 'rgba(2,6,23,.78)', padding: '5px 9px', borderRadius: '12px', maxWidth: '85%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' });
+      Object.assign(label.style, { position: 'absolute', left: '8px', bottom: '8px', zIndex: '2', color: OASIS.colors.surface, fontSize: '12px', fontWeight: '700', background: 'rgba(2,6,23,.78)', padding: '5px 9px', borderRadius: '12px', maxWidth: '85%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' });
       tile.appendChild(label);
       container.appendChild(tile);
     }
@@ -214,8 +215,8 @@ export default function LiveMedia({ url, token, canPublish, participantOrder = [
   }, [url, token, canPublish]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#020617', minHeight: 280 }}>
-      {connection !== 'connected' && <View style={{ position: 'absolute', zIndex: 1, inset: 0, alignItems: 'center', justifyContent: 'center' } as any}><ActivityIndicator color="#fff" /><Text style={{ color: '#fff', marginTop: 10 }}>جارٍ الاتصال بالبث…</Text></View>}
+    <View style={{ flex: 1, backgroundColor: OASIS.colors.live, minHeight: 280 }}>
+      {connection !== 'connected' && <View style={{ position: 'absolute', zIndex: 1, inset: 0, alignItems: 'center', justifyContent: 'center' } as any}><ActivityIndicator color={OASIS.colors.surface} /><Text style={{ color: OASIS.colors.surface, marginTop: 10 }}>جارٍ الاتصال بالبث…</Text></View>}
       <div ref={videoHostRef} style={{ position: 'absolute', inset: 0, minHeight: 280, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gridTemplateRows: 'minmax(0, 1fr)', gap: '4px', padding: '3px', boxSizing: 'border-box' }} />
     </View>
   );

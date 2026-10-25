@@ -1,4 +1,6 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { OasisPressable as Pressable } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
+import { StyleSheet, Text, View } from 'react-native';
 import { BadgeCheck } from 'lucide-react-native';
 import type { LiveChatMessage, LiveChatRole } from '@/lib/lives';
 
@@ -7,7 +9,7 @@ export default function LiveCommentCard({ message, onLongPress }: { message: Liv
   const verified = Boolean(message.profiles?.is_verified) && role === 'viewer';
   const name = message.profiles?.display_name || message.profiles?.username || 'جارٍ';
   return (
-    <Pressable onLongPress={onLongPress} delayLongPress={350} style={[styles.card, role === 'host' && styles.hostCard, role === 'guest' && styles.guestCard]}>
+    <Pressable oasisKind="card" onLongPress={onLongPress} delayLongPress={350} style={[styles.card, role === 'host' && styles.hostCard, role === 'guest' && styles.guestCard]}>
       <View style={styles.header}>
         {role === 'host' && <View style={styles.hostBadge}><Text style={styles.hostBadgeText}>مضيف</Text></View>}
         {role === 'guest' && <View style={styles.guestBadge}><Text style={styles.guestBadgeText}>ضيف</Text></View>}
@@ -24,10 +26,10 @@ const styles = StyleSheet.create({
   hostCard: { borderColor: 'rgba(16,185,129,0.4)', backgroundColor: 'rgba(6,78,59,0.4)' },
   guestCard: { borderColor: 'rgba(56,189,248,0.38)', backgroundColor: 'rgba(12,74,110,0.38)' },
   header: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, marginBottom: 1 },
-  name: { color: '#a7f3d0', fontWeight: '900', fontSize: 11 },
-  body: { color: '#fff', fontSize: 12, textAlign: 'right', lineHeight: 18 },
+  name: { color: '#a7f3d0', fontWeight: '700', fontSize: 11 },
+  body: { color: OASIS.colors.surface, fontSize: 12, textAlign: 'right', lineHeight: 18 },
   hostBadge: { backgroundColor: 'rgba(16,185,129,0.25)', borderRadius: 7, paddingHorizontal: 5, paddingVertical: 1 },
-  hostBadgeText: { color: '#6ee7b7', fontSize: 9, fontWeight: '900' },
+  hostBadgeText: { color: '#6ee7b7', fontSize: 11, fontWeight: '700' },
   guestBadge: { backgroundColor: 'rgba(56,189,248,0.25)', borderRadius: 7, paddingHorizontal: 5, paddingVertical: 1 },
-  guestBadgeText: { color: '#7dd3fc', fontSize: 9, fontWeight: '900' },
+  guestBadgeText: { color: '#7dd3fc', fontSize: 11, fontWeight: '700' },
 });

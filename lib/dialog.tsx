@@ -1,5 +1,8 @@
+import { CircleCheck, CircleAlert, Info, TriangleAlert } from 'lucide-react-native';
+import { OasisPressable as Pressable, OasisSurface } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Modal, Platform, StyleSheet, Text, View } from 'react-native';
 
 export type DialogButtonStyle = 'default' | 'cancel' | 'destructive';
 
@@ -79,6 +82,9 @@ export default function DialogProvider({ children }: { children: React.ReactNode
   }, []);
 
   const buttons = state?.buttons?.length ? state.buttons : [{ text: 'حسناً' }];
+  const tone = /خطأ|تعذر|فشل/.test(state?.title || '') ? 'error' : buttons.some(button => button.style === 'destructive') ? 'warning' : /نجاح|تم |نُشر/.test(state?.title || '') ? 'success' : 'info';
+  const ToneIcon = tone === 'error' ? CircleAlert : tone === 'warning' ? TriangleAlert : tone === 'success' ? CircleCheck : Info;
+  const toneColor = tone === 'error' ? OASIS.colors.danger : tone === 'warning' ? OASIS.colors.warning : tone === 'success' ? OASIS.colors.primary : OASIS.colors.info;
 
   return (
     <>
@@ -92,14 +98,14 @@ export default function DialogProvider({ children }: { children: React.ReactNode
       >
         <Pressable style={styles.backdrop} onPress={close} accessibilityLabel="إغلاق" />
         <View style={styles.center} pointerEvents="box-none">
-          <View style={styles.card}>
+          <OasisSurface oasisSurface="sheet" oasisAsset={`alerts/${tone}-dialog`} accessibilityRole="alert" accessibilityViewIsModal style={styles.card}><View style={{ alignItems: 'center', marginBottom: 4 }}><ToneIcon size={32} color={toneColor} /></View>
             {!!state?.title && <Text style={styles.title}>{state.title}</Text>}
             {!!state?.message && <Text style={styles.message}>{state.message}</Text>}
             <View style={[styles.actions, buttons.length > 2 && styles.actionsColumn]}>
               {buttons.map((button, index) => {
                 const variant = button.style === 'destructive' ? 'danger' : button.style === 'cancel' ? 'muted' : 'primary';
                 return (
-                  <Pressable
+                  <Pressable oasisKind="action" oasisVariant={variant === "muted" ? "secondary" : variant}
                     key={`${index}-${button.text ?? ''}`}
                     onPress={() => onButtonPress(button)}
                     disabled={button.disabled}
@@ -124,7 +130,7 @@ export default function DialogProvider({ children }: { children: React.ReactNode
                 );
               })}
             </View>
-          </View>
+          </OasisSurface>
         </View>
       </Modal>
     </>
@@ -134,36 +140,36 @@ export default function DialogProvider({ children }: { children: React.ReactNode
 const styles = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(2, 44, 34, 0.55)',
+    backgroundColor: 'rgba(0,0,0,0.35)',
   },
   center: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
+    padding: 16,
   },
   card: {
     width: '100%',
-    maxWidth: 420,
-    backgroundColor: '#fff',
-    borderRadius: 22,
-    padding: 20,
+    maxWidth: 340,
+    backgroundColor: OASIS.colors.surface,
+    borderRadius: 14,
+    padding: 14,
     gap: 10,
-    shadowColor: '#022c22',
+    shadowColor: OASIS.colors.deep,
     shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.22,
+    shadowOpacity: 0,
     shadowRadius: 26,
     elevation: 12,
   },
   title: {
-    color: '#0f172a',
+    color: OASIS.colors.ink,
     fontSize: 17,
-    fontWeight: '900',
+    fontWeight: '700',
     textAlign: 'right',
     lineHeight: 26,
   },
   message: {
-    color: '#475569',
+    color: OASIS.colors.muted,
     fontSize: 14,
     textAlign: 'right',
     lineHeight: 23,
@@ -180,13 +186,13 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#059669',
+    backgroundColor: OASIS.colors.primary,
     paddingVertical: 12,
     paddingHorizontal: 14,
     borderRadius: 14,
   },
   actionDanger: {
-    backgroundColor: '#fef2f2',
+    backgroundColor: OASIS.colors.dangerSoft,
     borderWidth: 1,
     borderColor: '#fecaca',
   },
@@ -197,15 +203,15 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   actionText: {
-    color: '#fff',
+    color: OASIS.colors.surface,
     fontSize: 14,
-    fontWeight: '900',
+    fontWeight: '700',
     textAlign: 'center',
   },
   actionTextDanger: {
-    color: '#dc2626',
+    color: OASIS.colors.danger,
   },
   actionTextMuted: {
-    color: '#475569',
+    color: OASIS.colors.muted,
   },
 });

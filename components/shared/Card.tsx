@@ -1,12 +1,6 @@
-import { ReactNode } from 'react';
-import { StyleSheet, View, ViewStyle } from 'react-native';
-
-type Props = { children: ReactNode; style?: ViewStyle };
-
-export default function Card({ children, style }: Props) {
-  return <View style={[styles.card, style]}>{children}</View>;
-}
-
-const styles = StyleSheet.create({
-  card:{backgroundColor:'#fff',borderRadius:22,borderWidth:1,borderColor:'#e2e8f0',padding:16,shadowColor:'#0f172a',shadowOpacity:.06,shadowRadius:18,shadowOffset:{width:0,height:8},elevation:3},
-});
+import type { ReactNode } from 'react';
+import { StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
+import { OasisSurface } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
+export default function Card({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) { return <OasisSurface style={[styles.card, style]}>{children}</OasisSurface>; }
+const styles = StyleSheet.create({ card: { backgroundColor: OASIS.colors.surface, borderRadius: 14, borderWidth: 1, borderColor: OASIS.colors.line, padding: 14, shadowColor: OASIS.colors.deep, shadowOpacity: 0, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 1 } });

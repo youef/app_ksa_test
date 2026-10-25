@@ -1,4 +1,5 @@
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { OasisPressable as Pressable } from '@/components/oasis/OasisPrimitives';
+import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image as ImageIcon, Type, Trash2 } from 'lucide-react-native';
 import { getGradient } from '@/lib/storyGradients';
@@ -26,12 +27,12 @@ export function StoryCarousel({
 }: Props) {
   return (
     <View style={styles.container}>
-      <ScrollView
+      <ScrollView style={{ direction: 'rtl' }}
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={[styles.scroll, { direction: 'ltr' }]}
       >
-        <Pressable
+        <Pressable oasisKind="action"
           style={[styles.addBtn, atCapacity && styles.addBtnDisabled]}
           onPress={onAddImages}
           disabled={atCapacity}
@@ -42,7 +43,7 @@ export function StoryCarousel({
           <Text style={styles.addText}>+ صور</Text>
         </Pressable>
 
-        <Pressable
+        <Pressable oasisKind="action"
           style={[styles.addBtn, atCapacity && styles.addBtnDisabled]}
           onPress={onAddText}
           disabled={atCapacity}
@@ -80,7 +81,7 @@ export function StoryCarousel({
                 <Text style={styles.indexText}>{idx + 1}</Text>
               </View>
 
-              <Pressable
+              <Pressable oasisKind="icon"
                 style={styles.deleteBtn}
                 onPress={(e) => {
                   e.stopPropagation();
@@ -126,7 +127,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   addBtnDisabled: { opacity: 0.4 },
-  addText: { color: SC.mint, fontSize: 11, fontWeight: '800' },
+  addText: { color: SC.mint, fontSize: 11, fontWeight: '600' },
   thumb: {
     width: 64,
     height: 84,
@@ -146,7 +147,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 4,
   },
-  thumbText: { color: SC.white, fontSize: 9, fontWeight: '800', textAlign: 'center' },
+  thumbText: { color: SC.white, fontSize: 11, fontWeight: '600', textAlign: 'center' },
   indexBadge: {
     position: 'absolute',
     bottom: 4,
@@ -158,7 +159,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  indexText: { color: SC.white, fontSize: 10, fontWeight: '900' },
+  indexText: { color: SC.white, fontSize: 11, fontWeight: '700' },
   deleteBtn: {
     position: 'absolute',
     top: 4,

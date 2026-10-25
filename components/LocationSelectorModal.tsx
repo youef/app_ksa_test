@@ -1,16 +1,7 @@
+import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
 import { useEffect, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Modal,
-  View,
-  Text,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  Platform,
-} from 'react-native';
+import { ActivityIndicator, Alert, Modal, View, Text, ScrollView, StyleSheet, Platform } from 'react-native';
 import {
   SAUDI_REGIONS,
   buildSaudiLocations,
@@ -278,8 +269,8 @@ export default function LocationSelectorModal({
       <View style={{ flex: 1 }}>
           {/* Header */}
           <View style={styles.header}>
-            <Pressable onPress={resetAndClose} style={styles.closeBtn}>
-              <X size={22} color="#475569" />
+            <Pressable oasisKind="icon" onPress={resetAndClose} style={styles.closeBtn}>
+              <X size={22} color={OASIS.colors.muted} />
             </Pressable>
 
             <View style={{ flex: 1, alignItems: 'center' }}>
@@ -296,11 +287,11 @@ export default function LocationSelectorModal({
             </View>
 
             {step !== 'region' && !lockActive ? (
-              <Pressable
+              <Pressable oasisKind="icon"
                 onPress={() => setStep(step === 'district' ? 'city' : 'region')}
                 style={styles.backBtn}
               >
-                <ChevronRight size={22} color="#059669" />
+                <ChevronRight size={22} color={OASIS.colors.primary} />
               </Pressable>
             ) : (
               <View style={{ width: 40 }} />
@@ -343,30 +334,30 @@ export default function LocationSelectorModal({
             {/* Step 1: Regions */}
             {step === 'region' && (
               <>
-                <Pressable
+                <Pressable oasisKind="action"
                   style={styles.currentLocationButton}
                   onPress={handleUseCurrentLocation}
                   disabled={locating}
                   accessibilityRole="button"
                   accessibilityLabel="تحديد موقعي تلقائياً"
                 >
-                  {locating ? <ActivityIndicator size="small" color="#fff" /> : <Compass size={18} color="#fff" />}
+                  {locating ? <ActivityIndicator size="small" color={OASIS.colors.surface} /> : <Compass size={18} color={OASIS.colors.surface} />}
                   <Text style={styles.currentLocationButtonText}>
                     {locating ? 'جارٍ تحديد موقعك…' : 'تحديد موقعي تلقائياً'}
                   </Text>
                 </Pressable>
 
                 {/* National Address Short Code Entry Box */}
-                <View style={styles.nationalAddressCard}>
+                <OasisSurface oasisSurface="card" style={styles.nationalAddressCard}>
                   <View style={styles.naHeaderRow}>
-                    <Sparkles size={16} color="#059669" />
+                    <Sparkles size={16} color={OASIS.colors.primary} />
                     <Text style={styles.naHeaderTitle}>تحديد سريع برمز العنوان الوطني</Text>
                   </View>
                   <Text style={styles.naDesc}>
                     اكتب الرمز المختصر لعنوانك (مثال: RRRD2929) للتحديد الدقيق فوراً
                   </Text>
                   <View style={styles.naInputRow}>
-                    <Building2 size={18} color="#059669" />
+                    <Building2 size={18} color={OASIS.colors.primary} />
                     <TextInput
                       style={styles.naInput}
                       placeholder="أدخل الرمز مثل RRRD2929..."
@@ -386,7 +377,7 @@ export default function LocationSelectorModal({
                           {resolvedAddress.region} · {resolvedAddress.city} · حي {resolvedAddress.district}
                         </Text>
                       </View>
-                      <Pressable
+                      <Pressable oasisKind="action"
                         style={styles.applyResolvedBtn}
                         onPress={handleApplyResolvedAddress}
                       >
@@ -394,12 +385,12 @@ export default function LocationSelectorModal({
                       </Pressable>
                     </View>
                   )}
-                </View>
+                </OasisSurface>
 
                 <View style={styles.divider} />
 
                 {filteredRegions.map(reg => (
-                  <Pressable
+                  <Pressable oasisKind="card"
                     key={reg.id}
                     style={styles.itemCard}
                     onPress={() => handleChooseRegion(reg)}
@@ -410,7 +401,7 @@ export default function LocationSelectorModal({
                       <Text style={styles.itemDesc}>{reg.cities.length} مدن ومحافظات رئيسية</Text>
                     </View>
                     <View style={styles.itemIconWrap}>
-                      <MapPin size={18} color="#059669" />
+                      <MapPin size={18} color={OASIS.colors.primary} />
                     </View>
                   </Pressable>
                 ))}
@@ -423,7 +414,7 @@ export default function LocationSelectorModal({
                 {filteredCities.slice(0, visibleCount).map(cit => {
                   const isCitySelected = selectedCity === cit.name;
                   return (
-                    <Pressable
+                    <Pressable oasisKind="card"
                       key={cit.id}
                       style={[styles.itemCard, isCitySelected && styles.itemCardSelected]}
                       onPress={() => handleChooseCity(cit)}
@@ -434,7 +425,7 @@ export default function LocationSelectorModal({
                         <Text style={styles.itemDesc}>{cit.districts.length} حيًا من بيانات المدينة</Text>
                       </View>
                       <View style={styles.itemIconWrap}>
-                        <MapPin size={18} color="#059669" />
+                        <MapPin size={18} color={OASIS.colors.primary} />
                       </View>
                     </Pressable>
                   );
@@ -447,7 +438,7 @@ export default function LocationSelectorModal({
             {step === 'district' && (
               <>
                 {/* Option for All Districts in this City */}
-                <Pressable
+                <Pressable oasisKind="card"
                   style={[
                     styles.itemCard,
                     selectedCity === selectedCit?.name && selectedDistrict === 'كل الأحياء' && styles.itemCardSelected,
@@ -456,7 +447,7 @@ export default function LocationSelectorModal({
                 >
                   <View style={styles.itemRadio}>
                     {selectedCity === selectedCit?.name && selectedDistrict === 'كل الأحياء' && (
-                      <Check size={16} color="#059669" />
+                      <Check size={16} color={OASIS.colors.primary} />
                     )}
                   </View>
                   <View style={{ flex: 1 }}>
@@ -470,19 +461,19 @@ export default function LocationSelectorModal({
                 {districtOptions.slice(0, visibleCount).map(dist => {
                   const isSelected = selectedCity === selectedCit?.name && selectedDistrict === dist.name;
                   return (
-                    <Pressable
+                    <Pressable oasisKind="card"
                       key={dist.id}
                       style={[styles.itemCard, isSelected && styles.itemCardSelected]}
                       onPress={() => handleChooseDistrict(dist)}
                     >
                       <View style={styles.itemRadio}>
-                        {isSelected && <Check size={16} color="#059669" />}
+                        {isSelected && <Check size={16} color={OASIS.colors.primary} />}
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={styles.itemTitle}>{dist.name}</Text>
                       </View>
                       <View style={styles.itemIconWrap}>
-                        <MapPin size={18} color="#059669" />
+                        <MapPin size={18} color={OASIS.colors.primary} />
                       </View>
                     </Pressable>
                   );
@@ -503,7 +494,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#fff',
+    backgroundColor: OASIS.colors.surface,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     maxHeight: '85%',
@@ -515,7 +506,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingTop: 14,
     paddingBottom: 14,
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
@@ -523,7 +514,7 @@ const styles = StyleSheet.create({
   closeBtn: {
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: 14,
     backgroundColor: '#f1f5f9',
     justifyContent: 'center',
     alignItems: 'center',
@@ -531,38 +522,38 @@ const styles = StyleSheet.create({
   backBtn: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    backgroundColor: '#ecfdf5',
+    borderRadius: 14,
+    backgroundColor: OASIS.colors.soft,
     justifyContent: 'center',
     alignItems: 'center',
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: '900',
-    color: '#0f172a',
+    fontWeight: '700',
+    color: OASIS.colors.ink,
   },
   headerSub: {
     fontSize: 12,
-    color: '#64748b',
+    color: OASIS.colors.muted,
     marginTop: 2,
   },
   searchBar: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    backgroundColor: '#f8fafc',
+    backgroundColor: OASIS.colors.background,
     marginHorizontal: 20,
     marginVertical: 12,
     paddingHorizontal: 14,
     height: 46,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
     gap: 10,
   },
   searchInput: {
     flex: 1,
     fontSize: 14,
-    color: '#0f172a',
+    color: OASIS.colors.ink,
     textAlign: 'right',
   },
   scrollArea: {
@@ -570,7 +561,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingBottom: 24,
+    paddingBottom: 16,
     gap: 10,
   },
   divider: {
@@ -584,7 +575,7 @@ const styles = StyleSheet.create({
     gap: 8,
     marginHorizontal: 20,
     marginTop: 12,
-    backgroundColor: '#fffbeb',
+    backgroundColor: OASIS.colors.warningSoft,
     borderWidth: 1,
     borderColor: '#fde68a',
     borderRadius: 12,
@@ -596,30 +587,30 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
     color: '#b45309',
-    fontWeight: '800',
+    fontWeight: '600',
     textAlign: 'right',
   },
-  loadMore: { alignItems: 'center', padding: 14, borderRadius: 14, backgroundColor: '#ecfdf5' },
-  loadMoreText: { color: '#047857', fontSize: 13, fontWeight: '800' },
+  loadMore: { alignItems: 'center', padding: 14, borderRadius: 14, backgroundColor: OASIS.colors.soft },
+  loadMoreText: { color: OASIS.colors.primary, fontSize: 13, fontWeight: '600' },
   itemCard: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     padding: 14,
     borderRadius: 16,
-    backgroundColor: '#f8fafc',
+    backgroundColor: OASIS.colors.background,
     borderWidth: 1.5,
     borderColor: '#f1f5f9',
     gap: 12,
   },
   itemCardSelected: {
-    borderColor: '#059669',
-    backgroundColor: '#ecfdf5',
+    borderColor: OASIS.colors.primary,
+    backgroundColor: OASIS.colors.soft,
   },
   itemIconWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: '#ecfdf5',
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: OASIS.colors.soft,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -634,13 +625,13 @@ const styles = StyleSheet.create({
   },
   itemTitle: {
     fontSize: 15,
-    fontWeight: '800',
-    color: '#0f172a',
+    fontWeight: '600',
+    color: OASIS.colors.ink,
     textAlign: 'right',
   },
   itemDesc: {
     fontSize: 12,
-    color: '#64748b',
+    color: OASIS.colors.muted,
     textAlign: 'right',
     marginTop: 2,
   },
@@ -652,11 +643,11 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 8,
     borderRadius: 14,
-    backgroundColor: '#059669',
+    backgroundColor: OASIS.colors.primary,
   },
-  currentLocationButtonText: { color: '#fff', fontSize: 13, fontWeight: '900' },
+  currentLocationButtonText: { color: OASIS.colors.surface, fontSize: 13, fontWeight: '700' },
   nationalAddressCard: {
-    backgroundColor: '#ecfdf5',
+    backgroundColor: OASIS.colors.soft,
     borderWidth: 1.5,
     borderColor: '#a7f3d0',
     borderRadius: 16,
@@ -671,20 +662,20 @@ const styles = StyleSheet.create({
   },
   naHeaderTitle: {
     fontSize: 14,
-    fontWeight: '800',
-    color: '#059669',
+    fontWeight: '600',
+    color: OASIS.colors.primary,
     textAlign: 'right',
   },
   naDesc: {
     fontSize: 12,
-    color: '#065f46',
+    color: OASIS.colors.deep,
     textAlign: 'right',
     marginBottom: 10,
   },
   naInputRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: OASIS.colors.surface,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#a7f3d0',
@@ -696,12 +687,12 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     fontWeight: '700',
-    color: '#059669',
+    color: OASIS.colors.primary,
     textAlign: 'right',
   },
   resolvedBox: {
     marginTop: 10,
-    backgroundColor: '#fff',
+    backgroundColor: OASIS.colors.surface,
     borderRadius: 12,
     padding: 10,
     flexDirection: 'row-reverse',
@@ -712,25 +703,25 @@ const styles = StyleSheet.create({
   },
   resolvedLabel: {
     fontSize: 11,
-    color: '#64748b',
+    color: OASIS.colors.muted,
     textAlign: 'right',
   },
   resolvedValue: {
     fontSize: 13,
-    fontWeight: '800',
-    color: '#0f172a',
+    fontWeight: '600',
+    color: OASIS.colors.ink,
     textAlign: 'right',
     marginTop: 2,
   },
   applyResolvedBtn: {
-    backgroundColor: '#059669',
+    backgroundColor: OASIS.colors.primary,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 10,
   },
   applyResolvedText: {
-    color: '#fff',
+    color: OASIS.colors.surface,
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
   },
 });

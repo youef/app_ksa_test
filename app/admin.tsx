@@ -1,22 +1,10 @@
+import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import {
-  Alert,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-  RefreshControl,
-  ActivityIndicator,
-  Platform,
-  TextInput,
-  Image,
-  Animated,
-  useWindowDimensions,
-} from 'react-native';
+import { Alert, ScrollView, Text, View, ActivityIndicator, Platform, Image, Linking, Animated } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
-import { AppHeader } from '@/components/shared/AppHeader';
 import * as ImagePicker from 'expo-image-picker';
 import {
   getBrandingLogo,
@@ -27,8 +15,10 @@ import {
 } from '@/lib/branding';
 import { sendAdminBroadcastPush } from '@/lib/pushSender';
 import { useAdminRealtime } from '@/hooks/useAdminRealtime';
-import { TrendChart, InsightCard, bucketByDay, TrendPoint } from '@/components/admin/AdminInsights';
+import { bucketByDay, TrendPoint } from '@/components/admin/AdminInsights';
 import { AdminTaskCenter } from '@/components/admin/AdminTaskCenter';
+import { AdminWorkspace } from '@/components/admin/AdminWorkspace';
+import { AdminOverview } from '@/components/admin/AdminOverview';
 import { AdminGlobalSearch } from '@/components/admin/AdminGlobalSearch';
 import { AdminFeatureFlags } from '@/components/admin/AdminFeatureFlags';
 import { AdminRbacPanel } from '@/components/admin/AdminRbacPanel';
@@ -94,7 +84,17 @@ import {
   AdminActivityLog,
   AdminStats,
 } from '@/components/admin/adminTypes';
-import { adminStyles as styles, ADMIN_COLORS as C, ADMIN_GRADIENTS } from '@/components/admin/adminStyles';
+import { adminStyles as styles, ADMIN_COLORS as C } from '@/components/admin/adminStyles';
+
+function verificationAccountLabel(value?: string | null): string {
+  switch (value) {
+    case 'merchant': return 'مؤسسة أو نشاط تجاري';
+    case 'freelance': return 'عمل حر';
+    case 'provider': return 'مقدم خدمة';
+    case 'idea': return 'مبادرة أو مشروع ناشئ';
+    default: return 'حساب فردي';
+  }
+}
 
 function accountAgeLabel(iso?: string | null): string {
   if (!iso) return '—';
@@ -159,12 +159,12 @@ interface AdminNavGroup {
 const ADMIN_NAV: AdminNavGroup[] = [
   {
     key: 'command',
-    label: 'القيادة',
+    label: 'الرئيسية',
     emoji: '🎯',
     tabs: [
-      { key: 'overview', label: 'نظرة عامة', icon: (a) => <LayoutDashboard size={15} color={a ? C.accentDark : '#64748B'} /> },
-      { key: 'tasks', label: 'مركز المهام', icon: (a) => <ListChecks size={15} color={a ? C.accentDark : '#64748B'} /> },
-      { key: 'search', label: 'البحث الشامل', icon: (a) => <Search size={15} color={a ? C.accentDark : '#64748B'} /> },
+      { key: 'overview', label: 'نظرة عامة', icon: (a) => <LayoutDashboard size={15} color={a ? C.accentDark : OASIS.colors.muted} /> },
+      { key: 'tasks', label: 'مركز المهام', icon: (a) => <ListChecks size={15} color={a ? C.accentDark : OASIS.colors.muted} /> },
+      { key: 'search', label: 'البحث الشامل', icon: (a) => <Search size={15} color={a ? C.accentDark : OASIS.colors.muted} /> },
     ],
   },
   {
@@ -172,11 +172,11 @@ const ADMIN_NAV: AdminNavGroup[] = [
     label: 'المجتمع',
     emoji: '👥',
     tabs: [
-      { key: 'users', label: 'المستخدمون', icon: (a) => <Users size={15} color={a ? C.accentDark : '#64748B'} /> },
-      { key: 'verifications', label: 'التوثيق', icon: (a) => <Star size={15} color={a ? C.accentDark : '#64748B'} /> },
-      { key: 'support', label: 'الدعم والتذاكر', icon: (a) => <LifeBuoy size={15} color={a ? C.accentDark : '#64748B'} /> },
-      { key: 'reports', label: 'البلاغات', icon: (a) => <Flag size={15} color={a ? C.accentDark : '#64748B'} /> },
-      { key: 'content', label: 'المحتوى', icon: (a) => <MessageCircle size={15} color={a ? C.accentDark : '#64748B'} /> },
+      { key: 'users', label: 'المستخدمون', icon: (a) => <Users size={15} color={a ? C.accentDark : OASIS.colors.muted} /> },
+      { key: 'verifications', label: 'التوثيق', icon: (a) => <Star size={15} color={a ? C.accentDark : OASIS.colors.muted} /> },
+      { key: 'support', label: 'الدعم والتذاكر', icon: (a) => <LifeBuoy size={15} color={a ? C.accentDark : OASIS.colors.muted} /> },
+      { key: 'reports', label: 'البلاغات', icon: (a) => <Flag size={15} color={a ? C.accentDark : OASIS.colors.muted} /> },
+      { key: 'content', label: 'المحتوى', icon: (a) => <MessageCircle size={15} color={a ? C.accentDark : OASIS.colors.muted} /> },
     ],
   },
   {
@@ -184,10 +184,10 @@ const ADMIN_NAV: AdminNavGroup[] = [
     label: 'المنصة',
     emoji: '🏢',
     tabs: [
-      { key: 'platform', label: 'الموارد والخدمات', icon: (a) => <Truck size={15} color={a ? C.accentDark : '#64748B'} /> },
-      { key: 'broadcast', label: 'البث والتعاميم', icon: (a) => <Megaphone size={15} color={a ? C.accentDark : '#64748B'} /> },
-      { key: 'locations', label: 'المواقع', icon: (a) => <MapPin size={15} color={a ? C.accentDark : '#64748B'} /> },
-      { key: 'branding', label: 'الهوية والشعار', icon: (a) => <Sparkles size={15} color={a ? C.accentDark : '#64748B'} /> },
+      { key: 'platform', label: 'الموارد والخدمات', icon: (a) => <Truck size={15} color={a ? C.accentDark : OASIS.colors.muted} /> },
+      { key: 'broadcast', label: 'البث والتعاميم', icon: (a) => <Megaphone size={15} color={a ? C.accentDark : OASIS.colors.muted} /> },
+      { key: 'locations', label: 'المواقع', icon: (a) => <MapPin size={15} color={a ? C.accentDark : OASIS.colors.muted} /> },
+      { key: 'branding', label: 'الهوية والشعار', icon: (a) => <Sparkles size={15} color={a ? C.accentDark : OASIS.colors.muted} /> },
     ],
   },
   {
@@ -195,9 +195,9 @@ const ADMIN_NAV: AdminNavGroup[] = [
     label: 'التحليلات',
     emoji: '📊',
     tabs: [
-      { key: 'analytics', label: 'تحليلات متقدمة', icon: (a) => <BarChart3 size={15} color={a ? C.accentDark : '#64748B'} /> },
-      { key: 'weekly', label: 'التقرير الأسبوعي', icon: (a) => <CalendarDays size={15} color={a ? C.accentDark : '#64748B'} /> },
-      { key: 'badges', label: 'الأوسمة والتحفيز', icon: (a) => <Award size={15} color={a ? C.accentDark : '#64748B'} /> },
+      { key: 'analytics', label: 'تحليلات متقدمة', icon: (a) => <BarChart3 size={15} color={a ? C.accentDark : OASIS.colors.muted} /> },
+      { key: 'weekly', label: 'التقرير الأسبوعي', icon: (a) => <CalendarDays size={15} color={a ? C.accentDark : OASIS.colors.muted} /> },
+      { key: 'badges', label: 'الأوسمة والتحفيز', icon: (a) => <Award size={15} color={a ? C.accentDark : OASIS.colors.muted} /> },
     ],
   },
   {
@@ -205,40 +205,23 @@ const ADMIN_NAV: AdminNavGroup[] = [
     label: 'النظام',
     emoji: '⚙️',
     tabs: [
-      { key: 'config', label: 'الميزات والإعدادات', icon: (a) => <Settings size={15} color={a ? C.accentDark : '#64748B'} /> },
-      { key: 'roles', label: 'الأدوار والصلاحيات', icon: (a) => <ShieldCheck size={15} color={a ? C.accentDark : '#64748B'} /> },
-      { key: 'security', label: 'الأمان والجلسات', icon: (a) => <Lock size={15} color={a ? C.accentDark : '#64748B'} /> },
-      { key: 'logs', label: 'سجل العمليات', icon: (a) => <Clock size={15} color={a ? C.accentDark : '#64748B'} /> },
+      { key: 'config', label: 'الميزات والإعدادات', icon: (a) => <Settings size={15} color={a ? C.accentDark : OASIS.colors.muted} /> },
+      { key: 'roles', label: 'الأدوار والصلاحيات', icon: (a) => <ShieldCheck size={15} color={a ? C.accentDark : OASIS.colors.muted} /> },
+      { key: 'security', label: 'الأمان والجلسات', icon: (a) => <Lock size={15} color={a ? C.accentDark : OASIS.colors.muted} /> },
+      { key: 'logs', label: 'سجل العمليات', icon: (a) => <Clock size={15} color={a ? C.accentDark : OASIS.colors.muted} /> },
     ],
   },
 ];
 
 export default function AdminScreen() {
-  const { width } = useWindowDimensions();
-  const isMobile = width < 768;
-  const isSmallPhone = width < 400;
-  const statCardWidth = isSmallPhone ? '100%' : isMobile ? '48%' : '23.5%';
-
   // Auth and loading state
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const [currentAdmin, setCurrentAdmin] = useState<AdminProfile | null>(null);
 
   // Active navigation tab
   const [activeTab, setActiveTab] = useState<AdminTabKey>('overview');
-
-  // Enhanced navigation state with search and filter
-  const [navSearch, setNavSearch] = useState('');
-  const [navFilter, setNavFilter] = useState('');
-  const navSearchTimer = useRef<any>(null);
-
-  const setNavSearchDebounced = useCallback((value: string) => {
-    clearTimeout(navSearchTimer.current);
-    navSearchTimer.current = setTimeout(() => setNavSearch(value), 300);
-  }, []);
-
-  // --- Responsive sidebar state ---
-  const [sidebarOpened, setSidebarOpened] = useState<boolean>(isMobile ? false : true);
 
   // Core relational data sets
   const [usersList, setUsersList] = useState<AdminProfile[]>([]);
@@ -293,27 +276,13 @@ export default function AdminScreen() {
 
   // Filters & Search
   const [userSearch, setUserSearch] = useState('');
+  const [userSort, setUserSort] = useState<'recent' | 'oldest' | 'name'>('recent');
+  const [loadWarning, setLoadWarning] = useState('');
   const [userRoleFilter, setUserRoleFilter] = useState<'all' | 'admin' | 'user' | 'verified' | 'geoverified' | 'banned'>('all');
   const [selectedCityFilter, setSelectedCityFilter] = useState<string>('all');
   const [platformTabSub, setPlatformTabSub] = useState<'services' | 'borrow' | 'urgent'>('services');
   const [contentFilter, setContentFilter] = useState<'all' | 'questions' | 'requests'>('all');
   const [reportStatusFilter, setReportStatusFilter] = useState<'all' | 'pending' | 'resolved' | 'dismissed'>('pending');
-
-  // --- Unified dashboard metrics ---
-  const dashboardMetrics = useMemo(() => ({
-    users: stats.users,
-    admins: stats.admins,
-    verifiedUsers: stats.verifiedUsers,
-    geoverifiedUsers: stats.geoverifiedUsers,
-    bannedUsers: stats.bannedUsers,
-    pendingVerifications: stats.pendingVerifications,
-    pendingReports: stats.pendingReports,
-    services: stats.services,
-    borrowItems: stats.borrowItems,
-    urgentAlerts: stats.urgentAlerts,
-    questions: stats.questions,
-    requests: stats.requests,
-  }), [stats]);
 
   // Broadcast Center State
   const [broadcastTitle, setBroadcastTitle] = useState('');
@@ -544,8 +513,12 @@ export default function AdminScreen() {
         reports: bucketByDay(trendReports.data as any, 30),
         questions: bucketByDay(trendQuestions.data as any, 30),
       });
+      const failedSections = [profilesRes, verifRes, reportsRes, servicesRes, borrowRes, urgentRes, questionsRes, requestsRes, auditRes, locationsRes, qCountRes, rCountRes, sCountRes, bCountRes, uCountRes, trendUsers, trendReports, trendQuestions].filter(result => result.error).length;
+      setLoadWarning(failedSections ? `تعذر تحميل ${failedSections} من مصادر البيانات. قد تظهر بعض الأقسام ناقصة؛ أعد المحاولة قبل الاعتماد على الملخص.` : '');
+      if (!failedSections) setUpdatedAt(new Date());
     } catch (err: any) {
       console.error('Error loading admin dashboard:', err);
+      setLoadWarning('تعذر تحديث البيانات. تحقق من الاتصال وأعد المحاولة.');
       showToast('تعذر تحميل بيانات لوحة التحكم: ' + (err?.message || 'خطأ في الاتصال'));
     } finally {
       setLoading(false);
@@ -793,6 +766,27 @@ export default function AdminScreen() {
     }
   };
 
+  const openVerificationAttachment = async (request: AdminVerificationRequest) => {
+    const attachment = request.attachment_url || request.document_url || null;
+    if (!attachment) {
+      Alert.alert('لا يوجد مستند', 'لم يرفق صاحب الطلب مستندًا مع هذا الطلب.');
+      return;
+    }
+
+    try {
+      if (/^https?:\/\//i.test(attachment)) {
+        await Linking.openURL(attachment);
+        return;
+      }
+      const signed = await supabase.storage.from('verification-documents').createSignedUrl(attachment, 600);
+      if (signed.error) throw signed.error;
+      if (!signed.data?.signedUrl) throw new Error('تعذر إنشاء رابط آمن للمستند.');
+      await Linking.openURL(signed.data.signedUrl);
+    } catch (error: any) {
+      Alert.alert('تعذر فتح المستند', error?.message || 'حاول مرة أخرى.');
+    }
+  };
+
   // Action 6: Verification Request Decision (Approve / Reject)
   const handleVerificationDecision = async (
     reqId: string,
@@ -806,52 +800,42 @@ export default function AdminScreen() {
 
       const { data: verificationRequest, error: verificationLoadError } = await supabase
         .from('verification_requests')
-        .select('subject,note')
+        .select('subject,note,attachment_url,document_url,verification_type')
         .eq('id', reqId)
         .maybeSingle();
       if (verificationLoadError) throw verificationLoadError;
+      if (!verificationRequest) throw new Error('طلب التوثيق غير موجود.');
 
-      const { error: reqErr } = await supabase
-        .from('verification_requests')
-        .update({
-          status: action,
-          reviewed_by: u.user.id,
-          reviewed_at: new Date().toISOString(),
-        })
-        .eq('id', reqId);
+      const { data: decision, error: decisionError } = await supabase.rpc('admin_review_verification', {
+        p_request_id: reqId,
+        p_status: action,
+      });
+      if (decisionError) throw decisionError;
 
-      if (reqErr) throw reqErr;
+      const decisionData = decision as any;
+      const requestedLabel = verificationAccountLabel(
+        decisionData?.requested_account_type || verificationRequest.subject,
+      );
 
       if (action === 'approved') {
-        const requestedType = ['merchant', 'freelance', 'provider'].includes(verificationRequest?.subject || '')
-          ? verificationRequest?.subject
-          : null;
-        const profilePatch: any = {
-          is_verified: true,
-          verification_status: 'verified',
-          updated_at: new Date().toISOString(),
-        };
-        if (requestedType) {
-          profilePatch.account_type = requestedType;
-          profilePatch.freelance_trade = verificationRequest?.note || null;
-        }
-
-        const { error: profErr } = await supabase
-          .from('profiles')
-          .update(profilePatch)
-          .eq('id', userId);
-
-        if (profErr) throw profErr;
-
-        setUsersList(prev => prev.map(usr => (usr.id === userId ? { ...usr, is_verified: true, verification_status: 'verified' } : usr)));
+        setUsersList(prev => prev.map(usr => (
+          usr.id === userId
+            ? {
+                ...usr,
+                is_verified: Boolean(decisionData?.is_verified),
+                verification_status: decisionData?.verification_status || 'verified',
+                account_type: decisionData?.account_type || usr.account_type,
+                is_verified_merchant: Boolean(decisionData?.is_verified_merchant),
+              }
+            : usr
+        )));
       }
 
-      // Dispatch in-app notification
-      const notifTitle = action === 'approved' ? 'تهانينا! تم اعتماد توثيق حسابك 🎉' : 'تحديث بشأن طلب التوثيق';
+      const notifTitle = action === 'approved' ? 'تم اعتماد توثيق حسابك' : 'تحديث بشأن طلب التوثيق';
       const notifBody =
         action === 'approved'
-          ? 'تم اعتماد هويتك في حيّنا ومنحك الشارة الزرقاء الرسمية.'
-          : 'تمت مراجعة طلب التوثيق الخاص بك، يرجى استيفاء البيانات والتقديم مجدداً.';
+          ? 'وافقت الإدارة على طلب ' + requestedLabel + ' وتم تحديث صفة الحساب وشارة التوثيق تلقائيًا.'
+          : 'تمت مراجعة طلب ' + requestedLabel + ' ولم يعتمد حاليًا. راجع البيانات ثم يمكنك التقديم مجددًا.';
 
       await supabase.from('notifications').insert({
         user_id: userId,
@@ -861,22 +845,38 @@ export default function AdminScreen() {
         data: { actor_id: u.user.id, request_id: reqId, status: action },
       });
 
-      // Dispatch push notification
       await sendAdminBroadcastPush([userId], {
         title: notifTitle,
         body: notifBody,
         data: { type: 'verification', status: action },
       });
 
-      await recordAuditLog(
-        action === 'approved' ? 'اعتماد طلب توثيق رسمي' : 'رفض طلب توثيق رسمي',
-        userName,
-        'verification',
-        reqId
-      );
+      const privateAttachment = verificationRequest.attachment_url || null;
+      if (privateAttachment && !/^https?:\/\//i.test(privateAttachment)) {
+        const cleanup = await supabase.storage.from('verification-documents').remove([privateAttachment]);
+        if (!cleanup.error) {
+          await supabase.from('verification_requests').update({ attachment_url: null }).eq('id', reqId);
+        } else {
+          console.warn('Could not remove reviewed verification evidence:', cleanup.error.message);
+        }
+      }
 
-      setVerifications(prev => prev.map(v => (v.id === reqId ? { ...v, status: action } : v)));
-      showToast(action === 'approved' ? 'تم اعتماد التوثيق ومنح الشارة الزرقاء ✓' : 'تم رفض طلب التوثيق');
+      setVerifications(prev => prev.map(v => (
+        v.id === reqId
+          ? {
+              ...v,
+              status: action,
+              reviewed_by: decisionData?.reviewed_by || u.user?.id || null,
+              reviewed_at: decisionData?.reviewed_at || new Date().toISOString(),
+              attachment_url:
+                privateAttachment && !/^https?:\/\//i.test(privateAttachment)
+                  ? null
+                  : v.attachment_url,
+            }
+          : v
+      )));
+
+      showToast(action === 'approved' ? 'تم اعتماد الصفة والتوثيق الرسمي' : 'تم رفض طلب التوثيق');
     } catch (e: any) {
       Alert.alert('خطأ', e?.message || 'تعذر البت في طلب التوثيق');
     }
@@ -1315,8 +1315,10 @@ export default function AdminScreen() {
       if (userRoleFilter === 'geoverified') return u.is_geoverified;
       if (userRoleFilter === 'banned') return u.is_banned;
       return true;
-    });
-  }, [usersList, userSearch, selectedCityFilter, userRoleFilter]);
+    }).sort((a, b) => userSort === 'name'
+      ? (a.display_name || a.username || '').localeCompare(b.display_name || b.username || '', 'ar')
+      : (new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) * (userSort === 'oldest' ? 1 : -1));
+  }, [usersList, userSearch, selectedCityFilter, userRoleFilter, userSort]);
 
   // Filtered Reports computation
   const filteredReports = useMemo(() => {
@@ -1331,11 +1333,6 @@ export default function AdminScreen() {
   // NOTE: these hooks must run before any early return so the
   // Rules of Hooks stay valid on every render.
   // ============================================================
-  const activeGroup = useMemo(
-    () => ADMIN_NAV.find((g) => g.tabs.some((t) => t.key === activeTab)) || ADMIN_NAV[0],
-    [activeTab]
-  );
-
   const totalPending = stats.pendingReports + stats.pendingVerifications + stats.urgentAlerts;
 
   const tabBadge = useCallback(
@@ -1343,8 +1340,6 @@ export default function AdminScreen() {
       switch (key) {
         case 'tasks':
           return totalPending;
-        case 'users':
-          return usersList.length;
         case 'verifications':
           return stats.pendingVerifications;
         case 'reports':
@@ -1379,7 +1374,7 @@ export default function AdminScreen() {
         <Text style={styles.unauthorizedSub}>
           لوحة التحكم مخصصة حصرياً للمدراء المعتمدين في قاعدة البيانات. صلاحيات المنصة محصورة في: مدير (Admin) ومستخدم عادي (User).
         </Text>
-        <Pressable style={styles.backBtn} onPress={() => router.replace('/home')}>
+        <Pressable oasisKind="action" style={styles.backBtn} onPress={() => router.replace('/home')}>
           <Text style={styles.backBtnText}>العودة للرئيسية</Text>
         </Pressable>
       </View>
@@ -1388,179 +1383,20 @@ export default function AdminScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Toast Banner */}
-      {toastMsg && (
-        <Animated.View style={[styles.toastBanner, { opacity: toastAnim }]}>
-          <Text style={styles.toastBannerText}>{toastMsg}</Text>
-        </Animated.View>
-      )}
-
-      {/* ======================================================== */}
-      {/* 0. COMMAND HERO (gradient)                               */}
-      {/* ======================================================== */}
-      <LinearGradient
-        colors={ADMIN_GRADIENTS.navy}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.heroWrap}
-      >
-        <View style={styles.heroTop}>
-          <Pressable style={styles.heroIconBtn} onPress={() => router.push('/home')}>
-            <ChevronRight size={18} color="#FFFFFF" />
-          </Pressable>
-
-          <View style={styles.heroBrand}>
-            <View style={styles.heroLogoBox}>
-              {brandingLogo ? (
-                <Image source={{ uri: brandingLogo }} style={styles.heroLogoImg} resizeMode="contain" />
-              ) : (
-                <Shield size={22} color="#6EE7B7" />
-              )}
-            </View>
-            <View style={styles.heroTexts}>
-              <Text style={styles.heroKicker}>COMMAND CENTER · حيّنا</Text>
-              <Text style={styles.heroTitle}>مركز عمليات حيّنا</Text>
-              <Text style={styles.heroSub}>
-                {currentAdmin.display_name || currentAdmin.username || 'مدير النظام'} ·{' '}
-                {new Date().toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long' })}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.heroActions}>
-            <Pressable style={styles.heroIconBtn} onPress={handleExportData}>
-              <Download size={15} color="#FFFFFF" />
-            </Pressable>
-            <Pressable style={styles.heroIconBtn} onPress={onRefresh}>
-              <RefreshCw size={14} color="#FFFFFF" />
-            </Pressable>
-          </View>
-        </View>
-
-        {/* Live operational status pills */}
-        <View style={styles.heroStatusRow}>
-          <View style={styles.heroPill}>
-            <View style={rt.total > 0 ? styles.heroLiveDot : styles.heroLiveDotOff} />
-            <Text style={styles.heroPillText}>{rt.total > 0 ? `${rt.total} تحديث مباشر` : 'متزامن مباشر'}</Text>
-          </View>
-          <Pressable style={styles.heroPill} onPress={() => setActiveTab('reports')}>
-            <Flag size={11} color="#FCA5A5" />
-            <Text style={styles.heroPillText}>{stats.pendingReports} بلاغ معلق</Text>
-          </Pressable>
-          <Pressable style={styles.heroPill} onPress={() => setActiveTab('verifications')}>
-            <Star size={11} color="#FDE68A" />
-            <Text style={styles.heroPillText}>{stats.pendingVerifications} توثيق</Text>
-          </Pressable>
-          <Pressable style={styles.heroPill} onPress={() => setActiveTab('platform')}>
-            <AlertTriangle size={11} color="#FCA5A5" />
-            <Text style={styles.heroPillText}>{stats.urgentAlerts} طارئ</Text>
-          </Pressable>
-        </View>
-
-        {/* Platform KPI chips */}
-        <View style={styles.heroKpiRow}>
-          <HeroKpi value={stats.users} label="مستخدم" />
-          <HeroKpi value={stats.services} label="خدمة" />
-          <HeroKpi value={stats.requests} label="فزعة" />
-          <HeroKpi value={stats.questions} label="استفسار" />
-          <HeroKpi value={stats.verifiedUsers} label="موثّق" />
-          <HeroKpi value={stats.admins} label="مدير" />
-        </View>
-
-        {/* Quick actions */}
-        <View style={styles.heroQuickRow}>
-          <Pressable style={styles.heroQuickBtn} onPress={() => setActiveTab('broadcast')}>
-            <Megaphone size={14} color="#0F172A" />
-            <Text style={styles.heroQuickText}>بث تعميم</Text>
-          </Pressable>
-          <Pressable style={styles.heroQuickBtn} onPress={() => setActiveTab('tasks')}>
-            <ListChecks size={14} color="#0F172A" />
-            <Text style={styles.heroQuickText}>مركز المهام</Text>
-            {totalPending > 0 ? (
-              <View style={styles.heroQuickBadge}>
-                <Text style={styles.heroQuickBadgeText}>{totalPending}</Text>
-              </View>
-            ) : null}
-          </Pressable>
-          <Pressable style={styles.heroQuickBtn} onPress={() => setActiveTab('analytics')}>
-            <TrendingUp size={14} color="#0F172A" />
-            <Text style={styles.heroQuickText}>التحليلات</Text>
-          </Pressable>
-          <Pressable style={styles.heroQuickBtn} onPress={() => setActiveTab('security')}>
-            <Lock size={14} color="#0F172A" />
-            <Text style={styles.heroQuickText}>الأمان</Text>
-          </Pressable>
-        </View>
-
-        {rt.total > 0 ? (
-          <Pressable
-            style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8, backgroundColor: 'rgba(16,185,129,0.18)', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, marginTop: 10 }}
-            onPress={() => { void loadDashboardData(); rt.reset(); }}
-          >
-            <View style={styles.heroLiveDot} />
-            <Text style={{ flex: 1, color: '#D1FAE5', fontSize: 11, fontWeight: '800', textAlign: 'right' }}>
-              {rt.total} تحديث مباشر جديد{rt.lastLabel ? ` · ${rt.lastLabel}` : ''} — اضغط للتحديث الآن
-            </Text>
-          </Pressable>
-        ) : null}
-      </LinearGradient>
-
-      {/* ======================================================== */}
-      {/* 2. GROUPED TWO-LEVEL NAVIGATION                          */}
-      {/* ======================================================== */}
-      <View style={styles.navShell}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.navGroupScroll}>
-          {ADMIN_NAV.map((group) => {
-            const isActiveGroup = group.key === activeGroup.key;
-            const groupCount = group.tabs.reduce((sum, t) => sum + tabBadge(t.key), 0);
-            return (
-              <Pressable
-                key={group.key}
-                style={[styles.navGroupChip, isActiveGroup && styles.navGroupChipActive]}
-                onPress={() => setActiveTab(group.tabs[0].key)}
-              >
-                <Text style={styles.navGroupEmoji}>{group.emoji}</Text>
-                <Text style={[styles.navGroupText, isActiveGroup && styles.navGroupTextActive]}>{group.label}</Text>
-                {groupCount > 0 ? (
-                  <View style={styles.navGroupCount}>
-                    <Text style={styles.navGroupCountText}>{groupCount}</Text>
-                  </View>
-                ) : null}
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.navTabScrollV2}>
-          {activeGroup.tabs.map((tab) => {
-            const isActive = tab.key === activeTab;
-            const count = tabBadge(tab.key);
-            return (
-              <Pressable
-                key={tab.key}
-                style={[styles.navTabV2, isActive && styles.navTabV2Active]}
-                onPress={() => setActiveTab(tab.key)}
-              >
-                {tab.icon(isActive)}
-                <Text style={[styles.navTabV2Text, isActive && styles.navTabV2TextActive]}>{tab.label}</Text>
-                {count > 0 ? (
-                  <View style={styles.navTabV2Badge}>
-                    <Text style={styles.navTabV2BadgeText}>{count}</Text>
-                  </View>
-                ) : null}
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-      </View>
-
-      {/* ======================================================== */}
-      {/* 3. MAIN DASHBOARD CONTENT SCROLL                         */}
-      {/* ======================================================== */}
-      <ScrollView
-        style={styles.scroll}
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}
+      <AdminWorkspace
+        groups={ADMIN_NAV}
+        active={activeTab}
+        onNavigate={setActiveTab}
+        badge={tabBadge}
+        name={currentAdmin.display_name || currentAdmin.username || 'مدير المنصة'}
+        refreshing={refreshing}
+        updatedAt={updatedAt}
+        onRefresh={onRefresh}
+        onExport={handleExportData}
+        onExit={() => router.replace('/more')}
+        updates={rt.total}
+        warning={loadWarning}
+        toast={toastMsg ? <Animated.View style={[styles.toastBanner, { opacity: toastAnim }]}><Text style={styles.toastBannerText}>{toastMsg}</Text></Animated.View> : null}
       >
         {/* TAB 0: UNIFIED TASK CENTER */}
         {activeTab === 'tasks' && (
@@ -1589,179 +1425,18 @@ export default function AdminScreen() {
         {activeTab === 'roles' && <AdminRbacPanel onSaved={showToast} />}
 
         {/* TAB 1: OVERVIEW & ANALYTICS */}
-        {activeTab === 'overview' && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>مؤشرات الأداء اللحظية 📈</Text>
-            <Text style={styles.sectionSubDesc}>نظرة شاملة ومحدثة على حركة ونشاط مجتمع الجيران في المملكة.</Text>
-
-            {/* KPI Cards Grid */}
-            <View style={styles.statsGrid}>
-              <StatCard
-                icon={<Users size={22} color="#0284C7" />}
-                bg="#F0F9FF"
-                value={stats.users}
-                label="إجمالي السكان"
-                sub={`${stats.admins} مدير · ${stats.users - stats.admins} مواطن`}
-                style={{ width: statCardWidth }}
-              />
-              <StatCard
-                icon={<Star size={22} color="#D97706" />}
-                bg="#FFFBEB"
-                value={stats.verifiedUsers}
-                label="حسابات موثقة رسمياً"
-                sub={`${stats.pendingVerifications} طلب معلق`}
-                style={{ width: statCardWidth }}
-              />
-              <StatCard
-                icon={<Truck size={22} color="#059669" />}
-                bg="#ECFDF5"
-                value={stats.services}
-                label="خدمات وحرفيو الحي"
-                sub="عروض عمل معتمدة"
-                style={{ width: statCardWidth }}
-              />
-              <StatCard
-                icon={<Wrench size={22} color="#7C3AED" />}
-                bg="#F5F3FF"
-                value={stats.borrowItems}
-                label="أدوات الإعارة المتاحة"
-                sub="تكاتف وتشارك الجيران"
-                style={{ width: statCardWidth }}
-              />
-            </View>
-
-            {/* 30-day trend analytics */}
-            {analytics.users.length > 0 ? (
-              <View style={{ marginTop: 18 }}>
-                <Text style={styles.sectionTitle}>اتجاهات آخر 30 يومًا 📈</Text>
-                <Text style={styles.sectionSubDesc}>نمو المستخدمين والمنشورات والبلاغات يوميًا خلال الشهر الماضي.</Text>
-
-                <View style={{ marginTop: 12, backgroundColor: C.card, borderRadius: 16, borderWidth: 1, borderColor: C.border, padding: 14 }}>
-                  <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                    <Text style={{ fontSize: 12.5, fontWeight: '900', color: C.ink }}>نمو المستخدمين الجدد</Text>
-                    <Text style={{ fontSize: 11, color: C.muted, fontWeight: '700' }}>
-                      الإجمالي: {analytics.users.reduce((s, d) => s + d.value, 0)}
-                    </Text>
-                  </View>
-                  <TrendChart data={analytics.users} color={C.info} height={140} />
-                </View>
-
-                <View style={{ marginTop: 10 }}>
-                  <InsightCard
-                    title="بلاغات واردة (30 يوم)"
-                    value={analytics.reports.reduce((s, d) => s + d.value, 0)}
-                    color={C.danger}
-                    data={analytics.reports}
-                  />
-                  <InsightCard
-                    title="منشورات ومناقشات (30 يوم)"
-                    value={analytics.questions.reduce((s, d) => s + d.value, 0)}
-                    color={C.accent}
-                    data={analytics.questions}
-                  />
-                </View>
-              </View>
-            ) : null}
-
-            {/* Cities Distribution */}
-            <View style={styles.citiesCard}>
-              <View style={styles.citiesCardHeader}>
-                <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-                  <MapPin size={16} color={C.accent} />
-                  <Text style={styles.citiesCardTitle}>توزيع نشاط مدن المملكة</Text>
-                </View>
-                <Text style={styles.citiesCardSub}>انقر على أي مدينة للتصفية الفورية</Text>
-              </View>
-
-              <View style={styles.cityPillsRow}>
-                {[
-                  { name: 'all', label: '🇸🇦 كامل المملكة', count: usersList.length },
-                  { name: 'الرياض', label: 'الرياض', count: usersList.filter(u => u.city?.includes('الرياض')).length },
-                  { name: 'جدة', label: 'جدة', count: usersList.filter(u => u.city?.includes('جدة')).length },
-                  { name: 'الدمام', label: 'الدمام', count: usersList.filter(u => u.city?.includes('الدمام')).length },
-                  { name: 'مكة', label: 'مكة المكرمة', count: usersList.filter(u => u.city?.includes('مكة')).length },
-                  { name: 'المدينة', label: 'المدينة المنورة', count: usersList.filter(u => u.city?.includes('المدينة')).length },
-                ].map(c => (
-                  <Pressable
-                    key={c.name}
-                    style={[styles.cityPill, selectedCityFilter === c.name && styles.cityPillActive]}
-                    onPress={() => {
-                      setSelectedCityFilter(c.name);
-                      showToast(`تم تحديد نطاق: ${c.label}`);
-                    }}
-                  >
-                    <Text style={[styles.cityPillText, selectedCityFilter === c.name && styles.cityPillTextActive]}>
-                      {c.label} ({c.count})
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-
-            {/* Platform Infrastructure Health */}
-            <View style={styles.healthCard}>
-              <View style={styles.healthHeader}>
-                <View style={styles.healthStatusBadge}>
-                  <View style={styles.healthDot} />
-                  <Text style={styles.healthStatusText}>الخوادم والبنية التحتية نشطة بنسبة 100%</Text>
-                </View>
-                <Activity size={16} color="#10B981" />
-              </View>
-
-              <View style={styles.healthRow}>
-                <Text style={styles.healthLabel}>قاعدة البيانات الموزعة (Supabase PostgreSQL + RLS)</Text>
-                <Text style={styles.healthValueActive}>متصلة ومحمية بالسياسات 🟢</Text>
-              </View>
-              <View style={styles.healthRow}>
-                <Text style={styles.healthLabel}>بوابة الإشعارات الفورية (Push Notification Gateway)</Text>
-                <Text style={styles.healthValueActive}>نشطة (Expo API) ⚡</Text>
-              </View>
-              <View style={styles.healthRow}>
-                <Text style={styles.healthLabel}>مستويات الصلاحيات المعتمدة</Text>
-                <Text style={styles.healthValueRole}>مدير (Admin) · مستخدم (User)</Text>
-              </View>
-            </View>
-
-            {/* Quick Action Shortcuts */}
-            <Text style={[styles.sectionTitle, { marginTop: 14 }]}>إجراءات سريعة لمدير النظام ⚡</Text>
-
-            <Pressable style={styles.quickAction} onPress={() => setActiveTab('verifications')}>
-              <View style={styles.quickActionLeft}>
-                <Star size={18} color="#D97706" />
-                <Text style={styles.quickActionText}>مراجعة واعتماد ملفات التوثيق الرسمية المعلقة</Text>
-              </View>
-              {stats.pendingVerifications > 0 ? (
-                <View style={[styles.qBadge, { backgroundColor: '#FEF3C7' }]}>
-                  <Text style={[styles.qBadgeText, { color: '#D97706' }]}>{stats.pendingVerifications} بانتظارك</Text>
-                </View>
-              ) : (
-                <ChevronRight size={18} color="#94A3B8" />
-              )}
-            </Pressable>
-
-            <Pressable style={styles.quickAction} onPress={() => setActiveTab('reports')}>
-              <View style={styles.quickActionLeft}>
-                <Flag size={18} color={C.danger} />
-                <Text style={styles.quickActionText}>معالجة بلاغات المحتوى المخالف والبت فيها</Text>
-              </View>
-              {stats.pendingReports > 0 ? (
-                <View style={[styles.qBadge, { backgroundColor: '#FEE2E2' }]}>
-                  <Text style={[styles.qBadgeText, { color: '#DC2626' }]}>{stats.pendingReports} بلاغ</Text>
-                </View>
-              ) : (
-                <ChevronRight size={18} color="#94A3B8" />
-              )}
-            </Pressable>
-
-            <Pressable style={styles.quickAction} onPress={() => setActiveTab('broadcast')}>
-              <View style={styles.quickActionLeft}>
-                <Megaphone size={18} color="#0284C7" />
-                <Text style={styles.quickActionText}>إرسال تعميم أو تنبيه عاجل لأهل الحي</Text>
-              </View>
-              <ChevronRight size={18} color="#94A3B8" />
-            </Pressable>
-          </View>
-        )}
+        {activeTab === 'overview' && <AdminOverview
+          stats={stats}
+          users={usersList}
+          reports={reports}
+          verifications={verifications}
+          urgentAlerts={urgentAlertsList}
+          logs={auditLogs}
+          analytics={analytics}
+          onNavigate={setActiveTab}
+          onOpenUser={(user) => void inspectUser(user)}
+          onCity={(city) => { setSelectedCityFilter(city); setActiveTab('users'); }}
+        />}
 
         {/* TAB 2: USERS MANAGEMENT & SECURITY */}
         {activeTab === 'users' && (
@@ -1775,6 +1450,10 @@ export default function AdminScreen() {
             <Text style={styles.sectionSubDesc}>
               إدارة حسابات السكان، ترقية المدراء، توثيق الهوية الوطنية والسكن، وحظر الحسابات المخالفة.
             </Text>
+            {selectedCityFilter !== 'all' ? <Pressable oasisKind="chip" accessibilityRole="button" accessibilityLabel="إلغاء تصفية المدينة" onPress={() => setSelectedCityFilter('all')} style={[styles.filterPill, { alignSelf: 'flex-end', flexDirection: 'row-reverse', gap: 8, marginBottom: 12 }]}><MapPin size={14} color={C.accent} /><Text style={styles.filterPillText}>{selectedCityFilter}</Text><X size={14} color={C.muted} /></Pressable> : null}
+            <View style={[styles.filterRow, { flexWrap: 'wrap' }]}>
+              {([{ key: 'recent', label: 'الأحدث تسجيلًا' }, { key: 'oldest', label: 'الأقدم تسجيلًا' }, { key: 'name', label: 'حسب الاسم' }] as const).map(option => <FilterPill key={option.key} label={option.label} active={userSort === option.key} onPress={() => setUserSort(option.key)} />)}
+            </View>
 
             {/* Search Input */}
             <View style={styles.searchBar}>
@@ -1810,8 +1489,8 @@ export default function AdminScreen() {
               filteredUsers.map(u => {
                 const isAdmin = u.role === 'admin';
                 return (
-                  <View key={u.id} style={[styles.userCard, isAdmin && styles.userCardAdmin, u.is_banned && styles.userCardBanned]}>
-                    <Pressable style={styles.userCardHeader} onPress={() => inspectUser(u)}>
+                  <OasisSurface oasisSurface="card" key={u.id} style={[styles.userCard, isAdmin && styles.userCardAdmin, u.is_banned && styles.userCardBanned]}>
+                    <Pressable oasisKind="card" style={styles.userCardHeader} onPress={() => inspectUser(u)}>
                       <View style={styles.userAvatarWrap}>
                         {u.avatar_url ? (
                           <Image source={{ uri: u.avatar_url }} style={styles.userAvatarImg} />
@@ -1822,7 +1501,7 @@ export default function AdminScreen() {
                         )}
                         {isAdmin && (
                           <View style={styles.adminCrownBadge}>
-                            <Crown size={10} color="#FFFFFF" />
+                            <Crown size={10} color={OASIS.colors.surface} />
                           </View>
                         )}
                       </View>
@@ -1830,8 +1509,8 @@ export default function AdminScreen() {
                       <View style={styles.userMeta}>
                         <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
                           <Text style={styles.userName}>{u.display_name || 'بدون اسم'}</Text>
-                          {u.is_verified && <CheckCircle2 size={14} color="#0284C7" />}
-                          {u.is_geoverified && <ShieldCheck size={14} color="#16A34A" />}
+                          {u.is_verified && <CheckCircle2 size={14} color={OASIS.colors.info} />}
+                          {u.is_geoverified && <ShieldCheck size={14} color={OASIS.colors.primary} />}
                         </View>
                         <Text style={styles.userHandle}>@{u.username || 'user'}</Text>
                         <Text style={styles.userLocation}>
@@ -1849,52 +1528,52 @@ export default function AdminScreen() {
 
                     {/* Admin Actions Bar */}
                     <View style={styles.userActionsRow}>
-                      <Pressable
+                      <Pressable oasisKind="action"
                         style={[styles.userActionBtn, isAdmin ? styles.btnDemote : styles.btnPromote]}
                         onPress={() => toggleUserRole(u)}
                       >
-                        {isAdmin ? <UserX size={14} color="#D97706" /> : <Crown size={14} color="#0284C7" />}
-                        <Text style={[styles.userActionBtnText, isAdmin ? { color: '#D97706' } : { color: '#0284C7' }]}>
+                        {isAdmin ? <UserX size={14} color="#D97706" /> : <Crown size={14} color={OASIS.colors.info} />}
+                        <Text style={[styles.userActionBtnText, isAdmin ? { color: '#D97706' } : { color: OASIS.colors.info }]}>
                           {isAdmin ? 'خفض لمستخدم' : 'ترقية لمدير 👑'}
                         </Text>
                       </Pressable>
 
-                      <Pressable
+                      <Pressable oasisKind="action"
                         style={[styles.userActionBtn, u.is_verified && styles.btnActiveSuccess]}
                         onPress={() => toggleVerification(u)}
                       >
-                        <CheckCircle2 size={14} color={u.is_verified ? '#16A34A' : '#64748B'} />
-                        <Text style={[styles.userActionBtnText, u.is_verified && { color: '#16A34A' }]}>
+                        <CheckCircle2 size={14} color={u.is_verified ? OASIS.colors.primary : OASIS.colors.muted} />
+                        <Text style={[styles.userActionBtnText, u.is_verified && { color: OASIS.colors.primary }]}>
                           {u.is_verified ? 'شارة موثقة' : 'توثيق رسمي'}
                         </Text>
                       </Pressable>
 
-                      <Pressable
+                      <Pressable oasisKind="action"
                         style={[styles.userActionBtn, u.is_geoverified && styles.btnActiveSuccess]}
                         onPress={() => toggleGeoVerification(u)}
                       >
-                        <ShieldCheck size={14} color={u.is_geoverified ? '#16A34A' : '#64748B'} />
-                        <Text style={[styles.userActionBtnText, u.is_geoverified && { color: '#16A34A' }]}>
+                        <ShieldCheck size={14} color={u.is_geoverified ? OASIS.colors.primary : OASIS.colors.muted} />
+                        <Text style={[styles.userActionBtnText, u.is_geoverified && { color: OASIS.colors.primary }]}>
                           {u.is_geoverified ? 'ابن الحي ✓' : 'توثيق السكن'}
                         </Text>
                       </Pressable>
 
-                      <Pressable
+                      <Pressable oasisKind="action"
                         style={[styles.userActionBtn, u.is_banned ? styles.btnBannedActive : styles.btnBan]}
                         onPress={() => toggleBanUser(u)}
                       >
-                        <Ban size={14} color={u.is_banned ? '#FFFFFF' : '#DC2626'} />
-                        <Text style={[styles.userActionBtnText, u.is_banned ? { color: '#FFFFFF' } : { color: '#DC2626' }]}>
+                        <Ban size={14} color={u.is_banned ? OASIS.colors.surface : OASIS.colors.danger} />
+                        <Text style={[styles.userActionBtnText, u.is_banned ? { color: OASIS.colors.surface } : { color: OASIS.colors.danger }]}>
                           {u.is_banned ? 'فك الحظر' : 'حظر'}
                         </Text>
                       </Pressable>
 
-                      <Pressable style={styles.userActionBtn} onPress={() => inspectUser(u)}>
+                      <Pressable oasisKind="action" style={styles.userActionBtn} onPress={() => inspectUser(u)}>
                         <Eye size={14} color="#0891B2" />
                         <Text style={[styles.userActionBtnText, { color: '#0891B2' }]}>الملف الكامل</Text>
                       </Pressable>
                     </View>
-                  </View>
+                  </OasisSurface>
                 );
               })
             )}
@@ -1915,13 +1594,13 @@ export default function AdminScreen() {
             </Text>
 
             {verifications.length === 0 ? (
-              <EmptyState icon={<Star size={42} color="#F59E0B" />} title="لا توجد طلبات توثيق معلقة" sub="تم فحص واعتماد كافة الطلبات المقدمة سابقاً بنجاح ✅" />
+              <EmptyState icon={<Star size={42} color={OASIS.colors.warning} />} title="لا توجد طلبات توثيق معلقة" sub="تم فحص واعتماد كافة الطلبات المقدمة سابقاً بنجاح ✅" />
             ) : (
               verifications.map(v => {
                 const u = v.user || {};
                 const isPending = v.status === 'pending';
                 return (
-                  <View key={v.id} style={[styles.verifCardDossier, !isPending && { borderColor: '#E2E8F0', opacity: 0.8 }]}>
+                  <View key={v.id} style={[styles.verifCardDossier, !isPending && { borderColor: OASIS.colors.line, opacity: 0.8 }]}>
                     <View style={styles.dossierTop}>
                       <View style={styles.dossierAvatarWrap}>
                         {u.avatar_url ? (
@@ -1933,7 +1612,7 @@ export default function AdminScreen() {
                         )}
                         {u.is_verified && (
                           <View style={styles.verifiedCheckBadge}>
-                            <Check size={9} color="#FFFFFF" />
+                            <Check size={9} color={OASIS.colors.surface} />
                           </View>
                         )}
                       </View>
@@ -1941,8 +1620,8 @@ export default function AdminScreen() {
                       <View style={styles.dossierUserMeta}>
                         <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
                           <Text style={styles.dossierUserName}>{u.display_name || 'بدون اسم'}</Text>
-                          {u.is_verified && <CheckCircle2 size={14} color="#0284C7" />}
-                          {u.is_geoverified && <ShieldCheck size={14} color="#16A34A" />}
+                          {u.is_verified && <CheckCircle2 size={14} color={OASIS.colors.info} />}
+                          {u.is_geoverified && <ShieldCheck size={14} color={OASIS.colors.primary} />}
                         </View>
                         <Text style={styles.dossierHandle}>@{u.username || 'citizen'}</Text>
                         <Text style={styles.dossierLocation}>
@@ -1957,10 +1636,28 @@ export default function AdminScreen() {
                       </View>
                     </View>
 
+                    <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 4 }}>
+                      <View style={{ flex: 1, alignItems: 'flex-end', gap: 3 }}>
+                        <Text style={{ color: OASIS.colors.muted, fontSize: 11, fontWeight: '600' }}>نوع الطلب</Text>
+                        <Text style={{ color: OASIS.colors.ink, fontSize: 12.5, fontWeight: '700', textAlign: 'right' }}>
+                          {verificationAccountLabel(v.subject)}
+                        </Text>
+                      </View>
+                      {(v.attachment_url || v.document_url) ? (
+                        <Pressable
+                          onPress={() => void openVerificationAttachment(v)}
+                          style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6, backgroundColor: OASIS.colors.soft, borderRadius: 12, paddingHorizontal: 11, paddingVertical: 8, borderWidth: 1, borderColor: OASIS.colors.soft }}
+                        >
+                          <Eye size={15} color={OASIS.colors.primary} />
+                          <Text style={{ color: OASIS.colors.primary, fontSize: 11, fontWeight: '700' }}>عرض المستند الخاص</Text>
+                        </Pressable>
+                      ) : null}
+                    </View>
+
                     {v.note ? (
                       <View style={styles.dossierNoteBox}>
-                        <Text style={styles.dossierNoteTitle}>ملاحظة المتقدم للتوثيق:</Text>
-                        <Text style={styles.dossierNoteText}>"{v.note}"</Text>
+                        <Text style={styles.dossierNoteTitle}>بيانات المتقدم:</Text>
+                        <Text style={styles.dossierNoteText}>{v.note}</Text>
                       </View>
                     ) : null}
 
@@ -1971,7 +1668,7 @@ export default function AdminScreen() {
                       </View>
                       <View style={styles.footprintItem}>
                         <Text style={styles.footprintLabel}>إثبات السكن</Text>
-                        <Text style={[styles.footprintVal, { color: u.is_geoverified ? '#16A34A' : '#D97706' }]}>
+                        <Text style={[styles.footprintVal, { color: u.is_geoverified ? OASIS.colors.primary : '#D97706' }]}>
                           {u.is_geoverified ? 'ابن الحي موثق 🛡️' : 'غير مثبت'}
                         </Text>
                       </View>
@@ -1987,15 +1684,15 @@ export default function AdminScreen() {
                           style={styles.btnApproveVerif}
                           onPress={() => handleVerificationDecision(v.id, v.user_id, 'approved', u.display_name || u.username || 'مواطن')}
                         >
-                          <Check size={16} color="#FFFFFF" />
-                          <Text style={styles.btnApproveVerifText}>اعتماد ومنح الشارة الزرقاء ✓</Text>
+                          <Check size={16} color={OASIS.colors.surface} />
+                          <Text style={styles.btnApproveVerifText}>اعتماد الصفة والتوثيق</Text>
                         </Pressable>
 
                         <Pressable
                           style={styles.btnRejectVerif}
                           onPress={() => handleVerificationDecision(v.id, v.user_id, 'rejected', u.display_name || u.username || 'مواطن')}
                         >
-                          <X size={15} color="#DC2626" />
+                          <X size={15} color={OASIS.colors.danger} />
                           <Text style={styles.btnRejectVerifText}>رفض الطلب ✕</Text>
                         </Pressable>
 
@@ -2023,7 +1720,7 @@ export default function AdminScreen() {
             <View style={styles.sectionHeaderRow}>
               <Text style={styles.sectionTitle}>مركز البلاغات والمراقبة 🚨</Text>
               <View style={[styles.countBadge, { backgroundColor: '#FEE2E2' }]}>
-                <Text style={[styles.countBadgeText, { color: '#DC2626' }]}>{stats.pendingReports} بلاغ معلق</Text>
+                <Text style={[styles.countBadgeText, { color: OASIS.colors.danger }]}>{stats.pendingReports} بلاغ معلق</Text>
               </View>
             </View>
             <Text style={styles.sectionSubDesc}>
@@ -2039,10 +1736,10 @@ export default function AdminScreen() {
             </View>
 
             {filteredReports.length === 0 ? (
-              <EmptyState icon={<Flag size={40} color="#10B981" />} title="لا توجد بلاغات في هذا التبويب" sub="مجتمع الجيران آمن ومستقر بإذن الله 🎉" />
+              <EmptyState icon={<Flag size={40} color={OASIS.colors.primary} />} title="لا توجد بلاغات في هذا التبويب" sub="مجتمع الجيران آمن ومستقر بإذن الله 🎉" />
             ) : (
               filteredReports.map(r => (
-                <View key={r.id} style={[styles.reportCard, r.status !== 'pending' && { borderColor: '#E2E8F0', opacity: 0.75 }]}>
+                <OasisSurface oasisSurface="card" key={r.id} style={[styles.reportCard, r.status !== 'pending' && { borderColor: OASIS.colors.line, opacity: 0.75 }]}>
                   <View style={styles.reportHeader}>
                     <View style={[styles.reportStatusTag, r.status === 'pending' ? styles.repPendingTag : styles.repDoneTag]}>
                       <Text style={[styles.reportStatusText, r.status === 'pending' ? styles.repPendingText : styles.repDoneText]}>
@@ -2068,24 +1765,24 @@ export default function AdminScreen() {
                   {r.status === 'pending' && (
                     <View style={styles.reportActionsGrid}>
                       <Pressable style={styles.btnDeleteContent} onPress={() => handleModerateReport(r, 'resolved', true)}>
-                        <Trash size={15} color="#FFFFFF" />
+                        <Trash size={15} color={OASIS.colors.surface} />
                         <Text style={styles.btnActionTextWhite}>حذف المحتوى المخالف فوراً وإغلاق البلاغ 🗑️</Text>
                       </Pressable>
 
                       <View style={{ flexDirection: 'row-reverse', gap: 8, marginTop: 8 }}>
-                        <Pressable style={styles.resolveBtn} onPress={() => handleModerateReport(r, 'resolved', false)}>
-                          <CheckCircle2 size={16} color="#FFFFFF" />
+                        <Pressable oasisKind="action" style={styles.resolveBtn} onPress={() => handleModerateReport(r, 'resolved', false)}>
+                          <CheckCircle2 size={16} color={OASIS.colors.surface} />
                           <Text style={styles.resolveBtnText}>إغلاق البلاغ كمعالج ✓</Text>
                         </Pressable>
 
-                        <Pressable style={styles.dismissBtn} onPress={() => handleModerateReport(r, 'dismissed', false)}>
-                          <XCircle size={16} color="#64748B" />
+                        <Pressable oasisKind="action" style={styles.dismissBtn} onPress={() => handleModerateReport(r, 'dismissed', false)}>
+                          <XCircle size={16} color={OASIS.colors.muted} />
                           <Text style={styles.dismissBtnText}>تجاهل كيدي ✕</Text>
                         </Pressable>
                       </View>
                     </View>
                   )}
-                </View>
+                </OasisSurface>
               ))
             )}
           </View>
@@ -2119,7 +1816,7 @@ export default function AdminScreen() {
                   <EmptyState icon={<Truck size={36} color="#94A3B8" />} title="لا توجد خدمات مسجلة" sub="ستظهر الخدمات التي يقدمها الجيران هنا." />
                 ) : (
                   servicesList.map(s => (
-                    <View key={s.id} style={styles.platformItemCard}>
+                    <OasisSurface oasisSurface="card" key={s.id} style={styles.platformItemCard}>
                       <View style={styles.platformItemTop}>
                         <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8, flex: 1 }}>
                           <Truck size={18} color={s.is_verified ? C.accent : C.muted} />
@@ -2131,30 +1828,30 @@ export default function AdminScreen() {
                           </View>
                         </View>
                         {s.price != null && (
-                          <Text style={{ fontWeight: '800', color: C.accent, fontSize: 12 }}>{s.price} ر.س</Text>
+                          <Text style={{ fontWeight: '600', color: C.accent, fontSize: 12 }}>{s.price} ر.س</Text>
                         )}
                       </View>
 
                       <View style={styles.platformItemActions}>
-                        <Pressable
+                        <Pressable oasisKind="action"
                           style={[styles.smallActionBtn, s.is_verified && { backgroundColor: '#DCFCE7' }]}
                           onPress={() => updatePlatformEntity('service', s.id, 'toggle_verified', s.title)}
                         >
-                          <CheckCircle2 size={15} color={s.is_verified ? '#16A34A' : '#64748B'} />
-                          <Text style={[styles.smallActionText, s.is_verified && { color: '#16A34A' }]}>
+                          <CheckCircle2 size={15} color={s.is_verified ? OASIS.colors.primary : OASIS.colors.muted} />
+                          <Text style={[styles.smallActionText, s.is_verified && { color: OASIS.colors.primary }]}>
                             {s.is_verified ? 'خدمة معتمدة ✓' : 'اعتماد وتوثيق'}
                           </Text>
                         </Pressable>
 
-                        <Pressable
+                        <Pressable oasisKind="action"
                           style={styles.smallActionBtn}
                           onPress={() => updatePlatformEntity('service', s.id, 'toggle_available', s.title)}
                         >
-                          <Activity size={15} color={s.available_now ? '#0284C7' : '#64748B'} />
+                          <Activity size={15} color={s.available_now ? OASIS.colors.info : OASIS.colors.muted} />
                           <Text style={styles.smallActionText}>{s.available_now ? 'متاح الآن' : 'غير متفرغ'}</Text>
                         </Pressable>
                       </View>
-                    </View>
+                    </OasisSurface>
                   ))
                 )}
               </View>
@@ -2168,7 +1865,7 @@ export default function AdminScreen() {
                   <EmptyState icon={<Wrench size={36} color="#94A3B8" />} title="لا توجد أدوات معروضة للإعارة" sub="ستظهر الأدوات المتاحة للإعارة هنا." />
                 ) : (
                   borrowItemsList.map(item => (
-                    <View key={item.id} style={styles.platformItemCard}>
+                    <OasisSurface oasisSurface="card" key={item.id} style={styles.platformItemCard}>
                       <View style={styles.platformItemTop}>
                         <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8, flex: 1 }}>
                           <Wrench size={18} color={item.status === 'available' ? C.accent : C.muted} />
@@ -2182,17 +1879,17 @@ export default function AdminScreen() {
                       </View>
 
                       <View style={styles.platformItemActions}>
-                        <Pressable
+                        <Pressable oasisKind="action"
                           style={styles.smallActionBtn}
                           onPress={() => updatePlatformEntity('borrow_item', item.id, 'toggle_status', item.title)}
                         >
-                          <Archive size={15} color="#64748B" />
+                          <Archive size={15} color={OASIS.colors.muted} />
                           <Text style={styles.smallActionText}>
                             {item.status === 'available' ? 'تعطيل الإتاحة' : 'تفعيل الإتاحة'}
                           </Text>
                         </Pressable>
                       </View>
-                    </View>
+                    </OasisSurface>
                   ))
                 )}
               </View>
@@ -2203,13 +1900,13 @@ export default function AdminScreen() {
               <View>
                 <Text style={styles.subSectionTitle}>تنبيهات الطوارئ والفزعات العاجلة</Text>
                 {urgentAlertsList.length === 0 ? (
-                  <EmptyState icon={<AlertTriangle size={36} color="#10B981" />} title="لا توجد تنبيهات طوارئ نشطة" sub="الحي يعيش في أمان وسلام تام 🛡️" />
+                  <EmptyState icon={<AlertTriangle size={36} color={OASIS.colors.primary} />} title="لا توجد تنبيهات طوارئ نشطة" sub="الحي يعيش في أمان وسلام تام 🛡️" />
                 ) : (
                   urgentAlertsList.map(alert => (
-                    <View key={alert.id} style={[styles.platformItemCard, { borderColor: alert.status === 'active' ? '#FECACA' : '#E2E8F0' }]}>
+                    <OasisSurface oasisSurface="card" key={alert.id} style={[styles.platformItemCard, { borderColor: alert.status === 'active' ? '#FECACA' : OASIS.colors.line }]}>
                       <View style={styles.platformItemTop}>
                         <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8, flex: 1 }}>
-                          <AlertTriangle size={18} color={alert.status === 'active' ? '#DC2626' : '#10B981'} />
+                          <AlertTriangle size={18} color={alert.status === 'active' ? OASIS.colors.danger : OASIS.colors.primary} />
                           <View style={{ flex: 1 }}>
                             <Text style={styles.platformItemTitle}>{alert.title}</Text>
                             <Text style={styles.platformItemSub}>
@@ -2221,24 +1918,24 @@ export default function AdminScreen() {
 
                       <View style={styles.platformItemActions}>
                         {alert.status === 'active' && (
-                          <Pressable
+                          <Pressable oasisKind="action"
                             style={[styles.smallActionBtn, { backgroundColor: '#DCFCE7' }]}
                             onPress={() => updatePlatformEntity('urgent_alert', alert.id, 'resolve', alert.title)}
                           >
-                            <CheckCircle2 size={15} color="#16A34A" />
-                            <Text style={[styles.smallActionText, { color: '#16A34A' }]}>تمت الاستجابة وحل الطارئ ✓</Text>
+                            <CheckCircle2 size={15} color={OASIS.colors.primary} />
+                            <Text style={[styles.smallActionText, { color: OASIS.colors.primary }]}>تمت الاستجابة وحل الطارئ ✓</Text>
                           </Pressable>
                         )}
 
-                        <Pressable
+                        <Pressable oasisKind="action"
                           style={[styles.smallActionBtn, { backgroundColor: '#FEE2E2' }]}
                           onPress={() => updatePlatformEntity('urgent_alert', alert.id, 'delete', alert.title)}
                         >
-                          <Trash size={15} color="#DC2626" />
-                          <Text style={[styles.smallActionText, { color: '#DC2626' }]}>حذف التنبيه</Text>
+                          <Trash size={15} color={OASIS.colors.danger} />
+                          <Text style={[styles.smallActionText, { color: OASIS.colors.danger }]}>حذف التنبيه</Text>
                         </Pressable>
                       </View>
-                    </View>
+                    </OasisSurface>
                   ))
                 )}
               </View>
@@ -2263,7 +1960,7 @@ export default function AdminScreen() {
               <View style={{ marginBottom: 16 }}>
                 <Text style={styles.subSectionTitle}>💬 استفسارات الجيران</Text>
                 {questionsList.map(q => (
-                  <View key={`q-${q.id}`} style={styles.contentItemCard}>
+                  <OasisSurface oasisSurface="card" key={`q-${q.id}`} style={styles.contentItemCard}>
                     <View style={styles.contentItemHeader}>
                       <Text style={styles.contentAuthorName}>{q.author?.display_name || 'ابن الحي'}</Text>
                       <Text style={styles.contentItemCity}>
@@ -2281,7 +1978,7 @@ export default function AdminScreen() {
 
                     <View style={styles.contentItemFooter}>
                       <Pressable style={styles.btnDeleteSm} onPress={() => deleteContentItem(q.id, 'question', q.title)}>
-                        <Trash size={14} color="#DC2626" />
+                        <Trash size={14} color={OASIS.colors.danger} />
                         <Text style={styles.btnDeleteSmText}>حذف المنشور 🗑️</Text>
                       </Pressable>
 
@@ -2293,7 +1990,7 @@ export default function AdminScreen() {
                         <Text style={styles.btnViewSmText}>معاينة الاستفسار</Text>
                       </Pressable>
                     </View>
-                  </View>
+                  </OasisSurface>
                 ))}
               </View>
             )}
@@ -2303,7 +2000,7 @@ export default function AdminScreen() {
               <View>
                 <Text style={styles.subSectionTitle}>🚚 طلبات الفزعة والمساعدة</Text>
                 {requestsList.map(r => (
-                  <View key={`r-${r.id}`} style={styles.contentItemCard}>
+                  <OasisSurface oasisSurface="card" key={`r-${r.id}`} style={styles.contentItemCard}>
                     <View style={styles.contentItemHeader}>
                       <Text style={styles.contentAuthorName}>{r.requester?.display_name || 'طالب المساعدة'}</Text>
                       <Text style={styles.contentItemCity}>
@@ -2321,7 +2018,7 @@ export default function AdminScreen() {
 
                     <View style={styles.contentItemFooter}>
                       <Pressable style={styles.btnDeleteSm} onPress={() => deleteContentItem(r.id, 'request', r.title)}>
-                        <Trash size={14} color="#DC2626" />
+                        <Trash size={14} color={OASIS.colors.danger} />
                         <Text style={styles.btnDeleteSmText}>حذف الطلب 🗑️</Text>
                       </Pressable>
 
@@ -2333,7 +2030,7 @@ export default function AdminScreen() {
                         <Text style={styles.btnViewSmText}>معاينة الطلب</Text>
                       </Pressable>
                     </View>
-                  </View>
+                  </OasisSurface>
                 ))}
               </View>
             )}
@@ -2351,16 +2048,16 @@ export default function AdminScreen() {
             {/* Quick Presets */}
             <Text style={styles.inputLabel}>نماذج سريعة جاهزة للتعميم:</Text>
             <View style={styles.templatePillsRow}>
-              <Pressable style={styles.templatePill} onPress={() => applyBroadcastTemplate('emergency')}>
+              <Pressable oasisKind="chip" style={styles.templatePill} onPress={() => applyBroadcastTemplate('emergency')}>
                 <Text style={styles.templatePillText}>🚨 طارئ أمني</Text>
               </Pressable>
-              <Pressable style={styles.templatePill} onPress={() => applyBroadcastTemplate('weather')}>
+              <Pressable oasisKind="chip" style={styles.templatePill} onPress={() => applyBroadcastTemplate('weather')}>
                 <Text style={styles.templatePillText}>⛈️ تنبيه طقس</Text>
               </Pressable>
-              <Pressable style={styles.templatePill} onPress={() => applyBroadcastTemplate('maintenance')}>
+              <Pressable oasisKind="chip" style={styles.templatePill} onPress={() => applyBroadcastTemplate('maintenance')}>
                 <Text style={styles.templatePillText}>🔧 صيانة خدمات</Text>
               </Pressable>
-              <Pressable style={styles.templatePill} onPress={() => applyBroadcastTemplate('welcome')}>
+              <Pressable oasisKind="chip" style={styles.templatePill} onPress={() => applyBroadcastTemplate('welcome')}>
                 <Text style={styles.templatePillText}>✨ ترحيب بالسكان</Text>
               </Pressable>
             </View>
@@ -2405,7 +2102,7 @@ export default function AdminScreen() {
                 style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginTop: 12, paddingVertical: 8 }}
                 onPress={() => setScheduleEnabled((v) => !v)}
               >
-                <Text style={{ fontSize: 13, color: C.ink, fontWeight: '800' }}>
+                <Text style={{ fontSize: 13, color: C.ink, fontWeight: '600' }}>
                   {scheduleEnabled ? '☑️' : '⬜️'} جدولة الإرسال لوقت لاحق
                 </Text>
               </Pressable>
@@ -2423,17 +2120,17 @@ export default function AdminScreen() {
               {broadcastTitle.length > 0 && (
                 <View style={styles.previewBox}>
                   <Text style={styles.previewHeading}>معاينة الإشعار كما سيصل للجيران 🔔</Text>
-                  <View style={styles.previewNotificationCard}>
+                  <OasisSurface oasisSurface="card" style={styles.previewNotificationCard}>
                     <View style={styles.previewCardHeader}>
                       <Text style={styles.previewAppName}>منصة حيّنا · الآن</Text>
-                      <Crown size={12} color="#F59E0B" />
+                      <Crown size={12} color={OASIS.colors.warning} />
                     </View>
                     <Text style={styles.previewTitleText}>
                       {broadcastType === 'emergency' ? '🚨 ' : broadcastType === 'weather' ? '⛈️ ' : '📢 '}
                       {broadcastTitle}
                     </Text>
                     <Text style={styles.previewBodyText}>{broadcastBody || 'تفاصيل التعميم الإداري...'}</Text>
-                  </View>
+                  </OasisSurface>
                 </View>
               )}
 
@@ -2443,10 +2140,10 @@ export default function AdminScreen() {
                 disabled={sendingBroadcast}
               >
                 {sendingBroadcast ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
+                  <ActivityIndicator size="small" color={OASIS.colors.surface} />
                 ) : (
                   <>
-                    <Send size={18} color="#FFFFFF" />
+                    <Send size={18} color={OASIS.colors.surface} />
                     <Text style={styles.btnSendBroadcastText}>نشر وبث التعميم الآن 📢</Text>
                   </>
                 )}
@@ -2455,7 +2152,7 @@ export default function AdminScreen() {
               {/* Delivery report */}
               {lastDelivery ? (
                 <View style={{ marginTop: 12, backgroundColor: C.accentLight, borderRadius: 12, padding: 12, gap: 4 }}>
-                  <Text style={{ fontSize: 12, fontWeight: '900', color: C.accentDark, textAlign: 'right' }}>تقرير آخر بث ✅</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: C.accentDark, textAlign: 'right' }}>تقرير آخر بث ✅</Text>
                   <Text style={{ fontSize: 11, color: C.inkMuted, textAlign: 'right', lineHeight: 18 }}>
                     «{lastDelivery.label}» — {lastDelivery.recipients} مستلم · {lastDelivery.pushed} إشعار فوري مُرسَل
                   </Text>
@@ -2471,8 +2168,8 @@ export default function AdminScreen() {
                       key={s.id}
                       style={{ backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 12, padding: 12, gap: 6 }}
                     >
-                      <Text style={{ fontSize: 12.5, fontWeight: '900', color: C.ink, textAlign: 'right' }}>{s.title}</Text>
-                      <Text style={{ fontSize: 10.5, color: C.muted, textAlign: 'right' }}>
+                      <Text style={{ fontSize: 12.5, fontWeight: '700', color: C.ink, textAlign: 'right' }}>{s.title}</Text>
+                      <Text style={{ fontSize: 11, color: C.muted, textAlign: 'right' }}>
                         {new Date(s.scheduled_at).toLocaleString('ar-SA')}
                       </Text>
                       <View style={{ flexDirection: 'row-reverse', gap: 8 }}>
@@ -2481,13 +2178,13 @@ export default function AdminScreen() {
                           onPress={() => sendScheduledNow(s)}
                           disabled={sendingBroadcast}
                         >
-                          <Text style={{ color: '#fff', fontSize: 11, fontWeight: '900' }}>إرسال الآن</Text>
+                          <Text style={{ color: OASIS.colors.surface, fontSize: 11, fontWeight: '700' }}>إرسال الآن</Text>
                         </Pressable>
                         <Pressable
                           style={{ backgroundColor: C.dangerLight, borderRadius: 9, paddingHorizontal: 12, paddingVertical: 6 }}
                           onPress={() => cancelScheduledBroadcast(s.id)}
                         >
-                          <Text style={{ color: C.danger, fontSize: 11, fontWeight: '900' }}>إلغاء</Text>
+                          <Text style={{ color: C.danger, fontSize: 11, fontWeight: '700' }}>إلغاء</Text>
                         </Pressable>
                       </View>
                     </View>
@@ -2516,7 +2213,7 @@ export default function AdminScreen() {
               <EmptyState icon={<Clock size={40} color="#94A3B8" />} title="لا توجد عمليات مسجلة حتى الآن" sub="سيتم توثيق أي إجراء رقابي تتخذه كمدير للنظام تلقائياً هنا." />
             ) : (
               auditLogs.map(log => (
-                <View key={log.id} style={styles.auditLogCard}>
+                <OasisSurface oasisSurface="card" key={log.id} style={styles.auditLogCard}>
                   <View style={styles.auditLogIconBox}>
                     <ShieldCheck size={18} color="#0891B2" />
                   </View>
@@ -2527,7 +2224,7 @@ export default function AdminScreen() {
                     </Text>
                   </View>
                   <Text style={styles.auditLogTime}>{new Date(log.created_at).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })}</Text>
-                </View>
+                </OasisSurface>
               ))
             )}
           </View>
@@ -2573,10 +2270,10 @@ export default function AdminScreen() {
                 disabled={savingLocation}
               >
                 {savingLocation ? (
-                  <ActivityIndicator color="#FFFFFF" />
+                  <ActivityIndicator color={OASIS.colors.surface} />
                 ) : (
                   <>
-                    <MapPin size={18} color="#FFFFFF" />
+                    <MapPin size={18} color={OASIS.colors.surface} />
                     <Text style={styles.btnSendBroadcastText}>حفظ وإضافة الحي للقاعدة 📍</Text>
                   </>
                 )}
@@ -2592,8 +2289,8 @@ export default function AdminScreen() {
                     <MapPin size={16} color={C.accent} />
                     <Text style={styles.quickActionText}>{fullLocName}</Text>
                   </View>
-                  <Pressable style={styles.trashActionBtn} onPress={() => handleDeleteLocation(loc.id, fullLocName)}>
-                    <Trash size={14} color="#EF4444" />
+                  <Pressable oasisKind="icon" style={styles.trashActionBtn} onPress={() => handleDeleteLocation(loc.id, fullLocName)}>
+                    <Trash size={14} color={OASIS.colors.danger} />
                   </Pressable>
                 </View>
               );
@@ -2609,12 +2306,12 @@ export default function AdminScreen() {
               تحديث الشعار المركزي للمنصة؛ ينعكس فورياً في شاشات تسجيل الدخول، هيدر التطبيق، وأيقونة الويب.
             </Text>
 
-            <View style={{ alignItems: 'center', backgroundColor: '#065F46', borderRadius: 24, padding: 26, marginVertical: 12 }}>
+            <View style={{ alignItems: 'center', backgroundColor: OASIS.colors.deep, borderRadius: 14, padding: 16, marginVertical: 12 }}>
               <View
                 style={{
                   width: 140,
                   height: 140,
-                  borderRadius: 28,
+                  borderRadius: 14,
                   backgroundColor: 'rgba(255,255,255,0.14)',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -2624,7 +2321,7 @@ export default function AdminScreen() {
               >
                 <Image source={{ uri: brandingLogo }} style={{ width: 115, height: 115 }} resizeMode="contain" />
               </View>
-              <Text style={{ color: '#FFFFFF', fontSize: 17, fontWeight: '900', marginTop: 12 }}>شعار حيّنا المعتمد</Text>
+              <Text style={{ color: OASIS.colors.surface, fontSize: 17, fontWeight: '700', marginTop: 12 }}>شعار حيّنا المعتمد</Text>
               <Text style={{ color: '#A7F3D0', fontSize: 11, fontWeight: '700', marginTop: 4 }}>
                 تحديث الشعار يطبق مركزياً في النظام بالكامل
               </Text>
@@ -2635,7 +2332,7 @@ export default function AdminScreen() {
               onPress={changeGlobalLogo}
               disabled={brandingUploading}
             >
-              {brandingUploading ? <ActivityIndicator color="#FFFFFF" /> : <Sparkles size={18} color="#FFFFFF" />}
+              {brandingUploading ? <ActivityIndicator color={OASIS.colors.surface} /> : <Sparkles size={18} color={OASIS.colors.surface} />}
               <Text style={styles.btnSendBroadcastText}>
                 {brandingUploading ? 'جارٍ رفع الشعار...' : 'اختيار ورفع شعار جديد'}
               </Text>
@@ -2655,8 +2352,7 @@ export default function AdminScreen() {
         {/* TAB: SECURITY & SESSIONS */}
         {activeTab === 'security' && <AdminSecurityCenter onSaved={showToast} />}
 
-        <View style={{ height: 100 }} />
-      </ScrollView>
+      </AdminWorkspace>
 
       {/* ======================================================== */}
       {/* 4. USER DOSSIER INSPECTOR MODAL                          */}
@@ -2665,14 +2361,14 @@ export default function AdminScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalDossierBox}>
             <View style={styles.modalDossierHeader}>
-              <Pressable onPress={() => setInspectedUser(null)} style={styles.modalCloseBtn}>
+              <Pressable oasisKind="icon" onPress={() => setInspectedUser(null)} style={styles.modalCloseBtn}>
                 <X size={18} color={C.ink} />
               </Pressable>
               <Text style={styles.modalDossierTitle}>الملف الإداري الشامل للمواطن 📁</Text>
             </View>
 
             <ScrollView style={styles.modalDossierScroll} showsVerticalScrollIndicator={false}>
-              <View style={styles.modalProfileCard}>
+              <OasisSurface oasisSurface="card" style={styles.modalProfileCard}>
                 <View style={styles.modalAvatarWrap}>
                   {inspectedUser.avatar_url ? (
                     <Image source={{ uri: inspectedUser.avatar_url }} style={styles.modalAvatarImg} />
@@ -2683,7 +2379,7 @@ export default function AdminScreen() {
                   )}
                   {inspectedUser.role === 'admin' && (
                     <View style={styles.modalAdminBadge}>
-                      <Crown size={12} color="#FFFFFF" />
+                      <Crown size={12} color={OASIS.colors.surface} />
                     </View>
                   )}
                 </View>
@@ -2691,8 +2387,8 @@ export default function AdminScreen() {
                 <View style={styles.modalUserInfo}>
                   <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
                     <Text style={styles.modalName}>{inspectedUser.display_name || 'بدون اسم'}</Text>
-                    {inspectedUser.is_verified && <CheckCircle2 size={16} color="#0284C7" />}
-                    {inspectedUser.is_geoverified && <ShieldCheck size={16} color="#16A34A" />}
+                    {inspectedUser.is_verified && <CheckCircle2 size={16} color={OASIS.colors.info} />}
+                    {inspectedUser.is_geoverified && <ShieldCheck size={16} color={OASIS.colors.primary} />}
                   </View>
                   <Text style={styles.modalHandle}>@{inspectedUser.username || 'user'}</Text>
                   <Text style={styles.modalCity}>
@@ -2700,7 +2396,7 @@ export default function AdminScreen() {
                     {inspectedUser.city || 'الرياض'}
                   </Text>
                 </View>
-              </View>
+              </OasisSurface>
 
               {/* Activity metrics */}
               <View style={styles.modalFootprintRow}>
@@ -2717,7 +2413,7 @@ export default function AdminScreen() {
                   <Text style={styles.modalFootprintLabel}>الفزعات</Text>
                 </View>
                 <View style={styles.modalFootprintBox}>
-                  <Text style={[styles.modalFootprintNum, { color: inspectedUser.role === 'admin' ? '#F59E0B' : '#0284C7' }]}>
+                  <Text style={[styles.modalFootprintNum, { color: inspectedUser.role === 'admin' ? OASIS.colors.warning : OASIS.colors.info }]}>
                     {inspectedUser.role === 'admin' ? 'مدير 👑' : 'مستخدم 👤'}
                   </Text>
                   <Text style={styles.modalFootprintLabel}>الرتبة</Text>
@@ -2737,8 +2433,8 @@ export default function AdminScreen() {
                     key={m.label}
                     style={{ flexBasis: '48%', flexGrow: 1, backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 12, padding: 10, gap: 3 }}
                   >
-                    <Text style={{ fontSize: 15, fontWeight: '900', color: m.color, textAlign: 'right' }}>{m.value}</Text>
-                    <Text style={{ fontSize: 10.5, color: C.muted, fontWeight: '700', textAlign: 'right' }}>{m.label}</Text>
+                    <Text style={{ fontSize: 15, fontWeight: '700', color: m.color, textAlign: 'right' }}>{m.value}</Text>
+                    <Text style={{ fontSize: 11, color: C.muted, fontWeight: '700', textAlign: 'right' }}>{m.label}</Text>
                   </View>
                 ))}
               </View>
@@ -2753,7 +2449,7 @@ export default function AdminScreen() {
                     >
                       <MessageCircle size={13} color={C.info} />
                       <Text style={{ flex: 1, fontSize: 11.5, color: C.ink, textAlign: 'right' }} numberOfLines={1}>{r.title}</Text>
-                      <Text style={{ fontSize: 9.5, color: C.subtle, fontWeight: '700' }}>{new Date(r.created_at).toLocaleDateString('ar-SA')}</Text>
+                      <Text style={{ fontSize: 11, color: C.subtle, fontWeight: '700' }}>{new Date(r.created_at).toLocaleDateString('ar-SA')}</Text>
                     </View>
                   ))}
                 </View>
@@ -2766,9 +2462,9 @@ export default function AdminScreen() {
                 style={[styles.modalActionItem, inspectedUser.role === 'admin' ? styles.itemDemote : styles.itemPromote]}
                 onPress={() => toggleUserRole(inspectedUser)}
               >
-                <Crown size={18} color={inspectedUser.role === 'admin' ? '#D97706' : '#0284C7'} />
+                <Crown size={18} color={inspectedUser.role === 'admin' ? '#D97706' : OASIS.colors.info} />
                 <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                  <Text style={[styles.modalActionTitle, inspectedUser.role === 'admin' ? { color: '#D97706' } : { color: '#0284C7' }]}>
+                  <Text style={[styles.modalActionTitle, inspectedUser.role === 'admin' ? { color: '#D97706' } : { color: OASIS.colors.info }]}>
                     {inspectedUser.role === 'admin' ? 'خفض الرتبة إلى مستخدم عادي 👤' : 'ترقية إلى مدير النظام (Admin) 👑'}
                   </Text>
                   <Text style={styles.modalActionSub}>
@@ -2782,9 +2478,9 @@ export default function AdminScreen() {
                 style={[styles.modalActionItem, inspectedUser.is_verified && styles.itemSuccess]}
                 onPress={() => toggleVerification(inspectedUser)}
               >
-                <CheckCircle2 size={18} color={inspectedUser.is_verified ? '#16A34A' : '#64748B'} />
+                <CheckCircle2 size={18} color={inspectedUser.is_verified ? OASIS.colors.primary : OASIS.colors.muted} />
                 <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                  <Text style={[styles.modalActionTitle, inspectedUser.is_verified && { color: '#16A34A' }]}>
+                  <Text style={[styles.modalActionTitle, inspectedUser.is_verified && { color: OASIS.colors.primary }]}>
                     {inspectedUser.is_verified ? 'سحب التوثيق الرسمي' : 'منح التوثيق الرسمي بالشارة الزرقاء ✓'}
                   </Text>
                   <Text style={styles.modalActionSub}>اعتماد الهوية الوطنية والاسم الحقيقي في حيّنا</Text>
@@ -2796,9 +2492,9 @@ export default function AdminScreen() {
                 style={[styles.modalActionItem, inspectedUser.is_geoverified && styles.itemSuccess]}
                 onPress={() => toggleGeoVerification(inspectedUser)}
               >
-                <ShieldCheck size={18} color={inspectedUser.is_geoverified ? '#16A34A' : '#64748B'} />
+                <ShieldCheck size={18} color={inspectedUser.is_geoverified ? OASIS.colors.primary : OASIS.colors.muted} />
                 <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                  <Text style={[styles.modalActionTitle, inspectedUser.is_geoverified && { color: '#16A34A' }]}>
+                  <Text style={[styles.modalActionTitle, inspectedUser.is_geoverified && { color: OASIS.colors.primary }]}>
                     {inspectedUser.is_geoverified ? 'إلغاء إثبات السكن' : 'توثيق السكن "ابن الحي الموثق" 🛡️'}
                   </Text>
                   <Text style={styles.modalActionSub}>تأكيد إقامة المواطن وسكنه الفعلي داخل الحي</Text>
@@ -2810,9 +2506,9 @@ export default function AdminScreen() {
                 style={[styles.modalActionItem, inspectedUser.is_banned ? styles.itemBanned : styles.itemBan]}
                 onPress={() => toggleBanUser(inspectedUser)}
               >
-                <Ban size={18} color={inspectedUser.is_banned ? '#FFFFFF' : '#DC2626'} />
+                <Ban size={18} color={inspectedUser.is_banned ? OASIS.colors.surface : OASIS.colors.danger} />
                 <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                  <Text style={[styles.modalActionTitle, inspectedUser.is_banned ? { color: '#FFFFFF' } : { color: '#DC2626' }]}>
+                  <Text style={[styles.modalActionTitle, inspectedUser.is_banned ? { color: OASIS.colors.surface } : { color: OASIS.colors.danger }]}>
                     {inspectedUser.is_banned ? 'رفع الحظر عن الحساب 🟢' : 'حظر الحساب نهائياً 🚫'}
                   </Text>
                   <Text style={[styles.modalActionSub, inspectedUser.is_banned && { color: '#FEE2E2' }]}>
@@ -2837,10 +2533,10 @@ export default function AdminScreen() {
                 disabled={!directNoticeText.trim() || sendingDirectNotice}
               >
                 {sendingDirectNotice ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
+                  <ActivityIndicator size="small" color={OASIS.colors.surface} />
                 ) : (
                   <>
-                    <Send size={15} color="#FFFFFF" />
+                    <Send size={15} color={OASIS.colors.surface} />
                     <Text style={styles.btnSendNoticeText}>إرسال التنبيه الآن</Text>
                   </>
                 )}
@@ -2854,73 +2550,15 @@ export default function AdminScreen() {
 }
 
 // Helper Subcomponents
-function HeroKpi({ value, label }: { value: number; label: string }) {
-  return (
-    <View style={styles.heroKpi}>
-      <Text style={styles.heroKpiNum}>{Number(value || 0).toLocaleString('ar-EG')}</Text>
-      <Text style={styles.heroKpiLabel}>{label}</Text>
-    </View>
-  );
-}
-
-function TabPill({
-  label,
-  icon,
-  active,
-  badge,
-  onPress,
-}: {
-  label: string;
-  icon: React.ReactNode;
-  active: boolean;
-  badge?: number;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable style={[styles.navTabPill, active && styles.navTabPillActive]} onPress={onPress}>
-      {icon}
-      <Text style={[styles.navTabPillText, active && styles.navTabPillTextActive]}>{label}</Text>
-      {badge !== undefined && badge > 0 && (
-        <View style={styles.navTabBadge}>
-          <Text style={styles.navTabBadgeText}>{badge}</Text>
-        </View>
-      )}
-    </Pressable>
-  );
-}
 
 function FilterPill({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
   return (
-    <Pressable style={[styles.filterPill, active && styles.filterPillActive]} onPress={onPress}>
+    <Pressable oasisVariant={active ? 'primary' : 'secondary'} oasisKind="chip" style={[styles.filterPill, active && styles.filterPillActive]} onPress={onPress}>
       <Text style={[styles.filterPillText, active && styles.filterPillTextActive]}>{label}</Text>
     </Pressable>
   );
 }
 
-function StatCard({
-  icon,
-  bg,
-  value,
-  label,
-  sub,
-  style,
-}: {
-  icon: React.ReactNode;
-  bg: string;
-  value: number;
-  label: string;
-  sub?: string;
-  style?: any;
-}) {
-  return (
-    <View style={[styles.statCard, style]}>
-      <View style={[styles.statIconBox, { backgroundColor: bg }]}>{icon}</View>
-      <Text style={styles.statValue}>{value.toLocaleString('ar-SA')}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
-      {sub ? <Text style={styles.statSub}>{sub}</Text> : null}
-    </View>
-  );
-}
 
 function EmptyState({ icon, title, sub }: { icon: React.ReactNode; title: string; sub?: string }) {
   return (

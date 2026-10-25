@@ -1,4 +1,6 @@
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { OasisPressable as Pressable } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
+import { ScrollView, Text, View } from 'react-native';
 import { Flame, Map, MessageCircle, Truck, User, Wrench } from 'lucide-react-native';
 import { styles } from './homeStyles';
 import type { HomeTab } from '@/lib/homeUtils';
@@ -19,7 +21,7 @@ export default function FeedTabs({ activeTab, onChange, counts, isGuest }: Props
   ) => {
     const active = activeTab === key;
     return (
-      <Pressable
+      <Pressable oasisKind="chip"
         key={key}
         style={[styles.fTab, active && activeStyle]}
         onPress={() => onChange(key)}
@@ -28,7 +30,7 @@ export default function FeedTabs({ activeTab, onChange, counts, isGuest }: Props
         accessibilityLabel={label}
       >
         <View style={styles.fTabLabelRow}>
-          <Icon size={15} color={active ? '#fff' : '#475569'} />
+          <Icon size={15} color={active ? OASIS.colors.surface : OASIS.colors.muted} />
           <Text style={[styles.fTabText, active && styles.fTabTextActive]}>{label}</Text>
         </View>
       </Pressable>

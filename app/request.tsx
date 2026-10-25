@@ -1,19 +1,8 @@
+import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
+import { HeaderAction } from '@/components/shared/AppHeader';
 import { useEffect, useState } from 'react';
-import {
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  ActivityIndicator,
-  Platform,
-  Image,
-  Modal,
-  Share,
-  KeyboardAvoidingView,
-} from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, View, ActivityIndicator, Platform, Image, Modal, Share, KeyboardAvoidingView } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { sendPushToUser } from '@/lib/pushSender';
@@ -45,6 +34,8 @@ import {
   Pencil,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import TwitterInquiryCard from '@/components/TwitterInquiryCard';
+import { useDynamicIsland } from '@/context/DynamicIslandContext';
 import { AppHeader } from '@/components/shared/AppHeader';
 import { requireAccount } from '@/lib/authGate';
 import { getActiveLocation } from '@/lib/locationSync';
@@ -66,16 +57,16 @@ function isAutoSuggestedOffer(match: any): boolean {
 function getRequestTypeInfo(type?: string) {
   switch (type) {
     case 'delivery':
-      return { label: 'توصيل مشوار أو غرض', icon: Car, bg: '#eff6ff', color: '#2563eb', border: '#bfdbfe' };
+      return { label: 'توصيل مشوار أو غرض', icon: Car, bg: OASIS.colors.infoSoft, color: '#2563eb', border: '#bfdbfe' };
     case 'tools':
       return { label: 'إعارة واستعارة أداة', icon: Wrench, bg: '#fff7ed', color: '#ea580c', border: '#fed7aa' };
     case 'home':
     case 'maintenance':
-      return { label: 'مساعدة وصيانة بالحي', icon: Wrench, bg: '#f0fdf4', color: '#16a34a', border: '#bbf7d0' };
+      return { label: 'مساعدة وصيانة بالحي', icon: Wrench, bg: OASIS.colors.soft, color: OASIS.colors.primary, border: '#bbf7d0' };
     case 'volunteer':
       return { label: 'فزعة وتطوع خيري', icon: HeartHandshake, bg: '#fdf2f8', color: '#db2777', border: '#fbcfe8' };
     default:
-      return { label: type || 'طلب فزعة عامة', icon: HeartHandshake, bg: '#ecfdf5', color: '#059669', border: '#a7f3d0' };
+      return { label: type || 'طلب فزعة عامة', icon: HeartHandshake, bg: OASIS.colors.soft, color: OASIS.colors.primary, border: '#a7f3d0' };
   }
 }
 
@@ -95,6 +86,8 @@ const COMPLETION_TEMPLATES = [
 
 export default function Request() {
   const bottomNavInset = useBottomNavInset();
+  const { showIsland } = useDynamicIsland();
+  const [viewerProfile, setViewerProfile] = useState<any>(null);
   const { id } = useLocalSearchParams<{ id: string }>();
   const [request, setRequest] = useState<any>(null);
   const [requester, setRequester] = useState<any>(null);
@@ -124,6 +117,8 @@ export default function Request() {
       const { data: auth } = await supabase.auth.getSession();
       const user = auth.session?.user ?? null;
       setMe(user?.id || '');
+      const viewer = user ? await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle() : { data: null };
+      setViewerProfile(viewer.data);
 
       const requestPromise = user
         ? supabase.from('requests').select('*').eq('id', id).maybeSingle()
@@ -143,19 +138,8 @@ export default function Request() {
       ]);
 
       const requestData = Array.isArray(requestResult.data) ? requestResult.data[0] : requestResult.data;
+      setRequest(requestData || null);
       if (requestData) {
-        setRequest(requestData);
-
-        // Safely bump views count
-        if (requestData.id && user) {
-          try {
-            supabase
-              .from('requests')
-              .update({ views_count: (requestData.views_count || 0) + 1 })
-              .eq('id', id)
-              .then(() => {});
-          } catch {}
-        }
 
         if (requestData.requester_id) {
           const { data: p } = await supabase
@@ -513,7 +497,7 @@ export default function Request() {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#059669" />
+        <ActivityIndicator size="large" color={OASIS.colors.primary} />
         <Text style={styles.loadingText}>جاري تحميل تفاصيل الفزعة...</Text>
       </View>
     );
@@ -632,22 +616,22 @@ export default function Request() {
         fallbackRoute="/requests"
         rightAction={
           <View style={styles.headerRightActions}>
-            <Pressable
+            <HeaderAction
               onPress={handleShare}
               style={styles.headerActionBtn}
               accessibilityRole="button"
               accessibilityLabel="مشاركة"
             >
-              <Share2 size={16} color="#059669" />
-            </Pressable>
-            <Pressable
+              <Share2 size={16} color={OASIS.colors.primary} />
+            </HeaderAction>
+            <HeaderAction
               onPress={() => router.push({ pathname: '/report', params: { type: 'request', id: request.id } })}
               style={styles.headerActionBtn}
               accessibilityRole="button"
               accessibilityLabel="إبلاغ"
             >
-              <Flag size={16} color="#64748b" />
-            </Pressable>
+              <Flag size={16} color={OASIS.colors.muted} />
+            </HeaderAction>
           </View>
         }
       />
@@ -656,135 +640,21 @@ export default function Request() {
         contentContainerStyle={[styles.scroll, { paddingBottom: bottomNavInset + 40 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Modern Executive Hero Card */}
-        <View style={styles.heroCard}>
-          {/* Top Badges Row */}
-          <View style={styles.heroTopBadges}>
-            {/* Status Badge */}
-            {request.status === 'completed' ? (
-              <View style={styles.completedBadgeHero}>
-                <Sparkles size={13} color="#047857" />
-                <Text style={styles.completedBadgeHeroText}>تمت الفزعة بنجاح ☕</Text>
-              </View>
-            ) : request.status === 'accepted' ? (
-              <View style={styles.acceptedBadge}>
-                <CheckCircle2 size={13} color="#15803d" />
-                <Text style={styles.acceptedBadgeText}>جاري التنفيذ مع جار 🤝</Text>
-              </View>
-            ) : (
-              <View style={styles.openBadge}>
-                <View style={styles.openDot} />
-                <Text style={styles.openBadgeText}>مفتوح ويحتاج فزعة</Text>
-              </View>
-            )}
-
-            {/* Category / Type Pill */}
-            <View style={[styles.typePill, { backgroundColor: typeInfo.bg, borderColor: typeInfo.border }]}>
-              <TypeIcon size={12} color={typeInfo.color} />
-              <Text style={[styles.typePillText, { color: typeInfo.color }]}>{typeInfo.label}</Text>
-            </View>
-
-            {/* Urgency Badge */}
-            {request.is_urgent && (
-              <View style={styles.urgentBadge}>
-                <Flame size={12} color="#dc2626" />
-                <Text style={styles.urgentBadgeText}>عاجل</Text>
-              </View>
-            )}
-          </View>
-
-          {/* Title */}
-          <Text style={styles.heroTitle}>{request.title}</Text>
-
-          {/* Meta Info Row */}
-          <View style={styles.metaRow}>
-            <View style={styles.metaChip}>
-              <MapPin size={13} color="#059669" />
-              <Text style={styles.metaChipText}>{locationLabel}</Text>
-            </View>
-
-            {request.created_at && (
-              <View style={styles.metaChip}>
-                <Clock size={12} color="#64748b" />
-                <Text style={styles.metaChipText}>{relativeTime(request.created_at)}</Text>
-              </View>
-            )}
-
-            {request.views_count != null && (
-              <View style={styles.metaChip}>
-                <Eye size={12} color="#64748b" />
-                <Text style={styles.metaChipText}>{request.views_count} مشاهدة</Text>
-              </View>
-            )}
-          </View>
-
-          {/* Privacy Guarantee Note */}
-          <View style={styles.privacyNoteBox}>
-            <Info size={13} color="#047857" />
-            <Text style={styles.privacyNoteText}>
-              الموقع معروض على مستوى الحي فقط لحماية خصوصية الجيران · يتم تبادل الإحداثيات بالخاص بعد قبول الفزعة.
-            </Text>
-          </View>
+        <TwitterInquiryCard detailMode type="request" data={{ ...request, profiles: requester, answers_count: offers.length }} currentUserId={me || null} currentUserProfile={viewerProfile} isGuest={!me} onQuickReply={async () => {}} onToast={message => showIsland(message, undefined, 'success')} onDeleted={() => void load()} />
+        <View style={{ backgroundColor: OASIS.colors.surface, borderRadius: 14, padding: 16, gap: 12, borderWidth: 1, borderColor: OASIS.colors.line }}>
+          {Boolean(request.notes) && <Text style={styles.notesText}>{request.notes}</Text>}
+          {Number(request.budget) > 0 && <Text style={styles.budgetValue}>المكافأة المقترحة: {request.budget} ر.س</Text>}
+          <Pressable oasisKind="action" onPress={() => router.push({ pathname: '/map', params: { district: request.district, city: request.city } })} accessibilityRole="button" style={styles.openMapBtn}><MapPin size={16} color="#176b52" /><Text style={styles.openMapBtnText}>عرض الحي على الخريطة</Text></Pressable>
         </View>
-
         <View style={styles.bodyContainer}>
-          {/* Author Management Card: Edit (Limit 2) & Delete */}
-          {isOwner && (
-            <View style={styles.authorManageBox}>
-              <View style={styles.authorManageHeader}>
-                <View style={styles.authorManageInfo}>
-                  <Text style={styles.authorManageTitle}>إدارة طلبك</Text>
-                  <Text style={styles.authorManageSub}>
-                    {editsRemaining > 0
-                      ? `متبقي لك ${editsRemaining} من ${MAX_EDITS} محاولات تعديل`
-                      : 'استنفدت الحد الأقصى للتعديل (محاولتان فقط)'}
-                  </Text>
-                </View>
-                <View style={[styles.editLimitBadge, editsRemaining === 0 ? styles.editLimitBadgeExpired : styles.editLimitBadgeActive]}>
-                  <Text style={[styles.editLimitBadgeText, editsRemaining === 0 ? styles.editLimitBadgeTextExpired : styles.editLimitBadgeTextActive]}>
-                    {editsRemaining}/{MAX_EDITS} محاولات
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.authorActionsRow}>
-                <Pressable
-                  style={[styles.editActionBtn, editsRemaining === 0 && styles.disabledActionBtn]}
-                  onPress={handleOpenEdit}
-                  disabled={editsRemaining === 0}
-                >
-                  <Pencil size={15} color={editsRemaining === 0 ? '#94a3b8' : '#047857'} />
-                  <Text style={[styles.editActionBtnText, editsRemaining === 0 && styles.disabledActionBtnText]}>
-                    {editsRemaining === 0 ? 'انتهت محاولات التعديل' : 'تعديل الطلب'}
-                  </Text>
-                </Pressable>
-
-                <Pressable
-                  style={[styles.deleteActionBtn, deletingRequest && { opacity: 0.6 }]}
-                  onPress={handleDeleteRequest}
-                  disabled={deletingRequest}
-                >
-                  {deletingRequest ? (
-                    <ActivityIndicator size="small" color="#dc2626" />
-                  ) : (
-                    <>
-                      <Trash2 size={15} color="#dc2626" />
-                      <Text style={styles.deleteActionBtnText}>حذف الطلب</Text>
-                    </>
-                  )}
-                </Pressable>
-              </View>
-            </View>
-          )}
-
           {/* Celebratory Banner if completed */}
           {request.status === 'completed' && (
             <LinearGradient
-              colors={['#ecfdf5', '#d1fae5']}
+              colors={[OASIS.colors.soft, OASIS.colors.soft]}
               style={styles.completedStatusCard}
             >
               <View style={styles.completedStatusIconCircle}>
-                <Check size={20} color="#059669" />
+                <Check size={20} color={OASIS.colors.primary} />
               </View>
               <View style={styles.completedStatusTextCol}>
                 <Text style={styles.completedStatusTitle}>تمت الفزعة وإتمام هذا الطلب بنجاح! 🎉</Text>
@@ -795,130 +665,11 @@ export default function Request() {
             </LinearGradient>
           )}
 
-          {/* Requester Profile Card */}
-          {requester && (
-            <Pressable
-              style={({ pressed }) => [
-                styles.requesterCard,
-                pressed && { opacity: 0.96 },
-              ]}
-              onPress={() => router.push({ pathname: '/user', params: { id: requester.id } })}
-            >
-              <View style={styles.requesterAvatarWrap}>
-                {requester.avatar_url ? (
-                  <Image source={{ uri: requester.avatar_url }} style={styles.requesterAvatar} />
-                ) : (
-                  <View style={styles.avatarPlaceholder}>
-                    <Text style={styles.avatarLetter}>
-                      {(requester.display_name || requester.username || 'ح')[0]}
-                    </Text>
-                  </View>
-                )}
-                {requester.is_geoverified && (
-                  <View style={styles.verifiedBadgeCircle}>
-                    <ShieldCheck size={11} color="#fff" />
-                  </View>
-                )}
-              </View>
-
-              <View style={styles.requesterTextCol}>
-                <View style={styles.requesterNameRow}>
-                  <Text style={styles.requesterName}>
-                    {requester.display_name || `@${requester.username || 'صاحب الطلب'}`}
-                  </Text>
-                  <View style={styles.requesterBadgePill}>
-                    <CheckCircle2 size={11} color="#059669" />
-                    <Text style={styles.requesterBadgePillText}>صاحب الطلب</Text>
-                  </View>
-                </View>
-                <Text style={styles.requesterSub}>
-                  {requester.district ? `ساكن في حي ${requester.district} · ${requester.city || ''}` : 'أحد جيران الحي'}
-                </Text>
-              </View>
-
-              <View style={styles.visitProfilePill}>
-                <Text style={styles.visitProfilePillText}>الملف</Text>
-                <ChevronLeft size={13} color="#059669" />
-              </View>
-            </Pressable>
-          )}
-
-          {/* Details & Needs Card */}
-          <View style={styles.card}>
-            <View style={styles.cardHeaderRow}>
-              <View style={styles.cardHeaderIconBox}>
-                <HeartHandshake size={18} color="#059669" />
-              </View>
-              <Text style={styles.cardTitle}>تفاصيل الطلب والاحتياج</Text>
-            </View>
-
-            <Text style={styles.cardDesc}>{request.description}</Text>
-
-            {request.notes && (
-              <View style={styles.notesBox}>
-                <Info size={14} color="#64748b" />
-                <Text style={styles.notesText}>{request.notes}</Text>
-              </View>
-            )}
-
-            {/* Compensation / Volunteer Mode */}
-            {request.budget && Number(request.budget) > 0 ? (
-              <View style={styles.budgetBox}>
-                <Banknote size={18} color="#15803d" />
-                <View style={styles.budgetCol}>
-                  <Text style={styles.budgetValue}>المكافأة المقترحة: {request.budget} ر.س</Text>
-                  <Text style={styles.budgetSub}>مكافأة تقديرية اختيارية من صاحب الطلب</Text>
-                </View>
-              </View>
-            ) : (
-              <View style={styles.volunteerBox}>
-                <HeartHandshake size={18} color="#059669" />
-                <View style={styles.volunteerCol}>
-                  <Text style={styles.volunteerValue}>فزعة وتطوع ومساعدة أخوية لوجه الله 🤝</Text>
-                  <Text style={styles.volunteerSub}>خدمة جيرة متبادلة تكسبك دعوة صادقة ونقاط سمعة</Text>
-                </View>
-              </View>
-            )}
-
-            {/* Open Map Link */}
-            <Pressable
-              style={styles.openMapBtn}
-              onPress={() => router.push({ pathname: '/map', params: { district: request.district, city: request.city } })}
-            >
-              <MapPin size={15} color="#059669" />
-              <Text style={styles.openMapBtnText}>عرض موقع الحي في خريطة المنصة 🗺️</Text>
-              <ArrowRight size={14} color="#059669" style={{ transform: [{ rotate: '180deg' }] }} />
-            </Pressable>
-          </View>
-
-          {/* Owner Broadcast Action Card */}
-          {isOwner && (
-            <View style={styles.ownerNoticeCard}>
-              <View style={styles.ownerNoticeTop}>
-                <Sparkles size={18} color="#059669" />
-                <Text style={styles.ownerNoticeTitle}>أنت صاحب هذا الطلب المنشور 📢</Text>
-              </View>
-              <Text style={styles.ownerNoticeSub}>
-                طلبك معروض أمام جميع جيران {locationLabel}. يمكنك نسخ رابط الطلب ومشاركته في قروب الحي بالواتساب لسرعة التجاوب.
-              </Text>
-              <View style={styles.ownerActionRow}>
-                <Pressable style={styles.ownerShareBtn} onPress={handleShare}>
-                  <Share2 size={15} color="#ffffff" />
-                  <Text style={styles.ownerShareBtnText}>مشاركة الطلب في قروب الحي</Text>
-                </Pressable>
-                <Pressable style={styles.ownerDeleteBtn} onPress={deleteRequest}>
-                  <Trash2 size={15} color="#dc2626" />
-                  <Text style={styles.ownerDeleteBtnText}>حذف</Text>
-                </Pressable>
-              </View>
-            </View>
-          )}
-
           {/* Helper Already Offered State */}
           {!isOwner && myOffer && (
-            <View style={styles.myOfferNoticeCard}>
+            <OasisSurface oasisSurface="card" style={styles.myOfferNoticeCard}>
               <View style={styles.myOfferHeader}>
-                <CheckCircle2 size={20} color="#059669" />
+                <CheckCircle2 size={20} color={OASIS.colors.primary} />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.myOfferTitle}>لقد أرسلت عرض فزعتك لهذا الطلب! 🤝</Text>
                   <Text style={styles.myOfferSub}>
@@ -943,22 +694,22 @@ export default function Request() {
               </View>
 
               {myOffer.status === 'accepted' && convId && (
-                <Pressable
+                <Pressable oasisKind="action"
                   style={styles.goToChatBtn}
                   onPress={() => router.push({ pathname: '/conversation', params: { id: convId } })}
                 >
-                  <MessageSquare size={16} color="#ffffff" />
+                  <MessageSquare size={16} color={OASIS.colors.surface} />
                   <Text style={styles.goToChatBtnText}>الانتقال إلى المحادثة الخاصة للاتفاق 💬</Text>
                 </Pressable>
               )}
-            </View>
+            </OasisSurface>
           )}
 
           {/* Offers Received Section */}
-          <View style={styles.card}>
+          <OasisSurface oasisSurface="card" style={styles.card}>
             <View style={styles.cardHeaderRow}>
               <View style={styles.cardHeaderIconBox}>
-                <MessageSquare size={18} color="#059669" />
+                <MessageSquare size={18} color={OASIS.colors.primary} />
               </View>
               <View style={styles.sectionTitleWithCount}>
                 <Text style={styles.cardTitle}>عروض المساعدة من الجيران</Text>
@@ -991,14 +742,14 @@ export default function Request() {
                   <View style={styles.offerHeader}>
                     <View style={styles.offerHelperInfo}>
                       <View style={styles.offerAvatarCircle}>
-                        <User size={14} color="#059669" />
+                        <User size={14} color={OASIS.colors.primary} />
                       </View>
                       <View>
                         <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}>
                           <Text style={styles.offerHelperName}>
                             {o.profiles?.display_name || `@${o.profiles?.username || 'فاعل خير'}`}
                           </Text>
-                          {o.profiles?.is_geoverified && <ShieldCheck size={12} color="#10b981" />}
+                          {o.profiles?.is_geoverified && <ShieldCheck size={12} color={OASIS.colors.primary} />}
                         </View>
                         {o.created_at && (
                           <Text style={styles.offerTimeText}>{relativeTime(o.created_at)}</Text>
@@ -1027,8 +778,8 @@ export default function Request() {
 
                   {/* Owner Accept Button */}
                   {isOwner && o.status === 'proposed' && request.status === 'open' && (
-                    <Pressable style={styles.acceptBtn} onPress={() => acceptOffer(o)}>
-                      <Check size={16} color="#fff" />
+                    <Pressable oasisKind="action" style={styles.acceptBtn} onPress={() => acceptOffer(o)}>
+                      <Check size={16} color={OASIS.colors.surface} />
                       <Text style={styles.acceptBtnText}>قبول العرض وبدء التنسيق بالخاص 💬</Text>
                     </Pressable>
                   )}
@@ -1038,24 +789,24 @@ export default function Request() {
                     <View style={styles.acceptedOfferWrap}>
                       {convId && (
                         <View style={styles.offerActionsRow}>
-                          <Pressable
+                          <Pressable oasisKind="action"
                             style={styles.openChatBtn}
                             onPress={() => router.push({ pathname: '/conversation', params: { id: convId } })}
                           >
-                            <MessageSquare size={15} color="#047857" />
+                            <MessageSquare size={15} color={OASIS.colors.primary} />
                             <Text style={styles.openChatBtnText}>فتح المحادثة الخاصة</Text>
                           </Pressable>
 
                           {isOwner && (
-                            <Pressable
+                            <Pressable oasisKind="chip"
                               style={[styles.shareLocationBtn, sharingLocation && { opacity: 0.6 }]}
                               onPress={shareExactLocation}
                               disabled={sharingLocation}
                             >
                               {sharingLocation ? (
-                                <ActivityIndicator size="small" color="#fff" />
+                                <ActivityIndicator size="small" color={OASIS.colors.surface} />
                               ) : (
-                                <MapPin size={15} color="#fff" />
+                                <MapPin size={15} color={OASIS.colors.surface} />
                               )}
                               <Text style={styles.shareLocationBtnText}>إرسال موقعي الدقيق</Text>
                             </Pressable>
@@ -1064,7 +815,7 @@ export default function Request() {
                       )}
 
                       {isOwner && request.status !== 'completed' && (
-                        <Pressable
+                        <Pressable oasisKind="action"
                           style={styles.completeWithCoffeeBtn}
                           onPress={() => openCompletionModal(o)}
                         >
@@ -1079,7 +830,7 @@ export default function Request() {
 
                   {o.status === 'completed' && (
                     <View style={styles.completedHelperBanner}>
-                      <Sparkles size={14} color="#059669" />
+                      <Sparkles size={14} color={OASIS.colors.primary} />
                       <Text style={styles.completedHelperBannerText}>
                         تمت الفزعة بنجاح بفضل هذا الجار 🤍☕ (+15 نقطة سمعة)
                       </Text>
@@ -1088,14 +839,14 @@ export default function Request() {
                 </View>
               ))
             )}
-          </View>
+          </OasisSurface>
 
           {/* Interactive Offer Submission Form (For Neighbors when Request is Open) */}
           {!isOwner && !myOffer && request.status === 'open' && me && (
-            <View style={styles.offerFormCard}>
+            <OasisSurface oasisSurface="card" style={styles.offerFormCard}>
               <View style={styles.cardHeaderRow}>
                 <View style={styles.cardHeaderIconBox}>
-                  <HeartHandshake size={18} color="#059669" />
+                  <HeartHandshake size={18} color={OASIS.colors.primary} />
                 </View>
                 <Text style={styles.offerFormTitle}>تقديم فزعة ومساعدة 🤝</Text>
               </View>
@@ -1107,7 +858,7 @@ export default function Request() {
               {/* Quick Reply Chips */}
               <View style={styles.quickChipsGrid}>
                 {QUICK_REPLY_TEMPLATES.map((tmpl, idx) => (
-                  <Pressable
+                  <Pressable oasisKind="chip"
                     key={idx}
                     style={styles.quickChip}
                     onPress={() => setMessage(tmpl)}
@@ -1126,21 +877,21 @@ export default function Request() {
                 multiline
               />
 
-              <Pressable
+              <Pressable oasisKind="action"
                 style={[styles.sendOfferBtn, submittingOffer && { opacity: 0.6 }]}
                 onPress={sendOffer}
                 disabled={submittingOffer}
               >
                 {submittingOffer ? (
-                  <ActivityIndicator size="small" color="#fff" />
+                  <ActivityIndicator size="small" color={OASIS.colors.surface} />
                 ) : (
                   <>
-                    <Send size={16} color="#fff" />
+                    <Send size={16} color={OASIS.colors.surface} />
                     <Text style={styles.sendOfferBtnText}>إرسال عرض المساعدة للجار</Text>
                   </>
                 )}
               </Pressable>
-            </View>
+            </OasisSurface>
           )}
 
           {/* Guest Sign-In Prompt */}
@@ -1149,25 +900,25 @@ export default function Request() {
               style={styles.guestOfferPrompt}
               onPress={() => requireAccount('سجّل الدخول أو أنشئ حساباً لتقديم المساعدة لأهل الحي.')}
             >
-              <HeartHandshake size={20} color="#047857" />
+              <HeartHandshake size={20} color={OASIS.colors.primary} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.guestOfferPromptTitle}>سجّل الدخول للمشاركة في فزعة جارك</Text>
                 <Text style={styles.guestOfferPromptSub}>انضم لأهل حيك وساهم في تعزيز روح الجيرة والتكافل</Text>
               </View>
-              <ChevronLeft size={16} color="#047857" />
+              <ChevronLeft size={16} color={OASIS.colors.primary} />
             </Pressable>
           )}
 
           {/* Safety & Neighbor Guidelines */}
-          <View style={styles.guidelinesCard}>
+          <OasisSurface oasisSurface="card" style={styles.guidelinesCard}>
             <View style={styles.guidelinesTitleRow}>
-              <ShieldCheck size={16} color="#059669" />
+              <ShieldCheck size={16} color={OASIS.colors.primary} />
               <Text style={styles.guidelinesTitle}>إرشادات الفزعة الآمنة في الحي</Text>
             </View>
             <Text style={styles.guidelinesItem}>• التنسيق المباشر واللقاء في أماكن معروفة ومدخل الحي.</Text>
             <Text style={styles.guidelinesItem}>• الحفاظ على الأمانات والأدوات المعارة وردّها بحالة ممتازة.</Text>
             <Text style={styles.guidelinesItem}>• التعامل بأخلاق الإسلام وحسن الجوار والإخلاص في المساعدة.</Text>
-          </View>
+          </OasisSurface>
         </View>
       </ScrollView>
 
@@ -1182,14 +933,14 @@ export default function Request() {
           style={styles.modalOverlay}
           onPress={() => setCompleteModalOpen(false)}
         >
-          <Pressable style={styles.appreciationModalCard} onPress={e => e.stopPropagation?.()}>
+          <Pressable oasisKind="card" style={styles.appreciationModalCard} onPress={e => e.stopPropagation?.()}>
             <View style={styles.appreciationModalHeader}>
-              <Pressable
+              <Pressable oasisKind="icon"
                 onPress={() => setCompleteModalOpen(false)}
                 style={styles.modalCloseBtn}
                 accessibilityRole="button"
               >
-                <X size={18} color="#64748b" />
+                <X size={18} color={OASIS.colors.muted} />
               </Pressable>
               <View style={styles.appreciationModalTitleCol}>
                 <View style={styles.appreciationModalIconCircle}>
@@ -1207,7 +958,7 @@ export default function Request() {
               {COMPLETION_TEMPLATES.map((tmpl, idx) => {
                 const isSelected = completeNote === tmpl;
                 return (
-                  <Pressable
+                  <Pressable oasisKind="chip"
                     key={idx}
                     style={[styles.appreciationChip, isSelected && styles.appreciationChipSelected]}
                     onPress={() => setCompleteNote(tmpl)}
@@ -1232,17 +983,17 @@ export default function Request() {
               multiline
             />
 
-            <Pressable
+            <Pressable oasisKind="action"
               style={[styles.appreciationSendBtn, completingRequest && { opacity: 0.7 }]}
               onPress={() => completeRequestWithCoffee()}
               disabled={completingRequest}
               accessibilityRole="button"
             >
               {completingRequest ? (
-                <ActivityIndicator size="small" color="#ffffff" />
+                <ActivityIndicator size="small" color={OASIS.colors.surface} />
               ) : (
                 <>
-                  <Coffee size={18} color="#ffffff" />
+                  <Coffee size={18} color={OASIS.colors.surface} />
                   <Text style={styles.appreciationSendBtnText}>
                     اعتماد الإتمام وإهداء القهوة والسمعة (+15 نقطة) ☕
                   </Text>
@@ -1264,7 +1015,7 @@ export default function Request() {
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.modalOverlay}
         >
-          <View style={styles.modalCard}>
+          <OasisSurface oasisSurface="sheet" style={styles.modalCard}>
             <View style={styles.modalHeader}>
               <View>
                 <Text style={styles.modalTitle}>تعديل طلب الفزعة</Text>
@@ -1272,12 +1023,12 @@ export default function Request() {
                   محاولة {editCount + 1} من {MAX_EDITS} (متبقي بعدها {Math.max(0, MAX_EDITS - (editCount + 1))})
                 </Text>
               </View>
-              <Pressable
+              <Pressable oasisKind="icon"
                 style={styles.modalCloseBtn}
                 onPress={() => setIsEditModalOpen(false)}
                 disabled={savingEdit}
               >
-                <X size={18} color="#64748b" />
+                <X size={18} color={OASIS.colors.muted} />
               </Pressable>
             </View>
 
@@ -1326,7 +1077,7 @@ export default function Request() {
             </View>
 
             <View style={styles.modalFooter}>
-              <Pressable
+              <Pressable oasisKind="action"
                 style={[styles.modalCancelBtn, savingEdit && { opacity: 0.6 }]}
                 onPress={() => setIsEditModalOpen(false)}
                 disabled={savingEdit}
@@ -1334,19 +1085,19 @@ export default function Request() {
                 <Text style={styles.modalCancelBtnText}>إلغاء</Text>
               </Pressable>
 
-              <Pressable
+              <Pressable oasisVariant="primary" oasisKind="action"
                 style={[styles.modalSubmitBtn, (!editTitle.trim() || !editDescription.trim() || savingEdit) && styles.modalSubmitBtnDisabled]}
                 onPress={handleSaveEdit}
                 disabled={!editTitle.trim() || !editDescription.trim() || savingEdit}
               >
                 {savingEdit ? (
-                  <ActivityIndicator size="small" color="#fff" />
+                  <ActivityIndicator size="small" color={OASIS.colors.surface} />
                 ) : (
                   <Text style={styles.modalSubmitBtnText}>حفظ التعديلات</Text>
                 )}
               </Pressable>
             </View>
-          </View>
+          </OasisSurface>
         </KeyboardAvoidingView>
       </Modal>
     </View>
@@ -1354,41 +1105,42 @@ export default function Request() {
 }
 
 const styles = StyleSheet.create({
+  srOnly: { position: 'absolute', width: 1, height: 1, opacity: 0 },
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f5f7f6',
   },
   scroll: {
-    flexGrow: 1,
+    flexGrow: 1, width: '100%', maxWidth: 760, alignSelf: 'center', paddingHorizontal: 16, paddingTop: 12, gap: 12,
   },
   center: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
-    backgroundColor: '#f8fafc',
+    padding: 16,
+    backgroundColor: '#f5f7f6',
     gap: 12,
   },
   loadingText: {
-    color: '#059669',
+    color: OASIS.colors.primary,
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   errorText: {
-    color: '#0f172a',
+    color: OASIS.colors.ink,
     fontSize: 16,
-    fontWeight: '900',
+    fontWeight: '700',
     marginBottom: 8,
   },
   backBtnAction: {
-    backgroundColor: '#059669',
+    backgroundColor: OASIS.colors.primary,
     paddingHorizontal: 22,
     paddingVertical: 12,
     borderRadius: 16,
   },
   backBtnActionText: {
-    color: '#fff',
-    fontWeight: '900',
+    color: OASIS.colors.surface,
+    fontWeight: '700',
     fontSize: 13,
   },
   headerRightActions: {
@@ -1399,24 +1151,24 @@ const styles = StyleSheet.create({
   headerActionBtn: {
     width: 36,
     height: 36,
-    borderRadius: 18,
+    borderRadius: 14,
     backgroundColor: '#f1f5f9',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
   },
   heroCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: OASIS.colors.surface,
     marginHorizontal: 16,
     marginTop: 12,
-    borderRadius: 22,
-    padding: 18,
+    borderRadius: 14,
+    padding: 15,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    shadowColor: '#0f172a',
+    borderColor: OASIS.colors.line,
+    shadowColor: OASIS.colors.ink,
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.04,
+    shadowOpacity: 0,
     shadowRadius: 8,
     elevation: 2,
     gap: 12,
@@ -1431,7 +1183,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#ecfdf5',
+    backgroundColor: OASIS.colors.soft,
     paddingHorizontal: 10,
     paddingVertical: 4.5,
     borderRadius: 10,
@@ -1442,12 +1194,12 @@ const styles = StyleSheet.create({
     width: 7,
     height: 7,
     borderRadius: 3.5,
-    backgroundColor: '#10b981',
+    backgroundColor: OASIS.colors.primary,
   },
   openBadgeText: {
-    color: '#047857',
+    color: OASIS.colors.primary,
     fontSize: 11.5,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   acceptedBadge: {
     flexDirection: 'row-reverse',
@@ -1463,13 +1215,13 @@ const styles = StyleSheet.create({
   acceptedBadgeText: {
     color: '#15803d',
     fontSize: 11.5,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   completedBadgeHero: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: '#ecfdf5',
+    backgroundColor: OASIS.colors.soft,
     paddingHorizontal: 10,
     paddingVertical: 4.5,
     borderRadius: 10,
@@ -1478,8 +1230,8 @@ const styles = StyleSheet.create({
   },
   completedBadgeHeroText: {
     fontSize: 11.5,
-    fontWeight: '900',
-    color: '#065f46',
+    fontWeight: '700',
+    color: OASIS.colors.deep,
   },
   typePill: {
     flexDirection: 'row-reverse',
@@ -1492,7 +1244,7 @@ const styles = StyleSheet.create({
   },
   typePillText: {
     fontSize: 11.5,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   urgentBadge: {
     flexDirection: 'row-reverse',
@@ -1506,14 +1258,14 @@ const styles = StyleSheet.create({
     borderColor: '#fca5a5',
   },
   urgentBadgeText: {
-    color: '#dc2626',
+    color: OASIS.colors.danger,
     fontSize: 11,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   heroTitle: {
-    color: '#0f172a',
+    color: OASIS.colors.ink,
     fontSize: 19,
-    fontWeight: '900',
+    fontWeight: '700',
     textAlign: 'right',
     lineHeight: 28,
   },
@@ -1527,23 +1279,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f5f7f6',
     paddingHorizontal: 9,
     paddingVertical: 4,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
   },
   metaChipText: {
     fontSize: 11.5,
     fontWeight: '700',
-    color: '#475569',
+    color: OASIS.colors.muted,
   },
   privacyNoteBox: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#f0fdf4',
+    backgroundColor: OASIS.colors.soft,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 10,
@@ -1559,14 +1311,14 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   bodyContainer: {
-    padding: 16,
+    padding: 0,
     gap: 12,
   },
   completedStatusCard: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     padding: 14,
-    borderRadius: 18,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: '#a7f3d0',
     gap: 12,
@@ -1574,13 +1326,13 @@ const styles = StyleSheet.create({
   completedStatusIconCircle: {
     width: 38,
     height: 38,
-    borderRadius: 19,
-    backgroundColor: '#fff',
+    borderRadius: 14,
+    backgroundColor: OASIS.colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#059669',
+    shadowColor: OASIS.colors.primary,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0,
     shadowRadius: 3,
     elevation: 2,
   },
@@ -1589,28 +1341,28 @@ const styles = StyleSheet.create({
   },
   completedStatusTitle: {
     fontSize: 13.5,
-    fontWeight: '900',
-    color: '#065f46',
+    fontWeight: '700',
+    color: OASIS.colors.deep,
     marginBottom: 2,
     textAlign: 'right',
   },
   completedStatusSub: {
     fontSize: 11.5,
     lineHeight: 17,
-    color: '#047857',
+    color: OASIS.colors.primary,
     textAlign: 'right',
   },
   requesterCard: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 18,
+    backgroundColor: OASIS.colors.surface,
+    borderRadius: 14,
     padding: 14,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
+    shadowOpacity: 0,
     shadowRadius: 6,
     elevation: 1,
     gap: 12,
@@ -1623,22 +1375,22 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 24,
     borderWidth: 1.5,
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
   },
   avatarPlaceholder: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#ecfdf5',
+    backgroundColor: OASIS.colors.soft,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
     borderColor: '#a7f3d0',
   },
   avatarLetter: {
-    color: '#065f46',
+    color: OASIS.colors.deep,
     fontSize: 20,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   verifiedBadgeCircle: {
     position: 'absolute',
@@ -1647,11 +1399,11 @@ const styles = StyleSheet.create({
     width: 17,
     height: 17,
     borderRadius: 8.5,
-    backgroundColor: '#10b981',
+    backgroundColor: OASIS.colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
-    borderColor: '#fff',
+    borderColor: OASIS.colors.surface,
   },
   requesterTextCol: {
     alignItems: 'flex-end',
@@ -1663,26 +1415,26 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   requesterName: {
-    color: '#0f172a',
+    color: OASIS.colors.ink,
     fontSize: 14.5,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   requesterBadgePill: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 3,
-    backgroundColor: '#ecfdf5',
+    backgroundColor: OASIS.colors.soft,
     paddingHorizontal: 6,
     paddingVertical: 1.5,
     borderRadius: 6,
   },
   requesterBadgePillText: {
-    fontSize: 9.5,
-    fontWeight: '800',
-    color: '#059669',
+    fontSize: 11,
+    fontWeight: '600',
+    color: OASIS.colors.primary,
   },
   requesterSub: {
-    color: '#64748b',
+    color: OASIS.colors.muted,
     fontSize: 12,
     marginTop: 3,
     fontWeight: '700',
@@ -1691,7 +1443,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 3,
-    backgroundColor: '#f0fdf4',
+    backgroundColor: OASIS.colors.soft,
     paddingHorizontal: 9,
     paddingVertical: 6,
     borderRadius: 10,
@@ -1700,18 +1452,18 @@ const styles = StyleSheet.create({
   },
   visitProfilePillText: {
     fontSize: 11.5,
-    fontWeight: '800',
-    color: '#059669',
+    fontWeight: '600',
+    color: OASIS.colors.primary,
   },
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 16,
+    backgroundColor: OASIS.colors.surface,
+    borderRadius: 14,
+    padding: 14,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
+    shadowOpacity: 0,
     shadowRadius: 6,
     elevation: 1,
   },
@@ -1725,18 +1477,18 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 10,
-    backgroundColor: '#ecfdf5',
+    backgroundColor: OASIS.colors.soft,
     alignItems: 'center',
     justifyContent: 'center',
   },
   cardTitle: {
-    color: '#0f172a',
+    color: OASIS.colors.ink,
     fontSize: 15,
-    fontWeight: '900',
+    fontWeight: '700',
     textAlign: 'right',
   },
   cardDesc: {
-    color: '#334155',
+    color: OASIS.colors.ink,
     fontSize: 14,
     lineHeight: 23,
     textAlign: 'right',
@@ -1746,17 +1498,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f5f7f6',
     padding: 10,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
     marginBottom: 12,
   },
   notesText: {
     flex: 1,
     fontSize: 12,
-    color: '#64748b',
+    color: OASIS.colors.muted,
     fontWeight: '600',
     textAlign: 'right',
   },
@@ -1778,7 +1530,7 @@ const styles = StyleSheet.create({
   budgetValue: {
     color: '#15803d',
     fontSize: 13.5,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   budgetSub: {
     color: '#166534',
@@ -1790,7 +1542,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: '#ecfdf5',
+    backgroundColor: OASIS.colors.soft,
     padding: 12,
     borderRadius: 14,
     borderWidth: 1,
@@ -1802,12 +1554,12 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   volunteerValue: {
-    color: '#065f46',
+    color: OASIS.colors.deep,
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   volunteerSub: {
-    color: '#047857',
+    color: OASIS.colors.primary,
     fontSize: 11,
     fontWeight: '600',
     marginTop: 2,
@@ -1816,29 +1568,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f5f7f6',
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
     marginTop: 4,
   },
   openMapBtnText: {
     fontSize: 12.5,
-    fontWeight: '800',
-    color: '#059669',
+    fontWeight: '600',
+    color: OASIS.colors.primary,
   },
   ownerNoticeCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 18,
-    padding: 16,
+    backgroundColor: OASIS.colors.surface,
+    borderRadius: 14,
+    padding: 14,
     borderWidth: 1.5,
     borderColor: '#a7f3d0',
     gap: 10,
-    shadowColor: '#059669',
+    shadowColor: OASIS.colors.primary,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0,
     shadowRadius: 5,
     elevation: 2,
   },
@@ -1849,13 +1601,13 @@ const styles = StyleSheet.create({
   },
   ownerNoticeTitle: {
     fontSize: 14,
-    fontWeight: '900',
-    color: '#065f46',
+    fontWeight: '700',
+    color: OASIS.colors.deep,
   },
   ownerNoticeSub: {
     fontSize: 12,
     lineHeight: 18,
-    color: '#475569',
+    color: OASIS.colors.muted,
     textAlign: 'right',
   },
   ownerActionRow: {
@@ -1869,14 +1621,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#059669',
+    backgroundColor: OASIS.colors.primary,
     paddingVertical: 10,
     borderRadius: 12,
   },
   ownerShareBtnText: {
     fontSize: 12.5,
-    fontWeight: '900',
-    color: '#ffffff',
+    fontWeight: '700',
+    color: OASIS.colors.surface,
   },
   ownerDeleteBtn: {
     flexDirection: 'row-reverse',
@@ -1892,19 +1644,19 @@ const styles = StyleSheet.create({
   },
   ownerDeleteBtnText: {
     fontSize: 12,
-    fontWeight: '900',
-    color: '#dc2626',
+    fontWeight: '700',
+    color: OASIS.colors.danger,
   },
   myOfferNoticeCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 18,
-    padding: 16,
+    backgroundColor: OASIS.colors.surface,
+    borderRadius: 14,
+    padding: 14,
     borderWidth: 1.5,
     borderColor: '#a7f3d0',
     gap: 10,
-    shadowColor: '#059669',
+    shadowColor: OASIS.colors.primary,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
+    shadowOpacity: 0,
     shadowRadius: 6,
     elevation: 2,
   },
@@ -1915,14 +1667,14 @@ const styles = StyleSheet.create({
   },
   myOfferTitle: {
     fontSize: 14,
-    fontWeight: '900',
-    color: '#065f46',
+    fontWeight: '700',
+    color: OASIS.colors.deep,
     textAlign: 'right',
     marginBottom: 4,
   },
   myOfferSub: {
     fontSize: 12.5,
-    color: '#334155',
+    color: OASIS.colors.ink,
     textAlign: 'right',
     lineHeight: 18,
   },
@@ -1935,7 +1687,7 @@ const styles = StyleSheet.create({
   myOfferStatusLabel: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#64748b',
+    color: OASIS.colors.muted,
   },
   myOfferStatusPill: {
     paddingHorizontal: 9,
@@ -1950,7 +1702,7 @@ const styles = StyleSheet.create({
   },
   myOfferStatusText: {
     fontSize: 11.5,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   myOfferStatusTextPending: {
     color: '#b45309',
@@ -1963,15 +1715,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#059669',
+    backgroundColor: OASIS.colors.primary,
     paddingVertical: 10,
     borderRadius: 12,
     marginTop: 4,
   },
   goToChatBtnText: {
     fontSize: 12.5,
-    fontWeight: '900',
-    color: '#ffffff',
+    fontWeight: '700',
+    color: OASIS.colors.surface,
   },
   sectionTitleWithCount: {
     flexDirection: 'row-reverse',
@@ -1979,10 +1731,10 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   countBadgePill: {
-    backgroundColor: '#ecfdf5',
-    color: '#047857',
+    backgroundColor: OASIS.colors.soft,
+    color: OASIS.colors.primary,
     fontSize: 11.5,
-    fontWeight: '900',
+    fontWeight: '700',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 10,
@@ -1991,14 +1743,14 @@ const styles = StyleSheet.create({
   },
   noOffersBox: {
     alignItems: 'center',
-    paddingVertical: 28,
+    paddingVertical: 16,
     gap: 8,
   },
   autoSuggestionNote: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#f0f9ff',
+    backgroundColor: OASIS.colors.infoSoft,
     borderWidth: 1,
     borderColor: '#bae6fd',
     borderRadius: 14,
@@ -2014,13 +1766,13 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   noOffersTitle: {
-    color: '#0f172a',
+    color: OASIS.colors.ink,
     fontSize: 14.5,
-    fontWeight: '900',
+    fontWeight: '700',
     marginTop: 4,
   },
   noOffersSub: {
-    color: '#64748b',
+    color: OASIS.colors.muted,
     fontSize: 12,
     fontWeight: '700',
     textAlign: 'center',
@@ -2046,16 +1798,16 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#ecfdf5',
+    backgroundColor: OASIS.colors.soft,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: '#a7f3d0',
   },
   offerHelperName: {
-    color: '#0f172a',
+    color: OASIS.colors.ink,
     fontSize: 13.5,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   offerTimeText: {
     color: '#94a3b8',
@@ -2073,29 +1825,29 @@ const styles = StyleSheet.create({
     backgroundColor: '#dcfce7',
   },
   offerStatusCompleted: {
-    backgroundColor: '#ecfdf5',
+    backgroundColor: OASIS.colors.soft,
   },
   offerStatusText: {
-    color: '#64748b',
+    color: OASIS.colors.muted,
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   offerStatusTextAccepted: {
     color: '#15803d',
   },
   offerStatusTextCompleted: {
-    color: '#047857',
+    color: OASIS.colors.primary,
   },
   offerBubble: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f5f7f6',
     borderRadius: 12,
     padding: 10,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
     marginBottom: 8,
   },
   offerMessage: {
-    color: '#334155',
+    color: OASIS.colors.ink,
     fontSize: 13,
     lineHeight: 20,
     textAlign: 'right',
@@ -2105,15 +1857,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#059669',
+    backgroundColor: OASIS.colors.primary,
     borderRadius: 12,
     paddingVertical: 10,
     marginTop: 4,
   },
   acceptBtnText: {
-    color: '#fff',
+    color: OASIS.colors.surface,
     fontSize: 12.5,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   acceptedOfferWrap: {
     gap: 8,
@@ -2129,15 +1881,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#ecfdf5',
+    backgroundColor: OASIS.colors.soft,
     borderRadius: 12,
     paddingVertical: 10,
     borderWidth: 1,
     borderColor: '#a7f3d0',
   },
   openChatBtnText: {
-    color: '#047857',
-    fontWeight: '900',
+    color: OASIS.colors.primary,
+    fontWeight: '700',
     fontSize: 12,
   },
   shareLocationBtn: {
@@ -2151,8 +1903,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   shareLocationBtnText: {
-    color: '#fff',
-    fontWeight: '900',
+    color: OASIS.colors.surface,
+    fontWeight: '700',
     fontSize: 12,
   },
   completeWithCoffeeBtn: {
@@ -2162,14 +1914,14 @@ const styles = StyleSheet.create({
     gap: 7,
     backgroundColor: '#fef3c7',
     borderWidth: 1.5,
-    borderColor: '#f59e0b',
+    borderColor: OASIS.colors.warning,
     borderRadius: 12,
     paddingVertical: 10,
     paddingHorizontal: 14,
   },
   completeWithCoffeeBtnText: {
     fontSize: 12.5,
-    fontWeight: '900',
+    fontWeight: '700',
     color: '#78350f',
   },
   completedHelperBanner: {
@@ -2177,7 +1929,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#ecfdf5',
+    backgroundColor: OASIS.colors.soft,
     borderWidth: 1,
     borderColor: '#a7f3d0',
     borderRadius: 12,
@@ -2186,30 +1938,30 @@ const styles = StyleSheet.create({
   },
   completedHelperBannerText: {
     fontSize: 12,
-    fontWeight: '800',
-    color: '#065f46',
+    fontWeight: '600',
+    color: OASIS.colors.deep,
   },
   offerFormCard: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 16,
+    backgroundColor: OASIS.colors.surface,
+    borderRadius: 14,
+    padding: 14,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
+    shadowOpacity: 0,
     shadowRadius: 6,
     elevation: 1,
     gap: 10,
   },
   offerFormTitle: {
-    color: '#0f172a',
+    color: OASIS.colors.ink,
     fontSize: 15,
-    fontWeight: '900',
+    fontWeight: '700',
     textAlign: 'right',
   },
   offerFormSub: {
-    color: '#64748b',
+    color: OASIS.colors.muted,
     fontSize: 12,
     textAlign: 'right',
     lineHeight: 17,
@@ -2220,77 +1972,77 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   quickChip: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f5f7f6',
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
   },
   quickChipText: {
     fontSize: 11.5,
     fontWeight: '700',
-    color: '#334155',
+    color: OASIS.colors.ink,
   },
   offerInput: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f5f7f6',
     borderRadius: 14,
     padding: 12,
     textAlign: 'right',
     fontSize: 13,
-    color: '#0f172a',
+    color: OASIS.colors.ink,
     borderWidth: 1.5,
-    borderColor: '#e2e8f0',
-    minHeight: 70,
+    borderColor: OASIS.colors.line,
+    minHeight: 44,
   },
   sendOfferBtn: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#059669',
+    backgroundColor: OASIS.colors.primary,
     borderRadius: 14,
     paddingVertical: 12,
-    shadowColor: '#059669',
+    shadowColor: OASIS.colors.primary,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0,
     shadowRadius: 4,
     elevation: 2,
   },
   sendOfferBtnText: {
-    color: '#fff',
+    color: OASIS.colors.surface,
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   guestOfferPrompt: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 12,
     padding: 14,
-    borderRadius: 18,
-    backgroundColor: '#ecfdf5',
+    borderRadius: 14,
+    backgroundColor: OASIS.colors.soft,
     borderWidth: 1,
     borderColor: '#a7f3d0',
   },
   guestOfferPromptTitle: {
-    color: '#047857',
+    color: OASIS.colors.primary,
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '700',
     textAlign: 'right',
     marginBottom: 2,
   },
   guestOfferPromptSub: {
-    color: '#065f46',
+    color: OASIS.colors.deep,
     fontSize: 11,
     fontWeight: '600',
     textAlign: 'right',
   },
   guidelinesCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: OASIS.colors.surface,
     borderRadius: 16,
     padding: 14,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
     gap: 6,
   },
   guidelinesTitleRow: {
@@ -2301,13 +2053,13 @@ const styles = StyleSheet.create({
   },
   guidelinesTitle: {
     fontSize: 12.5,
-    fontWeight: '900',
-    color: '#0f172a',
+    fontWeight: '700',
+    color: OASIS.colors.ink,
   },
   guidelinesItem: {
     fontSize: 11.5,
     lineHeight: 18,
-    color: '#64748b',
+    color: OASIS.colors.muted,
     textAlign: 'right',
     fontWeight: '600',
   },
@@ -2316,17 +2068,17 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(15, 23, 42, 0.65)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
+    padding: 14,
   },
   appreciationModalCard: {
     width: '100%',
     maxWidth: 440,
-    backgroundColor: '#fff',
-    borderRadius: 24,
-    padding: 20,
+    backgroundColor: OASIS.colors.surface,
+    borderRadius: 14,
+    padding: 14,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0,
     shadowRadius: 20,
     elevation: 8,
   },
@@ -2346,7 +2098,7 @@ const styles = StyleSheet.create({
   appreciationModalIconCircle: {
     width: 54,
     height: 54,
-    borderRadius: 27,
+    borderRadius: 14,
     backgroundColor: '#fef3c7',
     alignItems: 'center',
     justifyContent: 'center',
@@ -2356,22 +2108,22 @@ const styles = StyleSheet.create({
   },
   appreciationModalTitle: {
     fontSize: 17,
-    fontWeight: '900',
-    color: '#1e293b',
+    fontWeight: '700',
+    color: OASIS.colors.ink,
     textAlign: 'center',
     marginBottom: 4,
   },
   appreciationModalSub: {
     fontSize: 12,
     lineHeight: 18,
-    color: '#64748b',
+    color: OASIS.colors.muted,
     textAlign: 'center',
     paddingHorizontal: 8,
   },
   appreciationSectionLabel: {
     fontSize: 12,
-    fontWeight: '800',
-    color: '#334155',
+    fontWeight: '600',
+    color: OASIS.colors.ink,
     textAlign: 'right',
     marginBottom: 8,
     marginTop: 6,
@@ -2383,36 +2135,36 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   appreciationChip: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f5f7f6',
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 14,
   },
   appreciationChipSelected: {
     backgroundColor: '#fef3c7',
-    borderColor: '#f59e0b',
+    borderColor: OASIS.colors.warning,
   },
   appreciationChipText: {
     fontSize: 11.5,
     fontWeight: '700',
-    color: '#475569',
+    color: OASIS.colors.muted,
   },
   appreciationChipTextSelected: {
     color: '#92400e',
-    fontWeight: '900',
+    fontWeight: '700',
   },
   appreciationInput: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f5f7f6',
     borderWidth: 1.5,
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
     borderRadius: 16,
     padding: 12,
     textAlign: 'right',
     fontSize: 13,
-    color: '#0f172a',
-    minHeight: 70,
+    color: OASIS.colors.ink,
+    minHeight: 44,
     marginBottom: 14,
   },
   appreciationSendBtn: {
@@ -2425,21 +2177,21 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     shadowColor: '#b45309',
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0,
     shadowRadius: 5,
     elevation: 3,
   },
   appreciationSendBtnText: {
-    color: '#ffffff',
+    color: OASIS.colors.surface,
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   authorManageBox: {
-    backgroundColor: '#ffffff',
-    borderRadius: 18,
+    backgroundColor: OASIS.colors.surface,
+    borderRadius: 14,
     padding: 16,
     borderWidth: 1.5,
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
     gap: 12,
   },
   authorManageHeader: {
@@ -2452,12 +2204,12 @@ const styles = StyleSheet.create({
   },
   authorManageTitle: {
     fontSize: 14,
-    fontWeight: '900',
-    color: '#0f172a',
+    fontWeight: '700',
+    color: OASIS.colors.ink,
   },
   authorManageSub: {
     fontSize: 12,
-    color: '#64748b',
+    color: OASIS.colors.muted,
     marginTop: 2,
   },
   editLimitBadge: {
@@ -2467,22 +2219,22 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   editLimitBadgeActive: {
-    backgroundColor: '#ecfdf5',
+    backgroundColor: OASIS.colors.soft,
     borderColor: '#a7f3d0',
   },
   editLimitBadgeExpired: {
-    backgroundColor: '#fef2f2',
+    backgroundColor: OASIS.colors.dangerSoft,
     borderColor: '#fecaca',
   },
   editLimitBadgeText: {
     fontSize: 11,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   editLimitBadgeTextActive: {
-    color: '#047857',
+    color: OASIS.colors.primary,
   },
   editLimitBadgeTextExpired: {
-    color: '#b91c1c',
+    color: OASIS.colors.danger,
   },
   authorActionsRow: {
     flexDirection: 'row-reverse',
@@ -2495,7 +2247,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#ecfdf5',
+    backgroundColor: OASIS.colors.soft,
     paddingVertical: 10,
     borderRadius: 12,
     borderWidth: 1,
@@ -2503,12 +2255,12 @@ const styles = StyleSheet.create({
   },
   editActionBtnText: {
     fontSize: 13,
-    fontWeight: '800',
-    color: '#047857',
+    fontWeight: '600',
+    color: OASIS.colors.primary,
   },
   disabledActionBtn: {
     backgroundColor: '#f1f5f9',
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
   },
   disabledActionBtnText: {
     color: '#94a3b8',
@@ -2519,7 +2271,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#fef2f2',
+    backgroundColor: OASIS.colors.dangerSoft,
     paddingVertical: 10,
     borderRadius: 12,
     borderWidth: 1,
@@ -2527,14 +2279,14 @@ const styles = StyleSheet.create({
   },
   deleteActionBtnText: {
     fontSize: 13,
-    fontWeight: '800',
-    color: '#dc2626',
+    fontWeight: '600',
+    color: OASIS.colors.danger,
   },
   modalCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: OASIS.colors.surface,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    padding: 20,
+    padding: 14,
     gap: 16,
     maxHeight: '90%',
   },
@@ -2548,13 +2300,13 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 17,
-    fontWeight: '900',
-    color: '#0f172a',
+    fontWeight: '700',
+    color: OASIS.colors.ink,
     textAlign: 'right',
   },
   modalSubtitle: {
     fontSize: 12,
-    color: '#047857',
+    color: OASIS.colors.primary,
     fontWeight: '700',
     textAlign: 'right',
     marginTop: 2,
@@ -2564,19 +2316,19 @@ const styles = StyleSheet.create({
   },
   modalInputLabel: {
     fontSize: 12.5,
-    fontWeight: '800',
-    color: '#334155',
+    fontWeight: '600',
+    color: OASIS.colors.ink,
     textAlign: 'right',
   },
   modalInput: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f5f7f6',
     borderWidth: 1.5,
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 10,
     fontSize: 14,
-    color: '#0f172a',
+    color: OASIS.colors.ink,
     textAlign: 'right',
   },
   modalTextArea: {
@@ -2587,7 +2339,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#fffbeb',
+    backgroundColor: OASIS.colors.warningSoft,
     padding: 10,
     borderRadius: 12,
     borderWidth: 1,
@@ -2609,7 +2361,7 @@ const styles = StyleSheet.create({
   },
   modalSubmitBtn: {
     flex: 2,
-    backgroundColor: '#059669',
+    backgroundColor: OASIS.colors.primary,
     paddingVertical: 12,
     borderRadius: 14,
     alignItems: 'center',
@@ -2620,9 +2372,9 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   modalSubmitBtnText: {
-    color: '#ffffff',
+    color: OASIS.colors.surface,
     fontSize: 14,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   modalCancelBtn: {
     flex: 1,
@@ -2633,8 +2385,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   modalCancelBtnText: {
-    color: '#475569',
+    color: OASIS.colors.muted,
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '600',
   },
 });

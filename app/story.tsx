@@ -1,30 +1,25 @@
+import { OasisTextInput as TextInput, OasisPressable as Pressable } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
+import { headerTopInset } from '@/components/shared/AppHeader';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useEffect, useState, useRef } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  StyleSheet,
-  Pressable,
-  Platform,
-  Image,
-  Dimensions,
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Animated,
-  PanResponder,
-} from 'react-native';
+import { View, Text, StyleSheet, Platform, Image, Dimensions, ActivityIndicator, Alert, KeyboardAvoidingView, Animated, PanResponder } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
+import { isActiveStory } from '@/lib/storyActivity';
+import { getLocalSeenStoryIds, rememberSeenStories } from '@/lib/storySeen';
+import { BG_GRADIENTS } from '@/lib/storyGradients';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/lib/supabase';
+import { requireAccount } from '@/lib/authGate';
 import { LinearGradient } from 'expo-linear-gradient';
-import { X, Send, Eye, Heart, Trash2, ChevronLeft, ChevronRight, Flag, Ban } from 'lucide-react-native';
+import { X, Send, Eye, Heart, Trash2, ChevronLeft, ChevronRight, Flag, Ban, MoreVertical, UserRound } from 'lucide-react-native';
 
 const { width, height } = Dimensions.get('window');
 const STORY_DURATION = 7000; // 7 seconds per story
 
 export default function StoryViewer() {
-  const { id, resume } = useLocalSearchParams<{ id: string; resume?: string }>();
+  const headerInsets = useSafeAreaInsets();
+  const { id, resume, next } = useLocalSearchParams<{ id: string; resume?: string; next?: string }>();
   const [storiesList, setStoriesList] = useState<any[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [author, setAuthor] = useState<any>(null);
@@ -32,9 +27,30 @@ export default function StoryViewer() {
   const [replyText, setReplyText] = useState('');
   const [sending, setSending] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string>('');
+  const activeLikeStory = useRef<string | undefined>(undefined);
+  activeLikeStory.current = storiesList[currentIndex]?.id;
   const [liked, setLiked] = useState(false);
+  const [likeBusy, setLikeBusy] = useState(false);
+  const [likesReady, setLikesReady] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
+  useEffect(() => {
+    let active = true;
+    setLiked(false); setLikesReady(false); setLikeCount(0);
+    if (!currentStoryIdForLikes()) return;
+    const storyId = storiesList[currentIndex]?.id;
+    (async () => {
+      const [mine, count] = await Promise.all([
+        supabase.from('story_likes').select('story_id').eq('story_id', storyId).eq('user_id', currentUserId).maybeSingle(),
+        supabase.from('story_likes').select('story_id', { count: 'exact', head: true }).eq('story_id', storyId),
+      ]);
+      if (!active || mine.error || count.error) return;
+      setLiked(Boolean(mine.data)); setLikeCount(count.count || 0); setLikesReady(true);
+    })().catch(() => {});
+    return () => { active = false; };
+    function currentStoryIdForLikes() { return Boolean(storiesList[currentIndex]?.id && currentUserId); }
+  }, [storiesList[currentIndex]?.id, currentUserId]);
   const [showReplyBox, setShowReplyBox] = useState(false);
-  const [canReply, setCanReply] = useState(true);
+  const [canReply, setCanReply] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [pollVotes, setPollVotes] = useState<number[]>([0, 0]);
   const [myPollVote, setMyPollVote] = useState<number | null>(null);
@@ -215,6 +231,11 @@ export default function StoryViewer() {
       setCurrentUserId(u.user.id);
     } else {
       setCurrentUserId('');
+      setStoriesList([]);
+      setLoading(false);
+      requireAccount('اليوميات متاحة لأعضاء حيّنا فقط. سجّل الدخول أو أنشئ حساباً للمشاهدة.');
+      router.replace('/auth');
+      return;
     }
 
     // Fetch the target story first
@@ -247,7 +268,13 @@ export default function StoryViewer() {
       .or(`expires_at.gt.${nowIso},and(expires_at.is.null,created_at.gte.${yesterday})`)
       .order('created_at', { ascending: true });
 
-    const sequence = allAuthorStories && allAuthorStories.length > 0 ? allAuthorStories : [targetStory];
+    let sequence = !isActiveStory(targetStory) && targetStory.author_id === u.user.id ? [targetStory] : (allAuthorStories || []).filter(story => isActiveStory(story));
+    if (resume === '0') {
+      const seen = new Set(await getLocalSeenStoryIds(u.user.id));
+      // A fresh discovery queue skips previously viewed slides, while an explicit replay still works.
+      if (!seen.has(targetStory.id)) sequence = sequence.filter(story => !seen.has(story.id));
+    }
+    if (!sequence.length) { setStoriesList([]); setLoading(false); return; }
     setStoriesList(sequence);
 
     // Resume the last viewed story only when opening from the author story ring.
@@ -262,7 +289,7 @@ export default function StoryViewer() {
     setCurrentIndex(targetIdx >= 0 ? targetIdx : 0);
 
     // Per-story reply permissions are recalculated when the active story changes.
-    setCanReply(Boolean(u?.user) && targetStory.allow_replies !== false);
+    setCanReply(false);
 
     setLoading(false);
   }
@@ -276,15 +303,16 @@ export default function StoryViewer() {
   useEffect(() => {
     let cancelled = false;
     async function checkReplyPermission() {
+      setCanReply(false);
       if (!currentStory?.id || !currentUserId || currentStory.author_id === currentUserId || currentStory.allow_replies === false) {
         setCanReply(false);
         return;
       }
-      if (author?.allow_story_replies === 'nobody') {
+      if (author?.allow_story_replies === 'nobody' || author?.allow_dms === 'nobody') {
         setCanReply(false);
         return;
       }
-      if (author?.allow_story_replies === 'followers') {
+      if (author?.allow_story_replies === 'followers' || author?.allow_dms === 'followers') {
         const { data: followRecord, error } = await supabase
           .from('follows')
           .select('id')
@@ -298,9 +326,17 @@ export default function StoryViewer() {
     }
     void checkReplyPermission();
     return () => { cancelled = true; };
-  }, [currentStory?.id, currentStory?.allow_replies, currentUserId, author?.allow_story_replies]);
+  }, [currentStory?.id, currentStory?.allow_replies, currentUserId, author?.allow_story_replies, author?.allow_dms]);
 
   // 2. Animate Progress Bar and Auto-Advance
+  useEffect(() => {
+    if (loading || !currentUserId || !currentStory?.id) return;
+    rememberSeenStories(currentUserId, [currentStory.id]);
+    if (currentStory.author_id !== currentUserId) {
+      void supabase.rpc('record_story_view', { p_story_id: currentStory.id }).then(() => {}, () => {});
+    }
+  }, [loading, currentUserId, currentStory?.id]);
+
   useEffect(() => {
     if (!currentStory || isPaused || showReplyBox) return;
 
@@ -318,11 +354,6 @@ export default function StoryViewer() {
         handleNextStory();
       }
     });
-
-    // Record view & increment view count for current story
-    if (currentUserId && currentStory?.id) {
-      supabase.rpc('record_story_view', { p_story_id: currentStory.id }).then(() => {});
-    }
 
     return () => animation.stop();
   }, [currentIndex, isPaused, showReplyBox, storiesList.length]);
@@ -348,7 +379,9 @@ export default function StoryViewer() {
     if (currentIndex < storiesList.length - 1) {
       setCurrentIndex(prev => prev + 1);
     } else {
-      router.back();
+      const queue = typeof next === 'string' ? next.split(',').filter(Boolean) : [];
+      if (queue.length) router.replace({ pathname: '/story', params: { id: queue[0], resume: '0', next: queue.slice(1).join(',') } });
+      else router.back();
     }
   }
 
@@ -421,7 +454,8 @@ export default function StoryViewer() {
         text: 'حذف',
         style: 'destructive',
         onPress: async () => {
-          await supabase.from('stories').delete().eq('id', currentStory.id);
+          const deleted = await supabase.from('stories').delete().eq('id', currentStory.id).eq('author_id', currentUserId).select('id').single();
+          if (deleted.error || !deleted.data) { Alert.alert('تعذر الحذف', 'لم يتم حذف اليومية. حاول مجددًا.'); setIsPaused(false); return; }
           const remaining = storiesList.filter(s => s.id !== currentStory.id);
           if (remaining.length === 0) {
             router.back();
@@ -454,88 +488,28 @@ export default function StoryViewer() {
     const msgText = replyText.trim();
 
     try {
-      // 1. Try story_replies trigger
-      const { error: replyErr } = await supabase.from('story_replies').insert({
-        story_id: currentStory.id,
-        sender_id: currentUserId,
-        body: msgText,
-      });
-
-      if (!replyErr) {
-        setSending(false);
-        setReplyText('');
-        setShowReplyBox(false);
-        Alert.alert('تم! ✅', 'وصل ردك لصاحب القصة في الرسائل الخاصة', [
-          { text: 'فتح الدردشة', onPress: () => router.replace('/messages') },
-          { text: 'لاحقاً' },
-        ]);
-        return;
-      }
-
-      // 2. Manual conversation fallback
-      const { data: myConvs } = await supabase
-        .from('conversation_members')
-        .select('conversation_id')
-        .eq('user_id', currentUserId);
-
-      let convId: string | null = null;
-      if (myConvs && myConvs.length > 0) {
-        const convIds = myConvs.map((c: any) => c.conversation_id);
-        const { data: otherMember } = await supabase
-          .from('conversation_members')
-          .select('conversation_id')
-          .eq('user_id', currentStory.author_id)
-          .in('conversation_id', convIds)
-          .limit(1)
-          .maybeSingle();
-        if (otherMember) convId = otherMember.conversation_id;
-      }
-
-      if (!convId) {
-        const { data: newConv } = await supabase.from('conversations').insert({}).select().single();
-        convId = newConv?.id;
-        if (convId) {
-          await supabase.from('conversation_members').insert([
-            { conversation_id: convId, user_id: currentUserId },
-            { conversation_id: convId, user_id: currentStory.author_id },
-          ]);
-        }
-      }
-
-      if (convId) {
-        await supabase.from('messages').insert({
-          conversation_id: convId,
-          sender_id: currentUserId,
-          body: `↩️ رد على قصتك: ${msgText}`,
-          read_by: [currentUserId],
-        });
-
-        setSending(false);
-        setReplyText('');
-        setShowReplyBox(false);
-        Alert.alert('تم! ✅', 'وصل ردك في الرسائل الخاصة', [
-          { text: 'فتح الدردشة', onPress: () => router.replace('/messages') },
-          { text: 'لاحقاً' },
-        ]);
-      } else {
-        setSending(false);
-        Alert.alert('خطأ', 'لم نتمكن من إرسال ردك.');
-      }
+      const { error } = await supabase.from('story_replies').insert({ story_id: currentStory.id, sender_id: currentUserId, body: msgText });
+      if (error) throw error;
+      setReplyText(''); setShowReplyBox(false); setSending(false);
+      Alert.alert('تم إرسال الرد', 'يمكنك متابعة المحادثة في الرسائل الخاصة.', [{ text: 'فتح الرسائل', onPress: () => router.replace('/messages') }, { text: 'لاحقًا' }]);
     } catch (e: any) {
       setSending(false);
       Alert.alert('خطأ', e.message);
     }
   }
 
-  function handleLike() {
-    if (!currentUserId) {
-      Alert.alert('تسجيل الدخول', 'يرجى تسجيل الدخول للتفاعل والإعجاب بالقصة', [
-        { text: 'تسجيل الدخول', onPress: () => router.push('/auth') },
-        { text: 'إلغاء', style: 'cancel' },
-      ]);
-      return;
-    }
-    setLiked(!liked);
+  async function handleLike() {
+    if (!currentUserId || !currentStory || likeBusy || !likesReady) return;
+    const storyId = currentStory.id;
+    setLikeBusy(true);
+    try {
+      const result = liked
+        ? await supabase.from('story_likes').delete().eq('story_id', storyId).eq('user_id', currentUserId)
+        : await supabase.from('story_likes').upsert({ story_id: storyId, user_id: currentUserId }, { onConflict: 'story_id,user_id', ignoreDuplicates: true });
+      if (result.error) throw result.error;
+      if (activeLikeStory.current === storyId) { setLiked(!liked); setLikeCount(value => Math.max(0, value + (liked ? -1 : 1))); }
+    } catch { Alert.alert('تعذر حفظ الإعجاب', 'تحقق من الاتصال وحاول مجددًا.'); }
+    finally { setLikeBusy(false); }
   }
 
   function handleOpenReply() {
@@ -552,7 +526,7 @@ export default function StoryViewer() {
   if (loading) {
     return (
       <View style={styles.loadingScreen}>
-        <ActivityIndicator size="large" color="#059669" />
+        <ActivityIndicator size="large" color={OASIS.colors.primary} />
       </View>
     );
   }
@@ -561,7 +535,7 @@ export default function StoryViewer() {
     return (
       <View style={styles.loadingScreen}>
         <Text style={styles.notFoundText}>القصة غير موجودة أو انتهت مدتها ⏳</Text>
-        <Pressable style={styles.backBtn} onPress={() => router.back()}>
+        <Pressable oasisKind="action" style={styles.backBtn} onPress={() => router.back()}>
           <Text style={styles.backBtnText}>العودة</Text>
         </Pressable>
       </View>
@@ -571,9 +545,12 @@ export default function StoryViewer() {
   const isOwn = currentUserId === currentStory.author_id;
   const timeLeft = Math.max(0, Math.floor((new Date(currentStory.expires_at).getTime() - Date.now()) / (1000 * 60 * 60)));
 
-  const gradColors = currentStory.bg_color
-    ? [currentStory.bg_color, shiftColor(currentStory.bg_color)] as [string, string]
-    : ['#065f46', '#059669'] as [string, string];
+  const matchingGradient = BG_GRADIENTS.find((gradient) => gradient.colors[0].toLowerCase() === String(currentStory.bg_color || '').toLowerCase());
+  const gradColors = matchingGradient
+    ? matchingGradient.colors as [string, string]
+    : currentStory.bg_color
+      ? [currentStory.bg_color, shiftColor(currentStory.bg_color)] as [string, string]
+      : [OASIS.colors.deep, OASIS.colors.primary] as [string, string];
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -600,7 +577,7 @@ export default function StoryViewer() {
           {/* ======================================================== */}
           {/* SEGMENTED PROGRESS BARS                                  */}
           {/* ======================================================== */}
-          {uiVisible && <View style={styles.progressRow}>
+          {uiVisible && <View style={[styles.progressRow, { marginTop: headerTopInset(headerInsets.top) + 4 }]}>
             {storiesList.map((st, idx) => {
               let fillWidth: any = '0%';
               if (idx < currentIndex) {
@@ -623,56 +600,36 @@ export default function StoryViewer() {
           {/* ======================================================== */}
           {/* TOP HEADER                                               */}
           {/* ======================================================== */}
-          {uiVisible && <View style={styles.header}>
-            <View style={styles.headerRightActions}>
-              <Pressable onPress={() => router.back()} style={styles.iconBtn}>
-                <X size={22} color="#fff" />
-              </Pressable>
-
-              {isOwn && (
-                <Pressable onPress={confirmDeleteStory} style={[styles.iconBtn, { backgroundColor: 'rgba(239,68,68,0.3)' }]}>
-                  <Trash2 size={18} color="#ef4444" />
-                </Pressable>
-              )}
-              {!isOwn && currentUserId && (
-                <Pressable onPress={openStorySafetyMenu} style={[styles.iconBtn, { backgroundColor: 'rgba(15,23,42,0.32)' }]} accessibilityRole="button" accessibilityLabel="الإبلاغ أو حظر الحساب">
-                  <Flag size={18} color="#fff" />
-                </Pressable>
-              )}
-            </View>
-
-            {/* Author info & Story Counter */}
-            <View style={styles.authorRow}>
-              <View style={styles.authorInfo}>
-                <View style={styles.authorNameRow}>
-                  <Text style={styles.authorName}>{author?.display_name || author?.username || 'جار'}</Text>
-                  {storiesList.length > 1 && (
-                    <Text style={styles.counterBadge}>
-                      {currentIndex + 1} / {storiesList.length}
-                    </Text>
-                  )}
+          {uiVisible && (
+            <View style={styles.storyOverlayHeader}>
+              <View style={styles.storyOverlayIdentity}>
+                <View style={styles.storyOverlayAvatar}>
+                  {!author?.hide_name && author?.avatar_url
+                    ? <Image source={{ uri: author.avatar_url }} style={styles.storyOverlayAvatarImage} />
+                    : <UserRound size={19} color={OASIS.colors.surface} />}
                 </View>
-                <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 5 }}>
-                  {(author?.district || author?.city) && (
-                    <Text style={styles.authorDistrictText} numberOfLines={1}>
-                      {[author.district, author.city].filter(Boolean).join(' · ')}
-                    </Text>
-                  )}
-                  <Text style={styles.storyTime}>· تنتهي بعد {timeLeft}س</Text>
+                <View style={styles.storyOverlayNameBox}>
+                  <Text numberOfLines={1} style={styles.storyOverlayName}>{author?.hide_name ? 'مجهول' : (author?.display_name || author?.username || 'جار')}</Text>
+                  {author?.hide_name && Boolean(author?.username) && <Text style={styles.storyOverlayMeta} numberOfLines={1}>@{String(author.username).replace(/^@/, '')}</Text>}
+                  <Text style={styles.storyOverlayMeta}>{currentIndex + 1} / {storiesList.length}</Text>
                 </View>
               </View>
-
-              <View style={styles.authorAvatar}>
-                {author?.avatar_url ? (
-                  <Image source={{ uri: author.avatar_url }} style={styles.avatarImg} />
-                ) : (
-                  <View style={styles.avatarFallback}>
-                    <Text style={styles.avatarLetter}>{author?.display_name?.[0] || 'ج'}</Text>
-                  </View>
-                )}
+              <View style={styles.storyOverlayActions}>
+                {isOwn ? (
+                  <Pressable accessibilityRole="button" accessibilityLabel="حذف اليومية" onPress={confirmDeleteStory} style={styles.storyOverlayIcon}>
+                    <Trash2 size={21} color={OASIS.colors.surface} />
+                  </Pressable>
+                ) : currentUserId ? (
+                  <Pressable accessibilityRole="button" accessibilityLabel="خيارات اليومية" onPress={openStorySafetyMenu} style={styles.storyOverlayIcon}>
+                    <MoreVertical size={22} color={OASIS.colors.surface} />
+                  </Pressable>
+                ) : null}
+                <Pressable accessibilityRole="button" accessibilityLabel="إغلاق اليومية" onPress={() => router.back()} style={styles.storyOverlayIcon}>
+                  <X size={24} color={OASIS.colors.surface} />
+                </Pressable>
               </View>
             </View>
-          </View>}
+          )}
 
           {/* ======================================================== */}
           {/* INTERACTIVE TAP ZONES (Left / Right Navigation)          */}
@@ -702,7 +659,7 @@ export default function StoryViewer() {
             <View style={styles.storyContent} pointerEvents="box-none">
               {currentStory.type === 'text' ? (
                 <Text style={[styles.storyText, {
-                  color: currentStory.text_color || '#FFFFFF',
+                  color: currentStory.text_color || OASIS.colors.surface,
                   fontSize: currentStory.font_size || 34,
                   fontFamily: currentStory.font_family === 'serif' ? 'serif' : currentStory.font_family === 'monospace' ? 'monospace' : 'System',
                   fontWeight: currentStory.font_family === 'normal' ? '600' : '900',
@@ -718,7 +675,7 @@ export default function StoryViewer() {
                   {currentStory.content ? (
                     <View style={styles.captionContainer}>
                       <Text style={[styles.imageCaption, {
-                        color: currentStory.text_color || '#FFFFFF',
+                        color: currentStory.text_color || OASIS.colors.surface,
                         fontSize: currentStory.font_size || 20,
                         fontFamily: currentStory.font_family === 'serif' ? 'serif' : currentStory.font_family === 'monospace' ? 'monospace' : 'System',
                         fontWeight: currentStory.font_family === 'normal' ? '600' : '900',
@@ -776,11 +733,11 @@ export default function StoryViewer() {
                 <Text style={styles.interactiveHint}>وصلت إجابتك لصاحب القصة ✓</Text>
               ) : (
                 <View style={styles.questionAnswerRow}>
-                  <Pressable style={styles.questionSendButton} onPress={submitQuestionAnswer} disabled={interactiveSending || !questionAnswer.trim()}>
-                    {interactiveSending ? <ActivityIndicator size="small" color="#fff" /> : <Send size={16} color="#fff" />}
+                  <Pressable oasisKind="icon" style={styles.questionSendButton} onPress={submitQuestionAnswer} disabled={interactiveSending || !questionAnswer.trim()}>
+                    {interactiveSending ? <ActivityIndicator size="small" color={OASIS.colors.surface} /> : <Send size={16} color={OASIS.colors.surface} />}
                   </Pressable>
                   <TextInput value={questionAnswer} onChangeText={setQuestionAnswer} style={styles.questionAnswerInput}
-                    placeholder="اكتب إجابتك..." placeholderTextColor="#64748b" maxLength={1000} />
+                    placeholder="اكتب إجابتك..." placeholderTextColor={OASIS.colors.muted} maxLength={1000} />
                 </View>
               )}
             </View>
@@ -791,9 +748,9 @@ export default function StoryViewer() {
           {/* ======================================================== */}
           {(uiVisible || showReplyBox || isPaused) && (isOwn ? (
             <View style={styles.ownerStats}>
-              <Pressable style={styles.statBadge} onPress={showStoryViewers} accessibilityRole="button" accessibilityLabel="عرض قائمة مشاهدي القصة">
-                <Eye size={16} color="#fff" />
-                <Text style={styles.statBadgeText}>{currentStory.view_count || 0} مشاهدة · عرض القائمة</Text>
+              <Pressable style={styles.statBadge} onPress={showStoryViewers} accessibilityRole="button" accessibilityLabel="عرض مشاهدي اليومية">
+                <Eye size={16} color={OASIS.colors.surface} />
+                <Text style={styles.statBadgeText}>{currentStory.view_count || 0} مشاهدة · {likesReady ? likeCount : '—'} إعجاب</Text>
               </Pressable>
             </View>
           ) : (
@@ -801,12 +758,13 @@ export default function StoryViewer() {
               {canReply ? (
                 showReplyBox ? (
                   <View style={styles.replyBox}>
-                    <Pressable style={styles.sendBtn} onPress={sendReply} disabled={sending}>
-                      {sending ? <ActivityIndicator size="small" color="#fff" /> : <Send size={18} color="#fff" />}
+                    <Pressable oasisVariant="primary" oasisKind="action" style={styles.sendBtn} onPress={sendReply} disabled={sending}>
+                      {sending ? <ActivityIndicator size="small" color={OASIS.colors.surface} /> : <Send size={18} color={OASIS.colors.surface} />}
                     </Pressable>
                     <TextInput
                       style={styles.replyInput}
                       value={replyText}
+                      maxLength={2000}
                       onChangeText={setReplyText}
                       placeholder="ردك يصل مباشرة للرسائل..."
                       placeholderTextColor="rgba(255,255,255,0.5)"
@@ -816,8 +774,8 @@ export default function StoryViewer() {
                   </View>
                 ) : (
                   <View style={styles.replyActions}>
-                    <Pressable style={styles.likeBtn} onPress={handleLike}>
-                      <Heart size={26} color={liked ? '#f43f5e' : '#fff'} fill={liked ? '#f43f5e' : 'transparent'} />
+                    <Pressable oasisKind="icon" style={[styles.likeBtn, !likesReady && { opacity: 0.4 }]} onPress={handleLike} disabled={likeBusy || !likesReady} accessibilityRole="button" accessibilityLabel={!likesReady ? 'الإعجابات غير متاحة مؤقتًا' : liked ? 'إلغاء الإعجاب' : 'إعجاب باليومية'}>
+                      <Heart size={26} color={liked ? '#f43f5e' : OASIS.colors.surface} fill={liked ? '#f43f5e' : 'transparent'} />
                     </Pressable>
                     <Pressable style={styles.replyTrigger} onPress={handleOpenReply}>
                       <Text style={styles.replyTriggerText}>رد على القصة...</Text>
@@ -826,8 +784,8 @@ export default function StoryViewer() {
                 )
               ) : (
                 <View style={styles.disabledReplyBar}>
-                  <Pressable style={styles.likeBtn} onPress={handleLike}>
-                    <Heart size={26} color={liked ? '#f43f5e' : '#fff'} fill={liked ? '#f43f5e' : 'transparent'} />
+                  <Pressable oasisKind="icon" style={[styles.likeBtn, !likesReady && { opacity: 0.4 }]} onPress={handleLike} disabled={likeBusy || !likesReady} accessibilityRole="button" accessibilityLabel={!likesReady ? 'الإعجابات غير متاحة مؤقتًا' : liked ? 'إلغاء الإعجاب' : 'إعجاب باليومية'}>
+                    <Heart size={26} color={liked ? '#f43f5e' : OASIS.colors.surface} fill={liked ? '#f43f5e' : 'transparent'} />
                   </Pressable>
                   <View style={styles.disabledReplyNotice}>
                     <Text style={styles.disabledReplyNoticeText}>
@@ -852,7 +810,7 @@ function shiftColor(hex: string): string {
     const b = Math.max(0, (num & 0xff) - 40);
     return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
   } catch {
-    return '#065f46';
+    return OASIS.colors.deep;
   }
 }
 
@@ -866,26 +824,26 @@ const styles = StyleSheet.create({
     gap: 8,
     zIndex: 30,
   },
-  interactiveQuestion: { color: '#0f172a', fontSize: 14, fontWeight: '900', textAlign: 'center' },
-  interactiveOption: { padding: 9, borderRadius: 10, borderWidth: 1, borderColor: '#cbd5e1', backgroundColor: '#f8fafc', gap: 5 },
-  interactiveOptionSelected: { borderColor: '#059669', backgroundColor: '#ecfdf5' },
+  interactiveQuestion: { color: OASIS.colors.ink, fontSize: 14, fontWeight: '700', textAlign: 'center' },
+  interactiveOption: { padding: 9, borderRadius: 10, borderWidth: 1, borderColor: '#cbd5e1', backgroundColor: OASIS.colors.background, gap: 5 },
+  interactiveOptionSelected: { borderColor: OASIS.colors.primary, backgroundColor: OASIS.colors.soft },
   interactiveOptionHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' },
-  interactiveOptionText: { color: '#0f172a', fontSize: 12, fontWeight: '800' },
-  interactiveOptionCount: { color: '#475569', fontSize: 11, fontWeight: '700' },
-  interactiveVoteTrack: { height: 4, borderRadius: 4, backgroundColor: '#e2e8f0', overflow: 'hidden' },
-  interactiveVoteFill: { height: '100%', backgroundColor: '#059669' },
-  interactiveHint: { color: '#64748b', fontSize: 10, textAlign: 'center' },
+  interactiveOptionText: { color: OASIS.colors.ink, fontSize: 12, fontWeight: '600' },
+  interactiveOptionCount: { color: OASIS.colors.muted, fontSize: 11, fontWeight: '700' },
+  interactiveVoteTrack: { height: 4, borderRadius: 4, backgroundColor: OASIS.colors.line, overflow: 'hidden' },
+  interactiveVoteFill: { height: '100%', backgroundColor: OASIS.colors.primary },
+  interactiveHint: { color: OASIS.colors.muted, fontSize: 11, textAlign: 'center' },
   questionResponsesList: { maxHeight: 130, gap: 6 },
-  questionResponseItem: { backgroundColor: '#ecfdf5', borderRadius: 10, padding: 9 },
-  questionResponseText: { color: '#064e3b', fontSize: 12, textAlign: 'right', fontWeight: '700' },
+  questionResponseItem: { backgroundColor: OASIS.colors.soft, borderRadius: 10, padding: 9 },
+  questionResponseText: { color: OASIS.colors.deep, fontSize: 12, textAlign: 'right', fontWeight: '700' },
   questionAnswerRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
-  questionAnswerInput: { flex: 1, minHeight: 40, backgroundColor: '#f1f5f9', borderRadius: 10, paddingHorizontal: 12, color: '#0f172a', textAlign: 'right' },
-  questionSendButton: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#059669', alignItems: 'center', justifyContent: 'center' },
+  questionAnswerInput: { flex: 1, minHeight: 40, backgroundColor: '#f1f5f9', borderRadius: 10, paddingHorizontal: 12, color: OASIS.colors.ink, textAlign: 'right' },
+  questionSendButton: { width: 40, height: 40, borderRadius: 12, backgroundColor: OASIS.colors.primary, alignItems: 'center', justifyContent: 'center' },
   container: { flex: 1, backgroundColor: '#000' },
-  loadingScreen: { flex: 1, backgroundColor: '#0f172a', alignItems: 'center', justifyContent: 'center' },
-  notFoundText: { color: '#fff', fontSize: 17, fontWeight: '700', marginBottom: 20, textAlign: 'center' },
-  backBtn: { backgroundColor: '#059669', paddingHorizontal: 28, paddingVertical: 12, borderRadius: 14 },
-  backBtnText: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  loadingScreen: { flex: 1, backgroundColor: OASIS.colors.ink, alignItems: 'center', justifyContent: 'center' },
+  notFoundText: { color: OASIS.colors.surface, fontSize: 17, fontWeight: '700', marginBottom: 14, textAlign: 'center' },
+  backBtn: { backgroundColor: OASIS.colors.primary, paddingHorizontal: 28, paddingVertical: 12, borderRadius: 14 },
+  backBtnText: { color: OASIS.colors.surface, fontWeight: '600', fontSize: 15 },
   bgImage: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%', backgroundColor: '#080808' },
   gradient: {
     flex: 1,
@@ -907,9 +865,18 @@ const styles = StyleSheet.create({
   },
   progressSegmentFill: {
     height: '100%',
-    backgroundColor: '#fff',
+    backgroundColor: OASIS.colors.surface,
     borderRadius: 2,
   },
+  storyOverlayHeader: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingTop: 9, paddingBottom: 7, zIndex: 30, backgroundColor: 'transparent' },
+  storyOverlayIdentity: { flexDirection: 'row-reverse', alignItems: 'center', gap: 9, flex: 1, minWidth: 0 },
+  storyOverlayAvatar: { width: 36, height: 36, borderRadius: 18, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.9)', backgroundColor: 'rgba(0,0,0,0.16)', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  storyOverlayAvatarImage: { width: '100%', height: '100%' },
+  storyOverlayNameBox: { flex: 1, alignItems: 'flex-end' },
+  storyOverlayName: { fontSize: 14, color: OASIS.colors.surface, fontWeight: '600', textAlign: 'right' },
+  storyOverlayMeta: { fontSize: 11, color: 'rgba(255,255,255,0.8)', textAlign: 'right', marginTop: 2 },
+  storyOverlayActions: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5 },
+  storyOverlayIcon: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
   header: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
@@ -926,7 +893,7 @@ const styles = StyleSheet.create({
   iconBtn: {
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: 14,
     backgroundColor: 'rgba(0,0,0,0.28)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -937,7 +904,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   authorAvatar: {},
-  avatarImg: { width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: '#fff' },
+  avatarImg: { width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: OASIS.colors.surface },
   avatarFallback: {
     width: 44,
     height: 44,
@@ -946,20 +913,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: '#fff',
+    borderColor: OASIS.colors.surface,
   },
-  avatarLetter: { color: '#fff', fontSize: 18, fontWeight: '900' },
+  avatarLetter: { color: OASIS.colors.surface, fontSize: 18, fontWeight: '700' },
   authorInfo: { alignItems: 'flex-end' },
   authorNameRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 6,
   },
-  authorName: { color: '#fff', fontSize: 15, fontWeight: '900' },
+  authorName: { color: OASIS.colors.surface, fontSize: 15, fontWeight: '700' },
   counterBadge: {
-    color: '#10b981',
+    color: OASIS.colors.primary,
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '600',
     backgroundColor: 'rgba(0,0,0,0.4)',
     paddingHorizontal: 6,
     paddingVertical: 2,
@@ -967,8 +934,8 @@ const styles = StyleSheet.create({
   },
   authorDistrictText: {
     color: '#a7f3d0',
-    fontSize: 10.5,
-    fontWeight: '800',
+    fontSize: 11,
+    fontWeight: '600',
   },
   storyTime: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '600', marginTop: 1 },
   tapZonesContainer: {
@@ -1001,11 +968,11 @@ const styles = StyleSheet.create({
     zIndex: 5,
   },
   storyText: {
-    color: '#fff',
-    fontSize: 28,
-    fontWeight: '900',
+    color: OASIS.colors.surface,
+    fontSize: 22,
+    fontWeight: '700',
     textAlign: 'center',
-    lineHeight: 42,
+    lineHeight: 33,
     textShadowColor: 'rgba(0,0,0,0.5)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 10,
@@ -1022,9 +989,9 @@ const styles = StyleSheet.create({
     maxWidth: '92%',
   },
   imageCaption: {
-    color: '#fff',
+    color: OASIS.colors.surface,
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: '600',
     textAlign: 'center',
   },
   ownerStats: {
@@ -1042,7 +1009,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     gap: 6,
   },
-  statBadgeText: { color: '#fff', fontSize: 13, fontWeight: '800' },
+  statBadgeText: { color: OASIS.colors.surface, fontSize: 13, fontWeight: '600' },
   replyArea: {
     paddingHorizontal: 16,
     paddingBottom: 6,
@@ -1055,8 +1022,8 @@ const styles = StyleSheet.create({
   },
   likeBtn: {
     width: 48,
-    height: 48,
-    borderRadius: 24,
+    height: 44,
+    borderRadius: 14,
     backgroundColor: 'rgba(0,0,0,0.35)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1064,7 +1031,7 @@ const styles = StyleSheet.create({
   replyTrigger: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.35)',
-    borderRadius: 24,
+    borderRadius: 14,
     borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.35)',
     height: 48,
@@ -1081,7 +1048,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.5)',
-    borderRadius: 26,
+    borderRadius: 14,
     borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.5)',
     paddingHorizontal: 6,
@@ -1089,7 +1056,7 @@ const styles = StyleSheet.create({
   },
   replyInput: {
     flex: 1,
-    color: '#fff',
+    color: OASIS.colors.surface,
     fontSize: 14,
     paddingHorizontal: 14,
     textAlign: 'right',
@@ -1097,8 +1064,8 @@ const styles = StyleSheet.create({
   sendBtn: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    backgroundColor: '#059669',
+    borderRadius: 14,
+    backgroundColor: OASIS.colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1110,7 +1077,7 @@ const styles = StyleSheet.create({
   disabledReplyNotice: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.4)',
-    borderRadius: 24,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.2)',
     height: 48,

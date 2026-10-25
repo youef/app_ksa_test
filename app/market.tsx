@@ -1,28 +1,15 @@
+import { OasisEmptyIllustration } from '@/components/oasis/OasisEmptyIllustration';
+import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
 import React, { useState, useEffect, useMemo } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Platform,
-  Pressable,
-  ScrollView,
-  TextInput,
-  Image,
-  RefreshControl,
-  Share,
-  useWindowDimensions,
-  Linking,
-  Modal,
-  Alert,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, StyleSheet, Platform, ScrollView, Image, RefreshControl, Share, useWindowDimensions, Linking, Modal, Alert, ImageBackground, ActivityIndicator } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { useBottomNavInset } from '@/lib/bottomNav';
 import ScreenState from '@/components/shared/ScreenState';
 import AppHeader from '@/components/shared/AppHeader';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
-  ShoppingBag,
+  ShoppingBag, TrendingUp, SlidersHorizontal, Utensils, Pill, Shirt, Scissors, Wrench, Croissant, UsersRound, HeartHandshake, Trophy, Palette, House, Package, Image as ImageIcon, CircleCheck, ChevronDown,
   MapPin,
   ShieldCheck,
   Plus,
@@ -48,6 +35,9 @@ import {
   Send,
   CheckCircle2,
   Award,
+  Truck,
+  BadgeCheck,
+  User,
 } from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { relativeTime } from '@/lib/mapPins';
@@ -68,43 +58,42 @@ import {
 
 export type MarketSection = 'market' | 'businesses' | 'events';
 
-export type SortOption = 'newest' | 'rating' | 'price_asc' | 'price_desc';
-const SORT_OPTIONS: { id: SortOption; label: string; icon: string }[] = [
-  { id: 'newest', label: 'الأحدث', icon: '⚡' },
-  { id: 'rating', label: 'الأعلى تقييماً', icon: '⭐' },
-  { id: 'price_asc', label: 'الأقل سعراً', icon: '🏷️' },
-  { id: 'price_desc', label: 'الأعلى سعراً', icon: '💎' },
+export type SortOption = 'newest' | 'engaged' | 'nearby';
+const SORT_OPTIONS: { id: SortOption; label: string; Icon: any }[] = [
+  { id: 'newest', label: 'الأحدث', Icon: Clock },
+  { id: 'engaged', label: 'الأكثر تفاعلاً', Icon: TrendingUp },
+  { id: 'nearby', label: 'الأقرب إلى الحي', Icon: MapPin },
 ];
 
 type QuickFilter = 'all' | 'available' | 'delivery' | 'images' | 'verified';
-const QUICK_FILTERS: { id: QuickFilter; label: string }[] = [
-  { id: 'all', label: 'الكل' },
-  { id: 'available', label: '🟢 متاح الآن' },
-  { id: 'delivery', label: '🚗 توصيل' },
-  { id: 'images', label: '📷 بالصور' },
-  { id: 'verified', label: '🛡️ موثق' },
+const QUICK_FILTERS: { id: QuickFilter; label: string; Icon?: any }[] = [
+  { id: 'all', label: 'كل العروض', Icon: LayoutGrid },
+  { id: 'available', label: 'متاح الآن', Icon: CircleCheck },
+  { id: 'delivery', label: 'يتوفر توصيل', Icon: Truck },
+  { id: 'images', label: 'عروض بالصور', Icon: ImageIcon },
+  { id: 'verified', label: 'حساب موثق', Icon: ShieldCheck },
 ];
 
 type BusinessCategory = 'all' | 'grocery' | 'restaurant' | 'pharmacy' | 'laundry' | 'salon' | 'repair' | 'bakery';
-const BUSINESS_CATEGORIES: { id: BusinessCategory; label: string; emoji: string }[] = [
-  { id: 'all', label: 'الكل', emoji: '🏬' },
-  { id: 'grocery', label: 'بقالة وتموينات', emoji: '🛒' },
-  { id: 'restaurant', label: 'مطاعم ومقاهي', emoji: '🍽️' },
-  { id: 'pharmacy', label: 'صيدليات وعناية', emoji: '💊' },
-  { id: 'laundry', label: 'مغاسل وتنظيف', emoji: '🧺' },
-  { id: 'salon', label: 'حلاقة وصالونات', emoji: '✂️' },
-  { id: 'repair', label: 'صيانة وورش', emoji: '🔧' },
-  { id: 'bakery', label: 'مخابز وحلويات', emoji: '🥖' },
+const BUSINESS_CATEGORIES: { id: BusinessCategory; label: string; Icon: any }[] = [
+  { id: 'all', label: 'كل المحلات', Icon: Store },
+  { id: 'grocery', label: 'بقالة وتموينات', Icon: ShoppingBag },
+  { id: 'restaurant', label: 'مطاعم ومقاهي', Icon: Utensils },
+  { id: 'pharmacy', label: 'صيدليات وعناية', Icon: Pill },
+  { id: 'laundry', label: 'مغاسل وتنظيف', Icon: Shirt },
+  { id: 'salon', label: 'حلاقة وصالونات', Icon: Scissors },
+  { id: 'repair', label: 'صيانة وورش', Icon: Wrench },
+  { id: 'bakery', label: 'مخابز وحلويات', Icon: Croissant },
 ];
 
 type EventCategory = 'all' | 'community' | 'volunteer' | 'sports' | 'family' | 'culture';
-const EVENT_CATEGORIES: { id: EventCategory; label: string; emoji: string }[] = [
-  { id: 'all', label: 'الكل', emoji: '🌟' },
-  { id: 'community', label: 'ملتقيات الجيران', emoji: '☕' },
-  { id: 'volunteer', label: 'مبادرات وتطوع', emoji: '🌿' },
-  { id: 'sports', label: 'رياضية وشبابية', emoji: '⚽' },
-  { id: 'family', label: 'عائلية وأطفال', emoji: '👨‍👩‍👧‍👦' },
-  { id: 'culture', label: 'ثقافة ومجتمع', emoji: '🎨' },
+const EVENT_CATEGORIES: { id: EventCategory; label: string; Icon: any }[] = [
+  { id: 'all', label: 'كل الفعاليات', Icon: Calendar },
+  { id: 'community', label: 'ملتقيات الجيران', Icon: UsersRound },
+  { id: 'volunteer', label: 'مبادرات وتطوع', Icon: HeartHandshake },
+  { id: 'sports', label: 'رياضية وشبابية', Icon: Trophy },
+  { id: 'family', label: 'عائلية وأطفال', Icon: House },
+  { id: 'culture', label: 'ثقافة ومجتمع', Icon: Palette },
 ];
 
 export default function Market() {
@@ -113,7 +102,7 @@ export default function Market() {
   const { width } = useWindowDimensions();
 
   // Active Main Section: 'market' | 'businesses' | 'events'
-  const params = useLocalSearchParams<{ section?: string }>();
+  const params = useLocalSearchParams<{ section?: string; businessId?: string }>();
   const initialSection: MarketSection = params.section === 'events' ? 'events' : params.section === 'businesses' ? 'businesses' : 'market';
   const [section, setSection] = useState<MarketSection>(initialSection);
 
@@ -133,6 +122,10 @@ export default function Market() {
   const [eventCategory, setEventCategory] = useState<EventCategory>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('newest');
+  const [filterMenu, setFilterMenu] = useState<'sort' | 'category' | null>(null);
+  const [eventAttendees, setEventAttendees] = useState<any[]>([]);
+  const [loadingAttendees, setLoadingAttendees] = useState(false);
+  const [attendeeActionBusy, setAttendeeActionBusy] = useState(false);
   const [savedItems, setSavedItems] = useState<Record<string, boolean>>({});
 
   // Location State
@@ -165,20 +158,49 @@ export default function Market() {
   const gap = 12;
   const cardWidth = (contentWidth - gap * (columns - 1)) / columns;
 
-  const toggleSaveItem = (itemId: string) => {
-    setSavedItems((prev) => ({
-      ...prev,
-      [itemId]: !prev[itemId],
-    }));
+  const favoriteKey = (targetType: 'service' | 'product' | 'store', itemId: string) => `${targetType}:${itemId}`;
+
+  const toggleSaveItem = async (itemId: string, targetType: 'service' | 'product' | 'store') => {
+    const { data: auth, error: authError } = await supabase.auth.getUser();
+    if (authError || !auth.user) {
+      Alert.alert('سجّل الدخول أولاً', 'يلزم تسجيل الدخول لحفظ المنتجات والمتاجر في المفضلة.');
+      router.push('/auth');
+      return;
+    }
+    const key = favoriteKey(targetType, itemId);
+    const isSaved = Boolean(savedItems[key]);
+    setSavedItems((prev) => ({ ...prev, [key]: !isSaved }));
+    try {
+      if (isSaved) {
+        const { error } = await supabase.from('favorite_items').delete()
+          .eq('user_id', auth.user.id).eq('target_type', targetType).eq('target_id', itemId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('favorite_items').upsert(
+          { user_id: auth.user.id, target_type: targetType, target_id: itemId },
+          { onConflict: 'user_id,target_type,target_id', ignoreDuplicates: true },
+        );
+        if (error) throw error;
+      }
+    } catch (error: any) {
+      setSavedItems((prev) => ({ ...prev, [key]: isSaved }));
+      Alert.alert('تعذر تحديث المفضلة', error?.message || 'حاول مرة أخرى بعد قليل.');
+    }
   };
 
   useEffect(() => {
     const loadUser = async () => {
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) return;
+      const { data: favorites } = await supabase.from('favorite_items')
+        .select('target_type,target_id').eq('user_id', u.user.id)
+        .in('target_type', ['service', 'product', 'store']);
+      if (favorites) {
+        setSavedItems(Object.fromEntries(favorites.map((fav: any) => [favoriteKey(fav.target_type, fav.target_id), true])));
+      }
       const { data: p } = await supabase
         .from('profiles')
-        .select('id, display_name, avatar_url, is_geoverified')
+        .select('id, display_name, avatar_url, is_geoverified, account_type, is_verified, freelance_trade')
         .eq('id', u.user.id)
         .maybeSingle();
       setProfile(p);
@@ -193,15 +215,29 @@ export default function Market() {
     loadAllData();
   }, []);
 
+  useEffect(() => {
+    if (!params.businessId || !businesses.length) return;
+    const savedBusiness = businesses.find((business) => business.id === params.businessId);
+    if (savedBusiness) {
+      setSection('businesses');
+      setSelectedBusiness(savedBusiness);
+    }
+  }, [params.businessId, businesses]);
+
   const loadAllData = async () => {
     setRefreshing(true);
     setLoadError(false);
     try {
-      const [servicesRes, businessRes, eventsRes] = await Promise.all([
+      const [servicesRes, productsRes, businessRes, eventsRes] = await Promise.all([
         supabase
           .from('services')
-          .select('*, profiles:provider_id(display_name, avatar_url, is_verified, phone)')
+          .select('*, profiles:provider_id(display_name, avatar_url, is_verified, phone, city, district, account_type, freelance_trade), business:business_id(id,name,is_verified)')
           .eq('moderation_status', 'approved')
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('marketplace_items')
+          .select('*, seller:seller_id(display_name, avatar_url, is_verified, phone, city, district, account_type, freelance_trade), business:business_id(id,name,is_verified)')
+          .eq('status', 'available')
           .order('created_at', { ascending: false }),
         supabase
           .from('businesses')
@@ -217,17 +253,45 @@ export default function Market() {
           .limit(50),
       ]);
 
-      if (servicesRes.error) {
-        setItems([]);
-      } else {
-        setItems(servicesRes.data || []);
-      }
+      const serviceRows = servicesRes.error
+        ? []
+        : (servicesRes.data || []).map((row: any) => ({ ...row, _source: 'service' }));
+
+      const productRows = productsRes.error
+        ? []
+        : (productsRes.data || []).map((row: any) => ({
+            ...row,
+            _source: 'product',
+            name: row.title,
+            price_from: row.price,
+            price_to: null,
+            price_type: row.price == null ? 'negotiable' : 'fixed',
+            listing_type: row.seller?.account_type === 'merchant' ? 'product_in_shop' : 'home_sale',
+            subcategory: row.item_type,
+            shop_name: row.business?.name || (row.seller?.account_type === 'merchant' ? row.seller?.freelance_trade : null),
+            cover_url: row.image_url,
+            images: row.image_url ? [row.image_url] : [],
+            available_now: row.status === 'available',
+            delivery_modes: [],
+            whatsapp: null,
+            phone: row.seller?.phone || null,
+            profiles: row.seller || null,
+          }));
+
+      setItems(
+        [...serviceRows, ...productRows].sort(
+          (a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime(),
+        ),
+      );
 
       // Map real businesses only (No mock data)
       const dbBusinesses = (businessRes.data || []).map((b: any) => ({
         id: b.id,
         name: b.name || 'منشأة تجارية',
         category: b.category || 'grocery',
+        image_url: b.image_url || b.cover_url || b.logo_url || null,
+        cover_url: b.cover_url || b.image_url || null,
+        logo_url: b.logo_url || null,
         categoryLabel: BUSINESS_CATEGORIES.find((c) => c.id === b.category)?.label || b.category || 'خدمات محلية',
         city: b.city || '',
         district: b.district || '',
@@ -237,9 +301,9 @@ export default function Market() {
         whatsapp: b.whatsapp || '',
         openNow: b.is_open ?? true,
         is_verified: Boolean(b.is_verified),
-        icon: BUSINESS_CATEGORIES.find((c) => c.id === b.category)?.emoji || '🏪',
-        color: '#059669',
-        bg: '#ecfdf5',
+        Icon: BUSINESS_CATEGORIES.find((c) => c.id === b.category)?.Icon || Store,
+        color: OASIS.colors.primary,
+        bg: OASIS.colors.soft,
         hours: b.working_hours || 'ساعات العمل حسب التنسيق',
         description: b.description || 'منشأة معتمدة لخدمة سكان الحي بأعلى معايير الجودة.',
         features: b.features || ['خدمة سكان الحي', 'استجابة سريعة', 'موثوق'],
@@ -259,11 +323,12 @@ export default function Market() {
         dateLabel: ev.date_label || (ev.starts_at ? new Date(ev.starts_at).toLocaleString('ar-SA') : 'قريباً'),
         location: ev.location_name || 'نقطة التجمع بالحي',
         organizer: ev.organizer?.display_name || 'أحد سكان الحي',
+        organizerId: ev.organizer_id,
         attendeesCount: ev.attendees_count || 0,
         isFree: ev.is_free ?? true,
-        icon: EVENT_CATEGORIES.find((c) => c.id === ev.category)?.emoji || '🌟',
-        color: '#059669',
-        bg: '#ecfdf5',
+        Icon: EVENT_CATEGORIES.find((c) => c.id === ev.category)?.Icon || Calendar,
+        color: OASIS.colors.primary,
+        bg: OASIS.colors.soft,
         description: ev.description || 'نشاط مجتمعي يجمع الجيران في أجواء طيبة ومميزة.',
         agenda: ev.agenda || [],
         guidelines: ev.guidelines || '',
@@ -322,25 +387,21 @@ export default function Market() {
     });
 
     return filtered.sort((a, b) => {
-      if (sortBy === 'price_asc') {
-        const pA = a.item.price_from ?? 999999;
-        const pB = b.item.price_from ?? 999999;
-        return pA - pB;
+      if (sortBy === 'engaged') {
+        const score = (x: any) => Number(x.views_count ?? x.views ?? 0) + Number(x.likes_count ?? x.likes ?? 0) * 2 + Number(x.favorites_count ?? 0) * 3;
+        return score(b.item) - score(a.item) || new Date(b.item.created_at || 0).getTime() - new Date(a.item.created_at || 0).getTime();
       }
-      if (sortBy === 'price_desc') {
-        const pA = a.item.price_from ?? 0;
-        const pB = b.item.price_from ?? 0;
-        return pB - pA;
+      if (sortBy === 'nearby') {
+        const rank = (x: any) => {
+          const city = x.item.city || x.item.profiles?.city;
+          const district = x.item.district || x.item.profiles?.district;
+          return district && district === activeLoc.district ? 0 : city && city === activeLoc.city ? 1 : 2;
+        };
+        return rank(a) - rank(b) || new Date(b.item.created_at || 0).getTime() - new Date(a.item.created_at || 0).getTime();
       }
-      if (sortBy === 'rating') {
-        const rA = a.item.rating ?? (a.item.profiles?.is_verified ? 5.0 : 4.5);
-        const rB = b.item.rating ?? (b.item.profiles?.is_verified ? 5.0 : 4.5);
-        return rB - rA;
-      }
-      // default: newest
       return new Date(b.item.created_at || 0).getTime() - new Date(a.item.created_at || 0).getTime();
     });
-  }, [inAreaMarket, activeType, quick, query, sortBy]);
+  }, [inAreaMarket, activeType, quick, query, sortBy, activeLoc]);
 
   const families = activeType === 'all' && quick === 'all' && !query
     ? inAreaMarket.filter((e) => e.type?.id === 'home_family').slice(0, 10)
@@ -360,8 +421,12 @@ export default function Market() {
     });
 
     return filtered.sort((a, b) => {
-      if (sortBy === 'rating') return (b.rating || 0) - (a.rating || 0);
-      return (b.reviews || 0) - (a.reviews || 0);
+      if (sortBy === 'engaged') return (b.reviews || 0) - (a.reviews || 0) || (b.rating || 0) - (a.rating || 0);
+      if (sortBy === 'nearby') {
+        const rank = (x: any) => x.district && x.district === activeLoc.district ? 0 : x.city && x.city === activeLoc.city ? 1 : 2;
+        return rank(a) - rank(b) || (b.reviews || 0) - (a.reviews || 0);
+      }
+      return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
     });
   }, [businesses, activeLoc, businessCategory, quick, query, sortBy]);
 
@@ -379,9 +444,10 @@ export default function Market() {
 
   const shareItem = async (item: any) => {
     const text = `شوف هذا العرض في سوق حيّنا: ${item.name} — ${formatServicePrice(item)}`;
+    const route = item._source === 'product' ? 'marketplace-item' : 'service';
     try {
       await Share.share({
-        message: Platform.OS === 'web' && typeof window !== 'undefined' ? `${text} — ${window.location.origin}/service?id=${item.id}` : text,
+        message: Platform.OS === 'web' && typeof window !== 'undefined' ? `${text} — ${window.location.origin}/${route}?id=${item.id}` : text,
         title: item.name,
       });
     } catch {}
@@ -395,21 +461,55 @@ export default function Market() {
   };
 
   const shareEvent = async (ev: any) => {
-    const text = `دعوة لحضور «${ev.title}» بحيّنا!\n📍 المكان: ${ev.location}\n🗓️ الموعد: ${ev.dateLabel}\nالدعوة عامة والدخول مجاني 🎉`;
+    const text = `دعوة لحضور «${ev.title}» بحيّنا!\nالمكان: ${ev.location}\nالموعد: ${ev.dateLabel}\nالدعوة عامة والدخول مجاني`;
     try {
       await Share.share({ message: text, title: ev.title });
     } catch {}
   };
 
-  const toggleRsvp = (eventId: string) => {
-    setRsvpList((prev) => {
-      const next = !prev[eventId];
-      if (next) {
-        Alert.alert('تم تسجيل حضورك بنجاح! 🎉', 'يسعدنا تواجدك مع جيرانك في الفعالية، ونتمنى لكم وقتاً ممتعاً.');
+  const toggleRsvp = async (eventId: string) => {
+    const { data: auth } = await supabase.auth.getUser();
+    const userId = auth.user?.id;
+    if (!userId) { router.push('/auth'); return; }
+    const attending = Boolean(rsvpList[eventId]);
+    setAttendeeActionBusy(true);
+    try {
+      if (attending) {
+        const { error } = await supabase.from('event_attendees').delete().eq('event_id', eventId).eq('user_id', userId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('event_attendees').upsert({ event_id: eventId, user_id: userId, status: 'going' }, { onConflict: 'event_id,user_id' });
+        if (error) throw error;
       }
-      return { ...prev, [eventId]: next };
-    });
+      setRsvpList((prev) => ({ ...prev, [eventId]: !attending }));
+      setEvents((prev) => prev.map((ev) => ev.id === eventId ? { ...ev, attendeesCount: Math.max(0, (ev.attendeesCount || 0) + (attending ? -1 : 1)) } : ev));
+      if (!attending) Alert.alert('تم تسجيل حضورك', 'تم تسجيل مشاركتك في الفعالية.');
+      if (selectedEvent?.id === eventId) setSelectedEvent((prev: any) => prev ? { ...prev, attendeesCount: Math.max(0, (prev.attendeesCount || 0) + (attending ? -1 : 1)) } : prev);
+    } catch (error: any) {
+      Alert.alert('تعذر تحديث الحضور', error?.message || 'حاول مرة أخرى بعد قليل.');
+    } finally { setAttendeeActionBusy(false); }
   };
+
+  useEffect(() => {
+    const loadRsvpAndAttendees = async () => {
+      if (!selectedEvent) { setEventAttendees([]); return; }
+      const { data: auth } = await supabase.auth.getUser();
+      const userId = auth.user?.id;
+      if (userId) {
+        const { data: mine } = await supabase.from('event_attendees').select('event_id,status').eq('event_id', selectedEvent.id).eq('user_id', userId).maybeSingle();
+        setRsvpList((prev) => ({ ...prev, [selectedEvent.id]: Boolean(mine && mine.status !== 'cancelled') }));
+      }
+      if (userId && selectedEvent.organizerId === userId) {
+        setLoadingAttendees(true);
+        const { data, error } = await supabase.from('event_attendees')
+          .select('user_id,status,created_at,profile:profiles!event_attendees_user_id_fkey(display_name,username,avatar_url)')
+          .eq('event_id', selectedEvent.id).eq('status', 'going').order('created_at', { ascending: false });
+        if (!error) setEventAttendees(data || []);
+        setLoadingAttendees(false);
+      } else setEventAttendees([]);
+    };
+    void loadRsvpAndAttendees();
+  }, [selectedEvent?.id, selectedEvent?.organizerId]);
 
   const openPhone = (phone?: string) => {
     if (!phone) return;
@@ -430,6 +530,10 @@ export default function Market() {
   };
 
   const openItem = (item: any) => {
+    if (item._source === 'product') {
+      router.push({ pathname: '/marketplace-item', params: { id: item.id } });
+      return;
+    }
     setSelectedProduct(item);
   };
 
@@ -469,25 +573,27 @@ export default function Market() {
   };
 
   // Render Card: Market Product / Service
-  const renderMarketCard = ({ item, type }: { item: any; type: ReturnType<typeof getListingType> }, w: number) => {
+  const renderMarketCard = ({ item, type }: { item: any; type: ReturnType<typeof getListingType> }, w: number, listMode = false) => {
     const cover = getServiceCover(item);
     const modes: string[] = (item.delivery_modes || []).slice(0, 3);
     const timeAgo = relativeTime(item.created_at);
-    const isSaved = Boolean(savedItems[item.id]);
+    const favoriteType = item._source === 'product' ? 'product' : 'service';
+    const isSaved = Boolean(savedItems[favoriteKey(favoriteType, item.id)]);
 
     return (
-      <Pressable
+      <Pressable oasisKind="card"
         key={item.id}
         id={`market-item-${item.id}`}
         onPress={() => openItem(item)}
         style={({ pressed, hovered }: any) => [
           styles.card,
           { width: w },
+          listMode && styles.cardRow,
           hovered && styles.cardHover,
           pressed && { transform: [{ scale: 0.985 }] },
         ]}
       >
-        <View style={[styles.cardImage, { height: w * 0.78, backgroundColor: type?.bg || '#f1f5f9' }]}>
+        <View style={[styles.cardImage, listMode ? styles.cardImageRow : { height: w * 0.78 }, { backgroundColor: type?.bg || '#f1f5f9' }]}>
           {cover ? (
             <Image source={{ uri: cover }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
           ) : type ? (
@@ -514,13 +620,13 @@ export default function Market() {
           <View style={styles.cardTopActions}>
             <Pressable
               hitSlop={8}
-              style={[styles.shareFab, isSaved && { backgroundColor: '#fef2f2' }]}
+              style={[styles.shareFab, isSaved && { backgroundColor: OASIS.colors.dangerSoft }]}
               onPress={(e: any) => {
                 e?.stopPropagation?.();
-                toggleSaveItem(item.id);
+                void toggleSaveItem(item.id, favoriteType);
               }}
             >
-              <Heart size={13} color={isSaved ? '#ef4444' : '#475569'} fill={isSaved ? '#ef4444' : 'none'} />
+              <Heart size={13} color={isSaved ? OASIS.colors.danger : OASIS.colors.muted} fill={isSaved ? OASIS.colors.danger : 'none'} />
             </Pressable>
             <Pressable
               hitSlop={8}
@@ -530,7 +636,7 @@ export default function Market() {
                 void shareItem(item);
               }}
             >
-              <Send size={12} color="#334155" />
+              <Send size={12} color={OASIS.colors.ink} />
             </Pressable>
             {Boolean(item.whatsapp || item.phone) && (
               <Pressable
@@ -541,25 +647,42 @@ export default function Market() {
                   openWhatsApp(item.whatsapp || item.phone, `مرحباً، شفت عرضك «${item.name}» في سوق الحي بحيّنا وحاب أستفسر`);
                 }}
               >
-                <MessageCircle size={13} color="#fff" />
+                <MessageCircle size={13} color={OASIS.colors.surface} />
               </Pressable>
             )}
           </View>
         </View>
 
-        <View style={styles.cardBody}>
-          <Text style={styles.cardTitle} numberOfLines={1}>{item.name}</Text>
+        <View style={[styles.cardBody, listMode && styles.cardBodyRow]}>
+          <Text style={styles.cardTitle} numberOfLines={listMode ? 2 : 1}>{item.name}</Text>
           <Text style={styles.cardSub} numberOfLines={1}>
-            {item.shop_name ? `🏪 ${item.shop_name}` : (item.subcategory || item.profiles?.display_name || item.category || 'عرض محلي')}
+            {item.shop_name ? item.shop_name : (item.subcategory || item.profiles?.display_name || item.category || 'عرض محلي')}
           </Text>
 
           <View style={styles.cardFooter}>
             <Text style={styles.cardPrice} numberOfLines={1}>{formatServicePrice(item)}</Text>
-            {modes.length > 0 && <Text style={styles.cardModes}>{modes.map((m) => getDeliveryMode(m)?.emoji).join('')}</Text>}
+            {modes.length > 0 && (
+              <View style={styles.cardModes}>
+                {modes.map((m) => {
+                  const mode = getDeliveryMode(m);
+                  if (!mode) return null;
+                  const ModeIcon = m === 'delivery' ? Truck
+                    : m === 'pickup_home' ? House
+                    : m === 'at_shop' ? Store
+                    : m === 'home_visit' ? Wrench
+                    : ExternalLink;
+                  return (
+                    <View key={m} style={styles.cardModeIcon} accessibilityLabel={mode.label}>
+                      <ModeIcon size={13} color={OASIS.colors.muted} strokeWidth={2.1} />
+                    </View>
+                  );
+                })}
+              </View>
+            )}
           </View>
 
           <View style={styles.cardMeta}>
-            {item.profiles?.is_verified && <ShieldCheck size={12} color="#059669" />}
+            {item.profiles?.is_verified && <ShieldCheck size={12} color={OASIS.colors.primary} />}
             <MapPin size={10} color="#94a3b8" />
             <Text style={styles.cardMetaText} numberOfLines={1}>
               {type?.nationwide ? 'عن بُعد' : (item.district || item.profiles?.district) ? `حي ${item.district || item.profiles?.district}` : (item.city || 'داخل الحي')}
@@ -569,7 +692,7 @@ export default function Market() {
 
           <View style={styles.cardDetailsHintRow}>
             <Text style={styles.cardDetailsHintText}>عرض التفاصيل الكاملة</Text>
-            <ArrowRight size={11} color="#059669" />
+            <ArrowRight size={11} color={OASIS.colors.primary} />
           </View>
         </View>
       </Pressable>
@@ -577,24 +700,25 @@ export default function Market() {
   };
 
   // Render Card: Local Business / Store Directory
-  const renderBusinessCard = (b: any, w: number) => {
-    const isSaved = Boolean(savedItems[b.id]);
+  const renderBusinessCard = (b: any, w: number, listMode = false) => {
+    const isSaved = Boolean(savedItems[favoriteKey('store', b.id)]);
 
     return (
-      <Pressable
+      <Pressable oasisKind="card"
         key={b.id}
         onPress={() => setSelectedBusiness(b)}
         style={({ pressed, hovered }: any) => [
           styles.card,
           { width: w },
+          listMode && styles.cardRow,
           hovered && styles.cardHover,
           pressed && { transform: [{ scale: 0.985 }] },
         ]}
       >
-        <View style={[styles.cardImage, { height: w * 0.58, backgroundColor: b.bg || '#f0f9ff' }]}>
-          <Text style={{ fontSize: Math.min(36, w * 0.22) }}>{b.icon || '🏬'}</Text>
+        <View style={[styles.cardImage, listMode ? styles.cardImageRow : { height: w * 0.58 }, { backgroundColor: b.bg || OASIS.colors.infoSoft }]}>
+          <Text style={{ fontSize: Math.min(36, w * 0.22) }}><b.Icon size={34} color={b.color || OASIS.colors.info} /></Text>
           <View style={[styles.typeBadge, { backgroundColor: 'rgba(255,255,255,0.96)' }]}>
-            <Text style={[styles.typeBadgeText, { color: b.color || '#0284c7' }]}>{b.categoryLabel}</Text>
+            <Text style={[styles.typeBadgeText, { color: b.color || OASIS.colors.info }]}>{b.categoryLabel}</Text>
           </View>
           {b.openNow && (
             <View style={styles.availableBadgePill}>
@@ -605,13 +729,13 @@ export default function Market() {
           <View style={styles.cardTopActions}>
             <Pressable
               hitSlop={8}
-              style={[styles.shareFab, isSaved && { backgroundColor: '#fef2f2' }]}
+              style={[styles.shareFab, isSaved && { backgroundColor: OASIS.colors.dangerSoft }]}
               onPress={(e: any) => {
                 e?.stopPropagation?.();
-                toggleSaveItem(b.id);
+                void toggleSaveItem(b.id, 'store');
               }}
             >
-              <Heart size={13} color={isSaved ? '#ef4444' : '#475569'} fill={isSaved ? '#ef4444' : 'none'} />
+              <Heart size={13} color={isSaved ? OASIS.colors.danger : OASIS.colors.muted} fill={isSaved ? OASIS.colors.danger : 'none'} />
             </Pressable>
             <Pressable
               hitSlop={8}
@@ -621,28 +745,28 @@ export default function Market() {
                 void shareBusiness(b);
               }}
             >
-              <Share2 size={12} color="#334155" />
+              <Share2 size={12} color={OASIS.colors.ink} />
             </Pressable>
           </View>
         </View>
 
-        <View style={styles.cardBody}>
+        <View style={[styles.cardBody, listMode && styles.cardBodyRow]}>
           <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between' }}>
             <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4, flex: 1 }}>
               <Text style={styles.cardTitle} numberOfLines={1}>{b.name}</Text>
-              {b.is_verified && <ShieldCheck size={13} color="#059669" />}
+              {b.is_verified && <ShieldCheck size={13} color={OASIS.colors.primary} />}
             </View>
             <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 2 }}>
-              <Star size={11} color="#f59e0b" fill="#f59e0b" />
-              <Text style={{ fontSize: 11, fontWeight: '800', color: '#0f172a' }}>{b.rating}</Text>
+              <Star size={11} color={OASIS.colors.warning} fill={OASIS.colors.warning} />
+              <Text style={{ fontSize: 11, fontWeight: '600', color: OASIS.colors.ink }}>{b.rating}</Text>
             </View>
           </View>
 
           <Text style={styles.cardSub} numberOfLines={2}>{b.description || b.hours}</Text>
 
           <View style={[styles.cardMeta, { marginTop: 6 }]}>
-            <MapPin size={10} color="#059669" />
-            <Text style={[styles.cardMetaText, { color: '#475569' }]} numberOfLines={1}>
+            <MapPin size={10} color={OASIS.colors.primary} />
+            <Text style={[styles.cardMetaText, { color: OASIS.colors.muted }]} numberOfLines={1}>
               {b.district ? `حي ${b.district}` : ''} {b.city ? `· ${b.city}` : ''}
             </Text>
           </View>
@@ -657,7 +781,7 @@ export default function Market() {
                   openPhone(b.phone);
                 }}
               >
-                <Phone size={12} color="#0284c7" />
+                <Phone size={12} color={OASIS.colors.info} />
                 <Text style={styles.bizBtnCallText}>اتصال</Text>
               </Pressable>
             )}
@@ -680,14 +804,14 @@ export default function Market() {
                 openMaps(`${b.name} ${b.district || ''} ${b.city || ''}`);
               }}
             >
-              <Navigation size={12} color="#475569" />
+              <Navigation size={12} color={OASIS.colors.muted} />
               <Text style={styles.bizBtnMapText}>الخريطة</Text>
             </Pressable>
           </View>
 
           <View style={styles.cardDetailsHintRow}>
-            <Text style={[styles.cardDetailsHintText, { color: '#0284c7' }]}>عرض بطاقة المحل والخدمات</Text>
-            <ArrowRight size={11} color="#0284c7" />
+            <Text style={[styles.cardDetailsHintText, { color: OASIS.colors.info }]}>عرض بطاقة المحل والخدمات</Text>
+            <ArrowRight size={11} color={OASIS.colors.info} />
           </View>
         </View>
       </Pressable>
@@ -695,28 +819,29 @@ export default function Market() {
   };
 
   // Render Card: Neighborhood Community Event
-  const renderEventCard = (ev: any, w: number) => {
+  const renderEventCard = (ev: any, w: number, listMode = false) => {
     const isAttending = Boolean(rsvpList[ev.id]);
     const currentCount = ev.attendeesCount + (isAttending ? 1 : 0);
 
     return (
-      <Pressable
+      <Pressable oasisKind="card"
         key={ev.id}
         onPress={() => setSelectedEvent(ev)}
         style={({ pressed, hovered }: any) => [
           styles.card,
           { width: w },
+          listMode && styles.cardRow,
           hovered && styles.cardHover,
           pressed && { transform: [{ scale: 0.985 }] },
         ]}
       >
-        <View style={[styles.cardImage, { height: w * 0.58, backgroundColor: ev.bg || '#ecfdf5' }]}>
-          <Text style={{ fontSize: Math.min(36, w * 0.22) }}>{ev.icon || '🗓️'}</Text>
+        <View style={[styles.cardImage, listMode ? styles.cardImageRow : { height: w * 0.58 }, { backgroundColor: ev.bg || OASIS.colors.soft }]}>
+          <Text style={{ fontSize: Math.min(36, w * 0.22) }}><ev.Icon size={34} color={ev.color || OASIS.colors.primary} /></Text>
           <View style={[styles.typeBadge, { backgroundColor: 'rgba(255,255,255,0.96)' }]}>
-            <Text style={[styles.typeBadgeText, { color: ev.color || '#059669' }]}>{ev.categoryLabel}</Text>
+            <Text style={[styles.typeBadgeText, { color: ev.color || OASIS.colors.primary }]}>{ev.categoryLabel}</Text>
           </View>
-          <View style={[styles.availableBadgePill, { backgroundColor: '#ecfdf5', borderColor: '#a7f3d0' }]}>
-            <Text style={[styles.availableBadgeText, { color: '#047857' }]}>{ev.isFree ? 'مجاني 🎟️' : 'تسجيل'}</Text>
+          <View style={[styles.availableBadgePill, { backgroundColor: OASIS.colors.soft, borderColor: '#a7f3d0' }]}>
+            <Text style={[styles.availableBadgeText, { color: OASIS.colors.primary }]}>{ev.isFree ? 'مجاني' : 'تسجيل'}</Text>
           </View>
           <View style={styles.cardTopActions}>
             <Pressable
@@ -727,13 +852,13 @@ export default function Market() {
                 void shareEvent(ev);
               }}
             >
-              <Share2 size={12} color="#334155" />
+              <Share2 size={12} color={OASIS.colors.ink} />
             </Pressable>
           </View>
         </View>
 
-        <View style={styles.cardBody}>
-          <Text style={styles.cardTitle} numberOfLines={1}>{ev.title}</Text>
+        <View style={[styles.cardBody, listMode && styles.cardBodyRow]}>
+          <Text style={styles.cardTitle} numberOfLines={listMode ? 2 : 1}>{ev.title}</Text>
           <Text style={styles.cardSub} numberOfLines={2}>{ev.description}</Text>
 
           <View style={styles.eventInfoBox}>
@@ -742,36 +867,37 @@ export default function Market() {
               <Text style={styles.eventInfoText} numberOfLines={1}>{ev.dateLabel}</Text>
             </View>
             <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4, marginTop: 4 }}>
-              <MapPin size={11} color="#059669" />
+              <MapPin size={11} color={OASIS.colors.primary} />
               <Text style={styles.eventInfoText} numberOfLines={1}>{ev.location}</Text>
             </View>
           </View>
 
           <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
             <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}>
-              <Users size={12} color="#64748b" />
-              <Text style={{ fontSize: 11, color: '#64748b', fontWeight: '700' }}>
+              <Users size={12} color={OASIS.colors.muted} />
+              <Text style={{ fontSize: 11, color: OASIS.colors.muted, fontWeight: '700' }}>
                 {currentCount} مشارك
               </Text>
             </View>
 
-            <Pressable
-              style={[styles.rsvpBtn, isAttending && styles.rsvpBtnActive]}
+            <Pressable oasisKind="action"
+              style={[styles.rsvpBtn, isAttending && styles.rsvpBtnActive, attendeeActionBusy && { opacity: 0.65 }]}
+              disabled={attendeeActionBusy}
               onPress={(e: any) => {
                 e?.stopPropagation?.();
                 toggleRsvp(ev.id);
               }}
             >
-              {isAttending ? <Check size={12} color="#fff" /> : <Sparkles size={12} color="#059669" />}
-              <Text style={[styles.rsvpBtnText, isAttending && { color: '#fff' }]}>
+              {isAttending ? <Check size={12} color={OASIS.colors.surface} /> : <Sparkles size={12} color={OASIS.colors.primary} />}
+              <Text style={[styles.rsvpBtnText, isAttending && { color: OASIS.colors.surface }]}>
                 {isAttending ? 'سأحضر ✓' : 'حضور'}
               </Text>
             </Pressable>
           </View>
 
           <View style={styles.cardDetailsHintRow}>
-            <Text style={[styles.cardDetailsHintText, { color: '#059669' }]}>عرض تفاصيل الفعالية والبرنامج</Text>
-            <ArrowRight size={11} color="#059669" />
+            <Text style={[styles.cardDetailsHintText, { color: OASIS.colors.primary }]}>عرض تفاصيل الفعالية والبرنامج</Text>
+            <ArrowRight size={11} color={OASIS.colors.primary} />
           </View>
         </View>
       </Pressable>
@@ -785,39 +911,25 @@ export default function Market() {
   // Add Button Action based on current section
   const handleAddPress = () => {
     if (section === 'market') {
-      router.push('/new-service');
+      router.push('/new-listing');
     } else if (section === 'businesses') {
-      router.push('/new-service');
+      router.push({ pathname: '/profile', params: { tab: 'content' } });
     } else {
       setShowEventModal(true);
     }
   };
 
-  const addBtnLabel = section === 'market' ? 'أضف عرضك' : section === 'businesses' ? 'أضف محلك' : 'أضف فعالية';
+  const addBtnLabel = section === 'market' ? 'إضافة منتج أو خدمة' : section === 'businesses' ? 'إدارة منشأتي' : 'أضف فعالية';
 
   return (
     <View style={styles.container}>
-      <AppHeader
-        variant="tab"
-        title="سوق ودليل الحي"
-        subtitle={locationLabel}
-        rightAction={
-          <Pressable
-            id="market-header-add"
-            onPress={handleAddPress}
-            style={styles.headerAddBtn}
-          >
-            <Plus size={14} color="#047857" />
-            <Text style={styles.headerAddBtnText}>{addBtnLabel}</Text>
-          </Pressable>
-        }
-      />
+      <AppHeader variant="tab" title="السوق" subtitle={locationLabel} />
 
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingBottom: bottomNavInset + 28 }}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadAllData} tintColor="#059669" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadAllData} tintColor={OASIS.colors.primary} />}
       >
         {/* ======================================================== */}
         {/* HERO EXECUTIVE CARD                                      */}
@@ -825,7 +937,7 @@ export default function Market() {
         <View style={styles.heroSectionWrap}>
           <View style={styles.inner}>
             <LinearGradient
-              colors={['#064e3b', '#047857', '#059669']}
+              colors={[OASIS.colors.deep, OASIS.colors.primary, OASIS.colors.primary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.heroCard}
@@ -833,49 +945,17 @@ export default function Market() {
               <View style={styles.heroHeaderRow}>
                 <View style={{ flex: 1 }}>
                   <View style={styles.heroBadgeRow}>
-                    <View style={styles.heroBadge}>
-                      <Sparkles size={11} color="#fef08a" />
-                      <Text style={styles.heroBadgeText}>تجارة وخدمات الحي المباشرة</Text>
-                    </View>
                     <View style={styles.heroLocBadge}>
                       <MapPin size={10} color="#a7f3d0" />
                       <Text style={styles.heroLocText} numberOfLines={1}>{locationLabel}</Text>
                     </View>
                   </View>
 
-                  <Text style={styles.heroTitle}>سوق وتجارة الجيران</Text>
-                  <Text style={styles.heroSubtitle}>
-                    منصة البيع والخدمات ودليل الأعمال والأسر المنتجة في الحي بدون وسطاء أو عمولات
-                  </Text>
+                  <Text style={styles.heroTitle}>سوق الحي</Text>
+                  <Text style={styles.heroSubtitle}>عروض الجيران، دليل المحلات، وفعاليات الحي في مكان واحد.</Text>
                 </View>
               </View>
 
-              {/* High-Contrast Live KPI Ribbon */}
-              <View style={styles.kpiRow}>
-                <View style={styles.kpiItem}>
-                  <ShoppingBag size={15} color="#a7f3d0" />
-                  <Text style={styles.kpiVal}>{inAreaMarket.length}</Text>
-                  <Text style={styles.kpiLbl}>عروض نشطة</Text>
-                </View>
-                <View style={styles.kpiDivider} />
-                <View style={styles.kpiItem}>
-                  <Store size={15} color="#a7f3d0" />
-                  <Text style={styles.kpiVal}>{displayedBusinesses.length}</Text>
-                  <Text style={styles.kpiLbl}>محلات ومتاجر</Text>
-                </View>
-                <View style={styles.kpiDivider} />
-                <View style={styles.kpiItem}>
-                  <Calendar size={15} color="#a7f3d0" />
-                  <Text style={styles.kpiVal}>{displayedEvents.length}</Text>
-                  <Text style={styles.kpiLbl}>فعاليات مجدولة</Text>
-                </View>
-                <View style={styles.kpiDivider} />
-                <View style={styles.kpiItem}>
-                  <ShieldCheck size={15} color="#a7f3d0" />
-                  <Text style={styles.kpiVal}>100%</Text>
-                  <Text style={styles.kpiLbl}>أمان وموثوقية</Text>
-                </View>
-              </View>
             </LinearGradient>
           </View>
         </View>
@@ -887,12 +967,12 @@ export default function Market() {
           <View style={styles.inner}>
             {/* Primary Segment Switcher */}
             <View style={styles.segmentWrap}>
-              <Pressable
+              <Pressable oasisVariant={section === 'market' ? 'primary' : 'secondary'} oasisKind="chip"
                 onPress={() => setSection('market')}
                 style={[styles.segmentBtn, section === 'market' && styles.segmentBtnActive]}
               >
-                <ShoppingBag size={14} color={section === 'market' ? '#fff' : '#64748b'} />
-                <Text style={[styles.segmentText, section === 'market' && styles.segmentTextActive]}>سوق الحي والأسر</Text>
+                <ShoppingBag size={14} color={section === 'market' ? OASIS.colors.surface : OASIS.colors.muted} />
+                <Text style={[styles.segmentText, section === 'market' && styles.segmentTextActive]}>سوق الحي</Text>
                 <View style={[styles.segmentCount, section === 'market' && styles.segmentCountActive]}>
                   <Text style={[styles.segmentCountText, section === 'market' && styles.segmentCountTextActive]}>
                     {inAreaMarket.length}
@@ -900,12 +980,12 @@ export default function Market() {
                 </View>
               </Pressable>
 
-              <Pressable
+              <Pressable oasisVariant={section === 'businesses' ? 'primary' : 'secondary'} oasisKind="chip"
                 onPress={() => setSection('businesses')}
                 style={[styles.segmentBtn, section === 'businesses' && styles.segmentBtnActive]}
               >
-                <Building2 size={14} color={section === 'businesses' ? '#fff' : '#64748b'} />
-                <Text style={[styles.segmentText, section === 'businesses' && styles.segmentTextActive]}>دليل المحلات والأنشطة</Text>
+                <Building2 size={14} color={section === 'businesses' ? OASIS.colors.surface : OASIS.colors.muted} />
+                <Text style={[styles.segmentText, section === 'businesses' && styles.segmentTextActive]}>دليل المحلات</Text>
                 <View style={[styles.segmentCount, section === 'businesses' && styles.segmentCountActive]}>
                   <Text style={[styles.segmentCountText, section === 'businesses' && styles.segmentCountTextActive]}>
                     {displayedBusinesses.length}
@@ -913,12 +993,12 @@ export default function Market() {
                 </View>
               </Pressable>
 
-              <Pressable
+              <Pressable oasisVariant={section === 'events' ? 'primary' : 'secondary'} oasisKind="chip"
                 onPress={() => setSection('events')}
                 style={[styles.segmentBtn, section === 'events' && styles.segmentBtnActive]}
               >
-                <Calendar size={14} color={section === 'events' ? '#fff' : '#64748b'} />
-                <Text style={[styles.segmentText, section === 'events' && styles.segmentTextActive]}>ملتقيات وفعاليات</Text>
+                <Calendar size={14} color={section === 'events' ? OASIS.colors.surface : OASIS.colors.muted} />
+                <Text style={[styles.segmentText, section === 'events' && styles.segmentTextActive]}>الفعاليات</Text>
                 <View style={[styles.segmentCount, section === 'events' && styles.segmentCountActive]}>
                   <Text style={[styles.segmentCountText, section === 'events' && styles.segmentCountTextActive]}>
                     {displayedEvents.length}
@@ -929,7 +1009,7 @@ export default function Market() {
 
             {/* Contextual Search Input & Action Button */}
             <View style={styles.searchRow}>
-              <View style={styles.searchBox}>
+              <OasisSurface oasisSurface="field" style={styles.searchBox}>
                 <Search size={18} color="#94a3b8" />
                 <TextInput
                   id="market-search"
@@ -937,7 +1017,7 @@ export default function Market() {
                   onChangeText={setSearchQuery}
                   placeholder={
                     section === 'market'
-                      ? 'ابحث عن منتج، سلعة، أو أسر منتجة...'
+                      ? 'ابحث عن منتج أو خدمة...'
                       : section === 'businesses'
                       ? 'ابحث عن بقالة، صيدلية، مطعم، ورشة...'
                       : 'ابحث في فعاليات وملتقيات الحي...'
@@ -951,34 +1031,25 @@ export default function Market() {
                     <X size={16} color="#94a3b8" />
                   </Pressable>
                 )}
-              </View>
+              </OasisSurface>
 
-              <Pressable id="market-add" style={styles.addBtn} onPress={handleAddPress}>
-                <Plus size={18} color="#fff" />
-                {width > 360 && <Text style={styles.addBtnText}>{addBtnLabel}</Text>}
+              <Pressable oasisKind="action" id="market-add" accessibilityRole="button" accessibilityLabel={addBtnLabel} style={styles.addBtn} onPress={handleAddPress}>
+
+                <Plus size={18} color={OASIS.colors.surface} />
+                <Text style={styles.addBtnText}>{addBtnLabel}</Text>
               </Pressable>
             </View>
 
-            {/* Smart Sorting Bar */}
-            <View style={styles.sortBar}>
-              <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}>
-                <ArrowUpDown size={12} color="#64748b" />
-                <Text style={styles.sortBarLabel}>ترتيب:</Text>
-              </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row-reverse', gap: 6 }}>
-                {SORT_OPTIONS.map((opt) => (
-                  <Pressable
-                    key={opt.id}
-                    onPress={() => setSortBy(opt.id)}
-                    style={[styles.sortChip, sortBy === opt.id && styles.sortChipActive]}
-                  >
-                    <Text style={{ fontSize: 10 }}>{opt.icon}</Text>
-                    <Text style={[styles.sortChipText, sortBy === opt.id && styles.sortChipTextActive]}>
-                      {opt.label}
-                    </Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
+            <View style={styles.filterControlsRow}>
+              <Pressable style={styles.filterSelect} onPress={() => setFilterMenu('sort')}>
+                <ArrowUpDown size={15} color={OASIS.colors.muted} /><Text style={styles.filterSelectLabel}>الترتيب</Text>
+                <Text style={styles.filterSelectValue}>{SORT_OPTIONS.find((o) => o.id === sortBy)?.label || 'الأحدث'}</Text><ChevronDown size={15} color={OASIS.colors.muted} />
+              </Pressable>
+              <Pressable style={styles.filterSelect} onPress={() => setFilterMenu('category')}>
+                <SlidersHorizontal size={15} color={OASIS.colors.muted} /><Text style={styles.filterSelectLabel}>التصفية</Text>
+                <Text style={styles.filterSelectValue} numberOfLines={1}>{section === 'market' ? (activeType === 'all' ? QUICK_FILTERS.find((f) => f.id === quick)?.label || 'كل العروض' : LISTING_TYPES.find((t) => t.id === activeType)?.short || 'كل العروض') : section === 'businesses' ? (BUSINESS_CATEGORIES.find((c) => c.id === businessCategory)?.label || 'كل المحلات') : (EVENT_CATEGORIES.find((c) => c.id === eventCategory)?.label || 'كل الفعاليات')}</Text>
+                <ChevronDown size={15} color={OASIS.colors.muted} />
+              </Pressable>
             </View>
           </View>
         </View>
@@ -990,7 +1061,7 @@ export default function Market() {
           {loading ? (
             <ScreenState type="loading" title="جاري التجهيز والتحميل" message="نرتب لك محتوى الحي الأقرب إليك" />
           ) : loadError ? (
-            <View style={{ paddingVertical: 24 }}>
+            <View style={{ paddingVertical: 16 }}>
               <ScreenState type="error" title="تعذر تحميل المحتوى" message="اسحب للتحديث وحاول مرة أخرى" />
             </View>
           ) : (
@@ -1000,50 +1071,18 @@ export default function Market() {
               {/* ======================================================== */}
               {section === 'market' && (
                 <>
-                  {/* Category Circles */}
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.typesRow} style={styles.typesScroll}>
-                    <TypeCircle
-                      label="الكل"
-                      active={activeType === 'all'}
-                      color="#059669"
-                      bg="#ecfdf5"
-                      Icon={LayoutGrid}
-                      count={inAreaMarket.length}
-                      onPress={() => setActiveType('all')}
-                    />
-                    {LISTING_TYPES.map((t) => (
-                      <TypeCircle
-                        key={t.id}
-                        label={t.short}
-                        active={activeType === t.id}
-                        color={t.color}
-                        bg={t.bg}
-                        Icon={t.Icon}
-                        count={typeCounts[t.id] || 0}
-                        onPress={() => setActiveType(activeType === t.id ? 'all' : t.id)}
-                      />
-                    ))}
-                  </ScrollView>
-
-                  {/* Quick Filter Chips */}
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickRow}>
-                    {QUICK_FILTERS.map((f) => (
-                      <Pressable key={f.id} onPress={() => setQuick(f.id)} style={[styles.quickChip, quick === f.id && styles.quickChipActive]}>
-                        <Text style={[styles.quickText, quick === f.id && styles.quickTextActive]}>{f.label}</Text>
-                      </Pressable>
-                    ))}
-                  </ScrollView>
+                  <View style={styles.filterHintRow}><SlidersHorizontal size={14} color={OASIS.colors.muted} /><Text style={styles.filterHintText}>اختر نوع العرض أو حالته من قائمة التصفية</Text></View>
 
                   {/* Productive Families Spotlight */}
                   {families.length > 0 && (
                     <View style={{ marginBottom: 18 }}>
                       <View style={styles.sectionHead}>
-                        <Text style={styles.sectionTitle}>🏠 من الأسر المنتجة في حيّك</Text>
+                        <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}><House size={16} color={OASIS.colors.primary} /><Text style={styles.sectionTitle}>من الأسر المنتجة في حيّك</Text></View>
                         <Pressable onPress={() => setActiveType('home_family')}>
                           <Text style={styles.seeAll}>عرض الكل</Text>
                         </Pressable>
                       </View>
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row-reverse', gap }}>
+                      <ScrollView style={{ direction: 'rtl' }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[{ flexDirection: 'row-reverse', gap }, { direction: 'ltr' }]}>
                         {families.map((e) => renderMarketCard(e, Math.min(160, cardWidth)))}
                       </ScrollView>
                     </View>
@@ -1057,18 +1096,19 @@ export default function Market() {
                   </View>
 
                   {displayedMarket.length > 0 ? (
-                    <View style={[styles.grid, { gap }]}>
-                      {displayedMarket.map((e) => renderMarketCard(e, cardWidth))}
+                    <View style={[styles.list, { gap }]}>
+                      {displayedMarket.map((e) => renderMarketCard(e, contentWidth, true))}
                     </View>
                   ) : (
                     <View style={styles.emptyState}>
-                      <View style={styles.emptyIcon}><ShoppingBag size={32} color="#059669" /></View>
+                      <View style={{ alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}><OasisEmptyIllustration kind="empty-market" /></View>
                       <Text style={styles.emptyTitle}>لا توجد عروض في هذا الحي حالياً</Text>
                       <Text style={styles.emptyText}>
                         كن أول جار يشارك منتجاته أو خدماته مع أهالي {locationLabel} وبدون أي عمولات.
                       </Text>
-                      <Pressable style={styles.emptyBtn} onPress={() => router.push('/new-service')}>
-                        <Plus size={16} color="#fff" />
+                      <Pressable oasisKind="action" style={styles.emptyBtn} onPress={() => router.push('/new-service')}>
+
+                        <Plus size={16} color={OASIS.colors.surface} />
                         <Text style={styles.emptyBtnText}>أضف أول عرض في الحي</Text>
                       </Pressable>
                     </View>
@@ -1081,39 +1121,26 @@ export default function Market() {
               {/* ======================================================== */}
               {section === 'businesses' && (
                 <>
-                  {/* Category Pills */}
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickRow} style={{ marginTop: 12 }}>
-                    {BUSINESS_CATEGORIES.map((c) => (
-                      <Pressable
-                        key={c.id}
-                        onPress={() => setBusinessCategory(c.id)}
-                        style={[styles.quickChip, businessCategory === c.id && styles.quickChipActive]}
-                      >
-                        <Text style={[styles.quickText, businessCategory === c.id && styles.quickTextActive]}>
-                          {c.emoji} {c.label}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </ScrollView>
+                  <View style={styles.filterHintRow}><SlidersHorizontal size={14} color={OASIS.colors.muted} /><Text style={styles.filterHintText}>صفِّ المحلات حسب النشاط من قائمة التصفية</Text></View>
 
                   <View style={styles.sectionHead}>
-                    <Text style={styles.sectionTitle}>المحلات والأنشطة التجارية في الحي</Text>
+                    <Text style={styles.sectionTitle}>دليل المحلات في الحي</Text>
                     <Text style={styles.resultCount}>{displayedBusinesses.length} منشأة</Text>
                   </View>
 
                   {displayedBusinesses.length > 0 ? (
-                    <View style={[styles.grid, { gap }]}>
-                      {displayedBusinesses.map((b) => renderBusinessCard(b, cardWidth))}
+                    <View style={[styles.list, { gap }]}>
+                      {displayedBusinesses.map((b) => renderBusinessCard(b, contentWidth, true))}
                     </View>
                   ) : (
                     <View style={styles.emptyState}>
-                      <View style={[styles.emptyIcon, { backgroundColor: '#f0f9ff' }]}><Building2 size={32} color="#0284c7" /></View>
-                      <Text style={styles.emptyTitle}>دليل المحلات والأنشطة التجارية</Text>
+                      <View style={{ alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}><OasisEmptyIllustration kind="empty-market" /></View>
+                      <Text style={styles.emptyTitle}>دليل المحلات</Text>
                       <Text style={styles.emptyText}>
                         لم يتم تسجيل محلات في هذا التصنيف بعد. هل تملك بقالة، مغسلة، صيدلية، أو نشاطاً تجارياً؟ سجله مجاناً ليظهر لجميع سكان الحي!
                       </Text>
-                      <Pressable style={[styles.emptyBtn, { backgroundColor: '#0284c7' }]} onPress={() => router.push('/new-service')}>
-                        <Plus size={16} color="#fff" />
+                      <Pressable oasisKind="action" style={[styles.emptyBtn, { backgroundColor: OASIS.colors.info }]} onPress={() => router.push('/new-service')}>
+                        <Plus size={16} color={OASIS.colors.surface} />
                         <Text style={styles.emptyBtnText}>سجّل محلك التجاري مجاناً</Text>
                       </Pressable>
                     </View>
@@ -1126,39 +1153,26 @@ export default function Market() {
               {/* ======================================================== */}
               {section === 'events' && (
                 <>
-                  {/* Event Category Pills */}
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickRow} style={{ marginTop: 12 }}>
-                    {EVENT_CATEGORIES.map((c) => (
-                      <Pressable
-                        key={c.id}
-                        onPress={() => setEventCategory(c.id)}
-                        style={[styles.quickChip, eventCategory === c.id && styles.quickChipActive]}
-                      >
-                        <Text style={[styles.quickText, eventCategory === c.id && styles.quickTextActive]}>
-                          {c.emoji} {c.label}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </ScrollView>
+                  <View style={styles.filterHintRow}><SlidersHorizontal size={14} color={OASIS.colors.muted} /><Text style={styles.filterHintText}>صفِّ الفعاليات حسب نوع النشاط من قائمة التصفية</Text></View>
 
                   <View style={styles.sectionHead}>
-                    <Text style={styles.sectionTitle}>فعاليات وأنشطة الحي القادمة</Text>
+                    <Text style={styles.sectionTitle}>فعاليات الحي القادمة</Text>
                     <Text style={styles.resultCount}>{displayedEvents.length} فعالية</Text>
                   </View>
 
                   {displayedEvents.length > 0 ? (
-                    <View style={[styles.grid, { gap }]}>
-                      {displayedEvents.map((ev) => renderEventCard(ev, cardWidth))}
+                    <View style={[styles.list, { gap }]}>
+                      {displayedEvents.map((ev) => renderEventCard(ev, contentWidth, true))}
                     </View>
                   ) : (
                     <View style={styles.emptyState}>
-                      <View style={[styles.emptyIcon, { backgroundColor: '#fffbeb' }]}><Calendar size={32} color="#d97706" /></View>
+                      <View style={{ alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}><OasisEmptyIllustration kind="empty-market" /></View>
                       <Text style={styles.emptyTitle}>ملتقيات ومبادرات الحي</Text>
                       <Text style={styles.emptyText}>
                         لا توجد فعاليات مجدولة في الحي حالياً. بادر بتنظيم لقاء أخوي، دوري كرة قدم، أو مبادرة تطوعية واجمع جيرانك!
                       </Text>
-                      <Pressable style={[styles.emptyBtn, { backgroundColor: '#d97706' }]} onPress={() => setShowEventModal(true)}>
-                        <Plus size={16} color="#fff" />
+                      <Pressable oasisKind="action" style={[styles.emptyBtn, { backgroundColor: '#d97706' }]} onPress={() => setShowEventModal(true)}>
+                        <Plus size={16} color={OASIS.colors.surface} />
                         <Text style={styles.emptyBtnText}>نظّم فعالية جديدة للحي</Text>
                       </Pressable>
                     </View>
@@ -1170,6 +1184,25 @@ export default function Market() {
         </View>
       </ScrollView>
 
+      <Modal visible={!!filterMenu} transparent animationType="fade" onRequestClose={() => setFilterMenu(null)}>
+        <Pressable style={styles.filterModalBackdrop} onPress={() => setFilterMenu(null)}>
+          <OasisSurface oasisSurface="card" style={styles.filterMenuCard}>
+            <View style={styles.filterMenuHeader}><Text style={styles.filterMenuTitle}>{filterMenu === 'sort' ? 'ترتيب النتائج' : 'تصفية النتائج'}</Text><Pressable oasisKind="icon" onPress={() => setFilterMenu(null)} style={styles.modalCloseBtn}><X size={17} color={OASIS.colors.ink} /></Pressable></View>
+            <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
+              {filterMenu === 'sort' ? SORT_OPTIONS.map((opt) => <Pressable key={opt.id} style={styles.filterMenuItem} onPress={() => { setSortBy(opt.id); setFilterMenu(null); }}><opt.Icon size={18} color={sortBy === opt.id ? OASIS.colors.primary : OASIS.colors.muted} /><Text style={[styles.filterMenuItemText, sortBy === opt.id && { color: OASIS.colors.primary, fontWeight: '700' }]}>{opt.label}</Text>{sortBy === opt.id && <Check size={17} color={OASIS.colors.primary} />}</Pressable>) : section === 'market' ? (
+                <>
+                  <Pressable style={styles.filterMenuItem} onPress={() => { setActiveType('all'); setQuick('all'); setFilterMenu(null); }}><LayoutGrid size={18} color={OASIS.colors.muted} /><Text style={styles.filterMenuItemText}>كل العروض</Text></Pressable>
+                  {LISTING_TYPES.map((t) => <Pressable key={t.id} style={styles.filterMenuItem} onPress={() => { setActiveType(t.id); setFilterMenu(null); }}><t.Icon size={18} color={activeType === t.id ? OASIS.colors.primary : t.color} /><Text style={styles.filterMenuItemText}>{t.label}</Text>{activeType === t.id && <Check size={17} color={OASIS.colors.primary} />}</Pressable>)}
+                  <View style={styles.filterMenuDivider} />
+                  {QUICK_FILTERS.map((f) => <Pressable key={f.id} style={styles.filterMenuItem} onPress={() => { setQuick(f.id); setFilterMenu(null); }}>{f.Icon && <f.Icon size={18} color={quick === f.id ? OASIS.colors.primary : OASIS.colors.muted} />}<Text style={styles.filterMenuItemText}>{f.label}</Text>{quick === f.id && <Check size={17} color={OASIS.colors.primary} />}</Pressable>)}
+                </>
+              ) : section === 'businesses' ? BUSINESS_CATEGORIES.map((c) => <Pressable key={c.id} style={styles.filterMenuItem} onPress={() => { setBusinessCategory(c.id); setFilterMenu(null); }}><c.Icon size={18} color={businessCategory === c.id ? OASIS.colors.primary : OASIS.colors.muted} /><Text style={styles.filterMenuItemText}>{c.label}</Text>{businessCategory === c.id && <Check size={17} color={OASIS.colors.primary} />}</Pressable>) : EVENT_CATEGORIES.map((c) => <Pressable key={c.id} style={styles.filterMenuItem} onPress={() => { setEventCategory(c.id); setFilterMenu(null); }}><c.Icon size={18} color={eventCategory === c.id ? OASIS.colors.primary : OASIS.colors.muted} /><Text style={styles.filterMenuItemText}>{c.label}</Text>{eventCategory === c.id && <Check size={17} color={OASIS.colors.primary} />}</Pressable>)}
+            </ScrollView>
+            <Pressable oasisKind="action" style={styles.filterResetBtn} onPress={() => { setActiveType('all'); setBusinessCategory('all'); setEventCategory('all'); setQuick('all'); setFilterMenu(null); }}><Text style={styles.filterResetText}>إعادة ضبط التصفية</Text></Pressable>
+          </OasisSurface>
+        </Pressable>
+      </Modal>
+
       {/* ======================================================== */}
       {/* MODAL 1: BUSINESS DETAILS                                */}
       {/* ======================================================== */}
@@ -1178,33 +1211,33 @@ export default function Market() {
           <View style={styles.modalOverlay}>
             <View style={[styles.modalContent, { maxHeight: '90%' }]}>
               <View style={styles.modalHeader}>
-                <Pressable onPress={() => setSelectedBusiness(null)} style={styles.modalCloseBtn}>
-                  <X size={18} color="#0f172a" />
+                <Pressable oasisKind="icon" onPress={() => setSelectedBusiness(null)} style={styles.modalCloseBtn}>
+                  <X size={18} color={OASIS.colors.ink} />
                 </Pressable>
                 <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-                  <Store size={18} color="#0284c7" />
+                  <Store size={18} color={OASIS.colors.info} />
                   <Text style={styles.modalTitle}>تفاصيل المحل التجاري</Text>
                 </View>
               </View>
 
               <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
-                <View style={[styles.detailHeroBox, { backgroundColor: selectedBusiness.bg || '#f0f9ff' }]}>
+                <View style={[styles.detailHeroBox, { backgroundColor: selectedBusiness.bg || OASIS.colors.infoSoft }]}>
                   <View style={styles.detailHeroIconCircle}>
-                    <Text style={{ fontSize: 34 }}>{selectedBusiness.icon || '🏬'}</Text>
+                    <Text style={{ fontSize: 22 }}><selectedBusiness.Icon size={34} color={selectedBusiness.color || OASIS.colors.info} /></Text>
                   </View>
                   <View style={{ alignItems: 'center', marginTop: 10, gap: 4 }}>
                     <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
                       <Text style={styles.detailHeroTitle}>{selectedBusiness.name}</Text>
-                      {selectedBusiness.is_verified && <ShieldCheck size={18} color="#059669" />}
+                      {selectedBusiness.is_verified && <ShieldCheck size={18} color={OASIS.colors.primary} />}
                     </View>
                     <View style={styles.detailBadgeRow}>
-                      <Text style={[styles.detailCatPill, { color: selectedBusiness.color || '#0284c7' }]}>
+                      <Text style={[styles.detailCatPill, { color: selectedBusiness.color || OASIS.colors.info }]}>
                         {selectedBusiness.categoryLabel}
                       </Text>
                       <View style={styles.detailRatingPill}>
-                        <Star size={13} color="#f59e0b" fill="#f59e0b" />
-                        <Text style={{ fontSize: 12, fontWeight: '900', color: '#0f172a' }}>{selectedBusiness.rating}</Text>
-                        <Text style={{ fontSize: 11, color: '#64748b' }}>({selectedBusiness.reviews} تقييم)</Text>
+                        <Star size={13} color={OASIS.colors.warning} fill={OASIS.colors.warning} />
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: OASIS.colors.ink }}>{selectedBusiness.rating}</Text>
+                        <Text style={{ fontSize: 11, color: OASIS.colors.muted }}>({selectedBusiness.reviews} تقييم)</Text>
                       </View>
                     </View>
                   </View>
@@ -1212,20 +1245,20 @@ export default function Market() {
 
                 <View style={styles.detailStatusBanner}>
                   <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-                    <Clock size={16} color="#059669" />
-                    <Text style={{ fontSize: 13, fontWeight: '800', color: '#0f172a' }}>
+                    <Clock size={16} color={OASIS.colors.primary} />
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: OASIS.colors.ink }}>
                       {selectedBusiness.hours || 'متاح لخدمة الحي'}
                     </Text>
                   </View>
                   <View style={[styles.statusTag, selectedBusiness.openNow ? styles.statusTagOpen : styles.statusTagClosed]}>
-                    <Text style={[styles.statusTagText, selectedBusiness.openNow ? { color: '#15803d' } : { color: '#b91c1c' }]}>
-                      {selectedBusiness.openNow ? 'مفتوح الآن 🟢' : 'مغلق حالياً 🔴'}
+                    <Text style={[styles.statusTagText, selectedBusiness.openNow ? { color: '#15803d' } : { color: OASIS.colors.danger }]}>
+                      {selectedBusiness.openNow ? 'مفتوح الآن' : 'مغلق حالياً'}
                     </Text>
                   </View>
                 </View>
 
                 <View style={styles.detailLocationBanner}>
-                  <MapPin size={16} color="#059669" />
+                  <MapPin size={16} color={OASIS.colors.primary} />
                   <Text style={styles.detailLocationText}>
                     الموقع: {selectedBusiness.district ? `حي ${selectedBusiness.district}` : ''} {selectedBusiness.city ? `· ${selectedBusiness.city}` : ''}
                   </Text>
@@ -1234,7 +1267,7 @@ export default function Market() {
                 <View style={styles.detailActionsGrid}>
                   {Boolean(selectedBusiness.phone) && (
                     <Pressable style={styles.detailActionBtnCall} onPress={() => openPhone(selectedBusiness.phone)}>
-                      <Phone size={16} color="#0284c7" />
+                      <Phone size={16} color={OASIS.colors.info} />
                       <Text style={styles.detailActionBtnCallText}>اتصال مباشر</Text>
                     </Pressable>
                   )}
@@ -1251,11 +1284,11 @@ export default function Market() {
                     style={styles.detailActionBtnMap}
                     onPress={() => openMaps(`${selectedBusiness.name} ${selectedBusiness.district || ''} ${selectedBusiness.city || ''}`)}
                   >
-                    <Navigation size={16} color="#059669" />
+                    <Navigation size={16} color={OASIS.colors.primary} />
                     <Text style={styles.detailActionBtnMapText}>الخريطة</Text>
                   </Pressable>
                   <Pressable style={styles.detailActionBtnShare} onPress={() => void shareBusiness(selectedBusiness)}>
-                    <Share2 size={16} color="#475569" />
+                    <Share2 size={16} color={OASIS.colors.muted} />
                     <Text style={styles.detailActionBtnShareText}>مشاركة</Text>
                   </Pressable>
                 </View>
@@ -1273,8 +1306,8 @@ export default function Market() {
                     <View style={{ gap: 8, marginTop: 6 }}>
                       {selectedBusiness.features.map((feat: string, idx: number) => (
                         <View key={idx} style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8 }}>
-                          <CheckCircle2 size={16} color="#059669" />
-                          <Text style={{ fontSize: 13, color: '#334155', fontWeight: '700' }}>{feat}</Text>
+                          <CheckCircle2 size={16} color={OASIS.colors.primary} />
+                          <Text style={{ fontSize: 13, color: OASIS.colors.ink, fontWeight: '700' }}>{feat}</Text>
                         </View>
                       ))}
                     </View>
@@ -1296,30 +1329,30 @@ export default function Market() {
           <View style={styles.modalOverlay}>
             <View style={[styles.modalContent, { maxHeight: '90%' }]}>
               <View style={styles.modalHeader}>
-                <Pressable onPress={() => setSelectedEvent(null)} style={styles.modalCloseBtn}>
-                  <X size={18} color="#0f172a" />
+                <Pressable oasisKind="icon" onPress={() => setSelectedEvent(null)} style={styles.modalCloseBtn}>
+                  <X size={18} color={OASIS.colors.ink} />
                 </Pressable>
                 <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-                  <Calendar size={18} color="#059669" />
+                  <Calendar size={18} color={OASIS.colors.primary} />
                   <Text style={styles.modalTitle}>تفاصيل الفعالية والنشاط</Text>
                 </View>
               </View>
 
               <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
-                <View style={[styles.detailHeroBox, { backgroundColor: selectedEvent.bg || '#ecfdf5' }]}>
+                <View style={[styles.detailHeroBox, { backgroundColor: selectedEvent.bg || OASIS.colors.soft }]}>
                   <View style={styles.detailHeroIconCircle}>
-                    <Text style={{ fontSize: 34 }}>{selectedEvent.icon || '🗓️'}</Text>
+                    <Text style={{ fontSize: 22 }}><selectedEvent.Icon size={34} color={selectedEvent.color || OASIS.colors.primary} /></Text>
                   </View>
                   <View style={{ alignItems: 'center', marginTop: 10, gap: 4 }}>
                     <Text style={styles.detailHeroTitle}>{selectedEvent.title}</Text>
                     <View style={styles.detailBadgeRow}>
-                      <Text style={[styles.detailCatPill, { color: selectedEvent.color || '#059669' }]}>
+                      <Text style={[styles.detailCatPill, { color: selectedEvent.color || OASIS.colors.primary }]}>
                         {selectedEvent.categoryLabel}
                       </Text>
-                      <View style={[styles.detailRatingPill, { backgroundColor: '#ecfdf5', borderColor: '#a7f3d0' }]}>
-                        <Award size={13} color="#059669" />
-                        <Text style={{ fontSize: 12, fontWeight: '800', color: '#047857' }}>
-                          {selectedEvent.isFree ? 'دخول مجاني 🎟️' : 'تسجيل مسبق'}
+                      <View style={[styles.detailRatingPill, { backgroundColor: OASIS.colors.soft, borderColor: '#a7f3d0' }]}>
+                        <Award size={13} color={OASIS.colors.primary} />
+                        <Text style={{ fontSize: 12, fontWeight: '600', color: OASIS.colors.primary }}>
+                          {selectedEvent.isFree ? 'دخول مجاني' : 'تسجيل مسبق'}
                         </Text>
                       </View>
                     </View>
@@ -1328,16 +1361,16 @@ export default function Market() {
 
                 <View style={styles.detailStatusBanner}>
                   <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8 }}>
-                    <Users size={16} color="#059669" />
+                    <Users size={16} color={OASIS.colors.primary} />
                     <View>
-                      <Text style={{ fontSize: 11, color: '#64748b' }}>الجهة المنظمة</Text>
-                      <Text style={{ fontSize: 13, fontWeight: '800', color: '#0f172a' }}>{selectedEvent.organizer || 'أحد سكان الحي'}</Text>
+                      <Text style={{ fontSize: 11, color: OASIS.colors.muted }}>الجهة المنظمة</Text>
+                      <Text style={{ fontSize: 13, fontWeight: '600', color: OASIS.colors.ink }}>{selectedEvent.organizer || 'أحد سكان الحي'}</Text>
                     </View>
                   </View>
                   <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}>
-                    <Users size={14} color="#059669" />
-                    <Text style={{ fontSize: 12.5, fontWeight: '900', color: '#059669' }}>
-                      {selectedEvent.attendeesCount + (rsvpList[selectedEvent.id] ? 1 : 0)} جار مسجل
+                    <Users size={14} color={OASIS.colors.primary} />
+                    <Text style={{ fontSize: 12.5, fontWeight: '700', color: OASIS.colors.primary }}>
+                      {selectedEvent.attendeesCount || 0} جار مسجل
                     </Text>
                   </View>
                 </View>
@@ -1350,7 +1383,7 @@ export default function Market() {
                 </View>
 
                 <View style={styles.detailLocationBanner}>
-                  <MapPin size={16} color="#059669" />
+                  <MapPin size={16} color={OASIS.colors.primary} />
                   <Text style={styles.detailLocationText}>
                     نقطة التجمع: {selectedEvent.location} ({selectedEvent.district ? `حي ${selectedEvent.district}` : selectedEvent.city || ''})
                   </Text>
@@ -1358,19 +1391,20 @@ export default function Market() {
 
                 {/* RSVP Interactive Button */}
                 <View style={{ marginVertical: 12 }}>
-                  <Pressable
-                    style={[styles.bigRsvpBtn, rsvpList[selectedEvent.id] && styles.bigRsvpBtnActive]}
+                  <Pressable oasisKind="action"
+                    style={[styles.bigRsvpBtn, rsvpList[selectedEvent.id] && styles.bigRsvpBtnActive, attendeeActionBusy && { opacity: 0.65 }]}
                     onPress={() => toggleRsvp(selectedEvent.id)}
+                    disabled={attendeeActionBusy}
                   >
                     {rsvpList[selectedEvent.id] ? (
                       <>
-                        <Check size={20} color="#fff" />
+                        <Check size={20} color={OASIS.colors.surface} />
                         <Text style={styles.bigRsvpBtnText}>تم تسجيل حضورك بنجاح ✓ (انقر للإلغاء)</Text>
                       </>
                     ) : (
                       <>
-                        <Sparkles size={20} color="#fff" />
-                        <Text style={styles.bigRsvpBtnText}>تسجيل الحضور في الفعالية (سأحضر 🎉)</Text>
+                        <Sparkles size={20} color={OASIS.colors.surface} />
+                        <Text style={styles.bigRsvpBtnText}>تسجيل الحضور في الفعالية (سأحضر)</Text>
                       </>
                     )}
                   </Pressable>
@@ -1381,20 +1415,55 @@ export default function Market() {
                     style={styles.detailActionBtnMap}
                     onPress={() => openMaps(`${selectedEvent.location} ${selectedEvent.district || ''} ${selectedEvent.city || ''}`)}
                   >
-                    <Navigation size={16} color="#059669" />
+                    <Navigation size={16} color={OASIS.colors.primary} />
                     <Text style={styles.detailActionBtnMapText}>عرض الموقع بالخريطة</Text>
                   </Pressable>
                   <Pressable style={styles.detailActionBtnShare} onPress={() => void shareEvent(selectedEvent)}>
-                    <Share2 size={16} color="#475569" />
+                    <Share2 size={16} color={OASIS.colors.muted} />
                     <Text style={styles.detailActionBtnShareText}>مشاركة الدعوة</Text>
                   </Pressable>
                 </View>
 
                 <View style={styles.detailSectionBox}>
-                  <Text style={styles.detailSectionTitle}>عن الفعالية والنشاط ℹ️</Text>
-                  <Text style={styles.detailSectionDesc}>{selectedEvent.description}</Text>
+                  <Text style={styles.detailSectionTitle}>عن الفعالية والنشاط</Text>
+                  <Text style={styles.detailSectionDesc}>{selectedEvent.description || 'تفاصيل الفعالية سيضيفها المنظم قريباً.'}</Text>
                 </View>
+                {Array.isArray(selectedEvent.agenda) && selectedEvent.agenda.length > 0 && (
+                  <View style={styles.detailSectionBox}>
+                    <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 7 }}>
+                      <Calendar size={17} color={OASIS.colors.primary} />
+                      <Text style={styles.detailSectionTitle}>برنامج الفعالية</Text>
+                    </View>
+                    <View style={{ gap: 9, marginTop: 8 }}>
+                      {selectedEvent.agenda.map((entry: any, index: number) => (
+                        <View key={index} style={styles.eventAgendaRow}>
+                          <View style={styles.eventAgendaNumber}><Text style={styles.eventAgendaNumberText}>{index + 1}</Text></View>
+                          <Text style={[styles.detailSectionDesc, { flex: 1 }]}>{typeof entry === 'string' ? entry : entry?.title || entry?.description || String(entry)}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+                {selectedEvent.guidelines ? (
+                  <View style={styles.detailSectionBox}>
+                    <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 7 }}>
+                      <ShieldCheck size={17} color={OASIS.colors.primary} />
+                      <Text style={styles.detailSectionTitle}>إرشادات المشاركة</Text>
+                    </View>
+                    <Text style={[styles.detailSectionDesc, { marginTop: 7 }]}>{selectedEvent.guidelines}</Text>
+                  </View>
+                ) : null}
 
+
+                {selectedEvent.organizerId === profile?.id && (
+                  <View style={styles.detailSectionBox}>
+                    <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                      <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 7 }}><Users size={17} color={OASIS.colors.primary} /><Text style={styles.detailSectionTitle}>قائمة المشاركين في فعاليتك</Text></View>
+                      <Text style={{ fontSize: 11, color: OASIS.colors.muted, fontWeight: '700' }}>{eventAttendees.length} مشارك</Text>
+                    </View>
+                    {loadingAttendees ? <ActivityIndicator color={OASIS.colors.primary} style={{ marginTop: 10 }} /> : eventAttendees.length ? <View style={{ gap: 10, marginTop: 10 }}>{eventAttendees.map((attendee) => <View key={attendee.user_id} style={styles.attendeeRow}><View style={styles.attendeeAvatar}>{attendee.profile?.avatar_url ? <Image source={{ uri: attendee.profile.avatar_url }} style={StyleSheet.absoluteFillObject} /> : <User size={17} color={OASIS.colors.muted} />}</View><View style={{ flex: 1, alignItems: 'flex-end', gap: 2 }}><Text style={{ fontSize: 13, color: OASIS.colors.ink, fontWeight: '600' }}>{attendee.profile?.display_name || attendee.profile?.username || 'جارٍ مشارك'}</Text><Text style={{ fontSize: 11, color: OASIS.colors.muted }}>مسجل لحضور الفعالية</Text></View><BadgeCheck size={16} color={OASIS.colors.primary} /></View>)}</View> : <Text style={[styles.detailSectionDesc, { marginTop: 8 }]}>لا يوجد مشاركون مسجلون حتى الآن.</Text>}
+                  </View>
+                )}
                 <View style={{ height: 20 }} />
               </ScrollView>
             </View>
@@ -1410,11 +1479,11 @@ export default function Market() {
           <View style={styles.modalOverlay}>
             <View style={[styles.modalContent, { maxHeight: '90%' }]}>
               <View style={styles.modalHeader}>
-                <Pressable onPress={() => setSelectedProduct(null)} style={styles.modalCloseBtn}>
-                  <X size={18} color="#0f172a" />
+                <Pressable oasisKind="icon" onPress={() => setSelectedProduct(null)} style={styles.modalCloseBtn}>
+                  <X size={18} color={OASIS.colors.ink} />
                 </Pressable>
                 <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-                  <ShoppingBag size={18} color="#059669" />
+                  <ShoppingBag size={18} color={OASIS.colors.primary} />
                   <Text style={styles.modalTitle}>تفاصيل العرض والسلعة</Text>
                 </View>
               </View>
@@ -1433,21 +1502,21 @@ export default function Market() {
                   </View>
 
                   <Text style={styles.productModalSub}>
-                    {selectedProduct.shop_name ? `🏪 ${selectedProduct.shop_name}` : selectedProduct.subcategory || selectedProduct.category || 'عرض محلي'}
+                    {selectedProduct.shop_name ? selectedProduct.shop_name : selectedProduct.subcategory || selectedProduct.category || 'عرض محلي'}
                   </Text>
 
                   {/* Delivery & Status row */}
                   <View style={{ flexDirection: 'row-reverse', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
                     {selectedProduct.available_now && (
                       <View style={[styles.statusTag, styles.statusTagOpen]}>
-                        <Text style={[styles.statusTagText, { color: '#15803d' }]}>متاح الآن للتسليم 🟢</Text>
+                        <Text style={[styles.statusTagText, { color: '#15803d' }]}>متاح الآن للتسليم</Text>
                       </View>
                     )}
                     {(selectedProduct.delivery_modes || []).map((m: string) => {
                       const dm = getDeliveryMode(m);
                       return dm ? (
                         <View key={m} style={styles.deliveryPill}>
-                          <Text style={{ fontSize: 12 }}>{dm.emoji}</Text>
+                          {m === 'delivery' ? <Truck size={14} color={OASIS.colors.muted} /> : m === 'remote' ? <ExternalLink size={14} color={OASIS.colors.muted} /> : m === 'home_visit' ? <User size={14} color={OASIS.colors.muted} /> : m === 'at_shop' ? <Store size={14} color={OASIS.colors.muted} /> : <Package size={14} color={OASIS.colors.muted} />}
                           <Text style={styles.deliveryPillText}>{dm.label}</Text>
                         </View>
                       ) : null;
@@ -1456,7 +1525,7 @@ export default function Market() {
 
                   {/* Location Info */}
                   <View style={[styles.detailLocationBanner, { marginTop: 12 }]}>
-                    <MapPin size={16} color="#059669" />
+                    <MapPin size={16} color={OASIS.colors.primary} />
                     <Text style={styles.detailLocationText}>
                       الموقع: {selectedProduct.district ? `حي ${selectedProduct.district}` : ''} {selectedProduct.city ? `· ${selectedProduct.city}` : 'داخل الحي'}
                     </Text>
@@ -1464,7 +1533,7 @@ export default function Market() {
 
                   {/* Description */}
                   <View style={styles.detailSectionBox}>
-                    <Text style={styles.detailSectionTitle}>وصف السلعة والتفاصيل 📝</Text>
+                    <Text style={styles.detailSectionTitle}>وصف السلعة والتفاصيل</Text>
                     <Text style={styles.detailSectionDesc}>
                       {selectedProduct.description || 'عرض متاح من أحد سكان أو أسر الحي، تم فحصه لضمان أفضل تجربة.'}
                     </Text>
@@ -1475,22 +1544,22 @@ export default function Market() {
                     <View style={styles.detailStatusBanner}>
                       <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 10 }}>
                         {selectedProduct.profiles.avatar_url ? (
-                          <Image source={{ uri: selectedProduct.profiles.avatar_url }} style={{ width: 36, height: 36, borderRadius: 18 }} />
+                          <Image source={{ uri: selectedProduct.profiles.avatar_url }} style={{ width: 36, height: 36, borderRadius: 14 }} />
                         ) : (
-                          <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#d1fae5', alignItems: 'center', justifyContent: 'center' }}>
-                            <Text style={{ fontSize: 14, fontWeight: '900', color: '#047857' }}>
+                          <View style={{ width: 36, height: 36, borderRadius: 14, backgroundColor: OASIS.colors.soft, alignItems: 'center', justifyContent: 'center' }}>
+                            <Text style={{ fontSize: 14, fontWeight: '700', color: OASIS.colors.primary }}>
                               {selectedProduct.profiles.display_name?.[0] || 'ج'}
                             </Text>
                           </View>
                         )}
                         <View>
                           <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}>
-                            <Text style={{ fontSize: 13, fontWeight: '800', color: '#0f172a' }}>
+                            <Text style={{ fontSize: 13, fontWeight: '600', color: OASIS.colors.ink }}>
                               {selectedProduct.profiles.display_name || 'أحد الجيران'}
                             </Text>
-                            {selectedProduct.profiles.is_verified && <ShieldCheck size={14} color="#059669" />}
+                            {selectedProduct.profiles.is_verified && <ShieldCheck size={14} color={OASIS.colors.primary} />}
                           </View>
-                          <Text style={{ fontSize: 11, color: '#64748b' }}>معلن موثق بالحي</Text>
+                          <Text style={{ fontSize: 11, color: OASIS.colors.muted }}>معلن موثق بالحي</Text>
                         </View>
                       </View>
                     </View>
@@ -1509,25 +1578,25 @@ export default function Market() {
                     )}
                     {Boolean(selectedProduct.phone) && (
                       <Pressable style={styles.detailActionBtnCall} onPress={() => openPhone(selectedProduct.phone)}>
-                        <Phone size={16} color="#0284c7" />
+                        <Phone size={16} color={OASIS.colors.info} />
                         <Text style={styles.detailActionBtnCallText}>اتصال</Text>
                       </Pressable>
                     )}
                     <Pressable style={styles.detailActionBtnShare} onPress={() => void shareItem(selectedProduct)}>
-                      <Share2 size={16} color="#475569" />
+                      <Share2 size={16} color={OASIS.colors.muted} />
                       <Text style={styles.detailActionBtnShareText}>مشاركة</Text>
                     </Pressable>
                   </View>
 
                   {/* Open Dedicated Page Button */}
-                  <Pressable
+                  <Pressable oasisKind="action"
                     style={styles.fullPageBtn}
                     onPress={() => {
                       setSelectedProduct(null);
                       router.push({ pathname: '/service', params: { id: selectedProduct.id } });
                     }}
                   >
-                    <ExternalLink size={16} color="#fff" />
+                    <ExternalLink size={16} color={OASIS.colors.surface} />
                     <Text style={styles.fullPageBtnText}>فتح صفحة العرض المخصصة كاملة</Text>
                   </Pressable>
                 </View>
@@ -1544,10 +1613,10 @@ export default function Market() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Pressable onPress={() => setShowEventModal(false)} style={styles.modalCloseBtn}>
-                <X size={18} color="#0f172a" />
+              <Pressable oasisKind="icon" onPress={() => setShowEventModal(false)} style={styles.modalCloseBtn}>
+                <X size={18} color={OASIS.colors.ink} />
               </Pressable>
-              <Text style={styles.modalTitle}>إضافة فعالية جديدة للحي 📅</Text>
+              <Text style={styles.modalTitle}>إضافة فعالية جديدة للحي</Text>
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 480 }}>
@@ -1561,15 +1630,15 @@ export default function Market() {
               />
 
               <Text style={[styles.inputLabel, { marginTop: 12 }]}>تصنيف الفعالية</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row-reverse', gap: 6, paddingVertical: 4 }}>
+              <ScrollView style={{ direction: 'rtl' }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[{ flexDirection: 'row-reverse', gap: 6, paddingVertical: 4 }, { direction: 'ltr' }]}>
                 {EVENT_CATEGORIES.filter((c) => c.id !== 'all').map((c) => (
-                  <Pressable
+                  <Pressable oasisKind="chip"
                     key={c.id}
                     onPress={() => setEventCategoryChoice(c.id)}
                     style={[styles.quickChip, eventCategoryChoice === c.id && styles.quickChipActive]}
                   >
                     <Text style={[styles.quickText, eventCategoryChoice === c.id && styles.quickTextActive]}>
-                      {c.emoji} {c.label}
+                      {c.label}
                     </Text>
                   </Pressable>
                 ))}
@@ -1603,17 +1672,17 @@ export default function Market() {
                 multiline
               />
 
-              <Pressable
+              <Pressable oasisKind="action"
                 style={[styles.submitEventBtn, savingEvent && { opacity: 0.6 }]}
                 onPress={handleCreateEvent}
                 disabled={savingEvent}
               >
                 {savingEvent ? (
-                  <ActivityIndicator size="small" color="#fff" />
+                  <ActivityIndicator size="small" color={OASIS.colors.surface} />
                 ) : (
                   <>
-                    <Calendar size={18} color="#fff" />
-                    <Text style={styles.submitEventBtnText}>نشر الفعالية لسكان الحي 📢</Text>
+                    <Calendar size={18} color={OASIS.colors.surface} />
+                    <Text style={styles.submitEventBtnText}>نشر الفعالية لسكان الحي</Text>
                   </>
                 )}
               </Pressable>
@@ -1631,34 +1700,34 @@ function TypeCircle({ label, active, color, bg, Icon, count, onPress }: {
   return (
     <Pressable onPress={onPress} style={({ pressed }: any) => [styles.typeItem, pressed && { opacity: 0.75 }]}>
       <View style={[styles.typeCircle, { backgroundColor: active ? color : bg }, active && styles.typeCircleActive]}>
-        <Icon size={22} color={active ? '#fff' : color} />
+        <Icon size={22} color={active ? OASIS.colors.surface : color} />
         {count > 0 && (
-          <View style={[styles.typeCount, { borderColor: active ? color : '#fff' }]}>
+          <View style={[styles.typeCount, { borderColor: active ? color : OASIS.colors.surface }]}>
             <Text style={styles.typeCountText}>{count > 99 ? '99+' : count}</Text>
           </View>
         )}
       </View>
-      <Text style={[styles.typeLabel, active && { color, fontWeight: '900' }]} numberOfLines={1}>{label}</Text>
+      <Text style={[styles.typeLabel, active && { color, fontWeight: '700' }]} numberOfLines={1}>{label}</Text>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc', width: '100%' },
+  container: { flex: 1, backgroundColor: OASIS.colors.background, width: '100%' },
   inner: { width: '100%', maxWidth: 1100, alignSelf: 'center', paddingHorizontal: 16 },
 
   headerAddBtn: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#ecfdf5',
+    backgroundColor: OASIS.colors.soft,
     borderWidth: 1,
     borderColor: '#a7f3d0',
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 16,
   },
-  headerAddBtnText: { color: '#047857', fontSize: 12, fontWeight: '800' },
+  headerAddBtnText: { color: OASIS.colors.primary, fontSize: 12, fontWeight: '600' },
 
   // Hero Section
   heroSectionWrap: {
@@ -1666,10 +1735,10 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
   },
   heroCard: {
-    borderRadius: 20,
-    padding: 16,
-    shadowColor: '#059669',
-    shadowOpacity: 0.15,
+    borderRadius: 14,
+    padding: 14,
+    shadowColor: OASIS.colors.primary,
+    shadowOpacity: 0,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
     elevation: 4,
@@ -1697,7 +1766,7 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 10,
   },
-  heroBadgeText: { fontSize: 10.5, fontWeight: '800', color: '#fef08a' },
+  heroBadgeText: { fontSize: 11, fontWeight: '600', color: '#fef08a' },
   heroLocBadge: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
@@ -1707,9 +1776,9 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 10,
   },
-  heroLocText: { fontSize: 10.5, fontWeight: '700', color: '#a7f3d0' },
-  heroTitle: { fontSize: 20, fontWeight: '900', color: '#fff', textAlign: 'right', marginTop: 2 },
-  heroSubtitle: { fontSize: 12, color: '#d1fae5', textAlign: 'right', marginTop: 4, lineHeight: 18 },
+  heroLocText: { fontSize: 11, fontWeight: '700', color: '#a7f3d0' },
+  heroTitle: { fontSize: 20, fontWeight: '700', color: OASIS.colors.surface, textAlign: 'right', marginTop: 2 },
+  heroSubtitle: { fontSize: 12, color: OASIS.colors.soft, textAlign: 'right', marginTop: 4, lineHeight: 18 },
 
   // Live Neighborhood KPI Ribbon
   kpiRow: {
@@ -1725,19 +1794,39 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.12)',
   },
   kpiItem: { flex: 1, alignItems: 'center', gap: 2 },
-  kpiVal: { fontSize: 14, fontWeight: '900', color: '#fff' },
-  kpiLbl: { fontSize: 10, color: '#a7f3d0', fontWeight: '700' },
+  kpiVal: { fontSize: 14, fontWeight: '700', color: OASIS.colors.surface },
+  kpiLbl: { fontSize: 11, color: '#a7f3d0', fontWeight: '700' },
   kpiDivider: { width: 1, height: 22, backgroundColor: 'rgba(255,255,255,0.18)' },
 
+  filterControlsRow: { flexDirection: 'row-reverse', gap: 10, marginTop: 10 },
+  filterSelect: { flex: 1, minWidth: 0, flexDirection: 'row-reverse', alignItems: 'center', gap: 6, backgroundColor: OASIS.colors.background, borderWidth: 1, borderColor: OASIS.colors.line, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 11 },
+  filterSelectLabel: { fontSize: 11, color: OASIS.colors.muted, fontWeight: '700' },
+  filterSelectValue: { flex: 1, fontSize: 11.5, color: OASIS.colors.ink, fontWeight: '700', textAlign: 'right' },
+  filterHintRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, paddingTop: 10, paddingBottom: 2 },
+  filterHintText: { fontSize: 11, color: OASIS.colors.muted, fontWeight: '600' },
+  filterModalBackdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.35)', justifyContent: 'center', padding: 14 },
+  filterMenuCard: { backgroundColor: OASIS.colors.surface, borderRadius: 14, padding: 14, maxWidth: 520, width: '100%', alignSelf: 'center', maxHeight: '85%' },
+  filterMenuHeader: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: '#f1f5f9', marginBottom: 4 },
+  filterMenuTitle: { fontSize: 15, fontWeight: '700', color: OASIS.colors.ink },
+  filterMenuItem: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: OASIS.colors.background },
+  filterMenuItemText: { flex: 1, textAlign: 'right', fontSize: 13, color: OASIS.colors.ink, fontWeight: '700' },
+  filterMenuDivider: { height: 1, backgroundColor: OASIS.colors.line, marginVertical: 5 },
+  filterResetBtn: { alignItems: 'center', paddingVertical: 11, marginTop: 8, borderRadius: 10, backgroundColor: '#f1f5f9' },
+  filterResetText: { fontSize: 12, color: OASIS.colors.muted, fontWeight: '600' },
+  attendeeRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
+  eventAgendaRow: { flexDirection: 'row-reverse', alignItems: 'flex-start', gap: 9 },
+  eventAgendaNumber: { width: 25, height: 25, borderRadius: 9, backgroundColor: OASIS.colors.soft, alignItems: 'center', justifyContent: 'center' },
+  eventAgendaNumberText: { fontSize: 11, color: OASIS.colors.primary, fontWeight: '700' },
+  attendeeAvatar: { width: 36, height: 36, borderRadius: 18, overflow: 'hidden', backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' },
   // Sticky Wrap
   stickyWrap: {
-    backgroundColor: '#fff',
+    backgroundColor: OASIS.colors.surface,
     paddingBottom: 10,
     paddingTop: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
-    shadowColor: '#0f172a',
-    shadowOpacity: 0.04,
+    shadowColor: OASIS.colors.ink,
+    shadowOpacity: 0,
     shadowRadius: 10,
     elevation: 2,
     marginBottom: 4,
@@ -1762,23 +1851,23 @@ const styles = StyleSheet.create({
     borderRadius: 11,
   },
   segmentBtnActive: {
-    backgroundColor: '#059669',
-    shadowColor: '#059669',
-    shadowOpacity: 0.25,
+    backgroundColor: OASIS.colors.primary,
+    shadowColor: OASIS.colors.primary,
+    shadowOpacity: 0,
     shadowRadius: 4,
     elevation: 2,
   },
   segmentText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#64748b',
+    color: OASIS.colors.muted,
   },
   segmentTextActive: {
-    color: '#fff',
-    fontWeight: '900',
+    color: OASIS.colors.surface,
+    fontWeight: '700',
   },
   segmentCount: {
-    backgroundColor: '#e2e8f0',
+    backgroundColor: OASIS.colors.line,
     borderRadius: 10,
     paddingHorizontal: 5,
     paddingVertical: 1,
@@ -1787,19 +1876,19 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.25)',
   },
   segmentCountText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#475569',
+    fontSize: 11,
+    fontWeight: '600',
+    color: OASIS.colors.muted,
   },
   segmentCountTextActive: {
-    color: '#fff',
+    color: OASIS.colors.surface,
   },
 
   searchRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
   searchBox: { flex: 1, height: 46, borderRadius: 14, backgroundColor: '#f1f5f9', flexDirection: 'row-reverse', alignItems: 'center', paddingHorizontal: 14, gap: 8 },
-  searchInput: { flex: 1, color: '#0f172a', fontSize: 13.5, paddingVertical: 0, ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}) },
-  addBtn: { height: 46, minWidth: 46, paddingHorizontal: 14, borderRadius: 14, backgroundColor: '#059669', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 5 },
-  addBtnText: { color: '#fff', fontSize: 13, fontWeight: '900' },
+  searchInput: { flex: 1, color: OASIS.colors.ink, fontSize: 13.5, paddingVertical: 0, ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}) },
+  addBtn: { height: 46, minWidth: 46, paddingHorizontal: 14, borderRadius: 0, backgroundColor: 'transparent', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 5 },
+  addBtnText: { color: OASIS.colors.surface, fontSize: 13, fontWeight: '700' },
 
   // Sort Bar
   sortBar: {
@@ -1811,7 +1900,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#f1f5f9',
   },
-  sortBarLabel: { fontSize: 11, fontWeight: '800', color: '#64748b' },
+  sortBarLabel: { fontSize: 11, fontWeight: '600', color: OASIS.colors.muted },
   sortChip: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
@@ -1819,76 +1908,81 @@ const styles = StyleSheet.create({
     paddingHorizontal: 9,
     paddingVertical: 4,
     borderRadius: 12,
-    backgroundColor: '#f8fafc',
+    backgroundColor: OASIS.colors.background,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
   },
   sortChipActive: {
-    backgroundColor: '#059669',
-    borderColor: '#059669',
+    backgroundColor: OASIS.colors.primary,
+    borderColor: OASIS.colors.primary,
   },
-  sortChipText: { fontSize: 11, fontWeight: '700', color: '#475569' },
-  sortChipTextActive: { color: '#fff', fontWeight: '800' },
+  sortChipText: { fontSize: 11, fontWeight: '700', color: OASIS.colors.muted },
+  sortChipTextActive: { color: OASIS.colors.surface, fontWeight: '600' },
 
   // Category Icons Row
   typesScroll: { marginTop: 12 },
   typesRow: { flexDirection: 'row-reverse', gap: 14, paddingBottom: 4 },
   typeItem: { alignItems: 'center', width: 64 },
-  typeCircle: { width: 54, height: 54, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  typeCircleActive: { shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
-  typeCount: { position: 'absolute', top: -4, left: -4, minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, backgroundColor: '#0f172a', alignItems: 'center', justifyContent: 'center', borderWidth: 2 },
-  typeCountText: { color: '#fff', fontSize: 9, fontWeight: '900' },
-  typeLabel: { fontSize: 11.5, color: '#475569', fontWeight: '700', marginTop: 6 },
+  typeCircle: { width: 54, height: 54, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  typeCircleActive: { shadowColor: '#000', shadowOpacity: 0, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
+  typeCount: { position: 'absolute', top: -4, left: -4, minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, backgroundColor: OASIS.colors.ink, alignItems: 'center', justifyContent: 'center', borderWidth: 2 },
+  typeCountText: { color: OASIS.colors.surface, fontSize: 11, fontWeight: '700' },
+  typeLabel: { fontSize: 11.5, color: OASIS.colors.muted, fontWeight: '700', marginTop: 6 },
 
   quickRow: { flexDirection: 'row-reverse', gap: 8, paddingVertical: 10 },
-  quickChip: { paddingHorizontal: 13, paddingVertical: 7, borderRadius: 20, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0' },
-  quickChipActive: { backgroundColor: '#0f172a', borderColor: '#0f172a' },
-  quickText: { fontSize: 12, color: '#475569', fontWeight: '700' },
-  quickTextActive: { color: '#fff' },
+  quickChip: { paddingHorizontal: 13, paddingVertical: 7, borderRadius: 14, backgroundColor: OASIS.colors.surface, borderWidth: 1, borderColor: OASIS.colors.line },
+  quickChipActive: { backgroundColor: OASIS.colors.ink, borderColor: OASIS.colors.ink },
+  quickText: { fontSize: 12, color: OASIS.colors.muted, fontWeight: '700' },
+  quickTextActive: { color: OASIS.colors.surface },
 
   sectionHead: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, marginTop: 8 },
-  sectionTitle: { fontSize: 15.5, fontWeight: '900', color: '#0f172a', textAlign: 'right' },
-  seeAll: { fontSize: 12, color: '#059669', fontWeight: '800' },
+  sectionTitle: { fontSize: 15.5, fontWeight: '700', color: OASIS.colors.ink, textAlign: 'right' },
+  seeAll: { fontSize: 12, color: OASIS.colors.primary, fontWeight: '600' },
   resultCount: { fontSize: 11.5, color: '#94a3b8', fontWeight: '700' },
 
   grid: { flexDirection: 'row-reverse', flexWrap: 'wrap' },
+  list: { flexDirection: 'column', width: '100%' },
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 18,
+    backgroundColor: OASIS.colors.surface,
+    borderRadius: 14,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    shadowColor: '#0f172a',
-    shadowOpacity: 0.04,
+    borderColor: OASIS.colors.line,
+    shadowColor: OASIS.colors.ink,
+    shadowOpacity: 0,
     shadowRadius: 8,
     elevation: 2,
     ...(Platform.OS === 'web' ? ({ transition: 'transform 160ms ease, box-shadow 160ms ease', cursor: 'pointer' } as any) : {}),
   },
+  cardRow: { flexDirection: 'row-reverse', alignItems: 'stretch', minHeight: 124, borderRadius: 16 },
+  cardImageRow: { width: 112, height: 124, flexShrink: 0, borderRadius: 0 },
+  cardBodyRow: { flex: 1, minWidth: 0, justifyContent: 'center', padding: 12 },
   cardHover: {
     transform: [{ translateY: -3 }],
-    shadowColor: '#0f172a',
-    shadowOpacity: 0.1,
+    shadowColor: OASIS.colors.ink,
+    shadowOpacity: 0,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 8 },
     borderColor: '#cbd5e1',
   },
   cardImage: { alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative' },
   typeBadge: { position: 'absolute', top: 8, right: 8, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 },
-  typeBadgeText: { fontSize: 10, fontWeight: '900' },
+  typeBadgeText: { fontSize: 11, fontWeight: '700' },
   availableBadgePill: { position: 'absolute', top: 8, left: 8, backgroundColor: 'rgba(255,255,255,0.95)', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2, flexDirection: 'row-reverse', alignItems: 'center', gap: 3 },
   availableDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#22c55e' },
-  availableBadgeText: { fontSize: 9.5, fontWeight: '900', color: '#15803d' },
+  availableBadgeText: { fontSize: 11, fontWeight: '700', color: '#15803d' },
   cardTopActions: { position: 'absolute', bottom: 8, left: 8, flexDirection: 'row', gap: 5 },
-  shareFab: { width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.94)', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 3, elevation: 2 },
+  shareFab: { width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.94)', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0, shadowRadius: 3, elevation: 2 },
   cardBody: { padding: 10, paddingTop: 9 },
-  cardTitle: { fontSize: 13.5, fontWeight: '900', color: '#0f172a', textAlign: 'right' },
-  cardSub: { fontSize: 11.5, color: '#64748b', textAlign: 'right', marginTop: 2, lineHeight: 16 },
+  cardTitle: { fontSize: 13.5, fontWeight: '700', color: OASIS.colors.ink, textAlign: 'right' },
+  cardSub: { fontSize: 11.5, color: OASIS.colors.muted, textAlign: 'right', marginTop: 2, lineHeight: 16 },
   cardFooter: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginTop: 7, gap: 4 },
-  cardPrice: { fontSize: 13.5, fontWeight: '900', color: '#059669', flexShrink: 1 },
-  cardModes: { fontSize: 11 },
-  cardTimeText: { fontSize: 10, color: '#94a3b8', fontWeight: '600' },
+  cardPrice: { fontSize: 13.5, fontWeight: '700', color: OASIS.colors.primary, flexShrink: 1 },
+  cardModes: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  cardModeIcon: { width: 22, height: 22, borderRadius: 7, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' },
+  cardTimeText: { fontSize: 11, color: '#94a3b8', fontWeight: '600' },
   cardMeta: { flexDirection: 'row-reverse', alignItems: 'center', gap: 3, marginTop: 6 },
-  cardMetaText: { fontSize: 10.5, color: '#94a3b8', fontWeight: '600', flexShrink: 1 },
+  cardMetaText: { fontSize: 11, color: '#94a3b8', fontWeight: '600', flexShrink: 1 },
   cardDetailsHintRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
@@ -1897,9 +1991,9 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingTop: 6,
     borderTopWidth: 1,
-    borderTopColor: '#f8fafc',
+    borderTopColor: OASIS.colors.background,
   },
-  cardDetailsHintText: { fontSize: 11, fontWeight: '800', color: '#059669' },
+  cardDetailsHintText: { fontSize: 11, fontWeight: '600', color: OASIS.colors.primary },
 
   // Business Card Action Buttons
   businessActionsRow: {
@@ -1916,55 +2010,55 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
-    backgroundColor: '#f0f9ff',
+    backgroundColor: OASIS.colors.infoSoft,
     paddingVertical: 6,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#bae6fd',
   },
-  bizBtnCallText: { fontSize: 11, fontWeight: '800', color: '#0284c7' },
+  bizBtnCallText: { fontSize: 11, fontWeight: '600', color: OASIS.colors.info },
   bizBtnWa: {
     flex: 1,
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
-    backgroundColor: '#f0fdf4',
+    backgroundColor: OASIS.colors.soft,
     paddingVertical: 6,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#bbf7d0',
   },
-  bizBtnWaText: { fontSize: 11, fontWeight: '800', color: '#15803d' },
+  bizBtnWaText: { fontSize: 11, fontWeight: '600', color: '#15803d' },
   bizBtnMap: {
     flex: 1,
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
-    backgroundColor: '#f8fafc',
+    backgroundColor: OASIS.colors.background,
     paddingVertical: 6,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
   },
-  bizBtnMapText: { fontSize: 11, fontWeight: '800', color: '#475569' },
+  bizBtnMapText: { fontSize: 11, fontWeight: '600', color: OASIS.colors.muted },
 
   // Event Card Elements
   eventInfoBox: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: OASIS.colors.background,
     borderRadius: 10,
     padding: 8,
     marginTop: 8,
     borderWidth: 1,
     borderColor: '#f1f5f9',
   },
-  eventInfoText: { fontSize: 11, color: '#334155', fontWeight: '700' },
+  eventInfoText: { fontSize: 11, color: OASIS.colors.ink, fontWeight: '700' },
   rsvpBtn: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#ecfdf5',
+    backgroundColor: OASIS.colors.soft,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 8,
@@ -1972,64 +2066,64 @@ const styles = StyleSheet.create({
     borderColor: '#a7f3d0',
   },
   rsvpBtnActive: {
-    backgroundColor: '#059669',
-    borderColor: '#059669',
+    backgroundColor: OASIS.colors.primary,
+    borderColor: OASIS.colors.primary,
   },
-  rsvpBtnText: { fontSize: 11, fontWeight: '900', color: '#059669' },
+  rsvpBtnText: { fontSize: 11, fontWeight: '700', color: OASIS.colors.primary },
 
   // Empty State
-  emptyState: { alignItems: 'center', paddingVertical: 48, paddingHorizontal: 20, backgroundColor: '#fff', borderRadius: 20, borderWidth: 1, borderColor: '#e2e8f0', marginVertical: 8 },
-  emptyIcon: { width: 64, height: 64, borderRadius: 22, backgroundColor: '#ecfdf5', alignItems: 'center', justifyContent: 'center' },
-  emptyTitle: { fontSize: 15.5, fontWeight: '900', color: '#0f172a', marginTop: 12 },
-  emptyText: { fontSize: 12.5, color: '#64748b', marginTop: 6, textAlign: 'center', lineHeight: 19, maxWidth: 380 },
-  emptyBtn: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, backgroundColor: '#059669', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, marginTop: 16 },
-  emptyBtnText: { color: '#fff', fontSize: 13, fontWeight: '900' },
+  emptyState: { alignItems: 'center', paddingVertical: 24, paddingHorizontal: 20, backgroundColor: OASIS.colors.surface, borderRadius: 14, borderWidth: 1, borderColor: OASIS.colors.line, marginVertical: 8 },
+  emptyIcon: { width: 64, height: 64, borderRadius: 14, backgroundColor: OASIS.colors.soft, alignItems: 'center', justifyContent: 'center' },
+  emptyTitle: { fontSize: 15.5, fontWeight: '700', color: OASIS.colors.ink, marginTop: 12 },
+  emptyText: { fontSize: 12.5, color: OASIS.colors.muted, marginTop: 6, textAlign: 'center', lineHeight: 19, maxWidth: 380 },
+  emptyBtn: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, backgroundColor: 'transparent', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 0, marginTop: 16 },
+  emptyBtnText: { color: OASIS.colors.surface, fontSize: 13, fontWeight: '700' },
 
   // Modals Core
   modalOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.65)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 18, paddingBottom: 32 },
+  modalContent: { backgroundColor: OASIS.colors.surface, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 18, paddingBottom: 24 },
   modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#f1f5f9', paddingBottom: 14, marginBottom: 14 },
-  modalTitle: { fontSize: 16, fontWeight: '900', color: '#0f172a' },
+  modalTitle: { fontSize: 16, fontWeight: '700', color: OASIS.colors.ink },
   modalCloseBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' },
-  inputLabel: { fontSize: 12, fontWeight: '800', color: '#334155', textAlign: 'right', marginBottom: 6 },
-  modalInput: { backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9, fontSize: 13, color: '#0f172a', textAlign: 'right' },
-  submitEventBtn: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#059669', borderRadius: 14, paddingVertical: 13, marginTop: 18 },
-  submitEventBtnText: { color: '#fff', fontSize: 13, fontWeight: '900' },
+  inputLabel: { fontSize: 12, fontWeight: '600', color: OASIS.colors.ink, textAlign: 'right', marginBottom: 6 },
+  modalInput: { backgroundColor: OASIS.colors.background, borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9, fontSize: 13, color: OASIS.colors.ink, textAlign: 'right' },
+  submitEventBtn: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: OASIS.colors.primary, borderRadius: 14, paddingVertical: 13, marginTop: 18 },
+  submitEventBtnText: { color: OASIS.colors.surface, fontSize: 13, fontWeight: '700' },
 
   // Detailed Modals Elements
-  detailHeroBox: { borderRadius: 20, padding: 18, alignItems: 'center', marginBottom: 14 },
-  detailHeroIconCircle: { width: 68, height: 68, borderRadius: 34, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 8, elevation: 3 },
-  detailHeroTitle: { fontSize: 19, fontWeight: '900', color: '#0f172a', textAlign: 'center' },
+  detailHeroBox: { borderRadius: 14, padding: 18, alignItems: 'center', marginBottom: 14 },
+  detailHeroIconCircle: { width: 68, height: 68, borderRadius: 34, backgroundColor: OASIS.colors.surface, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0, shadowRadius: 8, elevation: 3 },
+  detailHeroTitle: { fontSize: 19, fontWeight: '700', color: OASIS.colors.ink, textAlign: 'center' },
   detailBadgeRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginTop: 6 },
-  detailCatPill: { fontSize: 12, fontWeight: '800', backgroundColor: 'rgba(255,255,255,0.92)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  detailRatingPill: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, backgroundColor: '#fff', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, borderWidth: 1, borderColor: '#fef3c7' },
+  detailCatPill: { fontSize: 12, fontWeight: '600', backgroundColor: 'rgba(255,255,255,0.92)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  detailRatingPill: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, backgroundColor: OASIS.colors.surface, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, borderWidth: 1, borderColor: '#fef3c7' },
 
   detailStatusBanner: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#f8fafc',
+    backgroundColor: OASIS.colors.background,
     padding: 12,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
     marginBottom: 10,
   },
   statusTag: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
   statusTagOpen: { backgroundColor: '#dcfce7' },
   statusTagClosed: { backgroundColor: '#fee2e2' },
-  statusTagText: { fontSize: 11, fontWeight: '800' },
+  statusTagText: { fontSize: 11, fontWeight: '600' },
 
   detailLocationBanner: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#f8fafc',
+    backgroundColor: OASIS.colors.background,
     padding: 11,
     borderRadius: 12,
     marginBottom: 12,
   },
-  detailLocationText: { fontSize: 12.5, fontWeight: '700', color: '#334155', flex: 1, textAlign: 'right' },
+  detailLocationText: { fontSize: 12.5, fontWeight: '700', color: OASIS.colors.ink, flex: 1, textAlign: 'right' },
 
   detailActionsGrid: { flexDirection: 'row-reverse', gap: 8, marginBottom: 14 },
   detailActionBtnCall: {
@@ -2038,39 +2132,39 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#eff6ff',
+    backgroundColor: OASIS.colors.infoSoft,
     borderWidth: 1,
     borderColor: '#bfdbfe',
     borderRadius: 12,
     paddingVertical: 10,
   },
-  detailActionBtnCallText: { fontSize: 12, fontWeight: '800', color: '#0284c7' },
+  detailActionBtnCallText: { fontSize: 12, fontWeight: '600', color: OASIS.colors.info },
   detailActionBtnWa: {
     flex: 1.2,
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#ecfdf5',
+    backgroundColor: OASIS.colors.soft,
     borderWidth: 1,
     borderColor: '#a7f3d0',
     borderRadius: 12,
     paddingVertical: 10,
   },
-  detailActionBtnWaText: { fontSize: 12, fontWeight: '800', color: '#059669' },
+  detailActionBtnWaText: { fontSize: 12, fontWeight: '600', color: OASIS.colors.primary },
   detailActionBtnMap: {
     flex: 1,
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#f8fafc',
+    backgroundColor: OASIS.colors.background,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: OASIS.colors.line,
     borderRadius: 12,
     paddingVertical: 10,
   },
-  detailActionBtnMapText: { fontSize: 12, fontWeight: '800', color: '#059669' },
+  detailActionBtnMapText: { fontSize: 12, fontWeight: '600', color: OASIS.colors.primary },
   detailActionBtnShare: {
     flex: 0.8,
     flexDirection: 'row-reverse',
@@ -2081,11 +2175,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 10,
   },
-  detailActionBtnShareText: { fontSize: 12, fontWeight: '800', color: '#475569' },
+  detailActionBtnShareText: { fontSize: 12, fontWeight: '600', color: OASIS.colors.muted },
 
-  detailSectionBox: { backgroundColor: '#f8fafc', borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#f1f5f9' },
-  detailSectionTitle: { fontSize: 14, fontWeight: '900', color: '#0f172a', textAlign: 'right', marginBottom: 6 },
-  detailSectionDesc: { fontSize: 13, color: '#475569', lineHeight: 20, textAlign: 'right' },
+  detailSectionBox: { backgroundColor: OASIS.colors.background, borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#f1f5f9' },
+  detailSectionTitle: { fontSize: 14, fontWeight: '700', color: OASIS.colors.ink, textAlign: 'right', marginBottom: 6 },
+  detailSectionDesc: { fontSize: 13, color: OASIS.colors.muted, lineHeight: 20, textAlign: 'right' },
 
   // Big RSVP button
   bigRsvpBtn: {
@@ -2093,35 +2187,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#059669',
+    backgroundColor: OASIS.colors.primary,
     paddingVertical: 14,
     borderRadius: 14,
-    shadowColor: '#059669',
-    shadowOpacity: 0.3,
+    shadowColor: OASIS.colors.primary,
+    shadowOpacity: 0,
     shadowRadius: 8,
     elevation: 4,
   },
   bigRsvpBtnActive: {
-    backgroundColor: '#047857',
+    backgroundColor: OASIS.colors.primary,
   },
-  bigRsvpBtnText: { color: '#fff', fontSize: 14, fontWeight: '900' },
+  bigRsvpBtnText: { color: OASIS.colors.surface, fontSize: 14, fontWeight: '700' },
 
   // Product Preview Modal Elements
-  productModalImgWrap: { width: '100%', height: 210, borderRadius: 18, overflow: 'hidden', marginBottom: 10, backgroundColor: '#f1f5f9' },
-  productModalTitle: { fontSize: 18, fontWeight: '900', color: '#0f172a', textAlign: 'right', flex: 1 },
-  productModalPrice: { fontSize: 18, fontWeight: '900', color: '#059669' },
-  productModalSub: { fontSize: 13, color: '#64748b', textAlign: 'right', marginTop: 4 },
+  productModalImgWrap: { width: '100%', height: 210, borderRadius: 14, overflow: 'hidden', marginBottom: 10, backgroundColor: '#f1f5f9' },
+  productModalTitle: { fontSize: 18, fontWeight: '700', color: OASIS.colors.ink, textAlign: 'right', flex: 1 },
+  productModalPrice: { fontSize: 18, fontWeight: '700', color: OASIS.colors.primary },
+  productModalSub: { fontSize: 13, color: OASIS.colors.muted, textAlign: 'right', marginTop: 4 },
   deliveryPill: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, backgroundColor: '#f1f5f9', paddingHorizontal: 9, paddingVertical: 4, borderRadius: 10 },
-  deliveryPillText: { fontSize: 11, fontWeight: '700', color: '#334155' },
+  deliveryPillText: { fontSize: 11, fontWeight: '700', color: OASIS.colors.ink },
   fullPageBtn: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#0f172a',
+    backgroundColor: OASIS.colors.ink,
     borderRadius: 14,
     paddingVertical: 13,
     marginTop: 14,
   },
-  fullPageBtnText: { color: '#fff', fontSize: 13, fontWeight: '900' },
+  fullPageBtnText: { color: OASIS.colors.surface, fontSize: 13, fontWeight: '700' },
 });

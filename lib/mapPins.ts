@@ -1,3 +1,4 @@
+import { OASIS } from './oasis';
 import { supabase } from './supabase';
 import {
   SAUDI_REGIONS,
@@ -40,15 +41,15 @@ export const MAP_PIN_KINDS: Record<
   MapPinKind,
   { label: string; short: string; color: string; emoji: string }
 > = {
-  question: { label: 'أسئلة واستفسارات', short: 'أسئلة', color: '#2563EB', emoji: '؟' },
+  question: { label: 'أسئلة واستفسارات', short: 'أسئلة', color: OASIS.colors.info, emoji: '؟' },
   tool: { label: 'إعارة أدوات', short: 'إعارة', color: '#7C3AED', emoji: '🧰' },
-  emergency: { label: 'تنبيهات طارئة', short: 'طارئ', color: '#DC2626', emoji: '🚨' },
-  request: { label: 'طلبات مساعدة', short: 'طلبات', color: '#F59E0B', emoji: '🤝' },
-  business: { label: 'محلات وخدمات', short: 'محلات', color: '#059669', emoji: '🏪' },
-  carpool: { label: 'توصيل مدارس', short: 'توصيل', color: '#059669', emoji: '🚗' },
+  emergency: { label: 'تنبيهات طارئة', short: 'طارئ', color: OASIS.colors.danger, emoji: '🚨' },
+  request: { label: 'طلبات مساعدة', short: 'طلبات', color: OASIS.colors.warning, emoji: '🤝' },
+  business: { label: 'محلات وخدمات', short: 'محلات', color: OASIS.colors.primary, emoji: '🏪' },
+  carpool: { label: 'توصيل مدارس', short: 'توصيل', color: OASIS.colors.primary, emoji: '🚗' },
   event: { label: 'فعاليات الحي', short: 'فعاليات', color: '#DB2777', emoji: '🎉' },
-  marketplace: { label: 'إعلانات وسوق الحي', short: 'السوق', color: '#D97706', emoji: '🛍️' },
-  alert: { label: 'تنبيهات الحي', short: 'تنبيهات', color: '#B91C1C', emoji: '⚠️' },
+  marketplace: { label: 'إعلانات وسوق الحي', short: 'السوق', color: OASIS.colors.gold, emoji: '🛍️' },
+  alert: { label: 'تنبيهات الحي', short: 'تنبيهات', color: OASIS.colors.danger, emoji: '⚠️' },
 };
 
 export const MAP_PIN_ORDER: MapPinKind[] = [
@@ -168,6 +169,7 @@ export function resolvePinPosition(
     }
   }
 
+  if (!blur) return null; // Public destinations require recorded coordinates, never a scattered city centre.
   const center = findPlaceCenter(row.city, row.district);
   if (!center) return null;
   const spread = normalizeSaudiLocationName(row.district || '') ? DISTRICT_SPREAD : CITY_SPREAD;
@@ -211,7 +213,7 @@ async function safeRows(
 ): Promise<any[]> {
   try {
     const result = await build();
-    return result?.data ?? fallback;
+    return (result?.data ?? fallback).filter((row: any) => !/بيانات تجريبية|متجر محلي تجريبي|خدمة تجريبية|شبه واقعية|synthetic|mock data|demo data/i.test(String(row.description || '') + ' ' + String(row.body || '')));
   } catch {
     return fallback;
   }
@@ -222,7 +224,7 @@ async function safeRows(
  * Every query is defensive, so a missing column or table degrades instead of breaking.
  */
 export async function loadMapPins(limit = 220): Promise<MapPin[]> {
-  const [questionRows, requestRows, businessRows, directoryRows, servicesRows, carpoolRows, eventRows, marketplaceRows, alertRows] = await Promise.all([
+  const [questionRows, requestRows, businessRows, servicesRows, carpoolRows, eventRows, marketplaceRows, alertRows] = await Promise.all([
     safeRows(() =>
       supabase.from('questions').select('*').order('created_at', { ascending: false }).limit(limit),
     ),
@@ -237,9 +239,6 @@ export async function loadMapPins(limit = 220): Promise<MapPin[]> {
     ),
     safeRows(() =>
       supabase.from('businesses').select('*').not('latitude', 'is', null).limit(limit),
-    ),
-    safeRows(() =>
-      supabase.from('business_directory').select('*').limit(limit),
     ),
     safeRows(() =>
       supabase.from('services').select('*').eq('moderation_status', 'approved').order('created_at', { ascending: false }).limit(limit),
@@ -373,12 +372,7 @@ export async function loadMapPins(limit = 220): Promise<MapPin[]> {
     });
   });
 
-  const shops = [
-    ...businessRows.map((row: any) => ({ row, table: 'businesses' })),
-    ...directoryRows
-      .filter((row: any) => !businessRows.some((b: any) => b.id === row?.id))
-      .map((row: any) => ({ row, table: 'business_directory' })),
-  ];
+  const shops = businessRows.map((row: any) => ({ row, table: 'businesses' }));
 
   shops.forEach(({ row, table }: { row: any; table: string }) => {
     if (!row?.id) return;
@@ -427,6 +421,8 @@ export async function loadMapPins(limit = 220): Promise<MapPin[]> {
     const position = resolvePinPosition(
       {
         id: `service-${row.id}`,
+        lat: row.details?.latitude,
+        lng: row.details?.longitude,
         city: row.city,
         district: row.district,
       },

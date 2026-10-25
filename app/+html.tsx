@@ -1,3 +1,4 @@
+import { OASIS } from '@/lib/oasis';
 import { ScrollViewStyleReset } from 'expo-router/html';
 import type { PropsWithChildren } from 'react';
 
@@ -26,7 +27,7 @@ export default function Root({ children }: PropsWithChildren) {
 
         {/* PWA / Web Manifest */}
         <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#065f46" />
+        <meta name="theme-color" content={OASIS.colors.deep} />
 
         {/* Apple iOS Web App & Push Notification Requirements */}
         <meta name="apple-mobile-web-app-capable" content="yes" />

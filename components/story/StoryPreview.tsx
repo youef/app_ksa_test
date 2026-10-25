@@ -1,15 +1,7 @@
+import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
+import { OASIS } from '@/lib/oasis';
 import React, { useMemo, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Image,
-  PanResponder,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Image, PanResponder, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   Camera,
@@ -72,7 +64,7 @@ interface Props {
 }
 
 const TEXT_COLORS = [
-  '#FFFFFF', '#111827', '#F87171', '#FBBF24',
+  OASIS.colors.surface, OASIS.colors.ink, '#F87171', '#FBBF24',
   '#34D399', '#60A5FA', '#C084FC', '#FB7185',
 ];
 
@@ -90,7 +82,7 @@ export function StoryPreview(props: Props) {
   const [interactiveType, setInteractiveType] = useState<InteractiveType>('none');
   const [audience, setAudience] = useState<Audience>('everyone');
   const [customAudience, setCustomAudience] = useState('');
-  const [textColor, setTextColor] = useState('#FFFFFF');
+  const [textColor, setTextColor] = useState<string>(OASIS.colors.surface);
   const [fontSize, setFontSize] = useState(24);
   const [fontFamily, setFontFamily] = useState('System');
   const [rotation, setRotation] = useState(0);
@@ -246,7 +238,7 @@ export function StoryPreview(props: Props) {
       ) : null}
 
       <View style={styles.toolbar}>
-        <Pressable
+        <Pressable oasisKind="icon"
           onPress={props.onClose}
           style={styles.toolBtn}
           hitSlop={8}
@@ -264,7 +256,7 @@ export function StoryPreview(props: Props) {
           </Text>
         </View>
 
-        <Pressable
+        <Pressable oasisVariant="primary" oasisKind="action"
           style={[styles.publishBtn, disabled && styles.disabled]}
           onPress={publish}
           disabled={disabled}
@@ -290,7 +282,7 @@ export function StoryPreview(props: Props) {
             {renderText(false)}
           </View>
         ) : (
-          <View style={styles.pickCard}>
+          <OasisSurface oasisSurface="card" style={styles.pickCard}>
             <View style={styles.pickIcon}>
               <UploadCloud size={32} color={SC.primary} />
             </View>
@@ -298,15 +290,15 @@ export function StoryPreview(props: Props) {
             <Text style={styles.pickSub}>
               اختر صورة من جهازك أو التقط صورة بالكاميرا
             </Text>
-            <Pressable style={styles.pickBtn} onPress={props.onPickImages}>
+            <Pressable oasisKind="action" style={styles.pickBtn} onPress={props.onPickImages}>
               <UploadCloud size={18} color={SC.white} />
               <Text style={styles.pickBtnText}>معرض الصور / ملفات الجهاز</Text>
             </Pressable>
-            <Pressable style={styles.cameraBtn} onPress={props.onTakePhoto}>
+            <Pressable oasisKind="action" style={styles.cameraBtn} onPress={props.onTakePhoto}>
               <Camera size={18} color={SC.primary} />
               <Text style={styles.cameraBtnText}>التقاط بالكاميرا</Text>
             </Pressable>
-          </View>
+          </OasisSurface>
         )}
       </View>
 
@@ -402,7 +394,7 @@ export function StoryPreview(props: Props) {
 
         <View style={styles.controlRow}>
           {FONT_OPTIONS.map((font) => (
-            <Pressable
+            <Pressable oasisKind="chip"
               key={font.value}
               onPress={() => setFontFamily(font.value)}
               style={[
@@ -417,19 +409,19 @@ export function StoryPreview(props: Props) {
 
         <Text style={styles.sectionTitle}>التفاعل</Text>
         <View style={styles.controlRow}>
-          <Pressable
+          <Pressable oasisKind="chip"
             onPress={() => setInteractiveType('none')}
             style={[styles.choiceChip, interactiveType === 'none' && styles.choiceChipActive]}
           >
             <Text style={styles.choiceText}>بدون</Text>
           </Pressable>
-          <Pressable
+          <Pressable oasisKind="chip"
             onPress={() => setInteractiveType('poll')}
             style={[styles.choiceChip, interactiveType === 'poll' && styles.choiceChipActive]}
           >
             <Text style={styles.choiceText}>استطلاع رأي</Text>
           </Pressable>
-          <Pressable
+          <Pressable oasisKind="chip"
             onPress={() => setInteractiveType('question')}
             style={[styles.choiceChip, interactiveType === 'question' && styles.choiceChipActive]}
           >
@@ -488,7 +480,7 @@ export function StoryPreview(props: Props) {
             ['friends', 'الأصدقاء'],
             ['custom', 'قائمة مخصصة'],
           ] as const).map(([value, label]) => (
-            <Pressable
+            <Pressable oasisKind="chip"
               key={value}
               onPress={() => {
                 setAudience(value);
@@ -531,7 +523,7 @@ export function StoryPreview(props: Props) {
       {!props.publishing && !retrying && publishError ? (
         <View style={[styles.feedback, styles.errorFeedback]}>
           <Text style={styles.feedbackText}>{publishError}</Text>
-          <Pressable onPress={publish} style={styles.retryButton}>
+          <Pressable oasisKind="action" onPress={publish} style={styles.retryButton}>
             <RotateCw size={15} color={SC.white} />
             <Text style={styles.retryText}>إعادة المحاولة</Text>
           </Pressable>
@@ -580,7 +572,7 @@ const styles = StyleSheet.create({
   toolBtn: {
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: 14,
     backgroundColor: SC.scrim,
     justifyContent: 'center',
     alignItems: 'center',
@@ -596,18 +588,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.15)',
   },
-  counterText: { color: SC.white, fontSize: 12, fontWeight: '800' },
+  counterText: { color: SC.white, fontSize: 12, fontWeight: '600' },
   publishBtn: {
     backgroundColor: SC.primary,
     paddingHorizontal: 16,
     paddingVertical: 8,
-    borderRadius: 20,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
     minWidth: 74,
   },
   publishInner: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5 },
-  publishLabel: { color: SC.white, fontWeight: '800', fontSize: 13 },
+  publishLabel: { color: SC.white, fontWeight: '600', fontSize: 13 },
   disabled: { opacity: 0.5 },
   canvas: {
     flex: 1,
@@ -623,7 +615,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   storyText: {
-    fontWeight: '900',
+    fontWeight: '700',
     textAlign: 'center',
     width: '100%',
     lineHeight: 38,
@@ -647,11 +639,11 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     maxWidth: '95%',
   },
-  caption: { fontWeight: '800', textAlign: 'center' },
+  caption: { fontWeight: '600', textAlign: 'center' },
   pickCard: {
     backgroundColor: 'rgba(255,255,255,0.96)',
-    borderRadius: 20,
-    padding: 20,
+    borderRadius: 14,
+    padding: 14,
     alignItems: 'center',
     width: '100%',
     maxWidth: 360,
@@ -659,13 +651,13 @@ const styles = StyleSheet.create({
   pickIcon: {
     width: 60,
     height: 60,
-    borderRadius: 30,
+    borderRadius: 14,
     backgroundColor: SC.mintSoft,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 10,
   },
-  pickTitle: { fontSize: 16, fontWeight: '900', color: SC.panelDeep, marginBottom: 4 },
+  pickTitle: { fontSize: 16, fontWeight: '700', color: SC.panelDeep, marginBottom: 4 },
   pickSub: { fontSize: 12, color: SC.mutedSoft, textAlign: 'center', marginBottom: 16 },
   pickBtn: {
     flexDirection: 'row-reverse',
@@ -678,7 +670,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 8,
   },
-  pickBtnText: { color: SC.white, fontSize: 13, fontWeight: '800' },
+  pickBtnText: { color: SC.white, fontSize: 13, fontWeight: '600' },
   cameraBtn: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
@@ -691,7 +683,7 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
     borderRadius: 12,
   },
-  cameraBtnText: { color: SC.primary, fontSize: 13, fontWeight: '800' },
+  cameraBtnText: { color: SC.primary, fontSize: 13, fontWeight: '600' },
   editorPanel: {
     maxHeight: 220,
     flexGrow: 0,
@@ -703,7 +695,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     color: SC.white,
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '700',
     textAlign: 'right',
     marginTop: 3,
   },
@@ -718,18 +710,18 @@ const styles = StyleSheet.create({
     height: 34,
     paddingHorizontal: 9,
     borderRadius: 10,
-    backgroundColor: '#334155',
+    backgroundColor: OASIS.colors.ink,
     alignItems: 'center',
     justifyContent: 'center',
   },
   controlValue: {
     color: SC.white,
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
     minWidth: 24,
     textAlign: 'center',
   },
-  resetText: { color: SC.white, fontSize: 11, fontWeight: '800' },
+  resetText: { color: SC.white, fontSize: 11, fontWeight: '600' },
   colorSwatch: {
     width: 25,
     height: 25,
@@ -742,7 +734,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 12,
-    backgroundColor: '#334155',
+    backgroundColor: OASIS.colors.ink,
     borderWidth: 1,
     borderColor: 'transparent',
   },
@@ -750,13 +742,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(5,150,105,0.35)',
     borderColor: SC.mint,
   },
-  choiceText: { color: SC.white, fontSize: 12, fontWeight: '800' },
+  choiceText: { color: SC.white, fontSize: 12, fontWeight: '600' },
   formGroup: { gap: 7 },
   field: {
     minHeight: 40,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#475569',
+    borderColor: OASIS.colors.muted,
     backgroundColor: 'rgba(15,23,42,0.9)',
     color: SC.white,
     paddingHorizontal: 12,
@@ -773,9 +765,9 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   interactiveTitle: {
-    color: '#0f172a',
+    color: OASIS.colors.ink,
     fontSize: 15,
-    fontWeight: '900',
+    fontWeight: '700',
     textAlign: 'center',
   },
   pollOption: {
@@ -783,15 +775,15 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
     borderColor: '#a7f3d0',
-    backgroundColor: '#ecfdf5',
+    backgroundColor: OASIS.colors.soft,
   },
-  pollOptionText: { color: '#065f46', textAlign: 'center', fontWeight: '800' },
+  pollOptionText: { color: OASIS.colors.deep, textAlign: 'center', fontWeight: '600' },
   questionPlaceholder: {
     padding: 10,
     borderRadius: 10,
     backgroundColor: '#f1f5f9',
   },
-  questionPlaceholderText: { color: '#64748b', textAlign: 'center' },
+  questionPlaceholderText: { color: OASIS.colors.muted, textAlign: 'center' },
   statusOverlay: {
     position: 'absolute',
     bottom: 44,
@@ -804,7 +796,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     gap: 7,
   },
-  statusText: { color: SC.white, fontSize: 12, fontWeight: '800', textAlign: 'center' },
+  statusText: { color: SC.white, fontSize: 12, fontWeight: '600', textAlign: 'center' },
   progressTrack: {
     height: 5,
     borderRadius: 4,
@@ -824,8 +816,8 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   errorFeedback: { backgroundColor: '#991b1b' },
-  successFeedback: { backgroundColor: '#047857' },
-  feedbackText: { flex: 1, color: SC.white, fontSize: 12, fontWeight: '800', textAlign: 'right' },
+  successFeedback: { backgroundColor: OASIS.colors.primary },
+  feedbackText: { flex: 1, color: SC.white, fontSize: 12, fontWeight: '600', textAlign: 'right' },
   retryButton: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
@@ -835,7 +827,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: 'rgba(255,255,255,0.18)',
   },
-  retryText: { color: SC.white, fontSize: 11, fontWeight: '900' },
+  retryText: { color: SC.white, fontSize: 11, fontWeight: '700' },
   progressRow: {
     flexDirection: 'row',
     gap: 4,
