@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
-import { containsProfanity, banAccountOnViolation } from '@/lib/profanity';
+import { containsProfanity, findProfanity, banAccountOnViolation } from '@/lib/profanity';
 import {
   clearForMe,
   deleteConversationForEveryone,
@@ -541,8 +541,9 @@ export default function Conversation() {
       );
     }
 
-    if (containsProfanity(body)) {
-      await banAccountOnViolation(currentUserId);
+    const detected = findProfanity(body);
+    if (detected) {
+      await banAccountOnViolation(currentUserId, 'message', body, detected);
       Alert.alert('تم حظر الحساب', 'تم اكتشاف محتوى مخالف. تم إغلاق حسابك.');
       router.replace('/banned');
       return;

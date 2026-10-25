@@ -18,7 +18,7 @@ import {
 
 import { AppHeader } from '@/components/shared/AppHeader';
 import { supabase } from '@/lib/supabase';
-import { containsProfanity, banAccountOnViolation } from '@/lib/profanity';
+import { containsProfanity, findProfanity, banAccountOnViolation } from '@/lib/profanity';
 import { getPermanentMyLocation, isAllKingdom } from '@/lib/locationSync';
 import {
   type LocalServiceImage,
@@ -112,8 +112,9 @@ export default function NewListing() {
     if (!description.trim()) return Alert.alert('التفاصيل مطلوبة', 'اكتب وصفًا واضحًا للمنتج.');
     if (!city.trim()) return Alert.alert('المدينة مطلوبة', 'حدّث موقع حسابك من مركز الحساب أولًا.');
 
-    if (containsProfanity(`${title} ${description}`)) {
-      await banAccountOnViolation(profile.id);
+    const detected = findProfanity(`${title} ${description}`);
+    if (detected) {
+      await banAccountOnViolation(profile.id, 'product', `${title} ${description}`, detected);
       Alert.alert('تم حظر الحساب', 'تم اكتشاف محتوى مخالف. تم إغلاق حسابك.');
       router.replace('/banned');
       return;

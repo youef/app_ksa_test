@@ -24,10 +24,9 @@ function normalize(input: string): string {
 export function containsProfanity(text: string): boolean {
   const t = normalize(text);
   if (!t) return false;
-  for (const w of BAD_WORDS) {
+  for (const w of getCachedBannedWords()) {
     const nw = normalize(w);
     if (!nw) continue;
-    // word boundary-ish: check as substring but avoid tiny false positives
     if (nw.length < 3) continue;
     if (t.includes(nw)) return true;
   }
@@ -37,7 +36,7 @@ export function containsProfanity(text: string): boolean {
 export function findProfanity(text: string): string | null {
   const t = normalize(text);
   if (!t) return null;
-  for (const w of BAD_WORDS) {
+  for (const w of getCachedBannedWords()) {
     const nw = normalize(w);
     if (!nw || nw.length < 3) continue;
     if (t.includes(nw)) return w;
@@ -45,11 +44,39 @@ export function findProfanity(text: string): string | null {
   return null;
 }
 
-export async function banAccountOnViolation(userId: string) {
+let cachedWords: string[] | null = null;
+
+export async function loadBannedWords(): Promise<string[]> {
   try {
-    await (await import('@/lib/supabase')).supabase.from('profiles').update({ is_banned: true }).eq('id', userId);
+    const { supabase } = await import('@/lib/supabase');
+    const { data } = await supabase.from('banned_words').select('word,enabled');
+    const dbWords = (data || []).filter((r: any) => r.enabled !== false).map((r: any) => String(r.word));
+    cachedWords = Array.from(new Set([...BAD_WORDS, ...dbWords]));
+  } catch {
+    cachedWords = [...BAD_WORDS];
+  }
+  return cachedWords;
+}
+
+export function getCachedBannedWords(): string[] {
+  return cachedWords || BAD_WORDS;
+}
+
+export async function banAccountOnViolation(userId: string, contentType?: string, content?: string, detectedWord?: string | null) {
+  try {
+    const { supabase } = await import('@/lib/supabase');
+    await supabase.from('profiles').update({ is_banned: true }).eq('id', userId);
+    if (contentType && content) {
+      await supabase.from('moderation_violations').insert({
+        user_id: userId,
+        content_type: contentType,
+        content: content.slice(0, 2000),
+        detected_word: detectedWord || null,
+      });
+    }
   } catch {}
   try {
-    await (await import('@/lib/supabase')).supabase.auth.signOut();
+    const { supabase } = await import('@/lib/supabase');
+    await supabase.auth.signOut();
   } catch {}
 }

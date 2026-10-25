@@ -15,6 +15,7 @@ import { initLogRocket } from '@/lib/logrocket';
 import BottomNav from '@/components/BottomNav';
 import { PlatformConfigProvider, usePlatformConfig } from '@/lib/platformConfig';
 import { installDarkModeWebFixes } from '@/lib/darkModeWeb';
+import { loadBannedWords } from '@/lib/profanity';
 
 const ACCOUNT_ONLY_ROUTES = [
   '/profile', '/settings', '/market', '/messages', '/conversation', '/search',
@@ -75,6 +76,7 @@ function RootContent() {
     };
 
     void loadSession();
+    void loadBannedWords();
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setHasSession(Boolean(session?.user));
       if (!session?.user) setIsAdmin(false);
