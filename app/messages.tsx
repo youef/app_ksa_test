@@ -344,7 +344,9 @@ export default function Messages() {
     return matchesSearch && (!onlyUnread || c.isUnread);
   });
 
-  const unreadCount = conversations.filter(c => c.isUnread && !c.isMuted && !dndNow).length;
+  const officialQuery = searchQuery.trim().replace(/[\u064B-\u065F\u0670\u0640]/g, '');
+  const showPlatformConversation = (!officialQuery || 'منصة حينا رسائل المنصة الرسمية'.includes(officialQuery)) && (!onlyUnread || platformUnreadCount > 0);
+  const unreadCount = conversations.filter(c => c.isUnread && !c.isMuted && !dndNow).length + (platformUnreadCount > 0 ? 1 : 0);
   const silentUnread = conversations.filter(c => c.isUnread && (c.isMuted || dndNow)).length;
 
   return (
@@ -410,7 +412,7 @@ export default function Messages() {
           >
             <MessageCircle size={13} color={!onlyUnread ? OASIS.colors.surface : OASIS.colors.muted} />
             <Text style={[styles.filterPillText, !onlyUnread && styles.filterPillTextActive]}>
-              الكل ({conversations.length})
+              الكل ({conversations.length + 1})
             </Text>
           </Pressable>
 
@@ -470,7 +472,7 @@ export default function Messages() {
           }
         >
           <View style={styles.inner}>
-            {(!searchQuery.trim() || 'منصة حيّنا رسائل المنصة الرسمية'.includes(searchQuery.trim())) && (!onlyUnread || platformUnreadCount > 0) ? (
+            {showPlatformConversation ? (
               <Pressable oasisKind="card" accessibilityRole="button" accessibilityLabel="محادثة منصة حيّنا الرسمية" onPress={() => router.push('/platform-inbox')} style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 12, padding: 14, marginBottom: 14, backgroundColor: OASIS.colors.surface, borderRadius: 14, borderWidth: 1, borderColor: OASIS.colors.line }}>
                 <View style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: OASIS.colors.soft, alignItems: 'center', justifyContent: 'center' }}><CheckCircle2 size={24} color={OASIS.colors.primary} /></View>
                 <View style={{ flex: 1, gap: 5 }}><Text style={{ textAlign: 'right', fontSize: 15, fontWeight: '700', color: OASIS.colors.ink }}>منصة حيّنا ✓</Text><Text numberOfLines={1} style={{ textAlign: 'right', fontSize: 12, color: OASIS.colors.muted }}>{platformMessages[0]?.body || 'الحساب الرسمي · الترحيب وأخبار المنصة'}</Text></View>
@@ -478,7 +480,7 @@ export default function Messages() {
               </Pressable>
             ) : null}
 
-            {filtered.length === 0 ? (
+            {filtered.length === 0 && !showPlatformConversation ? (
               <View style={styles.emptyState}>
                 <View style={{ alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}><OasisEmptyIllustration kind="empty-chat" /></View>
                 <Text style={styles.emptyTitle}>
