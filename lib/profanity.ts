@@ -62,21 +62,18 @@ export function getCachedBannedWords(): string[] {
   return cachedWords || BAD_WORDS;
 }
 
-export async function banAccountOnViolation(userId: string, contentType?: string, content?: string, detectedWord?: string | null) {
-  try {
-    const { supabase } = await import('@/lib/supabase');
-    await supabase.from('profiles').update({ is_banned: true }).eq('id', userId);
-    if (contentType && content) {
-      await supabase.from('moderation_violations').insert({
-        user_id: userId,
-        content_type: contentType,
-        content: content.slice(0, 2000),
-        detected_word: detectedWord || null,
-      });
-    }
-  } catch {}
-  try {
-    const { supabase } = await import('@/lib/supabase');
-    await supabase.auth.signOut();
-  } catch {}
+export async function banAccountOnViolation(userId: string, contentType?: string, content?: string, _detectedWord?: string | null) {
+  const { supabase } = await import('@/lib/supabase');
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user || auth.user.id !== userId || !contentType || !content) return;
+  // Only the database can verify a violation and change protected profile fields.
+  const { data, error } = await supabase.rpc('hayna_report_own_prohibited_content', {
+    p_content_type: contentType,
+    p_content: content.slice(0, 2000),
+  });
+  if (error) {
+    console.warn('Moderation verification failed:', error.message);
+    return;
+  }
+  if (data === true) await supabase.auth.signOut();
 }
