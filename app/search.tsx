@@ -72,11 +72,12 @@ async function searchRows(
 }
 
 async function searchUsers(term: string, limit = 15): Promise<Row[]> {
-  const pattern = `%${term.replace(/[(),.%*_\\]/g, ' ').trim()}%`;
+  const pattern = `%${term.replace(/^@/, '').replace(/[(),.%*_\\]/g, ' ').trim()}%`;
   const { data, error } = await supabase
     .from('profiles')
-    .select('id,username,display_name,avatar_url,city,district,is_verified,show_in_search,profile_privacy,created_at')
+    .select('id,username,display_name,avatar_url,city,district,is_verified,show_in_search,profile_privacy,is_banned,created_at')
     .eq('show_in_search', true)
+    .eq('is_banned', false)
     .or(`display_name.ilike.${pattern},username.ilike.${pattern},city.ilike.${pattern},district.ilike.${pattern}`)
     .limit(limit);
 
@@ -86,7 +87,7 @@ async function searchUsers(term: string, limit = 15): Promise<Row[]> {
   }
 
   return ((data as Row[]) ?? []).filter((profile) =>
-    profile.show_in_search === true &&
+    profile.show_in_search === true && profile.is_banned !== true &&
     (!profile.profile_privacy || profile.profile_privacy === 'public')
   );
 }
@@ -98,8 +99,8 @@ async function searchBusinesses(term: string, limit = 20): Promise<Row[]> {
   ]);
 
   const taggedItems: Row[] = [
-    ...businesses.map((item: Row) => ({ ...item, __sourceTable: 'businesses' } as Row)),
-    ...services.map((item: Row) => ({ ...item, __sourceTable: 'services' } as Row)),
+    ...businesses.filter((item: Row) => item.moderation_status === 'approved').map((item: Row) => ({ ...item, __sourceTable: 'businesses' } as Row)),
+    ...services.filter((item: Row) => item.moderation_status === 'approved' && item.activity_status !== 'inactive').map((item: Row) => ({ ...item, __sourceTable: 'services' } as Row)),
   ];
   const unique = new Map<string, Row>();
   for (const item of taggedItems) {
