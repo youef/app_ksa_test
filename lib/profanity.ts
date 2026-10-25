@@ -40,9 +40,10 @@ let cachedWords: string[] | null = null;
 export async function loadBannedWords(): Promise<string[]> {
   try {
     const { supabase } = await import('@/lib/supabase');
-    const { data } = await supabase.from('banned_words').select('word,enabled');
-    const dbWords = (data || []).filter((r: any) => r.enabled !== false).map((r: any) => String(r.word));
-    cachedWords = Array.from(new Set([...BAD_WORDS, ...dbWords]));
+    const { data, error } = await supabase.from('banned_words').select('word').eq('enabled', true);
+    if (error) throw error;
+    const dbWords = (data || []).map((r: any) => String(r.word));
+    cachedWords = Array.from(new Set(dbWords));
   } catch {
     cachedWords = [...BAD_WORDS];
   }
@@ -50,7 +51,7 @@ export async function loadBannedWords(): Promise<string[]> {
 }
 
 export function getCachedBannedWords(): string[] {
-  return cachedWords || BAD_WORDS;
+  return cachedWords ?? BAD_WORDS;
 }
 
 export async function banAccountOnViolation(userId: string, contentType?: string, content?: string, _detectedWord?: string | null) {
