@@ -213,8 +213,13 @@ async function safeRows(
 ): Promise<any[]> {
   try {
     const result = await build();
+    if (result && 'error' in result && (result as { error?: { message?: string } }).error) {
+      console.warn('Map data query failed:', (result as { error?: { message?: string } }).error?.message);
+      return fallback;
+    }
     return (result?.data ?? fallback).filter((row: any) => !/بيانات تجريبية|متجر محلي تجريبي|خدمة تجريبية|شبه واقعية|synthetic|mock data|demo data/i.test(String(row.description || '') + ' ' + String(row.body || '')));
-  } catch {
+  } catch (error) {
+    console.warn('Map data source unavailable:', error);
     return fallback;
   }
 }
