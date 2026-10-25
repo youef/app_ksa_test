@@ -28,6 +28,7 @@ import {
   LayoutTemplate,
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
+import { containsProfanity, findProfanity, banAccountOnViolation } from '@/lib/profanity';
 import { useStoryComposer } from '@/hooks/useStoryComposer';
 import { useStoryPublisher } from '@/hooks/useStoryPublisher';
 import { BG_GRADIENTS, getGradient } from '@/lib/storyGradients';
@@ -209,6 +210,19 @@ export default function CreateStory() {
     }
     if (interactiveType === 'question' && !questionPrompt.trim()) {
       return Alert.alert('السؤال غير مكتمل', 'اكتب السؤال الذي سيظهر للمتابعين.');
+    }
+
+    const storyText = [
+      ...composer.slides.map((s: any) => s?.content || ''),
+      pollQuestion, pollOptionA, pollOptionB, questionPrompt,
+    ].join(' ');
+    const detected = findProfanity(storyText);
+    if (detected) {
+      const auth = await supabase.auth.getUser();
+      if (auth.data.user) await banAccountOnViolation(auth.data.user.id, 'story', storyText, detected);
+      Alert.alert('تم حظر الحساب', 'تم اكتشاف محتوى مخالف في القصة. تم إغلاق حسابك.');
+      router.replace('/banned');
+      return;
     }
 
     let outcome: Awaited<ReturnType<typeof publisher.publish>>;
