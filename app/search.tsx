@@ -573,7 +573,6 @@ export default function SearchPage() {
             {/* Compact results without redundant section headers */}
             {(activeTab === 'all' || activeTab === 'users') && results.users.length > 0 && (
               <View style={styles.section}>
-                </View>
                 {results.users.map(renderUser)}
               </View>
             )}
@@ -581,7 +580,6 @@ export default function SearchPage() {
             {/* Questions Section */}
             {(activeTab === 'all' || activeTab === 'questions') && results.questions.length > 0 && (
               <View style={styles.section}>
-                </View>
                 {results.questions.map(renderQuestion)}
               </View>
             )}
@@ -589,7 +587,6 @@ export default function SearchPage() {
             {/* Requests Section */}
             {(activeTab === 'all' || activeTab === 'requests') && results.requests.length > 0 && (
               <View style={styles.section}>
-                </View>
                 {results.requests.map(renderRequest)}
               </View>
             )}
@@ -597,7 +594,6 @@ export default function SearchPage() {
             {/* Shops Section */}
             {(activeTab === 'all' || activeTab === 'shops') && results.shops.length > 0 && (
               <View style={styles.section}>
-                </View>
                 {results.shops.map(renderShop)}
               </View>
             )}
