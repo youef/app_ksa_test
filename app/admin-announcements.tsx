@@ -2,13 +2,13 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
-import { ImagePlus, Megaphone, Trash2, Send, X, CheckCircle2 } from 'lucide-react-native';
+import { ImagePlus, Megaphone, Trash2, Send, CheckCircle2, Link2 } from 'lucide-react-native';
 import { OasisPressable as Pressable } from '@/components/oasis/OasisPrimitives';
 import AppHeader from '@/components/shared/AppHeader';
 import { useTheme } from '@/context/ThemeContext';
 import { supabase } from '@/lib/supabase';
 
-type Ad = { id: string; title: string | null; message: string | null; image_url: string | null; expires_at: string; created_at: string };
+type Ad = { id: string; title: string | null; message: string | null; image_url: string | null; expires_at: string; created_at: string; action_type: string; action_target: string | null };
 type Format = 'text' | 'mixed' | 'image';
 
 export default function AdminAnnouncements() {
@@ -22,10 +22,12 @@ export default function AdminAnnouncements() {
   const [message, setMessage] = useState('');
   const [photo, setPhoto] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [error, setError] = useState('');
+  const [destination, setDestination] = useState<'none' | 'internal' | 'external'>('none');
+  const [target, setTarget] = useState('');
 
   const load = useCallback(async () => {
     const { data, error: queryError } = await supabase.from('home_announcements')
-      .select('id,title,message,image_url,expires_at,created_at')
+      .select('id,title,message,image_url,expires_at,created_at,action_type,action_target')
       .gt('expires_at', new Date().toISOString()).order('created_at', { ascending: false });
     if (queryError) setError(queryError.message);
     else setAds((data || []) as Ad[]);
@@ -58,6 +60,8 @@ export default function AdminAnnouncements() {
     setError('');
     if (format !== 'image' && !title.trim() && !message.trim()) return setError('اكتب عنوانًا أو رسالة للإعلان.');
     if (format !== 'text' && !photo) return setError('اختر صورة للإعلان أولًا.');
+    if (destination === 'internal' && !/^\/[a-zA-Z0-9/_-]+$/.test(target.trim())) return setError('أدخل مسارًا داخليًا صحيحًا مثل /market أو /stories أو /map');
+    if (destination === 'external' && !/^https:\/\/[^\s]+$/i.test(target.trim())) return setError('الرابط الخارجي يجب أن يبدأ بـ https://');
     setBusy(true);
     let uploadedPath: string | null = null;
     try {
@@ -79,9 +83,11 @@ export default function AdminAnnouncements() {
         message: format === 'image' ? null : message.trim() || null,
         image_url: imageUrl,
         created_by: auth.user.id,
+        action_type: destination,
+        action_target: destination === 'none' ? null : target.trim(),
       });
       if (insertError) throw insertError;
-      setTitle(''); setMessage(''); setPhoto(null); setFormat('text');
+      setTitle(''); setMessage(''); setPhoto(null); setFormat('text'); setDestination('none'); setTarget('');
       await load();
       Alert.alert('تم النشر', 'الإعلان ظاهر للجميع لمدة 24 ساعة.');
     } catch (e: any) {
@@ -120,9 +126,20 @@ export default function AdminAnnouncements() {
           <TextInput value={message} onChangeText={setMessage} placeholder="نص الإعلان" placeholderTextColor={c.muted} multiline maxLength={1000} style={[s.input, s.multiline, { color: c.ink, borderColor: c.line, backgroundColor: c.background }]} textAlign="right" />
         </> : null}
         {format !== 'text' ? <Pressable onPress={() => void pickPhoto()} style={[s.photoPicker, { borderColor: c.line, backgroundColor: c.soft }]}>
-          {photo ? <Image source={{ uri: photo.uri }} style={s.preview} resizeMode="contain" /> : <ImagePlus size={30} color={c.primary} />}
+          {photo ? <Image source={{ uri: photo.uri }} style={s.preview} resizeMode="cover" /> : <ImagePlus size={30} color={c.primary} />}
           <Text style={{ color: c.primary, fontWeight: '700' }}>{photo ? 'تغيير الصورة' : 'اختر صورة للإعلان (حتى 5 ميجابايت)'}</Text>
         </Pressable> : null}
+        <View style={s.row}><Link2 size={18} color={c.primary} /><Text style={[s.heading, { color: c.ink, fontSize: 14 }]}>عند الضغط على الإعلان</Text></View>
+        <View style={s.formats}>{([{ key: 'none', label: 'بدون انتقال' }, { key: 'internal', label: 'قسم بالتطبيق' }, { key: 'external', label: 'رابط خارجي' }] as const).map(option =>
+          <Pressable key={option.key} onPress={() => { setDestination(option.key); setTarget(''); }} style={[s.option, { backgroundColor: destination === option.key ? c.primary : c.soft }]}>
+            <Text style={{ color: destination === option.key ? '#FFFFFF' : c.ink, fontSize: 11, fontWeight: '700' }}>{option.label}</Text>
+          </Pressable>)}</View>
+        {destination === 'internal' ? <View style={s.formats}>{([{ path: '/market', label: 'السوق' }, { path: '/stories', label: 'اليوميات' }, { path: '/map', label: 'الخريطة' }, { path: '/questions', label: 'الاستفسارات' }] as const).map(link =>
+          <Pressable key={link.path} onPress={() => setTarget(link.path)} style={[s.option, { backgroundColor: target === link.path ? c.primary : c.soft }]}>
+            <Text style={{ fontSize: 10, fontWeight: '700', color: target === link.path ? '#FFFFFF' : c.ink }}>{link.label}</Text>
+          </Pressable>)}</View> : null}
+        {destination !== 'none' ? <TextInput value={target} onChangeText={setTarget} autoCapitalize="none" placeholder={destination === 'external' ? 'https://example.com' : '/market'} placeholderTextColor={c.muted} style={[s.input, { color: c.ink, borderColor: c.line, backgroundColor: c.background }]} textAlign="left" /> : null}
+        <Text style={{ color: c.muted, textAlign: 'right', fontSize: 11 }}>مقاس الإعلان العرضي الموصى به: 1200 × 430 بكسل (بنسبة 2.8:1)</Text>
         {error ? <Text style={{ color: c.danger, textAlign: 'right' }}>{error}</Text> : null}
         <Pressable onPress={() => void publish()} disabled={busy} style={[s.submit, { backgroundColor: c.primary, opacity: busy ? 0.6 : 1 }]}>
           {busy ? <ActivityIndicator color="#FFFFFF" /> : <Send color="#FFFFFF" size={18} />}
@@ -135,6 +152,7 @@ export default function AdminAnnouncements() {
         <View style={s.row}><CheckCircle2 size={16} color={c.primary} /><Text style={{ color: c.muted, flex: 1, textAlign: 'right' }}>ينتهي {new Date(ad.expires_at).toLocaleString('ar-SA')}</Text></View>
         {ad.title ? <Text style={[s.heading, { color: c.ink }]}>{ad.title}</Text> : null}
         {ad.image_url ? <Image source={{ uri: ad.image_url }} resizeMode="contain" style={s.preview} /> : null}
+        {ad.action_target ? <Text style={{ color: c.primary, textAlign: 'right', fontSize: 11 }}>الوجهة: {ad.action_target}</Text> : null}
         {ad.message ? <Text style={{ color: c.ink, textAlign: 'right', lineHeight: 22 }}>{ad.message}</Text> : null}
         <Pressable onPress={() => void remove(ad)} disabled={busy} style={s.delete}><Trash2 size={17} color={c.danger} /><Text style={{ color: c.danger, fontWeight: '700' }}>حذف الإعلان</Text></Pressable>
       </View>)}
@@ -153,7 +171,7 @@ const s = StyleSheet.create({
   input: { borderWidth: 1, borderRadius: 12, minHeight: 48, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14 },
   multiline: { minHeight: 110, textAlignVertical: 'top' },
   photoPicker: { minHeight: 130, borderRadius: 14, borderWidth: 1, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', gap: 9, padding: 10 },
-  preview: { width: '100%', height: 185, borderRadius: 12 },
+  preview: { width: '100%', aspectRatio: 2.8, maxHeight: 230, borderRadius: 12 },
   submit: { minHeight: 48, borderRadius: 13, flexDirection: 'row-reverse', justifyContent: 'center', alignItems: 'center', gap: 9 },
   delete: { flexDirection: 'row-reverse', gap: 7, alignItems: 'center', alignSelf: 'flex-start', paddingVertical: 8 },
 });
