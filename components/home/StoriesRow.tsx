@@ -7,6 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { ShieldCheck, ChevronLeft, UserRound } from 'lucide-react-native';
 import { styles } from './homeStyles';
 import type { Profile, Story } from '@/lib/homeUtils';
+import { useTheme } from '@/context/ThemeContext';
 
 type Props = {
   profile: Profile | null;
@@ -15,6 +16,7 @@ type Props = {
 };
 
 export default function StoriesRow({ profile, stories, selectedDistrict }: Props) {
+  const { colors, isDark } = useTheme();
   const visibleStories = stories.slice(0, 4);
   const ringColors = (p: Profile | null | undefined): [string, string, string] => {
     const type = String(p?.account_type || 'standard').toLowerCase();
@@ -51,9 +53,9 @@ export default function StoriesRow({ profile, stories, selectedDistrict }: Props
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
               >
-                <View style={styles.storyInnerBorder}>
+                <View style={[styles.storyInnerBorder, isDark && { borderColor: colors.surface, backgroundColor: colors.background }]}>
                   {isAnonymous ? (
-                    <View style={[styles.storyTextPreview, { backgroundColor: OASIS.colors.soft }]}><UserRound size={25} color={OASIS.colors.primary} /></View>
+                    <View style={[styles.storyTextPreview, { backgroundColor: isDark ? colors.soft : OASIS.colors.soft }]}><UserRound size={25} color={colors.primary} /></View>
                   ) : story.type === 'text' ? (
                     <View style={[styles.storyTextPreview, { backgroundColor: bg }]}>
                       <Text style={styles.storyTextPreviewLetter} numberOfLines={1}>{story.content?.[0] || 'ق'}</Text>
@@ -72,7 +74,7 @@ export default function StoriesRow({ profile, stories, selectedDistrict }: Props
                   </View>
                 )}
               </LinearGradient>
-              <Text style={styles.storyName} numberOfLines={1}>{authorName}</Text>
+              <Text style={[styles.storyName, isDark && { color: colors.ink }]} numberOfLines={1}>{authorName}</Text>
               {isAnonymous && Boolean(username) && <Text style={[styles.storyDistrictSub, { textAlign: 'center' }]} numberOfLines={1}>{username}</Text>}
             </Pressable>
           );

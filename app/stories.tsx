@@ -12,8 +12,10 @@ import { isActiveStory, storyDiscoveryMembership } from '@/lib/storyActivity';
 import { getCachedSeenStoryIds, getLocalSeenStoryIds, rememberSeenStories } from '@/lib/storySeen';
 import { prioritizeUnseenStoryGroups, unseenStories } from '@/lib/storyActivity';
 import { relativeTime } from '@/lib/mapPins';
+import { useTheme } from '@/context/ThemeContext';
 
 export default function StoriesScreen() {
+  const { colors, isDark } = useTheme();
   const bottomNavInset = useBottomNavInset();
   const [viewerId, setViewerId] = useState('');
   const [errorText, setErrorText] = useState('');
@@ -244,9 +246,9 @@ export default function StoriesScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
-        <ImageBackground source={{ uri: Platform.OS === 'web' ? '/welcome/hayna-heritage-bg.png' : 'https://appksatest.vercel.app/welcome/hayna-heritage-bg.png' }} resizeMode="cover" style={StyleSheet.absoluteFillObject} imageStyle={{ opacity: 0.15 }} />
+        <ImageBackground source={{ uri: Platform.OS === 'web' ? '/welcome/hayna-heritage-bg.png' : 'https://appksatest.vercel.app/welcome/hayna-heritage-bg.png' }} resizeMode="cover" style={StyleSheet.absoluteFillObject} imageStyle={{ opacity: isDark ? 0.05 : 0.15 }} />
       </View>
       <AppHeader
         variant="sub"
@@ -255,10 +257,10 @@ export default function StoriesScreen() {
 
       />
 
-      <View style={styles.ringsSection}>
+      <View style={[styles.ringsSection, isDark && { backgroundColor: colors.surface, borderBottomColor: colors.line }]}>
 
           <ScrollView style={{ direction: 'rtl' }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.ringsScroll, { direction: 'ltr' }]}>
-            <Pressable style={styles.ringItem} accessibilityRole="button" accessibilityLabel="أضف يومياتك" onPress={() => router.push(needsLogin ? '/auth' : '/create-story')}><View style={[styles.ringOuter, styles.ringSeen]}><Plus size={22} color={OASIS.colors.primary} /></View><Text numberOfLines={1} style={styles.ringName}>يومياتك</Text></Pressable>
+            <Pressable style={styles.ringItem} accessibilityRole="button" accessibilityLabel="أضف يومياتك" onPress={() => router.push(needsLogin ? '/auth' : '/create-story')}><View style={[styles.ringOuter, styles.ringSeen]}><Plus size={22} color={colors.primary} /></View><Text numberOfLines={1} style={[styles.ringName, isDark && { color: colors.ink }]}>يومياتك</Text></Pressable>
             {storyRings.map((group: any) => {
               const author = group.author;
               const name = displayName(author);
@@ -335,7 +337,7 @@ export default function StoriesScreen() {
                 const cardBorder = trendBorderColor(group.hasUnseen);
                 return (
                   <Pressable oasisKind="plain" key={group.authorId}
-                    style={[styles.storyCard, { width: cardWidth || '48%', borderColor: cardBorder, opacity: isSeen ? 0.82 : 1 }]}
+                    style={[styles.storyCard, isDark && { backgroundColor: colors.surface }, { width: cardWidth || '48%', borderColor: cardBorder, opacity: isSeen ? 0.82 : 1 }]}
                     onPress={() => openAuthorStories(group.stories, trendingAuthors)}
                     accessibilityRole="button" accessibilityLabel={"فتح يوميات " + name}>
                     <View style={[styles.storyCardMedia, { backgroundColor: bg, height: mediaHeight }]}>

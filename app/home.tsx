@@ -46,9 +46,11 @@ import EmptyState from '@/components/home/EmptyState';
 import { FeedSkeleton, ErrorBanner } from '@/components/home/HomeStates';
 import { styles } from '@/components/home/homeStyles';
 import { requireAccount } from '@/lib/authGate';
+import { useTheme } from '@/context/ThemeContext';
 
 
 export default function Home() {
+  const { colors, isDark } = useTheme();
   const { flags } = usePlatformConfig();
   const bottomNavInset = useBottomNavInset();
   const { showIsland } = useDynamicIsland();
@@ -213,7 +215,7 @@ export default function Home() {
   }, [feed.hasMore, feed.loadingMore, feed.loading, feed.loadMore]);
 
   return (
-    <View style={[styles.container, layout.page]}>
+    <View style={[styles.container, layout.page, { backgroundColor: colors.background }]}>
 
       <AppHeader
         variant="home"
@@ -235,9 +237,9 @@ export default function Home() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={OASIS.colors.primary}
-            colors={[OASIS.colors.primary]}
-            progressBackgroundColor={OASIS.colors.soft}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+            progressBackgroundColor={isDark ? colors.surface : colors.soft}
           />
         }
       >

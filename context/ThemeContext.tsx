@@ -34,8 +34,8 @@ export const LIGHT_COLORS = {
 export const DARK_COLORS = {
   background: '#0F0F10',
   surface: '#1C1C1E',
-  ink: '#F2F2F7',
-  muted: '#98989D',
+  ink: '#FFFFFF',
+  muted: '#F2F2F7',
   line: '#2C2C2E',
   primary: '#34D399',
   deep: '#059669',
@@ -53,6 +53,16 @@ export const DARK_COLORS = {
 } as const;
 
 export type OasisColors = Record<keyof typeof LIGHT_COLORS, string>;
+
+let activeColors: OasisColors = LIGHT_COLORS;
+
+export function setActiveColors(colors: OasisColors) {
+  activeColors = colors;
+}
+
+export function getActiveColors(): OasisColors {
+  return activeColors;
+}
 
 // ─── Context ──────────────────────────────────────────────────────────────────
 
@@ -109,6 +119,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     mode === 'dark' || (mode === 'system' && systemScheme === 'dark');
 
   const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+  setActiveColors(colors);
 
   if (!loaded) return null;
 

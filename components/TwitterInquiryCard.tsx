@@ -1,5 +1,6 @@
 import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
+import { useTheme } from '@/context/ThemeContext';
 import { useState, useEffect } from 'react';
 import { Alert, Image, Modal, StyleSheet, Text, View, Platform, Share } from 'react-native';
 import { router } from 'expo-router';
@@ -73,6 +74,7 @@ export default function TwitterInquiryCard({
   onDeleted,
   detailMode = false,
 }: TwitterInquiryCardProps) {
+  const { colors, isDark } = useTheme();
   const isReq = type === 'request';
   const isAdmin = Boolean(currentUserId && currentUserProfile?.role === 'admin');
   const isOwner = Boolean(currentUserId && currentUserId === (isReq ? data.requester_id : data.author_id));
@@ -433,9 +435,9 @@ export default function TwitterInquiryCard({
   }
 
   return (
-    <OasisSurface oasisSurface="card" style={[s.xCard, !expanded && s.xCardCollapsed, isEmergency && s.xCardEmergency, isToolSharing && s.xCardToolSharing]}>
+    <OasisSurface oasisSurface="card" style={[s.xCard, isDark && { backgroundColor: colors.surface, borderColor: colors.line }, !expanded && s.xCardCollapsed, isEmergency && s.xCardEmergency, isToolSharing && s.xCardToolSharing]}>
       {/* Top Header */}
-      <View style={s.xHeader}>
+      <View style={[s.xHeader, isDark && { borderBottomColor: colors.line }]}>
         <Pressable
           onPress={() => isGuest ? requireAccount() : data.profiles?.id && router.push({ pathname: '/user', params: { id: data.profiles.id } })}
           style={s.xAvatarWrap}
@@ -454,7 +456,7 @@ export default function TwitterInquiryCard({
 
         <View style={s.xAuthorMeta}>
           <View style={s.xAuthorRow}>
-            <Pressable onPress={() => isGuest ? requireAccount() : data.profiles?.id && router.push({ pathname: '/user', params: { id: data.profiles.id } })}>              <Text style={s.xAuthorName} numberOfLines={1}>{name}</Text>
+            <Pressable onPress={() => isGuest ? requireAccount() : data.profiles?.id && router.push({ pathname: '/user', params: { id: data.profiles.id } })}>              <Text style={[s.xAuthorName, isDark && { color: colors.ink }]} numberOfLines={1}>{name}</Text>
             </Pressable>
             {isEmergency ? (
               <View style={s.xEmergencyBadge}><Flame size={11} color={OASIS.colors.danger} /><Text style={s.xEmergencyBadgeText}>عاجل</Text></View>
@@ -485,10 +487,10 @@ export default function TwitterInquiryCard({
 
       {/* Main Content Area */}
       <Pressable onPress={detailMode ? undefined : navigateToDetails} style={s.xContentArea} accessibilityRole={detailMode ? undefined : "button"} accessibilityLabel={detailMode ? undefined : "فتح تفاصيل المنشور"}>
-        <Text style={[s.xTitle, isEmergency && { color: '#991b1b' }]} numberOfLines={detailMode ? undefined : 2}>{data.title}</Text>
+        <Text style={[s.xTitle, isDark && { color: colors.ink }, isEmergency && { color: '#991b1b' }]} numberOfLines={detailMode ? undefined : 2}>{data.title}</Text>
         {(data.body || data.description) && (
           <>
-            <Text style={s.xBodyText} numberOfLines={detailMode ? undefined : 2}>{isReq ? data.description : data.body}</Text>
+            <Text style={[s.xBodyText, isDark && { color: colors.muted }]} numberOfLines={detailMode ? undefined : 2}>{isReq ? data.description : data.body}</Text>
             {!detailMode && String(isReq ? data.description : data.body || '').length > 130 && <Text style={s.xReadMore}>عرض المزيد وفتح التفاصيل ←</Text>}
           </>
         )}

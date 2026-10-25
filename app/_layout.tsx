@@ -14,6 +14,7 @@ import { C } from '@/lib/ui';
 import { initLogRocket } from '@/lib/logrocket';
 import BottomNav from '@/components/BottomNav';
 import { PlatformConfigProvider, usePlatformConfig } from '@/lib/platformConfig';
+import { installDarkModeWebFixes } from '@/lib/darkModeWeb';
 
 const ACCOUNT_ONLY_ROUTES = [
   '/profile', '/settings', '/market', '/messages', '/conversation', '/search',
@@ -92,6 +93,18 @@ function RootContent() {
   const hiddenRoute = Object.entries(flags).some(([key, enabled]) => enabled === false && ({ market: ['/market', '/service', '/new-service', '/new-listing'], directory: ['/directory', '/business'], search: ['/search'], stories: ['/stories', '/story', '/create-story'], weather: ['/weather'], carpooling: ['/carpooling'], urgent_alerts: ['/emergency-alert'], questions: ['/questions', '/question'], live: ['/lives', '/live'], map: ['/map'] }[key] || []).some(route => path === route || path.startsWith(route + '/')));
   const routeBlocked = hiddenRoute && path !== '/admin';
 
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+    if (!isDark) {
+      document.documentElement.classList.remove('dark');
+      document.documentElement.setAttribute('data-theme', 'light');
+      document.documentElement.style.colorScheme = 'light';
+      document.body.style.backgroundColor = '#F2F2F7';
+      return;
+    }
+    return installDarkModeWebFixes();
+  }, [isDark]);
+
   return (
     <>
       <Head>
@@ -101,7 +114,7 @@ function RootContent() {
         <style type="text/css">{`
           html, body { width: 100%; min-height: 100%; -webkit-text-size-adjust: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
           body, #root, #root * { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
-          html, body, #root { background-color: ${isDark ? '#0F0F10' : '#F2F2F7'}; color: ${isDark ? '#F2F2F7' : '#1C1C1E'}; transition: background-color 0.25s, color 0.25s; }
+          html, body, #root { background-color: ${isDark ? '#0F0F10' : '#F2F2F7'}; color: ${isDark ? '#FFFFFF' : '#1C1C1E'}; transition: background-color 0.25s, color 0.25s; }
           #root { isolation: isolate; }
           input, textarea, select { font-size: 16px !important; color-scheme: ${isDark ? 'dark' : 'light'}; }
           input:focus, textarea:focus, select:focus { font-size: 16px !important; }
@@ -112,6 +125,7 @@ function RootContent() {
           ::-webkit-scrollbar-track { background: ${isDark ? '#1C1C1E' : '#F2F2F7'}; }
           ::-webkit-scrollbar-thumb { background: ${isDark ? '#3A3A3C' : '#C7C7CC'}; border-radius: 3px; }
           @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+
         `}</style>
       </Head>
 

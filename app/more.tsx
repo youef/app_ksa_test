@@ -21,6 +21,7 @@ import { AppHeader } from '@/components/shared/AppHeader';
 import { AccountIdentityBadge, AccountVerificationBadge } from '@/components/profile/AccountIdentityBadge';
 import { supabase } from '@/lib/supabase';
 import { useBottomNavInset } from '@/lib/bottomNav';
+import { useTheme } from '@/context/ThemeContext';
 
 type MenuItem = {
   title: string;
@@ -44,6 +45,7 @@ const HELP: MenuItem[] = [
 ];
 
 export default function More() {
+  const { colors, isDark } = useTheme();
   const bottomInset = useBottomNavInset();
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<any>(null);
@@ -72,7 +74,7 @@ export default function More() {
     : profile?.display_name || profile?.username || 'حسابي';
 
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <AppHeader variant="tab" title="المزيد" subtitle="وصول سريع بدون تكرار" />
 
       <ScrollView
@@ -80,7 +82,7 @@ export default function More() {
         showsVerticalScrollIndicator={false}
       >
         <Pressable oasisKind="card"
-          style={styles.accountCard}
+          style={[styles.accountCard, isDark && { backgroundColor: colors.surface, borderColor: colors.line }]}
           onPress={() => router.push(profile ? '/profile' : '/auth')}
           accessibilityRole="button"
         >
@@ -136,22 +138,23 @@ export default function More() {
 }
 
 function MenuGroup({ title, items }: { title: string; items: MenuItem[] }) {
+  const { colors, isDark } = useTheme();
   return (
     <View style={styles.group}>
-      <Text style={styles.groupTitle}>{title}</Text>
-      <OasisSurface oasisSurface="card" style={styles.groupCard}>
+      <Text style={[styles.groupTitle, isDark && { color: colors.muted }]}>{title}</Text>
+      <OasisSurface oasisSurface="card" style={[styles.groupCard, isDark && { backgroundColor: colors.surface, borderColor: colors.line }]}>
         {items.map((item, index) => {
           const Icon = item.Icon;
           return (
             <React.Fragment key={item.href + item.title}>
-              {index ? <View style={styles.divider} /> : null}
+              {index ? <View style={[styles.divider, isDark && { backgroundColor: colors.line }]} /> : null}
               <Pressable style={styles.row} onPress={() => router.push(item.href as any)}>
-                <View style={styles.rowIcon}><Icon size={19} color="#0F766E" /></View>
+                <View style={[styles.rowIcon, isDark && { backgroundColor: colors.soft }]}><Icon size={19} color={colors.primary} /></View>
                 <View style={styles.rowCopy}>
-                  <Text style={styles.rowTitle}>{item.title}</Text>
-                  <Text style={styles.rowSub}>{item.subtitle}</Text>
+                  <Text style={[styles.rowTitle, isDark && { color: colors.ink }]}>{item.title}</Text>
+                  <Text style={[styles.rowSub, isDark && { color: colors.muted }]}>{item.subtitle}</Text>
                 </View>
-                <ChevronLeft size={18} color="#CBD5E1" />
+                <ChevronLeft size={18} color={isDark ? colors.muted : "#CBD5E1"} />
               </Pressable>
             </React.Fragment>
           );

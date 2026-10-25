@@ -4,6 +4,7 @@ import { useState } from 'react';
 import OasisGlassFrame from './home/OasisGlassFrame';
 import { ActivityIndicator, Alert, Modal, Text, View } from 'react-native';
 import { Building2, ChevronDown, MapPin } from 'lucide-react-native';
+import { useTheme } from '@/context/ThemeContext';
 import { getCurrentDeviceLocation, reverseGeocodeDeviceLocation } from '@/lib/deviceLocation';
 import { savePermanentMyLocation, type HaynaLocation } from '@/lib/locationSync';
 import { isInsideSaudiArabia, isKnownSaudiCity } from '@/lib/saudiLocations';
@@ -15,6 +16,7 @@ type Props = {
 };
 
 export default function LocationScopeBar({ location, onLocationChanged, compact = false }: Props) {
+  const { colors, isDark } = useTheme();
   const [busy, setBusy] = useState<'district' | 'city' | null>(null);
   const [open, setOpen] = useState(false);
   const districtMode = Boolean(location.city && location.city !== 'كل المدن' && location.district && !['كل الأحياء', 'كل أحياء المدينة', 'جميع الأحياء'].includes(location.district));
@@ -64,25 +66,25 @@ export default function LocationScopeBar({ location, onLocationChanged, compact 
       <OasisGlassFrame variant="location" style={{ height: 44 }}>
       <Pressable onPress={() => setOpen((value) => !value)} accessibilityRole="button" accessibilityState={{ expanded: open }}
         style={{ height: 44, width: '100%', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 0, borderRadius: 14, backgroundColor: 'transparent', borderWidth: 0 }}>
-        <MapPin size={15} color="#176b52" />
-        <Text numberOfLines={1} style={{ color: '#345348', fontSize: compact ? 11 : 12, fontWeight: '600', flexShrink: 1, textAlign: 'center', lineHeight: 17 }}>{title}</Text>
-        <ChevronDown size={14} color="#176b52" />
+        <MapPin size={15} color={colors.primary} />
+        <Text numberOfLines={1} style={{ color: isDark ? colors.ink : '#345348', fontSize: compact ? 11 : 12, fontWeight: '600', flexShrink: 1, textAlign: 'center', lineHeight: 17 }}>{title}</Text>
+        <ChevronDown size={14} color={colors.primary} />
       </Pressable>
       </OasisGlassFrame>
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
-        <Pressable onPress={() => setOpen(false)} style={{ flex: 1, backgroundColor: 'rgba(8,35,25,0.25)', justifyContent: 'center', alignItems: 'center', padding: 16 }}>
-          <Pressable onPress={() => {}} style={{ width: '100%', maxWidth: 320, padding: 14, borderRadius: 14, backgroundColor: OASIS.colors.surface, gap: 8 }}>
-            <Text style={{ fontSize: 15, fontWeight: '600', color: OASIS.colors.deep, textAlign: 'center', marginBottom: 8 }}>نطاق الموقع</Text>
+        <Pressable onPress={() => setOpen(false)} style={{ flex: 1, backgroundColor: 'rgba(8,35,25,0.45)', justifyContent: 'center', alignItems: 'center', padding: 16 }}>
+          <Pressable onPress={() => {}} style={{ width: '100%', maxWidth: 320, padding: 14, borderRadius: 14, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, gap: 8 }}>
+            <Text style={{ fontSize: 15, fontWeight: '600', color: colors.ink, textAlign: 'center', marginBottom: 8 }}>نطاق الموقع</Text>
 
           <Pressable onPress={() => { setOpen(false); void chooseScope('district'); }} disabled={Boolean(busy)} accessibilityRole="button" accessibilityState={{ selected: districtMode, disabled: Boolean(busy) }}
-            style={{ minHeight: 44, flexDirection: 'row-reverse', alignItems: 'center', gap: 8, paddingHorizontal: 9, borderRadius: 8, backgroundColor: districtMode ? '#e8f4ee' : OASIS.colors.surface }}>
-            {busy === 'district' ? <ActivityIndicator size="small" color="#176b52" /> : <MapPin size={15} color="#176b52" />}
-            <Text style={{ color: '#345348', fontSize: 12, fontWeight: districtMode ? '900' : '600' }}>حي موقعي</Text>
+            style={{ minHeight: 44, flexDirection: 'row-reverse', alignItems: 'center', gap: 8, paddingHorizontal: 9, borderRadius: 8, backgroundColor: districtMode ? (isDark ? '#122920' : '#e8f4ee') : colors.surface }}>
+            {busy === 'district' ? <ActivityIndicator size="small" color={colors.primary} /> : <MapPin size={15} color={colors.primary} />}
+            <Text style={{ color: isDark ? colors.ink : '#345348', fontSize: 12, fontWeight: districtMode ? '900' : '600' }}>حي موقعي</Text>
           </Pressable>
           <Pressable onPress={() => { setOpen(false); void chooseScope('city'); }} disabled={Boolean(busy)} accessibilityRole="button" accessibilityState={{ selected: !districtMode && Boolean(location.city && location.city !== 'كل المدن'), disabled: Boolean(busy) }}
-            style={{ minHeight: 44, flexDirection: 'row-reverse', alignItems: 'center', gap: 8, paddingHorizontal: 9, borderRadius: 8, backgroundColor: !districtMode && location.city !== 'كل المدن' ? '#e8f4ee' : OASIS.colors.surface }}>
-            {busy === 'city' ? <ActivityIndicator size="small" color="#176b52" /> : <Building2 size={15} color="#176b52" />}
-            <Text style={{ color: '#345348', fontSize: 12, fontWeight: !districtMode && location.city !== 'كل المدن' ? '900' : '600' }}>المدينة كاملة</Text>
+            style={{ minHeight: 44, flexDirection: 'row-reverse', alignItems: 'center', gap: 8, paddingHorizontal: 9, borderRadius: 8, backgroundColor: !districtMode && location.city !== 'كل المدن' ? (isDark ? '#122920' : '#e8f4ee') : colors.surface }}>
+            {busy === 'city' ? <ActivityIndicator size="small" color={colors.primary} /> : <Building2 size={15} color={colors.primary} />}
+            <Text style={{ color: isDark ? colors.ink : '#345348', fontSize: 12, fontWeight: !districtMode && location.city !== 'كل المدن' ? '900' : '600' }}>المدينة كاملة</Text>
           </Pressable>
           </Pressable>
         </Pressable>
