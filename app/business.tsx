@@ -207,6 +207,27 @@ export default function Business() {
             </Pressable>
           ) : null}
 
+          {business.owner ? (
+            <Pressable
+              style={styles.ownerCard}
+              onPress={() => router.push({ pathname: '/user', params: { id: business.owner.id } })}
+            >
+              <View style={styles.ownerCopy}>
+                <Text style={styles.ownerEyebrow}>مالك النشاط</Text>
+                <Text style={styles.ownerName}>
+                  {business.owner.account_type === 'merchant' && business.owner.freelance_trade
+                    ? business.owner.freelance_trade
+                    : business.owner.display_name || business.owner.username}
+                </Text>
+                <View style={styles.ownerBadges}>
+                  <AccountIdentityBadge role={business.owner.role} accountType={business.owner.account_type} isVerified={Boolean(business.owner.is_verified)} compact />
+                  <AccountVerificationBadge role={business.owner.role} accountType={business.owner.account_type} isVerified={Boolean(business.owner.is_verified)} compact />
+                </View>
+              </View>
+              <ChevronRight size={18} color="#94A3B8" />
+            </Pressable>
+          ) : null}
+
           {/* Add Review Card */}
           <OasisSurface oasisSurface="card" style={styles.reviewFormCard}>
             <Text style={styles.reviewFormTitle}>أضف تجربتك وتقييمك ⭐</Text>
