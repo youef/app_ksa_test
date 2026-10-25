@@ -241,7 +241,7 @@ export async function loadMapPins(limit = 220): Promise<MapPin[]> {
         .limit(limit),
     ),
     safeRows(() =>
-      supabase.from('businesses').select('*').not('latitude', 'is', null).limit(limit),
+      supabase.from('businesses').select('*').limit(limit),
     ),
     safeRows(() =>
       supabase.from('services').select('*').eq('moderation_status', 'approved').order('created_at', { ascending: false }).limit(limit),
