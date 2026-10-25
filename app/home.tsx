@@ -37,7 +37,6 @@ import { useHomeFeed } from '@/hooks/useHomeFeed';
 import { useHomeLocation } from '@/hooks/useHomeLocation';
 import { useBottomNavInset } from '@/lib/bottomNav';
 import TwitterInquiryCard from '@/components/TwitterInquiryCard';
-import LocationScopeBar from '@/components/LocationScopeBar';
 import AppHeader from '@/components/shared/AppHeader';
 import AtmosphereBar from '@/components/home/AtmosphereBar';
 import StoriesRow from '@/components/home/StoriesRow';
@@ -246,9 +245,6 @@ export default function Home() {
       >
         <CommunityShortcuts signedIn={Boolean(feed.currentUserId)} />
         <View style={layout.contextRow}>
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <LocationScopeBar compact location={{ region: loc.region, city: loc.city, district: loc.district }} />
-          </View>
           <View style={{ flex: 1, minWidth: 0 }}>
             <AtmosphereBar compact weather={loc.weather} weatherLoading={loc.weatherLoading} />
           </View>
