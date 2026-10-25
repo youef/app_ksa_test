@@ -114,7 +114,13 @@ export default function BottomNav() {
         .neq('sender_id', user.id)
         .limit(100);
       const unread = (messages || []).filter((message: { read_by?: string[] | null }) => !message.read_by?.includes(user.id));
-      setUnreadCount(unread.length);
+      // platform messages unread
+      const { count: pmUnread } = await supabase
+        .from('platform_messages')
+        .select('id', { count: 'exact', head: true })
+        .eq('recipient_id', user.id)
+        .eq('read', false);
+      setUnreadCount(unread.length + (pmUnread || 0));
     } catch {
       setUnreadCount(0);
     }

@@ -17,6 +17,7 @@ export default function AdminBroadcastScreen() {
   const [type, setType] = useState<MsgType>('update');
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
+  const [targetUsername, setTargetUsername] = useState('');
   const [sending, setSending] = useState(false);
   const [savingTpl, setSavingTpl] = useState(false);
   const [result, setResult] = useState<string | null>(null);
@@ -44,6 +45,60 @@ export default function AdminBroadcastScreen() {
         if (error) throw error;
       }
       setResult(`تم إرسال ${rows.length} رسالة.`);
+    } catch (e: any) {
+      Alert.alert('تعذر الإرسال', e?.message || 'حاول مرة أخرى.');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const sendToUser = async () => {
+    const u = targetUsername.trim().toLowerCase();
+    if (!u) return Alert.alert('اسم المستخدم مطلوب', 'أدخل username.');
+    if (!body.trim()) return Alert.alert('النص مطلوب', 'اكتب نص الرسالة.');
+    setSending(true);
+    setResult(null);
+    try {
+      const { data: prof, error: pErr } = await supabase.from('profiles').select('id').eq('username', u).maybeSingle();
+      if (pErr) throw pErr;
+      if (!prof?.id) throw new Error('المستخدم غير موجود.');
+      const { error } = await supabase.from('platform_messages').insert({
+        recipient_id: prof.id,
+        sender_label: 'فريق حيّنا',
+        title: title.trim() || null,
+        body: body.trim(),
+        type,
+      });
+      if (error) throw error;
+      setResult(`تم الإرسال إلى @${u}.`);
+      setTargetUsername('');
+    } catch (e: any) {
+      Alert.alert('تعذر الإرسال', e?.message || 'حاول مرة أخرى.');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const sendToNewUsers = async () => {
+    if (!body.trim()) return Alert.alert('النص مطلوب', 'اكتب نص الرسالة.');
+    setSending(true);
+    setResult(null);
+    try {
+      const since = new Date(Date.now() - 7 * 86400000).toISOString();
+      const { data: users, error: uErr } = await supabase.from('profiles').select('id').gte('created_at', since);
+      if (uErr) throw uErr;
+      const ids = (users || []).map((u: any) => u.id);
+      if (!ids.length) throw new Error('لا يوجد مستخدمون جدد خلال 7 أيام.');
+      const rows = ids.map((id: string) => ({
+        recipient_id: id,
+        sender_label: 'فريق حيّنا',
+        title: title.trim() || null,
+        body: body.trim(),
+        type,
+      }));
+      const { error } = await supabase.from('platform_messages').insert(rows);
+      if (error) throw error;
+      setResult(`تم إرسال ${rows.length} رسالة للمستخدمين الجدد.`);
     } catch (e: any) {
       Alert.alert('تعذر الإرسال', e?.message || 'حاول مرة أخرى.');
     } finally {
@@ -103,6 +158,18 @@ export default function AdminBroadcastScreen() {
           <Text style={[styles.label, isDark && { color: colors.muted }]}>النص</Text>
           <TextInput value={body} onChangeText={setBody} placeholder="نص الرسالة..." placeholderTextColor="#94A3B8" multiline style={[styles.input, styles.textarea, isDark && { backgroundColor: colors.background, borderColor: colors.line, color: colors.ink }]} />
 
+          <Text style={[styles.label, isDark && { color: colors.muted }]}>إرسال لمستخدم محدد (username)</Text>
+          <View style={styles.targetRow}>
+            <TextInput value={targetUsername} onChangeText={setTargetUsername} placeholder="username" placeholderTextColor="#94A3B8" autoCapitalize="none" style={[styles.input, isDark && { backgroundColor: colors.background, borderColor: colors.line, color: colors.ink }]} />
+            <Pressable oasisKind="action" style={styles.smallBtn} onPress={() => void sendToUser()} disabled={sending}>
+              <Text style={styles.smallBtnText}>إرسال</Text>
+            </Pressable>
+          </View>
+
+          <Pressable oasisKind="action" style={styles.secondaryWide} onPress={() => void sendToNewUsers()} disabled={sending}>
+            <Text style={styles.secondaryWideText}>إرسال للمستخدمين الجدد (آخر 7 أيام)</Text>
+          </Pressable>
+
           <View style={styles.actions}>
             <Pressable oasisKind="action" oasisVariant="primary" style={styles.actionBtn} onPress={() => void sendToAll()} disabled={sending}>
               {sending ? <ActivityIndicator size="small" color={OASIS.colors.surface} /> : <Send size={16} color={OASIS.colors.surface} />}
@@ -152,6 +219,11 @@ const styles = StyleSheet.create({
   label: { color: '#636366', fontSize: 11, fontWeight: '700', textAlign: 'right' },
   input: { minHeight: 42, borderWidth: 1, borderColor: '#DDEAE4', borderRadius: 10, paddingHorizontal: 10, color: '#1C1C1E', fontSize: 12, fontWeight: '700', backgroundColor: '#FFFFFF' },
   textarea: { minHeight: 110, textAlignVertical: 'top', paddingTop: 10 },
+  targetRow: { flexDirection: 'row-reverse', gap: 8, alignItems: 'center' },
+  smallBtn: { paddingHorizontal: 14, minHeight: 42, borderRadius: 10, backgroundColor: OASIS.colors.soft, borderWidth: 1, borderColor: OASIS.colors.primary, alignItems: 'center', justifyContent: 'center' },
+  smallBtnText: { color: OASIS.colors.primary, fontSize: 12, fontWeight: '800' },
+  secondaryWide: { minHeight: 42, borderRadius: 10, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: OASIS.colors.primary, backgroundColor: OASIS.colors.soft },
+  secondaryWideText: { color: OASIS.colors.primary, fontSize: 12, fontWeight: '800' },
   actions: { flexDirection: 'row-reverse', gap: 8, flexWrap: 'wrap' },
   actionBtn: { flex: 1, minHeight: 44, borderRadius: 12, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: OASIS.colors.primary },
   actionBtnText: { color: OASIS.colors.surface, fontSize: 12, fontWeight: '800' },

@@ -481,7 +481,17 @@ export default function Messages() {
               <>
                 {platformMessages.length > 0 && (
                   <View style={styles.pmSection}>
-                    <Text style={styles.sectionLabel}>رسائل المنصة 📬</Text>
+                    <View style={styles.pmHeader}>
+                      <Text style={styles.sectionLabel}>رسائل المنصة 📬</Text>
+                      <Pressable onPress={async () => {
+                        const unreadIds = platformMessages.filter((x) => !x.read).map((x) => x.id);
+                        if (!unreadIds.length) return;
+                        await supabase.from('platform_messages').update({ read: true }).in('id', unreadIds);
+                        setPlatformMessages((prev) => prev.map((x) => ({ ...x, read: true })));
+                      }}>
+                        <Text style={styles.pmMarkAll}>تعليم الكل كمقروء</Text>
+                      </Pressable>
+                    </View>
                     {platformMessages.map((pm) => (
                       <Pressable
                         key={pm.id}
@@ -1054,6 +1064,8 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   pmSection: { gap: 8, marginBottom: 8 },
+  pmHeader: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between' },
+  pmMarkAll: { color: OASIS.colors.primary, fontSize: 11, fontWeight: '700' },
   pmCard: { flexDirection: 'row-reverse', gap: 10, padding: 12, borderRadius: 12, backgroundColor: OASIS.colors.surface, borderWidth: 1, borderColor: OASIS.colors.line, alignItems: 'flex-start' },
   pmUnread: { borderColor: OASIS.colors.primary, backgroundColor: OASIS.colors.soft },
   pmIcon: { width: 32, height: 32, borderRadius: 10, backgroundColor: OASIS.colors.soft, alignItems: 'center', justifyContent: 'center' },
