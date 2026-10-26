@@ -1,8 +1,7 @@
-import { OasisArtwork } from '@/components/oasis/OasisPrimitives';
-import { OasisPressable as Pressable, OasisSurface } from '@/components/oasis/OasisPrimitives';
+import { OasisPressable as Pressable } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
 import { useCallback, useEffect, useState } from 'react';
-import { Image, Keyboard, NativeScrollEvent, NativeSyntheticEvent, Platform, StyleSheet, Text, View } from 'react-native';
+import { Image, Keyboard, NativeScrollEvent, NativeSyntheticEvent, Platform, StyleSheet, View } from 'react-native';
 import { router, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Home, Compass, Plus, Store, MoreHorizontal } from 'lucide-react-native';
@@ -233,7 +232,6 @@ export default function BottomNav() {
                 <View style={[styles.orb, isCreate && styles.createOrb, isActive && styles.activeOrb]}>
                   <Icon size={isCreate ? 30 : 23} color={isCreate ? '#FFFFFF' : isActive ? '#047857' : '#075A43'} strokeWidth={isCreate ? 2.7 : 2.2} />
                 </View>
-                {!isCreate && <Text numberOfLines={1} style={[styles.label, isActive && styles.labelActive]}>{tab.label}</Text>}
                 {isActive && <View style={styles.activeDot} />}
               </Pressable>
             );
@@ -249,13 +247,13 @@ const styles = StyleSheet.create({
   surface: { height: 88, maxWidth: 560, width: '100%', alignSelf: 'center', borderRadius: 30, backgroundColor: 'transparent', borderWidth: 0, overflow: 'visible', shadowColor: '#064E3B', shadowOpacity: 0.16, shadowRadius: 16, shadowOffset: { width: 0, height: 5 }, elevation: 10 },
   navArtwork: { position: 'absolute', left: 0, right: 0, bottom: 0, width: '100%', height: 88, borderRadius: 30 },
   heritageGlow: { ...StyleSheet.absoluteFillObject, borderRadius: 30, backgroundColor: 'transparent' },
-  row: { height: 76, marginTop: 12, direction: 'ltr', flexDirection: 'row-reverse', alignItems: 'center', paddingHorizontal: 6 },
-  tab: { flex: 1, minWidth: 0, height: 76, alignItems: 'center', justifyContent: 'center', gap: 3 },
+  // Five equal hit areas remain aligned with the circular slots in the PNG.
+  // Filling the artwork eliminates the vertical shift caused by visible labels.
+  row: { ...StyleSheet.absoluteFillObject, direction: 'ltr', flexDirection: 'row-reverse', alignItems: 'center', paddingHorizontal: 6 },
+  tab: { flex: 1, minWidth: 0, height: '100%', alignItems: 'center', justifyContent: 'center' },
   orb: { width: 49, height: 49, borderRadius: 25, backgroundColor: 'rgba(255,255,255,0.79)', borderWidth: 1.5, borderColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', shadowColor: '#456A55', shadowOpacity: 0.08, shadowRadius: 5, elevation: 2 },
   activeOrb: { borderColor: '#55D8A5', borderWidth: 2.5, backgroundColor: '#F1FFF8' },
-  createOrb: { width: 64, height: 64, borderRadius: 32, marginTop: -18, backgroundColor: '#006D4E', borderWidth: 5, borderColor: '#F9F4DF', shadowColor: '#006D4E', shadowOpacity: 0.3, shadowRadius: 10, elevation: 9 },
-  label: { fontSize: 10, lineHeight: 13, fontWeight: '600', color: '#365C4D', textAlign: 'center', writingDirection: 'rtl' },
-  labelActive: { color: '#047857', fontWeight: '800' },
-  activeDot: { position: 'absolute', bottom: 2, width: 17, height: 4, borderRadius: 3, backgroundColor: '#047857' },
+  createOrb: { width: 64, height: 64, borderRadius: 32, marginTop: -8, backgroundColor: '#006D4E', borderWidth: 5, borderColor: '#F9F4DF', shadowColor: '#006D4E', shadowOpacity: 0.3, shadowRadius: 10, elevation: 9 },
+  activeDot: { position: 'absolute', bottom: 6, width: 17, height: 4, borderRadius: 3, backgroundColor: '#047857' },
   pressed: { opacity: 0.7, transform: [{ scale: 0.95 }] },
 });
