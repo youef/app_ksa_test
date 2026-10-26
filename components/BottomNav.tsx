@@ -209,8 +209,9 @@ export default function BottomNav() {
   const bottomPadding = Math.max(insets.bottom, Platform.OS === 'ios' ? 8 : 7);
 
   return (
-    <Animated.View pointerEvents="box-none" style={[styles.dock, { backgroundColor: colors.surface, borderTopColor: colors.line, paddingBottom: bottomPadding }, animatedStyle]}>
+    <Animated.View pointerEvents="box-none" style={[styles.dock, { paddingBottom: bottomPadding }, animatedStyle]}>
       <View style={styles.surface}>
+        <View style={styles.heritageGlow} />
         <View style={styles.row}>
           {TABS.map((tab) => {
             const isCreate = tab.kind === 'create';
@@ -226,10 +227,13 @@ export default function BottomNav() {
                   if (isCreate && !hasSession) { router.navigate('/auth' as never); return; }
                   if (normalize(pathname) !== tab.key) router.navigate(tab.key as never);
                 }}
-                style={({ pressed }) => [styles.tab, isCreate && styles.createTab, pressed && styles.pressed]}
+                style={({ pressed }) => [styles.tab, pressed && styles.pressed]}
               >
-                <View style={styles.iconWrap}><Icon size={23} color={isActive ? colors.primary : colors.muted} strokeWidth={isActive ? 2.3 : 1.8} /></View>
-                <Text numberOfLines={1} style={[styles.label, { color: isActive ? colors.primary : colors.muted }, isActive && styles.labelActive]}>{tab.label}</Text>
+                <View style={[styles.orb, isCreate && styles.createOrb, isActive && styles.activeOrb]}>
+                  <Icon size={isCreate ? 30 : 23} color={isCreate ? '#FFFFFF' : isActive ? '#047857' : '#075A43'} strokeWidth={isCreate ? 2.7 : 2.2} />
+                </View>
+                {!isCreate && <Text numberOfLines={1} style={[styles.label, isActive && styles.labelActive]}>{tab.label}</Text>}
+                {isActive && <View style={styles.activeDot} />}
               </Pressable>
             );
           })}
@@ -240,60 +244,16 @@ export default function BottomNav() {
 }
 
 const styles = StyleSheet.create({
-  dock: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 100,
-    paddingTop: 0,
-    backgroundColor: OASIS.colors.surface,
-    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: OASIS.colors.line,
-  },
-  surface: { height: 56, maxWidth: 720, width: '100%', alignSelf: 'center' },
-  background: { ...StyleSheet.absoluteFillObject, zIndex: 0 },
-  glassImage: { width: '100%', height: '100%' },
-  row: {
-    position: 'relative',
-    zIndex: 1,
-    height: 56,
-    paddingTop: 2,
-    // Keep the Arabic order identical with or without native RTL enabled.
-    direction: 'ltr',
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    paddingHorizontal: 4,
-  },
-  tab: {
-    flex: 1,
-    minWidth: 0,
-    minHeight: 50,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 1,
-    paddingHorizontal: 1,
-    position: 'relative',
-  },
-  createTab: {},
-  iconWrap: {
-    width: 44,
-    height: 26,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  createButton: {
-    width: 54,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: 'transparent',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  createArtwork: { ...StyleSheet.absoluteFillObject, zIndex: 0 },
-  createForeground: { position: 'relative', zIndex: 1, alignItems: 'center', justifyContent: 'center' },
-  label: { fontSize: 11, lineHeight: 15, fontWeight: '500', color: OASIS.colors.muted, textAlign: 'center', writingDirection: 'rtl' },
-  labelActive: { color: OASIS.colors.primary, fontWeight: '600' },
-  activeDot: { position: 'absolute', bottom: 0, width: 4, height: 4, borderRadius: 2, backgroundColor: OASIS.colors.primary },
-  // Opacity keeps the raised create button in place while it is pressed.
-  pressed: { opacity: 0.65 },
+  dock: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 100, backgroundColor: 'transparent', paddingHorizontal: 12, paddingTop: 14 },
+  surface: { height: 76, maxWidth: 720, width: '100%', alignSelf: 'center', borderRadius: 38, backgroundColor: '#FFF8E6', borderWidth: 1.5, borderColor: '#C5AD66', overflow: 'visible', shadowColor: '#064E3B', shadowOpacity: 0.16, shadowRadius: 16, shadowOffset: { width: 0, height: 5 }, elevation: 10 },
+  heritageGlow: { ...StyleSheet.absoluteFillObject, borderRadius: 38, backgroundColor: 'rgba(209,250,229,0.24)' },
+  row: { height: 76, direction: 'ltr', flexDirection: 'row-reverse', alignItems: 'center', paddingHorizontal: 6 },
+  tab: { flex: 1, minWidth: 0, height: 76, alignItems: 'center', justifyContent: 'center', gap: 3 },
+  orb: { width: 49, height: 49, borderRadius: 25, backgroundColor: 'rgba(255,255,255,0.79)', borderWidth: 1.5, borderColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', shadowColor: '#456A55', shadowOpacity: 0.08, shadowRadius: 5, elevation: 2 },
+  activeOrb: { borderColor: '#55D8A5', borderWidth: 2.5, backgroundColor: '#F1FFF8' },
+  createOrb: { width: 66, height: 66, borderRadius: 33, marginTop: -30, backgroundColor: '#006D4E', borderWidth: 5, borderColor: '#F9F4DF', shadowColor: '#006D4E', shadowOpacity: 0.3, shadowRadius: 10, elevation: 9 },
+  label: { fontSize: 10, lineHeight: 13, fontWeight: '600', color: '#365C4D', textAlign: 'center', writingDirection: 'rtl' },
+  labelActive: { color: '#047857', fontWeight: '800' },
+  activeDot: { position: 'absolute', bottom: 2, width: 17, height: 4, borderRadius: 3, backgroundColor: '#047857' },
+  pressed: { opacity: 0.7, transform: [{ scale: 0.95 }] },
 });
