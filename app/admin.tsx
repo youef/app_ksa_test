@@ -975,54 +975,12 @@ export default function AdminScreen() {
     target: string;
     segment: string;
   }) => {
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) throw new Error('انتهت جلسة تسجيل الدخول.');
-
-    const badgeIcon =
-      payload.type === 'emergency'
-        ? '🚨'
-        : payload.type === 'weather'
-        ? '⛈️'
-        : payload.type === 'maintenance'
-        ? '🔧'
-        : '📢';
-
-    const recipientIds = usersList
-      .filter((user) => (payload.target === 'all' ? true : (user.city || '').includes(payload.target)))
-      .filter((user) => {
-        if (payload.segment === 'all') return true;
-        if (payload.segment === 'verified') return !!user.is_verified;
-        if (payload.segment === 'unverified') return !user.is_verified;
-        if (payload.segment === 'admins') return user.role === 'admin';
-        return true;
-      })
-      .map((usr) => usr.id)
-      .filter(Boolean);
-
-    if (!recipientIds.length) throw new Error('لا يوجد مستخدمون مطابقون للمعايير المحددة.');
-
-    const fullTitle = `${badgeIcon} ${payload.title.trim()}`;
-    const fullBody = payload.body.trim();
-
-    const rows = recipientIds.map((usrId) => ({
-      user_id: usrId,
-      type: 'broadcast',
-      title: fullTitle,
-      body: fullBody,
-      data: { actor_id: u.user!.id, broadcast_type: payload.type, target: payload.target, segment: payload.segment },
-    }));
-    for (let i = 0; i < rows.length; i += 400) {
-      const { error: batchErr } = await supabase.from('notifications').insert(rows.slice(i, i + 400));
-      if (batchErr) throw batchErr;
-    }
-
-    const pushResult = await sendAdminBroadcastPush(recipientIds, {
-      title: fullTitle,
-      body: fullBody,
-      data: { type: 'broadcast', broadcast_type: payload.type, target: payload.target, segment: payload.segment },
+    const { data, error } = await supabase.rpc('admin_send_broadcast', {
+      p_title: payload.title, p_body: payload.body, p_type: payload.type,
+      p_scope: payload.target, p_segment: payload.segment,
     });
-
-    return { recipients: recipientIds.length, pushed: pushResult.sentCount || 0, pushError: pushResult.error };
+    if (error || !data) throw error || new Error('تعذر إرسال التعميم.');
+    return data;
   };
 
   const loadScheduledBroadcasts = async () => {
@@ -1040,7 +998,10 @@ export default function AdminScreen() {
 
   const cancelScheduledBroadcast = async (id: string) => {
     try {
-      await supabase.from('scheduled_broadcasts').update({ status: 'canceled' }).eq('id', id);
+      const { data, error } = await supabase.from('scheduled_broadcasts')
+        .update({ status: 'canceled' }).eq('id', id).eq('status', 'pending').select('id');
+      if (error) throw error;
+      if (!data?.length) throw new Error('سبق إرسال هذا التعميم أو إلغاؤه.');
       await loadScheduledBroadcasts();
       showToast('تم إلغاء التعميم المجدول');
     } catch (e: any) {
@@ -1051,16 +1012,10 @@ export default function AdminScreen() {
   const sendScheduledNow = async (item: any) => {
     setSendingBroadcast(true);
     try {
-      const res = await deliverBroadcast({
-        title: item.title,
-        body: item.body,
-        type: item.broadcast_type || 'official',
-        target: item.target?.scope || 'all',
-        segment: item.target?.segment || 'all',
-      });
-      await supabase.from('scheduled_broadcasts').update({ status: 'sent', sent_at: new Date().toISOString() }).eq('id', item.id);
+      const { data: res, error } = await supabase.rpc('admin_dispatch_scheduled_broadcast', { p_id: item.id });
+      if (error || !res) throw error || new Error('تعذر إرسال التعميم المجدول.');
       setLastDelivery({ recipients: res.recipients, pushed: res.pushed, label: item.title });
-      showToast('تم إرسال التعميم المجدول ✅');
+      showToast(res.already_sent ? 'سبق إرسال هذا التعميم' : 'تم إرسال التعميم المجدول ✅');
       await loadScheduledBroadcasts();
     } catch (e: any) {
       Alert.alert('خطأ', e?.message || 'تعذر الإرسال');

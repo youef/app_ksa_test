@@ -12,7 +12,6 @@ import {
   Power,
   Save,
   DatabaseZap,
-  Trash2,
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { ADMIN_COLORS as C } from './adminStyles';
@@ -168,37 +167,6 @@ export function AdminFeatureFlags({ onSaved }: { onSaved: (msg: string) => void 
             );
           })}
         </View>
-      </OasisSurface>
-
-      {/* Test Data Purge Section */}
-      <OasisSurface oasisSurface="card" style={[styles.card, { borderColor: '#fca5a5', backgroundColor: '#fff5f5' }]}>
-        <View style={styles.cardHead}>
-          <View style={styles.cardTitleRow}>
-            <Trash2 size={16} color={C.danger} />
-            <Text style={[styles.cardTitle, { color: C.danger }]}>تنظيف البيانات والحسابات التجريبية</Text>
-          </View>
-        </View>
-        <Text style={[styles.cardHint, { color: '#991b1b' }]}>
-          حذف كافة الحسابات الوهمية (80 حساباً تجريبياً)، وكافة الخدمات والطلبات والأسئلة التجريبية، ومنع النظام من إرسال أي مقترحات أو عروض تجريبية نهائياً.
-        </Text>
-        <Pressable oasisVariant="primary" oasisKind="action"
-          style={[styles.saveBtn, { backgroundColor: C.danger, marginTop: 8 }]}
-          onPress={async () => {
-            try {
-              const { data, error } = await supabase.rpc('admin_purge_test_data');
-              if (error) {
-                onSaved('يرجى تنفيذ ملف الترحيل 202610120002_purge_all_test_and_mock_data.sql أولاً في محرّر Supabase.');
-              } else {
-                onSaved(`تم تنظيف النظام بنجاح! تم حذف ${data?.deleted_profiles || 0} حساباً و${data?.deleted_services || 0} خدمة تجريبية.`);
-              }
-            } catch (err: any) {
-              onSaved('حدث خطأ: ' + err.message);
-            }
-          }}
-        >
-          <Trash2 size={16} color={OASIS.colors.surface} />
-          <Text style={styles.saveText}>تنظيف كافة البيانات التجريبية الآن</Text>
-        </Pressable>
       </OasisSurface>
 
       <Pressable oasisVariant="primary" oasisKind="action" style={styles.saveBtn} onPress={save} disabled={saving}>
