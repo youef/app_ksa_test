@@ -213,7 +213,7 @@ function buildPinInfoWindow(pin: MapPin, onOpen: () => void, onClose: () => void
     onClose();
   };
 
-  if (pin.kind === 'business') {
+  if (pin.kind === 'business' && (pin.phone || pin.exact)) {
     const dirButton = document.createElement('button');
     dirButton.textContent = pin.phone ? 'الاتصال' : 'الاتجاهات';
     dirButton.style.cssText =
