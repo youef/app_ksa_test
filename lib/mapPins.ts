@@ -220,13 +220,13 @@ export async function loadMapPins(limit = 220): Promise<MapPin[]> {
   const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(400, Math.floor(limit))) : 220;
   // One query covers carpool and ordinary requests. NULL request types are included.
   const [questionRows, allRequestRows, businessRows, servicesRows, eventRows, marketplaceRows, alertRows] = await Promise.all([
-    safeRows(() => supabase.from('questions').select('*').order('created_at', { ascending: false }).limit(safeLimit)),
-    safeRows(() => supabase.from('requests').select('*').eq('status', 'open').order('created_at', { ascending: false }).limit(safeLimit)),
-    safeRows(() => supabase.from('businesses').select('*').limit(safeLimit)),
-    safeRows(() => supabase.from('services').select('*').eq('moderation_status', 'approved').order('created_at', { ascending: false }).limit(safeLimit)),
-    safeRows(() => supabase.from('events').select('*').eq('status', 'published').eq('moderation_status', 'approved').order('starts_at', { ascending: true }).limit(safeLimit)),
-    safeRows(() => supabase.from('marketplace_items').select('*').eq('status', 'available').order('created_at', { ascending: false }).limit(safeLimit)),
-    safeRows(() => supabase.from('urgent_alerts').select('*').eq('status', 'active').order('created_at', { ascending: false }).limit(safeLimit)),
+    safeRows(() => supabase.from('questions').select('id,author_id,title,body,city,district,status,created_at,is_emergency,urgency_level,is_tool_sharing,item_type,category').order('created_at', { ascending: false }).limit(safeLimit)),
+    safeRows(() => supabase.from('requests').select('id,requester_id,title,description,request_type,city,district,status,created_at,is_urgent,budget,price_per_seat,expires_at').eq('status', 'open').order('created_at', { ascending: false }).limit(safeLimit)),
+    safeRows(() => supabase.from('businesses').select('id,owner_id,name,description,city,district,latitude,longitude,phone,is_open_now,is_verified,created_at,moderation_status').limit(safeLimit)),
+    safeRows(() => supabase.from('services').select('id,provider_id,name,description,city,district,price_from,is_verified,created_at,available_now,listing_type,subcategory,moderation_status,category').eq('moderation_status', 'approved').order('created_at', { ascending: false }).limit(safeLimit)),
+    safeRows(() => supabase.from('events').select('id,organizer_id,title,description,city,district,starts_at,ends_at,latitude,longitude,status,created_at,moderation_status,category,is_free').eq('status', 'published').eq('moderation_status', 'approved').order('starts_at', { ascending: true }).limit(safeLimit)),
+    safeRows(() => supabase.from('marketplace_items').select('id,seller_id,title,description,price,item_type,city,district,status,created_at').eq('status', 'available').order('created_at', { ascending: false }).limit(safeLimit)),
+    safeRows(() => supabase.from('urgent_alerts').select('id,creator_id,title,description,alert_type,city,district,status,location_lat,location_lng,created_at').eq('status', 'active').order('created_at', { ascending: false }).limit(safeLimit)),
   ]);
   const requestRows = allRequestRows.filter((row: any) => row.request_type !== 'carpooling');
   const carpoolRows = allRequestRows.filter((row: any) => row.request_type === 'carpooling');
@@ -274,6 +274,7 @@ export async function loadMapPins(limit = 220): Promise<MapPin[]> {
   });
 
   requestRows.forEach((row: any) => {
+    if (isExpired(row.expires_at)) return;
     const position = resolvePinPosition({
       id: `request-${row.id}`,
       lat: row.lat,
@@ -311,6 +312,7 @@ export async function loadMapPins(limit = 220): Promise<MapPin[]> {
 
   // Carpool pins (requests with request_type = 'carpooling')
   carpoolRows.forEach((row: any) => {
+    if (isExpired(row.expires_at)) return;
     const position = resolvePinPosition({
       id: `carpool-${row.id}`,
       lat: row.lat,
@@ -396,8 +398,8 @@ export async function loadMapPins(limit = 220): Promise<MapPin[]> {
     const position = resolvePinPosition(
       {
         id: `service-${row.id}`,
-        lat: row.latitude ?? row.lat ?? row.details?.latitude,
-        lng: row.longitude ?? row.lng ?? row.details?.longitude,
+        lat: undefined, // Service locations are district-only in public map responses.
+        lng: undefined,
         city: row.city,
         district: row.district,
       },
