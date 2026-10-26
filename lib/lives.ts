@@ -185,7 +185,19 @@ export async function getLiveToken(streamId: string, intent: 'host' | 'viewer' |
   const { data, error } = await supabase.functions.invoke('livekit-token', {
     body: { stream_id: streamId, intent },
   });
-  if (error) throw new Error(error.message || 'تعذر الاتصال بخدمة البث.');
+  if (error) {
+    // FunctionsHttpError hides the JSON error body in context. Surface the
+    // actual room permission / stopped-stream reason instead of a generic 4xx.
+    let message = error.message || 'تعذر الاتصال بخدمة البث.';
+    const context = 'context' in error ? error.context : null;
+    if (context && typeof (context as Response).json === 'function') {
+      try {
+        const result = await (context as Response).clone().json();
+        if (typeof result?.error === 'string') message = result.error;
+      } catch { /* Keep the standard SDK error when a response has no JSON. */ }
+    }
+    throw new Error(message);
+  }
   if (!data?.token || !data?.url) throw new Error(data?.error || 'لم تصل بيانات الاتصال بالبث.');
   return data as { token: string; url: string; identity: string };
 }
