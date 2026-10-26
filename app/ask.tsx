@@ -11,6 +11,8 @@ import { containsProfanity, findProfanity, banAccountOnViolation } from '@/lib/p
 import { getCurrentDeviceLocation, reverseGeocodeDeviceLocation } from '@/lib/deviceLocation';
 import { getActiveLocation, getPermanentMyLocation, savePermanentMyLocation, subscribeLocation, isAllKingdom } from '@/lib/locationSync';
 import { detectEmergencyAndSafetyAI } from '@/lib/aiAssistant';
+import PublishLocationEditor from '@/components/location/PublishLocationEditor';
+import { isKnownSaudiCity } from '@/lib/saudiLocations';
 
 const POST_TYPES = [
   { key: 'inquiry', label: 'استفسار', hint: 'اسأل أهل الخبرة في حيّك', icon: MessageSquare },
@@ -100,6 +102,8 @@ export default function AskScreen() {
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
   const submittingRef = useRef(false);
+  const locationManuallySelectedRef = useRef(false);
+  const [editingLocation, setEditingLocation] = useState(false);
   const [step, setStep] = useState<1 | 2>(1);
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
@@ -153,14 +157,14 @@ export default function AskScreen() {
       // 1. Immediately populate from active location / permanent storage (Zero wait)
       try {
         const active = await getActiveLocation();
-        if (isMounted && active?.city && !isAllKingdom(active.city)) {
+        if (isMounted && !locationManuallySelectedRef.current && active?.city && !isAllKingdom(active.city) && isKnownSaudiCity(active.city)) {
           setCity(active.city);
           const d = (active.district && active.district !== 'كل الأحياء' && active.district !== 'كل أحياء المدينة') ? active.district : '';
           setDistrict(d);
           setRegion(active.region || 'المملكة');
         } else {
           const loc = await getPermanentMyLocation();
-          if (isMounted && loc?.city && !isAllKingdom(loc.city)) {
+          if (isMounted && !locationManuallySelectedRef.current && loc?.city && !isAllKingdom(loc.city) && isKnownSaudiCity(loc.city)) {
             setCity(loc.city);
             const d = (loc.district && loc.district !== 'كل الأحياء' && loc.district !== 'كل أحياء المدينة') ? loc.district : '';
             setDistrict(d);
@@ -181,7 +185,7 @@ export default function AskScreen() {
             .eq('id', u.user.id)
             .maybeSingle();
 
-          if (prof?.city && isMounted) {
+          if (prof?.city && isMounted && !locationManuallySelectedRef.current && isKnownSaudiCity(prof.city)) {
             const cleanCity = prof.city.trim();
             const cleanDist = (prof.district && prof.district !== 'كل الأحياء' && prof.district !== 'كل أحياء المدينة')
               ? prof.district.trim()
@@ -205,7 +209,7 @@ export default function AskScreen() {
         ]);
         if (device && isMounted) {
           const place = await reverseGeocodeDeviceLocation(device as any);
-          if (place?.region && place?.city && place?.district) {
+          if (isMounted && !locationManuallySelectedRef.current && place?.region && place?.city && place?.district && isKnownSaudiCity(place.city)) {
             setRegion(place.region);
             setCity(place.city);
             setDistrict(place.district);
@@ -217,7 +221,7 @@ export default function AskScreen() {
     initLocation();
 
     const unsubscribe = subscribeLocation((newLoc) => {
-      if (isMounted && newLoc?.city && !isAllKingdom(newLoc.city)) {
+      if (isMounted && !locationManuallySelectedRef.current && newLoc?.city && !isAllKingdom(newLoc.city) && isKnownSaudiCity(newLoc.city)) {
         setCity(newLoc.city);
         const d = (newLoc.district && newLoc.district !== 'كل الأحياء' && newLoc.district !== 'كل أحياء المدينة') ? newLoc.district : '';
         setDistrict(d);
@@ -283,14 +287,8 @@ export default function AskScreen() {
       const isEmergency = safetyCheck?.isEmergency || postType === 'emergency';
       const isToolSharing = postType === 'tool_sharing';
 
-      let deviceLocation: any = null;
-      try {
-        deviceLocation = await Promise.race([
-          getCurrentDeviceLocation(),
-          new Promise((res) => setTimeout(() => res(null), 1200)),
-        ]);
-      } catch {}
-
+      // Public questions and help requests never need precise user coordinates.
+      // Keeping only city and district here matches the publishing privacy notice.
       if (city) {
         await savePermanentMyLocation({
           region: region || 'المملكة',
@@ -352,8 +350,6 @@ export default function AskScreen() {
           budget: budget ? Number(budget) : null,
           is_urgent: isEmergency,
           status: 'open',
-          lat: deviceLocation?.latitude ?? null,
-          lng: deviceLocation?.longitude ?? null,
         };
 
         let reqResult = await supabase.from('requests').insert(reqPayload).select('id').single();
@@ -377,8 +373,6 @@ export default function AskScreen() {
         body: body.trim() || 'بدون تفاصيل إضافية',
         city: city.trim(),
         district: district.trim() || null,
-        lat: deviceLocation?.latitude ?? null,
-        lng: deviceLocation?.longitude ?? null,
       };
 
       let insertedQuestionId: string | null = null;
@@ -520,7 +514,7 @@ export default function AskScreen() {
                 <Text style={styles.locationValue}>{city ? [city, district && `حي ${district}`].filter(Boolean).join(' · ') : 'لم يتم تحديد المدينة'}</Text>
                 <Text style={styles.locationHint}>نشارك المدينة والحي فقط، وليس إحداثياتك الدقيقة.</Text>
               </View>
-              <Pressable accessibilityRole="button" accessibilityLabel="تحديث الموقع" onPress={() => router.push('/set-location')} style={styles.locationChange}><MapPin size={17} color={OASIS.colors.primary} /><Text style={styles.locationChangeText}>تحديث</Text></Pressable>
+              <Pressable accessibilityRole="button" accessibilityLabel="تحديث الموقع" onPress={() => setEditingLocation(true)} style={styles.locationChange}><MapPin size={17} color={OASIS.colors.primary} /><Text style={styles.locationChangeText}>تحديث</Text></Pressable>
             </View>
             <View style={styles.previewCard}>
               <View style={styles.previewHeader}><Eye size={16} color={OASIS.colors.primary} /><Text style={styles.previewHeaderText}>معاينة المنشور</Text></View>
@@ -544,6 +538,20 @@ export default function AskScreen() {
           </Pressable>
         </View>
       </View>
+      <PublishLocationEditor
+        visible={editingLocation}
+        city={city}
+        district={district}
+        region={region}
+        onClose={() => setEditingLocation(false)}
+        onSaved={location => {
+          locationManuallySelectedRef.current = true;
+          setCity(location.city);
+          setDistrict(location.district === 'كل الأحياء' ? '' : location.district);
+          setRegion(location.region);
+          setFieldErrors(previous => ({ ...previous, city: undefined }));
+        }}
+      />
     </KeyboardAvoidingView>
   );
 }
