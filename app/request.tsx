@@ -1097,7 +1097,7 @@ const styles = StyleSheet.create({
   srOnly: { position: 'absolute', width: 1, height: 1, opacity: 0 },
   container: {
     flex: 1,
-    backgroundColor: '#f5f7f6',
+    backgroundColor: 'transparent',
   },
   scroll: {
     flexGrow: 1, width: '100%', maxWidth: 760, alignSelf: 'center', paddingHorizontal: 16, paddingTop: 12, gap: 12,

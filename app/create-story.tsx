@@ -793,7 +793,7 @@ const s = StyleSheet.create({
   composerTopSpacer: { width: 40, height: 40 },
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: 'transparent',
   },
   canvasWrapper: {
     flex: 1,
