@@ -181,7 +181,7 @@ export default function AboutScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, width: '100%', backgroundColor: '#f4f7f5' },
+  container: { flex: 1, width: '100%', backgroundColor: 'transparent' },
   scroll: { paddingTop: 12 },
   content: { width: '100%', maxWidth: 680, alignSelf: 'center', paddingHorizontal: 14, gap: 12 },
   headerAction: {

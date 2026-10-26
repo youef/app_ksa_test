@@ -98,7 +98,7 @@ export default function AdminModerationScreen() {
   };
 
   return (
-    <View style={[styles.screen, { backgroundColor: colors.background }]}>
+    <View style={[styles.screen, { backgroundColor: 'transparent' }]}>
       <AppHeader variant="sub" title="إدارة الفلترة والمخالفين" subtitle="الكلمات المحظورة والمتابعات" fallbackRoute="/admin" />
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: bottomInset + 28 }]} showsVerticalScrollIndicator={false}>
         {loading ? <ActivityIndicator size="large" color={OASIS.colors.primary} /> : null}
@@ -194,7 +194,7 @@ export default function AdminModerationScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#F7F9F8' },
+  screen: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: 14, gap: 12, maxWidth: 920, width: '100%', alignSelf: 'center' },
   card: { padding: 14, borderRadius: 14, borderWidth: 1, borderColor: '#DDEAE4', backgroundColor: '#FFFFFF', gap: 10 },
   cardHeader: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },

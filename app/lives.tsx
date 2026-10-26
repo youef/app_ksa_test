@@ -678,7 +678,7 @@ function AchievementCard({ item }: { item: LiveAchievement }) {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#F4F8F6' },
+  screen: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: 12, paddingTop: 14 },
 
   headerCta: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, backgroundColor: OASIS.colors.primary, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },

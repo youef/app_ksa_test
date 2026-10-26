@@ -26,7 +26,7 @@ export default function BannedScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: OASIS.colors.background, padding: 24 },
+  screen: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', padding: 24 },
   card: { maxWidth: 420, width: '100%', backgroundColor: OASIS.colors.surface, borderRadius: 18, borderWidth: 1, borderColor: OASIS.colors.line, padding: 24, alignItems: 'center', gap: 12 },
   icon: { width: 72, height: 72, borderRadius: 36, backgroundColor: OASIS.colors.dangerSoft, alignItems: 'center', justifyContent: 'center' },
   title: { color: OASIS.colors.danger, fontSize: 20, fontWeight: '800', textAlign: 'center' },
