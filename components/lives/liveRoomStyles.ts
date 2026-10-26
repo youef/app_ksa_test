@@ -38,7 +38,12 @@ export const styles = StyleSheet.create({
   mediaAlertWrap: { position: 'absolute', top: '30%', alignSelf: 'center', zIndex: 15, alignItems: 'center', gap: 6 },
   mediaAlert: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 16, backgroundColor: 'rgba(190,18,60,0.82)' },
   mediaAlertText: { color: OASIS.colors.surface, fontSize: 11, fontWeight: '600' },
-  effectsLayer: { position: 'absolute', right: 18, bottom: 0, width: 70, height: 340, zIndex: 6 },
+  effectsLayer: { position: 'absolute', right: 88, bottom: 0, width: 70, height: 340, zIndex: 6 },
+  // Compact portrait-mode reactions rail; chat remains readable on the opposite side.
+  viewerRail: { position: 'absolute', right: 10, zIndex: 12, alignItems: 'center', gap: 13, width: 64 },
+  viewerRailButton: { alignItems: 'center', justifyContent: 'center', gap: 4, minHeight: 57 },
+  viewerRailIcon: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)', backgroundColor: 'rgba(2,20,16,0.58)', alignItems: 'center', justifyContent: 'center' },
+  viewerRailLabel: { fontSize: 10.5, fontWeight: '800', color: '#FFFFFF', textShadowColor: 'rgba(0,0,0,0.8)', textShadowRadius: 5, textAlign: 'center' },
   floatingEffect: { position: 'absolute', right: 4, alignItems: 'flex-end' },
   effectBubble: { alignItems: 'center' },
   effectName: { color: OASIS.colors.surface, fontSize: 11, fontWeight: '600', maxWidth: 62, backgroundColor: 'rgba(2,6,23,0.55)', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 7, marginBottom: 2 },
