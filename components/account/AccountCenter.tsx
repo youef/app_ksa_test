@@ -1,7 +1,9 @@
+import { PROFILE_READ_FIELDS } from '@/lib/profileFields';
 import { AppearanceSettings } from '@/components/account/AppearanceSettings';
 import { useTheme } from '@/context/ThemeContext';
 import { ProfileHeader } from '@/components/profile/ProfileHeader';
 import { ProfileEditor } from '@/components/profile/ProfileEditor';
+import { ProfileContactSettings } from '@/components/profile/ProfileContactSettings';
 import { ProfileConnections } from '@/components/profile/ProfileConnections';
 import { validateProfileDraft } from '@/lib/profileEditor';
 import { OasisArtwork } from '@/components/oasis/OasisPrimitives';
@@ -30,6 +32,7 @@ import {
   MessageCircle,
   Moon,
   Package,
+  Phone,
   Palette,
   Plus,
   RefreshCw,
@@ -172,10 +175,6 @@ export default function AccountCenter() {
   const [userId, setUserId] = useState('');
   const [email, setEmail] = useState('');
   const [profile, setProfile] = useState<any>(null);
-  const [contactPhone, setContactPhone] = useState('');
-  const [contactVisible, setContactVisible] = useState(false);
-  const [contactBusy, setContactBusy] = useState(false);
-  const [contactLoaded, setContactLoaded] = useState(false);
   const [capabilities, setCapabilities] = useState<Capability>({});
   const [stats, setStats] = useState({ followers: 0, following: 0, reputation: 0, community: 0 });
 
@@ -250,9 +249,6 @@ export default function AccountCenter() {
       setUserId(uid);
       setEmail(auth.user.email || '');
       setEmailDraft(auth.user.email || '');
-      setContactLoaded(false);
-      const contactResult = await supabase.from('profile_contact_numbers').select('phone,is_visible').eq('user_id', uid).maybeSingle();
-      if (!contactResult.error) { setContactPhone(contactResult.data?.phone || ''); setContactVisible(Boolean(contactResult.data?.is_visible)); setContactLoaded(true); }
 
       const [
         profileRes,
@@ -271,7 +267,7 @@ export default function AccountCenter() {
         featuredRes,
         answerCount,
       ] = await Promise.all([
-        supabase.from('profiles').select('*').eq('id', uid).maybeSingle(),
+        supabase.from('profiles').select(PROFILE_READ_FIELDS).eq('id', uid).maybeSingle(),
         supabase.rpc('hayna_my_account_capabilities'),
         supabase.from('marketplace_items').select('id,title,description,price,item_type,status,image_url,created_at,business_id', {count:'exact'}).eq('seller_id', uid).order('created_at', { ascending: false }).order('id',{ascending:false}).limit(40),
         supabase.from('services').select('id,name,description,price_from,price_to,price_type,cover_url,activity_status,moderation_status,created_at,business_id', {count:'exact'}).eq('provider_id', uid).order('created_at', { ascending: false }).order('id',{ascending:false}).limit(40),
@@ -624,23 +620,6 @@ export default function AccountCenter() {
     }
   }
 
-  async function saveContactPhone() {
-    if (!userId || contactBusy || !contactLoaded) return;
-    const normalized = contactPhone.trim().replace(/[\s()-]/g, '');
-    if (normalized && !/^\+?[0-9]{9,15}$/.test(normalized)) return notify('راجع رقم الجوال', 'أدخل رقمًا من 9 إلى 15 رقمًا، ويمكنك إضافة + في البداية.');
-    if (!normalized && contactVisible) return notify('أضف رقم الجوال', 'أدخل رقمًا قبل تفعيل إظهاره.');
-    setContactBusy(true);
-    try {
-      const result = normalized
-        ? await supabase.from('profile_contact_numbers').upsert({ user_id: userId, phone: normalized, is_visible: contactVisible, updated_at: new Date().toISOString() })
-        : await supabase.from('profile_contact_numbers').delete().eq('user_id', userId);
-      if (result.error) throw result.error;
-      setContactPhone(normalized);
-      notify('تم الحفظ', contactVisible ? 'رقم التواصل ظاهر في ملفك العام وفق إعدادات الخصوصية.' : 'رقم التواصل مخفي عن الآخرين.');
-    } catch (error: any) { notify('تعذر حفظ رقم التواصل', error?.message || 'حاول مرة أخرى.'); }
-    finally { setContactBusy(false); }
-  }
-
   async function savePrivacy(patch: Record<string, any>) {
     if (!userId || settingsSaving) return;
     setSettingsSaving(true);
@@ -903,7 +882,7 @@ export default function AccountCenter() {
           }}>
             {editing ? <ProfileEditor draft={draft} dirty={dirty} saving={saving} avatarBusy={avatarBusy} coverBusy={coverBusy} onChange={patch => {if (patch.displayName !== undefined) setDisplayName(patch.displayName);if (patch.username !== undefined) setUsername(patch.username);if (patch.bio !== undefined) setBio(patch.bio);}} onSave={() => void saveProfile()} onCancel={closeEditor} onAvatar={() => void pickAvatar()} onCover={() => void pickCover()} /> : <SectionCard>
               <View style={styles.sectionHeader}><View style={styles.sectionHeaderCopy}><Text style={styles.sectionTitle}>ملفك، بطريقتك</Text><Text style={styles.sectionSub}>كل تغييراتك هنا مرتبطة مباشرة بملفك العام</Text></View><Sparkles size={22} color={colors.primary}/></View>
-              <View style={styles.actionGrid}><QuickAction label="تعديل الملف" sub="الاسم والنبذة والصور" Icon={UserRound} onPress={beginEditing}/><QuickAction label="تخصيص المظهر" sub="الألوان والغلاف والأقسام" Icon={Palette} onPress={() => {navigateTab('settings');setSettingsSection('design');}}/><QuickAction label="عرض ملفي" sub="شاهد الملف العام" Icon={Eye} onPress={() => router.push({pathname:'/user',params:{id:userId}})}/><QuickAction label="مشاركة الملف" sub="انسخ رابط حسابك" Icon={Users} onPress={() => void shareProfile()}/></View>
+              <View style={styles.actionGrid}><QuickAction label="تعديل الملف" sub="الاسم والنبذة والصور" Icon={UserRound} onPress={beginEditing}/><QuickAction label="رقم التواصل" sub="إضافة رقمك والتحكم بإظهاره" Icon={Phone} onPress={() => navigateTab('settings','privacy')}/><QuickAction label="تخصيص المظهر" sub="الألوان والغلاف والأقسام" Icon={Palette} onPress={() => {navigateTab('settings');setSettingsSection('design');}}/><QuickAction label="عرض ملفي" sub="شاهد الملف العام" Icon={Eye} onPress={() => router.push({pathname:'/user',params:{id:userId}})}/><QuickAction label="مشاركة الملف" sub="انسخ رابط حسابك" Icon={Users} onPress={() => void shareProfile()}/></View>
             </SectionCard>}
 
             <SectionCard>
@@ -1123,14 +1102,7 @@ export default function AccountCenter() {
                 <Lock size={20} color="#0F766E" />
               </View>
 
-              <View style={{gap: 10}}>
-                <Text style={styles.sectionTitle}>رقم التواصل الاختياري</Text>
-                <Text style={styles.sectionSub}>رقم للتواصل فقط، ولا يغيّر رقم تسجيل الدخول. يظهر عند تفعيل الخيار وحفظه.</Text>
-                {!contactLoaded && <Text style={styles.sectionSub}>تعذر تحميل رقم التواصل. اسحب للتحديث ثم حاول مجددًا.</Text>}
-                <TextInput accessibilityLabel="رقم التواصل" value={contactPhone} onChangeText={setContactPhone} keyboardType="phone-pad" maxLength={20} editable={contactLoaded && !contactBusy} placeholder="05xxxxxxxx أو +9665xxxxxxxx" style={styles.input} />
-                <ToggleRow title="إظهار رقم التواصل" sub="يمكن للآخرين الاتصال بك من ملفك العام" value={contactVisible} disabled={!contactLoaded || contactBusy} onValueChange={setContactVisible} />
-                <Pressable accessibilityRole="button" onPress={() => void saveContactPhone()} disabled={!contactLoaded || contactBusy} style={styles.outlineButtonWide}><Text style={styles.outlineButtonText}>{contactBusy ? 'جارٍ الحفظ…' : 'حفظ رقم التواصل'}</Text></Pressable>
-              </View>
+              <ProfileContactSettings userId={userId} restricted={profile.profile_privacy === 'private' || Boolean(profile.hide_name) || Boolean(profile.is_banned)} onSaved={message => notify('رقم التواصل', message)} />
               <ToggleRow title="حساب خاص" sub="لا يظهر نشاطك لغير المتابعين" disabled={settingsSaving} value={profile.profile_privacy === 'private'} onValueChange={(value: boolean) => void savePrivacy({ profile_privacy: value ? 'private' : 'public' })} />
               <ToggleRow title="إخفاء الاسم" sub="يظهر الحساب كجار مجهول في السياقات العامة" disabled={settingsSaving} value={Boolean(profile.hide_name)} onValueChange={(value: boolean) => void savePrivacy({ hide_name: value })} />
 

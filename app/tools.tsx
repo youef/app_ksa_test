@@ -1,3 +1,4 @@
+import { PROFILE_READ_FIELDS } from '@/lib/profileFields';
 import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
 import { HeaderAction, AppHeader } from '@/components/shared/AppHeader';
@@ -70,7 +71,7 @@ export default function ToolsLendingScreen() {
       setCurrentUserId(uid);
 
       if (uid) {
-        const { data: prof } = await supabase.from('profiles').select('*').eq('id', uid).maybeSingle();
+        const { data: prof } = await supabase.from('profiles').select(PROFILE_READ_FIELDS).eq('id', uid).maybeSingle();
         setUserProfile(prof);
       }
 

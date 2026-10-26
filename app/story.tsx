@@ -1,3 +1,4 @@
+import { PROFILE_READ_FIELDS } from '@/lib/profileFields';
 import { OasisTextInput as TextInput, OasisPressable as Pressable } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
 import { headerTopInset } from '@/components/shared/AppHeader';
@@ -253,7 +254,7 @@ export default function StoryViewer() {
     // Load author profile
     const { data: p } = await supabase
       .from('profiles')
-      .select('*')
+      .select(PROFILE_READ_FIELDS)
       .eq('id', targetStory.author_id)
       .maybeSingle();
     setAuthor(p);

@@ -1,3 +1,4 @@
+import { PROFILE_READ_FIELDS } from '@/lib/profileFields';
 import { OASIS } from '@/lib/oasis';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import {
@@ -113,7 +114,7 @@ export default function Conversation() {
 
     const { data: myProf } = await supabase
       .from('profiles')
-      .select('*')
+      .select(PROFILE_READ_FIELDS)
       .eq('id', u.user.id)
       .maybeSingle();
     setMyProfile(myProf);
@@ -152,7 +153,7 @@ export default function Conversation() {
     if (otherId) {
       const { data: profile } = await supabase
         .from('profiles')
-        .select('*')
+        .select(PROFILE_READ_FIELDS)
         .eq('id', otherId)
         .single();
       setOtherUser(profile);

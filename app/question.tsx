@@ -1,3 +1,4 @@
+import { PROFILE_READ_FIELDS } from '@/lib/profileFields';
 import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
 import { HeaderAction } from '@/components/shared/AppHeader';
@@ -91,7 +92,7 @@ export default function Question() {
     const { data: auth } = await supabase.auth.getSession();
     const user = auth.session?.user ?? null;
     setCurrentUserId(user?.id ?? null);
-    const viewer = user ? await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle() : { data: null };
+    const viewer = user ? await supabase.from('profiles').select(PROFILE_READ_FIELDS).eq('id', user.id).maybeSingle() : { data: null };
     setViewerProfile(viewer.data);
     const questionPromise = user
       ? supabase.from('questions').select('*').eq('id', id).maybeSingle()
@@ -112,7 +113,7 @@ export default function Question() {
       const userIds = [question.author_id, ...(b.data || []).map((ans: any) => ans.author_id)];
       const uniqueIds = Array.from(new Set(userIds.filter(Boolean)));
 
-      const { data: profilesData } = await supabase.from('profiles').select('*').in('id', uniqueIds);
+      const { data: profilesData } = await supabase.from('profiles').select(PROFILE_READ_FIELDS).in('id', uniqueIds);
       const profilesMap = (profilesData || []).reduce((acc: any, p: any) => ({ ...acc, [p.id]: p }), {});
 
       question.profiles = profilesMap[question.author_id];

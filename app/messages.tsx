@@ -1,3 +1,4 @@
+import { PROFILE_READ_FIELDS } from '@/lib/profileFields';
 import { OasisEmptyIllustration } from '@/components/oasis/OasisEmptyIllustration';
 import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
@@ -153,7 +154,7 @@ export default function Messages() {
     const otherUserIds = [...new Set(allMembers.map((m: any) => m.user_id))];
     const { data: profiles } =
       otherUserIds.length > 0
-        ? await supabase.from('profiles').select('*').in('id', otherUserIds)
+        ? await supabase.from('profiles').select(PROFILE_READ_FIELDS).in('id', otherUserIds)
         : { data: [] };
 
     const profileMap = (profiles || []).reduce((acc: any, p: any) => ({ ...acc, [p.id]: p }), {});

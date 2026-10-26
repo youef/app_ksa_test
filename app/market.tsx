@@ -231,12 +231,12 @@ export default function Market() {
       const [servicesRes, productsRes, businessRes, eventsRes] = await Promise.all([
         supabase
           .from('services')
-          .select('*, profiles:provider_id(display_name, avatar_url, is_verified, phone, city, district, account_type, freelance_trade), business:business_id(id,name,is_verified)')
+          .select('*, profiles:provider_id(display_name, avatar_url, is_verified, city, district, account_type, freelance_trade), business:business_id(id,name,is_verified)')
           .eq('moderation_status', 'approved')
           .order('created_at', { ascending: false }),
         supabase
           .from('marketplace_items')
-          .select('*, seller:seller_id(display_name, avatar_url, is_verified, phone, city, district, account_type, freelance_trade), business:business_id(id,name,is_verified)')
+          .select('*, seller:seller_id(display_name, avatar_url, is_verified, city, district, account_type, freelance_trade), business:business_id(id,name,is_verified)')
           .eq('status', 'available')
           .order('created_at', { ascending: false }),
         supabase
@@ -274,7 +274,7 @@ export default function Market() {
             available_now: row.status === 'available',
             delivery_modes: [],
             whatsapp: null,
-            phone: row.seller?.phone || null,
+            phone: null,
             profiles: row.seller || null,
           }));
 
