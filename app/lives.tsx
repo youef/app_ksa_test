@@ -176,6 +176,17 @@ export default function LivesScreen() {
     return () => { ++generation.current; clearTimeout(debounce); clearInterval(timer); void supabase.removeChannel(channel); };
   }, [load, leaderboardPeriod]));
 
+  // Do not advertise a restricted stream to somebody who cannot obtain its token.
+  // The Edge Function remains the source of truth for actual entry permissions.
+  const accessibleStreams = useMemo(() => streams.filter((stream) => {
+    if (stream.host_id === currentUserId) return true;
+    if (stream.audience === 'public') return true;
+    if (stream.audience === 'followers') return following.includes(stream.host_id);
+    if (stream.audience === 'city') return Boolean(city && stream.profiles?.city &&
+      city.toLocaleLowerCase('ar') === stream.profiles.city.toLocaleLowerCase('ar'));
+    return false;
+  }), [streams, currentUserId, following, city]);
+
   const isFollowing = useCallback((stream: LiveStream) => following.includes(stream.host_id), [following]);
   const isNearby = useCallback(
     (stream: LiveStream) => Boolean(city && stream.profiles?.city?.toLocaleLowerCase() === city.toLocaleLowerCase()),
@@ -183,37 +194,37 @@ export default function LivesScreen() {
   );
 
   const baseCounts = useMemo(() => ({
-    all: streams.length,
-    following: streams.filter(isFollowing).length,
-    nearby: streams.filter(isNearby).length,
-  }), [streams, isFollowing, isNearby]);
+    all: accessibleStreams.length,
+    following: accessibleStreams.filter(isFollowing).length,
+    nearby: accessibleStreams.filter(isNearby).length,
+  }), [accessibleStreams, isFollowing, isNearby]);
 
   const categories = useMemo(() => {
     const set = new Set<string>();
-    streams.forEach((stream) => { if (stream.category) set.add(stream.category); });
+    accessibleStreams.forEach((stream) => { if (stream.category) set.add(stream.category); });
     return ['all', ...Array.from(set)];
-  }, [streams]);
+  }, [accessibleStreams]);
 
-  const visible = useMemo(() => discoverLives(streams.filter((stream) => {
+  const visible = useMemo(() => discoverLives(accessibleStreams.filter((stream) => {
     if (category !== 'all' && stream.category !== category) return false;
     if (filter === 'following') return isFollowing(stream);
     if (filter === 'nearby') return isNearby(stream);
     return true;
-  }), searchQuery, sort), [streams, filter, category, isFollowing, isNearby, searchQuery, sort]);
+  }), searchQuery, sort), [accessibleStreams, filter, category, isFollowing, isNearby, searchQuery, sort]);
 
   const trending = useMemo(() => {
-    if (!streams.length) return [];
-    return [...streams]
+    if (!accessibleStreams.length) return [];
+    return [...accessibleStreams]
       .sort((a, b) => ((b.viewer_count || 0) - (a.viewer_count || 0)) || ((b.peak_viewer_count || 0) - (a.peak_viewer_count || 0)))
       .slice(0, 8);
-  }, [streams]);
+  }, [accessibleStreams]);
 
-  const totalViewers = useMemo(() => streams.reduce((sum, stream) => sum + (stream.viewer_count || 0), 0), [streams]);
-  const hostCount = useMemo(() => new Set(streams.map((stream) => stream.host_id)).size, [streams]);
+  const totalViewers = useMemo(() => accessibleStreams.reduce((sum, stream) => sum + (stream.viewer_count || 0), 0), [accessibleStreams]);
+  const hostCount = useMemo(() => new Set(accessibleStreams.map((stream) => stream.host_id)).size, [accessibleStreams]);
   const earnedAchievements = useMemo(() => achievements.filter((item) => item.earned).length, [achievements]);
 
   const badges: Record<TabKey, number> = {
-    live: streams.length,
+    live: accessibleStreams.length,
     trending: trending.length,
     stars: topHosts.length,
     achievements: earnedAchievements,
@@ -234,7 +245,7 @@ export default function LivesScreen() {
       <AppHeader
         variant="tab"
         title="البثوث المباشرة"
-        subtitle={streams.length > 0 ? `${compactCount(streams.length)} على الهواء · ${compactCount(totalViewers)} مشاهد` : 'كن قريبًا من مجتمع حيّك'}
+        subtitle={accessibleStreams.length > 0 ? `${compactCount(accessibleStreams.length)} على الهواء · ${compactCount(totalViewers)} مشاهد` : 'كن قريبًا من مجتمع حيّك'}
         fallbackRoute="/more"
         rightAction={(
           <HeaderAction
@@ -300,7 +311,7 @@ export default function LivesScreen() {
               </View>
 
               <View style={styles.heroStats}>
-                <HeroStat icon={<Radio size={15} color={OASIS.colors.soft} />} value={compactCount(streams.length)} label="بث مباشر" />
+                <HeroStat icon={<Radio size={15} color={OASIS.colors.soft} />} value={compactCount(accessibleStreams.length)} label="بث مباشر" />
                 <View style={styles.heroDivider} />
                 <HeroStat icon={<Eye size={15} color={OASIS.colors.soft} />} value={compactCount(totalViewers)} label="مشاهد" />
                 <View style={styles.heroDivider} />
@@ -562,7 +573,7 @@ function LiveCard({ stream, onPress }: { stream: LiveStream; onPress: () => void
       <View style={styles.cardBody}>
         <Text style={styles.cardTitle} numberOfLines={2}>{stream.title}</Text>
         <View style={styles.cardMetaRow}>
-          <Text style={styles.cardCategory} numberOfLines={1}>{stream.category}</Text>
+          <Text style={styles.cardCategory} numberOfLines={1}>{stream.category} · {AUDIENCE_LABEL[stream.audience]}</Text>
           <Text style={styles.cardDot}>·</Text>
           <Text style={styles.cardDuration}>{liveDuration(stream.started_at)}</Text>
         </View>
