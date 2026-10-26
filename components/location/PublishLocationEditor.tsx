@@ -49,6 +49,7 @@ export default function PublishLocationEditor({ visible, city, district, region,
   const [districtSearch, setDistrictSearch] = useState('');
   const [chooseCity, setChooseCity] = useState(false);
   const [lockedCity, setLockedCity] = useState<LockedCity | null>(null);
+  const [gpsConfirmedCity, setGpsConfirmedCity] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -62,6 +63,8 @@ export default function PublishLocationEditor({ visible, city, district, region,
     setCitySearch('');
     setDistrictSearch('');
     setChooseCity(!city);
+    setLockedCity(null);
+    setGpsConfirmedCity(false);
     setError('');
     void getLockedCity().then(lock => {
       if (!active) return;
@@ -96,6 +99,7 @@ export default function PublishLocationEditor({ visible, city, district, region,
       setError('المدينة مرتبطة بموقع GPS الموثّق. اختر حيًا في مدينتك، أو استخدم تحديد الموقع الحالي لتحديث المدينة.');
       return;
     }
+    setGpsConfirmedCity(false);
     setDraftCity(item.name);
     setDraftRegion(item.region);
     setDraftDistrict('');
@@ -130,6 +134,7 @@ export default function PublishLocationEditor({ visible, city, district, region,
       setDraftDistrict(fromGps || '');
       setDistrictSearch('');
       setChooseCity(false);
+      setGpsConfirmedCity(true);
       setLockedCity({ city: matchingCity.name, region: matchingCity.region });
       // Do not store the device coordinates. A verified GPS city can move a city lock.
       // Saving happens only when the user confirms the selected district.
@@ -155,7 +160,7 @@ export default function PublishLocationEditor({ visible, city, district, region,
         region: selectedCity.region,
         district: withoutPrefix(draftDistrict.trim()),
       };
-      await savePermanentMyLocation(next, true);
+      await savePermanentMyLocation(next, true, { allowCityChange: gpsConfirmedCity });
       const actual = await getActiveLocation();
       if (!matches(actual.city, next.city) || !matches(actual.district, next.district)) {
         setError('تعذر حفظ الموقع المطلوب بسبب قيود الموقع الموثق. حاول مجددًا.');
@@ -204,6 +209,7 @@ export default function PublishLocationEditor({ visible, city, district, region,
             {chooseCity && !lockedCity ? (
               <View style={styles.optionsBox}>
                 <View style={styles.searchBox}><Search size={18} color="#647C6B" /><TextInput value={citySearch} onChangeText={setCitySearch} placeholder="ابحث عن مدينتك" placeholderTextColor="#869A90" style={styles.searchInput} textAlign="right" /></View>
+                <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled" style={{ maxHeight: 230 }}>
                 {searchedCities.map((item, idx) => (
                   <Pressable key={item.region + ':' + item.name + ':' + idx} onPress={() => chooseLocation(item)} style={styles.option}>
                     <Text style={styles.optionText}>{item.name} <Text style={styles.optionRegion}>· {item.region}</Text></Text>
@@ -211,14 +217,16 @@ export default function PublishLocationEditor({ visible, city, district, region,
                   </Pressable>
                 ))}
                 {searchedCities.length === 0 ? <Text style={styles.empty}>لا توجد مدينة مطابقة.</Text> : null}
+                </ScrollView>
               </View>
             ) : null}
 
             <Text style={[styles.label, { marginTop: 16 }]}>الحي <Text style={{ color: '#B45309' }}>(مطلوب)</Text></Text>
             {draftCity ? (
               <View style={styles.optionsBox}>
-                <View style={styles.searchBox}><Search size={18} color="#647C6B" /><TextInput value={districtSearch} onChangeText={setDistrictSearch} placeholder="ابحث عن الحي في " style={styles.searchInput} placeholderTextColor="#869A90" textAlign="right" /></View>
+                <View style={styles.searchBox}><Search size={18} color="#647C6B" /><TextInput value={districtSearch} onChangeText={setDistrictSearch} placeholder="ابحث عن اسم الحي" style={styles.searchInput} placeholderTextColor="#869A90" textAlign="right" /></View>
                 <View style={styles.selectedLocation}><Text style={styles.selectedText}>{draftDistrict ? 'الحي المحدد: ' + draftDistrict : 'اختر الحي الأقرب لمنطقة سكنك'}</Text></View>
+                <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled" style={{ maxHeight: 235 }}>
                 {filteredDistricts.map((item, idx) => (
                   <Pressable key={item + ':' + idx} onPress={() => { setDraftDistrict(item); setError(''); }} style={[styles.option, matches(item, draftDistrict) && styles.optionSelected]}>
                     <Text style={[styles.optionText, matches(item, draftDistrict) && { color: '#047857' }]}>{item}</Text>
@@ -226,6 +234,7 @@ export default function PublishLocationEditor({ visible, city, district, region,
                   </Pressable>
                 ))}
                 {filteredDistricts.length === 0 ? <Text style={styles.empty}>لم نجد هذا الحي. تحقق من كتابة اسمه أو فعّل تحديد الموقع.</Text> : null}
+                </ScrollView>
               </View>
             ) : <Text style={styles.empty}>اختر المدينة أولًا.</Text>}
             <View style={styles.privacy}>
