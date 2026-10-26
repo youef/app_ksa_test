@@ -68,7 +68,7 @@ function AdminSupportPage() {
     toastTimer.current = setTimeout(() => setToast(null), 2600);
   }, []);
   return (
-    <View style={{ flex: 1, backgroundColor: '#F4F7FB' }}>
+    <View style={{ flex: 1, backgroundColor: 'transparent' }}>
       {toast ? (
         <View style={{ backgroundColor: OASIS.colors.ink, marginHorizontal: 14, marginTop: 10, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10 }}>
           <Text style={{ color: OASIS.colors.surface, fontSize: 12, fontWeight: '600', textAlign: 'right' }}>{toast}</Text>

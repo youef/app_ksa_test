@@ -819,7 +819,7 @@ export default function Service() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: OASIS.colors.background },
+  container: { flex: 1, backgroundColor: 'transparent' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 16, backgroundColor: OASIS.colors.background },
   loadingText: { color: OASIS.colors.muted, fontSize: 14, marginTop: 12, fontWeight: '700' },
   errorText: { color: OASIS.colors.ink, fontSize: 16, fontWeight: '700', marginTop: 12, marginBottom: 16 },
