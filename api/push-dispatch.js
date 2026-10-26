@@ -49,11 +49,10 @@ module.exports = async function handler(req, res) {
 
     // Service-role access is server-only and bypasses recipient RLS for token lookup.
     const profiles = await requestJson(
-      `/rest/v1/profiles?id=eq.${encodeURIComponent(user.id)}&select=role&limit=1`,
+      `/rest/v1/profiles?id=eq.${encodeURIComponent(user.id)}&select=role,is_banned&limit=1`,
       SUPABASE_SERVICE_KEY
     );
-    const email = String(user.email || '').toLowerCase();
-    if (profiles?.[0]?.role !== 'admin' && email !== 'root@gmail.com') {
+    if (profiles?.[0]?.role !== 'admin' || profiles?.[0]?.is_banned) {
       return res.status(403).json({ ok: false, error: 'إرسال التنبيهات العامة متاح للإدارة فقط.' });
     }
 

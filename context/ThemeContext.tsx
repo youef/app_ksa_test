@@ -89,7 +89,6 @@ const STORAGE_KEY = '@hayna_theme_mode';
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const systemScheme = useColorScheme();
   const [mode, setModeState] = useState<ThemeMode>('system');
-  const [loaded, setLoaded] = useState(false);
   const modeRef = useRef<ThemeMode>('system');
 
   useEffect(() => {
@@ -100,8 +99,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
           modeRef.current = saved;
         }
       })
-      .catch(() => {})
-      .finally(() => setLoaded(true));
+.catch(() => {});
   }, []);
 
   const setMode = useCallback((next: ThemeMode) => {
@@ -124,8 +122,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
   setActiveColors(colors);
-
-  if (!loaded) return null;
 
   return (
     <ThemeContext.Provider value={{ mode, isDark, colors, setMode, toggle }}>

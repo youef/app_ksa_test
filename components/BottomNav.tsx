@@ -1,6 +1,5 @@
 import { OasisPressable as Pressable } from '@/components/oasis/OasisPrimitives';
-import { OASIS } from '@/lib/oasis';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Image, Keyboard, NativeScrollEvent, NativeSyntheticEvent, Platform, StyleSheet, View } from 'react-native';
 import { router, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -79,7 +78,6 @@ export default function BottomNav() {
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const [hasSession, setHasSession] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -92,63 +90,20 @@ export default function BottomNav() {
     nativeLastY = 0;
   }, [pathname]);
 
-  const refreshUnread = useCallback(async () => {
-    try {
-      const { data: auth } = await supabase.auth.getSession();
-      const user = auth.session?.user;
-      setHasSession(Boolean(user));
-      if (!user) { setUnreadCount(0); return; }
-
-      const { data: memberships } = await supabase
-        .from('conversation_members')
-        .select('conversation_id')
-        .eq('user_id', user.id);
-      const ids = (memberships || []).map((item: { conversation_id: string }) => item.conversation_id);
-      if (!ids.length) { setUnreadCount(0); return; }
-
-      const { data: messages } = await supabase
-        .from('messages')
-        .select('conversation_id, sender_id, read_by')
-        .in('conversation_id', ids)
-        .neq('sender_id', user.id)
-        .limit(100);
-      const unread = (messages || []).filter((message: { read_by?: string[] | null }) => !message.read_by?.includes(user.id));
-      // platform messages unread
-      const { count: pmUnread } = await supabase
-        .from('platform_messages')
-        .select('id', { count: 'exact', head: true })
-        .eq('recipient_id', user.id)
-        .eq('read', false);
-      setUnreadCount(unread.length + (pmUnread || 0));
-    } catch {
-      setUnreadCount(0);
-    }
-  }, []);
-
-  // الاستماع لتغيير الجلسة والرسائل الجديدة (Realtime)
+  // Keep only the auth state needed to protect the compose button.
+  // Unread messages belong to the messaging UI, not this navigation component:
+  // the previous subscription performed costly queries without displaying a badge.
   useEffect(() => {
-    void refreshUnread();
+    let mounted = true;
+    void supabase.auth.getSession()
+      .then(({ data }) => { if (mounted) setHasSession(Boolean(data.session?.user)); })
+      .catch(() => { if (mounted) setHasSession(false); });
 
-    const { data: authListener } = supabase.auth.onAuthStateChange(() => {
-      void refreshUnread();
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (mounted) setHasSession(Boolean(session?.user));
     });
-
-    const channel = supabase
-      .channel('bottom-nav-unread')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'messages' },
-        () => {
-          void refreshUnread();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      authListener.subscription.unsubscribe();
-      supabase.removeChannel(channel);
-    };
-  }, [refreshUnread]);
+    return () => { mounted = false; authListener.subscription.unsubscribe(); };
+  }, []);
 
   // الكيبورد + السكرول (ويب)
   useEffect(() => {
