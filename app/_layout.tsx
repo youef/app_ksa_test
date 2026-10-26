@@ -18,7 +18,7 @@ import { installDarkModeWebFixes } from '@/lib/darkModeWeb';
 import { loadBannedWords } from '@/lib/profanity';
 
 const ACCOUNT_ONLY_ROUTES = [
-  '/profile', '/settings', '/market', '/messages', '/platform-inbox', '/conversation', '/search',
+  '/profile', '/settings', '/messages', '/platform-inbox', '/conversation',
   '/ask', '/create-story', '/story', '/stories', '/story-settings', '/story-viewers', '/notifications',
   '/new-service', '/new-listing', '/service', '/business', '/directory', '/user', '/report', '/admin', '/support',
   '/live',
@@ -58,21 +58,34 @@ function RootContent() {
     void syncDndWithNotifications();
 
     const loadSession = async () => {
-      const { data } = await supabase.auth.getSession();
-      setHasSession(Boolean(data.session?.user));
-      if (data.session?.user) {
-        const { data: profile } = await supabase.from('profiles').select('role,is_banned').eq('id', data.session.user.id).maybeSingle();
-        if (profile?.is_banned) {
-          await supabase.auth.signOut();
-          router.replace('/banned');
-          return;
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        const user = data.session?.user;
+        setHasSession(Boolean(user));
+        if (user) {
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles').select('role,is_banned').eq('id', user.id).maybeSingle();
+          if (profileError) throw profileError;
+          if (profile?.is_banned) {
+            await supabase.auth.signOut();
+            router.replace('/banned');
+            return;
+          }
+          setIsAdmin(profile?.role === 'admin');
+          // An unavailable notification service should not block app startup.
+          void registerPushToken().catch(() => {});
+        } else {
+          setIsAdmin(false);
         }
-        setIsAdmin(profile?.role === 'admin');
-      } else setIsAdmin(false);
-      setSessionReady(true);
-      // Background sync: never let a denied notification permission surface
-      // as an uncaught rejection (which would show the dev error overlay).
-      if (data.session?.user) void registerPushToken().catch(() => {});
+      } catch {
+        // Auth, storage or network errors should not leave the app on a
+        // permanent loading screen. Protected routes still require a session.
+        setHasSession(false);
+        setIsAdmin(false);
+      } finally {
+        setSessionReady(true);
+      }
     };
 
     void loadSession();
