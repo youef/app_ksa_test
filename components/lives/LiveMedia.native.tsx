@@ -136,7 +136,7 @@ function RoomBridge({ onConnectionChange, onQualityChange, onMediaStateChange, o
 
 export default function LiveMedia({ url, token, canPublish, participantOrder, onConnectionChange, onQualityChange, onMediaStateChange, onApiReady, onReady, onError }: LiveMediaProps) {
   useEffect(() => {
-    void AudioSession.startAudioSession();
+    void AudioSession.startAudioSession().catch((cause) => { console.warn('Live audio session unavailable:', cause); });
     return () => { void AudioSession.stopAudioSession(); };
   }, []);
 
@@ -148,9 +148,11 @@ export default function LiveMedia({ url, token, canPublish, participantOrder, on
         connect
         audio={canPublish}
         video={canPublish}
-        options={{ adaptiveStream: { pixelDensity: 'screen' }, dynacast: true }}
+        options={{ adaptiveStream: true, dynacast: true }}
         onConnected={onReady}
-        onDisconnected={() => onError?.('انقطع الاتصال بالبث. أعد المحاولة.')}
+        // Role changes and room unmounts cause intentional disconnections;
+        // RoomBridge reports connection status without ending a valid stream.
+        onDisconnected={() => onConnectionChange?.('disconnected')}
         onError={(error) => onError?.(error.message || 'تعذر الاتصال بغرفة البث.')}
       >
         <RoomTracks participantOrder={participantOrder} />
