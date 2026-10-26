@@ -27,6 +27,7 @@ import {
   ChevronLeft,
   Share2,
   Car,
+  GraduationCap,
   Wrench,
   Eye,
   ArrowRight,
@@ -56,6 +57,8 @@ function isAutoSuggestedOffer(match: any): boolean {
 
 function getRequestTypeInfo(type?: string) {
   switch (type) {
+    case 'carpooling':
+      return { label: 'توصيل المدارس', icon: GraduationCap, bg: '#ECFDF5', color: '#047857', border: '#A7F3D0' };
     case 'delivery':
       return { label: 'توصيل مشوار أو غرض', icon: Car, bg: OASIS.colors.infoSoft, color: '#2563eb', border: '#bfdbfe' };
     case 'tools':
@@ -596,7 +599,7 @@ export default function Request() {
     <View style={styles.container}>
       <AppHeader
         variant="sub"
-        title="طلب فزعة بالحي"
+        title={request.request_type === 'carpooling' ? 'توصيل المدارس' : 'طلب فزعة بالحي'}
         subtitle={locationLabel}
         fallbackRoute="/requests"
         rightAction={
@@ -625,6 +628,7 @@ export default function Request() {
         contentContainerStyle={[styles.scroll, { paddingBottom: bottomNavInset + 40 }]}
         showsVerticalScrollIndicator={false}
       >
+        {request.request_type === 'carpooling' ? <View style={{ backgroundColor: '#ECFDF5', borderColor: '#BBE7CE', borderWidth: 1, borderRadius: 15, padding: 14, marginBottom: 12, gap: 6, flexDirection: 'row-reverse', alignItems: 'flex-start' }}><GraduationCap size={21} color="#047857" /><View style={{ flex: 1, alignItems: 'flex-end' }}><Text style={{ color: '#064E3B', fontWeight: '800', fontSize: 14 }}>تنسيق توصيل المدارس</Text><Text style={{ color: '#376454', fontSize: 12, lineHeight: 21, textAlign: 'right' }}>المنشور مخصص لترتيب التوصيل فقط. لا تشارك بيانات الأطفال أو موقع المنزل أو وقت الالتقاء العلني؛ تأكد من الجهة والسائق واتفق برسائل خاصة.</Text></View></View> : null}
         <TwitterInquiryCard detailMode type="request" data={{ ...request, profiles: requester, answers_count: offers.length }} currentUserId={me || null} currentUserProfile={viewerProfile} isGuest={!me} onQuickReply={async () => {}} onToast={message => showIsland(message, undefined, 'success')} onDeleted={() => void load()} />
         <View style={{ backgroundColor: OASIS.colors.surface, borderRadius: 14, padding: 16, gap: 12, borderWidth: 1, borderColor: OASIS.colors.line }}>
           {Boolean(request.notes) && <Text style={styles.notesText}>{request.notes}</Text>}
