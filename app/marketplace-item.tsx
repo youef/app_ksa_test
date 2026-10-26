@@ -6,7 +6,7 @@ import { ActivityIndicator, Alert, Image, ScrollView, Share, StyleSheet, Text, V
 import { router, useLocalSearchParams } from 'expo-router';
 import { ArrowUpRight, MapPin, Package, Share2, ShoppingBag, UserRound } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
-import { AccountIdentityBadge, AccountVerificationBadge } from '@/components/profile/AccountIdentityBadge';
+import { AccountIdentityBadge } from '@/components/profile/AccountIdentityBadge';
 
 export default function MarketplaceItemPage() {
   const params = useLocalSearchParams<{ id?: string }>();
@@ -85,7 +85,6 @@ export default function MarketplaceItemPage() {
           <Text style={styles.sellerTitle}>{seller.account_type === 'merchant' && seller.freelance_trade ? seller.freelance_trade : seller.display_name || seller.username || 'صاحب الإعلان'}</Text>
           <View style={styles.sellerBadges}>
             <AccountIdentityBadge role={seller.role} accountType={seller.account_type} isVerified={Boolean(seller.is_verified)} compact />
-            <AccountVerificationBadge role={seller.role} accountType={seller.account_type} isVerified={Boolean(seller.is_verified)} compact />
           </View>
         </View>
         <ArrowUpRight size={18} color={OASIS.colors.primary} />

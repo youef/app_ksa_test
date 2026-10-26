@@ -1,9 +1,8 @@
-import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
 import { useAppHeaderHeight } from '@/components/shared/AppHeader';
 import { HeaderAction } from '@/components/shared/AppHeader';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { View } from 'react-native';
 import { router } from 'expo-router';
 import {
   Flame,
@@ -17,10 +16,8 @@ import {
   Utensils,
   WashingMachine,
   Croissant,
-  SlidersHorizontal,
   ChevronDown,
   ChevronUp,
-  Globe,
   Layers,
   MapPin as MapPinIcon,
   Navigation,
@@ -29,6 +26,7 @@ import {
   Star,
   Store,
   X,
+  Plus, Minus, Compass, ShieldCheck, ArrowUpRight, RefreshCw, ListFilter, Map as MapIcon, Check, ChevronRight,
 } from 'lucide-react-native';
 
 import { mapSymbolSvg } from '@/lib/mapSymbols';
@@ -57,6 +55,8 @@ import {
 } from '@/lib/places';
 import { formatDistance, navigationUrl } from '@/lib/privacy';
 import { getActiveLocation, isAllKingdom, subscribeLocation } from '@/lib/locationSync';
+import { mapExplorerCss } from '@/components/map/mapExplorerStyles';
+import { distanceMeters } from '@/lib/privacy';
 
 const KSA_CENTER = { lat: 24.7136, lng: 46.6753 };
 const KSA_BOUNDS = { north: 32.6, south: 15.9, east: 56.1, west: 34.4 };
@@ -91,7 +91,7 @@ function injectLeafletAssets() {
     const link = document.createElement('link');
     link.id = 'leaflet-css';
     link.rel = 'stylesheet';
-    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    link.href = '/leaflet/leaflet.css';
     document.head.appendChild(link);
   }
   if (!document.getElementById('hayna-leaflet-custom-style')) {
@@ -324,14 +324,25 @@ function buildPlaceInfoWindow(place: NearbyPlace, onClose: () => void) {
 
 export default function WebMap() {
   const appHeaderHeight = useAppHeaderHeight();
-  const { width } = useWindowDimensions();
-  const isWide = width >= 980;
 
   const mapElRef = useRef<HTMLDivElement | null>(null);
+  const mapGenerationRef = useRef(0);
   const leafletInstanceRef = useRef<any>(null);
   const leafletPinLayerRef = useRef<any>(null);
   const leafletPlaceLayerRef = useRef<any>(null);
   const leafletMyMarkerRef = useRef<any>(null);
+  const densityLayerRef = useRef<any>(null);
+  const placeMarkersRef = useRef(new Map<string, any>());
+  const [mapMoved, setMapMoved] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(6);
+  const [tab, setTab] = useState<'places' | 'community'>('community');
+  const [openOnly, setOpenOnly] = useState(false);
+  const [sort, setSort] = useState('distance');
+  const [selectedPlace, setSelectedPlace] = useState<string | null>(null);
+  const [searchOrigin, setSearchOrigin] = useState<{ lat: number; lng: number; label: string } | null>(null);
+  const [searched, setSearched] = useState(false);
+  const [mapError, setMapError] = useState(false);
+  const [retry, setRetry] = useState(0);
 
   const googleMapRef = useRef<any>(null);
   const googleApiRef = useRef<any>(null);
@@ -355,9 +366,8 @@ export default function WebMap() {
   const [places, setPlaces] = useState<NearbyPlace[]>([]);
   const [placeCategory, setPlaceCategory] = useState<string>(ALL_PLACES_KEY);
   const [placesLoading, setPlacesLoading] = useState(false);
-  const [categoriesOpen, setCategoriesOpen] = useState(false);
   const searchSequence = useRef(0);
-  const [sheetOpen, setSheetOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -382,11 +392,11 @@ export default function WebMap() {
   }, []);
 
   // ---------------------------------------------------------------- Leaflet Engine Setup
-  const initLeafletMap = useCallback(async () => {
+  const initLeafletMap = useCallback(async (generation: number) => {
     if (!mapElRef.current) return;
     injectLeafletAssets();
     const L = await getLeafletModule();
-    if (!L || !mapElRef.current) return;
+    if (!L || !mapElRef.current || mapGenerationRef.current !== generation) return;
 
     // Cleanup previous map if exists
     if (leafletInstanceRef.current) {
@@ -403,26 +413,29 @@ export default function WebMap() {
       zoomControl: false,
     });
 
-    L.control.zoom({ position: 'bottomright' }).addTo(map);
+    L.control.scale({ position: 'bottomleft', imperial: false }).addTo(map);
+    map.on('moveend', () => { setMapMoved(true); setZoomLevel(map.getZoom()); });
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© خريطة حيّنا · OpenStreetMap',
+      attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a>',
       maxZoom: 19,
     }).addTo(map);
 
     leafletPinLayerRef.current = L.layerGroup().addTo(map);
     leafletPlaceLayerRef.current = L.layerGroup().addTo(map);
+    densityLayerRef.current = L.layerGroup().addTo(map);
     leafletInstanceRef.current = map;
     setMapReady(true);
   }, []);
 
   // ---------------------------------------------------------------- Google Maps Engine Setup
-  const initGoogleMap = useCallback(async () => {
+  const initGoogleMap = useCallback(async (generation: number) => {
     if (!mapElRef.current) return;
 
     // Handle Google auth failures gracefully
     if (typeof window !== 'undefined') {
       (window as any).gm_authFailure = () => {
+        if (mapGenerationRef.current !== generation) return;
         setMapNotice('تعذر تحميل الخريطة البديلة. تم استعادة الخريطة الأساسية.');
         setEngine('leaflet');
       };
@@ -431,6 +444,7 @@ export default function WebMap() {
     try {
       mapElRef.current.innerHTML = '';
       const api = await loadGoogleMaps();
+      if (!mapElRef.current || mapGenerationRef.current !== generation) return;
       googleApiRef.current = api;
       const map = new api.Map(mapElRef.current, {
         center: KSA_CENTER,
@@ -444,13 +458,15 @@ export default function WebMap() {
         gestureHandling: 'greedy',
         styles: MAP_ID ? undefined : MAP_STYLES,
         mapTypeControl: false,
-        zoomControl: true,
+        zoomControl: false,
         ...(MAP_ID ? { mapId: MAP_ID } : {}),
       });
       googleMapRef.current = map;
+      map.addListener('idle', () => { setMapMoved(true); setZoomLevel(map.getZoom()); });
       googleInfoRef.current = new api.InfoWindow({ disableAutoPan: false });
       setMapReady(true);
     } catch (err: any) {
+      if (mapGenerationRef.current !== generation) return;
       setMapNotice('تعذّر الاتصال بخوادم خرائط Google. تم الرجوع لخريطة حيّنا المباشرة.');
       setEngine('leaflet');
     }
@@ -459,19 +475,39 @@ export default function WebMap() {
   // ---------------------------------------------------------------- Bootstrap Map Engine
   useEffect(() => {
     setMapReady(false);
+    setMapError(false);
+    let cancelled = false;
+    const generation = ++mapGenerationRef.current;
     if (engine === 'leaflet') {
-      void initLeafletMap();
+      void initLeafletMap(generation).catch(() => { if (!cancelled) { setMapError(true); setMapNotice('تعذر تحميل الخريطة. تحقق من الاتصال وأعد المحاولة.'); } });
     } else {
-      void initGoogleMap();
+      void initGoogleMap(generation);
     }
 
     return () => {
+      cancelled = true;
+      ++mapGenerationRef.current;
+      googleInfoRef.current?.close();
+      if (googleMapRef.current && googleApiRef.current) googleApiRef.current.event.clearInstanceListeners(googleMapRef.current);
+      googleMapRef.current = null;
+      googlePinMarkersRef.current = [];
+      googlePlaceMarkersRef.current = [];
       if (leafletInstanceRef.current) {
         try { leafletInstanceRef.current.remove(); } catch {}
         leafletInstanceRef.current = null;
       }
     };
-  }, [engine, initLeafletMap, initGoogleMap]);
+  }, [engine, retry, initLeafletMap, initGoogleMap]);
+
+  useEffect(() => {
+    if (!mapReady || !mapElRef.current) return;
+    const observer = new ResizeObserver(() => {
+      leafletInstanceRef.current?.invalidateSize();
+      if (googleMapRef.current && googleApiRef.current) googleApiRef.current.event.trigger(googleMapRef.current, 'resize');
+    });
+    observer.observe(mapElRef.current);
+    return () => observer.disconnect();
+  }, [mapReady]);
 
   useEffect(() => {
     void refreshPins();
@@ -497,19 +533,18 @@ export default function WebMap() {
   }, [refreshPins]);
 
   const visiblePins = useMemo(
-    () => city ? filterPins(pins, { kind, city, query }) : [],
-    [pins, kind, city, query],
+    () => city ? filterPins(pins, { kind, city, query: tab === 'community' ? query : '' }) : [],
+    [pins, kind, city, query, tab],
   );
   const scopedPins = useMemo(() => city ? filterPins(pins, { city }) : [], [pins, city]);
   const kindCounts = useMemo(() => countByKind(scopedPins), [scopedPins]);
   useEffect(() => {
-    if (!city) return;
-    const center = findPlaceCenter(city);
+    const center = city ? findPlaceCenter(city) : KSA_CENTER;
     if (!center) return;
-    if (leafletInstanceRef.current) leafletInstanceRef.current.setView([center.lat, center.lng], 11);
+    if (leafletInstanceRef.current) leafletInstanceRef.current.setView([center.lat, center.lng], city ? 12 : 6);
     if (googleMapRef.current) {
       googleMapRef.current.setCenter({ lat: center.lat, lng: center.lng });
-      googleMapRef.current.setZoom(11);
+      googleMapRef.current.setZoom(city ? 12 : 6);
     }
   }, [city, mapReady]);
 
@@ -523,7 +558,33 @@ export default function WebMap() {
       if (!L || !pinLayer) return;
 
       pinLayer.clearLayers();
-      visiblePins.forEach((pin) => {
+      const groups = new Map<string, MapPin[]>();
+      (tab === 'community' ? visiblePins : []).forEach(pin => {
+        const point = leafletInstanceRef.current.project([pin.lat, pin.lng], zoomLevel);
+        const key = `${Math.floor(point.x / 54)}:${Math.floor(point.y / 54)}`;
+        groups.set(key, [...(groups.get(key) || []), pin]);
+      });
+      groups.forEach((group) => {
+        if (group.length > 1) {
+          const lat = group.reduce((sum, p) => sum + p.lat, 0) / group.length;
+          const lng = group.reduce((sum, p) => sum + p.lng, 0) / group.length;
+          const cluster = L.marker([lat, lng], { title: `${group.length} منشورًا، اضغط للتكبير`, icon: L.divIcon({ className: 'hayna-cluster', html: `<span>${group.length}</span>`, iconSize: [46, 46], iconAnchor: [23, 23] }) });
+          const list = document.createElement('div');
+          list.dir = 'rtl';
+          list.style.cssText = 'max-height:240px;overflow:auto;min-width:210px;font-family:inherit';
+          group.forEach(pin => {
+            const button = document.createElement('button');
+            button.textContent = pin.title;
+            button.style.cssText = 'display:block;width:100%;border:0;border-bottom:1px solid #e5eae2;background:transparent;color:#17664f;padding:10px;text-align:right;font:inherit;cursor:pointer';
+            button.onclick = () => router.push(pin.href as never);
+            list.appendChild(button);
+          });
+          cluster.bindPopup(list, { maxWidth: 280 });
+          cluster.on('click', () => { if (zoomLevel < 19) { cluster.closePopup(); leafletInstanceRef.current.fitBounds(L.latLngBounds(group.map(p => [p.lat, p.lng])), { padding: [65, 65], maxZoom: Math.min(19, zoomLevel + 3) }); } });
+          cluster.addTo(pinLayer);
+          return;
+        }
+        const pin = group[0];
         const kindMeta = MAP_PIN_KINDS[pin.kind];
         const icon = L.divIcon({
           className: 'hayna-custom-pin',
@@ -532,7 +593,7 @@ export default function WebMap() {
           iconAnchor: [20, 50],
           popupAnchor: [0, -45],
         });
-        const marker = L.marker([pin.lat, pin.lng], { icon });
+        const marker = L.marker([pin.lat, pin.lng], { icon, title: pin.title });
         const { content } = buildPinInfoWindow(
           pin,
           () => router.push(pin.href as never),
@@ -553,7 +614,7 @@ export default function WebMap() {
       });
       googlePinMarkersRef.current = [];
 
-      visiblePins.forEach((pin) => {
+      (tab === 'community' ? visiblePins : []).forEach((pin) => {
         const kindMeta = MAP_PIN_KINDS[pin.kind];
         const marker = new api.Marker({
           map,
@@ -573,15 +634,27 @@ export default function WebMap() {
               () => googleInfoRef.current?.close(),
             );
             googleInfoRef.current.setContent(content);
-            googleInfoRef.current.open({ map, anchor });
+            googleInfoRef.current.setPosition(anchor);
+            googleInfoRef.current.open({ map, anchor: marker });
           }
         });
         googlePinMarkersRef.current.push({ id: pin.id, advanced: false, marker });
       });
     }
-  }, [visiblePins, mapReady, engine]);
+  }, [visiblePins, mapReady, engine, zoomLevel, tab]);
+
+  useEffect(() => {
+    const layer = densityLayerRef.current;
+    layer?.clearLayers();
+    if (!heatOn || !mapReady || engine !== 'leaflet' || tab !== 'community') return;
+    const L = (window as any).L;
+    visiblePins.forEach(pin => L.circle([pin.lat, pin.lng], { radius: 350, color: '#C58C43', weight: 0, fillColor: '#E6A34F', fillOpacity: .12, interactive: false }).addTo(layer));
+  }, [heatOn, visiblePins, mapReady, engine, tab]);
 
   // ---------------------------------------------------------------- Update Places on Active Engine
+  const displayedPlaces = useMemo(() => places.filter(p => !openOnly || p.openNow === true)
+    .sort((a, b) => sort === 'rating' ? (b.rating ?? -1) - (a.rating ?? -1) || a.distance - b.distance : a.distance - b.distance), [places, openOnly, sort]);
+
   useEffect(() => {
     if (!mapReady) return;
 
@@ -591,7 +664,8 @@ export default function WebMap() {
       if (!L || !placeLayer) return;
 
       placeLayer.clearLayers();
-      places.forEach((place) => {
+      placeMarkersRef.current.clear();
+      (tab === 'places' ? displayedPlaces : []).forEach((place) => {
         const icon = L.divIcon({
           className: 'hayna-custom-place',
           html: pinElement('#0F766E', 'business', false).outerHTML,
@@ -599,7 +673,9 @@ export default function WebMap() {
           iconAnchor: [20, 50],
           popupAnchor: [0, -45],
         });
-        const marker = L.marker([place.lat, place.lng], { icon });
+        const marker = L.marker([place.lat, place.lng], { icon, title: place.name });
+        marker.on('click', () => setSelectedPlace(place.id));
+        placeMarkersRef.current.set(place.id, marker);
         const { content } = buildPlaceInfoWindow(place, () => marker.closePopup());
         marker.bindPopup(content, { maxWidth: 310, minWidth: 240 });
         marker.addTo(placeLayer);
@@ -615,7 +691,7 @@ export default function WebMap() {
       });
       googlePlaceMarkersRef.current = [];
 
-      places.forEach((place) => {
+      (tab === 'places' ? displayedPlaces : []).forEach((place) => {
         const marker = new api.Marker({
           map,
           position: { lat: place.lat, lng: place.lng },
@@ -627,89 +703,88 @@ export default function WebMap() {
           },
         });
         marker.addListener('click', () => {
+          setSelectedPlace(place.id);
           if (googleInfoRef.current) {
             const { content, anchor } = buildPlaceInfoWindow(place, () =>
               googleInfoRef.current?.close(),
             );
             googleInfoRef.current.setContent(content);
-            googleInfoRef.current.open({ map, anchor });
+            googleInfoRef.current.setPosition(anchor);
+            googleInfoRef.current.open({ map, anchor: marker });
           }
         });
         googlePlaceMarkersRef.current.push({ id: place.id, advanced: false, marker });
       });
     }
-  }, [places, mapReady, engine]);
+  }, [displayedPlaces, mapReady, engine, tab]);
 
   // ---------------------------------------------------------------- Nearby Places Search
   const runPlaceSearch = useCallback(
-    async (nextCategory: string, nextQuery: string) => {
+    async (nextCategory: string, nextQuery: string, useViewport = false) => {
       const sequence = ++searchSequence.current;
-      let origin: { latitude: number; longitude: number };
-      const active = await getActiveLocation();
-      if (isAllKingdom(active.city)) return;
-      const center = findPlaceCenter(active.city);
-      if (myLocation) {
-        origin = myLocation;
-      } else if (center) {
-        origin = { latitude: center.lat, longitude: center.lng };
-      } else {
-        const device = await getCurrentDeviceLocation();
-        if (!device) { setMapNotice('حدد مدينتك أو اسمح بالوصول إلى موقعك لعرض أماكن قريبة.'); return; }
-        origin = device;
-        setMyLocation(origin);
-      }
-
+      const center = findPlaceCenter(city);
+      const viewCenter = engine === 'leaflet' ? leafletInstanceRef.current?.getCenter() : googleMapRef.current?.getCenter();
+      const viewport = viewCenter ? { lat: typeof viewCenter.lat === 'function' ? viewCenter.lat() : viewCenter.lat, lng: typeof viewCenter.lng === 'function' ? viewCenter.lng() : viewCenter.lng } : null;
+      const origin = useViewport && viewport ? { ...viewport, label: 'مركز الخريطة' }
+        : myLocation ? { lat: myLocation.latitude, lng: myLocation.longitude, label: 'موقعك' }
+        : center ? { lat: center.lat, lng: center.lng, label: `مركز ${city}` } : null;
+      if (!origin) { setMapNotice('كبّر الخريطة إلى المنطقة المطلوبة، ثم اضغط «ابحث في هذه المنطقة».'); return; }
+      setTab('places');
+      setSheetOpen(true);
+      setMapNotice(null);
+      setSelectedPlace(null);
+      setSearched(true);
       setPlacesLoading(true);
+      setPlaces([]);
+      setSearchOrigin(origin);
       try {
       const results = await searchNearbyPlaces({
-        lat: origin.latitude,
-        lng: origin.longitude,
+        lat: origin.lat,
+        lng: origin.lng,
         category: nextCategory === ALL_PLACES_KEY ? null : nextCategory,
         text: nextQuery,
+        radiusMeters: 5000,
       });
-      if (sequence === searchSequence.current) setPlaces(results);
+      if (sequence === searchSequence.current) {
+        // Apply the same geographic radius to every data-source fallback.
+        setPlaces(results.filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lng) && distanceMeters(origin, p) <= 5000));
+        setMapMoved(false);
+      }
       } catch { if (sequence === searchSequence.current) setMapNotice('تعذر تحميل الأماكن. حاول مجددًا.'); }
       finally { if (sequence === searchSequence.current) setPlacesLoading(false); }
     },
-    [myLocation],
+    [myLocation, city, engine],
   );
+
+  useEffect(() => {
+    ++searchSequence.current;
+    setPlaces([]);
+    setSearched(false);
+    setPlacesLoading(false);
+    setSelectedPlace(null);
+    setSearchOrigin(null);
+  }, [city, myLocation]);
+
+  useEffect(() => () => { ++searchSequence.current; }, []);
 
 
   // ---------------------------------------------------------------- Actions
-  const focusCity = useCallback(
-    (targetCity: string) => {
-      if (targetCity === 'all') {
-        if (engine === 'leaflet' && leafletInstanceRef.current) {
-          leafletInstanceRef.current.setView([KSA_CENTER.lat, KSA_CENTER.lng], 6);
-        } else if (googleMapRef.current) {
-          googleMapRef.current.setCenter(KSA_CENTER);
-          googleMapRef.current.setZoom(6);
-        }
-        return;
-      }
-
-      const target = pins.filter((pin) => pin.city === targetCity);
-      if (!target.length) return;
-
-      if (engine === 'leaflet' && leafletInstanceRef.current) {
-        const L = (window as any).L;
-        const bounds = L.latLngBounds(target.map((p) => [p.lat, p.lng]));
-        leafletInstanceRef.current.fitBounds(bounds, { padding: [50, 50] });
-      } else if (googleMapRef.current && googleApiRef.current) {
-        const bounds = new googleApiRef.current.LatLngBounds();
-        target.forEach((p) => bounds.extend({ lat: p.lat, lng: p.lng }));
-        googleMapRef.current.fitBounds(bounds, 70);
-      }
-    },
-    [pins, engine],
-  );
-
   const locateMe = useCallback(async () => {
     setLocating(true);
     const location = await getCurrentDeviceLocation();
     setLocating(false);
     if (!location) { setMapNotice('اسمح بالوصول إلى موقعك ثم أعد المحاولة.'); return; }
     setMyLocation(location);
+    setMapNotice(null);
+    setTab('places');
+    setSheetOpen(true);
+  }, []);
+
+  // Recreate the private device marker when the map engine changes.
+  useEffect(() => {
+    if (!myLocation || !mapReady) return;
+    const location = myLocation;
+    let accuracyCircle: any = null;
 
     if (engine === 'leaflet' && leafletInstanceRef.current) {
       const L = (window as any).L;
@@ -725,8 +800,9 @@ export default function WebMap() {
       leafletMyMarkerRef.current = L.marker([location.latitude, location.longitude], { icon: myIcon }).addTo(
         leafletInstanceRef.current,
       );
-      const active = await getActiveLocation();
-      const center = findPlaceCenter(active.city);
+      if (location.accuracy != null && location.accuracy > 0) {
+        accuracyCircle = L.circle([location.latitude, location.longitude], { radius: location.accuracy, color: '#2563EB', weight: 1, fillOpacity: .07, interactive: false }).addTo(leafletInstanceRef.current);
+      }
       leafletInstanceRef.current.flyTo([location.latitude, location.longitude], 16, { duration: 1.2 });
     } else if (googleMapRef.current && googleApiRef.current) {
       if (googleMyMarkerRef.current) {
@@ -742,583 +818,119 @@ export default function WebMap() {
           anchor: new googleApiRef.current.Point(19, 48),
         },
       });
-      const active = await getActiveLocation();
-      const center = findPlaceCenter(active.city);
       googleMapRef.current.panTo({lat:location.latitude,lng:location.longitude});
       googleMapRef.current.setZoom(16);
     }
+    return () => { accuracyCircle?.remove(); };
+  }, [myLocation, mapReady, engine]);
 
-  }, [engine, placeCategory, query, runPlaceSearch]);
+  useEffect(() => {
+    if (myLocation) void runPlaceSearch(placeCategory, query);
+    // A fresh GPS fix is the explicit trigger; category and query have their own controls.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myLocation]);
 
   const focusPlace = useCallback(
     (place: NearbyPlace) => {
+      setSelectedPlace(place.id);
       if (engine === 'leaflet' && leafletInstanceRef.current) {
         leafletInstanceRef.current.flyTo([place.lat, place.lng], 16, { duration: 1 });
+        placeMarkersRef.current.get(place.id)?.openPopup();
       } else if (googleMapRef.current) {
         googleMapRef.current.panTo({ lat: place.lat, lng: place.lng });
         googleMapRef.current.setZoom(16);
+        const marker = googlePlaceMarkersRef.current.find(m => m.id === place.id)?.marker;
+        if (marker) googleApiRef.current.event.trigger(marker, 'click');
       }
     },
     [engine],
   );
 
-  // ---------------------------------------------------------------- Render Helpers
-  const kindChip = (value: KindFilter, label: string, color: string, count: number) => {
-    const active = kind === value;
-    return (
-      <Pressable oasisKind="chip"
-        key={value}
-        onPress={() => setKind(value)}
-        style={[styles.chip, active && { backgroundColor: color, borderColor: color }]}
-      >
-        <Text style={[styles.chipText, active && styles.chipTextActive]}>
-          {label} ({count})
-        </Text>
-      </Pressable>
-    );
+  const zoom = (delta: number) => {
+    if (engine === 'leaflet') leafletInstanceRef.current?.setZoom(leafletInstanceRef.current.getZoom() + delta);
+    else if (googleMapRef.current) googleMapRef.current.setZoom(googleMapRef.current.getZoom() + delta);
   };
-
-  const placeRow = (place: NearbyPlace) => {
-    const open = place.openNow;
-    const CategoryIcon = categoryIcons[place.categoryKey] || Store;
-    return (
-      <Pressable
-        key={place.id}
-        onPress={() => focusPlace(place)}
-        style={styles.placeRow}
-      >
-        <View style={styles.placeBadge}>
-<CategoryIcon size={20} color={C.accent} />
-        </View>
-        <View style={styles.placeBody}>
-          <Text style={styles.placeName} numberOfLines={1}>
-            {place.name}
-          </Text>
-          <Text style={styles.placeMeta} numberOfLines={1}>
-            {place.categoryLabel} · {formatDistance(place.distance)}
-            {place.address ? ` · ${place.address}` : ''}
-          </Text>
-          <View style={styles.placeChips}>
-            {open != null ? (
-              <Text
-                style={[
-                  styles.miniChip,
-                  open
-                    ? { color: '#15803d', backgroundColor: '#dcfce7' }
-                    : { color: OASIS.colors.danger, backgroundColor: '#fee2e2' },
-                ]}
-              >
-                {open ? 'مفتوح' : 'مغلق'}
-              </Text>
-            ) : null}
-            {place.rating != null ? <Text style={styles.miniChip}>★ {place.rating.toFixed(1)}</Text> : null}
-            {place.phone ? (
-              <Text style={[styles.miniChip, { color: '#1d4ed8', backgroundColor: OASIS.colors.infoSoft }]}>
-                {place.phone}
-              </Text>
-            ) : null}
-          </View>
-        </View>
-        <View style={styles.placeActions}>
-          <Pressable oasisKind="icon"
-            hitSlop={8}
-            onPress={() => window.open(navigationUrl(place.lat, place.lng), '_blank', 'noopener')}
-            style={styles.placeActionBtn}
-          >
-            <Navigation size={15} color={C.accent} />
-          </Pressable>
-          {place.phone ? (
-            <Pressable oasisKind="icon"
-              hitSlop={8}
-              onPress={() => window.open(`tel:${place.phone}`, '_self')}
-              style={styles.placeActionBtn}
-            >
-              <Phone size={15} color={C.accent} />
-            </Pressable>
-          ) : null}
-        </View>
-      </Pressable>
-    );
+  const resetView = () => {
+    const center = findPlaceCenter(city) || KSA_CENTER;
+    if (engine === 'leaflet') leafletInstanceRef.current?.flyTo([center.lat, center.lng], city ? 12 : 6);
+    else if (googleMapRef.current) { googleMapRef.current.panTo(center); googleMapRef.current.setZoom(city ? 12 : 6); }
   };
-
-  const placesSheet = (
-    <OasisSurface oasisSurface="sheet" style={[styles.sheet, isWide ? styles.sheetWide : styles.sheetMobile]}>
-      <View style={styles.sheetHandle} />
-      <View style={styles.sheetHead}>
-        <Store size={17} color={C.accent} />
-        <Text style={styles.sheetTitle}>
-          {placesLoading ? 'جارٍ البحث عن المحلات القريبة…' : `أقرب المحلات (${places.length})`}
-        </Text>
-        {placesLoading ? <ActivityIndicator size="small" color={C.accent} /> : null}
-        <Pressable accessibilityLabel="إغلاق أقرب المحلات" onPress={() => setSheetOpen(false)} hitSlop={8}><X size={20} color={C.muted} /></Pressable>
-      </View>
-      <ScrollView
-        style={styles.sheetScroll}
-        contentContainerStyle={styles.sheetContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {places.map(placeRow)}
-        {!places.length && !placesLoading ? (
-          <Text style={styles.emptyText}>
-            لا توجد نتائج قريبة. فعّل الموقع أو جرّب فئة أخرى.
-          </Text>
-        ) : null}
-      </ScrollView>
-    </OasisSurface>
-  );
+  const chooseCategory = (category: string) => {
+    setPlaceCategory(category);
+    setQuery('');
+    void runPlaceSearch(category, '');
+  };
+  const number = (value: number) => value.toLocaleString('ar-SA');
+  const resultsCount = tab === 'places' ? displayedPlaces.length : visiblePins.length;
+  const busy = tab === 'places' ? placesLoading : loading;
 
   return (
-    <View style={styles.root}>
-      {/* 1. FIXED APP HEADER */}
-      <AppHeader
-        variant="sub"
-        title="خريطة الحي"
-        subtitle={city || 'استكشف ما حولك'}
-        fallbackRoute="/home"
-        rightAction={
-          <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-            <HeaderAction
-              onPress={() => {
-                setMapNotice(null);
-                setEngine((prev) => (prev === 'leaflet' ? 'google' : 'leaflet'));
-              }}
-              accessibilityLabel="تبديل الخريطة"
-              style={[styles.engineBtn, engine === 'google' && styles.engineBtnGoogle]}
-            >
-              {engine === 'leaflet' ? (
-                <>
-                  <Layers size={13} color={OASIS.colors.primary} />
-
-                </>
-              ) : (
-                <>
-                  <Globe size={13} color="#2563eb" />
-
-                </>
-              )}
-            </HeaderAction>
-          </View>
-        }
-      />
-
-      {/* 2. MAP CANVAS (Full screen behind floating controls) */}
-      <div
-        ref={(node) => {
-          mapElRef.current = node;
-        }}
-        style={{
-          position: 'absolute',
-          top: appHeaderHeight,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          width: '100%',
-          height: 'calc(100% - 52px)',
-          zIndex: 1,
-        }}
-      />
-
-      {/* 3. FLOATING GOOGLE MAPS SEARCH & CATEGORIES */}
-      <View pointerEvents="box-none" style={styles.floatingTopContainer}>
-        {/* Google Maps Search Capsule */}
-        <View style={styles.floatingSearchCapsule}>
-          <Search size={18} color={OASIS.colors.primary} />
-          <TextInput
-            value={query}
-            onChangeText={setQuery}
-            onSubmitEditing={() => void runPlaceSearch(placeCategory, query)}
-            placeholder="ابحث عن مكان أو خدمة"
-            placeholderTextColor="#94a3b8"
-            style={styles.floatingSearchInput}
-            returnKeyType="search"
-          />
-          {query.length > 0 ? (
-            <Pressable onPress={() => setQuery('')} hitSlop={8} style={{ padding: 4 }}>
-              <X size={15} color="#94a3b8" />
-            </Pressable>
-          ) : null}
-        </View>
-
-        <Pressable accessibilityRole="button" accessibilityState={{ expanded: categoriesOpen }} onPress={() => setCategoriesOpen(v => !v)} style={styles.filterToggle}>
-          <SlidersHorizontal size={17} color={C.accent} /><Text style={styles.floatingChipText}>فئات الأماكن</Text>{categoriesOpen ? <ChevronUp size={16} color={C.muted}/> : <ChevronDown size={16} color={C.muted}/>}
-        </Pressable>
-        {categoriesOpen ? <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={[styles.floatingChipsScroll, { direction: 'ltr' }]}
-          style={[styles.floatingChipsRow, { direction: 'rtl' }]}
-        >
-          <Pressable oasisKind="chip"
-            onPress={() => {
-              setPlaceCategory(ALL_PLACES_KEY);
-              void runPlaceSearch(ALL_PLACES_KEY, query);
-            }}
-            style={[
-              styles.floatingChip,
-              placeCategory === ALL_PLACES_KEY && styles.floatingChipActive,
-            ]}
-          >
-            <Text
-              style={[
-                styles.floatingChipText,
-                placeCategory === ALL_PLACES_KEY && styles.floatingChipTextActive,
-              ]}
-            >
-              كل الأماكن
-            </Text>
-          </Pressable>
-          {PLACE_CATEGORIES.map((category) => { const CategoryIcon = categoryIcons[category.key] || Store; return (
-            <Pressable oasisKind="chip"
-              key={category.key}
-              onPress={() => {
-                setPlaceCategory(category.key);
-                void runPlaceSearch(category.key, '');
-              }}
-              style={[
-                styles.floatingChip,
-                placeCategory === category.key && styles.floatingChipActive,
-              ]}
-            >
-              <CategoryIcon size={16} color={placeCategory === category.key ? OASIS.colors.surface : C.accent} />
-              <Text
-                style={[
-                  styles.floatingChipText,
-                  placeCategory === category.key && styles.floatingChipTextActive,
-                ]}
-              >
-                {category.label}
-              </Text>
-            </Pressable>
-          ); })}
-        </ScrollView> : null}
-      </View>
-
-      {/* 4. FLOATING GOOGLE MAPS ACTION BUTTONS (BOTTOM-RIGHT FABs) */}
-      <View style={styles.floatingFabCol}>
-        <Pressable oasisKind="icon"
-          onPress={() => void locateMe()}
-          style={styles.floatingFabBtn}
-          accessibilityRole="button"
-          accessibilityLabel="تحديد موقعي"
-        >
-          <LocateFixed size={20} color={locating ? '#94a3b8' : OASIS.colors.primary} />
-        </Pressable>
-        <Pressable oasisKind="icon"
-          onPress={() => setHeatOn((v) => !v)}
-          style={[styles.floatingFabBtn, heatOn && { backgroundColor: '#ea580c' }]}
-          accessibilityRole="button"
-          accessibilityLabel="خريطة التفاعل"
-        >
-          <Flame size={18} color={heatOn ? OASIS.colors.surface : '#ea580c'} />
-        </Pressable>
-      </View>
-
-      {/* Engine Notice banner if Google fails */}
-      {mapNotice ? (
-        <View style={styles.mapNotice}>
-          <Text style={styles.mapNoticeText}>{mapNotice}</Text>
-          <Pressable onPress={() => setMapNotice(null)} hitSlop={8}>
-            <X size={15} color="#b45309" />
-          </Pressable>
-        </View>
-      ) : null}
-
-      {!loading && !pins.length && !sheetOpen ? (
-        <View style={styles.mapHint}>
-          <Text style={styles.mapHintText}>
-            لا يوجد نشاط مسجّل بعد — أنشئ سؤالاً أو طلب مساعدة وسيظهر هنا.
-          </Text>
-        </View>
-      ) : null}
-
-      {/* Floating Button to Re-open Nearby Places */}
-      {!sheetOpen && (
-        <Pressable oasisKind="action"
-          style={styles.openSheetBtn}
-          onPress={() => { setSheetOpen(true); void runPlaceSearch(placeCategory, query); }}
-          accessibilityRole="button"
-        >
-          <Store size={17} color={OASIS.colors.surface} />
-          <Text style={styles.openSheetBtnText}>
-            أقرب المحلات
-          </Text>
-        </Pressable>
-      )}
-
-      {sheetOpen ? placesSheet : null}
-
-      <View style={styles.legend}>
-        <Text style={styles.legendText}>مواقع المنشورات تقريبية لحماية الخصوصية</Text>
-      </View>
+    <View style={{ flex: 1, position: 'relative', backgroundColor: '#F5F6F2' }}>
+      <AppHeader variant="sub" title="خريطة الحي" subtitle={city || 'استكشف المملكة'} fallbackRoute="/home"
+        rightAction={<HeaderAction onPress={resetView} accessibilityLabel="العودة إلى نطاق المدينة"><Compass size={19} color="#17664F" /></HeaderAction>} />
+      <style>{mapExplorerCss}</style>
+      <main className="mx" dir="rtl" style={{ top: appHeaderHeight }}>
+        <div className="mx-heading">
+          <div><div className="mx-eyebrow"><span /> دليلك إلى ما حولك</div><h1>حيّك، من زاوية أقرب<span>.</span></h1><p>اكتشف الأماكن والخدمات، وتابع ما يحدث في محيطك.</p></div>
+          <button className="mx-location" onClick={resetView} aria-label="العودة إلى مركز المدينة المحددة"><MapPinIcon size={17} color="#17664F" /><span>{city || 'كل المملكة'}</span><span className="mx-location-sub">نطاق الاستكشاف</span><Compass size={14} color="#7A8D82" /></button>
+        </div>
+        <div className="mx-workspace">
+          <aside className={`mx-panel ${sheetOpen ? '' : 'mx-panel-collapsed'}`} aria-label="لوحة استكشاف الحي">
+            <div className="mx-panel-head">
+              <div className="mx-panel-title"><span className="mx-square"><Compass size={22} color="#17664F" /></span><div><h2>اكتشف حولك</h2><p>{city ? `أماكن وحكايات من ${city}` : 'كل ما يقرّبك من حيّك'}</p></div><button className="mx-icon mx-mobile-only" aria-label={sheetOpen ? 'طي لوحة النتائج' : 'عرض لوحة النتائج'} onClick={() => setSheetOpen(v => !v)}>{sheetOpen ? <ChevronDown size={18} color="#17664F" /> : <ChevronUp size={18} color="#17664F" />}</button></div>
+              <form className="mx-search" onSubmit={e => { e.preventDefault(); if (tab === 'places') void runPlaceSearch(placeCategory, query); }}>
+                <Search size={19} color="#17664F" />
+                <input aria-label={tab === 'places' ? 'البحث عن مكان أو خدمة' : 'البحث في نشاط الحي'} placeholder={tab === 'places' ? 'مكان، مقهى، أو خدمة…' : 'ابحث في منشورات حيّك…'} value={query} onChange={e => setQuery(e.target.value)} />
+                {query && <button type="button" aria-label="مسح البحث" onClick={() => setQuery('')}><X size={15} color="#71837B" /></button>}
+                <button type="submit" aria-label="بحث" className="mx-search-submit"><ArrowUpRight size={17} color="#fff" /></button>
+              </form>
+              <div className="mx-tabs" role="tablist" aria-label="نوع الاستكشاف">
+                <button role="tab" aria-selected={tab === 'community'} onClick={() => { setTab('community'); setQuery(''); }}><MapIcon size={16} color={tab === 'community' ? '#17664F' : '#85938B'} />نبض الحي<span>{number(scopedPins.length)}</span></button>
+                <button role="tab" aria-selected={tab === 'places'} onClick={() => { setTab('places'); setQuery(''); if (!searched) void runPlaceSearch(placeCategory, ''); }}><Store size={16} color={tab === 'places' ? '#17664F' : '#85938B'} />الأماكن القريبة</button>
+              </div>
+            </div>
+            <div className="mx-panel-details">
+              <div className="mx-section-label"><span>{tab === 'places' ? 'ماذا تبحث عنه؟' : 'استكشف حسب الاهتمام'}</span><ListFilter size={15} color="#819087" /></div>
+              <div className="mx-categories">
+                {tab === 'places' ? <>
+                  <button className={placeCategory === ALL_PLACES_KEY ? 'active' : ''} onClick={() => chooseCategory(ALL_PLACES_KEY)}><Layers size={15} color={placeCategory === ALL_PLACES_KEY ? '#fff' : '#72877A'} />الكل</button>
+                  {PLACE_CATEGORIES.map(c => { const Icon = categoryIcons[c.key] || Store; return <button key={c.key} className={placeCategory === c.key ? 'active' : ''} onClick={() => chooseCategory(c.key)}><Icon size={15} color={placeCategory === c.key ? '#fff' : '#72877A'} />{c.label}</button>; })}
+                </> : <>
+                  <button className={kind === 'all' ? 'active' : ''} onClick={() => setKind('all')}><Layers size={15} color={kind === 'all' ? '#fff' : '#72877A'} />الكل<span>{number(scopedPins.length)}</span></button>
+                  {MAP_PIN_ORDER.map(k => <button key={k} className={kind === k ? 'active' : ''} onClick={() => setKind(k)}><i style={{ background: kind === k ? '#D7EBCB' : MAP_PIN_KINDS[k].color }} />{MAP_PIN_KINDS[k].short}<span>{number(kindCounts[k] || 0)}</span></button>)}
+                </>}
+              </div>
+              {tab === 'places' && <div className="mx-filters"><button className={openOnly ? 'active' : ''} aria-pressed={openOnly} onClick={() => setOpenOnly(v => !v)}><span className="mx-status-dot" />مفتوح الآن{openOnly && <Check size={13} color="#17664F" />}</button><label>الترتيب<select aria-label="ترتيب الأماكن" value={sort} onChange={e => setSort(e.target.value)}><option value="distance">الأقرب أولًا</option><option value="rating">الأعلى تقييمًا</option></select></label></div>}
+              <div className="mx-results-heading"><h3>{tab === 'places' ? 'أماكن تستحق الاكتشاف' : 'من حولك في الحي'}</h3><span aria-live="polite">{busy ? 'جارٍ التحميل…' : `${number(resultsCount)} نتيجة`}</span></div>
+              {tab === 'places' && searchOrigin && <p className="mx-distance-note">المسافات بخط مستقيم من {searchOrigin.label} · ضمن ٥ كم</p>}
+            </div>
+            <div className="mx-results" role="tabpanel" aria-label={tab === 'places' ? 'نتائج الأماكن القريبة' : 'نتائج نشاط الحي'} aria-busy={busy}>
+              {busy ? <div className="mx-skeletons" role="status" aria-label="جارٍ تحميل النتائج">{[0, 1, 2].map(i => <div className="mx-skeleton" key={i}><span /><div><i /><i /><i /></div></div>)}</div> : tab === 'places' ? displayedPlaces.map(place => {
+                const Icon = categoryIcons[place.categoryKey] || Store;
+                return <article key={place.id} className={`mx-card ${selectedPlace === place.id ? 'selected' : ''}`}>
+                  <button className="mx-card-main" onClick={() => focusPlace(place)} aria-label={`عرض ${place.name} على الخريطة`}>
+                    <span className="mx-place-icon"><Icon size={23} color="#237056" /></span><div className="mx-card-copy"><h4>{place.name}</h4><p>{place.categoryLabel} <span>·</span> {formatDistance(place.distance)}</p><div className="mx-card-tags">{place.openNow !== null && <span className={place.openNow ? 'mx-open' : 'mx-closed'}>{place.openNow ? 'مفتوح الآن' : 'مغلق الآن'}</span>}{place.rating != null && <span className="mx-rating"><Star size={12} color="#B68C45" fill="#B68C45" />{place.rating.toFixed(1)} <small>({number(place.reviews)})</small></span>}</div></div><ChevronRight size={15} color="#9BA99F" />
+                  </button>
+                  {place.address && <p className="mx-address">{place.address}</p>}
+                  <div className="mx-card-actions"><a href={navigationUrl(place.lat, place.lng)} target="_blank" rel="noopener noreferrer"><Navigation size={14} color="#17664F" />الاتجاهات</a>{place.phone && <a href={`tel:${place.phone}`} aria-label={`اتصال بـ ${place.name}`}><Phone size={14} color="#17664F" />اتصال</a>}<button onClick={() => focusPlace(place)}>على الخريطة<ArrowUpRight size={13} color="#8A9C91" /></button></div>
+                </article>;
+              }) : visiblePins.map(pin => <article key={pin.id} className="mx-card mx-community-card"><button className="mx-card-main" onClick={() => { const point = [pin.lat, pin.lng]; if (engine === 'leaflet') leafletInstanceRef.current?.flyTo(point, 16); else { googleMapRef.current?.panTo({ lat: pin.lat, lng: pin.lng }); googleMapRef.current?.setZoom(16); } }} aria-label={`عرض ${pin.title} على الخريطة`}><span className="mx-place-icon" style={{ background: `${MAP_PIN_KINDS[pin.kind].color}12` }}><MapPinIcon size={22} color={MAP_PIN_KINDS[pin.kind].color} /></span><div className="mx-card-copy"><div className="mx-pin-category" style={{ color: MAP_PIN_KINDS[pin.kind].color }}>{MAP_PIN_KINDS[pin.kind].label}{pin.urgent && <span className="mx-closed">عاجل</span>}</div><h4>{pin.title}</h4><p>{pin.area}</p></div></button>{pin.body && <p className="mx-post-body">{pin.body}</p>}<div className="mx-card-actions"><span className="mx-time">{relativeTime(pin.createdAt)}{pin.approximate ? ' · موقع تقريبي' : ''}</span><button onClick={() => router.push(pin.href as never)}>عرض التفاصيل<ArrowUpRight size={14} color="#17664F" /></button></div></article>)}
+              {!busy && !resultsCount && <div className="mx-empty"><span><MapPinIcon size={30} color="#6D9278" /></span><h3>{tab === 'community' && !city ? 'ابدأ من مدينتك' : tab === 'places' && !searched ? 'وجهتك التالية، قريبة منك' : 'لنوسّع دائرة الاكتشاف'}</h3><p>{tab === 'community' && !city ? 'حدد مدينتك من الصفحة الرئيسية لعرض نشاط الجيران، أو استكشف الأماكن بتحريك الخريطة.' : tab === 'places' && !searched ? 'ابحث عن مكان أو اختر فئة. يمكنك أيضًا تحريك الخريطة والبحث في المنطقة المعروضة.' : 'لا توجد نتائج مطابقة حاليًا. جرّب فئة أخرى أو منطقة قريبة.'}</p><button className="mx-primary" onClick={() => { if (tab === 'community') { if (!city) router.push('/home'); else { setKind('all'); setQuery(''); void refreshPins(); } } else { setOpenOnly(false); void runPlaceSearch(placeCategory, query, true); } }}>{tab === 'community' && !city ? 'تحديد مدينتي' : tab === 'community' ? 'تحديث النشاط' : 'البحث في هذه المنطقة'}<ArrowUpRight size={15} color="#fff" /></button></div>}
+            </div>
+            <div className="mx-panel-footer"><ShieldCheck size={17} color="#678773" /><p>قريبون منك، وخصوصيتك محفوظة<span>مواقع منشورات الجيران تقريبية دائمًا.</span></p></div>
+          </aside>
+          <section className="mx-map" aria-label="الخريطة التفاعلية">
+            <div ref={node => { mapElRef.current = node; }} className="mx-canvas" />
+            <div className="mx-map-top"><div className="mx-map-badge"><span className="mx-status-dot" /><strong>{city || 'المملكة العربية السعودية'}</strong><span>منظور الحي</span></div><button className="mx-map-layer" onClick={() => { setMapNotice(null); setHeatOn(false); setEngine(v => v === 'leaflet' ? 'google' : 'leaflet'); }} aria-label="تبديل مصدر الخريطة"><Layers size={17} color="#17664F" /><span>{engine === 'leaflet' ? 'الخريطة الأساسية' : 'خرائط Google'}</span></button></div>
+            {mapMoved && mapReady && <button className="mx-search-area" disabled={placesLoading} onClick={() => { if (tab === 'community') setQuery(''); void runPlaceSearch(placeCategory, tab === 'places' ? query : '', true); }}><RefreshCw size={15} color="#17664F" />{placesLoading ? 'جارٍ البحث…' : 'ابحث في هذه المنطقة'}</button>}
+            {(!mapReady || mapError) && <div className="mx-map-loading" role="status"><Compass size={32} color="#17664F" /><strong>{mapError ? 'الخريطة غير متاحة حاليًا' : 'نجهّز لك صورة أوضح للحي…'}</strong>{mapError && <button className="mx-primary" onClick={() => setRetry(v => v + 1)}>إعادة المحاولة</button>}</div>}
+            <div className="mx-map-tools"><button aria-label="العودة إلى نطاق المدينة" onClick={resetView}><Compass size={20} color="#17664F" /></button><span /><button aria-label="تكبير الخريطة" onClick={() => zoom(1)} disabled={!mapReady}><Plus size={20} color="#334E40" /></button><button aria-label="تصغير الخريطة" onClick={() => zoom(-1)} disabled={!mapReady}><Minus size={20} color="#334E40" /></button><span /><button aria-label="تحديد موقعي" disabled={locating} onClick={() => void locateMe()}><LocateFixed size={20} color="#17664F" /></button>{engine === 'leaflet' && tab === 'community' && <button aria-label="إظهار كثافة نشاط الحي" aria-pressed={heatOn} className={heatOn ? 'active' : ''} onClick={() => setHeatOn(v => !v)}><Flame size={19} color={heatOn ? '#B27128' : '#71867A'} /></button>}</div>
+            <div className="mx-map-bottom"><div className="mx-map-key"><strong>دليل الخريطة</strong><span><i style={{ background: '#17664F' }} />نشاط الحي</span><span><i style={{ background: '#0F766E' }} />أماكن وخدمات</span>{heatOn && <span><i style={{ background: '#E6A34F' }} />كثافة النشاط</span>}</div><button className="mx-my-location" disabled={locating} onClick={() => void locateMe()}><LocateFixed size={17} color="#fff" />{locating ? 'جارٍ تحديد موقعك…' : 'اكتشف بالقرب مني'}</button></div>
+            {myLocation && <div className="mx-accuracy">دقة الجهاز: {myLocation.accuracy != null ? `± ${Math.round(myLocation.accuracy)} م` : 'غير متاحة'}</div>}
+          </section>
+        </div>
+        {mapNotice && <div className="mx-notice" role="status"><MapPinIcon size={17} color="#8B6A32" /><p>{mapNotice}</p><button aria-label="إغلاق التنبيه" onClick={() => setMapNotice(null)}><X size={17} color="#8B6A32" /></button></div>}
+      </main>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: OASIS.colors.line,
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  floatingTopContainer: {
-    position: 'absolute',
-    top: 62,
-    left: 12,
-    right: 12,
-    zIndex: 90,
-    gap: 8,
-    maxWidth: 600,
-    alignSelf: 'center',
-  },
-  floatingSearchCapsule: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: OASIS.colors.surface,
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    height: 48,
-    borderWidth: 1,
-    borderColor: OASIS.colors.line,
-    shadowColor: OASIS.colors.ink,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0,
-    shadowRadius: 10,
-    elevation: 6,
-  },
-  floatingSearchInput: {
-    flex: 1,
-    textAlign: 'right',
-    fontSize: 13.5,
-    fontWeight: '600',
-    color: OASIS.colors.ink,
-    height: 44,
-    padding: 0,
-  },
-  floatingChipsRow: {
-    marginHorizontal: -4,
-  },
-  floatingChipsScroll: {
-    flexDirection: 'row-reverse',
-    gap: 6,
-    paddingHorizontal: 4,
-    paddingVertical: 2,
-  },
-  filterToggle: { alignSelf: 'flex-end', flexDirection: 'row-reverse', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: OASIS.colors.surface, borderRadius: 14, borderWidth: 1, borderColor: OASIS.colors.line },
-  floatingChip: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 13,
-    paddingVertical: 7,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.96)',
-    borderWidth: 1,
-    borderColor: OASIS.colors.line,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  floatingChipActive: {
-    backgroundColor: OASIS.colors.primary,
-    borderColor: OASIS.colors.primary,
-  },
-  floatingChipText: {
-    fontSize: 11.5,
-    fontWeight: '600',
-    color: OASIS.colors.ink,
-  },
-  floatingChipTextActive: {
-    color: OASIS.colors.surface,
-  },
-  floatingFabCol: {
-    position: 'absolute',
-    bottom: 90,
-    right: 16,
-    zIndex: 85,
-    gap: 10,
-  },
-  floatingFabBtn: {
-    width: 46,
-    height: 46,
-    borderRadius: 14,
-    backgroundColor: OASIS.colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0,
-    shadowRadius: 6,
-    elevation: 5,
-    borderWidth: 1,
-    borderColor: OASIS.colors.line,
-  },
-  placeChipText: { fontSize: 11.5, fontWeight: '600', color: C.ink },
-  placeChipTextActive: { color: OASIS.colors.surface },
-  cityChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 14,
-    backgroundColor: C.accentSoft,
-  },
-  cityChipActive: { backgroundColor: C.accent },
-  cityChipText: { fontSize: 11, fontWeight: '600', color: C.accent },
-  cityChipTextActive: { color: OASIS.colors.surface },
-  divider: { width: 1, height: 20, backgroundColor: C.line, alignSelf: 'center', marginHorizontal: 2 },
-  sheet: {
-    position: 'absolute',
-    backgroundColor: OASIS.colors.surface,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0,
-    shadowRadius: 18,
-    elevation: 12,
-    zIndex: 998,
-  },
-  sheetMobile: {
-    left: 0,
-    right: 0,
-    bottom: 0,
-    maxHeight: '44%',
-  },
-  sheetWide: {
-    left: 20,
-    bottom: 20,
-    width: 380,
-    maxHeight: '65%',
-    borderRadius: 20,
-  },
-  sheetHandle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#cbd5e1',
-    alignSelf: 'center',
-    marginTop: 8,
-    marginBottom: 4,
-  },
-  sheetHead: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-  },
-  sheetTitle: { flex: 1, fontSize: 14, fontWeight: '600', color: C.ink, textAlign: 'right' },
-  sheetScroll: { flex: 1 },
-  sheetContent: { padding: 12, gap: 10 },
-  placeRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 10,
-    padding: 10,
-    borderRadius: 16,
-    backgroundColor: OASIS.colors.background,
-    borderWidth: 1,
-    borderColor: OASIS.colors.line,
-  },
-  placeBadge: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: OASIS.colors.soft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  placeBody: { flex: 1, gap: 2 },
-  placeName: { fontSize: 13.5, fontWeight: '600', color: C.ink, textAlign: 'right' },
-  placeMeta: { fontSize: 11, color: C.muted, fontWeight: '600', textAlign: 'right' },
-  placeChips: { flexDirection: 'row-reverse', gap: 5, flexWrap: 'wrap', marginTop: 4 },
-  miniChip: {
-    fontSize: 11,
-    fontWeight: '600',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  placeActions: { flexDirection: 'row', gap: 6 },
-  placeActionBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    backgroundColor: OASIS.colors.soft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyText: { textAlign: 'center', fontSize: 12, color: C.muted, fontWeight: '700', paddingVertical: 14 },
-  openSheetBtn: {
-    position: 'absolute',
-    bottom: 30,
-    alignSelf: 'center',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: C.accent,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    borderRadius: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0,
-    shadowRadius: 10,
-    elevation: 8,
-    zIndex: 997,
-  },
-  openSheetBtnText: {
-    color: OASIS.colors.surface,
-    fontWeight: '600',
-    fontSize: 13,
-  },
-  legend: {
-    position: 'absolute',
-    bottom: 6,
-    left: 12,
-    backgroundColor: 'rgba(255,255,255,0.85)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
-    zIndex: 996,
-  },
-  legendText: { fontSize: 11, color: C.muted, fontWeight: '700' },
-  mapNotice: {
-    position: 'absolute',
-    top: 185,
-    left: 14,
-    right: 14,
-    backgroundColor: OASIS.colors.warningSoft,
-    borderWidth: 1,
-    borderColor: '#fde68a',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 8,
-    zIndex: 1000,
-  },
-  mapNoticeText: { flex: 1, fontSize: 11.5, color: '#92400e', fontWeight: '700', textAlign: 'right' },
-  mapHint: {
-    position: 'absolute',
-    bottom: 80,
-    alignSelf: 'center',
-    backgroundColor: 'rgba(15,23,42,0.8)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    zIndex: 995,
-  },
-  mapHintText: { color: OASIS.colors.surface, fontSize: 12, fontWeight: '700' },
-  chip: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: OASIS.colors.line, borderRadius: 14, paddingHorizontal: 10, paddingVertical: 7, backgroundColor: OASIS.colors.surface },
-  chipText: { color: OASIS.colors.muted, fontSize: 11, fontWeight: '700' },
-  chipTextActive: { color: OASIS.colors.surface },
-  engineBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 12, backgroundColor: OASIS.colors.soft, borderWidth: 1, borderColor: '#a7f3d0' },
-  engineBtnGoogle: { backgroundColor: OASIS.colors.infoSoft, borderColor: '#bfdbfe' },
-  engineBtnText: { color: OASIS.colors.primary, fontSize: 11, fontWeight: '600' },
-});

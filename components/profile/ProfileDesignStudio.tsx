@@ -1,3 +1,4 @@
+import { AccountStatusMark } from '@/components/profile/AccountIdentityBadge';
 import {
   ActivityIndicator,
   Alert,
@@ -11,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useTheme } from '@/context/ThemeContext';
 import { OASIS } from '@/lib/oasis';
 import { OasisPressable as Pressable } from '@/components/oasis/OasisPrimitives';
 import {
@@ -37,7 +39,7 @@ import {
   Sparkles,
   Trash2,
 } from 'lucide-react-native';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 export type FeaturedType = 'market' | 'service' | 'question' | 'request';
 
@@ -58,6 +60,7 @@ type Props = {
   coverBusy: boolean;
   items: StudioItem[];
   featured: FeaturedRow[];
+  featuredBusy?: boolean;
   wide: boolean;
   onPickCover: () => void;
   onRemoveCover: () => void;
@@ -89,6 +92,7 @@ export function ProfileDesignStudio({
   coverBusy,
   items,
   featured,
+  featuredBusy,
   wide,
   onPickCover,
   onRemoveCover,
@@ -97,6 +101,8 @@ export function ProfileDesignStudio({
   onSaveFeaturedTitle,
   onReset,
 }: Props) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors),[colors]);
   const accent = String(customization?.accent_color || OASIS.colors.primary);
   const banner = String(customization?.banner_style || 'emerald');
   const sectionVisibility = normalizeSectionVisibility(customization?.section_visibility);
@@ -119,6 +125,8 @@ export function ProfileDesignStudio({
     onChange({ section_visibility: { ...sectionVisibility, [key]: !sectionVisibility[key] } });
   };
 
+  useEffect(() => { setCoverFailed(false); }, [coverUri]);
+
   const featuredCount = featured.length;
 
   return (
@@ -126,56 +134,20 @@ export function ProfileDesignStudio({
       <View style={[styles.studioGrid, wide && styles.studioGridWide]}>
         {/* Preview column */}
         <View style={[styles.previewCol, wide && styles.previewColWide]}>
-          <View style={styles.previewCard}>
-            <LinearGradient colors={bannerColors(banner)} style={StyleSheet.absoluteFillObject} />
-            {coverUri && coverVisible && !coverFailed ? (
-              <Image source={{ uri: coverUri }} style={StyleSheet.absoluteFillObject} resizeMode="cover" onError={() => setCoverFailed(true)} />
-            ) : null}
-            <LinearGradient colors={['rgba(4,10,8,0.12)', 'rgba(4,10,8,0.7)']} style={StyleSheet.absoluteFillObject} />
-            <View style={styles.previewBody}>
-              <View style={styles.previewTop}>
-                <View style={[styles.previewAvatarRing, { borderColor: accent }]}>
-                  {profile?.avatar_url ? (
-                    <Image source={{ uri: profile.avatar_url }} style={styles.previewAvatar} />
-                  ) : (
-                    <View style={styles.previewAvatarFallback}>
-                      <Text style={styles.previewAvatarLetter}>{initials(displayName)}</Text>
-                    </View>
-                  )}
-                </View>
-                <View style={styles.previewCopy}>
-                  <Text style={styles.previewName} numberOfLines={1}>{displayName || 'حساب حيّنا'}</Text>
-                  <Text style={styles.previewHandle}>@{profile?.username || 'user'}</Text>
-                  {(profile?.city || profile?.district) ? (
-                    <View style={styles.previewLocationRow}>
-                      <MapPin size={11} color="rgba(255,255,255,0.78)" />
-                      <Text style={styles.previewLocation} numberOfLines={1}>
-                        {[profile?.district && 'حي ' + profile.district, profile?.city].filter(Boolean).join(' · ')}
-                      </Text>
-                    </View>
-                  ) : null}
-                </View>
+          <View style={{borderRadius:18,overflow:'hidden',borderWidth:1,borderColor:colors.line,backgroundColor:colors.surface}}>
+            <LinearGradient colors={bannerColors(banner)} style={{height:120}}>
+              {coverUri && coverVisible && !coverFailed && <Image source={{uri:coverUri}} style={StyleSheet.absoluteFillObject} resizeMode="cover" onError={() => setCoverFailed(true)} />}
+            </LinearGradient>
+            <View style={{padding:16,alignItems:'flex-end',gap:7}}>
+              <View style={{width:76,height:76,borderRadius:38,borderWidth:4,borderColor:colors.surface,marginTop:-54,backgroundColor:colors.soft,alignItems:'center',justifyContent:'center'}}>
+                {profile?.avatar_url ? <Image source={{uri:profile.avatar_url}} style={{width:68,height:68,borderRadius:34}}/> : <Text style={{fontSize:28,color:accent,fontWeight:'800'}}>{initials(displayName)}</Text>}
               </View>
-
-              <View style={styles.previewChips}>
-                <View style={[styles.previewChip, { borderColor: `${accent}66`, backgroundColor: `${accent}33` }]}>
-                  <Sparkles size={11} color="#FFFFFF" />
-                  <Text style={styles.previewChipText}>ملف مميز</Text>
-                </View>
-                {showBadges ? (
-                  <View style={styles.previewChip}>
-                    <Text style={styles.previewChipText}>شارات</Text>
-                  </View>
-                ) : null}
-              </View>
-
-              {showStats ? (
-                <View style={styles.previewStats}>
-                  <View style={styles.previewStat}><Text style={styles.previewStatValue}>{stats.followers}</Text><Text style={styles.previewStatLabel}>متابع</Text></View>
-                  <View style={styles.previewStat}><Text style={styles.previewStatValue}>{stats.content}</Text><Text style={styles.previewStatLabel}>محتوى</Text></View>
-                  <View style={styles.previewStat}><Text style={styles.previewStatValue}>{stats.reputation}</Text><Text style={styles.previewStatLabel}>سمعة</Text></View>
-                </View>
-              ) : null}
+              <View style={{flexDirection:'row-reverse',alignItems:'center',gap:6}}><Text style={{color:colors.ink,fontWeight:'800',fontSize:21,textAlign:'right'}}>{displayName || 'حساب حيّنا'}</Text>{showBadges && <AccountStatusMark role={profile?.role} accountType={profile?.account_type} isVerified={Boolean(profile?.is_verified)}/>}</View>
+              <Text style={{color:colors.muted,writingDirection:'ltr'}}>@{profile?.username || 'user'}</Text>
+              {sectionVisibility.bio && !!profile?.bio && <Text style={{color:colors.ink,textAlign:'right',lineHeight:22}}>{profile.bio}</Text>}
+              <Text style={{color:colors.muted,textAlign:'right',fontSize:12}}>{[profile?.district && 'حي ' + profile.district,profile?.city].filter(Boolean).join('، ')}</Text>
+              {showStats && <Text style={{color:colors.muted,fontSize:12}}>{stats.followers} متابع · {stats.following} يتابع · {stats.content} مساهمة</Text>}
+              <View style={{flexDirection:'row-reverse',gap:20,marginTop:12}}>{SECTION_META.filter(section => section.key !== 'bio' && section.key !== 'achievements' && sectionVisibility[section.key]).slice(0,3).map((section,index) => <Text key={section.key} style={{fontSize:11,color:index===0 ? accent : colors.muted,borderBottomWidth:index===0 ? 3 : 0,borderBottomColor:accent,paddingBottom:10}}>{section.label}</Text>)}</View>
             </View>
           </View>
 
@@ -206,6 +178,7 @@ export function ProfileDesignStudio({
               const active = accent === accentItem.value;
               return (
                 <Pressable
+                  accessibilityRole="radio" accessibilityState={{checked:active}}
                   key={accentItem.value}
                   style={styles.accentCell}
                   onPress={() => onChange({ accent_color: accentItem.value })}
@@ -226,6 +199,7 @@ export function ProfileDesignStudio({
               const active = banner === bannerItem.id;
               return (
                 <Pressable
+                  accessibilityRole="radio" accessibilityState={{checked:active}}
                   key={bannerItem.id}
                   style={[styles.bannerTile, active && styles.bannerTileActive, active && { borderColor: accent }]}
                   onPress={() => onChange({ banner_style: bannerItem.id })}
@@ -249,6 +223,7 @@ export function ProfileDesignStudio({
               const active = sectionVisibility[item.key];
               return (
                 <Pressable
+                  accessibilityRole="checkbox" accessibilityState={{checked:active}}
                   key={item.key}
                   style={[styles.sectionChip, active && styles.sectionChipActive, active && { borderColor: accent, backgroundColor: accentSoft(accent, '14') }]}
                   onPress={() => toggleSection(item.key)}
@@ -267,6 +242,7 @@ export function ProfileDesignStudio({
                 <Text style={styles.toggleSub}>المتابعون والإسهامات والسمعة</Text>
               </View>
               <Switch
+                accessibilityLabel="إظهار الإحصائيات"
                 value={showStats}
                 onValueChange={(value) => onChange({ show_stats: value })}
                 trackColor={{ false: OASIS.colors.line, true: accentSoft(accent, 'AA') }}
@@ -279,6 +255,7 @@ export function ProfileDesignStudio({
                 <Text style={styles.toggleSub}>الشارات والإنجازات في الملف العام</Text>
               </View>
               <Switch
+                accessibilityLabel="إظهار الشارات"
                 value={showBadges}
                 onValueChange={(value) => onChange({ show_badges: value })}
                 trackColor={{ false: OASIS.colors.line, true: accentSoft(accent, 'AA') }}
@@ -349,6 +326,7 @@ export function ProfileDesignStudio({
                 <Pressable
                   key={`${row.item_type}:${row.item_id}`}
                   style={[styles.pinnedChip, { borderColor: accent }]}
+                  disabled={featuredBusy}
                   onPress={() => onToggleFeatured(row.item_type, row.item_id)}
                 >
                   <Text style={[styles.pinnedChipText, { color: accent }]} numberOfLines={1}>
@@ -363,7 +341,7 @@ export function ProfileDesignStudio({
 
         {filteredItems.length ? (
           <View style={styles.featuredList}>
-            {filteredItems.slice(0, 18).map((item) => {
+            {filteredItems.map((item) => {
               const isPinned = pinned.has(`${item.type}:${item.id}`);
               return (
                 <Pressable
@@ -397,13 +375,13 @@ export function ProfileDesignStudio({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   stack: { gap: 12 },
   studioGrid: { gap: 12 },
   studioGridWide: { flexDirection: 'row-reverse', alignItems: 'flex-start' },
   previewCol: { gap: 10 },
   previewColWide: { width: 300, flexShrink: 0 },
-  previewCard: { minHeight: 220, borderRadius: 18, overflow: 'hidden', padding: 16, borderWidth: 1, borderColor: OASIS.colors.line },
+  previewCard: { minHeight: 220, borderRadius: 18, overflow: 'hidden', padding: 16, borderWidth: 1, borderColor: colors.line },
   previewBody: { flex: 1, justifyContent: 'space-between' },
   previewTop: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10 },
   previewAvatarRing: { width: 56, height: 56, borderRadius: 28, borderWidth: 2, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.12)' },
@@ -423,18 +401,18 @@ const styles = StyleSheet.create({
   previewStatValue: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
   previewStatLabel: { color: 'rgba(255,255,255,0.78)', fontSize: 10, fontWeight: '700', marginTop: 2 },
   coverActions: { flexDirection: 'row-reverse', gap: 8 },
-  coverPrimary: { flex: 1, minHeight: 40, borderRadius: 12, backgroundColor: OASIS.colors.primary, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  coverPrimaryText: { color: OASIS.colors.surface, fontSize: 11.5, fontWeight: '800' },
-  coverSecondary: { minHeight: 40, borderRadius: 12, paddingHorizontal: 12, backgroundColor: OASIS.colors.dangerSoft, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 4 },
-  coverSecondaryText: { color: OASIS.colors.danger, fontSize: 11, fontWeight: '800' },
-  coverHint: { color: OASIS.colors.muted, fontSize: 10.5, textAlign: 'right', lineHeight: 16 },
+  coverPrimary: { flex: 1, minHeight: 40, borderRadius: 12, backgroundColor: colors.primary, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  coverPrimaryText: { color: colors.surface, fontSize: 11.5, fontWeight: '800' },
+  coverSecondary: { minHeight: 40, borderRadius: 12, paddingHorizontal: 12, backgroundColor: colors.dangerSoft, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 4 },
+  coverSecondaryText: { color: colors.danger, fontSize: 11, fontWeight: '800' },
+  coverHint: { color: colors.muted, fontSize: 10.5, textAlign: 'right', lineHeight: 16 },
   controlsCol: { flex: 1, gap: 12, minWidth: 0 },
-  fieldLabel: { color: OASIS.colors.muted, fontSize: 11, fontWeight: '800', textAlign: 'right', marginBottom: 2 },
+  fieldLabel: { color: colors.muted, fontSize: 11, fontWeight: '800', textAlign: 'right', marginBottom: 2 },
   accentGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 },
   accentCell: { width: 62, alignItems: 'center', gap: 4 },
-  accentDot: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: OASIS.colors.surface },
+  accentDot: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.surface },
   accentDotActive: { borderWidth: 3 },
-  accentLabel: { color: OASIS.colors.muted, fontSize: 9.5, fontWeight: '700', textAlign: 'center' },
+  accentLabel: { color: colors.muted, fontSize: 9.5, fontWeight: '700', textAlign: 'center' },
   bannerGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 },
   bannerTile: { width: '47%', height: 58, borderRadius: 12, overflow: 'hidden', borderWidth: 2, borderColor: 'transparent', justifyContent: 'center', alignItems: 'center' },
   bannerTileActive: { borderWidth: 2 },
@@ -442,44 +420,44 @@ const styles = StyleSheet.create({
   bannerLabel: { color: '#FFFFFF', fontSize: 11.5, fontWeight: '800', zIndex: 2 },
   bannerCheck: { position: 'absolute', top: 6, left: 6, width: 20, height: 20, borderRadius: 10, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center' },
   sectionGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 },
-  sectionChip: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: OASIS.colors.line, backgroundColor: OASIS.colors.background },
+  sectionChip: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.background },
   sectionChipActive: { borderWidth: 1.5 },
-  sectionChipText: { color: OASIS.colors.muted, fontSize: 11, fontWeight: '700' },
+  sectionChipText: { color: colors.muted, fontSize: 11, fontWeight: '700' },
   toggleGrid: { gap: 2 },
-  toggleRow: { minHeight: 50, flexDirection: 'row-reverse', alignItems: 'center', gap: 10, borderBottomWidth: 1, borderBottomColor: OASIS.colors.line, paddingVertical: 4 },
+  toggleRow: { minHeight: 50, flexDirection: 'row-reverse', alignItems: 'center', gap: 10, borderBottomWidth: 1, borderBottomColor: colors.line, paddingVertical: 4 },
   toggleCopy: { flex: 1, alignItems: 'flex-end' },
-  toggleTitle: { color: OASIS.colors.ink, fontSize: 11.5, fontWeight: '700' },
-  toggleSub: { color: OASIS.colors.muted, fontSize: 10.5, marginTop: 2, textAlign: 'right' },
+  toggleTitle: { color: colors.ink, fontSize: 11.5, fontWeight: '700' },
+  toggleSub: { color: colors.muted, fontSize: 10.5, marginTop: 2, textAlign: 'right' },
   featuredTitleRow: { gap: 6 },
   featuredTitleInputRow: { flexDirection: 'row-reverse', gap: 8, alignItems: 'center' },
-  featuredTitleInput: { flex: 1, minHeight: 42, borderWidth: 1, borderColor: OASIS.colors.line, backgroundColor: OASIS.colors.background, borderRadius: 11, paddingHorizontal: 11, color: OASIS.colors.ink, fontSize: 12, fontWeight: '700' },
-  featuredTitleSave: { width: 42, height: 42, borderRadius: 11, backgroundColor: OASIS.colors.primary, alignItems: 'center', justifyContent: 'center' },
-  resetButton: { alignSelf: 'flex-start', flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10, backgroundColor: OASIS.colors.background, borderWidth: 1, borderColor: OASIS.colors.line },
-  resetText: { color: OASIS.colors.muted, fontSize: 11, fontWeight: '700' },
-  featuredCard: { backgroundColor: OASIS.colors.surface, borderRadius: 14, borderWidth: 1, borderColor: OASIS.colors.line, padding: 14, gap: 10 },
+  featuredTitleInput: { flex: 1, minHeight: 42, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.background, borderRadius: 11, paddingHorizontal: 11, color: colors.ink, fontSize: 12, fontWeight: '700' },
+  featuredTitleSave: { width: 42, height: 42, borderRadius: 11, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+  resetButton: { alignSelf: 'flex-start', flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.line },
+  resetText: { color: colors.muted, fontSize: 11, fontWeight: '700' },
+  featuredCard: { backgroundColor: colors.surface, borderRadius: 14, borderWidth: 1, borderColor: colors.line, padding: 14, gap: 10 },
   featuredHeader: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   featuredHeaderCopy: { flex: 1, alignItems: 'flex-end' },
-  sectionTitle: { color: OASIS.colors.ink, fontSize: 15, fontWeight: '700', textAlign: 'right' },
-  sectionSub: { color: OASIS.colors.muted, fontSize: 11, lineHeight: 17, textAlign: 'right', marginTop: 2 },
+  sectionTitle: { color: colors.ink, fontSize: 15, fontWeight: '700', textAlign: 'right' },
+  sectionSub: { color: colors.muted, fontSize: 11, lineHeight: 17, textAlign: 'right', marginTop: 2 },
   typeTabs: { flexDirection: 'row-reverse', gap: 6, paddingVertical: 2 },
   typeTab: { borderRadius: 999, paddingHorizontal: 11, paddingVertical: 7, backgroundColor: '#F1F5F9' },
-  typeTabActive: { backgroundColor: OASIS.colors.primary },
-  typeTabText: { color: OASIS.colors.muted, fontSize: 11, fontWeight: '700' },
-  typeTabTextActive: { color: OASIS.colors.surface },
+  typeTabActive: { backgroundColor: colors.primary },
+  typeTabText: { color: colors.muted, fontSize: 11, fontWeight: '700' },
+  typeTabTextActive: { color: colors.surface },
   pinnedRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
-  pinnedLabel: { color: OASIS.colors.muted, fontSize: 11, fontWeight: '700' },
+  pinnedLabel: { color: colors.muted, fontSize: 11, fontWeight: '700' },
   pinnedChips: { flexDirection: 'row-reverse', gap: 6 },
-  pinnedChip: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 999, borderWidth: 1, backgroundColor: OASIS.colors.background },
+  pinnedChip: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 999, borderWidth: 1, backgroundColor: colors.background },
   pinnedChipText: { fontSize: 10.5, fontWeight: '700', maxWidth: 110 },
   featuredList: { gap: 7 },
-  featuredRow: { minHeight: 54, borderRadius: 12, borderWidth: 1, borderColor: OASIS.colors.line, padding: 8, flexDirection: 'row-reverse', alignItems: 'center', gap: 9, backgroundColor: OASIS.colors.background },
-  featuredThumb: { width: 40, height: 40, borderRadius: 10, backgroundColor: OASIS.colors.soft, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  featuredRow: { minHeight: 54, borderRadius: 12, borderWidth: 1, borderColor: colors.line, padding: 8, flexDirection: 'row-reverse', alignItems: 'center', gap: 9, backgroundColor: colors.background },
+  featuredThumb: { width: 40, height: 40, borderRadius: 10, backgroundColor: colors.soft, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   featuredThumbImage: { width: '100%', height: '100%' },
   featuredCopy: { flex: 1, alignItems: 'flex-end' },
-  featuredTitle: { color: OASIS.colors.ink, fontSize: 11.5, fontWeight: '700', textAlign: 'right' },
-  featuredSub: { color: OASIS.colors.muted, fontSize: 10.5, marginTop: 2, textAlign: 'right' },
-  featuredPin: { width: 26, height: 26, borderRadius: 13, backgroundColor: OASIS.colors.background, borderWidth: 1, borderColor: OASIS.colors.line, alignItems: 'center', justifyContent: 'center' },
+  featuredTitle: { color: colors.ink, fontSize: 11.5, fontWeight: '700', textAlign: 'right' },
+  featuredSub: { color: colors.muted, fontSize: 10.5, marginTop: 2, textAlign: 'right' },
+  featuredPin: { width: 26, height: 26, borderRadius: 13, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.line, alignItems: 'center', justifyContent: 'center' },
   emptyState: { alignItems: 'center', gap: 6, paddingVertical: 14 },
-  emptyTitle: { color: OASIS.colors.ink, fontSize: 12, fontWeight: '700' },
+  emptyTitle: { color: colors.ink, fontSize: 12, fontWeight: '700' },
   emptySub: { color: '#94A3B8', fontSize: 11, textAlign: 'center', lineHeight: 18 },
 });

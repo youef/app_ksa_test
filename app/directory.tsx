@@ -15,7 +15,7 @@ import {
 } from 'lucide-react-native';
 
 import { AppHeader } from '@/components/shared/AppHeader';
-import { AccountIdentityBadge, AccountVerificationBadge } from '@/components/profile/AccountIdentityBadge';
+import { AccountIdentityBadge } from '@/components/profile/AccountIdentityBadge';
 import { supabase } from '@/lib/supabase';
 import { getActiveLocation, isAllKingdom, isLocationMatching } from '@/lib/locationSync';
 
@@ -214,7 +214,6 @@ function DirectoryRow({ item }: { item: DirectoryItem }) {
             </View>
             <Text style={styles.ownerName}>{item.owner.display_name || item.owner.username}</Text>
             <AccountIdentityBadge role={item.owner.role} accountType={item.owner.account_type} isVerified={Boolean(item.owner.is_verified)} compact />
-            <AccountVerificationBadge role={item.owner.role} accountType={item.owner.account_type} isVerified={Boolean(item.owner.is_verified)} compact />
           </Pressable>
         ) : null}
       </View>

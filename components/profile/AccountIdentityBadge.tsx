@@ -154,10 +154,12 @@ export function AccountIdentityBadge({
   style?: StyleProp<ViewStyle>;
 }) {
   const meta = getAccountIdentityMeta(role, accountType, isVerified);
-  const Icon = meta.Icon;
+  const verified = Boolean(isVerified) || role === 'admin';
+  const Icon = verified ? meta.VerificationIcon : meta.Icon;
+  const label = verified ? meta.verifiedTitle : compact ? meta.shortLabel : meta.label;
 
   return (
-    <View
+    <View accessible accessibilityLabel={label}
       style={[
         styles.badge,
         compact && styles.badgeCompact,
@@ -167,56 +169,25 @@ export function AccountIdentityBadge({
     >
       <Icon size={compact ? 12 : 14} color={meta.color} />
       <Text style={[styles.badgeText, compact && styles.badgeTextCompact, { color: meta.color }]}>
-        {compact ? meta.shortLabel : meta.label}
+        {label}
       </Text>
     </View>
   );
 }
 
-export function AccountVerificationBadge({
-  role,
-  accountType,
-  isVerified,
-  compact = false,
-  style,
-}: {
-  role?: string | null;
-  accountType?: string | null;
-  isVerified?: boolean;
-  compact?: boolean;
-  style?: StyleProp<ViewStyle>;
-}) {
-  if (!isVerified && role !== 'admin') return null;
+/** Compatibility entry point; render either this or AccountIdentityBadge, never both. */
+export function AccountVerificationBadge(props: React.ComponentProps<typeof AccountIdentityBadge>) {
+  if (!props.isVerified && props.role !== 'admin') return null;
+  return <AccountIdentityBadge {...props} />;
+}
 
-  const meta = getAccountIdentityMeta(role, accountType, isVerified);
-  const VerificationIcon = meta.VerificationIcon;
-
-  return (
-    <View
-      style={[
-        styles.verificationBadge,
-        compact && styles.verificationBadgeCompact,
-        {
-          backgroundColor: meta.verificationColor + '18',
-          borderColor: meta.verificationColor + '40',
-        },
-        style,
-      ]}
-    >
-      <View style={[styles.verificationSeal, { backgroundColor: meta.verificationColor }]}>
-        <VerificationIcon size={compact ? 10 : 12} color={OASIS.colors.surface} />
-      </View>
-      <Text
-        style={[
-          styles.verificationText,
-          compact && styles.verificationTextCompact,
-          { color: meta.verificationColor },
-        ]}
-      >
-        {meta.verifiedTitle}
-      </Text>
-    </View>
-  );
+/** The sole account mark next to a name; no avatar overlay or secondary seal. */
+export function AccountStatusMark({role,accountType,isVerified,size=20}:{role?:string|null;accountType?:string|null;isVerified?:boolean;size?:number}) {
+  if (role !== 'admin' && !isVerified && (!accountType || accountType === 'standard')) return null;
+  const meta = getAccountIdentityMeta(role,accountType,isVerified);
+  const verified=Boolean(isVerified) || role === 'admin';
+  const Icon=verified ? meta.VerificationIcon : meta.Icon;
+  return <View accessible accessibilityLabel={verified ? meta.verifiedTitle : meta.publicTitle} testID="account-status-mark" style={{alignItems:'center',justifyContent:'center',width:size+4,height:size+4}}><Icon size={size} color={verified ? meta.verificationColor : meta.color} /></View>;
 }
 
 export function AccountIdentityIcon({
@@ -233,8 +204,7 @@ export function AccountIdentityIcon({
   style?: StyleProp<ViewStyle>;
 }) {
   const meta = getAccountIdentityMeta(role, accountType, isVerified);
-  const Icon = meta.Icon;
-  const VerificationIcon = meta.VerificationIcon;
+  const Icon = isVerified || role === 'admin' ? meta.VerificationIcon : meta.Icon;
 
   return (
     <View
@@ -250,11 +220,7 @@ export function AccountIdentityIcon({
       ]}
     >
       <Icon size={Math.max(12, Math.round(size * 0.5))} color={OASIS.colors.surface} />
-      {isVerified || role === 'admin' ? (
-        <View style={[styles.verifiedDot, { backgroundColor: meta.verificationColor }]}>
-          <VerificationIcon size={10} color={OASIS.colors.surface} />
-        </View>
-      ) : null}
+
     </View>
   );
 }

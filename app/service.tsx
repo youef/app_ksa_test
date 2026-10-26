@@ -43,7 +43,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { getListingType, getDeliveryMode, formatServicePrice } from '@/lib/serviceTypes';
 import { relativeTime } from '@/lib/mapPins';
 import { useBottomNavInset } from '@/lib/bottomNav';
-import { AccountIdentityBadge, AccountVerificationBadge } from '@/components/profile/AccountIdentityBadge';
+import { AccountIdentityBadge } from '@/components/profile/AccountIdentityBadge';
 
 export default function Service() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -505,7 +505,6 @@ export default function Service() {
                 </Text>
                 <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 4 }}>
                   <AccountIdentityBadge role={provider.role} accountType={provider.account_type} isVerified={Boolean(provider.is_verified)} compact />
-                  <AccountVerificationBadge role={provider.role} accountType={provider.account_type} isVerified={Boolean(provider.is_verified)} compact />
                 </View>
                 <Text style={styles.sellerSub}>
                   {provider.district ? `حي ${provider.district}` : 'مقدم الخدمة'}

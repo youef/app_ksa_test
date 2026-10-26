@@ -22,7 +22,7 @@ import {
 } from 'lucide-react-native';
 
 import { AppHeader } from '@/components/shared/AppHeader';
-import { AccountIdentityBadge, AccountVerificationBadge } from '@/components/profile/AccountIdentityBadge';
+import { AccountIdentityBadge } from '@/components/profile/AccountIdentityBadge';
 import { supabase } from '@/lib/supabase';
 import { useBottomNavInset } from '@/lib/bottomNav';
 import { useTheme } from '@/context/ThemeContext';
@@ -113,7 +113,6 @@ export default function More() {
                 {profile ? (
                   <View style={styles.badges}>
                     <AccountIdentityBadge role={profile.role} accountType={profile.account_type} isVerified={Boolean(profile.is_verified)} compact />
-                    <AccountVerificationBadge role={profile.role} accountType={profile.account_type} isVerified={Boolean(profile.is_verified)} compact />
                   </View>
                 ) : null}
               </>

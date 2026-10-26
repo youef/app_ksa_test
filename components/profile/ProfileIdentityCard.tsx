@@ -10,7 +10,6 @@ import {
 } from 'lucide-react-native';
 import {
   AccountIdentityBadge,
-  AccountVerificationBadge,
   getAccountIdentityMeta,
   type AccountKind,
 } from './AccountIdentityBadge';
@@ -52,9 +51,6 @@ export function ProfileIdentityCard({
   return (
     <OasisSurface oasisSurface="card" style={[styles.card, { borderColor: meta.color + '26' }]}>
       <View style={styles.header}>
-        <OasisSurface oasisSurface="icon" style={[styles.iconWrap, { backgroundColor: meta.softColor, borderColor: meta.color + '26' }]}>
-          <Icon size={26} color={meta.color} />
-        </OasisSurface>
 
         <View style={styles.headingText}>
           <Text style={styles.eyebrow}>هوية الحساب</Text>
@@ -67,11 +63,6 @@ export function ProfileIdentityCard({
 
       <View style={styles.badgesRow}>
         <AccountIdentityBadge
-          role={role}
-          accountType={accountType}
-          isVerified={isVerified}
-        />
-        <AccountVerificationBadge
           role={role}
           accountType={accountType}
           isVerified={isVerified}
@@ -99,14 +90,7 @@ export function ProfileIdentityCard({
           },
         ]}
       >
-        {pending ? (
-          <Clock3 size={15} color="#B45309" />
-        ) : (
-          <ShieldCheck
-            size={15}
-            color={isVerified || role === 'admin' ? meta.verificationColor : OASIS.colors.muted}
-          />
-        )}
+        {pending && <Clock3 size={15} color="#B45309" />}
         <Text
           style={[
             styles.statusText,

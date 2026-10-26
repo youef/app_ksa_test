@@ -1,11 +1,17 @@
+import { AppearanceSettings } from '@/components/account/AppearanceSettings';
+import { useTheme } from '@/context/ThemeContext';
+import { ProfileHeader } from '@/components/profile/ProfileHeader';
+import { ProfileEditor } from '@/components/profile/ProfileEditor';
+import { ProfileConnections } from '@/components/profile/ProfileConnections';
+import { validateProfileDraft } from '@/lib/profileEditor';
 import { OasisArtwork } from '@/components/oasis/OasisPrimitives';
 import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Image, ImageBackground, Platform, RefreshControl, ScrollView, Share, StyleSheet, Switch, Text, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Image, ImageBackground, Platform, RefreshControl, ScrollView, Share, StyleSheet, Switch, Text, View, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import {
   Bell,
   BellOff,
@@ -40,18 +46,14 @@ import {
   Wrench,
 } from 'lucide-react-native';
 
-import { ThemeToggle } from '@/components/shared/ThemeToggle';
 import { AppHeader } from '@/components/shared/AppHeader';
 import {
-  AccountIdentityBadge,
-  AccountIdentityIcon,
-  AccountVerificationBadge,
   getAccountIdentityMeta,
   type AccountKind,
 } from '@/components/profile/AccountIdentityBadge';
 import { supabase } from '@/lib/supabase';
 import { ProfileDesignStudio, type FeaturedType, type StudioItem, type FeaturedRow } from '@/components/profile/ProfileDesignStudio';
-import { bannerColors, DEFAULT_FEATURED_TITLE, DEFAULT_SECTION_VISIBILITY, DEFAULT_SECTION_ORDER, DEFAULT_PROFILE_TYPE, MAX_FEATURED } from '@/lib/profileTheme';
+import { bannerColors, DEFAULT_FEATURED_TITLE, DEFAULT_SECTION_VISIBILITY, DEFAULT_SECTION_ORDER, DEFAULT_PROFILE_TYPE, MAX_FEATURED, DEFAULT_PROFILE_CUSTOMIZATION } from '@/lib/profileTheme';
 import { profileCoverUrl, uploadProfileCover, removeProfileCover } from '@/lib/profileCover';
 import { useBottomNavInset } from '@/lib/bottomNav';
 import { registerPushToken, syncDndWithNotifications, unregisterPushToken } from '@/lib/notifications';
@@ -66,6 +68,18 @@ import {
   saveDnd,
   setBlock,
 } from '@/lib/chatControls';
+
+type SettingsSection = 'privacy' | 'notifications' | 'appearance' | 'design' | 'security' | 'blocked' | 'help' | 'account';
+const SETTINGS_SECTIONS: {id: SettingsSection; label: string; Icon: any; description: string}[] = [
+{id:'privacy',label:'الخصوصية والتواصل',Icon:Lock,description:'ظهور حسابك والرسائل والردود'},
+{id:'notifications',label:'الإشعارات',Icon:Bell,description:'تنبيهات الجهاز وعدم الإزعاج'},
+{id:'appearance',label:'مظهر التطبيق',Icon:Moon,description:'الوضع الفاتح والداكن'},
+{id:'design',label:'تخصيص البروفايل',Icon:Palette,description:'الغلاف والألوان والأعمال المثبتة'},
+{id:'security',label:'الحساب والأمان',Icon:ShieldCheck,description:'البريد الإلكتروني وكلمة المرور'},
+{id:'blocked',label:'الحسابات المحظورة',Icon:UserX,description:'إدارة قائمة الحظر'},
+{id:'help',label:'المساعدة والدعم',Icon:MessageCircle,description:'تواصل مع فريق حيّنا'},
+{id:'account',label:'إدارة الحساب',Icon:Settings,description:'تسجيل الخروج وحذف الحساب'}
+];
 
 type HubTab = 'profile' | 'content' | 'settings';
 type ContentFilter = 'all' | 'products' | 'services' | 'community';
@@ -116,6 +130,29 @@ function statusLabel(value?: string | null) {
 }
 
 export default function AccountCenter() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors),[colors]);
+  const [notice, setNotice] = useState<{title:string;message:string} | null>(null);
+  const [confirmation, setConfirmation] = useState<{title:string;message:string;buttons:NonNullable<Parameters<typeof Alert.alert>[2]>} | null>(null);
+  const notify = (title: string, message = '', buttons?: Parameters<typeof Alert.alert>[2]) => {
+    if (buttons?.length) setConfirmation({title,message,buttons});
+    else {setNotice({title,message});scrollRef.current?.scrollTo({y:0,animated:true});}
+  };
+  const [loadError, setLoadError] = useState('');
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const [connections, setConnections] = useState<'followers'|'following'|null>(null);
+  const [contentTotals,setContentTotals] = useState({products:0,services:0,questions:0,requests:0});
+  const [contentBusy,setContentBusy] = useState(false);
+  const contentInFlight=useRef(false);
+  const [contributions, setContributions] = useState(0);
+  const [designError, setDesignError] = useState('');
+  const [designStatus, setDesignStatus] = useState<'idle'|'saving'|'saved'|'error'>('idle');
+  const designQueue = useRef<Promise<void>>(Promise.resolve());
+  const designRevision = useRef(0);
+  const customizationSaved = useRef<any>(null);
+  const featuredInFlight = useRef(false);
+  const [featuredSaving,setFeaturedSaving] = useState(false);
+  const customizationLatest = useRef<any>(null);
   const params = useLocalSearchParams<{ tab?: string; section?: string }>();
   const bottomInset = useBottomNavInset();
   const { width } = useWindowDimensions();
@@ -123,8 +160,11 @@ export default function AccountCenter() {
   const scrollRef = useRef<ScrollView>(null);
   const designY = useRef(0);
   const designScrolled = useRef(false);
-  const requestedTab = normalizeTab(Array.isArray(params.tab) ? params.tab[0] : params.tab);
+  const routeSection = Array.isArray(params.section) ? params.section[0] : params.section;
+  const routeTab = Array.isArray(params.tab) ? params.tab[0] : params.tab;
+  const requestedTab: HubTab = SETTINGS_SECTIONS.some(item => item.id === routeSection) ? 'settings' : normalizeTab(routeTab);
   const [tab, setTab] = useState<HubTab>(requestedTab);
+  const [settingsSection, setSettingsSection] = useState<SettingsSection>('privacy');
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -150,6 +190,7 @@ export default function AccountCenter() {
   const [identitySaving, setIdentitySaving] = useState(false);
 
   const [editing, setEditing] = useState(false);
+  const editorScrolled = useRef(false);
   const [displayName, setDisplayName] = useState('');
   const [username, setUsername] = useState('');
   const [bio, setBio] = useState('');
@@ -183,13 +224,16 @@ export default function AccountCenter() {
 
   useEffect(() => {
     setTab(requestedTab);
-    const section = Array.isArray(params.section) ? params.section[0] : params.section;
+    const section = routeSection || routeTab;
     if (section === 'identity') setIdentityOpen(true);
-  }, [requestedTab, params.section]);
+    if (section === 'edit') setEditing(true);
+    if (SETTINGS_SECTIONS.some(item => item.id === section)) setSettingsSection(section as SettingsSection);
+  }, [requestedTab, routeSection, routeTab]);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     setCoverState('loading');
+    setLoadError('');
     try {
       const { data: auth, error: authError } = await supabase.auth.getUser();
       if (authError) throw authError;
@@ -218,13 +262,14 @@ export default function AccountCenter() {
         reputationRes,
         pushRes,
         featuredRes,
+        answerCount,
       ] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', uid).maybeSingle(),
         supabase.rpc('hayna_my_account_capabilities'),
-        supabase.from('marketplace_items').select('id,title,description,price,item_type,status,image_url,created_at,business_id').eq('seller_id', uid).order('created_at', { ascending: false }).limit(40),
-        supabase.from('services').select('id,name,description,price_from,price_to,price_type,cover_url,activity_status,moderation_status,created_at,business_id').eq('provider_id', uid).order('created_at', { ascending: false }).limit(40),
-        supabase.from('questions').select('id,title,body,created_at,status').eq('author_id', uid).order('created_at', { ascending: false }).limit(20),
-        supabase.from('requests').select('id,title,description,created_at,status').eq('requester_id', uid).order('created_at', { ascending: false }).limit(20),
+        supabase.from('marketplace_items').select('id,title,description,price,item_type,status,image_url,created_at,business_id', {count:'exact'}).eq('seller_id', uid).order('created_at', { ascending: false }).order('id',{ascending:false}).limit(40),
+        supabase.from('services').select('id,name,description,price_from,price_to,price_type,cover_url,activity_status,moderation_status,created_at,business_id', {count:'exact'}).eq('provider_id', uid).order('created_at', { ascending: false }).order('id',{ascending:false}).limit(40),
+        supabase.from('questions').select('id,title,body,created_at,status', {count:'exact'}).eq('author_id', uid).order('created_at', { ascending: false }).order('id',{ascending:false}).limit(20),
+        supabase.from('requests').select('id,title,description,created_at,status', {count:'exact'}).eq('requester_id', uid).order('created_at', { ascending: false }).order('id',{ascending:false}).limit(20),
         supabase.from('businesses').select('*').eq('owner_id', uid).maybeSingle(),
         supabase.from('verification_requests').select('id,status,subject,note,created_at,reviewed_at').eq('user_id', uid).order('created_at', { ascending: false }).limit(1).maybeSingle(),
         supabase.from('profile_customizations').select('*').eq('user_id', uid).maybeSingle(),
@@ -233,12 +278,15 @@ export default function AccountCenter() {
         supabase.from('reputation').select('points').eq('user_id', uid).maybeSingle(),
         supabase.from('push_tokens').select('id').eq('user_id', uid).eq('platform', Platform.OS).limit(1),
         supabase.from('profile_featured_items').select('item_type,item_id,position').eq('user_id', uid).order('position', { ascending: true }),
+        supabase.from('answers').select('id',{count:'exact',head:true}).eq('author_id',uid),
       ]);
 
       if (profileRes.error) throw profileRes.error;
       const p = profileRes.data;
       if (!p) throw new Error('تعذر العثور على ملف الحساب.');
 
+      setContentTotals({products:productRes.count || 0,services:serviceRes.count || 0,questions:questionRes.count || 0,requests:requestRes.count || 0});
+      setContributions((productRes.count || 0)+(serviceRes.count || 0)+(questionRes.count || 0)+(requestRes.count || 0)+(answerCount.count || 0));
       setProfile(p);
       setDisplayName(p.display_name || '');
       setUsername(p.username || '');
@@ -262,6 +310,8 @@ export default function AccountCenter() {
         section_order: DEFAULT_SECTION_ORDER,
         profile_type: DEFAULT_PROFILE_TYPE,
       });
+      customizationSaved.current = customizationRes.data || DEFAULT_PROFILE_CUSTOMIZATION;
+      if ([productRes,serviceRes,questionRes,requestRes,customizationRes,featuredRes].some(result => result.error)) setLoadError('تعذر تحميل بعض محتويات الحساب. اسحب للتحديث أو أعد المحاولة.');
       setFeatured((featuredRes.data || []) as FeaturedRow[]);
       setStats({
         followers: followersRes.count || 0,
@@ -283,16 +333,16 @@ export default function AccountCenter() {
         setBlockedUsers((blocked || []).filter(Boolean));
       } catch {}
     } catch (error: any) {
-      Alert.alert('تعذر تحميل الحساب', error?.message || 'حاول مرة أخرى.');
+      setLoadError(error?.message || 'تحقق من الاتصال ثم أعد المحاولة.');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, []);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useFocusEffect(useCallback(() => { void load(); }, [load]));
+
+  useEffect(() => { customizationLatest.current = customization; }, [customization]);
 
   const sectionParam = Array.isArray(params.section) ? params.section[0] : params.section;
   useEffect(() => {
@@ -320,44 +370,75 @@ export default function AccountCenter() {
   const totalOwned = products.length + services.length + questions.length + requests.length;
   const IdentityMetaIcon = identityMeta.Icon;
 
-  async function saveProfile() {
-    if (!userId || !displayName.trim()) return;
-    setSaving(true);
+  const draft = { displayName, username, bio };
+  const dirty = displayName.trim() !== (profile?.display_name || '') || username.trim().toLowerCase() !== (profile?.username || '').toLowerCase() || bio.trim() !== (profile?.bio || '');
+  function beginEditing() {
+    editorScrolled.current = false;
+    setDisplayName(profile?.display_name || ''); setUsername(profile?.username || ''); setBio(profile?.bio || '');
+    setEditing(true); setTab('profile'); router.setParams({tab:'profile',section:'edit'});
+  }
+  function closeEditor() {
+    if (saving) return;
+    const close = () => {setDisplayName(profile?.display_name || '');setUsername(profile?.username || '');setBio(profile?.bio || '');setEditing(false);router.setParams({section:undefined});};
+    if (dirty) notify('تجاهل التغييرات؟','لم تُحفظ تعديلات الاسم أو النبذة بعد.',[{text:'متابعة التعديل',style:'cancel'},{text:'تجاهل التغييرات',style:'destructive',onPress:close}]);
+    else close();
+  }
+  function navigateTab(next: HubTab, section?: SettingsSection) {
+    if (saving) return;
+    const go = () => {setEditing(false);setTab(next);if(section) setSettingsSection(section);router.setParams({tab:next,section});};
+    if (editing && dirty) notify('تغييرات غير محفوظة','احفظ التعديلات أو تجاهلها قبل الانتقال.',[{text:'متابعة التعديل',style:'cancel'},{text:'تجاهل وانتقال',style:'destructive',onPress:go}]);
+    else go();
+  }
+  function openPublicProfile() {
+    const go=() => router.push({pathname:'/user',params:{id:userId}});
+    if (editing && dirty) notify('تغييرات غير محفوظة','هل تريد تجاهل التعديلات وعرض ملفك العام؟',[{text:'متابعة التعديل',style:'cancel'},{text:'تجاهل وعرض الملف',style:'destructive',onPress:() => {setEditing(false);go();}}]);
+    else go();
+  }
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !editing || !dirty) return;
+    const handler=(event:BeforeUnloadEvent) => {event.preventDefault();event.returnValue='';};
+    window.addEventListener('beforeunload',handler);
+    return () => window.removeEventListener('beforeunload',handler);
+  },[editing,dirty]);
+  async function shareProfile() {
+    const path = '/user?username=' + encodeURIComponent(profile?.username || userId);
+    const url = Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.origin + path : 'https://appksatest.vercel.app' + path;
     try {
-      const { error } = await supabase.from('profiles').update({
-        display_name: displayName.trim(),
-        bio: bio.trim() || null,
-      }).eq('id', userId);
-      if (error) throw error;
-
+      if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {await navigator.clipboard.writeText(url);notify('تم نسخ الرابط','يمكنك الآن مشاركة ملفك الشخصي.');}
+      else await Share.share({message:url});
+    } catch {notify('تعذر مشاركة الرابط','حاول مرة أخرى.');}
+  }
+  async function saveProfile() {
+    if (!userId || saving || !dirty) return;
+    const errors = validateProfileDraft(draft);
+    if (Object.keys(errors).length) return notify('راجع بياناتك', Object.values(errors).join('\n'));
+    setSaving(true);
+    let usernameChanged = false;
+    try {
       const nextUsername = username.trim().toLowerCase();
-      if (nextUsername && nextUsername !== String(profile?.username || '').toLowerCase()) {
-        if (!/^[a-zA-Z0-9_]{3,30}$/.test(nextUsername)) {
-          throw new Error('اسم المستخدم يجب أن يكون 3-30 حرفًا إنجليزيًا أو رقمًا أو شرطة سفلية.');
-        }
-        const changed = await supabase.rpc('change_my_username', { p_username: nextUsername });
+      if (nextUsername !== String(profile?.username || '').toLowerCase()) {
+        const changed = await supabase.rpc('change_my_username', {p_username:nextUsername});
         if (changed.error) throw changed.error;
+        usernameChanged = true;
+        setProfile((previous:any) => ({...previous,username:nextUsername}));
       }
-
-      setEditing(false);
-      await load(true);
-    } catch (error: any) {
-      Alert.alert('تعذر حفظ الملف', error?.message || 'حاول مرة أخرى.');
-    } finally {
-      setSaving(false);
-    }
+      const patch = {display_name:displayName.trim(),bio:bio.trim() || null};
+      const result = await supabase.from('profiles').update(patch).eq('id',userId).select('id,display_name,bio').single();
+      if (result.error) throw result.error;
+      setProfile((previous:any) => ({...previous,...patch,username:nextUsername}));
+      setDisplayName(patch.display_name);setUsername(nextUsername);setBio(patch.bio || '');
+      setEditing(false);router.setParams({section:undefined});
+      notify('تم حفظ الملف','تم تحديث بياناتك وستظهر في ملفك العام.');
+    } catch (error:any) {notify('تعذر إكمال الحفظ',(usernameChanged ? 'تم تحديث اسم المستخدم. تعذر حفظ باقي البيانات: ' : '') + (error?.message || 'حاول مرة أخرى.'));}
+    finally {setSaving(false);}
   }
 
   async function pickAvatar() {
-    if (!userId) return;
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.78,
-    });
-    if (result.canceled || !result.assets?.[0]) return;
+    if (!userId || avatarBusy) return;
+    setAvatarBusy(true);
     try {
+      const result = await ImagePicker.launchImageLibraryAsync({mediaTypes:['images'],allowsEditing:true,aspect:[1,1],quality:0.78});
+      if (result.canceled || !result.assets?.[0]) return;
       const asset = result.assets[0];
       const body = await (await fetch(asset.uri)).arrayBuffer();
       const path = userId + '/avatar.jpg';
@@ -366,33 +447,28 @@ export default function AccountCenter() {
         upsert: true,
       });
       if (upload.error) throw upload.error;
-      const url = supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl;
+      const url = supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl + '?v=' + Date.now();
       const saved = await supabase.from('profiles').update({ avatar_url: url }).eq('id', userId);
       if (saved.error) throw saved.error;
       setProfile((current: any) => ({ ...(current || {}), avatar_url: url }));
     } catch (error: any) {
-      Alert.alert('تعذر تحديث الصورة', error?.message || 'حاول مرة أخرى.');
-    }
+      notify('تعذر تحديث الصورة', error?.message || 'حاول مرة أخرى.');
+    } finally {setAvatarBusy(false);}
   }
 
   async function pickCover() {
     if (!userId || coverBusy) return;
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [16, 9],
-      quality: 0.82,
-    });
-    if (result.canceled || !result.assets?.[0]) return;
     setCoverBusy(true);
     try {
+      const result = await ImagePicker.launchImageLibraryAsync({mediaTypes:['images'],allowsEditing:true,aspect:[3,1],quality:0.82});
+      if (result.canceled || !result.assets?.[0]) return;
       const asset = result.assets[0];
       await uploadProfileCover(userId, asset);
       setCoverVersion(Date.now());
       setCoverState('ready');
-      Alert.alert('تم حفظ الغلاف', 'ستظهر الصورة كخلفية لملفك العام.');
+      notify('تم حفظ الغلاف', 'ستظهر الصورة كخلفية لملفك العام.');
     } catch (error: any) {
-      Alert.alert('تعذر حفظ الغلاف', error?.message || 'حاول مرة أخرى.');
+      notify('تعذر حفظ الغلاف', error?.message || 'حاول مرة أخرى.');
     } finally {
       setCoverBusy(false);
     }
@@ -406,19 +482,20 @@ export default function AccountCenter() {
       setCoverVersion(null);
       setCoverState('missing');
     } catch (error: any) {
-      Alert.alert('تعذر إزالة الغلاف', error?.message || 'حاول مرة أخرى.');
+      notify('تعذر إزالة الغلاف', error?.message || 'حاول مرة أخرى.');
     } finally {
       setCoverBusy(false);
     }
   }
 
   async function toggleFeatured(type: FeaturedType, id: string) {
-    if (!userId) return;
+    if (!userId || featuredInFlight.current) return;
     const exists = featured.some((row) => row.item_type === type && row.item_id === id);
     if (!exists && featured.length >= MAX_FEATURED) {
-      Alert.alert('الحد الأقصى', `يمكن تثبيت حتى ${MAX_FEATURED} عناصر.`);
+      notify('الحد الأقصى', `يمكن تثبيت حتى ${MAX_FEATURED} عناصر.`);
       return;
     }
+    featuredInFlight.current=true;setFeaturedSaving(true);
     try {
       if (exists) {
         const { error } = await supabase.from('profile_featured_items').delete().match({ user_id: userId, item_type: type, item_id: id });
@@ -435,8 +512,8 @@ export default function AccountCenter() {
         setFeatured((current) => [...current, (data as FeaturedRow) || { item_type: type, item_id: id, position: current.length }]);
       }
     } catch (error: any) {
-      Alert.alert('تعذر تحديث الأعمال المميزة', error?.message || 'حاول مرة أخرى.');
-    }
+      notify('تعذر تحديث الأعمال المميزة', error?.message || 'حاول مرة أخرى.');
+    } finally {featuredInFlight.current=false;setFeaturedSaving(false);}
   }
 
   async function resetDesign() {
@@ -465,7 +542,7 @@ export default function AccountCenter() {
       await savePermanentMyLocation(next, true, { allowCityChange: true });
       setProfile((current: any) => ({ ...(current || {}), ...next }));
     } catch (error: any) {
-      Alert.alert('تعذر تحديث الموقع', error?.message || 'حاول مرة أخرى.');
+      notify('تعذر تحديث الموقع', error?.message || 'حاول مرة أخرى.');
     } finally {
       setLocationBusy(false);
     }
@@ -482,17 +559,17 @@ export default function AccountCenter() {
   async function submitIdentityRequest() {
     if (!userId || identitySaving) return;
     if (verificationPending) {
-      Alert.alert('طلب قيد المراجعة', 'لا يمكن إرسال طلب جديد قبل أن تراجع الإدارة الطلب الحالي.');
+      notify('طلب قيد المراجعة', 'لا يمكن إرسال طلب جديد قبل أن تراجع الإدارة الطلب الحالي.');
       return;
     }
     const isProfessional = identityType !== 'standard';
     const needsEvidence = isProfessional || !Boolean(profile?.is_verified);
     if (isProfessional && !professionalName.trim()) {
-      Alert.alert('بيانات ناقصة', identityType === 'merchant' ? 'اكتب اسم المنشأة أو النشاط التجاري.' : 'اكتب اسم المجال أو النشاط المهني.');
+      notify('بيانات ناقصة', identityType === 'merchant' ? 'اكتب اسم المنشأة أو النشاط التجاري.' : 'اكتب اسم المجال أو النشاط المهني.');
       return;
     }
     if (needsEvidence && !evidence) {
-      Alert.alert('الإثبات مطلوب', identityType === 'standard'
+      notify('الإثبات مطلوب', identityType === 'standard'
         ? 'أرفق إثبات هوية حتى تتمكن الإدارة من توثيق الحساب الفردي.'
         : 'أرفق مستندًا مناسبًا حتى تتمكن الإدارة من التحقق من الصفة.');
       return;
@@ -531,24 +608,24 @@ export default function AccountCenter() {
       setEvidence(null);
       setIdentityOpen(false);
       await load(true);
-      Alert.alert('تم إرسال الطلب', 'ستبقى الصفة الحالية كما هي حتى تراجع الإدارة الطلب وتوافق عليه.');
+      notify('تم إرسال الطلب', 'ستبقى الصفة الحالية كما هي حتى تراجع الإدارة الطلب وتوافق عليه.');
     } catch (error: any) {
       if (uploadedPath) await supabase.storage.from('verification-documents').remove([uploadedPath]);
-      Alert.alert('تعذر إرسال الطلب', error?.message || 'حاول مرة أخرى.');
+      notify('تعذر إرسال الطلب', error?.message || 'حاول مرة أخرى.');
     } finally {
       setIdentitySaving(false);
     }
   }
 
   async function savePrivacy(patch: Record<string, any>) {
-    if (!userId) return;
+    if (!userId || settingsSaving) return;
     setSettingsSaving(true);
     try {
       const updated = await supabase.from('profiles').update(patch).eq('id', userId);
       if (updated.error) throw updated.error;
       setProfile((current: any) => ({ ...(current || {}), ...patch }));
     } catch (error: any) {
-      Alert.alert('تعذر حفظ الإعداد', error?.message || 'حاول مرة أخرى.');
+      notify('تعذر حفظ الإعداد', error?.message || 'حاول مرة أخرى.');
     } finally {
       setSettingsSaving(false);
     }
@@ -567,40 +644,51 @@ export default function AccountCenter() {
         setPushEnabled(true);
       }
     } catch (error: any) {
-      Alert.alert('الإشعارات', error?.message || 'تعذر تحديث الإشعارات.');
+      notify('الإشعارات', error?.message || 'تعذر تحديث الإشعارات.');
     } finally {
       setPushBusy(false);
     }
   }
 
   async function saveDndSettings(enabled: boolean, start = dndStart, end = dndEnd) {
-    if (!userId) return;
-    const next: DndSettings = { ...dnd, enabled, schedule: enabled ? 'custom' : 'off', start, end };
-    const result = await saveDnd(userId, next);
-    if (!result.ok) {
-      Alert.alert('تعذر الحفظ', result.error);
-      return;
-    }
-    setDnd(next);
-    await syncDndWithNotifications(userId);
+    if (!userId || settingsSaving) return;
+    if (enabled && (!/^([01]\d|2[0-3]):[0-5]\d$/.test(start) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(end) || start === end)) return notify('راجع فترة الهدوء','أدخل وقتين صالحين ومختلفين بصيغة HH:MM.');
+    setSettingsSaving(true);
+    try {
+      const next: DndSettings = {...dnd,enabled,schedule:enabled ? 'custom':'off',start:enabled ? start : dnd.start,end:enabled ? end : dnd.end};
+      const result=await saveDnd(userId,next);
+      if (!result.ok) throw new Error(result.error);
+      setDnd(next);
+      await syncDndWithNotifications(userId);
+      notify('تم حفظ الإعدادات',enabled ? 'تم تفعيل فترة الهدوء المحددة.' : 'تم إيقاف عدم الإزعاج.');
+    } catch(error:any) {notify('تعذر إكمال الإعداد',error?.message || 'حاول مرة أخرى.');}
+    finally {setSettingsSaving(false);}
   }
 
   async function saveCustomization(patch: Record<string, any>) {
     if (!userId) return;
-    const next = { ...customization, ...patch };
+    const previous = customizationLatest.current || customization;
+    const next = {...previous,...patch};
+    customizationLatest.current = next;
     setCustomization(next);
-    const saved = await supabase.from('profile_customizations').upsert({
-      user_id: userId,
-      accent_color: next.accent_color || OASIS.colors.primary,
-      banner_style: next.banner_style || 'emerald',
-      show_stats: next.show_stats !== false,
-      show_badges: next.show_badges !== false,
-      featured_title: next.featured_title || DEFAULT_FEATURED_TITLE,
-      section_visibility: next.section_visibility || DEFAULT_SECTION_VISIBILITY,
-      section_order: next.section_order || DEFAULT_SECTION_ORDER,
-      profile_type: next.profile_type || DEFAULT_PROFILE_TYPE,
-    }, { onConflict: 'user_id' });
-    if (saved.error) Alert.alert('تعذر حفظ المظهر', saved.error.message);
+    const revision = ++designRevision.current;
+    setDesignStatus('saving');setDesignError('');
+    const operation = designQueue.current.then(async () => {
+      const result = await supabase.from('profile_customizations').upsert({
+        user_id:userId,accent_color:next.accent_color || OASIS.colors.primary,
+        banner_style:next.banner_style || 'emerald',show_stats:next.show_stats !== false,
+        show_badges:next.show_badges !== false,featured_title:next.featured_title || DEFAULT_FEATURED_TITLE,
+        section_visibility:next.section_visibility || DEFAULT_SECTION_VISIBILITY,
+        section_order:next.section_order || DEFAULT_SECTION_ORDER,profile_type:next.profile_type || DEFAULT_PROFILE_TYPE,
+      },{onConflict:'user_id'});
+      if (result.error) throw result.error;
+      customizationSaved.current=next;
+    });
+    designQueue.current = operation.catch(() => {});
+    try {await operation;if (revision === designRevision.current) setDesignStatus('saved');}
+    catch (error:any) {
+      if (revision === designRevision.current) {customizationLatest.current=customizationSaved.current || previous;setCustomization(customizationSaved.current || previous);setDesignStatus('error');setDesignError(error?.message || 'تعذر حفظ التخصيص. أعد المحاولة.');}
+    }
   }
 
   async function saveBusiness() {
@@ -614,9 +702,9 @@ export default function AccountCenter() {
         whatsapp: business.whatsapp?.trim() || null,
       }).eq('id', business.id);
       if (result.error) throw result.error;
-      Alert.alert('تم الحفظ', 'تم تحديث بيانات المنشأة.');
+      notify('تم الحفظ', 'تم تحديث بيانات المنشأة.');
     } catch (error: any) {
-      Alert.alert('تعذر تحديث المنشأة', error?.message || 'حاول مرة أخرى.');
+      notify('تعذر تحديث المنشأة', error?.message || 'حاول مرة أخرى.');
     } finally {
       setSaving(false);
     }
@@ -624,31 +712,31 @@ export default function AccountCenter() {
 
   async function changeEmail() {
     const next = emailDraft.trim().toLowerCase();
-    if (!/^\S+@\S+\.\S+$/.test(next)) return Alert.alert('البريد غير صالح', 'أدخل بريدًا إلكترونيًا صحيحًا.');
+    if (!/^\S+@\S+\.\S+$/.test(next)) return notify('البريد غير صالح', 'أدخل بريدًا إلكترونيًا صحيحًا.');
     setSettingsSaving(true);
     try {
       const result = await supabase.auth.updateUser({ email: next });
       if (result.error) throw result.error;
-      Alert.alert('تحقق من بريدك', 'تم إرسال رسالة تأكيد إلى البريد الجديد.');
+      notify('تحقق من بريدك', 'تم إرسال رسالة تأكيد إلى البريد الجديد.');
     } catch (error: any) {
-      Alert.alert('تعذر تغيير البريد', error?.message || 'حاول مرة أخرى.');
+      notify('تعذر تغيير البريد', error?.message || 'حاول مرة أخرى.');
     } finally {
       setSettingsSaving(false);
     }
   }
 
   async function changePassword() {
-    if (passwordDraft.length < 8) return Alert.alert('كلمة المرور قصيرة', 'استخدم 8 أحرف على الأقل.');
-    if (passwordDraft !== passwordConfirm) return Alert.alert('عدم تطابق', 'تأكيد كلمة المرور غير مطابق.');
+    if (passwordDraft.length < 8) return notify('كلمة المرور قصيرة', 'استخدم 8 أحرف على الأقل.');
+    if (passwordDraft !== passwordConfirm) return notify('عدم تطابق', 'تأكيد كلمة المرور غير مطابق.');
     setSettingsSaving(true);
     try {
       const result = await supabase.auth.updateUser({ password: passwordDraft });
       if (result.error) throw result.error;
       setPasswordDraft('');
       setPasswordConfirm('');
-      Alert.alert('تم التحديث', 'تم تغيير كلمة المرور.');
+      notify('تم التحديث', 'تم تغيير كلمة المرور.');
     } catch (error: any) {
-      Alert.alert('تعذر تغيير كلمة المرور', error?.message || 'حاول مرة أخرى.');
+      notify('تعذر تغيير كلمة المرور', error?.message || 'حاول مرة أخرى.');
     } finally {
       setSettingsSaving(false);
     }
@@ -657,12 +745,12 @@ export default function AccountCenter() {
   async function unblockUser(targetId: string) {
     if (!userId) return;
     const result = await setBlock(userId, targetId, false);
-    if (!result.ok) return Alert.alert('تعذر إلغاء الحظر', result.error);
+    if (!result.ok) return notify('تعذر إلغاء الحظر', result.error);
     setBlockedUsers((current) => current.filter((item) => item.id !== targetId));
   }
 
   function confirmDeleteAccount() {
-    Alert.alert(
+    notify(
       'حذف الحساب نهائيًا',
       'سيتم حذف بيانات الحساب ولا يمكن التراجع عن هذه العملية.',
       [
@@ -672,7 +760,7 @@ export default function AccountCenter() {
           style: 'destructive',
           onPress: () => void (async () => {
             const result = await supabase.functions.invoke('delete-account');
-            if (result.error) return Alert.alert('تعذر الحذف', result.error.message);
+            if (result.error) return notify('تعذر الحذف', result.error.message);
             await supabase.auth.signOut({ scope: 'local' });
             router.replace('/auth');
           })(),
@@ -686,7 +774,7 @@ export default function AccountCenter() {
       setTab('profile');
       setIdentityType(profile?.account_type === 'standard' ? 'provider' : (profile?.account_type || 'provider'));
       setIdentityOpen(true);
-      Alert.alert('يتطلب حسابًا مهنيًا', 'فعّل صفة عمل حر أو مقدم خدمة أو تجاري أولًا، ثم انتظر اعتماد الإدارة.');
+      notify('يتطلب حسابًا مهنيًا', 'فعّل صفة عمل حر أو مقدم خدمة أو تجاري أولًا، ثم انتظر اعتماد الإدارة.');
       return;
     }
     router.push({ pathname: '/new-listing', params: { kind } });
@@ -699,6 +787,24 @@ export default function AccountCenter() {
     else router.push({ pathname: '/request', params: { id: item.id } });
   }
 
+  const contentRemaining = Math.max(0,contentTotals.products-products.length)+Math.max(0,contentTotals.services-services.length)+Math.max(0,contentTotals.questions-questions.length)+Math.max(0,contentTotals.requests-requests.length);
+  async function loadMoreContent(filter: ContentFilter = contentFilter) {
+    if (!userId || contentInFlight.current) return;
+    contentInFlight.current=true;setContentBusy(true);
+    const sources=[
+      {table:'marketplace_items',owner:'seller_id',rows:products,total:contentTotals.products,set:setProducts,include:filter==='all'||filter==='products'},
+      {table:'services',owner:'provider_id',rows:services,total:contentTotals.services,set:setServices,include:filter==='all'||filter==='services'},
+      {table:'questions',owner:'author_id',rows:questions,total:contentTotals.questions,set:setQuestions,include:filter==='all'||filter==='community'},
+      {table:'requests',owner:'requester_id',rows:requests,total:contentTotals.requests,set:setRequests,include:filter==='all'||filter==='community'},
+    ].filter(source => source.include && source.rows.length<source.total);
+    try {
+      const results=await Promise.all(sources.map(source => supabase.from(source.table).select('*').eq(source.owner,userId).order('created_at',{ascending:false}).order('id',{ascending:false}).range(source.rows.length,source.rows.length+29)));
+      for(const result of results) if (result.error) throw result.error;
+      results.forEach((result,index) => sources[index].set(previous => [...previous,...(result.data || []).filter(row => !previous.some(item => item.id===row.id))]));
+    } catch(error:any) {notify('تعذر تحميل المزيد',error?.message || 'تحقق من الاتصال ثم أعد المحاولة.');}
+    finally {contentInFlight.current=false;setContentBusy(false);}
+  }
+
   const filteredContent = useMemo(() => {
     const all = [
       ...products.map((item) => ({ kind: 'product', item })),
@@ -706,13 +812,14 @@ export default function AccountCenter() {
       ...questions.map((item) => ({ kind: 'question', item })),
       ...requests.map((item) => ({ kind: 'request', item })),
     ];
+    all.sort((a,b) => new Date(b.item.created_at || 0).getTime() - new Date(a.item.created_at || 0).getTime());
     if (contentFilter === 'products') return all.filter((row) => row.kind === 'product');
     if (contentFilter === 'services') return all.filter((row) => row.kind === 'service');
     if (contentFilter === 'community') return all.filter((row) => row.kind === 'question' || row.kind === 'request');
     return all.sort((a, b) => new Date(b.item.created_at || 0).getTime() - new Date(a.item.created_at || 0).getTime());
   }, [products, services, questions, requests, contentFilter]);
 
-  if (loading || !profile) {
+  if (loading) {
     return (
       <View style={styles.loadingScreen}>
         <ActivityIndicator size="large" color={OASIS.colors.primary} />
@@ -721,131 +828,65 @@ export default function AccountCenter() {
     );
   }
 
+  if (!profile) return <View style={[styles.loadingScreen,{backgroundColor:colors.background}]}><UserX size={42} color={colors.muted}/><Text style={{color:colors.ink,fontSize:20,fontWeight:'700'}}>تعذر تحميل حسابك</Text><Text style={{color:colors.muted,textAlign:'center',padding:20}}>{loadError || 'سجل الدخول لعرض بياناتك.'}</Text><Pressable oasisKind="action" oasisVariant="primary" onPress={() => void load()}><Text>إعادة المحاولة</Text></Pressable><Pressable onPress={() => router.replace('/auth')}><Text style={{color:colors.primary}}>تسجيل الدخول</Text></Pressable></View>;
+
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen,{backgroundColor:colors.background}]}>
+      <ProfileConnections userId={userId} kind={connections} onClose={() => setConnections(null)} />
+      <Modal visible={!!confirmation} transparent animationType="fade" onRequestClose={() => setConfirmation(null)}><View style={accountStyles.overlay}><View style={[accountStyles.dialog,{backgroundColor:colors.surface}]} accessibilityViewIsModal><Text style={{color:colors.ink,fontSize:21,fontWeight:'800',textAlign:'right'}}>{confirmation?.title}</Text><Text style={{color:colors.muted,lineHeight:25,textAlign:'right'}}>{confirmation?.message}</Text>{confirmation?.buttons.map((item,index) => <Pressable key={index} oasisKind="action" oasisVariant={item.style === 'destructive' ? 'danger' : 'secondary'} onPress={() => {setConfirmation(null);item.onPress?.();}}><Text>{item.text}</Text></Pressable>)}</View></View></Modal>
       <AppHeader
         variant="tab"
-        title="حسابي"
-        subtitle="ملفك، أعمالك وإعداداتك في مكان واحد"
-        rightAction={
+        title={tab === 'settings' ? 'الإعدادات' : editing ? 'تعديل الملف' : 'حسابي'}
+        subtitle={tab === 'settings' ? SETTINGS_SECTIONS.find(item => item.id === settingsSection)?.label : 'ملفك وأعمالك في حيّنا'}
+        rightAction={tab === 'settings' ? undefined : (
           <Pressable
             style={styles.headerAction}
-            onPress={() => router.push({ pathname: '/user', params: { id: userId } })}
+            onPress={openPublicProfile}
             accessibilityRole="button"
             accessibilityLabel="عرض الملف العام"
           >
             <Eye size={18} color="#0F766E" />
           </Pressable>
-        }
+        )}
       />
 
       <ScrollView
         ref={scrollRef}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load(true); }} tintColor={OASIS.colors.primary} />}
-        contentContainerStyle={[styles.content, { paddingBottom: bottomInset + 28, maxWidth: wide ? 1120 : 920 }]}
+        contentContainerStyle={[styles.content, { paddingBottom: bottomInset + 28, maxWidth: 820 }]}
       >
-        <View style={[styles.profileHero, wide && styles.profileHeroWide]}>
-          <LinearGradient colors={bannerColors(customization?.banner_style)} style={StyleSheet.absoluteFillObject} />
-          {profileCoverUrl(userId, coverVersion) && coverState !== 'missing' ? (
-            <Image source={{ uri: profileCoverUrl(userId, coverVersion) }} style={StyleSheet.absoluteFillObject} resizeMode="cover" onLoad={() => setCoverState('ready')} onError={() => setCoverState('missing')} />
-          ) : null}
-          <LinearGradient colors={['rgba(4,10,8,0.12)', 'rgba(4,10,8,0.62)']} style={StyleSheet.absoluteFillObject} />
-          <Pressable oasisKind="plain" onPress={pickAvatar} style={styles.avatarWrap}>
-            {profile.avatar_url ? (
-              <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
-            ) : (
-              <View style={styles.avatarFallback}>
-                <Text style={styles.avatarLetter}>{publicName.slice(0, 1).toUpperCase()}</Text>
-              </View>
-            )}
-            <View style={styles.cameraBadge}><Camera size={13} color={OASIS.colors.surface} /></View>
-            <AccountIdentityIcon role={profile.role} accountType={profile.account_type} isVerified={Boolean(profile.is_verified)} size={30} style={styles.identityIcon} />
-          </Pressable>
-
-          <View style={styles.heroCopy}>
-            <Text style={styles.publicName} numberOfLines={1}>{publicName}</Text>
-            <Text style={styles.handle}>@{profile.username}</Text>
-            <View style={styles.badgeRow}>
-              <AccountIdentityBadge role={profile.role} accountType={profile.account_type} isVerified={Boolean(profile.is_verified)} compact />
-              <AccountVerificationBadge role={profile.role} accountType={profile.account_type} isVerified={Boolean(profile.is_verified)} compact />
-            </View>
-            {(profile.city || profile.district) ? (
-              <View style={styles.locationLine}>
-                <MapPin size={13} color="rgba(255,255,255,0.82)" />
-                <Text style={styles.locationText}>{[profile.district && 'حي ' + profile.district, profile.city].filter(Boolean).join(' · ')}</Text>
-              </View>
-            ) : null}
-          </View>
-
-          <Pressable style={styles.heroCoverButton} onPress={() => void pickCover()} disabled={coverBusy}>
-            {coverBusy ? <ActivityIndicator size="small" color={OASIS.colors.surface} /> : <Camera size={14} color={OASIS.colors.surface} />}
-            <Text style={styles.heroCoverButtonText}>{coverState === 'ready' ? 'تغيير الغلاف' : 'غلاف'}</Text>
-          </Pressable>
-        </View>
-
-        <View style={styles.statsBar}>
-          <Stat value={stats.followers} label="متابع" />
-          <Stat value={stats.following} label="يتابع" />
-          <Stat value={totalOwned} label="محتوى" />
-          <Stat value={stats.reputation} label="سمعة" />
-        </View>
-
+        {!!notice && <View accessibilityRole="alert" style={[accountStyles.notice,{backgroundColor:colors.soft,borderColor:colors.line}]}><View style={{flex:1,alignItems:'flex-end',gap:4}}><Text style={{color:colors.ink,fontWeight:'800'}}>{notice.title}</Text><Text style={{color:colors.muted,fontSize:12,lineHeight:20,textAlign:'right'}}>{notice.message}</Text></View><Pressable accessibilityLabel="إغلاق الرسالة" onPress={() => setNotice(null)}><Text style={{color:colors.primary,padding:8}}>إغلاق</Text></Pressable></View>}
+        {!!loadError && <Text accessibilityRole="alert" style={{color:colors.danger,textAlign:'right'}}>{loadError}</Text>}
+        {tab === 'profile' ? (<ProfileHeader profile={editing ? {...profile,display_name:displayName,username,bio} : profile} customization={customization} displayName={editing ? displayName || 'اسمك الظاهر' : publicName} coverUri={coverState === 'missing' ? '' : profileCoverUrl(userId,coverVersion)} stats={{...stats,contributions}} own editableAvatar avatarBusy={avatarBusy} coverBusy={coverBusy} onAvatarPress={() => void pickAvatar()} onCoverPress={() => void pickCover()} onEdit={() => {if (!editing) beginEditing();}} onDesign={() => {navigateTab('settings','design');}} onSettings={() => navigateTab('settings')} onFollowers={() => setConnections('followers')} onFollowing={() => setConnections('following')} />) : <View style={[accountStyles.accountContext,{backgroundColor:colors.surface,borderColor:colors.line}]}>
+          {profile.avatar_url ? <Image source={{uri:profile.avatar_url}} style={{width:42,height:42,borderRadius:21}}/> : <View style={{width:42,height:42,borderRadius:21,backgroundColor:colors.soft,alignItems:'center',justifyContent:'center'}}><Text style={{color:colors.primary,fontWeight:'800'}}>{publicName[0]}</Text></View>}
+          <View style={{flex:1,alignItems:'flex-end',gap:4}}><Text style={{color:colors.ink,fontWeight:'700',fontSize:14}}>{publicName}</Text><Text style={{color:colors.muted,fontSize:12,writingDirection:'ltr'}}>@{profile.username}</Text></View>
+          <Pressable accessibilityLabel="عرض الملف العام" oasisKind="plain" onPress={openPublicProfile} style={{padding:10}}><Eye size={19} color={colors.primary}/></Pressable>
+        </View>}
         <View style={styles.tabs}>
-          <HubTabButton active={tab === 'profile'} label="الملف" Icon={CircleUserRound} onPress={() => setTab('profile')} />
-          <HubTabButton active={tab === 'content'} label="إدارتي" Icon={LayoutGrid} onPress={() => setTab('content')} />
-          <HubTabButton active={tab === 'settings'} label="الإعدادات" Icon={Settings} onPress={() => setTab('settings')} />
+          <HubTabButton active={tab === 'profile'} label="الملف" Icon={CircleUserRound} onPress={() => navigateTab('profile')} />
+          <HubTabButton active={tab === 'content'} label="إدارتي" Icon={LayoutGrid} onPress={() => navigateTab('content')} />
+          <HubTabButton active={tab === 'settings'} label="الإعدادات" Icon={Settings} onPress={() => navigateTab('settings')} />
         </View>
 
         {tab === 'profile' ? (
-          <View style={styles.stack}>
-            <SectionCard>
-              <View style={styles.sectionHeader}>
-                <View style={styles.sectionHeaderCopy}>
-                  <Text style={styles.sectionTitle}>ملفي العام</Text>
-                  <Text style={styles.sectionSub}>نفس المعلومات التي يراها الآخرون في حيّنا</Text>
-                </View>
-                <Pressable oasisKind="action" style={styles.ghostButton} onPress={() => setEditing((value) => !value)}>
-                  <Text style={styles.ghostButtonText}>{editing ? 'إغلاق' : 'تعديل'}</Text>
-                </Pressable>
-              </View>
-
-              {editing ? (
-                <View style={styles.formStack}>
-                  <Field label="الاسم الظاهر" value={displayName} onChangeText={setDisplayName} placeholder="اسمك أو اسمك الشخصي" />
-                  <Field label="اسم المستخدم" value={username} onChangeText={setUsername} placeholder="username" autoCapitalize="none" />
-                  <Field label="النبذة" value={bio} onChangeText={setBio} placeholder="عرّف بنفسك باختصار" multiline />
-                  <Pressable oasisVariant="primary" oasisKind="action" style={styles.primaryButton} onPress={() => void saveProfile()} disabled={saving}>
-
-                    {saving ? <ActivityIndicator size="small" color={OASIS.colors.surface} /> : <Save size={16} color={OASIS.colors.surface} />}
-                    <Text style={styles.primaryButtonText}>حفظ الملف</Text>
-                  </Pressable>
-                </View>
-              ) : (
-                <>
-                  <Text style={styles.bio}>{profile.bio || 'أضف نبذة قصيرة حتى يعرفك أهل الحي بشكل أفضل.'}</Text>
-                  <View style={styles.rowActions}>
-                    <Pressable oasisKind="action" style={styles.outlineButton} onPress={() => router.push({ pathname: '/user', params: { id: userId } })}>
-                      <Eye size={15} color="#0F766E" />
-                      <Text style={styles.outlineButtonText}>عرض الملف العام</Text>
-                    </Pressable>
-                    <Pressable oasisKind="action" style={styles.outlineButton} onPress={() => void Share.share({ message: 'https://appksatest.vercel.app/user?id=' + userId })}>
-                      <Users size={15} color="#0F766E" />
-                      <Text style={styles.outlineButtonText}>مشاركة</Text>
-                    </Pressable>
-                  </View>
-                </>
-              )}
-            </SectionCard>
+          <View style={styles.stack} onLayout={event => {
+            if (editing && !editorScrolled.current) {
+              editorScrolled.current = true;
+              scrollRef.current?.scrollTo({ y: Math.max(0, event.nativeEvent.layout.y - 12), animated: true });
+            }
+            if (!editing) editorScrolled.current = false;
+          }}>
+            {editing ? <ProfileEditor draft={draft} dirty={dirty} saving={saving} avatarBusy={avatarBusy} coverBusy={coverBusy} onChange={patch => {if (patch.displayName !== undefined) setDisplayName(patch.displayName);if (patch.username !== undefined) setUsername(patch.username);if (patch.bio !== undefined) setBio(patch.bio);}} onSave={() => void saveProfile()} onCancel={closeEditor} onAvatar={() => void pickAvatar()} onCover={() => void pickCover()} /> : <SectionCard>
+              <View style={styles.sectionHeader}><View style={styles.sectionHeaderCopy}><Text style={styles.sectionTitle}>ملفك، بطريقتك</Text><Text style={styles.sectionSub}>كل تغييراتك هنا مرتبطة مباشرة بملفك العام</Text></View><Sparkles size={22} color={colors.primary}/></View>
+              <View style={styles.actionGrid}><QuickAction label="تعديل الملف" sub="الاسم والنبذة والصور" Icon={UserRound} onPress={beginEditing}/><QuickAction label="تخصيص المظهر" sub="الألوان والغلاف والأقسام" Icon={Palette} onPress={() => {navigateTab('settings');setSettingsSection('design');}}/><QuickAction label="عرض ملفي" sub="شاهد الملف العام" Icon={Eye} onPress={() => router.push({pathname:'/user',params:{id:userId}})}/><QuickAction label="مشاركة الملف" sub="انسخ رابط حسابك" Icon={Users} onPress={() => void shareProfile()}/></View>
+            </SectionCard>}
 
             <SectionCard>
               <View style={styles.sectionHeader}>
                 <View style={styles.sectionHeaderCopy}>
                   <Text style={styles.sectionTitle}>هوية الحساب والتوثيق</Text>
                   <Text style={styles.sectionSub}>نوع الحساب والتوثيق منفصلان، ولا تتغير الصفة العامة حتى تعتمدها الإدارة</Text>
-                </View>
-                <View style={[styles.identitySquare, { backgroundColor: identityMeta.softColor }]}>
-                  <IdentityMetaIcon size={23} color={identityMeta.color} />
                 </View>
               </View>
 
@@ -855,7 +896,7 @@ export default function AccountCenter() {
                   <Text style={styles.identityDescription}>{profile.freelance_trade || identityMeta.description}</Text>
                 </View>
                 <View style={[styles.statusChip, { backgroundColor: verificationPending ? OASIS.colors.warningSoft : profile.is_verified ? identityMeta.softColor : OASIS.colors.background }]}>
-                  {verificationPending ? <RefreshCw size={13} color="#B45309" /> : <ShieldCheck size={13} color={profile.is_verified ? identityMeta.color : OASIS.colors.muted} />}
+
                   <Text style={[styles.statusChipText, { color: verificationPending ? '#B45309' : profile.is_verified ? identityMeta.color : OASIS.colors.muted }]}>
                     {verificationPending ? 'طلب قيد المراجعة' : profile.is_verified ? 'موثّق' : 'غير موثّق'}
                   </Text>
@@ -995,12 +1036,12 @@ export default function AccountCenter() {
               <View style={styles.sectionHeader}>
                 <View style={styles.sectionHeaderCopy}>
                   <Text style={styles.sectionTitle}>محتواي</Text>
-                  <Text style={styles.sectionSub}>{totalOwned} عنصر مرتبط بالحساب</Text>
+                  <Text style={styles.sectionSub}>{totalOwned} عنصر محمّل من {contentTotals.products+contentTotals.services+contentTotals.questions+contentTotals.requests} عنصر</Text>
                 </View>
                 <Package size={20} color={OASIS.colors.muted} />
               </View>
 
-              <ScrollView style={{ direction: 'rtl' }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.filterRow, { direction: 'ltr' }]}>
+              <ScrollView  horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
                 <FilterChip active={contentFilter === 'all'} label="الكل" onPress={() => setContentFilter('all')} />
                 <FilterChip active={contentFilter === 'products'} label={'المنتجات ' + products.length} onPress={() => setContentFilter('products')} />
                 <FilterChip active={contentFilter === 'services'} label={'الخدمات ' + services.length} onPress={() => setContentFilter('services')} />
@@ -1020,6 +1061,7 @@ export default function AccountCenter() {
                   <Text style={styles.emptySub}>استخدم أزرار الإضافة بالأعلى، وسيظهر كل شيء هنا تلقائيًا.</Text>
                 </View>
               )}
+              {contentRemaining > 0 && <Pressable oasisKind="action" disabled={contentBusy} onPress={() => void loadMoreContent('all')} style={styles.outlineButtonWide}>{contentBusy ? <ActivityIndicator color={colors.primary}/> : <RefreshCw size={16} color={colors.primary}/>}<Text style={{color:colors.primary}}>{contentBusy ? 'جارٍ التحميل…' : 'تحميل المزيد من محتواي'}</Text></Pressable>}
             </SectionCard>
 
             {(capabilities.can_promote || profile.role === 'admin') ? (
@@ -1039,7 +1081,16 @@ export default function AccountCenter() {
 
         {tab === 'settings' ? (
           <View style={styles.stack}>
-            <SectionCard>
+            <View style={settingsStyles.intro}><Text style={[settingsStyles.heading, {color:OASIS.colors.ink}]}>إعدادات الحساب</Text><Text style={styles.sectionSub}>تحكم بتجربتك من مكان واحد.</Text></View>
+            <View style={[settingsStyles.layout, wide && {flexDirection:'row-reverse',alignItems:'flex-start'}]}>
+              <ScrollView horizontal={!wide} showsHorizontalScrollIndicator={false} scrollEnabled={!wide} style={[settingsStyles.navigation,{flexGrow:0,backgroundColor:colors.surface,borderColor:colors.line},wide && {width:240}]} contentContainerStyle={wide ? {gap:5} : {flexDirection:'row-reverse',gap:5}} >
+                {SETTINGS_SECTIONS.map(({id,label,Icon,description}) => <Pressable key={id} oasisKind="plain" accessibilityRole="tab" accessibilityState={{selected:settingsSection===id}} style={[settingsStyles.navigationItem,settingsSection===id && {backgroundColor:OASIS.colors.soft,borderColor:OASIS.colors.primary}]} onPress={() => {setSettingsSection(id);designScrolled.current=true;router.setParams({tab:'settings',section:id});}}>
+                  <Icon size={19} color={settingsSection===id ? OASIS.colors.primary : OASIS.colors.muted} /><View style={{flex:1,alignItems:'flex-end',gap:3}}><Text style={{color:settingsSection===id ? OASIS.colors.primary : OASIS.colors.ink,fontWeight:'700',fontSize:13}}>{label}</Text>{wide && <Text style={styles.sectionSub}>{description}</Text>}</View>
+                </Pressable>)}
+              </ScrollView>
+              <View style={{flex:1,minWidth:0,gap:14}}>
+            {settingsSection === 'privacy' && <>
+<SectionCard>
               <View style={styles.sectionHeader}>
                 <View style={styles.sectionHeaderCopy}>
                   <Text style={styles.sectionTitle}>الخصوصية والتواصل</Text>
@@ -1048,24 +1099,27 @@ export default function AccountCenter() {
                 <Lock size={20} color="#0F766E" />
               </View>
 
-              <ToggleRow title="حساب خاص" sub="لا يظهر نشاطك لغير المتابعين" value={profile.profile_privacy === 'private'} onValueChange={(value: boolean) => void savePrivacy({ profile_privacy: value ? 'private' : 'public' })} />
-              <ToggleRow title="إخفاء الاسم" sub="يظهر الحساب كجار مجهول في السياقات العامة" value={Boolean(profile.hide_name)} onValueChange={(value: boolean) => void savePrivacy({ hide_name: value })} />
+              <ToggleRow title="حساب خاص" sub="لا يظهر نشاطك لغير المتابعين" disabled={settingsSaving} value={profile.profile_privacy === 'private'} onValueChange={(value: boolean) => void savePrivacy({ profile_privacy: value ? 'private' : 'public' })} />
+              <ToggleRow title="إخفاء الاسم" sub="يظهر الحساب كجار مجهول في السياقات العامة" disabled={settingsSaving} value={Boolean(profile.hide_name)} onValueChange={(value: boolean) => void savePrivacy({ hide_name: value })} />
 
               <ChoiceGroup
+                disabled={settingsSaving}
                 label="الرسائل الخاصة"
                 value={profile.allow_dms || 'everyone'}
                 options={[['everyone','الجميع'],['followers','المتابعون'],['nobody','إيقاف الخاص']]}
                 onChange={(value: string) => void savePrivacy({ allow_dms: value })}
               />
               <ChoiceGroup
+                disabled={settingsSaving}
                 label="الرد على القصص"
                 value={profile.allow_story_replies || 'everyone'}
                 options={[['everyone','الجميع'],['followers','المتابعون'],['nobody','إيقاف الردود']]}
                 onChange={(value: string) => void savePrivacy({ allow_story_replies: value })}
               />
-            </SectionCard>
+            </SectionCard></>}
 
-            <SectionCard>
+            {settingsSection === 'notifications' && <>
+<SectionCard>
               <View style={styles.sectionHeader}>
                 <View style={styles.sectionHeaderCopy}>
                   <Text style={styles.sectionTitle}>الإشعارات والهدوء</Text>
@@ -1075,31 +1129,21 @@ export default function AccountCenter() {
               </View>
 
               <ToggleRow title="إشعارات الجهاز" sub={pushEnabled ? 'التنبيهات مفعلة على هذا الجهاز' : 'فعّل تنبيهات الرسائل والأحداث المهمة'} value={pushEnabled} onValueChange={() => void togglePush()} disabled={pushBusy} />
-              <ToggleRow title="عدم الإزعاج" sub="إيقاف التنبيهات خلال الفترة المحددة" value={Boolean(dnd.enabled)} onValueChange={(value: boolean) => void saveDndSettings(value)} />
+              <ToggleRow title="عدم الإزعاج" sub="إيقاف التنبيهات خلال الفترة المحددة" disabled={settingsSaving} value={Boolean(dnd.enabled)} onValueChange={(value: boolean) => void saveDndSettings(value)} />
               <View style={styles.twoFields}>
                 <View style={styles.flexField}><Field label="من" value={dndStart} onChangeText={setDndStart} placeholder="22:00" /></View>
                 <View style={styles.flexField}><Field label="إلى" value={dndEnd} onChangeText={setDndEnd} placeholder="07:00" /></View>
               </View>
-              <Pressable style={styles.outlineButtonWide} onPress={() => void saveDndSettings(Boolean(dnd.enabled), dndStart, dndEnd)}>
+              <Pressable disabled={settingsSaving} style={styles.outlineButtonWide} onPress={() => void saveDndSettings(Boolean(dnd.enabled), dndStart, dndEnd)}>
                 <Save size={15} color="#0F766E" />
                 <Text style={styles.outlineButtonText}>حفظ فترة الهدوء</Text>
               </Pressable>
-            </SectionCard>
+            </SectionCard></>}
 
-            <SectionCard>
-              <View style={styles.sectionHeader}>
-                <View style={styles.sectionHeaderCopy}>
-                  <Text style={styles.sectionTitle}>مظهر التطبيق</Text>
-                  <Text style={styles.sectionSub}>التبديل بين الوضع الداكن والفاتح وتلقائي النظام</Text>
-                </View>
-                <Moon size={20} color="#6366F1" />
-              </View>
-              <View style={{ marginTop: 6 }}>
-                <ThemeToggle />
-              </View>
-            </SectionCard>
+            {settingsSection === 'appearance' && <AppearanceSettings onProfileDesign={() => {setSettingsSection('design');router.setParams({tab:'settings',section:'design'});}} />}
 
-            <View onLayout={(event) => {
+            {settingsSection === 'design' && <>
+<View onLayout={(event) => {
               designY.current = event.nativeEvent.layout.y;
               if ((Array.isArray(params.section) ? params.section[0] : params.section) === 'design' && !designScrolled.current) {
                 setTimeout(() => {
@@ -1119,6 +1163,7 @@ export default function AccountCenter() {
               </SectionCard>
             </View>
 
+            <Text accessibilityRole="alert" style={{color:designStatus === 'error' ? colors.danger : colors.muted,textAlign:'right',fontSize:12}}>{designStatus === 'saving' ? 'جارٍ حفظ التخصيص…' : designStatus === 'saved' ? 'تم حفظ التخصيص' : designStatus === 'error' ? designError : 'يُحفظ التخصيص تلقائيًا في ملفك العام'}</Text>
             <ProfileDesignStudio
               userId={userId}
               profile={profile}
@@ -1135,7 +1180,8 @@ export default function AccountCenter() {
                 ...requests.map((item) => ({ type: 'request' as FeaturedType, id: item.id, title: item.title, subtitle: item.status, image: null })),
               ]}
               featured={featured}
-              wide={wide}
+              featuredBusy={featuredSaving}
+              wide={false}
               onPickCover={() => void pickCover()}
               onRemoveCover={() => void removeCover()}
               onChange={(patch) => void saveCustomization(patch)}
@@ -1143,8 +1189,11 @@ export default function AccountCenter() {
               onSaveFeaturedTitle={(title) => void saveCustomization({ featured_title: title })}
               onReset={() => void resetDesign()}
             />
+            {contentRemaining > 0 && <Pressable oasisKind="action" disabled={contentBusy} onPress={() => void loadMoreContent('all')}><Text style={{color:colors.primary}}>{contentBusy ? 'جارٍ التحميل…' : 'تحميل مزيد من المحتوى لاختيار أعمال مميزة'}</Text></Pressable>}
+            </>}
 
-            <SectionCard>
+            {settingsSection === 'security' && <>
+<SectionCard>
               <View style={styles.sectionHeader}>
                 <View style={styles.sectionHeaderCopy}>
                   <Text style={styles.sectionTitle}>الحساب والأمان</Text>
@@ -1163,9 +1212,10 @@ export default function AccountCenter() {
                 <KeyRound size={15} color="#0F766E" />
                 <Text style={styles.outlineButtonText}>تغيير كلمة المرور</Text>
               </Pressable>
-            </SectionCard>
+            </SectionCard></>}
 
-            <SectionCard>
+            {settingsSection === 'blocked' && <>
+<SectionCard>
               <View style={styles.sectionHeader}>
                 <View style={styles.sectionHeaderCopy}>
                   <Text style={styles.sectionTitle}>المحظورون</Text>
@@ -1187,9 +1237,10 @@ export default function AccountCenter() {
                   </Pressable>
                 </View>
               )) : <Text style={styles.emptySub}>لن تظهر هنا إلا الحسابات التي قمت بحظرها.</Text>}
-            </SectionCard>
+            </SectionCard></>}
 
-            <SectionCard>
+            {settingsSection === 'help' && <>
+<SectionCard>
               <Pressable style={styles.navigationRow} onPress={() => router.push('/support')}>
                 <View style={[styles.navigationIcon, { backgroundColor: OASIS.colors.infoSoft }]}><MessageCircle size={18} color="#2563EB" /></View>
                 <View style={styles.navigationCopy}><Text style={styles.navigationTitle}>الدعم والمساعدة</Text><Text style={styles.navigationSub}>تذاكرك والتواصل مع فريق حيّنا</Text></View>
@@ -1207,8 +1258,10 @@ export default function AccountCenter() {
               ) : null}
             </SectionCard>
 
-            <SectionCard>
-              <Pressable oasisKind="action" oasisVariant="danger" style={styles.signOutButton} onPress={() => void supabase.auth.signOut().then(() => router.replace('/auth'))}>
+</>}
+{settingsSection === 'account' && <>
+<SectionCard>
+              <Pressable oasisKind="action" oasisVariant="danger" style={styles.signOutButton} disabled={settingsSaving} onPress={() => {setSettingsSaving(true);void supabase.auth.signOut().then(result => {if (result.error) notify('تعذر تسجيل الخروج',result.error.message);else router.replace('/auth');}).catch(error => notify('تعذر تسجيل الخروج',error?.message || 'حاول مرة أخرى.')).finally(() => setSettingsSaving(false));}}>
                 <LogOut size={17} color={OASIS.colors.danger} />
                 <Text style={styles.signOutText}>تسجيل الخروج</Text>
               </Pressable>
@@ -1217,6 +1270,9 @@ export default function AccountCenter() {
                 <Text style={styles.deleteText}>حذف الحساب نهائيًا</Text>
               </Pressable>
             </SectionCard>
+            </>}
+              </View>
+            </View>
           </View>
         ) : null}
       </ScrollView>
@@ -1225,10 +1281,14 @@ export default function AccountCenter() {
 }
 
 function SectionCard({ children }: { children: React.ReactNode }) {
+  const {colors} = useTheme();
+  const styles = useMemo(() => createStyles(colors),[colors]);
   return <OasisSurface oasisSurface="card" style={styles.card}>{children}</OasisSurface>;
 }
 
 function Stat({ value, label }: { value: number; label: string }) {
+  const {colors} = useTheme();
+  const styles = useMemo(() => createStyles(colors),[colors]);
   return (
     <View style={styles.stat}>
       <Text style={styles.statValue}>{value > 999 ? '999+' : value}</Text>
@@ -1238,21 +1298,26 @@ function Stat({ value, label }: { value: number; label: string }) {
 }
 
 function HubTabButton({ active, label, Icon, onPress }: { active: boolean; label: string; Icon: any; onPress: () => void }) {
+  const {colors} = useTheme();
+  const styles = useMemo(() => createStyles(colors),[colors]);
   return (
-    <Pressable oasisVariant={active ? 'primary' : 'secondary'} oasisKind="chip" style={[styles.tabButton, active && styles.tabButtonActive]} onPress={onPress}>
-      <Icon size={17} color={active ? OASIS.colors.surface : OASIS.colors.muted} />
+    <Pressable oasisKind="plain" accessibilityRole="tab" accessibilityState={{selected:active}} style={[styles.tabButton, active && styles.tabButtonActive]} onPress={onPress}>
+      <Icon size={17} color={active ? colors.primary : colors.muted} />
       <Text style={[styles.tabButtonText, active && styles.tabButtonTextActive]}>{label}</Text>
     </Pressable>
   );
 }
 
 function Field(props: any) {
+  const {colors} = useTheme();
+  const styles = useMemo(() => createStyles(colors),[colors]);
   const { label, multiline, ...rest } = props;
   return (
     <View style={styles.fieldWrap}>
       <Text style={styles.fieldLabel}>{label}</Text>
       <TextInput
         {...rest}
+        accessibilityLabel={label}
         multiline={multiline}
         textAlign="right"
         placeholderTextColor="#94A3B8"
@@ -1263,6 +1328,8 @@ function Field(props: any) {
 }
 
 function ToggleRow({ title, sub, value, onValueChange, disabled }: any) {
+  const {colors} = useTheme();
+  const styles = useMemo(() => createStyles(colors),[colors]);
   return (
     <View style={styles.toggleRow}>
       <View style={styles.toggleCopy}>
@@ -1270,6 +1337,7 @@ function ToggleRow({ title, sub, value, onValueChange, disabled }: any) {
         <Text style={styles.toggleSub}>{sub}</Text>
       </View>
       <Switch
+        accessibilityLabel={title}
         disabled={disabled}
         value={Boolean(value)}
         onValueChange={onValueChange}
@@ -1280,13 +1348,15 @@ function ToggleRow({ title, sub, value, onValueChange, disabled }: any) {
   );
 }
 
-function ChoiceGroup({ label, value, options, onChange }: { label: string; value: string; options: string[][]; onChange: (value: string) => void }) {
+function ChoiceGroup({ label, value, options, onChange, disabled }: { label: string; value: string; options: string[][]; onChange: (value: string) => void; disabled?:boolean }) {
+  const {colors} = useTheme();
+  const styles = useMemo(() => createStyles(colors),[colors]);
   return (
     <View style={styles.choiceWrap}>
       <Text style={styles.fieldLabel}>{label}</Text>
       <View style={styles.choiceRow}>
         {options.map(([id, title]) => (
-          <Pressable key={id} style={[styles.choice, value === id && styles.choiceActive]} onPress={() => onChange(id)}>
+          <Pressable key={id} disabled={disabled} accessibilityRole="radio" accessibilityState={{checked:value===id}} style={[styles.choice, value === id && styles.choiceActive]} onPress={() => onChange(id)}>
             <Text style={[styles.choiceText, value === id && styles.choiceTextActive]}>{title}</Text>
           </Pressable>
         ))}
@@ -1296,6 +1366,8 @@ function ChoiceGroup({ label, value, options, onChange }: { label: string; value
 }
 
 function QuickAction({ label, sub, Icon, onPress, disabled }: any) {
+  const {colors} = useTheme();
+  const styles = useMemo(() => createStyles(colors),[colors]);
   return (
     <Pressable style={[styles.quickAction, disabled && styles.quickActionDisabled]} onPress={onPress}>
       <View style={styles.quickActionIcon}><Icon size={20} color={disabled ? '#94A3B8' : OASIS.colors.primary} /></View>
@@ -1306,6 +1378,8 @@ function QuickAction({ label, sub, Icon, onPress, disabled }: any) {
 }
 
 function FilterChip({ active, label, onPress }: { active: boolean; label: string; onPress: () => void }) {
+  const {colors} = useTheme();
+  const styles = useMemo(() => createStyles(colors),[colors]);
   return (
     <Pressable oasisVariant={active ? 'primary' : 'secondary'} oasisKind="chip" style={[styles.filterChip, active && styles.filterChipActive]} onPress={onPress}>
       <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>{label}</Text>
@@ -1314,6 +1388,8 @@ function FilterChip({ active, label, onPress }: { active: boolean; label: string
 }
 
 function OwnedRow({ kind, item, onPress }: { kind: string; item: any; onPress: () => void }) {
+  const {colors} = useTheme();
+  const styles = useMemo(() => createStyles(colors),[colors]);
   const isProduct = kind === 'product';
   const isService = kind === 'service';
   const isQuestion = kind === 'question';
@@ -1336,21 +1412,21 @@ function OwnedRow({ kind, item, onPress }: { kind: string; item: any; onPress: (
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: OASIS.colors.background },
-  loadingScreen: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: OASIS.colors.background },
-  loadingText: { color: OASIS.colors.muted, fontSize: 12, fontWeight: '700' },
-  headerAction: { width: 36, height: 36, borderRadius: 14, backgroundColor: OASIS.colors.soft, alignItems: 'center', justifyContent: 'center' },
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
+  screen: { flex: 1, backgroundColor: colors.background },
+  loadingScreen: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: colors.background },
+  loadingText: { color: colors.muted, fontSize: 12, fontWeight: '700' },
+  headerAction: { width: 36, height: 36, borderRadius: 14, backgroundColor: colors.soft, alignItems: 'center', justifyContent: 'center' },
   content: { paddingHorizontal: 14, paddingTop: 12, gap: 14, maxWidth: 920, width: '100%', alignSelf: 'center' },
-  profileHero: { borderWidth: 1, borderColor: OASIS.colors.line, flexDirection: 'row-reverse', alignItems: 'center', gap: 12, padding: 16, minHeight: 138, borderRadius: 18, overflow: 'hidden' },
+  profileHero: { borderWidth: 1, borderColor: colors.line, flexDirection: 'row-reverse', alignItems: 'center', gap: 12, padding: 16, minHeight: 138, borderRadius: 18, overflow: 'hidden' },
   profileHeroWide: { minHeight: 156, padding: 20 },
   heroCoverButton: { position: 'absolute', left: 12, top: 12, minHeight: 32, borderRadius: 10, paddingHorizontal: 9, backgroundColor: 'rgba(0,0,0,0.42)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)', flexDirection: 'row-reverse', alignItems: 'center', gap: 5, zIndex: 3 },
   heroCoverButtonText: { color: '#FFFFFF', fontSize: 10.5, fontWeight: '800' },
-  avatarWrap: { width: 64, height: 64, borderRadius: 32, position: 'relative', borderWidth: 3, borderColor: OASIS.colors.soft },
+  avatarWrap: { width: 64, height: 64, borderRadius: 32, position: 'relative', borderWidth: 3, borderColor: colors.soft },
   avatar: { width: '100%', height: '100%', borderRadius: 40 },
-  avatarFallback: { flex: 1, borderRadius: 40, alignItems: 'center', justifyContent: 'center', backgroundColor: OASIS.colors.soft },
-  avatarLetter: { fontSize: 31, color: OASIS.colors.primary, fontWeight: '700' },
-  cameraBadge: { position: 'absolute', left: -2, bottom: -2, width: 27, height: 27, borderRadius: 14, backgroundColor: OASIS.colors.primary, borderWidth: 2, borderColor: OASIS.colors.surface, alignItems: 'center', justifyContent: 'center' },
+  avatarFallback: { flex: 1, borderRadius: 40, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.soft },
+  avatarLetter: { fontSize: 31, color: colors.primary, fontWeight: '700' },
+  cameraBadge: { position: 'absolute', left: -2, bottom: -2, width: 27, height: 27, borderRadius: 14, backgroundColor: colors.primary, borderWidth: 2, borderColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
   identityIcon: { position: 'absolute', right: -4, top: -4 },
   heroCopy: { flex: 1, alignItems: 'flex-end', minWidth: 0 },
   publicName: { color: '#FFFFFF', fontSize: 21, fontWeight: '700', textAlign: 'right', maxWidth: '100%' },
@@ -1358,113 +1434,117 @@ const styles = StyleSheet.create({
   badgeRow: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 5, marginTop: 7 },
   locationLine: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, marginTop: 7 },
   locationText: { color: 'rgba(255,255,255,0.82)', fontSize: 11, fontWeight: '700' },
-  statsBar: { flexDirection: 'row-reverse', backgroundColor: OASIS.colors.surface, borderRadius: 14, borderWidth: 1, borderColor: OASIS.colors.line, overflow: 'hidden' },
+  statsBar: { flexDirection: 'row-reverse', backgroundColor: colors.surface, borderRadius: 14, borderWidth: 1, borderColor: colors.line, overflow: 'hidden' },
   stat: { flex: 1, alignItems: 'center', paddingVertical: 11, borderLeftWidth: 1, borderLeftColor: '#F1F5F9' },
-  statValue: { color: OASIS.colors.ink, fontSize: 16, fontWeight: '700' },
-  statLabel: { color: OASIS.colors.muted, fontSize: 11, fontWeight: '700', marginTop: 2 },
-  tabs: { flexDirection: 'row-reverse', backgroundColor: OASIS.colors.surface, borderRadius: 16, padding: 4, borderWidth: 1, borderColor: OASIS.colors.line, gap: 4 },
-  tabButton: { flex: 1, minHeight: 42, borderRadius: 12, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  tabButtonActive: { backgroundColor: OASIS.colors.primary },
-  tabButtonText: { color: OASIS.colors.muted, fontSize: 11.5, fontWeight: '700' },
-  tabButtonTextActive: { color: OASIS.colors.surface },
+  statValue: { color: colors.ink, fontSize: 16, fontWeight: '700' },
+  statLabel: { color: colors.muted, fontSize: 11, fontWeight: '700', marginTop: 2 },
+  tabs: { flexDirection:'row-reverse',backgroundColor:colors.surface,borderRadius:0,padding:0,borderBottomWidth:1,borderColor:colors.line,gap:4 },
+  tabButton: { flex: 1, minHeight: 48, borderRadius: 0, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  tabButtonActive: { borderBottomWidth: 3, borderBottomColor: colors.primary },
+  tabButtonText: { color: colors.muted, fontSize: 11.5, fontWeight: '700' },
+  tabButtonTextActive: { color: colors.primary },
   stack: { gap: 12 },
-  card: { backgroundColor: OASIS.colors.surface, borderRadius: 14, borderWidth: 1, borderColor: OASIS.colors.line, padding: 14, gap: 12 },
+  card: { backgroundColor: colors.surface, borderRadius: 14, borderWidth: 1, borderColor: colors.line, padding: 14, gap: 12 },
   sectionHeader: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   sectionHeaderCopy: { flex: 1, alignItems: 'flex-end' },
-  sectionTitle: { color: OASIS.colors.ink, fontSize: 15, fontWeight: '700', textAlign: 'right' },
-  sectionSub: { color: OASIS.colors.muted, fontSize: 11, lineHeight: 17, fontWeight: '600', textAlign: 'right', marginTop: 2 },
+  sectionTitle: { color: colors.ink, fontSize: 15, fontWeight: '700', textAlign: 'right' },
+  sectionSub: { color: colors.muted, fontSize: 11, lineHeight: 17, fontWeight: '600', textAlign: 'right', marginTop: 2 },
   ghostButton: { borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: '#F1F5F9' },
-  ghostButtonText: { color: OASIS.colors.muted, fontSize: 11, fontWeight: '700' },
-  bio: { color: OASIS.colors.ink, fontSize: 12, lineHeight: 20, textAlign: 'right' },
+  ghostButtonText: { color: colors.muted, fontSize: 11, fontWeight: '700' },
+  bio: { color: colors.ink, fontSize: 12, lineHeight: 20, textAlign: 'right' },
   rowActions: { flexDirection: 'row-reverse', gap: 8, flexWrap: 'wrap' },
-  outlineButton: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: OASIS.colors.soft, backgroundColor: OASIS.colors.soft, paddingHorizontal: 11, minHeight: 38, borderRadius: 11 },
-  outlineButtonWide: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: OASIS.colors.soft, backgroundColor: OASIS.colors.soft, paddingHorizontal: 11, minHeight: 42, borderRadius: 12 },
-  outlineButtonText: { color: OASIS.colors.primary, fontSize: 11, fontWeight: '700' },
+  outlineButton: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: colors.soft, backgroundColor: colors.soft, paddingHorizontal: 11, minHeight: 38, borderRadius: 11 },
+  outlineButtonWide: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: colors.soft, backgroundColor: colors.soft, paddingHorizontal: 11, minHeight: 42, borderRadius: 12 },
+  outlineButtonText: { color: colors.primary, fontSize: 11, fontWeight: '700' },
   formStack: { gap: 10 },
   fieldWrap: { gap: 5 },
-  fieldLabel: { color: OASIS.colors.muted, fontSize: 11, fontWeight: '700', textAlign: 'right' },
-  input: { minHeight: 43, borderWidth: 1, borderColor: OASIS.colors.line, backgroundColor: OASIS.colors.background, borderRadius: 12, paddingHorizontal: 11, color: OASIS.colors.ink, fontSize: 12, fontWeight: '700' },
+  fieldLabel: { color: colors.muted, fontSize: 11, fontWeight: '700', textAlign: 'right' },
+  input: { minHeight: 43, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.background, borderRadius: 12, paddingHorizontal: 11, color: colors.ink, fontSize: 12, fontWeight: '700' },
   inputMultiline: { minHeight: 86, textAlignVertical: 'top', paddingTop: 10 },
   primaryButton: { minHeight: 44, borderRadius: 0, backgroundColor: 'transparent', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 7 },
-  primaryButtonText: { color: OASIS.colors.surface, fontSize: 12, fontWeight: '700' },
+  primaryButtonText: { color: colors.surface, fontSize: 12, fontWeight: '700' },
   identitySquare: { width: 43, height: 43, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-  identitySummary: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, backgroundColor: OASIS.colors.background, borderRadius: 14, padding: 11 },
+  identitySummary: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, backgroundColor: colors.background, borderRadius: 14, padding: 11 },
   identitySummaryCopy: { flex: 1, alignItems: 'flex-end' },
-  identityCurrent: { color: OASIS.colors.ink, fontSize: 13, fontWeight: '700' },
-  identityDescription: { color: OASIS.colors.muted, fontSize: 11, lineHeight: 17, textAlign: 'right', marginTop: 2 },
+  identityCurrent: { color: colors.ink, fontSize: 13, fontWeight: '700' },
+  identityDescription: { color: colors.muted, fontSize: 11, lineHeight: 17, textAlign: 'right', marginTop: 2 },
   statusChip: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 5 },
   statusChipText: { fontSize: 11, fontWeight: '700' },
-  identityManage: { minHeight: 42, borderRadius: 12, backgroundColor: OASIS.colors.soft, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 5 },
-  identityManageText: { color: OASIS.colors.primary, fontSize: 11.5, fontWeight: '700' },
+  identityManage: { minHeight: 42, borderRadius: 12, backgroundColor: colors.soft, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 5 },
+  identityManageText: { color: colors.primary, fontSize: 11.5, fontWeight: '700' },
   identityEditor: { gap: 11, borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 11 },
   typeGrid: { gap: 7 },
-  typeChoice: { minHeight: 54, borderRadius: 13, borderWidth: 1, borderColor: OASIS.colors.line, backgroundColor: OASIS.colors.surface, flexDirection: 'row-reverse', alignItems: 'center', gap: 9, padding: 9 },
+  typeChoice: { minHeight: 54, borderRadius: 13, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, flexDirection: 'row-reverse', alignItems: 'center', gap: 9, padding: 9 },
   typeChoiceIcon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   typeChoiceCopy: { flex: 1, alignItems: 'flex-end' },
-  typeChoiceTitle: { color: OASIS.colors.ink, fontSize: 11.5, fontWeight: '700' },
-  typeChoiceSub: { color: OASIS.colors.muted, fontSize: 11, marginTop: 2, textAlign: 'right' },
-  evidenceButton: { flexDirection: 'row-reverse', alignItems: 'center', gap: 9, minHeight: 44, borderWidth: 1, borderStyle: 'dashed', borderColor: '#A7F3D0', backgroundColor: OASIS.colors.soft, borderRadius: 13, padding: 10 },
+  typeChoiceTitle: { color: colors.ink, fontSize: 11.5, fontWeight: '700' },
+  typeChoiceSub: { color: colors.muted, fontSize: 11, marginTop: 2, textAlign: 'right' },
+  evidenceButton: { flexDirection: 'row-reverse', alignItems: 'center', gap: 9, minHeight: 44, borderWidth: 1, borderStyle: 'dashed', borderColor: '#A7F3D0', backgroundColor: colors.soft, borderRadius: 13, padding: 10 },
   evidenceCopy: { flex: 1, alignItems: 'flex-end' },
-  evidenceTitle: { color: OASIS.colors.primary, fontSize: 11.5, fontWeight: '700' },
-  evidenceSub: { color: OASIS.colors.muted, fontSize: 11, marginTop: 2, textAlign: 'right' },
-  locationCard: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 10, backgroundColor: OASIS.colors.background, padding: 11, borderRadius: 13 },
-  locationMain: { flex: 1, color: OASIS.colors.ink, fontSize: 11.5, fontWeight: '600', textAlign: 'right' },
-  smallButton: { minHeight: 34, borderRadius: 10, backgroundColor: OASIS.colors.soft, paddingHorizontal: 9, flexDirection: 'row-reverse', gap: 5, alignItems: 'center' },
-  smallButtonText: { color: OASIS.colors.primary, fontSize: 11, fontWeight: '700' },
+  evidenceTitle: { color: colors.primary, fontSize: 11.5, fontWeight: '700' },
+  evidenceSub: { color: colors.muted, fontSize: 11, marginTop: 2, textAlign: 'right' },
+  locationCard: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 10, backgroundColor: colors.background, padding: 11, borderRadius: 13 },
+  locationMain: { flex: 1, color: colors.ink, fontSize: 11.5, fontWeight: '600', textAlign: 'right' },
+  smallButton: { minHeight: 34, borderRadius: 10, backgroundColor: colors.soft, paddingHorizontal: 9, flexDirection: 'row-reverse', gap: 5, alignItems: 'center' },
+  smallButtonText: { color: colors.primary, fontSize: 11, fontWeight: '700' },
   actionGrid: { gap: 8 },
-  quickAction: { flexDirection: 'row-reverse', alignItems: 'center', gap: 9, minHeight: 58, borderWidth: 1, borderColor: OASIS.colors.line, borderRadius: 14, padding: 10 },
-  quickActionDisabled: { opacity: 0.58, backgroundColor: OASIS.colors.background },
-  quickActionIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: OASIS.colors.soft, alignItems: 'center', justifyContent: 'center' },
+  quickAction: { flexDirection: 'row-reverse', alignItems: 'center', gap: 9, minHeight: 58, borderWidth: 1, borderColor: colors.line, borderRadius: 14, padding: 10 },
+  quickActionDisabled: { opacity: 0.58, backgroundColor: colors.background },
+  quickActionIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: colors.soft, alignItems: 'center', justifyContent: 'center' },
   quickActionCopy: { flex: 1, alignItems: 'flex-end' },
-  quickActionTitle: { color: OASIS.colors.ink, fontSize: 12, fontWeight: '700' },
-  quickActionSub: { color: OASIS.colors.muted, fontSize: 11, marginTop: 2, textAlign: 'right' },
+  quickActionTitle: { color: colors.ink, fontSize: 12, fontWeight: '700' },
+  quickActionSub: { color: colors.muted, fontSize: 11, marginTop: 2, textAlign: 'right' },
   twoFields: { flexDirection: 'row-reverse', gap: 8 },
   flexField: { flex: 1 },
   filterRow: { flexDirection: 'row-reverse', gap: 7, paddingVertical: 2 },
   filterChip: { borderRadius: 999, paddingHorizontal: 11, paddingVertical: 7, backgroundColor: '#F1F5F9' },
-  filterChipActive: { backgroundColor: OASIS.colors.primary },
-  filterChipText: { color: OASIS.colors.muted, fontSize: 11, fontWeight: '700' },
-  filterChipTextActive: { color: OASIS.colors.surface },
+  filterChipActive: { backgroundColor: colors.primary },
+  filterChipText: { color: colors.muted, fontSize: 11, fontWeight: '700' },
+  filterChipTextActive: { color: colors.surface },
   contentList: { gap: 7 },
   ownedRow: { minHeight: 56, borderRadius: 13, borderWidth: 1, borderColor: '#EDF2F7', padding: 8, flexDirection: 'row-reverse', alignItems: 'center', gap: 9 },
-  ownedThumb: { width: 43, height: 43, borderRadius: 11, backgroundColor: OASIS.colors.soft, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  ownedThumb: { width: 43, height: 43, borderRadius: 11, backgroundColor: colors.soft, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   ownedImage: { width: '100%', height: '100%' },
   ownedCopy: { flex: 1, alignItems: 'flex-end' },
   ownedType: { color: '#94A3B8', fontSize: 11, fontWeight: '700' },
-  ownedTitle: { color: OASIS.colors.ink, fontSize: 11.5, fontWeight: '700', marginTop: 1, textAlign: 'right' },
-  ownedStatus: { color: OASIS.colors.muted, fontSize: 11, marginTop: 2, fontWeight: '700' },
+  ownedTitle: { color: colors.ink, fontSize: 11.5, fontWeight: '700', marginTop: 1, textAlign: 'right' },
+  ownedStatus: { color: colors.muted, fontSize: 11, marginTop: 2, fontWeight: '700' },
   emptyState: { alignItems: 'center', gap: 6, paddingVertical: 14 },
-  emptyTitle: { color: OASIS.colors.ink, fontSize: 12, fontWeight: '700' },
+  emptyTitle: { color: colors.ink, fontSize: 12, fontWeight: '700' },
   emptySub: { color: '#94A3B8', fontSize: 11, textAlign: 'center', lineHeight: 18 },
   navigationRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 9, minHeight: 52 },
   navigationIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   navigationCopy: { flex: 1, alignItems: 'flex-end' },
-  navigationTitle: { color: OASIS.colors.ink, fontSize: 12, fontWeight: '700' },
-  navigationSub: { color: OASIS.colors.muted, fontSize: 11, marginTop: 2, textAlign: 'right' },
+  navigationTitle: { color: colors.ink, fontSize: 12, fontWeight: '700' },
+  navigationSub: { color: colors.muted, fontSize: 11, marginTop: 2, textAlign: 'right' },
   toggleRow: { minHeight: 56, flexDirection: 'row-reverse', alignItems: 'center', gap: 10, borderBottomWidth: 1, borderBottomColor: '#F1F5F9', paddingVertical: 5 },
   toggleCopy: { flex: 1, alignItems: 'flex-end' },
-  toggleTitle: { color: OASIS.colors.ink, fontSize: 11.5, fontWeight: '700' },
-  toggleSub: { color: OASIS.colors.muted, fontSize: 11, marginTop: 2, lineHeight: 17, textAlign: 'right' },
+  toggleTitle: { color: colors.ink, fontSize: 11.5, fontWeight: '700' },
+  toggleSub: { color: colors.muted, fontSize: 11, marginTop: 2, lineHeight: 17, textAlign: 'right' },
   choiceWrap: { gap: 6, paddingTop: 4 },
   choiceRow: { flexDirection: 'row-reverse', gap: 6, flexWrap: 'wrap' },
   choice: { borderRadius: 10, paddingHorizontal: 10, paddingVertical: 7, backgroundColor: '#F1F5F9' },
-  choiceActive: { backgroundColor: OASIS.colors.primary },
-  choiceText: { color: OASIS.colors.muted, fontSize: 11, fontWeight: '700' },
-  choiceTextActive: { color: OASIS.colors.surface },
+  choiceActive: { backgroundColor: colors.primary },
+  choiceText: { color: colors.muted, fontSize: 11, fontWeight: '700' },
+  choiceTextActive: { color: colors.surface },
   colorRow: { flexDirection: 'row-reverse', gap: 9, flexWrap: 'wrap' },
-  colorDot: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: OASIS.colors.surface },
-  colorDotActive: { borderColor: OASIS.colors.ink },
+  colorDot: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.surface },
+  colorDotActive: { borderColor: colors.ink },
   divider: { height: 1, backgroundColor: '#F1F5F9', marginVertical: 2 },
   blockedRow: { minHeight: 54, flexDirection: 'row-reverse', alignItems: 'center', gap: 9 },
   blockedAvatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   blockedAvatarImage: { width: '100%', height: '100%' },
   blockedCopy: { flex: 1, alignItems: 'flex-end' },
-  blockedName: { color: OASIS.colors.ink, fontSize: 11, fontWeight: '700' },
+  blockedName: { color: colors.ink, fontSize: 11, fontWeight: '700' },
   blockedHandle: { color: '#94A3B8', fontSize: 11, marginTop: 1 },
-  unblockButton: { borderRadius: 9, backgroundColor: OASIS.colors.dangerSoft, paddingHorizontal: 9, paddingVertical: 6 },
-  unblockText: { color: OASIS.colors.danger, fontSize: 11, fontWeight: '700' },
-  signOutButton: { minHeight: 45, borderRadius: 12, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 7, backgroundColor: OASIS.colors.dangerSoft },
-  signOutText: { color: OASIS.colors.danger, fontSize: 11.5, fontWeight: '700' },
+  unblockButton: { borderRadius: 9, backgroundColor: colors.dangerSoft, paddingHorizontal: 9, paddingVertical: 6 },
+  unblockText: { color: colors.danger, fontSize: 11, fontWeight: '700' },
+  signOutButton: { minHeight: 45, borderRadius: 12, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 7, backgroundColor: colors.dangerSoft },
+  signOutText: { color: colors.danger, fontSize: 11.5, fontWeight: '700' },
   deleteButton: { minHeight: 45, borderRadius: 12, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 7, borderWidth: 1, borderColor: '#FECACA' },
-  deleteText: { color: OASIS.colors.danger, fontSize: 11.5, fontWeight: '700' },
+  deleteText: { color: colors.danger, fontSize: 11.5, fontWeight: '700' },
 });
+
+const settingsStyles=StyleSheet.create({intro:{alignItems:'flex-end',gap:6,paddingVertical:12},heading:{fontSize:24,fontWeight:'800'},layout:{gap:20},navigation:{gap:5,borderWidth:1,borderColor:OASIS.colors.line,borderRadius:18,padding:8,backgroundColor:OASIS.colors.surface},navigationItem:{flexDirection:'row-reverse',alignItems:'center',gap:12,padding:13,borderRadius:12,borderWidth:1,borderColor:'transparent'}});
+
+const accountStyles=StyleSheet.create({accountContext:{flexDirection:'row-reverse',alignItems:'center',gap:12,padding:16,borderWidth:1,borderRadius:18},notice:{padding:16,borderWidth:1,borderRadius:16,flexDirection:'row-reverse',alignItems:'center',gap:12},overlay:{flex:1,backgroundColor:'rgba(0,0,0,.5)',justifyContent:'center',alignItems:'center',padding:24},dialog:{width:'100%',maxWidth:440,borderRadius:24,padding:24,gap:18}});

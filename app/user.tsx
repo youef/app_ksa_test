@@ -1,13 +1,16 @@
+import { ProfileHeader } from '@/components/profile/ProfileHeader';
 import { OasisEmptyIllustration } from '@/components/oasis/OasisEmptyIllustration';
 import { OasisPressable as Pressable, OasisSurface } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
+import { useTheme } from '@/context/ThemeContext';
+import { ProfileConnections } from '@/components/profile/ProfileConnections';
 import { bannerColors } from '@/lib/profileTheme';
 import { profileCoverUrl } from '@/lib/profileCover';
 import { HeaderAction, AppHeader } from '@/components/shared/AppHeader';
-import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Platform, RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions, Share } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Image, Modal, Platform, RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions, Share } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import {
   ArrowRight,
   BadgeCheck,
@@ -33,10 +36,12 @@ import {
   User,
   Edit3,
   Palette,
+  Settings,
+  CalendarDays,
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { ProfileCustomizationEntry } from '@/components/profile/ProfileCustomizationEntry';
-import { AccountIdentityBadge, AccountIdentityIcon, AccountVerificationBadge, getAccountIdentityMeta } from '@/components/profile/AccountIdentityBadge';
+import { AccountStatusMark, getAccountIdentityMeta } from '@/components/profile/AccountIdentityBadge';
 import { C } from '@/lib/ui';
 import { getBlockStatus, setBlock } from '@/lib/chatControls';
 import { isExactDistrictMatching } from '@/lib/locationSync';
@@ -53,6 +58,12 @@ const TABS: { id: Tab; label: string; icon: any }[] = [
 ];
 
 export default function UserProfile() {
+  const { colors } = useTheme();
+  const [confirmBlock, setConfirmBlock] = useState(false);
+  const [actionError, setActionError] = useState('');
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [shareNotice, setShareNotice] = useState('');
+  const [connections, setConnections] = useState<'followers' | 'following' | null>(null);
   const params = useLocalSearchParams<{ id?: string; username?: string }>();
   const routeId = Array.isArray(params.id) ? params.id[0] : (params.id || '');
   const routeUsername = Array.isArray(params.username) ? params.username[0] : (params.username || '');
@@ -60,6 +71,7 @@ export default function UserProfile() {
   const [resolvedProfileId, setResolvedProfileId] = useState<string>('');
   const id = resolvedProfileId || routeId;
   const { width } = useWindowDimensions();
+  const [coverVersion, setCoverVersion] = useState(Date.now());
   const [coverFailed, setCoverFailed] = useState(false);
   const [profile, setProfile] = useState<any>(null);
   const [hasActiveStories, setHasActiveStories] = useState(false);
@@ -85,6 +97,9 @@ export default function UserProfile() {
   const [blocked, setBlocked] = useState(false);
   const [blockedByOther, setBlockedByOther] = useState(false);
   const [sameDistrict, setSameDistrict] = useState(true);
+  const tabsScrollRef=useRef<ScrollView>(null);
+  const tabMetrics=useRef<Record<string,{x:number;width:number}>>({});
+  const tabViewport=useRef(0);
   const [tab, setTab] = useState<Tab>('questions');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -96,8 +111,25 @@ export default function UserProfile() {
   const [featuredItems, setFeaturedItems] = useState<any[]>([]);
   const [profileCustomization, setProfileCustomization] = useState<any>(null);
 
+  const visibleTabs = useMemo(() => TABS.filter(({id: key}) => {
+    if (key === 'answers') return currentUserId === id;
+    const section = key === 'market' ? 'products' : key;
+    return profileCustomization?.section_visibility?.[section] !== false;
+  }).sort((a,b) => {
+    const order: string[] = profileCustomization?.section_order || [];
+    const index = (key: Tab) => { const value = order.indexOf(key === 'market' ? 'products' : key === 'answers' ? 'questions' : key); return value < 0 ? 999 : value; };
+    return index(a.id) - index(b.id);
+  }), [currentUserId,id,profileCustomization]);
+  useEffect(() => { if (!loading && visibleTabs.length && !visibleTabs.some(item => item.id === tab)) setTab(visibleTabs[0].id); }, [loading,visibleTabs,tab]);
+
+  function revealActiveTab(key:Tab=tab) {
+    const metrics=tabMetrics.current[key];
+    if (metrics && tabViewport.current) tabsScrollRef.current?.scrollTo({x:Math.max(0,metrics.x-(tabViewport.current-metrics.width)/2),animated:false});
+  }
+  useEffect(() => {revealActiveTab();},[tab,visibleTabs]);
+
   const cardWidth = useMemo(() => {
-    const max = Math.min(width - 32, 1080);
+    const max = Math.min(width, 820) - 32;
     if (max >= 900) return (max - 32) / 3;
     if (max >= 620) return (max - 16) / 2;
     return max;
@@ -200,12 +232,13 @@ export default function UserProfile() {
       const { data: sessionData } = await supabase.auth.getSession();
       const me = sessionData?.session?.user?.id || null;
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(lookupKey);
-      const { data: p, error } = await supabase.from('profiles').select('id,username,display_name,avatar_url,role,is_verified,is_verified_merchant,verification_status,account_type,freelance_trade,city,district,bio,is_geoverified,badges,profile_privacy,hide_name,is_banned,allow_dms')
+      const { data: p, error } = await supabase.from('profiles').select('id,username,display_name,avatar_url,role,is_verified,is_verified_merchant,verification_status,account_type,freelance_trade,city,district,bio,is_geoverified,badges,profile_privacy,hide_name,is_banned,allow_dms,created_at')
         .eq(isUuid ? 'id' : 'username', lookupKey).maybeSingle();
       if (error) throw error;
       setCurrentUserId(me);
       setProfile(p);
       setCoverFailed(false);
+      setCoverVersion(Date.now());
       if (!p) return;
       setResolvedProfileId(p.id);
       if (p.is_banned === true && me !== p.id) {
@@ -364,9 +397,7 @@ export default function UserProfile() {
     }
   };
 
-  useEffect(() => {
-    void load();
-  }, [lookupKey]);
+  useFocusEffect(useCallback(() => { void load(); }, [lookupKey]));
 
   useEffect(() => {
     if (!id || !profile || loading) return;
@@ -450,7 +481,7 @@ export default function UserProfile() {
     if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
       try {
         await navigator.clipboard.writeText(text);
-        Alert.alert('تم نسخ الرابط 📋', 'تم نسخ رابط الملف الشخصي للمشاركة.');
+        setShareNotice('تم نسخ رابط الملف الشخصي');
         return;
       } catch {}
     }
@@ -459,58 +490,21 @@ export default function UserProfile() {
     } catch {}
   };
 
-  function openOptionsMenu() {
-    if (!currentUserId || currentUserId === id) {
-      handleShareProfile();
-      return;
-    }
-
-    Alert.alert(
-      displayName,
-      'اختر إجراءً:',
-      [
-        { text: 'مشاركة الملف 📋', onPress: handleShareProfile },
-        {
-          text: blocked ? 'إلغاء الحظر ✓' : 'حظر المستخدم 🚫',
-          style: blocked ? 'default' : 'destructive',
-          onPress: toggleBlock,
-        },
-        {
-          text: 'إبلاغ عن الحساب 🚩',
-          onPress: () => router.push({ pathname: '/report', params: { type: 'user', id } }),
-        },
-        { text: 'إلغاء', style: 'cancel' },
-      ]
-    );
-  }
+  function openOptionsMenu() { setMenuOpen(true); }
 
   function toggleBlock() {
+    if (currentUserId && currentUserId !== id && !busy) setConfirmBlock(true);
+  }
+  async function confirmBlockChange() {
     if (!currentUserId || currentUserId === id || busy) return;
-    Alert.alert(
-      blocked ? 'إلغاء الحظر' : 'حظر المستخدم',
-      blocked ? 'هل تريد إلغاء حظر هذا المستخدم؟' : 'لن يتمكن المستخدم من مراسلتك أو متابعة حسابك.',
-      [
-        { text: 'إلغاء', style: 'cancel' },
-        {
-          text: blocked ? 'إلغاء الحظر' : 'حظر',
-          style: blocked ? 'default' : 'destructive',
-          onPress: async () => {
-            setBusy(true);
-            try {
-              const r = await setBlock(currentUserId, id, !blocked);
-              if (!r.ok) throw new Error(r.error);
-              setBlocked(!blocked);
-              if (!blocked) setFollowing(false);
-              await load(true);
-            } catch (e: any) {
-              Alert.alert('تعذر تنفيذ العملية', e?.message || 'حاول مرة أخرى.');
-            } finally {
-              setBusy(false);
-            }
-          },
-        },
-      ]
-    );
+    setBusy(true); setActionError('');
+    try {
+      const result = await setBlock(currentUserId, id, !blocked);
+      if (!result.ok) throw new Error(result.error);
+      setConfirmBlock(false);
+      await load(true);
+    } catch (error: any) { setActionError(error?.message || 'تعذر تنفيذ العملية. حاول مرة أخرى.'); }
+    finally { setBusy(false); }
   }
 
   if (loading) {
@@ -553,7 +547,7 @@ export default function UserProfile() {
   const heroColors: [string, string, string] = (profileCustomization?.banner_style || 'emerald') === 'emerald'
     ? identityMeta.heroColors
     : bannerColors(profileCustomization?.banner_style);
-  const coverUrl = profileCoverUrl(id);
+  const coverUrl = profileCoverUrl(id, coverVersion);
   const identityDescriptor =
     profile.freelance_trade ||
     (profile.account_type === 'merchant'
@@ -580,7 +574,27 @@ export default function UserProfile() {
       : answers;
 
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, {backgroundColor: colors.background}]}>
+      <Modal visible={confirmBlock} transparent animationType="fade" onRequestClose={() => {if (!busy) setConfirmBlock(false);}}>
+        <View style={social.menuOverlay}><View style={[social.menu,{backgroundColor:colors.surface}]} accessibilityViewIsModal>
+          <Text style={[social.name,{fontSize:20,color:colors.ink}]}>{blocked ? 'إلغاء حظر المستخدم؟' : 'حظر المستخدم؟'}</Text>
+          <Text style={{color:colors.muted,textAlign:'right',lineHeight:24}}>{blocked ? 'سيتمكن هذا المستخدم من التواصل معك وفق إعدادات الخصوصية.' : 'لن يتمكن المستخدم من مراسلتك أو متابعة حسابك.'}</Text>
+          {!!actionError && <Text accessibilityRole="alert" style={{color:colors.danger}}>{actionError}</Text>}
+          <Pressable oasisKind="action" oasisVariant="danger" disabled={busy} onPress={() => void confirmBlockChange()}><Text>{busy ? 'جارٍ التنفيذ…' : blocked ? 'إلغاء الحظر' : 'تأكيد الحظر'}</Text></Pressable>
+          <Pressable oasisKind="plain" style={social.menuRow} disabled={busy} onPress={() => setConfirmBlock(false)}><Text style={{color:colors.muted}}>إلغاء</Text></Pressable>
+        </View></View>
+      </Modal>
+      <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
+        <View style={social.menuOverlay}><Pressable oasisKind="plain" style={StyleSheet.absoluteFillObject} onPress={() => setMenuOpen(false)} accessibilityLabel="إغلاق الخيارات" /><View style={[social.menu,{backgroundColor:colors.surface}]}>
+          <Text style={[social.name,{fontSize:20,color:colors.ink}]}>خيارات الملف</Text>
+          <Pressable oasisKind="plain" style={social.menuRow} onPress={() => {setMenuOpen(false);void handleShareProfile();}}><Share2 size={20} color={colors.ink}/><Text style={{color:colors.ink}}>مشاركة رابط الملف</Text></Pressable>
+          {own && <Pressable oasisKind="plain" style={social.menuRow} onPress={() => {setMenuOpen(false);router.push('/profile?tab=settings');}}><Settings size={20} color={colors.ink}/><Text style={{color:colors.ink}}>الإعدادات والتخصيص</Text></Pressable>}
+          {!!currentUserId && !own && <><Pressable oasisKind="plain" style={social.menuRow} onPress={() => {setMenuOpen(false);toggleBlock();}}><UserRoundX size={20} color={colors.danger}/><Text style={{color:colors.danger}}>{blocked ? 'إلغاء الحظر' : 'حظر المستخدم'}</Text></Pressable><Pressable oasisKind="plain" style={social.menuRow} onPress={() => {setMenuOpen(false);router.push({pathname:'/report',params:{type:'user',id}});}}><ShieldCheck size={20} color={colors.danger}/><Text style={{color:colors.danger}}>إبلاغ عن الحساب</Text></Pressable></>}
+          <Pressable oasisKind="plain" style={social.menuRow} onPress={() => setMenuOpen(false)}><Text style={{color:colors.muted}}>إغلاق</Text></Pressable>
+        </View></View>
+      </Modal>
+      {!!shareNotice && <Pressable oasisKind="plain" onPress={() => setShareNotice('')} style={{padding:12,backgroundColor:colors.soft}}><Text accessibilityRole="alert" style={{color:colors.primary,textAlign:'center'}}>{shareNotice} · إغلاق</Text></Pressable>}
+      <ProfileConnections userId={id} kind={connections} onClose={() => setConnections(null)} />
       <AppHeader
         variant="sub"
         title={displayName}
@@ -620,222 +634,30 @@ export default function UserProfile() {
         contentContainerStyle={styles.page}
       >
         <View style={[styles.shell, { paddingTop: 14 }]}>
-          {/* Executive Hero Banner */}
-          <LinearGradient
-            colors={heroColors}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={[styles.hero, width < 720 && styles.heroCompact]}
-          >
-            {coverUrl && !coverFailed && (
-              <Image source={{ uri: coverUrl }} style={StyleSheet.absoluteFillObject} resizeMode="cover" onError={() => setCoverFailed(true)} />
-            )}
-            <LinearGradient colors={['rgba(4,10,8,0.16)', 'rgba(4,10,8,0.62)']} style={[StyleSheet.absoluteFillObject, { pointerEvents: 'none' }]} />
-            <View style={styles.heroGlowOne} />
-            <View style={styles.heroGlowTwo} />
-
-            <View style={styles.heroTop}>
-              {/* Avatar with Status Ring */}
-              <Pressable style={[styles.avatarRing, hasActiveStories && styles.avatarRingHasStory]} onPress={openProfileStories} accessibilityRole="button" accessibilityLabel={hasActiveStories ? "عرض يوميات هذا المستخدم، لديه قصة نشطة" : "عرض يوميات هذا المستخدم"}>
-                {profile.avatar_url && !anonymous && !profile.avatar_url.includes('blank-profile-picture') ? (
-                  <Image source={{ uri: profile.avatar_url }} style={styles.avatar as any} />
-                ) : (
-                  <View style={styles.avatarFallback}>
-                    <Text style={styles.avatarLetter}>
-                      {(profile.display_name || profile.username || 'ج')[0].toUpperCase()}
-                    </Text>
-                  </View>
-                )}
-                {hasActiveStories && (
-                  <View style={styles.storyAvailableBadge}>
-                    <Sparkles size={11} color={OASIS.colors.surface} />
-                  </View>
-                )}
-                {!anonymous ? (
-                  <AccountIdentityIcon
-                    role={profile.role}
-                    accountType={profile.account_type}
-                    isVerified={Boolean(profile.is_verified)}
-                    size={28}
-                    style={styles.accountIdentityMark}
-                  />
-                ) : null}
-              </Pressable>
-
-              {/* Action Buttons in Hero */}
-              <View style={[styles.heroActions, width < 720 && { maxWidth: '100%' }]}>
-                {own ? (
-                  <View style={styles.ownHeroActions}>
-                    <Pressable oasisKind="action"
-                      style={styles.editProfileBtn}
-                      onPress={() => router.push('/profile')}
-                    >
-                      <Edit3 size={15} color={OASIS.colors.surface} />
-                      <Text style={styles.editProfileText}>تعديل ملفي</Text>
-                    </Pressable>
-                    <Pressable oasisKind="action"
-                      style={styles.designProfileBtn}
-                      onPress={() => router.push({ pathname: '/profile', params: { tab: 'settings', section: 'design' } })}
-                    >
-                      <Palette size={15} color={OASIS.colors.surface} />
-                      <Text style={styles.editProfileText}>تخصيص</Text>
-                    </Pressable>
-                  </View>
-                ) : (
-                  <>
-                    {!blocked && !blockedByOther && (
-                      <Pressable oasisKind="action"
-                        style={[styles.followBtn, { backgroundColor: accentColor }, following && styles.followBtnActive]}
-                        onPress={toggleFollow}
-                        disabled={busy}
-                      >
-                        <UserCheck size={15} color={following ? OASIS.colors.primary : OASIS.colors.surface} />
-                        <Text style={[styles.followText, following && { color: OASIS.colors.primary }]}>
-                          {following ? 'تتابعه' : 'متابعة'}
-                        </Text>
-                      </Pressable>
-                    )}
-
-                    <Pressable oasisKind="action"
-                      style={[styles.messageBtn, { backgroundColor: accentColor }]}
-                      onPress={openMessage}
-                      disabled={busy}
-                    >
-                      <MessageCircle size={15} color={OASIS.colors.surface} />
-                      <Text style={styles.messageText}>مراسلة</Text>
-                    </Pressable>
-                  </>
-                )}
-              </View>
-            </View>
-
-            {/* Identity & Details */}
-            <View style={styles.heroIdentity}>
-              <View style={styles.nameRow}>
-                <Text style={styles.name}>{displayName}</Text>
-              </View>
-
-              {!anonymous && profile.username ? (
-                <Text style={styles.handle}>@{profile.username}</Text>
-              ) : null}
-
-              {!anonymous && profile.account_type === 'merchant' && profile.freelance_trade && profile.display_name ? (
-                <Text style={styles.accountOwnerLine}>يديره {profile.display_name}</Text>
-              ) : null}
-
-              {!anonymous ? (
-                <View style={styles.heroIdentityBadges}>
-                  <AccountIdentityBadge
-                    role={profile.role}
-                    accountType={profile.account_type}
-                    isVerified={Boolean(profile.is_verified)}
-                    compact
-                  />
-                  <AccountVerificationBadge
-                    role={profile.role}
-                    accountType={profile.account_type}
-                    isVerified={Boolean(profile.is_verified)}
-                    compact
-                  />
-                </View>
-              ) : null}
-
-              <View style={styles.heroLocation}>
-                <MapPin size={13} color="#a7f3d0" />
-                <Text style={styles.heroLocationText}>
-                  {[profile.district && `حي ${profile.district}`, profile.city].filter(Boolean).join(' · ') ||
-                    'المملكة العربية السعودية'}
-                </Text>
-              </View>
-            </View>
-
-            {!anonymous && profile.bio && profileCustomization?.section_visibility?.bio !== false && (
-              <View style={styles.bioBox}>
-                <Text style={styles.bio}>{profile.bio}</Text>
-              </View>
-            )}
-
-            {/* Trust and Badges Pills */}
-            <View style={styles.trustRow}>
-              <View style={styles.trustPill}>
-                <ShieldCheck size={13} color="#a7f3d0" />
-                <Text style={styles.trustText}>
-                  {profile.is_geoverified ? 'جار موثق بالحي' : 'عضو في الحي'}
-                </Text>
-              </View>
-
-              <View
-                style={[
-                  styles.trustPill,
-                  { backgroundColor: 'rgba(253, 230, 138, 0.22)', borderColor: 'rgba(253, 230, 138, 0.45)' },
-                ]}
-              >
-                <Sparkles size={13} color="#fde68a" />
-                <Text style={[styles.trustText, { color: '#fde68a' }]}>
-                  {stats.reputation || 0} نقطة سمعة
-                </Text>
-              </View>
-
-              {profileCustomization?.show_badges !== false && profileCustomization?.section_visibility?.achievements !== false && Array.isArray(profile.badges) &&
-                profile.badges.map((b: string, i: number) => (
-                  <View key={i} style={styles.customBadgePill}>
-                    <Text style={styles.customBadgeText}>{b}</Text>
-                  </View>
-                ))}
-            </View>
-          </LinearGradient>
-
-          {/* Elevated Stats Bar */}
-          {profileCustomization?.show_stats !== false && <OasisSurface oasisSurface="card" style={[styles.statsCard, { borderColor: `${accentColor}30` }]}>
-            <Stat label="السمعة" value={stats.reputation} />
-            <Stat label="متابعين" value={stats.followers} />
-            <Stat label="يتابع" value={stats.following} />
-            <Stat label="إسهامات" value={totalContributions} />
-          </OasisSurface>}
-
+          <ProfileHeader profile={profile} customization={profileCustomization} displayName={displayName} coverUri={coverUrl} stats={{...stats, contributions:totalContributions}} own={own} anonymous={anonymous} locked={locked} following={following} followedBy={followedBy} busy={busy || blocked || blockedByOther} hideContactActions={blocked || blockedByOther} hasStories={hasActiveStories} onAvatarPress={openProfileStories} onEdit={() => router.push('/profile?section=edit')} onDesign={() => router.push('/profile?tab=settings&section=design')} onSettings={() => router.push('/profile?tab=settings')} onFollowers={() => setConnections('followers')} onFollowing={() => setConnections('following')} onFollow={() => void toggleFollow()} onMessage={() => void openMessage()} />
           {!locked && (featuredItems.length > 0 || own) && (
             <View style={styles.content}>
-              <View style={styles.contentHead}>
+              {featuredItems.length > 0 && <View style={styles.contentHead}>
                 <View>
                   <Text style={[styles.contentTitle, { color: accentColor }]}>{profileCustomization?.featured_title || 'أعمالي المميزة'}</Text>
                   <Text style={styles.contentSub}>{featuredItems.length ? 'اختيارات مثبتة من هذا الجار' : 'اختر أفضل مساهماتك لتظهر هنا'}</Text>
                 </View>
                 {own && featuredItems.length > 0 && <Pressable style={styles.marketLink} onPress={() => router.push({ pathname: '/profile', params: { tab: 'settings', section: 'design' } })}><Text style={[styles.marketLinkText, { color: accentColor }]}>إدارة</Text><Edit3 size={14} color={accentColor} /></Pressable>}
-              </View>
+              </View>}
               {featuredItems.length > 0 ? (
                 <View style={[styles.grid, { gap: 12 }]}>
                   {featuredItems.map(item => <ActivityCard key={item._featuredType + ':' + item.id} type={item._featuredType === 'question' ? 'questions' : item._featuredType === 'service' ? 'services' : item._featuredType === 'request' ? 'requests' : 'market'} item={item} width={cardWidth} />)}
                 </View>
               ) : (
-                <View style={styles.featuredEmpty}>
-                  <Sparkles size={22} color={accentColor} />
-                  <Text style={styles.contentSub}>لم تثبّت أي عمل بعد. ثبّت الاستفسارات أو الخدمات أو الطلبات أو إعلانات السوق التي تفتخر بها.</Text>
-                  <ProfileCustomizationEntry accentColor={accentColor} compact />
-                </View>
+                <Pressable oasisKind="plain" onPress={() => router.push('/profile?tab=settings&section=design')} style={{flexDirection:'row-reverse',alignItems:'center',gap:12,padding:16,borderWidth:1,borderColor:colors.line,borderRadius:16,backgroundColor:colors.surface}}><Sparkles size={19} color={accentColor}/><View style={{flex:1,gap:4}}><Text style={{color:colors.ink,textAlign:'right',fontWeight:'700',fontSize:13}}>أبرز أفضل مشاركاتك</Text><Text style={{color:colors.muted,textAlign:'right',fontSize:12}}>اختر مساهمات لتثبيتها في ملفك</Text></View><ChevronLeft size={18} color={colors.muted}/></Pressable>
               )}
             </View>
           )}
 
           {/* Activity Category Tabs */}
           <OasisSurface oasisSurface="card" style={styles.tabsCard}>
-            <ScrollView style={{ direction: 'rtl' }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.tabs, { direction: 'ltr' }]}>
-              {TABS.filter(({ id: key }) => (key !== 'answers' || own) && (key !== 'services' || (profileCustomization && profileCustomization.section_visibility && profileCustomization.section_visibility.services !== false)) && (key !== 'questions' || !(profileCustomization && profileCustomization.section_visibility && profileCustomization.section_visibility.questions === false)) && (key !== 'market' || !(profileCustomization && profileCustomization.section_visibility && profileCustomization.section_visibility.products === false)) && (key !== 'requests' || !(profileCustomization && profileCustomization.section_visibility && profileCustomization.section_visibility.requests === false)) && (key !== 'reviews' || !(profileCustomization && profileCustomization.section_visibility && profileCustomization.section_visibility.reviews === false))).sort((a, b) => {
-                const customOrder = (profileCustomization && profileCustomization.section_order) || [];
-                if (customOrder.length) {
-                  const aKey = a.id === 'market' ? 'products' : a.id === 'answers' ? 'questions' : a.id === 'requests' ? 'services' : a.id;
-                  const bKey = b.id === 'market' ? 'products' : b.id === 'answers' ? 'questions' : b.id === 'requests' ? 'services' : b.id;
-                  return customOrder.indexOf(aKey) - customOrder.indexOf(bKey);
-                }
-                const accountOrder: Record<string, Tab[]> = {
-                  merchant: ['market', 'services', 'reviews', 'questions', 'requests', 'answers'],
-                  freelance: ['services', 'reviews', 'market', 'questions', 'requests', 'answers'],
-                  provider: ['services', 'reviews', 'questions', 'requests', 'market', 'answers'],
-                  idea: ['questions', 'requests', 'services', 'market', 'reviews', 'answers'],
-                  standard: ['questions', 'requests', 'market', 'services', 'reviews', 'answers'],
-                };
-                const order = accountOrder[profile.account_type || 'standard'] || accountOrder.standard;
-                return order.indexOf(a.id) - order.indexOf(b.id);
-              }).map(({ id: key, label, icon: Icon }) => {
+            <ScrollView ref={tabsScrollRef} onLayout={event => {tabViewport.current=event.nativeEvent.layout.width;revealActiveTab();}} onContentSizeChange={() => revealActiveTab()} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
+              {visibleTabs.map(({ id: key, label, icon: Icon }) => {
                 const count =
                   key === 'market'
                     ? stats.market
@@ -850,14 +672,15 @@ export default function UserProfile() {
                     : stats.answers;
                 const active = tab === key;
                 return (
-                  <Pressable oasisVariant={active ? 'primary' : 'secondary'} oasisKind="chip"
+                  <Pressable oasisKind="plain" accessibilityRole="tab" accessibilityState={{selected: active}}
                     key={key}
+                    onLayout={event => {tabMetrics.current[key]=event.nativeEvent.layout;if(key===tab) revealActiveTab(key);}}
                     onPress={() => { setTab(key); void loadTabData(key, id, currentUserId); }}
-                    style={[styles.tab, active && styles.tabActive]}
+                    style={[styles.tab, active && {borderBottomColor: accentColor, borderBottomWidth: 3}]}
                   >
-                    <Icon size={15} color={active ? OASIS.colors.surface : OASIS.colors.muted} />
-                    <Text style={[styles.tabText, active && styles.tabTextActive]}>{label}</Text>
-                    <Text style={[styles.tabCount, active && styles.tabCountActive]}>({count})</Text>
+                    <Icon size={15} color={active ? accentColor : colors.muted} />
+                    <Text style={[styles.tabText, active && {color: accentColor}]}>{label}</Text>
+                    <Text style={[styles.tabCount, active && {color: accentColor}]}>({count})</Text>
                   </Pressable>
                 );
               })}
@@ -891,7 +714,7 @@ export default function UserProfile() {
                 </Pressable>
               )}
             </OasisSurface>
-          ) : (
+          ) : !visibleTabs.length ? <View style={styles.empty}><Text style={styles.emptyTitle}>لا توجد أقسام ظاهرة</Text><Text style={styles.emptyText}>{own ? 'يمكنك إظهار أقسام ملفك من إعدادات التخصيص.' : 'اختار صاحب الحساب إخفاء أقسام نشاطه.'}</Text>{own && <ProfileCustomizationEntry accentColor={accentColor} compact />}</View> : (
             <View style={styles.content}>
               <View style={styles.contentHead}>
                 <View>
@@ -927,7 +750,7 @@ export default function UserProfile() {
                       {!!item.body && <Text style={styles.reviewBody}>{item.body}</Text>}
                     </OasisSurface>
                   )) : currentData.map(item => (
-                    <ActivityCard key={item.id} type={tab} item={item} width={cardWidth} />
+                    <ActivityCard key={item.id} type={tab} item={item} width={cardWidth} author={profile} />
                   ))}
                 </View>
               )}
@@ -983,7 +806,8 @@ function Empty({ tab, own }: { tab: Tab; own: boolean }) {
   );
 }
 
-function ActivityCard({ type, item, width }: { type: Tab; item: any; width: number }) {
+function ActivityCard({ type, item, width, author }: { type: Tab; item: any; width: number; author?: any }) {
+  const { colors } = useTheme();
   const image = item.image_url || item.cover_url;
   const title =
     type === 'services'
@@ -1036,6 +860,21 @@ function ActivityCard({ type, item, width }: { type: Tab; item: any; width: numb
       router.push({ pathname: '/question', params: { id: item.question_id } });
     }
   };
+
+  if (author && (type === 'questions' || type === 'answers' || type === 'requests')) {
+    return <Pressable oasisKind="plain" style={[social.post,{backgroundColor:colors.surface,borderColor:colors.line}]} onPress={handleCardPress} accessibilityLabel={title || 'عرض المشاركة'}>
+      {item.is_pinned && <View style={social.metaItem}><Star size={13} color={colors.muted}/><Text style={{color:colors.muted,fontSize:11}}>مشاركة مثبتة</Text></View>}
+      <View style={{flexDirection:'row-reverse',gap:12}}>
+        {author.avatar_url ? <Image source={{uri:author.avatar_url}} style={{width:40,height:40,borderRadius:20}} /> : <View style={{width:40,height:40,borderRadius:20,backgroundColor:colors.soft,alignItems:'center',justifyContent:'center'}}><User size={19} color={colors.primary}/></View>}
+        <View style={{flex:1,gap:9,minWidth:0}}>
+          <View style={{flexDirection:'row-reverse',flexWrap:'wrap',alignItems:'center',gap:6}}><Text style={{color:colors.ink,fontWeight:'800'}}>{author.display_name || author.username}</Text><AccountStatusMark role={author.role} accountType={author.account_type} isVerified={Boolean(author.is_verified)} size={15}/><Text style={{color:colors.muted,fontSize:12}}>@{author.username}</Text><Text style={{color:colors.muted,fontSize:11}}>{new Date(item.created_at).toLocaleDateString('ar-SA',{day:'numeric',month:'short'})}</Text></View>
+          <Text style={{color:colors.ink,fontSize:16,lineHeight:25,textAlign:'right',fontWeight:'700'}}>{title}</Text>
+          {!!subtitle && <Text style={{color:colors.ink,fontSize:14,lineHeight:25,textAlign:'right'}} numberOfLines={5}>{subtitle}</Text>}
+          <View style={[social.metadata,{justifyContent:'space-between'}]}><View style={social.metaItem}><MapPin size={13} color={colors.muted}/><Text style={{color:colors.muted,fontSize:11}}>{itemDistrict || 'مجتمع حيّنا'}</Text></View>{(item.view_count != null || item.views_count != null) && <Text style={{color:colors.muted,fontSize:11}}>{Number(item.view_count ?? item.views_count ?? 0).toLocaleString('ar-SA')} مشاهدة</Text>}<Text style={{color:colors.primary,fontSize:12}}>عرض {type === 'answers' ? 'النقاش' : 'التفاصيل'} ←</Text></View>
+        </View>
+      </View>
+    </Pressable>;
+  }
 
   return (
     <Pressable oasisKind="card"
@@ -1116,7 +955,7 @@ function ActivityCard({ type, item, width }: { type: Tab; item: any; width: numb
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: OASIS.colors.background },
   page: { paddingBottom: 110 },
-  shell: { width: '100%', maxWidth: 1080, alignSelf: 'center', paddingHorizontal: 16 },
+  shell: { width: '100%', maxWidth: 820, alignSelf: 'center', paddingHorizontal: 16 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: OASIS.colors.background, padding: 16 },
   loadingText: { marginTop: 10, color: OASIS.colors.primary, fontWeight: '600', fontSize: 13 },
   hero: { borderRadius: 14, padding: 18, overflow: 'hidden', minHeight: 250 },
@@ -1141,12 +980,8 @@ const styles = StyleSheet.create({
   },
   heroTop: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 10 },
   avatarRing: {
-    position: 'relative',
-    width: 80,
-    height: 80,
-    borderRadius: 26,
-    padding: 3,
-    backgroundColor: 'rgba(255,255,255,0.28)',
+    position: 'relative', width: 104, height: 104, borderRadius: 52,
+    padding: 4, marginTop: -52, backgroundColor: OASIS.colors.surface,
   },
   avatarRingHasStory: {
     backgroundColor: '#fbbf24',
@@ -1172,10 +1007,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     zIndex: 3,
   },
-  avatar: { width: 74, height: 74, borderRadius: 23 },
+  avatar: { width: 96, height: 96, borderRadius: 48 },
   avatarFallback: {
     flex: 1,
-    borderRadius: 23,
+    borderRadius: 48,
     backgroundColor: OASIS.colors.soft,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1218,7 +1053,7 @@ const styles = StyleSheet.create({
     gap: 8,
     flexWrap: 'wrap',
     justifyContent: 'flex-end',
-    maxWidth: '72%',
+    maxWidth: '100%',
   },
   followBtn: {
     height: 38,
@@ -1243,7 +1078,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   messageText: { color: OASIS.colors.surface, fontWeight: '700', fontSize: 12.5 },
-  ownHeroActions: { flexDirection: 'row-reverse', gap: 8 },
+  ownHeroActions: { flexDirection: 'row-reverse', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' },
   designProfileBtn: {
     height: 38,
     paddingHorizontal: 14,
@@ -1266,7 +1101,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
-  editProfileText: { color: OASIS.colors.surface, fontWeight: '700', fontSize: 12.5 },
+  editProfileText: { color: OASIS.colors.ink, fontWeight: '700', fontSize: 12.5 },
   heroIdentity: { marginTop: 18, alignItems: 'flex-end' },
   nameRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 7 },
   name: { color: OASIS.colors.surface, fontSize: 20, fontWeight: '700', textAlign: 'right' },
@@ -1346,16 +1181,17 @@ const styles = StyleSheet.create({
   stat: { flex: 1, alignItems: 'center', paddingVertical: 8, borderLeftWidth: 1, borderLeftColor: '#f1f5f9' },
   statValue: { color: OASIS.colors.ink, fontSize: 17, fontWeight: '700' },
   statLabel: { color: OASIS.colors.muted, fontSize: 11, fontWeight: '700', marginTop: 2 },
-  tabsCard: { marginTop: 14, backgroundColor: OASIS.colors.surface, borderRadius: 16, borderWidth: 1, borderColor: OASIS.colors.line, padding: 5 },
+  tabsCard: { marginTop: 16, backgroundColor: OASIS.colors.surface, borderRadius: 0, borderBottomWidth: 1, borderColor: OASIS.colors.line, padding: 0 },
   tabs: { flexDirection: 'row-reverse', gap: 6 },
   tab: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 5,
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-    backgroundColor: OASIS.colors.background,
+    paddingVertical: 17,
+    borderRadius: 0,
+    borderBottomWidth: 3,
+    borderBottomColor: 'transparent',
   },
   tabActive: { backgroundColor: OASIS.colors.primary },
   tabText: { color: OASIS.colors.muted, fontSize: 12, fontWeight: '600' },
@@ -1457,4 +1293,8 @@ const styles = StyleSheet.create({
     zIndex: 5,
   },
 
+});
+
+const social = StyleSheet.create({
+post:{width:'100%',padding:18,borderBottomWidth:1,gap:10},menuOverlay:{flex:1,backgroundColor:'rgba(0,0,0,.4)',justifyContent:'center',alignItems:'center',padding:24},menu:{width:'100%',maxWidth:400,borderRadius:24,padding:24,gap:8},menuRow:{flexDirection:'row-reverse',alignItems:'center',gap:12,paddingVertical:14},profile:{borderWidth:1,borderRadius:20,overflow:'hidden'},cover:{width:'100%',overflow:'hidden'},identityBody:{paddingHorizontal:20,paddingBottom:24},topLine:{flexDirection:'row-reverse',justifyContent:'space-between',alignItems:'flex-start',gap:12,marginBottom:14},name:{fontSize:26,fontWeight:'800',textAlign:'right'},bio:{fontSize:15,lineHeight:26,textAlign:'right',marginVertical:6},metadata:{flexDirection:'row-reverse',flexWrap:'wrap',gap:14,marginTop:5},metaItem:{flexDirection:'row-reverse',alignItems:'center',gap:6},numbers:{flexDirection:'row-reverse',flexWrap:'wrap',gap:22,marginTop:12,marginBottom:6},followsYou:{paddingHorizontal:8,paddingVertical:3,borderRadius:5,fontSize:11},iconButton:{width:40,height:40,borderRadius:20,borderWidth:1,alignItems:'center',justifyContent:'center'},coverEdit:{position:'absolute',left:16,top:16,backgroundColor:'rgba(0,0,0,.4)',padding:10,borderRadius:24,flexDirection:'row-reverse',gap:8,alignItems:'center'}
 });

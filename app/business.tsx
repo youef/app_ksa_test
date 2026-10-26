@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View, ActivityIndicator, Platform } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
-import { AccountIdentityBadge, AccountVerificationBadge } from '@/components/profile/AccountIdentityBadge';
+import { AccountIdentityBadge } from '@/components/profile/AccountIdentityBadge';
 import { C } from '@/lib/ui';
 import {
   ChevronRight,
@@ -200,7 +200,6 @@ export default function Business() {
                 </Text>
                 <View style={styles.ownerBadges}>
                   <AccountIdentityBadge role={business.owner.role} accountType={business.owner.account_type} isVerified={Boolean(business.owner.is_verified)} compact />
-                  <AccountVerificationBadge role={business.owner.role} accountType={business.owner.account_type} isVerified={Boolean(business.owner.is_verified)} compact />
                 </View>
               </View>
               <ChevronRight size={18} color="#94A3B8" />
@@ -221,7 +220,6 @@ export default function Business() {
                 </Text>
                 <View style={styles.ownerBadges}>
                   <AccountIdentityBadge role={business.owner.role} accountType={business.owner.account_type} isVerified={Boolean(business.owner.is_verified)} compact />
-                  <AccountVerificationBadge role={business.owner.role} accountType={business.owner.account_type} isVerified={Boolean(business.owner.is_verified)} compact />
                 </View>
               </View>
               <ChevronRight size={18} color="#94A3B8" />
