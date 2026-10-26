@@ -2,7 +2,7 @@ import { OasisArtwork } from '@/components/oasis/OasisPrimitives';
 import { OasisPressable as Pressable, OasisSurface } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
 import { useCallback, useEffect, useState } from 'react';
-import { Image, ImageBackground, Keyboard, NativeScrollEvent, NativeSyntheticEvent, Platform, StyleSheet, Text, View } from 'react-native';
+import { Image, Keyboard, NativeScrollEvent, NativeSyntheticEvent, Platform, StyleSheet, Text, View } from 'react-native';
 import { router, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Home, Compass, Plus, Store, MoreHorizontal } from 'lucide-react-native';
@@ -210,7 +210,8 @@ export default function BottomNav() {
 
   return (
     <Animated.View pointerEvents="box-none" style={[styles.dock, { paddingBottom: bottomPadding }, animatedStyle]}>
-      <ImageBackground source={{ uri: 'https://appksatest.vercel.app/welcome/hayna-bottom-nav-background.png' }} resizeMode="stretch" imageStyle={styles.navArtwork} style={styles.surface}>
+      <View style={styles.surface}>
+        <Image source={require('../public/welcome/hayna-bottom-nav-background.png')} resizeMode="cover" style={styles.navArtwork} pointerEvents="none" />
         <View style={styles.heritageGlow} />
         <View style={styles.row}>
           {TABS.map((tab) => {
@@ -238,21 +239,21 @@ export default function BottomNav() {
             );
           })}
         </View>
-      </ImageBackground>
+      </View>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   dock: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 100, backgroundColor: 'transparent', paddingHorizontal: 12, paddingTop: 14 },
-  surface: { height: 76, maxWidth: 720, width: '100%', alignSelf: 'center', borderRadius: 38, backgroundColor: 'rgba(255,248,230,0.30)', borderWidth: 1.5, borderColor: '#C5AD66', overflow: 'visible', shadowColor: '#064E3B', shadowOpacity: 0.16, shadowRadius: 16, shadowOffset: { width: 0, height: 5 }, elevation: 10 },
-  navArtwork: { borderRadius: 38 },
-  heritageGlow: { ...StyleSheet.absoluteFillObject, borderRadius: 38, backgroundColor: 'rgba(209,250,229,0.08)' },
-  row: { height: 76, direction: 'ltr', flexDirection: 'row-reverse', alignItems: 'center', paddingHorizontal: 6 },
+  surface: { height: 88, maxWidth: 560, width: '100%', alignSelf: 'center', borderRadius: 30, backgroundColor: 'transparent', borderWidth: 0, overflow: 'visible', shadowColor: '#064E3B', shadowOpacity: 0.16, shadowRadius: 16, shadowOffset: { width: 0, height: 5 }, elevation: 10 },
+  navArtwork: { position: 'absolute', left: 0, right: 0, bottom: 0, width: '100%', height: 88, borderRadius: 30 },
+  heritageGlow: { ...StyleSheet.absoluteFillObject, borderRadius: 30, backgroundColor: 'transparent' },
+  row: { height: 76, marginTop: 12, direction: 'ltr', flexDirection: 'row-reverse', alignItems: 'center', paddingHorizontal: 6 },
   tab: { flex: 1, minWidth: 0, height: 76, alignItems: 'center', justifyContent: 'center', gap: 3 },
   orb: { width: 49, height: 49, borderRadius: 25, backgroundColor: 'rgba(255,255,255,0.79)', borderWidth: 1.5, borderColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', shadowColor: '#456A55', shadowOpacity: 0.08, shadowRadius: 5, elevation: 2 },
   activeOrb: { borderColor: '#55D8A5', borderWidth: 2.5, backgroundColor: '#F1FFF8' },
-  createOrb: { width: 66, height: 66, borderRadius: 33, marginTop: -30, backgroundColor: '#006D4E', borderWidth: 5, borderColor: '#F9F4DF', shadowColor: '#006D4E', shadowOpacity: 0.3, shadowRadius: 10, elevation: 9 },
+  createOrb: { width: 64, height: 64, borderRadius: 32, marginTop: -18, backgroundColor: '#006D4E', borderWidth: 5, borderColor: '#F9F4DF', shadowColor: '#006D4E', shadowOpacity: 0.3, shadowRadius: 10, elevation: 9 },
   label: { fontSize: 10, lineHeight: 13, fontWeight: '600', color: '#365C4D', textAlign: 'center', writingDirection: 'rtl' },
   labelActive: { color: '#047857', fontWeight: '800' },
   activeDot: { position: 'absolute', bottom: 2, width: 17, height: 4, borderRadius: 3, backgroundColor: '#047857' },
