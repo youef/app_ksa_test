@@ -19,6 +19,7 @@ import {
   LogOut,
   FileText,
   Mail,
+  GraduationCap,
 } from 'lucide-react-native';
 
 import { AppHeader } from '@/components/shared/AppHeader';
@@ -38,6 +39,7 @@ type MenuItem = {
 const DISCOVER: MenuItem[] = [
   { title: 'سوق الحي', subtitle: 'المنتجات والخدمات والمنشآت', href: '/market', Icon: ShoppingBag },
   { title: 'خريطة الحي', subtitle: 'اكتشف ما حولك على خريطة حيّنا', href: '/map', Icon: Map },
+  { title: 'توصيل المدارس', subtitle: 'اطلب توصيلًا أو شارك مقاعد مع أولياء الأمور', href: '/carpooling', Icon: GraduationCap },
   { title: 'الاستفسارات', subtitle: 'أسئلة وتجارب أهل الحي', href: '/questions', Icon: MessageCircle },
   { title: 'دليل الأعمال', subtitle: 'المنشآت ومقدمو الخدمات', href: '/directory', Icon: Store },
   { title: 'البثوث المباشرة', subtitle: 'لقاءات ومحتوى المجتمع', href: '/lives', Icon: Radio },
@@ -122,7 +124,7 @@ export default function More() {
         </Pressable>
 
         <TextInput accessibilityLabel="البحث في الخدمات والإعدادات" value={query} onChangeText={setQuery} placeholder="ابحث عن خدمة أو إعداد…" style={{ minHeight: 44, paddingHorizontal: 12, borderWidth: 1, borderColor: colors.line, borderRadius: 12, backgroundColor: colors.surface, color: colors.ink, textAlign: 'right' }} />
-        <MenuGroup title="استكشف حيّنا" query={query} items={DISCOVER.filter(item => !((item.href === '/lives' && flags.live === false) || (item.href === '/market' && flags.market === false) || (item.href === '/map' && flags.map === false) || (item.href === '/directory' && flags.directory === false) || (item.href === '/questions' && flags.questions === false)))} />
+        <MenuGroup title="استكشف حيّنا" query={query} items={DISCOVER.filter(item => !((item.href === '/lives' && flags.live === false) || (item.href === '/market' && flags.market === false) || (item.href === '/map' && flags.map === false) || (item.href === '/directory' && flags.directory === false) || (item.href === '/questions' && flags.questions === false) || (item.href === '/carpooling' && flags.carpooling === false)))} />
 
         <MenuGroup
           title="المساعدة"
