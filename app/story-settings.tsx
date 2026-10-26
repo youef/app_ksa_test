@@ -213,7 +213,7 @@ export default function StorySettingsScreen() {
 }
 
 const s = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
+  screen: { flex: 1, backgroundColor: OASIS.colors.background },
   headerIcon: { width: 36, height: 36, borderRadius: 12, backgroundColor: OASIS.colors.soft, alignItems: 'center', justifyContent: 'center' },
   content: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 24, gap: 14, maxWidth: 760, width: '100%', alignSelf: 'center' },
   heroCard: { backgroundColor: OASIS.colors.soft, borderRadius: 14, borderWidth: 1, borderColor: '#bbf7d0', padding: 17, gap: 16 },

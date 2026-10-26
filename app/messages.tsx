@@ -902,7 +902,7 @@ function formatTime(dateStr: string): string {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: 'transparent' },
+  container: { flex: 1, backgroundColor: OASIS.colors.background },
   headerRightActions: {
     flexDirection: 'row-reverse',
     alignItems: 'center',

@@ -525,7 +525,7 @@ export default function ToolsLendingScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: 'transparent' },
+  container: { flex: 1, backgroundColor: OASIS.colors.background },
   hero: {
     paddingTop: Platform.OS === 'ios' ? 52 : 24,
     paddingHorizontal: 16,

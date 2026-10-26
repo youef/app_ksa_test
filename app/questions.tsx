@@ -302,14 +302,14 @@ export default function Questions() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'transparent',
+    backgroundColor: '#f4f7f5',
   },
   feedContent: {
     flexGrow: 1,
     width: '100%', maxWidth: 760, alignSelf: 'center',
     paddingTop: 8,
     paddingHorizontal: 12,
-    backgroundColor: 'transparent',
+    backgroundColor: '#f4f7f5',
   },
   locationButton: {
     width: 38,

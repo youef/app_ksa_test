@@ -253,7 +253,7 @@ function Stat({ value, label }: { value: string; label: string }) {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
+  screen: { flex: 1, backgroundColor: '#F4F7FB' },
   content: { padding: 14, gap: 13 },
   hero: { borderRadius: 14, padding: 18, gap: 12 },
   heroTop: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between' },

@@ -864,7 +864,7 @@ const styles = StyleSheet.create({
 });
 
 const screenStyles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: 'transparent' },
+  container: { flex: 1, backgroundColor: OASIS.colors.background },
   hero: {
     paddingTop: Platform.OS === 'ios' ? 54 : 40,
     paddingHorizontal: 16,

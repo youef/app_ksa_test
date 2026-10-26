@@ -360,7 +360,7 @@ export default function Locations() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: 'transparent' },
+  container: { flex: 1, backgroundColor: OASIS.colors.background },
 
   // Navbar
   navbar: {

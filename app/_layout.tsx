@@ -1,7 +1,7 @@
 import { OasisPressable as Pressable } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, ImageBackground, Platform, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Platform, Text, View } from 'react-native';
 import { Redirect, router, Stack, usePathname } from 'expo-router';
 import Head from 'expo-router/head';
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
@@ -97,8 +97,6 @@ function RootContent() {
 
   const { colors, isDark } = useTheme();
   const path = pathname.replace(/\/+$/, '') || '/';
-  // Keep the dedicated welcome and login artwork completely independent.
-  const useHeritageBackground = !['/', '/index', '/welcome', '/auth', '/login'].includes(path);
   const liveFullScreen = path === '/live' || path.startsWith('/live/');
   const storyFullScreen = ['/stories', '/create-story', '/story', '/story-viewers', '/story-settings'].some(route => path === route || path.startsWith(route + '/'));
   const hideBottomNav = ['/ask', '/service', '/new-service', '/new-listing', '/admin', '/admin-pro', '/admin-support', '/admin-marketplace', '/admin-moderation', '/admin-broadcast'].some(route => path === route || path.startsWith(route + '/'));
@@ -144,17 +142,7 @@ function RootContent() {
       <SafeAreaProvider initialMetrics={initialWindowMetrics}>
         <DynamicIslandProvider>
           <DialogProvider>
-            <View style={{ flex: 1, position: 'relative', backgroundColor: useHeritageBackground && !isDark ? '#F8FAF7' : colors.background, width: '100%', maxWidth: path.startsWith('/admin') ? 1440 : path === '/map' || path.startsWith('/live/') ? 1280 : path === '/' ? 1100 : 820, alignSelf: 'center' }}>
-              {useHeritageBackground ? (
-                <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
-                  <ImageBackground
-                    source={require('../public/welcome/hayna-app-background.png')}
-                    resizeMode="cover"
-                    style={StyleSheet.absoluteFillObject}
-                    imageStyle={{ opacity: isDark ? 0.16 : 0.27 }}
-                  />
-                </View>
-              ) : null}
+            <View style={{ flex: 1, position: 'relative', backgroundColor: colors.background, width: '100%', maxWidth: path.startsWith('/admin') ? 1440 : path === '/map' || path.startsWith('/live/') ? 1280 : path === '/' ? 1100 : 820, alignSelf: 'center' }}>
               {!configReady ? <PendingScreen /> : maintenance.enabled && sessionReady && !isAdmin && path !== '/auth' ? <View style={{ flex: 1, backgroundColor: OASIS.colors.background, alignItems: 'center', justifyContent: 'center', padding: 16 }}><Text style={{ fontSize: 28 }}>🛠️</Text><Text style={{ fontSize: 20, fontWeight: '700', color: OASIS.colors.ink, marginTop: 14 }}>نعتذر، المنصة تحت الصيانة</Text><Text style={{ fontSize: 15, color: OASIS.colors.muted, textAlign: 'center', lineHeight: 25, marginTop: 10 }}>{maintenance.message || 'نعمل على تحسين تجربتكم، يرجى العودة لاحقاً.'}</Text><Pressable onPress={() => router.push('/auth')} style={{ marginTop: 16, backgroundColor: OASIS.colors.primary, paddingHorizontal: 22, paddingVertical: 12, borderRadius: 14 }}><Text style={{ color: OASIS.colors.surface, fontWeight: '600' }}>دخول المدير</Text></Pressable></View> : maintenance.enabled && isAdmin && path !== '/admin' ? <Redirect href="/admin" /> : protectCurrentRoute ? (sessionReady ? <Redirect href="/auth" /> : <PendingScreen />) : routeBlocked ? <Redirect href="/home" /> : (
                 <Stack
                   screenOptions={{

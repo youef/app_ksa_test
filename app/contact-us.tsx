@@ -59,7 +59,7 @@ function Field({ label, value, onChange, placeholder, keyboard = 'default' }: an
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
+  screen: { flex: 1, backgroundColor: OASIS.colors.background },
   content: { padding: 14 },
   card: { backgroundColor: OASIS.colors.surface, borderWidth: 1, borderColor: OASIS.colors.line, borderRadius: 14, padding: 14, gap: 10 },
   title: { fontSize: 15, fontWeight: '700', color: OASIS.colors.ink, textAlign: 'right' },

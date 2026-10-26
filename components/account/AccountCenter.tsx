@@ -828,10 +828,10 @@ export default function AccountCenter() {
     );
   }
 
-  if (!profile) return <View style={[styles.loadingScreen,{backgroundColor: 'transparent'}]}><UserX size={42} color={colors.muted}/><Text style={{color:colors.ink,fontSize:20,fontWeight:'700'}}>تعذر تحميل حسابك</Text><Text style={{color:colors.muted,textAlign:'center',padding:20}}>{loadError || 'سجل الدخول لعرض بياناتك.'}</Text><Pressable oasisKind="action" oasisVariant="primary" onPress={() => void load()}><Text>إعادة المحاولة</Text></Pressable><Pressable onPress={() => router.replace('/auth')}><Text style={{color:colors.primary}}>تسجيل الدخول</Text></Pressable></View>;
+  if (!profile) return <View style={[styles.loadingScreen,{backgroundColor:colors.background}]}><UserX size={42} color={colors.muted}/><Text style={{color:colors.ink,fontSize:20,fontWeight:'700'}}>تعذر تحميل حسابك</Text><Text style={{color:colors.muted,textAlign:'center',padding:20}}>{loadError || 'سجل الدخول لعرض بياناتك.'}</Text><Pressable oasisKind="action" oasisVariant="primary" onPress={() => void load()}><Text>إعادة المحاولة</Text></Pressable><Pressable onPress={() => router.replace('/auth')}><Text style={{color:colors.primary}}>تسجيل الدخول</Text></Pressable></View>;
 
   return (
-    <View style={[styles.screen,{backgroundColor: 'transparent'}]}>
+    <View style={[styles.screen,{backgroundColor:colors.background}]}>
       <ProfileConnections userId={userId} kind={connections} onClose={() => setConnections(null)} />
       <Modal visible={!!confirmation} transparent animationType="fade" onRequestClose={() => setConfirmation(null)}><View style={accountStyles.overlay}><View style={[accountStyles.dialog,{backgroundColor:colors.surface}]} accessibilityViewIsModal><Text style={{color:colors.ink,fontSize:21,fontWeight:'800',textAlign:'right'}}>{confirmation?.title}</Text><Text style={{color:colors.muted,lineHeight:25,textAlign:'right'}}>{confirmation?.message}</Text>{confirmation?.buttons.map((item,index) => <Pressable key={index} oasisKind="action" oasisVariant={item.style === 'destructive' ? 'danger' : 'secondary'} onPress={() => {setConfirmation(null);item.onPress?.();}}><Text>{item.text}</Text></Pressable>)}</View></View></Modal>
       <AppHeader
@@ -1413,8 +1413,8 @@ function OwnedRow({ kind, item, onPress }: { kind: string; item: any; onPress: (
 }
 
 const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
-  loadingScreen: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: 'transparent' },
+  screen: { flex: 1, backgroundColor: colors.background },
+  loadingScreen: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: colors.background },
   loadingText: { color: colors.muted, fontSize: 12, fontWeight: '700' },
   headerAction: { width: 36, height: 36, borderRadius: 14, backgroundColor: colors.soft, alignItems: 'center', justifyContent: 'center' },
   content: { paddingHorizontal: 14, paddingTop: 12, gap: 14, maxWidth: 920, width: '100%', alignSelf: 'center' },

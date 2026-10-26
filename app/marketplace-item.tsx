@@ -95,7 +95,7 @@ export default function MarketplaceItemPage() {
 }
 
 const styles = StyleSheet.create({
-  screen:{flex:1,backgroundColor: 'transparent'},page:{padding:16,paddingBottom:24,gap:14,width:'100%',maxWidth:860,alignSelf:'center'},
+  screen:{flex:1,backgroundColor:OASIS.colors.background},page:{padding:16,paddingBottom:24,gap:14,width:'100%',maxWidth:860,alignSelf:'center'},
   center:{flex:1,alignItems:'center',justifyContent:'center',gap:10,padding:16,backgroundColor:OASIS.colors.background},muted:{fontSize:12,color:OASIS.colors.muted,textAlign:'right',lineHeight:19},
   title:{fontSize:21,fontWeight:'700',color:OASIS.colors.ink,textAlign:'right',lineHeight:31},image:{width:'100%',height:260,borderRadius:18,backgroundColor:OASIS.colors.line},imageFallback:{height:190,borderRadius:18,backgroundColor:OASIS.colors.soft,alignItems:'center',justifyContent:'center',gap:8},
   card:{backgroundColor:OASIS.colors.surface,borderRadius:14,borderWidth:1,borderColor:OASIS.colors.line,padding:18,gap:12},row:{flexDirection:'row-reverse',alignItems:'center',justifyContent:'space-between'},typePill:{backgroundColor:OASIS.colors.soft,paddingHorizontal:10,paddingVertical:5,borderRadius:9},typeText:{fontSize:11,fontWeight:'600',color:OASIS.colors.primary},status:{fontSize:11,color:OASIS.colors.muted,fontWeight:'700'},

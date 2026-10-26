@@ -112,7 +112,7 @@ export default function AdminMarketplace() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: 'transparent' },
+  root: { flex: 1, backgroundColor: OASIS.colors.background },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: OASIS.colors.background },
   content: { padding: 14, gap: 14, maxWidth: 900, width: '100%', alignSelf: 'center' },
   hero: { backgroundColor: OASIS.colors.deep, borderRadius: 14, padding: 18, alignItems: 'flex-end', gap: 8 },

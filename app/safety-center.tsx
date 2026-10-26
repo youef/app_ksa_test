@@ -101,7 +101,7 @@ function SectionHeading({title,subtitle}:{title:string;subtitle:string}) {
 }
 
 const styles = StyleSheet.create({
-  screen:{flex:1,backgroundColor: 'transparent'},
+  screen:{flex:1,backgroundColor:'#F4F7FB'},
   content:{padding:14,gap:13},
   hero:{borderRadius:14,padding:19,gap:12,overflow:'hidden'},
   heroTop:{flexDirection:'row-reverse',alignItems:'center',justifyContent:'space-between'},

@@ -734,7 +734,7 @@ function formatTimeAgo(dateStr: string) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'transparent',
+    backgroundColor: OASIS.colors.background,
   },
   headerHero: {
     paddingTop: Platform.OS === 'ios' ? 52 : 40,

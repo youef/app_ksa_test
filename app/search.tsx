@@ -643,7 +643,7 @@ export default function SearchPage() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'transparent',
+    backgroundColor: OASIS.colors.background,
   },
   headerMapBtn: {
     width: 36,

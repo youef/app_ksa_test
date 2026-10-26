@@ -260,7 +260,7 @@ function Field({ label, multiline, ...props }: any) {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
+  screen: { flex: 1, backgroundColor: '#F7F9F8' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#F7F9F8' },
   loading: { color: OASIS.colors.muted, fontSize: 12, fontWeight: '700' },
   content: { padding: 15, paddingBottom: 24, maxWidth: 720, width: '100%', alignSelf: 'center', gap: 12 },

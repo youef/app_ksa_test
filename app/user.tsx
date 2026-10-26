@@ -574,7 +574,7 @@ export default function UserProfile() {
       : answers;
 
   return (
-    <View style={[styles.screen, {backgroundColor: 'transparent'}]}>
+    <View style={[styles.screen, {backgroundColor: colors.background}]}>
       <Modal visible={confirmBlock} transparent animationType="fade" onRequestClose={() => {if (!busy) setConfirmBlock(false);}}>
         <View style={social.menuOverlay}><View style={[social.menu,{backgroundColor:colors.surface}]} accessibilityViewIsModal>
           <Text style={[social.name,{fontSize:20,color:colors.ink}]}>{blocked ? 'إلغاء حظر المستخدم؟' : 'حظر المستخدم؟'}</Text>
@@ -953,7 +953,7 @@ function ActivityCard({ type, item, width, author }: { type: Tab; item: any; wid
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
+  screen: { flex: 1, backgroundColor: OASIS.colors.background },
   page: { paddingBottom: 110 },
   shell: { width: '100%', maxWidth: 820, alignSelf: 'center', paddingHorizontal: 16 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: OASIS.colors.background, padding: 16 },

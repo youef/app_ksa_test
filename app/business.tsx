@@ -306,7 +306,7 @@ export default function Business() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'transparent',
+    backgroundColor: OASIS.colors.background,
   },
   scroll: {
     paddingBottom: 24,

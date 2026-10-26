@@ -7,7 +7,7 @@ export const chatStyles = StyleSheet.create({
     minHeight: Platform.OS === 'web' ? ('100vh' as any) : undefined,
     width: '100%',
     alignSelf: 'stretch',
-    backgroundColor: 'transparent',
+    backgroundColor: OASIS.colors.background,
   },
   inner: {
     width: '100%',

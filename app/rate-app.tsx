@@ -106,7 +106,7 @@ export default function RateAppScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen:{flex:1,backgroundColor: 'transparent'},content:{padding:14,gap:13},
+  screen:{flex:1,backgroundColor:'#F4F7FB'},content:{padding:14,gap:13},
   hero:{borderRadius:14,padding:18,gap:12},heroTop:{flexDirection:'row-reverse',alignItems:'center',justifyContent:'space-between'},heroIcon:{width:50,height:50,borderRadius:16,backgroundColor:'rgba(255,255,255,0.14)',alignItems:'center',justifyContent:'center'},heroPill:{flexDirection:'row-reverse',alignItems:'center',gap:5,backgroundColor:'rgba(255,255,255,0.12)',paddingHorizontal:9,paddingVertical:6,borderRadius:14},heroPillText:{fontSize:11,fontWeight:'700',color:'#FEF3C7'},heroTitle:{fontSize:22,fontWeight:'700',color:OASIS.colors.surface,textAlign:'right'},heroDesc:{fontSize:12,color:'#FEF3C7',lineHeight:20,textAlign:'right'},heroFoot:{flexDirection:'row-reverse',alignItems:'center',gap:6,marginTop:3},heroFootText:{fontSize:11,color:'#FDE68A',fontWeight:'700'},
   loading:{paddingVertical:24,alignItems:'center',gap:10},loadingText:{fontSize:12,color:OASIS.colors.muted},
   savedBanner:{flexDirection:'row-reverse',alignItems:'center',gap:8,padding:12,borderRadius:13,backgroundColor:OASIS.colors.soft,borderWidth:1,borderColor:'#A7F3D0'},savedText:{flex:1,fontSize:11,color:OASIS.colors.deep,fontWeight:'600',textAlign:'right'},

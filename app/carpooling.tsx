@@ -404,7 +404,7 @@ export default function CarpoolingScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: 'transparent' },
+  container: { flex: 1, backgroundColor: OASIS.colors.background },
   headerActionBtn: {
     flexDirection: 'row-reverse',
     alignItems: 'center',

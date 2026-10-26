@@ -2,7 +2,7 @@ import { oasisAssets } from '@/components/oasis/assets';
 import { OasisPressable as Pressable } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Platform, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, ImageBackground, Modal, Platform, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SlidersHorizontal, X, Check, Clock3, TrendingUp, MapPin, LayoutGrid, HandHelping, PackageOpen, CircleHelp, Store, Siren, UserRound, Hourglass, MessageCircle, CircleCheck, CalendarDays, CalendarRange, CalendarClock, RotateCcw, ListFilter } from 'lucide-react-native';
 
 const FILTER_OPTION_ICONS: Record<string, typeof Check> = {
@@ -216,7 +216,7 @@ export default function Home() {
   }, [feed.hasMore, feed.loadingMore, feed.loading, feed.loadMore]);
 
   return (
-    <View style={[styles.container, layout.page, { backgroundColor: 'transparent' }]}>
+    <View style={[styles.container, layout.page, { backgroundColor: colors.background }]}>
 
       <AppHeader
         variant="home"
@@ -227,8 +227,12 @@ export default function Home() {
         unreadMessagesCount={feed.unreadMessagesCount}
       />
 
-      {/* The shared root owns the heritage background; do not draw it twice. */}
-      <View style={{ flex: 1, backgroundColor: 'transparent' }}>
+      <ImageBackground
+        source={{ uri: 'https://appksatest.vercel.app/welcome/hayna-app-background.png' }}
+        resizeMode="cover"
+        imageStyle={{ opacity: isDark ? 0.16 : 0.27 }}
+        style={{ flex: 1, backgroundColor: isDark ? colors.background : '#F8FAF7' }}
+      >
       <ScrollView
         style={{ flex: 1, backgroundColor: 'transparent' }}
         showsVerticalScrollIndicator={false}
@@ -317,7 +321,7 @@ export default function Home() {
 
         </View>
       </ScrollView>
-      </View>
+      </ImageBackground>
 
       <Modal visible={filterOpen} transparent animationType="slide" onRequestClose={() => setFilterOpen(false)}>
         <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(15,23,42,0.38)' }}>

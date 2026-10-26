@@ -130,7 +130,7 @@ export default function StoryViewersScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, width: '100%', minHeight: '100%', backgroundColor: 'transparent' },
+  screen: { flex: 1, width: '100%', minHeight: '100%', backgroundColor: OASIS.colors.background },
   header: {
     minHeight: 64, paddingHorizontal: 18, paddingTop: 8, paddingBottom: 10,
     flexDirection: 'row-reverse', alignItems: 'center', gap: 12,

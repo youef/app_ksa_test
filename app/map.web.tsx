@@ -865,7 +865,7 @@ export default function WebMap() {
   const busy = tab === 'places' ? placesLoading : loading;
 
   return (
-    <View style={{ flex: 1, position: 'relative', backgroundColor: 'transparent' }}>
+    <View style={{ flex: 1, position: 'relative', backgroundColor: '#F5F6F2' }}>
       <AppHeader variant="sub" title="خريطة الحي" subtitle={city || 'استكشف المملكة'} fallbackRoute="/home"
         rightAction={<HeaderAction onPress={resetView} accessibilityLabel="العودة إلى نطاق المدينة"><Compass size={19} color="#17664F" /></HeaderAction>} />
       <style>{mapExplorerCss}</style>

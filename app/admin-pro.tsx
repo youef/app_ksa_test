@@ -156,7 +156,7 @@ function Quick({icon,value,label}:any){
 }
 
 const s=StyleSheet.create({
- page:{flex:1,backgroundColor: 'transparent'},
+ page:{flex:1,backgroundColor:'#F1F5F9'},
  top:{paddingTop:24,paddingHorizontal:16,paddingBottom:14,backgroundColor:'#08111F',flexDirection:'row-reverse',alignItems:'center',gap:10},
  kicker:{fontSize:11,fontWeight:'700',color:'#5EEAD4',letterSpacing:1.2},title:{fontSize:21,fontWeight:'700',color:OASIS.colors.surface,marginTop:2},sub:{fontSize:11,color:'#94A3B8',marginTop:3},
  back:{paddingHorizontal:11,paddingVertical:8,borderRadius:11,backgroundColor:OASIS.colors.ink},backText:{fontSize:11,fontWeight:'600',color:'#CBD5E1'},

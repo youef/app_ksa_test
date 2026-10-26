@@ -1042,7 +1042,7 @@ export default function Question() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'transparent',
+    backgroundColor: '#f4f8f6',
   },
   headerShareBtn: {
     width: 36,

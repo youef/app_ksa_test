@@ -160,7 +160,7 @@ export default function Report() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'transparent',
+    backgroundColor: OASIS.colors.background,
   },
   scroll: {
     paddingBottom: 14,
