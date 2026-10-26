@@ -505,7 +505,7 @@ export default function MapScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg },
+  root: { flex: 1, backgroundColor: 'transparent' },
   map: { flex: 1 },
   overlay: {
     position: 'absolute',

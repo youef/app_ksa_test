@@ -555,7 +555,7 @@ function Field({ multiline, suffix, icon, ...props }: React.ComponentProps<typeo
 const styles = StyleSheet.create({
   loadingScreen: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: OASIS.colors.background, gap: 12 },
   loadingText: { color: OASIS.colors.muted, fontSize: 13, fontWeight: '700' },
-  container: { flex: 1, backgroundColor: OASIS.colors.background },
+  container: { flex: 1, backgroundColor: 'transparent' },
   header: {
     backgroundColor: OASIS.colors.surface,
     paddingHorizontal: 16,
