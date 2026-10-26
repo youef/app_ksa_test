@@ -851,6 +851,27 @@ export default function LiveRoomScreen() {
           ))}
         </View>
 
+        {overlayVisible && !mediaRole && (
+          <View style={[styles.viewerRail, { bottom: Math.max(insets.bottom, 10) + 186 }]}>
+            <Pressable accessibilityLabel="إرسال تفاعل" onPress={() => setShowReactions((value) => !value)} style={styles.viewerRailButton}>
+              <View style={styles.viewerRailIcon}><Heart color="#fb7185" fill="#fb7185" size={24} /></View>
+              <Text style={styles.viewerRailLabel}>إعجاب</Text>
+            </Pressable>
+            <Pressable accessibilityLabel="إرسال هدية مجانية" onPress={() => setGiftOpen(true)} style={styles.viewerRailButton}>
+              <View style={[styles.viewerRailIcon, { borderColor: 'rgba(253,230,138,0.45)' }]}><Gift color="#fde68a" size={24} /></View>
+              <Text style={styles.viewerRailLabel}>دعم</Text>
+            </Pressable>
+            <Pressable accessibilityLabel="إظهار أو إخفاء التعليقات" onPress={() => setShowChat(value => !value)} style={styles.viewerRailButton}>
+              <View style={styles.viewerRailIcon}><MessageCircle color="#fff" size={23} /></View>
+              <Text style={styles.viewerRailLabel}>تعليقات</Text>
+            </Pressable>
+            <Pressable accessibilityLabel="مشاركة البث" onPress={() => void shareLive()} style={styles.viewerRailButton}>
+              <View style={styles.viewerRailIcon}><Share2 color="#fff" size={22} /></View>
+              <Text style={styles.viewerRailLabel}>مشاركة</Text>
+            </Pressable>
+          </View>
+        )}
+
         <Modal visible={peoplePanel !== null} transparent animationType="fade" onRequestClose={() => setPeoplePanel(null)}>
           <Pressable style={styles.modalBackdrop} onPress={() => setPeoplePanel(null)}>
             <Pressable style={styles.peopleSheet} onPress={(event) => event.stopPropagation()}>
@@ -1066,16 +1087,14 @@ export default function LiveRoomScreen() {
                   </View>
                 )}
                 <View style={[styles.actionRow, { paddingBottom: Math.max(insets.bottom, 10) }]}>
-                  <Pressable oasisKind="action" onPress={() => setShowReactions((value) => !value)} style={[styles.actionButton, showReactions && styles.actionButtonActive]}><Heart size={22} color={OASIS.colors.surface} fill="#fb7185" /><Text style={styles.actionLabel}>تفاعل</Text></Pressable>
-                  <Pressable oasisKind="action" onPress={() => setGiftOpen(true)} style={[styles.actionButton, { backgroundColor: 'rgba(251,191,36,0.12)', borderRadius: 16, padding: 5 }]}><Gift size={23} color="#fde68a" /><Text style={styles.actionLabel}>ادعم</Text></Pressable>
-                  <Pressable oasisKind="action" onPress={() => setShowChat((value) => !value)} style={styles.actionButton}><MessageCircle size={20} color={OASIS.colors.surface} /><Text style={styles.actionLabel}>{showChat ? 'إخفاء' : 'التعليقات'}</Text></Pressable>
+
                   <Pressable oasisKind="action" onPress={() => setOverlayVisible(false)} style={styles.actionButton}><EyeOff size={20} color={OASIS.colors.surface} /><Text style={styles.actionLabel}>وضع</Text></Pressable>
                   {guestState !== 'accepted' && (
                     <Pressable oasisKind="action" disabled={guestState !== 'idle'} onPress={startGuestRequest} style={[styles.actionButton, guestState !== 'idle' && { opacity: 0.7 }]}><UserPlus size={21} color={OASIS.colors.surface} /><Text style={styles.actionLabel}>{guestState === 'pending' ? 'بانتظار المضيف' : 'اطلب الصعود'}</Text></Pressable>
                   )}
                   {moderatorPermissions && <Pressable oasisKind="action" onPress={() => setModerationOpen(true)} style={styles.actionButton}><ShieldAlert size={20} color="#a7f3d0" /><Text style={styles.actionLabel}>إشراف</Text></Pressable>}
                   <Pressable oasisKind="action" onPress={showReport} style={styles.actionButton}><ShieldAlert size={20} color={OASIS.colors.surface} /><Text style={styles.actionLabel}>إبلاغ</Text></Pressable>
-                  <Pressable oasisKind="action" onPress={() => void shareLive()} style={styles.actionButton}><Share2 size={19} color={OASIS.colors.surface} /><Text style={styles.actionLabel}>مشاركة</Text></Pressable>
+
                   <View style={styles.durationPill}><Text style={styles.durationText}>{duration}</Text></View>
                 </View>
               </>
