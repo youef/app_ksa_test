@@ -20,8 +20,6 @@ import {
   SlidersHorizontal,
   ChevronDown,
   ChevronUp,
-  Globe,
-  Layers,
   MapPin as MapPinIcon,
   Navigation,
   Phone,
@@ -875,30 +873,7 @@ export default function WebMap() {
         title="خريطة الحي"
         subtitle={city || 'استكشف ما حولك'}
         fallbackRoute="/home"
-        rightAction={
-          <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-            <HeaderAction
-              onPress={() => {
-                setMapNotice(null);
-                setEngine((prev) => (prev === 'leaflet' ? 'google' : 'leaflet'));
-              }}
-              accessibilityLabel="تبديل الخريطة"
-              style={[styles.engineBtn, engine === 'google' && styles.engineBtnGoogle]}
-            >
-              {engine === 'leaflet' ? (
-                <>
-                  <Layers size={13} color={OASIS.colors.primary} />
-
-                </>
-              ) : (
-                <>
-                  <Globe size={13} color="#2563eb" />
-
-                </>
-              )}
-            </HeaderAction>
-          </View>
-        }
+        rightAction={null}
       />
 
       {/* 2. MAP CANVAS (Full screen behind floating controls) */}
