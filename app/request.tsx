@@ -1,3 +1,4 @@
+import { PROFILE_READ_FIELDS } from '@/lib/profileFields';
 import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
 import { HeaderAction } from '@/components/shared/AppHeader';
@@ -120,7 +121,7 @@ export default function Request() {
       const { data: auth } = await supabase.auth.getSession();
       const user = auth.session?.user ?? null;
       setMe(user?.id || '');
-      const viewer = user ? await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle() : { data: null };
+      const viewer = user ? await supabase.from('profiles').select(PROFILE_READ_FIELDS).eq('id', user.id).maybeSingle() : { data: null };
       setViewerProfile(viewer.data);
 
       const requestPromise = user

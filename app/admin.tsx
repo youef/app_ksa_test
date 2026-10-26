@@ -1,3 +1,4 @@
+import { PROFILE_READ_FIELDS } from '@/lib/profileFields';
 import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
@@ -355,7 +356,7 @@ export default function AdminScreen() {
       // 1. Strict database role check - NO MOCK OR HARDCODED EMAIL BYPASS
       const { data: profileData, error: profileErr } = await supabase
         .from('profiles')
-        .select('*')
+        .select(PROFILE_READ_FIELDS)
         .eq('id', authData.user.id)
         .maybeSingle();
 
@@ -388,7 +389,7 @@ export default function AdminScreen() {
         bCountRes,
         uCountRes,
       ] = await Promise.all([
-        supabase.from('profiles').select('*').order('created_at', { ascending: false }).limit(200),
+        supabase.from('profiles').select(PROFILE_READ_FIELDS).order('created_at', { ascending: false }).limit(200),
         supabase
           .from('verification_requests')
           .select('*')
@@ -401,7 +402,7 @@ export default function AdminScreen() {
           .limit(60),
         supabase
           .from('services')
-          .select('*, provider:provider_id(id, display_name, username, avatar_url, phone)')
+          .select('*, provider:provider_id(id, display_name, username, avatar_url)')
           .order('created_at', { ascending: false })
           .limit(60),
         supabase

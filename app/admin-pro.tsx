@@ -1,3 +1,4 @@
+import { PROFILE_READ_FIELDS } from '@/lib/profileFields';
 import { OasisPressable as Pressable, OasisSurface } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
 import { HeaderAction, AppHeader } from '@/components/shared/AppHeader';
@@ -28,12 +29,12 @@ export default function AdminPro() {
     setLoading(true);
     const { data: auth } = await supabase.auth.getUser();
     if (!auth.user) { router.replace('/auth'); return; }
-    const { data: pr } = await supabase.from('profiles').select('*').eq('id', auth.user.id).maybeSingle();
+    const { data: pr } = await supabase.from('profiles').select(PROFILE_READ_FIELDS).eq('id', auth.user.id).maybeSingle();
     if (!pr || pr.role !== 'admin') { router.replace('/home'); return; }
     setProfile(pr);
 
     const [u,r,v,q,req,b,m,e,srv] = await Promise.all([
-      supabase.from('profiles').select('*').order('created_at',{ascending:false}).limit(1000),
+      supabase.from('profiles').select(PROFILE_READ_FIELDS).order('created_at',{ascending:false}).limit(1000),
       supabase.from('reports').select('*').order('created_at',{ascending:false}).limit(1000),
       supabase.from('verification_requests').select('*').order('created_at',{ascending:false}).limit(1000),
       supabase.from('questions').select('id').order('created_at',{ascending:false}).limit(100),

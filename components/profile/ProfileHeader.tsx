@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Linking, Image, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { CalendarDays, Camera, Edit3, Lock, MapPin, MessageCircle, Palette, Settings } from 'lucide-react-native';
+import { CalendarDays, Camera, Edit3, Lock, MapPin, MessageCircle, Palette, Phone, Settings } from 'lucide-react-native';
+import { normalizeContactPhone } from '@/lib/contactPhone';
+import { loadProfileContact } from '@/lib/profileContact';
 import { useTheme } from '@/context/ThemeContext';
 import { bannerColors } from '@/lib/profileTheme';
 import { AccountStatusMark, getAccountIdentityMeta } from './AccountIdentityBadge';
@@ -42,6 +44,9 @@ export function ProfileHeader(props: Props) {
   const { width } = useWindowDimensions();
   const [coverFailed, setCoverFailed] = useState(false);
   const [avatarFailed, setAvatarFailed] = useState(false);
+  const [calling, setCalling] = useState(false);
+  const [callError, setCallError] = useState('');
+  useEffect(() => { setCallError(''); }, [profile.id, props.contactPhone]);
   useEffect(() => setCoverFailed(false), [props.coverUri]);
   useEffect(() => setAvatarFailed(false), [profile.avatar_url]);
   const identity = getAccountIdentityMeta(profile.role, profile.account_type, Boolean(profile.is_verified));
@@ -50,6 +55,21 @@ export function ProfileHeader(props: Props) {
   const heroColors = !customization?.banner_style || customization.banner_style === 'emerald' ? identity.heroColors : bannerColors(customization.banner_style);
   const button = [styles.button, { backgroundColor: colors.surface, borderColor: colors.line }];
   const action = (label: string, Icon: typeof Edit3, onPress?: () => void) => <Pressable key={label} accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={button}><Icon size={16} color={colors.ink} /><Text style={{ color: colors.ink, fontWeight: '700', fontSize: 12 }}>{label}</Text></Pressable>;
+
+  async function callContact() {
+    if (calling) return;
+    setCalling(true); setCallError('');
+    try {
+      const current = await loadProfileContact(profile.id, true);
+      const phone = normalizeContactPhone(current?.phone || '');
+      if (!phone || phone !== props.contactPhone) {
+        setCallError('رقم التواصل غير متاح حاليًا. حدّث الملف.');
+        return;
+      }
+      await Linking.openURL('tel:' + phone);
+    } catch { setCallError('تعذر فتح الاتصال. أعد المحاولة من جهاز يدعم المكالمات.'); }
+    finally { setCalling(false); }
+  }
 
   return <View testID="profile-header" style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.line }]}>
     <LinearGradient colors={heroColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ height: width < 600 ? 150 : 210, overflow: 'hidden' }}>
@@ -80,7 +100,10 @@ export function ProfileHeader(props: Props) {
         {!anonymous && <Text style={{ color: colors.muted, fontSize: 15, writingDirection: 'ltr' }}>@{profile.username}</Text>}
         {props.followedBy && !own && <Text style={{ color: colors.muted, backgroundColor: colors.soft, padding: 5, borderRadius: 5, fontSize: 11 }}>يتابعك</Text>}
         {!locked && profile.bio && customization?.section_visibility?.bio !== false && <Text style={{ color: colors.ink, fontSize: 15, lineHeight: 26, textAlign: 'right', marginVertical: 4 }}>{profile.bio}</Text>}
-        {!own && !anonymous && !locked && !props.hideContactActions && !!props.contactPhone && <Pressable accessibilityRole="link" accessibilityLabel="الاتصال برقم التواصل" onPress={() => void Linking.openURL('tel:' + props.contactPhone)} style={button}><Text style={{ color: colors.primary, fontWeight: '700' }}>اتصال: {props.contactPhone}</Text></Pressable>}
+        {!anonymous && !locked && !profile.is_banned && !props.hideContactActions && !!props.contactPhone && <View style={{ gap: 6, alignItems: 'flex-end' }}>
+          <Pressable accessibilityRole="link" accessibilityLabel="الاتصال برقم التواصل" disabled={calling} onPress={() => void callContact()} style={button}>{calling ? <ActivityIndicator color={colors.primary} /> : <Phone size={17} color={colors.primary} />}<Text style={{ color: colors.primary, fontWeight: '700', writingDirection: 'ltr' }}>{props.contactPhone}</Text></Pressable>
+          {!!callError && <Text accessibilityRole="alert" style={{ color: colors.danger, fontSize: 12, textAlign: 'right' }}>{callError}</Text>}
+        </View>}
         {!anonymous && <View style={styles.metadata}>
           <View style={styles.row}><MapPin size={15} color={colors.muted} /><Text style={{ color: colors.muted, fontSize: 12 }}>{[profile.district && 'حي ' + profile.district, profile.city].filter(Boolean).join('، ') || 'المملكة العربية السعودية'}</Text></View>
           {!!profile.created_at && <View style={styles.row}><CalendarDays size={15} color={colors.muted} /><Text style={{ color: colors.muted, fontSize: 12 }}>انضم في {new Date(profile.created_at).toLocaleDateString('ar-SA', { month: 'long', year: 'numeric' })}</Text></View>}
