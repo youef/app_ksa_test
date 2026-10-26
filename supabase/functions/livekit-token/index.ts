@@ -95,8 +95,14 @@ serve(async (req) => {
       .eq('stream_id', stream.id).eq('blocked_user_id', user.id).maybeSingle();
     if (blocked) return respond({ error: 'لا يمكنك الانضمام إلى هذا البث.' }, 403);
 
+    // LiveKit identities are unique per active connection. A second viewer tab
+    // with the same account must not evict the first viewer/host connection.
+    // Keep host and guest identities stable for host moderation / removeParticipant.
+    const participantIdentity = intent === 'viewer'
+      ? `${user.id}:viewer:${crypto.randomUUID()}`
+      : user.id;
     const accessToken = new AccessToken(livekitKey, livekitSecret, {
-      identity: user.id,
+      identity: participantIdentity,
       name,
       ttl: '15m',
       attributes: { hayna_user_id: user.id, stream_id: stream.id, role: intent },
@@ -108,7 +114,7 @@ serve(async (req) => {
       canPublish,
       canPublishData: canPublish,
     });
-    return respond({ token: await accessToken.toJwt(), url: livekitUrl, identity: user.id });
+    return respond({ token: await accessToken.toJwt(), url: livekitUrl, identity: participantIdentity });
   } catch (error) {
     console.error('livekit-token failed', error);
     return respond({ error: 'تعذر تجهيز الدخول للبث. حاول مرة أخرى.' }, 500);
