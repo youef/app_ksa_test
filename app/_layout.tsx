@@ -55,7 +55,7 @@ function RootContent() {
 
   useEffect(() => {
     initLogRocket();
-    void syncDndWithNotifications();
+    void syncDndWithNotifications().catch(() => {});
 
     const loadSession = async () => {
       try {
@@ -89,7 +89,7 @@ function RootContent() {
     };
 
     void loadSession();
-    void loadBannedWords();
+    void loadBannedWords().catch(() => {});
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setHasSession(Boolean(session?.user));
       if (!session?.user) setIsAdmin(false);
