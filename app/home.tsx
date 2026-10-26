@@ -227,8 +227,14 @@ export default function Home() {
         unreadMessagesCount={feed.unreadMessagesCount}
       />
 
+      <ImageBackground
+        source={{ uri: 'https://appksatest.vercel.app/images/backgrounds/hayna-app-background.png' }}
+        resizeMode="cover"
+        imageStyle={{ opacity: isDark ? 0.16 : 0.27 }}
+        style={{ flex: 1, backgroundColor: isDark ? colors.background : '#F8FAF7' }}
+      >
       <ScrollView
-        style={styles.container}
+        style={{ flex: 1, backgroundColor: 'transparent' }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         onScroll={handleFeedScroll}
@@ -315,6 +321,7 @@ export default function Home() {
 
         </View>
       </ScrollView>
+      </ImageBackground>
 
       <Modal visible={filterOpen} transparent animationType="slide" onRequestClose={() => setFilterOpen(false)}>
         <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(15,23,42,0.38)' }}>
