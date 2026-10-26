@@ -25,6 +25,7 @@ import {
   Check,
   Sparkles,
   HeartHandshake,
+  GraduationCap,
   Coffee,
   Award,
 } from 'lucide-react-native';
@@ -462,6 +463,8 @@ export default function TwitterInquiryCard({
               <View style={s.xEmergencyBadge}><Flame size={11} color={OASIS.colors.danger} /><Text style={s.xEmergencyBadgeText}>عاجل</Text></View>
             ) : isToolSharing ? (
               <View style={s.xToolBadge}><Wrench size={11} color={OASIS.colors.primary} /><Text style={s.xToolBadgeText}>إعارة</Text></View>
+            ) : isReq && data.request_type === 'carpooling' ? (
+              <View style={[s.xReqBadge, { backgroundColor: '#ECFDF5' }]}><GraduationCap size={12} color="#047857" /><Text style={[s.xReqBadgeText, { color: '#047857' }]}>توصيل مدارس</Text></View>
             ) : isReq ? (
               <View style={s.xReqBadge}><HeartHandshake size={11} color="#d97706" /><Text style={s.xReqBadgeText}>طلب فزعة</Text></View>
             ) : (
