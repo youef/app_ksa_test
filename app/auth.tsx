@@ -10,7 +10,7 @@ import { AppHeader } from '@/components/shared/AppHeader';
 import { HAYNA_BUTTON } from '@/components/shared/haynaButtonTokens';
 import { HaynaActionButton } from '@/components/shared/HaynaActionButton';
 
-const AUTH_BACKGROUND = require('../public/design-system/hayna-v1/artwork/welcome-art.png');
+const AUTH_BACKGROUND = require('../public/welcome/hayna-app-background.png');
 
 export default function Auth() {
   const [logoUri, setLogoUri] = useState(getCachedBrandingLogo());
@@ -20,6 +20,7 @@ export default function Auth() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [fieldError, setFieldError] = useState('');
   const [viewportHeight, setViewportHeight] = useState(0);
   const [contentHeight, setContentHeight] = useState(0);
 
@@ -29,12 +30,15 @@ export default function Auth() {
   }, []);
 
   async function submit() {
+    if (loading) return;
+    setFieldError('');
     if (!email.trim()) {
       return Alert.alert('تنبيه', 'الرجاء إدخال البريد الإلكتروني.');
     }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email.trim())) {
-      return Alert.alert('تنبيه', 'البريد الإلكتروني المدخل غير صحيح.');
+      setFieldError('يرجى إدخال بريد إلكتروني صحيح.');
+      return;
     }
     if (!password) {
       return Alert.alert('تنبيه', 'الرجاء إدخال كلمة المرور.');
@@ -94,6 +98,7 @@ export default function Auth() {
       } else if (errorMsg.includes('Network request failed')) {
         errorMsg = 'خطأ في الاتصال بالشبكة، يرجى التحقق من اتصالك بالإنترنت.';
       }
+      setFieldError(errorMsg);
       Alert.alert('خطأ', errorMsg);
     } finally {
       setLoading(false);
@@ -131,14 +136,14 @@ export default function Auth() {
               style={[styles.segmentBtn, isLogin && styles.segmentBtnActive]}
               accessibilityRole="button"
             >
-              <View style={styles.segmentContent}><LogIn size={16} color={isLogin ? OASIS.colors.primary : OASIS.colors.muted} /><Text style={[styles.segmentBtnText, isLogin && styles.segmentBtnTextActive]}>تسجيل الدخول</Text></View>
+              <View style={styles.segmentContent}><LogIn size={16} color={isLogin ? '#FFFFFF' : '#064E3B'} /><Text style={[styles.segmentBtnText, isLogin && styles.segmentBtnTextActive]}>تسجيل الدخول</Text></View>
             </Pressable>
             <Pressable oasisVariant={!isLogin ? 'primary' : 'secondary'} oasisKind="chip"
               onPress={() => setIsLogin(false)}
               style={[styles.segmentBtn, !isLogin && styles.segmentBtnActive]}
               accessibilityRole="button"
             >
-              <View style={styles.segmentContent}><UserRoundPlus size={16} color={!isLogin ? OASIS.colors.primary : OASIS.colors.muted} /><Text style={[styles.segmentBtnText, !isLogin && styles.segmentBtnTextActive]}>إنشاء حساب</Text></View>
+              <View style={styles.segmentContent}><UserRoundPlus size={16} color={!isLogin ? '#FFFFFF' : '#064E3B'} /><Text style={[styles.segmentBtnText, !isLogin && styles.segmentBtnTextActive]}>إنشاء حساب</Text></View>
             </Pressable>
           </View>
 
@@ -180,6 +185,8 @@ export default function Auth() {
                   style={styles.input}
                   autoCapitalize="none"
                   keyboardType="email-address"
+                  autoComplete="email"
+                  textContentType="emailAddress"
                   value={email}
                   onChangeText={setEmail}
                   placeholder="name@example.com"
@@ -195,6 +202,7 @@ export default function Auth() {
                 <TextInput
                   style={styles.input}
                   secureTextEntry={!showPassword}
+                  autoComplete={isLogin ? 'current-password' : 'new-password'}
                   value={password}
                   onChangeText={setPassword}
                   placeholder="••••••••"
@@ -206,6 +214,7 @@ export default function Auth() {
               </OasisSurface>
             </View>
 
+            {!!fieldError && <Text accessibilityRole="alert" style={{ color: '#B42318', textAlign: 'right', marginBottom: 8, fontSize: 13 }}>{fieldError}</Text>}
             <HaynaActionButton
               title={loading ? 'جاري التنفيذ...' : isLogin ? 'تسجيل الدخول' : 'إنشاء الحساب والانضمام'}
               onPress={submit}
@@ -250,11 +259,11 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   background: { flex: 1, width: '100%' },
-  backgroundImage: { opacity: 0.32 },
-  backgroundVeil: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(250,249,241,0.18)' },
+  backgroundImage: { opacity: 0.68 },
+  backgroundVeil: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(250,252,248,0.28)' },
   scroll: {
     flexGrow: 1,
-    paddingVertical: 12,
+    paddingVertical: 18,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -262,28 +271,29 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: HAYNA_BUTTON.maxContentWidth + 32,
     paddingHorizontal: 16,
-    gap: 10,
+    gap: 14,
   },
   segmentContainer: {
     flexDirection: 'row-reverse',
-    backgroundColor: 'rgba(255,253,247,0.92)',
+    backgroundColor: 'rgba(232,244,238,0.88)',
     borderWidth: 1,
     borderColor: OASIS.colors.line,
-    padding: 4,
-    borderRadius: 16,
-    gap: 4,
+    padding: 5,
+    borderRadius: 18,
+    gap: 6,
   },
   segmentContent: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 7 },
   segmentBtn: {
     flex: 1,
+    minHeight: 56,
     paddingVertical: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 12,
+    borderRadius: 16,
   },
   segmentBtnActive: {
-    backgroundColor: OASIS.colors.surface,
-    shadowColor: '#000',
+    backgroundColor: '#047857',
+    shadowColor: '#064E3B',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0,
     shadowRadius: 4,
@@ -295,19 +305,19 @@ const styles = StyleSheet.create({
     color: OASIS.colors.muted,
   },
   segmentBtnTextActive: {
-    color: OASIS.colors.primary,
+    color: '#FFFFFF',
     fontWeight: '700',
   },
   formContainer: {
-    backgroundColor: 'rgba(255,253,247,0.88)',
-    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.86)',
+    borderRadius: 26,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.95)',
-    padding: 18,
+    borderColor: 'rgba(255,255,255,0.76)',
+    padding: 22,
     shadowColor: OASIS.colors.ink,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0,
-    shadowRadius: 12,
+    shadowOpacity: 0.09,
+    shadowRadius: 20,
     elevation: 3,
   },
   brandBadgeRow: {
@@ -320,9 +330,9 @@ const styles = StyleSheet.create({
     borderBottomColor: '#f1f5f9',
   },
   brandLogoSmall: {
-    width: 46,
-    height: 46,
-    borderRadius: 14,
+    width: 68,
+    height: 68,
+    borderRadius: 16,
     backgroundColor: OASIS.colors.soft,
     borderWidth: 1,
     borderColor: '#a7f3d0',
@@ -331,13 +341,13 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   brandLogoImg: {
-    width: 34,
-    height: 34,
+    width: 52,
+    height: 52,
   },
   brandBadgeTitle: {
-    fontSize: 16,
+    fontSize: 19,
     fontWeight: '700',
-    color: OASIS.colors.ink,
+    color: '#17231D',
   },
   brandBadgeSub: {
     fontSize: 12,
@@ -347,7 +357,7 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   inputGroup: {
-    marginBottom: 12,
+    marginBottom: 16,
   },
   label: {
     fontWeight: '600',
@@ -362,9 +372,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.88)',
     borderWidth: 1,
     borderColor: '#C8DCD0',
-    borderRadius: 14,
+    borderRadius: 18,
     paddingHorizontal: 14,
-    height: 44,
+    height: 60,
   },
   inputIcon: {
     marginLeft: 10,
