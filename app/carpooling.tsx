@@ -228,17 +228,17 @@ export default function CarpoolingScreen() {
       <AppHeader
         variant="sub"
         title="توصيل مدارس الحي"
-        subtitle="مشاركة المقاعد وتخفيف الزحام بين أولياء الأمور"
+        subtitle="طلبات وعروض حقيقية · التنسيق خاص وآمن"
         fallbackRoute="/home"
         rightAction={
           <HeaderAction
             style={styles.headerActionBtn}
-            onPress={() => setModalOpen(true)}
+            onPress={openPublish}
             accessibilityRole="button"
             accessibilityLabel="شارك مقعداً"
           >
             <Plus size={14} color={OASIS.colors.primary} />
-            <Text style={styles.headerActionBtnText}>شارك مقعداً</Text>
+            <Text style={styles.headerActionBtnText}>نشر توصيل</Text>
           </HeaderAction>
         }
       />
@@ -250,7 +250,7 @@ export default function CarpoolingScreen() {
             style={styles.searchInput}
             value={search}
             onChangeText={setSearch}
-            placeholder="ابحث باسم المدرسة، الحي، أو ولي الأمر..."
+            placeholder="ابحث بالحي، المرحلة، أو نوع المشوار..."
             placeholderTextColor="#9ca3af"
           />
           <Search size={18} color={OASIS.colors.primary} />
@@ -306,13 +306,13 @@ export default function CarpoolingScreen() {
         ) : filtered.length === 0 ? (
           <OasisSurface oasisSurface="card" style={styles.emptyCard}>
             <Car size={44} color="#94a3b8" />
-            <Text style={styles.emptyTitle}>لا توجد رحلات توصيل مسجلة</Text>
+            <Text style={styles.emptyTitle}>{locationCity ? 'لا توجد طلبات توصيل في مدينتك الآن' : 'حدد مدينتك لعرض التوصيل المدرسي'}</Text>
             <Text style={styles.emptySub}>
-              شارك مقاعد سيارتك الفارغة مع أولياء أمور مدرستكم بالحي ووفر وقتك وزحامك.
+              اعرض مقاعد متاحة أو اطلب توصيلًا، مع تنسيق التفاصيل في محادثة خاصة فقط.
             </Text>
-            <Pressable oasisKind="action" style={styles.emptyAddBtn} onPress={() => setModalOpen(true)}>
+            <Pressable oasisKind="action" style={styles.emptyAddBtn} onPress={openPublish}>
               <Plus size={16} color={OASIS.colors.surface} />
-              <Text style={styles.emptyAddBtnText}>أضف أول رحلة مشاركة</Text>
+              <Text style={styles.emptyAddBtnText}>أضف طلب توصيل</Text>
             </Pressable>
           </OasisSurface>
         ) : (
@@ -324,7 +324,7 @@ export default function CarpoolingScreen() {
                   <View style={styles.seatsBadge}>
                     <Users size={12} color={OASIS.colors.deep} />
                     <Text style={styles.seatsBadgeText}>
-                      {item.participants_count || 0} / {item.max_participants || item.seats_available} مقعد
+                      {item.mode === 'offer' ? `${item.seats_available} مقاعد معروضة` : 'مطلوب توصيل'}
                     </Text>
                   </View>
 
@@ -339,7 +339,7 @@ export default function CarpoolingScreen() {
                     <View style={{ alignItems: 'flex-end' }}>
                       <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}>
                         <Text style={styles.parentName}>{item.parent_name}</Text>
-                        {item.is_verified && <ShieldCheck size={13} color={OASIS.colors.primary} />}
+                        
                       </View>
                       <View style={styles.locRow}>
                         <MapPin size={11} color={OASIS.colors.muted} />
@@ -361,31 +361,21 @@ export default function CarpoolingScreen() {
 
                 <View style={styles.tripTypeRow}>
                   <Clock size={13} color="#b45309" />
-                  <Text style={styles.tripTypeText}>{item.trip_type_label}</Text>
+                  <Text style={styles.tripTypeText}>{item.trip_type_label} · التنسيق عبر المحادثة</Text>
                 </View>
 
                 {item.notes ? (
-                  <Text style={styles.notesText}>"{item.notes}"</Text>
+                  <Text style={styles.notesText} numberOfLines={5}>{item.notes}</Text>
                 ) : null}
 
                 <View style={styles.cardActions}>
-                  {item.phone ? (
-                    <Pressable oasisKind="action"
-                      style={styles.contactBtn}
-                      onPress={() => Linking.openURL(`tel:${item.phone}`)}
-                    >
-                      <Phone size={14} color={OASIS.colors.primary} />
-                      <Text style={styles.contactBtnText}>اتصال للتنسيق</Text>
-                    </Pressable>
-                  ) : null}
-
                   <Pressable oasisVariant="primary" oasisKind="action"
                     style={[styles.joinBtn, isChatLoading && { opacity: 0.8 }]}
-                    onPress={() => handleJoinCarpool(item)}
+                    onPress={() => item.mode === 'offer' ? void handleJoinCarpool(item) : void handleOpenChat(item)}
                     disabled={isChatLoading}
                   >
                     <Users size={14} color={OASIS.colors.surface} />
-                    <Text style={styles.joinBtnText}>الانضمام للرحلة</Text>
+                    <Text style={styles.joinBtnText}>{item.mode === 'offer' ? 'طلب مقعد' : 'عرض مساعدة'}</Text>
                   </Pressable>
 
                   <Pressable oasisKind="action"
