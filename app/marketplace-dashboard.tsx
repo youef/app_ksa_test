@@ -256,7 +256,7 @@ function Empty({ text }: { text: string }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: OASIS.colors.background },
+  root: { flex: 1, backgroundColor: 'transparent' },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: OASIS.colors.background },
   content: { padding: 14, gap: 14, maxWidth: 920, width: '100%', alignSelf: 'center' },
   hero: { backgroundColor: OASIS.colors.deep, borderRadius: 14, padding: 14, alignItems: 'flex-end', gap: 8 },

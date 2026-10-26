@@ -84,7 +84,7 @@ export default function More() {
     : profile?.display_name || profile?.username || 'حسابي';
 
   return (
-    <View style={[styles.screen, { backgroundColor: colors.background }]}>
+    <View style={[styles.screen, { backgroundColor: 'transparent' }]}>
       <AppHeader variant="tab" title="المزيد" subtitle="حسابك وخدمات حيّك في مكان واحد" />
 
       <ScrollView
@@ -197,7 +197,7 @@ function MenuGroup({ title, items, query = '' }: { title: string; items: MenuIte
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#F7F9F8' },
+  screen: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: 14, gap: 16, maxWidth: 820, width: '100%', alignSelf: 'center' },
   accountCard: { minHeight: 92, borderRadius: 14, backgroundColor: OASIS.colors.surface, borderWidth: 1, borderColor: '#DDEAE4', padding: 13, flexDirection: 'row-reverse', alignItems: 'center', gap: 11 },
   avatarWrap: { width: 56, height: 56, borderRadius: 28, backgroundColor: OASIS.colors.soft, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderWidth: 2, borderColor: OASIS.colors.soft },

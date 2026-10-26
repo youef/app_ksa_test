@@ -135,7 +135,7 @@ export default function TermsScreen() {
   const bottomInset = useBottomNavInset();
   const { colors, isDark } = useTheme();
   return (
-    <View style={[styles.screen, { backgroundColor: colors.background }]}>
+    <View style={[styles.screen, { backgroundColor: 'transparent' }]}>
       <AppHeader variant="sub" title="الشروط والسياسات" subtitle="جميع بنود منصة حيّنا" fallbackRoute="/more" />
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: bottomInset + 28 }]} showsVerticalScrollIndicator={false}>
         <OasisSurface oasisSurface="card" style={[styles.hero, isDark && { backgroundColor: colors.surface, borderColor: colors.line }]}>
@@ -185,7 +185,7 @@ export default function TermsScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#F7F9F8' },
+  screen: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: 14, gap: 12, maxWidth: 820, width: '100%', alignSelf: 'center' },
   hero: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: '#DDEAE4', backgroundColor: '#FFFFFF' },
   heroIcon: { width: 46, height: 46, borderRadius: 14, backgroundColor: '#EAF5EF', alignItems: 'center', justifyContent: 'center' },

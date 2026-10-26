@@ -227,7 +227,7 @@ function Filter({ active, label, onPress }: { active: boolean; label: string; on
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#F7F9F8' },
+  screen: { flex: 1, backgroundColor: 'transparent' },
   page: { padding: 14, paddingBottom: 24, gap: 12, maxWidth: 820, width: '100%', alignSelf: 'center' },
   searchWrap: { height: 46, borderRadius: 14, borderWidth: 1, borderColor: OASIS.colors.line, backgroundColor: OASIS.colors.surface, flexDirection: 'row-reverse', alignItems: 'center', gap: 8, paddingHorizontal: 12 },
   searchInput: { flex: 1, color: OASIS.colors.ink, fontSize: 12, fontWeight: '700' },

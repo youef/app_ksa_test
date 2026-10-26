@@ -57,14 +57,14 @@ export const ADMIN_GRADIENTS = {
 export const adminStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: ADMIN_COLORS.bg,
+    backgroundColor: 'transparent',
   },
   center: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 16,
-    backgroundColor: ADMIN_COLORS.bg,
+    backgroundColor: 'transparent',
   },
   loadingText: {
     marginTop: 14,

@@ -246,10 +246,8 @@ export default function StoriesScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
-        <ImageBackground source={{ uri: Platform.OS === 'web' ? '/welcome/hayna-heritage-bg.png' : 'https://appksatest.vercel.app/welcome/hayna-heritage-bg.png' }} resizeMode="cover" style={StyleSheet.absoluteFillObject} imageStyle={{ opacity: isDark ? 0.05 : 0.15 }} />
-      </View>
+    <View style={[styles.container, { backgroundColor: 'transparent' }]}>
+      {/* Heritage imagery is provided by the app-level background. */}
       <AppHeader
         variant="sub"
         title="اليوميات"
@@ -391,7 +389,7 @@ function previewTextColor(background: string) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: OASIS.colors.background },
+  container: { flex: 1, backgroundColor: 'transparent' },
   scroll: { padding: 12 },
   loadingBox: { paddingVertical: 36, alignItems: 'center', justifyContent: 'center', gap: 10 },
   loadingText: { fontSize: 13, color: OASIS.colors.muted },
