@@ -228,7 +228,7 @@ export default function Home() {
       />
 
       <ImageBackground
-        source={{ uri: 'https://appksatest.vercel.app/images/backgrounds/hayna-app-background.png' }}
+        source={{ uri: 'https://appksatest.vercel.app/welcome/hayna-app-background.png' }}
         resizeMode="cover"
         imageStyle={{ opacity: isDark ? 0.16 : 0.27 }}
         style={{ flex: 1, backgroundColor: isDark ? colors.background : '#F8FAF7' }}
