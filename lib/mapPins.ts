@@ -181,6 +181,12 @@ function relativeTime(value?: string | null): string {
   const minute = 60_000;
   const hour = 60 * minute;
   const day = 24 * hour;
+  if (diff < -minute) {
+    const until = -diff;
+    if (until < hour) return `بعد ${Math.ceil(until / minute)} دقيقة`;
+    if (until < day) return `بعد ${Math.ceil(until / hour)} ساعة`;
+    return `بعد ${Math.ceil(until / day)} يوم`;
+  }
   if (diff < minute) return 'الآن';
   if (diff < hour) return `قبل ${Math.floor(diff / minute)} دقيقة`;
   if (diff < day) return `قبل ${Math.floor(diff / hour)} ساعة`;
@@ -354,7 +360,8 @@ export async function loadMapPins(limit = 220): Promise<MapPin[]> {
         district: row.district,
       },
       {},
-      { blur: false },
+      // Unverified listings might point to a person's home; keep them approximate.
+      { blur: row.is_verified !== true },
     );
     if (!position) return;
 
