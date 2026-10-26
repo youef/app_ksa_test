@@ -436,16 +436,21 @@ export default function AskScreen() {
           <View style={[styles.progressSegment, styles.progressActive]} />
           <View style={[styles.progressSegment, step === 2 && styles.progressActive]} />
         </View>
-        <Text accessibilityRole="header" style={styles.heading}>{step === 1 ? 'وش ودّك تشارك؟' : 'اكتب التفاصيل'}</Text>
-        <Text style={styles.subtitle}>{step === 1 ? 'اختر نوع المنشور المناسب لك.' : 'عنوان واضح وتفاصيل بسيطة توصل طلبك.'}</Text>
+        <Text accessibilityRole="header" style={styles.heading}>{step === 1 ? 'وش ودّك تشارك اليوم؟' : postType === 'school_transport' ? 'رتّب توصيل المدارس' : 'اكتب منشورك'}</Text>
+        <Text style={styles.subtitle}>{step === 1 ? 'اختر التصنيف؛ سنجهز لك النموذج المناسب بخطوتين.' : postType === 'school_transport' ? 'انشر طلبًا أو عرضًا واضحًا دون معلومات الطلاب الخاصة.' : 'اكتب عنوانًا واضحًا ووصفًا يساعد جيرانك على التفاعل.'}</Text>
 
         {step === 1 ? (
-          <View style={styles.typeGrid}>
+          <>
+            <View style={styles.introNote}>
+              <View style={styles.introIcon}><Sparkles size={17} color={OASIS.colors.primary} /></View>
+              <View style={{ flex: 1 }}><Text style={styles.introTitle}>شارك مجتمعك بخطوتين</Text><Text style={styles.introDesc}>استفسارات، فزعات، إعارة، تبرعات، وتنظيم رحلات المدارس في مكان واحد.</Text></View>
+            </View>
+            <View style={styles.typeGrid}>
             {POST_TYPES.map(type => {
               const active = type.key === postType;
               const Icon = type.icon;
               return (
-                <Pressable oasisKind="card" key={type.key} testID={`post-type-${type.key}`} accessibilityRole="button" accessibilityLabel={`${type.label}، ${type.hint}`} accessibilityState={{ selected: active }} onPress={() => setPostType(type.key)} style={({ pressed }) => [styles.typeCard, type.key === 'emergency' && styles.emergencyType, active && styles.typeSelected, pressed && styles.pressed]}>
+                <Pressable oasisKind="card" key={type.key} testID={`post-type-${type.key}`} accessibilityRole="button" accessibilityLabel={`${type.label}، ${type.hint}`} accessibilityState={{ selected: active }} onPress={() => setPostType(type.key)} style={({ pressed }) => [styles.typeCard, (type.key === 'emergency' || type.key === 'school_transport') && styles.wideType, active && styles.typeSelected, pressed && styles.pressed]}>
                   <View style={styles.typeTop}><View style={[styles.typeIcon, active && styles.typeIconSelected]}><Icon size={25} color={active ? OASIS.colors.primary : '#52685d'} strokeWidth={1.8} /></View><View style={[styles.selection, active && styles.selectionActive]}>{active ? <Check size={13} color={OASIS.colors.surface} strokeWidth={3} /> : null}</View></View>
                   <Text style={[styles.typeLabel, active && styles.selectedText]}>{type.label}</Text>
                   <Text style={styles.typeHint}>{type.hint}</Text>
@@ -453,39 +458,88 @@ export default function AskScreen() {
               );
             })}
           </View>
+          </>
         ) : (
           <View style={styles.details}>
             <Pressable accessibilityRole="button" accessibilityLabel={`نوع المنشور ${selectedType.label}، تغيير`} onPress={() => changeStep(1)} disabled={busy} style={styles.selectedRow}>
               <View style={styles.selectedIdentity}><selectedType.icon size={19} color={OASIS.colors.primary} /><Text style={styles.selectedName}>{selectedType.label}</Text></View>
               <Text style={styles.changeText}>تغيير</Text>
             </Pressable>
-            <View style={styles.field}>
+            {postType !== 'school_transport' ? <View style={styles.field}>
               <View style={styles.labelRow}><Text style={styles.label}>العنوان</Text><Text style={styles.count}>{title.length.toLocaleString('ar-SA')} / ١٢٠</Text></View>
               <TextInput testID="post-title" accessibilityLabel="عنوان المنشور" editable={!busy} maxLength={120} value={title} onChangeText={value => { setTitle(value); setFieldErrors(previous => ({ ...previous, title: undefined })); }} placeholder={postType === 'help' ? 'مثال: أحتاج فزعة لاشتراك بطارية' : postType === 'tool_sharing' ? 'مثال: أحتاج استعارة دريل اليوم' : postType === 'donate' ? 'مثال: أثاث بحالة جيدة للتبرع' : postType === 'emergency' ? 'اكتب وصفًا مختصرًا للحالة' : 'وش تبي تسأل جيرانك؟'} placeholderTextColor="#8a9b91" style={[styles.titleInput, fieldErrors.title && styles.invalidInput]} returnKeyType="next" />
               {fieldErrors.title ? <Text accessibilityRole="alert" style={styles.error}>{fieldErrors.title}</Text> : null}
-            </View>
+            </View> : (
+              <View style={styles.schoolHeading}>
+                <GraduationCap size={22} color={OASIS.colors.primary} />
+                <View style={{ flex: 1 }}><Text style={styles.schoolHeadingTitle}>نشر توصيل مدرسي</Text><Text style={styles.schoolHeadingDesc}>اختيارات محددة تسهّل البحث والتوافق بين أولياء الأمور.</Text></View>
+              </View>
+            )}
+            {postType === 'school_transport' ? (
+              <View style={styles.schoolPanel}>
+                <Text style={styles.label}>تبي توصيل أو عندك مقاعد؟</Text>
+                <View style={styles.schoolRow}>
+                  {SCHOOL_MODES.map(item => <Pressable key={item.key} accessibilityRole="button" accessibilityState={{ selected: schoolMode === item.key }} onPress={() => setSchoolMode(item.key)} style={[styles.modeCard, schoolMode === item.key && styles.modeActive]}>
+                    <Text style={[styles.modeTitle, schoolMode === item.key && styles.modeTitleActive]}>{item.label}</Text>
+                    <Text style={styles.modeHint}>{item.hint}</Text>
+                  </Pressable>)}
+                </View>
+                <Text style={styles.label}>المرحلة الدراسية</Text>
+                <View style={styles.optionWrap}>
+                  {SCHOOL_LEVELS.map(level => <Pressable key={level} accessibilityRole="button" accessibilityState={{ selected: schoolLevel === level }} onPress={() => setSchoolLevel(level)} style={[styles.optionChip, schoolLevel === level && styles.optionActive]}><Text style={[styles.optionText, schoolLevel === level && styles.optionTextActive]}>{level}</Text></Pressable>)}
+                </View>
+                <Text style={styles.label}>اتجاه المشوار</Text>
+                <View style={styles.optionWrap}>
+                  {SCHOOL_TRIPS.map(item => <Pressable key={item.key} accessibilityRole="button" accessibilityState={{ selected: schoolTrip === item.key }} onPress={() => setSchoolTrip(item.key)} style={[styles.optionChip, schoolTrip === item.key && styles.optionActive]}><Text style={[styles.optionText, schoolTrip === item.key && styles.optionTextActive]}>{item.label}</Text></Pressable>)}
+                </View>
+                <Text style={styles.label}>أيام التوصيل</Text>
+                <View style={styles.optionWrap}>
+                  {SCHOOL_DAYS.map(day => <Pressable key={day} accessibilityRole="checkbox" accessibilityState={{ checked: schoolDays.includes(day) }} onPress={() => setSchoolDays(days => days.includes(day) ? days.filter(d => d !== day) : [...days, day])} style={[styles.optionChip, schoolDays.includes(day) && styles.optionActive]}><Text style={[styles.optionText, schoolDays.includes(day) && styles.optionTextActive]}>{day}</Text></Pressable>)}
+                </View>
+                {schoolMode === 'offer' ? <View style={styles.field}><Text style={styles.label}>المقاعد المتاحة (1–8)</Text><TextInput accessibilityLabel="عدد المقاعد المتاحة" editable={!busy} value={schoolSeats} onChangeText={setSchoolSeats} keyboardType="number-pad" maxLength={1} style={styles.budgetInput} placeholder="2" />{fieldErrors.budget ? <Text accessibilityRole="alert" style={styles.error}>{fieldErrors.budget}</Text> : null}</View> : null}
+                <View style={styles.schoolSafety}>
+                  <ShieldCheck size={18} color="#047857" />
+                  <Text style={styles.schoolSafetyText}>لا تكتب اسم طالب، اسم مدرسة محددة، رقم جوال، عنوان منزل أو وقت الالتقاء الدقيق. نسّقها برسالة خاصة مع طرف موثوق، وتحقق من التصاريح المناسبة قبل الاتفاق.</Text>
+                </View>
+              </View>
+            ) : null}
             <View style={styles.field}>
-              <View style={styles.labelRow}><Text style={styles.label}>التفاصيل <Text style={styles.optional}>(اختياري)</Text></Text><Text style={styles.count}>{body.length.toLocaleString('ar-SA')} / ١٢٠٠</Text></View>
-              <TextInput testID="post-body" accessibilityLabel="تفاصيل المنشور" editable={!busy} multiline maxLength={1200} value={body} onChangeText={setBody} placeholder="اكتب التفاصيل اللي تساعد جيرانك يفهمون طلبك…" placeholderTextColor="#8a9b91" style={styles.bodyInput} textAlignVertical="top" />
+              <View style={styles.labelRow}><Text style={styles.label}>{postType === 'school_transport' ? 'ملاحظات عامة آمنة' : 'التفاصيل'} <Text style={styles.optional}>(اختياري)</Text></Text><Text style={styles.count}>{body.length.toLocaleString('ar-SA')} / ١٢٠٠</Text></View>
+              <TextInput testID="post-body" accessibilityLabel="تفاصيل المنشور" editable={!busy} multiline maxLength={1200} value={body} onChangeText={setBody} placeholder={postType === 'school_transport' ? 'مثال: الأفضل سيارة عائلية، والتنسيق برسائل حيّنا فقط.' : 'اكتب التفاصيل اللي تساعد جيرانك يفهمون طلبك…'} placeholderTextColor="#8a9b91" style={styles.bodyInput} textAlignVertical="top" />
             </View>
             {postType === 'help' ? <View style={styles.field}><Text style={styles.label}>مكافأة رمزية بالريال <Text style={styles.optional}>(اختياري)</Text></Text><TextInput testID="post-budget" accessibilityLabel="مكافأة اختيارية بالريال السعودي" editable={!busy} keyboardType="decimal-pad" value={budget} onChangeText={value => { setBudget(value); setFieldErrors(previous => ({ ...previous, budget: undefined })); }} placeholder="بدون مقابل" placeholderTextColor="#8a9b91" style={[styles.budgetInput, fieldErrors.budget && styles.invalidInput]} />{fieldErrors.budget ? <Text accessibilityRole="alert" style={styles.error}>{fieldErrors.budget}</Text> : null}</View> : null}
-            <View style={styles.templates}>
+            {postType !== 'school_transport' ? <View style={styles.templates}>
               <Text style={styles.templatesLabel}>ابدأ بقالب جاهز</Text>
               <View style={styles.templateList}>{QUICK_TEMPLATES.filter(template => template.type === postType).map(template => <Pressable oasisKind="chip" key={template.title} accessibilityRole="button" accessibilityLabel={`استخدام قالب ${template.label}`} disabled={busy} onPress={() => { setTitle(template.title); setBody(template.body); setFieldErrors(previous => ({ ...previous, title: undefined })); }} style={({ pressed }) => [styles.templateChip, pressed && styles.pressed]}><Text style={styles.templateText}>{template.label}</Text></Pressable>)}</View>
-            </View>
+            </View> : null}
             {safetyCheck?.isEmergency || postType === 'emergency' ? <View style={styles.notice}><AlertTriangle size={18} color="#9a5b12" /><Text style={styles.noticeText}>إذا كانت هناك خطورة مباشرة، تواصل مع الجهة المختصة أولًا.</Text></View> : null}
             {safetyCheck?.isSpam ? <View style={styles.notice}><ShieldAlert size={18} color="#9a5b12" /><Text style={styles.noticeText}>{safetyCheck.spamReason || 'راجع المحتوى قبل النشر.'}</Text></View> : null}
+            <View style={styles.locationCard}>
+              <View style={styles.locationText}>
+                <Text style={styles.locationTitle}>منطقة النشر</Text>
+                <Text style={styles.locationValue}>{city ? [city, district && `حي ${district}`].filter(Boolean).join(' · ') : 'لم يتم تحديد المدينة'}</Text>
+                <Text style={styles.locationHint}>نشارك المدينة والحي فقط، وليس إحداثياتك الدقيقة.</Text>
+              </View>
+              <Pressable accessibilityRole="button" accessibilityLabel="تحديث الموقع" onPress={() => router.push('/set-location')} style={styles.locationChange}><MapPin size={17} color={OASIS.colors.primary} /><Text style={styles.locationChangeText}>تحديث</Text></Pressable>
+            </View>
+            <View style={styles.previewCard}>
+              <View style={styles.previewHeader}><Eye size={16} color={OASIS.colors.primary} /><Text style={styles.previewHeaderText}>معاينة المنشور</Text></View>
+              <Text style={styles.previewTitle}>{publishTitle || 'عنوان منشورك يظهر هنا'}</Text>
+              <Text style={styles.previewBody} numberOfLines={4}>{postType === 'school_transport' ? `${schoolMode === 'need' ? 'طلب توصيل' : 'عرض مقاعد'} · ${schoolLevel} · ${SCHOOL_TRIPS.find(item => item.key === schoolTrip)?.label} · ${schoolDays.join('، ')}${schoolMode === 'offer' ? ` · ${schoolSeats} مقعد` : ''}` : body.trim() || 'تفاصيل المنشور تظهر هنا'}</Text>
+              <Text style={styles.previewLocation}>{city || 'المدينة'}{district ? ` · ${district}` : ''}</Text>
+            </View>
+            {fieldErrors.title ? <Text accessibilityRole="alert" style={styles.error}>{fieldErrors.title}</Text> : null}
             {fieldErrors.city ? <Text accessibilityRole="alert" style={styles.error}>{fieldErrors.city}</Text> : null}
           </View>
         )}
       </ScrollView>
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) }]}>
         <View style={styles.footerContent}>
-          <View style={styles.audience}><Users size={15} color="#73877a" /><Text style={styles.audienceText}>لجيران حيّك</Text></View>
+          <View style={styles.audience}><Users size={15} color="#73877a" /><Text style={styles.audienceText}>{postType === 'school_transport' ? 'توصيل المدارس · بدون بيانات أطفال' : 'لجيران حيّك'}</Text></View>
           <Pressable oasisVariant="primary" oasisKind="action" testID="ask-primary" accessibilityRole="button" accessibilityLabel={step === 1 ? 'التالي، كتابة التفاصيل' : 'نشر في الحي'} accessibilityState={{ disabled: busy, busy }} disabled={busy} onPress={() => { if (step === 1) changeStep(2); else void save(); }} style={({ pressed }) => [styles.primary, (busy || pressed) && styles.pressed]}>
 
             {busy ? <ActivityIndicator color={OASIS.colors.surface} size="small" /> : null}
-            <Text style={styles.primaryText}>{busy ? 'جارٍ النشر…' : step === 1 ? 'التالي' : 'نشر في الحي'}</Text>
+            <Text style={styles.primaryText}>{busy ? 'جارٍ النشر…' : step === 1 ? 'التالي · تفاصيل المنشور' : postType === 'school_transport' ? 'نشر طلب التوصيل' : 'نشر في الحي'}</Text>
             {!busy && step === 1 ? <ArrowLeft size={18} color={OASIS.colors.surface} /> : null}
           </Pressable>
         </View>
@@ -506,6 +560,7 @@ const styles = StyleSheet.create({
   typeGrid: { direction: 'ltr', flexDirection: 'row-reverse', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 12 },
   typeCard: { width: '48%', minHeight: 116, backgroundColor: '#f6f8f6', borderRadius: 14, borderWidth: 1.5, borderColor: '#f0f4f1', padding: 14, alignItems: 'flex-end' },
   emergencyType: { width: '100%', minHeight: 104 },
+  wideType: { width: '100%', minHeight: 96 },
   typeSelected: { backgroundColor: '#edf7f1', borderColor: OASIS.colors.primary },
   typeTop: { direction: 'ltr', flexDirection: 'row-reverse', width: '100%', justifyContent: 'space-between', alignItems: 'center', marginBottom: 13 },
   typeIcon: { width: 32, height: 32, backgroundColor: '#eaf0ec', borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
@@ -543,5 +598,39 @@ const styles = StyleSheet.create({
   audienceText: { fontSize: 11, color: '#73877a' },
   primary: { direction: 'ltr', flexDirection: 'row-reverse', gap: 9, alignItems: 'center', justifyContent: 'center', minHeight: 52, padding: 14, backgroundColor: 'transparent', borderRadius: 0 },
   primaryText: { color: OASIS.colors.surface, fontSize: 16, fontWeight: '600' },
+  introNote: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, borderRadius: 18, backgroundColor: '#ECF7F0', padding: 15, marginBottom: 17, borderWidth: 1, borderColor: '#D4EBDC' },
+  introIcon: { width: 39, height: 39, borderRadius: 14, backgroundColor: '#D5EFDD', justifyContent: 'center', alignItems: 'center' },
+  introTitle: { color: OASIS.colors.deep, fontSize: 14, fontWeight: '800', textAlign: 'right' },
+  introDesc: { color: '#547263', fontSize: 11.5, lineHeight: 20, textAlign: 'right', marginTop: 3 },
+  schoolHeading: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, padding: 13, borderRadius: 16, backgroundColor: '#EDF8F0' },
+  schoolHeadingTitle: { textAlign: 'right', color: '#064E3B', fontWeight: '800', fontSize: 15 },
+  schoolHeadingDesc: { textAlign: 'right', color: '#567467', fontSize: 11.5, lineHeight: 19, marginTop: 2 },
+  schoolPanel: { borderRadius: 20, borderColor: '#DDEBE2', borderWidth: 1, backgroundColor: '#FAFCFA', padding: 15, gap: 13 },
+  schoolRow: { flexDirection: 'row-reverse', gap: 9 },
+  modeCard: { flex: 1, minHeight: 76, borderRadius: 14, borderColor: '#DFE8E2', borderWidth: 1, backgroundColor: '#FFFFFF', padding: 11, alignItems: 'flex-end', justifyContent: 'center' },
+  modeActive: { borderColor: '#059669', backgroundColor: '#E8F7EF', borderWidth: 2 },
+  modeTitle: { color: '#3B5548', textAlign: 'right', fontSize: 12.5, fontWeight: '700' },
+  modeTitleActive: { color: '#047857' },
+  modeHint: { fontSize: 10, color: '#6B8174', lineHeight: 17, textAlign: 'right', marginTop: 3 },
+  optionWrap: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 7 },
+  optionChip: { minHeight: 39, borderRadius: 12, borderWidth: 1, borderColor: '#E0E9E2', paddingHorizontal: 13, paddingVertical: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  optionActive: { backgroundColor: '#047857', borderColor: '#047857' },
+  optionText: { color: '#496255', fontSize: 12, fontWeight: '600' },
+  optionTextActive: { color: '#FFFFFF' },
+  schoolSafety: { flexDirection: 'row-reverse', alignItems: 'flex-start', gap: 9, backgroundColor: '#EAF8F1', borderRadius: 13, padding: 13 },
+  schoolSafetyText: { flex: 1, color: '#16553F', fontSize: 11.5, lineHeight: 20, textAlign: 'right' },
+  locationCard: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#F1F6F2', borderWidth: 1, borderColor: '#E1E9E3', borderRadius: 15, padding: 13, gap: 9 },
+  locationText: { alignItems: 'flex-end', flex: 1 },
+  locationTitle: { color: '#506C5A', textAlign: 'right', fontSize: 11, fontWeight: '600' },
+  locationValue: { color: '#143F2C', fontSize: 13, textAlign: 'right', fontWeight: '800', marginTop: 4 },
+  locationHint: { color: '#718777', textAlign: 'right', fontSize: 10.5, marginTop: 4 },
+  locationChange: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, minHeight: 40, backgroundColor: '#DCF3E5', paddingHorizontal: 11, borderRadius: 12 },
+  locationChangeText: { color: '#047857', fontWeight: '700', fontSize: 11.5 },
+  previewCard: { backgroundColor: '#FFFFFF', borderRadius: 18, padding: 15, borderWidth: 1, borderColor: '#D7E7DC', gap: 8 },
+  previewHeader: { flexDirection: 'row-reverse', alignItems: 'center', gap: 7, paddingBottom: 4 },
+  previewHeaderText: { color: '#047857', fontWeight: '800', fontSize: 12 },
+  previewTitle: { textAlign: 'right', color: '#103B27', fontSize: 15, fontWeight: '800', lineHeight: 25 },
+  previewBody: { textAlign: 'right', color: '#4A6254', fontSize: 12, lineHeight: 21 },
+  previewLocation: { textAlign: 'right', color: '#799083', fontSize: 11 },
   pressed: { opacity: 0.65 },
 });
