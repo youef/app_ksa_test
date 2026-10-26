@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Linking, Image, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CalendarDays, Camera, Edit3, Lock, MapPin, MessageCircle, Palette, Settings } from 'lucide-react-native';
 import { useTheme } from '@/context/ThemeContext';
@@ -8,6 +8,7 @@ import { AccountStatusMark, getAccountIdentityMeta } from './AccountIdentityBadg
 
 type Props = {
   profile: any;
+  contactPhone?: string;
   customization?: any;
   coverUri: string;
   displayName?: string;
@@ -79,6 +80,7 @@ export function ProfileHeader(props: Props) {
         {!anonymous && <Text style={{ color: colors.muted, fontSize: 15, writingDirection: 'ltr' }}>@{profile.username}</Text>}
         {props.followedBy && !own && <Text style={{ color: colors.muted, backgroundColor: colors.soft, padding: 5, borderRadius: 5, fontSize: 11 }}>يتابعك</Text>}
         {!locked && profile.bio && customization?.section_visibility?.bio !== false && <Text style={{ color: colors.ink, fontSize: 15, lineHeight: 26, textAlign: 'right', marginVertical: 4 }}>{profile.bio}</Text>}
+        {!own && !anonymous && !locked && !props.hideContactActions && !!props.contactPhone && <Pressable accessibilityRole="link" accessibilityLabel="الاتصال برقم التواصل" onPress={() => void Linking.openURL('tel:' + props.contactPhone)} style={button}><Text style={{ color: colors.primary, fontWeight: '700' }}>اتصال: {props.contactPhone}</Text></Pressable>}
         {!anonymous && <View style={styles.metadata}>
           <View style={styles.row}><MapPin size={15} color={colors.muted} /><Text style={{ color: colors.muted, fontSize: 12 }}>{[profile.district && 'حي ' + profile.district, profile.city].filter(Boolean).join('، ') || 'المملكة العربية السعودية'}</Text></View>
           {!!profile.created_at && <View style={styles.row}><CalendarDays size={15} color={colors.muted} /><Text style={{ color: colors.muted, fontSize: 12 }}>انضم في {new Date(profile.created_at).toLocaleDateString('ar-SA', { month: 'long', year: 'numeric' })}</Text></View>}
