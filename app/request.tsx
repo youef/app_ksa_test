@@ -279,23 +279,8 @@ export default function Request() {
         } catch {}
       }
 
-      // Step C: Fallback creation
-      if (!finalConvId) {
-        try {
-          let convRes = await supabase.from('conversations').insert({}).select('id').single();
-          if (convRes.error) {
-            convRes = await supabase.from('conversations').insert({ created_by: me }).select('id').single();
-          }
-
-          if (convRes.data?.id) {
-            finalConvId = convRes.data.id;
-            await supabase.from('conversation_members').insert([
-              { conversation_id: finalConvId, user_id: me },
-              { conversation_id: finalConvId, user_id: match.helper_id },
-            ]);
-          }
-        } catch {}
-      }
+      // Membership is created atomically by the protected server RPC.
+      if (!finalConvId) throw new Error('تعذر إنشاء محادثة آمنة. تحقق من إعدادات الرسائل ثم حاول مجددًا.');
 
       // Step D: Send message directly in private chat to the helper
       if (finalConvId) {

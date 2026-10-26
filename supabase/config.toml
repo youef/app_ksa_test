@@ -1,50 +1,25 @@
-# Supabase Configuration for Hayya KSA
-# Run: supabase db push && supabase functions deploy
-
+# Job schedules are defined in database migrations, not config.toml.
 project_id = "vkeuyompnddqfvulalkk"
 
-[functions]
-  # Scheduled broadcast dispatcher - runs every minute
-  scheduled-broadcast-dispatch = { verify_jwt = false }
-
-  # Notifications cleanup - runs weekly (Sunday 03:00)
-  notifications-cleanup = { verify_jwt = false }
-
-  # Refresh denormalized counters - runs every 5 minutes
-  refresh-counters = { verify_jwt = false }
-
-  # Weekly admin report - runs Sunday 09:00
-  weekly-admin-report = { verify_jwt = false }
-
+[functions.livekit-token]
+verify_jwt = true
+[functions.delete-account]
+verify_jwt = true
+[functions.scheduled-broadcast-dispatch]
+verify_jwt = true
+[functions.notifications-cleanup]
+verify_jwt = true
+[functions.refresh-counters]
+verify_jwt = true
+[functions.weekly-admin-report]
+verify_jwt = true
 [functions.create-marketplace-checkout]
 verify_jwt = true
-
 [functions.marketplace-admin]
 verify_jwt = true
 
+# Provider callbacks verify the payment server-side.
 [functions.moyasar-marketplace-webhook]
 verify_jwt = false
-
 [functions.tap-marketplace-webhook]
 verify_jwt = false
-
-[cron]
-  # Every minute: check and send due scheduled broadcasts
-  scheduled-broadcast-dispatch = "scheduled-broadcast-dispatch * * * * *"
-
-  # Weekly Sunday 03:00: clean old notifications
-  notifications-cleanup = "notifications-cleanup 0 3 * * 0"
-
-  # Every 5 minutes: refresh denormalized counters for active users
-  refresh-counters = "refresh-counters */5 * * * *"
-
-  # Weekly Sunday 09:00: generate and send weekly admin report
-  weekly-admin-report = "weekly-admin-report 0 9 * * 0"
-
-[edge_runtime]
-  # Increase timeout for heavier functions
-  scheduled-broadcast-dispatch = { timeout = 120 }
-  # Public gateway callback; handler re-fetches and verifies the invoice server-to-server.
-  moyasar-marketplace-webhook = { verify_jwt = false }
-  tap-marketplace-webhook = { verify_jwt = false }
-  weekly-admin-report = { timeout = 180 }

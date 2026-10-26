@@ -1,7 +1,9 @@
 import { OasisSurface, OasisPressable as Pressable } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
-import React from 'react';
-import { View, Text, Image, Linking } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { View, Text, Image, Linking, ActivityIndicator } from 'react-native';
+import { supabase } from '@/lib/supabase';
+import { parseChatImage, chatImagePath } from '@/lib/chatMedia';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MapPin, ExternalLink, Award, Coffee, Sparkles, Check, CheckCheck } from 'lucide-react-native';
 import { navigationUrl } from '@/lib/privacy';
@@ -26,12 +28,7 @@ export interface AppreciationPayload {
 }
 
 export function parseImageMessage(value: string) {
-  try {
-    const parsed = JSON.parse(value);
-    return parsed?.type === 'image' && parsed?.url ? parsed : null;
-  } catch {
-    return null;
-  }
+  return parseChatImage(value);
 }
 
 export function isUserFriendlyCaption(name?: string): boolean {
@@ -113,6 +110,31 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   isAnonymous,
   onPreviewImage,
 }) => {
+  const media = useMemo(() => parseImageMessage(msg.body), [msg.body]);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [imageFailed, setImageFailed] = useState(false);
+  useEffect(() => {
+    let active = true;
+    setImageUrl(null);
+    setImageFailed(false);
+    if (!media) return;
+    const path = chatImagePath(media);
+    if (!path) {
+      // External image messages keep their original URL; bucket images always require a signature.
+      if (media.url && !media.storage_path && !media.url.includes('/chat-media/')) setImageUrl(media.url);
+      else setImageFailed(true);
+      return;
+    }
+    const sign = async () => {
+      const { data, error } = await supabase.storage.from('chat-media').createSignedUrl(path, 600);
+      if (!active) return;
+      setImageUrl(error ? null : data?.signedUrl || null);
+      setImageFailed(Boolean(error || !data?.signedUrl));
+    };
+    void sign();
+    const timer = setInterval(() => { void sign(); }, 8 * 60 * 1000);
+    return () => { active = false; clearInterval(timer); };
+  }, [media, currentUserId]);
   const isMine = msg.sender_id === currentUserId;
   const isRead =
     Array.isArray(msg.read_by) &&
@@ -170,22 +192,22 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               );
             }
 
-            const media = parseImageMessage(msg.body);
             if (media) {
               const hasRealCaption = isUserFriendlyCaption(media.name);
               return (
                 <View style={styles.imageMsgContainer}>
                   <Pressable
-                    onPress={() => onPreviewImage(media.url)}
+                    disabled={!imageUrl}
+                    onPress={() => { if (imageUrl) onPreviewImage(imageUrl); }}
                     style={styles.imagePressable}
                     accessibilityRole="button"
                     accessibilityLabel="عرض الصورة بالحجم الكامل"
                   >
-                    <Image
-                      source={{ uri: media.url }}
+                    {imageUrl ? <Image
+                      source={{ uri: imageUrl }}
                       style={styles.messageImage}
                       resizeMode="cover"
-                    />
+                    /> : imageFailed ? <Text style={styles.msgText}>تعذر تحميل الصورة</Text> : <ActivityIndicator accessibilityLabel="تحميل الصورة" />}
                   </Pressable>
                   {hasRealCaption && (
                     <Text style={[styles.imageCaption, isMine && styles.msgTextMine]}>

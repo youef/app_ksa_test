@@ -391,10 +391,9 @@ export default function Conversation() {
           contentType: asset.mimeType || 'image/jpeg', cacheControl: '3600', upsert: false,
         });
         if (uploadError) throw uploadError;
-        const { data: urlData } = supabase.storage.from('chat-media').getPublicUrl(path);
         const { error } = await supabase.from('messages').insert({
           conversation_id: convId, sender_id: currentUserId,
-          body: JSON.stringify({ type: 'image', url: urlData.publicUrl, name: 'صورة' }),
+          body: JSON.stringify({ type: 'image', storage_path: path, name: 'صورة' }),
           read_by: [currentUserId],
         });
         if (error) throw error;
