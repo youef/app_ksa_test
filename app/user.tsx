@@ -74,6 +74,7 @@ export default function UserProfile() {
   const [coverVersion, setCoverVersion] = useState(Date.now());
   const [coverFailed, setCoverFailed] = useState(false);
   const [profile, setProfile] = useState<any>(null);
+  const [contactPhone, setContactPhone] = useState('');
   const [hasActiveStories, setHasActiveStories] = useState(false);
   const [stats, setStats] = useState({
     market: 0,
@@ -287,6 +288,7 @@ export default function UserProfile() {
         iBlocked ||
         blockedMe ||
         (p.hide_name === true && me !== p.id);
+      setContactPhone('');
       if (locked) {
         setItems([]);
         setServices([]);
@@ -306,6 +308,8 @@ export default function UserProfile() {
         return;
       }
 
+      const contactResult = await supabase.from('profile_contact_numbers').select('phone,is_visible').eq('user_id', p.id).eq('is_visible', true).maybeSingle();
+      if (!contactResult.error) setContactPhone(contactResult.data?.phone || '');
       const [customizationResult, featuredResult] = await Promise.all([
         supabase.from('profile_customizations').select('accent_color,banner_style,show_stats,show_badges,featured_title,profile_type,section_visibility,section_order').eq('user_id', p.id).maybeSingle(),
         supabase.from('profile_featured_items').select('item_type,item_id,position').eq('user_id', p.id).order('position', { ascending: true }).limit(10),
@@ -634,7 +638,7 @@ export default function UserProfile() {
         contentContainerStyle={styles.page}
       >
         <View style={[styles.shell, { paddingTop: 14 }]}>
-          <ProfileHeader profile={profile} customization={profileCustomization} displayName={displayName} coverUri={coverUrl} stats={{...stats, contributions:totalContributions}} own={own} anonymous={anonymous} locked={locked} following={following} followedBy={followedBy} busy={busy || blocked || blockedByOther} hideContactActions={blocked || blockedByOther} hasStories={hasActiveStories} onAvatarPress={openProfileStories} onEdit={() => router.push('/profile?section=edit')} onDesign={() => router.push('/profile?tab=settings&section=design')} onSettings={() => router.push('/profile?tab=settings')} onFollowers={() => setConnections('followers')} onFollowing={() => setConnections('following')} onFollow={() => void toggleFollow()} onMessage={() => void openMessage()} />
+          <ProfileHeader contactPhone={contactPhone} profile={profile} customization={profileCustomization} displayName={displayName} coverUri={coverUrl} stats={{...stats, contributions:totalContributions}} own={own} anonymous={anonymous} locked={locked} following={following} followedBy={followedBy} busy={busy || blocked || blockedByOther} hideContactActions={blocked || blockedByOther} hasStories={hasActiveStories} onAvatarPress={openProfileStories} onEdit={() => router.push('/profile?section=edit')} onDesign={() => router.push('/profile?tab=settings&section=design')} onSettings={() => router.push('/profile?tab=settings')} onFollowers={() => setConnections('followers')} onFollowing={() => setConnections('following')} onFollow={() => void toggleFollow()} onMessage={() => void openMessage()} />
           {!locked && (featuredItems.length > 0 || own) && (
             <View style={styles.content}>
               {featuredItems.length > 0 && <View style={styles.contentHead}>
