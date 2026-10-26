@@ -210,7 +210,7 @@ export default function BottomNav() {
   return (
     <Animated.View pointerEvents="box-none" style={[styles.dock, { paddingBottom: bottomPadding }, animatedStyle]}>
       <View style={styles.surface}>
-        <Image source={require('../public/welcome/hayna-bottom-nav-background.png')} resizeMode="cover" style={styles.navArtwork} pointerEvents="none" />
+        <Image source={require('../public/welcome/hayna-bottom-nav-background.png')} resizeMode="cover" style={styles.navArtwork} />
         <View style={styles.heritageGlow} />
         <View style={styles.row}>
           {TABS.map((tab) => {
