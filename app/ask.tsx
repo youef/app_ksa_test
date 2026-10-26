@@ -2,9 +2,9 @@ import { OasisPressable as Pressable, OasisTextInput as TextInput } from '@/comp
 import { OASIS } from '@/lib/oasis';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { ImageBackground, Alert, BackHandler, KeyboardAvoidingView, ScrollView, Text, View, StyleSheet, ActivityIndicator, Platform } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MessageSquare, HeartHandshake, Wrench, Gift, AlertTriangle, Check, ArrowLeft, Users, ShieldAlert } from 'lucide-react-native';
+import { MessageSquare, HeartHandshake, Wrench, Gift, AlertTriangle, Check, ArrowLeft, Users, ShieldAlert, GraduationCap, MapPin, Clock3, CalendarDays, ShieldCheck, Eye, ChevronLeft, Sparkles } from 'lucide-react-native';
 import { AppHeader } from '@/components/shared/AppHeader';
 import { supabase } from '@/lib/supabase';
 import { containsProfanity, findProfanity, banAccountOnViolation } from '@/lib/profanity';
@@ -18,6 +18,7 @@ const POST_TYPES = [
   { key: 'tool_sharing', label: 'إعارة', hint: 'استعر أداة أو شاركها', icon: Wrench },
   { key: 'donate', label: 'تبرع', hint: 'شارك ما يزيد عن حاجتك', icon: Gift },
   { key: 'emergency', label: 'طارئ', hint: 'بلّغ جيرانك عن حالة عاجلة', icon: AlertTriangle },
+  { key: 'school_transport', label: 'توصيل المدارس', hint: 'اطلب توصيلًا أو اعرض مقاعد متاحة', icon: GraduationCap },
 ] as const;
 type PostType = typeof POST_TYPES[number]['key'];
 
@@ -66,7 +67,36 @@ const QUICK_TEMPLATES = [
   },
 ];
 
+type SchoolMode = 'need' | 'offer';
+type SchoolTrip = 'morning' | 'return' | 'both';
+type SchoolLevel = 'رياض أطفال' | 'ابتدائي' | 'متوسط' | 'ثانوي';
+
+const SCHOOL_MODES: { key: SchoolMode; label: string; hint: string }[] = [
+  { key: 'need', label: 'أحتاج توصيلًا', hint: 'أبحث عن جهة مناسبة' },
+  { key: 'offer', label: 'لدي مقاعد متاحة', hint: 'أعرض المشاركة في المشوار' },
+];
+const SCHOOL_LEVELS: SchoolLevel[] = ['رياض أطفال', 'ابتدائي', 'متوسط', 'ثانوي'];
+const SCHOOL_TRIPS: { key: SchoolTrip; label: string }[] = [
+  { key: 'morning', label: 'ذهاب للمدرسة' },
+  { key: 'return', label: 'عودة من المدرسة' },
+  { key: 'both', label: 'ذهاب وعودة' },
+];
+const SCHOOL_DAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'] as const;
+
+function schoolTitle(mode: SchoolMode, level: SchoolLevel, trip: SchoolTrip, district: string) {
+  const prefix = mode === 'need' ? 'مطلوب توصيل مدرسي' : 'مقاعد لتوصيل مدرسي';
+  const type = SCHOOL_TRIPS.find(item => item.key === trip)?.label || 'ذهاب وعودة';
+  return `${prefix} - ${level} - ${type}${district.trim() ? ` - حي ${district.trim()}` : ''}`;
+}
+
+function includesPrivateSchoolDetails(text: string) {
+  // Avoid exposing direct contact numbers, exact pickup times, or home addresses
+  // in a listing viewable by other platform users.
+  return /(?:\+?966|05)\s*[- ]?\d[\d\s-]{7,}|(?:\d{1,2}[:٫]\d{2})|(?:منزل|بيتنا|عنوان المنزل|رقم البيت|رقم العمارة|رقم الشارع|رقم المبنى)/i.test(text);
+}
+
 export default function AskScreen() {
+  const { type: initialType } = useLocalSearchParams<{ type?: string }>();
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
   const submittingRef = useRef(false);
@@ -80,7 +110,18 @@ export default function AskScreen() {
   const [busy, setBusy] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<{ title?: string; city?: string; budget?: string }>({});
   const [postType, setPostType] = useState<PostType>('inquiry');
-  const safetyCheck = useMemo(() => detectEmergencyAndSafetyAI(`${title} ${body}`.trim()), [title, body]);
+  const [schoolMode, setSchoolMode] = useState<SchoolMode>('need');
+  const [schoolLevel, setSchoolLevel] = useState<SchoolLevel>('ابتدائي');
+  const [schoolTrip, setSchoolTrip] = useState<SchoolTrip>('both');
+  const [schoolDays, setSchoolDays] = useState<string[]>([...SCHOOL_DAYS]);
+  const [schoolSeats, setSchoolSeats] = useState('2');
+  const composedSchoolTitle = useMemo(() => schoolTitle(schoolMode, schoolLevel, schoolTrip, district), [schoolMode, schoolLevel, schoolTrip, district]);
+  const publishTitle = postType === 'school_transport' ? composedSchoolTitle : title.trim();
+  const safetyCheck = useMemo(() => detectEmergencyAndSafetyAI(`${publishTitle} ${body}`.trim()), [publishTitle, body]);
+
+  useEffect(() => {
+    if (initialType === 'school_transport' || initialType === 'carpooling') setPostType('school_transport');
+  }, [initialType]);
   const selectedType = POST_TYPES.find(type => type.key === postType)!;
 
   function changeStep(next: 1 | 2) {
@@ -194,13 +235,21 @@ export default function AskScreen() {
   async function save() {
     if (submittingRef.current || step !== 2) return;
     const nextErrors: { title?: string; city?: string; budget?: string } = {};
-    if (!title.trim()) nextErrors.title = 'اكتب عنواناً مختصراً قبل النشر.';
+    if (!publishTitle.trim() || publishTitle.trim().length < 5) nextErrors.title = 'اكتب عنوانًا واضحًا لا يقل عن خمسة أحرف.';
     if (!city.trim()) nextErrors.city = 'لم نتمكن من تحديد موقعك تلقائيًا. فعّل إذن الموقع أو راجع موقعك في إعدادات الحساب ثم أعد المحاولة.';
     if (postType === 'help' && budget.trim() && (!Number.isFinite(Number(budget)) || Number(budget) < 0)) nextErrors.budget = 'اكتب مبلغًا صحيحًا بالريال أو اتركه فارغًا.';
+    if (postType === 'school_transport') {
+      if (!district.trim()) nextErrors.city = 'اختر الحي في إعدادات موقعك قبل نشر طلب التوصيل.';
+      if (!schoolDays.length) nextErrors.title = 'اختر يومًا واحدًا على الأقل للتوصيل.';
+      if (schoolMode === 'offer' && (!Number.isInteger(Number(schoolSeats)) || Number(schoolSeats) < 1 || Number(schoolSeats) > 8)) {
+        nextErrors.budget = 'عدد المقاعد يجب أن يكون بين ١ و٨.';
+      }
+      if (includesPrivateSchoolDetails(body)) nextErrors.title = 'احذف رقم الهاتف، العنوان الدقيق وأوقات الالتقاء من التفاصيل؛ نسّقها داخل المحادثة الخاصة.';
+    }
     setFieldErrors(nextErrors);
     if (Object.keys(nextErrors).length) return;
-    if (!title.trim()) {
-      return Alert.alert('مطلوب', postType === 'help' ? 'يرجى كتابة عنوان لطلب المساعدة.' : 'يرجى كتابة عنوان السؤال.');
+    if (!publishTitle.trim()) {
+      return Alert.alert('مطلوب', 'يرجى كتابة عنوان للمنشور.');
     }
     if (!city) {
       return Alert.alert('تحديد الموقع', 'يرجى اختيار مدينتك وحيك لضمان وصول طلبك لجيرانك بدقة.');
@@ -210,7 +259,7 @@ export default function AskScreen() {
       return Alert.alert('تنبيه أمان المجتمع', safetyCheck.spamReason || 'المحتوى ترويجي أو عشوائي وغير مصرح به.');
     }
 
-    const combinedText = `${title} ${body}`.trim();
+    const combinedText = `${publishTitle} ${body}`.trim();
     const detected = findProfanity(combinedText);
     if (detected) {
       const { data: u } = await supabase.auth.getUser();
@@ -255,11 +304,47 @@ export default function AskScreen() {
         }).eq('id', u.user.id);
       }
 
+      // School transport uses the existing carpool request flow. Only general
+      // neighbourhood + school stage are public: never persist child details,
+      // phone numbers, exact meeting points, or raw GPS here.
+      if (postType === 'school_transport') {
+        const direction = SCHOOL_TRIPS.find(item => item.key === schoolTrip)?.label || 'ذهاب وعودة';
+        const detailLines = [
+          schoolMode === 'need' ? 'نوع المشاركة: طلب توصيل مدرسي' : 'نوع المشاركة: عرض مقاعد توصيل مدرسي',
+          `المرحلة: ${schoolLevel}`,
+          `المشوار: ${direction}`,
+          `الأيام: ${schoolDays.join('، ')}`,
+          schoolMode === 'offer' ? `المقاعد المتاحة: ${schoolSeats}` : null,
+          body.trim() ? `تفاصيل عامة: ${body.trim()}` : null,
+          'لتنسيق تفاصيل المدرسة ونقطة الالتقاء يرجى التواصل داخل المحادثة الخاصة بعد التحقق من مقدم الخدمة.',
+        ].filter(Boolean).join('\n');
+        const { data: schoolRequest, error: schoolError } = await supabase.from('requests')
+          .insert({
+            requester_id: u.user.id,
+            request_type: 'carpooling',
+            title: publishTitle.slice(0, 120),
+            description: detailLines,
+            city: city.trim(),
+            district: district.trim(),
+            status: 'open',
+            is_urgent: false,
+            max_participants: schoolMode === 'offer' ? Number(schoolSeats) : null,
+            available_seats: schoolMode === 'offer' ? Number(schoolSeats) : null,
+            is_recurring: schoolDays.length > 1,
+          })
+          .select('id')
+          .single();
+        if (schoolError || !schoolRequest) throw schoolError || new Error('تعذر نشر طلب توصيل المدارس.');
+        Alert.alert('تم النشر', 'تم نشر طلب التوصيل دون مشاركة بيانات الطلاب أو موقع المنزل.');
+        router.replace({ pathname: '/request', params: { id: schoolRequest.id } });
+        return;
+      }
+
       // 1. Direct Help Request branch
       if (postType === 'help') {
         const reqPayload: any = {
           requester_id: u.user.id,
-          title: title.trim(),
+          title: publishTitle.trim(),
           description: body.trim() || title.trim(),
           request_type: 'help',
           city: city.trim() || null,
@@ -288,7 +373,7 @@ export default function AskScreen() {
       // 2. Questions / Tools / Donate / Emergency branch
       const payload: any = {
         author_id: u.user.id,
-        title: title.trim(),
+        title: publishTitle.trim(),
         body: body.trim() || 'بدون تفاصيل إضافية',
         city: city.trim(),
         district: district.trim() || null,
