@@ -68,6 +68,10 @@ export default function LiveRoomScreen() {
   const [guestMutedByHost, setGuestMutedByHost] = useState(false);
   const elapsed = useLiveRoomHeartbeat(id ? String(id) : undefined, currentUser, role, stream?.started_at);
   const [connected, setConnected] = useState(false);
+  const [mediaIssue, setMediaIssue] = useState('');
+  const [retryingMedia, setRetryingMedia] = useState(false);
+  const [giftOpen, setGiftOpen] = useState(false);
+  const [giftSending, setGiftSending] = useState(false);
   const [connection, setConnection] = useState<LiveMediaConnection>('connecting');
   const [quality, setQuality] = useState<LiveMediaQuality>('unknown');
   const [mediaState, setMediaState] = useState<LiveMediaState>({ cameraEnabled: true, microphoneEnabled: true });
@@ -103,6 +107,7 @@ export default function LiveRoomScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const mediaApiRef = useRef<LiveMediaApi | null>(null);
   const connectedRef = useRef(false);
+  const lastGiftSentAtRef = useRef(0);
   const hostPulseAtRef = useRef(Date.now());
   const staleSweepAtRef = useRef(0);
   const guestMutedRef = useRef(false);
@@ -171,6 +176,7 @@ export default function LiveRoomScreen() {
     setNextStream(null);
     setNoMoreStreams(false);
     setError('');
+    setMediaIssue('');
     try {
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) { router.replace('/auth'); return; }
@@ -535,6 +541,21 @@ export default function LiveRoomScreen() {
     catch (e) { Alert.alert('تعذر إرسال البلاغ', e instanceof Error ? e.message : 'حاول مرة أخرى.'); }
   }
 
+  async function retryMediaConnection() {
+    if (!id || retryingMedia) return;
+    setRetryingMedia(true);
+    setMediaIssue('');
+    try {
+      const credentials = await getLiveToken(String(id), role);
+      setToken(credentials.token);
+      setRoomUrl(credentials.url);
+    } catch (cause) {
+      setMediaIssue(cause instanceof Error ? cause.message : 'تعذرت إعادة الاتصال. حاول مرة أخرى.');
+    } finally {
+      setRetryingMedia(false);
+    }
+  }
+
   async function sendReaction(emoji: string) {
     const name = currentUserName;
     pushEffect({ emoji, name, kind: 'heart' });
@@ -543,9 +564,9 @@ export default function LiveRoomScreen() {
     setShowReactions(false);
   }
 
-  async function sendGift() {
-    const emoji = ['🎁', '💎', '🌟', '🔥'][Math.floor(Math.random() * 4)];
-    if (!id || !currentUser) return;
+  async function sendGift(emoji: '🎁' | '💎' | '🌟' | '🔥') {
+    if (!id || !currentUser || giftSending || Date.now() - lastGiftSentAtRef.current < 1500) return;
+    setGiftSending(true);
     try {
       const { error: giftError } = await supabase.from('live_gift_events').insert({
         stream_id: id,
@@ -553,11 +574,15 @@ export default function LiveRoomScreen() {
         emoji,
       });
       if (giftError) throw giftError;
+      lastGiftSentAtRef.current = Date.now();
+      setGiftOpen(false);
       pushEffect({ emoji, name: currentUserName, kind: 'gift' });
       await heartChannelRef.current?.send({ type: 'broadcast', event: 'gift', payload: { emoji, name: currentUserName } });
       await loadSupporters(id);
     } catch (cause) {
       Alert.alert('تعذر إرسال الهدية', cause instanceof Error ? cause.message : 'حاول مرة أخرى.');
+    } finally {
+      setGiftSending(false);
     }
   }
 
@@ -704,25 +729,46 @@ export default function LiveRoomScreen() {
           onQualityChange={handleQualityChange}
           onMediaStateChange={handleMediaStateChange}
           onApiReady={handleApiReady}
-          onReady={() => { connectedRef.current = true; setConnected(true); }}
+          onReady={() => { connectedRef.current = true; setConnected(true); setMediaIssue(''); }}
           onError={(message) => {
             connectedRef.current = false;
             setConnected(false);
-            if (role === 'host' && id) {
-              void endLiveStream(id).then(() => setError(message)).catch((endError) => {
-                console.error('Unable to close the host stream after media failure.', endError);
-                setError(`${message} تعذر إنهاء البث تلقائيًا؛ استخدم زر الإنهاء.`);
-              });
-            } else setError(message);
+            // An interrupted media connection is recoverable. Never end a live
+            // session automatically before the host can reconnect.
+            setMediaIssue(message);
           }}
         />
 
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="إظهار أو إخفاء الواجهة"
-          style={styles.stageTap}
-          onPress={() => setOverlayVisible((value) => !value)}
-        />
+        {/* Full-stage touch catchers intercepted the browser's media-unlock action.
+            Use the explicit hide/show controls instead. */}
+
+        <Modal visible={giftOpen} transparent animationType="slide" onRequestClose={() => setGiftOpen(false)}>
+          <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.62)' }}>
+            <Pressable accessibilityLabel="إغلاق الهدايا" onPress={() => setGiftOpen(false)} style={{ flex: 1 }} />
+            <View style={{ backgroundColor: '#102b23', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 19, paddingBottom: Math.max(insets.bottom, 22) + 14, borderWidth: 1, borderColor: '#245746' }}>
+              <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 9 }}>
+                <Text style={{ color: '#fff', fontSize: 20, fontWeight: '800' }}>ادعم البث بهدية</Text>
+                <Pressable onPress={() => setGiftOpen(false)} accessibilityLabel="إغلاق"><X size={22} color="#fff" /></Pressable>
+              </View>
+              <Text style={{ textAlign: 'right', color: '#c0d8ce', fontSize: 12, marginBottom: 18 }}>الهدايا رمزية ومجانية، لا تستخدم أموالًا أو رصيدًا مدفوعًا.</Text>
+              <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 10 }}>
+                {([
+                  ['🎁', 'هدية الجار', 'تشجيع جميل'],
+                  ['💎', 'ألماسة', 'تميّز المضيف'],
+                  ['🌟', 'نجمة', 'محتوى يستحق'],
+                  ['🔥', 'حماس', 'بث رائع'],
+                ] as const).map(([emoji, label, description]) => (
+                  <Pressable key={emoji} disabled={giftSending} onPress={() => void sendGift(emoji)} style={{ width: '47%', backgroundColor: '#193d31', borderRadius: 18, borderWidth: 1, borderColor: '#30634e', alignItems: 'center', paddingVertical: 18, gap: 5, opacity: giftSending ? 0.55 : 1 }}>
+                    <Text style={{ fontSize: 32 }}>{emoji}</Text>
+                    <Text style={{ color: '#fff', fontWeight: '800', fontSize: 14 }}>{label}</Text>
+                    <Text style={{ color: '#b6d6c9', fontSize: 11 }}>{description}</Text>
+                    <Text style={{ color: '#6ee7b7', fontSize: 11, fontWeight: '700' }}>مجانية</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          </View>
+        </Modal>
 
         {overlayVisible && (
           <>
@@ -776,6 +822,14 @@ export default function LiveRoomScreen() {
           </View>
         )}
 
+        {mediaIssue ? (
+          <View style={[styles.connectionBanner, { top: '37%', maxWidth: '86%', flexDirection: 'column' }]}>
+            <Text style={[styles.connectionBannerText, { textAlign: 'center' }]}>{mediaIssue}</Text>
+            <Pressable accessibilityRole="button" disabled={retryingMedia} onPress={() => void retryMediaConnection()} style={{ backgroundColor: '#047857', borderRadius: 12, paddingVertical: 9, paddingHorizontal: 17, marginTop: 7 }}>
+              <Text style={{ color: '#fff', fontWeight: '700' }}>{retryingMedia ? 'جارٍ إعادة الاتصال…' : 'إعادة الاتصال بالبث'}</Text>
+            </Pressable>
+          </View>
+        ) : null}
         {connection === 'reconnecting' && (
           <View pointerEvents="none" style={styles.connectionBanner}><ActivityIndicator color={OASIS.colors.surface} size="small" /><Text style={styles.connectionBannerText}>جارٍ إعادة الاتصال…</Text></View>
         )}
@@ -1013,7 +1067,7 @@ export default function LiveRoomScreen() {
                 )}
                 <View style={[styles.actionRow, { paddingBottom: Math.max(insets.bottom, 10) }]}>
                   <Pressable oasisKind="action" onPress={() => setShowReactions((value) => !value)} style={[styles.actionButton, showReactions && styles.actionButtonActive]}><Heart size={22} color={OASIS.colors.surface} fill="#fb7185" /><Text style={styles.actionLabel}>تفاعل</Text></Pressable>
-                  <Pressable oasisKind="action" onPress={() => void sendGift()} style={styles.actionButton}><Gift size={21} color="#fde68a" /><Text style={styles.actionLabel}>هدية</Text></Pressable>
+                  <Pressable oasisKind="action" onPress={() => setGiftOpen(true)} style={[styles.actionButton, { backgroundColor: 'rgba(251,191,36,0.12)', borderRadius: 16, padding: 5 }]}><Gift size={23} color="#fde68a" /><Text style={styles.actionLabel}>ادعم</Text></Pressable>
                   <Pressable oasisKind="action" onPress={() => setShowChat((value) => !value)} style={styles.actionButton}><MessageCircle size={20} color={OASIS.colors.surface} /><Text style={styles.actionLabel}>{showChat ? 'إخفاء' : 'التعليقات'}</Text></Pressable>
                   <Pressable oasisKind="action" onPress={() => setOverlayVisible(false)} style={styles.actionButton}><EyeOff size={20} color={OASIS.colors.surface} /><Text style={styles.actionLabel}>وضع</Text></Pressable>
                   {guestState !== 'accepted' && (
