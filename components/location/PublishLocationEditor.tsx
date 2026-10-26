@@ -93,6 +93,10 @@ export default function PublishLocationEditor({ visible, city, district, region,
     [citySearch],
   );
   const canSave = Boolean(draftCity && selectedCity && draftDistrict.trim());
+  const typedDistrict = withoutPrefix(districtSearch);
+  const validCustomDistrict = typedDistrict.length >= 2 && typedDistrict.length <= 55 &&
+    /^[\u0600-\u06FFa-zA-Z\s-]+$/u.test(typedDistrict) &&
+    !/(?:عنوان|منزل|شارع|عمارة|مبنى|رقم البيت)/u.test(typedDistrict);
 
   function chooseLocation(item: CityOption) {
     if (lockedCity && !matches(item.name, lockedCity.city)) {
@@ -233,7 +237,7 @@ export default function PublishLocationEditor({ visible, city, district, region,
                     {matches(item, draftDistrict) ? <Check size={17} color="#047857" /> : null}
                   </Pressable>
                 ))}
-                {filteredDistricts.length === 0 && districtSearch.trim().length >= 2 ? (
+                {filteredDistricts.length === 0 && validCustomDistrict ? (
                   <Pressable accessibilityRole="button" onPress={() => { setDraftDistrict(withoutPrefix(districtSearch)); setError(''); }} style={styles.manualDistrict}>
                     <Text style={styles.manualDistrictLabel}>اعتماد اسم الحي المكتوب: {withoutPrefix(districtSearch)}</Text>
                     <Check size={17} color="#047857" />
