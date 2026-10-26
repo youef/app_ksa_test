@@ -176,6 +176,17 @@ export default function LivesScreen() {
     return () => { ++generation.current; clearTimeout(debounce); clearInterval(timer); void supabase.removeChannel(channel); };
   }, [load, leaderboardPeriod]));
 
+  // Do not advertise a restricted stream to somebody who cannot obtain its token.
+  // The Edge Function remains the source of truth for actual entry permissions.
+  const accessibleStreams = useMemo(() => streams.filter((stream) => {
+    if (stream.host_id === currentUserId) return true;
+    if (stream.audience === 'public') return true;
+    if (stream.audience === 'followers') return following.includes(stream.host_id);
+    if (stream.audience === 'city') return Boolean(city && stream.profiles?.city &&
+      city.toLocaleLowerCase('ar') === stream.profiles.city.toLocaleLowerCase('ar'));
+    return false;
+  }), [streams, currentUserId, following, city]);
+
   const isFollowing = useCallback((stream: LiveStream) => following.includes(stream.host_id), [following]);
   const isNearby = useCallback(
     (stream: LiveStream) => Boolean(city && stream.profiles?.city?.toLocaleLowerCase() === city.toLocaleLowerCase()),
@@ -183,37 +194,37 @@ export default function LivesScreen() {
   );
 
   const baseCounts = useMemo(() => ({
-    all: streams.length,
-    following: streams.filter(isFollowing).length,
-    nearby: streams.filter(isNearby).length,
-  }), [streams, isFollowing, isNearby]);
+    all: accessibleStreams.length,
+    following: accessibleStreams.filter(isFollowing).length,
+    nearby: accessibleStreams.filter(isNearby).length,
+  }), [accessibleStreams, isFollowing, isNearby]);
 
   const categories = useMemo(() => {
     const set = new Set<string>();
-    streams.forEach((stream) => { if (stream.category) set.add(stream.category); });
+    accessibleStreams.forEach((stream) => { if (stream.category) set.add(stream.category); });
     return ['all', ...Array.from(set)];
-  }, [streams]);
+  }, [accessibleStreams]);
 
-  const visible = useMemo(() => discoverLives(streams.filter((stream) => {
+  const visible = useMemo(() => discoverLives(accessibleStreams.filter((stream) => {
     if (category !== 'all' && stream.category !== category) return false;
     if (filter === 'following') return isFollowing(stream);
     if (filter === 'nearby') return isNearby(stream);
     return true;
-  }), searchQuery, sort), [streams, filter, category, isFollowing, isNearby, searchQuery, sort]);
+  }), searchQuery, sort), [accessibleStreams, filter, category, isFollowing, isNearby, searchQuery, sort]);
 
   const trending = useMemo(() => {
-    if (!streams.length) return [];
-    return [...streams]
+    if (!accessibleStreams.length) return [];
+    return [...accessibleStreams]
       .sort((a, b) => ((b.viewer_count || 0) - (a.viewer_count || 0)) || ((b.peak_viewer_count || 0) - (a.peak_viewer_count || 0)))
       .slice(0, 8);
-  }, [streams]);
+  }, [accessibleStreams]);
 
-  const totalViewers = useMemo(() => streams.reduce((sum, stream) => sum + (stream.viewer_count || 0), 0), [streams]);
-  const hostCount = useMemo(() => new Set(streams.map((stream) => stream.host_id)).size, [streams]);
+  const totalViewers = useMemo(() => accessibleStreams.reduce((sum, stream) => sum + (stream.viewer_count || 0), 0), [accessibleStreams]);
+  const hostCount = useMemo(() => new Set(accessibleStreams.map((stream) => stream.host_id)).size, [accessibleStreams]);
   const earnedAchievements = useMemo(() => achievements.filter((item) => item.earned).length, [achievements]);
 
   const badges: Record<TabKey, number> = {
-    live: streams.length,
+    live: accessibleStreams.length,
     trending: trending.length,
     stars: topHosts.length,
     achievements: earnedAchievements,
@@ -234,7 +245,7 @@ export default function LivesScreen() {
       <AppHeader
         variant="tab"
         title="البثوث المباشرة"
-        subtitle={streams.length > 0 ? `${compactCount(streams.length)} على الهواء · ${compactCount(totalViewers)} مشاهد` : 'كن قريبًا من مجتمع حيّك'}
+        subtitle={accessibleStreams.length > 0 ? `${compactCount(accessibleStreams.length)} على الهواء · ${compactCount(totalViewers)} مشاهد` : 'كن قريبًا من مجتمع حيّك'}
         fallbackRoute="/more"
         rightAction={(
           <HeaderAction
@@ -296,11 +307,11 @@ export default function LivesScreen() {
                   <LivePulse size={9} color="#fecdd3" />
                   <Text style={styles.heroLiveText}>على الهواء الآن</Text>
                 </View>
-                <Text style={styles.heroCaption}>انضم لجيرانك أو ابدأ بثك</Text>
+                <Text style={styles.heroCaption}>شاهد، تفاعل، وادعم مبدعي حيّنا</Text>
               </View>
 
               <View style={styles.heroStats}>
-                <HeroStat icon={<Radio size={15} color={OASIS.colors.soft} />} value={compactCount(streams.length)} label="بث مباشر" />
+                <HeroStat icon={<Radio size={15} color={OASIS.colors.soft} />} value={compactCount(accessibleStreams.length)} label="بث مباشر" />
                 <View style={styles.heroDivider} />
                 <HeroStat icon={<Eye size={15} color={OASIS.colors.soft} />} value={compactCount(totalViewers)} label="مشاهد" />
                 <View style={styles.heroDivider} />
@@ -336,7 +347,7 @@ export default function LivesScreen() {
             </View>
 
             <View style={styles.sectionRow}>
-              <Text style={styles.sectionTitle}>على الهواء الآن</Text>
+              <Text style={styles.sectionTitle}>اكتشف البثوث المباشرة</Text>
               <View style={styles.countPill}><LivePulse size={7} /><Text style={styles.countPillText}>{visible.length} بث</Text></View>
             </View>
 
@@ -508,7 +519,9 @@ function StreamCover({ stream, tall = false }: { stream: LiveStream; tall?: bool
   const profile = stream.profiles;
   return (
     <View style={[styles.cover, tall && styles.coverTall]}>
-      <LinearGradient colors={[OASIS.colors.deep, OASIS.colors.deep, '#0f766e']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={['#041b15', '#064e3b', '#042a20']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+      {profile?.avatar_url ? <Image source={{ uri: profile.avatar_url }} style={StyleSheet.absoluteFillObject} resizeMode="cover" blurRadius={18} /> : null}
+      <LinearGradient colors={['rgba(4,25,20,0.10)', 'rgba(4,28,23,0.45)', 'rgba(1,13,11,0.96)']} locations={[0,0.45,1]} style={StyleSheet.absoluteFill} />
       <View style={styles.coverOrbA} />
       <View style={styles.coverOrbB} />
       <View style={styles.coverAvatarRing}>
@@ -528,7 +541,7 @@ function SpotlightCard({ stream, onPress }: { stream: LiveStream; onPress: () =>
     <Pressable accessibilityRole="button" onPress={onPress} style={styles.spotlight}>
       <StreamCover stream={stream} tall />
       <View style={styles.spotlightTopRow}>
-        <View style={styles.onAir}><LivePulse size={7} color={OASIS.colors.surface} /><Text style={styles.onAirText}>مميّز</Text></View>
+        <View style={styles.onAir}><LivePulse size={7} color={OASIS.colors.surface} /><Text style={styles.onAirText}>مباشر الآن</Text></View>
         <View style={styles.audienceChip}><Text style={styles.audienceChipText}>{AUDIENCE_LABEL[stream.audience]}</Text></View>
       </View>
       <View style={styles.spotlightBottom}>
@@ -541,7 +554,7 @@ function SpotlightCard({ stream, onPress }: { stream: LiveStream; onPress: () =>
           <View style={styles.metaChip}><Users size={12} color={OASIS.colors.line} /><Text style={styles.metaChipText}>{compactCount(stream.viewer_count || 0)} مشاهد</Text></View>
           <View style={styles.metaChip}><Clock size={12} color={OASIS.colors.line} /><Text style={styles.metaChipText}>{liveDuration(stream.started_at)}</Text></View>
           <View style={styles.metaChip}><Text style={styles.metaChipText}>{stream.category}</Text></View>
-          <View style={styles.spotlightJoin}><Text style={styles.spotlightJoinText}>انضم الآن</Text><ChevronLeft size={14} color={OASIS.colors.deep} /></View>
+          <View style={styles.spotlightJoin}><Text style={styles.spotlightJoinText}>شاهد البث</Text><ChevronLeft size={14} color={OASIS.colors.deep} /></View>
         </View>
       </View>
     </Pressable>
@@ -560,7 +573,7 @@ function LiveCard({ stream, onPress }: { stream: LiveStream; onPress: () => void
       <View style={styles.cardBody}>
         <Text style={styles.cardTitle} numberOfLines={2}>{stream.title}</Text>
         <View style={styles.cardMetaRow}>
-          <Text style={styles.cardCategory} numberOfLines={1}>{stream.category}</Text>
+          <Text style={styles.cardCategory} numberOfLines={1}>{stream.category} · {AUDIENCE_LABEL[stream.audience]}</Text>
           <Text style={styles.cardDot}>·</Text>
           <Text style={styles.cardDuration}>{liveDuration(stream.started_at)}</Text>
         </View>
@@ -665,15 +678,15 @@ function AchievementCard({ item }: { item: LiveAchievement }) {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: OASIS.colors.soft },
-  content: { padding: 14, paddingTop: 14 },
+  screen: { flex: 1, backgroundColor: '#F4F8F6' },
+  content: { padding: 12, paddingTop: 14 },
 
   headerCta: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, backgroundColor: OASIS.colors.primary, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
   headerCtaText: { color: OASIS.colors.surface, fontSize: 12.5, fontWeight: '700' },
 
   // Tab bar
   tabBarWrap: { paddingHorizontal: 12, paddingTop: 10, paddingBottom: 10, backgroundColor: OASIS.colors.soft },
-  tabBar: { flexDirection: 'row-reverse', gap: 8, backgroundColor: OASIS.colors.surface, borderRadius: 14, padding: 6, borderWidth: 1, borderColor: OASIS.colors.soft, shadowColor: OASIS.colors.deep, shadowOpacity: 0, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 3 },
+  tabBar: { flexDirection: 'row-reverse', gap: 6, backgroundColor: '#FFFFFF', borderRadius: 20, padding: 5, borderWidth: 1, borderColor: '#E1EDE6', shadowColor: OASIS.colors.deep, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 3 },
   tabItem: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3, paddingVertical: 9, borderRadius: 15 },
   tabItemActive: { backgroundColor: OASIS.colors.deep },
   tabIconWrap: { position: 'relative' },
@@ -685,7 +698,7 @@ const styles = StyleSheet.create({
   tabBadgeTextActive: { color: OASIS.colors.surface },
 
   // Hero
-  hero: { borderRadius: 14, padding: 14, marginBottom: 16, overflow: 'hidden' },
+  hero: { borderRadius: 22, padding: 18, marginBottom: 18, overflow: 'hidden', borderWidth: 1, borderColor: '#0F6B4F' },
   heroTop: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
   heroLive: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
   heroLiveText: { color: OASIS.colors.surface, fontSize: 14, fontWeight: '700' },
@@ -726,18 +739,18 @@ const styles = StyleSheet.create({
   countPillText: { color: OASIS.colors.primary, fontSize: 12, fontWeight: '600' },
 
   // Covers
-  cover: { height: 118, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  coverTall: { height: 168 },
+  cover: { height: 295, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', backgroundColor: '#061E16' },
+  coverTall: { height: 225 },
   coverOrbA: { position: 'absolute', top: -30, left: -20, width: 110, height: 110, borderRadius: 55, backgroundColor: 'rgba(16,185,129,0.28)' },
   coverOrbB: { position: 'absolute', bottom: -40, right: -24, width: 130, height: 130, borderRadius: 65, backgroundColor: 'rgba(4,120,87,0.35)' },
-  coverAvatarRing: { width: 62, height: 62, borderRadius: 31, borderWidth: 2, borderColor: '#6ee7b7', backgroundColor: OASIS.colors.primary, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  coverAvatarRing: { width: 78, height: 78, borderRadius: 39, borderWidth: 2, borderColor: '#6ee7b7', backgroundColor: OASIS.colors.primary, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   coverAvatar: { width: '100%', height: '100%' },
-  coverAvatarLetter: { color: OASIS.colors.surface, fontWeight: '700', fontSize: 24 },
+  coverAvatarLetter: { color: OASIS.colors.surface, fontWeight: '700', fontSize: 30 },
 
   // Spotlight
-  spotlight: { borderRadius: 14, overflow: 'hidden', marginBottom: 14, backgroundColor: OASIS.colors.deep },
+  spotlight: { borderRadius: 24, overflow: 'hidden', marginBottom: 16, backgroundColor: '#082f25', borderWidth: 1, borderColor: '#24694f' },
   spotlightTopRow: { position: 'absolute', top: 12, right: 12, left: 12, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between' },
-  spotlightBottom: { padding: 14, gap: 5 },
+  spotlightBottom: { padding: 16, gap: 7 },
   spotlightTitle: { color: OASIS.colors.surface, fontSize: 17, fontWeight: '700', textAlign: 'right' },
   spotlightMetaRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5 },
   spotlightHost: { color: '#a7f3d0', fontSize: 12, fontWeight: '600', maxWidth: '80%' },
@@ -748,27 +761,27 @@ const styles = StyleSheet.create({
   spotlightJoinText: { color: OASIS.colors.deep, fontSize: 12, fontWeight: '700' },
 
   // Live grid card
-  grid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 12 },
-  card: { width: '100%', backgroundColor: OASIS.colors.surface, borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: OASIS.colors.line, shadowColor: OASIS.colors.ink, shadowOpacity: 0, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 3 },
-  cardTopRow: { position: 'absolute', top: 9, right: 9, left: 9, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between' },
+  grid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 12, alignItems: 'flex-start' },
+  card: { width: '100%', height: 295, backgroundColor: '#08241c', borderRadius: 22, overflow: 'hidden', borderWidth: 1, borderColor: '#255941', shadowColor: '#052318', shadowOpacity: 0.12, shadowRadius: 15, shadowOffset: { width: 0, height: 6 }, elevation: 3 },
+  cardTopRow: { position: 'absolute', top: 12, right: 10, left: 10, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between' },
   viewersPill: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, backgroundColor: 'rgba(2,6,23,0.42)', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 },
   viewersPillText: { color: OASIS.colors.surface, fontSize: 11, fontWeight: '700' },
-  cardBody: { padding: 11, gap: 5 },
-  cardTitle: { color: OASIS.colors.ink, fontSize: 13.5, fontWeight: '700', textAlign: 'right', minHeight: 34 },
+  cardBody: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 13, paddingTop: 14, paddingBottom: 15, gap: 5, backgroundColor: 'rgba(1,20,15,0.76)' },
+  cardTitle: { color: '#FFFFFF', fontSize: 14.5, fontWeight: '800', textAlign: 'right', minHeight: 34 },
   cardMetaRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5 },
-  cardCategory: { color: OASIS.colors.primary, fontSize: 11, fontWeight: '600', maxWidth: '60%' },
+  cardCategory: { color: '#A7F3D0', fontSize: 11, fontWeight: '600', maxWidth: '60%' },
   cardDot: { color: '#cbd5e1', fontSize: 11 },
-  cardDuration: { color: '#94a3b8', fontSize: 11, fontWeight: '700' },
+  cardDuration: { color: '#d2e7de', fontSize: 11, fontWeight: '700' },
   cardHostRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginTop: 2 },
   cardHostNameRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 3 },
-  cardHostName: { color: OASIS.colors.ink, fontSize: 12, fontWeight: '600', maxWidth: 96 },
-  cardHostArea: { color: OASIS.colors.muted, fontSize: 11, marginTop: 1, textAlign: 'right' },
-  cardHostAvatar: { width: 30, height: 30, borderRadius: 15 },
+  cardHostName: { color: '#FFFFFF', fontSize: 12, fontWeight: '700', maxWidth: 96 },
+  cardHostArea: { color: '#b4d5c4', fontSize: 11, marginTop: 1, textAlign: 'right' },
+  cardHostAvatar: { width: 32, height: 32, borderRadius: 16, borderWidth: 1, borderColor: '#6ee7b7' },
   cardHostAvatarFallback: { width: 30, height: 30, borderRadius: 15, backgroundColor: OASIS.colors.soft, alignItems: 'center', justifyContent: 'center' },
   cardHostAvatarLetter: { color: OASIS.colors.primary, fontWeight: '700' },
 
   // On-air badges
-  onAir: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, backgroundColor: OASIS.colors.danger, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 4 },
+  onAir: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, backgroundColor: '#E11D48', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
   onAirText: { color: OASIS.colors.surface, fontSize: 11, fontWeight: '700' },
   audienceChip: { backgroundColor: 'rgba(2,6,23,0.42)', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
   audienceChipText: { color: OASIS.colors.line, fontSize: 11, fontWeight: '600' },

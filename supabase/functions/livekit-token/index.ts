@@ -58,8 +58,19 @@ serve(async (req) => {
       const { data: guestRequest } = await supabase.from('live_guest_requests').select('id')
         .eq('stream_id', stream.id).eq('guest_id', guestId).eq('status', 'accepted').maybeSingle();
       if (!guestRequest) return respond({ error: 'هذا المستخدم ليس ضيفًا مقبولًا في البث.' }, 404);
-      const adminRoom = new RoomServiceClient(livekitUrl, livekitKey, livekitSecret);
-      try { await adminRoom.removeParticipant(stream.room_name, guestId); } catch { /* A guest may already have disconnected. */ }
+      const adminUrl = livekitUrl.replace(/^wss:/i, 'https:').replace(/^ws:/i, 'http:');
+      const adminRoom = new RoomServiceClient(adminUrl, livekitKey, livekitSecret);
+      try {
+        await adminRoom.removeParticipant(stream.room_name, guestId);
+      } catch (cause) {
+        // Offline guests cannot be removed twice; all other failures should
+        // NOT mark the guest removed while they might still be streaming.
+        const detail = cause instanceof Error ? cause.message : String(cause);
+        if (!/participant.*(not found|does not exist)|not_found/i.test(detail)) {
+          console.error('LiveKit guest removal failed', cause);
+          return respond({ error: 'تعذرت إزالة الضيف من غرفة البث. أعد المحاولة.' }, 502);
+        }
+      }
       const { error: removeError } = await supabase.from('live_guest_requests')
         .update({ status: 'removed', decided_at: new Date().toISOString() }).eq('id', guestRequest.id);
       if (removeError) throw removeError;
@@ -95,10 +106,16 @@ serve(async (req) => {
       .eq('stream_id', stream.id).eq('blocked_user_id', user.id).maybeSingle();
     if (blocked) return respond({ error: 'لا يمكنك الانضمام إلى هذا البث.' }, 403);
 
+    // LiveKit identities are unique per active connection. A second viewer tab
+    // with the same account must not evict the first viewer/host connection.
+    // Keep host and guest identities stable for host moderation / removeParticipant.
+    const participantIdentity = intent === 'viewer'
+      ? `${user.id}:viewer:${crypto.randomUUID()}`
+      : user.id;
     const accessToken = new AccessToken(livekitKey, livekitSecret, {
-      identity: user.id,
+      identity: participantIdentity,
       name,
-      ttl: '15m',
+      ttl: '8m',
       attributes: { hayna_user_id: user.id, stream_id: stream.id, role: intent },
     });
     accessToken.addGrant({
@@ -108,7 +125,7 @@ serve(async (req) => {
       canPublish,
       canPublishData: canPublish,
     });
-    return respond({ token: await accessToken.toJwt(), url: livekitUrl, identity: user.id });
+    return respond({ token: await accessToken.toJwt(), url: livekitUrl, identity: participantIdentity });
   } catch (error) {
     console.error('livekit-token failed', error);
     return respond({ error: 'تعذر تجهيز الدخول للبث. حاول مرة أخرى.' }, 500);
