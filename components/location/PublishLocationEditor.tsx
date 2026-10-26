@@ -233,7 +233,12 @@ export default function PublishLocationEditor({ visible, city, district, region,
                     {matches(item, draftDistrict) ? <Check size={17} color="#047857" /> : null}
                   </Pressable>
                 ))}
-                {filteredDistricts.length === 0 ? <Text style={styles.empty}>لم نجد هذا الحي. تحقق من كتابة اسمه أو فعّل تحديد الموقع.</Text> : null}
+                {filteredDistricts.length === 0 && districtSearch.trim().length >= 2 ? (
+                  <Pressable accessibilityRole="button" onPress={() => { setDraftDistrict(withoutPrefix(districtSearch)); setError(''); }} style={styles.manualDistrict}>
+                    <Text style={styles.manualDistrictLabel}>اعتماد اسم الحي المكتوب: {withoutPrefix(districtSearch)}</Text>
+                    <Check size={17} color="#047857" />
+                  </Pressable>
+                ) : filteredDistricts.length === 0 ? <Text style={styles.empty}>لم نجد هذا الحي. اكتبه كاملًا ثم اضغط اعتماد، أو جرّب تحديد الموقع.</Text> : null}
                 </ScrollView>
               </View>
             ) : <Text style={styles.empty}>اختر المدينة أولًا.</Text>}
@@ -281,6 +286,8 @@ const styles = StyleSheet.create({
   selectedText: { textAlign: 'right', fontSize: 11, color: '#2D6C51' },
   option: { minHeight: 43, paddingHorizontal: 14, paddingVertical: 10, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#F0F4F1' },
   optionSelected: { backgroundColor: '#ECF8F0' },
+  manualDistrict: { minHeight: 46, backgroundColor: '#ECF8F0', borderTopWidth: 1, borderTopColor: '#BFE9CF', paddingHorizontal: 14, paddingVertical: 10, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 9 },
+  manualDistrictLabel: { flex: 1, color: '#047857', fontSize: 12.5, textAlign: 'right', fontWeight: '700' },
   optionText: { textAlign: 'right', color: '#284A37', fontSize: 13.5, fontWeight: '600' },
   optionRegion: { color: '#819386', fontWeight: '400', fontSize: 10 },
   empty: { textAlign: 'right', fontSize: 12, color: '#7D9083', padding: 14 },
