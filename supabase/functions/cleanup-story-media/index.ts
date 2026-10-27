@@ -35,5 +35,6 @@ Deno.serve(async (req: Request) => {
       if (removeError) failed++; else removed++;
     }
   }
+  await db.rpc("hayna_record_story_cleanup", { p_scanned: scanned, p_removed: removed, p_failed: failed, p_protected: protectedCount, p_error: failed ? "Some files failed; next scheduled run retries" : null });
   return Response.json({ scanned, removed, failed, protected: protectedCount, pendingFolders: queue.length });
 });
