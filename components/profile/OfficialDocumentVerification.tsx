@@ -276,7 +276,7 @@ export function OfficialDocumentVerification({ userId, kind, onSubmitted }: { us
                 <TextInput
                   accessibilityLabel={svc.placeholder}
                   value={numbers[kind]}
-                  onChangeText={value => { setNumbers(previous => ({ ...previous, [kind]: value })); setError(''); }}
+                  onChangeText={value => { setNumbers(previous => ({ ...previous, [kind]: value })); setError(''); if (kind === 'business') { setWathqResult(null); setWathqMessage(''); } }}
                   keyboardType="default"
                   autoCorrect={false}
                   autoCapitalize="characters"
