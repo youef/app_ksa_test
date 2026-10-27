@@ -1,56 +1,50 @@
+import { Platform } from 'react-native';
 import { supabase } from './supabase';
 
 export type UploadStrategy = 'bucket' | 'base64' | 'local';
+export interface UploadResult { url: string; strategy: UploadStrategy; bucket?: string; error?: string; }
+const BUCKET = 'story-media';
+const MAX_SOURCE_BYTES = 12 * 1024 * 1024;
+const MAX_UPLOAD_BYTES = 2 * 1024 * 1024;
 
-export interface UploadResult {
-  url: string;
-  strategy: UploadStrategy;
-  bucket?: string;
-  error?: string;
-}
-
-const BUCKETS = ['stories', 'avatars'] as const;
-
-async function tryBucket(
-  bucket: string,
-  objectPath: string,
-  body: ArrayBuffer,
-): Promise<string | null> {
-  const { error } = await supabase.storage
-    .from(bucket)
-    .upload(objectPath, body, { contentType: 'image/jpeg', upsert: true });
-
-  if (error) return null;
-  return supabase.storage.from(bucket).getPublicUrl(objectPath).data.publicUrl;
+async function optimizeForWeb(blob: Blob): Promise<Blob> {
+  if (Platform.OS !== 'web' || typeof document === 'undefined' || typeof createImageBitmap !== 'function') return blob;
+  const bitmap = await createImageBitmap(blob);
+  try {
+    const ratio = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(bitmap.width * ratio));
+    canvas.height = Math.max(1, Math.round(bitmap.height * ratio));
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('تعذر تجهيز الصورة');
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    for (const quality of [0.8, 0.65, 0.5]) {
+      const output = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/webp', quality));
+      if (output && output.type === 'image/webp' && output.size <= MAX_UPLOAD_BYTES) return output;
+    }
+    throw new Error('الصورة كبيرة جدًا بعد الضغط. اختر صورة أصغر.');
+  } finally { bitmap.close(); }
 }
 
 export async function uploadStoryImage(options: {
-  uri: string;
-  base64?: string | null;
-  userId: string;
-  index: number;
+  uri: string; base64?: string | null; userId: string; index: number;
 }): Promise<UploadResult> {
-  const { uri, base64, userId, index } = options;
-  const objectPath = `${userId}/${Date.now()}_${index}.jpg`;
-  let lastError = '';
-
-  try {
-    const response = await fetch(uri);
-    const blob = await response.arrayBuffer();
-
-    for (const bucket of BUCKETS) {
-      const path = bucket === 'stories' ? objectPath : `story_${objectPath}`;
-      const publicUrl = await tryBucket(bucket, path, blob);
-      if (publicUrl) return { url: publicUrl, strategy: 'bucket', bucket };
-      lastError = `فشل الرفع إلى حاوية ${bucket}`;
-    }
-  } catch (err) {
-    lastError = err instanceof Error ? err.message : 'تعذر قراءة ملف الصورة';
+  const response = await fetch(options.uri);
+  if (!response.ok) throw new Error('تعذر قراءة الصورة');
+  const source = await response.blob();
+  if (source.size > MAX_SOURCE_BYTES) throw new Error('الصورة الأصلية أكبر من 12 ميجابايت');
+  const optimized = await optimizeForWeb(source);
+  if (optimized.size > MAX_UPLOAD_BYTES) throw new Error('الصورة أكبر من 2 ميجابايت بعد المعالجة');
+  const isWebp = optimized.type === 'image/webp';
+  const mime = isWebp ? 'image/webp' : 'image/jpeg';
+  if (!isWebp && !['image/jpeg', 'image/jpg'].includes(optimized.type)) {
+    throw new Error('صيغة الصورة غير مدعومة. استخدم JPEG أو WebP.');
   }
-
-  if (base64) {
-    return { url: `data:image/jpeg;base64,${base64}`, strategy: 'base64', error: lastError };
-  }
-
-  throw new Error(lastError || 'تعذر رفع الصورة؛ لم تُنشر اليومية. تحقق من الاتصال وحاول مجددًا.');
+  const path = `${options.userId}/${Date.now()}-${options.index}-${Math.random().toString(36).slice(2, 10)}.${isWebp ? 'webp' : 'jpg'}`;
+  const bytes = await optimized.arrayBuffer();
+  const { error } = await supabase.storage.from(BUCKET).upload(path, bytes, {
+    contentType: mime, cacheControl: '3600', upsert: false,
+  });
+  if (error) throw new Error(`تعذر رفع الصورة: ${error.message}`);
+  return { url: supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl, strategy: 'bucket', bucket: BUCKET };
 }
