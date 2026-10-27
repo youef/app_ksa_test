@@ -73,9 +73,10 @@ import {
   setBlock,
 } from '@/lib/chatControls';
 
-type SettingsSection = 'privacy' | 'notifications' | 'appearance' | 'design' | 'security' | 'blocked' | 'help' | 'account';
+type SettingsSection = 'privacy' | 'location' | 'notifications' | 'appearance' | 'design' | 'security' | 'blocked' | 'help' | 'account';
 const SETTINGS_SECTIONS: {id: SettingsSection; label: string; Icon: any; description: string}[] = [
-{id:'privacy',label:'الخصوصية والتواصل',Icon:Lock,description:'ظهور حسابك والرسائل والردود'},
+{id:'privacy',label:'الخصوصية والتواصل',Icon:Lock,description:'رقم التواصل، الخصوصية والرسائل'},
+{id:'location',label:'الموقع والحي',Icon:MapPin,description:'تحديد الحي والمدينة وتحديث الموقع'},
 {id:'notifications',label:'الإشعارات',Icon:Bell,description:'تنبيهات الجهاز وعدم الإزعاج'},
 {id:'appearance',label:'مظهر التطبيق',Icon:Moon,description:'الوضع الفاتح والداكن'},
 {id:'design',label:'تخصيص البروفايل',Icon:Palette,description:'الغلاف والألوان والأعمال المثبتة'},
@@ -85,7 +86,7 @@ const SETTINGS_SECTIONS: {id: SettingsSection; label: string; Icon: any; descrip
 {id:'account',label:'إدارة الحساب',Icon:Settings,description:'تسجيل الخروج وحذف الحساب'}
 ];
 
-type HubTab = 'profile' | 'content' | 'settings';
+type HubTab = 'profile' | 'verification' | 'content' | 'settings';
 type ContentFilter = 'all' | 'products' | 'services' | 'community';
 type Capability = {
   user_id?: string;
@@ -113,6 +114,7 @@ const ACCOUNT_TYPES: { key: AccountKind; label: string; description: string }[] 
 
 function normalizeTab(value?: string): HubTab {
   if (value === 'content' || value === 'business' || value === 'commerce') return 'content';
+  if (value === 'verification' || value === 'identity') return 'verification';
   if (value === 'settings' || value === 'privacy' || value === 'security' || value === 'design') return 'settings';
   return 'profile';
 }
@@ -166,9 +168,10 @@ export default function AccountCenter() {
   const designScrolled = useRef(false);
   const routeSection = Array.isArray(params.section) ? params.section[0] : params.section;
   const routeTab = Array.isArray(params.tab) ? params.tab[0] : params.tab;
-  const requestedTab: HubTab = SETTINGS_SECTIONS.some(item => item.id === routeSection) ? 'settings' : normalizeTab(routeTab);
+  const requestedTab: HubTab = SETTINGS_SECTIONS.some(item => item.id === routeSection) ? 'settings' : routeSection === 'identity' ? 'verification' : normalizeTab(routeTab);
   const [tab, setTab] = useState<HubTab>(requestedTab);
   const [settingsSection, setSettingsSection] = useState<SettingsSection>('privacy');
+  const [settingsDetailOpen, setSettingsDetailOpen] = useState<boolean>(SETTINGS_SECTIONS.some(item => item.id === routeSection));
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -231,7 +234,8 @@ export default function AccountCenter() {
     const section = routeSection || routeTab;
     if (section === 'identity') setIdentityOpen(true);
     if (section === 'edit') setEditing(true);
-    if (SETTINGS_SECTIONS.some(item => item.id === section)) setSettingsSection(section as SettingsSection);
+    if (SETTINGS_SECTIONS.some(item => item.id === section)) { setSettingsSection(section as SettingsSection); setSettingsDetailOpen(true); }
+    else if (requestedTab === 'settings') setSettingsDetailOpen(false);
   }, [requestedTab, routeSection, routeTab]);
 
   const load = useCallback(async (silent = false) => {
@@ -275,7 +279,7 @@ export default function AccountCenter() {
         supabase.from('questions').select('id,title,body,created_at,status', {count:'exact'}).eq('author_id', uid).order('created_at', { ascending: false }).order('id',{ascending:false}).limit(20),
         supabase.from('requests').select('id,title,description,created_at,status', {count:'exact'}).eq('requester_id', uid).order('created_at', { ascending: false }).order('id',{ascending:false}).limit(20),
         supabase.from('businesses').select('*').eq('owner_id', uid).maybeSingle(),
-        supabase.from('verification_requests').select('id,status,subject,note,created_at,reviewed_at').eq('user_id', uid).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+        supabase.from('verification_requests').select('id,status,subject,note,created_at,reviewed_at').eq('user_id', uid).is('document_number', null).order('created_at', { ascending: false }).limit(1).maybeSingle(),
         supabase.from('profile_customizations').select('*').eq('user_id', uid).maybeSingle(),
         supabase.from('follows').select('id', { count: 'exact', head: true }).eq('following_id', uid),
         supabase.from('follows').select('id', { count: 'exact', head: true }).eq('follower_id', uid),
@@ -389,7 +393,7 @@ export default function AccountCenter() {
   }
   function navigateTab(next: HubTab, section?: SettingsSection) {
     if (saving) return;
-    const go = () => {setEditing(false);setTab(next);if(section) setSettingsSection(section);router.setParams({tab:next,section});};
+    const go = () => {setEditing(false);setTab(next);if(section) setSettingsSection(section); if(next === 'settings') setSettingsDetailOpen(Boolean(section)); scrollRef.current?.scrollTo({y:0,animated:false});router.setParams({tab:next,section});};
     if (editing && dirty) notify('تغييرات غير محفوظة','احفظ التعديلات أو تجاهلها قبل الانتقال.',[{text:'متابعة التعديل',style:'cancel'},{text:'تجاهل وانتقال',style:'destructive',onPress:go}]);
     else go();
   }
@@ -840,8 +844,8 @@ export default function AccountCenter() {
       <Modal visible={!!confirmation} transparent animationType="fade" onRequestClose={() => setConfirmation(null)}><View style={accountStyles.overlay}><View style={[accountStyles.dialog,{backgroundColor:colors.surface}]} accessibilityViewIsModal><Text style={{color:colors.ink,fontSize:21,fontWeight:'800',textAlign:'right'}}>{confirmation?.title}</Text><Text style={{color:colors.muted,lineHeight:25,textAlign:'right'}}>{confirmation?.message}</Text>{confirmation?.buttons.map((item,index) => <Pressable key={index} oasisKind="action" oasisVariant={item.style === 'destructive' ? 'danger' : 'secondary'} onPress={() => {setConfirmation(null);item.onPress?.();}}><Text>{item.text}</Text></Pressable>)}</View></View></Modal>
       <AppHeader
         variant="tab"
-        title={tab === 'settings' ? 'الإعدادات' : editing ? 'تعديل الملف' : 'حسابي'}
-        subtitle={tab === 'settings' ? SETTINGS_SECTIONS.find(item => item.id === settingsSection)?.label : 'ملفك وأعمالك في حيّنا'}
+        title={tab === 'settings' ? 'الإعدادات' : tab === 'verification' ? 'التوثيق' : tab === 'content' ? 'أعمالي ومحتواي' : editing ? 'تعديل الملف' : 'ملفي الشخصي'}
+        subtitle={tab === 'settings' ? (settingsDetailOpen ? SETTINGS_SECTIONS.find(item => item.id === settingsSection)?.label : 'أقسام حسابك') : tab === 'verification' ? 'هوية الحساب والوثائق' : tab === 'content' ? 'المنتجات والخدمات والمشاركات' : 'هويتك في حيّنا'}
         rightAction={tab === 'settings' ? undefined : (
           <Pressable
             style={styles.headerAction}
@@ -862,30 +866,67 @@ export default function AccountCenter() {
       >
         {!!notice && <View accessibilityRole="alert" style={[accountStyles.notice,{backgroundColor:colors.soft,borderColor:colors.line}]}><View style={{flex:1,alignItems:'flex-end',gap:4}}><Text style={{color:colors.ink,fontWeight:'800'}}>{notice.title}</Text><Text style={{color:colors.muted,fontSize:12,lineHeight:20,textAlign:'right'}}>{notice.message}</Text></View><Pressable accessibilityLabel="إغلاق الرسالة" onPress={() => setNotice(null)}><Text style={{color:colors.primary,padding:8}}>إغلاق</Text></Pressable></View>}
         {!!loadError && <Text accessibilityRole="alert" style={{color:colors.danger,textAlign:'right'}}>{loadError}</Text>}
+        <View style={styles.tabs}>
+          <HubTabButton active={tab === 'profile'} label="ملفي" Icon={CircleUserRound} onPress={() => navigateTab('profile')} />
+          <HubTabButton active={tab === 'verification'} label="التوثيق" Icon={ShieldCheck} onPress={() => navigateTab('verification')} />
+          <HubTabButton active={tab === 'content'} label="أعمالي" Icon={LayoutGrid} onPress={() => navigateTab('content')} />
+          <HubTabButton active={tab === 'settings'} label="الإعدادات" Icon={Settings} onPress={() => navigateTab('settings')} />
+        </View>
         {tab === 'profile' ? (<ProfileHeader profile={editing ? {...profile,display_name:displayName,username,bio} : profile} customization={customization} displayName={editing ? displayName || 'اسمك الظاهر' : publicName} coverUri={coverState === 'missing' ? '' : profileCoverUrl(userId,coverVersion)} stats={{...stats,contributions}} own editableAvatar avatarBusy={avatarBusy} coverBusy={coverBusy} onAvatarPress={() => void pickAvatar()} onCoverPress={() => void pickCover()} onEdit={() => {if (!editing) beginEditing();}} onDesign={() => {navigateTab('settings','design');}} onSettings={() => navigateTab('settings')} onFollowers={() => setConnections('followers')} onFollowing={() => setConnections('following')} />) : <View style={[accountStyles.accountContext,{backgroundColor:colors.surface,borderColor:colors.line}]}>
           {profile.avatar_url ? <Image source={{uri:profile.avatar_url}} style={{width:42,height:42,borderRadius:21}}/> : <View style={{width:42,height:42,borderRadius:21,backgroundColor:colors.soft,alignItems:'center',justifyContent:'center'}}><Text style={{color:colors.primary,fontWeight:'800'}}>{publicName[0]}</Text></View>}
           <View style={{flex:1,alignItems:'flex-end',gap:4}}><Text style={{color:colors.ink,fontWeight:'700',fontSize:14}}>{publicName}</Text><Text style={{color:colors.muted,fontSize:12,writingDirection:'ltr'}}>@{profile.username}</Text></View>
           <Pressable accessibilityLabel="عرض الملف العام" oasisKind="plain" onPress={openPublicProfile} style={{padding:10}}><Eye size={19} color={colors.primary}/></Pressable>
         </View>}
-        <View style={styles.tabs}>
-          <HubTabButton active={tab === 'profile'} label="الملف" Icon={CircleUserRound} onPress={() => navigateTab('profile')} />
-          <HubTabButton active={tab === 'content'} label="إدارتي" Icon={LayoutGrid} onPress={() => navigateTab('content')} />
-          <HubTabButton active={tab === 'settings'} label="الإعدادات" Icon={Settings} onPress={() => navigateTab('settings')} />
-        </View>
 
         {tab === 'profile' ? (
           <View style={styles.stack} onLayout={event => {
             if (editing && !editorScrolled.current) {
               editorScrolled.current = true;
-              scrollRef.current?.scrollTo({ y: Math.max(0, event.nativeEvent.layout.y - 12), animated: true });
+              scrollRef.current?.scrollTo({ y: Math.max(0, event.nativeEvent.layout.y - 10), animated: true });
             }
             if (!editing) editorScrolled.current = false;
           }}>
-            {editing ? <ProfileEditor draft={draft} dirty={dirty} saving={saving} avatarBusy={avatarBusy} coverBusy={coverBusy} onChange={patch => {if (patch.displayName !== undefined) setDisplayName(patch.displayName);if (patch.username !== undefined) setUsername(patch.username);if (patch.bio !== undefined) setBio(patch.bio);}} onSave={() => void saveProfile()} onCancel={closeEditor} onAvatar={() => void pickAvatar()} onCover={() => void pickCover()} /> : <SectionCard>
-              <View style={styles.sectionHeader}><View style={styles.sectionHeaderCopy}><Text style={styles.sectionTitle}>ملفك، بطريقتك</Text><Text style={styles.sectionSub}>كل تغييراتك هنا مرتبطة مباشرة بملفك العام</Text></View><Sparkles size={22} color={colors.primary}/></View>
-              <View style={styles.actionGrid}><QuickAction label="تعديل الملف" sub="الاسم والنبذة والصور" Icon={UserRound} onPress={beginEditing}/><QuickAction label="رقم التواصل" sub="إضافة رقمك والتحكم بإظهاره" Icon={Phone} onPress={() => navigateTab('settings','privacy')}/><QuickAction label="تخصيص المظهر" sub="الألوان والغلاف والأقسام" Icon={Palette} onPress={() => {navigateTab('settings');setSettingsSection('design');}}/><QuickAction label="عرض ملفي" sub="شاهد الملف العام" Icon={Eye} onPress={() => router.push({pathname:'/user',params:{id:userId}})}/><QuickAction label="مشاركة الملف" sub="انسخ رابط حسابك" Icon={Users} onPress={() => void shareProfile()}/></View>
-            </SectionCard>}
+            {editing ? (
+              <ProfileEditor
+                draft={draft}
+                dirty={dirty}
+                saving={saving}
+                avatarBusy={avatarBusy}
+                coverBusy={coverBusy}
+                onChange={patch => {
+                  if (patch.displayName !== undefined) setDisplayName(patch.displayName);
+                  if (patch.username !== undefined) setUsername(patch.username);
+                  if (patch.bio !== undefined) setBio(patch.bio);
+                }}
+                onSave={() => void saveProfile()}
+                onCancel={closeEditor}
+                onAvatar={() => void pickAvatar()}
+                onCover={() => void pickCover()}
+              />
+            ) : (
+              <View style={styles.profileActions}>
+                <Pressable accessibilityRole="button" accessibilityLabel="مشاركة ملفي" style={styles.profileAction} onPress={() => void shareProfile()}>
+                  <Users size={18} color={colors.primary} />
+                  <Text style={styles.profileActionText}>مشاركة الملف</Text>
+                </Pressable>
+                <Pressable accessibilityRole="button" accessibilityLabel="معاينة ملفي العام" style={styles.profileAction} onPress={openPublicProfile}>
+                  <Eye size={18} color={colors.primary} />
+                  <Text style={styles.profileActionText}>معاينة الملف</Text>
+                </Pressable>
+              </View>
+            )}
+          </View>
+        ) : null}
 
+        {tab === 'verification' ? (
+          <View style={styles.stack}>
+            <View style={styles.areaLead}>
+              <View style={styles.areaLeadIcon}><ShieldCheck size={22} color={colors.primary} /></View>
+              <View style={{ flex: 1, alignItems: 'flex-end', gap: 3 }}>
+                <Text style={styles.areaLeadTitle}>مركز توثيق حسابك</Text>
+                <Text style={styles.areaLeadDescription}>الصفة المهنية والوثائق الرسمية في مكان واحد. لا يُمنح أي اعتماد قبل مراجعة الإدارة.</Text>
+              </View>
+            </View>
             <SectionCard>
               <View style={styles.sectionHeader}>
                 <View style={styles.sectionHeaderCopy}>
@@ -961,25 +1002,7 @@ export default function AccountCenter() {
                 </View>
               ) : null}
             </SectionCard>
-
             <OfficialDocumentVerification userId={userId} onSubmitted={() => void load(true)} />
-
-            <SectionCard>
-              <View style={styles.sectionHeader}>
-                <View style={styles.sectionHeaderCopy}>
-                  <Text style={styles.sectionTitle}>موقع الحساب</Text>
-                  <Text style={styles.sectionSub}>يستخدم للحي، السوق والمحتوى القريب منك</Text>
-                </View>
-                <MapPin size={20} color="#0F766E" />
-              </View>
-              <OasisSurface oasisSurface="card" style={styles.locationCard}>
-                <Text style={styles.locationMain}>{[profile.region, profile.city, profile.district && 'حي ' + profile.district].filter(Boolean).join(' · ') || 'لم يحدد بعد'}</Text>
-                <Pressable oasisKind="action" style={styles.smallButton} onPress={() => void updateCurrentLocation()} disabled={locationBusy}>
-                  {locationBusy ? <ActivityIndicator size="small" color="#0F766E" /> : <RefreshCw size={14} color="#0F766E" />}
-                  <Text style={styles.smallButtonText}>تحديث من موقعي</Text>
-                </Pressable>
-              </OasisSurface>
-            </SectionCard>
           </View>
         ) : null}
 
@@ -1008,7 +1031,7 @@ export default function AccountCenter() {
                 {capabilities.can_manage_business ? (
                   <QuickAction label="منشأتي" sub="البيانات والظهور التجاري" Icon={Store} onPress={() => setContentFilter('all')} />
                 ) : (
-                  <QuickAction label="تحويل لتجاري" sub="اطلب اعتماد منشأة" Icon={BriefcaseBusiness} onPress={() => { setTab('profile'); setIdentityType('merchant'); setIdentityOpen(true); }} />
+                  <QuickAction label="تحويل لتجاري" sub="اطلب اعتماد منشأة" Icon={BriefcaseBusiness} onPress={() => { navigateTab('verification'); setIdentityType('merchant'); setIdentityOpen(true); }} />
                 )}
                 <QuickAction label="المفضلة" sub="كل ما حفظته" Icon={Heart} onPress={() => router.push('/favorites')} />
               </View>
@@ -1087,14 +1110,22 @@ export default function AccountCenter() {
 
         {tab === 'settings' ? (
           <View style={styles.stack}>
-            <View style={settingsStyles.intro}><Text style={[settingsStyles.heading, {color:OASIS.colors.ink}]}>إعدادات الحساب</Text><Text style={styles.sectionSub}>تحكم بتجربتك من مكان واحد.</Text></View>
-            <View style={[settingsStyles.layout, wide && {flexDirection:'row-reverse',alignItems:'flex-start'}]}>
-              <ScrollView horizontal={!wide} showsHorizontalScrollIndicator={false} scrollEnabled={!wide} style={[settingsStyles.navigation,{flexGrow:0,backgroundColor:colors.surface,borderColor:colors.line},wide && {width:240}]} contentContainerStyle={wide ? {gap:5} : {flexDirection:'row-reverse',gap:5}} >
-                {SETTINGS_SECTIONS.map(({id,label,Icon,description}) => <Pressable key={id} oasisKind="plain" accessibilityRole="tab" accessibilityState={{selected:settingsSection===id}} style={[settingsStyles.navigationItem,settingsSection===id && {backgroundColor:OASIS.colors.soft,borderColor:OASIS.colors.primary}]} onPress={() => {setSettingsSection(id);designScrolled.current=true;router.setParams({tab:'settings',section:id});}}>
-                  <Icon size={19} color={settingsSection===id ? OASIS.colors.primary : OASIS.colors.muted} /><View style={{flex:1,alignItems:'flex-end',gap:3}}><Text style={{color:settingsSection===id ? OASIS.colors.primary : OASIS.colors.ink,fontWeight:'700',fontSize:13}}>{label}</Text>{wide && <Text style={styles.sectionSub}>{description}</Text>}</View>
-                </Pressable>)}
-              </ScrollView>
-              <View style={{flex:1,minWidth:0,gap:14}}>
+            <View style={styles.areaLead}>
+              <View style={styles.areaLeadIcon}><Settings size={22} color={colors.primary} /></View>
+              <View style={{ flex: 1, alignItems: 'flex-end', gap: 3 }}>
+                <Text style={styles.areaLeadTitle}>{settingsDetailOpen ? SETTINGS_SECTIONS.find(item => item.id === settingsSection)?.label : 'إعدادات حسابي'}</Text>
+                <Text style={styles.areaLeadDescription}>{settingsDetailOpen ? SETTINGS_SECTIONS.find(item => item.id === settingsSection)?.description : 'اختر القسم المطلوب. كل إعداداتك محفوظة في مكانها، بعيدًا عن ملفك العام.'}</Text>
+              </View>
+            </View>
+            {settingsDetailOpen ? (
+              <View style={styles.stack}>
+                <Pressable accessibilityRole="button" accessibilityLabel="العودة إلى أقسام الإعدادات" style={styles.settingsBack} onPress={() => {
+                  setSettingsDetailOpen(false);
+                  router.setParams({ tab: 'settings', section: undefined });
+                }}>
+                  <ChevronLeft size={17} color={colors.primary} style={{ transform: [{ rotate: '180deg' }] }} />
+                  <Text style={styles.settingsBackText}>كل الإعدادات</Text>
+                </Pressable>
             {settingsSection === 'privacy' && <>
 <SectionCard>
               <View style={styles.sectionHeader}>
@@ -1124,6 +1155,25 @@ export default function AccountCenter() {
                 onChange={(value: string) => void savePrivacy({ allow_story_replies: value })}
               />
             </SectionCard></>}
+
+            {settingsSection === 'location' && (
+            <SectionCard>
+              <View style={styles.sectionHeader}>
+                <View style={styles.sectionHeaderCopy}>
+                  <Text style={styles.sectionTitle}>موقع الحساب</Text>
+                  <Text style={styles.sectionSub}>يستخدم للحي، السوق والمحتوى القريب منك</Text>
+                </View>
+                <MapPin size={20} color="#0F766E" />
+              </View>
+              <OasisSurface oasisSurface="card" style={styles.locationCard}>
+                <Text style={styles.locationMain}>{[profile.region, profile.city, profile.district && 'حي ' + profile.district].filter(Boolean).join(' · ') || 'لم يحدد بعد'}</Text>
+                <Pressable oasisKind="action" style={styles.smallButton} onPress={() => void updateCurrentLocation()} disabled={locationBusy}>
+                  {locationBusy ? <ActivityIndicator size="small" color="#0F766E" /> : <RefreshCw size={14} color="#0F766E" />}
+                  <Text style={styles.smallButtonText}>تحديث من موقعي</Text>
+                </Pressable>
+              </OasisSurface>
+            </SectionCard>
+            )}
 
             {settingsSection === 'notifications' && <>
 <SectionCard>
@@ -1279,7 +1329,30 @@ export default function AccountCenter() {
             </SectionCard>
             </>}
               </View>
-            </View>
+            ) : (
+              <View style={styles.settingsGrid}>
+                {SETTINGS_SECTIONS.map(({ id, label, Icon, description }) => (
+                  <Pressable
+                    key={id}
+                    accessibilityRole="button"
+                    accessibilityLabel={'فتح ' + label}
+                    style={styles.settingsCategory}
+                    onPress={() => {
+                      setSettingsSection(id);
+                      setSettingsDetailOpen(true);
+                      designScrolled.current = false;
+                      router.setParams({ tab: 'settings', section: id });
+                      scrollRef.current?.scrollTo({ y: 0, animated: true });
+                    }}
+                  >
+                    <View style={styles.settingsCategoryIcon}><Icon size={20} color={colors.primary} /></View>
+                    <Text style={styles.settingsCategoryTitle}>{label}</Text>
+                    <Text style={styles.settingsCategoryDescription} numberOfLines={2}>{description}</Text>
+                    <ChevronLeft size={14} color={colors.muted} />
+                  </Pressable>
+                ))}
+              </View>
+            )}
           </View>
         ) : null}
       </ScrollView>
@@ -1424,7 +1497,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   loadingScreen: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: colors.background },
   loadingText: { color: colors.muted, fontSize: 12, fontWeight: '700' },
   headerAction: { width: 36, height: 36, borderRadius: 14, backgroundColor: colors.soft, alignItems: 'center', justifyContent: 'center' },
-  content: { paddingHorizontal: 14, paddingTop: 12, gap: 14, maxWidth: 920, width: '100%', alignSelf: 'center' },
+  content: { paddingHorizontal: 14, paddingTop: 14, gap: 16, maxWidth: 920, width: '100%', alignSelf: 'center' },
   profileHero: { borderWidth: 1, borderColor: colors.line, flexDirection: 'row-reverse', alignItems: 'center', gap: 12, padding: 16, minHeight: 138, borderRadius: 18, overflow: 'hidden' },
   profileHeroWide: { minHeight: 156, padding: 20 },
   heroCoverButton: { position: 'absolute', left: 12, top: 12, minHeight: 32, borderRadius: 10, paddingHorizontal: 9, backgroundColor: 'rgba(0,0,0,0.42)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)', flexDirection: 'row-reverse', alignItems: 'center', gap: 5, zIndex: 3 },
@@ -1445,12 +1518,26 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   stat: { flex: 1, alignItems: 'center', paddingVertical: 11, borderLeftWidth: 1, borderLeftColor: '#F1F5F9' },
   statValue: { color: colors.ink, fontSize: 16, fontWeight: '700' },
   statLabel: { color: colors.muted, fontSize: 11, fontWeight: '700', marginTop: 2 },
-  tabs: { flexDirection:'row-reverse',backgroundColor:colors.surface,borderRadius:0,padding:0,borderBottomWidth:1,borderColor:colors.line,gap:4 },
-  tabButton: { flex: 1, minHeight: 48, borderRadius: 0, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  tabButtonActive: { borderBottomWidth: 3, borderBottomColor: colors.primary },
-  tabButtonText: { color: colors.muted, fontSize: 11.5, fontWeight: '700' },
+  tabs: { flexDirection:'row-reverse',backgroundColor:colors.surface,borderRadius:18,padding:5,borderWidth:1,borderColor:colors.line,gap:4 },
+  tabButton: { flex: 1, minWidth: 0, minHeight: 49, borderRadius: 13, flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4 },
+  tabButtonActive: { backgroundColor: colors.soft, borderWidth: 1, borderColor: colors.primary + '36' },
+  tabButtonText: { color: colors.muted, fontSize: 11, fontWeight: '700' },
   tabButtonTextActive: { color: colors.primary },
-  stack: { gap: 12 },
+  stack: { gap: 14 },
+  profileActions: { flexDirection: 'row-reverse', gap: 10 },
+  profileAction: { flex: 1, minHeight: 46, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: colors.line, borderRadius: 14, backgroundColor: colors.surface },
+  profileActionText: { fontSize: 12, fontWeight: '700', color: colors.ink },
+  areaLead: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, backgroundColor: colors.surface, borderRadius: 18, borderWidth: 1, borderColor: colors.line, padding: 16 },
+  areaLeadIcon: { width: 43, height: 43, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.soft },
+  areaLeadTitle: { color: colors.ink, fontSize: 17, fontWeight: '800', textAlign: 'right' },
+  areaLeadDescription: { color: colors.muted, fontSize: 11.5, lineHeight: 19, textAlign: 'right' },
+  settingsGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 10 },
+  settingsCategory: { flexGrow: 1, flexBasis: '46%', minWidth: 0, minHeight: 156, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, borderRadius: 18, padding: 14, alignItems: 'flex-end', gap: 8 },
+  settingsCategoryIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.soft },
+  settingsCategoryTitle: { color: colors.ink, fontSize: 13, fontWeight: '800', textAlign: 'right' },
+  settingsCategoryDescription: { color: colors.muted, fontSize: 11, lineHeight: 17, textAlign: 'right', minHeight: 35 },
+  settingsBack: { alignSelf: 'flex-end', minHeight: 40, flexDirection: 'row-reverse', alignItems: 'center', gap: 7, paddingHorizontal: 12, borderRadius: 12, backgroundColor: colors.soft },
+  settingsBackText: { color: colors.primary, fontWeight: '700', fontSize: 12 },
   card: { backgroundColor: colors.surface, borderRadius: 14, borderWidth: 1, borderColor: colors.line, padding: 14, gap: 12 },
   sectionHeader: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   sectionHeaderCopy: { flex: 1, alignItems: 'flex-end' },
@@ -1468,7 +1555,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   fieldLabel: { color: colors.muted, fontSize: 11, fontWeight: '700', textAlign: 'right' },
   input: { minHeight: 43, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.background, borderRadius: 12, paddingHorizontal: 11, color: colors.ink, fontSize: 12, fontWeight: '700' },
   inputMultiline: { minHeight: 86, textAlignVertical: 'top', paddingTop: 10 },
-  primaryButton: { minHeight: 44, borderRadius: 0, backgroundColor: 'transparent', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 7 },
+  primaryButton: { minHeight: 46, borderRadius: 12, backgroundColor: colors.primary, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 7 },
   primaryButtonText: { color: colors.surface, fontSize: 12, fontWeight: '700' },
   identitySquare: { width: 43, height: 43, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   identitySummary: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, backgroundColor: colors.background, borderRadius: 14, padding: 11 },
