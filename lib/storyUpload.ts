@@ -36,11 +36,12 @@ export async function uploadStoryImage(options: {
   const optimized = await optimizeForWeb(source);
   if (optimized.size > MAX_UPLOAD_BYTES) throw new Error('الصورة أكبر من 2 ميجابايت بعد المعالجة');
   const isWebp = optimized.type === 'image/webp';
-  const mime = isWebp ? 'image/webp' : 'image/jpeg';
-  if (!isWebp && !['image/jpeg', 'image/jpg'].includes(optimized.type)) {
+  const isPng = optimized.type === 'image/png';
+  const mime = isWebp ? 'image/webp' : isPng ? 'image/png' : 'image/jpeg';
+  if (!isWebp && !isPng && !['image/jpeg', 'image/jpg'].includes(optimized.type)) {
     throw new Error('صيغة الصورة غير مدعومة. استخدم JPEG أو WebP.');
   }
-  const path = `${options.userId}/${Date.now()}-${options.index}-${Math.random().toString(36).slice(2, 10)}.${isWebp ? 'webp' : 'jpg'}`;
+  const path = `${options.userId}/${Date.now()}-${options.index}-${Math.random().toString(36).slice(2, 10)}.${isWebp ? 'webp' : isPng ? 'png' : 'jpg'}`;
   const bytes = await optimized.arrayBuffer();
   const { error } = await supabase.storage.from(BUCKET).upload(path, bytes, {
     contentType: mime, cacheControl: '3600', upsert: false,
