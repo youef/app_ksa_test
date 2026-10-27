@@ -185,7 +185,7 @@ export default function BottomNav() {
                 style={({ pressed }) => [styles.tab, pressed && styles.pressed]}
               >
                 <View style={[styles.orb, !isCreate && styles.standardOrbLower, isCreate && styles.createOrb, isActive && styles.activeOrb]}>
-                  <Icon size={isCreate ? 30 : 23} color={isCreate ? '#FFFFFF' : isActive ? '#047857' : '#075A43'} strokeWidth={isCreate ? 2.7 : 2.2} />
+                  <Icon size={isCreate ? 30 : 23} color={isCreate ? '#006D4E' : isActive ? '#047857' : '#075A43'} strokeWidth={isCreate ? 2.7 : 2.2} />
                 </View>
                 {isActive && <View style={styles.activeDot} />}
               </Pressable>
@@ -211,7 +211,8 @@ const styles = StyleSheet.create({
   // Keep the central Add (+) icon at its original position.
   standardOrbLower: { transform: [{ translateY: 3 }] },
   activeOrb: { borderColor: '#55D8A5', borderWidth: 2.5, backgroundColor: '#F1FFF8' },
-  createOrb: { width: 64, height: 64, borderRadius: 32, marginTop: -6, backgroundColor: '#006D4E', borderWidth: 5, borderColor: '#F9F4DF', shadowColor: '#006D4E', shadowOpacity: 0.3, shadowRadius: 10, elevation: 9 },
+  // The PNG provides the center-button appearance; avoid an extra background, border or shadow.
+  createOrb: { width: 64, height: 64, borderRadius: 32, marginTop: -12, backgroundColor: 'transparent', borderWidth: 0, borderColor: 'transparent', shadowColor: 'transparent', shadowOpacity: 0, shadowRadius: 0, shadowOffset: { width: 0, height: 0 }, elevation: 0 },
   activeDot: { position: 'absolute', bottom: 6, width: 17, height: 4, borderRadius: 3, backgroundColor: '#047857' },
   pressed: { opacity: 0.7, transform: [{ scale: 0.95 }] },
 });
