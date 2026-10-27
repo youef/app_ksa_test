@@ -22,6 +22,7 @@ import { AdminWorkspace } from '@/components/admin/AdminWorkspace';
 import { AdminOverview } from '@/components/admin/AdminOverview';
 import { AdminGlobalSearch } from '@/components/admin/AdminGlobalSearch';
 import { AdminFeatureFlags } from '@/components/admin/AdminFeatureFlags';
+import AdminBackgrounds from '@/components/admin/AdminBackgrounds';
 import { AdminRbacPanel } from '@/components/admin/AdminRbacPanel';
 import { AdminAnalytics } from '@/components/admin/AdminAnalytics';
 import { AdminSecurityCenter } from '@/components/admin/AdminSecurityCenter';
@@ -72,6 +73,7 @@ import {
   Store,
   Building2,
   UserCog,
+  ImagePlus,
 } from 'lucide-react-native';
 
 import {
@@ -138,6 +140,7 @@ type AdminTabKey =
   | 'broadcast'
   | 'locations'
   | 'branding'
+  | 'backgrounds'
   | 'weekly'
   | 'badges'
   | 'config'
@@ -190,6 +193,7 @@ const ADMIN_NAV: AdminNavGroup[] = [
       { key: 'broadcast', label: 'البث والتعاميم', icon: (a) => <Megaphone size={15} color={a ? C.accentDark : OASIS.colors.muted} /> },
       { key: 'locations', label: 'المواقع', icon: (a) => <MapPin size={15} color={a ? C.accentDark : OASIS.colors.muted} /> },
       { key: 'branding', label: 'الهوية والشعار', icon: (a) => <Sparkles size={15} color={a ? C.accentDark : OASIS.colors.muted} /> },
+      { key: 'backgrounds', label: 'صور وخلفيات الصفحات', icon: (a) => <ImagePlus size={15} color={a ? C.accentDark : OASIS.colors.muted} /> },
     ],
   },
   {
@@ -1313,7 +1317,7 @@ export default function AdminScreen() {
   // Loading Screen
   if (loading) {
     return (
-      <View style={styles.center}>
+      <View style={[styles.center, { backgroundColor: 'transparent' }]}>
         <ActivityIndicator size="large" color={C.accent} />
         <Text style={styles.loadingText}>جاري فتح مركز العمليات والرقابة الشاملة...</Text>
       </View>
@@ -1323,7 +1327,7 @@ export default function AdminScreen() {
   // Unauthorized Fallback
   if (!currentAdmin || currentAdmin.role !== 'admin') {
     return (
-      <View style={styles.center}>
+      <View style={[styles.center, { backgroundColor: 'transparent' }]}>
         <LinearGradient colors={['#FEE2E2', '#FECACA']} style={styles.unauthorizedIconWrap}>
           <Shield size={50} color={C.danger} />
         </LinearGradient>
@@ -1339,7 +1343,7 @@ export default function AdminScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <AdminWorkspace
         groups={ADMIN_NAV}
         active={activeTab}
@@ -2292,6 +2296,8 @@ export default function AdminScreen() {
             })}
           </View>
         )}
+
+        {activeTab === 'backgrounds' && <AdminBackgrounds />}
 
         {/* TAB 10: BRANDING LOGO */}
         {activeTab === 'branding' && (

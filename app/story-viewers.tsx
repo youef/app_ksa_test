@@ -86,7 +86,7 @@ export default function StoryViewersScreen() {
   }, [storyId]);
 
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { backgroundColor: 'transparent' }]}>
       <AppHeader title="مشاهدو القصة" fallbackRoute="/stories" rightAction={<View style={styles.countPill}><Text style={styles.countText}>{viewers.length}</Text></View>} />
 
       {loading ? (

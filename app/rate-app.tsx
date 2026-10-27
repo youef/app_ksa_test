@@ -67,7 +67,7 @@ export default function RateAppScreen() {
   const meta = ratingMeta(rating);
 
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { backgroundColor: 'transparent' }]}>
       <AppHeader variant="sub" title="قيّم تجربتك" subtitle="صوتك يساعدنا على التطوير" fallbackRoute="/more" />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content,{paddingBottom:bottomNavInset+30}]}>
         <LinearGradient colors={['#78350F','#B45309','#D97706']} start={{x:0,y:0}} end={{x:1,y:1}} style={styles.hero}>

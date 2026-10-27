@@ -516,7 +516,7 @@ export default function UserProfile() {
 
   if (loading) {
     return (
-      <View style={styles.center}>
+      <View style={[styles.center, { backgroundColor: 'transparent' }]}>
         <ActivityIndicator size="large" color={OASIS.colors.primary} />
         <Text style={styles.loadingText}>جاري تجهيز الملف الشخصي...</Text>
       </View>
@@ -525,7 +525,7 @@ export default function UserProfile() {
 
   if (!profile) {
     return (
-      <View style={styles.center}>
+      <View style={[styles.center, { backgroundColor: 'transparent' }]}>
         <UserRoundX size={48} color="#94a3b8" />
         <Text style={styles.emptyTitle}>{loadError ? 'تعذر تحميل الملف' : 'الحساب غير موجود'}</Text>
         <Text style={styles.emptyText}>{loadError ? 'تحقق من اتصالك ثم أعد المحاولة.' : 'تأكد من اسم المستخدم أو الرابط وحاول مرة أخرى.'}</Text>
@@ -581,7 +581,7 @@ export default function UserProfile() {
       : answers;
 
   return (
-    <View style={[styles.screen, {backgroundColor: colors.background}]}>
+    <View style={[styles.screen, {backgroundColor: colors.background}, { backgroundColor: 'transparent' }]}>
       <Modal visible={confirmBlock} transparent animationType="fade" onRequestClose={() => {if (!busy) setConfirmBlock(false);}}>
         <View style={social.menuOverlay}><View style={[social.menu,{backgroundColor:colors.surface}]} accessibilityViewIsModal>
           <Text style={[social.name,{fontSize:20,color:colors.ink}]}>{blocked ? 'إلغاء حظر المستخدم؟' : 'حظر المستخدم؟'}</Text>

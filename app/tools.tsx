@@ -214,7 +214,7 @@ export default function ToolsLendingScreen() {
   });
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <AppHeader
         variant="sub"
         title="سلفني بالحي"

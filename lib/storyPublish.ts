@@ -132,10 +132,11 @@ export async function publishStorySlides(
 
   if (!insertResult.error) {
     const firstId = insertResult.data?.[0]?.id as string | undefined;
+    const insertedCount = insertResult.data?.length ?? 0;
     return {
-      publishedCount: payloads.length,
+      publishedCount: insertedCount,
       requestedCount: payloads.length,
-      failures: [],
+      failures: insertedCount < payloads.length ? ['تم رفض يومية أو أكثر بسبب محتوى مخالف أو صلاحيات النشر.'] : [],
       degradedUploads: degraded,
       unauthenticated: false,
       firstPublishedId: firstId,
@@ -148,14 +149,18 @@ export async function publishStorySlides(
   // Batch insert rejected: retry row by row so one bad slide cannot block the rest.
   const failures: string[] = [];
   let publishedCount = 0;
+  let firstPublishedId: string | undefined;
 
   for (let i = 0; i < payloads.length; i++) {
-    const { error: rowError } = await supabase.from('stories').insert(payloads[i]);
+    const { data: inserted, error: rowError } = await supabase.from('stories').insert(payloads[i]).select('id');
     if (rowError) {
-      failures.push(`الشرريحة ${i + 1}: ${rowError.message}`);
+      failures.push(`الشريحة ${i + 1}: ${rowError.message}`);
       if (__DEV__) console.error(`[story] insert failed for slide ${i + 1}:`, rowError.message);
-    } else {
+    } else if (inserted?.length) {
       publishedCount += 1;
+      firstPublishedId ??= inserted[0].id;
+    } else {
+      failures.push(`الشريحة ${i + 1}: رُفضت اليومية بسبب محتوى مخالف أو صلاحيات النشر.`);
     }
   }
 
@@ -165,5 +170,6 @@ export async function publishStorySlides(
     failures,
     degradedUploads: degraded,
     unauthenticated: false,
+    firstPublishedId,
   };
 }

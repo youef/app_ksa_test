@@ -922,7 +922,7 @@ export default function Market() {
   const addBtnLabel = section === 'market' ? 'إضافة منتج أو خدمة' : section === 'businesses' ? 'إدارة منشأتي' : 'أضف فعالية';
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <AppHeader variant="tab" title="السوق" subtitle={locationLabel} />
 
       <ScrollView

@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabase';
 
 export default function BannedScreen() {
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { backgroundColor: 'transparent' }]}>
       <View style={styles.card}>
         <View style={styles.icon}><Ban size={40} color={OASIS.colors.danger} /></View>
         <Text style={styles.title}>تم إغلاق الحساب</Text>

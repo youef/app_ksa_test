@@ -1,7 +1,6 @@
-import { oasisAssets } from '@/components/oasis/assets';
 import { OasisPressable as Pressable } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
-import { Image, ImageBackground, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, ScrollView, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ShieldCheck, ChevronLeft, UserRound } from 'lucide-react-native';
@@ -30,7 +29,7 @@ export default function StoriesRow({ profile, stories, selectedDistrict }: Props
   return (
     <View style={[styles.storiesContainer, { position: 'relative', overflow: 'hidden', backgroundColor: 'transparent', borderBottomWidth: 0, justifyContent: 'center' }]}>
 
-      <ScrollView horizontal  showsHorizontalScrollIndicator={false} style={{ direction: 'rtl' }} contentContainerStyle={[styles.storiesScroll, { direction: 'ltr', flexGrow: 1, justifyContent: 'flex-start', alignItems: 'center', flexDirection: 'row-reverse' }]}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.storiesScroll, { flexGrow: 1, justifyContent: 'flex-start', alignItems: 'center', flexDirection: 'row-reverse' }]}>
         {visibleStories.map(story => {
           const isAnonymous = story.profiles?.hide_name === true;
           const authorName = isAnonymous ? 'مجهول' : (story.profiles?.display_name || story.profiles?.username || 'جار');
@@ -88,12 +87,12 @@ export default function StoriesRow({ profile, stories, selectedDistrict }: Props
           accessibilityLabel="عرض المزيد من اليوميات"
         >
           <View style={{
-            width: 48,
-            height: 48,
-            borderRadius: 14,
+            width: 44,
+            height: 44,
+            borderRadius: 22,
             backgroundColor: OASIS.colors.soft,
-            borderWidth: 2,
-            borderColor: '#a7f3d0',
+            borderWidth: 1.5,
+            borderColor: '#B8D9C6',
             alignItems: 'center',
             justifyContent: 'center',
           }}>

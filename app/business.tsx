@@ -90,7 +90,7 @@ export default function Business() {
 
   if (loading) {
     return (
-      <View style={styles.center}>
+      <View style={[styles.center, { backgroundColor: 'transparent' }]}>
         <ActivityIndicator size="large" color={OASIS.colors.primary} />
         <Text style={styles.loadingText}>جاري تحميل تفاصيل المحل...</Text>
       </View>
@@ -99,7 +99,7 @@ export default function Business() {
 
   if (!business) {
     return (
-      <View style={styles.center}>
+      <View style={[styles.center, { backgroundColor: 'transparent' }]}>
         <Text style={styles.errorText}>المحل التجاري غير موجود.</Text>
         <Pressable onPress={() => router.back()} style={styles.backBtnAction}>
           <Text style={styles.backBtnActionText}>العودة للدليل</Text>
@@ -113,7 +113,7 @@ export default function Business() {
     : 0;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <AppHeader
         variant="sub"
         title={business.name || 'دليل المحلات'}

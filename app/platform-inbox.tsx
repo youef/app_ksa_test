@@ -42,7 +42,7 @@ export default function PlatformInbox() {
       .subscribe();
     return () => { void supabase.removeChannel(channel); };
   }, []));
-  return <View style={{ flex: 1, backgroundColor: colors.background }}>
+  return <View style={[{ flex: 1, backgroundColor: colors.background }, { backgroundColor: 'transparent' }]}>
     <AppHeader variant="sub" title={PLATFORM_NAME} subtitle="الحساب الرسمي · الترحيب وآخر التحديثات" fallbackRoute="/messages" />
     <ScrollView refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void load()} />} contentContainerStyle={[s.content, { paddingBottom: bottom + 20 }]}>
       <View style={[s.identity, { backgroundColor: colors.surface, borderColor: colors.line }]}>

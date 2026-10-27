@@ -25,7 +25,7 @@ function UserSupportPage(){
  const create=async()=>{if(subject.trim().length<3||message.trim().length<3){Alert.alert('بيانات ناقصة','اكتب عنواناً ووصفاً واضحين.');return;}if(!uid)return;setBusy(true);try{const {data,error}=await supabase.from('support_tickets').insert({user_id:uid,name,email:email||null,subject:subject.trim(),message:message.trim()}).select().single();if(error)throw error;setTickets(p=>[data as Ticket,...p]);setSelected(data.id);setSubject('');setMessage('');setForm(false);Alert.alert('تم إنشاء التذكرة','يمكنك متابعة الردود من هذه الصفحة.');}catch(e:any){Alert.alert('تعذر إرسال الطلب',e?.message||'حاول مرة أخرى');}finally{setBusy(false);}};
  const send=async(t:Ticket)=>{if(!reply.trim()||!uid)return;if(t.status==='resolved'||t.status==='closed'){Alert.alert('التذكرة مكتملة','افتح تذكرة جديدة إذا استمرت المشكلة.');return;}setBusy(true);try{const {data,error}=await supabase.from('support_ticket_replies').insert({ticket_id:t.id,user_id:uid,author_name:name,message:reply.trim(),is_admin:false}).select().single();if(error)throw error;setReplies(p=>[...p,data as Reply]);setReply('');Alert.alert('تم إرسال الرد','وصلت رسالتك إلى فريق الدعم.');}catch(e:any){Alert.alert('تعذر إرسال الرد',e?.message||'تحقق من الصلاحيات');}finally{setBusy(false);}};
  const btn=(bg:string)=>({backgroundColor:bg,borderRadius:12,paddingHorizontal:13,paddingVertical:11,flexDirection:'row' as const,alignItems:'center' as const,justifyContent:'center' as const,gap:7});
- return <View style={{flex:1,backgroundColor:'#F4F7FB'}}><AppHeader title="مركز الدعم والمساعدة" fallbackRoute="/more" rightAction={<HeaderAction accessibilityLabel={form?'إلغاء التذكرة':'تذكرة جديدة'} onPress={()=>setForm(v=>!v)}><Plus size={20} color={OASIS.colors.primary}/></HeaderAction>}/><ScrollView contentContainerStyle={{padding:16,paddingBottom:120,gap:14}}>
+ return <View style={[{flex:1,backgroundColor:'#F4F7FB'}, { backgroundColor: 'transparent' }]}><AppHeader title="مركز الدعم والمساعدة" fallbackRoute="/more" rightAction={<HeaderAction accessibilityLabel={form?'إلغاء التذكرة':'تذكرة جديدة'} onPress={()=>setForm(v=>!v)}><Plus size={20} color={OASIS.colors.primary}/></HeaderAction>}/><ScrollView contentContainerStyle={{padding:16,paddingBottom:120,gap:14}}>
 
  <View style={{flexDirection:'row-reverse',gap:8}}>
   {[{key:'all',label:'كل التذاكر',value:tickets.length,color:OASIS.colors.ink,bg:'#F1F5F9'},{key:'open',label:'جديدة',value:openCount,color:'#92400E',bg:'#FEF3C7'},{key:'reviewing',label:'قيد المعالجة',value:reviewCount,color:'#1D4ED8',bg:'#DBEAFE'},{key:'resolved',label:'مكتملة',value:doneCount,color:OASIS.colors.primary,bg:OASIS.colors.soft}].map((item:any)=><Pressable key={item.key} onPress={()=>setStatusFilter(item.key)} style={{flex:1,minWidth:0,backgroundColor:statusFilter===item.key?item.bg:OASIS.colors.surface,borderWidth:1,borderColor:statusFilter===item.key?item.color:OASIS.colors.line,borderRadius:13,paddingVertical:10,paddingHorizontal:4,alignItems:'center',gap:4}}><Text numberOfLines={1} style={{fontSize:11,fontWeight:'600',color:item.color}}>{item.label}</Text><Text style={{fontSize:16,fontWeight:'700',color:item.color}}>{item.value}</Text></Pressable>)}
@@ -68,7 +68,7 @@ function AdminSupportPage() {
     toastTimer.current = setTimeout(() => setToast(null), 2600);
   }, []);
   return (
-    <View style={{ flex: 1, backgroundColor: '#F4F7FB' }}>
+    <View style={[{ flex: 1, backgroundColor: '#F4F7FB' }, { backgroundColor: 'transparent' }]}>
       {toast ? (
         <View style={{ backgroundColor: OASIS.colors.ink, marginHorizontal: 14, marginTop: 10, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10 }}>
           <Text style={{ color: OASIS.colors.surface, fontSize: 12, fontWeight: '600', textAlign: 'right' }}>{toast}</Text>
@@ -114,7 +114,7 @@ export default function SupportScreen() {
   }, []);
   if (loading) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F4F7FB' }}>
+      <View style={[{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F4F7FB' }, { backgroundColor: 'transparent' }]}>
         <ActivityIndicator size="large" color="#0F766E" />
       </View>
     );

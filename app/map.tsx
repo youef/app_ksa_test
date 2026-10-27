@@ -221,7 +221,7 @@ export default function MapScreen() {
   if (Platform.OS === 'web') {
     const webPins = visiblePins;
     return (
-      <View style={{ flex: 1, backgroundColor: '#F4F7F5', minHeight: '100vh' as never }}>
+      <View style={[{ flex: 1, backgroundColor: '#F4F7F5', minHeight: '100vh' as never }, { backgroundColor: 'transparent' }]}>
         <View style={{ backgroundColor: '#123F35', paddingHorizontal: 24, paddingTop: 14, paddingBottom: 14, borderBottomLeftRadius: 26, borderBottomRightRadius: 26 }}>
           {locationError ? <Text accessibilityRole="alert" style={{ color: OASIS.colors.danger, padding: 12, textAlign: 'right' }}>{locationError}</Text> : null}
         <View style={{ maxWidth: 1240, width: '100%', alignSelf: 'center' }}>
@@ -309,7 +309,7 @@ export default function MapScreen() {
   }
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: 'transparent' }]}>
       <AppHeader
         variant="sub"
         title="خريطة الحي"

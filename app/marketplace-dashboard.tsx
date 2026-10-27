@@ -116,10 +116,10 @@ export default function MarketplaceDashboard() {
     setRefreshing(false);
   };
 
-  if (loading) return <View style={styles.loading}><ActivityIndicator size="large" color={OASIS.colors.primary} /><Text style={styles.muted}>نجهز المزايا التجارية والمدفوعات…</Text></View>;
+  if (loading) return <View style={[styles.loading, { backgroundColor: 'transparent' }]}><ActivityIndicator size="large" color={OASIS.colors.primary} /><Text style={styles.muted}>نجهز المزايا التجارية والمدفوعات…</Text></View>;
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: 'transparent' }]}>
       <AppHeader variant="sub" title="المزايا التجارية" subtitle="الاشتراكات · الترويج · المدفوعات" fallbackRoute="/profile?tab=content" />
       <ScrollView
         contentContainerStyle={[styles.content, { paddingBottom: bottomInset + 28 }]}

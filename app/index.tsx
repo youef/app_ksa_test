@@ -12,6 +12,7 @@ import { supabase } from '@/lib/supabase';
 import { useTheme } from '@/context/ThemeContext';
 import { HAYNA_BUTTON } from '@/components/shared/haynaButtonTokens';
 import { HaynaActionButton } from '@/components/shared/HaynaActionButton';
+import { usePageBackground } from '@/hooks/usePageBackground';
 import {
   FALLBACK_LOGO_URI, getBrandingLogo, getCachedBrandingLogo, subscribeBrandingLogo,
 } from '@/lib/branding';
@@ -19,9 +20,8 @@ import {
 // Animated header background, separate from the logo and controls.
 // The background is separate from the interactive buttons and text below.
 
-const WELCOME_BACKGROUND = require('../public/design-system/hayna-v1/artwork/welcome-art.png');
-
 export default function Index() {
+  const background = usePageBackground('welcome');
   const { isDark, colors, setMode } = useTheme();
   const [signedIn, setSignedIn] = useState(false);
   const [logoUri, setLogoUri] = useState(getCachedBrandingLogo() || FALLBACK_LOGO_URI);
@@ -105,7 +105,7 @@ export default function Index() {
       <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={colors.background} translucent={false} />
       <View style={styles.background}>
         <View pointerEvents="none" style={[styles.headerBackground, { height: Math.min(height * 0.6, 520) }]}>
-        <ImageBackground source={WELCOME_BACKGROUND} resizeMode="cover" style={StyleSheet.absoluteFillObject}>
+        <ImageBackground source={background.source} onError={background.onError} resizeMode="cover" style={StyleSheet.absoluteFillObject} imageStyle={{ opacity: background.opacity }}>
           <View style={[styles.topVeil, isDark && { backgroundColor: "rgba(5,12,10,0.65)" }]} />
           <LinearGradient colors={isDark ? ['rgba(15,15,16,0)', colors.background] : ['rgba(245,243,233,0)', colors.background]} style={styles.headerFade} />
         </ImageBackground>

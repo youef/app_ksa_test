@@ -438,7 +438,7 @@ export default function SearchPage() {
   );
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <AppHeader
         variant="tab"
         title="استكشف"

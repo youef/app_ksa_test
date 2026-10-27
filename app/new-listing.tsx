@@ -149,12 +149,12 @@ export default function NewListing() {
   }
 
   if (loading) {
-    return <View style={styles.center}><ActivityIndicator size="large" color={OASIS.colors.primary} /><Text style={styles.loading}>جاري تجهيز الإضافة...</Text></View>;
+    return <View style={[styles.center, { backgroundColor: 'transparent' }]}><ActivityIndicator size="large" color={OASIS.colors.primary} /><Text style={styles.loading}>جاري تجهيز الإضافة...</Text></View>;
   }
 
   if (!kind) {
     return (
-      <View style={styles.screen}>
+      <View style={[styles.screen, { backgroundColor: 'transparent' }]}>
         <AppHeader variant="sub" title="إضافة جديدة" subtitle="اختر نوع ما تريد نشره" fallbackRoute="/profile?tab=content" />
         <ScrollView contentContainerStyle={styles.content}>
           <Text style={styles.heroTitle}>ماذا تريد أن تضيف؟</Text>
@@ -183,7 +183,7 @@ export default function NewListing() {
   }
 
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { backgroundColor: 'transparent' }]}>
       <AppHeader variant="sub" title="إضافة منتج" subtitle={isMerchant ? 'سيظهر باسم المنشأة في السوق' : 'إعلان شخصي مرتبط بملفك'} fallbackRoute="/profile?tab=content" />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <OasisSurface oasisSurface="card" style={styles.ownerCard}>

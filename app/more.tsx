@@ -20,6 +20,7 @@ import {
   FileText,
   Mail,
   GraduationCap,
+  Images,
 } from 'lucide-react-native';
 
 import { AppHeader } from '@/components/shared/AppHeader';
@@ -84,7 +85,7 @@ export default function More() {
     : profile?.display_name || profile?.username || 'حسابي';
 
   return (
-    <View style={[styles.screen, { backgroundColor: colors.background }]}>
+    <View style={[styles.screen, { backgroundColor: colors.background }, { backgroundColor: 'transparent' }]}>
       <AppHeader variant="tab" title="المزيد" subtitle="حسابك وخدمات حيّك في مكان واحد" />
 
       <ScrollView
@@ -134,6 +135,7 @@ export default function More() {
             ...(profile?.role === 'admin'
               ? [
                   { title: 'لوحة الإدارة', subtitle: 'إدارة المنصة والصلاحيات', href: '/admin', Icon: ShieldCheck },
+                  { title: 'صور وخلفيات الصفحات', subtitle: 'تغيير خلفيات الترحيب والدخول والتطبيق', href: '/admin-backgrounds', Icon: Images },
                   { title: 'إدارة الفلترة والمخالفين', subtitle: 'الكلمات المحظورة والمتابعات', href: '/admin-moderation', Icon: FileText },
                   { title: 'مركز تواصل المنصة', subtitle: 'الترحيب التلقائي والتحديثات الرسمية', href: '/admin-broadcast', Icon: Mail },
                 ]

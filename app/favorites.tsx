@@ -163,7 +163,7 @@ export default function FavoritesScreen() {
   const countStores = countFor('stores');
 
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { backgroundColor: 'transparent' }]}>
       <AppHeader variant="sub" title="المفضلة" subtitle="منتجاتك واستفساراتك وكل ما حفظته" fallbackRoute="/more" />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingBottom: bottomNavInset + 28 }]}>
         <LinearGradient colors={['#312E81', '#5B21B6', '#7C3AED']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>

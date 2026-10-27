@@ -1,6 +1,7 @@
 import { OasisPressable as Pressable } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
 import { ActivityIndicator, Image, Platform, Text, View } from 'react-native';
 import { Redirect, router, Stack, usePathname } from 'expo-router';
 import Head from 'expo-router/head';
@@ -13,6 +14,7 @@ import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
 import { initLogRocket } from '@/lib/logrocket';
 import BottomNav from '@/components/BottomNav';
+import AppBackground from '@/components/shared/AppBackground';
 import { PlatformConfigProvider, usePlatformConfig } from '@/lib/platformConfig';
 import { installDarkModeWebFixes } from '@/lib/darkModeWeb';
 import { loadBannedWords } from '@/lib/profanity';
@@ -109,10 +111,14 @@ function RootContent() {
   }, []);
 
   const { colors, isDark } = useTheme();
+  const navigationTheme = useMemo(() => {
+    const theme = isDark ? DarkTheme : DefaultTheme;
+    return { ...theme, colors: { ...theme.colors, background: 'transparent' } };
+  }, [isDark]);
   const path = pathname.replace(/\/+$/, '') || '/';
   const liveFullScreen = path === '/live' || path.startsWith('/live/');
   const storyFullScreen = ['/stories', '/create-story', '/story', '/story-viewers', '/story-settings'].some(route => path === route || path.startsWith(route + '/'));
-  const hideBottomNav = ['/ask', '/service', '/new-service', '/new-listing', '/admin', '/admin-pro', '/admin-support', '/admin-marketplace', '/admin-moderation', '/admin-broadcast'].some(route => path === route || path.startsWith(route + '/'));
+  const hideBottomNav = path.startsWith('/admin') || ['/ask', '/service', '/new-service', '/new-listing'].some(route => path === route || path.startsWith(route + '/'));
   const hiddenRoute = Object.entries(flags).some(([key, enabled]) => enabled === false && ({ market: ['/market', '/service', '/new-service', '/new-listing'], directory: ['/directory', '/business'], search: ['/search'], stories: ['/stories', '/story', '/create-story'], weather: ['/weather'], carpooling: ['/carpooling'], urgent_alerts: ['/emergency-alert'], questions: ['/questions', '/question'], live: ['/lives', '/live'], map: ['/map'] }[key] || []).some(route => path === route || path.startsWith(route + '/')));
   const routeBlocked = hiddenRoute && path !== '/admin';
 
@@ -155,9 +161,9 @@ function RootContent() {
       <SafeAreaProvider initialMetrics={initialWindowMetrics}>
         <DynamicIslandProvider>
           <DialogProvider>
-            <View style={{ flex: 1, position: 'relative', backgroundColor: colors.background, width: '100%', maxWidth: path.startsWith('/admin') ? 1440 : path === '/map' || path.startsWith('/live/') ? 1280 : path === '/' ? 1100 : 820, alignSelf: 'center' }}>
+            <AppBackground style={{ flex: 1, position: 'relative', width: '100%', maxWidth: path.startsWith('/admin') ? 1440 : path === '/map' || path.startsWith('/live/') ? 1280 : path === '/' ? 1100 : 820, alignSelf: 'center' }}>
               {!configReady ? <PendingScreen /> : maintenance.enabled && sessionReady && !isAdmin && path !== '/auth' ? <View style={{ flex: 1, backgroundColor: OASIS.colors.background, alignItems: 'center', justifyContent: 'center', padding: 16 }}><Text style={{ fontSize: 28 }}>🛠️</Text><Text style={{ fontSize: 20, fontWeight: '700', color: OASIS.colors.ink, marginTop: 14 }}>نعتذر، المنصة تحت الصيانة</Text><Text style={{ fontSize: 15, color: OASIS.colors.muted, textAlign: 'center', lineHeight: 25, marginTop: 10 }}>{maintenance.message || 'نعمل على تحسين تجربتكم، يرجى العودة لاحقاً.'}</Text><Pressable onPress={() => router.push('/auth')} style={{ marginTop: 16, backgroundColor: OASIS.colors.primary, paddingHorizontal: 22, paddingVertical: 12, borderRadius: 14 }}><Text style={{ color: OASIS.colors.surface, fontWeight: '600' }}>دخول المدير</Text></Pressable></View> : maintenance.enabled && isAdmin && path !== '/admin' ? <Redirect href="/admin" /> : protectCurrentRoute ? (sessionReady ? <Redirect href="/auth" /> : <PendingScreen />) : routeBlocked ? <Redirect href="/home" /> : (
-                <Stack
+                <NavigationThemeProvider value={navigationTheme}><Stack
                   screenOptions={{
                     headerShown: false,
                     // Native gets a short slide; web swaps screens without a blank animation frame.
@@ -167,10 +173,10 @@ function RootContent() {
                     freezeOnBlur: false,
                     gestureEnabled: true,
                   }}
-                />
+                /></NavigationThemeProvider>
               )}
               {!(maintenance.enabled && sessionReady && !isAdmin) && !liveFullScreen && !storyFullScreen && !hideBottomNav && path !== '/map' && !path.startsWith('/map/') && <BottomNav />}
-            </View>
+            </AppBackground>
           </DialogProvider>
         </DynamicIslandProvider>
       </SafeAreaProvider>

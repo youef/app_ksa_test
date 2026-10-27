@@ -568,7 +568,7 @@ export default function Question() {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={[styles.loadingContainer, { backgroundColor: 'transparent' }]}>
         <ActivityIndicator size="large" color={OASIS.colors.primary} />
         <Text style={styles.loadingText}>جاري تحميل تفاصيل الاستفسار...</Text>
       </View>
@@ -577,7 +577,7 @@ export default function Question() {
 
   if (!q) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={[styles.loadingContainer, { backgroundColor: 'transparent' }]}>
         <Text style={styles.errorText}>السؤال غير موجود أو تم حذفه</Text>
         <Pressable oasisKind="action" style={styles.backButton} onPress={() => router.back()}>
           <Text style={styles.backButtonText}>العودة للرئيسية</Text>
@@ -658,7 +658,7 @@ export default function Question() {
   }
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0} style={styles.container}>
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0} style={[styles.container, { backgroundColor: 'transparent' }]}>
       <AppHeader
         variant="sub"
         title="استفسار ونقاش الحي"

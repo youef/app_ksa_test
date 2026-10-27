@@ -233,7 +233,7 @@ export default function NewService() {
 
   if (authChecking) {
     return (
-      <View style={styles.loadingScreen}>
+      <View style={[styles.loadingScreen, { backgroundColor: 'transparent' }]}>
         <ActivityIndicator size="large" color={OASIS.colors.primary} />
         <Text style={styles.loadingText}>نجهز صفحة إضافة العرض…</Text>
       </View>
@@ -247,7 +247,7 @@ export default function NewService() {
   });
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <AppHeader
         variant="sub"
         title="إضافة خدمة"

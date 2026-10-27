@@ -108,10 +108,10 @@ export default function AdminAnnouncements() {
     setBusy(false);
   }
 
-  if (checking) return <View style={[s.center, { backgroundColor: c.background }]}><ActivityIndicator color={c.primary} /></View>;
-  if (!allowed) return <View style={[s.center, { backgroundColor: c.background }]}><Text style={{ color: c.danger }}>هذه الصفحة مخصصة لإدارة المنصة فقط.</Text><Pressable onPress={() => router.replace('/home')}><Text style={{ color: c.primary }}>العودة للرئيسية</Text></Pressable></View>;
+  if (checking) return <View style={[s.center, { backgroundColor: c.background }, { backgroundColor: 'transparent' }]}><ActivityIndicator color={c.primary} /></View>;
+  if (!allowed) return <View style={[s.center, { backgroundColor: c.background }, { backgroundColor: 'transparent' }]}><Text style={{ color: c.danger }}>هذه الصفحة مخصصة لإدارة المنصة فقط.</Text><Pressable onPress={() => router.replace('/home')}><Text style={{ color: c.primary }}>العودة للرئيسية</Text></Pressable></View>;
 
-  return <View style={{ flex: 1, backgroundColor: c.background }}>
+  return <View style={[{ flex: 1, backgroundColor: c.background }, { backgroundColor: 'transparent' }]}>
     <AppHeader variant="sub" title="إدارة الإعلانات" subtitle="إعلانات الصفحة الرئيسية · 24 ساعة" fallbackRoute="/admin" />
     <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
       <View style={[s.panel, { backgroundColor: c.surface, borderColor: c.line }]}>

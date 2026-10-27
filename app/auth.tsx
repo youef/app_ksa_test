@@ -9,10 +9,10 @@ import { Mail, Lock, User, ArrowRight, Compass, ShieldCheck, Eye, EyeOff, LogIn,
 import { AppHeader } from '@/components/shared/AppHeader';
 import { HAYNA_BUTTON } from '@/components/shared/haynaButtonTokens';
 import { HaynaActionButton } from '@/components/shared/HaynaActionButton';
-
-const AUTH_BACKGROUND = require('../public/design-system/hayna-v1/artwork/welcome-art.png');
+import { usePageBackground } from '@/hooks/usePageBackground';
 
 export default function Auth() {
+  const background = usePageBackground('login');
   const [logoUri, setLogoUri] = useState(getCachedBrandingLogo());
   const [isLogin, setIsLogin] = useState(true);
   const [username, setUsername] = useState('');
@@ -102,7 +102,7 @@ export default function Auth() {
 
   return (
     <View style={styles.container}>
-      <ImageBackground source={AUTH_BACKGROUND} resizeMode="cover" style={StyleSheet.absoluteFillObject} imageStyle={styles.backgroundImage}>
+      <ImageBackground source={background.source} onError={background.onError} resizeMode="cover" style={StyleSheet.absoluteFillObject} imageStyle={{ opacity: background.opacity }}>
         <View style={styles.backgroundVeil} />
       </ImageBackground>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.background}>

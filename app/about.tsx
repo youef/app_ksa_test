@@ -75,7 +75,7 @@ export default function AboutScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <AppHeader
         variant="sub"
         title="حول المنصة والمطور"

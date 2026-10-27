@@ -195,7 +195,7 @@ export default function Locations() {
   const isAllDistricts = currentLoc.district === 'كل الأحياء' || currentLoc.district === 'كل أحياء المدينة';
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <AppHeader
         variant="sub"
         title="موقعك الموثّق"

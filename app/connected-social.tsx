@@ -77,7 +77,7 @@ export default function ConnectedSocialScreen() {
   };
 
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { backgroundColor: 'transparent' }]}>
       <AppHeader variant="sub" title="المتابعون" subtitle="علاقاتك ومجتمعك في حيّنا" fallbackRoute="/more" />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content,{paddingBottom:bottomNavInset+28}]}>
         <LinearGradient colors={['#082F49','#075985','#0E7490']} start={{x:0,y:0}} end={{x:1,y:1}} style={styles.hero}>

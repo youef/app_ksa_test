@@ -457,7 +457,8 @@ export default function TwitterInquiryCard({
 
         <View style={s.xAuthorMeta}>
           <View style={s.xAuthorRow}>
-            <Pressable onPress={() => isGuest ? requireAccount() : data.profiles?.id && router.push({ pathname: '/user', params: { id: data.profiles.id } })}>              <Text style={[s.xAuthorName, isDark && { color: colors.ink }]} numberOfLines={1}>{name}</Text>
+            <Pressable onPress={() => isGuest ? requireAccount() : data.profiles?.id && router.push({ pathname: '/user', params: { id: data.profiles.id } })}>
+              <Text style={[s.xAuthorName, isDark && { color: colors.ink }]} numberOfLines={1}>{name}</Text>
             </Pressable>
             {isEmergency ? (
               <View style={s.xEmergencyBadge}><Flame size={11} color={OASIS.colors.danger} /><Text style={s.xEmergencyBadgeText}>عاجل</Text></View>

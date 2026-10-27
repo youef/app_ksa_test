@@ -1,12 +1,12 @@
 import { storyDiscoveryMembership } from '@/lib/storyActivity';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { router, useFocusEffect } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import {
   getActiveLocation,
   setActiveLocation,
   isAllKingdom,
-  isLocationMatching,
+  subscribeLocation,
   type HaynaLocation,
 } from '@/lib/locationSync';
 import {
@@ -16,15 +16,17 @@ import {
   type Question,
   type Story,
 } from '@/lib/homeUtils';
+import { queryHomePosts } from '@/lib/homeFeedQuery';
 
 const PAGE_SIZE = 30;
 
 type Options = {
   /** Called whenever the effective location was resolved from profile / storage. */
   onLocation: (loc: HaynaLocation) => void;
+  ownPosts?: boolean;
 };
 
-export function useHomeFeed({ onLocation }: Options) {
+export function useHomeFeed({ onLocation, ownPosts = false }: Options) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -40,18 +42,22 @@ export function useHomeFeed({ onLocation }: Options) {
   const [locationIncomplete, setLocationIncomplete] = useState(false);
 
   const busyRef = useRef(false);
+  const loadSequenceRef = useRef(0);
+  const scopeKeyRef = useRef('');
+  const ownPostsRef = useRef(ownPosts);
+  ownPostsRef.current = ownPosts;
   const limitRef = useRef(PAGE_SIZE);
   const locRef = useRef<HaynaLocation | null>(null);
   const onLocationRef = useRef(onLocation);
   onLocationRef.current = onLocation;
 
-  const load = useCallback(async (opts?: { more?: boolean }) => {
-    if (busyRef.current) return;
+  const load = useCallback(async (opts?: { more?: boolean; scope?: HaynaLocation }) => {
+    if (busyRef.current && opts?.more) return;
+    const sequence = ++loadSequenceRef.current;
+    const isCurrent = () => sequence === loadSequenceRef.current;
     busyRef.current = true;
-    if (opts?.more) {
-      limitRef.current += PAGE_SIZE;
-      setLoadingMore(true);
-    }
+    const mine = ownPostsRef.current;
+    if (opts?.more) setLoadingMore(true);
 
     try {
       const { data: auth } = await supabase.auth.getSession();
@@ -65,14 +71,26 @@ export function useHomeFeed({ onLocation }: Options) {
       if (profileRes.error) throw profileRes.error;
 
       const profileData = profileRes.data as Profile | null;
+      if (!isCurrent()) return;
+      const selectedLoc = opts?.scope ?? savedLoc;
       const loc: HaynaLocation =
-        user && profileData?.city && isAllKingdom(savedLoc.city)
+        user && profileData?.city && isAllKingdom(selectedLoc.city)
           ? {
               region: profileData.region || 'المملكة',
               city: profileData.city,
               district: profileData.district || 'كل الأحياء',
             }
-          : savedLoc;
+          : selectedLoc;
+
+      const scopeKey = JSON.stringify([loc.city, loc.district, mine, user?.id]);
+      if (scopeKeyRef.current !== scopeKey) {
+        scopeKeyRef.current = scopeKey;
+        limitRef.current = PAGE_SIZE;
+        setQuestions([]);
+        setRequests([]);
+        setHasMore(false);
+        setLoading(true);
+      } else if (opts?.more) limitRef.current += PAGE_SIZE;
 
       locRef.current = loc;
       setProfile(profileData);
@@ -100,18 +118,12 @@ export function useHomeFeed({ onLocation }: Options) {
           .or(`expires_at.gt.${new Date().toISOString()},and(expires_at.is.null,created_at.gte.${new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()})`)
           .order('created_at', { ascending: false })
           .limit(40) : Promise.resolve({ data: [], error: null }),
-        user
-          ? supabase.from('questions').select('*').order('created_at', { ascending: false }).limit(limit)
-          : supabase.rpc('hayna_guest_questions', { p_city: loc.city, p_district: loc.district, p_limit: limit }),
-        user ? supabase
-          .from('requests')
-          .select('*')
-          .eq('status', 'open')
-          .order('created_at', { ascending: false })
-          .limit(limit) : supabase.rpc('hayna_guest_requests', { p_city: loc.city, p_district: loc.district, p_limit: limit }),
+        queryHomePosts(supabase, 'questions', loc, user?.id ?? null, limit, mine),
+        queryHomePosts(supabase, 'requests', loc, user?.id ?? null, limit, mine),
         user ? supabase.from('platform_messages').select('id', { count: 'exact', head: true }).eq('recipient_id', user.id).eq('read', false) : Promise.resolve({ count: 0, error: null }),
       ]);
 
+      if (!isCurrent()) return;
       setUnreadNotifCount(notifRes.count ?? 0);
 
       // Count unread conversations using the same last-message rule as /messages.
@@ -164,11 +176,12 @@ export function useHomeFeed({ onLocation }: Options) {
         localStories.push(story);
         seen.add(story.author_id);
       }
+      if (!isCurrent()) return;
       setStories(localStories.slice(0, 10));
 
       const qRows = dedupe((questionsRes.data ?? []) as Question[], 'author_id');
       const rRows = dedupe((requestsRes.data ?? []) as HelpRequest[], 'requester_id');
-      setHasMore((questionsRes.data?.length ?? 0) >= limit || (requestsRes.data?.length ?? 0) >= limit);
+      setHasMore(questionsRes.hasMore || requestsRes.hasMore);
 
       // Stage 2: answers for questions + help_matches for requests + ONE profiles query for every author involved.
       const qIds = qRows.map(q => q.id);
@@ -199,6 +212,7 @@ export function useHomeFeed({ onLocation }: Options) {
         ? await supabase.from('profiles').select('*').in('id', profileIds)
         : { data: [] as any[] };
       const profileMap: Record<string, Profile> = {};
+      if (!isCurrent()) return;
       (profilesRes.data ?? []).forEach((p: any) => { profileMap[p.id] = p; });
 
       const answersByQ: Record<string, any[]> = {};
@@ -237,14 +251,17 @@ export function useHomeFeed({ onLocation }: Options) {
       );
       setError(null);
     } catch (e: any) {
+      if (!isCurrent()) return;
       console.warn('home load failed:', e);
       setError(e?.code === 'PGRST202'
         ? 'يلزم تحديث قاعدة البيانات لتصفح محتوى الحي كزائر.'
         : e?.message ? 'تعذر تحميل الصفحة، تحقق من الاتصال وحاول مرة أخرى.' : 'حدث خطأ غير متوقع.');
     } finally {
-      busyRef.current = false;
-      setLoading(false);
-      setLoadingMore(false);
+      if (isCurrent()) {
+        busyRef.current = false;
+        setLoading(false);
+        setLoadingMore(false);
+      }
     }
   }, []);
 
@@ -253,6 +270,30 @@ export function useHomeFeed({ onLocation }: Options) {
       void load();
     }, [load]),
   );
+
+  useEffect(() => subscribeLocation(next => {
+    if (locRef.current?.city === next.city && locRef.current?.district === next.district) return;
+    locRef.current = next;
+    ++loadSequenceRef.current; // Old requests cannot overwrite a newly selected scope.
+    setQuestions([]);
+    setRequests([]);
+    setHasMore(false);
+    setLoading(true);
+    void load({ scope: next });
+  }), [load]);
+
+  const previousOwnPostsRef = useRef(ownPosts);
+  useEffect(() => {
+    if (previousOwnPostsRef.current === ownPosts) return;
+    previousOwnPostsRef.current = ownPosts;
+    setQuestions([]);
+    setRequests([]);
+    setHasMore(false);
+    setLoading(true);
+    void load();
+  }, [ownPosts, load]);
+
+  useEffect(() => () => { ++loadSequenceRef.current; }, []);
 
   // Realtime: new posts refresh the feed (debounced), new notifications bump the badge.
   const channelRef = useRef<any>(null);

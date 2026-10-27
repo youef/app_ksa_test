@@ -30,7 +30,7 @@ export default function ContactUsScreen() {
   };
 
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { backgroundColor: 'transparent' }]}>
       <AppHeader variant="sub" title="اتصل بنا" subtitle="الرسائل تصل إدارة حيّنا" fallbackRoute="/more" />
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: bottomNavInset + 24 }]}>
         <OasisSurface oasisSurface="card" style={styles.card}>

@@ -128,7 +128,7 @@ export default function Directory() {
     : location.city + (location.district && location.district !== 'كل الأحياء' ? ' · حي ' + location.district : '');
 
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { backgroundColor: 'transparent' }]}>
       <AppHeader variant="sub" title="دليل الأعمال" subtitle={locationLabel} fallbackRoute="/more" />
       <ScrollView
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load(true); }} tintColor={OASIS.colors.primary} />}

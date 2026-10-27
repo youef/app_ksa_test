@@ -351,7 +351,7 @@ export default function Messages() {
   const silentUnread = conversations.filter(c => c.isUnread && (c.isMuted || dndNow)).length;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <AppHeader
         variant="tab"
         title="الرسائل والمحادثات"

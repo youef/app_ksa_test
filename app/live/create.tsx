@@ -43,7 +43,7 @@ export default function CreateLiveScreen() {
   }
 
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { backgroundColor: 'transparent' }]}>
       <AppHeader variant="sub" title="تجهيز البث" subtitle="أكمل التفاصيل ثم ابدأ مباشرة" fallbackRoute="/lives" />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.notice}><Camera size={20} color={OASIS.colors.primary} /><Text style={styles.noticeText}>قبل البث سنطلب إذن الكاميرا والميكروفون. تستطيع إيقافهما من داخل الغرفة.</Text></View>

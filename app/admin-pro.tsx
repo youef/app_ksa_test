@@ -76,10 +76,10 @@ export default function AdminPro() {
     }
   };
 
-  if (loading) return <View style={s.center}><ActivityIndicator size="large" color={OASIS.colors.primary}/><Text style={s.loading}>جاري تجهيز مركز العمليات المتقدم...</Text></View>;
+  if (loading) return <View style={[s.center, { backgroundColor: 'transparent' }]}><ActivityIndicator size="large" color={OASIS.colors.primary}/><Text style={s.loading}>جاري تجهيز مركز العمليات المتقدم...</Text></View>;
 
   return (
-    <View style={s.page}>
+    <View style={[s.page, { backgroundColor: 'transparent' }]}>
       <AppHeader
         variant="sub"
         title="مركز عمليات حيّنا المتقدم"

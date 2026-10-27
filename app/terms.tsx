@@ -135,7 +135,7 @@ export default function TermsScreen() {
   const bottomInset = useBottomNavInset();
   const { colors, isDark } = useTheme();
   return (
-    <View style={[styles.screen, { backgroundColor: colors.background }]}>
+    <View style={[styles.screen, { backgroundColor: colors.background }, { backgroundColor: 'transparent' }]}>
       <AppHeader variant="sub" title="الشروط والسياسات" subtitle="جميع بنود منصة حيّنا" fallbackRoute="/more" />
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: bottomInset + 28 }]} showsVerticalScrollIndicator={false}>
         <OasisSurface oasisSurface="card" style={[styles.hero, isDark && { backgroundColor: colors.surface, borderColor: colors.line }]}>

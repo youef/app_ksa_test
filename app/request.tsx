@@ -485,7 +485,7 @@ export default function Request() {
 
   if (loading) {
     return (
-      <View style={styles.center}>
+      <View style={[styles.center, { backgroundColor: 'transparent' }]}>
         <ActivityIndicator size="large" color={OASIS.colors.primary} />
         <Text style={styles.loadingText}>جاري تحميل تفاصيل الفزعة...</Text>
       </View>
@@ -494,7 +494,7 @@ export default function Request() {
 
   if (!request) {
     return (
-      <View style={styles.center}>
+      <View style={[styles.center, { backgroundColor: 'transparent' }]}>
         <ShieldAlert size={48} color="#94a3b8" />
         <Text style={styles.errorText}>الطلب غير موجود أو تمت إزالته.</Text>
         <Pressable onPress={() => router.back()} style={styles.backBtnAction}>
@@ -597,7 +597,7 @@ export default function Request() {
   const myOffer = offers.find(o => o.helper_id === me);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <AppHeader
         variant="sub"
         title={request.request_type === 'carpooling' ? 'توصيل المدارس' : 'طلب فزعة بالحي'}

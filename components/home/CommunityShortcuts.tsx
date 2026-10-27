@@ -11,6 +11,7 @@ export default function CommunityShortcuts({ signedIn: _signedIn }: { signedIn: 
   const { colors: c, isDark } = useTheme();
   const [items, setItems] = useState<Announcement[]>([]);
   const [active, setActive] = useState(0);
+  const [imageRatios, setImageRatios] = useState<Record<string, number>>({});
   const refresh = useCallback(async () => {
     const { data, error } = await supabase.from('home_announcements').select('id,title,message,image_url,expires_at,action_type,action_target')
       .gt('expires_at', new Date().toISOString()).order('created_at', { ascending: false }).limit(30);
@@ -23,6 +24,15 @@ export default function CommunityShortcuts({ signedIn: _signedIn }: { signedIn: 
   }, [refresh]);
   const visible = items.filter(item => Date.parse(item.expires_at) > Date.now());
   const ad = visible.length ? visible[active % visible.length] : null;
+  const fullImageUrl = ad?.image_url && !ad.title && !ad.message ? ad.image_url : null;
+  useEffect(() => {
+    if (!fullImageUrl || imageRatios[fullImageUrl]) return;
+    let active = true;
+    Image.getSize(fullImageUrl, (width, height) => {
+      if (active && width > 0 && height > 0) setImageRatios(current => ({ ...current, [fullImageUrl]: width / height }));
+    }, () => undefined);
+    return () => { active = false; };
+  }, [fullImageUrl, imageRatios]);
   if (!ad) return null;
   const hasAction = ad.action_type !== 'none' && Boolean(ad.action_target);
   async function openDestination() {
@@ -38,9 +48,9 @@ export default function CommunityShortcuts({ signedIn: _signedIn }: { signedIn: 
       <View style={s.headerTitle}><Megaphone size={14} color={c.primary} /><Text style={[s.label, { color: c.primary }]}>إعلانات حيّنا</Text></View>
       {visible.length > 1 ? <Text style={{ color: c.muted, fontSize: 10 }}>{(active % visible.length) + 1} / {visible.length}</Text> : <Text style={{ color: c.muted, fontSize: 10 }}>إعلان رسمي</Text>}
     </View>
-    <Pressable oasisKind="plain" disabled={!hasAction} onPress={() => void openDestination()} accessibilityRole={hasAction ? 'link' : undefined} accessibilityLabel={hasAction ? 'فتح الإعلان' : 'إعلان حيّنا'} style={[s.banner, { backgroundColor: isDark ? '#14362D' : '#E7F5ED', borderColor: c.line }]}>
+    <Pressable oasisKind="plain" disabled={!hasAction} onPress={() => void openDestination()} accessibilityRole={hasAction ? 'link' : undefined} accessibilityLabel={hasAction ? 'فتح الإعلان' : 'إعلان حيّنا'} style={[s.banner, { backgroundColor: isDark ? '#14362D' : '#EDF5EF', borderColor: c.line }, fullImageUrl ? { aspectRatio: imageRatios[fullImageUrl] || 2.8, minHeight: undefined, maxHeight: undefined } : undefined]}>
       {ad.image_url && !ad.title && !ad.message ? (
-        <Image source={{ uri: ad.image_url }} resizeMode="cover" style={s.fullImage} accessibilityLabel="صورة الإعلان" />
+        <Image source={{ uri: ad.image_url }} resizeMode="contain" style={s.fullImage} accessibilityLabel="صورة الإعلان" />
       ) : ad.image_url ? (
         <View style={s.mixed}>
           <View style={s.copy}>
@@ -65,7 +75,7 @@ export default function CommunityShortcuts({ signedIn: _signedIn }: { signedIn: 
   </View>;
 }
 const s = StyleSheet.create({
-  outer: { marginHorizontal: 14, marginTop: 9, marginBottom: 12, gap: 7, maxWidth: 760, width: 'auto' },
+  outer: { marginTop: 3, marginBottom: 5, gap: 4, maxWidth: 760, width: '100%', alignSelf: 'center', paddingHorizontal: 14 },
   header: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 3 },
   headerTitle: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
   label: { fontSize: 11, fontWeight: '800' },
@@ -73,11 +83,11 @@ const s = StyleSheet.create({
   fullImage: { width: '100%', height: '100%' },
   mixed: { flex: 1, flexDirection: 'row-reverse' },
   sideImage: { width: '43%', height: '100%' },
-  copy: { flex: 1, justifyContent: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 9 },
+  copy: { flex: 1, justifyContent: 'center', gap: 3, paddingHorizontal: 12, paddingVertical: 5 },
   textOnly: { flex: 1, flexDirection: 'row-reverse', alignItems: 'center', paddingHorizontal: 4 },
-  title: { fontSize: 15, fontWeight: '900', textAlign: 'right' },
+  title: { fontSize: 13, fontWeight: '700', textAlign: 'right' },
   message: { fontSize: 11, lineHeight: 17, textAlign: 'right' },
-  cta: { backgroundColor: '#047857', borderRadius: 9, paddingHorizontal: 9, paddingVertical: 6, flexDirection: 'row-reverse', alignItems: 'center', gap: 5, alignSelf: 'flex-start' },
+  cta: { backgroundColor: '#047857', borderRadius: 9, paddingHorizontal: 9, paddingVertical: 4, flexDirection: 'row-reverse', alignItems: 'center', gap: 5, alignSelf: 'flex-start' },
   ctaText: { color: '#FFFFFF', fontSize: 10, fontWeight: '800' },
   imageAction: { position: 'absolute', bottom: 10, left: 10, backgroundColor: 'rgba(4,78,59,0.88)', borderRadius: 12, padding: 8 },
   dots: { flexDirection: 'row', justifyContent: 'center', gap: 5 },

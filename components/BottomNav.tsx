@@ -1,6 +1,8 @@
 import { OasisPressable as Pressable } from '@/components/oasis/OasisPrimitives';
 import { useEffect, useState } from 'react';
-import { Image, Keyboard, NativeScrollEvent, NativeSyntheticEvent, Platform, StyleSheet, View } from 'react-native';
+import { DeviceEventEmitter, Keyboard, NativeScrollEvent, NativeSyntheticEvent, Platform, StyleSheet, Text, View } from 'react-native';
+import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Home, Compass, Plus, Store, MoreHorizontal } from 'lucide-react-native';
@@ -74,7 +76,7 @@ function activeFor(pathname: string, key: string) {
 }
 
 export default function BottomNav() {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const [hasSession, setHasSession] = useState(false);
@@ -164,8 +166,10 @@ export default function BottomNav() {
 
   return (
     <Animated.View pointerEvents="box-none" style={[styles.dock, { paddingBottom: bottomPadding }, animatedStyle]}>
-      <View style={styles.surface}>
-        <Image source={require('../public/welcome/hayna-bottom-nav-background.png')} resizeMode="cover" style={styles.navArtwork} />
+      <View style={[styles.surface, { backgroundColor: isDark ? 'rgba(20,36,29,.76)' : 'rgba(255,255,255,.76)', borderColor: isDark ? 'rgba(180,218,197,.2)' : 'rgba(255,255,255,.92)' }]}>
+        <BlurView intensity={80} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFillObject} />
+        <LinearGradient pointerEvents="none" colors={isDark ? ['rgba(196,238,215,.12)', 'rgba(10,30,20,.08)'] : ['rgba(255,255,255,.68)', 'rgba(232,246,237,.24)']} style={StyleSheet.absoluteFillObject} />
+        <View pointerEvents="none" style={[styles.glassHighlight, { backgroundColor: isDark ? 'rgba(213,246,227,.22)' : '#FFFFFF' }]} />
         <View style={styles.row}>
           {TABS.map((tab) => {
             const isCreate = tab.kind === 'create';
@@ -173,20 +177,23 @@ export default function BottomNav() {
             const Icon = tab.icon;
             return (
               <Pressable
+                oasisKind="plain"
                 key={tab.key}
                 accessibilityRole="button"
                 accessibilityLabel={tab.label}
+                accessibilityHint={isCreate ? 'إنشاء منشور جديد' : isActive && tab.key === '/home' ? 'اضغط للعودة إلى أعلى الصفحة' : undefined}
                 accessibilityState={{ selected: isActive }}
                 onPress={() => {
                   if (isCreate && !hasSession) { router.navigate('/auth' as never); return; }
+                  if (isActive && tab.key === '/home') { setNavHidden(false); DeviceEventEmitter.emit('hayna:home-scroll-top'); return; }
                   if (normalize(pathname) !== tab.key) router.navigate(tab.key as never);
                 }}
                 style={({ pressed }) => [styles.tab, pressed && styles.pressed]}
               >
-                <View style={isCreate ? styles.createOrb : [styles.orb, styles.standardOrbLower, isActive && styles.activeOrb]}>
-                  <Icon size={isCreate ? 30 : 23} color={isCreate ? '#FFFFFF' : isActive ? '#047857' : '#075A43'} strokeWidth={isCreate ? 2.7 : 2.2} />
+                <View style={[styles.iconWrap, { backgroundColor: isDark ? 'rgba(198,230,213,.06)' : 'rgba(4,120,87,.04)' }, isActive && { backgroundColor: isDark ? 'rgba(52,211,153,.16)' : 'rgba(4,120,87,.1)' }, isCreate && styles.createIcon]}>
+                  <Icon size={isCreate ? 21 : 20} color={isCreate ? '#FFFFFF' : isActive ? colors.primary : colors.muted} strokeWidth={isActive || isCreate ? 2.3 : 1.8} />
                 </View>
-                {isActive && <View style={styles.activeDot} />}
+                <Text numberOfLines={1} style={[styles.label, { color: isActive ? colors.primary : colors.muted }, isActive && styles.activeLabel]}>{tab.label}</Text>
               </Pressable>
             );
           })}
@@ -197,21 +204,14 @@ export default function BottomNav() {
 }
 
 const styles = StyleSheet.create({
-  dock: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 100, backgroundColor: 'transparent', paddingHorizontal: 12, paddingTop: 14 },
-  // Let the PNG be the only visible navigation background: no glass panel or shadow behind it.
-  surface: { height: 88, maxWidth: 560, width: '100%', alignSelf: 'center', backgroundColor: 'transparent', overflow: 'visible' },
-  navArtwork: { position: 'absolute', left: 0, right: 0, bottom: 0, width: '100%', height: 88, borderRadius: 30 },
-  // Five equal hit areas remain aligned with the circular slots in the PNG.
-  // Filling the artwork eliminates the vertical shift caused by visible labels.
-  row: { ...StyleSheet.absoluteFillObject, direction: 'ltr', flexDirection: 'row-reverse', alignItems: 'center', paddingHorizontal: 6, paddingTop: 12, paddingBottom: 4 },
-  tab: { flex: 1, minWidth: 0, height: '100%', alignItems: 'center', justifyContent: 'center', paddingTop: 10 },
-  orb: { width: 49, height: 49, borderRadius: 25, backgroundColor: 'rgba(255,255,255,0.79)', borderWidth: 1.5, borderColor: '#06492B', alignItems: 'center', justifyContent: 'center', shadowColor: '#456A55', shadowOpacity: 0.08, shadowRadius: 5, elevation: 2 },
-  // Move only the four side icons down 3px to align with the PNG's round slots.
-  // Keep the central Add (+) icon at its original position.
-  standardOrbLower: { transform: [{ translateY: 3 }] },
-  activeOrb: { borderColor: '#06492B', borderWidth: 2.5, backgroundColor: '#F1FFF8' },
-  // The PNG provides the center-button appearance; avoid an extra background, border or shadow.
-  createOrb: { width: 64, height: 64, borderRadius: 32, marginTop: -12, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', borderWidth: 0, borderColor: 'transparent', shadowColor: 'transparent', shadowOpacity: 0, shadowRadius: 0, shadowOffset: { width: 0, height: 0 }, elevation: 0 },
-  activeDot: { position: 'absolute', bottom: 6, width: 17, height: 4, borderRadius: 3, backgroundColor: '#047857' },
+  dock: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 100, backgroundColor: 'transparent', paddingHorizontal: 12, paddingTop: 8 },
+  surface: { height: BOTTOM_NAV_HEIGHT - 8, maxWidth: 560, width: '100%', alignSelf: 'center', borderRadius: 999, borderWidth: 1, overflow: 'hidden', shadowColor: '#173F30', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.14, shadowRadius: 18, elevation: 6 },
+  glassHighlight: { position: 'absolute', top: 0, right: 22, left: 22, height: 1 },
+  row: { flex: 1, flexDirection: 'row-reverse', alignItems: 'center', paddingHorizontal: 4 },
+  tab: { flex: 1, minWidth: 0, minHeight: 44, height: '100%', alignItems: 'center', justifyContent: 'center', gap: 3 },
+  iconWrap: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  createIcon: { backgroundColor: '#047857', width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: 'rgba(255,255,255,.45)', shadowColor: '#047857', shadowOffset: { width: 0, height: 3 }, shadowOpacity: .18, shadowRadius: 6 },
+  label: { fontSize: 10, lineHeight: 14, fontWeight: '500' },
+  activeLabel: { fontWeight: '700' },
   pressed: { opacity: 0.7, transform: [{ scale: 0.95 }] },
 });

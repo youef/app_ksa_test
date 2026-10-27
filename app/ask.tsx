@@ -1,14 +1,15 @@
 import { OasisPressable as Pressable, OasisTextInput as TextInput } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { ImageBackground, Alert, BackHandler, KeyboardAvoidingView, ScrollView, Text, View, StyleSheet, ActivityIndicator, Platform } from 'react-native';
+import { Alert, BackHandler, KeyboardAvoidingView, ScrollView, Text, View, StyleSheet, ActivityIndicator, Platform } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MessageSquare, HeartHandshake, Wrench, Gift, AlertTriangle, Check, ArrowLeft, Users, ShieldAlert, GraduationCap, MapPin, Clock3, CalendarDays, ShieldCheck, Eye, ChevronLeft, Sparkles } from 'lucide-react-native';
+import { MessageSquare, HeartHandshake, Wrench, Gift, AlertTriangle, Check, ArrowLeft, Users, ShieldAlert, GraduationCap, MapPin, ShieldCheck, Eye, ChevronDown, LayoutTemplate } from 'lucide-react-native';
 import { AppHeader } from '@/components/shared/AppHeader';
 import { supabase } from '@/lib/supabase';
-import { containsProfanity, findProfanity, banAccountOnViolation } from '@/lib/profanity';
-import { getCurrentDeviceLocation, reverseGeocodeDeviceLocation } from '@/lib/deviceLocation';
+import { findProfanity, banAccountOnViolation } from '@/lib/profanity';
+import { useTheme, type OasisColors } from '@/context/ThemeContext';
+import { includesPrivateSchoolDetails, normalizeAskNumber, parseAskReward } from '@/lib/askForm';
 import { getActiveLocation, getPermanentMyLocation, savePermanentMyLocation, subscribeLocation, isAllKingdom } from '@/lib/locationSync';
 import { detectEmergencyAndSafetyAI } from '@/lib/aiAssistant';
 import PublishLocationEditor from '@/components/location/PublishLocationEditor';
@@ -91,16 +92,14 @@ function schoolTitle(mode: SchoolMode, level: SchoolLevel, trip: SchoolTrip, dis
   return `${prefix} - ${level} - ${type}${district.trim() ? ` - حي ${district.trim()}` : ''}`;
 }
 
-function includesPrivateSchoolDetails(text: string) {
-  // Avoid exposing direct contact numbers, exact pickup times, or home addresses
-  // in a listing viewable by other platform users.
-  return /(?:\+?966|05)\s*[- ]?\d[\d\s-]{7,}|(?:\d{1,2}[:٫]\d{2})|(?:منزل|بيتنا|عنوان المنزل|رقم البيت|رقم العمارة|رقم الشارع|رقم المبنى)/i.test(text);
-}
-
 export default function AskScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { type: initialType } = useLocalSearchParams<{ type?: string }>();
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
+  const titleRef = useRef<React.ElementRef<typeof TextInput>>(null);
+  const bodyRef = useRef<React.ElementRef<typeof TextInput>>(null);
   const submittingRef = useRef(false);
   const locationManuallySelectedRef = useRef(false);
   const [editingLocation, setEditingLocation] = useState(false);
@@ -112,6 +111,8 @@ export default function AskScreen() {
   const [district, setDistrict] = useState('');
   const [region, setRegion] = useState('');
   const [busy, setBusy] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<{ title?: string; city?: string; budget?: string }>({});
   const [postType, setPostType] = useState<PostType>('inquiry');
   const [schoolMode, setSchoolMode] = useState<SchoolMode>('need');
@@ -125,6 +126,7 @@ export default function AskScreen() {
 
   useEffect(() => {
     if (initialType === 'school_transport' || initialType === 'carpooling') setPostType('school_transport');
+    else if (POST_TYPES.some(item => item.key === initialType)) setPostType(initialType as PostType);
   }, [initialType]);
   const selectedType = POST_TYPES.find(type => type.key === postType)!;
 
@@ -201,21 +203,7 @@ export default function AskScreen() {
         }
       } catch (err) {}
 
-      // 3. Fast non-blocking GPS refinement in background
-      try {
-        const device = await Promise.race([
-          getCurrentDeviceLocation(),
-          new Promise((res) => setTimeout(() => res(null), 2000)),
-        ]);
-        if (device && isMounted) {
-          const place = await reverseGeocodeDeviceLocation(device as any);
-          if (isMounted && !locationManuallySelectedRef.current && place?.region && place?.city && place?.district && isKnownSaudiCity(place.city)) {
-            setRegion(place.region);
-            setCity(place.city);
-            setDistrict(place.district);
-          }
-        }
-      } catch (e) {}
+      // Device location is requested explicitly from the location editor.
     }
 
     initLocation();
@@ -240,18 +228,22 @@ export default function AskScreen() {
     if (submittingRef.current || step !== 2) return;
     const nextErrors: { title?: string; city?: string; budget?: string } = {};
     if (!publishTitle.trim() || publishTitle.trim().length < 5) nextErrors.title = 'اكتب عنوانًا واضحًا لا يقل عن خمسة أحرف.';
-    if (!city.trim()) nextErrors.city = 'لم نتمكن من تحديد موقعك تلقائيًا. فعّل إذن الموقع أو راجع موقعك في إعدادات الحساب ثم أعد المحاولة.';
-    if (postType === 'help' && budget.trim() && (!Number.isFinite(Number(budget)) || Number(budget) < 0)) nextErrors.budget = 'اكتب مبلغًا صحيحًا بالريال أو اتركه فارغًا.';
+    if (!city.trim()) nextErrors.city = 'حدد مدينة النشر من زر تعديل الموقع أدناه.';
+    if (postType === 'help' && !Number.isFinite(parseAskReward(budget) ?? 0)) nextErrors.budget = 'اكتب مبلغًا صحيحًا بالريال، مثل ٥٠ أو ٢٥٫٥٠.';
     if (postType === 'school_transport') {
-      if (!district.trim()) nextErrors.city = 'اختر الحي في إعدادات موقعك قبل نشر طلب التوصيل.';
+      if (!district.trim()) nextErrors.city = 'حدد حيّك من زر تعديل الموقع أدناه.';
       if (!schoolDays.length) nextErrors.title = 'اختر يومًا واحدًا على الأقل للتوصيل.';
-      if (schoolMode === 'offer' && (!Number.isInteger(Number(schoolSeats)) || Number(schoolSeats) < 1 || Number(schoolSeats) > 8)) {
+      if (schoolMode === 'offer' && (!Number.isInteger(Number(normalizeAskNumber(schoolSeats))) || Number(normalizeAskNumber(schoolSeats)) < 1 || Number(normalizeAskNumber(schoolSeats)) > 8)) {
         nextErrors.budget = 'عدد المقاعد يجب أن يكون بين ١ و٨.';
       }
       if (includesPrivateSchoolDetails(body)) nextErrors.title = 'احذف رقم الهاتف، العنوان الدقيق وأوقات الالتقاء من التفاصيل؛ نسّقها داخل المحادثة الخاصة.';
     }
     setFieldErrors(nextErrors);
-    if (Object.keys(nextErrors).length) return;
+    if (Object.keys(nextErrors).length) {
+      if (nextErrors.title && postType !== 'school_transport') { scrollRef.current?.scrollTo({ y: 0, animated: true }); titleRef.current?.focus(); }
+      else scrollRef.current?.scrollToEnd({ animated: true });
+      return;
+    }
     if (!publishTitle.trim()) {
       return Alert.alert('مطلوب', 'يرجى كتابة عنوان للمنشور.');
     }
@@ -326,8 +318,8 @@ export default function AskScreen() {
             district: district.trim(),
             status: 'open',
             is_urgent: false,
-            max_participants: schoolMode === 'offer' ? Number(schoolSeats) : null,
-            available_seats: schoolMode === 'offer' ? Number(schoolSeats) : null,
+            max_participants: schoolMode === 'offer' ? Number(normalizeAskNumber(schoolSeats)) : null,
+            available_seats: schoolMode === 'offer' ? Number(normalizeAskNumber(schoolSeats)) : null,
             is_recurring: schoolDays.length > 1,
           })
           .select('id')
@@ -347,7 +339,7 @@ export default function AskScreen() {
           request_type: 'help',
           city: city.trim() || null,
           district: district.trim() || null,
-          budget: budget ? Number(budget) : null,
+          budget: parseAskReward(budget),
           is_urgent: isEmergency,
           status: 'open',
         };
@@ -423,29 +415,24 @@ export default function AskScreen() {
     }
   }
   return (
-    <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <AppHeader variant="sub" title="منشور جديد" subtitle={`الخطوة ${step === 1 ? '١' : '٢'} من ٢`} fallbackRoute="/home" onBackPress={goBack} />
+    <KeyboardAvoidingView style={[styles.screen, { backgroundColor: 'transparent' }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <AppHeader variant="sub" title="منشور جديد" fallbackRoute="/home" onBackPress={goBack} />
       <ScrollView ref={scrollRef} style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'} showsVerticalScrollIndicator={false}>
-        <View style={styles.progress} accessible accessibilityLabel={`الخطوة ${step} من 2`}>
-          <View style={[styles.progressSegment, styles.progressActive]} />
-          <View style={[styles.progressSegment, step === 2 && styles.progressActive]} />
+        <View style={styles.progress} accessibilityLabel={`الخطوة ${step} من 2`}>
+          <Text style={[styles.stepLabel, styles.stepActive]}>١ · التصنيف</Text><View style={styles.stepConnector} /><Text style={[styles.stepLabel, step === 2 && styles.stepActive]}>٢ · التفاصيل والنشر</Text>
         </View>
         <Text accessibilityRole="header" style={styles.heading}>{step === 1 ? 'وش ودّك تشارك اليوم؟' : postType === 'school_transport' ? 'رتّب توصيل المدارس' : 'اكتب منشورك'}</Text>
-        <Text style={styles.subtitle}>{step === 1 ? 'اختر التصنيف؛ سنجهز لك النموذج المناسب بخطوتين.' : postType === 'school_transport' ? 'انشر طلبًا أو عرضًا واضحًا دون معلومات الطلاب الخاصة.' : 'اكتب عنوانًا واضحًا ووصفًا يساعد جيرانك على التفاعل.'}</Text>
+        <Text style={styles.subtitle}>{step === 1 ? 'اختر نوع مشاركتك، ثم اكتب التفاصيل.' : postType === 'school_transport' ? 'انشر طلبًا أو عرضًا واضحًا دون معلومات الطلاب الخاصة.' : 'عنوان واضح وتفاصيل مختصرة توصل طلبك أسرع.'}</Text>
 
         {step === 1 ? (
           <>
-            <View style={styles.introNote}>
-              <View style={styles.introIcon}><Sparkles size={17} color={OASIS.colors.primary} /></View>
-              <View style={{ flex: 1 }}><Text style={styles.introTitle}>شارك مجتمعك بخطوتين</Text><Text style={styles.introDesc}>استفسارات، فزعات، إعارة، تبرعات، وتنظيم رحلات المدارس في مكان واحد.</Text></View>
-            </View>
             <View style={styles.typeGrid}>
             {POST_TYPES.map(type => {
               const active = type.key === postType;
               const Icon = type.icon;
               return (
-                <Pressable oasisKind="card" key={type.key} testID={`post-type-${type.key}`} accessibilityRole="button" accessibilityLabel={`${type.label}، ${type.hint}`} accessibilityState={{ selected: active }} onPress={() => setPostType(type.key)} style={({ pressed }) => [styles.typeCard, (type.key === 'emergency' || type.key === 'school_transport') && styles.wideType, active && styles.typeSelected, pressed && styles.pressed]}>
-                  <View style={styles.typeTop}><View style={[styles.typeIcon, active && styles.typeIconSelected]}><Icon size={25} color={active ? OASIS.colors.primary : '#52685d'} strokeWidth={1.8} /></View><View style={[styles.selection, active && styles.selectionActive]}>{active ? <Check size={13} color={OASIS.colors.surface} strokeWidth={3} /> : null}</View></View>
+                <Pressable oasisKind="plain" key={type.key} testID={`post-type-${type.key}`} accessibilityRole="button" accessibilityLabel={`${type.label}، ${type.hint}`} accessibilityState={{ selected: active }} onPress={() => { setPostType(type.key); setFieldErrors({}); setShowTemplates(false); setShowPreview(false); }} style={({ pressed }) => [styles.typeCard, active && styles.typeSelected, pressed && styles.pressed]}>
+                  <View style={styles.typeTop}><View style={[styles.typeIcon, active && styles.typeIconSelected]}><Icon size={21} color={active ? colors.primary : colors.muted} strokeWidth={1.8} /></View>{active ? <View style={[styles.selection, styles.selectionActive]}><Check size={13} color="#FFFFFF" strokeWidth={3} /></View> : null}</View>
                   <Text style={[styles.typeLabel, active && styles.selectedText]}>{type.label}</Text>
                   <Text style={styles.typeHint}>{type.hint}</Text>
                 </Pressable>
@@ -455,17 +442,17 @@ export default function AskScreen() {
           </>
         ) : (
           <View style={styles.details}>
-            <Pressable accessibilityRole="button" accessibilityLabel={`نوع المنشور ${selectedType.label}، تغيير`} onPress={() => changeStep(1)} disabled={busy} style={styles.selectedRow}>
-              <View style={styles.selectedIdentity}><selectedType.icon size={19} color={OASIS.colors.primary} /><Text style={styles.selectedName}>{selectedType.label}</Text></View>
+            <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel={`نوع المنشور ${selectedType.label}، تغيير`} onPress={() => changeStep(1)} disabled={busy} style={styles.selectedRow}>
+              <View style={styles.selectedIdentity}><selectedType.icon size={19} color={colors.primary} /><Text style={styles.selectedName}>{selectedType.label}</Text></View>
               <Text style={styles.changeText}>تغيير</Text>
             </Pressable>
             {postType !== 'school_transport' ? <View style={styles.field}>
               <View style={styles.labelRow}><Text style={styles.label}>العنوان</Text><Text style={styles.count}>{title.length.toLocaleString('ar-SA')} / ١٢٠</Text></View>
-              <TextInput testID="post-title" accessibilityLabel="عنوان المنشور" editable={!busy} maxLength={120} value={title} onChangeText={value => { setTitle(value); setFieldErrors(previous => ({ ...previous, title: undefined })); }} placeholder={postType === 'help' ? 'مثال: أحتاج فزعة لاشتراك بطارية' : postType === 'tool_sharing' ? 'مثال: أحتاج استعارة دريل اليوم' : postType === 'donate' ? 'مثال: أثاث بحالة جيدة للتبرع' : postType === 'emergency' ? 'اكتب وصفًا مختصرًا للحالة' : 'وش تبي تسأل جيرانك؟'} placeholderTextColor="#8a9b91" style={[styles.titleInput, fieldErrors.title && styles.invalidInput]} returnKeyType="next" />
+              <TextInput ref={titleRef} aria-invalid={Boolean(fieldErrors.title)} onSubmitEditing={() => bodyRef.current?.focus()} testID="post-title" accessibilityLabel="عنوان المنشور" editable={!busy} maxLength={120} value={title} onChangeText={value => { setTitle(value); setFieldErrors(previous => ({ ...previous, title: undefined })); }} placeholder={postType === 'help' ? 'مثال: أحتاج فزعة لاشتراك بطارية' : postType === 'tool_sharing' ? 'مثال: أحتاج استعارة دريل اليوم' : postType === 'donate' ? 'مثال: أثاث بحالة جيدة للتبرع' : postType === 'emergency' ? 'اكتب وصفًا مختصرًا للحالة' : 'وش تبي تسأل جيرانك؟'} placeholderTextColor={colors.muted} style={[styles.titleInput, fieldErrors.title && styles.invalidInput]} returnKeyType="next" />
               {fieldErrors.title ? <Text accessibilityRole="alert" style={styles.error}>{fieldErrors.title}</Text> : null}
             </View> : (
               <View style={styles.schoolHeading}>
-                <GraduationCap size={22} color={OASIS.colors.primary} />
+                <GraduationCap size={22} color={colors.primary} />
                 <View style={{ flex: 1 }}><Text style={styles.schoolHeadingTitle}>نشر توصيل مدرسي</Text><Text style={styles.schoolHeadingDesc}>اختيارات محددة تسهّل البحث والتوافق بين أولياء الأمور.</Text></View>
               </View>
             )}
@@ -473,38 +460,38 @@ export default function AskScreen() {
               <View style={styles.schoolPanel}>
                 <Text style={styles.label}>تبي توصيل أو عندك مقاعد؟</Text>
                 <View style={styles.schoolRow}>
-                  {SCHOOL_MODES.map(item => <Pressable key={item.key} accessibilityRole="button" accessibilityState={{ selected: schoolMode === item.key }} onPress={() => setSchoolMode(item.key)} style={[styles.modeCard, schoolMode === item.key && styles.modeActive]}>
+                  {SCHOOL_MODES.map(item => <Pressable oasisKind="plain" disabled={busy} key={item.key} accessibilityRole="button" accessibilityState={{ selected: schoolMode === item.key }} onPress={() => setSchoolMode(item.key)} style={[styles.modeCard, schoolMode === item.key && styles.modeActive]}>
                     <Text style={[styles.modeTitle, schoolMode === item.key && styles.modeTitleActive]}>{item.label}</Text>
                     <Text style={styles.modeHint}>{item.hint}</Text>
                   </Pressable>)}
                 </View>
                 <Text style={styles.label}>المرحلة الدراسية</Text>
                 <View style={styles.optionWrap}>
-                  {SCHOOL_LEVELS.map(level => <Pressable key={level} accessibilityRole="button" accessibilityState={{ selected: schoolLevel === level }} onPress={() => setSchoolLevel(level)} style={[styles.optionChip, schoolLevel === level && styles.optionActive]}><Text style={[styles.optionText, schoolLevel === level && styles.optionTextActive]}>{level}</Text></Pressable>)}
+                  {SCHOOL_LEVELS.map(level => <Pressable oasisKind="plain" disabled={busy} key={level} accessibilityRole="button" accessibilityState={{ selected: schoolLevel === level }} onPress={() => setSchoolLevel(level)} style={[styles.optionChip, schoolLevel === level && styles.optionActive]}><Text style={[styles.optionText, schoolLevel === level && styles.optionTextActive]}>{level}</Text></Pressable>)}
                 </View>
                 <Text style={styles.label}>اتجاه المشوار</Text>
                 <View style={styles.optionWrap}>
-                  {SCHOOL_TRIPS.map(item => <Pressable key={item.key} accessibilityRole="button" accessibilityState={{ selected: schoolTrip === item.key }} onPress={() => setSchoolTrip(item.key)} style={[styles.optionChip, schoolTrip === item.key && styles.optionActive]}><Text style={[styles.optionText, schoolTrip === item.key && styles.optionTextActive]}>{item.label}</Text></Pressable>)}
+                  {SCHOOL_TRIPS.map(item => <Pressable oasisKind="plain" disabled={busy} key={item.key} accessibilityRole="button" accessibilityState={{ selected: schoolTrip === item.key }} onPress={() => setSchoolTrip(item.key)} style={[styles.optionChip, schoolTrip === item.key && styles.optionActive]}><Text style={[styles.optionText, schoolTrip === item.key && styles.optionTextActive]}>{item.label}</Text></Pressable>)}
                 </View>
                 <Text style={styles.label}>أيام التوصيل</Text>
                 <View style={styles.optionWrap}>
-                  {SCHOOL_DAYS.map(day => <Pressable key={day} accessibilityRole="checkbox" accessibilityState={{ checked: schoolDays.includes(day) }} onPress={() => setSchoolDays(days => days.includes(day) ? days.filter(d => d !== day) : [...days, day])} style={[styles.optionChip, schoolDays.includes(day) && styles.optionActive]}><Text style={[styles.optionText, schoolDays.includes(day) && styles.optionTextActive]}>{day}</Text></Pressable>)}
+                  {SCHOOL_DAYS.map(day => <Pressable oasisKind="plain" disabled={busy} key={day} accessibilityRole="checkbox" accessibilityState={{ checked: schoolDays.includes(day) }} onPress={() => setSchoolDays(days => days.includes(day) ? days.filter(d => d !== day) : [...days, day])} style={[styles.optionChip, schoolDays.includes(day) && styles.optionActive]}><Text style={[styles.optionText, schoolDays.includes(day) && styles.optionTextActive]}>{day}</Text></Pressable>)}
                 </View>
-                {schoolMode === 'offer' ? <View style={styles.field}><Text style={styles.label}>المقاعد المتاحة (1–8)</Text><TextInput accessibilityLabel="عدد المقاعد المتاحة" editable={!busy} value={schoolSeats} onChangeText={setSchoolSeats} keyboardType="number-pad" maxLength={1} style={styles.budgetInput} placeholder="2" />{fieldErrors.budget ? <Text accessibilityRole="alert" style={styles.error}>{fieldErrors.budget}</Text> : null}</View> : null}
+                {schoolMode === 'offer' ? <View style={styles.field}><Text style={styles.label}>المقاعد المتاحة (1–8)</Text><TextInput accessibilityLabel="عدد المقاعد المتاحة" editable={!busy} value={schoolSeats} onChangeText={value => { setSchoolSeats(value); setFieldErrors(previous => ({ ...previous, budget: undefined })); }} keyboardType="number-pad" maxLength={1} style={styles.budgetInput} placeholder="2" />{fieldErrors.budget ? <Text accessibilityRole="alert" style={styles.error}>{fieldErrors.budget}</Text> : null}</View> : null}
                 <View style={styles.schoolSafety}>
-                  <ShieldCheck size={18} color="#047857" />
+                  <ShieldCheck size={18} color={colors.primary} />
                   <Text style={styles.schoolSafetyText}>لا تكتب اسم طالب، اسم مدرسة محددة، رقم جوال، عنوان منزل أو وقت الالتقاء الدقيق. نسّقها برسالة خاصة مع طرف موثوق، وتحقق من التصاريح المناسبة قبل الاتفاق.</Text>
                 </View>
               </View>
             ) : null}
             <View style={styles.field}>
               <View style={styles.labelRow}><Text style={styles.label}>{postType === 'school_transport' ? 'ملاحظات عامة آمنة' : 'التفاصيل'} <Text style={styles.optional}>(اختياري)</Text></Text><Text style={styles.count}>{body.length.toLocaleString('ar-SA')} / ١٢٠٠</Text></View>
-              <TextInput testID="post-body" accessibilityLabel="تفاصيل المنشور" editable={!busy} multiline maxLength={1200} value={body} onChangeText={setBody} placeholder={postType === 'school_transport' ? 'مثال: الأفضل سيارة عائلية، والتنسيق برسائل حيّنا فقط.' : 'اكتب التفاصيل اللي تساعد جيرانك يفهمون طلبك…'} placeholderTextColor="#8a9b91" style={styles.bodyInput} textAlignVertical="top" />
+              <TextInput ref={bodyRef} testID="post-body" accessibilityLabel="تفاصيل المنشور" editable={!busy} multiline maxLength={1200} value={body} onChangeText={value => { setBody(value); if (postType === 'school_transport') setFieldErrors(previous => ({ ...previous, title: undefined })); }} placeholder={postType === 'school_transport' ? 'مثال: الأفضل سيارة عائلية، والتنسيق برسائل حيّنا فقط.' : 'اكتب التفاصيل اللي تساعد جيرانك يفهمون طلبك…'} placeholderTextColor={colors.muted} style={styles.bodyInput} textAlignVertical="top" />
             </View>
-            {postType === 'help' ? <View style={styles.field}><Text style={styles.label}>مكافأة رمزية بالريال <Text style={styles.optional}>(اختياري)</Text></Text><TextInput testID="post-budget" accessibilityLabel="مكافأة اختيارية بالريال السعودي" editable={!busy} keyboardType="decimal-pad" value={budget} onChangeText={value => { setBudget(value); setFieldErrors(previous => ({ ...previous, budget: undefined })); }} placeholder="بدون مقابل" placeholderTextColor="#8a9b91" style={[styles.budgetInput, fieldErrors.budget && styles.invalidInput]} />{fieldErrors.budget ? <Text accessibilityRole="alert" style={styles.error}>{fieldErrors.budget}</Text> : null}</View> : null}
+            {postType === 'help' ? <View style={styles.field}><Text style={styles.label}>مكافأة رمزية بالريال <Text style={styles.optional}>(اختياري)</Text></Text><TextInput testID="post-budget" accessibilityLabel="مكافأة اختيارية بالريال السعودي" editable={!busy} keyboardType="decimal-pad" value={budget} onChangeText={value => { setBudget(value); setFieldErrors(previous => ({ ...previous, budget: undefined })); }} placeholder="بدون مقابل" placeholderTextColor={colors.muted} style={[styles.budgetInput, fieldErrors.budget && styles.invalidInput]} />{fieldErrors.budget ? <Text accessibilityRole="alert" style={styles.error}>{fieldErrors.budget}</Text> : null}</View> : null}
             {postType !== 'school_transport' ? <View style={styles.templates}>
-              <Text style={styles.templatesLabel}>ابدأ بقالب جاهز</Text>
-              <View style={styles.templateList}>{QUICK_TEMPLATES.filter(template => template.type === postType).map(template => <Pressable oasisKind="chip" key={template.title} accessibilityRole="button" accessibilityLabel={`استخدام قالب ${template.label}`} disabled={busy} onPress={() => { setTitle(template.title); setBody(template.body); setFieldErrors(previous => ({ ...previous, title: undefined })); }} style={({ pressed }) => [styles.templateChip, pressed && styles.pressed]}><Text style={styles.templateText}>{template.label}</Text></Pressable>)}</View>
+              <Pressable oasisKind="plain" onPress={() => setShowTemplates(value => !value)} accessibilityRole="button" accessibilityState={{ expanded: showTemplates }} style={styles.disclosure}><LayoutTemplate size={16} color={colors.primary} /><Text style={styles.disclosureText}>ابدأ بقالب جاهز</Text><ChevronDown size={16} color={colors.muted} style={showTemplates ? { transform: [{ rotate: '180deg' }] } : undefined} /></Pressable>
+              {showTemplates ? <View style={styles.templateList}>{QUICK_TEMPLATES.filter(template => template.type === postType).map(template => <Pressable oasisKind="plain" key={template.title} accessibilityRole="button" accessibilityLabel={`استخدام قالب ${template.label}`} disabled={busy} onPress={() => { if ((title.trim() || body.trim()) && (title !== template.title || body !== template.body)) { Alert.alert('استبدال النص بالقالب؟', 'سيتم استبدال العنوان والتفاصيل الحالية.', [{ text: 'إلغاء', style: 'cancel' }, { text: 'استخدام القالب', onPress: () => { setTitle(template.title); setBody(template.body); setShowTemplates(false); } }]); return; } setTitle(template.title); setBody(template.body); setShowTemplates(false); setFieldErrors(previous => ({ ...previous, title: undefined })); }} style={({ pressed }) => [styles.templateChip, pressed && styles.pressed]}><Text style={styles.templateText}>{template.label}</Text></Pressable>)}</View> : null}
             </View> : null}
             {safetyCheck?.isEmergency || postType === 'emergency' ? <View style={styles.notice}><AlertTriangle size={18} color="#9a5b12" /><Text style={styles.noticeText}>إذا كانت هناك خطورة مباشرة، تواصل مع الجهة المختصة أولًا.</Text></View> : null}
             {safetyCheck?.isSpam ? <View style={styles.notice}><ShieldAlert size={18} color="#9a5b12" /><Text style={styles.noticeText}>{safetyCheck.spamReason || 'راجع المحتوى قبل النشر.'}</Text></View> : null}
@@ -514,15 +501,15 @@ export default function AskScreen() {
                 <Text style={styles.locationValue}>{city ? [city, district && `حي ${district}`].filter(Boolean).join(' · ') : 'لم يتم تحديد المدينة'}</Text>
                 <Text style={styles.locationHint}>نشارك المدينة والحي فقط، وليس إحداثياتك الدقيقة.</Text>
               </View>
-              <Pressable accessibilityRole="button" accessibilityLabel="تحديث الموقع" onPress={() => setEditingLocation(true)} style={styles.locationChange}><MapPin size={17} color={OASIS.colors.primary} /><Text style={styles.locationChangeText}>تحديث</Text></Pressable>
+              <Pressable oasisKind="plain" accessibilityRole="button" disabled={busy} accessibilityLabel="تعديل موقع النشر" onPress={() => setEditingLocation(true)} style={styles.locationChange}><MapPin size={17} color={colors.primary} /><Text style={styles.locationChangeText}>تعديل</Text></Pressable>
             </View>
-            <View style={styles.previewCard}>
-              <View style={styles.previewHeader}><Eye size={16} color={OASIS.colors.primary} /><Text style={styles.previewHeaderText}>معاينة المنشور</Text></View>
+            <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="معاينة المنشور" accessibilityState={{ expanded: showPreview }} onPress={() => setShowPreview(value => !value)} style={styles.disclosure}><Eye size={16} color={colors.primary} /><Text style={styles.disclosureText}>معاينة المنشور</Text><ChevronDown size={16} color={colors.muted} style={showPreview ? { transform: [{ rotate: '180deg' }] } : undefined} /></Pressable>
+            {showPreview ? <View style={styles.previewCard}>
               <Text style={styles.previewTitle}>{publishTitle || 'عنوان منشورك يظهر هنا'}</Text>
               <Text style={styles.previewBody} numberOfLines={4}>{postType === 'school_transport' ? `${schoolMode === 'need' ? 'طلب توصيل' : 'عرض مقاعد'} · ${schoolLevel} · ${SCHOOL_TRIPS.find(item => item.key === schoolTrip)?.label} · ${schoolDays.join('، ')}${schoolMode === 'offer' ? ` · ${schoolSeats} مقعد` : ''}` : body.trim() || 'تفاصيل المنشور تظهر هنا'}</Text>
               <Text style={styles.previewLocation}>{city || 'المدينة'}{district ? ` · ${district}` : ''}</Text>
-            </View>
-            {fieldErrors.title ? <Text accessibilityRole="alert" style={styles.error}>{fieldErrors.title}</Text> : null}
+            </View> : null}
+            {postType === 'school_transport' && fieldErrors.title ? <Text accessibilityRole="alert" style={styles.error}>{fieldErrors.title}</Text> : null}
             {fieldErrors.city ? <Text accessibilityRole="alert" style={styles.error}>{fieldErrors.city}</Text> : null}
           </View>
         )}
@@ -530,11 +517,11 @@ export default function AskScreen() {
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) }]}>
         <View style={styles.footerContent}>
           <View style={styles.audience}><Users size={15} color="#73877a" /><Text style={styles.audienceText}>{postType === 'school_transport' ? 'توصيل المدارس · بدون بيانات أطفال' : 'لجيران حيّك'}</Text></View>
-          <Pressable oasisVariant="primary" oasisKind="action" testID="ask-primary" accessibilityRole="button" accessibilityLabel={step === 1 ? 'التالي، كتابة التفاصيل' : 'نشر في الحي'} accessibilityState={{ disabled: busy, busy }} disabled={busy} onPress={() => { if (step === 1) changeStep(2); else void save(); }} style={({ pressed }) => [styles.primary, (busy || pressed) && styles.pressed]}>
+          <Pressable oasisKind="plain" testID="ask-primary" accessibilityRole="button" accessibilityLabel={step === 1 ? 'التالي، كتابة التفاصيل' : 'نشر في الحي'} accessibilityState={{ disabled: busy, busy }} disabled={busy} onPress={() => { if (step === 1) changeStep(2); else void save(); }} style={({ pressed }) => [styles.primary, (busy || pressed) && styles.pressed]}>
 
-            {busy ? <ActivityIndicator color={OASIS.colors.surface} size="small" /> : null}
-            <Text style={styles.primaryText}>{busy ? 'جارٍ النشر…' : step === 1 ? 'التالي · تفاصيل المنشور' : postType === 'school_transport' ? 'نشر طلب التوصيل' : 'نشر في الحي'}</Text>
-            {!busy && step === 1 ? <ArrowLeft size={18} color={OASIS.colors.surface} /> : null}
+            {busy ? <ActivityIndicator color="#FFFFFF" size="small" /> : null}
+            <Text style={styles.primaryText}>{busy ? 'جارٍ النشر…' : step === 1 ? 'التالي' : postType === 'school_transport' ? 'نشر طلب التوصيل' : 'نشر في الحي'}</Text>
+            {!busy && step === 1 ? <ArrowLeft size={18} color="#FFFFFF" /> : null}
           </Pressable>
         </View>
       </View>
@@ -556,89 +543,83 @@ export default function AskScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: OASIS.colors.surface },
+function createStyles(c: OasisColors) { return StyleSheet.create({
+  screen: { flex: 1, backgroundColor: 'transparent' },
   scroll: { flex: 1 },
-  content: { flexGrow: 1, padding: 14, paddingBottom: 16, width: '100%', maxWidth: 560, alignSelf: 'center' },
-  progress: { direction: 'ltr', flexDirection: 'row-reverse', gap: 7, marginBottom: 16 },
-  progressSegment: { flex: 1, height: 4, borderRadius: 4, backgroundColor: '#eaf0ec' },
-  progressActive: { backgroundColor: OASIS.colors.primary },
-  heading: { color: '#17372a', fontSize: 22, lineHeight: 31, fontWeight: '700', textAlign: 'right', writingDirection: 'rtl' },
-  subtitle: { color: '#74867a', fontSize: 14, lineHeight: 23, textAlign: 'right', marginTop: 5, marginBottom: 16, writingDirection: 'rtl' },
-  typeGrid: { direction: 'ltr', flexDirection: 'row-reverse', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 12 },
-  typeCard: { width: '48%', minHeight: 116, backgroundColor: '#f6f8f6', borderRadius: 14, borderWidth: 1.5, borderColor: '#f0f4f1', padding: 14, alignItems: 'flex-end' },
-  emergencyType: { width: '100%', minHeight: 104 },
-  wideType: { width: '100%', minHeight: 96 },
-  typeSelected: { backgroundColor: '#edf7f1', borderColor: OASIS.colors.primary },
-  typeTop: { direction: 'ltr', flexDirection: 'row-reverse', width: '100%', justifyContent: 'space-between', alignItems: 'center', marginBottom: 13 },
-  typeIcon: { width: 32, height: 32, backgroundColor: '#eaf0ec', borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  typeIconSelected: { backgroundColor: '#d7eddf' },
+  content: { flexGrow: 1, padding: 18, paddingBottom: 22, width: '100%', maxWidth: 560, alignSelf: 'center' },
+  progress: { direction: 'ltr', flexDirection: 'row-reverse', alignItems: 'center', gap: 9, marginBottom: 18 },
+  stepLabel: { fontSize: 11, color: c.muted, fontWeight: '500' },
+  stepActive: { color: c.primary, fontWeight: '700' },
+  stepConnector: { width: 26, height: 1, backgroundColor: c.line },
+  disclosure: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, minHeight: 44, paddingHorizontal: 3 },
+  disclosureText: { flex: 1, fontSize: 12, color: c.primary, textAlign: 'right', fontWeight: '600' },
+  heading: { color: c.ink, fontSize: 21, lineHeight: 31, fontWeight: '700', textAlign: 'right', writingDirection: 'rtl' },
+  subtitle: { color: c.muted, fontSize: 12, lineHeight: 21, textAlign: 'right', marginTop: 4, marginBottom: 20, writingDirection: 'rtl' },
+  typeGrid: { direction: 'ltr', flexDirection: 'row-reverse', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 10 },
+  typeCard: { width: '48.5%', minHeight: 112, backgroundColor: c.surface, borderRadius: 17, borderWidth: 1, borderColor: c.line, padding: 12, alignItems: 'flex-end' },
+  typeSelected: { backgroundColor: c.soft, borderColor: OASIS.colors.primary },
+  typeTop: { direction: 'ltr', flexDirection: 'row-reverse', width: '100%', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  typeIcon: { width: 32, height: 32, backgroundColor: c.soft, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  typeIconSelected: { backgroundColor: c.soft },
   selection: { width: 19, height: 19, borderRadius: 10, borderWidth: 1, borderColor: '#cedbd2', alignItems: 'center', justifyContent: 'center' },
-  selectionActive: { backgroundColor: OASIS.colors.primary, borderColor: OASIS.colors.primary },
-  typeLabel: { color: '#254333', fontSize: 17, fontWeight: '600', textAlign: 'right' },
-  selectedText: { color: OASIS.colors.primary },
-  typeHint: { fontSize: 11, lineHeight: 18, color: '#74867a', textAlign: 'right', marginTop: 4, writingDirection: 'rtl' },
+  selectionActive: { backgroundColor: '#047857', borderColor: '#047857' },
+  typeLabel: { color: c.ink, fontSize: 14, fontWeight: '600', textAlign: 'right' },
+  selectedText: { color: c.primary },
+  typeHint: { fontSize: 10, lineHeight: 17, color: c.muted, textAlign: 'right', marginTop: 3, writingDirection: 'rtl' },
   details: { gap: 14 },
-  selectedRow: { direction: 'ltr', flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#edf7f1', borderRadius: 15, paddingHorizontal: 14, minHeight: 52 },
+  selectedRow: { direction: 'ltr', flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', backgroundColor: c.soft, borderRadius: 15, paddingHorizontal: 14, minHeight: 52 },
   selectedIdentity: { direction: 'ltr', flexDirection: 'row-reverse', gap: 8, alignItems: 'center' },
-  selectedName: { fontSize: 14, fontWeight: '600', color: OASIS.colors.primary },
-  changeText: { fontSize: 12, color: OASIS.colors.primary },
+  selectedName: { fontSize: 14, fontWeight: '600', color: c.primary },
+  changeText: { fontSize: 12, color: c.primary },
   field: { gap: 9 },
   labelRow: { direction: 'ltr', flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
-  label: { fontSize: 13, fontWeight: '600', color: '#254333', textAlign: 'right' },
-  optional: { fontWeight: '400', color: '#839287', fontSize: 11 },
-  count: { fontSize: 11, color: '#839287' },
-  titleInput: { fontSize: 17, lineHeight: 27, minHeight: 44, borderBottomWidth: 1, borderColor: '#e1e9e3', paddingVertical: 12, color: '#17372a', textAlign: 'right', writingDirection: 'rtl' },
-  bodyInput: { minHeight: 120, borderRadius: 17, backgroundColor: '#f6f8f6', padding: 14, fontSize: 16, lineHeight: 27, color: '#17372a', textAlign: 'right', writingDirection: 'rtl' },
-  budgetInput: { borderWidth: 1, borderColor: '#e1e9e3', borderRadius: 14, minHeight: 44, padding: 12, fontSize: 16, color: '#17372a', textAlign: 'right' },
+  label: { fontSize: 13, fontWeight: '600', color: c.ink, textAlign: 'right' },
+  optional: { fontWeight: '400', color: c.muted, fontSize: 11 },
+  count: { fontSize: 11, color: c.muted },
+  titleInput: { fontSize: 16, lineHeight: 25, minHeight: 50, borderWidth: 1, borderRadius: 13, backgroundColor: c.surface, borderColor: c.line, padding: 12, color: c.ink, textAlign: 'right', writingDirection: 'rtl' },
+  bodyInput: { minHeight: 128, borderRadius: 13, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface, padding: 12, fontSize: 16, lineHeight: 26, color: c.ink, textAlign: 'right', writingDirection: 'rtl' },
+  budgetInput: { borderWidth: 1, borderColor: c.line, backgroundColor: c.surface, borderRadius: 14, minHeight: 44, padding: 12, fontSize: 16, color: c.ink, textAlign: 'right' },
   invalidInput: { borderColor: '#c2413a' },
   templates: { gap: 10 },
-  templatesLabel: { fontSize: 12, color: '#74867a', textAlign: 'right' },
   templateList: { direction: 'ltr', flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 },
-  templateChip: { minHeight: 44, borderWidth: 1, borderColor: '#e1e9e3', borderRadius: 13, paddingHorizontal: 12, paddingVertical: 10, justifyContent: 'center' },
-  templateText: { fontSize: 12, color: '#52685d', textAlign: 'right' },
-  notice: { direction: 'ltr', flexDirection: 'row-reverse', alignItems: 'flex-start', gap: 9, backgroundColor: '#fff8eb', borderRadius: 14, padding: 13 },
-  noticeText: { flex: 1, fontSize: 12, lineHeight: 21, color: '#855d25', textAlign: 'right', writingDirection: 'rtl' },
-  error: { fontSize: 12, lineHeight: 21, color: '#b73535', textAlign: 'right', writingDirection: 'rtl' },
-  footer: { borderTopWidth: 1, borderTopColor: '#eef2ef', backgroundColor: OASIS.colors.surface, paddingHorizontal: 22, paddingTop: 12 },
-  footerContent: { width: '100%', maxWidth: 516, alignSelf: 'center', gap: 11 },
+  templateChip: { minHeight: 44, borderWidth: 1, borderColor: c.line, borderRadius: 13, paddingHorizontal: 12, paddingVertical: 10, justifyContent: 'center' },
+  templateText: { fontSize: 12, color: c.muted, textAlign: 'right' },
+  notice: { direction: 'ltr', flexDirection: 'row-reverse', alignItems: 'flex-start', gap: 9, backgroundColor: c.warningSoft, borderRadius: 14, padding: 13 },
+  noticeText: { flex: 1, fontSize: 12, lineHeight: 21, color: c.warning, textAlign: 'right', writingDirection: 'rtl' },
+  error: { fontSize: 12, lineHeight: 21, color: c.danger, textAlign: 'right', writingDirection: 'rtl' },
+  footer: { borderTopWidth: 1, borderTopColor: c.line, backgroundColor: c.surface, paddingHorizontal: 18, paddingTop: 10 },
+  footerContent: { width: '100%', maxWidth: 524, alignSelf: 'center', gap: 7 },
   audience: { direction: 'ltr', flexDirection: 'row-reverse', gap: 5, alignItems: 'center', justifyContent: 'center' },
-  audienceText: { fontSize: 11, color: '#73877a' },
-  primary: { direction: 'ltr', flexDirection: 'row-reverse', gap: 9, alignItems: 'center', justifyContent: 'center', minHeight: 52, padding: 14, backgroundColor: 'transparent', borderRadius: 0 },
-  primaryText: { color: OASIS.colors.surface, fontSize: 16, fontWeight: '600' },
-  introNote: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, borderRadius: 18, backgroundColor: '#ECF7F0', padding: 15, marginBottom: 17, borderWidth: 1, borderColor: '#D4EBDC' },
-  introIcon: { width: 39, height: 39, borderRadius: 14, backgroundColor: '#D5EFDD', justifyContent: 'center', alignItems: 'center' },
-  introTitle: { color: OASIS.colors.deep, fontSize: 14, fontWeight: '800', textAlign: 'right' },
-  introDesc: { color: '#547263', fontSize: 11.5, lineHeight: 20, textAlign: 'right', marginTop: 3 },
-  schoolHeading: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, padding: 13, borderRadius: 16, backgroundColor: '#EDF8F0' },
-  schoolHeadingTitle: { textAlign: 'right', color: '#064E3B', fontWeight: '800', fontSize: 15 },
-  schoolHeadingDesc: { textAlign: 'right', color: '#567467', fontSize: 11.5, lineHeight: 19, marginTop: 2 },
-  schoolPanel: { borderRadius: 20, borderColor: '#DDEBE2', borderWidth: 1, backgroundColor: '#FAFCFA', padding: 15, gap: 13 },
+  audienceText: { fontSize: 11, color: c.muted },
+  primary: { direction: 'ltr', flexDirection: 'row-reverse', gap: 9, alignItems: 'center', justifyContent: 'center', minHeight: 48, padding: 12, backgroundColor: '#047857', borderRadius: 24 },
+  primaryText: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
+  schoolHeading: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, padding: 13, borderRadius: 16, backgroundColor: c.soft },
+  schoolHeadingTitle: { textAlign: 'right', color: c.primary, fontWeight: '800', fontSize: 15 },
+  schoolHeadingDesc: { textAlign: 'right', color: c.muted, fontSize: 11.5, lineHeight: 19, marginTop: 2 },
+  schoolPanel: { borderRadius: 20, borderColor: c.line, borderWidth: 1, backgroundColor: c.surface, padding: 15, gap: 13 },
   schoolRow: { flexDirection: 'row-reverse', gap: 9 },
-  modeCard: { flex: 1, minHeight: 76, borderRadius: 14, borderColor: '#DFE8E2', borderWidth: 1, backgroundColor: '#FFFFFF', padding: 11, alignItems: 'flex-end', justifyContent: 'center' },
-  modeActive: { borderColor: '#059669', backgroundColor: '#E8F7EF', borderWidth: 2 },
-  modeTitle: { color: '#3B5548', textAlign: 'right', fontSize: 12.5, fontWeight: '700' },
-  modeTitleActive: { color: '#047857' },
-  modeHint: { fontSize: 10, color: '#6B8174', lineHeight: 17, textAlign: 'right', marginTop: 3 },
+  modeCard: { flex: 1, minHeight: 76, borderRadius: 14, borderColor: c.line, borderWidth: 1, backgroundColor: c.surface, padding: 11, alignItems: 'flex-end', justifyContent: 'center' },
+  modeActive: { borderColor: '#059669', backgroundColor: c.soft, borderWidth: 2 },
+  modeTitle: { color: c.ink, textAlign: 'right', fontSize: 12.5, fontWeight: '700' },
+  modeTitleActive: { color: c.primary },
+  modeHint: { fontSize: 10, color: c.muted, lineHeight: 17, textAlign: 'right', marginTop: 3 },
   optionWrap: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 7 },
-  optionChip: { minHeight: 39, borderRadius: 12, borderWidth: 1, borderColor: '#E0E9E2', paddingHorizontal: 13, paddingVertical: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  optionChip: { minHeight: 39, borderRadius: 12, borderWidth: 1, borderColor: c.line, paddingHorizontal: 13, paddingVertical: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: c.surface },
   optionActive: { backgroundColor: '#047857', borderColor: '#047857' },
-  optionText: { color: '#496255', fontSize: 12, fontWeight: '600' },
+  optionText: { color: c.muted, fontSize: 12, fontWeight: '600' },
   optionTextActive: { color: '#FFFFFF' },
-  schoolSafety: { flexDirection: 'row-reverse', alignItems: 'flex-start', gap: 9, backgroundColor: '#EAF8F1', borderRadius: 13, padding: 13 },
-  schoolSafetyText: { flex: 1, color: '#16553F', fontSize: 11.5, lineHeight: 20, textAlign: 'right' },
-  locationCard: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#F1F6F2', borderWidth: 1, borderColor: '#E1E9E3', borderRadius: 15, padding: 13, gap: 9 },
+  schoolSafety: { flexDirection: 'row-reverse', alignItems: 'flex-start', gap: 9, backgroundColor: c.soft, borderRadius: 13, padding: 13 },
+  schoolSafetyText: { flex: 1, color: c.primary, fontSize: 11.5, lineHeight: 20, textAlign: 'right' },
+  locationCard: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', backgroundColor: c.soft, borderWidth: 1, borderColor: c.line, borderRadius: 15, padding: 13, gap: 9 },
   locationText: { alignItems: 'flex-end', flex: 1 },
-  locationTitle: { color: '#506C5A', textAlign: 'right', fontSize: 11, fontWeight: '600' },
-  locationValue: { color: '#143F2C', fontSize: 13, textAlign: 'right', fontWeight: '800', marginTop: 4 },
-  locationHint: { color: '#718777', textAlign: 'right', fontSize: 10.5, marginTop: 4 },
-  locationChange: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, minHeight: 40, backgroundColor: '#DCF3E5', paddingHorizontal: 11, borderRadius: 12 },
-  locationChangeText: { color: '#047857', fontWeight: '700', fontSize: 11.5 },
-  previewCard: { backgroundColor: '#FFFFFF', borderRadius: 18, padding: 15, borderWidth: 1, borderColor: '#D7E7DC', gap: 8 },
-  previewHeader: { flexDirection: 'row-reverse', alignItems: 'center', gap: 7, paddingBottom: 4 },
-  previewHeaderText: { color: '#047857', fontWeight: '800', fontSize: 12 },
-  previewTitle: { textAlign: 'right', color: '#103B27', fontSize: 15, fontWeight: '800', lineHeight: 25 },
-  previewBody: { textAlign: 'right', color: '#4A6254', fontSize: 12, lineHeight: 21 },
-  previewLocation: { textAlign: 'right', color: '#799083', fontSize: 11 },
+  locationTitle: { color: c.muted, textAlign: 'right', fontSize: 11, fontWeight: '600' },
+  locationValue: { color: c.ink, fontSize: 13, textAlign: 'right', fontWeight: '800', marginTop: 4 },
+  locationHint: { color: c.muted, textAlign: 'right', fontSize: 10.5, marginTop: 4 },
+  locationChange: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, minHeight: 40, backgroundColor: c.soft, paddingHorizontal: 11, borderRadius: 12 },
+  locationChangeText: { color: c.primary, fontWeight: '700', fontSize: 11.5 },
+  previewCard: { backgroundColor: c.surface, borderRadius: 18, padding: 15, borderWidth: 1, borderColor: c.line, gap: 8 },
+  previewTitle: { textAlign: 'right', color: c.ink, fontSize: 15, fontWeight: '800', lineHeight: 25 },
+  previewBody: { textAlign: 'right', color: c.muted, fontSize: 12, lineHeight: 21 },
+  previewLocation: { textAlign: 'right', color: c.muted, fontSize: 11 },
   pressed: { opacity: 0.65 },
-});
+}); }

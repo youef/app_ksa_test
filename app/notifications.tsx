@@ -251,7 +251,7 @@ export default function Notifications() {
   const unreadCount = items.filter(i => !i.read_at && i.type !== 'message' && i.target_type !== 'conversation').length;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <AppHeader
         variant="sub"
         title="مركز الإشعارات"

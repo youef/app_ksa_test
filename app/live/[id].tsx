@@ -712,12 +712,12 @@ export default function LiveRoomScreen() {
     return items;
   }, [mediaRole, mediaState, guestMutedByHost]);
 
-  if (loading) return <View style={styles.loadingScreen}><StatusBar hidden /><ActivityIndicator size="large" color="#34d399" /><Text style={styles.loadingText}>جارٍ تجهيز البث…</Text></View>;
+  if (loading) return <View style={[styles.loadingScreen, { backgroundColor: 'rgba(7,28,19,.82)' }]}><StatusBar hidden /><ActivityIndicator size="large" color="#34d399" /><Text style={styles.loadingText}>جارٍ تجهيز البث…</Text></View>;
   if (ending) return <EndedOverlay reason={endReason} countdown={endCountdown} hostName={hostName} nextStream={nextStream} noMoreStreams={noMoreStreams} onNext={goToNextStream} onBrowse={() => router.replace('/lives')} panHandlers={endSwipe.panHandlers} />;
-  if (error || !stream) return <View style={styles.errorScreen}><StatusBar hidden /><View style={styles.errorIcon}><Radio color={OASIS.colors.surface} size={30} /></View><Text style={styles.errorTitle}>{error || 'تعذر فتح البث'}</Text><Text style={styles.errorHint}>تأكد من الاتصال بالإنترنت وحاول مرة أخرى.</Text><Pressable oasisKind="action" onPress={() => router.replace('/lives')} style={styles.returnButton}><Text style={styles.returnText}>العودة للبثوث</Text></Pressable></View>;
+  if (error || !stream) return <View style={[styles.errorScreen, { backgroundColor: 'rgba(7,28,19,.82)' }]}><StatusBar hidden /><View style={styles.errorIcon}><Radio color={OASIS.colors.surface} size={30} /></View><Text style={styles.errorTitle}>{error || 'تعذر فتح البث'}</Text><Text style={styles.errorHint}>تأكد من الاتصال بالإنترنت وحاول مرة أخرى.</Text><Pressable oasisKind="action" onPress={() => router.replace('/lives')} style={styles.returnButton}><Text style={styles.returnText}>العودة للبثوث</Text></Pressable></View>;
 
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { backgroundColor: 'transparent' }]}>
       <StatusBar hidden />
       <View style={styles.stage}>
         <LiveMedia

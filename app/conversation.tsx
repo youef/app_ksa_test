@@ -684,7 +684,7 @@ export default function Conversation() {
 
   if (loading || resolvingConv) {
     return (
-      <View style={styles.center}>
+      <View style={[styles.center, { backgroundColor: 'transparent' }]}>
         <ActivityIndicator size="large" color={OASIS.colors.primary} />
       </View>
     );
@@ -692,12 +692,9 @@ export default function Conversation() {
 
   return (
     <KeyboardAvoidingView
-      style={[
-        styles.container,
-        Platform.OS === 'web' && webViewport
+      style={[styles.container, Platform.OS === 'web' && webViewport
           ? ({ position: 'fixed', top: webViewport.top, height: webViewport.height, minHeight: 0 } as any)
-          : null,
-      ]}
+          : null, { backgroundColor: 'transparent' }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ChatHeader

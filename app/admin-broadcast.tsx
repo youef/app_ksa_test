@@ -81,7 +81,7 @@ export default function AdminBroadcastScreen() {
   const previewBody = tab === 'welcome' ? welcome.body : body;
   const card = [s.card, { backgroundColor: c.surface, borderColor: c.line }];
   const input = [s.input, { color: c.ink, backgroundColor: c.background, borderColor: c.line }];
-  return <View style={{ flex: 1, backgroundColor: c.background }}>
+  return <View style={[{ flex: 1, backgroundColor: c.background }, { backgroundColor: 'transparent' }]}>
     <AppHeader variant="sub" title="مركز تواصل المنصة" subtitle="ترحيب تلقائي وتحديثات رسمية" fallbackRoute="/admin" />
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={[s.content, { paddingBottom: bottom + 24 }]}>
       {!ready ? <ActivityIndicator color={c.primary} /> : null}

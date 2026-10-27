@@ -206,7 +206,7 @@ export default function Questions() {
   useEffect(() => { if (queryLimit > 80) void loadQuestions(activeLoc); }, [queryLimit]);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <AppHeader
         variant="sub"
         title="استفسارات الجيران"
@@ -215,10 +215,10 @@ export default function Questions() {
       />
 
       <ScrollView
-        style={styles.container}
+        style={[styles.container, { backgroundColor: 'transparent' }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={[styles.feedContent, { paddingBottom: bottomNavInset + 24 }]}
+        contentContainerStyle={[styles.feedContent, { paddingBottom: bottomNavInset + 24, backgroundColor: 'transparent' }]}
         onMomentumScrollEnd={({ nativeEvent }) => {
           const { contentOffset, contentSize, layoutMeasurement } = nativeEvent;
           const nearBottom = contentOffset.y + layoutMeasurement.height >= contentSize.height - 180;

@@ -107,7 +107,7 @@ export default function StorySettingsScreen() {
   const customNotificationsCount = people.filter(person => prefs[person.id]?.notifications_enabled === false).length;
 
   return (
-    <View style={s.screen}>
+    <View style={[s.screen, { backgroundColor: 'transparent' }]}>
       <AppHeader variant="sub" title="إعدادات القصص" subtitle="التنبيهات والخصوصية" fallbackRoute="/stories"
         rightAction={<View style={s.headerIcon}><Settings2 size={19} color={OASIS.colors.primary} /></View>} />
       <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>

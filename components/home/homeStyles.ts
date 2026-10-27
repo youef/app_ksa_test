@@ -318,7 +318,7 @@ export const styles = StyleSheet.create({
 
   // Upgraded Stories Section
   storiesContainer: {
-    paddingVertical: 8,
+    paddingVertical: 4,
     backgroundColor: 'rgba(255,255,255,0.58)',
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.82)',
@@ -397,8 +397,8 @@ export const styles = StyleSheet.create({
     marginBottom: 5,
   },
   storyGradientRing: {
-    width: 50,
-    height: 50,
+    width: 44,
+    height: 44,
     borderRadius: 25,
     padding: 2.5,
     justifyContent: 'center',

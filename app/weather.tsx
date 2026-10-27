@@ -459,7 +459,7 @@ export default function WeatherScreen() {
   };
 
   return (
-    <View style={screenStyles.container}>
+    <View style={[screenStyles.container, { backgroundColor: 'transparent' }]}>
       <AppHeader
         variant="sub"
         title="طقس الحي"

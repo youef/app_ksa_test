@@ -1,9 +1,8 @@
-import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
+import { OasisPressable as Pressable } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
-import { HeaderAction } from '@/components/shared/AppHeader';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { Alert, Dimensions, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View, ActivityIndicator, PanResponder } from 'react-native';
+import { Alert, Image, KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, View, ActivityIndicator, PanResponder } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -28,12 +27,12 @@ import {
   LayoutTemplate,
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
-import { containsProfanity, findProfanity, banAccountOnViolation } from '@/lib/profanity';
+import { loadBannedWords } from '@/lib/profanity';
+import { findProhibitedStoryWord } from '@/lib/storyModeration';
 import { useStoryComposer } from '@/hooks/useStoryComposer';
 import { useStoryPublisher } from '@/hooks/useStoryPublisher';
 import { BG_GRADIENTS, getGradient } from '@/lib/storyGradients';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+import { storyComposerStyles as s } from '@/components/story/composerStyles';
 
 const WHATSAPP_FONTS = [
   { id: 'bold', name: 'عريض', fontWeight: '900' as const, fontStyle: 'normal' as const, isPill: false },
@@ -216,12 +215,9 @@ export default function CreateStory() {
       ...composer.slides.map((s: any) => s?.content || ''),
       pollQuestion, pollOptionA, pollOptionB, questionPrompt,
     ].join(' ');
-    const detected = findProfanity(storyText);
+    const detected = findProhibitedStoryWord({ content: storyText }, await loadBannedWords());
     if (detected) {
-      const auth = await supabase.auth.getUser();
-      if (auth.data.user) await banAccountOnViolation(auth.data.user.id, 'story', storyText, detected);
-      Alert.alert('تم حظر الحساب', 'تم اكتشاف محتوى مخالف في القصة. تم إغلاق حسابك.');
-      router.replace('/banned');
+      Alert.alert('تعذر نشر اليومية', 'تحتوي اليومية على كلمات ممنوعة. عدّل النص أو خيارات الاستطلاع ثم حاول مجددًا.');
       return;
     }
 
@@ -296,10 +292,29 @@ export default function CreateStory() {
 
   return (
     <KeyboardAvoidingView
-      style={s.container}
+      style={[s.container, { backgroundColor: 'transparent' }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 12 : 0}
     >
+      {Platform.OS === 'web' && <style>{`[data-testid="story-text-editor"], [data-testid="story-text-editor"]:focus {font-size:${fontSize}px !important;line-height:${Math.round(fontSize * 1.5)}px !important;outline:none !important;}`}</style>}
+      <View style={[s.editorHeader, { paddingTop: Math.max(12, safeInsets.top + 8) }]}>
+        <Pressable oasisKind="plain" disabled={publisher.publishing} onPress={() => router.canGoBack() ? router.back() : router.replace('/home')} accessibilityRole="button" accessibilityLabel="إغلاق إنشاء اليومية" style={s.composerCloseButton}>
+          <X size={21} color="#17664F" />
+        </Pressable>
+        <View style={s.editorHeading}><Text style={s.editorTitle}>يومية جديدة</Text><Text style={s.editorSubtitle}>لحظة منك، وحكاية لأهل حيّك</Text></View>
+        <View style={s.editorBrand}><Type size={20} color="#17664F" /></View>
+      </View>
+      <View style={s.modeBar}>
+        <View style={s.modeSwitcherPill}>
+          <Pressable oasisKind="plain" onPress={() => composer.patchActiveSlide({ type: 'text' })} style={[s.modeOption, !isImageSlide && s.modeOptionActive]} accessibilityRole="button" accessibilityLabel="يومية نصية" accessibilityState={{ selected: !isImageSlide }}>
+            <Type size={16} color={!isImageSlide ? '#17664F' : '#819087'} /><Text style={[s.modeOptionText, !isImageSlide && s.modeOptionTextActive]}>نص</Text>
+          </Pressable>
+          <Pressable oasisKind="plain" onPress={() => composer.patchActiveSlide({ type: 'image' })} style={[s.modeOption, isImageSlide && s.modeOptionActive]} accessibilityRole="button" accessibilityLabel="يومية مصورة" accessibilityState={{ selected: isImageSlide }}>
+            <ImageIcon size={16} color={isImageSlide ? '#17664F' : '#819087'} /><Text style={[s.modeOptionText, isImageSlide && s.modeOptionTextActive]}>صورة</Text>
+          </Pressable>
+        </View>
+        <View style={s.expiryNote}><Clock size={12} color="#7A8E81" /><Text style={s.expiryText}>تظهر لمدة ٢٤ ساعة</Text></View>
+      </View>
       {/* Immersive Creative Canvas */}
       <View style={s.canvasWrapper}>
         <LinearGradient
@@ -314,37 +329,26 @@ export default function CreateStory() {
             />
           )}
 
-          {/* Top WhatsApp Status Bar */}
-          <View style={[s.composerTopBar, { paddingTop: Math.max(12, safeInsets.top + 4) }]}>
-            <Pressable oasisKind="icon" onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="إغلاق إنشاء اليومية" style={s.composerCloseButton}>
-              <X size={24} color={OASIS.colors.surface} />
-            </Pressable>
-            <View style={s.modeSwitcherPill}>
-              <Pressable onPress={() => composer.setActiveSlideType('text')} style={[s.modeOption, !isImageSlide && s.modeOptionActive]} accessibilityRole="button" accessibilityLabel="يومية نصية">
-                <Text style={[s.modeOptionText, !isImageSlide && s.modeOptionTextActive]}>نص</Text>
-              </Pressable>
-              <Pressable onPress={() => composer.setActiveSlideType('image')} style={[s.modeOption, isImageSlide && s.modeOptionActive]} accessibilityRole="button" accessibilityLabel="يومية مصورة">
-                <Text style={[s.modeOptionText, isImageSlide && s.modeOptionTextActive]}>صورة</Text>
-              </Pressable>
-            </View>
-            <View style={s.composerTopSpacer} />
+          <View style={s.composerTopBar}>
+            <View style={s.previewHeading}><View style={s.previewDot} /><Text style={s.previewTitle}>معاينة اليومية</Text><Text style={s.previewCount}>{composer.activeIdx + 1} / {composer.slides.length}</Text></View>
+            <Pressable oasisKind="plain" accessibilityLabel="إضافة شريحة" disabled={composer.atCapacity} onPress={isImageSlide ? handlePickImages : composer.addTextSlide} style={s.addSlideButton}><Plus size={16} color="#FFFFFF" /></Pressable>
           </View>
           <View style={{paddingHorizontal: 16, alignItems: 'flex-end'}}><View style={s.topToolsRow}>
               {!isImageSlide ? (
                 <>
-                  <HeaderAction tone="overlay"
-                    onPress={() => setShowPalette(!showPalette)}
+                  <Pressable oasisKind="plain"
+                    onPress={() => { setShowPalette(v => !v); setShowTemplates(false); setShowStoryOptions(false); }}
                     style={[s.toolIconBtn, showPalette && s.toolIconBtnActive]}
                     hitSlop={8}
                     accessibilityRole="button"
                     accessibilityLabel="تغيير لون الخلفية"
                   >
                     <Palette size={19} color={OASIS.colors.surface} />
-                  </HeaderAction>
-                  <HeaderAction tone="overlay" onPress={() => setShowTemplates(v => !v)} style={[s.toolIconBtn, showTemplates && s.toolIconBtnActive]} accessibilityRole="button" accessibilityLabel="قوالب جاهزة">
+                  </Pressable>
+                  <Pressable oasisKind="plain" onPress={() => { setShowTemplates(v => !v); setShowPalette(false); setShowStoryOptions(false); }} style={[s.toolIconBtn, showTemplates && s.toolIconBtnActive]} accessibilityRole="button" accessibilityLabel="قوالب جاهزة">
                     <LayoutTemplate size={19} color={OASIS.colors.surface} />
-                  </HeaderAction>
-                  <HeaderAction tone="overlay"
+                  </Pressable>
+                  <Pressable oasisKind="plain"
                     onPress={handleCycleFont}
                     style={s.toolIconBtn}
                     hitSlop={8}
@@ -352,8 +356,8 @@ export default function CreateStory() {
                     accessibilityLabel="تغيير نمط الخط"
                   >
                     <Type size={19} color={OASIS.colors.surface} />
-                  </HeaderAction>
-                  <HeaderAction tone="overlay"
+                  </Pressable>
+                  <Pressable oasisKind="plain"
                     onPress={handleCycleAlign}
                     style={s.toolIconBtn}
                     hitSlop={8}
@@ -367,11 +371,11 @@ export default function CreateStory() {
                     ) : (
                       <AlignLeft size={18} color={OASIS.colors.surface} />
                     )}
-                  </HeaderAction>
+                  </Pressable>
                 </>
               ) : (
                 <>
-                  <HeaderAction tone="overlay"
+                  <Pressable oasisKind="plain"
                     onPress={handlePickImages}
                     style={s.toolIconBtn}
                     hitSlop={8}
@@ -379,11 +383,11 @@ export default function CreateStory() {
                     accessibilityLabel="اختيار صورة"
                   >
                     <ImageIcon size={19} color={OASIS.colors.surface} />
-                  </HeaderAction>
-                  {hasImage && <HeaderAction tone="overlay" onPress={() => void withAssetErrors(composer.cropActiveImage, 'قص الصورة')} style={s.toolIconBtn} accessibilityRole="button" accessibilityLabel="قص الصورة بنسبة تسعة إلى ستة عشر">
+                  </Pressable>
+                  {hasImage && <Pressable oasisKind="plain" onPress={() => void withAssetErrors(composer.cropActiveImage, 'قص الصورة')} style={s.toolIconBtn} accessibilityRole="button" accessibilityLabel="قص الصورة بنسبة تسعة إلى ستة عشر">
                     <Crop size={19} color={OASIS.colors.surface} />
-                  </HeaderAction>}
-                  <HeaderAction tone="overlay"
+                  </Pressable>}
+                  <Pressable oasisKind="plain"
                     onPress={handleTakePhoto}
                     style={s.toolIconBtn}
                     hitSlop={8}
@@ -391,18 +395,18 @@ export default function CreateStory() {
                     accessibilityLabel="التقاط بالكاميرا"
                   >
                     <Camera size={19} color={OASIS.colors.surface} />
-                  </HeaderAction>
+                  </Pressable>
                 </>
               )}
-              <HeaderAction tone="overlay"
-                onPress={() => setShowStoryOptions((value) => !value)}
+              <Pressable oasisKind="plain"
+                onPress={() => { setShowStoryOptions(v => !v); setShowPalette(false); setShowTemplates(false); }}
                 style={[s.toolIconBtn, showStoryOptions && s.toolIconBtnActive]}
                 hitSlop={8}
                 accessibilityRole="button"
                 accessibilityLabel="خيارات القصة والخصوصية"
               >
                 <SlidersHorizontal size={18} color={OASIS.colors.surface} />
-              </HeaderAction>
+              </Pressable>
             </View></View>
 
           {/* 24H Badge & Slide Info Notice */}
@@ -421,7 +425,7 @@ export default function CreateStory() {
           {/* Expandable Palette Selector Bar */}
           {!isImageSlide && showPalette && (
             <View style={s.paletteSelectorBox}>
-              <ScrollView style={{ direction: 'rtl' }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[s.paletteScroll, { direction: 'ltr' }]}>
+              <ScrollView  horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[s.paletteScroll]}>
                 {BG_GRADIENTS.map((g) => {
                   const isSelected = activeSlide.bgGradId === g.id;
                   return (
@@ -444,9 +448,9 @@ export default function CreateStory() {
           {showTemplates && !isImageSlide && (
             <View style={s.templatePanel}>
               <Text style={s.templateHeading}>قوالب جاهزة</Text>
-              <ScrollView style={{ direction: 'rtl' }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[s.templateRow, { direction: 'ltr' }]}>
+              <ScrollView  horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[s.templateRow]}>
                 {STORY_TEMPLATES.map(template => (
-                  <Pressable oasisKind="chip" key={template.label} onPress={() => applyTemplate(template)} style={s.templateChip} accessibilityRole="button" accessibilityLabel={`قالب ${template.label}`}>
+                  <Pressable oasisKind="plain" key={template.label} onPress={() => applyTemplate(template)} style={s.templateChip} accessibilityRole="button" accessibilityLabel={`قالب ${template.label}`}>
                     <Text style={s.templateChipText}>{template.label}</Text>
                   </Pressable>
                 ))}
@@ -456,12 +460,14 @@ export default function CreateStory() {
           {/* Central Content Area */}
           <View style={s.centralCanvas}>
             {!isImageSlide ? (
-              <OasisSurface oasisSurface="card" style={[s.textCanvasCard, currentFont.isPill && s.textCanvasCardPill]}>
+              <View style={[s.textCanvasCard, currentFont.isPill && s.textCanvasCardPill]}>
                 <View {...(dragResponder?.panHandlers ?? {})} style={[s.dragHandle, { transform: [{ translateX: textOffset.x }, { translateY: textOffset.y }] }]}>
                   <Move size={16} color={OASIS.colors.surface} />
                   <Text style={s.dragHandleText}>{Platform.OS === 'web' ? 'حرّك النص من إعدادات التنسيق' : 'اسحب لتحريك النص'}</Text>
                 </View>
                 <TextInput
+                  testID="story-text-editor"
+                  accessibilityLabel="نص اليومية"
                   style={[
                     s.whatsAppTextInput,
                     {
@@ -480,16 +486,16 @@ export default function CreateStory() {
                   value={activeSlide.content}
                   onChangeText={(text) => composer.patchActiveSlide({ content: text })}
                   onFocus={() => { setShowStoryOptions(false); setShowPalette(false); }}
-                  placeholder="اكتب حالتك أو استفسارك لأهل حيك هنا..."
-                  placeholderTextColor="rgba(255,255,255,0.65)"
+                  placeholder="وش حاب تشارك أهل حيّك؟"
+                  placeholderTextColor="rgba(255,255,255,0.75)"
                   multiline
                   maxLength={300}
                 />
-              </OasisSurface>
+              </View>
             ) : hasImage ? (
               <View style={s.imageCenterPlaceholder} />
             ) : (
-              <OasisSurface oasisSurface="card" style={s.emptyPhotoCard}>
+              <View style={s.emptyPhotoCard}>
                 <View style={s.emptyPhotoIconWrap}>
                   <UploadCloud size={34} color={OASIS.colors.primary} />
                 </View>
@@ -497,13 +503,15 @@ export default function CreateStory() {
                 <Text style={s.emptyPhotoSub}>
                   شارك صور مشاريع، معالم الحي، أو نشاطاتك اليومية مع جيرانك
                 </Text>
-
-              </OasisSurface>
+                <Pressable oasisKind="plain" onPress={handlePickImages} accessibilityLabel="اختيار صورة من الألبوم" style={s.photoPickButton}><ImageIcon size={17} color="#17664F" /><Text style={s.photoPickText}>اختيار من الألبوم</Text></Pressable>
+                <Pressable oasisKind="plain" onPress={handleTakePhoto} accessibilityLabel="التقاط صورة بالكاميرا" style={s.photoCameraButton}><Camera size={16} color="#FFFFFF" /><Text style={s.photoCameraText}>التقاط صورة</Text></Pressable>
+              </View>
             )}
           </View>
 
           {showStoryOptions && (
             <View style={s.storyOptionsPanel}>
+              <View style={s.settingsHeading}><Text style={s.settingsTitle}>إعدادات اليومية</Text><Pressable oasisKind="plain" onPress={() => setShowStoryOptions(false)} accessibilityLabel="إغلاق إعدادات اليومية" style={s.settingsClose}><X size={18} color="#17664F" /></Pressable></View>
               <View style={s.settingsTabs}>
                 {([
                   ['privacy', 'الخصوصية'],
@@ -528,7 +536,7 @@ export default function CreateStory() {
                   ['followers', 'المتابعون'],
                   ['custom', 'قائمة مخصصة'],
                 ] as const).map(([value, label]) => (
-                  <Pressable oasisKind="chip" key={value} onPress={() => handleAudienceChange(value)}
+                  <Pressable oasisKind="plain" key={value} onPress={() => handleAudienceChange(value)}
                     style={[s.optionsChip, audience === value && s.optionsChipActive]}>
                     <Text style={s.optionsChipText}>{label}</Text>
                   </Pressable>
@@ -540,11 +548,11 @@ export default function CreateStory() {
                     audienceCandidates.length === 0 ? (
                       <Text style={s.optionsHint}>لا يوجد متابعون متاحون للاختيار حاليًا.</Text>
                     ) : (
-                      <ScrollView style={{ direction: 'rtl' }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[s.optionsChipRow, { direction: 'ltr' }]}>
+                      <ScrollView  horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[s.optionsChipRow]}>
                         {audienceCandidates.map((person) => {
                           const selected = allowedUserIds.includes(person.id);
                           return (
-                            <Pressable oasisKind="chip" key={person.id}
+                            <Pressable oasisKind="plain" key={person.id}
                               onPress={() => setAllowedUserIds((ids) => selected ? ids.filter((id) => id !== person.id) : [...ids, person.id])}
                               style={[s.personChip, selected && s.optionsChipActive]}>
                               <Text style={s.optionsChipText}>{person.display_name || person.username || 'مستخدم'}</Text>
@@ -561,7 +569,7 @@ export default function CreateStory() {
                 <ShieldCheck size={15} color="#a7f3d0" />
                 <Text style={s.optionsSectionTitle}>الردود على القصة</Text>
               </View>
-              <Pressable oasisKind="chip" disabled={accountRepliesDisabled} onPress={() => setAllowStoryReplies((value) => !value)} style={[s.optionsChip, allowStoryReplies && s.optionsChipActive]}>
+              <Pressable oasisKind="plain" disabled={accountRepliesDisabled} onPress={() => setAllowStoryReplies((value) => !value)} style={[s.optionsChip, allowStoryReplies && s.optionsChipActive]}>
                 <Text style={s.optionsChipText}>{allowStoryReplies ? 'الردود مسموحة' : 'الردود مغلقة'}</Text>
                 <Text style={s.optionsHint}>{accountRepliesDisabled ? 'الردود مغلقة من إعدادات حسابك. غيّرها من إعدادات اليوميات.' : allowStoryReplies ? 'تطبق صلاحيات الرد من إعدادات حسابك' : 'لن يتمكن أحد من الرد على هذه القصة'}</Text>
               </Pressable>
@@ -572,15 +580,15 @@ export default function CreateStory() {
               </View>
               <Text style={s.optionsHint}>الأشخاص المحددون هنا لن تظهر لهم هذه القصة، حتى لو كانوا ضمن جمهورها.</Text>
               {audienceCandidates.length === 0 ? (
-                <Pressable oasisKind="chip" onPress={loadAudienceCandidates} style={s.personChip}>
+                <Pressable oasisKind="plain" onPress={loadAudienceCandidates} style={s.personChip}>
                   <Text style={s.optionsChipText}>تحميل قائمة المتابعين</Text>
                 </Pressable>
               ) : (
-                <ScrollView style={{ direction: 'rtl' }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[s.optionsChipRow, { direction: 'ltr' }]}>
+                <ScrollView  horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[s.optionsChipRow]}>
                   {audienceCandidates.map((person) => {
                     const selected = hiddenUserIds.includes(person.id);
                     return (
-                      <Pressable oasisKind="chip" key={`hidden-${person.id}`}
+                      <Pressable oasisKind="plain" key={`hidden-${person.id}`}
                         onPress={() => setHiddenUserIds((ids) => selected ? ids.filter((id) => id !== person.id) : [...ids, person.id])}
                         style={[s.personChip, selected && s.optionsChipActive]}>
                         <Text style={s.optionsChipText}>{person.display_name || person.username || 'مستخدم'}</Text>
@@ -600,7 +608,7 @@ export default function CreateStory() {
                   ['poll', 'استطلاع'],
                   ['question', 'سؤال'],
                 ] as const).map(([value, label]) => (
-                  <Pressable oasisKind="chip" key={value} onPress={() => setInteractiveType(value)}
+                  <Pressable oasisKind="plain" key={value} onPress={() => setInteractiveType(value)}
                     style={[s.optionsChip, interactiveType === value && s.optionsChipActive]}>
                     <Text style={s.optionsChipText}>{label}</Text>
                   </Pressable>
@@ -628,17 +636,17 @@ export default function CreateStory() {
                   <Pressable key={color} onPress={() => setTextColor(color)}
                     style={[s.storyTextColorDot, { backgroundColor: color }, textColor === color && s.storyTextColorDotActive]} />
                 ))}
-                <Pressable oasisKind="chip" style={s.optionsChip} onPress={() => setFontSize((n) => Math.max(16, n - 2))}>
+                <Pressable oasisKind="plain" style={s.optionsChip} onPress={() => setFontSize((n) => Math.max(16, n - 2))}>
                   <Text style={s.optionsChipText}>A−</Text>
                 </Pressable>
                 <Text style={s.optionsChipText}>{fontSize}</Text>
-                <Pressable oasisKind="chip" style={s.optionsChip} onPress={() => setFontSize((n) => Math.min(48, n + 2))}>
+                <Pressable oasisKind="plain" style={s.optionsChip} onPress={() => setFontSize((n) => Math.min(48, n + 2))}>
                   <Text style={s.optionsChipText}>A+</Text>
                 </Pressable>
-                <Pressable oasisKind="chip" style={s.optionsChip} onPress={() => setTextRotation((n) => (n + 5) % 360)}>
+                <Pressable oasisKind="plain" style={s.optionsChip} onPress={() => setTextRotation((n) => (n + 5) % 360)}>
                   <Text style={s.optionsChipText}>تدوير ↻</Text>
                 </Pressable>
-                <Pressable oasisKind="chip" style={s.optionsChip} onPress={() => setTextRotation((n) => (n - 5 + 360) % 360)}>
+                <Pressable oasisKind="plain" style={s.optionsChip} onPress={() => setTextRotation((n) => (n - 5 + 360) % 360)}>
                   <Text style={s.optionsChipText}>↺</Text>
                 </Pressable>
               </View>
@@ -646,12 +654,12 @@ export default function CreateStory() {
                 {([
                   ['↑', 0, -12], ['↓', 0, 12], ['←', -12, 0], ['→', 12, 0],
                 ] as const).map(([label, dx, dy]) => (
-                  <Pressable oasisKind="chip" key={label} style={s.optionsChip}
+                  <Pressable oasisKind="plain" key={label} style={s.optionsChip}
                     onPress={() => setTextOffset((pos) => ({ x: Math.max(-140, Math.min(140, pos.x + dx)), y: Math.max(-260, Math.min(260, pos.y + dy)) }))}>
                     <Text style={s.optionsChipText}>{label}</Text>
                   </Pressable>
                 ))}
-                <Pressable oasisKind="chip" style={s.optionsChip} onPress={() => { setTextRotation(0); setTextOffset({ x: 0, y: 0 }); }}>
+                <Pressable oasisKind="plain" style={s.optionsChip} onPress={() => { setTextRotation(0); setTextOffset({ x: 0, y: 0 }); }}>
                   <Text style={s.optionsChipText}>إعادة ضبط الموضع</Text>
                 </Pressable>
               </View>
@@ -663,7 +671,7 @@ export default function CreateStory() {
           {/* Multi-slide carousel indicator strip */}
           {composer.slides.length > 1 && (
             <View style={s.slideIndicatorStrip}>
-              <ScrollView style={{ direction: 'rtl' }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[s.thumbsScroll, { direction: 'ltr' }]}>
+              <ScrollView  horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[s.thumbsScroll]}>
                 {composer.slides.map((sItem, idx) => (
                   <Pressable
                     key={idx}
@@ -689,7 +697,7 @@ export default function CreateStory() {
                   </Pressable>
                 ))}
                 {!composer.atCapacity && (
-                  <Pressable oasisKind="icon"
+                  <Pressable oasisKind="plain"
                     style={s.thumbAddBtn}
                     onPress={isImageSlide ? handlePickImages : composer.addTextSlide}
                   >
@@ -700,8 +708,9 @@ export default function CreateStory() {
             </View>
           )}
 
-          {/* Bottom WhatsApp Control & Send Bar */}
-          <View style={s.bottomWhatsAppBar}>
+        </LinearGradient>
+      </View>
+          <View style={[s.bottomWhatsAppBar, { paddingBottom: Math.max(12, safeInsets.bottom + 8) }]}>
             {/* Caption Input for Image Mode */}
             {isImageSlide && hasImage ? (
               <View style={s.whatsAppCaptionInputWrap}>
@@ -725,7 +734,7 @@ export default function CreateStory() {
               </View>
             ) : !isImageSlide ? (
               <View style={s.charCounterWrap}>
-                <Text style={s.charCounterText}>{textLength}/300</Text>
+                <Text style={s.footerAudience}>{audience === 'public' ? 'الجميع' : audience === 'followers' ? 'المتابعون' : 'قائمة مخصصة'}</Text><Text style={s.charCounterText}>{textLength} / 300 حرف</Text>
               </View>
             ) : (
               <View style={{ flex: 1 }} />
@@ -733,31 +742,24 @@ export default function CreateStory() {
 
             {/* Glowing Circular Send Button */}
             <Pressable
+              oasisKind="plain"
               style={[
                 s.whatsAppSendFab,
-                (!composer.isReady || publisher.publishing) && s.whatsAppSendFabDisabled,
+                (!defaultsReady || !composer.isReady || publisher.publishing) && s.whatsAppSendFabDisabled,
               ]}
               onPress={handlePublish}
               disabled={!defaultsReady || !composer.isReady || publisher.publishing}
               accessibilityRole="button"
-              accessibilityLabel="نشر الحالة"
+              accessibilityLabel="نشر اليومية"
             >
-              <LinearGradient
-                colors={composer.isReady ? [OASIS.colors.primary, OASIS.colors.primary] : [OASIS.colors.muted, OASIS.colors.ink]}
-                style={s.whatsAppSendFabGrad}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              >
                 {publisher.publishing ? (
-                  <ActivityIndicator size="small" color={OASIS.colors.surface} />
+                  <ActivityIndicator size="small" color="#17664F" />
                 ) : (
-                  <Send size={22} color={OASIS.colors.surface} />
+                  <Send size={18} color={defaultsReady && composer.isReady ? '#FFFFFF' : '#789383'} />
                 )}
-              </LinearGradient>
+                <Text style={[s.publishLabel, (!defaultsReady || !composer.isReady || publisher.publishing) && s.publishLabelDisabled]}>{publisher.publishing ? 'جارٍ النشر…' : 'نشر اليومية'}</Text>
             </Pressable>
           </View>
-        </LinearGradient>
-      </View>
 
       {/* Publishing Progress Overlay */}
       {publisher.publishing && (
@@ -779,403 +781,3 @@ export default function CreateStory() {
     </KeyboardAvoidingView>
   );
 }
-
-const s = StyleSheet.create({
-  templatePanel: { marginHorizontal: 14, padding: 10, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.42)', zIndex: 30 },
-  templateHeading: { color: OASIS.colors.surface, fontSize: 12, fontWeight: '600', textAlign: 'right', marginBottom: 7 },
-  templateRow: { flexDirection: 'row-reverse', gap: 8 },
-  templateChip: { paddingHorizontal: 13, paddingVertical: 9, borderRadius: 11, backgroundColor: 'rgba(255,255,255,0.18)' },
-  templateChipText: { color: OASIS.colors.surface, fontSize: 12, fontWeight: '700' },
-  dragHandle: { alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 13, paddingVertical: 8, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.35)', zIndex: 12 },
-  dragHandleText: { color: OASIS.colors.surface, fontSize: 11, fontWeight: '700' },
-  composerTopBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingBottom: 8, backgroundColor: 'transparent', zIndex: 20 },
-  composerCloseButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  composerTopSpacer: { width: 40, height: 40 },
-  container: {
-    flex: 1,
-    backgroundColor: '#000',
-  },
-  canvasWrapper: {
-    flex: 1,
-    width: '100%',
-    height: '100%',
-    position: 'relative',
-  },
-  gradientCanvas: {
-    flex: 1,
-    width: '100%',
-    height: '100%',
-    justifyContent: 'space-between',
-  },
-  fullImage: {
-    ...StyleSheet.absoluteFillObject,
-    width: '100%',
-    height: '100%',
-  },
-  topBar: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: Platform.OS === 'ios' ? 52 : 36,
-    paddingHorizontal: 16,
-    zIndex: 20,
-  },
-  circleIconBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 14,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modeSwitcherPill: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    borderRadius: 14,
-    padding: 3,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
-  },
-  modeOption: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 14,
-  },
-  modeOptionActive: {
-    backgroundColor: OASIS.colors.primary,
-  },
-  modeOptionText: {
-    color: '#cbd5e1',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  modeOptionTextActive: {
-    color: OASIS.colors.surface,
-    fontWeight: '700',
-  },
-  topToolsRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 8,
-  },
-  toolIconBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 14,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-  },
-  toolIconBtnActive: {
-    backgroundColor: OASIS.colors.primary,
-    borderColor: '#34d399',
-  },
-  badge24hRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginTop: 8,
-  },
-  badge24h: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    paddingHorizontal: 12,
-    paddingVertical: 4.5,
-    borderRadius: 20,
-  },
-  badge24hText: {
-    color: OASIS.colors.soft,
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  fontBadge: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 12,
-  },
-  fontBadgeText: {
-    color: OASIS.colors.surface,
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  paletteSelectorBox: {
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingVertical: 8,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  paletteScroll: {
-    flexDirection: 'row-reverse',
-    paddingHorizontal: 16,
-    gap: 12,
-    alignItems: 'center',
-  },
-  paletteCircleWrap: {
-    alignItems: 'center',
-    gap: 3,
-  },
-  paletteCircleWrapActive: {
-    transform: [{ scale: 1.08 }],
-  },
-  paletteCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: OASIS.colors.surface,
-  },
-  paletteName: {
-    color: '#94a3b8',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  paletteNameActive: {
-    color: '#34d399',
-    fontWeight: '700',
-  },
-  centralCanvas: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  textCanvasCard: {
-    width: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  textCanvasCardPill: {
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    borderRadius: 24,
-    paddingVertical: 18,
-    paddingHorizontal: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-  },
-  whatsAppTextInput: {
-    color: OASIS.colors.surface,
-    lineHeight: 38,
-    width: '100%',
-    paddingHorizontal: 10,
-    textShadowColor: 'rgba(0, 0, 0, 0.5)',
-    textShadowOffset: { width: 0, height: 1.5 },
-    textShadowRadius: 4,
-  },
-  imageCenterPlaceholder: {
-    flex: 1,
-  },
-  emptyPhotoCard: {
-    backgroundColor: 'rgba(15, 23, 42, 0.85)',
-    borderRadius: 24,
-    padding: 24,
-    alignItems: 'center',
-    width: '100%',
-    maxWidth: 340,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-  },
-  emptyPhotoIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: OASIS.colors.soft,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 14,
-  },
-  emptyPhotoTitle: {
-    color: OASIS.colors.surface,
-    fontSize: 17,
-    fontWeight: '700',
-    marginBottom: 6,
-  },
-  emptyPhotoSub: {
-    color: '#94a3b8',
-    fontSize: 12.5,
-    textAlign: 'center',
-    lineHeight: 18,
-    marginBottom: 20,
-  },
-  slideIndicatorStrip: {
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-  },
-  thumbsScroll: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 8,
-  },
-  thumbItem: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.3)',
-    position: 'relative',
-  },
-  thumbItemActive: {
-    borderColor: OASIS.colors.primary,
-    transform: [{ scale: 1.08 }],
-  },
-  thumbImg: {
-    width: '100%',
-    height: '100%',
-  },
-  thumbTextPlaceholder: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: OASIS.colors.ink,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  thumbTextLetter: {
-    color: OASIS.colors.surface,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  thumbDeleteBadge: {
-    position: 'absolute',
-    top: 2,
-    left: 2,
-    backgroundColor: OASIS.colors.danger,
-    borderRadius: 7,
-    padding: 2,
-  },
-  thumbAddBtn: {
-    width: 48,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: OASIS.colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  bottomWhatsAppBar: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingBottom: Platform.OS === 'ios' ? 36 : 18,
-    paddingTop: 10,
-    gap: 12,
-  },
-  whatsAppCaptionInputWrap: {
-    flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.8)',
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
-  },
-  whatsAppCaptionInput: {
-    color: OASIS.colors.surface,
-    fontSize: 14,
-    textAlign: 'right',
-  },
-  charCounterWrap: {
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-  },
-  charCounterText: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  whatsAppSendFab: {
-    width: 52,
-    height: 52,
-    borderRadius: 14,
-    overflow: 'hidden',
-    shadowColor: OASIS.colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  whatsAppSendFabGrad: {
-    width: '100%',
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  whatsAppSendFabDisabled: {
-    opacity: 0.5,
-  },
-  storyOptionsPanel: {
-    maxHeight: 210,
-    marginHorizontal: 12,
-    marginVertical: 4,
-    padding: 8,
-    borderRadius: 16,
-    backgroundColor: 'rgba(15,23,42,0.96)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
-  },
-  settingsTabs: { flexDirection: 'row-reverse', gap: 6, marginBottom: 6 },
-  settingsTab: { flex: 1, paddingVertical: 8, paddingHorizontal: 4, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center' },
-  settingsTabActive: { backgroundColor: OASIS.colors.deep, borderWidth: 1, borderColor: '#34d399' },
-  settingsTabText: { color: '#cbd5e1', fontSize: 11, fontWeight: '700' },
-  settingsTabTextActive: { color: OASIS.colors.surface, fontWeight: '700' },
-  settingsSectionScroll: { maxHeight: 150 },
-  storyOptionsContent: { paddingHorizontal: 4, paddingVertical: 5, gap: 9 },
-  optionsSectionHeader: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
-  optionsSectionTitle: { color: OASIS.colors.surface, fontSize: 11, fontWeight: '700', textAlign: 'right' },
-  optionsChipRow: { flexDirection: 'row-reverse', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
-  optionsChip: { paddingHorizontal: 9, paddingVertical: 6, borderRadius: 10, backgroundColor: OASIS.colors.ink, flexDirection: 'row-reverse', alignItems: 'center', gap: 4 },
-  optionsChipActive: { backgroundColor: OASIS.colors.deep, borderWidth: 1, borderColor: '#34d399' },
-  optionsChipText: { color: OASIS.colors.surface, fontSize: 11, fontWeight: '600' },
-  optionsHint: { color: '#cbd5e1', fontSize: 11, textAlign: 'right' },
-  audiencePicker: { maxHeight: 42 },
-  personChip: { paddingHorizontal: 9, paddingVertical: 6, borderRadius: 10, backgroundColor: OASIS.colors.ink, flexDirection: 'row-reverse', alignItems: 'center', gap: 4 },
-  optionsFields: { gap: 5 },
-  optionsInput: { minHeight: 32, color: OASIS.colors.surface, backgroundColor: 'rgba(255,255,255,0.08)', borderColor: 'rgba(255,255,255,0.2)', borderWidth: 1, borderRadius: 9, paddingHorizontal: 9, paddingVertical: 5, fontSize: 12, textAlign: 'right' },
-  storyTextColorDot: { width: 19, height: 19, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)' },
-  storyTextColorDotActive: { borderWidth: 3, borderColor: '#34d399' },
-  publishProgressTrack: { height: 5, width: '100%', backgroundColor: OASIS.colors.line, borderRadius: 5, overflow: 'hidden', marginTop: 4 },
-  publishProgressFill: { height: '100%', backgroundColor: OASIS.colors.primary, borderRadius: 5 },
-  publishingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.75)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 100,
-  },
-  publishingModal: {
-    backgroundColor: OASIS.colors.surface,
-    borderRadius: 14,
-    padding: 16,
-    alignItems: 'center',
-    gap: 12,
-    width: 260,
-  },
-  publishingTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: OASIS.colors.ink,
-    textAlign: 'center',
-  },
-  publishingStatus: {
-    fontSize: 12,
-    color: OASIS.colors.muted,
-    textAlign: 'center',
-  },
-});

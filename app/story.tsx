@@ -12,6 +12,9 @@ import { BG_GRADIENTS } from '@/lib/storyGradients';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/lib/supabase';
 import { requireAccount } from '@/lib/authGate';
+import { useTheme } from '@/context/ThemeContext';
+import { loadBannedWords, getCachedBannedWords } from '@/lib/profanity';
+import { findProhibitedStoryWord } from '@/lib/storyModeration';
 import { LinearGradient } from 'expo-linear-gradient';
 import { X, Send, Eye, Heart, Trash2, ChevronLeft, ChevronRight, Flag, Ban, MoreVertical, UserRound } from 'lucide-react-native';
 
@@ -19,6 +22,7 @@ const { width, height } = Dimensions.get('window');
 const STORY_DURATION = 7000; // 7 seconds per story
 
 export default function StoryViewer() {
+  const { colors, isDark } = useTheme();
   const headerInsets = useSafeAreaInsets();
   const { id, resume, next } = useLocalSearchParams<{ id: string; resume?: string; next?: string }>();
   const [storiesList, setStoriesList] = useState<any[]>([]);
@@ -246,7 +250,9 @@ export default function StoryViewer() {
       .eq('id', id)
       .maybeSingle();
 
-    if (!targetStory) {
+    const prohibitedWords = await loadBannedWords();
+    if (!targetStory || findProhibitedStoryWord(targetStory, prohibitedWords)) {
+      setStoriesList([]);
       setLoading(false);
       return;
     }
@@ -270,6 +276,7 @@ export default function StoryViewer() {
       .order('created_at', { ascending: true });
 
     let sequence = !isActiveStory(targetStory) && targetStory.author_id === u.user.id ? [targetStory] : (allAuthorStories || []).filter(story => isActiveStory(story));
+    sequence = sequence.filter(story => !findProhibitedStoryWord(story, prohibitedWords));
     if (resume === '0') {
       const seen = new Set(await getLocalSeenStoryIds(u.user.id));
       // A fresh discovery queue skips previously viewed slides, while an explicit replay still works.
@@ -526,17 +533,17 @@ export default function StoryViewer() {
 
   if (loading) {
     return (
-      <View style={styles.loadingScreen}>
+      <View style={[styles.loadingScreen, { backgroundColor: colors.background }, { backgroundColor: 'transparent' }]}>
         <ActivityIndicator size="large" color={OASIS.colors.primary} />
       </View>
     );
   }
 
-  if (!currentStory) {
+  if (!currentStory || findProhibitedStoryWord(currentStory, getCachedBannedWords())) {
     return (
-      <View style={styles.loadingScreen}>
-        <Text style={styles.notFoundText}>القصة غير موجودة أو انتهت مدتها ⏳</Text>
-        <Pressable oasisKind="action" style={styles.backBtn} onPress={() => router.back()}>
+      <View style={[styles.loadingScreen, { backgroundColor: colors.background }, { backgroundColor: 'transparent' }]}>
+        <Text style={[styles.notFoundText, { color: colors.ink }]}>هذه اليومية غير متاحة أو انتهت مدتها</Text>
+        <Pressable oasisKind="action" style={styles.backBtn} onPress={() => router.canGoBack() ? router.back() : router.replace('/home')}>
           <Text style={styles.backBtnText}>العودة</Text>
         </Pressable>
       </View>
@@ -554,7 +561,7 @@ export default function StoryViewer() {
       : [OASIS.colors.deep, OASIS.colors.primary] as [string, string];
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={[{ flex: 1 }, { backgroundColor: 'transparent' }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={styles.container} {...panResponder.panHandlers}>
         {/* Story Background */}
         {currentStory.type === 'image' && currentStory.image_url ? (
@@ -601,7 +608,6 @@ export default function StoryViewer() {
           {/* ======================================================== */}
           {/* TOP HEADER                                               */}
           {/* ======================================================== */}
-          {uiVisible && (
             <View style={styles.storyOverlayHeader}>
               <View style={styles.storyOverlayIdentity}>
                 <View style={styles.storyOverlayAvatar}>
@@ -617,20 +623,19 @@ export default function StoryViewer() {
               </View>
               <View style={styles.storyOverlayActions}>
                 {isOwn ? (
-                  <Pressable accessibilityRole="button" accessibilityLabel="حذف اليومية" onPress={confirmDeleteStory} style={styles.storyOverlayIcon}>
-                    <Trash2 size={21} color={OASIS.colors.surface} />
+                  <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="حذف اليومية" onPress={confirmDeleteStory} style={[styles.storyOverlayIcon, { backgroundColor: colors.dangerSoft, borderColor: isDark ? '#623030' : '#F0D6D0' }]}>
+                    <Trash2 size={20} color={colors.danger} />
                   </Pressable>
                 ) : currentUserId ? (
-                  <Pressable accessibilityRole="button" accessibilityLabel="خيارات اليومية" onPress={openStorySafetyMenu} style={styles.storyOverlayIcon}>
-                    <MoreVertical size={22} color={OASIS.colors.surface} />
+                  <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="خيارات اليومية" onPress={openStorySafetyMenu} style={[styles.storyOverlayIcon, { backgroundColor: colors.surface, borderColor: colors.line }]}>
+                    <MoreVertical size={21} color={colors.ink} />
                   </Pressable>
                 ) : null}
-                <Pressable accessibilityRole="button" accessibilityLabel="إغلاق اليومية" onPress={() => router.back()} style={styles.storyOverlayIcon}>
-                  <X size={24} color={OASIS.colors.surface} />
+                <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="إغلاق اليومية" onPress={() => router.canGoBack() ? router.back() : router.replace('/home')} style={[styles.storyOverlayIcon, { backgroundColor: colors.surface, borderColor: colors.line }]}>
+                  <X size={21} color={colors.ink} />
                 </Pressable>
               </View>
             </View>
-          )}
 
           {/* ======================================================== */}
           {/* INTERACTIVE TAP ZONES (Left / Right Navigation)          */}
@@ -876,8 +881,8 @@ const styles = StyleSheet.create({
   storyOverlayNameBox: { flex: 1, alignItems: 'flex-end' },
   storyOverlayName: { fontSize: 14, color: OASIS.colors.surface, fontWeight: '600', textAlign: 'right' },
   storyOverlayMeta: { fontSize: 11, color: 'rgba(255,255,255,0.8)', textAlign: 'right', marginTop: 2 },
-  storyOverlayActions: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5 },
-  storyOverlayIcon: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
+  storyOverlayActions: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
+  storyOverlayIcon: { width: 44, height: 44, borderRadius: 13, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   header: {
     flexDirection: 'row-reverse',
     alignItems: 'center',

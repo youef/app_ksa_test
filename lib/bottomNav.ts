@@ -1,6 +1,7 @@
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePathname } from 'expo-router';
-export const BOTTOM_NAV_HEIGHT = 56;
+// Includes the glass surface and its 8-point top clearance.
+export const BOTTOM_NAV_HEIGHT = 72;
 export function useBottomNavInset(extra = 16) {
   const insets = useSafeAreaInsets();
   const path = usePathname();

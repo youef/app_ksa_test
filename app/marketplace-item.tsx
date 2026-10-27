@@ -60,10 +60,10 @@ export default function MarketplaceItemPage() {
     try { await Share.share({ title: item.title || 'إعلان من سوق حيّنا', message: [item.title, item.description, url].filter(Boolean).join('\n') }); } catch {}
   };
 
-  if (loading) return <View style={styles.center}><ActivityIndicator size="large" color={OASIS.colors.primary} /><Text style={styles.muted}>جارٍ تحميل الإعلان...</Text></View>;
-  if (error || !item) return <View style={styles.center}><Package size={42} color="#94a3b8" /><Text style={styles.title}>{error ? 'تعذّر تحميل الإعلان' : 'الإعلان غير موجود'}</Text><Text style={styles.muted}>قد يكون الإعلان حُذف أو لم يعد متاحاً.</Text><Pressable oasisVariant="primary" oasisKind="action" style={styles.primary} onPress={() => error ? void load() : router.back()}><Text style={styles.primaryText}>{error ? 'إعادة المحاولة' : 'رجوع'}</Text></Pressable></View>;
+  if (loading) return <View style={[styles.center, { backgroundColor: 'transparent' }]}><ActivityIndicator size="large" color={OASIS.colors.primary} /><Text style={styles.muted}>جارٍ تحميل الإعلان...</Text></View>;
+  if (error || !item) return <View style={[styles.center, { backgroundColor: 'transparent' }]}><Package size={42} color="#94a3b8" /><Text style={styles.title}>{error ? 'تعذّر تحميل الإعلان' : 'الإعلان غير موجود'}</Text><Text style={styles.muted}>قد يكون الإعلان حُذف أو لم يعد متاحاً.</Text><Pressable oasisVariant="primary" oasisKind="action" style={styles.primary} onPress={() => error ? void load() : router.back()}><Text style={styles.primaryText}>{error ? 'إعادة المحاولة' : 'رجوع'}</Text></Pressable></View>;
 
-  return <View style={styles.screen}>
+  return <View style={[styles.screen, { backgroundColor: 'transparent' }]}>
     <AppHeader variant="sub" title="تفاصيل الإعلان" fallbackRoute="/user" rightAction={<HeaderAction onPress={share} accessibilityRole="button" accessibilityLabel="مشاركة الإعلان" style={styles.share}><Share2 size={18} color={OASIS.colors.primary} /></HeaderAction>} />
     <ScrollView contentContainerStyle={styles.page}>
       {item.image_url ? <Image source={{ uri: item.image_url }} style={styles.image} resizeMode="cover" /> : <View style={styles.imageFallback}><ShoppingBag size={42} color={OASIS.colors.primary} /><Text style={styles.muted}>إعلان من سوق الحي</Text></View>}

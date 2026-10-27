@@ -98,7 +98,7 @@ export default function AdminModerationScreen() {
   };
 
   return (
-    <View style={[styles.screen, { backgroundColor: colors.background }]}>
+    <View style={[styles.screen, { backgroundColor: colors.background }, { backgroundColor: 'transparent' }]}>
       <AppHeader variant="sub" title="إدارة الفلترة والمخالفين" subtitle="الكلمات المحظورة والمتابعات" fallbackRoute="/admin" />
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: bottomInset + 28 }]} showsVerticalScrollIndicator={false}>
         {loading ? <ActivityIndicator size="large" color={OASIS.colors.primary} /> : null}

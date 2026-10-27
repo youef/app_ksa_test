@@ -26,7 +26,7 @@ export default function SafetyCenterScreen() {
   ];
 
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { backgroundColor: 'transparent' }]}>
       <AppHeader variant="sub" title="مركز الأمان والثقة" subtitle="مساحة آمنة لمجتمع حيّنا" fallbackRoute="/more" />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingBottom: bottomNavInset + 28 }]}>
         <LinearGradient colors={['#063B31', '#087F5B', '#0D9488']} start={{x:0,y:0}} end={{x:1,y:1}} style={styles.hero}>

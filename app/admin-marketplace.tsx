@@ -65,10 +65,10 @@ export default function AdminMarketplace() {
 
   const refresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
 
-  if (loading) return <View style={styles.center}><ActivityIndicator size="large" color={OASIS.colors.primary} /><Text style={styles.muted}>نحمّل قائمة المراجعة…</Text></View>;
+  if (loading) return <View style={[styles.center, { backgroundColor: 'transparent' }]}><ActivityIndicator size="large" color={OASIS.colors.primary} /><Text style={styles.muted}>نحمّل قائمة المراجعة…</Text></View>;
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: 'transparent' }]}>
       <AppHeader variant="sub" title="مراجعة إعلانات السوق" subtitle="لوحة الإدارة" fallbackRoute="/marketplace-dashboard" />
       <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={OASIS.colors.primary} />}>
         <View style={styles.hero}>

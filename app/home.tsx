@@ -1,8 +1,8 @@
-import { oasisAssets } from '@/components/oasis/assets';
 import { OasisPressable as Pressable } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, ImageBackground, Modal, Platform, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, DeviceEventEmitter, Modal, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { onNavScroll } from '@/components/BottomNav';
 import { SlidersHorizontal, X, Check, Clock3, TrendingUp, MapPin, LayoutGrid, HandHelping, PackageOpen, CircleHelp, Store, Siren, UserRound, Hourglass, MessageCircle, CircleCheck, CalendarDays, CalendarRange, CalendarClock, RotateCcw, ListFilter } from 'lucide-react-native';
 
 const FILTER_OPTION_ICONS: Record<string, typeof Check> = {
@@ -65,12 +65,17 @@ export default function Home() {
   const [draftPeriod, setDraftPeriod] = useState('كل الأوقات');
   const [appliedFilters, setAppliedFilters] = useState({ kind: 'الكل', status: 'الكل', period: 'كل الأوقات' });
   const [refreshing, setRefreshing] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
+  useEffect(() => {
+    const listener = DeviceEventEmitter.addListener('hayna:home-scroll-top', () => scrollRef.current?.scrollTo({ y: 0, animated: true }));
+    return () => listener.remove();
+  }, []);
   const activeTab: HomeTab = appliedFilters.kind === 'منشوراتي' ? 'mine' : 'all';
 
   // The feed hook resolves the saved location; the location hook owns it.
   // A ref breaks the circular dependency between the two hooks.
   const applyLocationRef = useRef<(loc: HaynaLocation) => void>(() => {});
-  const feed = useHomeFeed({ onLocation: loc => applyLocationRef.current(loc) });
+  const feed = useHomeFeed({ onLocation: loc => applyLocationRef.current(loc), ownPosts: activeTab === 'mine' });
   const loc = useHomeLocation({ setProfile: feed.setProfile, showToast });
   applyLocationRef.current = loc.apply;
 
@@ -208,6 +213,7 @@ export default function Home() {
 
   // Infinite feed: fetch the next batch when the user scrolls near the end.
   const handleFeedScroll = useCallback(({ nativeEvent }: any) => {
+    onNavScroll({ nativeEvent } as any);
     const { contentOffset, contentSize, layoutMeasurement } = nativeEvent;
     const nearEnd = contentOffset.y + layoutMeasurement.height >= contentSize.height - 520;
     if (nearEnd && feed.hasMore && !feed.loadingMore && !feed.loading) {
@@ -216,7 +222,7 @@ export default function Home() {
   }, [feed.hasMore, feed.loadingMore, feed.loading, feed.loadMore]);
 
   return (
-    <View style={[styles.container, layout.page, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, layout.page, { backgroundColor: colors.background }, { backgroundColor: 'transparent' }]}>
 
       <AppHeader
         variant="home"
@@ -227,13 +233,9 @@ export default function Home() {
         unreadMessagesCount={feed.unreadMessagesCount}
       />
 
-      <ImageBackground
-        source={{ uri: 'https://appksatest.vercel.app/welcome/hayna-app-background.png' }}
-        resizeMode="cover"
-        imageStyle={{ opacity: isDark ? 0.16 : 0.27 }}
-        style={{ flex: 1, backgroundColor: isDark ? colors.background : '#F8FAF7' }}
-      >
+      <View style={{ flex: 1, backgroundColor: 'transparent' }}>
       <ScrollView
+        ref={scrollRef}
         style={{ flex: 1, backgroundColor: 'transparent' }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -250,30 +252,30 @@ export default function Home() {
           />
         }
       >
-        <CommunityShortcuts signedIn={Boolean(feed.currentUserId)} />
         <View style={layout.contextRow}>
-          <View style={{ flex: 1, minWidth: 0 }}>
+          <View style={{ flex: 1.6, minWidth: 0 }}>
             <LocationScopeBar compact location={{ region: loc.region, city: loc.city, district: loc.district }} onLocationChanged={loc.apply} />
           </View>
           <View style={{ flex: 1, minWidth: 0 }}>
             <AtmosphereBar compact weather={loc.weather} weatherLoading={loc.weatherLoading} />
           </View>
         </View>
+        <CommunityShortcuts signedIn={Boolean(feed.currentUserId)} />
 
         {flags.stories !== false && Boolean(feed.currentUserId) && <View style={layout.stories}><StoriesRow profile={feed.profile} stories={feed.stories} selectedDistrict={loc.district} /></View>}
 
         <View style={[styles.feedSection, layout.feed]}>
-          <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, gap: 8 }}>
-            <ScrollView horizontal style={{ flex: 1, minWidth: 0, direction: 'rtl' }} showsHorizontalScrollIndicator={false} contentContainerStyle={{ direction: 'ltr', flexDirection: 'row-reverse', alignItems: 'center', gap: 6, paddingVertical: 6 }}>
-              {([['newest', 'الأحدث'], ['engaged', 'الأكثر تفاعلاً'], ['nearby', 'الأقرب']] as const).map(([key, label]) => (
-                <Pressable oasisKind="chip" oasisVariant={sortBy === key ? 'primary' : 'ghost'} key={key} onPress={() => setSortBy(key)} style={{ flexDirection: 'row-reverse', gap: 4, paddingHorizontal: 10 }} accessibilityRole="button" accessibilityState={{ selected: sortBy === key }}>
-                  {key === 'newest' ? <Clock3 size={14} color={OASIS.colors.primary} /> : key === 'engaged' ? <TrendingUp size={14} color={OASIS.colors.primary} /> : <MapPin size={14} color={OASIS.colors.primary} />}
-                  <Text style={{ fontSize: 12, fontWeight: '600', color: sortBy === key ? '#FFFFFF' : colors.ink }}>{label}</Text>
+          <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, gap: 4 }}>
+            <View style={{ flex: 1, minWidth: 0, flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}>
+              {([['newest', 'الأحدث'], ['engaged', 'الأكثر تفاعلاً'], ['nearby', 'من حيّك']] as const).map(([key, label]) => (
+                <Pressable oasisKind="plain" hitSlop={{ top: 6, bottom: 6 }} key={key} onPress={() => setSortBy(key)} style={{ flex: key === 'engaged' ? 1.6 : 1, minWidth: 0, height: 32, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', borderRadius: 16, gap: 3, paddingHorizontal: 4, backgroundColor: sortBy === key ? '#047857' : 'transparent' }} accessibilityRole="button" accessibilityState={{ selected: sortBy === key }}>
+                  {key === 'newest' ? <Clock3 size={11} color={sortBy === key ? '#FFFFFF' : colors.primary} /> : key === 'engaged' ? <TrendingUp size={11} color={sortBy === key ? '#FFFFFF' : colors.primary} /> : <MapPin size={11} color={sortBy === key ? '#FFFFFF' : colors.primary} />}
+                  <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85} style={{ flexShrink: 1, fontSize: 10, fontWeight: '600', color: sortBy === key ? '#FFFFFF' : colors.primary }}>{label}</Text>
                 </Pressable>
               ))}
-            </ScrollView>
-            <Pressable oasisKind="icon" oasisVariant="ghost" onPress={() => { setDraftKind(appliedFilters.kind); setDraftStatus(appliedFilters.status); setDraftPeriod(appliedFilters.period); setFilterOpen(true); }} accessibilityRole="button" accessibilityLabel="تصفية المنشورات">
-              <SlidersHorizontal size={20} color={OASIS.colors.primary} />
+            </View>
+            <Pressable oasisKind="plain" hitSlop={4} style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }} onPress={() => { setDraftKind(appliedFilters.kind); setDraftStatus(appliedFilters.status); setDraftPeriod(appliedFilters.period); setFilterOpen(true); }} accessibilityRole="button" accessibilityLabel="تصفية المنشورات">
+              <SlidersHorizontal size={17} color={colors.primary} />
               {(appliedFilters.kind !== 'الكل' || appliedFilters.status !== 'الكل' || appliedFilters.period !== 'كل الأوقات') && <View style={{ position: 'absolute', top: 5, right: 5, width: 6, height: 6, borderRadius: 3, backgroundColor: OASIS.colors.danger }} />}
             </Pressable>
           </View>
@@ -321,7 +323,7 @@ export default function Home() {
 
         </View>
       </ScrollView>
-      </ImageBackground>
+      </View>
 
       <Modal visible={filterOpen} transparent animationType="slide" onRequestClose={() => setFilterOpen(false)}>
         <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(15,23,42,0.38)' }}>
@@ -380,8 +382,8 @@ export default function Home() {
 
 const layout = StyleSheet.create({
   page: { backgroundColor: 'transparent' },
-  contextRow: { width: '100%', maxWidth: 760, alignSelf: 'center', flexDirection: 'row-reverse', alignItems: 'stretch', gap: 8, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8 },
-  stories: { width: '100%', maxWidth: 728, alignSelf: 'center', backgroundColor: 'transparent', borderRadius: 14, overflow: 'hidden', marginBottom: 8 },
-  feed: { maxWidth: 760, marginTop: 4 },
+  contextRow: { width: '100%', maxWidth: 760, alignSelf: 'center', flexDirection: 'row-reverse', alignItems: 'stretch', gap: 8, paddingHorizontal: 14, paddingTop: 8, paddingBottom: 4 },
+  stories: { width: '100%', maxWidth: 728, alignSelf: 'center', backgroundColor: 'transparent', borderRadius: 12, overflow: 'hidden', marginBottom: 0 },
+  feed: { maxWidth: 760, marginTop: 0 },
 
 });

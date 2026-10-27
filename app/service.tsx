@@ -264,7 +264,7 @@ export default function Service() {
 
   if (loading) {
     return (
-      <View style={styles.center}>
+      <View style={[styles.center, { backgroundColor: 'transparent' }]}>
         <ActivityIndicator size="large" color={OASIS.colors.primary} />
         <Text style={styles.loadingText}>جاري تجهيز تفاصيل العرض من الحي...</Text>
       </View>
@@ -273,7 +273,7 @@ export default function Service() {
 
   if (!service) {
     return (
-      <View style={styles.center}>
+      <View style={[styles.center, { backgroundColor: 'transparent' }]}>
         <AlertCircle size={48} color={OASIS.colors.danger} />
         <Text style={styles.errorText}>العرض غير موجود أو تم حذفه.</Text>
         <Pressable onPress={() => router.replace('/market')} style={styles.backBtnAction}>
@@ -308,7 +308,7 @@ export default function Service() {
   const timeAgoText = relativeTime(service.created_at);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <AppHeader
         variant="sub"
         title={service.name}

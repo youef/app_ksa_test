@@ -27,3 +27,37 @@ test('publishing obeys account-wide disabled replies even when the composer requ
   assert.equal(inserted[0].allow_replies, false);
   assert.equal(inserted[0].visibility, 'followers');
 });
+
+function publisherWithResults(results) {
+  const profile = { select() { return this; }, eq() { return this; }, async single() { return { data: { allow_story_replies: 'everyone' }, error: null }; } };
+  const supabase = { auth: { getUser: async () => ({ data: { user: { id: 'owner' } } }) }, from: table => table === 'profiles' ? profile : { insert: () => ({ select: async () => {
+    assert.ok(results.length, 'Unexpected duplicate insert');
+    return results.shift();
+  } }) } };
+  return load('../lib/storyPublish.ts', { './supabase': { supabase }, './storyGradients': { getGradient: () => ({ colors: ['#166044'] }) }, './storySlides': { selectPublishableSlides: rows => rows }, './storyTypes': { STORY_LIMITS: { ttlMs: 86400000 } }, './storyUpload': { uploadStoryImage: async () => { throw Error('text should not upload'); } } });
+}
+
+test('a silently blocked insert never reports a published story', async () => {
+  const api = publisherWithResults([{ data: [], error: null }]);
+  const result = await api.publishStorySlides([{ type: 'text', content: 'draft', bgGradId: 0 }]);
+  assert.equal(result.publishedCount, 0);
+  assert.equal(result.firstPublishedId, undefined);
+  assert.equal(result.failures.length, 1);
+});
+
+test('partial moderation counts only returned rows and does not retry the blocked batch', async () => {
+  const api = publisherWithResults([{ data: [{ id: 'allowed' }], error: null }]);
+  const result = await api.publishStorySlides([{ type: 'text', content: 'one', bgGradId: 0 }, { type: 'text', content: 'two', bgGradId: 0 }]);
+  assert.equal(result.publishedCount, 1);
+  assert.equal(result.requestedCount, 2);
+  assert.equal(result.firstPublishedId, 'allowed');
+  assert.equal(result.failures.length, 1);
+});
+
+test('row fallback keeps the first published ID and handles a silently blocked row', async () => {
+  const api = publisherWithResults([{ data: null, error: { message: 'batch rejected' } }, { data: [], error: null }, { data: [{ id: 'allowed' }], error: null }]);
+  const result = await api.publishStorySlides([{ type: 'text', content: 'one', bgGradId: 0 }, { type: 'text', content: 'two', bgGradId: 0 }]);
+  assert.equal(result.publishedCount, 1);
+  assert.equal(result.firstPublishedId, 'allowed');
+  assert.equal(result.failures.length, 1);
+});

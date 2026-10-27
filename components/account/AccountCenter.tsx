@@ -585,7 +585,7 @@ export default function AccountCenter() {
     const isProfessional = identityType !== 'standard';
     const needsEvidence = isProfessional || !Boolean(profile?.is_verified);
     if (isProfessional && !professionalName.trim()) {
-      notify('بيانات ناقصة', identityType === 'merchant' ? 'اكتب اسم المنشأة أو النشاط التجاري.' : 'اكتب اسم المجال أو النشاط المهني.');
+      notify('بيانات ناقصة', 'اكتب اسم المجال أو النشاط المهني.');
       return;
     }
     if (needsEvidence && !evidence) {
@@ -837,17 +837,17 @@ export default function AccountCenter() {
 
   if (loading) {
     return (
-      <View style={styles.loadingScreen}>
+      <View style={[styles.loadingScreen, { backgroundColor: 'transparent' }]}>
         <ActivityIndicator size="large" color={OASIS.colors.primary} />
         <Text style={styles.loadingText}>جاري تجهيز مركز حسابك...</Text>
       </View>
     );
   }
 
-  if (!profile) return <View style={[styles.loadingScreen,{backgroundColor:colors.background}]}><UserX size={42} color={colors.muted}/><Text style={{color:colors.ink,fontSize:20,fontWeight:'700'}}>تعذر تحميل حسابك</Text><Text style={{color:colors.muted,textAlign:'center',padding:20}}>{loadError || 'سجل الدخول لعرض بياناتك.'}</Text><Pressable oasisKind="action" oasisVariant="primary" onPress={() => void load()}><Text>إعادة المحاولة</Text></Pressable><Pressable onPress={() => router.replace('/auth')}><Text style={{color:colors.primary}}>تسجيل الدخول</Text></Pressable></View>;
+  if (!profile) return <View style={[styles.loadingScreen, {backgroundColor:colors.background}, { backgroundColor: 'transparent' }]}><UserX size={42} color={colors.muted}/><Text style={{color:colors.ink,fontSize:20,fontWeight:'700'}}>تعذر تحميل حسابك</Text><Text style={{color:colors.muted,textAlign:'center',padding:20}}>{loadError || 'سجل الدخول لعرض بياناتك.'}</Text><Pressable oasisKind="action" oasisVariant="primary" onPress={() => void load()}><Text>إعادة المحاولة</Text></Pressable><Pressable onPress={() => router.replace('/auth')}><Text style={{color:colors.primary}}>تسجيل الدخول</Text></Pressable></View>;
 
   return (
-    <View style={[styles.screen,{backgroundColor:colors.background}]}>
+    <View style={[styles.screen, {backgroundColor:colors.background}, { backgroundColor: 'transparent' }]}>
       <ProfileConnections userId={userId} kind={connections} onClose={() => setConnections(null)} />
       <Modal visible={!!confirmation} transparent animationType="fade" onRequestClose={() => setConfirmation(null)}><View style={accountStyles.overlay}><View style={[accountStyles.dialog,{backgroundColor:colors.surface}]} accessibilityViewIsModal><Text style={{color:colors.ink,fontSize:21,fontWeight:'800',textAlign:'right'}}>{confirmation?.title}</Text><Text style={{color:colors.muted,lineHeight:25,textAlign:'right'}}>{confirmation?.message}</Text>{confirmation?.buttons.map((item,index) => <Pressable key={index} oasisKind="action" oasisVariant={item.style === 'destructive' ? 'danger' : 'secondary'} onPress={() => {setConfirmation(null);item.onPress?.();}}><Text>{item.text}</Text></Pressable>)}</View></View></Modal>
       <AppHeader

@@ -241,7 +241,7 @@ export default function LivesScreen() {
   const openStream = (stream: LiveStream) => router.push({ pathname: '/live/[id]', params: { id: stream.id } });
 
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { backgroundColor: 'transparent' }]}>
       <AppHeader
         variant="tab"
         title="البثوث المباشرة"
