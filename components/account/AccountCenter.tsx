@@ -4,6 +4,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { ProfileHeader } from '@/components/profile/ProfileHeader';
 import { ProfileEditor } from '@/components/profile/ProfileEditor';
 import { ProfileContactSettings } from '@/components/profile/ProfileContactSettings';
+import { OfficialDocumentVerification } from '@/components/profile/OfficialDocumentVerification';
 import { ProfileConnections } from '@/components/profile/ProfileConnections';
 import { validateProfileDraft } from '@/lib/profileEditor';
 import { OasisArtwork } from '@/components/oasis/OasisPrimitives';
@@ -960,6 +961,8 @@ export default function AccountCenter() {
                 </View>
               ) : null}
             </SectionCard>
+
+            <OfficialDocumentVerification userId={userId} onSubmitted={() => void load(true)} />
 
             <SectionCard>
               <View style={styles.sectionHeader}>
