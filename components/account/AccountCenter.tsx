@@ -973,7 +973,7 @@ export default function AccountCenter() {
                         <Pressable
                           key={type.key}
                           style={[styles.typeChoice, active && { borderColor: meta.color, backgroundColor: meta.softColor }]}
-                          onPress={() => setIdentityType(type.key)}
+                          onPress={() => { setIdentityType(type.key); setProfessionalName(type.key === profile.account_type ? (profile.freelance_trade || '') : ''); setEvidence(null); }}
                         >
                           <View style={[styles.typeChoiceIcon, { backgroundColor: meta.backgroundColor }]}><Icon size={18} color={meta.color} /></View>
                           <View style={styles.typeChoiceCopy}>
