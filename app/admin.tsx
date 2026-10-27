@@ -1621,6 +1621,28 @@ export default function AdminScreen() {
                       ) : null}
                     </View>
 
+                    {v.document_number ? (
+                      <View style={[styles.dossierNoteBox, { gap: 8, borderWidth: 1, borderColor: OASIS.colors.line }]}>
+                        <Text style={styles.dossierNoteTitle}>
+                          {v.verification_type === 'freelance' ? 'وثيقة العمل الحر' : 'السجل التجاري'} — رقم مقدم من المستخدم
+                        </Text>
+                        <Text selectable style={[styles.dossierNoteText, { fontWeight: '800', writingDirection: 'ltr', textAlign: 'right' }]}>{v.document_number}</Text>
+                        <Text style={[styles.dossierNoteText, { color: '#9A3412' }]}>
+                          لم يتحقق حيّنا من الرقم آليًا. افتح الخدمة الحكومية وتأكد من صلاحية المستند ومن أن صاحب الحساب مالكه أو مفوّض رسميًا، ثم اتخذ القرار.
+                        </Text>
+                        <Pressable accessibilityRole="link" accessibilityLabel="فتح خدمة الاستعلام الحكومي" onPress={() => void Linking.openURL(
+                          v.verification_type === 'freelance'
+                            ? 'https://www.freelance.sa/ar/certificate-validation'
+                            : 'https://mc.gov.sa/ar/eservices/Pages/Commercial-data.aspx'
+                        ).catch(() => showToast('تعذر فتح موقع الاستعلام الرسمي'))}
+                          style={[styles.btnInspectCitizen, { alignSelf: 'flex-end', paddingHorizontal: 12, minHeight: 40, flexDirection: 'row-reverse', gap: 7 }]}
+                        >
+                          <Eye size={15} color={OASIS.colors.primary} />
+                          <Text style={{ color: OASIS.colors.primary, fontWeight: '700', fontSize: 12 }}>فتح الاستعلام الرسمي</Text>
+                        </Pressable>
+                      </View>
+                    ) : null}
+
                     {v.note ? (
                       <View style={styles.dossierNoteBox}>
                         <Text style={styles.dossierNoteTitle}>بيانات المتقدم:</Text>
@@ -1649,7 +1671,13 @@ export default function AdminScreen() {
                       <View style={styles.dossierActionsRow}>
                         <Pressable
                           style={styles.btnApproveVerif}
-                          onPress={() => handleVerificationDecision(v.id, v.user_id, 'approved', u.display_name || u.username || 'مواطن')}
+                          onPress={() => v.document_number
+                            ? confirmAction(
+                                'تأكيد مراجعة الوثيقة',
+                                'هل فحصت المستند على الموقع الحكومي بنفسك وتأكدت من صلاحيته ومن ملكية صاحب الحساب أو تفويضه؟ إدخال الرقم وحده لا يكفي للاعتماد.',
+                                () => void handleVerificationDecision(v.id, v.user_id, 'approved', u.display_name || u.username || 'مواطن'),
+                              )
+                            : void handleVerificationDecision(v.id, v.user_id, 'approved', u.display_name || u.username || 'مواطن')}
                         >
                           <Check size={16} color={OASIS.colors.surface} />
                           <Text style={styles.btnApproveVerifText}>اعتماد الصفة والتوثيق</Text>
