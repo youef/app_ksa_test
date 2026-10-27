@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import { Image, Platform } from 'react-native';
 import { supabase } from './supabase';
 
 export type UploadStrategy = 'bucket' | 'base64' | 'local';
@@ -29,6 +29,15 @@ async function optimizeForWeb(blob: Blob): Promise<Blob> {
 export async function uploadStoryImage(options: {
   uri: string; base64?: string | null; userId: string; index: number;
 }): Promise<UploadResult> {
+  // Decode dimensions before network upload; reject malformed and decompression-bomb images.
+  const dimensions = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+    Image.getSize(options.uri, (width, height) => resolve({ width, height }), reject);
+  }).catch(() => { throw new Error('تعذر قراءة أبعاد الصورة'); });
+  if (dimensions.width < 1 || dimensions.height < 1 ||
+      dimensions.width > 8000 || dimensions.height > 8000 ||
+      dimensions.width * dimensions.height > 32_000_000) {
+    throw new Error('أبعاد الصورة غير مسموحة');
+  }
   const response = await fetch(options.uri);
   if (!response.ok) throw new Error('تعذر قراءة الصورة');
   const source = await response.blob();
