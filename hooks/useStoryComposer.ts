@@ -132,8 +132,8 @@ export function useStoryComposer() {
       mediaTypes: ['images'],
       allowsMultipleSelection: true,
       selectionLimit: STORY_LIMITS.pickerSelectionLimit,
-      quality: 1,
-      base64: true,
+      quality: 0.7,
+      base64: false,
     });
     if (res.canceled || !res.assets?.length) return false;
     requestAddImages(res.assets);
@@ -145,8 +145,8 @@ export function useStoryComposer() {
       mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [9, 16],
-      quality: 1,
-      base64: true,
+      quality: 0.7,
+      base64: false,
     });
     if (res.canceled || !res.assets?.length) return false;
     attachImageToActiveSlide(res.assets[0]);
@@ -161,8 +161,8 @@ export function useStoryComposer() {
       mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [9, 16],
-      quality: 1,
-      base64: true,
+      quality: 0.7,
+      base64: false,
     });
     if (res.canceled || !res.assets?.length) return false;
 
