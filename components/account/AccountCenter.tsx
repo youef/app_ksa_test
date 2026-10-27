@@ -999,7 +999,7 @@ export default function AccountCenter() {
                     </Text>
                   </View>
                   {(identityType === 'merchant' || identityType === 'freelance') ? (
-                    <OfficialDocumentVerification key={identityType} kind={identityType === 'merchant' ? 'business' : 'freelance'} userId={userId} onSubmitted={() => void load(true)} />
+                    <OfficialDocumentVerification key={identityType} kind={identityType === 'merchant' ? 'business' : 'freelance'} userId={userId} />
                   ) : (
                     <View style={styles.identityEditor}>
                       {identityType !== 'standard' ? (
