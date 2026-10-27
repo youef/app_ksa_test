@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Linking, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Platform, StyleSheet, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Building2, BriefcaseBusiness, CheckCircle2, ExternalLink, FileCheck2, LockKeyhole, RotateCcw, ShieldAlert, UploadCloud } from 'lucide-react-native';
 import { OasisPressable as Pressable, OasisTextInput as TextInput } from '@/components/oasis/OasisPrimitives';
@@ -45,7 +45,7 @@ function documentStatus(request?: Request) {
   return { label: 'لم يُعتمد الطلب', color: '#B91C1C', bg: '#FEE2E2' };
 }
 
-export function OfficialDocumentVerification({ userId, onSubmitted }: { userId: string; onSubmitted?: () => void }) {
+export function OfficialDocumentVerification({ userId, kind, onSubmitted }: { userId: string; kind: Kind; onSubmitted?: () => void }) {
   const { colors } = useTheme();
   const [records, setRecords] = useState<Partial<Record<Kind, Request>>>({});
   const [numbers, setNumbers] = useState<Record<Kind, string>>({ ...EMPTY });
@@ -56,7 +56,9 @@ export function OfficialDocumentVerification({ userId, onSubmitted }: { userId: 
   const [busy, setBusy] = useState<Kind | null>(null);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
-  const [expanded, setExpanded] = useState<Kind | null>(null);
+  const [wathqLoading, setWathqLoading] = useState(false);
+  const [wathqResult, setWathqResult] = useState<{ name: string | null; status: string | null; crNumber: string | null; crNationalNumber: string | null; city: string | null } | null>(null);
+  const [wathqMessage, setWathqMessage] = useState('');
   const mounted = useRef(true);
   const inFlight = useRef(false);
 
@@ -91,6 +93,47 @@ export function OfficialDocumentVerification({ userId, onSubmitted }: { userId: 
     void load();
     return () => { mounted.current = false; };
   }, [load]);
+
+  async function lookupSandbox() {
+    const id = numbers.business.trim();
+    if (!/^[0-9]{10,15}$/.test(id)) {
+      setWathqMessage('أدخل رقم سجل تجاري أو رقمًا وطنيًا موحدًا مكونًا من 10 إلى 15 رقمًا.');
+      return;
+    }
+    if (wathqLoading) return;
+    setWathqLoading(true);
+    setWathqResult(null);
+    setWathqMessage('');
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session.session?.access_token) throw new Error('سجّل الدخول لاستخدام الاستعلام التجريبي.');
+      const endpoint = Platform.OS === 'web'
+        ? '/api/wathq-commercial'
+        : 'https://appksatest.vercel.app/api/wathq-commercial';
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + session.session.access_token,
+        },
+        body: JSON.stringify({ id, action: 'info' }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload?.error || 'تعذر الاستعلام التجريبي.');
+      setWathqResult({
+        name: payload.name || null,
+        status: payload.status || null,
+        crNumber: payload.crNumber || null,
+        crNationalNumber: payload.crNationalNumber || null,
+        city: payload.city || null,
+      });
+      setWathqMessage('نتيجة من بيئة واثق التجريبية؛ لا تثبت صحة السجل الحقيقي أو ملكيته، ولا يتم توثيق الحساب بها.');
+    } catch (err: any) {
+      setWathqMessage(err?.message || 'فشل الاستعلام التجريبي. استخدم الخدمة الحكومية الرسمية.');
+    } finally {
+      setWathqLoading(false);
+    }
+  }
 
   async function selectAttachment(kind: Kind) {
     setError('');
@@ -180,18 +223,20 @@ export function OfficialDocumentVerification({ userId, onSubmitted }: { userId: 
       <View style={styles.titleRow}>
         <FileCheck2 color={colors.primary} size={22} />
         <View style={{ flex: 1, alignItems: 'flex-end', gap: 4 }}>
-          <Text style={[styles.title, { color: colors.ink }]}>التحقق من الوثائق الرسمية</Text>
-          <Text style={[styles.description, { color: colors.muted }]}>خدمات حكومية مجانية عبر المواقع الرسمية، مع مراجعة داخل حيّنا.</Text>
+          <Text style={[styles.title, { color: colors.ink }]}>{SERVICES[kind].title}</Text>
+          <Text style={[styles.description, { color: colors.muted }]}>{SERVICES[kind].subtitle} · المتطلبات الخاصة بهذا الحساب</Text>
         </View>
       </View>
       <View style={[styles.notice, { backgroundColor: colors.background, borderColor: colors.line }]}>
         <ShieldAlert color={colors.muted} size={17} />
         <Text style={[styles.description, { color: colors.muted, flex: 1 }]}>
-          الاستعلام يجري في الموقع الحكومي، وليس آليًا داخل حيّنا. إدخال رقم أو رفع صورة لا يعني صحة الوثيقة ولا إثبات الملكية.
+          {kind === 'business'
+            ? 'للتوثيق الفعلي استخدم وزارة التجارة ثم أرسل إثبات الصفة. واثق التجريبي ليس سجلًا حقيقيًا ولا يثبت ملكية المنشأة.'
+            : 'تحقق من الوثيقة عبر منصة العمل الحر الرسمية، ثم أرفق إثباتها. لا يكفي رقم الوثيقة وحده لاعتماد الحساب.'}
         </Text>
       </View>
 
-      {loading ? <ActivityIndicator accessibilityLabel="تحميل حالات التوثيق" color={colors.primary} /> : (['business', 'freelance'] as Kind[]).map(kind => {
+      {loading ? <ActivityIndicator accessibilityLabel="تحميل حالة التوثيق" color={colors.primary} /> : (() => {
         const svc = SERVICES[kind];
         const record = records[kind];
         const status = documentStatus(record);
@@ -199,7 +244,7 @@ export function OfficialDocumentVerification({ userId, onSubmitted }: { userId: 
         const Icon = kind === 'business' ? Building2 : BriefcaseBusiness;
         return (
           <View key={kind} style={[styles.service, { backgroundColor: colors.background, borderColor: colors.line }]}>
-            <Pressable accessibilityRole="button" accessibilityLabel={'إدارة توثيق ' + svc.title} accessibilityState={{ expanded: expanded === kind }} onPress={() => setExpanded(current => current === kind ? null : kind)} style={styles.serviceTop}>
+            <View style={styles.serviceTop}>
               <Icon color={colors.primary} size={20} />
               <View style={{ flex: 1, alignItems: 'flex-end', gap: 3 }}>
                 <Text style={[styles.serviceTitle, { color: colors.ink }]}>{svc.title}</Text>
@@ -208,9 +253,8 @@ export function OfficialDocumentVerification({ userId, onSubmitted }: { userId: 
               <View style={[styles.status, { backgroundColor: status.bg }]}>
                 <Text style={{ color: status.color, fontWeight: '800', fontSize: 10 }}>{status.label}</Text>
               </View>
-              <Text style={[styles.expandArrow, { color: colors.primary }]}>{expanded === kind ? '−' : '+'}</Text>
-            </Pressable>
-            {expanded === kind ? <Text style={[styles.description, { color: colors.muted }]}>{svc.help}</Text> : null}
+            </View>
+            <Text style={[styles.description, { color: colors.muted }]}>{svc.help}</Text>
             {record ? (
               <View style={[styles.previous, { borderColor: colors.line }]}>
                 <Text style={[styles.small, { color: colors.muted }]}>آخر طلب: {record.document_number} · {new Date(record.created_at).toLocaleDateString('ar-SA')}</Text>
@@ -220,7 +264,6 @@ export function OfficialDocumentVerification({ userId, onSubmitted }: { userId: 
                 </Text>
               </View>
             ) : null}
-            {expanded === kind ? <>
             <Pressable accessibilityRole="link" accessibilityLabel={'فتح خدمة ' + svc.title + ' الرسمية'} onPress={() => {
               setError('');
               void Linking.openURL(svc.url).catch(() => setError('تعذر فتح الموقع الرسمي. حاول مرة أخرى.'));
@@ -243,6 +286,21 @@ export function OfficialDocumentVerification({ userId, onSubmitted }: { userId: 
                   placeholderTextColor={colors.muted}
                   style={[styles.input, { color: colors.ink, borderColor: colors.line, backgroundColor: colors.surface }]}
                 />
+                {kind === 'business' ? (
+                  <View style={[styles.sandboxPanel, { borderColor: colors.line, backgroundColor: colors.surface }]}>
+                    <Text style={[styles.small, { color: colors.muted }]}>فحص API تجريبي من واثق (بيانات اختبارية فقط). الخدمة الحقيقية تتطلب اشتراكًا إنتاجيًا.</Text>
+                    <Pressable accessibilityRole="button" accessibilityLabel="استعلام واثق التجريبي" style={[styles.officialLink, { borderColor: colors.line }]} disabled={wathqLoading} onPress={() => void lookupSandbox()}>
+                      {wathqLoading ? <ActivityIndicator color={colors.primary}/> : <FileCheck2 color={colors.primary} size={16} />}
+                      <Text style={[styles.actionText, { color: colors.primary }]}>{wathqLoading ? 'جارٍ الاستعلام التجريبي' : 'فحص السجل عبر واثق التجريبي'}</Text>
+                    </Pressable>
+                    {!!wathqMessage && <Text accessibilityRole="alert" style={[styles.small, { color: colors.muted }]}>{wathqMessage}</Text>}
+                    {wathqResult && <View style={styles.sandboxResult}>
+                      <Text style={[styles.small, { color: colors.ink, fontWeight: '800' }]}>اسم تجريبي: {wathqResult.name || 'غير متوفر'}</Text>
+                      <Text style={[styles.small, { color: colors.ink }]}>الحالة التجريبية: {wathqResult.status || 'غير متوفرة'}</Text>
+                      <Text style={[styles.small, { color: colors.muted }]}>رقم السجل: {wathqResult.crNumber || '—'} · الرقم الوطني: {wathqResult.crNationalNumber || '—'}</Text>
+                    </View>}
+                  </View>
+                ) : null}
                 <TextInput
                   accessibilityLabel={kind === 'business' ? 'اسم المنشأة' : 'المجال المهني'}
                   value={names[kind]}
@@ -271,10 +329,9 @@ export function OfficialDocumentVerification({ userId, onSubmitted }: { userId: 
                 </Pressable>
               </>
             ) : null}
-            </> : null}
           </View>
         );
-      })}
+      })()}
       {!!message && <Text accessibilityRole="alert" style={[styles.description, { color: '#047857' }]}>{message}</Text>}
       {!!error && <View style={{ gap: 8 }}><Text accessibilityRole="alert" style={[styles.description, { color: colors.danger }]}>{error}</Text><Pressable onPress={() => void load()} style={styles.retry}><RotateCcw size={15} color={colors.primary} /><Text style={[styles.small, { color: colors.primary }]}>إعادة تحميل حالة التوثيق</Text></Pressable></View>}
       <View style={styles.footer}>
@@ -293,6 +350,8 @@ const styles = StyleSheet.create({
   small: { fontSize: 11, lineHeight: 18, textAlign: 'right' },
   notice: { borderWidth: 1, borderRadius: 13, padding: 11, flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
   service: { borderWidth: 1, borderRadius: 16, padding: 13, gap: 11 },
+  sandboxPanel: { borderWidth: 1, borderRadius: 12, padding: 10, gap: 10 },
+  sandboxResult: { padding: 10, borderRadius: 10, gap: 3, backgroundColor: '#FFF7ED' },
   expandArrow: { fontSize: 24, fontWeight: '500', minWidth: 20, textAlign: 'center' },
   serviceTop: { flexDirection: 'row-reverse', alignItems: 'center', gap: 9, flexWrap: 'wrap' },
   serviceTitle: { fontSize: 14, fontWeight: '800', textAlign: 'right' },
