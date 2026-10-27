@@ -133,6 +133,7 @@ export default function SearchPage() {
   const [query, setQuery] = useState(params.q || '');
   const [activeTab, setActiveTab] = useState<Tab>(['all', 'users', 'questions', 'requests', 'shops'].includes(params.tab || '') ? params.tab! : 'all');
   const [loading, setLoading] = useState(false);
+  const [localOnly, setLocalOnly] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const searchSequence = useRef(0);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
@@ -178,7 +179,7 @@ export default function SearchPage() {
       }
     }, 350);
     return () => clearTimeout(timer);
-  }, [query]);
+  }, [query, localOnly]);
 
   const handleSelectKeyword = (rawKeyword: string) => {
     const cleanWord = rawKeyword.replace(/[🔧⚡🚗🛠️❄️🛒✂️🚙]/gu, '').trim();
@@ -215,6 +216,12 @@ export default function SearchPage() {
       if (sequence !== searchSequence.current) return;
 
       const myId = authResult.data?.user?.id;
+      let currentCity: string | null = null;
+      if (localOnly && myId) {
+        const { data: myProfile } = await supabase.from('profiles').select('city').eq('id', myId).maybeSingle();
+        currentCity = myProfile?.city?.trim() || null;
+      }
+      const inCity = (row: Row) => !currentCity || String(row.city || '').trim() === currentCity;
       let visibleUsers = usersResult;
       if (myId) {
         try {
@@ -234,10 +241,10 @@ export default function SearchPage() {
       }
 
       setResults({
-        users: visibleUsers,
-        questions: questionsResult,
-        requests: requestsResult,
-        shops: shopsResult,
+        users: visibleUsers.filter(inCity),
+        questions: questionsResult.filter(inCity),
+        requests: requestsResult.filter(inCity),
+        shops: shopsResult.filter(inCity),
       });
     } catch (error) {
       console.warn('Search failed:', error);
@@ -453,6 +460,10 @@ export default function SearchPage() {
         }
       />
 
+      <Pressable onPress={() => setLocalOnly(v => !v)} accessibilityRole="button"
+        style={{ alignSelf: 'flex-start', marginHorizontal: 16, marginVertical: 4, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 12, backgroundColor: localOnly ? '#dcfce7' : '#f1f5f9' }}>
+        <Text style={{ color: '#065f46', fontWeight: '600' }}>{localOnly ? '✓ داخل مدينتي' : 'تصفية حسب مدينتي'}</Text>
+      </Pressable>
       {/* Modern Search Input Capsule */}
       <View style={styles.searchBarContainer}>
         <OasisSurface oasisSurface="field" style={[styles.searchBox, isFocused && styles.searchBoxFocused]}>
