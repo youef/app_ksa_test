@@ -6,6 +6,7 @@ type Metrics = {
   total_bytes: number; objects: number; uploaded_24h: number; bytes_24h: number;
   daily: Array<{ day: string; bytes: number; files: number }>;
   cleanup: Array<{ time: string; scanned: number; removed: number; failed: number }>;
+  alerts?: Array<{ time: string; kind: string; details: Record<string, unknown> }>;
 };
 const bytes = (n: number) => (Number(n || 0) / 1048576).toFixed(2) + ' MB';
 export default function AdminStoryStorage() {
@@ -34,6 +35,10 @@ export default function AdminStoryStorage() {
       <View style={section}>
         <Text style={{ fontWeight: '700', marginBottom: 10 }}>الاستهلاك اليومي (آخر 14 يومًا)</Text>
         {data.daily.map(row => <Text key={row.day} style={{ paddingVertical: 5 }}>{row.day}: {row.files} ملف — {bytes(row.bytes)}</Text>)}
+      </View>
+      <View style={section}>
+        <Text style={{ fontWeight: '700', marginBottom: 10 }}>تنبيهات النظام</Text>
+        {data.alerts?.length ? data.alerts.map((row, i) => <Text key={i} style={{ color: '#b91c1c', paddingVertical: 5 }}>{row.kind} — {new Date(row.time).toLocaleString('ar-SA')}</Text>) : <Text>لا توجد تنبيهات نشطة</Text>}
       </View>
       <View style={section}>
         <Text style={{ fontWeight: '700', marginBottom: 10 }}>آخر عمليات التنظيف</Text>
