@@ -169,32 +169,4 @@ export async function publishStorySlides(
   // Uploaded objects were already removed after the failed insert; do not retry with broken URLs.
   return { publishedCount: 0, requestedCount: payloads.length, failures: [error.message], degradedUploads: degraded, unauthenticated: false };
 
-  if (__DEV__) console.warn('[story] batch insert rejected, retrying row by row:', error.message);
-
-  // Batch insert rejected: retry row by row so one bad slide cannot block the rest.
-  const failures: string[] = [];
-  let publishedCount = 0;
-  let firstPublishedId: string | undefined;
-
-  for (let i = 0; i < payloads.length; i++) {
-    const { data: inserted, error: rowError } = await supabase.from('stories').insert(payloads[i]).select('id');
-    if (rowError) {
-      failures.push(`الشريحة ${i + 1}: ${rowError.message}`);
-      if (__DEV__) console.error(`[story] insert failed for slide ${i + 1}:`, rowError.message);
-    } else if (inserted?.length) {
-      publishedCount += 1;
-      firstPublishedId ??= inserted[0].id;
-    } else {
-      failures.push(`الشريحة ${i + 1}: رُفضت اليومية بسبب محتوى مخالف أو صلاحيات النشر.`);
-    }
-  }
-
-  return {
-    publishedCount,
-    requestedCount: payloads.length,
-    failures,
-    degradedUploads: degraded,
-    unauthenticated: false,
-    firstPublishedId,
-  };
 }
