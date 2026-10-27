@@ -17,6 +17,7 @@ export default function AdminAnnouncements() {
   const [checking, setChecking] = useState(true);
   const [busy, setBusy] = useState(false);
   const [ads, setAds] = useState<Ad[]>([]);
+  const [expandedAd, setExpandedAd] = useState<string | null>(null);
   const [format, setFormat] = useState<Format>('text');
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
@@ -140,6 +141,14 @@ export default function AdminAnnouncements() {
           </Pressable>)}</View> : null}
         {destination !== 'none' ? <TextInput value={target} onChangeText={setTarget} autoCapitalize="none" placeholder={destination === 'external' ? 'https://example.com' : '/market'} placeholderTextColor={c.muted} style={[s.input, { color: c.ink, borderColor: c.line, backgroundColor: c.background }]} textAlign="left" /> : null}
         <Text style={{ color: c.muted, textAlign: 'right', fontSize: 11 }}>مقاس الإعلان العرضي الموصى به: 1200 × 430 بكسل (بنسبة 2.8:1)</Text>
+        <View style={[s.panel, { backgroundColor: c.soft, borderColor: c.line }]}>
+          <Text style={[s.heading, { color: c.ink, fontSize: 14 }]}>معاينة الإعلان قبل النشر</Text>
+          {format !== 'text' && photo ? <Image source={{ uri: photo.uri }} resizeMode="cover" style={s.preview} /> : null}
+          {format !== 'image' && title.trim() ? <Text style={{ color: c.ink, textAlign: 'right', fontWeight: '800' }}>{title.trim()}</Text> : null}
+          {format !== 'image' && message.trim() ? <Text style={{ color: c.ink, textAlign: 'right', lineHeight: 22 }} numberOfLines={4}>{message.trim()}</Text> : null}
+          {destination !== 'none' && target.trim() ? <Text style={{ color: c.primary, textAlign: 'right', fontSize: 12 }}>الانتقال إلى: {target.trim()}</Text> : null}
+          <Text style={{ color: c.muted, textAlign: 'right', fontSize: 11 }}>تظهر هذه المعاينة داخل لوحة الإدارة فقط، ولا تنشر الإعلان.</Text>
+        </View>
         {error ? <Text style={{ color: c.danger, textAlign: 'right' }}>{error}</Text> : null}
         <Pressable onPress={() => void publish()} disabled={busy} style={[s.submit, { backgroundColor: c.primary, opacity: busy ? 0.6 : 1 }]}>
           {busy ? <ActivityIndicator color="#FFFFFF" /> : <Send color="#FFFFFF" size={18} />}
@@ -150,10 +159,22 @@ export default function AdminAnnouncements() {
       {!ads.length ? <Text style={{ color: c.muted, textAlign: 'right' }}>لا توجد إعلانات نشطة حاليًا.</Text> : null}
       {ads.map(ad => <View key={ad.id} style={[s.panel, { backgroundColor: c.surface, borderColor: c.line }]}>
         <View style={s.row}><CheckCircle2 size={16} color={c.primary} /><Text style={{ color: c.muted, flex: 1, textAlign: 'right' }}>ينتهي {new Date(ad.expires_at).toLocaleString('ar-SA')}</Text></View>
+        <Pressable onPress={() => setExpandedAd(expandedAd === ad.id ? null : ad.id)} style={[s.detailToggle, { backgroundColor: c.soft }]}>
+          <Text style={{ color: c.primary, fontWeight: '800' }}>{expandedAd === ad.id ? 'إخفاء تفاصيل الإعلان' : 'عرض تفاصيل الإعلان'}</Text>
+        </Pressable>
         {ad.title ? <Text style={[s.heading, { color: c.ink }]}>{ad.title}</Text> : null}
         {ad.image_url ? <Image source={{ uri: ad.image_url }} resizeMode="contain" style={s.preview} /> : null}
         {ad.action_target ? <Text style={{ color: c.primary, textAlign: 'right', fontSize: 11 }}>الوجهة: {ad.action_target}</Text> : null}
         {ad.message ? <Text style={{ color: c.ink, textAlign: 'right', lineHeight: 22 }}>{ad.message}</Text> : null}
+        {expandedAd === ad.id ? <View style={[s.panel, { backgroundColor: c.soft, borderColor: c.line }]}>
+          <Text style={{ color: c.ink, textAlign: 'right' }}>رقم الإعلان: {ad.id}</Text>
+          <Text style={{ color: c.ink, textAlign: 'right' }}>نوع المحتوى: {ad.image_url ? (ad.title || ad.message ? 'صورة ونص' : 'صورة فقط') : 'نص فقط'}</Text>
+          <Text style={{ color: c.ink, textAlign: 'right' }}>تاريخ النشر: {new Date(ad.created_at).toLocaleString('ar-SA')}</Text>
+          <Text style={{ color: c.ink, textAlign: 'right' }}>الانتهاء: {new Date(ad.expires_at).toLocaleString('ar-SA')}</Text>
+          <Text style={{ color: c.ink, textAlign: 'right' }}>الحالة: {new Date(ad.expires_at).getTime() > Date.now() ? 'نشط' : 'منتهي'}</Text>
+          <Text style={{ color: c.ink, textAlign: 'right' }}>الإجراء: {ad.action_type === 'internal' ? 'انتقال داخل التطبيق' : ad.action_type === 'external' ? 'رابط خارجي' : 'بدون إجراء'}</Text>
+          {ad.action_target ? <Text selectable style={{ color: c.primary, textAlign: 'right' }}>المسار: {ad.action_target}</Text> : null}
+        </View> : null}
         <Pressable onPress={() => void remove(ad)} disabled={busy} style={s.delete}><Trash2 size={17} color={c.danger} /><Text style={{ color: c.danger, fontWeight: '700' }}>حذف الإعلان</Text></Pressable>
       </View>)}
     </ScrollView>
@@ -173,5 +194,6 @@ const s = StyleSheet.create({
   photoPicker: { minHeight: 130, borderRadius: 14, borderWidth: 1, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', gap: 9, padding: 10 },
   preview: { width: '100%', aspectRatio: 2.8, maxHeight: 230, borderRadius: 12 },
   submit: { minHeight: 48, borderRadius: 13, flexDirection: 'row-reverse', justifyContent: 'center', alignItems: 'center', gap: 9 },
+  detailToggle: { alignItems: 'center', padding: 12, borderRadius: 12 },
   delete: { flexDirection: 'row-reverse', gap: 7, alignItems: 'center', alignSelf: 'flex-start', paddingVertical: 8 },
 });
