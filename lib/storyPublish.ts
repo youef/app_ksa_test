@@ -166,6 +166,9 @@ export async function publishStorySlides(
   }
   const error = insertResult.error;
 
+  // Uploaded objects were already removed after the failed insert; do not retry with broken URLs.
+  return { publishedCount: 0, requestedCount: payloads.length, failures: [error.message], degradedUploads: degraded, unauthenticated: false };
+
   if (__DEV__) console.warn('[story] batch insert rejected, retrying row by row:', error.message);
 
   // Batch insert rejected: retry row by row so one bad slide cannot block the rest.
