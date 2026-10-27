@@ -370,6 +370,11 @@ export default function StoryViewer() {
   useEffect(() => {
     const nextStory = storiesList[currentIndex + 1];
     if (nextStory?.type === 'image' && nextStory.image_url) {
+      // Do not spend mobile data prefetching the next story.
+      if (Platform.OS === 'web' && typeof navigator !== 'undefined') {
+        const connection = (navigator as any).connection;
+        if (connection?.saveData || ['slow-2g', '2g', '3g'].includes(connection?.effectiveType)) return;
+      } else if (Platform.OS !== 'web') return;
       Image.prefetch(nextStory.image_url).catch(() => {});
     }
   }, [currentIndex, storiesList]);
