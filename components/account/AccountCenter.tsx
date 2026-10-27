@@ -573,6 +573,11 @@ export default function AccountCenter() {
 
   async function submitIdentityRequest() {
     if (!userId || identitySaving) return;
+    // Commercial registrations and freelance certificates have their own dedicated flow.
+    if (identityType === 'merchant' || identityType === 'freelance') {
+      notify('اختر التحقق المتخصص', 'استعمل نموذج السجل التجاري أو وثيقة العمل الحر الظاهر أسفل نوع الحساب.');
+      return;
+    }
     if (verificationPending) {
       notify('طلب قيد المراجعة', 'لا يمكن إرسال طلب جديد قبل أن تراجع الإدارة الطلب الحالي.');
       return;
@@ -604,11 +609,7 @@ export default function AccountCenter() {
         if (upload.error) throw upload.error;
       }
 
-      const verificationType = identityType === 'standard'
-        ? 'identity'
-        : identityType === 'freelance'
-          ? 'freelance'
-          : 'business';
+      const verificationType = identityType === 'standard' ? 'identity' : 'business';
 
       const inserted = await supabase.from('verification_requests').insert({
         user_id: userId,
@@ -950,7 +951,7 @@ export default function AccountCenter() {
                 <View style={[styles.statusChip, { backgroundColor: verificationPending ? OASIS.colors.warningSoft : profile.is_verified ? identityMeta.softColor : OASIS.colors.background }]}>
 
                   <Text style={[styles.statusChipText, { color: verificationPending ? '#B45309' : profile.is_verified ? identityMeta.color : OASIS.colors.muted }]}>
-                    {verificationPending ? 'طلب قيد المراجعة' : profile.is_verified ? 'موثّق' : 'غير موثّق'}
+                    {verificationPending ? 'طلب الحساب قيد المراجعة' : profile.is_verified ? 'حساب معتمد سابقًا' : 'الحساب غير موثّق'}
                   </Text>
                 </View>
               </View>
@@ -962,6 +963,7 @@ export default function AccountCenter() {
 
               {identityOpen ? (
                 <View style={styles.identityEditor}>
+                  <Text style={styles.sectionSub}>اختر نوع الحساب لعرض متطلبات التوثيق الخاصة به فقط.</Text>
                   <View style={styles.typeGrid}>
                     {ACCOUNT_TYPES.map((type) => {
                       const meta = getAccountIdentityMeta('user', type.key, false);
@@ -984,32 +986,46 @@ export default function AccountCenter() {
                     })}
                   </View>
 
-                  {identityType !== 'standard' ? (
-                    <Field
-                      label={identityType === 'merchant' ? 'اسم المنشأة أو النشاط' : 'اسم المجال أو النشاط'}
-                      value={professionalName}
-                      onChangeText={setProfessionalName}
-                      placeholder={identityType === 'merchant' ? 'مثال: متجر حيّنا' : 'مثال: تصميم وبرمجة'}
-                    />
-                  ) : null}
-
-                  <Pressable oasisKind="action" style={styles.evidenceButton} onPress={() => void chooseEvidence()}>
-                    <Package size={16} color="#0F766E" />
-                    <View style={styles.evidenceCopy}>
-                      <Text style={styles.evidenceTitle}>{evidence ? 'تم اختيار مستند' : 'إرفاق إثبات الصفة'}</Text>
-                      <Text style={styles.evidenceSub}>{evidence?.fileName || 'صورة الوثيقة تحفظ بشكل خاص ولا تظهر للعامة'}</Text>
+                  <View style={styles.identityFormHeading}>
+                    <Text style={styles.identityCurrent}>{ACCOUNT_TYPES.find(type => type.key === identityType)?.label}</Text>
+                    <Text style={styles.identityDescription}>
+                      {identityType === 'merchant'
+                        ? 'التحقق من بيانات المنشأة وسجلها التجاري.'
+                        : identityType === 'freelance'
+                        ? 'التحقق من وثيقة العمل الحر من منصة العمل الحر.'
+                        : identityType === 'standard'
+                        ? 'طلب توثيق الحساب الشخصي بالمراجعة الإدارية.'
+                        : 'إثبات صفة الحساب المهنية أو المجتمعية.'}
+                    </Text>
+                  </View>
+                  {(identityType === 'merchant' || identityType === 'freelance') ? (
+                    <OfficialDocumentVerification key={identityType} kind={identityType === 'merchant' ? 'business' : 'freelance'} userId={userId} onSubmitted={() => void load(true)} />
+                  ) : (
+                    <View style={styles.identityEditor}>
+                      {identityType !== 'standard' ? (
+                        <Field
+                          label={identityType === 'idea' ? 'اسم المبادرة أو المشروع' : 'اسم النشاط أو الخدمة'}
+                          value={professionalName}
+                          onChangeText={setProfessionalName}
+                          placeholder={identityType === 'idea' ? 'مثال: مبادرة أهل الحي' : 'مثال: صيانة الأجهزة المنزلية'}
+                        />
+                      ) : null}
+                      <Pressable oasisKind="action" style={styles.evidenceButton} onPress={() => void chooseEvidence()}>
+                        <Package size={16} color={colors.primary} />
+                        <View style={styles.evidenceCopy}>
+                          <Text style={styles.evidenceTitle}>{evidence ? 'تم اختيار الإثبات' : 'رفع إثبات الصفة'}</Text>
+                          <Text style={styles.evidenceSub}>{evidence?.fileName || 'الصورة خاصة بفريق المراجعة وليست عامة'}</Text>
+                        </View>
+                      </Pressable>
+                      <Pressable oasisVariant="primary" oasisKind="action" style={styles.primaryButton} onPress={() => void submitIdentityRequest()} disabled={identitySaving || verificationPending}>
+                        {identitySaving ? <ActivityIndicator size="small" color={OASIS.colors.surface} /> : <ShieldCheck size={16} color={OASIS.colors.surface} />}
+                        <Text style={styles.primaryButtonText}>{verificationPending ? 'بانتظار مراجعة الإدارة' : 'إرسال طلب توثيق هذا النوع'}</Text>
+                      </Pressable>
                     </View>
-                  </Pressable>
-
-                  <Pressable oasisVariant="primary" oasisKind="action" style={styles.primaryButton} onPress={() => void submitIdentityRequest()} disabled={identitySaving || verificationPending}>
-
-                    {identitySaving ? <ActivityIndicator size="small" color={OASIS.colors.surface} /> : <ShieldCheck size={16} color={OASIS.colors.surface} />}
-                    <Text style={styles.primaryButtonText}>{verificationPending ? 'بانتظار مراجعة الإدارة' : 'إرسال طلب المراجعة'}</Text>
-                  </Pressable>
+                  )}
                 </View>
               ) : null}
             </SectionCard>
-            <OfficialDocumentVerification userId={userId} onSubmitted={() => void load(true)} />
           </View>
         ) : null}
 
@@ -1607,6 +1623,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   identityManage: { minHeight: 42, borderRadius: 12, backgroundColor: colors.soft, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 5 },
   identityManageText: { color: colors.primary, fontSize: 11.5, fontWeight: '700' },
   identityEditor: { gap: 11, borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 11 },
+  identityFormHeading: { gap: 5, alignItems: 'flex-end', paddingVertical: 7, borderTopWidth: 1, borderColor: colors.line },
   typeGrid: { gap: 7 },
   typeChoice: { minHeight: 54, borderRadius: 13, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, flexDirection: 'row-reverse', alignItems: 'center', gap: 9, padding: 9 },
   typeChoiceIcon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
