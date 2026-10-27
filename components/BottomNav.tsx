@@ -166,7 +166,6 @@ export default function BottomNav() {
     <Animated.View pointerEvents="box-none" style={[styles.dock, { paddingBottom: bottomPadding }, animatedStyle]}>
       <View style={styles.surface}>
         <Image source={require('../public/welcome/hayna-bottom-nav-background.png')} resizeMode="cover" style={styles.navArtwork} />
-        <View style={styles.heritageGlow} />
         <View style={styles.row}>
           {TABS.map((tab) => {
             const isCreate = tab.kind === 'create';
@@ -199,9 +198,9 @@ export default function BottomNav() {
 
 const styles = StyleSheet.create({
   dock: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 100, backgroundColor: 'transparent', paddingHorizontal: 12, paddingTop: 14 },
-  surface: { height: 88, maxWidth: 560, width: '100%', alignSelf: 'center', borderRadius: 30, backgroundColor: 'transparent', borderWidth: 0, overflow: 'visible', shadowColor: '#064E3B', shadowOpacity: 0.16, shadowRadius: 16, shadowOffset: { width: 0, height: 5 }, elevation: 10 },
+  // Let the PNG be the only visible navigation background: no glass panel or shadow behind it.
+  surface: { height: 88, maxWidth: 560, width: '100%', alignSelf: 'center', backgroundColor: 'transparent', overflow: 'visible' },
   navArtwork: { position: 'absolute', left: 0, right: 0, bottom: 0, width: '100%', height: 88, borderRadius: 30 },
-  heritageGlow: { ...StyleSheet.absoluteFillObject, borderRadius: 30, backgroundColor: 'transparent' },
   // Five equal hit areas remain aligned with the circular slots in the PNG.
   // Filling the artwork eliminates the vertical shift caused by visible labels.
   row: { ...StyleSheet.absoluteFillObject, direction: 'ltr', flexDirection: 'row-reverse', alignItems: 'center', paddingHorizontal: 6, paddingTop: 12, paddingBottom: 4 },
