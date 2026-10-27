@@ -122,6 +122,21 @@ export async function publishStorySlides(
     };
   }
 
+  // Cooldown is enforced in PostgreSQL; avoid uploading files when publishing is blocked.
+  const recent = await supabase.from('stories').select('created_at').eq('author_id', user.id)
+    .order('created_at', { ascending: false }).limit(1);
+  if (!recent.error && recent.data?.[0]?.created_at &&
+      Date.now() - new Date(recent.data[0].created_at).getTime() < 3 * 60 * 60 * 1000) {
+    return { publishedCount: 0, requestedCount: publishable.length,
+      failures: ['يمكنك نشر ستوري جديدة بعد مرور ثلاث ساعات من آخر نشر.'],
+      degradedUploads: 0, unauthenticated: false };
+  }
+  if (publishable.length > 1) {
+    return { publishedCount: 0, requestedCount: publishable.length,
+      failures: ['يمكنك نشر ستوري واحدة كل ثلاث ساعات. اختر شريحة واحدة للنشر.'],
+      degradedUploads: 0, unauthenticated: false };
+  }
+
   const account = await supabase.from('profiles').select('allow_story_replies').eq('id', user.id).single();
   if (account.error) throw account.error;
   if (account.data.allow_story_replies === 'nobody') options = { ...options, allowReplies: false };
@@ -129,6 +144,13 @@ export async function publishStorySlides(
   const payloads = publishable.map((slide, i) => buildPayload(slide, user.id, urls[i], options));
 
   const insertResult = await supabase.from('stories').insert(payloads).select('id');
+  if (insertResult.error) {
+    // Prevent orphaned media when a database guard rejects the story.
+    const paths = urls.filter((url): url is string => Boolean(url))
+      .map(url => url.split('/storage/v1/object/public/story-media/')[1]?.split('?')[0])
+      .filter((path): path is string => Boolean(path));
+    if (paths.length) await supabase.storage.from('story-media').remove(paths);
+  }
 
   if (!insertResult.error) {
     const firstId = insertResult.data?.[0]?.id as string | undefined;
