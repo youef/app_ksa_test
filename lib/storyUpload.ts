@@ -58,9 +58,21 @@ export async function uploadStoryImage(options: {
   }
   const path = `${options.userId}/${Date.now()}-${options.index}-${Math.random().toString(36).slice(2, 10)}.${isWebp ? 'webp' : isPng ? 'png' : 'jpg'}`;
   const bytes = await optimized.arrayBuffer();
-  const { error } = await supabase.storage.from(BUCKET).upload(path, bytes, {
-    contentType: mime, cacheControl: '3600', upsert: false,
-  });
-  if (error) throw new Error(`تعذر رفع الصورة: ${error.message}`);
+  let lastError: string | undefined;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const { error } = await supabase.storage.from(BUCKET).upload(path, bytes, {
+      contentType: mime, cacheControl: '3600', upsert: false,
+    });
+    if (!error) {
+      return { url: supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl, strategy: 'bucket', bucket: BUCKET };
+    }
+    // Never retry authorization, size, or duplicate-object failures.
+    if (/403|401|413|409|unauthorized|forbidden|too large|already exists/i.test(error.message)) {
+      throw new Error(`تعذر رفع الصورة: ${error.message}`);
+    }
+    lastError = error.message;
+    if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 500 * 2 ** attempt));
+  }
+  throw new Error(`تعذر رفع الصورة بعد المحاولات: ${lastError}`);
   return { url: supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl, strategy: 'bucket', bucket: BUCKET };
 }
