@@ -35,8 +35,14 @@ export async function uploadStoryImage(options: {
   if (source.size > MAX_SOURCE_BYTES) throw new Error('الصورة الأصلية أكبر من 12 ميجابايت');
   const optimized = await optimizeForWeb(source);
   if (optimized.size > MAX_UPLOAD_BYTES) throw new Error('الصورة أكبر من 2 ميجابايت بعد المعالجة');
-  const isWebp = optimized.type === 'image/webp';
-  const isPng = optimized.type === 'image/png';
+  const header = new Uint8Array(await optimized.slice(0, 16).arrayBuffer());
+  const jpeg = header[0] === 0xff && header[1] === 0xd8 && header[2] === 0xff;
+  const png = header[0] === 0x89 && header[1] === 0x50 && header[2] === 0x4e && header[3] === 0x47;
+  const webp = String.fromCharCode(...header.slice(0, 4)) === 'RIFF'
+    && String.fromCharCode(...header.slice(8, 12)) === 'WEBP';
+  if (!jpeg && !png && !webp) throw new Error('الملف ليس صورة JPEG أو PNG أو WebP صالحة');
+  const isWebp = webp;
+  const isPng = png;
   const mime = isWebp ? 'image/webp' : isPng ? 'image/png' : 'image/jpeg';
   if (!isWebp && !isPng && !['image/jpeg', 'image/jpg'].includes(optimized.type)) {
     throw new Error('صيغة الصورة غير مدعومة. استخدم JPEG أو WebP.');
