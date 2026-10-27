@@ -56,6 +56,7 @@ export function OfficialDocumentVerification({ userId, onSubmitted }: { userId: 
   const [busy, setBusy] = useState<Kind | null>(null);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [expanded, setExpanded] = useState<Kind | null>(null);
   const mounted = useRef(true);
   const inFlight = useRef(false);
 
@@ -198,7 +199,7 @@ export function OfficialDocumentVerification({ userId, onSubmitted }: { userId: 
         const Icon = kind === 'business' ? Building2 : BriefcaseBusiness;
         return (
           <View key={kind} style={[styles.service, { backgroundColor: colors.background, borderColor: colors.line }]}>
-            <View style={styles.serviceTop}>
+            <Pressable accessibilityRole="button" accessibilityLabel={'إدارة توثيق ' + svc.title} accessibilityState={{ expanded: expanded === kind }} onPress={() => setExpanded(current => current === kind ? null : kind)} style={styles.serviceTop}>
               <Icon color={colors.primary} size={20} />
               <View style={{ flex: 1, alignItems: 'flex-end', gap: 3 }}>
                 <Text style={[styles.serviceTitle, { color: colors.ink }]}>{svc.title}</Text>
@@ -207,8 +208,9 @@ export function OfficialDocumentVerification({ userId, onSubmitted }: { userId: 
               <View style={[styles.status, { backgroundColor: status.bg }]}>
                 <Text style={{ color: status.color, fontWeight: '800', fontSize: 10 }}>{status.label}</Text>
               </View>
-            </View>
-            <Text style={[styles.description, { color: colors.muted }]}>{svc.help}</Text>
+              <Text style={[styles.expandArrow, { color: colors.primary }]}>{expanded === kind ? '−' : '+'}</Text>
+            </Pressable>
+            {expanded === kind ? <Text style={[styles.description, { color: colors.muted }]}>{svc.help}</Text> : null}
             {record ? (
               <View style={[styles.previous, { borderColor: colors.line }]}>
                 <Text style={[styles.small, { color: colors.muted }]}>آخر طلب: {record.document_number} · {new Date(record.created_at).toLocaleDateString('ar-SA')}</Text>
@@ -218,6 +220,7 @@ export function OfficialDocumentVerification({ userId, onSubmitted }: { userId: 
                 </Text>
               </View>
             ) : null}
+            {expanded === kind ? <>
             <Pressable accessibilityRole="link" accessibilityLabel={'فتح خدمة ' + svc.title + ' الرسمية'} onPress={() => {
               setError('');
               void Linking.openURL(svc.url).catch(() => setError('تعذر فتح الموقع الرسمي. حاول مرة أخرى.'));
@@ -268,6 +271,7 @@ export function OfficialDocumentVerification({ userId, onSubmitted }: { userId: 
                 </Pressable>
               </>
             ) : null}
+            </> : null}
           </View>
         );
       })}
@@ -289,6 +293,7 @@ const styles = StyleSheet.create({
   small: { fontSize: 11, lineHeight: 18, textAlign: 'right' },
   notice: { borderWidth: 1, borderRadius: 13, padding: 11, flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
   service: { borderWidth: 1, borderRadius: 16, padding: 13, gap: 11 },
+  expandArrow: { fontSize: 24, fontWeight: '500', minWidth: 20, textAlign: 'center' },
   serviceTop: { flexDirection: 'row-reverse', alignItems: 'center', gap: 9, flexWrap: 'wrap' },
   serviceTitle: { fontSize: 14, fontWeight: '800', textAlign: 'right' },
   status: { borderRadius: 999, paddingHorizontal: 9, paddingVertical: 6 },
