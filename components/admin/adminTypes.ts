@@ -27,6 +27,8 @@ export interface AdminVerificationRequest {
   verification_type?: 'identity' | 'freelance' | 'business' | null;
   attachment_url?: string | null;
   document_url?: string | null;
+  /** Private reference provided by applicant, not government validation. */
+  document_number?: string | null;
   status: 'pending' | 'approved' | 'rejected';
   reviewed_by: string | null;
   reviewed_at: string | null;
