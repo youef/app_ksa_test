@@ -86,6 +86,12 @@ const SETTINGS_SECTIONS: {id: SettingsSection; label: string; Icon: any; descrip
 {id:'account',label:'إدارة الحساب',Icon:Settings,description:'تسجيل الخروج وحذف الحساب'}
 ];
 
+const SETTINGS_GROUPS: { title: string; subtitle: string; ids: SettingsSection[] }[] = [
+  { title: 'ملفي وخصوصيتي', subtitle: 'التحكم بمعلوماتك وظهور حسابك', ids: ['privacy', 'location', 'security'] },
+  { title: 'التطبيق والمظهر', subtitle: 'الإشعارات والمظهر وتخصيص الصفحة', ids: ['notifications', 'appearance', 'design'] },
+  { title: 'المساعدة وإدارة الحساب', subtitle: 'الحظر والدعم وخيارات الحساب', ids: ['blocked', 'help', 'account'] },
+];
+
 type HubTab = 'profile' | 'verification' | 'content' | 'settings';
 type ContentFilter = 'all' | 'products' | 'services' | 'community';
 type Capability = {
@@ -115,7 +121,7 @@ const ACCOUNT_TYPES: { key: AccountKind; label: string; description: string }[] 
 function normalizeTab(value?: string): HubTab {
   if (value === 'content' || value === 'business' || value === 'commerce') return 'content';
   if (value === 'verification' || value === 'identity') return 'verification';
-  if (value === 'settings' || value === 'privacy' || value === 'security' || value === 'design') return 'settings';
+  if (value === 'settings' || SETTINGS_SECTIONS.some(item => item.id === value)) return 'settings';
   return 'profile';
 }
 
@@ -187,6 +193,7 @@ export default function AccountCenter() {
   const [questions, setQuestions] = useState<any[]>([]);
   const [requests, setRequests] = useState<any[]>([]);
   const [business, setBusiness] = useState<any | null>(null);
+  const [businessEditing, setBusinessEditing] = useState(false);
   const [contentFilter, setContentFilter] = useState<ContentFilter>('all');
 
   const [verification, setVerification] = useState<any | null>(null);
@@ -1029,7 +1036,7 @@ export default function AccountCenter() {
                   onPress={() => openAdd('service')}
                 />
                 {capabilities.can_manage_business ? (
-                  <QuickAction label="منشأتي" sub="البيانات والظهور التجاري" Icon={Store} onPress={() => setContentFilter('all')} />
+                  <QuickAction label="منشأتي" sub="فتح إعدادات وبيانات المنشأة" Icon={Store} onPress={() => setBusinessEditing(current => !current)} />
                 ) : (
                   <QuickAction label="تحويل لتجاري" sub="اطلب اعتماد منشأة" Icon={BriefcaseBusiness} onPress={() => { navigateTab('verification'); setIdentityType('merchant'); setIdentityOpen(true); }} />
                 )}
@@ -1039,14 +1046,15 @@ export default function AccountCenter() {
 
             {business && capabilities.can_manage_business ? (
               <SectionCard>
-                <View style={styles.sectionHeader}>
+                <Pressable accessibilityRole="button" accessibilityLabel="عرض تفاصيل منشأتي" accessibilityState={{ expanded: businessEditing }} style={styles.sectionHeader} onPress={() => setBusinessEditing(value => !value)}>
                   <View style={styles.sectionHeaderCopy}>
-                    <Text style={styles.sectionTitle}>المنشأة المرتبطة بالحساب</Text>
-                    <Text style={styles.sectionSub}>أي منتج أو خدمة تجارية جديدة ترتبط بهذه المنشأة تلقائيًا</Text>
+                    <Text style={styles.sectionTitle}>منشأتي · {business.name || 'النشاط التجاري'}</Text>
+                    <Text style={styles.sectionSub}>بيانات المنشأة وتعديلها عند الحاجة</Text>
                   </View>
-                  <Store size={21} color="#B7791F" />
-                </View>
-                <View style={styles.formStack}>
+                  <View style={styles.areaLeadIcon}><Store size={19} color={colors.primary} /></View>
+                  <ChevronLeft size={17} color={colors.muted} style={{ transform: [{ rotate: businessEditing ? '90deg' : '0deg' }] }} />
+                </Pressable>
+                {businessEditing ? <View style={styles.formStack}>
                   <Field label="اسم المنشأة" value={business.name || ''} onChangeText={(value: string) => setBusiness((current: any) => ({ ...current, name: value }))} />
                   <Field label="نبذة عن المنشأة" value={business.description || ''} onChangeText={(value: string) => setBusiness((current: any) => ({ ...current, description: value }))} multiline />
                   <View style={styles.twoFields}>
@@ -1057,7 +1065,12 @@ export default function AccountCenter() {
                     <Save size={15} color="#0F766E" />
                     <Text style={styles.outlineButtonText}>حفظ بيانات المنشأة</Text>
                   </Pressable>
-                </View>
+                </View> : (
+                  <View style={[styles.businessSummary, { backgroundColor: colors.background }]}>
+                    <Text numberOfLines={2} style={styles.businessSummaryTitle}>{business.name || 'منشأة حيّنا'}</Text>
+                    <Text numberOfLines={2} style={styles.businessSummarySub}>{business.description || 'اضغط على عنوان المنشأة لعرض البيانات وتعديلها.'}</Text>
+                  </View>
+                )}
               </SectionCard>
             ) : null}
 
@@ -1330,26 +1343,43 @@ export default function AccountCenter() {
             </>}
               </View>
             ) : (
-              <View style={styles.settingsGrid}>
-                {SETTINGS_SECTIONS.map(({ id, label, Icon, description }) => (
-                  <Pressable
-                    key={id}
-                    accessibilityRole="button"
-                    accessibilityLabel={'فتح ' + label}
-                    style={styles.settingsCategory}
-                    onPress={() => {
-                      setSettingsSection(id);
-                      setSettingsDetailOpen(true);
-                      designScrolled.current = false;
-                      router.setParams({ tab: 'settings', section: id });
-                      scrollRef.current?.scrollTo({ y: 0, animated: true });
-                    }}
-                  >
-                    <View style={styles.settingsCategoryIcon}><Icon size={20} color={colors.primary} /></View>
-                    <Text style={styles.settingsCategoryTitle}>{label}</Text>
-                    <Text style={styles.settingsCategoryDescription} numberOfLines={2}>{description}</Text>
-                    <ChevronLeft size={14} color={colors.muted} />
-                  </Pressable>
+              <View style={styles.stack}>
+                {SETTINGS_GROUPS.map(group => (
+                  <SectionCard key={group.title}>
+                    <View style={styles.sectionHeaderCopy}>
+                      <Text style={styles.sectionTitle}>{group.title}</Text>
+                      <Text style={styles.sectionSub}>{group.subtitle}</Text>
+                    </View>
+                    <View style={styles.settingsList}>
+                      {group.ids.map((id, index) => {
+                        const item = SETTINGS_SECTIONS.find(section => section.id === id);
+                        if (!item) return null;
+                        const Icon = item.Icon;
+                        return (
+                          <Pressable
+                            key={id}
+                            accessibilityRole="button"
+                            accessibilityLabel={'فتح ' + item.label}
+                            style={[styles.settingsListItem, index > 0 && styles.settingsListDivider]}
+                            onPress={() => {
+                              setSettingsSection(id);
+                              setSettingsDetailOpen(true);
+                              designScrolled.current = false;
+                              router.setParams({ tab: 'settings', section: id });
+                              scrollRef.current?.scrollTo({ y: 0, animated: true });
+                            }}
+                          >
+                            <View style={styles.settingsListIcon}><Icon size={19} color={colors.primary} /></View>
+                            <View style={styles.settingsListCopy}>
+                              <Text style={styles.settingsListTitle}>{item.label}</Text>
+                              <Text style={styles.settingsListSubtitle} numberOfLines={1}>{item.description}</Text>
+                            </View>
+                            <ChevronLeft size={17} color={colors.muted} />
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </SectionCard>
                 ))}
               </View>
             )}
@@ -1449,7 +1479,7 @@ function QuickAction({ label, sub, Icon, onPress, disabled }: any) {
   const {colors} = useTheme();
   const styles = useMemo(() => createStyles(colors),[colors]);
   return (
-    <Pressable style={[styles.quickAction, disabled && styles.quickActionDisabled]} onPress={onPress}>
+    <Pressable accessibilityRole="button" disabled={Boolean(disabled)} style={[styles.quickAction, disabled && styles.quickActionDisabled]} onPress={onPress}>
       <View style={styles.quickActionIcon}><Icon size={20} color={disabled ? '#94A3B8' : OASIS.colors.primary} /></View>
       <View style={styles.quickActionCopy}><Text style={styles.quickActionTitle}>{label}</Text><Text style={styles.quickActionSub}>{sub}</Text></View>
       <ChevronLeft size={17} color="#94A3B8" />
@@ -1524,6 +1554,9 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   tabButtonText: { color: colors.muted, fontSize: 11, fontWeight: '700' },
   tabButtonTextActive: { color: colors.primary },
   stack: { gap: 14 },
+  businessSummary: { borderRadius: 14, padding: 14, gap: 5 },
+  businessSummaryTitle: { color: colors.ink, fontSize: 13, fontWeight: '800', textAlign: 'right' },
+  businessSummarySub: { color: colors.muted, fontSize: 11.5, lineHeight: 18, textAlign: 'right' },
   profileActions: { flexDirection: 'row-reverse', gap: 10 },
   profileAction: { flex: 1, minHeight: 46, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: colors.line, borderRadius: 14, backgroundColor: colors.surface },
   profileActionText: { fontSize: 12, fontWeight: '700', color: colors.ink },
@@ -1531,6 +1564,13 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   areaLeadIcon: { width: 43, height: 43, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.soft },
   areaLeadTitle: { color: colors.ink, fontSize: 17, fontWeight: '800', textAlign: 'right' },
   areaLeadDescription: { color: colors.muted, fontSize: 11.5, lineHeight: 19, textAlign: 'right' },
+  settingsList: { gap: 0 },
+  settingsListItem: { flexDirection: 'row-reverse', minHeight: 65, alignItems: 'center', gap: 11, paddingVertical: 9 },
+  settingsListDivider: { borderTopWidth: 1, borderColor: colors.line },
+  settingsListIcon: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: colors.soft },
+  settingsListCopy: { flex: 1, alignItems: 'flex-end', gap: 3 },
+  settingsListTitle: { color: colors.ink, fontSize: 12.5, fontWeight: '800', textAlign: 'right' },
+  settingsListSubtitle: { color: colors.muted, fontSize: 11, textAlign: 'right' },
   settingsGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 10 },
   settingsCategory: { flexGrow: 1, flexBasis: '46%', minWidth: 0, minHeight: 156, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, borderRadius: 18, padding: 14, alignItems: 'flex-end', gap: 8 },
   settingsCategoryIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.soft },
