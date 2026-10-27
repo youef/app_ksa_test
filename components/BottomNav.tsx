@@ -207,9 +207,9 @@ const styles = StyleSheet.create({
   row: { ...StyleSheet.absoluteFillObject, direction: 'ltr', flexDirection: 'row-reverse', alignItems: 'center', paddingHorizontal: 6, paddingTop: 12, paddingBottom: 4 },
   tab: { flex: 1, minWidth: 0, height: '100%', alignItems: 'center', justifyContent: 'center', paddingTop: 10 },
   orb: { width: 49, height: 49, borderRadius: 25, backgroundColor: 'rgba(255,255,255,0.79)', borderWidth: 1.5, borderColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', shadowColor: '#456A55', shadowOpacity: 0.08, shadowRadius: 5, elevation: 2 },
-  // Only the four side icons move 8px lower to sit in the artwork's round slots.
-  // The central Add (+) icon keeps its current position, size and styling.
-  standardOrbLower: { transform: [{ translateY: 8 }] },
+  // Move only the four side icons down 3px to align with the PNG's round slots.
+  // Keep the central Add (+) icon at its original position.
+  standardOrbLower: { transform: [{ translateY: 3 }] },
   activeOrb: { borderColor: '#55D8A5', borderWidth: 2.5, backgroundColor: '#F1FFF8' },
   createOrb: { width: 64, height: 64, borderRadius: 32, marginTop: -6, backgroundColor: '#006D4E', borderWidth: 5, borderColor: '#F9F4DF', shadowColor: '#006D4E', shadowOpacity: 0.3, shadowRadius: 10, elevation: 9 },
   activeDot: { position: 'absolute', bottom: 6, width: 17, height: 4, borderRadius: 3, backgroundColor: '#047857' },
