@@ -27,7 +27,7 @@ export function useAppHeaderHeight() {
 export function AppHeaderFrame({ children, tone = 'light', safeArea = true, style }: { children: ReactNode; tone?: HeaderTone; safeArea?: boolean; style?: StyleProp<ViewStyle> }) {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
-  return <View testID="app-header" style={[styles.container, { backgroundColor: colors.surface, borderBottomColor: colors.line }, tone === 'overlay' && styles.overlay, { paddingTop: safeArea ? headerTopInset(insets.top) : 0 }, style]}>
+  return <View testID="app-header" style={[styles.container, { backgroundColor: 'transparent', borderBottomColor: 'transparent' }, tone === 'overlay' && styles.overlay, { paddingTop: safeArea ? headerTopInset(insets.top) : 0 }, style]}>
     <HeaderArtwork dark={tone === 'overlay' || isDark} />
     <View testID="app-header-content" style={styles.content}>{children}</View>
   </View>;
@@ -118,7 +118,7 @@ export function AppHeader({ variant = 'sub', title, subtitle, fallbackRoute = '/
 }
 
 const styles = StyleSheet.create({
-  container: { width: '100%', backgroundColor: OASIS.colors.surface, borderBottomWidth: 1, borderBottomColor: OASIS.colors.line, zIndex: 20, flexShrink: 0, overflow: 'hidden' },
+  container: { width: '100%', backgroundColor: 'transparent', borderBottomWidth: 0, borderBottomColor: 'transparent', zIndex: 20, flexShrink: 0, overflow: 'hidden' },
   overlay: { backgroundColor: 'transparent', borderBottomColor: 'transparent' },
   content: { position: 'relative', height: APP_HEADER_HEIGHT, width: '100%', maxWidth: 1100, alignSelf: 'center', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: HEADER_HORIZONTAL_PADDING, gap: 4 },
   side: { width: HEADER_SIDE_WIDTH, flexShrink: 0, alignItems: 'flex-start', justifyContent: 'center', height: HEADER_ACTION_SIZE },
