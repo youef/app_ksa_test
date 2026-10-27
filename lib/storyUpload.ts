@@ -1,3 +1,4 @@
+import { uploadResumableStory } from './storyTus';
 import { Image, Platform } from 'react-native';
 import { supabase } from './supabase';
 
@@ -56,23 +57,11 @@ export async function uploadStoryImage(options: {
   if (!isWebp && !isPng && !['image/jpeg', 'image/jpg'].includes(optimized.type)) {
     throw new Error('صيغة الصورة غير مدعومة. استخدم JPEG أو WebP.');
   }
-  const path = `${options.userId}/${Date.now()}-${options.index}-${Math.random().toString(36).slice(2, 10)}.${isWebp ? 'webp' : isPng ? 'png' : 'jpg'}`;
-  const bytes = await optimized.arrayBuffer();
-  let lastError: string | undefined;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const { error } = await supabase.storage.from(BUCKET).upload(path, bytes, {
-      contentType: mime, cacheControl: '3600', upsert: false,
-    });
-    if (!error) {
-      return { url: supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl, strategy: 'bucket', bucket: BUCKET };
-    }
-    // Never retry authorization, size, or duplicate-object failures.
-    if (/403|401|413|409|unauthorized|forbidden|too large|already exists/i.test(error.message)) {
-      throw new Error(`تعذر رفع الصورة: ${error.message}`);
-    }
-    lastError = error.message;
-    if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 500 * 2 ** attempt));
-  }
-  throw new Error(`تعذر رفع الصورة بعد المحاولات: ${lastError}`);
+  // Stable within the publishing window so a second attempt can resume the same TUS URL.
+  const identity = options.uri + ':' + optimized.size + ':' + options.index;
+  let hash = 2166136261;
+  for (let i = 0; i < identity.length; i++) hash = Math.imul(hash ^ identity.charCodeAt(i), 16777619);
+  const path = `${options.userId}/${Math.floor(Date.now() / 10800000)}-${(hash >>> 0).toString(36)}.${isWebp ? 'webp' : isPng ? 'png' : 'jpg'}`;
+  await uploadResumableStory({ file: optimized, path, mime });
   return { url: supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl, strategy: 'bucket', bucket: BUCKET };
 }
