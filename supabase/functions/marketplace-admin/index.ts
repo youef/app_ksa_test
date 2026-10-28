@@ -28,8 +28,8 @@ serve(async (req) => {
     const { data: authData, error: authError } = await authClient.auth.getUser();
     const user = authData.user;
     if (authError || !user) return json({ error: 'انتهت الجلسة.' }, 401);
-    const { data: profile } = await authClient.from('profiles').select('role').eq('id', user.id).maybeSingle();
-    if (profile?.role !== 'admin') {
+    const { data: allowed } = await authClient.rpc('hayna_marketplace_can_review');
+    if (allowed !== true) {
       return json({ error: 'هذه العملية مخصصة للإدارة.' }, 403);
     }
 
@@ -56,24 +56,8 @@ serve(async (req) => {
       const campaignId = typeof body.campaign_id === 'string' ? body.campaign_id : '';
       const decision = body.decision;
       if (!campaignId || !['approve', 'reject'].includes(decision)) return json({ error: 'طلب مراجعة غير صالح.' }, 400);
-      const { data: campaign, error: campaignError } = await admin.from('marketplace_ad_campaigns')
-        .select('id,status,package_id').eq('id', campaignId).maybeSingle();
-      if (campaignError || !campaign) return json({ error: 'الإعلان غير موجود.' }, 404);
-      if (campaign.status !== 'pending_review') return json({ error: 'تمت مراجعة هذا الإعلان مسبقًا.' }, 409);
-
-      const now = new Date();
-      let patch: Record<string, unknown> = { status: 'rejected', updated_at: now.toISOString() };
-      if (decision === 'approve') {
-        const { data: pkg } = await admin.from('marketplace_ad_packages').select('duration_days').eq('id', campaign.package_id).maybeSingle();
-        const days = Math.max(1, Number(pkg?.duration_days) || 7);
-        patch = {
-          status: 'active', starts_at: now.toISOString(),
-          ends_at: new Date(now.getTime() + days * 24 * 60 * 60 * 1000).toISOString(),
-          updated_at: now.toISOString(),
-        };
-      }
-      const { error } = await admin.from('marketplace_ad_campaigns').update(patch).eq('id', campaignId).eq('status', 'pending_review');
-      if (error) throw error;
+      const {error}=await authClient.rpc('hayna_review_marketplace_campaign',{p_campaign:campaignId,p_approve:decision==='approve'});
+      if(error)throw error;
       return json({ success: true, decision });
     }
     return json({ error: 'الإجراء غير معروف.' }, 400);

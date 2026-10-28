@@ -22,8 +22,8 @@ export default function AdminMarketplace() {
   const load = useCallback(async () => {
     const { data: auth } = await supabase.auth.getUser();
     if (!auth.user) { router.replace('/auth'); return; }
-    const { data: profile } = await supabase.from('profiles').select('role,is_banned').eq('id', auth.user.id).maybeSingle();
-    if (profile?.role !== 'admin' || profile?.is_banned) {
+    const { data: allowed } = await supabase.rpc('hayna_marketplace_can_review');
+    if (allowed !== true) {
       Alert.alert('غير مصرح', 'هذه الصفحة مخصصة للإدارة.');
       router.replace('/marketplace-dashboard');
       return;
