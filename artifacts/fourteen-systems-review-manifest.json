@@ -1,0 +1,30 @@
+{
+  "status": "review_only_not_applied",
+  "files": [
+    {
+      "path": "artifacts/integration-rbac.sql",
+      "bytes": 12808,
+      "sha256": "177c41af8a13628f305975a45bedd21c1e2f57ee0d5f75303363cb2e05a1810c"
+    },
+    {
+      "path": "artifacts/integration-commerce.sql",
+      "bytes": 33063,
+      "sha256": "519c0b9cf4067cdba3bc86d88400b4412e2ad2f74a4a0b085305a4aac529e80a"
+    },
+    {
+      "path": "artifacts/integration-community.sql",
+      "bytes": 34369,
+      "sha256": "7f3cbbd3005603dbdeb702554c0d65b0b6201f185f7cea95e1e28b8e8d712a88"
+    },
+    {
+      "path": "artifacts/integration-analytics.sql",
+      "bytes": 26424,
+      "sha256": "398e7d43034643f8ba6b372525c0ee4012056d44c0fdc54da0935a0179c1beb6"
+    },
+    {
+      "path": "artifacts/integration-rbac-extra.sql",
+      "bytes": 16535,
+      "sha256": "ff0c7becebc1180d12eaf28332d391d4e85696c17e8cb15871ead7aa94f754d7"
+    }
+  ]
+}
