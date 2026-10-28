@@ -1,305 +1,65 @@
-import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
-import { OASIS } from '@/lib/oasis';
-import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Linking, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useLocalSearchParams, router } from 'expo-router';
-import { BadgeCheck, Briefcase, CreditCard, Crown, Megaphone, RefreshCw, ShieldCheck, ShoppingBag, Star } from 'lucide-react-native';
-import { AppHeader } from '@/components/shared/AppHeader';
-import { useBottomNavInset } from '@/lib/bottomNav';
-import { supabase } from '@/lib/supabase';
+import React,{useCallback,useEffect,useRef,useState} from 'react';
+import {ActivityIndicator,Alert,AppState,Linking,RefreshControl,ScrollView,StyleSheet,Text,View}from'react-native';
+import {router,useFocusEffect,useLocalSearchParams}from'expo-router';
+import {BadgeCheck,BarChart3,Check,ChevronLeft,Clock,CreditCard,Crown,Eye,Megaphone,Package,Pause,Play,RefreshCw,ShieldCheck,ShoppingBag,Store,Tag,Wallet}from'lucide-react-native';
+import {OasisPressable as Pressable}from'@/components/oasis/OasisPrimitives';
+import {AppHeader}from'@/components/shared/AppHeader';
+import {MarketField,MarketChoice}from'@/components/market/MarketComposer';
+import {useTheme}from'@/context/ThemeContext';
+import {supabase}from'@/lib/supabase';
+import {useBottomNavInset}from'@/lib/bottomNav';
+import {marketplaceMoney as money,marketplaceStatus as statuses,safeMarketplaceCheckout,marketplaceError}from'@/lib/marketplaceWorkspace';
+type Tab='overview'|'plans'|'ads'|'orders'|'services';
+const tabs=[['overview','نظرة عامة',BarChart3],['plans','الباقات',Crown],['ads','الترويج',Megaphone],['services','طلبات الخدمات',Package],['orders','المدفوعات',CreditCard]]as const;
 
-type Plan = { id: string; slug: string; name: string; description: string; price_halalas: number; period_days: number; features: string[] };
-type AdPackage = { id: string; slug: string; name: string; description: string; price_halalas: number; duration_days: number };
-type Service = { id: string; name: string; description?: string; price_from: number | null; price_type?: string; provider_id: string; city?: string; district?: string };
-type Order = { id: string; order_type: string; status: string; amount_halalas: number; created_at: string; checkout_url?: string | null };
-
-const money = (halalas: number) => new Intl.NumberFormat('ar-SA', { style: 'currency', currency: 'SAR', maximumFractionDigits: 2 }).format(halalas / 100);
-const statusLabel: Record<string, string> = {
-  pending: 'بانتظار الدفع', paid: 'مدفوع', failed: 'فشل الدفع', cancelled: 'ملغي', refunded: 'مسترد', expired: 'منتهي',
-  pending_payment: 'بانتظار الدفع', active: 'نشط', past_due: 'متأخر', expired_subscription: 'منتهي',
-  pending_review: 'بانتظار مراجعة الإعلان', accepted: 'مقبول', in_progress: 'قيد التنفيذ', completed: 'مكتمل',
-};
-
-export default function MarketplaceDashboard() {
-  const bottomInset = useBottomNavInset();
-  const params = useLocalSearchParams<{ service_id?: string; payment?: string }>();
-  const [userId, setUserId] = useState<string | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [tab, setTab] = useState<'plans' | 'ads' | 'orders'>('plans');
-  const [myServices, setMyServices] = useState<Service[]>([]);
-  const [plans, setPlans] = useState<Plan[]>([]);
-  const [packages, setPackages] = useState<AdPackage[]>([]);
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [subscription, setSubscription] = useState<any>(null);
-  const [selectedServiceId, setSelectedServiceId] = useState<string>(params.service_id || '');
-  const [adTitle, setAdTitle] = useState('');
-  const [adDescription, setAdDescription] = useState('');
-  const [busyId, setBusyId] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const load = useCallback(async () => {
-    const { data: auth } = await supabase.auth.getUser();
-    if (!auth.user) {
-      setUserId(null);
-      router.replace('/auth');
-      setLoading(false);
-      return;
-    }
-    setUserId(auth.user.id);
-    const { data: ownProfile } = await supabase.from('profiles').select('role').eq('id', auth.user.id).maybeSingle();
-    setIsAdmin(ownProfile?.role === 'admin');
-    const [myServicesRes, plansRes, packagesRes, ordersRes, subscriptionRes] = await Promise.all([
-      supabase.from('services').select('id,name,description,price_from,price_type,provider_id,city,district')
-        .eq('provider_id', auth.user.id).order('created_at', { ascending: false }).limit(50),
-      supabase.from('marketplace_plans').select('id,slug,name,description,price_halalas,period_days,features')
-        .eq('active', true).order('sort_order'),
-      supabase.from('marketplace_ad_packages').select('id,slug,name,description,price_halalas,duration_days')
-        .eq('active', true).order('sort_order'),
-      supabase.from('marketplace_orders').select('id,order_type,status,amount_halalas,created_at,checkout_url')
-        .eq('user_id', auth.user.id).order('created_at', { ascending: false }).limit(30),
-      supabase.from('marketplace_subscriptions').select('id,status,current_period_end,plan:marketplace_plans(name,slug)')
-        .eq('user_id', auth.user.id).eq('status', 'active').order('current_period_end', { ascending: false }).limit(1).maybeSingle(),
-    ]);
-    setMyServices(myServicesRes.data || []);
-    setPlans(plansRes.data || []);
-    setPackages(packagesRes.data || []);
-    setOrders(ordersRes.data || []);
-    setSubscription(subscriptionRes.data || null);
-    setLoading(false);
-  }, []);
-
-  useEffect(() => { void load(); }, [load]);
-  useEffect(() => {
-    if (params.payment === 'success') Alert.alert('تمت العودة من الدفع', 'سيظهر الطلب مدفوعًا بعد تأكيد بوابة الدفع. اسحب للتحديث إذا لزم الأمر.');
-  }, [params.payment]);
-
-
-  async function checkout(body: Record<string, unknown>, key: string) {
-    if (!userId || busyId) return;
-    setBusyId(key);
-    try {
-      const { data, error } = await supabase.functions.invoke('create-marketplace-checkout', {
-        body: { ...body, request_id: `${userId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}` },
-      });
-      if (error) throw new Error(data?.error || error.message || 'تعذر الاتصال بخدمة الدفع.');
-      if (data?.error) throw new Error(data.error);
-      if (data?.checkout_url) {
-        await Linking.openURL(data.checkout_url);
-        Alert.alert('تم تجهيز الدفع', 'أكمل الدفع في صفحة بوابة الدفع. سيُحدّث النظام الحالة بعد تأكيدها من الخادم.');
-      } else if (data?.status === 'paid') {
-        Alert.alert('تم الدفع مسبقًا', 'هذه العملية مسجلة كمدفوعة.');
-      } else {
-        throw new Error('لم تُرجع بوابة الدفع رابط إكمال العملية.');
-      }
-      await load();
-    } catch (error: any) {
-      Alert.alert('تعذر إكمال العملية', error?.message || 'تحقق من اتصالك وإعدادات الدفع.');
-    } finally {
-      setBusyId('');
-    }
-  }
-
-  async function createAd(pkg: AdPackage) {
-    const selected = myServices.find(s => s.id === selectedServiceId);
-    const title = adTitle.trim() || selected?.name || '';
-    if (!title) return Alert.alert('عنوان الإعلان مطلوب', 'اكتب عنوان الإعلان أو اختر أحد عروضك.');
-    await checkout({
-      kind: 'ad_campaign', package_slug: pkg.slug, service_id: selectedServiceId || undefined,
-      title, description: adDescription.trim(),
-    }, `ad-${pkg.slug}`);
-  }
-
-  const refresh = async () => {
-    setRefreshing(true);
-    await load();
-    setRefreshing(false);
-  };
-
-  if (loading) return <View style={[styles.loading, { backgroundColor: 'transparent' }]}><ActivityIndicator size="large" color={OASIS.colors.primary} /><Text style={styles.muted}>نجهز المزايا التجارية والمدفوعات…</Text></View>;
-
-  return (
-    <View style={[styles.root, { backgroundColor: 'transparent' }]}>
-      <AppHeader variant="sub" title="المزايا التجارية" subtitle="الاشتراكات · الترويج · المدفوعات" fallbackRoute="/profile?tab=content" />
-      <ScrollView
-        contentContainerStyle={[styles.content, { paddingBottom: bottomInset + 28 }]}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={OASIS.colors.primary} />}
-      >
-        <View style={styles.hero}>
-          <View style={styles.heroIcon}><ShoppingBag size={26} color={OASIS.colors.surface} /></View>
-          <Text style={styles.heroTitle}>مزايا الحساب المهني</Text>
-          <Text style={styles.heroText}>الاشتراكات والترويج وسجل المدفوعات في مكان واحد. استكشاف المنتجات والخدمات يبقى في سوق حيّنا.</Text>
-          <View style={styles.secureLine}><ShieldCheck size={15} color="#a7f3d0" /><Text style={styles.secureText}>دفع مستضاف وآمن · لا نخزن بيانات البطاقات</Text></View>
-        </View>
-
-        {isAdmin && (
-          <Pressable oasisKind="action" onPress={() => router.push('/admin-marketplace')} style={styles.adminButton}>
-            <ShieldCheck size={17} color={OASIS.colors.surface} />
-            <Text style={styles.primaryButtonText}>مراجعة الإعلانات المدفوعة (الإدارة)</Text>
-          </Pressable>
-        )}
-
-        {subscription && (
-          <View style={styles.activePlan}>
-            <View style={styles.planIcon}><Crown size={20} color={OASIS.colors.primary} /></View>
-            <View style={{ flex: 1, alignItems: 'flex-end' }}>
-              <Text style={styles.activePlanTitle}>اشتراكك الحالي: {subscription.plan?.name || 'احترافي'}</Text>
-              <Text style={styles.muted}>ينتهي في {subscription.current_period_end ? new Date(subscription.current_period_end).toLocaleDateString('ar-SA') : '—'}</Text>
-            </View>
-            <BadgeCheck size={22} color={OASIS.colors.primary} />
-          </View>
-        )}
-
-        <View style={styles.tabs}>
-          {([
-            ['plans', 'الاشتراكات', Crown],
-            ['ads', 'الترويج', Megaphone],
-            ['orders', 'طلباتي', CreditCard],
-          ] as const).map(([id, label, Icon]) => (
-            <Pressable oasisVariant={tab === id ? 'primary' : 'secondary'} oasisKind="chip" key={id} onPress={() => setTab(id)} style={[styles.tab, tab === id && styles.tabActive]}>
-              <Icon size={16} color={tab === id ? OASIS.colors.surface : OASIS.colors.muted} />
-              <Text style={[styles.tabText, tab === id && styles.tabTextActive]}>{label}</Text>
-            </Pressable>
-          ))}
-        </View>
-
-        {tab === 'plans' && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>باقات مقدمي الخدمات</Text>
-            <Text style={styles.muted}>تفعيل المزايا يتم بعد تأكيد الدفع من الخادم. التجديد التلقائي غير مفعل حتى يتم ربط منتج recurring لدى مزود الدفع.</Text>
-            {plans.map(plan => (
-              <OasisSurface oasisSurface="card" key={plan.id} style={styles.card}>
-                <View style={styles.cardTop}>
-                  <View style={styles.pricePill}><Text style={styles.priceText}>{plan.price_halalas === 0 ? 'مجانية' : money(plan.price_halalas)}</Text></View>
-                  <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                    <Text style={styles.cardTitle}>{plan.name}</Text>
-                    <Text style={styles.muted}>{plan.period_days} يومًا</Text>
-                  </View>
-                  <View style={styles.smallIcon}><Crown size={19} color={OASIS.colors.primary} /></View>
-                </View>
-                <Text style={styles.description}>{plan.description}</Text>
-                {(plan.features || []).map((feature, i) => <Text key={i} style={styles.feature}>✓  {feature}</Text>)}
-                {plan.price_halalas > 0 && <Pressable oasisVariant="primary" oasisKind="action" disabled={!!busyId} style={[styles.primaryButton, !!busyId && styles.disabled]} onPress={() => void checkout({ kind: 'subscription', plan_slug: plan.slug }, `plan-${plan.slug}`)}>
-                  {busyId === `plan-${plan.slug}` ? <ActivityIndicator color={OASIS.colors.surface} /> : <Crown size={17} color={OASIS.colors.surface} />}
-                  <Text style={styles.primaryButtonText}>اشترك الآن</Text>
-                </Pressable>}
-              </OasisSurface>
-            ))}
-          </View>
-        )}
-
-        {tab === 'ads' && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>الإعلانات والترويج المدفوع</Text>
-            <Text style={styles.muted}>تُراجع الإعلانات بعد الدفع ولا تظهر تلقائيًا قبل الموافقة.</Text>
-            <OasisSurface oasisSurface="card" style={styles.card}>
-              <Text style={styles.fieldLabel}>اختر عرضًا تملكه (اختياري)</Text>
-              <View style={styles.choiceWrap}>
-                <Pressable onPress={() => setSelectedServiceId('')} style={[styles.choice, !selectedServiceId && styles.choiceActive]}><Text style={[styles.choiceText, !selectedServiceId && styles.choiceTextActive]}>إعلان عام</Text></Pressable>
-                {myServices.map(s => <Pressable key={s.id} onPress={() => { setSelectedServiceId(s.id); if (!adTitle.trim()) setAdTitle(s.name); }} style={[styles.choice, selectedServiceId === s.id && styles.choiceActive]}><Text style={[styles.choiceText, selectedServiceId === s.id && styles.choiceTextActive]}>{s.name}</Text></Pressable>)}
-              </View>
-              <Text style={styles.fieldLabel}>عنوان الإعلان</Text>
-              <TextInput value={adTitle} onChangeText={setAdTitle} placeholder="مثال: خصم خاص لسكان الحي" placeholderTextColor="#94a3b8" style={styles.input} textAlign="right" maxLength={100} />
-              <Text style={styles.fieldLabel}>وصف الإعلان (اختياري)</Text>
-              <TextInput value={adDescription} onChangeText={setAdDescription} placeholder="اكتب تفاصيل العرض" placeholderTextColor="#94a3b8" style={[styles.input, styles.multiline]} textAlign="right" multiline maxLength={1000} />
-            </OasisSurface>
-            {packages.map(pkg => (
-              <OasisSurface oasisSurface="card" key={pkg.id} style={styles.card}>
-                <View style={styles.cardTop}>
-                  <View style={styles.pricePill}><Text style={styles.priceText}>{money(pkg.price_halalas)}</Text></View>
-                  <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                    <Text style={styles.cardTitle}>{pkg.name}</Text>
-                    <Text style={styles.muted}>{pkg.duration_days} يومًا</Text>
-                  </View>
-                  <View style={styles.smallIcon}><Megaphone size={19} color={OASIS.colors.primary} /></View>
-                </View>
-                <Text style={styles.description}>{pkg.description}</Text>
-                <Pressable oasisVariant="primary" oasisKind="action" disabled={!!busyId} style={[styles.primaryButton, !!busyId && styles.disabled]} onPress={() => void createAd(pkg)}>
-                  {busyId === `ad-${pkg.slug}` ? <ActivityIndicator color={OASIS.colors.surface} /> : <Star size={17} color={OASIS.colors.surface} />}
-                  <Text style={styles.primaryButtonText}>روّج بهذا العرض</Text>
-                </Pressable>
-              </OasisSurface>
-            ))}
-          </View>
-        )}
-
-        {tab === 'orders' && (
-          <View style={styles.section}>
-            <View style={styles.rowTitle}>
-              <Text style={styles.sectionTitle}>سجل الطلبات والمدفوعات</Text>
-              <Pressable onPress={() => void refresh()}><RefreshCw size={18} color={OASIS.colors.primary} /></Pressable>
-            </View>
-            {orders.length === 0 ? <Empty text="لا توجد عمليات بعد. ستظهر هنا الاشتراكات وطلبات الخدمات وحملات الترويج." /> : orders.map(order => (
-              <View key={order.id} style={styles.orderRow}>
-                <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                  <Text style={styles.cardTitle}>{order.order_type === 'subscription' ? 'اشتراك' : order.order_type === 'ad_campaign' ? 'ترويج إعلان' : 'طلب خدمة'}</Text>
-                  <Text style={styles.muted}>{new Date(order.created_at).toLocaleString('ar-SA')}</Text>
-                  <Text style={styles.status}>{statusLabel[order.status] || order.status}</Text>
-                </View>
-                <Text style={styles.priceText}>{money(order.amount_halalas)}</Text>
-              </View>
-            ))}
-          </View>
-        )}
-
-        <View style={styles.notice}>
-          <ShieldCheck size={19} color={OASIS.colors.primary} />
-          <Text style={styles.noticeText}>لا تُفعّل الاشتراكات ولا تُعتمد الطلبات من رابط الرجوع فقط؛ يعتمد النظام على إشعار موثّق من بوابة الدفع والتحقق من الفاتورة على الخادم.</Text>
-        </View>
-      </ScrollView>
-    </View>
-  );
+export default function MarketplaceDashboard(){
+ const {colors:c}=useTheme(),bottom=useBottomNavInset(),params=useLocalSearchParams<{service_id?:string;payment?:string}>();
+ const [data,setData]=useState<any>(null),[tab,setTab]=useState<Tab>('overview'),[loading,setLoading]=useState(true),[refreshing,setRefreshing]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(''),[ready,setReady]=useState(false);
+ const [title,setTitle]=useState(''),[description,setDescription]=useState(''),[service,setService]=useState(params.service_id||''),[preview,setPreview]=useState(false);
+ const lock=useRef(false),sequence=useRef(0),mounted=useRef(false),requestKeys=useRef(new Map<string,string>());
+ const load=useCallback(async()=>{
+  const seq=++sequence.current;
+  try{const auth=await supabase.auth.getUser();if(!auth.data.user){router.replace('/auth');return;}
+   const response=await supabase.rpc('hayna_marketplace_workspace');if(response.error)throw response.error;
+   if(!mounted.current||seq!==sequence.current)return;setData(response.data);setError('');
+   const status=await supabase.functions.invoke('create-marketplace-checkout',{body:{kind:'status'}});
+   if(mounted.current&&seq===sequence.current)setReady(!status.error&&status.data?.ready===true);
+  }catch{if(mounted.current&&seq===sequence.current)setError('تعذر تحميل لوحة السوق. أعد المحاولة؛ لن نعرض بيانات ناقصة كأنها مكتملة.');}
+  finally{if(mounted.current&&seq===sequence.current){setLoading(false);setRefreshing(false);}}
+ },[]);
+ useFocusEffect(useCallback(()=>{mounted.current=true;void load();return()=>{mounted.current=false;++sequence.current;};},[load]));
+ useEffect(()=>{if(params.payment)setNotice(params.payment==='success'?'تمت العودة من البوابة. تظهر العملية مدفوعة بعد تأكيد الخادم فقط.':'لم يكتمل الدفع. يمكنك مراجعة الطلبات ومتابعة العملية.');},[params.payment]);
+ useEffect(()=>{if(!data)return;let timer:ReturnType<typeof setTimeout>|undefined;const refresh=()=>{clearTimeout(timer);timer=setTimeout(()=>void load(),700);};const channel=supabase.channel('marketplace-workspace').on('postgres_changes',{event:'*',schema:'public',table:'marketplace_orders'},refresh).on('postgres_changes',{event:'*',schema:'public',table:'marketplace_ad_campaigns'},refresh).on('postgres_changes',{event:'*',schema:'public',table:'marketplace_service_orders'},refresh).subscribe();return()=>{clearTimeout(timer);void supabase.removeChannel(channel);};},[Boolean(data),load]);
+ useEffect(()=>{const sub=AppState.addEventListener('change',state=>{if(state==='active')void load();});const focus=()=>void load();if(typeof window!=='undefined')window.addEventListener('focus',focus);return()=>{sub.remove();if(typeof window!=='undefined')window.removeEventListener('focus',focus);};},[load]);
+ async function action(key:string,run:()=>Promise<void>){if(lock.current)return;lock.current=true;setBusy(key);setError('');setNotice('');try{await run();await load();}catch(cause){setError((cause as Error).message||marketplaceError(cause));}finally{lock.current=false;setBusy('');}}
+ async function manage(kind:string,id:string,next:string){await action(id,async()=>{const result=await supabase.rpc('hayna_manage_marketplace',{p_kind:kind,p_id:id,p_action:next});if(result.error)throw new Error(marketplaceError(result.error));setNotice('تم حفظ التغيير.');});}
+ async function checkout(body:Record<string,unknown>){if(!ready)return;const fingerprint=JSON.stringify(body);if(!requestKeys.current.has(fingerprint))requestKeys.current.set(fingerprint,`${Date.now()}-${Math.random().toString(36).slice(2,14)}`);
+  await action(fingerprint,async()=>{const result=await supabase.functions.invoke('create-marketplace-checkout',{body:{...body,request_id:requestKeys.current.get(fingerprint)}});if(result.error){const failure=await (result.error as any).context?.json?.().catch(()=>null);throw new Error(failure?.error||'تعذر تجهيز الدفع. حدّث الطلبات قبل بدء محاولة أخرى.');}if(result.data?.status==='paid'){setNotice('هذه العملية مدفوعة بالفعل.');return;}const url=safeMarketplaceCheckout(result.data?.checkout_url);if(!url)throw new Error('تعذر التحقق من رابط بوابة الدفع. لم يُفتح أي رابط.');await Linking.openURL(url);setNotice('أكمل العملية لدى البوابة؛ سيؤكد الخادم حالة الدفع.');});}
+ const button=(label:string,onPress:()=>void,Icon:any=ChevronLeft,disabled=false,primary=false)=><Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel={label} disabled={!!busy||disabled} onPress={onPress} style={[s.button,{backgroundColor:primary?'#047857':c.soft,borderColor:c.line,opacity:busy||disabled? .5:1}]}><Icon size={17} color={primary?'#FFFFFF':c.primary}/><Text style={{fontSize:12,fontWeight:'700',color:primary?'#FFFFFF':c.primary}}>{label}</Text></Pressable>;
+ const card=(children:React.ReactNode,key?:string,compact=false)=><View key={key} style={[s.card,{backgroundColor:c.surface,borderColor:c.line},compact&&{width:'47%',flexBasis:'47%',alignItems:'flex-end'}]}>{children}</View>;
+ const heading=(text:string)=><Text style={[s.heading,{color:c.ink}]}>{text}</Text>;
+ const hint=(text:string)=><Text style={[s.hint,{color:c.muted}]}>{text}</Text>;
+ const badge=(status:string)=><View style={[s.badge,{backgroundColor:c.soft}]}><Text style={{color:c.primary,fontSize:10,fontWeight:'600'}}>{statuses[status]||status}</Text></View>;
+ if(loading)return <View style={s.center}><ActivityIndicator color={c.primary}/><Text style={[s.hint,{color:c.muted}]}>نحمّل نشاطك في السوق…</Text></View>;
+ return <View style={{flex:1,backgroundColor:'transparent'}}><AppHeader title="لوحة السوق" subtitle="نشاطك ومزاياك في مكان واحد" fallbackRoute="/profile?tab=content"/><ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{setRefreshing(true);void load();}} tintColor={c.primary}/>} contentContainerStyle={[s.content,{paddingBottom:bottom+24}]}>
+  <View style={s.hero}><View style={s.row}><View style={s.heroIcon}><Store size={25} color="#FFFFFF"/></View><View style={{flex:1,gap:5}}><Text style={s.heroTitle}>مساحة نمو نشاطك</Text><Text style={s.heroHint}>{data?.professional?'حساب مهني معتمد':'طلباتك ومدفوعاتك الخاصة'}{data?.location?.city?` · ${data.location.city}`:''}</Text></View><BadgeCheck size={23} color="#B9E6D6"/></View><Text style={s.heroHint}>إدارة العروض والترويج وطلبات الخدمات، ببيانات فعلية وتأكيد دفع آمن.</Text></View>
+  {error?<View accessibilityRole="alert" style={[s.card,{backgroundColor:c.dangerSoft,borderColor:c.line}]}><Text style={{color:c.danger,textAlign:'right',lineHeight:24}}>{error}</Text>{button('إعادة المحاولة',()=>void load(),RefreshCw)}</View>:null}
+  {notice?card(<Text accessibilityLiveRegion="polite" style={{color:c.primary,textAlign:'right',lineHeight:23}}>{notice}</Text>):null}
+  {data?<><ScrollView horizontal style={{direction:'rtl'}} showsHorizontalScrollIndicator={false} contentContainerStyle={[s.tabs,{direction:'ltr'}]}>{tabs.filter(([key])=>data.professional||!['plans','ads'].includes(key)).map(([key,label,Icon])=><Pressable key={key} oasisKind="plain" accessibilityRole="tab" accessibilityState={{selected:tab===key}} onPress={()=>{setTab(key);setError('');}} style={[s.tab,{backgroundColor:tab===key?'#047857':c.surface,borderColor:c.line}]}><Icon size={16} color={tab===key?'#FFFFFF':c.muted}/><Text style={{color:tab===key?'#FFFFFF':c.muted,fontSize:11,fontWeight:'600'}}>{label}</Text></Pressable>)}</ScrollView>
+  {tab==='overview'?<>
+   <View style={s.stats}>{[[data.stats.products,'منتج متاح',ShoppingBag],[data.stats.services,'خدمة معتمدة',Package],[data.stats.active_campaigns,'حملة نشطة',Megaphone],[data.stats.pending_services,'طلب يحتاج متابعة',Clock]].map(([value,label,Icon]:any)=>card(<><Icon size={20} color={c.primary}/><Text style={{color:c.ink,fontSize:25,fontWeight:'700'}}>{Number(value).toLocaleString('ar-SA')}</Text><Text style={[s.hint,{color:c.muted}]}>{label}</Text></>,label,true))}</View>
+   {card(<>{heading('إدارة نشاطك')}<View style={s.row}>{data.professional?button('عروضي ومنشأتي',()=>router.push('/profile?tab=content'),Store):button('توثيق الحساب المهني',()=>router.push('/profile?tab=verification'),ShieldCheck)}{button('تصفح السوق',()=>router.push('/market'),ShoppingBag)}</View>{data.admin?button('مراجعة الإعلانات',()=>router.push('/admin-marketplace'),ShieldCheck):null}</>)}
+   {data.subscription?card(<><View style={s.spread}>{badge('active')}<Crown size={23} color={c.primary}/></View>{heading(`باقتك: ${data.subscription.name}`)}{hint(`صالحة حتى ${new Date(data.subscription.current_period_end).toLocaleDateString('ar-SA')} · لا يوجد خصم تلقائي`)}{data.subscription.cancel_at_period_end?hint('محدد عدم التجديد بعد انتهاء المدة.'):button('عدم التجديد بعد انتهاء المدة',()=>void manage('subscription',data.subscription.id,'cancel_renewal'),Clock)}</>):data.professional?card(<>{heading('ابدأ بالباقة الأساسية')}{hint('فعّل ملف نشاطك مجانًا، واستعرض خيارات الترويج عند الحاجة.')}{button('استعراض الباقات',()=>setTab('plans'),Crown)}</>):null}
+  </>:null}
+  {tab==='plans'&&data.professional?<>{!ready?card(<><ShieldCheck size={21} color={c.primary}/>{heading('الدفع الإلكتروني غير متاح حاليًا')}{hint('الباقة الأساسية وإدارة النشاط متاحتان. تظهر الباقات المدفوعة للمراجعة، ويُتاح الدفع بعد اكتمال إعداد البوابة.')}</>):null}{data.plans.map((plan:any)=>card(<><View style={s.spread}><Text style={{color:c.primary,fontSize:22,fontWeight:'700'}}>{plan.price_halalas?money(plan.price_halalas):'مجانية'}</Text><Crown size={22} color={c.primary}/></View>{heading(plan.name)}{hint(`${plan.period_days} يومًا · ${plan.description}`)}{hint('إدارة نشاطك وعروضك من لوحة واحدة. الترويج يُشترى بشكل مستقل ويخضع للمراجعة.')}{data.subscription?.plan_id===plan.id?badge('active'):plan.price_halalas===0?button('تفعيل الباقة المجانية',()=>void action('free-plan',async()=>{const result=await supabase.rpc('hayna_activate_free_marketplace_plan');if(result.error)throw new Error(marketplaceError(result.error));setNotice('تم تفعيل الباقة المتاحة لحسابك.');}),Check,false,true):button(ready?'الانتقال للدفع الآمن':'بانتظار تفعيل بوابة الدفع',()=>void checkout({kind:'subscription',plan_slug:plan.slug}),CreditCard,!ready||data.subscription?.price_halalas>0,true)}</>,plan.id))}</>:null}
+  {tab==='ads'&&data.professional?<>
+   {card(<>{heading('روّج لنشاطك في منطقتك')}{hint('تبدأ مدة الترويج بعد تأكيد الدفع واعتماد الإعلان. تتوقف الحملة تلقائيًا عن العرض عند انتهاء مدتها.')}<MarketField label="عنوان الإعلان" value={title} onChangeText={setTitle} maxLength={100} placeholder="عرض مميز لأهل الحي"/><MarketField label="تفاصيل الإعلان" value={description} onChangeText={setDescription} maxLength={1000} multiline/><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.row}><MarketChoice label="إعلان للنشاط" active={!service} onPress={()=>setService('')}/>{data.services.filter((x:any)=>x.moderation_status==='approved').map((x:any)=><MarketChoice key={x.id} label={x.name} active={service===x.id} onPress={()=>setService(x.id)}/>)}</ScrollView>{button(preview?'إخفاء المعاينة':'معاينة الإعلان',()=>setPreview(!preview),Eye)}{preview?<View style={[s.preview,{backgroundColor:c.soft}]}><Text style={{color:c.primary,fontSize:10}}>محتوى ترويجي</Text>{heading(title.trim()||'عنوان إعلانك')}{hint(description.trim()||'تفاصيل العرض تظهر هنا.')}</View>:null}</>)}
+   {data.packages.map((pkg:any)=>card(<><View style={s.spread}>{heading(pkg.name)}<Text style={{color:c.primary,fontSize:19,fontWeight:'700'}}>{money(pkg.price_halalas)}</Text></View>{hint(`${pkg.duration_days} يومًا بعد الاعتماد`)}{button(ready?'تجهيز الإعلان والدفع':'الدفع غير متاح حاليًا',()=>void checkout({kind:'ad_campaign',package_slug:pkg.slug,service_id:service||undefined,title:title.trim(),description:description.trim()}),Megaphone,!ready||title.trim().length<3,true)}</>,pkg.id))}
+   {heading('حملاتي')}{data.campaigns.length?data.campaigns.map((item:any)=>card(<><View style={s.spread}>{badge(item.status==='active'&&Date.parse(item.ends_at)<=Date.now()?'ended':item.status)}<Text style={[s.heading,{color:c.ink}]}>{item.title}</Text></View>{hint(item.description)}{item.ends_at?hint(`نهاية العرض: ${new Date(item.ends_at).toLocaleDateString('ar-SA')}`):null}{item.status==='active'&&Date.parse(item.ends_at)>Date.now()?button('إيقاف مؤقت',()=>void manage('campaign',item.id,'pause'),Pause):item.status==='paused'&&Date.parse(item.ends_at)>Date.now()?button('استئناف الحملة',()=>void manage('campaign',item.id,'resume'),Play):null}</>,item.id)):card(hint('لا توجد حملات حتى الآن. يمكنك تجهيز إعلانك ومعاينته قبل الدفع.'))}
+  </>:null}
+  {tab==='services'?<>{heading('طلبات الخدمات')}{hint('قبول وبدء التنفيذ لمقدم الخدمة، وتأكيد الإكمال للعميل فقط. لا يُعتبر الطلب مدفوعًا دون تأكيد البوابة.')}{data.service_orders.length?data.service_orders.map((item:any)=>card(<><View style={s.spread}>{badge(item.status)}<Text style={[s.heading,{color:c.ink}]}>{item.service_name}</Text></View>{hint(`${item.is_buyer?'طلب اشتريته':'طلب وارد لنشاطك'} · ${money(item.amount_halalas)}`)}{item.is_provider&&item.status==='paid'?button('قبول الطلب',()=>void manage('service_order',item.id,'accept'),Check,false,true):null}{item.is_provider&&item.status==='accepted'?button('بدء التنفيذ',()=>void manage('service_order',item.id,'start'),Play,false,true):null}{item.is_buyer&&item.status==='in_progress'?button('تأكيد اكتمال الخدمة',()=>Alert.alert('تأكيد استلام الخدمة','أكد فقط بعد استلام الخدمة كاملة.',[{text:'رجوع',style:'cancel'},{text:'تأكيد الإكمال',onPress:()=>void manage('service_order',item.id,'complete')}]),Check,false,true):null}</>,item.id)):card(<><Package size={28} color={c.muted}/>{heading('لا توجد طلبات خدمات')}{hint('ستظهر طلباتك وطلبات العملاء هنا عند إنشائها.')}{button('استكشف الخدمات',()=>router.push('/market'),ShoppingBag)}</>)}</>:null}
+  {tab==='orders'?<>{card(<><Wallet size={22} color={c.primary}/>{heading(money(data.stats.confirmed_spend_halalas))}{hint('إجمالي مدفوعاتك المؤكدة، دون العمليات المعلقة أو المستردة.')}</>)}{data.orders.length?data.orders.map((order:any)=>card(<><View style={s.spread}>{badge(order.status)}<Text style={{color:c.ink,fontSize:17,fontWeight:'700'}}>{money(order.amount_halalas)}</Text></View>{hint(`${({subscription:'اشتراك',ad_campaign:'ترويج',service_order:'طلب خدمة'}as Record<string,string>)[order.order_type]||'طلب'} · ${new Date(order.created_at).toLocaleString('ar-SA')}`)}<Text selectable style={{color:c.muted,fontSize:10,textAlign:'right'}}>مرجع الطلب: {order.id}</Text>{order.status==='pending'&&safeMarketplaceCheckout(order.checkout_url)?button('متابعة الدفع',()=>void Linking.openURL(safeMarketplaceCheckout(order.checkout_url)!),CreditCard):null}</>,order.id)):card(<><CreditCard size={28} color={c.muted}/>{heading('لا توجد مدفوعات')}{hint('تظهر هنا العمليات الفعلية وحالتها بعد إنشائها. لا تُسجل أسعار العروض كإيراد.')}</>)}</>:null}
+  </>:null}
+ </ScrollView>{busy?<View accessibilityLiveRegion="polite" style={[s.busy,{backgroundColor:c.surface,borderColor:c.line}]}><ActivityIndicator size="small" color={c.primary}/><Text style={{color:c.primary,fontSize:12}}>جارٍ تنفيذ الإجراء…</Text></View>:null}</View>;
 }
-
-function Empty({ text }: { text: string }) {
-  return <View style={styles.empty}><ShoppingBag size={26} color="#94a3b8" /><Text style={styles.muted}>{text}</Text></View>;
-}
-
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: OASIS.colors.background },
-  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: OASIS.colors.background },
-  content: { padding: 14, gap: 14, maxWidth: 920, width: '100%', alignSelf: 'center' },
-  hero: { backgroundColor: OASIS.colors.deep, borderRadius: 14, padding: 14, alignItems: 'flex-end', gap: 8 },
-  heroIcon: { width: 52, height: 52, borderRadius: 16, backgroundColor: OASIS.colors.primary, alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-end' },
-  heroTitle: { color: OASIS.colors.surface, fontSize: 22, fontWeight: '700', textAlign: 'right' },
-  heroText: { color: OASIS.colors.soft, fontSize: 13, lineHeight: 21, textAlign: 'right' },
-  secureLine: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, marginTop: 4 },
-  secureText: { color: '#a7f3d0', fontSize: 11, fontWeight: '700' },
-  adminButton: { backgroundColor: '#7c3aed', borderRadius: 13, paddingVertical: 12, paddingHorizontal: 14, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  activePlan: { backgroundColor: OASIS.colors.soft, borderColor: '#a7f3d0', borderWidth: 1, borderRadius: 17, padding: 14, flexDirection: 'row-reverse', alignItems: 'center', gap: 10 },
-  planIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: OASIS.colors.soft, alignItems: 'center', justifyContent: 'center' },
-  activePlanTitle: { color: OASIS.colors.deep, fontWeight: '700', fontSize: 14, textAlign: 'right' },
-  tabs: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 7, backgroundColor: OASIS.colors.line, padding: 5, borderRadius: 16 },
-  tab: { flexGrow: 1, minWidth: '22%', borderRadius: 12, paddingVertical: 10, paddingHorizontal: 8, alignItems: 'center', justifyContent: 'center', gap: 5, flexDirection: 'row-reverse' },
-  tabActive: { backgroundColor: OASIS.colors.primary },
-  tabText: { color: OASIS.colors.muted, fontSize: 11.5, fontWeight: '600' },
-  tabTextActive: { color: OASIS.colors.surface },
-  section: { gap: 12 },
-  sectionTitle: { color: OASIS.colors.ink, fontSize: 17, fontWeight: '700', textAlign: 'right' },
-  card: { backgroundColor: OASIS.colors.surface, borderRadius: 14, padding: 15, borderWidth: 1, borderColor: OASIS.colors.line, gap: 10 },
-  cardTop: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10 },
-  smallIcon: { width: 42, height: 42, borderRadius: 13, backgroundColor: OASIS.colors.soft, alignItems: 'center', justifyContent: 'center' },
-  cardTitle: { color: OASIS.colors.ink, fontSize: 14, fontWeight: '700', textAlign: 'right' },
-  muted: { color: OASIS.colors.muted, fontSize: 11.5, lineHeight: 18, textAlign: 'right' },
-  pricePill: { backgroundColor: OASIS.colors.soft, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8 },
-  priceText: { color: OASIS.colors.primary, fontSize: 13, fontWeight: '700' },
-  description: { color: OASIS.colors.muted, fontSize: 12, lineHeight: 19, textAlign: 'right' },
-  feature: { color: OASIS.colors.ink, fontSize: 12, textAlign: 'right' },
-  primaryButton: { backgroundColor: OASIS.colors.primary, borderRadius: 13, paddingVertical: 12, paddingHorizontal: 14, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  primaryButtonText: { color: OASIS.colors.surface, fontSize: 13, fontWeight: '700' },
-  disabled: { opacity: 0.55 },
-  fieldLabel: { color: OASIS.colors.ink, fontSize: 12, fontWeight: '600', textAlign: 'right' },
-  input: { borderWidth: 1, borderColor: '#cbd5e1', backgroundColor: OASIS.colors.background, borderRadius: 12, padding: 12, color: OASIS.colors.ink, fontSize: 13, minHeight: 44 },
-  multiline: { minHeight: 82, textAlignVertical: 'top' },
-  choiceWrap: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 7 },
-  choice: { borderWidth: 1, borderColor: '#cbd5e1', backgroundColor: OASIS.colors.background, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 11 },
-  choiceActive: { backgroundColor: OASIS.colors.soft, borderColor: OASIS.colors.primary },
-  choiceText: { color: OASIS.colors.muted, fontSize: 11.5, fontWeight: '700' },
-  choiceTextActive: { color: OASIS.colors.deep },
-  orderRow: { backgroundColor: OASIS.colors.surface, borderWidth: 1, borderColor: OASIS.colors.line, borderRadius: 15, padding: 13, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
-  status: { color: OASIS.colors.primary, fontSize: 11, fontWeight: '600', textAlign: 'right', marginTop: 3 },
-  rowTitle: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between' },
-  empty: { backgroundColor: OASIS.colors.surface, borderWidth: 1, borderColor: OASIS.colors.line, borderRadius: 16, padding: 16, alignItems: 'center', gap: 12 },
-  notice: { backgroundColor: OASIS.colors.soft, borderWidth: 1, borderColor: '#bbf7d0', borderRadius: 15, padding: 13, flexDirection: 'row-reverse', alignItems: 'flex-start', gap: 9 },
-  noticeText: { flex: 1, color: '#166534', fontSize: 11.5, lineHeight: 18, textAlign: 'right' },
-});
+const s=StyleSheet.create({content:{padding:16,gap:15,width:'100%',maxWidth:780,alignSelf:'center'},center:{flex:1,alignItems:'center',justifyContent:'center',gap:14},hero:{backgroundColor:'#064E3B',padding:20,borderRadius:24,gap:13},heroIcon:{width:49,height:49,borderRadius:25,backgroundColor:'rgba(255,255,255,.12)',alignItems:'center',justifyContent:'center'},heroTitle:{color:'#FFFFFF',fontSize:21,fontWeight:'700',textAlign:'right'},heroHint:{color:'#D1EADF',fontSize:11,lineHeight:21,textAlign:'right'},row:{flexDirection:'row-reverse',alignItems:'center',gap:10},spread:{flexDirection:'row-reverse',alignItems:'center',justifyContent:'space-between',gap:12},card:{borderRadius:19,padding:16,borderWidth:1,gap:12,flexGrow:1},heading:{fontSize:15,fontWeight:'700',textAlign:'right',lineHeight:24},hint:{fontSize:11,lineHeight:22,textAlign:'right'},tabs:{flexDirection:'row-reverse',gap:7},tab:{minHeight:44,paddingHorizontal:13,borderWidth:1,borderRadius:22,flexDirection:'row-reverse',alignItems:'center',gap:6},button:{minHeight:44,paddingHorizontal:14,paddingVertical:10,borderWidth:1,borderRadius:22,flexDirection:'row-reverse',alignItems:'center',justifyContent:'center',gap:7},badge:{alignSelf:'flex-start',borderRadius:12,paddingHorizontal:10,paddingVertical:6},stats:{flexDirection:'row-reverse',flexWrap:'wrap',gap:10},preview:{padding:15,borderRadius:15,gap:8},busy:{position:'absolute',bottom:20,alignSelf:'center',paddingVertical:11,paddingHorizontal:18,borderRadius:24,borderWidth:1,flexDirection:'row-reverse',gap:9,alignItems:'center'}});

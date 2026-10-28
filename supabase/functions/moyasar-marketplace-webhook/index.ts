@@ -42,42 +42,12 @@ serve(async (req) => {
       return json({ error: 'Invoice amount or currency mismatch.' }, 409);
     }
     if (invoice?.metadata?.user_id !== order.user_id) return json({ error: 'Invoice owner mismatch.' }, 409);
-    if (order.status === 'paid') return json({ received: true, processed: true, duplicate: true });
+    const {data:result,error:confirmationError}=await admin.rpc('hayna_confirm_marketplace_payment',{
+      p_order:order.id,p_gateway:'moyasar',p_invoice:invoiceId,p_amount:order.amount_halalas,p_currency:'SAR',p_payment:invoice?.payment?.id || null,
+    });
+    if(confirmationError)throw confirmationError;
+    return json({received:true,processed:true,duplicate:result?.duplicate===true});
 
-    const now = new Date();
-    const { error: orderUpdateError } = await admin.from('marketplace_orders').update({
-      status: 'paid', gateway_invoice_id: invoiceId, paid_at: now.toISOString(),
-      metadata: { ...(order.metadata || {}), verified_gateway_status: 'paid', gateway_payment_id: invoice?.payment?.id || null },
-      updated_at: now.toISOString(),
-    }).eq('id', order.id).neq('status', 'paid');
-    if (orderUpdateError) throw orderUpdateError;
-
-    await admin.from('marketplace_payment_transactions').update({
-      status: 'paid', paid_at: now.toISOString(),
-      gateway_payload: { invoice_id: invoiceId, invoice_status: 'paid', payment_id: invoice?.payment?.id || null },
-      updated_at: now.toISOString(),
-    }).eq('order_id', order.id);
-
-    if (order.order_type === 'service_order' && order.service_order_id) {
-      const { error } = await admin.from('marketplace_service_orders').update({ status: 'paid', updated_at: now.toISOString() })
-        .eq('id', order.service_order_id);
-      if (error) throw error;
-    } else if (order.order_type === 'subscription' && order.subscription_id) {
-      const periodDays = Math.max(1, Number(order.period_days) || 30);
-      const periodEnd = new Date(now.getTime() + periodDays * 24 * 60 * 60 * 1000);
-      const { error } = await admin.from('marketplace_subscriptions').update({
-        status: 'active', current_period_start: now.toISOString(), current_period_end: periodEnd.toISOString(),
-        auto_renew: false, cancel_at_period_end: false, last_payment_order_id: order.id, updated_at: now.toISOString(),
-      }).eq('id', order.subscription_id);
-      if (error) throw error;
-    } else if (order.order_type === 'ad_campaign' && order.ad_campaign_id) {
-      // Paid campaigns remain pending review. Payment does not bypass content moderation.
-      const { error } = await admin.from('marketplace_ad_campaigns').update({ status: 'pending_review', updated_at: now.toISOString() })
-        .eq('id', order.ad_campaign_id);
-      if (error) throw error;
-    }
-
-    return json({ received: true, processed: true });
   } catch (error) {
     console.error('moyasar-marketplace-webhook failed', error);
     return json({ error: 'Webhook processing failed.' }, 500);

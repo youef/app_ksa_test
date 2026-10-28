@@ -31,9 +31,9 @@ serve(async (req) => {
   const baseUrl = (Deno.env.get('APP_BASE_URL') || 'https://appksatest.vercel.app').replace(/\/$/, '');
 
   if (!supabaseUrl || !anonKey || !serviceRoleKey) return json({ error: 'إعدادات الخادم غير مكتملة.' }, 503);
-  if (!['moyasar', 'tap'].includes(gateway)) return json({ error: 'اختر PAYMENT_GATEWAY=moyasar أو tap.' }, 503);
-  if (gateway === 'moyasar' && !moyasarSecret) return json({ error: 'أضف MOYASAR_SECRET_KEY إلى أسرار Supabase لتفعيل الدفع.' }, 503);
-  if (gateway === 'tap' && !tapSecret) return json({ error: 'أضف TAP_SECRET_KEY إلى أسرار Supabase لتفعيل الدفع.' }, 503);
+
+
+
 
   try {
     const authClient = createClient(supabaseUrl, anonKey, {
@@ -44,120 +44,25 @@ serve(async (req) => {
     if (authError || !authData.user) return json({ error: 'انتهت الجلسة. سجّل الدخول مجددًا.' }, 401);
     const user = authData.user;
     const admin = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
-    const { data: profile, error: profileError } = await admin
-      .from('profiles')
-      .select('role,account_type,is_verified')
-      .eq('id', user.id)
-      .maybeSingle();
-    if (profileError || !profile) return json({ error: 'تعذر التحقق من صلاحية الحساب.' }, 403);
-
-    const body = await req.json();
-    const kind = body?.kind;
-    if (!['service_order', 'subscription', 'ad_campaign'].includes(kind)) return json({ error: 'نوع الدفع غير صالح.' }, 400);
-
-    const canUseProfessionalPayments =
-      profile.role === 'admin' ||
-      (profile.is_verified && ['merchant', 'freelance', 'provider'].includes(profile.account_type || ''));
-    if ((kind === 'subscription' || kind === 'ad_campaign') && !canUseProfessionalPayments) {
-      return json({ error: 'الاشتراكات والترويج مخصصة للحسابات المهنية المعتمدة.' }, 403);
+    const body = await req.json().catch(() => ({}));
+    const ready = ['moyasar','tap'].includes(gateway) && Boolean(gateway==='moyasar'?moyasarSecret:tapSecret);
+    if(body.kind==='status')return json({ready,gateway,reason:ready?null:'payment_configuration_missing'});
+    if(!ready)return json({error:'الدفع الإلكتروني غير متاح حاليًا. يمكنك إدارة عروضك وتفعيل الباقة المجانية.',code:'payment_configuration_missing'},503);
+    const rawRequestId=typeof body.request_id==='string'?body.request_id.slice(0,100):'';
+    const {data:prepared,error:prepareError}=await authClient.rpc('hayna_prepare_marketplace_checkout',{
+      p_request_id:rawRequestId,p_kind:body.kind,p_reference:body.plan_slug||body.package_slug||'',p_service_id:body.service_id||null,
+      p_title:body.title||'',p_description:body.description||'',p_note:body.note||'',p_gateway:gateway,
+    });
+    if(prepareError)return json({error:'تعذر تجهيز الطلب. تحقق من صلاحية الحساب وحالة العرض أو الاشتراك.',code:prepareError.message},400);
+    const order=prepared.order;
+    if(!prepared.created){
+      if(order.status==='paid')return json({order_id:order.id,status:'paid',reused:true});
+      if(order.status==='pending'&&order.checkout_url)return json({order_id:order.id,checkout_url:order.checkout_url,reused:true});
+      return json({error:'هذه المحاولة قيد المعالجة أو انتهت. حدّث الطلبات قبل بدء محاولة جديدة.',code:'checkout_attempt_exists'},409);
     }
-
-    const rawRequestId = typeof body.request_id === 'string' ? body.request_id.slice(0, 100) : crypto.randomUUID();
-    const idempotencyKey = `${user.id}:${rawRequestId}`;
-
-    const { data: prior } = await admin.from('marketplace_orders').select('id,status,checkout_url,amount_halalas')
-      .eq('idempotency_key', idempotencyKey).maybeSingle();
-    if (prior) {
-      if (prior.checkout_url && prior.status === 'pending') return json({ order_id: prior.id, checkout_url: prior.checkout_url, reused: true });
-      if (prior.status === 'paid') return json({ order_id: prior.id, status: 'paid', reused: true });
-      return json({ error: 'يوجد طلب سابق بهذه المحاولة. أنشئ محاولة جديدة إذا لم يكتمل الدفع.' }, 409);
-    }
-
-    let amountHalalas = 0;
-    let periodDays: number | null = null;
-    let planId: string | null = null;
-    let packageId: string | null = null;
-    let serviceOrderId: string | null = null;
-    let subscriptionId: string | null = null;
-    let adCampaignId: string | null = null;
-    let description = 'طلب من سوق حيّنا';
-    let metadata: Record<string, string> = { order_type: kind, user_id: user.id };
-
-    if (kind === 'service_order') {
-      const serviceId = typeof body.service_id === 'string' ? body.service_id : '';
-      if (!serviceId) return json({ error: 'حدد الخدمة المطلوبة.' }, 400);
-      const { data: service, error } = await admin.from('services')
-        .select('id,provider_id,name,price_from,price_type,moderation_status,available_now')
-        .eq('id', serviceId).maybeSingle();
-      if (error || !service || service.moderation_status !== 'approved' || service.available_now === false) {
-        return json({ error: 'الخدمة غير متاحة للطلب حالياً.' }, 404);
-      }
-      if (service.provider_id === user.id) return json({ error: 'لا يمكنك شراء خدمتك الخاصة.' }, 400);
-      if (service.price_type && service.price_type !== 'fixed') return json({ error: 'هذه الخدمة تتطلب الاتفاق على السعر مع مقدمها قبل الدفع.' }, 400);
-      amountHalalas = amountFromSar(service.price_from);
-      if (!amountHalalas) return json({ error: 'لا يمكن الدفع إلكترونياً لهذه الخدمة قبل تحديد سعر ثابت.' }, 400);
-      description = `طلب خدمة: ${String(service.name).slice(0, 100)}`;
-      const { data: serviceOrder, error: serviceOrderError } = await admin.from('marketplace_service_orders').insert({
-        buyer_id: user.id, provider_id: service.provider_id, service_id: service.id,
-        service_name: service.name, amount_halalas: amountHalalas,
-        buyer_note: typeof body.note === 'string' ? body.note.slice(0, 1000) : null,
-      }).select('id').single();
-      if (serviceOrderError || !serviceOrder) throw serviceOrderError || new Error('تعذر إنشاء طلب الخدمة.');
-      serviceOrderId = serviceOrder.id;
-      metadata.service_id = service.id;
-    } else if (kind === 'subscription') {
-      const slug = typeof body.plan_slug === 'string' ? body.plan_slug : '';
-      const { data: plan } = await admin.from('marketplace_plans').select('id,slug,name,price_halalas,period_days,active')
-        .eq('slug', slug).eq('active', true).maybeSingle();
-      if (!plan || plan.price_halalas <= 0) return json({ error: 'الباقة غير متاحة للدفع أو مجانية.' }, 404);
-      amountHalalas = plan.price_halalas;
-      periodDays = plan.period_days;
-      planId = plan.id;
-      description = `اشتراك سوق حيّنا: ${plan.name}`;
-      const { data: subscription, error } = await admin.from('marketplace_subscriptions').insert({
-        user_id: user.id, plan_id: plan.id, status: 'pending',
-      }).select('id').single();
-      if (error || !subscription) throw error || new Error('تعذر إنشاء الاشتراك.');
-      subscriptionId = subscription.id;
-      metadata.plan_slug = plan.slug;
-    } else {
-      const packageSlug = typeof body.package_slug === 'string' ? body.package_slug : '';
-      const title = typeof body.title === 'string' ? body.title.trim().slice(0, 100) : '';
-      const serviceId = typeof body.service_id === 'string' ? body.service_id : null;
-      if (!title) return json({ error: 'أدخل عنوان الإعلان.' }, 400);
-      const { data: adPackage } = await admin.from('marketplace_ad_packages')
-        .select('id,slug,name,price_halalas,duration_days,active').eq('slug', packageSlug).eq('active', true).maybeSingle();
-      if (!adPackage) return json({ error: 'باقة الترويج غير متاحة.' }, 404);
-      if (serviceId) {
-        const { data: service } = await admin.from('services').select('id,provider_id').eq('id', serviceId).maybeSingle();
-        if (!service || service.provider_id !== user.id) return json({ error: 'يمكنك ترويج عروضك أنت فقط.' }, 403);
-      }
-      amountHalalas = adPackage.price_halalas;
-      packageId = adPackage.id;
-      periodDays = adPackage.duration_days;
-      description = `ترويج في سوق حيّنا: ${title}`;
-      const { data: campaign, error } = await admin.from('marketplace_ad_campaigns').insert({
-        owner_id: user.id, service_id: serviceId, package_id: adPackage.id,
-        title, description: typeof body.description === 'string' ? body.description.slice(0, 1000) : '',
-        status: 'pending_payment',
-      }).select('id').single();
-      if (error || !campaign) throw error || new Error('تعذر إنشاء حملة الإعلان.');
-      adCampaignId = campaign.id;
-      metadata.ad_package = adPackage.slug;
-    }
-
-    const { data: order, error: orderError } = await admin.from('marketplace_orders').insert({
-      user_id: user.id, order_type: kind, amount_halalas: amountHalalas, currency: 'SAR',
-      gateway, idempotency_key: idempotencyKey, service_order_id: serviceOrderId,
-      subscription_id: subscriptionId, ad_campaign_id: adCampaignId, plan_id: planId,
-      package_id: packageId, period_days: periodDays, metadata,
-    }).select('id').single();
-    if (orderError || !order) throw orderError || new Error('تعذر إنشاء طلب الدفع.');
-
-    if (serviceOrderId) await admin.from('marketplace_service_orders').update({ payment_order_id: order.id }).eq('id', serviceOrderId);
-    if (subscriptionId) await admin.from('marketplace_subscriptions').update({ last_payment_order_id: order.id }).eq('id', subscriptionId);
-    if (adCampaignId) await admin.from('marketplace_ad_campaigns').update({ payment_order_id: order.id }).eq('id', adCampaignId);
-
+    const amountHalalas=Number(order.amount_halalas),serviceOrderId=order.service_order_id,subscriptionId=order.subscription_id,adCampaignId=order.ad_campaign_id,kind=order.order_type;
+    const description='طلب سوق حيّنا · '+order.id;
+    const metadata={order_type:kind,user_id:user.id};
     const successUrl = `${baseUrl}/marketplace-dashboard?payment=success&order_id=${order.id}`;
     const backUrl = `${baseUrl}/marketplace-dashboard?payment=cancelled&order_id=${order.id}`;
     const callbackUrl = `${supabaseUrl}/functions/v1/${gateway === 'moyasar' ? 'moyasar-marketplace-webhook' : 'tap-marketplace-webhook'}`;

@@ -1,3 +1,4 @@
+import { MarketPromotions } from '@/components/market/MarketPromotions';
 import { OasisEmptyIllustration } from '@/components/oasis/OasisEmptyIllustration';
 import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
@@ -1071,6 +1072,7 @@ export default function Market() {
               {/* ======================================================== */}
               {section === 'market' && (
                 <>
+                  <MarketPromotions city={activeLoc.city} district={activeLoc.district}/>
                   <View style={styles.filterHintRow}><SlidersHorizontal size={14} color={OASIS.colors.muted} /><Text style={styles.filterHintText}>اختر نوع العرض أو حالته من قائمة التصفية</Text></View>
 
                   {/* Productive Families Spotlight */}
