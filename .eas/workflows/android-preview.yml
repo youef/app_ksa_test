@@ -1,0 +1,12 @@
+name: Hayna Android APK (Preview)
+
+# Run this workflow manually from Expo EAS Workflows.
+# No push trigger: avoids duplicate or unintended paid builds.
+jobs:
+  build_android:
+    name: Build Android preview APK
+    type: build
+    environment: preview
+    params:
+      platform: android
+      profile: preview
