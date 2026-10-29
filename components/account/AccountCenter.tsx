@@ -1171,9 +1171,9 @@ export default function AccountCenter() {
 
               <ChoiceGroup
                 disabled={settingsSaving}
-                label="الرسائل الخاصة"
+                label="الرسائل الخاصة داخل الحي"
                 value={profile.allow_dms || 'everyone'}
-                options={[['everyone','الجميع'],['followers','المتابعون'],['nobody','إيقاف الخاص']]}
+                options={[['everyone','سكان الحي'],['followers','متابعوني من الحي'],['nobody','إيقاف الخاص']]}
                 onChange={(value: string) => void savePrivacy({ allow_dms: value })}
               />
               <ChoiceGroup

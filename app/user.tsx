@@ -45,7 +45,8 @@ import { ProfileCustomizationEntry } from '@/components/profile/ProfileCustomiza
 import { AccountStatusMark, getAccountIdentityMeta } from '@/components/profile/AccountIdentityBadge';
 import { C } from '@/lib/ui';
 import { getBlockStatus, setBlock } from '@/lib/chatControls';
-import { isExactDistrictMatching } from '@/lib/locationSync';
+import { getNeighborAccess } from '@/lib/neighborAccess';
+import { ImagePreviewModal } from '@/components/shared/ImagePreviewModal';
 
 type Tab = 'questions' | 'answers' | 'services' | 'requests' | 'market' | 'reviews';
 
@@ -99,7 +100,9 @@ export default function UserProfile() {
   const [followedBy, setFollowedBy] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const [blockedByOther, setBlockedByOther] = useState(false);
-  const [sameDistrict, setSameDistrict] = useState(true);
+  const [canMessage,setCanMessage]=useState(false);
+  const [scopeDenied,setScopeDenied]=useState(false);
+  const [previewImage,setPreviewImage]=useState<{uri:string;title:string}|null>(null);
   const tabsScrollRef=useRef<ScrollView>(null);
   const tabMetrics=useRef<Record<string,{x:number;width:number}>>({});
   const tabViewport=useRef(0);
@@ -133,8 +136,7 @@ export default function UserProfile() {
 
   const cardWidth = useMemo(() => {
     const max = Math.min(width, 820) - 32;
-    if (max >= 900) return (max - 32) / 3;
-    if (max >= 620) return (max - 16) / 2;
+    if (max >= 620) return (max - 12) / 2;
     return max;
   }, [width]);
 
@@ -233,9 +235,14 @@ export default function UserProfile() {
     setLoadedTabs([]);
     setTabError(false);
     setBlocked(false); setBlockedByOther(false); setFollowing(false); setFollowedBy(false);
+    setCanMessage(false);setScopeDenied(false);setProfile(null);setPreviewImage(null);
     try {
       const { data: sessionData } = await supabase.auth.getSession();
       const me = sessionData?.session?.user?.id || null;
+      setCurrentUserId(me);
+      const access=await getNeighborAccess(lookupKey);
+      if(!access.can_view){setScopeDenied(true);return;}
+      setCanMessage(access.can_message);
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(lookupKey);
       const { data: p, error } = await supabase.from('profiles').select('id,username,display_name,avatar_url,role,is_verified,is_verified_merchant,verification_status,account_type,freelance_trade,city,district,bio,is_geoverified,badges,profile_privacy,hide_name,is_banned,allow_dms,created_at')
         .eq(isUuid ? 'id' : 'username', lookupKey).maybeSingle();
@@ -276,10 +283,6 @@ export default function UserProfile() {
         isFollowedBy = !!b.data;
         iBlocked = c.iBlocked;
         blockedMe = c.blockedMe;
-        const { data: mine } = await supabase.from('profiles').select('city,district').eq('id', me).maybeSingle();
-        setSameDistrict(!!mine && isExactDistrictMatching(p, mine.city, mine.district));
-      } else {
-        setSameDistrict(true);
       }
       setFollowing(isFollowing);
       setFollowedBy(isFollowedBy);
@@ -455,19 +458,8 @@ export default function UserProfile() {
     if (currentUserId === id) return;
     if (blocked) return Alert.alert('الحساب محظور', 'ألغِ الحظر أولاً.');
     if (blockedByOther) return Alert.alert('لا يمكن المراسلة', 'هذا المستخدم حظرك.');
-
-    const isPlatformAdmin = profile?.role === 'admin';
-    const allowDms = profile?.allow_dms === 'everyone' || isPlatformAdmin;
-
-    if (!allowDms && !sameDistrict) {
-      return Alert.alert('المراسلة داخل الحي', 'المراسلة الخاصة مخصصة لسكان الحي نفسه.');
-    }
-    if (profile?.allow_dms === 'nobody' && !isPlatformAdmin) {
-      return Alert.alert('الخاص مغلق', 'هذا المستخدم لا يستقبل رسائل خاصة.');
-    }
-    if (profile?.allow_dms === 'followers' && !following && !isPlatformAdmin) {
-      return Alert.alert('للمتابعين فقط', 'تابع المستخدم أولاً حتى تتمكن من مراسلته.');
-    }
+    const access=await getNeighborAccess(id).catch(()=>null);
+    if(!access?.can_message){setCanMessage(false);return Alert.alert('المراسلة غير متاحة','إعداد التواصل أو نطاق الحي لا يسمح بهذه المحادثة.');}
 
     setBusy(true);
     try {
@@ -527,8 +519,8 @@ export default function UserProfile() {
     return (
       <View style={[styles.center, { backgroundColor: 'transparent' }]}>
         <UserRoundX size={48} color="#94a3b8" />
-        <Text style={styles.emptyTitle}>{loadError ? 'تعذر تحميل الملف' : 'الحساب غير موجود'}</Text>
-        <Text style={styles.emptyText}>{loadError ? 'تحقق من اتصالك ثم أعد المحاولة.' : 'تأكد من اسم المستخدم أو الرابط وحاول مرة أخرى.'}</Text>
+        <Text style={styles.emptyTitle}>{loadError ? 'تعذر تحميل الملف' : scopeDenied ? 'الملف غير متاح ضمن نطاقك' : 'الحساب غير موجود'}</Text>
+        <Text style={styles.emptyText}>{loadError ? 'تحقق من اتصالك ثم أعد المحاولة.' : scopeDenied ? 'تظهر بيانات الجيران وفق موقع حسابك ونطاق المدينة أو الحي وإعدادات خصوصيتهم.' : 'تأكد من اسم المستخدم أو الرابط وحاول مرة أخرى.'}</Text>
         {loadError ? (
           <Pressable oasisVariant="primary" oasisKind="action" style={styles.primaryBtn} onPress={() => void load()}><Text style={styles.primaryBtnText}>إعادة المحاولة</Text></Pressable>
         ) : (
@@ -582,6 +574,7 @@ export default function UserProfile() {
 
   return (
     <View style={[styles.screen, {backgroundColor: colors.background}, { backgroundColor: 'transparent' }]}>
+      <ImagePreviewModal uri={previewImage?.uri || null} title={previewImage?.title || 'الصورة'} onClose={()=>setPreviewImage(null)}/>
       <Modal visible={confirmBlock} transparent animationType="fade" onRequestClose={() => {if (!busy) setConfirmBlock(false);}}>
         <View style={social.menuOverlay}><View style={[social.menu,{backgroundColor:colors.surface}]} accessibilityViewIsModal>
           <Text style={[social.name,{fontSize:20,color:colors.ink}]}>{blocked ? 'إلغاء حظر المستخدم؟' : 'حظر المستخدم؟'}</Text>
@@ -641,7 +634,7 @@ export default function UserProfile() {
         contentContainerStyle={styles.page}
       >
         <View style={[styles.shell, { paddingTop: 14 }]}>
-          <ProfileHeader contactPhone={contact && contact.profileId === profile.id && (lookupKey === profile.id || lookupKey === profile.username) ? contact.phone : ''} profile={profile} customization={profileCustomization} displayName={displayName} coverUri={coverUrl} stats={{...stats, contributions:totalContributions}} own={own} anonymous={anonymous} locked={locked} following={following} followedBy={followedBy} busy={busy || blocked || blockedByOther} hideContactActions={blocked || blockedByOther} hasStories={hasActiveStories} onAvatarPress={openProfileStories} onEdit={() => router.push('/profile?section=edit')} onDesign={() => router.push('/profile?tab=settings&section=design')} onSettings={() => router.push('/profile?tab=settings')} onFollowers={() => setConnections('followers')} onFollowing={() => setConnections('following')} onFollow={() => void toggleFollow()} onMessage={() => void openMessage()} />
+          <ProfileHeader contactPhone={contact && contact.profileId === profile.id && (lookupKey === profile.id || lookupKey === profile.username) ? contact.phone : ''} profile={profile} customization={profileCustomization} displayName={displayName} coverUri={coverUrl} stats={{...stats, contributions:totalContributions}} own={own} anonymous={anonymous} locked={locked} following={following} followedBy={followedBy} busy={busy || blocked || blockedByOther} canMessage={canMessage} hideContactActions={locked || blocked || blockedByOther} hasStories={hasActiveStories} onStoriesPress={()=>void openProfileStories()} onAvatarPress={()=>{if(!anonymous&&!locked&&profile.avatar_url)setPreviewImage({uri:profile.avatar_url,title:'الصورة الشخصية'});}} onCoverPreview={()=>{if(!anonymous&&!locked)setPreviewImage({uri:coverUrl,title:'صورة الغلاف'});}} onEdit={() => router.push('/profile?section=edit')} onDesign={() => router.push('/profile?tab=settings&section=design')} onSettings={() => router.push('/profile?tab=settings')} onFollowers={() => setConnections('followers')} onFollowing={() => setConnections('following')} onFollow={() => void toggleFollow()} onMessage={() => void openMessage()} />
           {!locked && (featuredItems.length > 0 || own) && (
             <View style={styles.content}>
               {featuredItems.length > 0 && <View style={styles.contentHead}>
@@ -683,11 +676,11 @@ export default function UserProfile() {
                     key={key}
                     onLayout={event => {tabMetrics.current[key]=event.nativeEvent.layout;if(key===tab) revealActiveTab(key);}}
                     onPress={() => { setTab(key); void loadTabData(key, id, currentUserId); }}
-                    style={[styles.tab, active && {borderBottomColor: accentColor, borderBottomWidth: 3}]}
+                    style={[styles.tab, { backgroundColor: active ? colors.soft : colors.surface, borderColor: active ? accentColor : 'transparent' }]}
                   >
                     <Icon size={15} color={active ? accentColor : colors.muted} />
                     <Text style={[styles.tabText, active && {color: accentColor}]}>{label}</Text>
-                    <Text style={[styles.tabCount, active && {color: accentColor}]}>({count})</Text>
+                    <View style={[styles.tabCountBadge, { backgroundColor: active ? colors.surface : colors.soft }]}><Text style={[styles.tabCount, { color: active ? accentColor : colors.muted }]}>{count}</Text></View>
                   </Pressable>
                 );
               })}
@@ -1188,26 +1181,27 @@ const styles = StyleSheet.create({
   stat: { flex: 1, alignItems: 'center', paddingVertical: 8, borderLeftWidth: 1, borderLeftColor: '#f1f5f9' },
   statValue: { color: OASIS.colors.ink, fontSize: 17, fontWeight: '700' },
   statLabel: { color: OASIS.colors.muted, fontSize: 11, fontWeight: '700', marginTop: 2 },
-  tabsCard: { marginTop: 16, backgroundColor: OASIS.colors.surface, borderRadius: 0, borderBottomWidth: 1, borderColor: OASIS.colors.line, padding: 0 },
-  tabs: { flexDirection: 'row-reverse', gap: 6 },
+  tabsCard: { marginTop: 20, backgroundColor: OASIS.colors.surface, borderRadius: 20, borderWidth: 1, borderColor: OASIS.colors.line, padding: 6, overflow: 'hidden' },
+  tabs: { flexDirection: 'row-reverse', gap: 6, flexGrow: 1 },
+  tabCountBadge: { minWidth: 22, height: 22, paddingHorizontal: 5, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },
   tab: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 5,
     paddingHorizontal: 12,
-    paddingVertical: 17,
-    borderRadius: 0,
-    borderBottomWidth: 3,
-    borderBottomColor: 'transparent',
+    minHeight: 46,
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 1,
   },
   tabActive: { backgroundColor: OASIS.colors.primary },
   tabText: { color: OASIS.colors.muted, fontSize: 12, fontWeight: '600' },
   tabTextActive: { color: OASIS.colors.surface },
   tabCount: { color: '#94a3b8', fontSize: 11, fontWeight: '600' },
   tabCountActive: { color: OASIS.colors.soft },
-  content: { marginTop: 16 },
-  contentHead: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 10 },
-  contentTitle: { color: OASIS.colors.ink, fontSize: 17, fontWeight: '700', textAlign: 'right' },
+  content: { marginTop: 22 },
+  contentHead: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 14 },
+  contentTitle: { lineHeight: 28, color: OASIS.colors.ink, fontSize: 17, fontWeight: '700', textAlign: 'right' },
   featuredEmpty: { alignItems: 'center', gap: 10, paddingVertical: 18 },
   contentSub: { color: OASIS.colors.muted, fontSize: 11, marginTop: 2, fontWeight: '600', textAlign: 'right' },
   marketLink: { flexDirection: 'row-reverse', alignItems: 'center', gap: 2 },
@@ -1259,7 +1253,7 @@ const styles = StyleSheet.create({
   lockIcon: { width: 56, height: 56, borderRadius: 14, backgroundColor: OASIS.colors.soft, alignItems: 'center', justifyContent: 'center' },
   lockTitle: { color: OASIS.colors.ink, fontSize: 16, fontWeight: '700', marginTop: 12 },
   lockText: { color: OASIS.colors.muted, fontSize: 12, textAlign: 'center', lineHeight: 18, marginTop: 4, maxWidth: 380 },
-  empty: { padding: 24, backgroundColor: OASIS.colors.surface, borderRadius: 14, borderWidth: 1, borderColor: OASIS.colors.line, alignItems: 'center' },
+  empty: { padding: 28, minHeight: 220, justifyContent: 'center', backgroundColor: OASIS.colors.surface, borderRadius: 14, borderWidth: 1, borderColor: OASIS.colors.line, alignItems: 'center' },
   emptyIcon: { width: 54, height: 54, borderRadius: 14, backgroundColor: OASIS.colors.soft, alignItems: 'center', justifyContent: 'center' },
   emptyTitle: { color: OASIS.colors.ink, fontSize: 15, fontWeight: '700', marginTop: 10 },
   emptyText: { color: OASIS.colors.muted, fontSize: 12, textAlign: 'center', lineHeight: 18, marginTop: 4, maxWidth: 380 },
@@ -1283,7 +1277,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
   },
   footerHintText: { color: OASIS.colors.muted, fontSize: 11, fontWeight: '700' },
-  reviewCard: { backgroundColor: OASIS.colors.surface, borderRadius: 16, borderWidth: 1, borderColor: OASIS.colors.line, padding: 12, gap: 8, width: '100%' },
+  reviewCard: { backgroundColor: OASIS.colors.surface, borderRadius: 20, borderWidth: 1, borderColor: OASIS.colors.line, padding: 12, gap: 8, width: '100%' },
   reviewAuthor: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
   reviewAvatar: { width: 36, height: 36, borderRadius: 18 },
   reviewAvatarFallback: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: OASIS.colors.soft },
@@ -1303,5 +1297,5 @@ const styles = StyleSheet.create({
 });
 
 const social = StyleSheet.create({
-post:{width:'100%',padding:18,borderBottomWidth:1,gap:10},menuOverlay:{flex:1,backgroundColor:'rgba(0,0,0,.4)',justifyContent:'center',alignItems:'center',padding:24},menu:{width:'100%',maxWidth:400,borderRadius:24,padding:24,gap:8},menuRow:{flexDirection:'row-reverse',alignItems:'center',gap:12,paddingVertical:14},profile:{borderWidth:1,borderRadius:20,overflow:'hidden'},cover:{width:'100%',overflow:'hidden'},identityBody:{paddingHorizontal:20,paddingBottom:24},topLine:{flexDirection:'row-reverse',justifyContent:'space-between',alignItems:'flex-start',gap:12,marginBottom:14},name:{fontSize:26,fontWeight:'800',textAlign:'right'},bio:{fontSize:15,lineHeight:26,textAlign:'right',marginVertical:6},metadata:{flexDirection:'row-reverse',flexWrap:'wrap',gap:14,marginTop:5},metaItem:{flexDirection:'row-reverse',alignItems:'center',gap:6},numbers:{flexDirection:'row-reverse',flexWrap:'wrap',gap:22,marginTop:12,marginBottom:6},followsYou:{paddingHorizontal:8,paddingVertical:3,borderRadius:5,fontSize:11},iconButton:{width:40,height:40,borderRadius:20,borderWidth:1,alignItems:'center',justifyContent:'center'},coverEdit:{position:'absolute',left:16,top:16,backgroundColor:'rgba(0,0,0,.4)',padding:10,borderRadius:24,flexDirection:'row-reverse',gap:8,alignItems:'center'}
+post:{width:'100%',padding:18,borderWidth:1,borderRadius:20,gap:10},menuOverlay:{flex:1,backgroundColor:'rgba(0,0,0,.4)',justifyContent:'center',alignItems:'center',padding:24},menu:{width:'100%',maxWidth:400,borderRadius:24,padding:24,gap:8},menuRow:{flexDirection:'row-reverse',alignItems:'center',gap:12,paddingVertical:14},profile:{borderWidth:1,borderRadius:20,overflow:'hidden'},cover:{width:'100%',overflow:'hidden'},identityBody:{paddingHorizontal:20,paddingBottom:24},topLine:{flexDirection:'row-reverse',justifyContent:'space-between',alignItems:'flex-start',gap:12,marginBottom:14},name:{fontSize:26,fontWeight:'800',textAlign:'right'},bio:{fontSize:15,lineHeight:26,textAlign:'right',marginVertical:6},metadata:{flexDirection:'row-reverse',flexWrap:'wrap',gap:14,marginTop:5},metaItem:{flexDirection:'row-reverse',alignItems:'center',gap:6},numbers:{flexDirection:'row-reverse',flexWrap:'wrap',gap:22,marginTop:12,marginBottom:6},followsYou:{paddingHorizontal:8,paddingVertical:3,borderRadius:5,fontSize:11},iconButton:{width:40,height:40,borderRadius:20,borderWidth:1,alignItems:'center',justifyContent:'center'},coverEdit:{position:'absolute',left:16,top:16,backgroundColor:'rgba(0,0,0,.4)',padding:10,borderRadius:24,flexDirection:'row-reverse',gap:8,alignItems:'center'}
 });

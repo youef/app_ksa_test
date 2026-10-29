@@ -44,6 +44,8 @@ import { getListingType, getDeliveryMode, formatServicePrice } from '@/lib/servi
 import { relativeTime } from '@/lib/mapPins';
 import { useBottomNavInset } from '@/lib/bottomNav';
 import { AccountIdentityBadge } from '@/components/profile/AccountIdentityBadge';
+import { getNeighborAccess } from '@/lib/neighborAccess';
+import { safeServiceMapUrl } from '@/lib/servicePublishingRules';
 
 export default function Service() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -55,6 +57,7 @@ export default function Service() {
   const [me, setMe] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [contacting, setContacting] = useState(false);
+  const [canContact,setCanContact]=useState(false);
   const [activeImage, setActiveImage] = useState(0);
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
@@ -72,6 +75,7 @@ export default function Service() {
     async function load() {
       if (!id) return;
       setLoading(true);
+      setCanContact(false);setProvider(null);setBusiness(null);
       try {
         const { data: u } = await supabase.auth.getUser();
         setMe(u.user?.id || null);
@@ -79,9 +83,11 @@ export default function Service() {
         const { data: s } = await supabase.from('services').select('*').eq('id', id).single();
         if (s) {
           setService(s);
+          const access=await getNeighborAccess(s.provider_id);
+          setCanContact(access.can_message);
 
           // Load provider profile
-          if (s.provider_id) {
+          if (s.provider_id && access.can_view) {
             const { data: p } = await supabase
               .from('profiles')
               .select('id, display_name, username, avatar_url, is_verified, is_geoverified, account_type, freelance_trade, role, city, district, created_at')
@@ -90,7 +96,7 @@ export default function Service() {
             setProvider(p);
           }
 
-          if (s.business_id) {
+          if (s.business_id && access.can_view) {
             const { data: b } = await supabase.from('businesses')
               .select('id,name,logo_url,is_verified,city,district')
               .eq('id', s.business_id).maybeSingle();
@@ -103,6 +109,8 @@ export default function Service() {
           const { data: rel } = await supabase
             .from('services')
             .select('id, name, cover_url, images, price_from, price_to, price_type, listing_type, subcategory, city, district')
+            .eq('city',s.city || '__no_city__')
+            .eq('moderation_status','approved')
             .neq('id', id)
             .limit(6);
           setRelated(rel || []);
@@ -199,7 +207,8 @@ export default function Service() {
     } catch {}
   }
 
-  function openWhatsApp() {
+  async function openWhatsApp() {
+    const access=await getNeighborAccess(service?.provider_id||'').catch(()=>null);if(!access?.can_message){setCanContact(false);return Alert.alert('التواصل غير متاح','إعداد التواصل أو نطاق الحي لا يسمح بهذا الإجراء.');}
     const rawNumber = service?.whatsapp || service?.phone;
     if (!rawNumber) {
       Alert.alert('تنبيه', 'رقم الواتساب غير مسجل لهذا العرض.');
@@ -214,7 +223,8 @@ export default function Service() {
     Linking.openURL(`https://wa.me/${intl}?text=${msg}`).catch(() => Alert.alert('خطأ', 'تعذر فتح واتساب'));
   }
 
-  function callPhone() {
+  async function callPhone() {
+    const access=await getNeighborAccess(service?.provider_id||'').catch(()=>null);if(!access?.can_message){setCanContact(false);return Alert.alert('التواصل غير متاح','إعداد التواصل أو نطاق الحي لا يسمح بهذا الإجراء.');}
     const number = service?.phone || service?.whatsapp;
     if (!number) {
       Alert.alert('تنبيه', 'رقم الاتصال غير مسجل.');
@@ -238,25 +248,16 @@ export default function Service() {
         Alert.alert('خطأ', 'لا يوجد معلن صالح لهذا العرض.');
         return;
       }
+      const access=await getNeighborAccess(providerId);setCanContact(access.can_message);
+      if(!access.can_message)throw new Error('إعداد التواصل أو نطاق الحي لا يسمح ببدء المحادثة.');
 
       const { data: convId, error: conversationError } = await supabase.rpc('hayna_get_or_create_direct_conversation', { p_target: providerId });
       if (conversationError || !convId) throw conversationError || new Error('تعذر إنشاء المحادثة.');
 
-      const body = `مرحباً! أستفسر عن عرضك «${service.name}» في سوق الحي. هل هو متوفر الآن؟`;
-      const { error: messageError } = await supabase.from('messages').insert({
-        conversation_id: convId,
-        sender_id: me,
-        body,
-      });
-
-      if (messageError) {
-        throw messageError;
-      }
-
       router.push({ pathname: '/conversation', params: { id: convId } });
     } catch (e) {
       console.warn('contactProvider error', e);
-      router.push('/messages');
+      Alert.alert('التواصل غير متاح',(e as Error)?.message || 'تعذر فتح المحادثة.');
     } finally {
       setContacting(false);
     }
@@ -302,9 +303,13 @@ export default function Service() {
     level: { label: 'المرحلة التعليمية', Icon: GraduationCap },
     range: { label: 'نطاق الخدمة والتغطية', Icon: MapPin },
     map_link: { label: 'رابط الخريطة', Icon: MapPin },
+    included: {label:'الأعمال المشمولة',Icon:PackageCheck},
+    estimated_duration: {label:'المدة المتوقعة',Icon:Clock},
+    response_time: {label:'وقت الرد',Icon:Clock},
+    service_conditions: {label:'شروط الخدمة والاستثناءات',Icon:Info},
   };
 
-  const extraEntries = Object.entries(details).filter(([_, v]) => Boolean(v && String(v).trim()));
+  const extraEntries = Object.entries(details).filter(([key, v]) => key!=='terms_accepted_at' && Boolean(v && String(v).trim()));
   const timeAgoText = relativeTime(service.created_at);
 
   return (
@@ -524,7 +529,7 @@ export default function Service() {
             </Pressable>
           )}
 
-          {!isOwner && (
+          {!isOwner && canContact && (
             <OasisSurface oasisSurface="card" style={styles.inlineContactCard}>
               <Text style={styles.inlineContactTitle}>التواصل مع صاحب العرض</Text>
               <View style={styles.inlineContactActions}>
@@ -603,7 +608,7 @@ export default function Service() {
                 if (k === 'map_link') {
                   return (
                     <View key={k} style={styles.specRow}>
-                      <Pressable onPress={() => Linking.openURL(v).catch(() => {})}>
+                      <Pressable onPress={() => {const url=safeServiceMapUrl(v);if(url)void Linking.openURL(url).catch(()=>Alert.alert('تعذر فتح الخريطة','أعد المحاولة لاحقًا.'));else Alert.alert('الرابط غير صالح','لا يمكن فتح رابط الخريطة المرفق.');}}>
                         <Text style={[styles.specVal, { color: OASIS.colors.info, textDecorationLine: 'underline' }]}>
                           فتح في خرائط Google
                         </Text>
