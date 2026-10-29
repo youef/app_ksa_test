@@ -26,3 +26,7 @@ verify_jwt = true
 verify_jwt = false
 [functions.tap-marketplace-webhook]
 verify_jwt = false
+
+# PayPal validates transmission signatures and fetches orders server-side.
+[functions.paypal-marketplace-webhook]
+verify_jwt = false
