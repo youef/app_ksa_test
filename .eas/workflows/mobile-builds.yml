@@ -1,0 +1,30 @@
+name: Hayna - Android APK and iOS IPA
+
+# Run manually from Expo's EAS Workflows dashboard or:
+# npx eas-cli@latest workflow:run .eas/workflows/mobile-builds.yml
+#
+# A one-off build can also be started by pushing a branch named
+# build/hayna-release-<date> after GitHub is linked to the EAS project.
+# The two builds are independent; an iOS credentials failure does not
+# cancel a successful Android build.
+on:
+  push:
+    branches:
+      - 'build/hayna-release-*'
+
+jobs:
+  build_android:
+    name: Android installable APK
+    type: build
+    environment: preview
+    params:
+      platform: android
+      profile: preview
+
+  build_ios:
+    name: iOS signed IPA for TestFlight
+    type: build
+    environment: production
+    params:
+      platform: ios
+      profile: testflight
