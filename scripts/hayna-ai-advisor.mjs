@@ -18,6 +18,18 @@ if(!actionable.length){
  console.log('All checks passed: skipping paid AI review.');
  process.exit(0);
 }
+// A known warning (e.g. OTA prerequisites) must not spend API credits every hour.
+// Manual workflow_dispatch always reviews now; scheduled failures at most once / 6h,
+// scheduled warnings at most once / 24h. Hourly deterministic checks still always run.
+const scheduled=process.env.GITHUB_EVENT_NAME==='schedule';
+const hasFailure=actionable.some(check=>check.status==='failed');
+const reviewIntervalHours=hasFailure?6:24;
+if(scheduled && new Date().getUTCHours()%reviewIntervalHours!==0){
+ fs.mkdirSync('artifacts',{recursive:true});
+ fs.writeFileSync('artifacts/hayna-ai-proposals.json',JSON.stringify({proposals:[],skipped:'cost_control_window',reviewIntervalHours,cost_tier:'deterministic'},null,2));
+ console.log('Skip paid AI: hourly diagnostics remain active; review window every '+reviewIntervalHours+' hours.');
+ process.exit(0);
+}
 const selectedModel=actionable.some(check=>check.status==='failed')
  ? (process.env.HAYNA_AI_MODEL_HIGH || model)
  : model;
