@@ -1,8 +1,8 @@
-name: Marketplace payment safety
+name: Marketplace integration safety
 
 on:
   pull_request:
-    paths: ['supabase/functions/**', 'supabase/migrations/**', 'artifacts/marketplace-*.sql', 'lib/marketplaceWorkspace.ts', 'tests/marketplace*.cjs', 'tests/databaseHarness.cjs', 'package-lock.json', '.github/workflows/marketplace-checks.yml']
+    paths: ['supabase/functions/**', 'supabase/migrations/**', 'artifacts/marketplace-*.sql', 'artifacts/neighbor*.sql', 'lib/marketplaceWorkspace.ts', 'lib/product*.ts', 'lib/servicePublishingRules.ts', 'lib/neighborAccess.ts', 'tests/*.cjs', 'package-lock.json', '.github/workflows/marketplace-checks.yml']
   push:
     branches: [main, codex/hayna-full-integration]
   workflow_dispatch:
@@ -23,5 +23,5 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci --ignore-scripts
-      - name: Verify RLS, atomic payment and untrusted provider callbacks
-        run: node --test tests/marketplaceWorkspace.database.test.cjs tests/marketplaceWorkspace.test.cjs tests/marketplaceWebhooks.test.cjs
+      - name: Verify location, publishing, profile RLS and payment callbacks
+        run: node --test tests/marketplaceWorkspace.database.test.cjs tests/marketplaceWorkspace.test.cjs tests/marketplaceWebhooks.test.cjs tests/productLocation.test.cjs tests/productDeviceLocation.test.cjs tests/productDetails.test.cjs tests/servicePublishingRules.test.cjs tests/neighborPrivacy.database.test.cjs

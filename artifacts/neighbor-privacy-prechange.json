@@ -1,0 +1,301 @@
+{
+  "functions": [
+    {
+      "proname": "hayna_get_or_create_direct_conversation",
+      "definition": "CREATE OR REPLACE FUNCTION public.hayna_get_or_create_direct_conversation(p_target uuid)\n RETURNS uuid\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'pg_catalog'\nAS $function$\r\ndeclare\r\n  v_uid uuid := auth.uid();\r\n  v_conv uuid;\r\nbegin\r\n  if v_uid is null then raise exception 'not_authenticated'; end if;\r\n  if p_target is null or p_target = v_uid then raise exception 'invalid_target'; end if;\r\n  if not exists (select 1 from public.profiles where id = p_target) then raise exception 'user_not_found'; end if;\r\n  if not public.hayna_can_dm(v_uid, p_target) then raise exception 'dm_not_allowed'; end if;\r\n\r\n  select c.id into v_conv\r\n  from public.conversations c\r\n  join public.conversation_members a on a.conversation_id = c.id and a.user_id = v_uid\r\n  join public.conversation_members b on b.conversation_id = c.id and b.user_id = p_target\r\n  where not exists (\r\n    select 1 from public.conversation_members x\r\n    where x.conversation_id = c.id and x.user_id not in (v_uid, p_target)\r\n  )\r\n  order by c.created_at asc limit 1;\r\n\r\n  if v_conv is null then\r\n    begin\r\n      insert into public.conversations default values\r\n      returning id into v_conv;\r\n    exception when others then\r\n      begin\r\n        insert into public.conversations (id)\r\n        values (gen_random_uuid())\r\n        returning id into v_conv;\r\n      exception when others then\r\n        insert into public.conversations (created_by)\r\n        values (v_uid)\r\n        returning id into v_conv;\r\n      end;\r\n    end;\r\n\r\n    insert into public.conversation_members(conversation_id, user_id)\r\n    values(v_conv, v_uid), (v_conv, p_target)\r\n    on conflict do nothing;\r\n  end if;\r\n\r\n  return v_conv;\r\nend $function$\n"
+    },
+    {
+      "proname": "hayna_can_dm",
+      "definition": "CREATE OR REPLACE FUNCTION public.hayna_can_dm(p_sender uuid, p_recipient uuid)\n RETURNS boolean\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO 'public', 'pg_catalog'\nAS $function$\r\n  select p_sender is not null and p_recipient is not null and p_sender <> p_recipient\r\n    and not exists (\r\n      select 1 from public.blocks b\r\n      where (b.blocker_id = p_sender and b.blocked_id = p_recipient)\r\n         or (b.blocker_id = p_recipient and b.blocked_id = p_sender)\r\n    );\r\n$function$\n"
+    },
+    {
+      "proname": "hayna_can_insert_conversation_member",
+      "definition": "CREATE OR REPLACE FUNCTION public.hayna_can_insert_conversation_member(p_conversation uuid, p_member uuid)\n RETURNS boolean\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$ declare actor uuid:=auth.uid(); begin if actor is null or not exists(select 1 from public.profiles where id=actor and not is_banned) or not exists(select 1 from public.conversations where id=p_conversation and created_by=actor) then return false; end if; perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('conversation-members:'||p_conversation::text,0)); if p_member<>actor and not public.hayna_can_dm(actor,p_member) then return false; end if; return exists(select 1 from public.conversation_members where conversation_id=p_conversation and user_id=p_member) or (select count(*) from public.conversation_members where conversation_id=p_conversation)<2; end $function$\n"
+    },
+    {
+      "proname": "hayna_can_message_conversation",
+      "definition": "CREATE OR REPLACE FUNCTION public.hayna_can_message_conversation(p_conversation uuid, p_sender uuid)\n RETURNS boolean\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO 'public', 'pg_catalog'\nAS $function$\n select p_sender is not null\n and exists(select 1 from public.conversation_members cm where cm.conversation_id=p_conversation and cm.user_id=p_sender)\n and exists(\n   select 1 from public.conversation_members other\n   where other.conversation_id=p_conversation and other.user_id<>p_sender\n     and public.hayna_can_dm(p_sender,other.user_id)\n );\n$function$\n"
+    }
+  ],
+  "policies": [
+    {
+      "tablename": "conversation_members",
+      "policyname": "conv_members_delete",
+      "cmd": "DELETE",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "qual": "(auth.uid() = user_id)",
+      "with_check": null
+    },
+    {
+      "tablename": "conversation_members",
+      "policyname": "conv_members_insert",
+      "cmd": "INSERT",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "qual": null,
+      "with_check": "(auth.uid() IS NOT NULL)"
+    },
+    {
+      "tablename": "conversation_members",
+      "policyname": "conversation_members_creator_guard",
+      "cmd": "INSERT",
+      "permissive": "RESTRICTIVE",
+      "roles": "{authenticated}",
+      "qual": null,
+      "with_check": "hayna_can_insert_conversation_member(conversation_id, user_id)"
+    },
+    {
+      "tablename": "conversation_members",
+      "policyname": "conversation members insert own",
+      "cmd": "INSERT",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "qual": null,
+      "with_check": "(user_id = ( SELECT auth.uid() AS uid))"
+    },
+    {
+      "tablename": "conversation_members",
+      "policyname": "conversation members read own",
+      "cmd": "SELECT",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "qual": "(user_id = ( SELECT auth.uid() AS uid))",
+      "with_check": null
+    },
+    {
+      "tablename": "conversation_members",
+      "policyname": "conv_members_select",
+      "cmd": "SELECT",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "conversation_members",
+      "policyname": "conversation_members_participant_guard",
+      "cmd": "SELECT",
+      "permissive": "RESTRICTIVE",
+      "roles": "{authenticated}",
+      "qual": "hayna_is_conversation_member(conversation_id, ( SELECT auth.uid() AS uid))",
+      "with_check": null
+    },
+    {
+      "tablename": "conversations",
+      "policyname": "conversations_delete",
+      "cmd": "DELETE",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "qual": "is_conv_member(id, auth.uid())",
+      "with_check": null
+    },
+    {
+      "tablename": "conversations",
+      "policyname": "conversations_participant_delete",
+      "cmd": "DELETE",
+      "permissive": "RESTRICTIVE",
+      "roles": "{authenticated}",
+      "qual": "((created_by = ( SELECT auth.uid() AS uid)) OR hayna_is_conversation_member(id, ( SELECT auth.uid() AS uid)))",
+      "with_check": null
+    },
+    {
+      "tablename": "conversations",
+      "policyname": "conversations participants create",
+      "cmd": "INSERT",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "qual": null,
+      "with_check": "true"
+    },
+    {
+      "tablename": "conversations",
+      "policyname": "conversations_creator_identity",
+      "cmd": "INSERT",
+      "permissive": "RESTRICTIVE",
+      "roles": "{authenticated}",
+      "qual": null,
+      "with_check": "(created_by = ( SELECT auth.uid() AS uid))"
+    },
+    {
+      "tablename": "conversations",
+      "policyname": "conversations_insert",
+      "cmd": "INSERT",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "qual": null,
+      "with_check": "(auth.uid() IS NOT NULL)"
+    },
+    {
+      "tablename": "conversations",
+      "policyname": "conversations_owner_or_member_read",
+      "cmd": "SELECT",
+      "permissive": "RESTRICTIVE",
+      "roles": "{authenticated}",
+      "qual": "((created_by = ( SELECT auth.uid() AS uid)) OR hayna_is_conversation_member(id, ( SELECT auth.uid() AS uid)))",
+      "with_check": null
+    },
+    {
+      "tablename": "conversations",
+      "policyname": "conversations participants read",
+      "cmd": "SELECT",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "qual": "(EXISTS ( SELECT 1\n   FROM conversation_members cm\n  WHERE ((cm.conversation_id = conversations.id) AND (cm.user_id = ( SELECT auth.uid() AS uid)))))",
+      "with_check": null
+    },
+    {
+      "tablename": "conversations",
+      "policyname": "conversations_select",
+      "cmd": "SELECT",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "messages",
+      "policyname": "hayna_banned_actor_write_guard",
+      "cmd": "ALL",
+      "permissive": "RESTRICTIVE",
+      "roles": "{authenticated}",
+      "qual": "hayna_account_is_active(( SELECT auth.uid() AS uid))",
+      "with_check": "hayna_account_is_active(( SELECT auth.uid() AS uid))"
+    },
+    {
+      "tablename": "messages",
+      "policyname": "hayna_banned_content_guard",
+      "cmd": "ALL",
+      "permissive": "RESTRICTIVE",
+      "roles": "{anon,authenticated}",
+      "qual": "hayna_account_is_active(sender_id)",
+      "with_check": "hayna_account_is_active(sender_id)"
+    },
+    {
+      "tablename": "messages",
+      "policyname": "messages sender delete",
+      "cmd": "DELETE",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "qual": "(sender_id = ( SELECT auth.uid() AS uid))",
+      "with_check": null
+    },
+    {
+      "tablename": "messages",
+      "policyname": "messages authenticated send allowed conversation",
+      "cmd": "INSERT",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "qual": null,
+      "with_check": "((sender_id = auth.uid()) AND hayna_can_message_conversation(conversation_id, auth.uid()))"
+    },
+    {
+      "tablename": "messages",
+      "policyname": "messages authenticated read allowed conversation",
+      "cmd": "SELECT",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "qual": "hayna_can_message_conversation(conversation_id, auth.uid())",
+      "with_check": null
+    },
+    {
+      "tablename": "messages",
+      "policyname": "messages sender update",
+      "cmd": "UPDATE",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "qual": "(sender_id = ( SELECT auth.uid() AS uid))",
+      "with_check": "(sender_id = ( SELECT auth.uid() AS uid))"
+    },
+    {
+      "tablename": "profile_customizations",
+      "policyname": "profile customization owner access",
+      "cmd": "ALL",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "qual": "(( SELECT auth.uid() AS uid) = user_id)",
+      "with_check": "(( SELECT auth.uid() AS uid) = user_id)"
+    },
+    {
+      "tablename": "profile_customizations",
+      "policyname": "profile customizations public read",
+      "cmd": "SELECT",
+      "permissive": "PERMISSIVE",
+      "roles": "{anon,authenticated}",
+      "qual": "(EXISTS ( SELECT 1\n   FROM profiles p\n  WHERE ((p.id = profile_customizations.user_id) AND (COALESCE(p.hide_name, false) = false) AND (COALESCE(p.is_banned, false) = false) AND ((COALESCE(p.profile_privacy, 'public'::text) = 'public'::text) OR ((auth.uid() IS NOT NULL) AND (EXISTS ( SELECT 1\n           FROM follows f\n          WHERE ((f.follower_id = auth.uid()) AND (f.following_id = profile_customizations.user_id)))))))))",
+      "with_check": null
+    },
+    {
+      "tablename": "profiles",
+      "policyname": "Users can insert their own profile.",
+      "cmd": "INSERT",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "qual": null,
+      "with_check": "(auth.uid() = id)"
+    },
+    {
+      "tablename": "profiles",
+      "policyname": "profiles_insert",
+      "cmd": "INSERT",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "qual": null,
+      "with_check": "(auth.uid() = id)"
+    },
+    {
+      "tablename": "profiles",
+      "policyname": "profiles_insert_authenticated_own",
+      "cmd": "INSERT",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "qual": null,
+      "with_check": "(( SELECT auth.uid() AS uid) = id)"
+    },
+    {
+      "tablename": "profiles",
+      "policyname": "profiles_select",
+      "cmd": "SELECT",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "profiles",
+      "policyname": "Public profiles are viewable by everyone.",
+      "cmd": "SELECT",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "tablename": "profiles",
+      "policyname": "profiles own read",
+      "cmd": "SELECT",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "qual": "(id = ( SELECT auth.uid() AS uid))",
+      "with_check": null
+    },
+    {
+      "tablename": "profiles",
+      "policyname": "profiles_update",
+      "cmd": "UPDATE",
+      "permissive": "PERMISSIVE",
+      "roles": "{public}",
+      "qual": "(auth.uid() = id)",
+      "with_check": null
+    },
+    {
+      "tablename": "profiles",
+      "policyname": "profiles_update_self_or_staff",
+      "cmd": "UPDATE",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "qual": "((( SELECT auth.uid() AS uid) = id) OR hayna_is_staff(( SELECT auth.uid() AS uid)))",
+      "with_check": "((( SELECT auth.uid() AS uid) = id) OR hayna_is_staff(( SELECT auth.uid() AS uid)))"
+    }
+  ]
+}

@@ -33,6 +33,7 @@ import {
   ArrowRight,
   ArrowUpDown,
   LayoutGrid,
+  List,
   Send,
   CheckCircle2,
   Award,
@@ -63,7 +64,7 @@ export type SortOption = 'newest' | 'engaged' | 'nearby';
 const SORT_OPTIONS: { id: SortOption; label: string; Icon: any }[] = [
   { id: 'newest', label: 'الأحدث', Icon: Clock },
   { id: 'engaged', label: 'الأكثر تفاعلاً', Icon: TrendingUp },
-  { id: 'nearby', label: 'الأقرب إلى الحي', Icon: MapPin },
+  { id: 'nearby', label: 'من حيّك أولاً', Icon: MapPin },
 ];
 
 type QuickFilter = 'all' | 'available' | 'delivery' | 'images' | 'verified';
@@ -115,6 +116,7 @@ export default function Market() {
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [partialLoadError, setPartialLoadError] = useState(false);
 
   // Filters
   const [activeType, setActiveType] = useState<ListingTypeId | 'all'>('all');
@@ -124,6 +126,7 @@ export default function Market() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('newest');
   const [filterMenu, setFilterMenu] = useState<'sort' | 'category' | null>(null);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [eventAttendees, setEventAttendees] = useState<any[]>([]);
   const [loadingAttendees, setLoadingAttendees] = useState(false);
   const [attendeeActionBusy, setAttendeeActionBusy] = useState(false);
@@ -228,6 +231,7 @@ export default function Market() {
   const loadAllData = async () => {
     setRefreshing(true);
     setLoadError(false);
+    setPartialLoadError(false);
     try {
       const [servicesRes, productsRes, businessRes, eventsRes] = await Promise.all([
         supabase
@@ -253,6 +257,9 @@ export default function Market() {
           .order('created_at', { ascending: false })
           .limit(50),
       ]);
+      const failedSources = [servicesRes, productsRes, businessRes, eventsRes].filter(result => result.error).length;
+      if (failedSources === 4) throw new Error('market_sources_unavailable');
+      setPartialLoadError(failedSources > 0);
 
       const serviceRows = servicesRes.error
         ? []
@@ -296,18 +303,19 @@ export default function Market() {
         categoryLabel: BUSINESS_CATEGORIES.find((c) => c.id === b.category)?.label || b.category || 'خدمات محلية',
         city: b.city || '',
         district: b.district || '',
-        rating: b.rating || 5.0,
+        rating: b.reviews_count > 0 && b.rating != null ? Number(b.rating) : null,
         reviews: b.reviews_count || 0,
         phone: b.phone || '',
         whatsapp: b.whatsapp || '',
-        openNow: b.is_open ?? true,
+        openNow: typeof b.is_open === 'boolean' ? b.is_open : null,
+        created_at: b.created_at,
         is_verified: Boolean(b.is_verified),
         Icon: BUSINESS_CATEGORIES.find((c) => c.id === b.category)?.Icon || Store,
         color: OASIS.colors.primary,
         bg: OASIS.colors.soft,
         hours: b.working_hours || 'ساعات العمل حسب التنسيق',
-        description: b.description || 'منشأة معتمدة لخدمة سكان الحي بأعلى معايير الجودة.',
-        features: b.features || ['خدمة سكان الحي', 'استجابة سريعة', 'موثوق'],
+        description: b.description || 'تعرّف على تفاصيل المنشأة وطرق التواصل معها.',
+        features: b.features || [],
         servicesList: b.services_list || [],
         reviewsList: b.reviews_list || [],
       }));
@@ -582,7 +590,7 @@ export default function Market() {
     const isSaved = Boolean(savedItems[favoriteKey(favoriteType, item.id)]);
 
     return (
-      <Pressable oasisKind="card"
+      <Pressable oasisKind="card" accessibilityRole="none" focusable={false}
         key={item.id}
         id={`market-item-${item.id}`}
         onPress={() => openItem(item)}
@@ -688,13 +696,14 @@ export default function Market() {
             <Text style={styles.cardMetaText} numberOfLines={1}>
               {type?.nationwide ? 'عن بُعد' : (item.district || item.profiles?.district) ? `حي ${item.district || item.profiles?.district}` : (item.city || 'داخل الحي')}
             </Text>
-            {Boolean(timeAgo) && <Text style={styles.cardTimeText}>· {timeAgo}</Text>}
+            {listMode && Boolean(timeAgo) && <Text style={styles.cardTimeText} numberOfLines={1}>· {timeAgo}</Text>}
           </View>
+          {!listMode && Boolean(timeAgo) && <Text style={[styles.cardTimeText,{textAlign:'right',marginTop:4}]} numberOfLines={1}>{timeAgo}</Text>}
 
-          <View style={styles.cardDetailsHintRow}>
+          <Pressable accessibilityRole="button" accessibilityLabel={`عرض تفاصيل ${item.name}`} onPress={(event:any) => { event?.stopPropagation?.(); openItem(item); }} style={styles.cardDetailsHintRow}>
             <Text style={styles.cardDetailsHintText}>عرض التفاصيل الكاملة</Text>
             <ArrowRight size={11} color={OASIS.colors.primary} />
-          </View>
+          </Pressable>
         </View>
       </Pressable>
     );
@@ -705,7 +714,7 @@ export default function Market() {
     const isSaved = Boolean(savedItems[favoriteKey('store', b.id)]);
 
     return (
-      <Pressable oasisKind="card"
+      <Pressable oasisKind="card" accessibilityRole="none" focusable={false}
         key={b.id}
         onPress={() => setSelectedBusiness(b)}
         style={({ pressed, hovered }: any) => [
@@ -759,7 +768,7 @@ export default function Market() {
             </View>
             <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 2 }}>
               <Star size={11} color={OASIS.colors.warning} fill={OASIS.colors.warning} />
-              <Text style={{ fontSize: 11, fontWeight: '600', color: OASIS.colors.ink }}>{b.rating}</Text>
+              <Text style={{ fontSize: 11, fontWeight: '600', color: OASIS.colors.ink }}>{b.rating == null ? 'جديد' : b.rating.toFixed(1)}</Text>
             </View>
           </View>
 
@@ -810,10 +819,10 @@ export default function Market() {
             </Pressable>
           </View>
 
-          <View style={styles.cardDetailsHintRow}>
+          <Pressable accessibilityRole="button" accessibilityLabel={`عرض تفاصيل ${b.name}`} onPress={(event:any) => { event?.stopPropagation?.(); setSelectedBusiness(b); }} style={styles.cardDetailsHintRow}>
             <Text style={[styles.cardDetailsHintText, { color: OASIS.colors.info }]}>عرض بطاقة المحل والخدمات</Text>
             <ArrowRight size={11} color={OASIS.colors.info} />
-          </View>
+          </Pressable>
         </View>
       </Pressable>
     );
@@ -825,7 +834,7 @@ export default function Market() {
     const currentCount = ev.attendeesCount + (isAttending ? 1 : 0);
 
     return (
-      <Pressable oasisKind="card"
+      <Pressable oasisKind="card" accessibilityRole="none" focusable={false}
         key={ev.id}
         onPress={() => setSelectedEvent(ev)}
         style={({ pressed, hovered }: any) => [
@@ -896,10 +905,10 @@ export default function Market() {
             </Pressable>
           </View>
 
-          <View style={styles.cardDetailsHintRow}>
+          <Pressable accessibilityRole="button" accessibilityLabel={`عرض تفاصيل ${ev.title}`} onPress={(event:any) => { event?.stopPropagation?.(); setSelectedEvent(ev); }} style={styles.cardDetailsHintRow}>
             <Text style={[styles.cardDetailsHintText, { color: OASIS.colors.primary }]}>عرض تفاصيل الفعالية والبرنامج</Text>
             <ArrowRight size={11} color={OASIS.colors.primary} />
-          </View>
+          </Pressable>
         </View>
       </Pressable>
     );
@@ -921,6 +930,10 @@ export default function Market() {
   };
 
   const addBtnLabel = section === 'market' ? 'إضافة منتج أو خدمة' : section === 'businesses' ? 'إدارة منشأتي' : 'أضف فعالية';
+  const hasFilters = Boolean(searchQuery.trim() || activeType !== 'all' || quick !== 'all' || businessCategory !== 'all' || eventCategory !== 'all');
+  const resetMarketFilters = () => {
+    setSearchQuery(''); setActiveType('all'); setQuick('all'); setBusinessCategory('all'); setEventCategory('all');
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
@@ -930,6 +943,7 @@ export default function Market() {
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingBottom: bottomNavInset + 28 }}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadAllData} tintColor={OASIS.colors.primary} />}
       >
         {/* ======================================================== */}
@@ -938,7 +952,7 @@ export default function Market() {
         <View style={styles.heroSectionWrap}>
           <View style={styles.inner}>
             <LinearGradient
-              colors={[OASIS.colors.deep, OASIS.colors.primary, OASIS.colors.primary]}
+              colors={['#123f34', '#176650', '#237a5b']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.heroCard}
@@ -955,6 +969,10 @@ export default function Market() {
                   <Text style={styles.heroTitle}>سوق الحي</Text>
                   <Text style={styles.heroSubtitle}>عروض الجيران، دليل المحلات، وفعاليات الحي في مكان واحد.</Text>
                 </View>
+                <Pressable accessibilityRole="button" accessibilityLabel="لوحة إدارة السوق" onPress={() => router.push('/marketplace-dashboard')} style={styles.workspaceShortcut}>
+                  <Store size={20} color="#ffffff" />
+                  <Text style={styles.workspaceShortcutText}>لوحتي</Text>
+                </Pressable>
               </View>
 
             </LinearGradient>
@@ -973,7 +991,7 @@ export default function Market() {
                 style={[styles.segmentBtn, section === 'market' && styles.segmentBtnActive]}
               >
                 <ShoppingBag size={14} color={section === 'market' ? OASIS.colors.surface : OASIS.colors.muted} />
-                <Text style={[styles.segmentText, section === 'market' && styles.segmentTextActive]}>سوق الحي</Text>
+                <Text style={[styles.segmentText, section === 'market' && styles.segmentTextActive]}>العروض</Text>
                 <View style={[styles.segmentCount, section === 'market' && styles.segmentCountActive]}>
                   <Text style={[styles.segmentCountText, section === 'market' && styles.segmentCountTextActive]}>
                     {inAreaMarket.length}
@@ -986,7 +1004,7 @@ export default function Market() {
                 style={[styles.segmentBtn, section === 'businesses' && styles.segmentBtnActive]}
               >
                 <Building2 size={14} color={section === 'businesses' ? OASIS.colors.surface : OASIS.colors.muted} />
-                <Text style={[styles.segmentText, section === 'businesses' && styles.segmentTextActive]}>دليل المحلات</Text>
+                <Text style={[styles.segmentText, section === 'businesses' && styles.segmentTextActive]}>المحلات</Text>
                 <View style={[styles.segmentCount, section === 'businesses' && styles.segmentCountActive]}>
                   <Text style={[styles.segmentCountText, section === 'businesses' && styles.segmentCountTextActive]}>
                     {displayedBusinesses.length}
@@ -1014,6 +1032,7 @@ export default function Market() {
                 <Search size={18} color="#94a3b8" />
                 <TextInput
                   id="market-search"
+                  accessibilityLabel="البحث في السوق"
                   value={searchQuery}
                   onChangeText={setSearchQuery}
                   placeholder={
@@ -1028,7 +1047,7 @@ export default function Market() {
                   textAlign="right"
                 />
                 {!!searchQuery && (
-                  <Pressable onPress={() => setSearchQuery('')}>
+                  <Pressable accessibilityRole="button" accessibilityLabel="مسح البحث" hitSlop={10} onPress={() => setSearchQuery('')}>
                     <X size={16} color="#94a3b8" />
                   </Pressable>
                 )}
@@ -1037,7 +1056,7 @@ export default function Market() {
               <Pressable oasisKind="action" id="market-add" accessibilityRole="button" accessibilityLabel={addBtnLabel} style={styles.addBtn} onPress={handleAddPress}>
 
                 <Plus size={18} color={OASIS.colors.surface} />
-                <Text style={styles.addBtnText}>{addBtnLabel}</Text>
+                <Text style={styles.addBtnText}>{width < 500 ? 'إضافة' : addBtnLabel}</Text>
               </Pressable>
             </View>
 
@@ -1052,6 +1071,22 @@ export default function Market() {
                 <ChevronDown size={15} color={OASIS.colors.muted} />
               </Pressable>
             </View>
+            {section === 'market' && (
+              <ScrollView horizontal {...(Platform.OS === 'web' ? {dir:'rtl'} : {})} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.discoveryChips}>
+                {QUICK_FILTERS.map(({id,label,Icon}) => (
+                  <Pressable key={id} accessibilityRole="button" accessibilityState={{selected:quick===id}} onPress={() => setQuick(id)} style={[styles.discoveryChip,quick===id && styles.discoveryChipActive]}>
+                    {Icon && <Icon size={14} color={quick===id ? OASIS.colors.primary : OASIS.colors.muted}/>}
+                    <Text style={[styles.discoveryChipText,quick===id && {color:OASIS.colors.primary}]}>{label}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            )}
+            {hasFilters && <View style={styles.browseToolbar}>
+              <Text style={styles.browseCaption}>{hasFilters ? 'نتائج حسب اختياراتك' : 'اكتشف ما يقدمه أهل الحي'}</Text>
+              <View style={{flexDirection:'row-reverse',alignItems:'center',gap:8}}>
+                {hasFilters && <Pressable accessibilityRole="button" onPress={resetMarketFilters} style={styles.clearFilters}><X size={13} color={OASIS.colors.primary}/><Text style={styles.clearFiltersText}>مسح الفلاتر</Text></Pressable>}
+              </View>
+            </View>}
           </View>
         </View>
 
@@ -1059,6 +1094,7 @@ export default function Market() {
         {/* MAIN BODY CONTENT                                        */}
         {/* ======================================================== */}
         <View style={styles.inner}>
+          {partialLoadError && !loading && !loadError && <Pressable accessibilityRole="button" onPress={loadAllData} style={styles.partialNotice}><Text style={styles.partialNoticeText}>تعذر تحميل بعض الأقسام. اضغط لإعادة المحاولة.</Text></Pressable>}
           {loading ? (
             <ScreenState type="loading" title="جاري التجهيز والتحميل" message="نرتب لك محتوى الحي الأقرب إليك" />
           ) : loadError ? (
@@ -1073,7 +1109,6 @@ export default function Market() {
               {section === 'market' && (
                 <>
                   <MarketPromotions city={activeLoc.city} district={activeLoc.district}/>
-                  <View style={styles.filterHintRow}><SlidersHorizontal size={14} color={OASIS.colors.muted} /><Text style={styles.filterHintText}>اختر نوع العرض أو حالته من قائمة التصفية</Text></View>
 
                   {/* Productive Families Spotlight */}
                   {families.length > 0 && (
@@ -1094,24 +1129,30 @@ export default function Market() {
                     <Text style={styles.sectionTitle}>
                       {activeType === 'all' ? 'أحدث العروض والسلع' : LISTING_TYPES.find((t) => t.id === activeType)?.label}
                     </Text>
-                    <Text style={styles.resultCount}>{displayedMarket.length} عرض نشط</Text>
+                    <View style={{flexDirection:'row-reverse',alignItems:'center',gap:8}}>
+                      <Text style={styles.resultCount}>{displayedMarket.length} عرض</Text>
+                      <View style={styles.viewSwitcher}>
+                        <Pressable accessibilityRole="button" accessibilityLabel="عرض شبكي" accessibilityState={{selected:viewMode==='grid'}} onPress={() => setViewMode('grid')} style={[styles.viewSwitch,viewMode==='grid' && styles.viewSwitchActive]}><LayoutGrid size={16} color={viewMode==='grid'?OASIS.colors.primary:OASIS.colors.muted}/></Pressable>
+                        <Pressable accessibilityRole="button" accessibilityLabel="عرض قائمة" accessibilityState={{selected:viewMode==='list'}} onPress={() => setViewMode('list')} style={[styles.viewSwitch,viewMode==='list' && styles.viewSwitchActive]}><List size={16} color={viewMode==='list'?OASIS.colors.primary:OASIS.colors.muted}/></Pressable>
+                      </View>
+                    </View>
                   </View>
 
                   {displayedMarket.length > 0 ? (
-                    <View style={[styles.list, { gap }]}>
-                      {displayedMarket.map((e) => renderMarketCard(e, contentWidth, true))}
+                    <View style={[viewMode === 'grid' ? styles.grid : styles.list, { gap }]}>
+                      {displayedMarket.map((e) => renderMarketCard(e, viewMode === 'grid' ? cardWidth : contentWidth, viewMode === 'list'))}
                     </View>
                   ) : (
                     <View style={styles.emptyState}>
                       <View style={{ alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}><OasisEmptyIllustration kind="empty-market" /></View>
-                      <Text style={styles.emptyTitle}>لا توجد عروض في هذا الحي حالياً</Text>
+                      <Text style={styles.emptyTitle}>{hasFilters ? 'لم نجد عرضًا بهذه الخيارات' : 'لا توجد عروض في هذا الحي حالياً'}</Text>
                       <Text style={styles.emptyText}>
-                        كن أول جار يشارك منتجاته أو خدماته مع أهالي {locationLabel} وبدون أي عمولات.
+                        {hasFilters ? 'جرّب كلمة بحث أخرى أو امسح الفلاتر للاطلاع على بقية العروض.' : `ستظهر هنا المنتجات والخدمات المتاحة في ${locationLabel}.`}
                       </Text>
-                      <Pressable oasisKind="action" style={styles.emptyBtn} onPress={() => router.push('/new-service')}>
+                      <Pressable oasisKind="action" style={styles.emptyBtn} onPress={hasFilters ? resetMarketFilters : handleAddPress}>
 
                         <Plus size={16} color={OASIS.colors.surface} />
-                        <Text style={styles.emptyBtnText}>أضف أول عرض في الحي</Text>
+                        <Text style={styles.emptyBtnText}>{hasFilters ? 'عرض كل العروض' : 'إضافة عرض'}</Text>
                       </Pressable>
                     </View>
                   )}
@@ -1127,12 +1168,17 @@ export default function Market() {
 
                   <View style={styles.sectionHead}>
                     <Text style={styles.sectionTitle}>دليل المحلات في الحي</Text>
-                    <Text style={styles.resultCount}>{displayedBusinesses.length} منشأة</Text>
+                    <View style={{flexDirection:'row-reverse',alignItems:'center',gap:8}}>
+                      <Text style={styles.resultCount}>{displayedBusinesses.length} منشأة</Text>
+                      <Pressable accessibilityRole="button" accessibilityLabel={viewMode === 'grid' ? 'عرض قائمة المحلات' : 'عرض شبكة المحلات'} style={styles.viewSwitch} onPress={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}>
+                        {viewMode === 'grid' ? <List size={18} color={OASIS.colors.primary}/> : <LayoutGrid size={18} color={OASIS.colors.primary}/>}
+                      </Pressable>
+                    </View>
                   </View>
 
                   {displayedBusinesses.length > 0 ? (
-                    <View style={[styles.list, { gap }]}>
-                      {displayedBusinesses.map((b) => renderBusinessCard(b, contentWidth, true))}
+                    <View style={[viewMode === 'grid' ? styles.grid : styles.list, { gap }]}>
+                      {displayedBusinesses.map((b) => renderBusinessCard(b, viewMode === 'grid' ? cardWidth : contentWidth, viewMode === 'list'))}
                     </View>
                   ) : (
                     <View style={styles.emptyState}>
@@ -1187,7 +1233,7 @@ export default function Market() {
       </ScrollView>
 
       <Modal visible={!!filterMenu} transparent animationType="fade" onRequestClose={() => setFilterMenu(null)}>
-        <Pressable style={styles.filterModalBackdrop} onPress={() => setFilterMenu(null)}>
+        <Pressable accessibilityRole="none" focusable={false} style={styles.filterModalBackdrop} onPress={() => setFilterMenu(null)}>
           <OasisSurface oasisSurface="card" style={styles.filterMenuCard}>
             <View style={styles.filterMenuHeader}><Text style={styles.filterMenuTitle}>{filterMenu === 'sort' ? 'ترتيب النتائج' : 'تصفية النتائج'}</Text><Pressable oasisKind="icon" onPress={() => setFilterMenu(null)} style={styles.modalCloseBtn}><X size={17} color={OASIS.colors.ink} /></Pressable></View>
             <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
@@ -1238,7 +1284,7 @@ export default function Market() {
                       </Text>
                       <View style={styles.detailRatingPill}>
                         <Star size={13} color={OASIS.colors.warning} fill={OASIS.colors.warning} />
-                        <Text style={{ fontSize: 12, fontWeight: '700', color: OASIS.colors.ink }}>{selectedBusiness.rating}</Text>
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: OASIS.colors.ink }}>{selectedBusiness.rating == null ? 'لا توجد تقييمات بعد' : selectedBusiness.rating.toFixed(1)}</Text>
                         <Text style={{ fontSize: 11, color: OASIS.colors.muted }}>({selectedBusiness.reviews} تقييم)</Text>
                       </View>
                     </View>
@@ -1254,7 +1300,7 @@ export default function Market() {
                   </View>
                   <View style={[styles.statusTag, selectedBusiness.openNow ? styles.statusTagOpen : styles.statusTagClosed]}>
                     <Text style={[styles.statusTagText, selectedBusiness.openNow ? { color: '#15803d' } : { color: OASIS.colors.danger }]}>
-                      {selectedBusiness.openNow ? 'مفتوح الآن' : 'مغلق حالياً'}
+                      {selectedBusiness.openNow == null ? 'لم تُحدد حالة العمل' : selectedBusiness.openNow ? 'مفتوح الآن' : 'مغلق حالياً'}
                     </Text>
                   </View>
                 </View>
@@ -1737,7 +1783,7 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
   },
   heroCard: {
-    borderRadius: 14,
+    borderRadius: 24,
     padding: 14,
     shadowColor: OASIS.colors.primary,
     shadowOpacity: 0,
@@ -1779,8 +1825,23 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   heroLocText: { fontSize: 11, fontWeight: '700', color: '#a7f3d0' },
-  heroTitle: { fontSize: 20, fontWeight: '700', color: OASIS.colors.surface, textAlign: 'right', marginTop: 2 },
-  heroSubtitle: { fontSize: 12, color: OASIS.colors.soft, textAlign: 'right', marginTop: 4, lineHeight: 18 },
+  heroTitle: { fontSize: 24, fontWeight: '700', color: '#ffffff', textAlign: 'right', marginTop: 2 },
+  heroSubtitle: { fontSize: 12, color: '#d1fae5', textAlign: 'right', marginTop: 4, lineHeight: 19 },
+  workspaceShortcut: { marginRight:12, width:58, minHeight:64, borderRadius:20, borderWidth:1, borderColor:'rgba(255,255,255,0.24)', backgroundColor:'rgba(255,255,255,0.12)', alignItems:'center',justifyContent:'center',gap:6 },
+  workspaceShortcutText: { color:'#ffffff', fontSize:11,fontWeight:'600' },
+  discoveryChips: { flexDirection:'row-reverse',gap:8,paddingTop:10,paddingBottom:4 },
+  discoveryChip: { flexDirection:'row-reverse',alignItems:'center',gap:5,paddingHorizontal:12,minHeight:36,borderRadius:18,borderWidth:1,borderColor:OASIS.colors.line,backgroundColor:OASIS.colors.surface },
+  discoveryChipActive: { backgroundColor:OASIS.colors.soft,borderColor:OASIS.colors.primary },
+  discoveryChipText: { fontSize:11,fontWeight:'600',color:OASIS.colors.muted },
+  browseToolbar: { flexDirection:'row-reverse',alignItems:'center',justifyContent:'space-between',gap:8,marginTop:10 },
+  browseCaption: { color:OASIS.colors.muted,fontSize:11,textAlign:'right',flex:1 },
+  partialNotice: {marginTop:10,padding:12,borderRadius:14,backgroundColor:OASIS.colors.soft,borderWidth:1,borderColor:OASIS.colors.line},
+  partialNoticeText: {color:OASIS.colors.ink,fontSize:12,lineHeight:20,textAlign:'right'},
+  clearFilters: { flexDirection:'row-reverse',alignItems:'center',gap:4,minHeight:36 },
+  clearFiltersText: {color:OASIS.colors.primary,fontSize:11,fontWeight:'600'},
+  viewSwitcher: {flexDirection:'row-reverse',padding:3,borderRadius:14,backgroundColor:OASIS.colors.background,borderWidth:1,borderColor:OASIS.colors.line},
+  viewSwitch: {width:36,height:34,borderRadius:10,alignItems:'center',justifyContent:'center'},
+  viewSwitchActive: {backgroundColor:OASIS.colors.soft},
 
   // Live Neighborhood KPI Ribbon
   kpiRow: {
@@ -1889,7 +1950,7 @@ const styles = StyleSheet.create({
   searchRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
   searchBox: { flex: 1, height: 46, borderRadius: 14, backgroundColor: '#f1f5f9', flexDirection: 'row-reverse', alignItems: 'center', paddingHorizontal: 14, gap: 8 },
   searchInput: { flex: 1, color: OASIS.colors.ink, fontSize: 13.5, paddingVertical: 0, ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}) },
-  addBtn: { height: 46, minWidth: 46, paddingHorizontal: 14, borderRadius: 0, backgroundColor: 'transparent', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 5 },
+  addBtn: { height: 46, minWidth: 46, paddingHorizontal: 14, borderRadius: 15, backgroundColor: OASIS.colors.primary, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 5 },
   addBtnText: { color: OASIS.colors.surface, fontSize: 13, fontWeight: '700' },
 
   // Sort Bar
@@ -1937,7 +1998,7 @@ const styles = StyleSheet.create({
   quickText: { fontSize: 12, color: OASIS.colors.muted, fontWeight: '700' },
   quickTextActive: { color: OASIS.colors.surface },
 
-  sectionHead: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, marginTop: 8 },
+  sectionHead: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap:8, marginBottom: 10, marginTop: 10, padding:10, borderRadius:18, backgroundColor:OASIS.colors.surface, borderWidth:1, borderColor:OASIS.colors.line },
   sectionTitle: { fontSize: 15.5, fontWeight: '700', color: OASIS.colors.ink, textAlign: 'right' },
   seeAll: { fontSize: 12, color: OASIS.colors.primary, fontWeight: '600' },
   resultCount: { fontSize: 11.5, color: '#94a3b8', fontWeight: '700' },
@@ -1946,7 +2007,7 @@ const styles = StyleSheet.create({
   list: { flexDirection: 'column', width: '100%' },
   card: {
     backgroundColor: OASIS.colors.surface,
-    borderRadius: 14,
+    borderRadius: 20,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: OASIS.colors.line,

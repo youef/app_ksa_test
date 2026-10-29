@@ -1,6 +1,6 @@
 import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View, Switch, ActivityIndicator, Platform, Image } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
@@ -15,10 +15,14 @@ import {
   Star,
   Phone,
   Clock3,
+  Navigation, ShieldCheck, ClipboardCheck, FileText, Wrench, Truck, Tag,
 } from 'lucide-react-native';
 import { AppHeader } from '@/components/shared/AppHeader';
-import LocationSelectorModal from '@/components/LocationSelectorModal';
-import { getPermanentMyLocation, savePermanentMyLocation, isAllKingdom } from '@/lib/locationSync';
+import { readCurrentProductPosition } from '@/lib/productDeviceLocation';
+import { reverseGeocodeDeviceLocation } from '@/lib/deviceLocation';
+import { normalizeSaudiLocationName } from '@/lib/saudiLocations';
+import { safeServiceMapUrl } from '@/lib/servicePublishingRules';
+import { confirmProductPosition, normalizeProductNumber, parseProductPrice, productPositionError, type ProductPosition } from '@/lib/productLocationRules';
 import {
   LISTING_TYPES,
   DELIVERY_MODES,
@@ -35,7 +39,6 @@ import {
 
 type PriceType = 'fixed' | 'range' | 'negotiable';
 const STEPS = ['نوع النشاط', 'الصور والتفاصيل', 'السعر والتواصل'];
-const NEW_COLUMNS = ['listing_type', 'subcategory', 'images', 'cover_url', 'delivery_modes', 'details', 'shop_name', 'working_hours', 'whatsapp', 'price_type', 'price_to'];
 
 export default function NewService() {
   const [step, setStep] = useState(0);
@@ -58,11 +61,22 @@ export default function NewService() {
   const [workingHours, setWorkingHours] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
   const [available, setAvailable] = useState(true);
+  const [servicePosition,setServicePosition]=useState<ProductPosition|null>(null);
+  const [locating,setLocating]=useState(false);
+  const [locationError,setLocationError]=useState('');
+  const [serviceConditions,setServiceConditions]=useState('');
+  const [duration,setDuration]=useState('');
+  const [responseTime,setResponseTime]=useState('');
+  const [includes,setIncludes]=useState('');
+  const [termsAccepted,setTermsAccepted]=useState(false);
+  const [saveError,setSaveError]=useState('');
+  const saveLock=useRef(false);
+  const locationRevision=useRef(0);
+  const mounted=useRef(true);
+  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;locationRevision.current++;};},[]);
 
-  const [region, setRegion] = useState('');
   const [city, setCity] = useState('');
   const [district, setDistrict] = useState('');
-  const [showLocationModal, setShowLocationModal] = useState(false);
 
   const type = useMemo(() => LISTING_TYPES.find((t) => t.id === typeId) || null, [typeId]);
 
@@ -74,11 +88,12 @@ export default function NewService() {
         router.replace('/auth');
         return;
       }
-      const [loc, profileRes, capsRes] = await Promise.all([
-        getPermanentMyLocation(),
+      const [profileRes, capsRes] = await Promise.all([
         supabase.from('profiles').select('region,city,district,account_type,is_verified,freelance_trade,display_name').eq('id', authData.user.id).maybeSingle(),
         supabase.rpc('hayna_my_account_capabilities'),
       ]);
+      if(profileRes.error)throw profileRes.error;
+      if(capsRes.error)throw capsRes.error;
       if (!capsRes.data?.can_publish_services) {
         setAuthChecking(false);
         Alert.alert('يتطلب حسابًا مهنيًا معتمدًا', 'إضافة الخدمات متاحة للحساب التجاري أو العمل الحر أو مقدم الخدمة بعد موافقة الإدارة.');
@@ -86,29 +101,25 @@ export default function NewService() {
         return;
       }
       setCapabilities(capsRes.data || {});
-      if (loc?.city && !isAllKingdom(loc.city)) {
-        if (loc.region) setRegion(loc.region);
-        setCity(loc.city);
-        if (loc.district && loc.district !== 'كل الأحياء' && loc.district !== 'كل أحياء المدينة') setDistrict(loc.district);
-      }
       const p = profileRes.data;
-      if (p?.region) setRegion(p.region);
       if (p?.city) {
         setCity(p.city);
         if (p?.district) setDistrict(p.district);
       }
       if (p?.account_type === 'merchant' && p?.freelance_trade) setShopName(p.freelance_trade);
       setAuthChecking(false);
-    })();
+    })().catch(cause=>{setAuthChecking(false);setSaveError((cause as Error)?.message || 'تعذر التحقق من الحساب.');});
   }, []);
 
   function chooseType(id: ListingTypeId) {
+    if(!capabilities.can_manage_business && ['home_family','home_sale','shop','product_in_shop'].includes(id))return;
     if (id !== typeId) {
       const t = LISTING_TYPES.find((x) => x.id === id)!;
       setTypeId(id);
       setSubcategory('');
       setExtra({});
       setModes(t.defaultModes);
+      locationRevision.current++;setLocating(false);setServicePosition(null);setTermsAccepted(false);
     }
     setStep(1);
   }
@@ -127,53 +138,92 @@ export default function NewService() {
   }
 
   function toggleMode(id: DeliveryModeId) {
+    if(type?.nationwide && id!=='remote')return;
     setModes((prev) => (prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id]));
   }
 
-  const validPrice = (v: string) => /^\d+(\.\d{1,2})?$/.test(v.trim());
+  const validPrice = (v: string) => parseProductPrice(v)!==null && !Number.isNaN(parseProductPrice(v));
+
+  async function locateService(){
+    if(locating || busy)return;
+    const revision=++locationRevision.current;
+    setLocating(true);setLocationError('');setServicePosition(null);
+    try{
+      const auth=await supabase.auth.getUser();if(!auth.data.user)throw new Error('سجّل الدخول لتأكيد موقع الخدمة.');
+      const expected=await supabase.from('profiles').select('city,district').eq('id',auth.data.user.id).single();if(expected.error)throw expected.error;
+      const fix=await readCurrentProductPosition();
+      let timeout:ReturnType<typeof setTimeout>|undefined;
+      let place;
+      try{place=await Promise.race([reverseGeocodeDeviceLocation(fix),new Promise<never>((_,reject)=>{timeout=setTimeout(()=>reject(new Error('تعذر جلب اسم الحي. تحقق من الاتصال وأعد المحاولة.')),20000);})]);}finally{if(timeout)clearTimeout(timeout);}
+      if(!place?.city || !place.district || place.isOutsideKSA)throw new Error('تعذر تحديد مدينة وحي داخل المملكة. أعد المحاولة بالموقع الدقيق.');
+      if(normalizeSaudiLocationName(place.city)!==normalizeSaudiLocationName(expected.data.city||'') || normalizeSaudiLocationName(place.district)!==normalizeSaudiLocationName(expected.data.district||''))throw new Error('موقع الجهاز يختلف عن حي الحساب. حدّث موقع الحساب ثم أعد التحقق، ولا تختر عنوانًا يدويًا للخدمة.');
+      const error=productPositionError(fix);if(error)throw new Error(error);
+      if(mounted.current&&revision===locationRevision.current){setServicePosition(fix);setCity(expected.data.city);setDistrict(expected.data.district);}
+    }catch(cause){if(mounted.current&&revision===locationRevision.current)setLocationError((cause as Error).message);}finally{if(mounted.current&&revision===locationRevision.current)setLocating(false);}
+  }
 
   function validateStep(s: number): string | null {
     if (s === 0 && !type) return 'اختر نوع نشاطك أولاً.';
     if (s === 1) {
-      if (!name.trim()) return 'اكتب عنوان العرض.';
-      if (!description.trim()) return 'اكتب تفاصيل العرض.';
+      if (name.trim().length<4) return 'اكتب عنوانًا واضحًا من ٤ أحرف على الأقل.';
+      if (description.trim().length<20) return 'أضف وصفًا من ٢٠ حرفًا على الأقل يوضح ما تقدمه وحدود الخدمة.';
+      if(!images.length)return 'أضف صورة تعبّر عن الخدمة قبل النشر.';
+      if(!subcategory)return 'اختر التصنيف المناسب للخدمة.';
+      if(extra.map_link?.trim()&&!safeServiceMapUrl(extra.map_link))return 'استخدم رابط خرائط HTTPS صحيحًا من خرائط Google أو Apple أو OpenStreetMap.';
       if (type?.showShopName && !shopName.trim()) return 'اكتب اسم المحل.';
     }
     if (s === 2) {
       if (priceType !== 'negotiable' && !validPrice(price)) return 'اكتب سعراً صحيحاً مثل 50 أو 75.50.';
-      if (priceType === 'range' && (!validPrice(priceTo) || Number(priceTo) < Number(price))) return 'السعر "إلى" يجب أن يكون أكبر من "من".';
+      if (priceType === 'range' && (!validPrice(priceTo) || Number(parseProductPrice(priceTo)) < Number(parseProductPrice(price)))) return 'السعر "إلى" يجب أن يكون أكبر من "من".';
       if (!modes.length) return 'اختر طريقة تقديم واحدة على الأقل.';
-      if (whatsapp.trim() && !/^(\+?966|0)?5\d{8}$/.test(whatsapp.replace(/\s/g, ''))) return 'رقم الواتساب غير صحيح (مثال: 05xxxxxxxx).';
+      if (whatsapp.trim() && !/^(\+?966|0)?5\d{8}$/.test(normalizeProductNumber(whatsapp).replace(/\s/g, ''))) return 'رقم الواتساب غير صحيح (مثال: 05xxxxxxxx).';
+      if(!type?.nationwide && !servicePosition)return 'حدّد موقعك الحالي للتحقق من حي تقديم الخدمة.';
+      if(!type?.nationwide && servicePosition){const error=productPositionError(servicePosition);if(error)return error;}
+      if(!termsAccepted)return 'راجع شروط تقديم الخدمة وأكّد صحة البيانات قبل النشر.';
     }
     return null;
   }
 
   function next() {
     const err = validateStep(step);
-    if (err) return Alert.alert('تنبيه', err);
+    if (err) {setSaveError(err);return;}
+    setSaveError('');
     setStep((s) => Math.min(s + 1, STEPS.length - 1));
   }
 
   function back() {
+    setSaveError('');
     if (step === 0) return router.canGoBack() ? router.back() : router.replace('/market');
     setStep((s) => s - 1);
   }
 
   async function save() {
+    if(saveLock.current || locating)return;
     for (const s of [0, 1, 2]) {
       const err = validateStep(s);
-      if (err) { setStep(s); return Alert.alert('تنبيه', err); }
+      if (err) { setStep(s);setSaveError(err);return; }
     }
-    setBusy(true);
+    saveLock.current=true;setBusy(true);setSaveError('');
     try {
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) { setBusy(false); return router.replace('/auth'); }
       const providerId = u.user.id;
+      const [access,location]=await Promise.all([supabase.rpc('hayna_my_account_capabilities'),supabase.from('profiles').select('city,district').eq('id',providerId).single()]);
+      if(access.error || !access.data?.can_publish_services)throw new Error('صلاحية نشر الخدمات غير متاحة حاليًا. راجع توثيق حسابك.');
+      if(location.error)throw location.error;
+      if(!type!.nationwide && (normalizeSaudiLocationName(location.data.city||'')!==normalizeSaudiLocationName(city) || normalizeSaudiLocationName(location.data.district||'')!==normalizeSaudiLocationName(district)))throw new Error('تغير موقع الحساب. حدّث الصفحة وأعد التحقق من الموقع.');
+      if(access.data.can_manage_business){const result=await supabase.rpc('hayna_ensure_my_business');if(result.error)throw result.error;}
+      if(!type!.nationwide)confirmProductPosition(servicePosition!,await readCurrentProductPosition());
 
       const imageUrls = images.length ? await uploadServiceImages(providerId, images) : [];
 
       const details: Record<string, string> = {};
       Object.entries(extra).forEach(([k, v]) => { if (v && v.trim()) details[k] = v.trim(); });
+      if(serviceConditions.trim())details.service_conditions=serviceConditions.trim();
+      if(duration.trim())details.estimated_duration=duration.trim();
+      if(responseTime.trim())details.response_time=responseTime.trim();
+      if(includes.trim())details.included=includes.trim();
+      details.terms_accepted_at=new Date().toISOString();
 
       const payload: Record<string, any> = {
         provider_id: providerId,
@@ -181,10 +231,10 @@ export default function NewService() {
         name: name.trim(),
         description: description.trim(),
         category: subcategory || type!.label,
-        city: city.trim() || null,
-        district: district.trim() || null,
-        price_from: priceType === 'negotiable' ? null : Number(price),
-        price_to: priceType === 'range' ? Number(priceTo) : null,
+        city: location.data.city || null,
+        district: location.data.district || null,
+        price_from: priceType === 'negotiable' ? null : parseProductPrice(price),
+        price_to: priceType === 'range' ? parseProductPrice(priceTo) : null,
         price_type: priceType,
         available_now: available,
         listing_type: type!.id,
@@ -195,26 +245,11 @@ export default function NewService() {
         details,
         shop_name: shopName.trim() || null,
         working_hours: workingHours.trim() || null,
-        whatsapp: whatsapp.replace(/\s/g, '') || null,
+        whatsapp: normalizeProductNumber(whatsapp).replace(/\s/g, '') || null,
       };
 
-      // Insert, dropping any column the live schema doesn't have yet (one at a time),
-      // so a single missing column never blocks publishing.
-      const attempt = { ...payload };
-      let result = await supabase.from('services').insert(attempt).select('id').single();
-      for (let i = 0; i < Object.keys(payload).length && result.error; i++) {
-        const missing = result.error.message.match(/Could not find the '([^']+)' column/i)?.[1];
-        if (missing && missing in attempt && missing !== 'provider_id' && missing !== 'name' && missing !== 'moderation_status') {
-          console.warn(`services.${missing} missing in schema, retrying without it`);
-          delete attempt[missing];
-        } else if (/column|schema cache/i.test(result.error.message) && NEW_COLUMNS.some((c) => c in attempt)) {
-          console.warn('services v2 columns missing, falling back to legacy insert:', result.error.message);
-          NEW_COLUMNS.forEach((c) => delete attempt[c]);
-        } else {
-          break;
-        }
-        result = await supabase.from('services').insert(attempt).select('id').single();
-      }
+      if(!type!.nationwide)confirmProductPosition(servicePosition!,await readCurrentProductPosition());
+      const result = await supabase.from('services').insert(payload).select('id').single();
 
       setBusy(false);
       if (result.error) {
@@ -227,7 +262,9 @@ export default function NewService() {
     } catch (e: any) {
       setBusy(false);
       console.error('new service save error:', e);
-      Alert.alert('خطأ', e.message || 'حدث خطأ أثناء حفظ العرض.');
+      setSaveError(e.message || 'حدث خطأ أثناء حفظ العرض.');
+    } finally {
+      saveLock.current=false;setBusy(false);
     }
   }
 
@@ -239,11 +276,12 @@ export default function NewService() {
       </View>
     );
   }
+  if(!capabilities.can_publish_services)return <View style={styles.loadingScreen}><ShieldCheck size={34} color={OASIS.colors.primary}/><Text style={styles.stepTitle}>الخدمات للحساب المهني المعتمد</Text><Text style={styles.sectionHint}>{saveError || 'راجع توثيق الحساب وصلاحياته قبل إضافة خدمة.'}</Text><Pressable onPress={()=>router.replace('/profile?tab=verification')} style={styles.nextAction}><Text style={styles.nextActionText}>مراجعة التوثيق</Text></Pressable></View>;
 
   const previewPrice = formatServicePrice({
     price_type: priceType,
-    price_from: price && validPrice(price) ? Number(price) : null,
-    price_to: priceTo && validPrice(priceTo) ? Number(priceTo) : null,
+    price_from: price && validPrice(price) ? parseProductPrice(price) : null,
+    price_to: priceTo && validPrice(priceTo) ? parseProductPrice(priceTo) : null,
   });
 
   return (
@@ -272,13 +310,14 @@ export default function NewService() {
         <View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${((step + 1) / STEPS.length) * 100}%` }]} /></View>
       </View>
 
+      {!!saveError&&<Text accessibilityRole="alert" style={{color:OASIS.colors.danger,textAlign:'right',paddingHorizontal:18,paddingVertical:10,lineHeight:20}}>{saveError}</Text>}
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {step === 0 && (
           <View>
             <Text style={styles.stepTitle}>وش نوع نشاطك؟</Text>
             <Text style={styles.stepHint}>اختر الأقرب لك، ونجهز لك الحقول المناسبة.</Text>
             <View style={styles.typeGrid}>
-              {LISTING_TYPES.map((t) => {
+              {LISTING_TYPES.filter(t=>capabilities.can_manage_business || !['home_family','home_sale','shop','product_in_shop'].includes(t.id)).map((t) => {
                 const active = t.id === typeId;
                 return (
                   <Pressable oasisKind="card"
@@ -306,7 +345,7 @@ export default function NewService() {
               <Pressable onPress={() => setStep(0)}><Text style={styles.changeLink}>تغيير</Text></Pressable>
             </View>
 
-            <Section title={`الصور (${images.length}/${MAX_SERVICE_IMAGES})`} hint="أول صورة هي الغلاف. الصور الواضحة تضاعف التواصل.">
+            <Section title={`الصور (${images.length}/${MAX_SERVICE_IMAGES})`} hint="أول صورة هي الغلاف. أضف صورًا حقيقية توضح الخدمة أو نماذج أعمالك.">
               <ScrollView style={{ direction: 'rtl' }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.imagesRow, { direction: 'ltr' }]}>
                 {images.length < MAX_SERVICE_IMAGES && (
                   <View style={styles.addImageCol}>
@@ -350,7 +389,7 @@ export default function NewService() {
             </Section>
 
             <Section title="عنوان العرض *">
-              <Field value={name} onChangeText={setName} placeholder={type.titlePlaceholder} maxLength={80} />
+              <Field accessibilityLabel="عنوان الخدمة" value={name} onChangeText={setName} placeholder={type.titlePlaceholder} maxLength={80} />
               <Text style={styles.counter}>{name.trim().length}/80</Text>
             </Section>
 
@@ -385,6 +424,17 @@ export default function NewService() {
               />
               <Text style={styles.counter}>{description.trim().length}/800</Text>
             </Section>
+            <Section title="ما الذي تتضمنه الخدمة؟" hint="وضّح الأعمال والمواد أو عدد الزيارات المشمولة؛ وتجنب الوعود غير المحددة.">
+              <Field accessibilityLabel="الأعمال المشمولة بالخدمة" value={includes} onChangeText={setIncludes} placeholder="مثال: فحص الجهاز وتشخيص العطل؛ قطع الغيار غير مشمولة" maxLength={400} multiline/>
+            </Section>
+            <Section title="المدة المتوقعة والرد" hint="اكتب تقديرًا واقعيًا. اتفق مع العميل على الموعد النهائي قبل بدء العمل.">
+              <Field accessibilityLabel="مدة تنفيذ الخدمة" value={duration} onChangeText={setDuration} placeholder="مثال: من ساعتين إلى أربع ساعات" maxLength={100} icon={<Clock3 size={16} color={OASIS.colors.muted}/>}/>
+              <View style={{height:10}}/>
+              <Field accessibilityLabel="وقت الرد المتوقع" value={responseTime} onChangeText={setResponseTime} placeholder="مثال: خلال يوم عمل" maxLength={100}/>
+            </Section>
+            <Section title="شروط الخدمة والاستثناءات" hint="وضّح رسوم الزيارة والإلغاء والضمان إن وُجد. لا تُضف شروطًا تخالف حقوق العميل.">
+              <Field accessibilityLabel="شروط الخدمة" value={serviceConditions} onChangeText={setServiceConditions} placeholder="المتطلبات قبل الزيارة، ما لا يشمله السعر، سياسة تغيير الموعد..." maxLength={800} multiline/>
+            </Section>
           </View>
         )}
 
@@ -414,25 +464,31 @@ export default function NewService() {
 
             <Section title="طريقة التقديم *" hint="اختر كل ما ينطبق">
               <View style={styles.chipsWrap}>
-                {DELIVERY_MODES.map((m) => (
+                {DELIVERY_MODES.filter(m=>!type.nationwide || m.id==='remote').map((m) => (
                   <Chip key={m.id} label={`${m.emoji}  ${m.label}`} active={modes.includes(m.id)} color={OASIS.colors.primary} onPress={() => toggleMode(m.id)} />
                 ))}
               </View>
             </Section>
 
             <Section title={type.nationwide ? 'موقعك (الخدمة تظهر لكل المملكة)' : 'الموقع والحي'}>
-              <Pressable oasisKind="action" style={styles.locationBtn} onPress={() => setShowLocationModal(true)}>
+              <View style={styles.locationBtn}>
                 <MapPin size={18} color={OASIS.colors.primary} />
-                <Text style={styles.locationBtnText}>{city ? `${city}${district ? ` · حي ${district}` : ''}` : 'اختر مدينتك وحيك...'}</Text>
-                <ChevronLeft size={16} color="#94a3b8" />
-              </Pressable>
+                <Text style={styles.locationBtnText}>{city ? `${city}${district ? ` · حي ${district}` : ''}` : 'موقع الحساب غير مكتمل'}</Text>
+                {servicePosition && <ShieldCheck size={18} color={OASIS.colors.primary}/>}
+              </View>
+              {type.nationwide ? <Text style={[styles.sectionHint,{marginTop:10}]}>خدمة عن بُعد؛ لا نطلب موقع تواجدك الدقيق، ويظل عنوان الحساب عامًا.</Text> : <>
+                <Pressable oasisKind="plain" accessibilityLabel="تأكيد موقعي الحالي للخدمة" disabled={busy||locating} style={[styles.locationBtn,{marginTop:10}]} onPress={()=>void locateService()}>{locating?<ActivityIndicator color={OASIS.colors.primary}/>:<Navigation size={18} color={OASIS.colors.primary}/>}<Text style={styles.locationBtnText}>{locating?'جارٍ تحديد موقع الجهاز…':servicePosition?`تم التحقق · الدقة نحو ${Math.ceil(servicePosition.accuracy).toLocaleString('ar-SA')} متر`:'تأكيد حي الخدمة من موقعي الحالي'}</Text></Pressable>
+                <Text style={[styles.sectionHint,{marginTop:8}]}>يُعاد القياس قبل النشر. نستخدم OpenStreetMap وArcGIS لتحديد المدينة والحي، دون حفظ إحداثيات الجهاز في الخدمة.</Text>
+                {!!locationError&&<Text accessibilityRole="alert" style={[styles.sectionHint,{color:OASIS.colors.danger}]}>{locationError}</Text>}
+                <Pressable disabled={busy||locating} onPress={()=>router.push('/locations')}><Text style={[styles.sectionHint,{color:OASIS.colors.primary,marginTop:10}]}>مراجعة موقع الحساب ثم العودة لإعادة التحقق</Text></Pressable>
+              </>}
             </Section>
 
             <Section title="أوقات العمل (اختياري)">
               <Field value={workingHours} onChangeText={setWorkingHours} placeholder="مثال: يومياً 4م - 11م" maxLength={60} icon={<Clock3 size={16} color="#94a3b8" />} />
             </Section>
 
-            <Section title="رقم واتساب (اختياري)" hint="يظهر زر واتساب في صفحة عرضك. التواصل داخل التطبيق متاح دائماً.">
+            <Section title="رقم واتساب (اختياري)" hint="بإضافته توافق على عرضه مع الخدمة. تركه فارغًا يتيح التواصل داخل التطبيق وفق إعدادات الخاص ونطاق الحي.">
               <Field value={whatsapp} onChangeText={setWhatsapp} placeholder="05xxxxxxxx" keyboardType="phone-pad" maxLength={14} icon={<Phone size={16} color="#94a3b8" />} />
             </Section>
 
@@ -456,6 +512,7 @@ export default function NewService() {
                 <Text style={styles.previewModes}>{modes.map((m) => DELIVERY_MODES.find((d) => d.id === m)?.emoji).join(' ')}</Text>
               </View>
             </OasisSurface>
+            <Pressable oasisKind="plain" accessibilityRole="checkbox" accessibilityState={{checked:termsAccepted}} disabled={busy} onPress={()=>setTermsAccepted(!termsAccepted)} style={[styles.switchRow,{marginTop:14}]}><View style={[styles.stepDot,termsAccepted&&styles.stepDotActive]}>{termsAccepted&&<Check size={14} color="#fff"/>}</View><Text style={[styles.sectionHint,{flex:1,color:OASIS.colors.ink}]}>أؤكد صحة بيانات الخدمة والسعر والشروط، وأن لدي الصلاحية والمؤهلات اللازمة لتقديمها. العرض يخضع لمراجعة الإدارة قبل ظهوره.</Text></Pressable>
           </View>
         )}
       </ScrollView>
@@ -486,31 +543,11 @@ export default function NewService() {
             onPress={() => void save()}
           >
             {busy ? <ActivityIndicator size="small" color={OASIS.colors.surface} /> : <Check size={19} color={OASIS.colors.surface} />}
-            <Text style={styles.nextActionText}>{busy ? 'جاري النشر...' : 'نشر العرض'}</Text>
+            <Text style={styles.nextActionText}>{busy ? 'جارٍ التحقق والحفظ…' : 'إرسال الخدمة للمراجعة'}</Text>
           </Pressable>
         )}
       </View>
 
-      <LocationSelectorModal
-        visible={showLocationModal}
-        onClose={() => setShowLocationModal(false)}
-        selectedCity={city}
-        selectedDistrict={district}
-        onSelect={async (reg, c, d) => {
-          const cleanCity = c === 'كل المدن' ? '' : c;
-          const cleanDist = (d === 'كل أحياء المدينة' || d === 'كل الأحياء') ? '' : d;
-          setRegion(reg || '');
-          setCity(cleanCity);
-          setDistrict(cleanDist);
-          if (cleanCity) {
-            await savePermanentMyLocation({ region: reg, city: cleanCity, district: cleanDist || 'كل الأحياء' });
-            const { data: u } = await supabase.auth.getUser();
-            if (u.user) {
-              await supabase.from('profiles').update({ region: reg || region || null, city: cleanCity, district: cleanDist || 'كل الأحياء' }).eq('id', u.user.id);
-            }
-          }
-        }}
-      />
     </View>
   );
 }
@@ -518,7 +555,7 @@ export default function NewService() {
 function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
+      <View style={{flexDirection:'row-reverse',alignItems:'center',gap:8}}>{title.includes('السعر')?<Tag size={17} color={OASIS.colors.primary}/>:title.includes('الموقع')||title.includes('موقعك')?<MapPin size={17} color={OASIS.colors.primary}/>:title.includes('صور')?<Camera size={17} color={OASIS.colors.primary}/>:title.includes('المدة')||title.includes('أوقات')?<Clock3 size={17} color={OASIS.colors.primary}/>:title.includes('طريقة')?<Truck size={17} color={OASIS.colors.primary}/>:<FileText size={17} color={OASIS.colors.primary}/>}<Text style={styles.sectionTitle}>{title}</Text></View>
       {hint ? <Text style={styles.sectionHint}>{hint}</Text> : null}
       <View style={{ marginTop: 10 }}>{children}</View>
     </View>
@@ -540,6 +577,7 @@ function Field({ multiline, suffix, icon, ...props }: React.ComponentProps<typeo
       {icon}
       <TextInput
         {...props}
+        accessibilityLabel={props.accessibilityLabel || props.placeholder || 'تفاصيل الخدمة'}
         multiline={multiline}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
@@ -597,7 +635,7 @@ const styles = StyleSheet.create({
   typeBannerText: { flex: 1, fontSize: 14, fontWeight: '700', textAlign: 'right' },
   changeLink: { color: OASIS.colors.muted, fontSize: 12, fontWeight: '600', textDecorationLine: 'underline' },
 
-  section: { backgroundColor: OASIS.colors.surface, borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#f1f5f9' },
+  section: { backgroundColor: OASIS.colors.surface, borderRadius: 20, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: OASIS.colors.line },
   sectionTitle: { fontSize: 14, fontWeight: '700', color: OASIS.colors.ink, textAlign: 'right' },
   sectionHint: { fontSize: 11.5, color: '#94a3b8', textAlign: 'right', marginTop: 3 },
 
