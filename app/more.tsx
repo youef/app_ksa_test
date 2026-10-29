@@ -135,6 +135,7 @@ export default function More() {
             ...(profile?.role === 'admin'
               ? [
                   { title: 'لوحة الإدارة', subtitle: 'إدارة المنصة والصلاحيات', href: '/admin', Icon: ShieldCheck },
+                  { title: 'وكيل حيّنا الذكي', subtitle: 'فحوصات هندسية، سجل القرارات، واقتراحات التطوير', href: '/admin-agent', Icon: ShieldCheck },
                   { title: 'صور وخلفيات الصفحات', subtitle: 'تغيير خلفيات الترحيب والدخول والتطبيق', href: '/admin-backgrounds', Icon: Images },
                   { title: 'إدارة الفلترة والمخالفين', subtitle: 'الكلمات المحظورة والمتابعات', href: '/admin-moderation', Icon: FileText },
                   { title: 'مركز تواصل المنصة', subtitle: 'الترحيب التلقائي والتحديثات الرسمية', href: '/admin-broadcast', Icon: Mail },

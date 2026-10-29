@@ -90,6 +90,14 @@
       "EXPO_PUBLIC_SUPABASE_URL": "https://vkeuyompnddqfvulalkk.supabase.co",
       "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_MASvVnmIu2nN28cY0hqa-A_7kWRo0u_",
       "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyD3dbOJXEPgG1qyNi4Z_sLO46kj6c5bnY8"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/f8205dc7-21de-46d3-aa97-57f2249a81ed",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
     }
   }
 }
