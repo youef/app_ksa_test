@@ -8,7 +8,7 @@ Target: `youef/app_ksa_test` · GitHub + Vercel + Supabase + PostHog + Expo EAS.
 - Additive migration for `ai_agent_runs` and `ai_agent_proposals`, RLS admin-readable; server credential required for reporting.
 - Every automated action is traceable through a GitHub workflow run and optional Supabase record.
 
-## Environment setup, after review and deployment
+## Optional LLM review\nConfigure a secret \`HAYNA_OPENAI_API_KEY\` and variable \`HAYNA_AI_MODEL\` to enable the AI expert panel. The Responses API sees only check IDs, statuses, and short diagnostic summaries (no log bodies, user data or secrets). It writes up to five suggestions to the artifact and optional admin-only database table; it never applies fixes. Enabling incurs model API usage charges.\n\n## Environment setup, after review and deployment
 - Apply SQL migration through the controlled migration pipeline BEFORE relying on the database-backed admin page.
 - GitHub Actions **secret** `HAYNA_SUPABASE_SERVICE_ROLE_KEY` (server-only), and **variable** `HAYNA_SUPABASE_URL` = the verified active hayna project URL. Do not use any EXPO_PUBLIC_ env var for the service key.
 - Schedule is automatically active after merge into the default branch, if GitHub Actions is enabled.
