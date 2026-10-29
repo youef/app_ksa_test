@@ -56,6 +56,7 @@ jobs:
         env:
           HAYNA_OPENAI_API_KEY: ${{ secrets.HAYNA_OPENAI_API_KEY }}
           HAYNA_AI_MODEL: ${{ vars.HAYNA_AI_MODEL }}
+          HAYNA_AI_MODEL_HIGH: ${{ vars.HAYNA_AI_MODEL_HIGH }}
           HAYNA_SUPABASE_URL: ${{ vars.HAYNA_SUPABASE_URL }}
           HAYNA_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.HAYNA_SUPABASE_SERVICE_ROLE_KEY }}
         run: node scripts/hayna-ai-advisor.mjs

@@ -86,7 +86,7 @@ export default function AdminAgent() {
           <View style={[s.pill,ev.status === 'verified' || ev.status === 'fixed' ? s.good : s.warn]}><Text style={s.pillText}>{ev.status === 'verified' ? 'تم التحقق' : ev.status === 'fixed' ? 'تم الإصلاح' : ev.status === 'detected' ? 'اكتُشفت' : ev.status === 'failed' ? 'فشل' : ev.status === 'blocked' ? 'متوقف' : ev.status === 'planned' ? 'مخطط' : ev.status}</Text></View>
         </View>
         <Text style={s.muted}>{formatDate(ev.created_at)} · {ev.component} · {ev.phase} · {ev.severity} · {ev.cost_tier}</Text>
-        {ev.decision ? <Text style={s.itemBody}>**القرار:** {ev.decision}</Text> : null}
+        {ev.decision ? <Text style={s.itemBody}>القرار: {ev.decision}</Text> : null}
         {Array.isArray(ev.plan) && ev.plan.length ? <View style={s.plan}>
           <Text style={s.planTitle}>خطة التنفيذ</Text>
           {ev.plan.slice(0,10).map((step, i) => <Text key={i} style={s.itemBody}>{i + 1}. {String(step)}</Text>)}

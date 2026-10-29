@@ -10,6 +10,18 @@ if(!key || !model){
 }
 const raw=JSON.parse(fs.readFileSync('artifacts/hayna-agent-report.json','utf8'));
 const safeContext={status:raw.status,checks:(raw.details?.checks||[]).map(c=>({id:String(c.id).slice(0,60),status:c.status,message:String(c.message).slice(0,180)}))};
+// Hourly baseline checks must not spend API tokens when no actionable warnings exist.
+const actionable=safeContext.checks.filter(check=>check.status==='failed'||check.status==='warning');
+if(!actionable.length){
+ fs.mkdirSync('artifacts',{recursive:true});
+ fs.writeFileSync('artifacts/hayna-ai-proposals.json',JSON.stringify({proposals:[],skipped:'all_checks_passed',cost_tier:'deterministic'},null,2));
+ console.log('All checks passed: skipping paid AI review.');
+ process.exit(0);
+}
+const selectedModel=actionable.some(check=>check.status==='failed')
+ ? (process.env.HAYNA_AI_MODEL_HIGH || model)
+ : model;
+console.log('AI review tier: '+(actionable.some(check=>check.status==='failed')?'high':'standard')+' · '+actionable.length+' actionable check(s)');
 const schema={type:'object',additionalProperties:false,properties:{proposals:{type:'array',maxItems:5,items:{type:'object',additionalProperties:false,properties:{title:{type:'string'},category:{type:'string',enum:['bug','security','database','performance','feature','release']},risk:{type:'string',enum:['low','medium','high','critical']},rationale:{type:'string'}},required:['title','category','risk','rationale']}}},required:['proposals']};
 const instructions=[
  'You are a supervised engineering review board for a Saudi local community application named Hayna.',
@@ -22,7 +34,7 @@ const instructions=[
 ].join(' ');
 let proposals=[];
 try{
- const response=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify({model,input:[{role:'system',content:instructions},{role:'user',content:JSON.stringify(safeContext)}],max_output_tokens:1200,text:{format:{type:'json_schema',name:'hayna_agent_proposals',schema,strict:true}}}),signal:AbortSignal.timeout(50000)});
+ const response=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify({model:selectedModel,input:[{role:'system',content:instructions},{role:'user',content:JSON.stringify(safeContext)}],max_output_tokens:actionable.some(check=>check.status==='failed')?1200:800,text:{format:{type:'json_schema',name:'hayna_agent_proposals',schema,strict:true}}}),signal:AbortSignal.timeout(50000)});
  if(!response.ok) throw new Error('AI endpoint HTTP '+response.status);
  const data=await response.json();
  const out=(data.output||[]).flatMap(item=>(item.content||[]).filter(part=>part.type==='output_text').map(part=>part.text)).join('');
