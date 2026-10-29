@@ -32,12 +32,22 @@ jobs:
           HAYNA_SUPABASE_URL: ${{ vars.HAYNA_SUPABASE_URL }}
           HAYNA_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.HAYNA_SUPABASE_SERVICE_ROLE_KEY }}
         run: node scripts/hayna-ai-audit.mjs
+      - name: Optional AI expert review (suggestions only)
+        if: always() && steps.audit.outcome != 'skipped'
+        env:
+          HAYNA_OPENAI_API_KEY: ${{ secrets.HAYNA_OPENAI_API_KEY }}
+          HAYNA_AI_MODEL: ${{ vars.HAYNA_AI_MODEL }}
+          HAYNA_SUPABASE_URL: ${{ vars.HAYNA_SUPABASE_URL }}
+          HAYNA_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.HAYNA_SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/hayna-ai-advisor.mjs
       - name: Upload engineering report
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: hayna-ai-report
-          path: artifacts/hayna-agent-report.*
+          path: |
+            artifacts/hayna-agent-report.*
+            artifacts/hayna-ai-proposals.json
           if-no-files-found: warn
           retention-days: 30
       - name: Create or update an actionable issue
