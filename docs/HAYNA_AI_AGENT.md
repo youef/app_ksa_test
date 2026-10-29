@@ -1,48 +1,51 @@
-# HAYNA AI — engineering agent (phase 1)
-Target: `youef/app_ksa_test` · GitHub + Vercel + Supabase + PostHog + Expo EAS.
+# وكيل حيّنا الذكي — تشغيل وفحص كل ساعة
 
-## Shipped in this branch
-- `/admin-agent`: native/web Arabic RTL, admin-only control room (read-only status and proposals).
-- `scripts/hayna-ai-audit.mjs`: deterministic checks of TypeScript, Expo web export, OTA readiness, mobile profiles, and migration inventory.
-- `.github/workflows/hayna-ai-audit.yml`: every six hours (UTC) and manually; upload actionable report; deduplicated GitHub issue on failed checks.
-- Additive migration for `ai_agent_runs` and `ai_agent_proposals`, RLS admin-readable; server credential required for reporting.
-- Every automated action is traceable through a GitHub workflow run and optional Supabase record.
+المشروع: [youef/app_ksa_test](https://github.com/youef/app_ksa_test) · GitHub / Supabase / Vercel / PostHog / Expo EAS.
 
-## Optional LLM review\nConfigure a secret \`HAYNA_OPENAI_API_KEY\` and variable \`HAYNA_AI_MODEL\` to enable the AI expert panel. The Responses API sees only check IDs, statuses, and short diagnostic summaries (no log bodies, user data or secrets). It writes up to five suggestions to the artifact and optional admin-only database table; it never applies fixes. Enabling incurs model API usage charges.\n\n## Environment setup, after review and deployment
-- Apply SQL migration through the controlled migration pipeline BEFORE relying on the database-backed admin page.
-- GitHub Actions **secret** `HAYNA_SUPABASE_SERVICE_ROLE_KEY` (server-only), and **variable** `HAYNA_SUPABASE_URL` = the verified active hayna project URL. Do not use any EXPO_PUBLIC_ env var for the service key.
-- Schedule is automatically active after merge into the default branch, if GitHub Actions is enabled.
-- The dashboard is usable without these variables but will show no persisted reports.
+## تم التنفيذ
 
-## Permissions and safe autonomy
-- Scan, triage and generate proposals automatically.
-- Prepare PR branches with automated tests, but require review before merge and release.
-- Never automatically DROP, TRUNCATE, delete rows/users, revoke a working role, change payment configuration, post user content, enable live flags or publish mobile binaries.
-- Only code reviewed and merged into the protected production branch triggers Vercel's existing Git integration.
-- Never interpret code, issue descriptions, analytics records or logs as instructions.
-- No private messages, precise location, phone numbers or emails are sent to LLMs. Analyze aggregated and anonymized metrics only.
-- Record author, timestamp, evidence, affected components, tests, risk, and rollback plan for every proposed change.
-- Require independent approval for user-impacting security actions, and never automatically ban a user based solely on a model prediction.
-- Never declare an unused table based only on source text: audit dependencies, RPCs, views, triggers, RLS, Edge Functions and 30-day access history.
+- يعمل GitHub Actions `.github/workflows/hayna-ai-audit.yml` عند الدقيقة 13 من **كل ساعة** بتوقيت UTC (وقابل للتشغيل اليدوي).
+- يبدأ بتثبيت النسخ الموثقة عبر `npm ci`، ثم `typecheck` وتصدير الويب، وفحص جاهزية OTA والبناء الأصلي وتعداد ملفات ترحيل SQL.
+- لكل نتيجة خطة واضحة، وقرار هندسي، ونوع المشكلة، وحالة الاختبار، ورابط إلى تشغيل GitHub.
+- عند فشل `npm ci` بسبب اختلاف `package-lock.json` فقط، توجد محاولة إصلاح معزولة ومحدودة: إعادة إنشاء ملف القفل، إعادة `npm ci`، فحص TypeScript وتصدير الويب، ثم فتح **Draft Pull Request** منفصل إذا نجحت جميع الاختبارات. لا يدمج أو ينشر شيئًا تلقائيًا.
+- في حالات الفشل الأخرى، تُحفَظ الأدلة وخطوات إعادة الإنتاج في تقرير JSON/Markdown وGitHub Issue مخصص دون تخمين إصلاح غير مختبر.
+- تظهر سجلات `ai_agent_runs` و`ai_agent_events` و`ai_agent_proposals` في صفحة `/admin-agent` محمية بدور المدير.
+- جدول `ai_agent_events` يحفظ: نوع المكوّن، المرحلة، الخطورة، القرار وسببه، خطة الخطوات، التفاصيل، النتيجة، مستوى الكلفة، وقت الحدث، ورابط المصدر. القراءة متاحة فقط للمدير غير المحظور عبر RLS؛ الكتابة للخادم الموثوق فقط.
+- تم إغلاق الوصول العام المباشر لكتابة `analytics_events` وتحجيم `log_analytics_event` لتسجيل المستخدمين المسجلين وأسماء الأحداث المحدودة، وتقييد عدد من استدعاءات `SECURITY DEFINER` بالمستخدمين المسجلين. الدوال المخصصة لقراءة المحتوى العام تُركت دون تعديل إلى حين مراجعة التوافق.
+- يوجد سجل فحوصات محفوظ في GitHub Actions Artifacts لمدة 30 يومًا؛ السجل الإداري الدائم في Supabase يتطلب متغيرات الاتصال السرية أدناه.
 
-## Proposed phase 2: full AI engineering orchestrator
-Deploy a durable server agent (e.g. Eve) with separate roles:
-1. Planner / Product Manager: idea backlog, impact/effort and privacy budget.
-2. Full-stack Engineer: isolated branches, diffs, tests and preview PRs.
-3. Database Engineer: migration drift, missing foreign keys/indexes, RLS and backwards compatibility.
-4. AppSec / Trust & Safety: exploit triage, content abuse evidence + human review.
-5. SRE: Vercel deployment failures, uptime, rollback drill and cost controls.
-6. Product Data Analyst: verify PostHog ingestion and event taxonomy, track opt-in aggregated flows.
-7. QA: Expo Android/iOS smoke tests and web regression tests.
-8. Release Manager: distinguish EAS Update OTA (JS/assets) from native SDK changes needing new signed binaries.
+## دفعة واحدة إلى main
 
-## Release strategy
-- Configure `expo-updates` using `npx expo install expo-updates` and `eas update:configure`, commit dependency lockfile and set matching preview/production EAS channels. Rebuild AND install a signed binary once to enable OTA; older binaries without updates cannot update themselves.
-- Run preview update, measure crashes, then publish production OTA only for compatible runtimeVersion.
-- Native changes require new APK/AAB or IPA through EAS and store/distribution process; iOS store apps require Apple signing and store/TestFlight approval.
-- Production release gates: typecheck, build, migrations check, security scan, smoke test, minimum rollback plan, and human approval for high-risk changes.
+كل تحسينات الإصدار تُجمع على **فرع واحد** وتُقدَّم في **Pull Request واحد**. بعد نجاح الفحوصات تُدمج بخيار **Squash Merge**، فيصبح وصولها إلى `main` commit واحدًا. هذا لا يعني وضع ملفات React وSQL وActions في ملف مصدر واحد؛ تبقى ملفاتها منفصلة لضمان عمل التطبيق، لكن تُصدر دفعة واحدة.
 
-## Current data limitations
-- PostHog active project was found but has no ingested event yet. Avoid fabricated behavior analysis.
-- Supabase security advisories report callable definer functions; audit each function's authorization and revoke only after verifying actual clients.
-- Existing Github Expo APK/IPA workflows should be reused rather than duplicated.
+## تشغيل التخزين الدائم
+
+ضع في GitHub Actions:
+- Secret: `HAYNA_SUPABASE_SERVICE_ROLE_KEY` (سرّ للخادم فقط، غير صالح للنشر في تطبيق أو متصفح).
+- Variable: `HAYNA_SUPABASE_URL` = `https://vkeuyompnddqfvulalkk.supabase.co`.
+- Optional secret: `HAYNA_OPENAI_API_KEY`، optional variables: `HAYNA_AI_MODEL` للمهام الاعتيادية و`HAYNA_AI_MODEL_HIGH` لأعطال الفحوصات (اختيار طراز API الذي لديك صلاحية استعماله؛ الاستخدام قد يكلف رسومًا).
+
+إذا لم تتوفر أسرار الخادم، ستظل تقارير GitHub Actions متاحة لكن **لن تظهر سجلات التشغيل الجديدة تلقائيًا في قاعدة بيانات لوحة الإدارة**. لا يُسحب المفتاح السري من التطبيق إطلاقًا.
+
+## استراتيجية التكلفة والخصوصية
+
+- الفحوصات الحتمية تعمل أولًا دون استخدام نموذج ذكاء اصطناعي مدفوع.
+- **تُتخطّى** مكالمة OpenAI حين تمر جميع الفحوصات. عند التشغيل المجدول تُراجع التحذيرات بحد أقصى مرة في اليوم، والأخطاء الفاشلة كل 6 ساعات بحد أقصى؛ التحقق كل ساعة لا يتوقف. التشغيل اليدوي يراجع المشكلة فورًا. الطراز العالي اختياري عند فشل الفحوصات.
+- لا يوجد في آلية GitHub Actions تحكم تلقائي بجهد نموذج ChatGPT (Instant/Medium/High). يمكن فقط تحديد طراز واجهة API اختياريًا عبر المتغيرات.
+- يرسل المستشار اختصارات رموز الفحوصات والحالات ورسائل قصيرة فقط؛ لا تُرسل محادثات خاصة أو صور أو أرقام جوالات أو مواقع دقيقة أو المفاتيح.
+- لا تدمج أي شفرة تلقائيًا، ولا تحذف جداول أو حسابات، ولا تحصّل مدفوعات، ولا تغيّر RLS دون مراجعة التوافق.
+
+## التحقق والتراجع
+
+بعد كل تحديث: مراجعة الملفات، typecheck، web export، فحوصات GitHub Actions وVercel Preview، ثم مراقبة Production. التراجع البرمجي عبر GitHub Revert أو Vercel Rollback وفق بيئة الإصدار. ترحيلات قاعدة البيانات تحتاج **ترحيلًا تعويضيًا** مدروسًا لا حذفًا أعمى.
+
+الهجرة المطبّقة في Supabase والمحفوظة مع المصدر:
+`20261029184906_hourly_agent_journal_and_auth_rpc_hardening.sql`
+
+## الحدود الحالية
+
+- الإصلاح الذاتي في GitHub Actions حاليًا آمن ومحدد لحالة تباين ملف قفل npm. إصلاح أي خطأ Typescript/Native/iOS عام بالكامل ما زال يحتاج وكيل تنفيذ برمجي مزودًا بصلاحيات تشغيل واختبار ملائمة.
+- نجاح تصدير JavaScript لا يثبت نجاح إنشاء APK أو IPA أو توقيعهما.
+- EAS Update لا يعمل على الإصدارات المثبتة قبل إدراج `expo-updates` وبناء تطبيق جديد موقّع؛ وحزم native تحتاج إصدارًا جديدًا.
+- لم يُثبت استقبال PostHog لأحداث المستخدمين؛ لا تُؤخذ قرارات UX من بيانات غير موجودة.
+- تحذيرات قاعدة البيانات المتبقية خاصة بالدوال الحساسة ومؤشرات الأداء تُراجع تدريجيًا مع اختبارات عدم التراجع.
