@@ -1,10 +1,11 @@
 name: HAYNA AI · Engineering Audit
 on:
   schedule:
-    - cron: "13 */6 * * *"
+    - cron: "13 * * * *"
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write # trusted default-branch scheduler; auto-repair is limited to a draft PR
+  pull-requests: write
   issues: write
 concurrency:
   group: hayna-ai-audit
@@ -24,16 +25,34 @@ jobs:
           node-version: "24"
           cache: npm
       - name: Install pinned dependencies
-        run: npm ci --ignore-scripts --no-audit --no-fund
+        id: dependencies
+        continue-on-error: true
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          if npm ci --ignore-scripts --no-audit --no-fund > artifacts/npm-install.log 2>&1; then
+            echo "Pinned dependencies installed."
+          else
+            tail -n 60 artifacts/npm-install.log
+            exit 1
+          fi
+      - name: Verified one-file dependency recovery
+        if: steps.dependencies.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HAYNA_SUPABASE_URL: ${{ vars.HAYNA_SUPABASE_URL }}
+          HAYNA_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.HAYNA_SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/hayna-ai-recover-install.mjs
       - name: Audit TypeScript, web build and native/OTA readiness
         id: audit
+        if: steps.dependencies.outcome == 'success'
         continue-on-error: true
         env:
           HAYNA_SUPABASE_URL: ${{ vars.HAYNA_SUPABASE_URL }}
           HAYNA_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.HAYNA_SUPABASE_SERVICE_ROLE_KEY }}
         run: node scripts/hayna-ai-audit.mjs
       - name: Optional AI expert review (suggestions only)
-        if: always() && steps.audit.outcome != 'skipped'
+        if: always() && hashFiles('artifacts/hayna-agent-report.json') != ''
         env:
           HAYNA_OPENAI_API_KEY: ${{ secrets.HAYNA_OPENAI_API_KEY }}
           HAYNA_AI_MODEL: ${{ vars.HAYNA_AI_MODEL }}
@@ -51,7 +70,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
       - name: Create or update an actionable issue
-        if: steps.audit.outcome == 'failure'
+        if: always() && (steps.dependencies.outcome == 'failure' || steps.audit.outcome == 'failure')
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -65,5 +84,5 @@ jobs:
             gh issue create --title "$title" --body-file artifacts/hayna-agent-report.md
           fi
       - name: Mark job failed if diagnostics failed
-        if: steps.audit.outcome == 'failure'
+        if: always() && (steps.dependencies.outcome == 'failure' || steps.audit.outcome == 'failure')
         run: exit 1
