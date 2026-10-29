@@ -120,7 +120,7 @@ function LocalUrgentBannerBase({ city, district }: Props) {
       const controller = request;
 
       try {
-        const safeCity = sanitizeFilterValue(city);
+        const safeCity = sanitizeFilterValue(city ?? '');
         if (!safeCity) {
           if (active) setAlert(null);
           return;

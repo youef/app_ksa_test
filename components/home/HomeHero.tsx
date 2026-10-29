@@ -196,13 +196,13 @@ function HomeHeroBase({
             accessibilityLabel={`الموقع الحالي: ${locationDisplay}. اضغط لتغيير الحي`}
             accessibilityHint="يفتح اختيار المدينة والحي"
           >
-            <MapPin size={16} color={'#A7F3D0'} />
+            <MapPin size={16} color={OASIS.colors.primary} />
             <Text style={styles.locationPillText} numberOfLines={1}>
               {locationDisplay}
             </Text>
             <View style={styles.locationPillCta}>
               <Text style={styles.locationPillCtaText}>تغيير الحي</Text>
-              <ChevronDown size={14} color={'#D1FAE5'} />
+              <ChevronDown size={14} color={OASIS.colors.primary} />
             </View>
           </Pressable>
         </View>
