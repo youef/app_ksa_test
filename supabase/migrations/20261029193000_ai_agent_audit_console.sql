@@ -26,6 +26,7 @@ $sql$;
 create table if not exists public.ai_agent_proposals (
   id uuid primary key default gen_random_uuid(),
   title text not null,
+  fingerprint text unique,
   category text not null check (category in ('bug','security','database','performance','feature','release')),
   risk text not null default 'medium' check (risk in ('low','medium','high','critical')),
   status text not null default 'proposed' check (status in ('proposed','in_review','approved','rejected','shipped')),
