@@ -529,6 +529,7 @@ export default function Service() {
             </Pressable>
           )}
 
+          {!isOwner && service.moderation_status==='approved' && service.available_now!==false && service.price_type==='fixed' && Number(service.price_from)>0 && <OasisSurface oasisSurface="card" style={{padding:18,borderRadius:20,gap:12}}><View style={{flexDirection:'row-reverse',alignItems:'center',gap:9}}><PackageCheck size={22} color={OASIS.colors.primary}/><Text style={{color:OASIS.colors.ink,fontWeight:'800',fontSize:16}}>اطلب الخدمة</Text></View><Text style={{color:OASIS.colors.muted,textAlign:'right',lineHeight:23,fontSize:12}}>راجع السعر وملاحظاتك في شاشة الطلب. يُفتح الدفع عند تهيئة البوابة، ولا يبدأ التنفيذ قبل تأكيد الدفع وقبول مقدم الخدمة.</Text><Pressable accessibilityRole="button" onPress={()=>router.push({pathname:'/marketplace-dashboard',params:{service_id:service.id,tab:'services'}})} style={{backgroundColor:OASIS.colors.primary,borderRadius:15,minHeight:48,alignItems:'center',justifyContent:'center'}}><Text style={{color:'#fff',fontWeight:'800'}}>مراجعة الطلب وخيارات الدفع</Text></Pressable></OasisSurface>}
           {!isOwner && canContact && (
             <OasisSurface oasisSurface="card" style={styles.inlineContactCard}>
               <Text style={styles.inlineContactTitle}>التواصل مع صاحب العرض</Text>

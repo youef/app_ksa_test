@@ -1,13 +1,35 @@
-import { OasisSurface, OasisPressable as Pressable } from '@/components/oasis/OasisPrimitives';
+import { memo, useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Image,
+  Linking,
+  Text,
+  View,
+} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import {
+  MapPin,
+  ExternalLink,
+  Award,
+  Coffee,
+  Sparkles,
+  Check,
+  CheckCheck,
+} from 'lucide-react-native';
+import {
+  OasisSurface,
+  OasisPressable as Pressable,
+} from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
-import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, Image, Linking, ActivityIndicator } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { parseChatImage, chatImagePath } from '@/lib/chatMedia';
-import { LinearGradient } from 'expo-linear-gradient';
-import { MapPin, ExternalLink, Award, Coffee, Sparkles, Check, CheckCheck } from 'lucide-react-native';
 import { navigationUrl } from '@/lib/privacy';
 import { chatStyles as styles } from './chatStyles';
+import type { ChatUser } from './ChatHeader';
+
+/* -------------------------------------------------------------------------- */
+/*                                  Types                                     */
+/* -------------------------------------------------------------------------- */
 
 export interface MessageItem {
   id: string;
@@ -26,6 +48,20 @@ export interface AppreciationPayload {
   points?: number;
   giver_name?: string;
 }
+
+export interface MessageBubbleProps {
+  msg: MessageItem;
+  prevMsg?: MessageItem;
+  currentUserId: string;
+  otherUser: ChatUser | null | undefined;
+  otherName: string;
+  isAnonymous: boolean;
+  onPreviewImage: (url: string) => void;
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                Parsers                                     */
+/* -------------------------------------------------------------------------- */
 
 export function parseImageMessage(value: string) {
   return parseChatImage(value);
@@ -47,13 +83,19 @@ export function parseLocationMessage(value: string) {
     const lat = Number(parsed.lat);
     const lng = Number(parsed.lng);
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-    return { lat, lng, label: typeof parsed.label === 'string' ? parsed.label : '' };
+    return {
+      lat,
+      lng,
+      label: typeof parsed.label === 'string' ? parsed.label : '',
+    };
   } catch {
     return null;
   }
 }
 
-export function parseAppreciationMessage(value: string): AppreciationPayload | null {
+export function parseAppreciationMessage(
+  value: string,
+): AppreciationPayload | null {
   try {
     const parsed = JSON.parse(value);
     if (parsed?.type !== 'appreciation') return null;
@@ -68,6 +110,10 @@ export function parseAppreciationMessage(value: string): AppreciationPayload | n
     return null;
   }
 }
+
+/* -------------------------------------------------------------------------- */
+/*                                Date utils                                  */
+/* -------------------------------------------------------------------------- */
 
 export function isSameDay(d1: Date, d2: Date) {
   return (
@@ -84,24 +130,25 @@ export function formatDateLabel(dateStr: string) {
   const yday = new Date(now);
   yday.setDate(now.getDate() - 1);
   if (isSameDay(d, yday)) return 'أمس';
-  return d.toLocaleDateString('ar-SA', { weekday: 'short', month: 'short', day: 'numeric' });
+  return d.toLocaleDateString('ar-SA', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
 }
 
 export function formatMsgTime(dateStr: string) {
-  return new Date(dateStr).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
+  return new Date(dateStr).toLocaleTimeString('ar-SA', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
-export interface MessageBubbleProps {
-  msg: MessageItem;
-  prevMsg?: MessageItem;
-  currentUserId: string;
-  otherUser: any;
-  otherName: string;
-  isAnonymous: boolean;
-  onPreviewImage: (url: string) => void;
-}
+/* -------------------------------------------------------------------------- */
+/*                                Component                                   */
+/* -------------------------------------------------------------------------- */
 
-export const MessageBubble: React.FC<MessageBubbleProps> = ({
+function MessageBubbleBase({
   msg,
   prevMsg,
   currentUserId,
@@ -109,159 +156,222 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   otherName,
   isAnonymous,
   onPreviewImage,
-}) => {
+}: MessageBubbleProps) {
   const media = useMemo(() => parseImageMessage(msg.body), [msg.body]);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [imageFailed, setImageFailed] = useState(false);
+
   useEffect(() => {
     let active = true;
     setImageUrl(null);
     setImageFailed(false);
     if (!media) return;
+
     const path = chatImagePath(media);
     if (!path) {
-      // External image messages keep their original URL; bucket images always require a signature.
-      if (media.url && !media.storage_path && !media.url.includes('/chat-media/')) setImageUrl(media.url);
-      else setImageFailed(true);
+      // روابط خارجية مباشرة
+      if (media.url && !media.storage_path && !media.url.includes('/chat-media/')) {
+        setImageUrl(media.url);
+      } else {
+        setImageFailed(true);
+      }
       return;
     }
+
     const sign = async () => {
-      const { data, error } = await supabase.storage.from('chat-media').createSignedUrl(path, 600);
+      const { data, error } = await supabase.storage
+        .from('chat-media')
+        .createSignedUrl(path, 600);
       if (!active) return;
       setImageUrl(error ? null : data?.signedUrl || null);
       setImageFailed(Boolean(error || !data?.signedUrl));
     };
+
     void sign();
-    const timer = setInterval(() => { void sign(); }, 8 * 60 * 1000);
-    return () => { active = false; clearInterval(timer); };
-  }, [media, currentUserId]);
+    const timer = setInterval(() => void sign(), 8 * 60 * 1000);
+
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [media]);
+
   const isMine = msg.sender_id === currentUserId;
   const isRead =
     Array.isArray(msg.read_by) &&
     Boolean(otherUser?.id) &&
-    msg.read_by.includes(otherUser.id);
+    msg.read_by.includes(otherUser!.id!);
 
   const showDate =
-    !prevMsg || !isSameDay(new Date(msg.created_at), new Date(prevMsg.created_at));
+    !prevMsg ||
+    !isSameDay(new Date(msg.created_at), new Date(prevMsg.created_at));
+
+  const place = useMemo(
+    () => parseLocationMessage(msg.body),
+    [msg.body],
+  );
+  const appreciation = useMemo(
+    () => (place || media ? null : parseAppreciationMessage(msg.body)),
+    [msg.body, place, media],
+  );
 
   return (
-    <View key={msg.id} testID="lr-hide" accessible={false} collapsable={false}>
-      {showDate && <Text style={styles.dateDivider}>{formatDateLabel(msg.created_at)}</Text>}
+    <View testID="lr-hide" accessible={false} collapsable={false}>
+      {showDate && (
+        <Text style={styles.dateDivider}>{formatDateLabel(msg.created_at)}</Text>
+      )}
+
       <View style={[styles.msgRow, isMine && styles.msgRowMine]}>
         {!isMine && (
           <View style={styles.otherAvatar}>
             {otherUser?.avatar_url && !isAnonymous ? (
-              <Image source={{ uri: otherUser.avatar_url }} style={styles.otherAvatarImg as any} />
+              <Image
+                source={{ uri: otherUser.avatar_url }}
+                style={styles.otherAvatarImg}
+                accessibilityIgnoresInvertColors
+              />
             ) : (
               <View style={styles.otherAvatarFallback}>
-                <Text style={styles.otherAvatarLetter}>{otherName[0] || 'ج'}</Text>
+                <Text style={styles.otherAvatarLetter}>
+                  {otherName?.[0] || 'ج'}
+                </Text>
               </View>
             )}
           </View>
         )}
-        <OasisSurface oasisSurface={isMine ? "bubble-out" : "bubble-in"} style={[styles.msgBubble, isMine ? styles.msgBubbleMine : styles.msgBubbleOther]}>
-          {(() => {
-            const place = parseLocationMessage(msg.body);
-            if (place) {
-              return (
-                <View style={[styles.locationCardOuter, isMine && styles.locationCardOuterMine]}>
-                  <View style={styles.locationCardHeader}>
-                    <View style={[styles.locationPinIconWrap, isMine && styles.locationPinIconWrapMine]}>
-                      <MapPin size={18} color={OASIS.colors.primary} />
-                    </View>
-                    <View style={styles.locationInfoCol}>
-                      <Text style={styles.locationHeaderTitle}>
-                        {isMine ? '📍 موقعي الدقيق المشترك' : '📍 موقع الجار المشترك'}
-                      </Text>
-                      <Text style={styles.locationDistrictTitle} numberOfLines={1}>
-                        {place.label ? `حي ${place.label}` : 'موقع على الخريطة'}
-                      </Text>
-                    </View>
+
+        <OasisSurface
+          oasisSurface={isMine ? 'bubble-out' : 'bubble-in'}
+          style={[
+            styles.msgBubble,
+            isMine ? styles.msgBubbleMine : styles.msgBubbleOther,
+          ]}
+        >
+          {place ? (
+            <View
+              style={[
+                styles.locationCardOuter,
+                isMine && styles.locationCardOuterMine,
+              ]}
+            >
+              <View style={styles.locationCardHeader}>
+                <View
+                  style={[
+                    styles.locationPinIconWrap,
+                    isMine && styles.locationPinIconWrapMine,
+                  ]}
+                >
+                  <MapPin size={18} color={OASIS.colors.primary} />
+                </View>
+                <View style={styles.locationInfoCol}>
+                  <Text style={styles.locationHeaderTitle}>
+                    {isMine ? '📍 موقعي الدقيق المشترك' : '📍 موقع الجار المشترك'}
+                  </Text>
+                  <Text style={styles.locationDistrictTitle} numberOfLines={1}>
+                    {place.label ? `حي ${place.label}` : 'موقع على الخريطة'}
+                  </Text>
+                </View>
+              </View>
+
+              <Pressable
+                oasisKind="action"
+                style={styles.locationNavBtn}
+                onPress={() =>
+                  Linking.openURL(navigationUrl(place.lat, place.lng)).catch(
+                    () => undefined,
+                  )
+                }
+                accessibilityRole="button"
+                accessibilityLabel="فتح في خرائط Google"
+              >
+                <ExternalLink size={13} color={OASIS.colors.surface} />
+                <Text style={styles.locationNavBtnText}>
+                  فتح في خرائط Google
+                </Text>
+              </Pressable>
+            </View>
+          ) : media ? (
+            <View style={styles.imageMsgContainer}>
+              <Pressable
+                disabled={!imageUrl}
+                onPress={() => {
+                  if (imageUrl) onPreviewImage(imageUrl);
+                }}
+                style={styles.imagePressable}
+                accessibilityRole="button"
+                accessibilityLabel="عرض الصورة بالحجم الكامل"
+              >
+                {imageUrl ? (
+                  <Image
+                    source={{ uri: imageUrl }}
+                    style={styles.messageImage}
+                    resizeMode="cover"
+                    accessibilityIgnoresInvertColors
+                  />
+                ) : imageFailed ? (
+                  <Text style={styles.msgText}>تعذر تحميل الصورة</Text>
+                ) : (
+                  <ActivityIndicator accessibilityLabel="تحميل الصورة" />
+                )}
+              </Pressable>
+              {isUserFriendlyCaption(media.name) && (
+                <Text
+                  style={[styles.imageCaption, isMine && styles.msgTextMine]}
+                  numberOfLines={2}
+                >
+                  {media.name}
+                </Text>
+              )}
+            </View>
+          ) : appreciation ? (
+            <View
+              style={[
+                styles.appreciationCardOuter,
+                isMine && styles.appreciationCardOuterMine,
+              ]}
+            >
+              <LinearGradient
+                colors={[OASIS.colors.warningSoft, '#fef3c7', '#fde68a']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.appreciationGrad}
+              >
+                <View style={styles.appreciationTopRow}>
+                  <View style={styles.appreciationBadge}>
+                    <Award size={12} color="#92400e" />
+                    <Text style={styles.appreciationBadgeText}>
+                      +{appreciation.points || 10} نقاط سمعة ⭐
+                    </Text>
                   </View>
-
-                  <Pressable oasisKind="action"
-                    style={styles.locationNavBtn}
-                    onPress={() => Linking.openURL(navigationUrl(place.lat, place.lng))}
-                    accessibilityRole="button"
-                    accessibilityLabel="فتح في خرائط Google"
-                  >
-                    <ExternalLink size={13} color={OASIS.colors.surface} />
-                    <Text style={styles.locationNavBtnText}>فتح في خرائط Google</Text>
-                  </Pressable>
+                  <View style={styles.appreciationCoffeeIconWrap}>
+                    <Coffee size={20} color="#78350f" />
+                  </View>
                 </View>
-              );
-            }
 
-            if (media) {
-              const hasRealCaption = isUserFriendlyCaption(media.name);
-              return (
-                <View style={styles.imageMsgContainer}>
-                  <Pressable
-                    disabled={!imageUrl}
-                    onPress={() => { if (imageUrl) onPreviewImage(imageUrl); }}
-                    style={styles.imagePressable}
-                    accessibilityRole="button"
-                    accessibilityLabel="عرض الصورة بالحجم الكامل"
-                  >
-                    {imageUrl ? <Image
-                      source={{ uri: imageUrl }}
-                      style={styles.messageImage}
-                      resizeMode="cover"
-                    /> : imageFailed ? <Text style={styles.msgText}>تعذر تحميل الصورة</Text> : <ActivityIndicator accessibilityLabel="تحميل الصورة" />}
-                  </Pressable>
-                  {hasRealCaption && (
-                    <Text style={[styles.imageCaption, isMine && styles.msgTextMine]}>
-                      {media.name}
-                    </Text>
-                  )}
+                <Text style={styles.appreciationTitle}>
+                  {appreciation.title || 'بطاقة شكر وقهوة الجيران'}
+                </Text>
+                <Text style={styles.appreciationNoteText}>
+                  "{appreciation.note}"
+                </Text>
+
+                <View style={styles.appreciationDivider} />
+
+                <View style={styles.appreciationFooterRow}>
+                  <Sparkles size={13} color="#92400e" />
+                  <Text style={styles.appreciationFooterText}>
+                    {isMine
+                      ? 'أرسلت قهوة وشكراً لجيرانك ☕'
+                      : `أهداك ${appreciation.giver_name || otherName} قهوة وشكراً لحسن جوارك ☕`}
+                  </Text>
                 </View>
-              );
-            }
-
-            const appreciation = parseAppreciationMessage(msg.body);
-            if (appreciation) {
-              return (
-                <View style={[styles.appreciationCardOuter, isMine && styles.appreciationCardOuterMine]}>
-                  <LinearGradient
-                    colors={[OASIS.colors.warningSoft, '#fef3c7', '#fde68a']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.appreciationGrad}
-                  >
-                    <View style={styles.appreciationTopRow}>
-                      <View style={styles.appreciationBadge}>
-                        <Award size={12} color="#92400e" />
-                        <Text style={styles.appreciationBadgeText}>
-                          +{appreciation.points || 10} نقاط سمعة ⭐
-                        </Text>
-                      </View>
-                      <View style={styles.appreciationCoffeeIconWrap}>
-                        <Coffee size={20} color="#78350f" />
-                      </View>
-                    </View>
-
-                    <Text style={styles.appreciationTitle}>
-                      {appreciation.title || 'بطاقة شكر وقهوة الجيران'}
-                    </Text>
-                    <Text style={styles.appreciationNoteText}>"{appreciation.note}"</Text>
-
-                    <View style={styles.appreciationDivider} />
-
-                    <View style={styles.appreciationFooterRow}>
-                      <Sparkles size={13} color="#92400e" />
-                      <Text style={styles.appreciationFooterText}>
-                        {isMine
-                          ? 'أرسلت قهوة وشكراً لجيرانك ☕'
-                          : `أهداك ${appreciation.giver_name || otherName} قهوة وشكراً لحسن جوارك ☕`}
-                      </Text>
-                    </View>
-                  </LinearGradient>
-                </View>
-              );
-            }
-
-            return <Text style={[styles.msgText, isMine && styles.msgTextMine]}>{msg.body}</Text>;
-          })()}
+              </LinearGradient>
+            </View>
+          ) : (
+            <Text style={[styles.msgText, isMine && styles.msgTextMine]}>
+              {msg.body}
+            </Text>
+          )}
 
           <View style={[styles.msgMeta, isMine && styles.msgMetaMine]}>
             <Text style={[styles.msgTime, isMine && styles.msgTimeMine]}>
@@ -269,13 +379,24 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             </Text>
             {isMine &&
               (isRead ? (
-                <CheckCheck size={12} color={OASIS.colors.primary} style={{ marginRight: 4 }} />
+                <CheckCheck
+                  size={12}
+                  color={OASIS.colors.primary}
+                  style={{ marginRight: 4 }}
+                />
               ) : (
-                <Check size={12} color={OASIS.colors.muted} style={{ marginRight: 4 }} />
+                <Check
+                  size={12}
+                  color={OASIS.colors.muted}
+                  style={{ marginRight: 4 }}
+                />
               ))}
           </View>
         </OasisSurface>
       </View>
     </View>
   );
-};
+}
+
+export const MessageBubble = memo(MessageBubbleBase);
+export default MessageBubble;

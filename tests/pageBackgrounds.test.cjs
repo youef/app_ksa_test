@@ -9,13 +9,25 @@ const compiled = new Module(filename);
 compiled._compile(output.outputText, filename);
 const { parsePageBackgrounds, DEFAULT_PAGE_BACKGROUNDS, isBackgroundPath, detectBackgroundImage } = compiled.exports;
 
-test('missing configuration preserves the existing three independent backgrounds', () => {
+test('missing configuration preserves defaults for all independent backgrounds', () => {
   assert.deepEqual(parsePageBackgrounds(null), DEFAULT_PAGE_BACKGROUNDS);
   const parsed = parsePageBackgrounds({ app: { path: 'backgrounds/my-image.webp', lightOpacity: .45, darkOpacity: .2 } });
   assert.equal(parsed.app.path, 'backgrounds/my-image.webp');
   assert.equal(parsed.app.lightOpacity, .45);
   assert.deepEqual(parsed.welcome, DEFAULT_PAGE_BACKGROUNDS.welcome);
   assert.deepEqual(parsed.login, DEFAULT_PAGE_BACKGROUNDS.login);
+  assert.deepEqual(parsed.chat, DEFAULT_PAGE_BACKGROUNDS.chat);
+});
+
+test('chat backgrounds are saved independently from internal page backgrounds', () => {
+  const parsed = parsePageBackgrounds({
+    app: { path: 'backgrounds/pages.png', lightOpacity: .8, darkOpacity: .4 },
+    chat: { path: 'backgrounds/chat.webp', lightOpacity: .55, darkOpacity: .25 },
+  });
+  assert.deepEqual(parsed.chat, { path: 'backgrounds/chat.webp', lightOpacity: .55, darkOpacity: .25 });
+  assert.equal(parsed.app.path, 'backgrounds/pages.png');
+  assert.equal(parsed.app.lightOpacity, .8);
+  assert.deepEqual(parsePageBackgrounds({ chat: { path: null } }).chat, DEFAULT_PAGE_BACKGROUNDS.chat);
 });
 test('untrusted URLs, SVGs and traversal paths never become a page image', () => {
   for (const path of ['https://example.com/a.png','data:image/svg+xml,evil','backgrounds/../global/logo.png','global/logo.png','backgrounds/a.svg','backgrounds/a.png?anything','backgrounds/a/b.png']) {

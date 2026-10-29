@@ -1,8 +1,8 @@
 import { MarketPromotions } from '@/components/market/MarketPromotions';
 import { OasisEmptyIllustration } from '@/components/oasis/OasisEmptyIllustration';
 import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
-import { OASIS } from '@/lib/oasis';
-import React, { useState, useEffect, useMemo } from 'react';
+import { OASIS, useTheme } from '@/lib/oasis';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet, Platform, ScrollView, Image, RefreshControl, Share, useWindowDimensions, Linking, Modal, Alert, ImageBackground, ActivityIndicator } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { useBottomNavInset } from '@/lib/bottomNav';
@@ -99,6 +99,12 @@ const EVENT_CATEGORIES: { id: EventCategory; label: string; Icon: any }[] = [
 ];
 
 export default function Market() {
+  useTheme();
+  const [marketScope, setMarketScope] = useState<'district' | 'city' | 'region'>('city');
+  const [scopeLabel, setScopeLabel] = useState('');
+  const [scopeError, setScopeError] = useState('');
+  const [catalogMore, setCatalogMore] = useState({ products:false, services:false, businesses:false, events:false });
+  const catalogRequest = useRef(0), catalogPage = useRef(0), catalogLock = useRef(false);
   const bottomNavInset = useBottomNavInset();
   const router = useRouter();
   const { width } = useWindowDimensions();
@@ -204,7 +210,7 @@ export default function Market() {
       }
       const { data: p } = await supabase
         .from('profiles')
-        .select('id, display_name, avatar_url, is_geoverified, account_type, is_verified, freelance_trade')
+        .select('id, display_name, avatar_url, is_geoverified, account_type, is_verified, freelance_trade, city, district, region')
         .eq('id', u.user.id)
         .maybeSingle();
       setProfile(p);
@@ -216,8 +222,9 @@ export default function Market() {
   }, []);
 
   useEffect(() => {
-    loadAllData();
-  }, []);
+    void loadAllData();
+    return () => { catalogRequest.current++; };
+  }, [marketScope, activeLoc.city, activeLoc.district, activeLoc.region]);
 
   useEffect(() => {
     if (!params.businessId || !businesses.length) return;
@@ -228,35 +235,31 @@ export default function Market() {
     }
   }, [params.businessId, businesses]);
 
-  const loadAllData = async () => {
+  const loadAllData = async (append = false) => {
+    if (append && catalogLock.current) return;
+    const ticket = append ? catalogRequest.current : ++catalogRequest.current;
+    const nextPage = append ? catalogPage.current + 1 : 0;
+    catalogLock.current = true;
+    if (!append) { setLoading(true); setItems([]); setBusinesses([]); setEvents([]); setScopeError(''); }
     setRefreshing(true);
     setLoadError(false);
     setPartialLoadError(false);
     try {
+      const read = async (source: string) => {
+        const result = await supabase.rpc('hayna_market_catalog_page', { p_source: source, p_scope: marketScope, p_page: nextPage });
+        return { ...result, data: result.data?.rows || [], meta: result.data };
+      };
       const [servicesRes, productsRes, businessRes, eventsRes] = await Promise.all([
-        supabase
-          .from('services')
-          .select('*, profiles:provider_id(display_name, avatar_url, is_verified, city, district, account_type, freelance_trade), business:business_id(id,name,is_verified)')
-          .eq('moderation_status', 'approved')
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('marketplace_items')
-          .select('*, seller:seller_id(display_name, avatar_url, is_verified, city, district, account_type, freelance_trade), business:business_id(id,name,is_verified)')
-          .eq('status', 'available')
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('businesses')
-          .select('*, owner:owner_id(display_name, username)')
-          .eq('moderation_status', 'approved')
-          .order('created_at', { ascending: false })
-          .limit(50),
-        supabase
-          .from('events')
-          .select('*, organizer:organizer_id(display_name, username)')
-          .eq('moderation_status', 'approved')
-          .order('created_at', { ascending: false })
-          .limit(50),
+        read('services'), read('products'), read('businesses'), read('events'),
       ]);
+      if (ticket !== catalogRequest.current) return;
+      const scoped = [servicesRes, productsRes, businessRes, eventsRes].find(result => !result.error)?.meta;
+      if (scoped?.label) setScopeLabel(scoped.label);
+      setCatalogMore({ products:!!productsRes.meta?.has_more, services:!!servicesRes.meta?.has_more, businesses:!!businessRes.meta?.has_more, events:!!eventsRes.meta?.has_more });
+      const scopeFailure = [servicesRes, productsRes, businessRes, eventsRes].find(result => result.error)?.error?.message || '';
+      if (/account_.*required|account_region_mismatch/.test(scopeFailure)) setScopeError('أكمل مدينة وحي ومنطقة حسابك لعرض نتائج نطاقك فقط.');
+      if (/authentication_required/.test(scopeFailure)) setScopeError('سجّل الدخول لعرض السوق حسب موقع حسابك.');
+      catalogPage.current = nextPage;
       const failedSources = [servicesRes, productsRes, businessRes, eventsRes].filter(result => result.error).length;
       if (failedSources === 4) throw new Error('market_sources_unavailable');
       setPartialLoadError(failedSources > 0);
@@ -274,9 +277,9 @@ export default function Market() {
             price_from: row.price,
             price_to: null,
             price_type: row.price == null ? 'negotiable' : 'fixed',
-            listing_type: row.seller?.account_type === 'merchant' ? 'product_in_shop' : 'home_sale',
+            listing_type: row.business_id ? 'product_in_shop' : 'home_sale',
             subcategory: row.item_type,
-            shop_name: row.business?.name || (row.seller?.account_type === 'merchant' ? row.seller?.freelance_trade : null),
+            shop_name: row.business?.name || null,
             cover_url: row.image_url,
             images: row.image_url ? [row.image_url] : [],
             available_now: row.status === 'available',
@@ -286,8 +289,8 @@ export default function Market() {
             profiles: row.seller || null,
           }));
 
-      setItems(
-        [...serviceRows, ...productRows].sort(
+      setItems(previous =>
+        [...(append ? previous : []), ...serviceRows, ...productRows].filter((row, index, all) => all.findIndex(other => other.id === row.id && other._source === row._source) === index).sort(
           (a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime(),
         ),
       );
@@ -296,7 +299,7 @@ export default function Market() {
       const dbBusinesses = (businessRes.data || []).map((b: any) => ({
         id: b.id,
         name: b.name || 'منشأة تجارية',
-        category: b.category || 'grocery',
+        category: b.category || 'all',
         image_url: b.image_url || b.cover_url || b.logo_url || null,
         cover_url: b.cover_url || b.image_url || null,
         logo_url: b.logo_url || null,
@@ -319,7 +322,7 @@ export default function Market() {
         servicesList: b.services_list || [],
         reviewsList: b.reviews_list || [],
       }));
-      setBusinesses(dbBusinesses);
+      setBusinesses(previous => append ? [...previous, ...dbBusinesses].filter((row, index, all) => all.findIndex(other => other.id === row.id) === index) : dbBusinesses);
 
       // Map real events only (No mock data)
       const dbEvents = (eventsRes.data || []).map((ev: any) => ({
@@ -342,12 +345,11 @@ export default function Market() {
         agenda: ev.agenda || [],
         guidelines: ev.guidelines || '',
       }));
-      setEvents(dbEvents);
+      setEvents(previous => append ? [...previous, ...dbEvents].filter((row, index, all) => all.findIndex(other => other.id === row.id) === index) : dbEvents);
     } catch {
-      setLoadError(true);
+      if (ticket === catalogRequest.current) setLoadError(true);
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (ticket === catalogRequest.current) { setLoading(false); setRefreshing(false); catalogLock.current = false; }
     }
   };
 
@@ -358,7 +360,7 @@ export default function Market() {
       city: item.city || item.profiles?.city || null,
       district: item.district || item.profiles?.district || null,
     };
-    const inArea = type?.nationwide || isLocationMatching(locItem, activeLoc.city, activeLoc.district);
+    const inArea = true; // Scope is enforced by hayna_market_catalog_page before pagination.
     return { item, type, inArea };
   }), [items, activeLoc]);
 
@@ -381,7 +383,7 @@ export default function Market() {
       if (quick === 'available' && !item.available_now) return false;
       if (quick === 'delivery' && !(item.delivery_modes || []).includes('delivery')) return false;
       if (quick === 'images' && !getServiceCover(item)) return false;
-      if (quick === 'verified' && !item.profiles?.is_verified) return false;
+      if (quick === 'verified' && !item.is_verified && !item.business?.is_verified) return false;
       if (!query) return true;
       return [
         item.name,
@@ -419,8 +421,6 @@ export default function Market() {
   // Filtered & Sorted Businesses
   const displayedBusinesses = useMemo(() => {
     const filtered = businesses.filter((b) => {
-      const matchLoc = isAllKingdom(activeLoc.city) || (b.city && b.city.includes(activeLoc.city));
-      if (!matchLoc) return false;
       if (businessCategory !== 'all' && b.category !== businessCategory) return false;
       if (quick === 'available' && !b.openNow) return false;
       if (quick === 'verified' && !b.is_verified) return false;
@@ -442,8 +442,6 @@ export default function Market() {
   // Filtered Events
   const displayedEvents = useMemo(() => {
     return events.filter((ev) => {
-      const matchLoc = isAllKingdom(activeLoc.city) || (ev.city && ev.city.includes(activeLoc.city));
-      if (!matchLoc) return false;
       if (eventCategory !== 'all' && ev.category !== eventCategory) return false;
       if (!query) return true;
       return [ev.title, ev.categoryLabel, ev.description, ev.location, ev.organizer]
@@ -543,7 +541,7 @@ export default function Market() {
       router.push({ pathname: '/marketplace-item', params: { id: item.id } });
       return;
     }
-    setSelectedProduct(item);
+    router.push({ pathname: '/service', params: { id: item.id } });
   };
 
   // Handle Event Creation
@@ -914,9 +912,7 @@ export default function Market() {
     );
   };
 
-  const locationLabel = isAllKingdom(activeLoc.city)
-    ? 'كل مناطق المملكة'
-    : activeLoc.city + (activeLoc.district !== 'كل الأحياء' ? ' · حي ' + activeLoc.district : '');
+  const locationLabel = scopeLabel || 'نطاق موقع حسابك';
 
   // Add Button Action based on current section
   const handleAddPress = () => {
@@ -1060,6 +1056,14 @@ export default function Market() {
               </Pressable>
             </View>
 
+            <OasisSurface oasisSurface="card" style={styles.scopePanel}>
+              <View style={{flexDirection:'row-reverse',alignItems:'center',gap:7}}><MapPin size={17} color={OASIS.colors.primary}/><Text style={{color:OASIS.colors.ink,fontWeight:'700',fontSize:13}}>نطاق السوق</Text></View>
+              <View style={{flexDirection:'row-reverse',gap:6}}>
+                {([{id:'district',label:'حيّي'},{id:'city',label:'مدينتي كاملة'},{id:'region',label:'منطقتي'}] as const).map(option=><Pressable key={option.id} accessibilityRole="button" accessibilityState={{selected:marketScope===option.id}} onPress={()=>setMarketScope(option.id)} style={[styles.scopeOption,{backgroundColor:marketScope===option.id?OASIS.colors.primary:OASIS.colors.soft}]}><Text style={{fontSize:12,fontWeight:'700',color:marketScope===option.id?'#fff':OASIS.colors.muted}}>{option.label}</Text></Pressable>)}
+              </View>
+              <Text style={{color:OASIS.colors.muted,fontSize:11,textAlign:'right'}}>من موقع حسابك فقط · {locationLabel}</Text>
+              {!!scopeError&&<><Text accessibilityRole="alert" style={{color:OASIS.colors.danger,textAlign:'right',fontSize:12}}>{scopeError}</Text><Pressable onPress={()=>router.push(profile?'/locations':'/auth')}><Text style={{color:OASIS.colors.primary,textAlign:'right',fontWeight:'700'}}>مراجعة الحساب والموقع</Text></Pressable></>}
+            </OasisSurface>
             <View style={styles.filterControlsRow}>
               <Pressable style={styles.filterSelect} onPress={() => setFilterMenu('sort')}>
                 <ArrowUpDown size={15} color={OASIS.colors.muted} /><Text style={styles.filterSelectLabel}>الترتيب</Text>
@@ -1094,7 +1098,7 @@ export default function Market() {
         {/* MAIN BODY CONTENT                                        */}
         {/* ======================================================== */}
         <View style={styles.inner}>
-          {partialLoadError && !loading && !loadError && <Pressable accessibilityRole="button" onPress={loadAllData} style={styles.partialNotice}><Text style={styles.partialNoticeText}>تعذر تحميل بعض الأقسام. اضغط لإعادة المحاولة.</Text></Pressable>}
+          {partialLoadError && !loading && !loadError && <Pressable accessibilityRole="button" onPress={()=>void loadAllData()} style={styles.partialNotice}><Text style={styles.partialNoticeText}>تعذر تحميل بعض الأقسام. اضغط لإعادة المحاولة.</Text></Pressable>}
           {loading ? (
             <ScreenState type="loading" title="جاري التجهيز والتحميل" message="نرتب لك محتوى الحي الأقرب إليك" />
           ) : loadError ? (
@@ -1229,6 +1233,7 @@ export default function Market() {
               )}
             </>
           )}
+          {!loading && !loadError && (section==='market' ? catalogMore.products||catalogMore.services : section==='businesses' ? catalogMore.businesses : catalogMore.events) && <Pressable accessibilityRole="button" disabled={refreshing} onPress={()=>void loadAllData(true)} style={[styles.scopePanel,{alignItems:'center',minHeight:48,justifyContent:'center'}]}>{refreshing?<ActivityIndicator color={OASIS.colors.primary}/>:<Text style={{color:OASIS.colors.primary,fontWeight:'700'}}>تحميل المزيد ضمن نطاقي</Text>}</Pressable>}
         </View>
       </ScrollView>
 
@@ -1761,6 +1766,8 @@ function TypeCircle({ label, active, color, bg, Icon, count, onPress }: {
 }
 
 const styles = StyleSheet.create({
+  scopePanel:{padding:13,gap:11,borderRadius:19,borderWidth:1,borderColor:OASIS.colors.line,marginBottom:12},
+  scopeOption:{flex:1,minHeight:42,borderRadius:14,alignItems:'center',justifyContent:'center'},
   container: { flex: 1, backgroundColor: OASIS.colors.background, width: '100%' },
   inner: { width: '100%', maxWidth: 1100, alignSelf: 'center', paddingHorizontal: 16 },
 

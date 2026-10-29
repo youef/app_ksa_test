@@ -520,7 +520,7 @@ export default function UserProfile() {
       <View style={[styles.center, { backgroundColor: 'transparent' }]}>
         <UserRoundX size={48} color="#94a3b8" />
         <Text style={styles.emptyTitle}>{loadError ? 'تعذر تحميل الملف' : scopeDenied ? 'الملف غير متاح ضمن نطاقك' : 'الحساب غير موجود'}</Text>
-        <Text style={styles.emptyText}>{loadError ? 'تحقق من اتصالك ثم أعد المحاولة.' : scopeDenied ? 'تظهر بيانات الجيران وفق موقع حسابك ونطاق المدينة أو الحي وإعدادات خصوصيتهم.' : 'تأكد من اسم المستخدم أو الرابط وحاول مرة أخرى.'}</Text>
+        <Text style={styles.emptyText}>{loadError ? 'تحقق من اتصالك ثم أعد المحاولة.' : scopeDenied ? 'يمكنك عرض ملفات الجيران في مدينتك، حتى لو اختلف الحي، وفق إعدادات خصوصيتهم.' : 'تأكد من اسم المستخدم أو الرابط وحاول مرة أخرى.'}</Text>
         {loadError ? (
           <Pressable oasisVariant="primary" oasisKind="action" style={styles.primaryBtn} onPress={() => void load()}><Text style={styles.primaryBtnText}>إعادة المحاولة</Text></Pressable>
         ) : (

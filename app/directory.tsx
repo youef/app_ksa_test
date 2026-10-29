@@ -1,260 +1,106 @@
-import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
-import { OASIS } from '@/lib/oasis';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Image, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { router } from 'expo-router';
-import {
-  BriefcaseBusiness,
-  ChevronLeft,
-  MapPin,
-  Search,
-  ShieldCheck,
-  Store,
-  UserRound,
-  Wrench,
-} from 'lucide-react-native';
-
+import { router, useFocusEffect } from 'expo-router';
+import { ArrowDownAZ, ArrowUpLeft, BriefcaseBusiness, ChevronLeft, MapPin, Search, ShieldCheck, SlidersHorizontal, Store, Wrench, X } from 'lucide-react-native';
+import { OasisPressable as Pressable, OasisSurface, OasisTextInput as TextInput } from '@/components/oasis/OasisPrimitives';
 import { AppHeader } from '@/components/shared/AppHeader';
-import { AccountIdentityBadge } from '@/components/profile/AccountIdentityBadge';
+import { OASIS, useTheme } from '@/lib/oasis';
 import { supabase } from '@/lib/supabase';
-import { getActiveLocation, isAllKingdom, isLocationMatching } from '@/lib/locationSync';
+import { getActiveLocation, isAllKingdom, subscribeLocation } from '@/lib/locationSync';
+import { useBottomNavInset } from '@/lib/bottomNav';
+import { DirectoryKind, DirectorySort, fetchDirectoryPage } from '@/lib/directoryPresentation';
 
-type DirectoryItem = {
-  id: string;
-  type: 'business' | 'service';
-  title: string;
-  description: string;
-  city?: string | null;
-  district?: string | null;
-  image?: string | null;
-  ownerId?: string | null;
-  owner?: any;
-  verified?: boolean;
-  category?: string | null;
-  businessName?: string | null;
-};
-
+type Entry = { id: string; kind: 'business' | 'service'; name: string; description: string; city: string; district: string; image?: string; is_verified: boolean; subcategory?: string; created_at: string };
 export default function Directory() {
-  const [items, setItems] = useState<DirectoryItem[]>([]);
-  const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState<'all' | 'business' | 'service'>('all');
-  const [location, setLocation] = useState({ region: 'كل المملكة', city: 'كل المدن', district: 'كل الأحياء' });
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState(false);
+  useTheme();
+  const c = OASIS.colors, bottom = useBottomNavInset(24);
+  const [items, setItems] = useState<Entry[]>([]), [query, setQuery] = useState(''), [search, setSearch] = useState('');
+  const [kind, setKind] = useState<DirectoryKind>('all'), [sort, setSort] = useState<DirectorySort>('recent'), [verified, setVerified] = useState(false);
+  const [location, setLocation] = useState({ city: 'كل المدن', district: 'كل الأحياء' }), [revision, setRevision] = useState(0);
+  const [loading, setLoading] = useState(true), [refreshing, setRefreshing] = useState(false), [moreBusy, setMoreBusy] = useState(false), [hasMore, setHasMore] = useState(false);
+  const [error, setError] = useState(''), [canManage, setCanManage] = useState(false);
+  const request = useRef(0), page = useRef(0), moreLock = useRef(false);
 
-  const load = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
-    setError(false);
+  useEffect(() => { const timer = setTimeout(() => setSearch(query.trim()), 350); return () => clearTimeout(timer); }, [query]);
+  useEffect(() => subscribeLocation(() => setRevision(value => value + 1)), []);
+  useEffect(() => { let active = true; void supabase.rpc('hayna_my_account_capabilities').then(({ data }) => { if (active) setCanManage(data?.can_manage_business === true); }); return () => { active = false; }; }, []);
+
+  const load = useCallback(async (append = false, refresh = false) => {
+    if (append && moreLock.current) return;
+    const ticket = append ? request.current : ++request.current;
+    const targetPage = append ? page.current + 1 : 0;
+    if (append) { moreLock.current = true; setMoreBusy(true); }
+    else { moreLock.current = false; setMoreBusy(false); setRefreshing(refresh); setLoading(!refresh); if (!refresh) { setItems([]); setHasMore(false); } }
+    setError('');
     try {
-      const [loc, businessesRes, servicesRes] = await Promise.all([
-        getActiveLocation(),
-        supabase
-          .from('businesses')
-          .select('id,owner_id,name,description,city,district,logo_url,cover_url,is_verified,moderation_status,owner:owner_id(id,display_name,username,avatar_url,is_verified,account_type,freelance_trade)')
-          .eq('moderation_status', 'approved')
-          .order('created_at', { ascending: false })
-          .limit(100),
-        supabase
-          .from('services')
-          .select('id,provider_id,business_id,name,description,city,district,cover_url,category,subcategory,is_verified,moderation_status,provider:provider_id(id,display_name,username,avatar_url,is_verified,account_type,freelance_trade),business:business_id(id,name,is_verified)')
-          .eq('moderation_status', 'approved')
-          .order('created_at', { ascending: false })
-          .limit(100),
-      ]);
+      const loc = await getActiveLocation();
+      if (ticket !== request.current) return;
       setLocation(loc);
-
-      if (businessesRes.error) throw businessesRes.error;
-      if (servicesRes.error) throw servicesRes.error;
-
-      const businesses: DirectoryItem[] = (businessesRes.data || []).map((row: any) => ({
-        id: row.id,
-        type: 'business',
-        title: row.name,
-        description: row.description || 'منشأة محلية في مجتمع حيّنا',
-        city: row.city,
-        district: row.district,
-        image: row.logo_url || row.cover_url,
-        ownerId: row.owner_id,
-        owner: row.owner,
-        verified: Boolean(row.is_verified),
-        businessName: row.name,
-      }));
-
-      const services: DirectoryItem[] = (servicesRes.data || []).map((row: any) => ({
-        id: row.id,
-        type: 'service',
-        title: row.name,
-        description: row.description || row.subcategory || row.category || 'خدمة محلية',
-        city: row.city,
-        district: row.district,
-        image: row.cover_url,
-        ownerId: row.provider_id,
-        owner: row.provider,
-        verified: Boolean(row.provider?.is_verified || row.is_verified),
-        category: row.subcategory || row.category,
-        businessName: row.business?.name || null,
-      }));
-
-      setItems([...businesses, ...services]);
-    } catch (e) {
-      console.warn('directory load', e);
-      setItems([]);
-      setError(true);
+      const result = await fetchDirectoryPage(supabase, { location: loc, kind, search, verified, sort, page: targetPage });
+      if (ticket !== request.current) return;
+      setItems(previous => {
+        const merged = append ? [...previous, ...result.items] : result.items;
+        return merged.filter((item, index) => merged.findIndex(other => other.id === item.id && other.kind === item.kind) === index).sort((a, b) => sort === 'name' ? a.name.localeCompare(b.name, 'ar') || a.id.localeCompare(b.id) : b.created_at.localeCompare(a.created_at) || a.id.localeCompare(b.id));
+      });
+      page.current = targetPage; setHasMore(result.hasMore);
+    } catch {
+      if (ticket === request.current) setError('تعذر تحميل النتائج. تحقق من الاتصال ثم أعد المحاولة.');
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (ticket === request.current) { setLoading(false); setRefreshing(false); setMoreBusy(false); moreLock.current = false; }
     }
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLocaleLowerCase('ar');
-    return items.filter((item) => {
-      if (filter !== 'all' && item.type !== filter) return false;
-      const locationMatch = isAllKingdom(location.city) || isLocationMatching(item, location.city, location.district);
-      if (!locationMatch) return false;
-      if (!q) return true;
-      return [item.title, item.description, item.category, item.businessName, item.owner?.display_name, item.city, item.district]
-        .some((value) => String(value || '').toLocaleLowerCase('ar').includes(q));
-    });
-  }, [items, filter, location, query]);
-
-  const locationLabel = isAllKingdom(location.city)
-    ? 'كل المملكة'
-    : location.city + (location.district && location.district !== 'كل الأحياء' ? ' · حي ' + location.district : '');
-
-  return (
-    <View style={[styles.screen, { backgroundColor: 'transparent' }]}>
-      <AppHeader variant="sub" title="دليل الأعمال" subtitle={locationLabel} fallbackRoute="/more" />
-      <ScrollView
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load(true); }} tintColor={OASIS.colors.primary} />}
-        contentContainerStyle={styles.page}
-        showsVerticalScrollIndicator={false}
-      >
-        <OasisSurface oasisSurface="field" style={styles.searchWrap}>
-          <Search size={17} color="#94A3B8" />
-          <TextInput
-            value={query}
-            onChangeText={setQuery}
-            placeholder="ابحث عن منشأة أو خدمة"
-            placeholderTextColor="#94A3B8"
-            style={styles.searchInput}
-            textAlign="right"
-          />
-        </OasisSurface>
-
-        <View style={styles.filters}>
-          <Filter active={filter === 'all'} label={'الكل ' + filtered.length} onPress={() => setFilter('all')} />
-          <Filter active={filter === 'business'} label="المنشآت" onPress={() => setFilter('business')} />
-          <Filter active={filter === 'service'} label="الخدمات" onPress={() => setFilter('service')} />
-        </View>
-
-        <View style={styles.notice}>
-          <ShieldCheck size={17} color={OASIS.colors.primary} />
-          <Text style={styles.noticeText}>هذا الدليل يعرض بيانات حقيقية من حيّنا فقط. إدارة النشاط والإضافة تتم من «حسابي».</Text>
-        </View>
-
-        {loading ? (
-          <View style={styles.state}><ActivityIndicator size="large" color={OASIS.colors.primary} /><Text style={styles.stateText}>جاري تحميل الدليل...</Text></View>
-        ) : error ? (
-          <View style={styles.state}><Text style={styles.stateTitle}>تعذر تحميل الدليل</Text><Pressable style={styles.retry} onPress={() => void load()}><Text style={styles.retryText}>إعادة المحاولة</Text></Pressable></View>
-        ) : filtered.length ? (
-          <View style={styles.list}>
-            {filtered.map((item) => <DirectoryRow key={item.type + ':' + item.id} item={item} />)}
-          </View>
-        ) : (
-          <View style={styles.state}>
-            <BriefcaseBusiness size={34} color="#94A3B8" />
-            <Text style={styles.stateTitle}>لا توجد نتائج حاليًا</Text>
-            <Text style={styles.stateText}>ستظهر المنشآت والخدمات المعتمدة في هذا النطاق هنا.</Text>
-          </View>
-        )}
-      </ScrollView>
-    </View>
-  );
-}
-
-function DirectoryRow({ item }: { item: DirectoryItem }) {
-  const Icon = item.type === 'business' ? Store : Wrench;
-  const open = () => {
-    if (item.type === 'business') router.push({ pathname: '/business', params: { id: item.id } });
-    else router.push({ pathname: '/service', params: { id: item.id } });
-  };
-
-  return (
-    <Pressable style={styles.row} onPress={open}>
-      <View style={styles.visual}>
-        {item.image ? <Image source={{ uri: item.image }} style={styles.image} /> : <Icon size={22} color="#0F766E" />}
+  }, [kind, search, verified, sort, revision]);
+  useFocusEffect(useCallback(() => { void load(); return () => { request.current++; moreLock.current = false; }; }, [load]));
+  const reset = () => { setQuery(''); setKind('all'); setVerified(false); setSort('recent'); };
+  const locationLabel = isAllKingdom(location.city) ? 'كل المملكة' : [location.district && location.district !== 'كل الأحياء' ? 'حي ' + location.district : null, location.city].filter(Boolean).join(' · ');
+  return <View style={s.screen}>
+    <AppHeader variant="sub" title="دليل الحي" subtitle={locationLabel} fallbackRoute="/more" />
+    <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={[s.page, { paddingBottom: bottom }]} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load(false, true)} tintColor={c.primary} />}>
+      <OasisSurface oasisSurface="card" style={[s.intro, { borderColor: c.line }]}>
+        <View style={[s.introIcon, { backgroundColor: c.soft }]}><BriefcaseBusiness size={25} color={c.primary} /></View>
+        <View style={s.grow}><Text style={[s.introTitle, { color: c.ink }]}>أعمال قريبة، وخيارات أوضح</Text><Text style={[s.secondary, { color: c.muted }]}>اكتشف المنشآت والخدمات المعتمدة في نطاق تصفحك.</Text></View>
+      </OasisSurface>
+      <OasisSurface oasisSurface="field" style={[s.search, { borderColor: c.line }]}>
+        <Search size={20} color={c.primary} />
+        <TextInput accessibilityLabel="البحث في دليل الحي" value={query} onChangeText={setQuery} maxLength={80} placeholder="اسم المنشأة أو الخدمة…" style={[s.input, { color: c.ink }]} returnKeyType="search" />
+        {!!query && <Pressable accessibilityRole="button" accessibilityLabel="مسح البحث" onPress={() => setQuery('')} style={s.clear}><X size={18} color={c.muted} /></Pressable>}
+      </OasisSurface>
+      <View style={[s.segment, { backgroundColor: c.surface, borderColor: c.line }]}>
+        {([{ value: 'all', title: 'الكل', Icon: BriefcaseBusiness }, { value: 'business', title: 'المنشآت', Icon: Store }, { value: 'service', title: 'الخدمات', Icon: Wrench }] as const).map(({ value, title, Icon }) => <Pressable key={value} accessibilityRole="button" accessibilityState={{ selected: kind === value }} onPress={() => setKind(value)} style={[s.segmentButton, kind === value && { backgroundColor: c.primary }]}><Icon size={16} color={kind === value ? '#fff' : c.muted} /><Text style={[s.chipText, { color: kind === value ? '#fff' : c.muted }]}>{title}</Text></Pressable>)}
       </View>
-      <View style={styles.copy}>
-        <View style={styles.titleRow}>
-          <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
-          {item.verified ? <ShieldCheck size={13} color={OASIS.colors.primary} /> : null}
-        </View>
-        {item.businessName && item.type === 'service' ? <Text style={styles.businessName}>{item.businessName}</Text> : null}
-        <Text style={styles.description} numberOfLines={2}>{item.description}</Text>
-        <View style={styles.meta}>
-          <MapPin size={11} color="#94A3B8" />
-          <Text style={styles.metaText}>{[item.district && 'حي ' + item.district, item.city].filter(Boolean).join(' · ') || 'الموقع غير محدد'}</Text>
-        </View>
-        {item.owner ? (
-          <Pressable
-            style={styles.ownerLine}
-            onPress={(event: any) => {
-              event?.stopPropagation?.();
-              item.ownerId && router.push({ pathname: '/user', params: { id: item.ownerId } });
-            }}
-          >
-            <View style={styles.ownerAvatar}>
-              {item.owner.avatar_url ? <Image source={{ uri: item.owner.avatar_url }} style={styles.image} /> : <UserRound size={13} color={OASIS.colors.muted} />}
-            </View>
-            <Text style={styles.ownerName}>{item.owner.display_name || item.owner.username}</Text>
-            <AccountIdentityBadge role={item.owner.role} accountType={item.owner.account_type} isVerified={Boolean(item.owner.is_verified)} compact />
-          </Pressable>
-        ) : null}
+      <View style={s.row}>
+        <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: verified }} onPress={() => setVerified(value => !value)} style={[s.chip, { backgroundColor: verified ? c.soft : c.surface, borderColor: verified ? c.primary : c.line }]}><ShieldCheck size={16} color={verified ? c.primary : c.muted} /><Text style={[s.chipText, { color: verified ? c.primary : c.muted }]}>الموثّقة فقط</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel={sort === 'recent' ? 'الترتيب الحالي الأحدث، التغيير إلى أبجدي' : 'الترتيب الحالي أبجدي، التغيير إلى الأحدث'} onPress={() => setSort(value => value === 'recent' ? 'name' : 'recent')} style={[s.chip, { backgroundColor: c.surface, borderColor: c.line }]}><ArrowDownAZ size={16} color={c.muted} /><Text style={[s.chipText, { color: c.muted }]}>{sort === 'recent' ? 'الأحدث' : 'أبجديًا'}</Text></Pressable>
       </View>
-      <ChevronLeft size={18} color="#CBD5E1" />
-    </Pressable>
-  );
+      <View style={[s.row, { justifyContent: 'space-between' }]}><Text style={[s.resultTitle, { color: c.ink }]}>{loading ? 'نبحث في نطاقك…' : items.length.toLocaleString('ar-SA') + ' نتيجة معروضة'}</Text>{(search || kind !== 'all' || verified) && <Pressable accessibilityRole="button" onPress={reset}><Text style={{ color: c.primary, fontSize: 12 }}>إعادة الضبط</Text></Pressable>}</View>
+      {loading ? <View style={s.state}><ActivityIndicator color={c.primary} size="large" /><Text style={[s.secondary, { color: c.muted }]}>جارٍ تحميل دليل الحي…</Text></View> : <>
+        {items.map(item => <DirectoryCard key={item.kind + item.id} item={item} />)}
+        {!!error && <OasisSurface oasisSurface="card" style={s.state}><Text style={[s.secondary, { color: c.muted }]}>{error}</Text><Pressable style={[s.action, { backgroundColor: c.primary }]} onPress={() => void load(items.length > 0)}><Text style={s.white}>إعادة المحاولة</Text></Pressable></OasisSurface>}
+        {!items.length && !error && <OasisSurface oasisSurface="card" style={s.state}><SlidersHorizontal size={32} color={c.primary} /><Text style={[s.introTitle, { color: c.ink }]}>لم نعثر على نتائج مطابقة</Text><Text style={[s.secondary, { color: c.muted }]}>جرّب اسمًا آخر أو خفّف الفلاتر. لن نغيّر نطاق موقعك تلقائيًا.</Text><Pressable onPress={reset} style={[s.action, { backgroundColor: c.primary }]}><Text style={s.white}>مسح الفلاتر</Text></Pressable></OasisSurface>}
+        {hasMore && !error && <Pressable disabled={moreBusy} onPress={() => void load(true)} style={[s.more, { backgroundColor: c.surface, borderColor: c.line }]}>{moreBusy ? <ActivityIndicator color={c.primary} /> : <Text style={{ color: c.primary, fontWeight: '700' }}>عرض المزيد</Text>}</Pressable>}
+      </>}
+      {canManage && <Pressable onPress={() => router.push('/marketplace-dashboard')} style={[s.manage, { backgroundColor: c.soft }]}><Store size={20} color={c.primary} /><View style={s.grow}><Text style={[s.resultTitle, { color: c.primary }]}>مساحة أعمالي</Text><Text style={[s.secondary, { color: c.muted }]}>إدارة المنشأة والخدمات من مكان واحد</Text></View><ArrowUpLeft size={19} color={c.primary} /></Pressable>}
+    </ScrollView>
+  </View>;
 }
-
-function Filter({ active, label, onPress }: { active: boolean; label: string; onPress: () => void }) {
-  return <Pressable style={[styles.filter, active && styles.filterActive]} onPress={onPress}><Text style={[styles.filterText, active && styles.filterTextActive]}>{label}</Text></Pressable>;
+function DirectoryCard({ item }: { item: Entry }) {
+  const c = OASIS.colors, [failed, setFailed] = useState(false), Icon = item.kind === 'business' ? Store : Wrench;
+  return <Pressable accessibilityRole="button" accessibilityLabel={'عرض ' + item.name} onPress={() => router.push({ pathname: item.kind === 'business' ? '/business' : '/service', params: { id: item.id } })} style={[s.card, { backgroundColor: c.surface, borderColor: c.line }]}>
+    <View style={[s.visual, { backgroundColor: c.soft }]}>{item.image && !failed ? <Image source={{ uri: item.image }} style={s.image} resizeMode={item.kind === 'business' ? 'contain' : 'cover'} onError={() => setFailed(true)} /> : <Icon size={29} color={c.primary} />}</View>
+    <View style={s.grow}>
+      <View style={s.row}><Text style={[s.type, { color: c.primary }]}>{item.kind === 'business' ? 'منشأة' : item.subcategory || 'خدمة'}</Text>{item.is_verified && <View accessibilityLabel="موثقة" style={s.row}><ShieldCheck size={13} color={c.primary} /><Text style={[s.type, { color: c.primary }]}>موثّقة</Text></View>}</View>
+      <Text numberOfLines={2} style={[s.cardTitle, { color: c.ink }]}>{item.name}</Text>
+      {!!item.description && <Text numberOfLines={2} style={[s.secondary, { color: c.muted }]}>{item.description}</Text>}
+      <View style={s.row}><MapPin size={12} color={c.muted} /><Text numberOfLines={1} style={[s.area, { color: c.muted }]}>{[item.district && 'حي ' + item.district, item.city].filter(Boolean).join(' · ') || 'العنوان العام غير مضاف'}</Text></View>
+    </View><ChevronLeft size={19} color={c.muted} />
+  </Pressable>;
 }
-
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#F7F9F8' },
-  page: { padding: 14, paddingBottom: 24, gap: 12, maxWidth: 820, width: '100%', alignSelf: 'center' },
-  searchWrap: { height: 46, borderRadius: 14, borderWidth: 1, borderColor: OASIS.colors.line, backgroundColor: OASIS.colors.surface, flexDirection: 'row-reverse', alignItems: 'center', gap: 8, paddingHorizontal: 12 },
-  searchInput: { flex: 1, color: OASIS.colors.ink, fontSize: 12, fontWeight: '700' },
-  filters: { flexDirection: 'row-reverse', gap: 7 },
-  filter: { borderRadius: 999, backgroundColor: '#F1F5F9', paddingHorizontal: 12, paddingVertical: 7 },
-  filterActive: { backgroundColor: '#0F766E' },
-  filterText: { color: OASIS.colors.muted, fontSize: 11, fontWeight: '700' },
-  filterTextActive: { color: OASIS.colors.surface },
-  notice: { flexDirection: 'row-reverse', alignItems: 'flex-start', gap: 7, backgroundColor: OASIS.colors.soft, borderRadius: 13, padding: 10, borderWidth: 1, borderColor: OASIS.colors.soft },
-  noticeText: { flex: 1, color: OASIS.colors.deep, fontSize: 11, lineHeight: 19, fontWeight: '700', textAlign: 'right' },
-  list: { gap: 8 },
-  row: { minHeight: 112, borderRadius: 17, backgroundColor: OASIS.colors.surface, borderWidth: 1, borderColor: OASIS.colors.line, padding: 10, flexDirection: 'row-reverse', alignItems: 'center', gap: 10 },
-  visual: { width: 66, height: 66, borderRadius: 15, backgroundColor: OASIS.colors.soft, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
-  image: { width: '100%', height: '100%' },
-  copy: { flex: 1, alignItems: 'flex-end', minWidth: 0 },
-  titleRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, width: '100%' },
-  title: { flex: 1, color: OASIS.colors.ink, fontSize: 13, fontWeight: '700', textAlign: 'right' },
-  businessName: { color: OASIS.colors.primary, fontSize: 11, fontWeight: '600', marginTop: 2 },
-  description: { color: OASIS.colors.muted, fontSize: 11, lineHeight: 17, textAlign: 'right', marginTop: 3 },
-  meta: { flexDirection: 'row-reverse', alignItems: 'center', gap: 3, marginTop: 5 },
-  metaText: { color: '#94A3B8', fontSize: 11, fontWeight: '700' },
-  ownerLine: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, marginTop: 6, maxWidth: '100%' },
-  ownerAvatar: { width: 21, height: 21, borderRadius: 11, backgroundColor: '#F1F5F9', overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
-  ownerName: { color: OASIS.colors.muted, fontSize: 11, fontWeight: '600', maxWidth: 100 },
-  state: { minHeight: 240, alignItems: 'center', justifyContent: 'center', gap: 8 },
-  stateTitle: { color: OASIS.colors.ink, fontSize: 14, fontWeight: '700' },
-  stateText: { color: '#94A3B8', fontSize: 11, textAlign: 'center', lineHeight: 18 },
-  retry: { backgroundColor: '#0F766E', borderRadius: 11, paddingHorizontal: 15, paddingVertical: 9 },
-  retryText: { color: OASIS.colors.surface, fontSize: 11, fontWeight: '700' },
+const s = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: 'transparent' }, page: { width: '100%', maxWidth: 820, alignSelf: 'center', padding: 16, gap: 12 },
+  intro: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, padding: 16, borderRadius: 22, borderWidth: 1 }, introIcon: { width: 52, height: 52, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  grow: { flex: 1, minWidth: 0, gap: 6 }, introTitle: { fontSize: 17, lineHeight: 25, fontWeight: '800', textAlign: 'right' }, secondary: { fontSize: 12, lineHeight: 20, textAlign: 'right' },
+  search: { minHeight: 52, borderRadius: 17, borderWidth: 1, paddingHorizontal: 13, flexDirection: 'row-reverse', alignItems: 'center', gap: 8 }, input: { flex: 1, fontSize: 14, textAlign: 'right', paddingVertical: 12 }, clear: { width: 36, height: 40, alignItems: 'center', justifyContent: 'center' },
+  segment: { flexDirection: 'row-reverse', borderWidth: 1, borderRadius: 18, padding: 4, gap: 4 }, segmentButton: { flex: 1, minHeight: 44, borderRadius: 14, flexDirection: 'row-reverse', justifyContent: 'center', alignItems: 'center', gap: 6 },
+  row: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 }, chip: { flexDirection: 'row-reverse', alignItems: 'center', minHeight: 42, gap: 6, borderWidth: 1, borderRadius: 16, paddingHorizontal: 13 }, chipText: { fontSize: 12, fontWeight: '700' },
+  resultTitle: { fontSize: 14, fontWeight: '700', textAlign: 'right' }, card: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, padding: 13, borderWidth: 1, borderRadius: 22 }, visual: { width: 76, height: 82, borderRadius: 17, overflow: 'hidden', justifyContent: 'center', alignItems: 'center' }, image: { width: '100%', height: '100%' }, type: { fontSize: 10, fontWeight: '700' }, cardTitle: { fontSize: 15, lineHeight: 23, fontWeight: '800', textAlign: 'right' }, area: { flex: 1, fontSize: 10, textAlign: 'right' },
+  state: { minHeight: 200, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12, borderRadius: 22 }, action: { minHeight: 44, paddingHorizontal: 20, borderRadius: 14, justifyContent: 'center' }, white: { color: '#fff', fontWeight: '700' }, more: { minHeight: 48, borderRadius: 16, borderWidth: 1, alignItems: 'center', justifyContent: 'center' }, manage: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, padding: 16, borderRadius: 20, marginTop: 8 },
 });

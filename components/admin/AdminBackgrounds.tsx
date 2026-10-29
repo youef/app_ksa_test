@@ -9,8 +9,8 @@ import { usePlatformConfig } from '@/lib/platformConfig';
 import { supabase } from '@/lib/supabase';
 import { BACKGROUND_BUCKET, BACKGROUND_CONFIG_KEY, BACKGROUND_SLOTS, DEFAULT_PAGE_BACKGROUNDS, MAX_BACKGROUND_BYTES, detectBackgroundImage, isBackgroundPath, parsePageBackgrounds, type BackgroundSlot, type PageBackground } from '@/lib/pageBackgrounds';
 
-const LABELS = { welcome: 'الترحيب', login: 'تسجيل الدخول', app: 'الصفحات الداخلية' };
-const NOTES = { welcome: 'خلفية شاشة الترحيب الأولى.', login: 'خلفية تسجيل الدخول وإنشاء الحساب.', app: 'الرئيسية والسوق واليوميات واستكشف والملفات وبقية الصفحات الداخلية.' };
+const LABELS = { welcome: 'الترحيب', login: 'تسجيل الدخول', app: 'الصفحات الداخلية', chat: 'الدردشة' };
+const NOTES = { welcome: 'خلفية شاشة الترحيب الأولى.', login: 'خلفية تسجيل الدخول وإنشاء الحساب.', app: 'الرئيسية والسوق واليوميات واستكشف والملفات وبقية الصفحات الداخلية عدا المحادثات.', chat: 'خلفية جميع المحادثات الخاصة. تظهر تلقائيًا للمستخدمين بعد تطبيقها، بشكل مستقل عن خلفية الصفحات الداخلية.' };
 type Draft = { setting: PageBackground; file?: ImagePicker.ImagePickerAsset };
 type LibraryImage = { name: string };
 const imageUrl = (path: string) => supabase.storage.from(BACKGROUND_BUCKET).getPublicUrl(path).data.publicUrl;
@@ -168,8 +168,8 @@ const s = StyleSheet.create({
   title: { fontSize: 21, fontWeight: '700', textAlign: 'right' },
   panelTitle: { flex: 1, fontSize: 16, fontWeight: '700', textAlign: 'right' },
   description: { fontSize: 12, lineHeight: 22, textAlign: 'right' },
-  slots: { flexDirection: 'row-reverse', gap: 7 },
-  slot: { flex: 1, minHeight: 50, padding: 8, borderWidth: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center', gap: 4 },
+  slots: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 7 },
+  slot: { flex: 1, minWidth: 110, minHeight: 50, padding: 8, borderWidth: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center', gap: 4 },
   slotTitle: { fontSize: 11, fontWeight: '700', textAlign: 'center' },
   dirtyDot: { width: 5, height: 5, borderRadius: 3 },
   panel: { borderWidth: 1, borderRadius: 20, padding: 16, gap: 13 },

@@ -1,9 +1,12 @@
+import { DiscussionComposer } from '@/components/community/DiscussionComposer';
+import { discussionStyles } from '@/components/community/discussionStyles';
 import { PROFILE_READ_FIELDS } from '@/lib/profileFields';
 import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
+import { useTheme } from '@/context/ThemeContext';
 import { HeaderAction } from '@/components/shared/AppHeader';
 import { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View, KeyboardAvoidingView, Keyboard, Platform, ActivityIndicator, Share, Image, ImageBackground, Modal } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, View, KeyboardAvoidingView, Platform, ActivityIndicator, Share, Image, ImageBackground, Modal } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
@@ -45,18 +48,16 @@ import { getCurrentDeviceLocation, reverseGeocodeDeviceLocation } from '@/lib/de
 import { relativeTime } from '@/lib/mapPins';
 
 const QUICK_QUESTION_RESPONSES = [
-  'شفته بالقرب من المسجد 📍',
-  'الله يحفظه ويرده بالسلامة 🤲',
-  'أنا بالحي وأقدر أساعدكم بالبحث 🚗',
-  'تواصل معي بالخاص للتنسيق 💬',
+  'عندي تجربة مشابهة وأقدر أفيدك',
+  'ممكن توضح التفاصيل أكثر؟',
+  'شكرًا، هذه المعلومة مفيدة',
 ];
 
 export default function Question() {
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
   const { showIsland } = useDynamicIsland();
   const [viewerProfile, setViewerProfile] = useState<any>(null);
-  const [composerFocused, setComposerFocused] = useState(false);
-  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const { id } = useLocalSearchParams<{ id: string }>();
   const [q, setQ] = useState<any>();
   const [answers, setAnswers] = useState<any[]>([]);
@@ -174,36 +175,6 @@ export default function Question() {
     channel.subscribe();
     return () => { void supabase.removeChannel(channel); };
   }, [id, currentUserId]);
-
-  useEffect(() => {
-    if (Platform.OS === 'web') {
-      const viewport = typeof window !== 'undefined' ? window.visualViewport : null;
-      const syncViewport = () => {
-        if (!viewport || typeof window === 'undefined') return;
-        setKeyboardVisible(window.innerHeight - viewport.height - viewport.offsetTop > 120);
-      };
-      viewport?.addEventListener('resize', syncViewport);
-      viewport?.addEventListener('scroll', syncViewport);
-      return () => {
-        viewport?.removeEventListener('resize', syncViewport);
-        viewport?.removeEventListener('scroll', syncViewport);
-      };
-    }
-
-    const showSub = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
-    const hideSub = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, []);
-
-  const notifyComposerFocus = (focused: boolean) => {
-    setComposerFocused(focused);
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('hayna:composer-focus', { detail: { focused } }));
-    }
-  };
 
   async function answer() {
     if (!body.trim()) return;
@@ -677,15 +648,17 @@ export default function Question() {
       />
 
       <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingBottom: 16 }]}
+        contentContainerStyle={[discussionStyles.page, { paddingBottom: 20 }]}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         showsVerticalScrollIndicator={false}
       >
         <TwitterInquiryCard detailMode type="question" data={{ ...q, answers, answers_count: answers.length }} currentUserId={currentUserId} currentUserProfile={viewerProfile} isGuest={!currentUserId} onQuickReply={async () => {}} onToast={message => showIsland(message, undefined, 'success')} onDeleted={() => void load(false)} />
 
         {/* Quick Suggested Responses Pills */}
         {!isSolved && currentUserId && (
-          <View style={styles.quickPillsSection}>
-            <Text style={styles.quickPillsTitle}>ردود واقتراحات سريعة بنقرة واحدة:</Text>
+          <View style={[styles.quickPillsSection, { backgroundColor: colors.surface, borderColor: colors.line }]}>
+            <Text style={styles.quickPillsTitle}>ابدأ ردك</Text>
             <View style={styles.quickPillsWrap}>
               {QUICK_QUESTION_RESPONSES.map((resp, idx) => (
                 <Pressable oasisKind="chip"
@@ -702,6 +675,7 @@ export default function Question() {
 
         {/* Answers / Discussion Section */}
         <View style={styles.answersSection}>
+          <View style={[discussionStyles.card, { backgroundColor: colors.surface, borderColor: colors.line }]}>
           <View style={styles.answersHeader}>
             <View style={styles.answersHeaderLeft}>
               <Text style={styles.answersCountBadge}>{answers.length}</Text>
@@ -713,14 +687,15 @@ export default function Question() {
           </View>
           <View style={styles.answerSortRow}>
             <Text style={styles.answerSortLabel}>ترتيب الردود</Text>
-            <Pressable oasisKind="chip" onPress={() => setAnswerSort('newest')} style={[styles.answerSortButton, answerSort === 'newest' && styles.answerSortButtonActive]}>
+            <Pressable oasisKind="chip" onPress={() => setAnswerSort('newest')} accessibilityRole="button" accessibilityState={{selected: answerSort === 'newest'}} style={[styles.answerSortButton, answerSort === 'newest' && styles.answerSortButtonActive]}>
               <Clock size={13} color={answerSort === 'newest' ? OASIS.colors.primary : OASIS.colors.muted} /><Text style={[styles.answerSortButtonText, answerSort === 'newest' && styles.answerSortButtonTextActive]}>الأحدث</Text>
             </Pressable>
-            <Pressable oasisKind="chip" onPress={() => setAnswerSort('useful')} style={[styles.answerSortButton, answerSort === 'useful' && styles.answerSortButtonActive]}>
+            <Pressable oasisKind="chip" onPress={() => setAnswerSort('useful')} accessibilityRole="button" accessibilityState={{selected: answerSort === 'useful'}} style={[styles.answerSortButton, answerSort === 'useful' && styles.answerSortButtonActive]}>
               <ThumbsUp size={13} color={answerSort === 'useful' ? OASIS.colors.primary : OASIS.colors.muted} /><Text style={[styles.answerSortButtonText, answerSort === 'useful' && styles.answerSortButtonTextActive]}>الأكثر فائدة</Text>
             </Pressable>
           </View>
 
+          </View>
           {answers.length === 0 ? (
             <View style={styles.emptyState}>
               <MessageCircle size={38} color="#94a3b8" />
@@ -867,12 +842,12 @@ export default function Question() {
       ) : (
         <OasisSurface oasisSurface="field" style={[styles.inputWrapper, { paddingBottom: Math.max(insets.bottom, Platform.OS === 'ios' ? 12 : 8) }]}>
           {replyTo && (
-            <View style={styles.replyingBar}>
+            <View style={[styles.replyingBar, { minHeight: 44 }]}>
               <Reply size={14} color={OASIS.colors.primary} />
               <Text style={styles.replyingText} numberOfLines={1}>
                 الرد على {replyTo.profiles?.display_name || replyTo.profiles?.username || 'الجار'}
               </Text>
-              <Pressable onPress={() => setReplyTo(null)}>
+              <Pressable accessibilityLabel="إلغاء الرد على التعليق" style={{minWidth:44,minHeight:44,alignItems:'center',justifyContent:'center'}} onPress={() => setReplyTo(null)}>
                 <Text style={styles.cancelReply}>إلغاء</Text>
               </Pressable>
             </View>
@@ -884,43 +859,17 @@ export default function Question() {
               <Text style={styles.closedNoticeText}>تم إغلاق الردود بعد اعتماد الإجابة الصحيحة</Text>
             </View>
           ) : (
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={styles.input}
-                multiline
-                value={body}
-                onChangeText={setBody}
-                placeholder="اكتب ردك ومشاركتك هنا..."
-                placeholderTextColor="#94a3b8"
-                maxLength={500}
-                onFocus={() => notifyComposerFocus(true)}
-                onBlur={() => notifyComposerFocus(false)}
-              />
-              <Pressable oasisVariant="primary" oasisKind="action"
-                style={({ pressed }) => [
-                  styles.sendButton,
-                  !body.trim() && styles.sendButtonDisabled,
-                  pressed && { transform: [{ scale: 0.95 }] },
-                ]}
-                onPress={answer}
-                disabled={!body.trim() || submitting || isSolved}
-              >
-                {submitting ? (
-                  <ActivityIndicator size="small" color={OASIS.colors.surface} />
-                ) : (
-                  <Send size={18} color={OASIS.colors.surface} />
-                )}
-              </Pressable>
-            </View>
+            <DiscussionComposer value={body} onChangeText={setBody} onSend={() => void answer()} busy={submitting} disabled={isSolved} />
           )}
         </OasisSurface>
       )}
 
       <Modal visible={reportOpen} transparent animationType="slide" onRequestClose={() => setReportOpen(false)}>
-        <View style={styles.modalOverlay}>
-          <OasisSurface oasisSurface="card" style={styles.reportModalCard}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined} style={[styles.modalOverlay, { paddingTop: Math.max(insets.top, 16), paddingBottom: Math.max(insets.bottom, 16), paddingHorizontal: Math.max(insets.left, insets.right, 16) }]}>
+          <OasisSurface oasisSurface="card" style={styles.modalCard}>
+            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <View><Text style={styles.modalTitle}>الإبلاغ عن الاستفسار</Text><Text style={styles.modalSubtitle}>اختر السبب وسنراجع البلاغ بسرية</Text></View>
+              <View style={{flex:1,minWidth:0}}><Text style={styles.modalTitle}>الإبلاغ عن الاستفسار</Text><Text style={styles.modalSubtitle}>اختر السبب وسنراجع البلاغ بسرية</Text></View>
               <Pressable oasisKind="icon" style={styles.modalCloseBtn} onPress={() => setReportOpen(false)} disabled={reportBusy}><X size={18} color={OASIS.colors.muted} /></Pressable>
             </View>
             <View style={styles.reportOptions}>
@@ -937,16 +886,19 @@ export default function Question() {
               <Pressable oasisKind="action" style={styles.modalCancelBtn} onPress={() => setReportOpen(false)} disabled={reportBusy}><Text style={styles.modalCancelBtnText}>إلغاء</Text></Pressable>
               <Pressable oasisVariant="primary" oasisKind="action" style={[styles.modalSubmitBtn, reportBusy && styles.modalSubmitBtnDisabled]} onPress={submitReport} disabled={reportBusy}>{reportBusy ? <ActivityIndicator size="small" color={OASIS.colors.surface} /> : <Text style={styles.modalSubmitBtnText}>إرسال البلاغ</Text>}</Pressable>
             </View>
+            </ScrollView>
           </OasisSurface>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       <Modal visible={Boolean(editingAnswer)} transparent animationType="slide" onRequestClose={() => !savingAnswerEdit && setEditingAnswer(null)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined} style={[styles.modalOverlay, { paddingTop: Math.max(insets.top, 16), paddingBottom: Math.max(insets.bottom, 16), paddingHorizontal: Math.max(insets.left, insets.right, 16) }]}>
           <OasisSurface oasisSurface="sheet" style={styles.modalCard}>
-            <View style={styles.modalHeader}><View><Text style={styles.modalTitle}>تعديل الرد</Text><Text style={styles.modalSubtitle}>يمكنك تعديل ردك أنت فقط</Text></View><Pressable oasisKind="icon" style={styles.modalCloseBtn} onPress={() => setEditingAnswer(null)} disabled={savingAnswerEdit}><X size={18} color={OASIS.colors.muted} /></Pressable></View>
+            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.modalContent}>
+            <View style={styles.modalHeader}><View style={{flex:1,minWidth:0}}><Text style={styles.modalTitle}>تعديل الرد</Text><Text style={styles.modalSubtitle}>يمكنك تعديل ردك أنت فقط</Text></View><Pressable oasisKind="icon" style={styles.modalCloseBtn} onPress={() => setEditingAnswer(null)} disabled={savingAnswerEdit}><X size={18} color={OASIS.colors.muted} /></Pressable></View>
             <TextInput style={[styles.modalInput, styles.modalTextArea]} value={editAnswerBody} onChangeText={setEditAnswerBody} placeholder="اكتب الرد بعد التعديل..." placeholderTextColor="#94a3b8" textAlign="right" multiline maxLength={500} />
             <View style={styles.modalFooter}><Pressable oasisKind="action" style={styles.modalCancelBtn} onPress={() => setEditingAnswer(null)} disabled={savingAnswerEdit}><Text style={styles.modalCancelBtnText}>إلغاء</Text></Pressable><Pressable oasisVariant="primary" oasisKind="action" style={[styles.modalSubmitBtn, (!editAnswerBody.trim() || savingAnswerEdit) && styles.modalSubmitBtnDisabled]} onPress={saveAnswerEdit} disabled={!editAnswerBody.trim() || savingAnswerEdit}>{savingAnswerEdit ? <ActivityIndicator size="small" color={OASIS.colors.surface} /> : <Text style={styles.modalSubmitBtnText}>حفظ الرد</Text>}</Pressable></View>
+            </ScrollView>
           </OasisSurface>
         </KeyboardAvoidingView>
       </Modal>
@@ -959,12 +911,13 @@ export default function Question() {
         onRequestClose={() => setIsEditModalOpen(false)}
       >
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}
+          style={[styles.modalOverlay, { paddingTop: Math.max(insets.top, 16), paddingBottom: Math.max(insets.bottom, 16), paddingHorizontal: Math.max(insets.left, insets.right, 16) }]}
         >
           <OasisSurface oasisSurface="sheet" style={styles.modalCard}>
+            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <View>
+              <View style={{flex:1,minWidth:0}}>
                 <Text style={styles.modalTitle}>تعديل الاستفسار</Text>
                 <Text style={styles.modalSubtitle}>
                   محاولة {editCount + 1} من {MAX_EDITS} (متبقي بعدها {Math.max(0, MAX_EDITS - (editCount + 1))})
@@ -1033,6 +986,7 @@ export default function Question() {
                 )}
               </Pressable>
             </View>
+            </ScrollView>
           </OasisSurface>
         </KeyboardAvoidingView>
       </Modal>
@@ -1084,14 +1038,6 @@ const styles = StyleSheet.create({
     color: OASIS.colors.surface,
     fontWeight: '700',
     fontSize: 14,
-  },
-  scroll: {
-    width: '100%',
-    maxWidth: 760,
-    alignSelf: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    gap: 12,
   },
   questionCard: {
     backgroundColor: 'rgba(255,255,255,0.96)',
@@ -1312,7 +1258,10 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   quickPillsSection: {
-    gap: 8,
+    padding: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    gap: 12,
   },
   quickPillsTitle: {
     fontSize: 12.5,
@@ -1323,9 +1272,10 @@ const styles = StyleSheet.create({
   quickPillsWrap: {
     flexDirection: 'row-reverse',
     flexWrap: 'wrap',
-    gap: 6,
+    gap: 8,
   },
   quickResponsePill: {
+    maxWidth: '100%',
     backgroundColor: OASIS.colors.surface,
     paddingHorizontal: 11,
     paddingVertical: 7,
@@ -1339,26 +1289,32 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   quickResponseText: {
+    flexShrink: 1,
+    textAlign: 'right',
+    lineHeight: 20,
     fontSize: 12,
     fontWeight: '700',
     color: OASIS.colors.ink,
   },
-  answerSortRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' },
+  answerSortRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   answerSortLabel: { color: OASIS.colors.muted, fontSize: 12, fontWeight: '600', marginLeft: 'auto' },
   answerSortButton: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, borderWidth: 1, borderColor: OASIS.colors.line, backgroundColor: OASIS.colors.surface, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 7 },
   answerSortButtonActive: { borderColor: '#6ee7b7', backgroundColor: OASIS.colors.soft },
   answerSortButtonText: { color: OASIS.colors.muted, fontSize: 11, fontWeight: '600' },
   answerSortButtonTextActive: { color: OASIS.colors.primary },
   answersSection: {
-    gap: 10,
+    gap: 12,
   },
   answersHeader: {
+    flexWrap: 'wrap',
+    gap: 8,
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 2,
   },
   answersHeaderLeft: {
+    flexShrink: 1,
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 8,
@@ -1375,6 +1331,9 @@ const styles = StyleSheet.create({
     borderColor: '#a7f3d0',
   },
   answersTitle: {
+    flexShrink: 1,
+    textAlign: 'right',
+    lineHeight: 24,
     fontSize: 15,
     fontWeight: '700',
     color: OASIS.colors.ink,
@@ -1386,8 +1345,9 @@ const styles = StyleSheet.create({
   },
   emptyState: {
     backgroundColor: OASIS.colors.surface,
-    borderRadius: 14,
-    padding: 16,
+    borderRadius: 20,
+    padding: 28,
+    minHeight: 200,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -1408,8 +1368,8 @@ const styles = StyleSheet.create({
   },
   answerCard: {
     backgroundColor: OASIS.colors.surface,
-    borderRadius: 14,
-    padding: 14,
+    borderRadius: 20,
+    padding: 16,
     borderWidth: 1,
     borderColor: OASIS.colors.line,
     gap: 10,
@@ -1435,6 +1395,9 @@ const styles = StyleSheet.create({
     borderColor: '#86efac',
   },
   bestBannerText: {
+    flexShrink: 1,
+    textAlign: 'right',
+    lineHeight: 19,
     fontSize: 11.5,
     fontWeight: '700',
     color: '#166534',
@@ -1485,6 +1448,7 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   replyToPill: {
+    maxWidth: '100%',
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 4,
@@ -1495,17 +1459,21 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-end',
   },
   replyToText: {
+    flexShrink: 1,
+    textAlign: 'right',
+    lineHeight: 18,
     fontSize: 11,
     color: OASIS.colors.muted,
     fontWeight: '700',
   },
   answerBody: {
-    fontSize: 13.5,
-    lineHeight: 22,
+    fontSize: 14,
+    lineHeight: 25,
     color: OASIS.colors.ink,
     textAlign: 'right',
   },
   answerActions: {
+    flexWrap: 'wrap',
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -1515,6 +1483,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   actionsRightGroup: {
+    flexWrap: 'wrap',
+    flexShrink: 1,
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 6,
@@ -1611,11 +1581,16 @@ const styles = StyleSheet.create({
     color: OASIS.colors.primary,
   },
   inputWrapper: {
-    backgroundColor: 'rgba(255,255,255,0.97)',
-    borderTopWidth: 1,
-    borderTopColor: '#dcebe3',
-    paddingHorizontal: 14,
-    paddingTop: 10,
+    flexShrink: 0,
+    width: '100%',
+    maxWidth: 788,
+    alignSelf: 'center',
+    backgroundColor: OASIS.colors.surface,
+    borderWidth: 1,
+    borderColor: OASIS.colors.line,
+    borderRadius: 22,
+    paddingHorizontal: 12,
+    paddingTop: 8,
     shadowColor: OASIS.colors.ink,
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0,
@@ -1655,44 +1630,12 @@ const styles = StyleSheet.create({
     borderRadius: 14,
   },
   closedNoticeText: {
+    flexShrink: 1,
+    textAlign: 'right',
+    lineHeight: 20,
     fontSize: 12.5,
     fontWeight: '600',
     color: OASIS.colors.muted,
-  },
-  inputContainer: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 8,
-  },
-  input: {
-    flex: 1,
-    backgroundColor: '#f5f9f7',
-    borderRadius: 17,
-    paddingHorizontal: 15,
-    paddingVertical: 11,
-    fontSize: 16,
-    color: OASIS.colors.ink,
-    borderWidth: 1.5,
-    borderColor: OASIS.colors.line,
-    textAlign: 'right',
-    maxHeight: 90,
-  },
-  sendButton: {
-    width: 46,
-    height: 46,
-    borderRadius: 14,
-    backgroundColor: '#16865b',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: OASIS.colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  sendButtonDisabled: {
-    backgroundColor: '#94a3b8',
-    opacity: 0.6,
   },
   authorManageBox: {
     backgroundColor: OASIS.colors.surface,
@@ -1794,14 +1737,18 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.6)',
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
   },
+  modalContent: { padding: 18, gap: 14 },
   modalCard: {
+    width: '100%',
+    maxWidth: 520,
+    overflow: 'hidden',
     backgroundColor: OASIS.colors.surface,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 14,
-    gap: 16,
+    borderRadius: 24,
+    padding: 0,
     maxHeight: '90%',
   },
   modalHeader: {
@@ -1826,8 +1773,8 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   modalCloseBtn: {
-    width: 32,
-    height: 32,
+    width: 44,
+    height: 44,
     borderRadius: 16,
     backgroundColor: '#f1f5f9',
     alignItems: 'center',

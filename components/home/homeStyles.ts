@@ -3,25 +3,211 @@ import { Dimensions, Platform, StyleSheet } from 'react-native';
 
 const { width } = Dimensions.get('window');
 
+/* -------------------------------------------------------------------------- */
+/*                              Design Tokens                                 */
+/* -------------------------------------------------------------------------- */
+
+const T = {
+  mintSoft: '#a7f3d0',
+  mintBorder: '#6ee7b7',
+  mintBorderLight: '#bbf7d0',
+  dangerBorder: '#fecaca',
+  warningBorder: '#fde68a',
+  warningText: '#b45309',
+  dangerText: '#991b1b',
+  slateLine: '#f1f5f9',
+  slatePlaceholder: '#94a3b8',
+  slateMuted: '#82918a',
+  inkDark: '#102a22',
+  shadowGreen: '#0f513d',
+  shadowRed: '#991b1b',
+  white10: 'rgba(255,255,255,0.10)',
+  white14: 'rgba(255,255,255,0.14)',
+  white16: 'rgba(255,255,255,0.16)',
+  white18: 'rgba(255,255,255,0.18)',
+  white22: 'rgba(255,255,255,0.22)',
+  white25: 'rgba(255,255,255,0.25)',
+  white40: 'rgba(255,255,255,0.40)',
+  white58: 'rgba(255,255,255,0.58)',
+  white78: 'rgba(255,255,255,0.78)',
+  white82: 'rgba(255,255,255,0.82)',
+  white86: 'rgba(255,255,255,0.86)',
+  white88: 'rgba(255,255,255,0.88)',
+  white94: 'rgba(255,255,255,0.94)',
+  white95: 'rgba(255,255,255,0.95)',
+  white96: 'rgba(255,255,255,0.96)',
+  white98: 'rgba(255,255,255,0.98)',
+  overlayDark: 'rgba(15,23,42,0.48)',
+  overlayDeep: 'rgba(2,6,23,0.62)',
+};
+
+const shadow = (color: string, elevation: number, radius = 10) => ({
+  shadowColor: color,
+  shadowOffset: { width: 0, height: Math.max(2, Math.round(radius / 3)) },
+  shadowOpacity: 0.12,
+  shadowRadius: radius,
+  elevation,
+});
+
+const cardBase = {
+  backgroundColor: OASIS.colors.surface,
+  borderRadius: 14,
+  padding: 14,
+  borderWidth: 1,
+  borderColor: OASIS.colors.line,
+};
+
+const primaryBtn = {
+  backgroundColor: OASIS.colors.primary,
+  borderRadius: 14,
+  alignItems: 'center' as const,
+  justifyContent: 'center' as const,
+  minHeight: 48,
+  paddingHorizontal: 16,
+};
+
+const subtleBtn = {
+  backgroundColor: OASIS.colors.soft,
+  borderRadius: 14,
+  alignItems: 'center' as const,
+  justifyContent: 'center' as const,
+  minHeight: 44,
+  paddingHorizontal: 14,
+  borderWidth: 1,
+  borderColor: T.mintSoft,
+};
+
+const badgeBase = {
+  position: 'absolute' as const,
+  alignItems: 'center' as const,
+  justifyContent: 'center' as const,
+  borderColor: OASIS.colors.surface,
+  borderWidth: 1.5,
+};
+
+/* -------------------------------------------------------------------------- */
+/*                                   Styles                                   */
+/* -------------------------------------------------------------------------- */
+
 export const styles = StyleSheet.create({
-  locationPromptBackdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.48)', justifyContent: 'center', alignItems: 'center', padding: 16 },
-  locationPromptCard: { width: '100%', maxWidth: 420, backgroundColor: OASIS.colors.surface, borderRadius: 14, padding: 14, alignItems: 'center' },
-  locationPromptTitle: { marginTop: 10, fontSize: 18, fontWeight: '700', color: OASIS.colors.deep, textAlign: 'center' },
-  locationPromptText: { marginTop: 8, fontSize: 13, lineHeight: 21, color: OASIS.colors.muted, textAlign: 'center' },
-  locationPromptActions: { width: '100%', flexDirection: 'row-reverse', gap: 10, marginTop: 18 },
-  locationPromptAllow: { flex: 1, backgroundColor: OASIS.colors.primary, borderRadius: 14, padding: 13, alignItems: 'center', justifyContent: 'center', minHeight: 48 },
-  locationPromptAllowText: { color: OASIS.colors.surface, fontWeight: '700' },
-  locationPromptLater: { flex: 1, backgroundColor: '#f1f5f9', borderRadius: 14, padding: 13, alignItems: 'center' },
-  locationPromptLaterText: { color: OASIS.colors.muted, fontWeight: '700' },
-  locationPromptLockRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, marginTop: 12, backgroundColor: OASIS.colors.soft, borderWidth: 1, borderColor: '#a7f3d0', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9, width: '100%' },
-  locationPromptLockText: { flex: 1, color: OASIS.colors.primary, fontSize: 12, fontWeight: '600', textAlign: 'right' },
-  locationPromptNotice: { marginTop: 10, fontSize: 11.5, lineHeight: 18, color: '#b45309', backgroundColor: OASIS.colors.warningSoft, borderWidth: 1, borderColor: '#fde68a', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9, textAlign: 'right', width: '100%' },
-  locationPromptMessage: { marginTop: 10, fontSize: 12, lineHeight: 19, color: OASIS.colors.danger, backgroundColor: OASIS.colors.dangerSoft, borderWidth: 1, borderColor: '#fecaca', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9, textAlign: 'right', width: '100%' },
-  locationPromptHelp: { marginTop: 14, fontSize: 11.5, color: OASIS.colors.primary, fontWeight: '600', textAlign: 'center' },
+  /* ----------------------------- Location Prompt ---------------------------- */
+  locationPromptBackdrop: {
+    flex: 1,
+    backgroundColor: T.overlayDark,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  locationPromptCard: {
+    ...cardBase,
+    width: '100%',
+    maxWidth: 420,
+    alignItems: 'center',
+  },
+  locationPromptTitle: {
+    marginTop: 10,
+    fontSize: 18,
+    fontWeight: '700',
+    color: OASIS.colors.deep,
+    textAlign: 'center',
+  },
+  locationPromptText: {
+    marginTop: 8,
+    fontSize: 13,
+    lineHeight: 21,
+    color: OASIS.colors.muted,
+    textAlign: 'center',
+  },
+  locationPromptActions: {
+    width: '100%',
+    flexDirection: 'row-reverse',
+    gap: 10,
+    marginTop: 18,
+  },
+  locationPromptAllow: {
+    ...primaryBtn,
+    flex: 1,
+    padding: 13,
+  },
+  locationPromptAllowText: {
+    color: OASIS.colors.surface,
+    fontWeight: '700',
+  },
+  locationPromptLater: {
+    flex: 1,
+    backgroundColor: T.slateLine,
+    borderRadius: 14,
+    padding: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  locationPromptLaterText: {
+    color: OASIS.colors.muted,
+    fontWeight: '700',
+  },
+  locationPromptLockRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 12,
+    backgroundColor: OASIS.colors.soft,
+    borderWidth: 1,
+    borderColor: T.mintSoft,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    width: '100%',
+  },
+  locationPromptLockText: {
+    flex: 1,
+    color: OASIS.colors.primary,
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'right',
+  },
+  locationPromptNotice: {
+    marginTop: 10,
+    fontSize: 11.5,
+    lineHeight: 18,
+    color: T.warningText,
+    backgroundColor: OASIS.colors.warningSoft,
+    borderWidth: 1,
+    borderColor: T.warningBorder,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    textAlign: 'right',
+    width: '100%',
+  },
+  locationPromptMessage: {
+    marginTop: 10,
+    fontSize: 12,
+    lineHeight: 19,
+    color: OASIS.colors.danger,
+    backgroundColor: OASIS.colors.dangerSoft,
+    borderWidth: 1,
+    borderColor: T.dangerBorder,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    textAlign: 'right',
+    width: '100%',
+  },
+  locationPromptHelp: {
+    marginTop: 14,
+    fontSize: 11.5,
+    color: OASIS.colors.primary,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+
+  /* --------------------------------- Layout --------------------------------- */
   container: {
     flex: 1,
-    backgroundColor: 'transparent',
+    backgroundColor: OASIS.colors.background,
   },
+
+  /* ---------------------------------- Hero ---------------------------------- */
   hero: {
     width: '100%',
     maxWidth: 1180,
@@ -55,7 +241,7 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   heroGreetingSmall: {
-    color: '#a7f3d0',
+    color: T.mintSoft,
     fontSize: 11,
     fontWeight: '700',
     marginBottom: 2,
@@ -68,16 +254,24 @@ export const styles = StyleSheet.create({
     textAlign: 'right',
     maxWidth: 160,
   },
+  heroGreeting: {
+    color: T.mintSoft,
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'right',
+    marginTop: 10,
+    marginBottom: 2,
+  },
   loginPill: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: T.white14,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.22)',
+    borderColor: T.white22,
   },
   heroBrandSection: {
     flexDirection: 'row-reverse',
@@ -88,12 +282,12 @@ export const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: T.white10,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
+    borderColor: T.white18,
   },
   brandTextWrap: {
     alignItems: 'flex-start',
@@ -105,7 +299,7 @@ export const styles = StyleSheet.create({
     lineHeight: 17,
   },
   brandSubText: {
-    color: '#a7f3d0',
+    color: T.mintSoft,
     fontSize: 11,
     fontWeight: '700',
     lineHeight: 15,
@@ -119,10 +313,12 @@ export const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   leftActions: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 10,
   },
+
+  /* --------------------------------- Avatar --------------------------------- */
   avatarWrap: {
     position: 'relative',
   },
@@ -137,7 +333,7 @@ export const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: T.white25,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
@@ -149,64 +345,56 @@ export const styles = StyleSheet.create({
     fontWeight: '700',
   },
   avatarVerifiedBadge: {
-    position: 'absolute',
+    ...badgeBase,
     bottom: -2,
     right: -2,
     width: 16,
     height: 16,
     borderRadius: 8,
     backgroundColor: OASIS.colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: OASIS.colors.surface,
   },
+
+  /* ---------------------------------- Icons --------------------------------- */
   iconCircleBtn: {
     width: 40,
     height: 40,
     borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: T.white14,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
+    borderColor: T.white18,
     position: 'relative',
   },
   notifBadge: {
-    position: 'absolute',
+    ...badgeBase,
     top: -2,
     right: -2,
     backgroundColor: OASIS.colors.danger,
     borderRadius: 10,
     minWidth: 18,
     height: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
     paddingHorizontal: 3,
-    borderWidth: 1.5,
-    borderColor: OASIS.colors.surface,
   },
   notifBadgeText: {
     color: OASIS.colors.surface,
     fontSize: 11,
     fontWeight: '700',
   },
+
+  /* --------------------------------- Search --------------------------------- */
   searchBarContainer: {
     paddingHorizontal: 20,
   },
   searchBar: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.98)',
+    backgroundColor: T.white98,
     borderRadius: 16,
     paddingHorizontal: 14,
     height: 50,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0,
-    shadowRadius: 10,
-    elevation: 3,
     gap: 8,
+    ...shadow('#000', 3),
   },
   searchInput: {
     flex: 1,
@@ -232,18 +420,19 @@ export const styles = StyleSheet.create({
     fontWeight: '600',
   },
   fullSearchTriggerBtn: {
-    backgroundColor: OASIS.colors.soft,
+    ...subtleBtn,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#a7f3d0',
+    minHeight: 0,
   },
   fullSearchTriggerText: {
     color: OASIS.colors.primary,
     fontSize: 11,
     fontWeight: '600',
   },
+
+  /* -------------------------------- Quick Tags ------------------------------ */
   quickTagsRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
@@ -252,12 +441,12 @@ export const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   quickTagPill: {
-    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+    backgroundColor: T.white16,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.22)',
+    borderColor: T.white22,
   },
   quickTagPillActive: {
     backgroundColor: OASIS.colors.soft,
@@ -268,7 +457,7 @@ export const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#6ee7b7',
+    borderColor: T.mintBorder,
   },
   quickTagText: {
     color: OASIS.colors.soft,
@@ -280,25 +469,22 @@ export const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
   },
-  // Atmosphere & Neighborhood Pulse Bar
+
+  /* ------------------------- Atmosphere Pulse Bar --------------------------- */
   atmosphereBar: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'space-around',
-    backgroundColor: 'rgba(255,255,255,0.78)',
+    backgroundColor: T.white78,
     marginHorizontal: 16,
     marginTop: 8,
     marginBottom: 12,
     borderRadius: 14,
     paddingVertical: 10,
     paddingHorizontal: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0,
-    shadowRadius: 6,
-    elevation: 2,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.95)',
+    borderColor: T.white95,
+    ...shadow('#000', 2, 6),
   },
   atmoItem: {
     flexDirection: 'row-reverse',
@@ -316,12 +502,12 @@ export const styles = StyleSheet.create({
     backgroundColor: OASIS.colors.line,
   },
 
-  // Upgraded Stories Section
+  /* --------------------------------- Stories -------------------------------- */
   storiesContainer: {
     paddingVertical: 4,
-    backgroundColor: 'rgba(255,255,255,0.58)',
+    backgroundColor: T.white58,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.82)',
+    borderBottomColor: T.white82,
   },
   storiesHeaderRow: {
     flexDirection: 'row-reverse',
@@ -348,7 +534,7 @@ export const styles = StyleSheet.create({
     paddingVertical: 2.5,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#a7f3d0',
+    borderColor: T.mintSoft,
     gap: 4,
   },
   storiesLivePulseDot: {
@@ -363,15 +549,14 @@ export const styles = StyleSheet.create({
     color: OASIS.colors.primary,
   },
   publishStoryHeaderBtn: {
+    ...subtleBtn,
     flexDirection: 'row-reverse',
-    alignItems: 'center',
-    backgroundColor: OASIS.colors.soft,
+    gap: 4,
     paddingHorizontal: 10,
     paddingVertical: 4.5,
     borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#bbf7d0',
-    gap: 4,
+    minHeight: 0,
+    borderColor: T.mintBorderLight,
   },
   publishStoryHeaderText: {
     fontSize: 11,
@@ -426,17 +611,14 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
   },
   storySelfPlusBadge: {
-    position: 'absolute',
+    ...badgeBase,
     bottom: 0,
     right: 0,
     backgroundColor: OASIS.colors.primary,
     width: 20,
     height: 20,
     borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
     borderWidth: 2,
-    borderColor: OASIS.colors.surface,
   },
   storyImg: {
     width: '100%',
@@ -456,17 +638,13 @@ export const styles = StyleSheet.create({
     fontWeight: '700',
   },
   storyVerifiedTag: {
-    position: 'absolute',
+    ...badgeBase,
     bottom: -1,
     right: -1,
+    backgroundColor: OASIS.colors.primary,
     width: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: OASIS.colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: OASIS.colors.surface,
   },
   storyName: {
     fontSize: 11,
@@ -482,17 +660,15 @@ export const styles = StyleSheet.create({
     marginTop: 1,
   },
 
-  // Service Pill Badges
+  /* ----------------------------- Service Badges ---------------------------- */
   servicePillBadge: {
-    position: 'absolute',
+    ...badgeBase,
     top: -5,
     right: -6,
     backgroundColor: OASIS.colors.primary,
     paddingHorizontal: 4,
     paddingVertical: 1,
     borderRadius: 8,
-    borderWidth: 1.5,
-    borderColor: OASIS.colors.surface,
     zIndex: 5,
   },
   servicePillBadgeText: {
@@ -500,6 +676,8 @@ export const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
   },
+
+  /* ------------------------------- Home Search ----------------------------- */
   homeSearchWrap: {
     width: '100%',
     maxWidth: 980,
@@ -515,47 +693,40 @@ export const styles = StyleSheet.create({
     gap: 10,
     paddingHorizontal: 16,
     borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.88)',
+    backgroundColor: T.white88,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.96)',
-    shadowColor: '#0f513d',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0,
-    shadowRadius: 16,
-    elevation: 2,
+    borderColor: T.white96,
+    ...shadow(T.shadowGreen, 2, 16),
   },
   homeSearchInput: {
     flex: 1,
     minWidth: 0,
     paddingVertical: 12,
-    color: '#102a22',
+    color: T.inkDark,
     fontSize: 14,
     fontWeight: '600',
   },
   homeSearchHint: {
     marginTop: 8,
     paddingHorizontal: 4,
-    color: '#82918a',
+    color: T.slateMuted,
     fontSize: 11,
     fontWeight: '600',
     textAlign: 'right',
   },
+
+  /* ----------------------------- Emergency Card ---------------------------- */
   emergencyHomeCard: {
+    ...cardBase,
     width: '94%',
     maxWidth: 948,
     alignSelf: 'center',
     marginHorizontal: 0,
     marginTop: 12,
     backgroundColor: 'rgba(255,247,247,0.94)',
-    borderRadius: 14,
     padding: 15,
-    borderWidth: 1,
-    borderColor: '#fecaca',
-    shadowColor: '#991b1b',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0,
-    shadowRadius: 12,
-    elevation: 2,
+    borderColor: T.dangerBorder,
+    ...shadow(T.shadowRed, 2, 12),
   },
   emergencyHomeHeader: {
     flexDirection: 'row-reverse',
@@ -584,12 +755,12 @@ export const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 10,
     borderWidth: 1,
-    borderColor: '#fecaca',
+    borderColor: T.dangerBorder,
   },
   emergencyQuestionTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#991b1b',
+    color: T.dangerText,
     textAlign: 'right',
   },
   emergencyQuestionSub: {
@@ -598,17 +769,15 @@ export const styles = StyleSheet.create({
     textAlign: 'right',
     marginTop: 3,
   },
+
+  /* ------------------------------- More Banner ----------------------------- */
   moreBannerCard: {
     marginHorizontal: 16,
     marginTop: 14,
     marginBottom: 4,
     borderRadius: 14,
     overflow: 'hidden',
-    shadowColor: OASIS.colors.primary,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0,
-    shadowRadius: 8,
-    elevation: 3,
+    ...shadow(OASIS.colors.primary, 3, 8),
   },
   moreBannerGrad: {
     flexDirection: 'row-reverse',
@@ -626,7 +795,7 @@ export const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    backgroundColor: T.white18,
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 12,
@@ -658,17 +827,15 @@ export const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 12,
     gap: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0,
-    shadowRadius: 4,
-    elevation: 2,
+    ...shadow('#000', 2, 4),
   },
   moreBannerBtnText: {
     color: OASIS.colors.deep,
     fontSize: 12,
     fontWeight: '700',
   },
+
+  /* ------------------------------ Services Grid ---------------------------- */
   servicesGrid: {
     flexDirection: 'row-reverse',
     justifyContent: 'space-between',
@@ -687,11 +854,7 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0,
-    shadowRadius: 4,
-    elevation: 1,
+    ...shadow('#000', 1, 4),
   },
   serviceLabel: {
     fontSize: 11,
@@ -699,6 +862,8 @@ export const styles = StyleSheet.create({
     color: OASIS.colors.ink,
     textAlign: 'center',
   },
+
+  /* --------------------------------- Feed ---------------------------------- */
   feedSection: {
     width: '100%',
     maxWidth: 980,
@@ -707,28 +872,55 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   feedIntro: {
+    ...cardBase,
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: 'rgba(255,255,255,0.86)',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.96)',
+    backgroundColor: T.white86,
+    borderColor: T.white96,
     paddingHorizontal: 16,
     paddingVertical: 14,
     marginBottom: 10,
-    shadowColor: OASIS.colors.deep,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0,
-    shadowRadius: 16,
-    elevation: 2,
+    ...shadow(OASIS.colors.deep, 2, 16),
   },
-  feedIntroCopy: { alignItems: 'flex-end', flex: 1 },
-  feedIntroEyebrow: { color: OASIS.colors.primary, fontSize: 11, fontWeight: '700' },
-  feedIntroTitle: { color: OASIS.colors.ink, fontSize: 18, fontWeight: '700', marginTop: 2 },
-  feedIntroSubtitle: { color: OASIS.colors.muted, fontSize: 11, fontWeight: '700', marginTop: 3 },
-  feedIntroBadge: { width: 48, height: 48, borderRadius: 16, backgroundColor: OASIS.colors.soft, alignItems: 'center', justifyContent: 'center', marginLeft: 12 },
-  feedIntroCount: { color: OASIS.colors.primary, fontSize: 11, fontWeight: '700', marginTop: 1 },
+  feedIntroCopy: {
+    alignItems: 'flex-end',
+    flex: 1,
+  },
+  feedIntroEyebrow: {
+    color: OASIS.colors.primary,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  feedIntroTitle: {
+    color: OASIS.colors.ink,
+    fontSize: 18,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  feedIntroSubtitle: {
+    color: OASIS.colors.muted,
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 3,
+  },
+  feedIntroBadge: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: OASIS.colors.soft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 12,
+  },
+  feedIntroCount: {
+    color: OASIS.colors.primary,
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 1,
+  },
+
+  /* -------------------------------- Feed Tabs ------------------------------ */
   floatingTabs: {
     flexDirection: 'row-reverse',
     gap: 8,
@@ -775,16 +967,15 @@ export const styles = StyleSheet.create({
   fTabTextActive: {
     color: OASIS.colors.surface,
   },
-  // Empty state & FAB
+
+  /* ---------------------------- Empty & Skeleton --------------------------- */
   emptyContainer: {
+    ...cardBase,
     alignItems: 'center',
     paddingVertical: 24,
     paddingHorizontal: 20,
-    backgroundColor: OASIS.colors.surface,
-    borderRadius: 14,
     marginTop: 10,
-    borderWidth: 1,
-    borderColor: '#f1f5f9',
+    borderColor: T.slateLine,
   },
   emptyIconBg: {
     width: 64,
@@ -810,27 +1001,36 @@ export const styles = StyleSheet.create({
     marginBottom: 16,
   },
   emptyAskBtn: {
-    backgroundColor: OASIS.colors.primary,
+    ...primaryBtn,
     paddingHorizontal: 18,
     paddingVertical: 10,
-    borderRadius: 14,
+    minHeight: 0,
   },
   emptyAskBtnText: {
     color: OASIS.colors.surface,
     fontSize: 13,
     fontWeight: '600',
   },
+  skeletonCard: {
+    ...cardBase,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    gap: 10,
+  },
+  skeletonLine: {
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: OASIS.colors.line,
+  },
+
+  /* --------------------------------- FAB ----------------------------------- */
   fabContainer: {
     position: 'absolute',
     bottom: Platform.OS === 'ios' ? 92 : 78,
-    left: 20,
+    right: 20,
     zIndex: 99,
     borderRadius: 14,
-    shadowColor: OASIS.colors.primary,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0,
-    shadowRadius: 16,
-    elevation: 8,
+    ...shadow(OASIS.colors.primary, 8, 16),
   },
   fabBtn: {
     borderRadius: 14,
@@ -843,32 +1043,112 @@ export const styles = StyleSheet.create({
     borderRadius: 14,
     gap: 8,
     borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.4)',
+    borderColor: T.white40,
   },
   fabText: {
     color: OASIS.colors.surface,
     fontSize: 14,
     fontWeight: '700',
   },
+
+  /* ------------------------------ Error Banner ----------------------------- */
+  errorBanner: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: OASIS.colors.dangerSoft,
+    borderWidth: 1,
+    borderColor: T.dangerBorder,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  errorBannerText: {
+    flex: 1,
+    color: T.dangerText,
+    fontSize: 13,
+    fontWeight: '700',
+    textAlign: 'right',
+  },
+  errorRetryBtn: {
+    backgroundColor: OASIS.colors.danger,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  errorRetryText: {
+    color: OASIS.colors.surface,
+    fontWeight: '600',
+    fontSize: 12,
+  },
+
+  /* ------------------------------- Load More ------------------------------- */
+  loadMoreBtn: {
+    alignSelf: 'center',
+    marginVertical: 14,
+    paddingHorizontal: 22,
+    paddingVertical: 11,
+    borderRadius: 999,
+    backgroundColor: OASIS.colors.soft,
+    borderWidth: 1,
+    borderColor: T.mintSoft,
+  },
+  loadMoreText: {
+    color: OASIS.colors.primary,
+    fontWeight: '600',
+    fontSize: 13,
+  },
+
+  /* -------------------------- Feed Category Header ------------------------- */
+  feedCategoryHeaderBtn: {
+    ...cardBase,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    marginBottom: 12,
+    ...shadow('#000', 1, 4),
+  },
+  feedCategoryHeaderRight: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 8,
+  },
+  feedCategoryHeaderTitle: {
+    fontSize: 13.5,
+    fontWeight: '600',
+    color: OASIS.colors.ink,
+  },
+  feedCategoryHeaderLeft: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 4,
+  },
+  feedCategoryHeaderLink: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: OASIS.colors.primary,
+  },
+
+  /* ------------------------------- Location Gate --------------------------- */
   locationGateOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(2, 6, 23, 0.62)',
+    backgroundColor: T.overlayDeep,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 14,
   },
   locationGateCard: {
+    ...cardBase,
     width: '100%',
     maxWidth: 430,
-    backgroundColor: OASIS.colors.surface,
-    borderRadius: 14,
     padding: 16,
     alignItems: 'stretch',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 14 },
-    shadowOpacity: 0,
-    shadowRadius: 28,
-    elevation: 12,
+    ...shadow('#000', 12, 28),
   },
   locationGateIcon: {
     alignSelf: 'center',
@@ -923,12 +1203,9 @@ export const styles = StyleSheet.create({
     marginBottom: 12,
   },
   locationGatePrimary: {
+    ...primaryBtn,
     minHeight: 52,
     borderRadius: 16,
-    backgroundColor: OASIS.colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 16,
   },
   locationGatePrimaryText: {
     color: OASIS.colors.surface,
@@ -936,65 +1213,46 @@ export const styles = StyleSheet.create({
     fontWeight: '700',
   },
   locationGateRequired: {
-    color: '#94a3b8',
+    color: T.slatePlaceholder,
     fontSize: 11,
     textAlign: 'center',
     marginTop: 11,
   },
 
+  /* ------------------------------- Bottom Nav ------------------------------ */
   bottomNavWrapper: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
   },
+  emptyIllustrationWrap: {
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginBottom: 12,
+},
 
-
-
-  skeletonCard: { backgroundColor: OASIS.colors.surface, borderRadius: 14, padding: 14, marginHorizontal: 16, marginBottom: 12, gap: 10 },
-  skeletonLine: { height: 12, borderRadius: 6, backgroundColor: OASIS.colors.line },
-  errorBanner: { marginHorizontal: 16, marginTop: 12, padding: 14, borderRadius: 16, backgroundColor: OASIS.colors.dangerSoft, borderWidth: 1, borderColor: '#fecaca', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-  errorBannerText: { flex: 1, color: '#991b1b', fontSize: 13, fontWeight: '700', textAlign: 'right' },
-  errorRetryBtn: { backgroundColor: OASIS.colors.danger, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8 },
-  errorRetryText: { color: OASIS.colors.surface, fontWeight: '600', fontSize: 12 },
-  loadMoreBtn: { alignSelf: 'center', marginVertical: 14, paddingHorizontal: 22, paddingVertical: 11, borderRadius: 999, backgroundColor: OASIS.colors.soft, borderWidth: 1, borderColor: '#a7f3d0' },
-  loadMoreText: { color: OASIS.colors.primary, fontWeight: '600', fontSize: 13 },
-  heroGreeting: { color: '#a7f3d0', fontSize: 14, fontWeight: '600', textAlign: 'right', marginTop: 10, marginBottom: 2 },
-  feedCategoryHeaderBtn: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: OASIS.colors.surface,
-    borderWidth: 1,
-    borderColor: OASIS.colors.line,
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  feedCategoryHeaderRight: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 8,
-  },
-  feedCategoryHeaderTitle: {
-    fontSize: 13.5,
-    fontWeight: '600',
-    color: OASIS.colors.ink,
-  },
-  feedCategoryHeaderLeft: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 4,
-  },
-  feedCategoryHeaderLink: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: OASIS.colors.primary,
-  },
+// أضف هذه إلى StyleSheet
+bannerFull: {
+  aspectRatio: 2.8,
+  minHeight: undefined,
+  maxHeight: undefined,
+},
+bannerFullWithRatio: {
+  minHeight: undefined,
+  maxHeight: undefined,
+},
+bannerMixed: {
+  backgroundColor: '#EDF5EF', // fallback
+},
+counter: {
+  fontSize: 10,
+},
+dotActive: {
+  width: 15,
+},
+headerDot: {
+  height: 5,
+  borderRadius: 5,
+},
 });

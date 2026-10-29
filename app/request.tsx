@@ -1,3 +1,7 @@
+import { DiscussionComposer } from '@/components/community/DiscussionComposer';
+import { discussionStyles } from '@/components/community/discussionStyles';
+import { useTheme } from '@/context/ThemeContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PROFILE_READ_FIELDS } from '@/lib/profileFields';
 import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
@@ -77,7 +81,7 @@ function getRequestTypeInfo(type?: string) {
 const QUICK_REPLY_TEMPLATES = [
   'أقدر أساعدك اليوم إن شاء الله 🤝',
   'أنا قريب بالحي وأقدر أمرك 🚗',
-  'الأداة متوفرة عندي وتفضل استعرها 🛠️',
+  'ممكن توضح الوقت المناسب والتفاصيل؟',
   'أنا بالخدمة وجاهز، تواصل معي 💬',
 ];
 
@@ -90,13 +94,14 @@ const COMPLETION_TEMPLATES = [
 
 export default function Request() {
   const bottomNavInset = useBottomNavInset();
+  const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
   const { showIsland } = useDynamicIsland();
   const [viewerProfile, setViewerProfile] = useState<any>(null);
   const { id } = useLocalSearchParams<{ id: string }>();
   const [request, setRequest] = useState<any>(null);
   const [requester, setRequester] = useState<any>(null);
   const [offers, setOffers] = useState<any[]>([]);
-  const [autoSuggestedCount, setAutoSuggestedCount] = useState(0);
   const [message, setMessage] = useState('');
   const [me, setMe] = useState('');
   const [loading, setLoading] = useState(true);
@@ -158,7 +163,6 @@ export default function Request() {
       // Only real neighbour offers are shown. Auto-generated matcher rows are ignored.
       const allMatches = oData.data ?? [];
       const realOffers = allMatches.filter((o: any) => !isAutoSuggestedOffer(o));
-      setAutoSuggestedCount(allMatches.length - realOffers.length);
       setOffers(realOffers);
 
       const { data: conv } = await supabase
@@ -201,6 +205,7 @@ export default function Request() {
   };
 
   async function sendOffer() {
+    if (submittingOffer || !message.trim()) return;
     if (!me) return requireAccount('سجّل الدخول أو أنشئ حساباً لتقديم المساعدة.');
     if (me === request?.requester_id) return Alert.alert('تنبيه', 'أنت صاحب هذا الطلب.');
 
@@ -209,7 +214,7 @@ export default function Request() {
       const r = await supabase.from('help_matches').insert({
         request_id: id,
         helper_id: me,
-        message: message.trim() || 'أقدر أساعدك في هذا الطلب 🤝',
+        message: message.trim(),
         status: 'proposed',
       });
 
@@ -597,7 +602,7 @@ export default function Request() {
   const myOffer = offers.find(o => o.helper_id === me);
 
   return (
-    <View style={[styles.container, { backgroundColor: 'transparent' }]}>
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined} keyboardVerticalOffset={0} style={[styles.container, { backgroundColor: 'transparent' }]}>
       <AppHeader
         variant="sub"
         title={request.request_type === 'carpooling' ? 'توصيل المدارس' : 'طلب فزعة بالحي'}
@@ -626,16 +631,22 @@ export default function Request() {
       />
 
       <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingBottom: bottomNavInset + 40 }]}
+        contentContainerStyle={[discussionStyles.page, { paddingBottom: bottomNavInset + 24 }]}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         showsVerticalScrollIndicator={false}
       >
         {request.request_type === 'carpooling' ? <View style={{ backgroundColor: '#ECFDF5', borderColor: '#BBE7CE', borderWidth: 1, borderRadius: 15, padding: 14, marginBottom: 12, gap: 6, flexDirection: 'row-reverse', alignItems: 'flex-start' }}><GraduationCap size={21} color="#047857" /><View style={{ flex: 1, alignItems: 'flex-end' }}><Text style={{ color: '#064E3B', fontWeight: '800', fontSize: 14 }}>تنسيق توصيل المدارس</Text><Text style={{ color: '#376454', fontSize: 12, lineHeight: 21, textAlign: 'right' }}>المنشور مخصص لترتيب التوصيل فقط. لا تشارك بيانات الأطفال أو موقع المنزل أو وقت الالتقاء العلني؛ تأكد من الجهة والسائق واتفق برسائل خاصة.</Text></View></View> : null}
         <TwitterInquiryCard detailMode type="request" data={{ ...request, profiles: requester, answers_count: offers.length }} currentUserId={me || null} currentUserProfile={viewerProfile} isGuest={!me} onQuickReply={async () => {}} onToast={message => showIsland(message, undefined, 'success')} onDeleted={() => void load()} />
-        <View style={{ backgroundColor: OASIS.colors.surface, borderRadius: 14, padding: 16, gap: 12, borderWidth: 1, borderColor: OASIS.colors.line }}>
-          {Boolean(request.notes) && <Text style={styles.notesText}>{request.notes}</Text>}
-          {Number(request.budget) > 0 && <Text style={styles.budgetValue}>المكافأة المقترحة: {request.budget} ر.س</Text>}
-          <Pressable oasisKind="action" onPress={() => router.push({ pathname: '/map', params: { district: request.district, city: request.city } })} accessibilityRole="button" style={styles.openMapBtn}><MapPin size={16} color="#176b52" /><Text style={styles.openMapBtnText}>عرض الحي على الخريطة</Text></Pressable>
-        </View>
+        <OasisSurface style={[discussionStyles.card, { borderColor: colors.line }]}>
+          <View style={discussionStyles.sectionHeader}><Info size={18} color={colors.primary} /><Text style={[discussionStyles.title, { color: colors.ink }]}>تفاصيل تساعدك على التنسيق</Text></View>
+          {!!request.notes && <View style={[styles.detailNote, { backgroundColor: colors.soft }]}><Text style={[discussionStyles.hint, { color: colors.muted }]}>ملاحظات صاحب الطلب</Text><Text style={[styles.notesText, { color: colors.ink }]}>{request.notes}</Text></View>}
+          <View style={[styles.detailNote, { backgroundColor: colors.soft }]}>
+            <View style={discussionStyles.sectionHeader}><Banknote size={18} color={colors.primary} /><Text style={[discussionStyles.hint, { color: colors.muted }]}>{Number(request.budget) > 0 ? 'المكافأة المقترحة' : 'المكافأة'}</Text></View>
+            <Text style={[styles.detailValue, { color: colors.primary }]}>{Number(request.budget) > 0 ? `${Number(request.budget).toLocaleString('ar-SA')} ر.س` : 'بالتنسيق مع صاحب الطلب'}</Text>
+          </View>
+          <Pressable oasisKind="plain" onPress={() => router.push({ pathname: '/map', params: { district: request.district, city: request.city } })} accessibilityRole="button" style={[styles.openMapBtn, { backgroundColor: colors.surface }]}><MapPin size={17} color={colors.primary} /><Text style={[styles.openMapBtnText, { flex: 1, textAlign: 'right' }]}>عرض الحي على الخريطة</Text><ChevronLeft size={16} color={colors.muted} /></Pressable>
+        </OasisSurface>
         <View style={styles.bodyContainer}>
           {/* Celebratory Banner if completed */}
           {request.status === 'completed' && (
@@ -696,7 +707,7 @@ export default function Request() {
           )}
 
           {/* Offers Received Section */}
-          <OasisSurface oasisSurface="card" style={styles.card}>
+          <OasisSurface oasisSurface="card" style={[discussionStyles.card, { borderColor: colors.line }]}>
             <View style={styles.cardHeaderRow}>
               <View style={styles.cardHeaderIconBox}>
                 <MessageSquare size={18} color={OASIS.colors.primary} />
@@ -707,14 +718,6 @@ export default function Request() {
               </View>
             </View>
 
-            {autoSuggestedCount > 0 && (
-              <View style={styles.autoSuggestionNote}>
-                <Info size={14} color="#0369a1" />
-                <Text style={styles.autoSuggestionNoteText}>
-                  تم تجاهل {autoSuggestedCount} مطابقة آلية — لا تُرسل العروض تلقائياً، ويظهر هنا فقط من أرسل فزعته بنفسه من الجيران الحقيقيين.
-                </Text>
-              </View>
-            )}
 
             {offers.length === 0 ? (
               <View style={styles.noOffersBox}>
@@ -734,7 +737,7 @@ export default function Request() {
                       <View style={styles.offerAvatarCircle}>
                         <User size={14} color={OASIS.colors.primary} />
                       </View>
-                      <View>
+                      <View style={{ flex: 1, minWidth: 0 }}>
                         <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}>
                           <Text style={styles.offerHelperName}>
                             {o.profiles?.display_name || `@${o.profiles?.username || 'فاعل خير'}`}
@@ -833,7 +836,7 @@ export default function Request() {
 
           {/* Interactive Offer Submission Form (For Neighbors when Request is Open) */}
           {!isOwner && !myOffer && request.status === 'open' && me && (
-            <OasisSurface oasisSurface="card" style={styles.offerFormCard}>
+            <OasisSurface oasisSurface="card" style={[discussionStyles.card, { borderColor: colors.line }]}>
               <View style={styles.cardHeaderRow}>
                 <View style={styles.cardHeaderIconBox}>
                   <HeartHandshake size={18} color={OASIS.colors.primary} />
@@ -842,7 +845,7 @@ export default function Request() {
               </View>
 
               <Text style={styles.offerFormSub}>
-                اختر رداً سريعاً بنقرة واحدة أو اكتب تفاصيل عرضك لصاحب الطلب:
+                وضّح كيف تقدر تساعد والوقت المناسب لك.
               </Text>
 
               {/* Quick Reply Chips */}
@@ -858,29 +861,7 @@ export default function Request() {
                 ))}
               </View>
 
-              <TextInput
-                style={styles.offerInput}
-                value={message}
-                onChangeText={setMessage}
-                placeholder="اكتب رسالتك لجارك... (مثال: أقدر أساعدك وأنا متاح الليلة)"
-                placeholderTextColor="#94a3b8"
-                multiline
-              />
-
-              <Pressable oasisKind="action"
-                style={[styles.sendOfferBtn, submittingOffer && { opacity: 0.6 }]}
-                onPress={sendOffer}
-                disabled={submittingOffer}
-              >
-                {submittingOffer ? (
-                  <ActivityIndicator size="small" color={OASIS.colors.surface} />
-                ) : (
-                  <>
-                    <Send size={16} color={OASIS.colors.surface} />
-                    <Text style={styles.sendOfferBtnText}>إرسال عرض المساعدة للجار</Text>
-                  </>
-                )}
-              </Pressable>
+              <DiscussionComposer value={message} onChangeText={setMessage} onSend={() => void sendOffer()} placeholder="كيف تقدر تساعد جارك؟" sendLabel="إرسال عرض المساعدة" busy={submittingOffer} />
             </OasisSurface>
           )}
 
@@ -907,7 +888,7 @@ export default function Request() {
             </View>
             <Text style={styles.guidelinesItem}>• التنسيق المباشر واللقاء في أماكن معروفة ومدخل الحي.</Text>
             <Text style={styles.guidelinesItem}>• الحفاظ على الأمانات والأدوات المعارة وردّها بحالة ممتازة.</Text>
-            <Text style={styles.guidelinesItem}>• التعامل بأخلاق الإسلام وحسن الجوار والإخلاص في المساعدة.</Text>
+            <Text style={styles.guidelinesItem}>• شارك الموقع وبيانات التواصل في المحادثة الخاصة فقط.</Text>
           </OasisSurface>
         </View>
       </ScrollView>
@@ -919,11 +900,13 @@ export default function Request() {
         animationType="fade"
         onRequestClose={() => setCompleteModalOpen(false)}
       >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined} style={{ flex: 1 }}>
         <Pressable
-          style={styles.modalOverlay}
+          style={[styles.modalOverlay, { paddingTop: Math.max(insets.top, 16), paddingBottom: Math.max(insets.bottom, 16) }]}
           onPress={() => setCompleteModalOpen(false)}
         >
-          <Pressable oasisKind="card" style={styles.appreciationModalCard} onPress={e => e.stopPropagation?.()}>
+          <Pressable oasisKind="plain" style={styles.appreciationModalCard} onPress={e => e.stopPropagation?.()}>
+            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.modalContent}>
             <View style={styles.appreciationModalHeader}>
               <Pressable oasisKind="icon"
                 onPress={() => setCompleteModalOpen(false)}
@@ -990,8 +973,10 @@ export default function Request() {
                 </>
               )}
             </Pressable>
+            </ScrollView>
           </Pressable>
         </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Modal for Editing Request */}
@@ -1002,12 +987,13 @@ export default function Request() {
         onRequestClose={() => setIsEditModalOpen(false)}
       >
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}
+          style={[styles.modalOverlay, { paddingTop: Math.max(insets.top, 16), paddingBottom: Math.max(insets.bottom, 16), paddingHorizontal: Math.max(insets.left, insets.right, 16) }]}
         >
           <OasisSurface oasisSurface="sheet" style={styles.modalCard}>
+            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <View>
+              <View style={{ flex: 1, minWidth: 0 }}>
                 <Text style={styles.modalTitle}>تعديل طلب الفزعة</Text>
                 <Text style={styles.modalSubtitle}>
                   محاولة {editCount + 1} من {MAX_EDITS} (متبقي بعدها {Math.max(0, MAX_EDITS - (editCount + 1))})
@@ -1087,21 +1073,21 @@ export default function Request() {
                 )}
               </Pressable>
             </View>
+            </ScrollView>
           </OasisSurface>
         </KeyboardAvoidingView>
       </Modal>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  detailNote: { padding: 12, borderRadius: 14, gap: 6 },
+  detailValue: { fontSize: 18, lineHeight: 28, fontWeight: '700', textAlign: 'right' },
   srOnly: { position: 'absolute', width: 1, height: 1, opacity: 0 },
   container: {
     flex: 1,
     backgroundColor: '#f5f7f6',
-  },
-  scroll: {
-    flexGrow: 1, width: '100%', maxWidth: 760, alignSelf: 'center', paddingHorizontal: 16, paddingTop: 12, gap: 12,
   },
   center: {
     flex: 1,
@@ -1139,6 +1125,8 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   headerActionBtn: {
+    minWidth: 44,
+    minHeight: 44,
     width: 36,
     height: 36,
     borderRadius: 14,
@@ -1302,7 +1290,7 @@ const styles = StyleSheet.create({
   },
   bodyContainer: {
     padding: 0,
-    gap: 12,
+    gap: 16,
   },
   completedStatusCard: {
     flexDirection: 'row-reverse',
@@ -1472,6 +1460,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   cardTitle: {
+    flexShrink: 1,
+    lineHeight: 22,
     color: OASIS.colors.ink,
     fontSize: 15,
     fontWeight: '700',
@@ -1496,7 +1486,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   notesText: {
-    flex: 1,
+    lineHeight: 23,
     fontSize: 12,
     color: OASIS.colors.muted,
     fontWeight: '600',
@@ -1601,6 +1591,8 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   ownerActionRow: {
+    flexWrap: 'wrap',
+    rowGap: 10,
     flexDirection: 'row-reverse',
     gap: 8,
     marginTop: 4,
@@ -1669,6 +1661,8 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   myOfferStatusRow: {
+    flexWrap: 'wrap',
+    rowGap: 10,
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 8,
@@ -1701,6 +1695,8 @@ const styles = StyleSheet.create({
     color: '#15803d',
   },
   goToChatBtn: {
+    minHeight: 44,
+    paddingHorizontal: 12,
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1711,11 +1707,16 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   goToChatBtnText: {
+    flexShrink: 1,
+    textAlign: 'right',
+    lineHeight: 22,
     fontSize: 12.5,
     fontWeight: '700',
     color: OASIS.colors.surface,
   },
   sectionTitleWithCount: {
+    flex: 1,
+    minWidth: 0,
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 8,
@@ -1732,28 +1733,11 @@ const styles = StyleSheet.create({
     borderColor: '#a7f3d0',
   },
   noOffersBox: {
+    minHeight: 180,
+    justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: 16,
     gap: 8,
-  },
-  autoSuggestionNote: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: OASIS.colors.infoSoft,
-    borderWidth: 1,
-    borderColor: '#bae6fd',
-    borderRadius: 14,
-    padding: 12,
-    marginBottom: 12,
-  },
-  autoSuggestionNoteText: {
-    flex: 1,
-    color: '#0369a1',
-    fontSize: 11.5,
-    lineHeight: 17,
-    fontWeight: '700',
-    textAlign: 'right',
   },
   noOffersTitle: {
     color: OASIS.colors.ink,
@@ -1768,18 +1752,23 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   offerItem: {
-    borderTopWidth: 1,
-    borderColor: '#f1f5f9',
-    paddingTop: 14,
-    marginTop: 12,
+    borderWidth: 1,
+    borderColor: OASIS.colors.line,
+    borderRadius: 16,
+    padding: 14,
+    gap: 8,
   },
   offerHeader: {
+    flexWrap: 'wrap',
+    rowGap: 10,
     flexDirection: 'row-reverse',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
   },
   offerHelperInfo: {
+    flex: 1,
+    minWidth: 120,
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 8,
@@ -1795,6 +1784,9 @@ const styles = StyleSheet.create({
     borderColor: '#a7f3d0',
   },
   offerHelperName: {
+    flexShrink: 1,
+    textAlign: 'right',
+    lineHeight: 22,
     color: OASIS.colors.ink,
     fontSize: 13.5,
     fontWeight: '700',
@@ -1829,7 +1821,7 @@ const styles = StyleSheet.create({
     color: OASIS.colors.primary,
   },
   offerBubble: {
-    backgroundColor: '#f5f7f6',
+    backgroundColor: OASIS.colors.soft,
     borderRadius: 12,
     padding: 10,
     borderWidth: 1,
@@ -1838,11 +1830,13 @@ const styles = StyleSheet.create({
   },
   offerMessage: {
     color: OASIS.colors.ink,
-    fontSize: 13,
-    lineHeight: 20,
+    fontSize: 14,
+    lineHeight: 25,
     textAlign: 'right',
   },
   acceptBtn: {
+    minHeight: 44,
+    paddingHorizontal: 12,
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1853,6 +1847,9 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   acceptBtnText: {
+    flexShrink: 1,
+    textAlign: 'right',
+    lineHeight: 22,
     color: OASIS.colors.surface,
     fontSize: 12.5,
     fontWeight: '700',
@@ -1862,10 +1859,15 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   offerActionsRow: {
+    flexWrap: 'wrap',
+    rowGap: 10,
     flexDirection: 'row-reverse',
     gap: 8,
   },
   openChatBtn: {
+    minWidth: 150,
+    minHeight: 44,
+    paddingHorizontal: 12,
     flex: 1,
     flexDirection: 'row-reverse',
     alignItems: 'center',
@@ -1878,11 +1880,17 @@ const styles = StyleSheet.create({
     borderColor: '#a7f3d0',
   },
   openChatBtnText: {
+    flexShrink: 1,
+    textAlign: 'right',
+    lineHeight: 22,
     color: OASIS.colors.primary,
     fontWeight: '700',
     fontSize: 12,
   },
   shareLocationBtn: {
+    minWidth: 150,
+    minHeight: 44,
+    paddingHorizontal: 12,
     flex: 1,
     flexDirection: 'row-reverse',
     alignItems: 'center',
@@ -1893,11 +1901,15 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   shareLocationBtnText: {
+    flexShrink: 1,
+    textAlign: 'right',
+    lineHeight: 22,
     color: OASIS.colors.surface,
     fontWeight: '700',
     fontSize: 12,
   },
   completeWithCoffeeBtn: {
+    minHeight: 44,
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1910,6 +1922,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   completeWithCoffeeBtnText: {
+    flexShrink: 1,
+    textAlign: 'right',
+    lineHeight: 22,
     fontSize: 12.5,
     fontWeight: '700',
     color: '#78350f',
@@ -1927,6 +1942,9 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   completedHelperBannerText: {
+    flexShrink: 1,
+    textAlign: 'right',
+    lineHeight: 22,
     fontSize: 12,
     fontWeight: '600',
     color: OASIS.colors.deep,
@@ -1945,6 +1963,8 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   offerFormTitle: {
+    flexShrink: 1,
+    lineHeight: 22,
     color: OASIS.colors.ink,
     fontSize: 15,
     fontWeight: '700',
@@ -1962,6 +1982,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   quickChip: {
+    maxWidth: '100%',
     backgroundColor: '#f5f7f6',
     paddingHorizontal: 10,
     paddingVertical: 6,
@@ -1970,39 +1991,12 @@ const styles = StyleSheet.create({
     borderColor: OASIS.colors.line,
   },
   quickChipText: {
+    flexShrink: 1,
+    textAlign: 'right',
+    lineHeight: 22,
     fontSize: 11.5,
     fontWeight: '700',
     color: OASIS.colors.ink,
-  },
-  offerInput: {
-    backgroundColor: '#f5f7f6',
-    borderRadius: 14,
-    padding: 12,
-    textAlign: 'right',
-    fontSize: 13,
-    color: OASIS.colors.ink,
-    borderWidth: 1.5,
-    borderColor: OASIS.colors.line,
-    minHeight: 44,
-  },
-  sendOfferBtn: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: OASIS.colors.primary,
-    borderRadius: 14,
-    paddingVertical: 12,
-    shadowColor: OASIS.colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  sendOfferBtnText: {
-    color: OASIS.colors.surface,
-    fontSize: 13,
-    fontWeight: '700',
   },
   guestOfferPrompt: {
     flexDirection: 'row-reverse',
@@ -2029,8 +2023,8 @@ const styles = StyleSheet.create({
   },
   guidelinesCard: {
     backgroundColor: OASIS.colors.surface,
-    borderRadius: 16,
-    padding: 14,
+    borderRadius: 22,
+    padding: 16,
     borderWidth: 1,
     borderColor: OASIS.colors.line,
     gap: 6,
@@ -2042,6 +2036,9 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   guidelinesTitle: {
+    flexShrink: 1,
+    textAlign: 'right',
+    lineHeight: 22,
     fontSize: 12.5,
     fontWeight: '700',
     color: OASIS.colors.ink,
@@ -2060,12 +2057,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 14,
   },
+  modalContent: { padding: 18, gap: 14 },
   appreciationModalCard: {
+    maxHeight: '90%',
+    overflow: 'hidden',
     width: '100%',
-    maxWidth: 440,
+    maxWidth: 520,
     backgroundColor: OASIS.colors.surface,
-    borderRadius: 14,
-    padding: 14,
+    borderRadius: 24,
+    padding: 0,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0,
@@ -2076,6 +2076,10 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   modalCloseBtn: {
+    minHeight: 44,
+    minWidth: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
     alignSelf: 'flex-start',
     padding: 6,
     borderRadius: 12,
@@ -2137,6 +2141,9 @@ const styles = StyleSheet.create({
     borderColor: OASIS.colors.warning,
   },
   appreciationChipText: {
+    flexShrink: 1,
+    textAlign: 'right',
+    lineHeight: 22,
     fontSize: 11.5,
     fontWeight: '700',
     color: OASIS.colors.muted,
@@ -2172,6 +2179,9 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   appreciationSendBtnText: {
+    flexShrink: 1,
+    textAlign: 'right',
+    lineHeight: 22,
     color: OASIS.colors.surface,
     fontSize: 13,
     fontWeight: '700',
@@ -2273,11 +2283,12 @@ const styles = StyleSheet.create({
     color: OASIS.colors.danger,
   },
   modalCard: {
+    width: '100%',
+    maxWidth: 520,
+    overflow: 'hidden',
     backgroundColor: OASIS.colors.surface,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 14,
-    gap: 16,
+    borderRadius: 24,
+    padding: 0,
     maxHeight: '90%',
   },
   modalHeader: {

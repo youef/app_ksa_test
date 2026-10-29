@@ -1,0 +1,22 @@
+[
+  {
+    "integrity": {
+      "events": {
+        "count": 0,
+        "digest": "d41d8cd98f00b204e9800998ecf8427e"
+      },
+      "services": {
+        "count": 6,
+        "digest": "f4db85b166ae2d7f14e76568b037aa12"
+      },
+      "businesses": {
+        "count": 361,
+        "digest": "b3f08054381205350efea11ca5d5f950"
+      },
+      "marketplace_items": {
+        "count": 4,
+        "digest": "61285302f883108eabf761be2e7a3d22"
+      }
+    }
+  }
+]

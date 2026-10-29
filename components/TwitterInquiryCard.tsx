@@ -436,7 +436,7 @@ export default function TwitterInquiryCard({
   }
 
   return (
-    <OasisSurface oasisSurface="card" style={[s.xCard, isDark && { backgroundColor: colors.surface, borderColor: colors.line }, !expanded && s.xCardCollapsed, isEmergency && s.xCardEmergency, isToolSharing && s.xCardToolSharing]}>
+    <OasisSurface oasisSurface="card" style={[s.xCard, detailMode && s.xCardDetail, isDark && { backgroundColor: colors.surface, borderColor: colors.line }, !expanded && s.xCardCollapsed, isEmergency && s.xCardEmergency, isToolSharing && s.xCardToolSharing]}>
       {/* Top Header */}
       <View style={[s.xHeader, isDark && { borderBottomColor: colors.line }]}>
         <Pressable
@@ -807,9 +807,9 @@ const s = StyleSheet.create({
   editInput: { borderWidth: 1, borderColor: '#dbe5df', borderRadius: 12, padding: 12, color: '#173c2c', textAlign: 'right', fontSize: 14 },
   xCard: {
     backgroundColor: OASIS.colors.surface,
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 14,
+    borderRadius: 22,
+    padding: 16,
+    marginBottom: 16,
     borderWidth: 1,
     borderColor: OASIS.colors.line,
     shadowColor: OASIS.colors.ink,
@@ -819,6 +819,7 @@ const s = StyleSheet.create({
     elevation: 3,
   },
   // Natural height prevents text, chips and actions from being clipped on different devices.
+  xCardDetail: { borderRadius: 22, padding: 18 },
   xCardCollapsed: {},
   xCardEmergency: {
     borderColor: '#fca5a5',

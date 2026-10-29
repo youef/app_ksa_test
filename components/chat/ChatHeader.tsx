@@ -1,18 +1,32 @@
-import { OasisPressable as Pressable } from '@/components/oasis/OasisPrimitives';
-import { OASIS } from '@/lib/oasis';
-import { AppHeader, HeaderAction } from '@/components/shared/AppHeader';
-import React from 'react';
-import { View, Text } from 'react-native';
+import { memo, useMemo } from 'react';
+import { Text, View } from 'react-native';
 import {
   MoreHorizontal,
   BellOff,
   UserX,
   Lock,
 } from 'lucide-react-native';
+import { OASIS } from '@/lib/oasis';
+import { OasisPressable as Pressable } from '@/components/oasis/OasisPrimitives';
+import { AppHeader, HeaderAction } from '@/components/shared/AppHeader';
 import { chatStyles as styles } from './chatStyles';
 
+/* -------------------------------------------------------------------------- */
+/*                                  Types                                     */
+/* -------------------------------------------------------------------------- */
+
+export type ChatUser = {
+  id?: string;
+  avatar_url?: string | null;
+  display_name?: string | null;
+  username?: string | null;
+  city?: string | null;
+  district?: string | null;
+  bio?: string | null;
+};
+
 export interface ChatHeaderProps {
-  otherUser: any;
+  otherUser: ChatUser | null | undefined;
   otherName: string;
   isAnonymous: boolean;
   isMuted: boolean;
@@ -20,13 +34,42 @@ export interface ChatHeaderProps {
   otherTyping: boolean;
   blockedByMe: boolean;
   blockedMe: boolean;
+  fallbackRoute?: string;
   onBackPress: () => void;
   onUserPress: () => void;
   onOptionsPress: () => void;
   onUnblockPress: () => void;
 }
 
-export const ChatHeader: React.FC<ChatHeaderProps> = ({
+/* -------------------------------------------------------------------------- */
+/*                              Helpers                                       */
+/* -------------------------------------------------------------------------- */
+
+const WARNING_TEXT = '#b45309';
+
+function buildLocationSubtitle(user: ChatUser | null | undefined): string {
+  if (!user) return '';
+  const district = user.district?.trim();
+  const city = user.city?.trim();
+  if (district) return `حي ${district}${city ? ` · ${city}` : ''}`;
+  return city ?? '';
+}
+
+function buildPresenceSubtitle(
+  typing: boolean,
+  online: boolean,
+  locationSubtitle: string,
+): string {
+  if (typing) return 'يكتب الآن…';
+  if (online) return 'متصل الآن';
+  return locationSubtitle || 'غير متصل';
+}
+
+/* -------------------------------------------------------------------------- */
+/*                              Component                                     */
+/* -------------------------------------------------------------------------- */
+
+function ChatHeaderBase({
   otherUser,
   otherName,
   isAnonymous,
@@ -35,53 +78,93 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   otherTyping,
   blockedByMe,
   blockedMe,
+  fallbackRoute = '/messages',
   onBackPress,
   onUserPress,
   onOptionsPress,
   onUnblockPress,
-}) => {
-  const locationSubtitle = otherUser?.district
-    ? `حي ${otherUser.district}${otherUser.city ? ` · ${otherUser.city}` : ''}`
-    : otherUser?.city || '';
+}: ChatHeaderProps) {
+  const locationSubtitle = useMemo(
+    () => buildLocationSubtitle(otherUser),
+    [otherUser],
+  );
+
+  const presence = useMemo(
+    () => buildPresenceSubtitle(otherTyping, isOnline, locationSubtitle),
+    [otherTyping, isOnline, locationSubtitle],
+  );
+
+  const avatarUrl = isAnonymous ? null : otherUser?.avatar_url ?? null;
+
+  const showBlockedByMe = blockedByMe;
+  const showBlockedMe = !blockedByMe && blockedMe;
+  const showMuted = !blockedByMe && !blockedMe && isMuted;
 
   return (
     <>
       <AppHeader
         variant="chat"
         title={otherName}
-        subtitle={otherTyping ? 'يكتب الآن…' : isOnline ? 'متصل الآن' : locationSubtitle || 'غير متصل'}
-        avatarUrl={isAnonymous ? null : otherUser?.avatar_url}
+        subtitle={presence}
+        avatarUrl={avatarUrl}
         isOnline={isOnline}
-        fallbackRoute="/messages"
+        fallbackRoute={fallbackRoute}
         onBackPress={onBackPress}
         onTitlePress={onUserPress}
-        rightAction={<HeaderAction accessibilityLabel="خيارات المحادثة" onPress={onOptionsPress}><MoreHorizontal size={20} color={OASIS.colors.primary} /></HeaderAction>}
+        rightAction={
+          <HeaderAction
+            accessibilityLabel="خيارات المحادثة"
+            accessibilityHint="يفتح قائمة الخيارات"
+            onPress={onOptionsPress}
+          >
+            <MoreHorizontal size={20} color={OASIS.colors.primary} />
+          </HeaderAction>
+        }
       />
 
-      {/* Notice Banners */}
-      {blockedByMe ? (
-        <View style={styles.noticeBlocked}>
+      {showBlockedByMe ? (
+        <View
+          style={styles.noticeBlocked}
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
+        >
           <UserX size={16} color={OASIS.colors.danger} />
-          <Text style={styles.noticeBlockedText}>
+          <Text style={styles.noticeBlockedText} numberOfLines={3}>
             أنت حظرت {otherName} — الإرسال مغلق ورسائله مخفية عنك.
           </Text>
-          <Pressable oasisKind="action" onPress={onUnblockPress} style={styles.unblockQuickBtn}>
+          <Pressable
+            oasisKind="action"
+            onPress={onUnblockPress}
+            style={styles.unblockQuickBtn}
+            accessibilityRole="button"
+            accessibilityLabel="إلغاء الحظر"
+            accessibilityHint="يفتح المحادثة مرة أخرى"
+          >
             <Text style={styles.unblockQuickText}>إلغاء الحظر</Text>
           </Pressable>
         </View>
-      ) : blockedMe ? (
-        <View style={styles.noticeBlocked}>
+      ) : showBlockedMe ? (
+        <View
+          style={styles.noticeBlocked}
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
+        >
           <Lock size={16} color={OASIS.colors.danger} />
-          <Text style={styles.noticeBlockedText}>
+          <Text style={styles.noticeBlockedText} numberOfLines={3}>
             {otherName} حظرك — لا يمكنكما تبادل الرسائل.
           </Text>
         </View>
-      ) : isMuted ? (
-        <View style={styles.noticeMuted}>
-          <BellOff size={14} color="#b45309" />
-          <Text style={styles.noticeMutedText}>إشعارات هذه المحادثة مكتومة 🔕</Text>
+      ) : showMuted ? (
+        <View style={styles.noticeMuted} accessibilityRole="text">
+          <BellOff size={14} color={WARNING_TEXT} />
+          <Text style={styles.noticeMutedText} numberOfLines={2}>
+            إشعارات هذه المحادثة مكتومة 🔕
+          </Text>
         </View>
       ) : null}
     </>
   );
-};
+}
+
+export const ChatHeader = memo(ChatHeaderBase);
+export default ChatHeader;

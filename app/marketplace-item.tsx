@@ -1,5 +1,5 @@
 import { OasisPressable as Pressable, OasisSurface } from '@/components/oasis/OasisPrimitives';
-import { OASIS } from '@/lib/oasis';
+import { OASIS, useTheme } from '@/lib/oasis';
 import { HeaderAction, AppHeader } from '@/components/shared/AppHeader';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
@@ -10,8 +10,15 @@ import { AccountIdentityBadge } from '@/components/profile/AccountIdentityBadge'
 import { ImagePreviewModal } from '@/components/shared/ImagePreviewModal';
 import { getNeighborAccess } from '@/lib/neighborAccess';
 import { parseProductDetails, productDisplayPrice } from '@/lib/productDetails';
+import { ProductRequestSheet } from '@/components/market/ProductRequestSheet';
+import { ProductEditorSheet } from '@/components/market/ProductEditorSheet';
+import { useBottomNavInset } from '@/lib/bottomNav';
 
 export default function MarketplaceItemPage() {
+  useTheme();
+  const bottom = useBottomNavInset(8);
+  const [orderOpen, setOrderOpen] = useState(false), [imageFailed, setImageFailed] = useState(false);
+  const [editing, setEditing] = useState(false);
   const params = useLocalSearchParams<{ id?: string }>();
   const itemId = Array.isArray(params.id) ? params.id[0] : params.id || '';
   const [item, setItem] = useState<any>(null);
@@ -29,7 +36,7 @@ export default function MarketplaceItemPage() {
   const load = useCallback(async () => {
     if (!itemId) { setLoading(false); setError(true); return; }
     setLoading(true); setError(false);
-    setSeller(null);setBusiness(null);setCanMessage(false);setImageOpen(false);setFavorite(false);setActionError('');
+    setSeller(null);setBusiness(null);setCanMessage(false);setImageOpen(false);setFavorite(false);setActionError('');setOrderOpen(false);setImageFailed(false);
     try {
       const { data, error: itemError } = await supabase
         .from('marketplace_items')
@@ -91,8 +98,10 @@ export default function MarketplaceItemPage() {
   return <View style={[styles.screen, { backgroundColor: 'transparent' }]}>
     <ImagePreviewModal uri={imageOpen?item.image_url:null} title={item.title||'صورة المنتج'} onClose={()=>setImageOpen(false)}/>
     <AppHeader variant="sub" title="تفاصيل المنتج" fallbackRoute="/market" rightAction={<HeaderAction onPress={share} accessibilityRole="button" accessibilityLabel="مشاركة الإعلان" style={styles.share}><Share2 size={18} color={OASIS.colors.primary} /></HeaderAction>} />
-    <ScrollView contentContainerStyle={styles.page}>
-      {item.image_url ? <Pressable accessibilityRole="button" accessibilityLabel="عرض صورة المنتج كاملة" onPress={()=>setImageOpen(true)} style={styles.imageFrame}><Image source={{ uri: item.image_url }} style={styles.image} resizeMode="contain"/><View style={styles.zoomBadge}><ZoomIn size={16} color="#fff"/><Text style={{color:'#fff',fontSize:11}}>عرض الصورة كاملة</Text></View></Pressable> : <View style={styles.imageFallback}><ShoppingBag size={42} color={OASIS.colors.primary} /><Text style={styles.muted}>إعلان من سوق الحي</Text></View>}
+    <ProductRequestSheet visible={orderOpen} item={item} userId={me} onClose={()=>setOrderOpen(false)}/>
+    <ProductEditorSheet item={editing?item:null} onClose={()=>setEditing(false)} onSaved={()=>void load()}/>
+    <ScrollView contentContainerStyle={[styles.page,{paddingBottom:bottom+120}]}>
+      {item.image_url && !imageFailed ? <Pressable accessibilityRole="button" accessibilityLabel="عرض صورة المنتج كاملة" onPress={()=>setImageOpen(true)} style={styles.imageFrame}><Image source={{ uri: item.image_url }} style={styles.image} onError={()=>setImageFailed(true)} resizeMode="contain"/><View style={styles.zoomBadge}><ZoomIn size={16} color="#fff"/><Text style={{color:'#fff',fontSize:11}}>عرض الصورة كاملة</Text></View></Pressable> : <View style={styles.imageFallback}><ShoppingBag size={42} color={OASIS.colors.primary} /><Text style={styles.muted}>إعلان من سوق الحي</Text></View>}
       <OasisSurface oasisSurface="card" style={styles.card}>
         <View style={styles.row}><View style={styles.typePill}><Text style={styles.typeText}>{item.item_type || 'إعلان'}</Text></View><Text style={[styles.status,{color:item.status==='available'?OASIS.colors.primary:OASIS.colors.muted}]}>{item.status === 'available' ? 'متاح' : item.status === 'sold' ? 'تم البيع' : 'غير متاح'}</Text></View>
         <Text style={styles.title}>{item.title || 'إعلان بدون عنوان'}</Text>
@@ -121,7 +130,15 @@ export default function MarketplaceItemPage() {
       </Pressable>}
       {me === item.seller_id && <Pressable oasisKind="action" style={styles.manageBtn} onPress={() => router.push({ pathname: '/profile', params: { tab: 'content' } })}><Text style={styles.manageBtnText}>إدارة من حسابي</Text></Pressable>}
       <OasisSurface oasisSurface="card" style={styles.card}><View style={styles.location}><Info size={17} color={OASIS.colors.primary}/><Text style={[styles.muted,{flex:1}]}>الموقع المعروض عام. يتم الاتفاق على التسليم والتكلفة عبر وسائل التواصل المسموحة لصاحب الإعلان.</Text></View></OasisSurface>
+      <OasisSurface oasisSurface="card" style={styles.card}><View style={styles.location}><ShoppingBag size={18} color={OASIS.colors.primary}/><Text style={styles.sellerTitle}>كيف أطلب المنتج؟</Text></View><Text style={styles.description}>١. أرسل الكمية والملاحظات للبائع.{"\n"}٢. اتفقا على التوفر والسعر والتسليم.{"\n"}٣. تأكد من المنتج قبل إتمام الاتفاق.</Text><Text style={styles.muted}>الطلب عبر المحادثة، ولا يمثل حجزًا للمخزون أو عملية دفع داخل التطبيق.</Text></OasisSurface>
+      <Pressable accessibilityRole="button" onPress={()=>router.push({pathname:'/report',params:{type:'product',id:item.id}})} style={{minHeight:44,flexDirection:'row-reverse',alignItems:'center',justifyContent:'center',gap:7}}><Flag size={15} color={OASIS.colors.muted}/><Text style={styles.muted}>الإبلاغ عن الإعلان</Text></Pressable>
     </ScrollView>
+    <View pointerEvents="box-none" style={{position:'absolute',left:0,right:0,bottom,alignItems:'center'}}>
+      <OasisSurface oasisSurface="card" style={{width:'92%',maxWidth:828,borderRadius:22,borderWidth:1,borderColor:OASIS.colors.line,padding:12,flexDirection:'row-reverse',alignItems:'center',gap:12}}>
+        <View style={{flex:1,gap:4}}><Text style={styles.muted}>{me===item.seller_id?'هذا منتجك':'السعر المعلن'}</Text><Text style={[styles.price,{fontSize:16}]}>{productDisplayPrice(item.price,item.item_type)}</Text></View>
+        <Pressable accessibilityRole="button" accessibilityLabel={me===item.seller_id?'إدارة المنتج':'اطلب المنتج'} disabled={me!==item.seller_id&&(item.status!=='available'||!!me&&!canMessage)} onPress={()=>{if(me===item.seller_id)setEditing(true);else if(!me)router.push('/auth');else setOrderOpen(true);}} style={[styles.messageAction,{flex:1,opacity:me!==item.seller_id&&(item.status!=='available'||!!me&&!canMessage)? .45:1,borderRadius:16}]}><ShoppingBag size={19} color="#fff"/><Text style={{color:'#fff',fontWeight:'800',fontSize:13}}>{me===item.seller_id?'إدارة المنتج':item.status!=='available'?'غير متاح':!me?'سجّل الدخول للطلب':canMessage?'اطلب المنتج':'الطلب غير متاح'}</Text></Pressable>
+      </OasisSurface>
+    </View>
   </View>;
 }
 

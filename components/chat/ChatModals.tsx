@@ -1,7 +1,10 @@
-import { OasisPressable as Pressable, OasisTextInput as TextInput } from '@/components/oasis/OasisPrimitives';
+import { memo, useCallback } from 'react';
+import { ActivityIndicator, Image, Modal, Platform, Text, View } from 'react-native';
+import {
+  OasisPressable as Pressable,
+  OasisTextInput as TextInput,
+} from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
-import React from 'react';
-import { View, Text, Modal, Image, ActivityIndicator, Platform } from 'react-native';
 import {
   X,
   Bell,
@@ -15,6 +18,11 @@ import {
   Trash2,
 } from 'lucide-react-native';
 import { chatStyles as styles } from './chatStyles';
+import type { ChatUser } from './ChatHeader';
+
+/* -------------------------------------------------------------------------- */
+/*                              Constants                                     */
+/* -------------------------------------------------------------------------- */
 
 export const APPRECIATION_TEMPLATES = [
   'كفو يا جارنا، بيض الله وجهك 🤍',
@@ -22,13 +30,17 @@ export const APPRECIATION_TEMPLATES = [
   'شكراً على حسن تعاملك وأمانتك ⭐',
   'وصل الغرض بالسلامة، جزاك الله خيراً 📦',
   'حيّاك الله يا جار الهنا، تسلم الأيادي ☕',
-];
+] as const;
+
+/* -------------------------------------------------------------------------- */
+/*                                  Types                                     */
+/* -------------------------------------------------------------------------- */
 
 export interface ChatModalsProps {
   optionsOpen: boolean;
   onCloseOptions: () => void;
   otherName: string;
-  otherUser: any;
+  otherUser: ChatUser | null | undefined;
   isMuted: boolean;
   onToggleMute: () => void;
   dndActive: boolean;
@@ -54,43 +66,65 @@ export interface ChatModalsProps {
   sendingAppreciation: boolean;
 }
 
-export const ChatModals: React.FC<ChatModalsProps> = ({
-  optionsOpen,
-  onCloseOptions,
-  otherName,
-  otherUser,
-  isMuted,
-  onToggleMute,
-  dndActive,
-  onToggleMyDnd,
-  onViewProfile,
-  blockedByMe,
-  onToggleBlock,
-  onOpenClear,
+/* -------------------------------------------------------------------------- */
+/*                                Component                                   */
+/* -------------------------------------------------------------------------- */
 
-  confirmClear,
-  onCloseConfirmClear,
-  onClearMine,
-  onDeleteForEveryone,
+function ChatModalsBase(props: ChatModalsProps) {
+  const {
+    optionsOpen,
+    onCloseOptions,
+    otherName,
+    otherUser,
+    isMuted,
+    onToggleMute,
+    dndActive,
+    onToggleMyDnd,
+    onViewProfile,
+    blockedByMe,
+    onToggleBlock,
+    onOpenClear,
+    confirmClear,
+    onCloseConfirmClear,
+    onClearMine,
+    onDeleteForEveryone,
+    previewImageUrl,
+    onClosePreviewImage,
+    appreciationModalOpen,
+    onCloseAppreciation,
+    appreciationNote,
+    onChangeAppreciationNote,
+    onSendAppreciation,
+    sendingAppreciation,
+  } = props;
 
-  previewImageUrl,
-  onClosePreviewImage,
+  // يمنع إغلاق الـ Modal عند النقر داخل البطاقة
+  const stopPropagation = useCallback((e: any) => {
+    e?.stopPropagation?.();
+  }, []);
 
-  appreciationModalOpen,
-  onCloseAppreciation,
-  appreciationNote,
-  onChangeAppreciationNote,
-  onSendAppreciation,
-  sendingAppreciation,
-}) => {
   return (
     <>
       {/* 1. Options menu modal */}
-      <Modal visible={optionsOpen} transparent animationType="fade" onRequestClose={onCloseOptions}>
+      <Modal
+        visible={optionsOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={onCloseOptions}
+      >
         <Pressable style={styles.optionsOverlay} onPress={onCloseOptions}>
-          <View style={styles.optionsSheet}>
+          <Pressable
+            style={styles.optionsSheet}
+            onPress={stopPropagation}
+            accessibilityViewIsModal
+          >
             <View style={styles.optionsHeader}>
-              <Pressable onPress={onCloseOptions} style={styles.optionsClose}>
+              <Pressable
+                onPress={onCloseOptions}
+                style={styles.optionsClose}
+                accessibilityRole="button"
+                accessibilityLabel="إغلاق"
+              >
                 <X size={18} color={OASIS.colors.muted} />
               </Pressable>
               <Text style={styles.optionsTitle} numberOfLines={1}>
@@ -98,63 +132,126 @@ export const ChatModals: React.FC<ChatModalsProps> = ({
               </Text>
             </View>
 
-            <Pressable style={styles.optionRow} onPress={onToggleMute}>
-              {isMuted ? <Bell size={18} color={OASIS.colors.primary} /> : <BellOff size={18} color="#d97706" />}
+            <Pressable
+              style={styles.optionRow}
+              onPress={onToggleMute}
+              accessibilityRole="button"
+              accessibilityState={{ selected: isMuted }}
+            >
+              {isMuted ? (
+                <Bell size={18} color={OASIS.colors.primary} />
+              ) : (
+                <BellOff size={18} color="#d97706" />
+              )}
               <View style={{ flex: 1 }}>
                 <Text style={styles.optionRowText}>
                   {isMuted ? 'إلغاء كتم إشعارات المحادثة 🔔' : 'كتم المحادثة 🔕'}
                 </Text>
-                <Text style={styles.optionRowSub}>يوقف التنبيهات لهذه المحادثة فقط</Text>
+                <Text style={styles.optionRowSub}>
+                  يوقف التنبيهات لهذه المحادثة فقط
+                </Text>
               </View>
             </Pressable>
 
-            <Pressable style={styles.optionRow} onPress={onToggleMyDnd}>
+            <Pressable
+              style={styles.optionRow}
+              onPress={onToggleMyDnd}
+              accessibilityRole="button"
+              accessibilityState={{ selected: dndActive }}
+            >
               <Moon size={18} color="#d97706" />
               <View style={{ flex: 1 }}>
                 <Text style={styles.optionRowText}>
-                  {dndActive ? 'إلغاء عدم الإزعاج العام' : 'تفعيل عدم الإزعاج العام 🌙'}
+                  {dndActive
+                    ? 'إلغاء عدم الإزعاج العام'
+                    : 'تفعيل عدم الإزعاج العام 🌙'}
                 </Text>
-                <Text style={styles.optionRowSub}>يصمت كل الإشعارات الواردة من كل المحادثات</Text>
+                <Text style={styles.optionRowSub}>
+                  يصمت كل الإشعارات الواردة من كل المحادثات
+                </Text>
               </View>
             </Pressable>
 
             {otherUser && (
-              <Pressable style={styles.optionRow} onPress={onViewProfile}>
+              <Pressable
+                style={styles.optionRow}
+                onPress={onViewProfile}
+                accessibilityRole="button"
+              >
                 <User size={18} color={OASIS.colors.primary} />
                 <Text style={styles.optionRowText}>عرض الملف الشخصي 👤</Text>
               </Pressable>
             )}
 
-            <Pressable style={styles.optionRow} onPress={onToggleBlock}>
-              {blockedByMe ? <UserCheck size={18} color={OASIS.colors.primary} /> : <UserX size={18} color={OASIS.colors.danger} />}
-              <Text style={[styles.optionRowText, !blockedByMe && { color: OASIS.colors.danger }]}>
+            <Pressable
+              style={styles.optionRow}
+              onPress={onToggleBlock}
+              accessibilityRole="button"
+              accessibilityState={{ selected: blockedByMe }}
+            >
+              {blockedByMe ? (
+                <UserCheck size={18} color={OASIS.colors.primary} />
+              ) : (
+                <UserX size={18} color={OASIS.colors.danger} />
+              )}
+              <Text
+                style={[
+                  styles.optionRowText,
+                  !blockedByMe && { color: OASIS.colors.danger },
+                ]}
+              >
                 {blockedByMe ? 'إلغاء حظر هذا المستخدم' : 'حظر هذا المستخدم 🚫'}
               </Text>
             </Pressable>
 
-            <Pressable style={styles.optionRow} onPress={onOpenClear}>
+            <Pressable
+              style={styles.optionRow}
+              onPress={onOpenClear}
+              accessibilityRole="button"
+            >
               <Eraser size={18} color={OASIS.colors.muted} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.optionRowText}>مسح المحادثة 🧹</Text>
-                <Text style={styles.optionRowSub}>اختر: من عندك فقط أو حذف للجميع</Text>
+                <Text style={styles.optionRowSub}>
+                  اختر: من عندك فقط أو حذف للجميع
+                </Text>
               </View>
             </Pressable>
-          </View>
+          </Pressable>
         </Pressable>
       </Modal>
 
       {/* 2. Clear / delete chooser modal */}
-      <Modal visible={confirmClear} transparent animationType="fade" onRequestClose={onCloseConfirmClear}>
+      <Modal
+        visible={confirmClear}
+        transparent
+        animationType="fade"
+        onRequestClose={onCloseConfirmClear}
+      >
         <Pressable style={styles.optionsOverlay} onPress={onCloseConfirmClear}>
-          <View style={styles.optionsSheet}>
+          <Pressable
+            style={styles.optionsSheet}
+            onPress={stopPropagation}
+            accessibilityViewIsModal
+          >
             <View style={styles.optionsHeader}>
-              <Pressable onPress={onCloseConfirmClear} style={styles.optionsClose}>
+              <Pressable
+                onPress={onCloseConfirmClear}
+                style={styles.optionsClose}
+                accessibilityRole="button"
+                accessibilityLabel="إغلاق"
+              >
                 <X size={18} color={OASIS.colors.muted} />
               </Pressable>
               <Text style={styles.optionsTitle}>مسح المحادثة</Text>
             </View>
 
-            <Pressable oasisKind="card" style={styles.choiceCard} onPress={onClearMine}>
+            <Pressable
+              oasisKind="card"
+              style={styles.choiceCard}
+              onPress={onClearMine}
+              accessibilityRole="button"
+            >
               <Eraser size={20} color="#0369a1" />
               <View style={{ flex: 1 }}>
                 <Text style={styles.choiceTitle}>مسح المحادثة عندي 🧹</Text>
@@ -164,19 +261,27 @@ export const ChatModals: React.FC<ChatModalsProps> = ({
               </View>
             </Pressable>
 
-            <Pressable oasisKind="card"
-              style={[styles.choiceCard, styles.choiceCardDanger, { borderBottomWidth: 0 }]}
+            <Pressable
+              oasisKind="card"
+              style={[
+                styles.choiceCard,
+                styles.choiceCardDanger,
+                { borderBottomWidth: 0 },
+              ]}
               onPress={onDeleteForEveryone}
+              accessibilityRole="button"
             >
               <Trash2 size={20} color={OASIS.colors.danger} />
               <View style={{ flex: 1 }}>
-                <Text style={[styles.choiceTitle, { color: OASIS.colors.danger }]}>حذف المحادثة للجميع ⚠️</Text>
+                <Text style={[styles.choiceTitle, { color: OASIS.colors.danger }]}>
+                  حذف المحادثة للجميع ⚠️
+                </Text>
                 <Text style={styles.choiceSub}>
                   حذف نهائي للمحادثة وكل رسائلها، وتختفي أيضاً من عند {otherName}.
                 </Text>
               </View>
             </Pressable>
-          </View>
+          </Pressable>
         </Pressable>
       </Modal>
 
@@ -188,7 +293,8 @@ export const ChatModals: React.FC<ChatModalsProps> = ({
         onRequestClose={onClosePreviewImage}
       >
         <View style={styles.lightboxBackdrop}>
-          <Pressable oasisKind="icon"
+          <Pressable
+            oasisKind="icon"
             style={styles.lightboxCloseBtn}
             onPress={onClosePreviewImage}
             accessibilityRole="button"
@@ -201,6 +307,7 @@ export const ChatModals: React.FC<ChatModalsProps> = ({
               source={{ uri: previewImageUrl }}
               style={styles.lightboxImage}
               resizeMode="contain"
+              accessibilityLabel="صورة الرسالة بالحجم الكامل"
             />
           )}
         </View>
@@ -214,7 +321,12 @@ export const ChatModals: React.FC<ChatModalsProps> = ({
         onRequestClose={onCloseAppreciation}
       >
         <Pressable style={styles.optionsOverlay} onPress={onCloseAppreciation}>
-          <Pressable oasisKind="card" style={styles.appreciationModalCard} onPress={e => e.stopPropagation?.()}>
+          <Pressable
+            oasisKind="card"
+            style={styles.appreciationModalCard}
+            onPress={stopPropagation}
+            accessibilityViewIsModal
+          >
             <View style={styles.appreciationModalHeader}>
               <Pressable
                 onPress={onCloseAppreciation}
@@ -228,26 +340,39 @@ export const ChatModals: React.FC<ChatModalsProps> = ({
                 <View style={styles.appreciationModalIconCircle}>
                   <Coffee size={24} color="#78350f" />
                 </View>
-                <Text style={styles.appreciationModalTitle}>إهداء بطاقة شكر وقهوة ☕</Text>
+                <Text style={styles.appreciationModalTitle}>
+                  إهداء بطاقة شكر وقهوة ☕
+                </Text>
                 <Text style={styles.appreciationModalSub}>
-                  أظهر تقديرك لـ {otherName} على فزعته وحسن تعامله، وسيتم إضافة +10 نقاط سمعة إيجابية لحسابه في الحي ⭐
+                  أظهر تقديرك لـ {otherName} على فزعته وحسن تعامله، وسيتم إضافة
+                  +10 نقاط سمعة إيجابية لحسابه في الحي ⭐
                 </Text>
               </View>
             </View>
 
-            <Text style={styles.appreciationSectionLabel}>اختر عبارة جاهزة أو اكتب عبارتك:</Text>
+            <Text style={styles.appreciationSectionLabel}>
+              اختر عبارة جاهزة أو اكتب عبارتك:
+            </Text>
             <View style={styles.appreciationChipsWrap}>
-              {APPRECIATION_TEMPLATES.map((tmpl, idx) => {
+              {APPRECIATION_TEMPLATES.map((tmpl) => {
                 const isSelected = appreciationNote === tmpl;
                 return (
-                  <Pressable oasisKind="chip"
-                    key={idx}
-                    style={[styles.appreciationChip, isSelected && styles.appreciationChipSelected]}
+                  <Pressable
+                    oasisKind="chip"
+                    key={tmpl}
+                    style={[
+                      styles.appreciationChip,
+                      isSelected && styles.appreciationChipSelected,
+                    ]}
                     onPress={() => onChangeAppreciationNote(tmpl)}
                     accessibilityRole="button"
+                    accessibilityState={{ selected: isSelected }}
                   >
                     <Text
-                      style={[styles.appreciationChipText, isSelected && styles.appreciationChipTextSelected]}
+                      style={[
+                        styles.appreciationChipText,
+                        isSelected && styles.appreciationChipTextSelected,
+                      ]}
                     >
                       {tmpl}
                     </Text>
@@ -261,25 +386,39 @@ export const ChatModals: React.FC<ChatModalsProps> = ({
               value={appreciationNote}
               onChangeText={onChangeAppreciationNote}
               placeholder="اكتب رسالة شكر خاصة لجارك..."
-              placeholderTextColor="#94a3b8"
+              placeholderTextColor={OASIS.colors.muted}
               multiline
               maxLength={200}
+              accessibilityLabel="نص رسالة الشكر"
             />
 
             <View style={styles.appreciationActionRow}>
-              <Pressable oasisKind="action"
-                style={[styles.appreciationSendBtn, sendingAppreciation && { opacity: 0.7 }]}
+              <Pressable
+                oasisKind="action"
+                style={[
+                  styles.appreciationSendBtn,
+                  sendingAppreciation && { opacity: 0.7 },
+                ]}
                 onPress={onSendAppreciation}
                 disabled={sendingAppreciation}
                 accessibilityRole="button"
                 accessibilityLabel="إرسال بطاقة الشكر والقهوة"
+                accessibilityState={{
+                  disabled: sendingAppreciation,
+                  busy: sendingAppreciation,
+                }}
               >
                 {sendingAppreciation ? (
-                  <ActivityIndicator size="small" color={OASIS.colors.surface} />
+                  <ActivityIndicator
+                    size="small"
+                    color={OASIS.colors.surface}
+                  />
                 ) : (
                   <>
                     <Coffee size={18} color={OASIS.colors.surface} />
-                    <Text style={styles.appreciationSendBtnText}>إرسال القهوة والتقدير (+10 نقاط) ☕</Text>
+                    <Text style={styles.appreciationSendBtnText}>
+                      إرسال القهوة والتقدير (+10 نقاط) ☕
+                    </Text>
                   </>
                 )}
               </Pressable>
@@ -289,4 +428,7 @@ export const ChatModals: React.FC<ChatModalsProps> = ({
       </Modal>
     </>
   );
-};
+}
+
+export const ChatModals = memo(ChatModalsBase);
+export default ChatModals;

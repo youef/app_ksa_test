@@ -1,8 +1,21 @@
-import { OasisPressable as Pressable, OasisSurface } from '@/components/oasis/OasisPrimitives';
+import {
+  OasisPressable as Pressable,
+  OasisSurface,
+} from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
+import { memo } from 'react';
 import { ActivityIndicator, Modal, Text, View } from 'react-native';
 import { MapPin } from 'lucide-react-native';
 import { styles } from './homeStyles';
+import {
+  formatLocationParts,
+  isRealCity,
+  isRealDistrict,
+} from '@/lib/locationFormat';
+
+/* -------------------------------------------------------------------------- */
+/*                            LocationGateModal                               */
+/* -------------------------------------------------------------------------- */
 
 type GateProps = {
   visible: boolean;
@@ -16,55 +29,110 @@ type GateProps = {
   onEnableNotifications: () => void;
 };
 
-/** Mandatory first-login setup: location, then notifications. */
-export function LocationGateModal({
-  visible, busy, message, region, city, district, hasExactLocation,
-  onSetupLocation, onEnableNotifications,
+function LocationGateModalBase({
+  visible,
+  busy,
+  message,
+  region,
+  city,
+  district,
+  hasExactLocation,
+  onSetupLocation,
+  onEnableNotifications,
 }: GateProps) {
+  // يمنع زر الرجوع في Android من إغلاق وهمي
+  const handleRequestClose = () => {
+    if (busy) return;
+    if (hasExactLocation) onEnableNotifications();
+    else onSetupLocation();
+  };
+
+  const locationText = hasExactLocation
+    ? `الموقع: ${formatLocationParts({ region, city, district })}`
+    : 'الموقع غير مكتمل';
+
+  const primaryLabel = hasExactLocation
+    ? 'تفعيل الإشعارات والمتابعة'
+    : 'تحديد موقعي تلقائياً';
+
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={() => {}}>
-      <View style={styles.locationGateOverlay}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={handleRequestClose}
+    >
+      <View
+        style={styles.locationGateOverlay}
+        accessibilityViewIsModal
+        importantForAccessibility="yes"
+      >
         <OasisSurface oasisSurface="card" style={styles.locationGateCard}>
-          <View style={styles.locationGateIcon}><MapPin size={28} color={OASIS.colors.primary} /></View>
+          <View style={styles.locationGateIcon}>
+            <MapPin size={28} color={OASIS.colors.primary} />
+          </View>
+
           <Text style={styles.locationGateTitle}>نحتاج موقعك قبل البدء</Text>
+
           <Text style={styles.locationGateText}>
-            حدّد موقعك تلقائياً لربط حسابك بالمنطقة والمدينة والحي، ثم فعّل الإشعارات لتصلك أخبار وتنبيهات حيّك فوراً.
+            حدّد موقعك تلقائياً لربط حسابك بالمنطقة والمدينة والحي، ثم فعّل
+            الإشعارات لتصلك أخبار وتنبيهات حيّك فوراً.
           </Text>
 
           <View style={styles.locationGateStatus}>
             <View style={styles.locationGateStatusRow}>
               <MapPin size={17} color={OASIS.colors.primary} />
-              <Text style={styles.locationGateStatusText}>
-                {hasExactLocation ? `الموقع: ${region} · ${city} · حي ${district}` : 'الموقع غير مكتمل'}
+              <Text style={styles.locationGateStatusText} numberOfLines={3}>
+                {locationText}
               </Text>
             </View>
           </View>
 
-          {!!message && <Text style={styles.locationGateMessage}>{message}</Text>}
+          {!!message && (
+            <Text
+              style={styles.locationGateMessage}
+              accessibilityLiveRegion="assertive"
+            >
+              {message}
+            </Text>
+          )}
 
           <Pressable
             style={styles.locationGatePrimary}
-            onPress={hasExactLocation ? onEnableNotifications : onSetupLocation}
+            onPress={
+              hasExactLocation ? onEnableNotifications : onSetupLocation
+            }
             disabled={busy}
             accessibilityRole="button"
+            accessibilityLabel={primaryLabel}
+            accessibilityState={{ disabled: busy, busy }}
+            accessibilityHint="يكمل إعداد حسابك للبدء باستخدام التطبيق"
           >
             {busy ? (
-              <ActivityIndicator color={OASIS.colors.surface} />
+              <ActivityIndicator
+                color={OASIS.colors.surface}
+                accessibilityLabel="جارٍ التحديد"
+              />
             ) : (
-              <Text style={styles.locationGatePrimaryText}>
-                {hasExactLocation ? 'تفعيل الإشعارات والمتابعة' : 'تحديد موقعي تلقائياً'}
-              </Text>
+              <Text style={styles.locationGatePrimaryText}>{primaryLabel}</Text>
             )}
           </Pressable>
 
           <Text style={styles.locationGateRequired}>
-            تحديد الموقع مطلوب. الإشعارات يمكن تفعيلها الآن أو لاحقاً من الإعدادات.
+            تحديد الموقع مطلوب. الإشعارات يمكن تفعيلها الآن أو لاحقاً من
+            الإعدادات.
           </Text>
         </OasisSurface>
       </View>
     </Modal>
   );
 }
+
+export const LocationGateModal = memo(LocationGateModalBase);
+
+/* -------------------------------------------------------------------------- */
+/*                          WeeklyLocationPrompt                              */
+/* -------------------------------------------------------------------------- */
 
 type PromptProps = {
   visible: boolean;
@@ -77,39 +145,75 @@ type PromptProps = {
   onOpenSettings: () => void;
 };
 
-/**
- * Mandatory weekly "confirm your real location" prompt.
- * There is deliberately no skip/later button: the user cannot continue browsing
- * their neighbourhood feed until the real GPS location is confirmed.
- */
-export function WeeklyLocationPrompt({
-  visible, busy, message, region, city, district, onUpdate, onOpenSettings,
+function WeeklyLocationPromptBase({
+  visible,
+  busy,
+  message,
+  region,
+  city,
+  district,
+  onUpdate,
+  onOpenSettings,
 }: PromptProps) {
-  const hasCity = Boolean(city) && city !== 'كل المدن';
+  const hasCity = isRealCity(city);
+  const hasDistrict = isRealDistrict(district);
+
+  // على Android، زر الرجوع يجب أن يفعّل التحديث بدل الإغلاق
+  const handleRequestClose = () => {
+    if (busy) return;
+    onUpdate();
+  };
+
+  const cityLine = hasCity
+    ? `مدينتك الحالية عبر GPS: ${city}${
+        hasDistrict ? ` · حي ${district}` : ''
+      }`
+    : 'لم نثبّت مدينتك بعد. نحتاج موقعك الحقيقي للمتابعة.';
+
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={() => {}}>
-      <View style={styles.locationPromptBackdrop}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={handleRequestClose}
+    >
+      <View
+        style={styles.locationPromptBackdrop}
+        accessibilityViewIsModal
+        importantForAccessibility="yes"
+      >
         <OasisSurface oasisSurface="card" style={styles.locationPromptCard}>
-          <View style={styles.locationGateIcon}><MapPin size={26} color={OASIS.colors.primary} /></View>
+          <View style={styles.locationGateIcon}>
+            <MapPin size={26} color={OASIS.colors.primary} />
+          </View>
+
           <Text style={styles.locationPromptTitle}>تحديث موقعك الأسبوعي</Text>
+
           <Text style={styles.locationPromptText}>
-            هل ما زلت في نفس الحي؟ حدّث موقعك لتصلك منشورات وتنبيهات جيرانك بدقة.
+            هل ما زلت في نفس الحي؟ حدّث موقعك لتصلك منشورات وتنبيهات جيرانك
+            بدقة.
           </Text>
 
           <View style={styles.locationPromptLockRow}>
             <MapPin size={15} color={OASIS.colors.primary} />
-            <Text style={styles.locationPromptLockText}>
-              {hasCity
-                ? `مدينتك الحالية عبر GPS: ${city}${district && district !== 'كل الأحياء' ? ` · حي ${district}` : ''}`
-                : 'لم نثبّت مدينتك بعد. نحتاج موقعك الحقيقي للمتابعة.'}
+            <Text style={styles.locationPromptLockText} numberOfLines={3}>
+              {cityLine}
             </Text>
           </View>
 
           <Text style={styles.locationPromptNotice}>
-            التحقق من الموقع إلزامي ولا يمكن تخطّيه. سيتم قراءة موقعك الحقيقي عبر GPS وتثبيت مدينتك، ولن تتمكن من تغييرها يدوياً لاحقاً.
+            التحقق من الموقع إلزامي ولا يمكن تخطّيه. سيتم قراءة موقعك الحقيقي
+            عبر GPS وتثبيت مدينتك، ولن تتمكن من تغييرها يدوياً لاحقاً.
           </Text>
 
-          {!!message && <Text style={styles.locationPromptMessage}>{message}</Text>}
+          {!!message && (
+            <Text
+              style={styles.locationPromptMessage}
+              accessibilityLiveRegion="assertive"
+            >
+              {message}
+            </Text>
+          )}
 
           <View style={styles.locationPromptActions}>
             <Pressable
@@ -117,20 +221,38 @@ export function WeeklyLocationPrompt({
               onPress={onUpdate}
               disabled={busy}
               accessibilityRole="button"
+              accessibilityLabel="تحديث الموقع الآن عبر GPS"
+              accessibilityState={{ disabled: busy, busy }}
             >
               {busy ? (
-                <ActivityIndicator color={OASIS.colors.surface} />
+                <ActivityIndicator
+                  color={OASIS.colors.surface}
+                  accessibilityLabel="جارٍ التحديث"
+                />
               ) : (
-                <Text style={styles.locationPromptAllowText}>تحديث الآن عبر GPS</Text>
+                <Text style={styles.locationPromptAllowText}>
+                  تحديث الآن عبر GPS
+                </Text>
               )}
             </Pressable>
           </View>
 
-          <Pressable onPress={onOpenSettings} accessibilityRole="button" hitSlop={6}>
-            <Text style={styles.locationPromptHelp}>المتصفح لا يدعم الموقع أو رفضت الإذن؟ اضغط هنا لطريقة التفعيل</Text>
+          <Pressable
+            onPress={onOpenSettings}
+            disabled={busy}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: busy }}
+            accessibilityHint="يفتح إعدادات المتصفح أو الجهاز لتفعيل الموقع"
+            hitSlop={6}
+          >
+            <Text style={styles.locationPromptHelp}>
+              المتصفح لا يدعم الموقع أو رفضت الإذن؟ اضغط هنا لطريقة التفعيل
+            </Text>
           </Pressable>
         </OasisSurface>
       </View>
     </Modal>
   );
 }
+
+export const WeeklyLocationPrompt = memo(WeeklyLocationPromptBase);

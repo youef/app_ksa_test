@@ -1,10 +1,67 @@
 import { OASIS } from '@/lib/oasis';
-import { StyleSheet, Platform } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
+
+/* -------------------------------------------------------------------------- */
+/*                              Design Tokens                                 */
+/* -------------------------------------------------------------------------- */
+
+const T = {
+  white04: 'rgba(255,255,255,0.04)',
+  white10: 'rgba(255,255,255,0.10)',
+  white14: 'rgba(255,255,255,0.14)',
+  white15: 'rgba(255,255,255,0.15)',
+  white18: 'rgba(255,255,255,0.18)',
+  white20: 'rgba(255,255,255,0.20)',
+  white25: 'rgba(255,255,255,0.25)',
+  white30: 'rgba(255,255,255,0.30)',
+  white40: 'rgba(255,255,255,0.40)',
+  white94: 'rgba(0,0,0,0.94)',
+  overlay: 'rgba(0,0,0,0.45)',
+  overlayLightbox: 'rgba(0,0,0,0.94)',
+
+  mintSoft: '#a7f3d0',
+  mintBorder: '#bbf7d0',
+  mint: '#34d399',
+  mintBg: '#DCF0E2',
+
+  dangerBorder: '#fca5a5',
+  dangerBorderSoft: '#fecaca',
+  dangerSoft: '#fca5a5',
+  warningBorder: '#fde68a',
+  warningText: '#b45309',
+  warningDeep: '#92400e',
+  warningDarker: '#78350f',
+  warningDarkest: '#451a03',
+  warningBg: '#fef3c7',
+  warningAmber: '#fbbf24',
+  warningAmberStrong: '#d97706',
+
+  infoBorder: '#bae6fd',
+  infoText: '#0369a1',
+
+  slate50: '#f1f5f9',
+  slate300: '#94a3b8',
+  slateLine: '#e2e8f0',
+  slateBorderSoft: '#f1f5f9',
+} as const;
+
+const shadow = (color: string, elevation: number, radius = 6) => ({
+  shadowColor: color,
+  shadowOffset: { width: 0, height: Math.max(1, Math.round(radius / 3)) },
+  shadowOpacity: 0.12,
+  shadowRadius: radius,
+  elevation,
+});
+
+/* -------------------------------------------------------------------------- */
+/*                                  Styles                                    */
+/* -------------------------------------------------------------------------- */
 
 export const chatStyles = StyleSheet.create({
+  /* --------------------------------- Layout ------------------------------- */
   container: {
     flex: 1,
-    minHeight: Platform.OS === 'web' ? ('100vh' as any) : undefined,
+    minHeight: Platform.OS === 'web' ? ('100vh' as unknown as number) : undefined,
     width: '100%',
     alignSelf: 'stretch',
     backgroundColor: OASIS.colors.background,
@@ -20,6 +77,8 @@ export const chatStyles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+
+  /* --------------------------------- Header ------------------------------- */
   header: {
     width: '100%',
     backgroundColor: OASIS.colors.deep,
@@ -27,11 +86,7 @@ export const chatStyles = StyleSheet.create({
     paddingBottom: 8,
     borderBottomLeftRadius: 18,
     borderBottomRightRadius: 18,
-    shadowColor: OASIS.colors.ink,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0,
-    shadowRadius: 8,
-    elevation: 3,
+    ...shadow(OASIS.colors.ink, 3, 8),
   },
   headerTop: {
     flexDirection: 'row-reverse',
@@ -53,11 +108,11 @@ export const chatStyles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: T.white14,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderColor: T.white20,
   },
   headerUser: {
     flexDirection: 'row-reverse',
@@ -77,11 +132,11 @@ export const chatStyles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 13,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: T.white20,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.3)',
+    borderColor: T.white30,
   },
   headerAvatarLetter: {
     color: OASIS.colors.surface,
@@ -103,7 +158,7 @@ export const chatStyles = StyleSheet.create({
     fontWeight: '700',
   },
   headerCity: {
-    color: '#a7f3d0',
+    color: T.mintSoft,
     fontSize: 11,
     fontWeight: '600',
     marginTop: 1,
@@ -115,11 +170,11 @@ export const chatStyles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: T.white15,
     marginLeft: 6,
   },
   headerStatusText: {
-    color: '#a7f3d0',
+    color: T.mintSoft,
     fontSize: 11,
     fontWeight: '600',
   },
@@ -135,10 +190,10 @@ export const chatStyles = StyleSheet.create({
     width: 7,
     height: 7,
     borderRadius: 4,
-    backgroundColor: 'rgba(255,255,255,0.4)',
+    backgroundColor: T.white40,
   },
   statusDotOnline: {
-    backgroundColor: '#34d399',
+    backgroundColor: T.mint,
   },
   headerActions: {
     flexDirection: 'row-reverse',
@@ -147,19 +202,20 @@ export const chatStyles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: T.white14,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderColor: T.white20,
   },
 
+  /* --------------------------------- Notices ------------------------------ */
   noticeBlocked: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     backgroundColor: OASIS.colors.dangerSoft,
     borderBottomWidth: 1,
-    borderColor: '#fca5a5',
+    borderColor: T.dangerBorder,
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
@@ -189,12 +245,12 @@ export const chatStyles = StyleSheet.create({
     gap: 6,
     backgroundColor: OASIS.colors.warningSoft,
     borderBottomWidth: 1,
-    borderColor: '#fde68a',
+    borderColor: T.warningBorder,
     paddingVertical: 6,
     paddingHorizontal: 12,
   },
   noticeMutedText: {
-    color: '#b45309',
+    color: T.warningText,
     fontSize: 11,
     fontWeight: '700',
   },
@@ -204,16 +260,17 @@ export const chatStyles = StyleSheet.create({
     gap: 6,
     backgroundColor: OASIS.colors.infoSoft,
     borderBottomWidth: 1,
-    borderColor: '#bae6fd',
+    borderColor: T.infoBorder,
     paddingVertical: 6,
     paddingHorizontal: 12,
   },
   noticeInfoText: {
-    color: '#0369a1',
+    color: T.infoText,
     fontSize: 11,
     fontWeight: '700',
   },
 
+  /* ------------------------------- Messages ------------------------------- */
   messagesList: {
     flex: 1,
     width: '100%',
@@ -230,11 +287,11 @@ export const chatStyles = StyleSheet.create({
   },
   dateDivider: {
     textAlign: 'center',
-    color: '#94a3b8',
+    color: T.slate300,
     fontSize: 11,
     fontWeight: '700',
     marginVertical: 14,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: T.slate50,
     alignSelf: 'center',
     paddingHorizontal: 10,
     paddingVertical: 3,
@@ -279,24 +336,16 @@ export const chatStyles = StyleSheet.create({
     paddingVertical: 10,
   },
   msgBubbleMine: {
-    backgroundColor: '#DCF0E2',
+    backgroundColor: T.mintBg,
     borderBottomLeftRadius: 4,
-    shadowColor: OASIS.colors.deep,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0,
-    shadowRadius: 6,
-    elevation: 2,
+    ...shadow(OASIS.colors.deep, 2),
   },
   msgBubbleOther: {
     backgroundColor: OASIS.colors.surface,
-    shadowColor: OASIS.colors.ink,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0,
-    shadowRadius: 5,
-    elevation: 1,
     borderBottomRightRadius: 4,
     borderWidth: 1,
     borderColor: OASIS.colors.line,
+    ...shadow(OASIS.colors.ink, 1, 5),
   },
   msgText: {
     fontSize: 14,
@@ -304,7 +353,9 @@ export const chatStyles = StyleSheet.create({
     color: OASIS.colors.ink,
     textAlign: 'right',
     flexShrink: 1,
-    ...(Platform.OS === 'web' ? ({ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' } as any) : {}),
+    ...(Platform.OS === 'web'
+      ? ({ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' } as unknown as object)
+      : {}),
   },
   msgTextMine: {
     color: OASIS.colors.ink,
@@ -320,12 +371,13 @@ export const chatStyles = StyleSheet.create({
   },
   msgTime: {
     fontSize: 11,
-    color: '#94a3b8',
+    color: T.slate300,
   },
   msgTimeMine: {
     color: OASIS.colors.muted,
   },
 
+  /* ------------------------------- Empty state ---------------------------- */
   emptyConv: {
     alignItems: 'center',
     paddingVertical: 50,
@@ -376,16 +428,13 @@ export const chatStyles = StyleSheet.create({
     fontWeight: '700',
   },
 
+  /* -------------------------------- Composer ------------------------------ */
   composerWrap: {
     backgroundColor: OASIS.colors.surface,
     borderTopWidth: 1,
     borderTopColor: OASIS.colors.line,
     paddingTop: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -3 },
-    shadowOpacity: 0,
-    shadowRadius: 6,
-    elevation: 3,
+    ...shadow('#000', 3, 6),
   },
   quickPromptsRow: {
     flexDirection: 'row-reverse',
@@ -396,7 +445,7 @@ export const chatStyles = StyleSheet.create({
   quickPromptPill: {
     backgroundColor: OASIS.colors.soft,
     borderWidth: 1,
-    borderColor: '#bbf7d0',
+    borderColor: T.mintBorder,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
@@ -437,11 +486,27 @@ export const chatStyles = StyleSheet.create({
   stickerEmoji: {
     fontSize: 25,
   },
+
+  /* --------------------------- Attachment row (جديد) --------------------- */
+  attachmentBtn: {
+    flex: 1,
+    minHeight: 44,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  attachmentLabel: {
+    fontSize: 12,
+    color: OASIS.colors.ink,
+  },
+
+  /* --------------------------------- Images ------------------------------- */
   messageImage: {
     width: 240,
     height: 220,
     borderRadius: 16,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: T.slate50,
   },
   imageCaption: {
     fontSize: 13,
@@ -457,9 +522,11 @@ export const chatStyles = StyleSheet.create({
     borderRadius: 16,
     overflow: 'hidden',
   },
+
+  /* ------------------------------- Lightbox ------------------------------- */
   lightboxBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.94)',
+    backgroundColor: T.overlayLightbox,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 16,
@@ -471,7 +538,7 @@ export const chatStyles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: T.white20,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 10,
@@ -480,6 +547,8 @@ export const chatStyles = StyleSheet.create({
     width: '100%',
     height: '80%',
   },
+
+  /* ------------------------------- Location ------------------------------- */
   locationCardOuter: {
     backgroundColor: OASIS.colors.surface,
     borderRadius: 16,
@@ -488,16 +557,12 @@ export const chatStyles = StyleSheet.create({
     maxWidth: 290,
     borderWidth: 1,
     borderColor: OASIS.colors.line,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0,
-    shadowRadius: 4,
-    elevation: 2,
     marginBottom: 4,
+    ...shadow('#000', 2, 4),
   },
   locationCardOuterMine: {
     backgroundColor: OASIS.colors.surface,
-    borderColor: '#a7f3d0',
+    borderColor: T.mintSoft,
   },
   locationCardHeader: {
     flexDirection: 'row-reverse',
@@ -513,7 +578,7 @@ export const chatStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#a7f3d0',
+    borderColor: T.mintSoft,
   },
   locationPinIconWrapMine: {
     backgroundColor: OASIS.colors.soft,
@@ -550,6 +615,8 @@ export const chatStyles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
+
+  /* --------------------------------- Input -------------------------------- */
   inputArea: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
@@ -570,7 +637,7 @@ export const chatStyles = StyleSheet.create({
   },
   attachCircleBtnBusy: {
     backgroundColor: OASIS.colors.soft,
-    borderColor: '#a7f3d0',
+    borderColor: T.mintSoft,
   },
   inputCapsule: {
     flex: 1,
@@ -608,11 +675,7 @@ export const chatStyles = StyleSheet.create({
     backgroundColor: OASIS.colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: OASIS.colors.primary,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0,
-    shadowRadius: 6,
-    elevation: 3,
+    ...shadow(OASIS.colors.primary, 3, 6),
   },
   sendButtonDisabled: {
     backgroundColor: OASIS.colors.primary,
@@ -621,7 +684,7 @@ export const chatStyles = StyleSheet.create({
   blockedInputArea: {
     backgroundColor: OASIS.colors.surface,
     borderTopWidth: 1,
-    borderColor: '#fca5a5',
+    borderColor: T.dangerBorder,
     padding: 16,
     alignItems: 'center',
     gap: 10,
@@ -644,9 +707,10 @@ export const chatStyles = StyleSheet.create({
     fontWeight: '600',
   },
 
+  /* --------------------------------- Modals ------------------------------- */
   optionsOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    backgroundColor: T.overlay,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 16,
@@ -656,11 +720,7 @@ export const chatStyles = StyleSheet.create({
     backgroundColor: OASIS.colors.surface,
     borderRadius: 14,
     padding: 18,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0,
-    shadowRadius: 12,
-    elevation: 8,
+    ...shadow('#000', 8, 12),
   },
   optionsHeader: {
     flexDirection: 'row-reverse',
@@ -668,7 +728,7 @@ export const chatStyles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 10,
     borderBottomWidth: 1,
-    borderColor: '#f1f5f9',
+    borderColor: T.slateBorderSoft,
     paddingBottom: 10,
   },
   optionsTitle: {
@@ -697,7 +757,7 @@ export const chatStyles = StyleSheet.create({
   },
   optionRowSub: {
     fontSize: 11,
-    color: '#94a3b8',
+    color: T.slate300,
     marginTop: 2,
     fontWeight: '600',
   },
@@ -709,11 +769,11 @@ export const chatStyles = StyleSheet.create({
     marginTop: 10,
     borderRadius: 14,
     borderWidth: 1.5,
-    borderColor: '#bae6fd',
+    borderColor: T.infoBorder,
     backgroundColor: OASIS.colors.infoSoft,
   },
   choiceCardDanger: {
-    borderColor: '#fecaca',
+    borderColor: T.dangerBorderSoft,
     backgroundColor: OASIS.colors.dangerSoft,
   },
   choiceTitle: {
@@ -729,35 +789,34 @@ export const chatStyles = StyleSheet.create({
     lineHeight: 16,
   },
 
+  /* ------------------------------ Coffee theme ---------------------------- */
   coffeeCircleBtn: {
     backgroundColor: OASIS.colors.warningSoft,
-    borderColor: '#fde68a',
+    borderColor: T.warningBorder,
   },
   quickPromptPillCoffee: {
     backgroundColor: OASIS.colors.warningSoft,
-    borderColor: '#fde68a',
+    borderColor: T.warningBorder,
   },
   quickPromptTextCoffee: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#92400e',
+    color: T.warningDeep,
   },
+
+  /* ---------------------------- Appreciation Card ------------------------- */
   appreciationCardOuter: {
     borderRadius: 14,
     overflow: 'hidden',
     minWidth: 230,
     maxWidth: 320,
     borderWidth: 1.5,
-    borderColor: '#fde68a',
-    shadowColor: '#b45309',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0,
-    shadowRadius: 6,
-    elevation: 3,
+    borderColor: T.warningBorder,
     marginBottom: 4,
+    ...shadow(T.warningText, 3, 6),
   },
   appreciationCardOuterMine: {
-    borderColor: '#fbbf24',
+    borderColor: T.warningAmber,
   },
   appreciationGrad: {
     padding: 13,
@@ -773,9 +832,9 @@ export const chatStyles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#fef3c7',
+    backgroundColor: T.warningBg,
     borderWidth: 1,
-    borderColor: '#fde68a',
+    borderColor: T.warningBorder,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 12,
@@ -783,7 +842,7 @@ export const chatStyles = StyleSheet.create({
   appreciationBadgeText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#92400e',
+    color: T.warningDeep,
   },
   appreciationCoffeeIconWrap: {
     width: 34,
@@ -791,14 +850,14 @@ export const chatStyles = StyleSheet.create({
     borderRadius: 17,
     backgroundColor: OASIS.colors.warningSoft,
     borderWidth: 1,
-    borderColor: '#fde68a',
+    borderColor: T.warningBorder,
     alignItems: 'center',
     justifyContent: 'center',
   },
   appreciationTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#78350f',
+    color: T.warningDarker,
     textAlign: 'right',
     marginBottom: 4,
   },
@@ -806,7 +865,7 @@ export const chatStyles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
     fontWeight: '700',
-    color: '#451a03',
+    color: T.warningDarkest,
     textAlign: 'right',
     marginBottom: 8,
   },
@@ -823,22 +882,18 @@ export const chatStyles = StyleSheet.create({
   appreciationFooterText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#92400e',
+    color: T.warningDeep,
     textAlign: 'right',
   },
 
-  /* Modal */
+  /* -------------------------- Appreciation Modal -------------------------- */
   appreciationModalCard: {
     width: '92%',
     maxWidth: 480,
     backgroundColor: OASIS.colors.surface,
     borderRadius: 14,
     padding: 18,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0,
-    shadowRadius: 16,
-    elevation: 8,
+    ...shadow('#000', 8, 16),
   },
   appreciationModalHeader: {
     marginBottom: 12,
@@ -851,9 +906,9 @@ export const chatStyles = StyleSheet.create({
     width: 54,
     height: 54,
     borderRadius: 14,
-    backgroundColor: '#fef3c7',
+    backgroundColor: T.warningBg,
     borderWidth: 2,
-    borderColor: '#fde68a',
+    borderColor: T.warningBorder,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 8,
@@ -861,7 +916,7 @@ export const chatStyles = StyleSheet.create({
   appreciationModalTitle: {
     fontSize: 17,
     fontWeight: '700',
-    color: '#78350f',
+    color: T.warningDarker,
     marginBottom: 4,
     textAlign: 'center',
   },
@@ -894,7 +949,7 @@ export const chatStyles = StyleSheet.create({
     borderRadius: 14,
   },
   appreciationChipSelected: {
-    backgroundColor: '#fef3c7',
+    backgroundColor: T.warningBg,
     borderColor: OASIS.colors.warning,
   },
   appreciationChipText: {
@@ -903,7 +958,7 @@ export const chatStyles = StyleSheet.create({
     color: OASIS.colors.muted,
   },
   appreciationChipTextSelected: {
-    color: '#92400e',
+    color: T.warningDeep,
     fontWeight: '700',
   },
   appreciationInput: {
@@ -930,11 +985,7 @@ export const chatStyles = StyleSheet.create({
     backgroundColor: OASIS.colors.primary,
     paddingVertical: 12,
     borderRadius: 14,
-    shadowColor: OASIS.colors.primary,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0,
-    shadowRadius: 6,
-    elevation: 3,
+    ...shadow(OASIS.colors.primary, 3, 6),
   },
   appreciationSendBtnText: {
     color: OASIS.colors.surface,

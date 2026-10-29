@@ -48,10 +48,12 @@ import { FeedSkeleton, ErrorBanner } from '@/components/home/HomeStates';
 import { styles } from '@/components/home/homeStyles';
 import { requireAccount } from '@/lib/authGate';
 import { useTheme } from '@/context/ThemeContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 
 export default function Home() {
   const { colors, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
   const { flags } = usePlatformConfig();
   const bottomNavInset = useBottomNavInset();
   const { showIsland } = useDynamicIsland();
@@ -65,6 +67,13 @@ export default function Home() {
   const [draftPeriod, setDraftPeriod] = useState('كل الأوقات');
   const [appliedFilters, setAppliedFilters] = useState({ kind: 'الكل', status: 'الكل', period: 'كل الأوقات' });
   const [refreshing, setRefreshing] = useState(false);
+  const activeFilters = (Object.keys(appliedFilters) as (keyof typeof appliedFilters)[]).filter(key => appliedFilters[key] !== (key === 'period' ? 'كل الأوقات' : 'الكل'));
+  const openFilters = () => {
+    setDraftKind(appliedFilters.kind);
+    setDraftStatus(appliedFilters.status);
+    setDraftPeriod(appliedFilters.period);
+    setFilterOpen(true);
+  };
   const scrollRef = useRef<ScrollView>(null);
   useEffect(() => {
     const listener = DeviceEventEmitter.addListener('hayna:home-scroll-top', () => scrollRef.current?.scrollTo({ y: 0, animated: true }));
@@ -241,7 +250,7 @@ export default function Home() {
         keyboardShouldPersistTaps="handled"
         onScroll={handleFeedScroll}
         scrollEventThrottle={300}
-        contentContainerStyle={{ paddingBottom: bottomNavInset + 24, backgroundColor: 'transparent', flexGrow: 1 }}
+        contentContainerStyle={{ paddingBottom: bottomNavInset + 24, paddingTop: 16, gap: 16, backgroundColor: 'transparent', flexGrow: 1 }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -253,33 +262,37 @@ export default function Home() {
         }
       >
         <View style={layout.contextRow}>
-          <View style={{ flex: 1.6, minWidth: 0 }}>
+          <View style={layout.locationTile}>
             <LocationScopeBar compact location={{ region: loc.region, city: loc.city, district: loc.district }} onLocationChanged={loc.apply} />
           </View>
-          <View style={{ flex: 1, minWidth: 0 }}>
+          <View style={layout.weatherTile}>
             <AtmosphereBar compact weather={loc.weather} weatherLoading={loc.weatherLoading} />
           </View>
         </View>
         <CommunityShortcuts signedIn={Boolean(feed.currentUserId)} />
 
-        {flags.stories !== false && Boolean(feed.currentUserId) && <View style={layout.stories}><StoriesRow profile={feed.profile} stories={feed.stories} selectedDistrict={loc.district} /></View>}
+        {flags.stories !== false && Boolean(feed.currentUserId) && <View style={layout.sectionShell}><View style={[layout.stories, { backgroundColor: colors.surface, borderColor: colors.line }]}><StoriesRow profile={feed.profile} stories={feed.stories} selectedDistrict={loc.district} /></View></View>}
 
         <View style={[styles.feedSection, layout.feed]}>
-          <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, gap: 4 }}>
-            <View style={{ flex: 1, minWidth: 0, flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}>
-              {([['newest', 'الأحدث'], ['engaged', 'الأكثر تفاعلاً'], ['nearby', 'من حيّك']] as const).map(([key, label]) => (
-                <Pressable oasisKind="plain" hitSlop={{ top: 6, bottom: 6 }} key={key} onPress={() => setSortBy(key)} style={{ flex: key === 'engaged' ? 1.6 : 1, minWidth: 0, height: 32, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', borderRadius: 16, gap: 3, paddingHorizontal: 4, backgroundColor: sortBy === key ? '#047857' : 'transparent' }} accessibilityRole="button" accessibilityState={{ selected: sortBy === key }}>
-                  {key === 'newest' ? <Clock3 size={11} color={sortBy === key ? '#FFFFFF' : colors.primary} /> : key === 'engaged' ? <TrendingUp size={11} color={sortBy === key ? '#FFFFFF' : colors.primary} /> : <MapPin size={11} color={sortBy === key ? '#FFFFFF' : colors.primary} />}
-                  <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85} style={{ flexShrink: 1, fontSize: 10, fontWeight: '600', color: sortBy === key ? '#FFFFFF' : colors.primary }}>{label}</Text>
-                </Pressable>
-              ))}
+          <View style={[layout.feedToolbar, { backgroundColor: colors.surface, borderColor: colors.line }]}>
+            <View style={layout.sortRow}>
+              <Pressable oasisKind="plain" hitSlop={{top:5,bottom:5}} style={[layout.filterButton, { backgroundColor: activeFilters.length ? colors.primary : colors.soft }]} onPress={openFilters} accessibilityRole="button" accessibilityLabel="تصفية المنشورات" accessibilityState={{ expanded: filterOpen }}>
+                <SlidersHorizontal size={12} color={activeFilters.length ? colors.surface : colors.primary} />
+                <Text numberOfLines={1} style={[layout.sortText, { color: activeFilters.length ? colors.surface : colors.primary }]}>تصفية{activeFilters.length ? ` ${activeFilters.length}` : ''}</Text>
+              </Pressable>
+              {([['newest', 'الأحدث'], ['engaged', 'الأكثر تفاعلاً'], ['nearby', 'من حيّنا']] as const).map(([key, label]) => {
+                const selected = sortBy === key;
+                const Icon = key === 'newest' ? Clock3 : key === 'engaged' ? TrendingUp : MapPin;
+                return <Pressable oasisKind="plain" hitSlop={{top:5,bottom:5}} key={key} onPress={() => setSortBy(key)} style={[layout.sortButton, { flex: key === 'engaged' ? 1.5 : 1, backgroundColor: selected ? colors.primary : 'transparent' }]} accessibilityRole="button" accessibilityState={{ selected }}>
+                  <Icon size={12} color={selected ? colors.surface : colors.muted} />
+                  <Text numberOfLines={1} style={[layout.sortText, { color: selected ? colors.surface : colors.muted }]}>{label}</Text>
+                </Pressable>;
+              })}
             </View>
-            <Pressable oasisKind="plain" hitSlop={4} style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }} onPress={() => { setDraftKind(appliedFilters.kind); setDraftStatus(appliedFilters.status); setDraftPeriod(appliedFilters.period); setFilterOpen(true); }} accessibilityRole="button" accessibilityLabel="تصفية المنشورات">
-              <SlidersHorizontal size={17} color={colors.primary} />
-              {(appliedFilters.kind !== 'الكل' || appliedFilters.status !== 'الكل' || appliedFilters.period !== 'كل الأوقات') && <View style={{ position: 'absolute', top: 5, right: 5, width: 6, height: 6, borderRadius: 3, backgroundColor: OASIS.colors.danger }} />}
-            </Pressable>
+            {!!activeFilters.length && <View style={layout.activeFilters}>
+              {activeFilters.map(key => <Pressable oasisKind="plain" key={key} onPress={() => setAppliedFilters(current => ({ ...current, [key]: key === 'period' ? 'كل الأوقات' : 'الكل' }))} accessibilityRole="button" accessibilityLabel={`إزالة تصفية ${appliedFilters[key]}`} style={[layout.filterChip, { borderColor: colors.line, backgroundColor: colors.soft }]}><Text style={[layout.filterChipText, { color: colors.primary }]}>{appliedFilters[key]}</Text><X size={13} color={colors.primary} /></Pressable>)}
+            </View>}
           </View>
-
 
           {feed.error && <ErrorBanner message={feed.error} onRetry={feed.reload} />}
 
@@ -326,20 +339,20 @@ export default function Home() {
       </View>
 
       <Modal visible={filterOpen} transparent animationType="slide" onRequestClose={() => setFilterOpen(false)}>
-        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(15,23,42,0.38)' }}>
-          <Pressable style={{ flex: 1 }} onPress={() => setFilterOpen(false)} accessibilityLabel="إغلاق لوحة التصفية" />
-          <View style={{ backgroundColor: '#f8fbf9', borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingHorizontal: 20, paddingTop: 18, paddingBottom: 16, maxHeight: '82%' }}>
+        <View style={[layout.filterOverlay, { paddingTop: Math.max(insets.top, 16), paddingBottom: Math.max(insets.bottom, 16), paddingHorizontal: Math.max(insets.left, insets.right, 16) }]}>
+          <Pressable oasisKind="plain" style={StyleSheet.absoluteFillObject} onPress={() => setFilterOpen(false)} accessibilityLabel="إغلاق لوحة التصفية" />
+          <View accessibilityViewIsModal style={[layout.filterSheet, { backgroundColor: colors.surface, borderColor: colors.line }]}>
             <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-              <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 9 }}>
-                <View style={{ width: 38, height: 38, borderRadius: 13, backgroundColor: '#dff4e9', alignItems: 'center', justifyContent: 'center' }}><SlidersHorizontal size={18} color="#176b52" /></View>
-                <View>
-                  <Text style={{ color: '#102a22', fontSize: 18, fontWeight: '700', textAlign: 'right' }}>تصفية المنشورات</Text>
-                  <Text style={{ color: '#718078', fontSize: 11, marginTop: 2, textAlign: 'right' }}>اعرض ما يناسبك من منشورات الحي</Text>
+              <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 9, flex: 1, minWidth: 0 }}>
+                <View style={{ width: 38, height: 38, borderRadius: 13, backgroundColor: colors.soft, alignItems: 'center', justifyContent: 'center' }}><SlidersHorizontal size={18} color={colors.primary} /></View>
+                <View style={{flex:1,minWidth:0}}>
+                  <Text style={{ color: colors.ink, fontSize: 18, fontWeight: '700', textAlign: 'right' }}>تصفية المنشورات</Text>
+                  <Text style={{ color: colors.muted, fontSize: 11, marginTop: 2, textAlign: 'right' }}>اعرض ما يناسبك من منشورات الحي</Text>
                 </View>
               </View>
-              <Pressable onPress={() => setFilterOpen(false)} style={{ padding: 8, borderRadius: 12, backgroundColor: '#eaf1ed' }} accessibilityLabel="إغلاق"><X size={18} color={OASIS.colors.muted} /></Pressable>
+              <Pressable onPress={() => setFilterOpen(false)} style={{ width:44, height:44, alignItems:'center', justifyContent:'center', borderRadius: 14, backgroundColor: colors.soft }} accessibilityLabel="إغلاق"><X size={18} color={OASIS.colors.muted} /></Pressable>
             </View>
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{flexShrink:1}}>
               {([
                 { title: 'نوع المنشور', value: draftKind, setter: setDraftKind, options: ['الكل', 'مساعدة وطلبات', 'إعارة أغراض', 'أسئلة واستفسارات', 'خدمات الحي', 'الطوارئ', ...(currentUserId ? ['منشوراتي'] : [])] },
                 { title: 'حالة الطلب', value: draftStatus, setter: setDraftStatus, options: ['الكل', 'بانتظار المساعدة', 'تم الرد', 'مكتمل'] },
@@ -352,10 +365,10 @@ export default function Home() {
                       const selected = section.value === option;
                       const OptionIcon = FILTER_OPTION_ICONS[option] || ListFilter;
                       return (
-                        <Pressable oasisKind="chip" oasisVariant={selected ? 'primary' : 'secondary'} key={option} onPress={() => section.setter(option)} style={{ width: '48%', minHeight: 36, borderRadius: 10, overflow: 'hidden', justifyContent: 'center', flexShrink: 0 }} accessibilityRole="button" accessibilityState={{ selected }}>
+                        <Pressable oasisKind="plain" oasisVariant={selected ? 'primary' : 'secondary'} key={option} onPress={() => section.setter(option)} style={{ flexGrow: 1, flexBasis: '46%', minHeight: 44, borderRadius: 14, justifyContent: 'center', paddingHorizontal: 10, paddingVertical: 8, borderWidth: 1, borderColor: selected ? colors.primary : colors.line, backgroundColor: selected ? colors.primary : colors.soft }} accessibilityRole="button" accessibilityState={{ selected }}>
                           <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
                             <OptionIcon size={14} color={(selected ? OASIS.colors.surface : OASIS.colors.deep)} />
-                            <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75} style={{ flexShrink: 1, color: (selected ? OASIS.colors.surface : OASIS.colors.deep), fontSize: 12, fontWeight: '700', textAlign: 'center' }}>{option}</Text>
+                            <Text style={{ flexShrink: 1, lineHeight: 20, color: (selected ? OASIS.colors.surface : OASIS.colors.deep), fontSize: 12, fontWeight: '700', textAlign: 'center' }}>{option}</Text>
                           </View>
                         </Pressable>
                       );
@@ -365,10 +378,10 @@ export default function Home() {
               ))}
             </ScrollView>
             <View style={{ flexDirection: 'row-reverse', gap: 10, marginTop: 12 }}>
-              <Pressable onPress={() => { setDraftKind('الكل'); setDraftStatus('الكل'); setDraftPeriod('كل الأوقات'); setAppliedFilters({ kind: 'الكل', status: 'الكل', period: 'كل الأوقات' }); setFilterOpen(false); }} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 48, borderRadius: 15, backgroundColor: OASIS.colors.surface, borderWidth: 1, borderColor: '#cbd5e1' }}>
+              <Pressable onPress={() => { setDraftKind('الكل'); setDraftStatus('الكل'); setDraftPeriod('كل الأوقات'); setAppliedFilters({ kind: 'الكل', status: 'الكل', period: 'كل الأوقات' }); setFilterOpen(false); }} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 48, borderRadius: 15, backgroundColor: OASIS.colors.surface, borderWidth: 1, borderColor: colors.line }}>
                 <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 7 }}><RotateCcw size={16} color={OASIS.colors.muted} /><Text style={{ color: OASIS.colors.muted, fontSize: 13, fontWeight: '700' }}>مسح الكل</Text></View>
               </Pressable>
-              <Pressable onPress={() => { setAppliedFilters({ kind: draftKind, status: draftStatus, period: draftPeriod }); setFilterOpen(false); }} style={{ flex: 1.4, alignItems: 'center', justifyContent: 'center', minHeight: 48, borderRadius: 15, backgroundColor: '#176b52' }}>
+              <Pressable onPress={() => { setAppliedFilters({ kind: draftKind, status: draftStatus, period: draftPeriod }); setFilterOpen(false); }} style={{ flex: 1.4, alignItems: 'center', justifyContent: 'center', minHeight: 48, borderRadius: 15, backgroundColor: colors.primary }}>
                 <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 7 }}><Check size={16} color={OASIS.colors.surface} /><Text style={{ color: OASIS.colors.surface, fontSize: 13, fontWeight: '700' }}>اعتماد التصفية</Text></View>
               </Pressable>
             </View>
@@ -382,8 +395,20 @@ export default function Home() {
 
 const layout = StyleSheet.create({
   page: { backgroundColor: 'transparent' },
-  contextRow: { width: '100%', maxWidth: 760, alignSelf: 'center', flexDirection: 'row-reverse', alignItems: 'stretch', gap: 8, paddingHorizontal: 14, paddingTop: 8, paddingBottom: 4 },
-  stories: { width: '100%', maxWidth: 728, alignSelf: 'center', backgroundColor: 'transparent', borderRadius: 12, overflow: 'hidden', marginBottom: 0 },
-  feed: { maxWidth: 760, marginTop: 0 },
-
+  contextRow: { width: '100%', maxWidth: 820, alignSelf: 'center', flexDirection: 'row-reverse', flexWrap: 'wrap', alignItems: 'stretch', gap: 10, paddingHorizontal: 16 },
+  locationTile: { flex: 1.6, minWidth: 160 },
+  weatherTile: { flex: 1, minWidth: 120 },
+  sectionShell: { width: '100%', maxWidth: 820, alignSelf: 'center', paddingHorizontal: 16 },
+  stories: { paddingVertical: 6, width: '100%', maxWidth: 788, alignSelf: 'center', borderWidth: 1, borderRadius: 22, overflow: 'hidden' },
+  feed: { width: '100%', maxWidth: 820, marginTop: 0, paddingHorizontal: 16 },
+  feedToolbar: { borderWidth: 1, borderRadius: 16, padding: 4, gap: 8, marginBottom: 12 },
+  filterButton: { flex: 0.9, minWidth: 0, height: 34, paddingHorizontal: 3, borderRadius: 11, flexDirection: 'row-reverse', gap: 3, alignItems: 'center', justifyContent: 'center' },
+  sortRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4 },
+  sortButton: { minWidth: 0, height: 34, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', borderRadius: 11, gap: 3, paddingHorizontal: 3 },
+  sortText: { fontSize: 10.5, lineHeight: 16, fontWeight: '600', flexShrink: 1, textAlign: 'center' },
+  activeFilters: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 },
+  filterChip: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: 10, minHeight: 32, paddingHorizontal: 8, maxWidth: '100%' },
+  filterChipText: { fontSize: 12, lineHeight: 20, flexShrink: 1 },
+  filterOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(15,23,42,0.45)' },
+  filterSheet: { width: '100%', maxWidth: 520, maxHeight: '90%', borderWidth: 1, borderRadius: 24, padding: 18 },
 });

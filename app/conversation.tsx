@@ -714,7 +714,7 @@ export default function Conversation() {
 
       <ScrollView
         ref={scrollRef}
-        style={styles.messagesList}
+        style={[styles.messagesList, { backgroundColor: 'transparent' }]}
         contentContainerStyle={[styles.messagesContent, { paddingBottom: 16 }]}
         showsVerticalScrollIndicator={false}
         onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}

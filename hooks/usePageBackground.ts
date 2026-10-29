@@ -8,6 +8,7 @@ export const DEFAULT_BACKGROUND_SOURCES = {
   welcome: require('../public/design-system/hayna-v1/artwork/welcome-art.png'),
   login: require('../public/design-system/hayna-v1/artwork/welcome-art.png'),
   app: require('../public/welcome/hayna-app-background.png'),
+  chat: require('../public/welcome/hayna-app-background.png'),
 };
 
 export function usePageBackground(slot: BackgroundSlot) {

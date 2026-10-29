@@ -1,7 +1,7 @@
 export const BACKGROUND_BUCKET = 'branding';
 export const BACKGROUND_CONFIG_KEY = 'page_backgrounds';
 export const MAX_BACKGROUND_BYTES = 5 * 1024 * 1024;
-export const BACKGROUND_SLOTS = ['welcome', 'login', 'app'] as const;
+export const BACKGROUND_SLOTS = ['welcome', 'login', 'app', 'chat'] as const;
 export type BackgroundSlot = typeof BACKGROUND_SLOTS[number];
 export type PageBackground = { path: string | null; lightOpacity: number; darkOpacity: number };
 export type PageBackgrounds = Record<BackgroundSlot, PageBackground>;
@@ -9,6 +9,7 @@ export const DEFAULT_PAGE_BACKGROUNDS: PageBackgrounds = {
   welcome: { path: null, lightOpacity: 1, darkOpacity: 1 },
   login: { path: null, lightOpacity: 0.32, darkOpacity: 0.32 },
   app: { path: null, lightOpacity: 0.27, darkOpacity: 0.16 },
+  chat: { path: null, lightOpacity: 0.27, darkOpacity: 0.16 },
 };
 
 export function isBackgroundPath(path: unknown): path is string {
