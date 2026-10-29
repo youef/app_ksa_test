@@ -1,0 +1,79 @@
+name: HAYNA Security · Dependency Audit
+
+on:
+  pull_request:
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/security-dependency-audit.yml'
+  schedule:
+    - cron: '27 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hayna-dependency-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  production-dependencies:
+    name: Audit production dependency vulnerabilities
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout source without persisted credentials
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Audit locked production dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          # npm audit returns a nonzero exit status when vulnerabilities exist.
+          # Capture JSON and validate it separately so registry/network failures
+          # cannot be silently treated as a clean security report.
+          npm audit --omit=dev --audit-level=high --json > artifacts/npm-audit.json || true
+          node - <<'NODE'
+          const fs = require('node:fs');
+          let report;
+          try {
+            report = JSON.parse(fs.readFileSync('artifacts/npm-audit.json', 'utf8'));
+          } catch {
+            console.error('SECURITY AUDIT INCOMPLETE: registry returned invalid or empty JSON');
+            process.exit(2);
+          }
+          if (report.error || !report.metadata?.vulnerabilities) {
+            console.error('SECURITY AUDIT INCOMPLETE: npm registry/audit response unavailable');
+            process.exit(2);
+          }
+          const v = report.metadata.vulnerabilities;
+          const high = Number(v.high || 0);
+          const critical = Number(v.critical || 0);
+          console.log('Production dependency vulnerability counts:', JSON.stringify({
+            low: v.low || 0, moderate: v.moderate || 0, high, critical
+          }));
+          if (high + critical > 0) {
+            console.error('ACTION REQUIRED: high/critical production dependency advisories found.');
+            process.exit(1);
+          }
+          console.log('No high/critical production dependency advisories reported.');
+          NODE
+
+      - name: Preserve audit evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: hayna-production-dependency-audit
+          path: artifacts/npm-audit.json
+          if-no-files-found: warn
+          retention-days: 14
