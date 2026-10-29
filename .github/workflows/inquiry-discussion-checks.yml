@@ -21,6 +21,11 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Verify hourly agent script syntax
+        run: |
+          node --check scripts/hayna-ai-audit.mjs
+          node --check scripts/hayna-ai-advisor.mjs
+          node --check scripts/hayna-ai-recover-install.mjs
       - name: TypeScript check
         run: npm run typecheck
 
