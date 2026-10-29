@@ -196,13 +196,13 @@ function HomeHeroBase({
             accessibilityLabel={`الموقع الحالي: ${locationDisplay}. اضغط لتغيير الحي`}
             accessibilityHint="يفتح اختيار المدينة والحي"
           >
-            <MapPin size={16} color={OASIS.colors.mintBorder} />
+            <MapPin size={16} color={OASIS.colors.primary} />
             <Text style={styles.locationPillText} numberOfLines={1}>
               {locationDisplay}
             </Text>
             <View style={styles.locationPillCta}>
               <Text style={styles.locationPillCtaText}>تغيير الحي</Text>
-              <ChevronDown size={14} color={OASIS.colors.mintSoft} />
+              <ChevronDown size={14} color={OASIS.colors.primary} />
             </View>
           </Pressable>
         </View>
@@ -219,7 +219,7 @@ function HomeHeroBase({
               value={searchQuery}
               onChangeText={onSearchChange}
               placeholder="ابحث عن سؤال، أداة، أو فزعة في حيك..."
-              placeholderTextColor={OASIS.colors.slatePlaceholder}
+              placeholderTextColor={OASIS.colors.muted}
               returnKeyType="search"
               autoCorrect={false}
               autoCapitalize="none"
@@ -234,7 +234,7 @@ function HomeHeroBase({
                 accessibilityLabel="مسح البحث"
                 hitSlop={8}
               >
-                <X size={16} color={OASIS.colors.slatePlaceholder} />
+                <X size={16} color={OASIS.colors.muted} />
               </Pressable>
             )}
           </View>
