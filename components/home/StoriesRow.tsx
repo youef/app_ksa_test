@@ -150,7 +150,7 @@ function StoriesRowBase({ stories, selectedDistrict }: Props) {
                 <View
                   style={[
                     styles.storyInnerBorder,
-                    isDark && styles.storyInnerBorderDark,
+                    isDark && {borderColor:colors.line,backgroundColor:colors.background},
                   ]}
                 >
                   {preview}
@@ -163,7 +163,7 @@ function StoriesRowBase({ stories, selectedDistrict }: Props) {
               </LinearGradient>
 
               <Text
-                style={[styles.storyName, isDark && styles.storyNameDark]}
+                style={[styles.storyName, isDark && {color:colors.ink}]}
                 numberOfLines={1}
               >
                 {authorName}

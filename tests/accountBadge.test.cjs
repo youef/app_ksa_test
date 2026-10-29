@@ -29,6 +29,8 @@ function loadSource(relative, dependencies = {}) {
 const badges = loadSource('components/profile/AccountIdentityBadge.tsx');
 const { ProfileHeader } = loadSource('components/profile/ProfileHeader.tsx', {
   './AccountIdentityBadge': badges,
+  '@/lib/contactPhone': loadSource('lib/contactPhone.ts'),
+  '@/lib/profileContact': { loadProfileContact: async () => null },
   '@/context/ThemeContext': { useTheme: () => ({ colors }) },
   '@/lib/profileTheme': { bannerColors: () => ['#111', '#222', '#333'] },
   'expo-linear-gradient': { LinearGradient: view },
@@ -52,7 +54,7 @@ test('unverified individual is not presented as verified', () => {
 test('verified business uses a single combined identity badge', () => {
   const html = renderToStaticMarkup(React.createElement(badges.AccountIdentityBadge, { accountType: 'merchant', isVerified: true }));
   assert.equal((html.match(/<svg/g) || []).length, 1);
-  assert.ok(html.includes('نشاط تجاري موثّق'));
+  assert.ok(html.includes('حساب تجاري معتمد لدى حيّنا'));
 });
 test('legacy avatar identity icon does not add a second verification dot', () => {
   const html = renderToStaticMarkup(React.createElement(badges.AccountIdentityIcon, { role: 'admin', isVerified: true }));

@@ -3,7 +3,7 @@ const {createDatabase,asUser}=require('./databaseHarness.cjs');
 const id=n=>`41000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
 test('neighbor profile scope and direct-message preferences are enforced by PostgreSQL',async t=>{
  const schema=`
- create table profiles(id uuid primary key,username text,city text,district text,hide_name boolean default false,is_banned boolean default false,profile_privacy text default 'public',allow_dms text default 'everyone');
+ create table profiles(id uuid primary key,username text,city text,district text,region text default 'الرياض',hide_name boolean default false,is_banned boolean default false,profile_privacy text default 'public',allow_dms text default 'everyone');
  create table blocks(blocker_id uuid,blocked_id uuid);create table follows(follower_id uuid,following_id uuid);
  create table admin_permissions(admin_id uuid,permission text,enabled boolean);create table admin_roles(key text,permissions jsonb);create table admin_role_assignments(user_id uuid,role_key text);
  create table conversations(id uuid primary key default gen_random_uuid(),created_by uuid,created_at timestamptz default now());
@@ -27,6 +27,14 @@ test('neighbor profile scope and direct-message preferences are enforced by Post
  const db=await createDatabase({schema,migration:fs.readFileSync('artifacts/neighbor-privacy.sql','utf8')});t.after(()=>db.close());
  await db.exec(`create policy allowed_message on messages for insert to authenticated with check(sender_id=auth.uid() and public.hayna_can_message_conversation(conversation_id,auth.uid()));`);
  let conversation;
+ await t.test('matching city and district labels in another region do not expose profiles or enable DMs',async()=>{
+  await asUser(db,null,'service_role');
+  await db.query("insert into profiles(id,username,city,district,region)values($1,'same_name_other_region','الرياض','النرجس','المدينة المنورة')",[id(6)]);
+  await asUser(db,id(1));
+  assert.equal((await db.query('select * from profiles where id=$1',[id(6)])).rows.length,0);
+  assert.equal((await db.query('select hayna_neighbor_access($1) r',[id(6)])).rows[0].r.can_view,false);
+  assert.equal((await db.query('select hayna_can_dm($1,$2) ok',[id(1),id(6)])).rows[0].ok,false);
+ });
  await t.test('different cities cannot read profiles even with old SELECT true policies',async()=>{
   await asUser(db,id(1));assert.equal((await db.query('select * from profiles where id=$1',[id(4)])).rows.length,0);
   assert.equal((await db.query('select * from profile_customizations')).rows.length,0);

@@ -1,63 +1,69 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const ts = require('typescript');
-const fs = require('node:fs');
-const vm = require('node:vm');
+const ts = require('typescript'), fs = require('node:fs'), vm = require('node:vm');
 function load(relative, mocks, globals = {}) {
-  const filename = require.resolve(relative);
+  const filename = require.resolve(relative), module = { exports: {} };
   const code = ts.transpileModule(fs.readFileSync(filename, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
-  const module = { exports: {} };
   vm.runInNewContext(code, { module, exports: module.exports, require: name => { if (!(name in mocks)) throw Error('Unexpected import: ' + name); return mocks[name]; }, console, __DEV__: false, ...globals }, { filename });
   return module.exports;
 }
-test('failed image uploads never publish a local device URL as a success', async () => {
-  const api = load('../lib/storyUpload.ts', { './supabase': { supabase: { storage: { from: () => ({ upload: async () => ({ error: { message: 'offline' } }) }) } } } }, { fetch: async () => ({ arrayBuffer: async () => new ArrayBuffer(1) }) });
-  await assert.rejects(api.uploadStoryImage({ uri: 'file:///private/photo.jpg', userId: 'owner', index: 0 }));
-  const fallback = await api.uploadStoryImage({ uri: 'file:///private/photo.jpg', base64: 'YQ==', userId: 'owner', index: 0 });
-  assert.equal(fallback.strategy, 'base64');
-  assert.equal(fallback.url.startsWith('data:image/jpeg;base64,'), true);
+test('failed resumable image uploads never publish local or inline data URLs as success', async () => {
+  let attempts = 0;
+  const api = load('../lib/storyUpload.ts', {
+    './storyTus': { uploadResumableStory: async () => { attempts++; throw Error('offline'); } },
+    'react-native': { Platform: { OS: 'android' }, Image: { getSize: (_uri, resolve) => resolve(640, 480) } },
+    './supabase': { supabase: { storage: { from: () => ({ getPublicUrl: () => assert.fail('failed upload cannot return a public URL') }) } } }
+  }, { Blob, fetch: async () => ({ ok: true, blob: async () => new Blob([new Uint8Array([0xff, 0xd8, 0xff, 0x00])], { type: 'image/jpeg' }) }) });
+  await assert.rejects(api.uploadStoryImage({ uri: 'file:///private/photo.jpg', userId: 'owner', index: 0 }), /offline/);
+  await assert.rejects(api.uploadStoryImage({ uri: 'file:///private/photo.jpg', base64: 'YQ==', userId: 'owner', index: 0 }), /offline/);
+  assert.equal(attempts, 2);
 });
-test('publishing obeys account-wide disabled replies even when the composer requests replies', async () => {
-  let inserted;
-  const profileQuery = { select() { return this; }, eq() { return this; }, async single() { return { data: { allow_story_replies: 'nobody' }, error: null }; } };
-  const supabase = { auth: { getUser: async () => ({ data: { user: { id: 'owner' } } }) }, from: table => table === 'profiles' ? profileQuery : { insert: rows => { inserted = rows; return { select: async () => ({ data: rows.map((_, i) => ({ id: 'published-' + i })), error: null }) }; } } };
-  const api = load('../lib/storyPublish.ts', { './supabase': { supabase }, './storyGradients': { getGradient: () => ({ colors: ['#166044'] }) }, './storySlides': { selectPublishableSlides: rows => rows }, './storyTypes': { STORY_LIMITS: { ttlMs: 86400000 } }, './storyUpload': { uploadStoryImage: async () => { throw Error('text should not upload'); } } });
-  const result = await api.publishStorySlides([{ type: 'text', content: 'يومي في الحي', bgGradId: 0 }], undefined, { audience: 'followers', allowedUserIds: [], hiddenUserIds: [], allowReplies: true, interactiveType: 'none' });
-  assert.equal(result.publishedCount, 1);
-  assert.equal(inserted[0].allow_replies, false);
-  assert.equal(inserted[0].visibility, 'followers');
-});
-
-function publisherWithResults(results) {
-  const profile = { select() { return this; }, eq() { return this; }, async single() { return { data: { allow_story_replies: 'everyone' }, error: null }; } };
-  const supabase = { auth: { getUser: async () => ({ data: { user: { id: 'owner' } } }) }, from: table => table === 'profiles' ? profile : { insert: () => ({ select: async () => {
-    assert.ok(results.length, 'Unexpected duplicate insert');
-    return results.shift();
-  } }) } };
-  return load('../lib/storyPublish.ts', { './supabase': { supabase }, './storyGradients': { getGradient: () => ({ colors: ['#166044'] }) }, './storySlides': { selectPublishableSlides: rows => rows }, './storyTypes': { STORY_LIMITS: { ttlMs: 86400000 } }, './storyUpload': { uploadStoryImage: async () => { throw Error('text should not upload'); } } });
+function publisherWithResults(results, { replies = 'everyone', recent = [] } = {}) {
+  const calls = { inserts: 0, uploads: 0 };
+  const recentQuery = { eq() { return this; }, order() { return this; }, async limit() { return { data: recent, error: null }; } };
+  const profile = { select() { return this; }, eq() { return this; }, async single() { return { data: { allow_story_replies: replies }, error: null }; } };
+  const supabase = {
+    auth: { getUser: async () => ({ data: { user: { id: 'owner' } } }) },
+    from: table => table === 'profiles' ? profile : {
+      select: () => recentQuery,
+      insert: rows => ({ select: async () => { calls.inserts++; calls.rows = rows; assert.ok(results.length, 'Unexpected duplicate insert'); return results.shift(); } })
+    }
+  };
+  const api = load('../lib/storyPublish.ts', {
+    './supabase': { supabase }, './storyGradients': { getGradient: () => ({ colors: ['#166044'] }) },
+    './storySlides': { selectPublishableSlides: rows => rows }, './storyTypes': { STORY_LIMITS: { ttlMs: 86400000 } },
+    './storyUpload': { uploadStoryImage: async () => { calls.uploads++; throw Error('text should not upload'); } }
+  });
+  return { api, calls };
 }
-
+const slide = { type: 'text', content: 'يومي في الحي', bgGradId: 0 };
+test('account-wide disabled replies override the composer and preserve the chosen audience', async () => {
+  const { api, calls } = publisherWithResults([{ data: [{ id: 'published' }], error: null }], { replies: 'nobody' });
+  const result = await api.publishStorySlides([slide], undefined, { audience: 'followers', allowedUserIds: [], hiddenUserIds: [], allowReplies: true, interactiveType: 'none' });
+  assert.equal(result.publishedCount, 1); assert.equal(calls.rows[0].allow_replies, false); assert.equal(calls.rows[0].visibility, 'followers');
+});
 test('a silently blocked insert never reports a published story', async () => {
-  const api = publisherWithResults([{ data: [], error: null }]);
-  const result = await api.publishStorySlides([{ type: 'text', content: 'draft', bgGradId: 0 }]);
-  assert.equal(result.publishedCount, 0);
-  assert.equal(result.firstPublishedId, undefined);
-  assert.equal(result.failures.length, 1);
+  const { api, calls } = publisherWithResults([{ data: [], error: null }]);
+  const result = await api.publishStorySlides([slide]);
+  assert.equal(result.publishedCount, 0); assert.equal(result.firstPublishedId, undefined); assert.equal(result.failures.length, 1); assert.equal(calls.inserts, 1);
 });
-
-test('partial moderation counts only returned rows and does not retry the blocked batch', async () => {
-  const api = publisherWithResults([{ data: [{ id: 'allowed' }], error: null }]);
-  const result = await api.publishStorySlides([{ type: 'text', content: 'one', bgGradId: 0 }, { type: 'text', content: 'two', bgGradId: 0 }]);
-  assert.equal(result.publishedCount, 1);
-  assert.equal(result.requestedCount, 2);
-  assert.equal(result.firstPublishedId, 'allowed');
-  assert.equal(result.failures.length, 1);
+test('only one story per publishing window is accepted before uploads or inserts', async () => {
+  const { api, calls } = publisherWithResults([]);
+  const result = await api.publishStorySlides([slide, { ...slide, content: 'شريحة أخرى' }]);
+  assert.equal(result.publishedCount, 0); assert.equal(result.requestedCount, 2); assert.equal(calls.inserts, 0); assert.equal(calls.uploads, 0);
 });
-
-test('row fallback keeps the first published ID and handles a silently blocked row', async () => {
-  const api = publisherWithResults([{ data: null, error: { message: 'batch rejected' } }, { data: [], error: null }, { data: [{ id: 'allowed' }], error: null }]);
-  const result = await api.publishStorySlides([{ type: 'text', content: 'one', bgGradId: 0 }, { type: 'text', content: 'two', bgGradId: 0 }]);
-  assert.equal(result.publishedCount, 1);
-  assert.equal(result.firstPublishedId, 'allowed');
-  assert.equal(result.failures.length, 1);
+test('an insert failure never retries a removed upload or reports success', async () => {
+  const { api, calls } = publisherWithResults([{ data: null, error: { message: 'batch rejected' } }]);
+  const result = await api.publishStorySlides([slide]);
+  assert.equal(result.publishedCount, 0); assert.equal(result.firstPublishedId, undefined); assert.equal(calls.inserts, 1); assert.match(result.failures[0], /batch rejected/);
+});
+test('recent stories enforce the three-hour cooldown before a write', async () => {
+  const { api, calls } = publisherWithResults([], { recent: [{ created_at: new Date(Date.now() - 60000).toISOString() }] });
+  const result = await api.publishStorySlides([slide]);
+  assert.equal(result.publishedCount, 0); assert.equal(calls.inserts, 0); assert.equal(calls.uploads, 0);
+});
+test('an expired publishing window permits one server-confirmed story', async () => {
+  const { api } = publisherWithResults([{ data: [{ id: 'confirmed' }], error: null }], { recent: [{ created_at: new Date(Date.now() - 10801000).toISOString() }] });
+  const result = await api.publishStorySlides([slide]);
+  assert.equal(result.publishedCount, 1); assert.equal(result.firstPublishedId, 'confirmed');
 });

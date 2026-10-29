@@ -9,8 +9,28 @@ permissions:
   contents: write
 
 jobs:
+  native-setup:
+    name: Check signed mobile build setup
+    permissions: {}
+    runs-on: ubuntu-latest
+    outputs:
+      configured: ${{ steps.expo-token.outputs.configured }}
+    steps:
+      - name: Check Expo credential availability without exposing it
+        id: expo-token
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -n "$EXPO_TOKEN" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::EXPO_TOKEN is missing. Signed APK and TestFlight builds are skipped; platform JavaScript bundles are checked separately."
+          fi
   web:
     name: Build Web Export
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -27,6 +47,8 @@ jobs:
 
   eas-build:
     name: Build Android APK & iOS TestFlight
+    needs: native-setup
+    if: needs.native-setup.outputs.configured == 'true'
     runs-on: ubuntu-latest
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}

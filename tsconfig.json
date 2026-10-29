@@ -7,5 +7,5 @@
       "@/*": ["./*"]
     }
   },
-  "exclude": ["node_modules", "supabase/functions", "dist", "build"]
+  "exclude": ["node_modules", "**/node_modules", "app_ksa_test", "supabase/functions", "dist", "build"]
 }

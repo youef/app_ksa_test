@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { ReactNode, ComponentProps } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { OasisSurface } from '@/components/oasis/OasisPrimitives';
 import { useTheme } from '@/context/ThemeContext';
@@ -24,10 +24,10 @@ export type OasisGlassFrameProps = {
 /*                               Config                                       */
 /* -------------------------------------------------------------------------- */
 
-const SURFACE_ASSET: Record<GlassFrameVariant, string> = {
+const SURFACE_ASSET = {
   weather: 'cards/notice-small',
   location: 'cards/default-small',
-};
+} as const satisfies Record<GlassFrameVariant, NonNullable<ComponentProps<typeof OasisSurface>['oasisAsset']>>;
 
 /* -------------------------------------------------------------------------- */
 /*                               Component                                    */
