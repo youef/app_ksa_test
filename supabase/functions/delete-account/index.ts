@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { ACCOUNT_MEDIA_BUCKETS, accountMediaPrefixes } from "./storageBuckets.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -45,11 +46,8 @@ serve(async (req) => {
     // the Storage API before deleting the Auth user (Auth rejects owners with
     // remaining Storage objects). `avatars` also stores story images under a
     // story_<account-id> folder.
-    const buckets = ["avatars", "chat-media", "service-images", "stories"];
-    for (const bucket of buckets) {
-      const prefixes = bucket === "avatars"
-        ? [user.id, `story_${user.id}`]
-        : [user.id];
+    for (const bucket of ACCOUNT_MEDIA_BUCKETS) {
+      const prefixes = accountMediaPrefixes(bucket, user.id);
       const paths: string[] = [];
       const listTree = async (prefix: string) => {
         let offset = 0;
