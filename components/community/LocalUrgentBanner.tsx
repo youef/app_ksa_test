@@ -48,9 +48,9 @@ function isAllValue(v?: string | null): boolean {
   return !v || v.startsWith('كل ');
 }
 
-function sanitizeFilterValue(v: string): string {
+function sanitizeFilterValue(v?: string | null): string {
   // منع حقن PostgREST: إزالة الفواصل والأقواس والرموز الخاصة
-  return v.replace(/[,()=*&%_\s]/g, '').slice(0, SAFE_FIELD_MAX);
+  return (v || '').replace(/[,()=*&%_]/g, '').replace(/\s+/g, ' ').trim().slice(0, SAFE_FIELD_MAX);
 }
 
 function resolveSeverity(raw: string): Severity {
