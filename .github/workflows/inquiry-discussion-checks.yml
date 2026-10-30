@@ -26,6 +26,8 @@ jobs:
           node --check scripts/hayna-ai-audit.mjs
           node --check scripts/hayna-ai-advisor.mjs
           node --check scripts/hayna-ai-recover-install.mjs
+      - name: Verify web response security headers
+        run: node --test tests/vercelSecurityHeaders.test.cjs
       - name: TypeScript check
         run: npm run typecheck
 
