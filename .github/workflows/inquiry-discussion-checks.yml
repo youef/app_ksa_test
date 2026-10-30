@@ -33,6 +33,8 @@ jobs:
           node --check scripts/hayna-ai-recover-install.mjs
       - name: Verify CI least-privilege regression
         run: node --test tests/workflowLeastPrivilege.test.cjs
+      - name: Verify patched shell-quote dependency
+        run: node --test tests/shellQuoteAdvisory.test.cjs
       - name: Verify web response security headers
         run: node --test tests/vercelSecurityHeaders.test.cjs
       - name: TypeScript check
