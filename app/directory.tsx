@@ -36,7 +36,8 @@ export default function Directory() {
       const loc = await getActiveLocation();
       if (ticket !== request.current) return;
       setLocation(loc);
-      const result = await fetchDirectoryPage(supabase, { location: loc, kind, search, verified, sort, page: targetPage });
+      // The directory is city-wide: the saved neighborhood must never hide other districts.
+      const result = await fetchDirectoryPage(supabase, { location: { ...loc, district: 'كل الأحياء' }, kind, search, verified, sort, page: targetPage });
       if (ticket !== request.current) return;
       setItems(previous => {
         const merged = append ? [...previous, ...result.items] : result.items;
@@ -51,19 +52,20 @@ export default function Directory() {
   }, [kind, search, verified, sort, revision]);
   useFocusEffect(useCallback(() => { void load(); return () => { request.current++; moreLock.current = false; }; }, [load]));
   const reset = () => { setQuery(''); setKind('all'); setVerified(false); setSort('recent'); };
-  const locationLabel = isAllKingdom(location.city) ? 'كل المملكة' : [location.district && location.district !== 'كل الأحياء' ? 'حي ' + location.district : null, location.city].filter(Boolean).join(' · ');
+  const locationLabel = isAllKingdom(location.city) ? 'كل مدن المملكة' : 'مدينة ' + location.city + ' · جميع الأحياء';
   return <View style={s.screen}>
-    <AppHeader variant="sub" title="دليل الحي" subtitle={locationLabel} fallbackRoute="/more" />
+    <AppHeader variant="sub" title="دليل المدينة" subtitle={locationLabel} fallbackRoute="/more" />
     <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={[s.page, { paddingBottom: bottom }]} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load(false, true)} tintColor={c.primary} />}>
       <OasisSurface oasisSurface="card" style={[s.intro, { borderColor: c.line }]}>
         <View style={[s.introIcon, { backgroundColor: c.soft }]}><BriefcaseBusiness size={25} color={c.primary} /></View>
-        <View style={s.grow}><Text style={[s.introTitle, { color: c.ink }]}>أعمال قريبة، وخيارات أوضح</Text><Text style={[s.secondary, { color: c.muted }]}>اكتشف المنشآت والخدمات المعتمدة في نطاق تصفحك.</Text></View>
+        <View style={s.grow}><Text style={[s.introTitle, { color: c.ink }]}>دليل المنشآت والخدمات في مدينتك</Text><Text style={[s.secondary, { color: c.muted }]}>تصفح جميع أحياء المدينة، وابحث عن المنشآت والخدمات المنشورة في حيّنا.</Text></View>
       </OasisSurface>
       <OasisSurface oasisSurface="field" style={[s.search, { borderColor: c.line }]}>
         <Search size={20} color={c.primary} />
-        <TextInput accessibilityLabel="البحث في دليل الحي" value={query} onChangeText={setQuery} maxLength={80} placeholder="اسم المنشأة أو الخدمة…" style={[s.input, { color: c.ink }]} returnKeyType="search" />
+        <TextInput accessibilityLabel="البحث في دليل المدينة" value={query} onChangeText={setQuery} maxLength={80} placeholder="ابحث عن منشأة أو خدمة أو حي…" style={[s.input, { color: c.ink }]} returnKeyType="search" />
         {!!query && <Pressable accessibilityRole="button" accessibilityLabel="مسح البحث" onPress={() => setQuery('')} style={s.clear}><X size={18} color={c.muted} /></Pressable>}
       </OasisSurface>
+      <View style={[s.scope, { backgroundColor: c.soft }]}><MapPin size={18} color={c.primary} /><View style={s.grow}><Text style={[s.resultTitle, { color: c.primary }]}>{locationLabel}</Text><Text style={[s.secondary, { color: c.muted }]}>عرض المنشآت والخدمات في جميع الأحياء دون تغيير موقع حسابك</Text></View></View>
       <View style={[s.segment, { backgroundColor: c.surface, borderColor: c.line }]}>
         {([{ value: 'all', title: 'الكل', Icon: BriefcaseBusiness }, { value: 'business', title: 'المنشآت', Icon: Store }, { value: 'service', title: 'الخدمات', Icon: Wrench }] as const).map(({ value, title, Icon }) => <Pressable key={value} accessibilityRole="button" accessibilityState={{ selected: kind === value }} onPress={() => setKind(value)} style={[s.segmentButton, kind === value && { backgroundColor: c.primary }]}><Icon size={16} color={kind === value ? '#fff' : c.muted} /><Text style={[s.chipText, { color: kind === value ? '#fff' : c.muted }]}>{title}</Text></Pressable>)}
       </View>
@@ -72,10 +74,10 @@ export default function Directory() {
         <Pressable accessibilityRole="button" accessibilityLabel={sort === 'recent' ? 'الترتيب الحالي الأحدث، التغيير إلى أبجدي' : 'الترتيب الحالي أبجدي، التغيير إلى الأحدث'} onPress={() => setSort(value => value === 'recent' ? 'name' : 'recent')} style={[s.chip, { backgroundColor: c.surface, borderColor: c.line }]}><ArrowDownAZ size={16} color={c.muted} /><Text style={[s.chipText, { color: c.muted }]}>{sort === 'recent' ? 'الأحدث' : 'أبجديًا'}</Text></Pressable>
       </View>
       <View style={[s.row, { justifyContent: 'space-between' }]}><Text style={[s.resultTitle, { color: c.ink }]}>{loading ? 'نبحث في نطاقك…' : items.length.toLocaleString('ar-SA') + ' نتيجة معروضة'}</Text>{(search || kind !== 'all' || verified) && <Pressable accessibilityRole="button" onPress={reset}><Text style={{ color: c.primary, fontSize: 12 }}>إعادة الضبط</Text></Pressable>}</View>
-      {loading ? <View style={s.state}><ActivityIndicator color={c.primary} size="large" /><Text style={[s.secondary, { color: c.muted }]}>جارٍ تحميل دليل الحي…</Text></View> : <>
+      {loading ? <View style={s.state}><ActivityIndicator color={c.primary} size="large" /><Text style={[s.secondary, { color: c.muted }]}>جارٍ تحميل دليل المدينة…</Text></View> : <>
         {items.map(item => <DirectoryCard key={item.kind + item.id} item={item} />)}
         {!!error && <OasisSurface oasisSurface="card" style={s.state}><Text style={[s.secondary, { color: c.muted }]}>{error}</Text><Pressable style={[s.action, { backgroundColor: c.primary }]} onPress={() => void load(items.length > 0)}><Text style={s.white}>إعادة المحاولة</Text></Pressable></OasisSurface>}
-        {!items.length && !error && <OasisSurface oasisSurface="card" style={s.state}><SlidersHorizontal size={32} color={c.primary} /><Text style={[s.introTitle, { color: c.ink }]}>لم نعثر على نتائج مطابقة</Text><Text style={[s.secondary, { color: c.muted }]}>جرّب اسمًا آخر أو خفّف الفلاتر. لن نغيّر نطاق موقعك تلقائيًا.</Text><Pressable onPress={reset} style={[s.action, { backgroundColor: c.primary }]}><Text style={s.white}>مسح الفلاتر</Text></Pressable></OasisSurface>}
+        {!items.length && !error && <OasisSurface oasisSurface="card" style={s.state}><SlidersHorizontal size={32} color={c.primary} /><Text style={[s.introTitle, { color: c.ink }]}>لم نعثر على نتائج مطابقة</Text><Text style={[s.secondary, { color: c.muted }]}>جرّب اسمًا آخر أو خفّف الفلاتر. الدليل يشمل جميع أحياء مدينتك.</Text><Pressable onPress={reset} style={[s.action, { backgroundColor: c.primary }]}><Text style={s.white}>مسح الفلاتر</Text></Pressable></OasisSurface>}
         {hasMore && !error && <Pressable disabled={moreBusy} onPress={() => void load(true)} style={[s.more, { backgroundColor: c.surface, borderColor: c.line }]}>{moreBusy ? <ActivityIndicator color={c.primary} /> : <Text style={{ color: c.primary, fontWeight: '700' }}>عرض المزيد</Text>}</Pressable>}
       </>}
       {canManage && <Pressable onPress={() => router.push('/marketplace-dashboard')} style={[s.manage, { backgroundColor: c.soft }]}><Store size={20} color={c.primary} /><View style={s.grow}><Text style={[s.resultTitle, { color: c.primary }]}>مساحة أعمالي</Text><Text style={[s.secondary, { color: c.muted }]}>إدارة المنشأة والخدمات من مكان واحد</Text></View><ArrowUpLeft size={19} color={c.primary} /></Pressable>}
@@ -99,6 +101,7 @@ const s = StyleSheet.create({
   intro: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, padding: 16, borderRadius: 22, borderWidth: 1 }, introIcon: { width: 52, height: 52, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   grow: { flex: 1, minWidth: 0, gap: 6 }, introTitle: { fontSize: 17, lineHeight: 25, fontWeight: '800', textAlign: 'right' }, secondary: { fontSize: 12, lineHeight: 20, textAlign: 'right' },
   search: { minHeight: 52, borderRadius: 17, borderWidth: 1, paddingHorizontal: 13, flexDirection: 'row-reverse', alignItems: 'center', gap: 8 }, input: { flex: 1, fontSize: 14, textAlign: 'right', paddingVertical: 12 }, clear: { width: 36, height: 40, alignItems: 'center', justifyContent: 'center' },
+  scope: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, padding: 13, borderRadius: 16 },
   segment: { flexDirection: 'row-reverse', borderWidth: 1, borderRadius: 18, padding: 4, gap: 4 }, segmentButton: { flex: 1, minHeight: 44, borderRadius: 14, flexDirection: 'row-reverse', justifyContent: 'center', alignItems: 'center', gap: 6 },
   row: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 }, chip: { flexDirection: 'row-reverse', alignItems: 'center', minHeight: 42, gap: 6, borderWidth: 1, borderRadius: 16, paddingHorizontal: 13 }, chipText: { fontSize: 12, fontWeight: '700' },
   resultTitle: { fontSize: 14, fontWeight: '700', textAlign: 'right' }, card: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, padding: 13, borderWidth: 1, borderRadius: 22 }, visual: { width: 76, height: 82, borderRadius: 17, overflow: 'hidden', justifyContent: 'center', alignItems: 'center' }, image: { width: '100%', height: '100%' }, type: { fontSize: 10, fontWeight: '700' }, cardTitle: { fontSize: 15, lineHeight: 23, fontWeight: '800', textAlign: 'right' }, area: { flex: 1, fontSize: 10, textAlign: 'right' },
