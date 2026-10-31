@@ -33,3 +33,14 @@ test('ledger is private and the RPC is authenticated-only', () => {
   assert.match(migration, /grant execute on function public\.send_neighbor_appreciation\(uuid, uuid, text\) to authenticated/);
   assert.match(migration, /set search_path = pg_catalog, public, app_private/);
 });
+
+test('the client never bypasses a rejected appreciation RPC', () => {
+  const screen = fs.readFileSync(path.join(__dirname, '..', 'app', 'conversation.tsx'), 'utf8');
+  const start = screen.indexOf('  async function sendAppreciation(');
+  const end = screen.indexOf('  async function shareExactLocation(', start);
+  assert.ok(start >= 0 && end > start, 'appreciation handler must exist');
+  const handler = screen.slice(start, end);
+  assert.match(handler, /if \\(rpcErr\\) throw rpcErr;/);
+  assert.doesNotMatch(handler, /from\\('reputation'\\)\\.upsert/);
+  assert.doesNotMatch(handler, /from\\('messages'\\)\\.insert/);
+});
