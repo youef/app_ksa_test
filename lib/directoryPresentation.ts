@@ -55,13 +55,17 @@ export async function fetchDirectoryPage(client: any, options: { location: { cit
     if (!all(options.location.district) && !all(options.location.city)) query = query.eq('district', options.location.district);
     if (options.verified) query = query.eq('is_verified', true);
     const search = directorySearch(options.search);
-    if (search) query = query.or('name.ilike.%' + search + '%,description.ilike.%' + search + '%');
+    if (search) {
+      const pattern = '%' + search + '%';
+      query = query.or('name.ilike.' + pattern + ',description.ilike.' + pattern + ',district.ilike.' + pattern + (table === 'services' ? ',subcategory.ilike.' + pattern : ''));
+    }
     const start = options.page * DIRECTORY_PAGE_SIZE;
     const response = await query.order(options.sort === 'name' ? 'name' : 'created_at', { ascending: options.sort === 'name' }).order('id', { ascending: true }).range(start, start + DIRECTORY_PAGE_SIZE);
     if (response.error) throw response.error;
     return response.data || [];
   };
   const [businesses, services] = await Promise.all([read('businesses'), read('services')]);
+  // Each source has its own pagination cursor; the extra row only signals another page.
   const items = [...businesses.slice(0, DIRECTORY_PAGE_SIZE).map((row: any) => ({ ...row, kind: 'business' as const, image: row.logo_url || row.cover_url })), ...services.slice(0, DIRECTORY_PAGE_SIZE).map((row: any) => ({ ...row, kind: 'service' as const, image: row.cover_url }))];
   items.sort((a, b) => options.sort === 'name' ? String(a.name).localeCompare(String(b.name), 'ar') || a.id.localeCompare(b.id) : String(b.created_at).localeCompare(String(a.created_at)) || a.id.localeCompare(b.id));
   return { items, hasMore: businesses.length > DIRECTORY_PAGE_SIZE || services.length > DIRECTORY_PAGE_SIZE };
