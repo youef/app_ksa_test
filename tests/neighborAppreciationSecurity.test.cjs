@@ -40,7 +40,7 @@ test('the client never bypasses a rejected appreciation RPC', () => {
   const end = screen.indexOf('  async function shareExactLocation(', start);
   assert.ok(start >= 0 && end > start, 'appreciation handler must exist');
   const handler = screen.slice(start, end);
-  assert.match(handler, /if \\(rpcErr\\) throw rpcErr;/);
-  assert.doesNotMatch(handler, /from\\('reputation'\\)\\.upsert/);
-  assert.doesNotMatch(handler, /from\\('messages'\\)\\.insert/);
+  assert.ok(handler.includes('if (rpcErr) throw rpcErr;'));
+  assert.ok(!handler.includes(".from('reputation').upsert"));
+  assert.ok(!handler.includes(".from('messages').insert"));
 });
