@@ -724,6 +724,40 @@ export default function Service() {
         </View>
       </ScrollView>
 
+      {/* Primary action stays visible on mobile and web regardless of the listing's pricing model. */}
+      {!isOwner && service.moderation_status === 'approved' && (
+        <View style={{ backgroundColor: OASIS.colors.surface, borderTopWidth: 1, borderTopColor: OASIS.colors.line, paddingHorizontal: 16, paddingTop: 10, paddingBottom: Math.max(14, bottomNavInset) }}>
+          <View style={{ width: '100%', maxWidth: 800, alignSelf: 'center', flexDirection: 'row-reverse', gap: 10 }}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={service.available_now === false ? 'الخدمة غير متاحة حالياً' : 'اطلب الآن'}
+              disabled={contacting || service.available_now === false || !canContact}
+              onPress={() => {
+                if (service.price_type === 'fixed' && Number(service.price_from) > 0) {
+                  router.push({ pathname: '/marketplace-dashboard', params: { service_id: service.id, tab: 'services' } });
+                } else {
+                  contactProvider();
+                }
+              }}
+              style={{ flex: 1, minHeight: 52, borderRadius: 16, backgroundColor: service.available_now === false || !canContact ? '#94a3b8' : OASIS.colors.primary, alignItems: 'center', justifyContent: 'center', flexDirection: 'row-reverse', gap: 9 }}
+            >
+              {contacting ? <ActivityIndicator color="#fff" size="small" /> : <PackageCheck color="#fff" size={19} />}
+              <Text style={{ color: '#fff', fontWeight: '800', fontSize: 16 }}>
+                {service.available_now === false ? 'غير متاح حالياً' : !canContact ? 'الطلب غير متاح لهذا الحساب' : service.price_type === 'fixed' && Number(service.price_from) > 0 ? 'مراجعة الطلب' : 'اطلب الآن'}
+              </Text>
+            </Pressable>
+            {canContact && Boolean(service.whatsapp || service.phone) && (
+              <Pressable accessibilityRole="button" accessibilityLabel="تواصل عبر واتساب" onPress={openWhatsApp} style={{ width: 54, minHeight: 52, borderRadius: 16, borderWidth: 1, borderColor: '#a7f3d0', backgroundColor: '#ecfdf5', justifyContent: 'center', alignItems: 'center' }}>
+                <MessageCircle size={24} color={OASIS.colors.primary} />
+              </Pressable>
+            )}
+          </View>
+          {service.available_now !== false && service.price_type !== 'fixed' && (
+            <Text style={{ fontSize: 11, color: OASIS.colors.muted, textAlign: 'center', marginTop: 5 }}>طلب مبدئي عبر المحادثة؛ اتفق مع المعلن على التفاصيل والسعر قبل الدفع.</Text>
+          )}
+        </View>
+      )}
+
       {/* Fullscreen Lightbox Modal */}
       <Modal visible={Boolean(fullscreenImage)} transparent animationType="fade">
         <View style={styles.modalBackdrop}>
