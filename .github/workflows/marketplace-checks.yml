@@ -23,5 +23,7 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci --ignore-scripts
+      - name: Verify account deletion storage privacy and failure safety
+        run: node --test tests/deleteAccountStorage.test.cjs
       - name: Verify location, publishing, profile RLS and payment callbacks
         run: node --test tests/marketplaceWorkspace.database.test.cjs tests/marketplaceWorkspace.test.cjs tests/marketplaceWebhooks.test.cjs tests/productLocation.test.cjs tests/productDeviceLocation.test.cjs tests/productDetails.test.cjs tests/servicePublishingRules.test.cjs tests/neighborPrivacy.database.test.cjs tests/directoryPresentation.test.cjs
