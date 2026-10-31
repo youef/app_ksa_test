@@ -21,3 +21,11 @@ test('static cache headers and SPA rewrite are preserved', () => {
   assert.ok(immutable.some((rule) => rule.source.includes('/_expo/static/')));
   assert.ok(immutable.some((rule) => rule.source.includes('woff2')));
 });
+
+test('web pages block cross-origin framing without restricting same-origin embeds', () => {
+  assert.equal(header('X-Frame-Options'), 'SAMEORIGIN');
+  assert.equal(header('Content-Security-Policy'), "frame-ancestors 'self'");
+  for (const name of ['X-Frame-Options', 'Content-Security-Policy']) {
+    assert.equal(globalRule.headers.filter((item) => item.key.toLowerCase() === name.toLowerCase()).length, 1);
+  }
+});
