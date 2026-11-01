@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Linking, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { AppHeader } from '@/components/shared/AppHeader';
+import {AdminPaymentPanel} from '@/components/market/AdminPaymentPanel';
 import { supabase } from '@/lib/supabase';
 import { OasisPressable as Pressable } from '@/components/oasis/OasisPrimitives';
 import { AlertTriangle, Bot, CheckCircle2, ChevronLeft, Clock3, ExternalLink, GitPullRequest, RefreshCw, ShieldCheck, Sparkles } from 'lucide-react-native';
@@ -28,12 +29,12 @@ export default function AdminAgent() {
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const load = useCallback(async () => {
     try {
-      setError('');
+      setBusy(true);setError('');setAuthorized(false);setRuns([]);setEvents([]);setProposals([]);
       const { data: userData, error: authError } = await supabase.auth.getUser();
       if (authError || !userData.user) { router.replace('/auth'); return; }
       const { data: profile, error: profileError } = await supabase.from('profiles')
-        .select('role').eq('id', userData.user.id).maybeSingle();
-      if (profileError || profile?.role !== 'admin') { router.replace('/home'); return; }
+        .select('role,is_banned').eq('id', userData.user.id).maybeSingle();
+      if (profileError || (profile?.role !== 'admin' || profile?.is_banned)) { router.replace('/home'); return; }
       setAuthorized(true);
       const [runResult, proposalResult, eventsResult] = await Promise.all([
         supabase.from('ai_agent_runs').select('id,status,summary,source,source_url,started_at,details').order('started_at',{ ascending:false }).limit(25),
@@ -57,10 +58,10 @@ export default function AdminAgent() {
     <AppHeader variant="sub" title="وكيل حيّنا الذكي" subtitle="غرفة العمليات الهندسية · HAYNA AI" fallbackRoute="/admin" />
     {busy ? <View style={s.center}><ActivityIndicator color="#08744E" /><Text style={s.muted}>جاري التحقق من صلاحية الإدارة...</Text></View> :
     authorized ? <ScrollView contentContainerStyle={s.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor="#08744E" />}>
-      <View style={s.hero}>
+      <AdminPaymentPanel/><View style={s.hero}>
         <View style={s.heroIcon}><Bot size={26} color="#FFFFFF" /></View>
         <Text style={s.heroTitle}>مركز قيادة الوكيل الهندسي</Text>
-        <Text style={s.heroBody}>يراجع المشروع كل ساعة، ويعرض هنا سجل الفحص والقرارات والخطط والنتائج. تُنفَّذ الإصلاحات منخفضة المخاطر بعد الاختبار؛ وتُحمى بيانات المستخدمين والتغييرات الحساسة.</Text>
+        <Text style={s.heroBody}>يعرض نتائج الفحوصات المجدولة المسجلة فعلًا. الإصلاح الآلي الحالي محدود بتباين ملف قفل npm ويُقترح عبر طلب مراجعة؛ لا يدمج أو ينشر تغييرات حساسة تلقائيًا.</Text>
         <Pressable style={s.heroButton} onPress={() => openTrustedUrl(AUDIT_URL)}>
           <ExternalLink size={15} color="#065F46" /><Text style={s.heroButtonText}>عرض الفحوصات في GitHub</Text>
         </Pressable>

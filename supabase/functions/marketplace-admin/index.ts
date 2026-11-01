@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { paypalConfiguration, paypalApi } from '../_shared/paypal.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -35,6 +36,16 @@ serve(async (req) => {
 
     const admin = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
     const body = await req.json();
+    if(body?.action==='payment_status'||body?.action==='payment_test'){
+      const config=paypalConfiguration(name=>Deno.env.get(name));
+      const names=['PAYPAL_CLIENT_ID','PAYPAL_CLIENT_SECRET','PAYPAL_MERCHANT_ID','PAYPAL_WEBHOOK_ID','PAYPAL_SAR_PER_USD'];
+      const checks=names.map(name=>({name,configured:Boolean(Deno.env.get(name))}));
+      let connected=false;
+      if(body.action==='payment_test'&&config){try{await paypalApi(config);connected=true;}catch{return json({error:'تعذر التحقق من اتصال PayPal. راجع مفاتيح البيئة وحساب التاجر؛ لم تُنشأ دفعة.'},502);}}
+      const schema=await admin.rpc('hayna_paypal_ready');
+      const configuredGateway=(Deno.env.get('PAYMENT_GATEWAY')||'moyasar').toLowerCase();
+      return json({gateway:['paypal','moyasar','tap'].includes(configuredGateway)?configuredGateway:'unconfigured',environment:config?.environment||'sandbox',configuration_complete:Boolean(config),database_ready:!schema.error&&schema.data==='paypal_v1',connected,checks,live_enabled:Deno.env.get('PAYPAL_LIVE_ENABLED')==='true'});
+    }
     if (body?.action === 'list') {
       const { data, error } = await admin.from('marketplace_ad_campaigns')
         .select('id,title,description,status,created_at,owner_id,package_id')

@@ -1,10 +1,12 @@
 import { OasisPressable as Pressable, OasisSurface } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { CheckCircle2, Clock, Megaphone, RefreshCw, ShieldCheck, XCircle } from 'lucide-react-native';
 import { AppHeader } from '@/components/shared/AppHeader';
+import {AdminPaymentPanel} from '@/components/market/AdminPaymentPanel';
+import {ConfirmActionModal} from '@/components/shared/ConfirmActionModal';
 import { supabase } from '@/lib/supabase';
 
 type Campaign = {
@@ -16,68 +18,64 @@ type Campaign = {
 export default function AdminMarketplace() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
+  const [authorized,setAuthorized]=useState(false),[loadError,setLoadError]=useState('');
   const [busyId, setBusyId] = useState('');
+  const [reviewTarget,setReviewTarget]=useState<{campaign:Campaign;decision:'approve'|'reject'}|null>(null),[reviewError,setReviewError]=useState('');
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
-    const { data: auth } = await supabase.auth.getUser();
-    if (!auth.user) { router.replace('/auth'); return; }
-    const { data: allowed } = await supabase.rpc('hayna_marketplace_can_review');
-    if (allowed !== true) {
-      Alert.alert('غير مصرح', 'هذه الصفحة مخصصة للإدارة.');
-      router.replace('/marketplace-dashboard');
-      return;
-    }
-    const { data, error } = await supabase.functions.invoke('marketplace-admin', { body: { action: 'list' } });
-    if (error || data?.error) {
-      Alert.alert('تعذر تحميل الإعلانات', data?.error || error?.message || 'تحقق من نشر دالة marketplace-admin.');
-      setCampaigns([]);
-    } else setCampaigns(data?.campaigns || []);
-    setLoading(false);
+    setLoading(true);setAuthorized(false);setCampaigns([]);setLoadError('');
+    try {
+      const {data:auth,error:authError}=await supabase.auth.getUser();
+      if(authError||!auth.user){router.replace('/auth');return;}
+      const permission=await supabase.rpc('hayna_marketplace_can_review');
+      if(permission.error)throw permission.error;
+      if(permission.data!==true){router.replace('/marketplace-dashboard');return;}
+      setAuthorized(true);
+      const result=await supabase.functions.invoke('marketplace-admin',{body:{action:'list'}});
+      if(result.error||result.data?.error)throw new Error('تعذر تحميل الحملات.');
+      setCampaigns(result.data?.campaigns||[]);
+    }catch{setLoadError('تعذر تحميل قائمة الإدارة. تحقق من الاتصال والصلاحيات ثم أعد المحاولة.');}
+    finally{setLoading(false);}
   }, []);
 
   useEffect(() => { void load(); }, [load]);
 
-  async function review(campaign: Campaign, decision: 'approve' | 'reject') {
+  function review(campaign:Campaign,decision:'approve'|'reject'){setReviewError('');setReviewTarget({campaign,decision});}
+  async function commitReview() {
+    if(!reviewTarget||busyId)return;const {campaign,decision}=reviewTarget;
     const run = async () => {
       setBusyId(campaign.id);
       try {
         const { data, error } = await supabase.functions.invoke('marketplace-admin', {
           body: { action: 'review', campaign_id: campaign.id, decision },
         });
-        if (error || data?.error) throw new Error(data?.error || error?.message || 'تعذرت مراجعة الإعلان.');
+        if (error || data?.error || data?.success!==true) throw new Error(data?.error || error?.message || 'تعذرت مراجعة الإعلان.');
         setCampaigns(prev => prev.filter(item => item.id !== campaign.id));
-        Alert.alert('تمت المراجعة', decision === 'approve' ? 'تم اعتماد الإعلان وتفعيل مدته.' : 'تم رفض الإعلان، ولم يتم تفعيله.');
+        setReviewTarget(null);
       } catch (e: any) {
-        Alert.alert('تعذر تنفيذ الإجراء', e?.message || 'حاول مرة أخرى.');
+        setReviewError(e?.message || 'حاول مرة أخرى.');
       } finally { setBusyId(''); }
     };
-    if (decision === 'approve') {
-      Alert.alert('اعتماد الإعلان', 'سيظهر الإعلان بعد اعتماده وتبدأ مدة الترويج الآن.', [
-        { text: 'إلغاء', style: 'cancel' }, { text: 'اعتماد', onPress: () => void run() },
-      ]);
-    } else {
-      Alert.alert('رفض الإعلان', 'سيتم رفض الحملة ولن تظهر للمستخدمين.', [
-        { text: 'إلغاء', style: 'cancel' }, { text: 'رفض الإعلان', style: 'destructive', onPress: () => void run() },
-      ]);
-    }
+    await run();
   }
 
   const refresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
 
   if (loading) return <View style={[styles.center, { backgroundColor: 'transparent' }]}><ActivityIndicator size="large" color={OASIS.colors.primary} /><Text style={styles.muted}>نحمّل قائمة المراجعة…</Text></View>;
 
+  if(!authorized)return <View style={styles.center}><Text style={styles.muted}>{loadError||'تعذر التحقق من صلاحية الإدارة.'}</Text><Pressable onPress={()=>void load()}><Text style={{color:OASIS.colors.primary}}>إعادة التحقق</Text></Pressable></View>;
   return (
     <View style={[styles.root, { backgroundColor: 'transparent' }]}>
-      <AppHeader variant="sub" title="مراجعة إعلانات السوق" subtitle="لوحة الإدارة" fallbackRoute="/marketplace-dashboard" />
+      <AppHeader variant="sub" title="إدارة السوق والدفع" subtitle="لوحة الإدارة" fallbackRoute="/marketplace-dashboard" />
       <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={OASIS.colors.primary} />}>
-        <View style={styles.hero}>
+        <AdminPaymentPanel/><View style={styles.hero}>
           <View style={styles.heroIcon}><ShieldCheck size={23} color={OASIS.colors.surface} /></View>
           <Text style={styles.heroTitle}>اعتماد الإعلانات المدفوعة</Text>
           <Text style={styles.heroText}>لا يبدأ الترويج إلا بعد نجاح الدفع ومراجعة المحتوى. الموافقة تبدأ مدة الحملة من وقت الاعتماد.</Text>
           <View style={styles.counter}><Clock size={15} color="#a7f3d0" /><Text style={styles.counterText}>{campaigns.length} إعلان بانتظار المراجعة</Text></View>
         </View>
-        {campaigns.length === 0 ? (
+        {loadError?<View style={styles.empty}><Text accessibilityRole="alert" style={{color:OASIS.colors.danger}}>{loadError}</Text><Pressable onPress={()=>void load()}><Text style={styles.refreshText}>إعادة المحاولة</Text></Pressable></View>:campaigns.length === 0 ? (
           <View style={styles.empty}><CheckCircle2 size={30} color={OASIS.colors.primary} /><Text style={styles.emptyTitle}>لا توجد إعلانات معلّقة</Text><Text style={styles.muted}>اسحب للأسفل لتحديث القائمة.</Text><Pressable oasisKind="action" onPress={() => void refresh()} style={styles.refreshButton}><RefreshCw size={16} color={OASIS.colors.primary} /><Text style={styles.refreshText}>تحديث</Text></Pressable></View>
         ) : campaigns.map(campaign => (
           <OasisSurface oasisSurface="card" key={campaign.id} style={styles.card}>
@@ -106,7 +104,7 @@ export default function AdminMarketplace() {
             </View>
           </OasisSurface>
         ))}
-      </ScrollView>
+      </ScrollView><ConfirmActionModal visible={!!reviewTarget} title={reviewTarget?.decision==='approve'?'اعتماد الإعلان':'رفض الإعلان'} description={reviewTarget?.decision==='approve'?'يتحقق الخادم من الدفع قبل الاعتماد وبدء مدة الحملة.':'رفض الحملة لا ينفذ استردادًا ماليًا؛ راجع تسوية الدفع لدى البوابة.'} destructive={reviewTarget?.decision==='reject'} confirmLabel={reviewTarget?.decision==='approve'?'اعتماد':'رفض الحملة'} busy={!!busyId} error={reviewError} onCancel={()=>setReviewTarget(null)} onConfirm={()=>void commitReview()}/>
     </View>
   );
 }

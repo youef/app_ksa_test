@@ -24,4 +24,4 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - name: Verify full local suite, privacy, publishing and payment callbacks
-        run: node --test --test-concurrency=2 tests/*.test.cjs
+        run: node --test --test-concurrency=2 tests/*.test.cjs tests/*.test.mjs
