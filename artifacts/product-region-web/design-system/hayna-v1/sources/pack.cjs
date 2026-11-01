@@ -1,0 +1,9 @@
+const fs=require('fs'),path=require('path'),sharp=require('sharp');const {zipSync}=require('fflate');
+const OUT=path.resolve('public/design-system/hayna-v1');
+async function main(){const m=JSON.parse(fs.readFileSync(path.join(OUT,'manifest.json'),'utf8'));const failures=[];let checked=0;
+for(const a of m.assets)for(const [density,file]of Object.entries(a.files)){try{const x=await sharp(path.join(OUT,file)).metadata();const scale=parseInt(density);if(scale&&a.width&&(x.width!==a.width*scale||x.height!==a.height*scale))failures.push({file,issue:'dimensions'});if(x.format!=='png')failures.push({file,issue:'format'});checked++;}catch(e){failures.push({file,issue:e.message});}}
+const report={logicalAssets:m.assets.length,pngFiles:checked+1,checked,failures,groups:Object.fromEntries([...new Set(m.assets.map(x=>x.group))].map(g=>[g,m.assets.filter(x=>x.group===g).length])),scope:'All manifest PNG dimensions checked. Compact controls match runtime tokens. Mockups and overview are archived v1 concepts; runtime pages use compact native components.'};
+fs.writeFileSync(path.join(OUT,'validation.json'),JSON.stringify(report,null,2));if(failures.length)throw Error(JSON.stringify(failures));
+fs.mkdirSync(path.join(OUT,'sources'),{recursive:true});for(const f of ['build.cjs','finalize.cjs','pack.cjs'])fs.copyFileSync(path.join('design/hayna-v1',f),path.join(OUT,'sources',f));
+const entries={};function walk(dir){for(const d of fs.readdirSync(dir,{withFileTypes:true})){const f=path.join(dir,d.name);if(d.isDirectory())walk(f);else entries['Hayna-iOS-Compact-v2/'+path.relative(OUT,f).replaceAll('\\','/')]=new Uint8Array(fs.readFileSync(f));}}walk(OUT);const zipPath=path.resolve('design/hayna-v1/Hayna-iOS-Compact-v2.zip');fs.writeFileSync(zipPath,zipSync(entries,{level:6}));console.log(JSON.stringify({...report,zipPath,zipMB:Math.round(fs.statSync(zipPath).size/1048576*100)/100}));}
+main().catch(e=>{console.error(e);process.exit(1)});

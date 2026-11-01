@@ -90,6 +90,27 @@ const badgeBase = {
 /* -------------------------------------------------------------------------- */
 
 export const styles = StyleSheet.create({
+  glassFrameCompact: { marginHorizontal: 16, marginBottom: 8, borderRadius: 16, minHeight: 44 },
+  glassFrameDefault: { marginHorizontal: 16, marginBottom: 10, borderRadius: 18, minHeight: 44 },
+  atmoBarBase: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 12 },
+  atmoBarCompact: { paddingVertical: 6 },
+  atmoBarFull: { paddingVertical: 10 },
+  atmoContent: { flexDirection: 'row-reverse', alignItems: 'center', gap: 7 },
+  atmoBarText: { flex: 1, textAlign: 'right' },
+  atmoBarTextCompact: { fontSize: 11, lineHeight: 18 },
+  atmoBarTextFull: { fontSize: 12, lineHeight: 20 },
+  locationPillWrap: { marginTop: 12 },
+  locationPill: { minHeight: 44, borderRadius: 16, borderWidth: 1, borderColor: T.white22, backgroundColor: T.white10, flexDirection: 'row-reverse', alignItems: 'center', gap: 8, paddingHorizontal: 12 },
+  locationPillText: { flex: 1, color: '#fff', fontSize: 12, textAlign: 'right' },
+  locationPillCta: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, paddingVertical: 7 },
+  locationPillCtaText: { color: '#D1FAE5', fontSize: 11, fontWeight: '700' },
+  heroSearchWrap: { marginTop: 12 },
+  heroSearchBar: { minHeight: 46, paddingHorizontal: 12, borderRadius: 16, backgroundColor: OASIS.colors.surface, flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
+  heroSearchInput: { flex: 1, minWidth: 0, minHeight: 44, paddingVertical: 10, color: OASIS.colors.ink, fontSize: 12, textAlign: 'right' },
+  heroSearchClearBtn: { width: 36, height: 44, alignItems: 'center', justifyContent: 'center' },
+  storiesScrollContent: { flexDirection: 'row-reverse', paddingHorizontal: 16, gap: 10, alignItems: 'flex-start' },
+  storyUsername: { fontSize: 10, writingDirection: 'ltr', maxWidth: 58 },
+  storyMoreCircle: { width: 44, height: 44, marginBottom: 5, borderRadius: 22, borderWidth: 1, borderColor: OASIS.colors.line, backgroundColor: OASIS.colors.soft, alignItems: 'center', justifyContent: 'center' },
   /* ----------------------------- Location Prompt ---------------------------- */
   locationPromptBackdrop: {
     flex: 1,
