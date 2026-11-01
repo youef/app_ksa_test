@@ -24,6 +24,7 @@ export default function MarketplaceItemPage() {
   const [item, setItem] = useState<any>(null);
   const [seller, setSeller] = useState<any>(null);
   const [business, setBusiness] = useState<any>(null);
+  const [sellerRating,setSellerRating]=useState<{average_rating:number;review_count:number}|null>(null);
   const [me, setMe] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -36,7 +37,7 @@ export default function MarketplaceItemPage() {
   const load = useCallback(async () => {
     if (!itemId) { setLoading(false); setError(true); return; }
     setLoading(true); setError(false);
-    setSeller(null);setBusiness(null);setCanMessage(false);setImageOpen(false);setFavorite(false);setActionError('');setOrderOpen(false);setImageFailed(false);
+    setSeller(null);setBusiness(null);setSellerRating(null);setCanMessage(false);setImageOpen(false);setFavorite(false);setActionError('');setOrderOpen(false);setImageFailed(false);
     try {
       const { data, error: itemError } = await supabase
         .from('marketplace_items')
@@ -64,6 +65,8 @@ export default function MarketplaceItemPage() {
           .select('id,username,display_name,avatar_url,is_verified,account_type,freelance_trade,role,city,district')
           .eq('id', data.seller_id).maybeSingle();
         setSeller(profile || null);
+        const summary=await supabase.from('order_seller_rating_summary').select('average_rating,review_count').eq('seller_id',data.seller_id).maybeSingle();
+        if(!summary.error&&summary.data)setSellerRating(summary.data);
       }
     } catch (e) {
       console.error('marketplace item load', e);
@@ -125,12 +128,13 @@ export default function MarketplaceItemPage() {
           <View style={styles.sellerBadges}>
             <AccountIdentityBadge role={seller.role} accountType={seller.account_type} isVerified={Boolean(seller.is_verified)} compact />
           </View>
+          {sellerRating?.review_count? <Text style={styles.muted}>★ {Number(sellerRating.average_rating).toFixed(1)} من 5 · {sellerRating.review_count} تقييم بعد استلام موثّق</Text>:null}
         </View>
         <ArrowUpRight size={18} color={OASIS.colors.primary} />
       </Pressable>}
       {me === item.seller_id && <Pressable oasisKind="action" style={styles.manageBtn} onPress={() => router.push({ pathname: '/profile', params: { tab: 'content' } })}><Text style={styles.manageBtnText}>إدارة من حسابي</Text></Pressable>}
       <OasisSurface oasisSurface="card" style={styles.card}><View style={styles.location}><Info size={17} color={OASIS.colors.primary}/><Text style={[styles.muted,{flex:1}]}>الموقع المعروض عام. يتم الاتفاق على التسليم والتكلفة عبر وسائل التواصل المسموحة لصاحب الإعلان.</Text></View></OasisSurface>
-      <OasisSurface oasisSurface="card" style={styles.card}><View style={styles.location}><ShoppingBag size={18} color={OASIS.colors.primary}/><Text style={styles.sellerTitle}>كيف أطلب المنتج؟</Text></View><Text style={styles.description}>١. أرسل الكمية والملاحظات للبائع.{"\n"}٢. اتفقا على التوفر والسعر والتسليم.{"\n"}٣. تأكد من المنتج قبل إتمام الاتفاق.</Text><Text style={styles.muted}>الطلب عبر المحادثة، ولا يمثل حجزًا للمخزون أو عملية دفع داخل التطبيق.</Text></OasisSurface>
+      <OasisSurface oasisSurface="card" style={styles.card}><View style={styles.location}><ShoppingBag size={18} color={OASIS.colors.primary}/><Text style={styles.sellerTitle}>كيف أطلب المنتج؟</Text></View><Text style={styles.description}>١. أرسل الكمية والملاحظات للبائع.{"\n"}٢. اتفقا على التوفر والسعر والتسليم.{"\n"}٣. تأكد من المنتج قبل إتمام الاتفاق.</Text><Text style={styles.muted}>يُسجل الطلب في السوق، وبعد موافقة البائع يُحجز المنتج. ولا يُسجل أي دفع داخل التطبيق لهذه الخطوة.</Text></OasisSurface>
       <Pressable accessibilityRole="button" onPress={()=>router.push({pathname:'/report',params:{type:'product',id:item.id}})} style={{minHeight:44,flexDirection:'row-reverse',alignItems:'center',justifyContent:'center',gap:7}}><Flag size={15} color={OASIS.colors.muted}/><Text style={styles.muted}>الإبلاغ عن الإعلان</Text></Pressable>
     </ScrollView>
     <View pointerEvents="box-none" style={{position:'absolute',left:0,right:0,bottom,alignItems:'center'}}>
