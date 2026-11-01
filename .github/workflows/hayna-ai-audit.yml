@@ -1,7 +1,8 @@
 name: HAYNA AI · Engineering Audit
 on:
   schedule:
-    - cron: "13 * * * *"
+    # Every six hours at approximately 00:13, 06:13, 12:13, 18:13 Asia/Riyadh (UTC+3).
+    - cron: "13 3,9,15,21 * * *"
   workflow_dispatch:
 permissions:
   contents: write # trusted default-branch scheduler; auto-repair is limited to a draft PR
