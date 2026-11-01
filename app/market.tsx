@@ -1,3 +1,7 @@
+import {ConversationProductRequests} from '@/components/chat/ConversationProductRequests';
+import {MarketShopFront} from '@/components/market/MarketShopFront';
+import {MarketPriceBand,matchesMarketPrice,compareMarketPrices,marketGridLayout} from '@/lib/marketShopping';
+import {productFulfillmentOptions} from '@/lib/productDetails';
 import { MarketPromotions } from '@/components/market/MarketPromotions';
 import { OasisEmptyIllustration } from '@/components/oasis/OasisEmptyIllustration';
 import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
@@ -60,9 +64,11 @@ import {
 
 export type MarketSection = 'market' | 'businesses' | 'events';
 
-export type SortOption = 'newest' | 'engaged' | 'nearby';
+export type SortOption = 'newest' | 'engaged' | 'nearby' | 'price_low' | 'price_high';
 const SORT_OPTIONS: { id: SortOption; label: string; Icon: any }[] = [
   { id: 'newest', label: 'الأحدث', Icon: Clock },
+  { id: 'price_low', label: 'السعر: الأقل أولًا', Icon: ArrowUpDown },
+  { id: 'price_high', label: 'السعر: الأعلى أولًا', Icon: ArrowUpDown },
   { id: 'engaged', label: 'الأكثر تفاعلاً', Icon: TrendingUp },
   { id: 'nearby', label: 'من حيّك أولاً', Icon: MapPin },
 ];
@@ -99,8 +105,10 @@ const EVENT_CATEGORIES: { id: EventCategory; label: string; Icon: any }[] = [
 ];
 
 export default function Market() {
-  useTheme();
+  useTheme();const styles=createStyles();
   const [marketScope, setMarketScope] = useState<'district' | 'city' | 'region'>('city');
+  const [requestsOpen,setRequestsOpen]=useState(false);
+  const [scopeExpanded,setScopeExpanded]=useState(false);
   const [scopeLabel, setScopeLabel] = useState('');
   const [scopeError, setScopeError] = useState('');
   const [catalogMore, setCatalogMore] = useState({ products:false, services:false, businesses:false, events:false });
@@ -126,6 +134,8 @@ export default function Market() {
 
   // Filters
   const [activeType, setActiveType] = useState<ListingTypeId | 'all'>('all');
+  const [shoppingSource,setShoppingSource]=useState<'all'|'product'|'service'>('all');
+  const [priceBand,setPriceBand]=useState<MarketPriceBand>('all'),[savedOnly,setSavedOnly]=useState(false);
   const [quick, setQuick] = useState<QuickFilter>('all');
   const [businessCategory, setBusinessCategory] = useState<BusinessCategory>('all');
   const [eventCategory, setEventCategory] = useState<EventCategory>('all');
@@ -163,10 +173,7 @@ export default function Market() {
   // RSVP interactive tracking
   const [rsvpList, setRsvpList] = useState<Record<string, boolean>>({});
 
-  const contentWidth = Math.min(width, 1100) - 32;
-  const columns = contentWidth > 900 ? 4 : contentWidth > 600 ? 3 : 2;
-  const gap = 12;
-  const cardWidth = (contentWidth - gap * (columns - 1)) / columns;
+  const {contentWidth,columns,gap,cardWidth}=marketGridLayout(width);
 
   const favoriteKey = (targetType: 'service' | 'product' | 'store', itemId: string) => `${targetType}:${itemId}`;
 
@@ -274,16 +281,16 @@ export default function Market() {
             ...row,
             _source: 'product',
             name: row.title,
-            price_from: row.price,
+            price_from: row.item_type==='تبرع'?0:row.price,
             price_to: null,
-            price_type: row.price == null ? 'negotiable' : 'fixed',
+            price_type: row.item_type==='تبرع'?'fixed':row.price == null ? 'negotiable' : 'fixed',
             listing_type: row.business_id ? 'product_in_shop' : 'home_sale',
             subcategory: row.item_type,
             shop_name: row.business?.name || null,
             cover_url: row.image_url,
             images: row.image_url ? [row.image_url] : [],
             available_now: row.status === 'available',
-            delivery_modes: [],
+            delivery_modes: productFulfillmentOptions(row.description).includes('توصيل بالتنسيق')?['delivery']:[],
             whatsapp: null,
             phone: null,
             profiles: row.seller || null,
@@ -379,11 +386,14 @@ export default function Market() {
   // Filtered & Sorted Market Items
   const displayedMarket = useMemo(() => {
     const filtered = inAreaMarket.filter(({ item, type }) => {
+      if(shoppingSource!=='all'&&item._source!==shoppingSource)return false;
+      if(!matchesMarketPrice(item,priceBand))return false;
+      if(savedOnly&&!savedItems[favoriteKey(item._source==='product'?'product':'service',item.id)])return false;
       if (activeType !== 'all' && type?.id !== activeType) return false;
       if (quick === 'available' && !item.available_now) return false;
       if (quick === 'delivery' && !(item.delivery_modes || []).includes('delivery')) return false;
       if (quick === 'images' && !getServiceCover(item)) return false;
-      if (quick === 'verified' && !item.is_verified && !item.business?.is_verified) return false;
+      if (quick === 'verified' && !item.is_verified && !item.business?.is_verified && !item.profiles?.is_verified) return false;
       if (!query) return true;
       return [
         item.name,
@@ -398,6 +408,7 @@ export default function Market() {
     });
 
     return filtered.sort((a, b) => {
+      if(sortBy==='price_low'||sortBy==='price_high')return compareMarketPrices(a.item,b.item,sortBy==='price_high');
       if (sortBy === 'engaged') {
         const score = (x: any) => Number(x.views_count ?? x.views ?? 0) + Number(x.likes_count ?? x.likes ?? 0) * 2 + Number(x.favorites_count ?? 0) * 3;
         return score(b.item) - score(a.item) || new Date(b.item.created_at || 0).getTime() - new Date(a.item.created_at || 0).getTime();
@@ -412,7 +423,7 @@ export default function Market() {
       }
       return new Date(b.item.created_at || 0).getTime() - new Date(a.item.created_at || 0).getTime();
     });
-  }, [inAreaMarket, activeType, quick, query, sortBy, activeLoc]);
+  }, [inAreaMarket, activeType, quick, query, sortBy, activeLoc,shoppingSource,priceBand,savedOnly,savedItems]);
 
   const families = activeType === 'all' && quick === 'all' && !query
     ? inAreaMarket.filter((e) => e.type?.id === 'home_family').slice(0, 10)
@@ -600,9 +611,9 @@ export default function Market() {
           pressed && { transform: [{ scale: 0.985 }] },
         ]}
       >
-        <View style={[styles.cardImage, listMode ? styles.cardImageRow : { height: w * 0.78 }, { backgroundColor: type?.bg || '#f1f5f9' }]}>
+        <View style={[styles.cardImage, listMode ? styles.cardImageRow : { height: w * 1.03 }, { backgroundColor: type?.bg || '#f1f5f9' }]}>
           {cover ? (
-            <Image source={{ uri: cover }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+            <Image source={{ uri: cover }} style={StyleSheet.absoluteFillObject} resizeMode={item._source==='product'?'contain':'cover'} />
           ) : type ? (
             <type.Icon size={Math.min(38, w * 0.22)} color={type.color} strokeWidth={1.8} />
           ) : (
@@ -616,6 +627,7 @@ export default function Market() {
             </View>
           )}
 
+          {item._source==='product'&&item.status!=='available'&&<View style={styles.availableBadgePill}><Text style={[styles.availableBadgeText,{color:OASIS.colors.muted}]}>{item.status==='reserved'?'محجوز':'مباع'}</Text></View>}
           {item.available_now && (
             <View style={styles.availableBadgePill}>
               <View style={styles.availableDot} />
@@ -661,7 +673,7 @@ export default function Market() {
         </View>
 
         <View style={[styles.cardBody, listMode && styles.cardBodyRow]}>
-          <Text style={styles.cardTitle} numberOfLines={listMode ? 2 : 1}>{item.name}</Text>
+          <Text style={styles.cardTitle} numberOfLines={2}>{item.name}</Text>
           <Text style={styles.cardSub} numberOfLines={1}>
             {item.shop_name ? item.shop_name : (item.subcategory || item.profiles?.display_name || item.category || 'عرض محلي')}
           </Text>
@@ -699,7 +711,7 @@ export default function Market() {
           {!listMode && Boolean(timeAgo) && <Text style={[styles.cardTimeText,{textAlign:'right',marginTop:4}]} numberOfLines={1}>{timeAgo}</Text>}
 
           <Pressable accessibilityRole="button" accessibilityLabel={`عرض تفاصيل ${item.name}`} onPress={(event:any) => { event?.stopPropagation?.(); openItem(item); }} style={styles.cardDetailsHintRow}>
-            <Text style={styles.cardDetailsHintText}>عرض التفاصيل الكاملة</Text>
+            <Text style={styles.cardDetailsHintText}>{item._source==='product'?'تسوّق المنتج':'تفاصيل الخدمة'}</Text>
             <ArrowRight size={11} color={OASIS.colors.primary} />
           </Pressable>
         </View>
@@ -926,13 +938,14 @@ export default function Market() {
   };
 
   const addBtnLabel = section === 'market' ? 'إضافة منتج أو خدمة' : section === 'businesses' ? 'إدارة منشأتي' : 'أضف فعالية';
-  const hasFilters = Boolean(searchQuery.trim() || activeType !== 'all' || quick !== 'all' || businessCategory !== 'all' || eventCategory !== 'all');
+  const hasFilters = Boolean(shoppingSource!=='all'||priceBand!=='all'||savedOnly||searchQuery.trim() || activeType !== 'all' || quick !== 'all' || businessCategory !== 'all' || eventCategory !== 'all');
   const resetMarketFilters = () => {
-    setSearchQuery(''); setActiveType('all'); setQuick('all'); setBusinessCategory('all'); setEventCategory('all');
+    setShoppingSource('all');setPriceBand('all');setSavedOnly(false);setSortBy('newest');setSearchQuery(''); setActiveType('all'); setQuick('all'); setBusinessCategory('all'); setEventCategory('all');
   };
 
   return (
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
+      {profile&&<ConversationProductRequests visible={requestsOpen} conversationId="" userId={profile.id} onClose={()=>setRequestsOpen(false)}/>}
       <AppHeader variant="tab" title="السوق" subtitle={locationLabel} />
 
       <ScrollView
@@ -945,35 +958,7 @@ export default function Market() {
         {/* ======================================================== */}
         {/* HERO EXECUTIVE CARD                                      */}
         {/* ======================================================== */}
-        <View style={styles.heroSectionWrap}>
-          <View style={styles.inner}>
-            <LinearGradient
-              colors={['#123f34', '#176650', '#237a5b']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.heroCard}
-            >
-              <View style={styles.heroHeaderRow}>
-                <View style={{ flex: 1 }}>
-                  <View style={styles.heroBadgeRow}>
-                    <View style={styles.heroLocBadge}>
-                      <MapPin size={10} color="#a7f3d0" />
-                      <Text style={styles.heroLocText} numberOfLines={1}>{locationLabel}</Text>
-                    </View>
-                  </View>
-
-                  <Text style={styles.heroTitle}>سوق الحي</Text>
-                  <Text style={styles.heroSubtitle}>عروض الجيران، دليل المحلات، وفعاليات الحي في مكان واحد.</Text>
-                </View>
-                <Pressable accessibilityRole="button" accessibilityLabel="لوحة إدارة السوق" onPress={() => router.push('/marketplace-dashboard')} style={styles.workspaceShortcut}>
-                  <Store size={20} color="#ffffff" />
-                  <Text style={styles.workspaceShortcutText}>لوحتي</Text>
-                </Pressable>
-              </View>
-
-            </LinearGradient>
-          </View>
-        </View>
+        <View style={[styles.inner,{paddingTop:6,paddingBottom:10}]}><LinearGradient colors={['#0b493b','#17836a']} start={{x:0,y:0}} end={{x:1,y:1}} style={{borderRadius:19,padding:15,flexDirection:'row-reverse',gap:12,alignItems:'center'}}><ShoppingBag size={31} color="#a7f3d0" strokeWidth={1.4}/><View style={{flex:1,gap:3}}><Text style={{color:'#fff',fontSize:19,fontWeight:'800',textAlign:'right'}}>كل ما تحتاجه، أقرب لك</Text><Text style={{color:'#d1fae5',fontSize:11,textAlign:'right'}}>اكتشف منتجات منطقتك وتواصل مع البائع مباشرة</Text></View><Pressable accessibilityRole="button" accessibilityLabel="طلبات المنتجات الخاصة بي" onPress={()=>{if(profile)setRequestsOpen(true);else router.push('/auth');}} style={{minWidth:42,minHeight:44,justifyContent:'center',alignItems:'center'}}><View style={{gap:3,alignItems:'center'}}><ShoppingBag size={20} color="#fff"/><Text style={{color:'#fff',fontSize:10}}>طلباتي</Text></View></Pressable></LinearGradient></View>
 
         {/* ======================================================== */}
         {/* STICKY INTERACTIVE CONTROLS BAR                          */}
@@ -1057,11 +1042,10 @@ export default function Market() {
             </View>
 
             <OasisSurface oasisSurface="card" style={styles.scopePanel}>
-              <View style={{flexDirection:'row-reverse',alignItems:'center',gap:7}}><MapPin size={17} color={OASIS.colors.primary}/><Text style={{color:OASIS.colors.ink,fontWeight:'700',fontSize:13}}>نطاق السوق</Text></View>
-              <View style={{flexDirection:'row-reverse',gap:6}}>
-                {([{id:'district',label:'حيّي'},{id:'city',label:'مدينتي كاملة'},{id:'region',label:'منطقتي'}] as const).map(option=><Pressable key={option.id} accessibilityRole="button" accessibilityState={{selected:marketScope===option.id}} onPress={()=>setMarketScope(option.id)} style={[styles.scopeOption,{backgroundColor:marketScope===option.id?OASIS.colors.primary:OASIS.colors.soft}]}><Text style={{fontSize:12,fontWeight:'700',color:marketScope===option.id?'#fff':OASIS.colors.muted}}>{option.label}</Text></Pressable>)}
-              </View>
-              <Text style={{color:OASIS.colors.muted,fontSize:11,textAlign:'right'}}>من موقع حسابك فقط · {locationLabel}</Text>
+              <Pressable accessibilityRole="button" accessibilityLabel="تغيير نطاق السوق" accessibilityState={{expanded:scopeExpanded}} onPress={()=>setScopeExpanded(!scopeExpanded)} style={{flexDirection:'row-reverse',alignItems:'center',gap:7,minHeight:36}}><MapPin size={17} color={OASIS.colors.primary}/><Text style={{color:OASIS.colors.ink,fontWeight:'700',fontSize:12,flex:1,textAlign:'right'}}>{locationLabel} · {marketScope==='city'?'المدينة كاملة':marketScope==='region'?'المنطقة كاملة':'الحي فقط'}</Text><Text style={{color:OASIS.colors.primary,fontSize:11}}>تغيير</Text><ChevronDown size={14} color={OASIS.colors.primary}/></Pressable>
+              {scopeExpanded&&<View style={{flexDirection:'row-reverse',gap:6}}>
+                {([{id:'district',label:'حيّي'},{id:'city',label:'مدينتي كاملة'},{id:'region',label:'منطقتي'}] as const).map(option=><Pressable key={option.id} accessibilityRole="button" accessibilityState={{selected:marketScope===option.id}} onPress={()=>{setMarketScope(option.id);setScopeExpanded(false);}} style={[styles.scopeOption,{backgroundColor:marketScope===option.id?OASIS.colors.primary:OASIS.colors.soft}]}><Text style={{fontSize:12,fontWeight:'700',color:marketScope===option.id?'#fff':OASIS.colors.muted}}>{option.label}</Text></Pressable>)}
+              </View>}
               {!!scopeError&&<><Text accessibilityRole="alert" style={{color:OASIS.colors.danger,textAlign:'right',fontSize:12}}>{scopeError}</Text><Pressable onPress={()=>router.push(profile?'/locations':'/auth')}><Text style={{color:OASIS.colors.primary,textAlign:'right',fontWeight:'700'}}>مراجعة الحساب والموقع</Text></Pressable></>}
             </OasisSurface>
             <View style={styles.filterControlsRow}>
@@ -1075,16 +1059,6 @@ export default function Market() {
                 <ChevronDown size={15} color={OASIS.colors.muted} />
               </Pressable>
             </View>
-            {section === 'market' && (
-              <ScrollView horizontal {...(Platform.OS === 'web' ? {dir:'rtl'} : {})} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.discoveryChips}>
-                {QUICK_FILTERS.map(({id,label,Icon}) => (
-                  <Pressable key={id} accessibilityRole="button" accessibilityState={{selected:quick===id}} onPress={() => setQuick(id)} style={[styles.discoveryChip,quick===id && styles.discoveryChipActive]}>
-                    {Icon && <Icon size={14} color={quick===id ? OASIS.colors.primary : OASIS.colors.muted}/>}
-                    <Text style={[styles.discoveryChipText,quick===id && {color:OASIS.colors.primary}]}>{label}</Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-            )}
             {hasFilters && <View style={styles.browseToolbar}>
               <Text style={styles.browseCaption}>{hasFilters ? 'نتائج حسب اختياراتك' : 'اكتشف ما يقدمه أهل الحي'}</Text>
               <View style={{flexDirection:'row-reverse',alignItems:'center',gap:8}}>
@@ -1114,27 +1088,14 @@ export default function Market() {
                 <>
                   <MarketPromotions city={activeLoc.city} district={activeLoc.district}/>
 
+                  <MarketShopFront activeType={activeType} onType={setActiveType} source={shoppingSource} onSource={setShoppingSource} priceBand={priceBand} onPrice={setPriceBand} savedOnly={savedOnly} onSaved={()=>{if(!profile){router.push('/auth');return;}setSavedOnly(!savedOnly);}}/>
                   {/* Productive Families Spotlight */}
-                  {families.length > 0 && (
-                    <View style={{ marginBottom: 18 }}>
-                      <View style={styles.sectionHead}>
-                        <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}><House size={16} color={OASIS.colors.primary} /><Text style={styles.sectionTitle}>من الأسر المنتجة في حيّك</Text></View>
-                        <Pressable onPress={() => setActiveType('home_family')}>
-                          <Text style={styles.seeAll}>عرض الكل</Text>
-                        </Pressable>
-                      </View>
-                      <ScrollView style={{ direction: 'rtl' }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[{ flexDirection: 'row-reverse', gap }, { direction: 'ltr' }]}>
-                        {families.map((e) => renderMarketCard(e, Math.min(160, cardWidth)))}
-                      </ScrollView>
-                    </View>
-                  )}
-
                   <View style={styles.sectionHead}>
                     <Text style={styles.sectionTitle}>
-                      {activeType === 'all' ? 'أحدث العروض والسلع' : LISTING_TYPES.find((t) => t.id === activeType)?.label}
+                      {activeType === 'all' ? 'اكتشف اختيارات السوق' : LISTING_TYPES.find((t) => t.id === activeType)?.label}
                     </Text>
                     <View style={{flexDirection:'row-reverse',alignItems:'center',gap:8}}>
-                      <Text style={styles.resultCount}>{displayedMarket.length} عرض</Text>
+                      <Text style={styles.resultCount}>{displayedMarket.length.toLocaleString('ar-SA')} نتيجة محمّلة</Text>
                       <View style={styles.viewSwitcher}>
                         <Pressable accessibilityRole="button" accessibilityLabel="عرض شبكي" accessibilityState={{selected:viewMode==='grid'}} onPress={() => setViewMode('grid')} style={[styles.viewSwitch,viewMode==='grid' && styles.viewSwitchActive]}><LayoutGrid size={16} color={viewMode==='grid'?OASIS.colors.primary:OASIS.colors.muted}/></Pressable>
                         <Pressable accessibilityRole="button" accessibilityLabel="عرض قائمة" accessibilityState={{selected:viewMode==='list'}} onPress={() => setViewMode('list')} style={[styles.viewSwitch,viewMode==='list' && styles.viewSwitchActive]}><List size={16} color={viewMode==='list'?OASIS.colors.primary:OASIS.colors.muted}/></Pressable>
@@ -1142,6 +1103,7 @@ export default function Market() {
                     </View>
                   </View>
 
+                  {hasFilters&&<Text style={{color:OASIS.colors.muted,fontSize:11,textAlign:'right',marginBottom:12}}>التصفية ضمن النتائج المحمّلة في نطاقك. حمّل المزيد لتوسيع النتائج.</Text>}
                   {displayedMarket.length > 0 ? (
                     <View style={[viewMode === 'grid' ? styles.grid : styles.list, { gap }]}>
                       {displayedMarket.map((e) => renderMarketCard(e, viewMode === 'grid' ? cardWidth : contentWidth, viewMode === 'list'))}
@@ -1242,7 +1204,7 @@ export default function Market() {
           <OasisSurface oasisSurface="card" style={styles.filterMenuCard}>
             <View style={styles.filterMenuHeader}><Text style={styles.filterMenuTitle}>{filterMenu === 'sort' ? 'ترتيب النتائج' : 'تصفية النتائج'}</Text><Pressable oasisKind="icon" onPress={() => setFilterMenu(null)} style={styles.modalCloseBtn}><X size={17} color={OASIS.colors.ink} /></Pressable></View>
             <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
-              {filterMenu === 'sort' ? SORT_OPTIONS.map((opt) => <Pressable key={opt.id} style={styles.filterMenuItem} onPress={() => { setSortBy(opt.id); setFilterMenu(null); }}><opt.Icon size={18} color={sortBy === opt.id ? OASIS.colors.primary : OASIS.colors.muted} /><Text style={[styles.filterMenuItemText, sortBy === opt.id && { color: OASIS.colors.primary, fontWeight: '700' }]}>{opt.label}</Text>{sortBy === opt.id && <Check size={17} color={OASIS.colors.primary} />}</Pressable>) : section === 'market' ? (
+              {filterMenu === 'sort' ? SORT_OPTIONS.filter(option=>section==='market'||!option.id.startsWith('price_')).map((opt) => <Pressable key={opt.id} style={styles.filterMenuItem} onPress={() => { setSortBy(opt.id); setFilterMenu(null); }}><opt.Icon size={18} color={sortBy === opt.id ? OASIS.colors.primary : OASIS.colors.muted} /><Text style={[styles.filterMenuItemText, sortBy === opt.id && { color: OASIS.colors.primary, fontWeight: '700' }]}>{opt.label}</Text>{sortBy === opt.id && <Check size={17} color={OASIS.colors.primary} />}</Pressable>) : section === 'market' ? (
                 <>
                   <Pressable style={styles.filterMenuItem} onPress={() => { setActiveType('all'); setQuick('all'); setFilterMenu(null); }}><LayoutGrid size={18} color={OASIS.colors.muted} /><Text style={styles.filterMenuItemText}>كل العروض</Text></Pressable>
                   {LISTING_TYPES.map((t) => <Pressable key={t.id} style={styles.filterMenuItem} onPress={() => { setActiveType(t.id); setFilterMenu(null); }}><t.Icon size={18} color={activeType === t.id ? OASIS.colors.primary : t.color} /><Text style={styles.filterMenuItemText}>{t.label}</Text>{activeType === t.id && <Check size={17} color={OASIS.colors.primary} />}</Pressable>)}
@@ -1750,6 +1712,7 @@ export default function Market() {
 function TypeCircle({ label, active, color, bg, Icon, count, onPress }: {
   label: string; active: boolean; color: string; bg: string; Icon: any; count: number; onPress: () => void;
 }) {
+  const styles=createStyles();
   return (
     <Pressable onPress={onPress} style={({ pressed }: any) => [styles.typeItem, pressed && { opacity: 0.75 }]}>
       <View style={[styles.typeCircle, { backgroundColor: active ? color : bg }, active && styles.typeCircleActive]}>
@@ -1765,8 +1728,8 @@ function TypeCircle({ label, active, color, bg, Icon, count, onPress }: {
   );
 }
 
-const styles = StyleSheet.create({
-  scopePanel:{padding:13,gap:11,borderRadius:19,borderWidth:1,borderColor:OASIS.colors.line,marginBottom:12},
+const createStyles = () => StyleSheet.create({
+  scopePanel:{padding:5,gap:4,borderRadius:19,borderWidth:1,borderColor:OASIS.colors.line,marginBottom:12},
   scopeOption:{flex:1,minHeight:42,borderRadius:14,alignItems:'center',justifyContent:'center'},
   container: { flex: 1, backgroundColor: OASIS.colors.background, width: '100%' },
   inner: { width: '100%', maxWidth: 1100, alignSelf: 'center', paddingHorizontal: 16 },
@@ -1832,7 +1795,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   heroLocText: { fontSize: 11, fontWeight: '700', color: '#a7f3d0' },
-  heroTitle: { fontSize: 24, fontWeight: '700', color: '#ffffff', textAlign: 'right', marginTop: 2 },
+  heroTitle: { fontSize: 21, fontWeight: '800', color: '#ffffff', textAlign: 'right', marginTop: 2 },
   heroSubtitle: { fontSize: 12, color: '#d1fae5', textAlign: 'right', marginTop: 4, lineHeight: 19 },
   workspaceShortcut: { marginRight:12, width:58, minHeight:64, borderRadius:20, borderWidth:1, borderColor:'rgba(255,255,255,0.24)', backgroundColor:'rgba(255,255,255,0.12)', alignItems:'center',justifyContent:'center',gap:6 },
   workspaceShortcutText: { color:'#ffffff', fontSize:11,fontWeight:'600' },
@@ -2042,12 +2005,12 @@ const styles = StyleSheet.create({
   availableDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#22c55e' },
   availableBadgeText: { fontSize: 11, fontWeight: '700', color: '#15803d' },
   cardTopActions: { position: 'absolute', bottom: 8, left: 8, flexDirection: 'row', gap: 5 },
-  shareFab: { width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.94)', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0, shadowRadius: 3, elevation: 2 },
+  shareFab: { width: 34, height: 34, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.94)', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0, shadowRadius: 3, elevation: 2 },
   cardBody: { padding: 10, paddingTop: 9 },
   cardTitle: { fontSize: 13.5, fontWeight: '700', color: OASIS.colors.ink, textAlign: 'right' },
   cardSub: { fontSize: 11.5, color: OASIS.colors.muted, textAlign: 'right', marginTop: 2, lineHeight: 16 },
   cardFooter: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginTop: 7, gap: 4 },
-  cardPrice: { fontSize: 13.5, fontWeight: '700', color: OASIS.colors.primary, flexShrink: 1 },
+  cardPrice: { fontSize: 17, fontWeight: '700', color: OASIS.colors.primary, flexShrink: 1 },
   cardModes: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   cardModeIcon: { width: 22, height: 22, borderRadius: 7, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' },
   cardTimeText: { fontSize: 11, color: '#94a3b8', fontWeight: '600' },

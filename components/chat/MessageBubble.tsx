@@ -250,7 +250,7 @@ function MessageBubbleBase({
             isMine ? styles.msgBubbleMine : styles.msgBubbleOther,
           ]}
         >
-          {productId ? <ProductMessageCard itemId={productId} body={msg.body}/> : place ? (
+          {productId ? <ProductMessageCard itemId={productId} body={msg.body} messageId={msg.id} userId={currentUserId} isBuyerMessage={isMine}/> : place ? (
             <View
               style={[
                 styles.locationCardOuter,

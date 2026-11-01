@@ -1,3 +1,4 @@
+import {ConversationProductRequests} from '@/components/chat/ConversationProductRequests';
 import { PROFILE_READ_FIELDS } from '@/lib/profileFields';
 import { OASIS } from '@/lib/oasis';
 import { useEffect, useState, useRef, useCallback } from 'react';
@@ -38,6 +39,7 @@ import { ChatModals } from '@/components/chat/ChatModals';
 import { sendPushToUser } from '@/lib/pushSender';
 
 export default function Conversation() {
+  const [productRequestsOpen,setProductRequestsOpen]=useState(false);
   const params = useLocalSearchParams<{ id?: string; userId?: string; target?: string }>();
   const rawId = Array.isArray(params.id) ? params.id[0] : params.id;
   const rawUserId = Array.isArray(params.userId)
@@ -709,10 +711,12 @@ export default function Conversation() {
         blockedMe={blockedMe}
         onBackPress={() => router.replace('/messages')}
         onUserPress={() => otherUser && router.push({ pathname: '/user', params: { id: otherUser.id } })}
+        onProductRequests={()=>setProductRequestsOpen(true)}
         onOptionsPress={() => setOptionsOpen(true)}
         onUnblockPress={confirmToggleBlock}
       />
 
+      <ConversationProductRequests visible={productRequestsOpen} conversationId={convId||''} userId={currentUserId} onClose={()=>setProductRequestsOpen(false)}/>
       <ScrollView
         ref={scrollRef}
         style={[styles.messagesList, { backgroundColor: 'transparent' }]}

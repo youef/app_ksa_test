@@ -2,6 +2,7 @@ import { memo, useMemo } from 'react';
 import { Text, View } from 'react-native';
 import {
   MoreHorizontal,
+  ShoppingBag,
   BellOff,
   UserX,
   Lock,
@@ -38,6 +39,7 @@ export interface ChatHeaderProps {
   onBackPress: () => void;
   onUserPress: () => void;
   onOptionsPress: () => void;
+  onProductRequests?:()=>void;
   onUnblockPress: () => void;
 }
 
@@ -82,6 +84,7 @@ function ChatHeaderBase({
   onBackPress,
   onUserPress,
   onOptionsPress,
+  onProductRequests,
   onUnblockPress,
 }: ChatHeaderProps) {
   const locationSubtitle = useMemo(
@@ -112,13 +115,13 @@ function ChatHeaderBase({
         onBackPress={onBackPress}
         onTitlePress={onUserPress}
         rightAction={
-          <HeaderAction
+          <View style={{flexDirection:'row-reverse',alignItems:'center',gap:4}}>{onProductRequests&&<HeaderAction accessibilityLabel="طلبات المنتجات في المحادثة" onPress={onProductRequests}><ShoppingBag size={20} color={OASIS.colors.primary}/></HeaderAction>}<HeaderAction
             accessibilityLabel="خيارات المحادثة"
             accessibilityHint="يفتح قائمة الخيارات"
             onPress={onOptionsPress}
           >
             <MoreHorizontal size={20} color={OASIS.colors.primary} />
-          </HeaderAction>
+          </HeaderAction></View>
         }
       />
 
