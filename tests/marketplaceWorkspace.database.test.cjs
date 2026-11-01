@@ -2,22 +2,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const {createDatabase,asUser}=require('./databaseHarness.cjs');
 const id=n=>`30000000-0000-0000-0000-${String(n).padStart(12,'0')}`;
 test('marketplace workspace enforces eligibility, payment atomicity, private orders and service transitions',async t=>{
- const schema=`create table profiles(id uuid primary key,role text default 'user',city text,district text,is_banned boolean default false,account_type text default 'standard',is_verified boolean default false,is_verified_merchant boolean default false);
- create table services(id uuid primary key,provider_id uuid,name text,moderation_status text default 'approved',available_now boolean default true,price_type text default 'fixed',price_from numeric default 25,created_at timestamptz default now());
- create table marketplace_items(id uuid primary key default gen_random_uuid(),seller_id uuid,status text);
- create function public.hayna_commerce_text_allowed(p_text text)returns boolean language sql as $$select true$$;
- create table admin_permissions(admin_id uuid,permission text,enabled boolean);
- create table admin_roles(key text primary key,permissions jsonb);
- create table admin_role_assignments(user_id uuid,role_key text);
- create table banned_words(word text,enabled boolean);
- insert into admin_roles values('owner','{"all":true}');
- insert into admin_role_assignments values('${id(1)}','owner');
- create table admin_activity_logs(actor_id uuid,action text,target_type text,target_id uuid,metadata jsonb);
- create function app_private.hayna_user_has_permission(p_user uuid,p_permission text)returns boolean language sql stable as $$select p_user='${id(1)}'::uuid$$;
- create function public.hayna_has_permission(p_permission text)returns boolean language sql stable as $$select app_private.hayna_user_has_permission(auth.uid(),p_permission)$$;
- insert into auth.users(id)values('${id(1)}'),('${id(2)}'),('${id(3)}'),('${id(4)}');
- insert into profiles(id,role,city,district,account_type,is_verified,is_verified_merchant)values('${id(1)}','admin','الرياض','النرجس','standard',false,false),('${id(2)}','user','الرياض','النرجس','merchant',true,true),('${id(3)}','user','الرياض','النرجس','standard',false,false),('${id(4)}','user','جدة','الروضة','standard',false,false);
- insert into services(id,provider_id,name)values('${id(10)}','${id(2)}','خدمة تجريبية');`;
+ const {schema}=require('./marketplaceFixture.cjs');
  const db=await createDatabase({schema,migration:[fs.readFileSync('supabase/migrations/20261015120000_marketplace_commerce.sql','utf8'),fs.readFileSync('artifacts/marketplace-workspace.sql','utf8'),fs.readFileSync('artifacts/marketplace-promotion-display.sql','utf8')]});t.after(()=>db.close());
  let serviceOrder,order,campaign,campaignOrder;
  await t.test('ordinary account can read workspace but cannot activate professional plan or forge ledger',async()=>{

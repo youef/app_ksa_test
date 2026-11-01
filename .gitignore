@@ -16,3 +16,5 @@ local_tests_and_docs/
 .env
 supabase/.temp/
 artifacts/qa-runtime/
+/app_ksa_test/
+/artifacts/*-review-base.zip
