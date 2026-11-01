@@ -1,5 +1,5 @@
 import React,{useCallback,useEffect,useState} from 'react';
-import {ActivityIndicator,RefreshControl,ScrollView,StyleSheet,Text,TextInput,View} from 'react-native';
+import {ActivityIndicator,Image,RefreshControl,ScrollView,StyleSheet,Text,TextInput,View} from 'react-native';
 import {router} from 'expo-router';
 import {AppHeader} from '@/components/shared/AppHeader';
 import {OasisPressable as Pressable} from '@/components/oasis/OasisPrimitives';
@@ -17,6 +17,7 @@ export default function AdminOrderDisputes(){
  const [allowed,setAllowed]=useState(false),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[refreshing,setRefreshing]=useState(false);
  const [tickets,setTickets]=useState<Ticket[]>([]),[reports,setReports]=useState<Report[]>([]),[selected,setSelected]=useState<Ticket|null>(null),[messages,setMessages]=useState<Msg[]>([]);
  const [reply,setReply]=useState(''),[note,setNote]=useState(''),[notice,setNotice]=useState(''),[error,setError]=useState('');
+ const [attachmentUrls,setAttachmentUrls]=useState<string[]>([]);
  const load=useCallback(async()=>{
   try{
    const a=await supabase.auth.getUser();if(!a.data.user){router.replace('/auth');return;}
@@ -34,8 +35,15 @@ export default function AdminOrderDisputes(){
  },[]);
  useEffect(()=>{void load();},[load]);
  async function openTicket(t:Ticket){
-  setSelected(t);setNote(t.admin_note||'');const result=await supabase.from('dispute_messages').select('id,body,sender_id,is_admin,created_at').eq('dispute_id',t.id).order('created_at',{ascending:true});
-  if(result.error)setError(result.error.message);else setMessages((result.data||[]) as Msg[]);
+  setSelected(t);setNote(t.admin_note||'');setAttachmentUrls([]);
+  const [result,att]=await Promise.all([
+   supabase.from('dispute_messages').select('id,body,sender_id,is_admin,created_at').eq('dispute_id',t.id).order('created_at',{ascending:true}),
+   supabase.from('dispute_attachments').select('storage_path').eq('dispute_id',t.id).order('created_at',{ascending:true})
+  ]);
+  if(result.error||att.error){setError(result.error?.message||att.error?.message||'تعذر تحميل مرفقات البلاغ.');return;}
+  setMessages((result.data||[]) as Msg[]);
+  const urls=await Promise.all((att.data||[]).map(async x=>(await supabase.storage.from('order-dispute-files').createSignedUrl(x.storage_path,300)).data?.signedUrl||''));
+  setAttachmentUrls(urls.filter(Boolean));
  }
  async function run(task:()=>Promise<void>){if(busy)return;setBusy(true);setError('');setNotice('');try{await task();await load();}catch(e:any){setError(e?.message||'تعذر تحديث البلاغ.');}finally{setBusy(false);}}
  async function changeStatus(value:string){
@@ -80,6 +88,7 @@ export default function AdminOrderDisputes(){
     {hint(selected.description)}{states.map(k=>button((arStatus[k]||k)+(selected.status===k?' ✓':''),()=>void changeStatus(k)))}
     <TextInput placeholder="ملاحظة داخلية للإدارة" value={note} onChangeText={setNote} multiline style={[s.input,{color:c.ink,borderColor:c.line}]}/>
     {button('حفظ الحالة والملاحظة',()=>void changeStatus(selected.status))}
+    {title('المرفقات الخاصة')}{attachmentUrls.length? <View style={{flexDirection:'row-reverse',flexWrap:'wrap',gap:8}}>{attachmentUrls.map((url,i)=><Image key={i} source={{uri:url}} style={{width:120,height:120,borderRadius:11}}/>)}</View>:hint('لا توجد صور مرفقة.')}
     {title('المحادثة الخاصة')}
     {messages.map(m=><View key={m.id} style={s.line}>{hint((m.is_admin?'الإدارة: ':'مقدم البلاغ: ')+m.body)}{hint(new Date(m.created_at).toLocaleString('ar-SA'))}</View>)}
     <TextInput placeholder="اكتب ردك لصاحب التذكرة" value={reply} onChangeText={setReply} multiline style={[s.input,{color:c.ink,borderColor:c.line}]}/>
