@@ -1,3 +1,4 @@
+import {parseProductDetails,productFulfillmentOptions} from '@/lib/productDetails';
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -12,11 +13,12 @@ import { supabase } from '@/lib/supabase';
 export function ProductRequestSheet({ visible, item, userId, onClose }: { visible: boolean; item: any; userId: string | null; onClose: () => void }) {
   useTheme(); const c = OASIS.colors;
   const [quantity, setQuantity] = useState(1), [note, setNote] = useState(''), [busy, setBusy] = useState(false), [error, setError] = useState(''), [ready, setReady] = useState(false);
+  const [fulfillment,setFulfillment]=useState('');
   const reference = useRef(''), lock = useRef(false);
   const storageKey = '@hayna_product_request:' + userId + ':' + item?.id;
   useEffect(() => {
     if (!visible) return;
-    let active = true; setReady(false); setQuantity(1); setNote(''); setError('');
+    let active = true; setReady(false); setQuantity(1); setNote(''); setError('');setFulfillment(productFulfillmentOptions(item?.description)[0]);
     void (async () => {
       try {
         const pending = await AsyncStorage.getItem(storageKey);
@@ -33,7 +35,7 @@ export function ProductRequestSheet({ visible, item, userId, onClose }: { visibl
     if (lock.current || !ready || !item || !userId) return;
     lock.current = true; setBusy(true); setError('');
     try {
-      const result = await sendProductRequest(supabase, { itemId: item.id, requestId: reference.current, quantity, note, expectedPrice: item.price });
+      const result = await sendProductRequest(supabase, { itemId: item.id, requestId: reference.current, quantity, note, fulfillment, expectedPrice: item.price });
       await AsyncStorage.removeItem(storageKey).catch(() => {});
       onClose(); router.push({ pathname: '/conversation', params: { id: result.conversationId } });
     } catch (cause) { setError((cause as Error).message || 'تعذر إرسال الطلب.'); }
@@ -47,6 +49,8 @@ export function ProductRequestSheet({ visible, item, userId, onClose }: { visibl
           <Text style={[s.title, { color: c.ink }]}>{item?.title}</Text>
           <Text style={[s.hint, { color: c.muted }]}>راجع طلبك، ثم أرسله إلى البائع في محادثة خاصة. لا يُخصم مبلغ ولا يُحجز المنتج بهذه الخطوة.</Text>
           <View style={s.between}><Text style={[s.label, { color: c.ink }]}>الكمية المطلوبة</Text><View style={s.row}><Pressable accessibilityLabel="زيادة الكمية" accessibilityRole="button" disabled={busy || quantity >= 20} onPress={() => setQuantity(value => Math.min(20, value + 1))} style={[s.step, { backgroundColor: c.soft }]}><Plus size={19} color={c.primary} /></Pressable><Text style={[s.quantity, { color: c.ink }]}>{quantity.toLocaleString('ar-SA')}</Text><Pressable accessibilityLabel="تقليل الكمية" accessibilityRole="button" disabled={busy || quantity <= 1} onPress={() => setQuantity(value => Math.max(1, value - 1))} style={[s.step, { backgroundColor: c.soft }]}><Minus size={19} color={c.primary} /></Pressable></View></View>
+          <Text style={[s.label,{color:c.ink}]}>طريقة الاستلام المطلوبة</Text><View style={[s.row,{flexWrap:'wrap'}]}>{productFulfillmentOptions(item?.description).map(value=><Pressable key={value} disabled={busy} accessibilityRole="radio" accessibilityState={{selected:fulfillment===value}} onPress={()=>setFulfillment(value)} style={[s.step,{width:'auto',paddingHorizontal:12,backgroundColor:fulfillment===value?c.primary:c.soft}]}><Text style={{color:fulfillment===value?'#fff':c.primary}}>{value}</Text></Pressable>)}</View>
+          {parseProductDetails(item?.description).specs.filter(x=>['الاستلام','تكلفة التوصيل','موعد التسليم'].includes(x.label)).map(x=><Text key={x.label} style={[s.hint,{color:c.ink}]}>{x.label}: {x.value}</Text>)}
           <Text style={[s.label, { color: c.ink }]}>ملاحظات للبائع · اختياري</Text><TextInput accessibilityLabel="ملاحظات طلب المنتج" value={note} onChangeText={setNote} maxLength={400} editable={!busy} multiline placeholder="اسأل عن المقاس أو اللون أو موعد الاستلام…" style={[s.input, { color: c.ink, borderColor: c.line }]} /><Text style={[s.hint, { color: c.muted }]}>{note.length.toLocaleString('ar-SA')} / ٤٠٠</Text>
           <View style={[s.summary, { backgroundColor: c.soft }]}><Text style={[s.label, { color: c.ink }]}>الإجمالي التقديري</Text><Text style={[s.total, { color: c.primary }]}>{total === null ? 'بالاتفاق مع البائع' : new Intl.NumberFormat('ar-SA', { style: 'currency', currency: 'SAR' }).format(total / 100)}</Text><Text style={[s.hint, { color: c.muted }]}>لا يشمل تكلفة التسليم. الكمية والتوفر والسعر النهائي يؤكدها البائع.</Text></View>
           <View style={s.row}><ShieldCheck size={19} color={c.primary} /><Text style={[s.hint, { flex: 1, color: c.muted }]}>لا ترسل عنوان منزلك الدقيق أو بيانات دفعك داخل الملاحظات.</Text></View>

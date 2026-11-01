@@ -56,6 +56,7 @@ export default function NewListing() {
   const [model, setModel] = useState('');
   const [dimensions, setDimensions] = useState('');
   const [delivery, setDelivery] = useState('استلام من الموقع');
+  const [defects,setDefects]=useState(''),[accessories,setAccessories]=useState(''),[warranty,setWarranty]=useState(''),[invoice,setInvoice]=useState('غير محدد'),[deliveryFee,setDeliveryFee]=useState(''),[deliveryTime,setDeliveryTime]=useState('');
   const [negotiable, setNegotiable] = useState(false);
   const [position, setPosition] = useState<ProductPosition | null>(null);
   const [locating, setLocating] = useState(false);
@@ -169,7 +170,7 @@ export default function NewListing() {
     return '';
   }
 
-  const detailDescription = [description.trim(), '\nتفاصيل المنتج', `التصنيف: ${category}`, `الحالة: ${condition}`, brand.trim() && `العلامة التجارية: ${brand.trim()}`, model.trim() && `الموديل: ${model.trim()}`, dimensions.trim() && `المقاسات: ${dimensions.trim()}`, `الاستلام: ${delivery}`].filter(Boolean).join('\n');
+  const detailDescription = [description.trim(), '\nتفاصيل المنتج', `التصنيف: ${category}`, `الحالة: ${condition}`, brand.trim() && `العلامة التجارية: ${brand.trim()}`, model.trim() && `الموديل: ${model.trim()}`, dimensions.trim() && `المقاسات: ${dimensions.trim()}`, `الاستلام: ${delivery}`, defects.trim() && `العيوب: ${defects.trim().replace(/\n/g,' ')}`, accessories.trim() && `الملحقات: ${accessories.trim().replace(/\n/g,' ')}`, warranty.trim() && `الضمان: ${warranty.trim().replace(/\n/g,' ')}`, `الفاتورة: ${invoice}`, delivery!=='استلام من الموقع' && `تكلفة التوصيل: ${deliveryFee.trim().replace(/\n/g,' ')||'بالاتفاق قبل الطلب'}`, deliveryTime.trim() && `موعد التسليم: ${deliveryTime.trim().replace(/\n/g,' ')}`].filter(Boolean).join('\n');
 
   async function chooseImage(fromCamera = false) {
     if(busy)return;
@@ -331,6 +332,10 @@ export default function NewListing() {
           <View style={styles.choices}>{['جديد','كالجديد','مستعمل بحالة جيدة','يحتاج صيانة'].map(value=><Choice key={value} label={value} selected={condition===value} disabled={busy} onPress={()=>setCondition(value)}/>)}</View>
           <Field label="وصف المنتج *" maxLength={2000} editable={!busy} value={description} onChangeText={setDescription} placeholder="اذكر مدة الاستخدام، المحتويات والملحقات، وأي عيوب أو إصلاحات سابقة..." multiline />
           <View style={styles.twoColumns}><View style={{flex:1}}><Field label="العلامة التجارية — اختياري" maxLength={60} editable={!busy} value={brand} onChangeText={setBrand} placeholder="مثال: سامسونج"/></View><View style={{flex:1}}><Field label="الموديل — اختياري" maxLength={60} editable={!busy} value={model} onChangeText={setModel} placeholder="اسم أو رقم الموديل"/></View></View>
+          <Field label="العيوب والملاحظات — اذكرها بوضوح" maxLength={200} editable={!busy} value={defects} onChangeText={setDefects} placeholder="مثال: خدش بسيط، أو لا توجد عيوب معروفة"/>
+          <Field label="الملحقات المشمولة" maxLength={160} editable={!busy} value={accessories} onChangeText={setAccessories} placeholder="الشاحن، العلبة، قطع إضافية…"/>
+          <Field label="الضمان ومدته — إن وجد" maxLength={160} editable={!busy} value={warranty} onChangeText={setWarranty} placeholder="الجهة والمدة المتبقية، أو بدون ضمان"/>
+          <Text style={styles.label}>فاتورة الشراء</Text><View style={styles.choices}>{['متوفرة','غير متوفرة','غير محدد'].map(value=><Choice key={value} label={value} selected={invoice===value} disabled={busy} onPress={()=>setInvoice(value)}/>)}</View>
           <Field label="المقاسات — اختياري" maxLength={100} editable={!busy} value={dimensions} onChangeText={setDimensions} placeholder="مثال: العرض ١٢٠ × العمق ٦٠ سم"/>
         </OasisSurface>
 
@@ -342,6 +347,8 @@ export default function NewListing() {
           </> : <Text style={styles.hint}>لا يُطلب سعر لهذا النوع من الإعلانات.</Text>}
           <Text style={styles.label}>طريقة تسليم المنتج</Text>
           <View style={styles.choices}>{['استلام من الموقع','توصيل بالتنسيق','استلام أو توصيل'].map(value=><Choice key={value} label={value} selected={delivery===value} disabled={busy} onPress={()=>setDelivery(value)}/>)}</View>
+          {delivery!=='استلام من الموقع'&&<Field label="تكلفة التوصيل بالريال أو بالاتفاق" value={deliveryFee} onChangeText={setDeliveryFee} maxLength={80} editable={!busy} placeholder="مثال: ٢٠ ر.س داخل المدينة، أو مجاني"/>}
+          <Field label="موعد التسليم المتوقع" value={deliveryTime} onChangeText={setDeliveryTime} maxLength={120} editable={!busy} placeholder="مثال: خلال يومين بعد تأكيد البائع"/>
           <Text style={styles.hint}>يُنسّق وقت الاستلام والتوصيل والتكلفة عبر المحادثة. لا تُضف رقم منزلك أو بياناتك الخاصة في الوصف.</Text>
         </OasisSurface>
 

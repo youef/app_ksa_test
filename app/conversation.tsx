@@ -156,7 +156,8 @@ export default function Conversation() {
         .select(PROFILE_READ_FIELDS)
         .eq('id', otherId)
         .single();
-      setOtherUser(profile);
+      // Keep the conversation member ID for blocking and receipts even when profile RLS hides personal fields.
+      setOtherUser(profile || {id:otherId});
       setOtherDnd(await isDndActiveNow(await loadDnd(otherId)));
     }
 

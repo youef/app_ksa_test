@@ -1,5 +1,7 @@
 const test = require('node:test'), assert = require('node:assert/strict'), fs = require('node:fs'), Module = require('node:module'), ts = require('typescript');
+require.extensions['.ts']=(module,filename)=>module._compile(ts.transpileModule(fs.readFileSync(filename,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,filename);
 const file = require.resolve('../lib/productRequest.ts'), compiled = new Module(file);
+compiled.filename=file; compiled.paths=Module._nodeModulePaths(require('node:path').dirname(file));
 compiled._compile(ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText, file);
 const { productRequestTotal, sendProductRequest } = compiled.exports;
 const input = { itemId: '20000000-0000-4000-8000-000000000001', requestId: '30000000-0000-4000-8000-000000000001', quantity: 2, note: 'اللون الأخضر', expectedPrice: '10.25' };
@@ -35,4 +37,7 @@ test('closed DMs, self-purchases, sold items and changed prices never send a req
   for (const options of [{ closed: true }, { self: true }, { sold: true }, { changed: true }, { anonymous: true }]) {
     const { api, state } = client(options); await assert.rejects(sendProductRequest(api, input)); assert.equal(state.writes, 0);
   }
+});
+test('unsupported delivery choice never sends a request when seller terms have changed',async()=>{
+ const {api,state}=client();await assert.rejects(sendProductRequest(api,{...input,fulfillment:'توصيل بالتنسيق'}),/خيارات التسليم/);assert.equal(state.writes,0);
 });
