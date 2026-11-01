@@ -6,7 +6,7 @@ import { router } from 'expo-router';
 import { Minus, Plus, Send, ShieldCheck, ShoppingBag, X } from 'lucide-react-native';
 import { OasisPressable as Pressable, OasisTextInput as TextInput } from '@/components/oasis/OasisPrimitives';
 import { OASIS, useTheme } from '@/lib/oasis';
-import { productRequestTotal, sendProductRequest } from '@/lib/productRequest';
+import { productRequestTotal } from '@/lib/productRequest';
 import { supabase } from '@/lib/supabase';
 
 export function ProductRequestSheet({ visible, item, userId, onClose }: { visible: boolean; item: any; userId: string | null; onClose: () => void }) {
@@ -27,15 +27,20 @@ export function ProductRequestSheet({ visible, item, userId, onClose }: { visibl
     })();
     return () => { active = false; };
   }, [visible, storageKey]);
+  const match=String(item?.description||'').match(/(?:^|\n)الاستلام:\s*([^\n]+)/);
+  const fulfillments=match?.[1]?.trim()==='استلام من الموقع'?['استلام من الموقع']:match?.[1]?.trim()==='توصيل بالتنسيق'?['توصيل بالتنسيق']:match?.[1]?.trim()==='استلام أو توصيل'?['استلام من الموقع','توصيل بالتنسيق']:['بالاتفاق مع البائع'];
+  const [fulfillment,setFulfillment]=useState('');
+  const selectedFulfillment=fulfillments.includes(fulfillment)?fulfillment:fulfillments[0];
   let total: number | null = null;
   try { total = productRequestTotal(item?.price, quantity); } catch { /* Submission also validates the actual server price. */ }
   async function submit() {
     if (lock.current || !ready || !item || !userId) return;
     lock.current = true; setBusy(true); setError('');
     try {
-      const result = await sendProductRequest(supabase, { itemId: item.id, requestId: reference.current, quantity, note, expectedPrice: item.price });
+      const result = await supabase.rpc('hayna_create_product_request', {p_request:reference.current,p_item:item.id,p_quantity:quantity,p_note:note,p_fulfillment:selectedFulfillment,p_expected_price:item.price});
+      if(result.error||!result.data?.request?.id)throw result.error||new Error('تعذر حفظ طلب المنتج.');
       await AsyncStorage.removeItem(storageKey).catch(() => {});
-      onClose(); router.push({ pathname: '/conversation', params: { id: result.conversationId } });
+      onClose(); router.push({ pathname: '/order-details', params: { id: result.data.request.id,kind:'product' } });
     } catch (cause) { setError((cause as Error).message || 'تعذر إرسال الطلب.'); }
     finally { lock.current = false; setBusy(false); }
   }
@@ -47,6 +52,7 @@ export function ProductRequestSheet({ visible, item, userId, onClose }: { visibl
           <Text style={[s.title, { color: c.ink }]}>{item?.title}</Text>
           <Text style={[s.hint, { color: c.muted }]}>راجع طلبك، ثم أرسله إلى البائع في محادثة خاصة. لا يُخصم مبلغ ولا يُحجز المنتج بهذه الخطوة.</Text>
           <View style={s.between}><Text style={[s.label, { color: c.ink }]}>الكمية المطلوبة</Text><View style={s.row}><Pressable accessibilityLabel="زيادة الكمية" accessibilityRole="button" disabled={busy || quantity >= 20} onPress={() => setQuantity(value => Math.min(20, value + 1))} style={[s.step, { backgroundColor: c.soft }]}><Plus size={19} color={c.primary} /></Pressable><Text style={[s.quantity, { color: c.ink }]}>{quantity.toLocaleString('ar-SA')}</Text><Pressable accessibilityLabel="تقليل الكمية" accessibilityRole="button" disabled={busy || quantity <= 1} onPress={() => setQuantity(value => Math.max(1, value - 1))} style={[s.step, { backgroundColor: c.soft }]}><Minus size={19} color={c.primary} /></Pressable></View></View>
+          <Text style={[s.label, { color: c.ink }]}>طريقة الاستلام</Text><View style={s.row}>{fulfillments.map(v=><Pressable key={v} accessibilityRole="button" onPress={()=>setFulfillment(v)} style={[s.step,{width:'auto',paddingHorizontal:13,backgroundColor:selectedFulfillment===v?c.primary:c.soft}]}><Text style={{color:selectedFulfillment===v?'white':c.ink,fontSize:12}}>{v}</Text></Pressable>)}</View>
           <Text style={[s.label, { color: c.ink }]}>ملاحظات للبائع · اختياري</Text><TextInput accessibilityLabel="ملاحظات طلب المنتج" value={note} onChangeText={setNote} maxLength={400} editable={!busy} multiline placeholder="اسأل عن المقاس أو اللون أو موعد الاستلام…" style={[s.input, { color: c.ink, borderColor: c.line }]} /><Text style={[s.hint, { color: c.muted }]}>{note.length.toLocaleString('ar-SA')} / ٤٠٠</Text>
           <View style={[s.summary, { backgroundColor: c.soft }]}><Text style={[s.label, { color: c.ink }]}>الإجمالي التقديري</Text><Text style={[s.total, { color: c.primary }]}>{total === null ? 'بالاتفاق مع البائع' : new Intl.NumberFormat('ar-SA', { style: 'currency', currency: 'SAR' }).format(total / 100)}</Text><Text style={[s.hint, { color: c.muted }]}>لا يشمل تكلفة التسليم. الكمية والتوفر والسعر النهائي يؤكدها البائع.</Text></View>
           <View style={s.row}><ShieldCheck size={19} color={c.primary} /><Text style={[s.hint, { flex: 1, color: c.muted }]}>لا ترسل عنوان منزلك الدقيق أو بيانات دفعك داخل الملاحظات.</Text></View>

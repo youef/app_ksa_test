@@ -71,6 +71,7 @@ export default function AdminMarketplace() {
     <View style={[styles.root, { backgroundColor: 'transparent' }]}>
       <AppHeader variant="sub" title="مراجعة إعلانات السوق" subtitle="لوحة الإدارة" fallbackRoute="/marketplace-dashboard" />
       <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={OASIS.colors.primary} />}>
+        <Pressable oasisKind="action" accessibilityRole="button" onPress={() => router.push('/admin-order-disputes')} style={styles.refreshButton}><ShieldCheck size={17} color={OASIS.colors.primary}/><Text style={styles.refreshText}>مركز بلاغات الطلبات والتقييمات</Text></Pressable>
         <View style={styles.hero}>
           <View style={styles.heroIcon}><ShieldCheck size={23} color={OASIS.colors.surface} /></View>
           <Text style={styles.heroTitle}>اعتماد الإعلانات المدفوعة</Text>

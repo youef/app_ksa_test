@@ -93,7 +93,7 @@ export default function Notifications() {
       if (notificationResult.error) throw notificationResult.error;
       const raw = (notificationResult.data || []) as NotificationItem[];
       // Direct messages already have a dedicated inbox entry; do not duplicate them here.
-      const visible = raw.filter(item => item.type !== 'message' && item.target_type !== 'conversation');
+      const visible = raw.filter(item => item.type !== 'message' && item.target_type !== 'conversation' && item.data?.in_app_allowed !== false);
       const actorIds = [...new Set(visible.map(item => {
         const data = item.data || {};
         return data.actor_id || data.author_id || data.follower_id || data.reviewer_id || data.sender_id || null;
@@ -197,11 +197,27 @@ export default function Notifications() {
   }
 
   // Interactive Click on Notification -> Navigate to Target
-  function handleNotificationPress(n: NotificationItem) {
+  async function handleNotificationPress(n: NotificationItem) {
     if (!n.read_at) {
       markAsRead(n.id);
     }
 
+    if(n.target_type==='order'&&n.target_id){
+      const key=String(n.data?.event_key||'');
+      if(n.type==='dispute_reply'||n.type==='dispute_status'){
+        const d=await supabase.from('order_disputes').select('service_order_id,product_request_id').eq('id',n.target_id).maybeSingle();
+        const id=d.data?.service_order_id||d.data?.product_request_id;
+        if(id){router.push({pathname:'/order-details',params:{id,kind:d.data?.product_request_id?'product':'service'}});return;}
+      }else if(n.type==='review_reply'){
+        const d=await supabase.from('order_reviews').select('service_order_id,product_request_id').eq('id',n.target_id).maybeSingle();
+        const id=d.data?.service_order_id||d.data?.product_request_id;
+        if(id){router.push({pathname:'/order-details',params:{id,kind:d.data?.product_request_id?'product':'service'}});return;}
+      }else{
+        const isProduct=key.startsWith('order:product:')||key.startsWith('product_rev:');
+        router.push({pathname:'/order-details',params:{id:n.target_id,kind:isProduct?'product':'service'}});return;
+      }
+      router.push('/product-orders');return;
+    }
     if (n.target_type === 'question' && n.target_id) {
       router.push({ pathname: '/question', params: { id: n.target_id } });
     } else if (n.target_type === 'request' && n.target_id) {
@@ -239,7 +255,7 @@ export default function Notifications() {
         return n.type === 'answer' || n.target_type === 'question' || n.type === 'message';
       }
       if (activeTab === 'community') {
-        return n.type === 'request' || n.target_type === 'request' || n.type === 'service' || n.target_type === 'service' || (n.title && n.title.includes('إعارة'));
+        return n.type === 'request' || n.target_type === 'request' || n.type === 'service' || n.target_type === 'service' || n.target_type==='order' || (n.title && n.title.includes('إعارة'));
       }
       if (activeTab === 'stories') {
         return n.type === 'story' || n.target_type === 'story' || (n.title && n.title.includes('يوميات'));
@@ -713,6 +729,8 @@ function getActionText(targetType: string) {
       return 'فتح المحادثة الفورية';
     case 'story':
       return 'مشاهدة قصة الجار';
+    case 'order':
+      return 'عرض حالة الطلب والتقييم والبلاغات';
     default:
       return 'عرض التفاصيل';
   }

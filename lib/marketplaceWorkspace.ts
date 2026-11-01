@@ -1,5 +1,5 @@
 export const marketplaceMoney=(amount:number)=>new Intl.NumberFormat('ar-SA',{style:'currency',currency:'SAR'}).format((Number(amount)||0)/100);
-export const marketplaceStatus:Record<string,string>={pending:'بانتظار الدفع',paid:'مدفوع',failed:'فشل الدفع',cancelled:'ملغى',refunded:'مسترد',expired:'منتهي',pending_payment:'بانتظار الدفع',pending_review:'قيد المراجعة',active:'نشط',paused:'متوقف مؤقتًا',rejected:'غير معتمد',ended:'انتهت الحملة',accepted:'مقبول',in_progress:'قيد التنفيذ',completed:'مكتمل',payment_failed:'فشل الدفع'};
+export const marketplaceStatus:Record<string,string>={pending:'بانتظار الدفع',paid:'مدفوع',failed:'فشل الدفع',cancelled:'ملغى',refunded:'مسترد',expired:'منتهي',pending_payment:'بانتظار الدفع',pending_review:'قيد المراجعة',active:'نشط',paused:'متوقف مؤقتًا',rejected:'غير معتمد',ended:'انتهت الحملة',accepted:'مقبول',in_progress:'قيد التنفيذ',ready:'جاهز للاستلام',completed:'مكتمل',payment_failed:'فشل الدفع'};
 export function safeMarketplaceCheckout(value:unknown):string|null{
  if(typeof value!=='string')return null;
  try{const url=new URL(value);return url.protocol==='https:'&&!url.username&&!url.password&&['moyasar.com','tap.company'].some(host=>url.hostname===host||url.hostname.endsWith('.'+host))?url.href:null;}catch{return null;}
