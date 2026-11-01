@@ -1247,7 +1247,8 @@ export const styles = StyleSheet.create({
     left: 0,
     right: 0,
   },
-  /* Mobile release: styles referenced by modular home components. */
+  /* Preserve existing last-wins mobile style overrides without duplicate literal keys. */
+  ...{
   glassFrameCompact: { alignSelf: 'stretch', borderRadius: 14 },
   glassFrameDefault: { width: '100%', borderRadius: 14 },
   atmoBarBase: { minHeight: 44, flexDirection: 'row-reverse', alignItems: 'center', paddingHorizontal: 12 },
@@ -1271,6 +1272,7 @@ export const styles = StyleSheet.create({
   storyNameDark: { color: '#FFFFFF' },
   storyUsername: { fontSize: 10, opacity: 0.8 },
   storyMoreCircle: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: T.mintBorder, backgroundColor: OASIS.colors.soft, marginBottom: 5 },
+  },
   emptyIllustrationWrap: {
   alignItems: 'center',
   justifyContent: 'center',
