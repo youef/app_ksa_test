@@ -64,6 +64,6 @@ test('application, migration, and workflow source contains no unresolved merge m
 
 test('scheduled engineering audit runs every six hours and retains manual dispatch', () => {
   const source = fs.readFileSync(path.join(workflowDirectory, 'hayna-ai-audit.yml'), 'utf8');
-  assert.match(source, /^    - cron: "13 3,9,15,21 \\* \\* \\*"$/m);
-  assert.match(source, /^  workflow_dispatch:\\s*$/m);
+  assert.match(source, /^    - cron: "13 3,9,15,21 \* \* \*"$/m);
+  assert.match(source, /^  workflow_dispatch:\s*$/m);
 });
