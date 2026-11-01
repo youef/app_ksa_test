@@ -42,6 +42,8 @@ export default function OrderDetails(){
  const [loading,setLoading]=useState(true),[refreshing,setRefreshing]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
  const [stars,setStars]=useState(5),[comment,setComment]=useState(''),[photos,setPhotos]=useState<ImagePicker.ImagePickerAsset[]>([]);
  const [sellerReply,setSellerReply]=useState(''),[reportReason,setReportReason]=useState('');
+ const [editingReply,setEditingReply]=useState(false),[deliveryWhen,setDeliveryWhen]=useState(''),[deliveryNote,setDeliveryNote]=useState('');
+ const [inApp,setInApp]=useState(true),[push,setPush]=useState(true);
  const [category,setCategory]=useState('delay'),[description,setDescription]=useState(''),[message,setMessage]=useState(''),[casePhotos,setCasePhotos]=useState<ImagePicker.ImagePickerAsset[]>([]);
  const field=kind==='service'?'service_order_id':'product_request_id';
  const load=useCallback(async()=>{
@@ -56,6 +58,9 @@ export default function OrderDetails(){
    if(orderError)throw orderError;
    if(!orderRow){setError('الطلب غير موجود أو ليس لديك صلاحية عرضه.');setOrder(null);return;}
    setOrder(orderRow);
+   setDeliveryWhen(orderRow.scheduled_delivery_at?new Date(orderRow.scheduled_delivery_at).toISOString().slice(0,16):'');setDeliveryNote(orderRow.delivery_note||'');
+   const prefs=await supabase.from('order_notification_preferences').select('in_app_enabled,push_enabled').eq('user_id',auth.user.id).maybeSingle();
+   if(!prefs.error){setInApp(prefs.data?.in_app_enabled!==false);setPush(prefs.data?.push_enabled!==false);}
    const [rv,ds,hs]=await Promise.all([
     supabase.from('order_reviews').select('*').eq(field,id).maybeSingle(),
     supabase.from('order_disputes').select('id,ticket_number,category,status,description,created_at').eq(field,id).order('created_at',{ascending:false}),
@@ -126,12 +131,26 @@ export default function OrderDetails(){
    if(e)throw e;setPhotos([]);setComment('');setNotice('تم إرسال تقييمك المرتبط بالاستلام.');
   });
  }
+ async function saveDelivery(){
+  await run(async()=>{
+   const ts=deliveryWhen.trim()?new Date(deliveryWhen.trim()):null;
+   if(ts&&(!Number.isFinite(ts.getTime())||ts.getTime()<Date.now()))throw new Error('أدخل موعدًا مستقبليًا بصيغة 2026-11-05T18:00');
+   const r=await supabase.rpc('hayna_order_update_delivery',{p_order:id,p_delivery_at:ts?ts.toISOString():null,p_note:deliveryNote.trim()});
+   if(r.error)throw r.error;setNotice('حُفظ موعد التسليم وأُرسل تنبيه إلى المشتري.');
+  });
+ }
+ async function savePreferences(inAppValue:boolean,pushValue:boolean){
+  await run(async()=>{
+   const r=await supabase.from('order_notification_preferences').upsert({user_id:uid,in_app_enabled:inAppValue,push_enabled:pushValue,updated_at:new Date().toISOString()},{onConflict:'user_id'});
+   if(r.error)throw r.error;setInApp(inAppValue);setPush(pushValue);setNotice('تم تحديث تفضيلات إشعارات الطلبات.');
+  });
+ }
  async function sendReply(){
   await run(async()=>{
    if(!review)return;
    const result=reply?await supabase.from('review_replies').update({body:sellerReply.trim()}).eq('id',reply.id):
     await supabase.from('review_replies').insert({review_id:review.id,seller_id:uid,body:sellerReply.trim()});
-   if(result.error)throw result.error;setSellerReply('');setNotice('تم حفظ رد البائع.');
+   if(result.error)throw result.error;setSellerReply('');setEditingReply(false);setNotice('تم حفظ رد البائع.');
   });
  }
  async function reportReview(){
@@ -186,14 +205,19 @@ export default function OrderDetails(){
      {kind==='product'&&isBuyer&&order.status==='ready'?button('تأكيد استلام المنتج',()=>Alert.alert('تأكيد الاستلام','هل استلمت المنتج بالفعل؟',[{text:'إلغاء',style:'cancel'},{text:'تأكيد',onPress:()=>void productAction('complete')}])):null}
      {kind==='product'&&isBuyer&&order.status==='pending'?button('إلغاء الطلب',()=>void productAction('cancel')):null}
      {kind==='product'&&order.conversation_id?button('فتح محادثة البائع والمشتري',()=>router.push({pathname:'/conversation',params:{id:order.conversation_id}})):null}
+     {kind==='service'&&order.scheduled_delivery_at?hint('موعد التسليم: '+date(order.scheduled_delivery_at)):null}
+     {kind==='service'&&order.delivery_note?hint('تفاصيل التسليم: '+order.delivery_note):null}
+     {kind==='service'&&isSeller&&['accepted','in_progress'].includes(order.status)?<>{title('تعديل موعد وتفاصيل التسليم')}{input(deliveryWhen,setDeliveryWhen,'الموعد: 2026-11-05T18:00 (اختياري)')}{input(deliveryNote,setDeliveryNote,'تفاصيل التسليم',true)}{button('حفظ الموعد وإبلاغ المشتري',()=>void saveDelivery())}</>:null}
     </>)}
     {history.length?box(<>{title('سجل حالة الطلب')}{history.map(x=><View key={x.id} style={S.line}>{hint((statusNames[x.old_status]||x.old_status)+' ← '+(statusNames[x.new_status]||x.new_status))}{hint(date(x.created_at))}</View>)}</>):null}
     {completed?box(<>{title('التقييم بعد الاستلام')}
      {review?<>{hint('التقييم: '+review.rating+' من 5')}{hint(review.body||'بدون تعليق')}{review.photo_paths?.map((path:string)=><Image key={path} source={{uri:supabase.storage.from('order-review-images').getPublicUrl(path).data.publicUrl}} style={S.photo}/>)}
-      {reply?<>{title('رد البائع')}{hint(reply.body)}</>:isSeller?<>{input(sellerReply,setSellerReply,'رد البائع',true)}{button('نشر الرد',()=>void sendReply(),!sellerReply.trim())}</>:null}
+      {reply?<>{title('رد البائع')}{hint(reply.body)}{isSeller&&!editingReply?button('تعديل ردي',()=>{setSellerReply(reply.body);setEditingReply(true);}):null}</>:null}
+      {isSeller&&(!reply||editingReply)?<>{input(sellerReply,setSellerReply,'رد البائع',true)}{button(reply?'حفظ تعديل الرد':'نشر الرد',()=>void sendReply(),!sellerReply.trim())}</>:null}
       {isSeller||isBuyer?<>{input(reportReason,setReportReason,'سبب الإبلاغ عن هذا التقييم',true)}{button('الإبلاغ عن التقييم',()=>void reportReview(),reportReason.trim().length<5)}</>:null}
      </>:isBuyer?<>{hint('يمكن إضافة تقييم واحد فقط لهذا الطلب المكتمل.')}<View style={S.stepRow}>{[1,2,3,4,5].map(n=><Pressable key={n} accessibilityLabel={'تقييم '+n} onPress={()=>setStars(n)}><Text style={{fontSize:25,color:n<=stars?'#E4A11B':c.muted}}>★</Text></Pressable>)}</View>{input(comment,setComment,'اكتب تجربتك (اختياري)',true)}{button('إضافة صور للتقييم (3 كحد أقصى)',()=>void chooseImages())}{photos.length?hint('تم اختيار '+photos.length+' صورة'):null}{button('نشر التقييم',()=>void submitReview())}</>:hint('التقييم متاح للمشتري فقط بعد تأكيد الاستلام.')}
     </>):null}
+    {box(<>{title('تفضيلات إشعارات الطلبات')}{hint('يمكنك تحديد إشعارات الطلبات داخل التطبيق وإشعارات الهاتف بصورة مستقلة.')}{button(inApp?'إيقاف إشعارات الطلبات داخل التطبيق':'تفعيل إشعارات الطلبات داخل التطبيق',()=>void savePreferences(!inApp,push))}{button(push?'إيقاف إشعارات الهاتف للطلبات':'تفعيل إشعارات الهاتف للطلبات',()=>void savePreferences(inApp,!push))}</>)}
     {box(<>{title('مركز مشكلات الطلبات')}{hint('تذاكر خاصة بين مقدم البلاغ والإدارة، مرتبطة بالطلب نفسه.')}
      {tickets.map(t=><Pressable key={t.id} onPress={()=>void loadTicket(t)} style={S.line}><Text style={{color:c.primary,fontWeight:'700',textAlign:'right'}}>تذكرة #{t.ticket_number} · {t.status}</Text>{hint(t.description)}</Pressable>)}
      {!ticket?<>{title('فتح بلاغ جديد')}<View style={S.stepRow}>{Object.entries(disputeKinds).map(([k,v])=><Pressable key={k} onPress={()=>setCategory(k)} style={[S.choice,{backgroundColor:category===k?c.primary:c.soft}]}><Text style={{fontSize:11,color:category===k?'white':c.ink}}>{v}</Text></Pressable>)}</View>
