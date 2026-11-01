@@ -30,3 +30,34 @@ test('manual Expo build workflow keeps separate Android and iOS jobs', () => {
   assert.match(source, /eas-cli@latest build --platform android --profile preview --non-interactive --wait/);
   assert.match(source, /eas-cli@latest build --platform ios --profile testflight --non-interactive --wait/);
 });
+
+// Generated bundles are intentionally excluded; source, migrations, and CI files are checked.
+const sourceRoots = ['app', 'components', 'lib', 'scripts', 'supabase', 'tests', '.github/workflows'];
+const sourceFilePattern = /\.(?:[cm]?[jt]sx?|ya?ml|sql)$/i;
+const ignoredDirectories = new Set(['node_modules', 'dist', 'build', '.expo', '.git', '.next']);
+
+function walkSourceFiles(directory, output) {
+  if (!fs.existsSync(directory)) return;
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    const absolute = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      if (!ignoredDirectories.has(entry.name)) walkSourceFiles(absolute, output);
+    } else if (entry.isFile() && sourceFilePattern.test(entry.name)) {
+      output.push(absolute);
+    }
+  }
+}
+
+test('application, migration, and workflow source contains no unresolved merge markers', () => {
+  const files = [];
+  for (const root of sourceRoots) walkSourceFiles(path.join(__dirname, '..', root), files);
+  assert.ok(files.length > 0, 'Expected application source files');
+  for (const filename of files) {
+    const source = fs.readFileSync(filename, 'utf8');
+    assert.doesNotMatch(
+      source,
+      /^(?:<{7}(?:\s|$)|={7}(?:\s|$)|>{7}(?:\s|$))/m,
+      `Unresolved merge-conflict marker in ${path.relative(path.join(__dirname, '..'), filename)}`
+    );
+  }
+});
