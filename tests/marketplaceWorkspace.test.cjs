@@ -11,3 +11,7 @@ test('amounts use halalas and permission/transition failures have understandable
  assert.match(marketplaceError({message:'verified_market_account_required'}),/المهنية المعتمدة/);
  assert.match(marketplaceError({message:'invalid_transition'}),/حدّث/);
 });
+test('PayPal approval links are restricted to checkoutnow on exact approved hosts',()=>{
+ for(const host of ['www.paypal.com','www.sandbox.paypal.com'])assert.ok(safeMarketplaceCheckout('https://'+host+'/checkoutnow?token=ORDER12345'));
+ for(const url of ['https://paypal.com.attacker.example/checkoutnow?token=ORDER12345','https://www.paypal.com/login','https://www.paypal.com/checkoutnow?token=bad!','https://www.paypal.com:444/checkoutnow?token=ORDER12345'])assert.equal(safeMarketplaceCheckout(url),null);
+});

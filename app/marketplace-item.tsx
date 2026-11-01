@@ -1,7 +1,7 @@
 import { OasisPressable as Pressable, OasisSurface } from '@/components/oasis/OasisPrimitives';
 import { OASIS, useTheme } from '@/lib/oasis';
 import { HeaderAction, AppHeader } from '@/components/shared/AppHeader';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { ActivityIndicator, Alert, Image, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { ArrowUpRight, MapPin, Package, Share2, ShoppingBag, UserRound, Heart, MessageCircle, ShieldCheck, Flag, CalendarDays, Tag, Ruler, Truck, Info, ZoomIn } from 'lucide-react-native';
@@ -13,9 +13,10 @@ import { parseProductDetails, productDisplayPrice } from '@/lib/productDetails';
 import { ProductRequestSheet } from '@/components/market/ProductRequestSheet';
 import { ProductEditorSheet } from '@/components/market/ProductEditorSheet';
 import { useBottomNavInset } from '@/lib/bottomNav';
+import {productContactState} from '@/lib/productContact';
 
 export default function MarketplaceItemPage() {
-  useTheme();
+  useTheme();const styles=createStyles();const revision=useRef(0);
   const bottom = useBottomNavInset(8);
   const [orderOpen, setOrderOpen] = useState(false), [imageFailed, setImageFailed] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -24,38 +25,46 @@ export default function MarketplaceItemPage() {
   const [item, setItem] = useState<any>(null);
   const [seller, setSeller] = useState<any>(null);
   const [business, setBusiness] = useState<any>(null);
+  const [trust,setTrust]=useState<{verified:boolean;review_count:number;rating:number|null;review_subject:string|null}|null>(null);
   const [me, setMe] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [canMessage,setCanMessage]=useState(false);
+  const [canMessage,setCanMessage]=useState(false),[canView,setCanView]=useState(false),[contactFailed,setContactFailed]=useState(false);
   const [imageOpen,setImageOpen]=useState(false);
   const [favorite,setFavorite]=useState(false);
   const [actionBusy,setActionBusy]=useState(false);
   const [actionError,setActionError]=useState('');
 
   const load = useCallback(async () => {
+    const ticket=++revision.current;
     if (!itemId) { setLoading(false); setError(true); return; }
     setLoading(true); setError(false);
-    setSeller(null);setBusiness(null);setCanMessage(false);setImageOpen(false);setFavorite(false);setActionError('');setOrderOpen(false);setImageFailed(false);
+    setTrust(null);setSeller(null);setBusiness(null);setCanMessage(false);setCanView(false);setContactFailed(false);setImageOpen(false);setFavorite(false);setActionError('');setOrderOpen(false);setImageFailed(false);
     try {
       const { data, error: itemError } = await supabase
         .from('marketplace_items')
-        .select('id,seller_id,business_id,title,description,price,item_type,city,district,image_url,status,created_at')
+        .select('id,seller_id,business_id,title,description,price,item_type,city,district,image_url,status,created_at,updated_at,region')
         .eq('id', itemId)
         .maybeSingle();
+      if(ticket!==revision.current)return;
       if (itemError) throw itemError;
       if (!data) { setItem(null); return; }
       setItem(data);
       const { data: auth } = await supabase.auth.getUser();
       setMe(auth.user?.id || null);
-      const access=await getNeighborAccess(data.seller_id);
+      if(ticket!==revision.current)return;
+      const trustResult=auth.user?await supabase.rpc('hayna_product_trust',{p_item:data.id}):null;
+      if(ticket!==revision.current)return;setTrust(trustResult?.error?null:trustResult?.data||null);
+      let access={can_view:false,can_message:false,target_id:null as string|null};
+      try{access=await getNeighborAccess(data.seller_id);}catch{if(ticket===revision.current)setContactFailed(true);}
+      if(ticket!==revision.current)return;setCanView(access.can_view);
       setCanMessage(access.can_message);
       if(auth.user){const saved=await supabase.from('favorite_items').select('target_id').eq('user_id',auth.user.id).eq('target_type','product').eq('target_id',data.id).maybeSingle();if(!saved.error)setFavorite(!!saved.data);}
       if (data.business_id && access.can_view) {
         const { data: businessRow } = await supabase.from('businesses')
           .select('id,name,logo_url,is_verified,city,district')
           .eq('id', data.business_id).maybeSingle();
-        setBusiness(businessRow || null);
+        if(ticket!==revision.current)return;setBusiness(businessRow || null);
       } else {
         setBusiness(null);
       }
@@ -63,15 +72,23 @@ export default function MarketplaceItemPage() {
         const { data: profile } = await supabase.from('profiles')
           .select('id,username,display_name,avatar_url,is_verified,account_type,freelance_trade,role,city,district')
           .eq('id', data.seller_id).maybeSingle();
-        setSeller(profile || null);
+        if(ticket!==revision.current)return;setSeller(profile || null);
       }
     } catch (e) {
+      if(ticket!==revision.current)return;
       console.error('marketplace item load', e);
       setError(true);
-    } finally { setLoading(false); }
+    } finally { if(ticket===revision.current)setLoading(false); }
   }, [itemId]);
 
-  useFocusEffect(useCallback(()=>{void load();},[load]));
+  useFocusEffect(useCallback(()=>{void load();return()=>{revision.current++;};},[load]));
+
+  useEffect(()=>{
+    if(!itemId)return;
+    const channel=supabase.channel('product:'+itemId).on('postgres_changes',{event:'UPDATE',schema:'public',table:'marketplace_items',filter:'id=eq.'+itemId},payload=>{setItem((old:any)=>old?.id===itemId?{...old,...payload.new}:old);setOrderOpen(false);}).subscribe();
+    const timer=setInterval(()=>{void supabase.from('marketplace_items').select('status,updated_at,price').eq('id',itemId).maybeSingle().then(({data,error})=>{if(!error)setItem((old:any)=>old?.id===itemId?(data?{...old,...data}:null):old);});},30000);
+    return()=>{clearInterval(timer);void supabase.removeChannel(channel);};
+  },[itemId]);
 
   async function toggleFavorite(){
     if(!me){router.push('/auth');return;}
@@ -81,7 +98,7 @@ export default function MarketplaceItemPage() {
   }
   async function messageSeller(){
     if(actionBusy)return;setActionBusy(true);setActionError('');
-    try{const access=await getNeighborAccess(item.seller_id);setCanMessage(access.can_message);if(!access.can_message)throw new Error('التواصل غير متاح حسب إعدادات صاحب الإعلان أو نطاق الحي.');const result=await supabase.rpc('hayna_get_or_create_direct_conversation',{p_target:item.seller_id});if(result.error)throw result.error;router.push({pathname:'/conversation',params:{id:result.data}});}
+    try{const access=await getNeighborAccess(item.seller_id);setCanMessage(access.can_message);if(!access.can_message)throw new Error('التواصل غير متاح حسب إعدادات صاحب الإعلان أو نطاق المنطقة.');const result=await supabase.rpc('hayna_get_or_create_direct_conversation',{p_target:item.seller_id});if(result.error||typeof result.data!=='string'||!result.data)throw new Error('تعذر تجهيز المحادثة. أعد المحاولة.');router.push({pathname:'/conversation',params:{id:result.data}});}
     catch(cause){setActionError((cause as Error).message||'تعذر فتح المحادثة.');}finally{setActionBusy(false);}
   }
 
@@ -95,6 +112,7 @@ export default function MarketplaceItemPage() {
   if (error || !item) return <View style={[styles.center, { backgroundColor: 'transparent' }]}><Package size={42} color="#94a3b8" /><Text style={styles.title}>{error ? 'تعذّر تحميل الإعلان' : 'الإعلان غير موجود'}</Text><Text style={styles.muted}>قد يكون الإعلان حُذف أو لم يعد متاحاً.</Text><Pressable oasisVariant="primary" oasisKind="action" style={styles.primary} onPress={() => error ? void load() : router.back()}><Text style={styles.primaryText}>{error ? 'إعادة المحاولة' : 'رجوع'}</Text></Pressable></View>;
 
   const details=parseProductDetails(item.description);
+  const contact=productContactState({signedIn:!!me,own:me===item.seller_id,available:item.status==='available',canView,canMessage,failed:contactFailed});
   return <View style={[styles.screen, { backgroundColor: 'transparent' }]}>
     <ImagePreviewModal uri={imageOpen?item.image_url:null} title={item.title||'صورة المنتج'} onClose={()=>setImageOpen(false)}/>
     <AppHeader variant="sub" title="تفاصيل المنتج" fallbackRoute="/market" rightAction={<HeaderAction onPress={share} accessibilityRole="button" accessibilityLabel="مشاركة الإعلان" style={styles.share}><Share2 size={18} color={OASIS.colors.primary} /></HeaderAction>} />
@@ -103,16 +121,19 @@ export default function MarketplaceItemPage() {
     <ScrollView contentContainerStyle={[styles.page,{paddingBottom:bottom+120}]}>
       {item.image_url && !imageFailed ? <Pressable accessibilityRole="button" accessibilityLabel="عرض صورة المنتج كاملة" onPress={()=>setImageOpen(true)} style={styles.imageFrame}><Image source={{ uri: item.image_url }} style={styles.image} onError={()=>setImageFailed(true)} resizeMode="contain"/><View style={styles.zoomBadge}><ZoomIn size={16} color="#fff"/><Text style={{color:'#fff',fontSize:11}}>عرض الصورة كاملة</Text></View></Pressable> : <View style={styles.imageFallback}><ShoppingBag size={42} color={OASIS.colors.primary} /><Text style={styles.muted}>إعلان من سوق الحي</Text></View>}
       <OasisSurface oasisSurface="card" style={styles.card}>
-        <View style={styles.row}><View style={styles.typePill}><Text style={styles.typeText}>{item.item_type || 'إعلان'}</Text></View><Text style={[styles.status,{color:item.status==='available'?OASIS.colors.primary:OASIS.colors.muted}]}>{item.status === 'available' ? 'متاح' : item.status === 'sold' ? 'تم البيع' : 'غير متاح'}</Text></View>
+        <View style={styles.row}><View style={styles.typePill}><Text style={styles.typeText}>{item.item_type || 'إعلان'}</Text></View><Text style={[styles.status,{color:item.status==='available'?OASIS.colors.primary:OASIS.colors.muted}]}>{item.status === 'available' ? 'متاح' : item.status === 'reserved' ? 'محجوز' : item.status === 'sold' ? 'تم البيع' : 'غير متاح'}</Text></View>
         <Text style={styles.title}>{item.title || 'إعلان بدون عنوان'}</Text>
         <Text style={styles.price}>{productDisplayPrice(item.price,item.item_type)}</Text>
+        {item.updated_at&&<Text style={styles.muted}>آخر تحديث: {new Date(item.updated_at).toLocaleDateString('ar-SA')}</Text>}
         <View style={styles.location}><CalendarDays size={15} color={OASIS.colors.muted}/><Text style={styles.muted}>{new Date(item.created_at).toLocaleDateString('ar-SA',{day:'numeric',month:'long',year:'numeric'})}</Text></View>
         {(item.city || item.district) && <View style={styles.location}><MapPin size={16} color={OASIS.colors.muted} /><Text style={styles.muted}>{[item.district && `حي ${item.district}`, item.city].filter(Boolean).join(' · ')}</Text></View>}
       </OasisSurface>
-      <OasisSurface oasisSurface="card" style={styles.card}><View style={styles.location}><Package size={18} color={OASIS.colors.primary}/><Text style={styles.sellerTitle}>عن المنتج</Text></View><Text style={styles.description}>{details.body||'لم يضف صاحب الإعلان وصفًا تفصيليًا.'}</Text>{details.specs.map(spec=><View key={spec.label} style={styles.specRow}>{spec.label==='المقاسات'?<Ruler size={17} color={OASIS.colors.primary}/>:spec.label==='الاستلام'?<Truck size={17} color={OASIS.colors.primary}/>:<Tag size={17} color={OASIS.colors.primary}/>}<Text style={styles.muted}>{spec.label}</Text><Text style={[styles.description,{flex:1}]}>{spec.value}</Text></View>)}</OasisSurface>
-      <View style={styles.actions}>{me!==item.seller_id&&<Pressable accessibilityRole="button" accessibilityLabel={favorite?'إزالة المنتج من المفضلة':'حفظ المنتج في المفضلة'} disabled={actionBusy} onPress={()=>void toggleFavorite()} style={styles.secondaryAction}><Heart size={18} color={favorite?OASIS.colors.danger:OASIS.colors.primary} fill={favorite?OASIS.colors.danger:'none'}/><Text style={styles.manageBtnText}>{favorite?'محفوظ':'حفظ الإعلان'}</Text></Pressable>}{canMessage&&me!==item.seller_id&&item.status==='available'&&<Pressable accessibilityRole="button" disabled={actionBusy} onPress={()=>void messageSeller()} style={styles.messageAction}><MessageCircle size={18} color="#fff"/><Text style={{color:'#fff',fontWeight:'600'}}>تواصل مع صاحب الإعلان</Text></Pressable>}</View>
+      <OasisSurface oasisSurface="card" style={styles.card}><View style={styles.location}><MessageCircle size={22} color={OASIS.colors.primary}/><Text style={styles.sellerTitle}>التواصل وطلب المنتج</Text></View><Text accessibilityLiveRegion="polite" style={styles.description}>{contact.reason}</Text>{contact.action==='request'?<View style={styles.actions}><Pressable accessibilityRole="button" disabled={actionBusy} onPress={()=>void messageSeller()} style={styles.messageAction}><MessageCircle size={19} color="#fff"/><Text style={{color:'#fff',fontWeight:'700'}}>مراسلة البائع</Text></Pressable><Pressable accessibilityRole="button" onPress={()=>setOrderOpen(true)} style={styles.secondaryAction}><ShoppingBag size={19} color={OASIS.colors.primary}/><Text style={styles.manageBtnText}>إرسال طلب المنتج</Text></Pressable></View>:contact.action==='signin'?<Pressable accessibilityRole="button" onPress={()=>router.push('/auth')} style={styles.messageAction}><UserRound size={19} color="#fff"/><Text style={{color:'#fff',fontWeight:'700'}}>تسجيل الدخول للتواصل</Text></Pressable>:contact.action==='retry'||contact.action==='restricted'?<Pressable accessibilityRole="button" onPress={()=>void load()} style={styles.secondaryAction}><ShieldCheck size={18} color={OASIS.colors.primary}/><Text style={styles.manageBtnText}>إعادة التحقق من الصلاحية</Text></Pressable>:null}</OasisSurface>
+      <OasisSurface oasisSurface="card" style={styles.card}><View style={styles.location}><Package size={18} color={OASIS.colors.primary}/><Text style={styles.sellerTitle}>عن المنتج</Text></View><Text style={styles.description}>{details.body||'لم يضف صاحب الإعلان وصفًا تفصيليًا.'}</Text>{details.specs.map((spec,index)=><View key={spec.label+index} style={styles.specRow}>{spec.label==='المقاسات'?<Ruler size={17} color={OASIS.colors.primary}/>:spec.label==='الاستلام'?<Truck size={17} color={OASIS.colors.primary}/>:<Tag size={17} color={OASIS.colors.primary}/>}<Text style={styles.muted}>{spec.label}</Text><Text style={[styles.description,{flex:1}]}>{spec.value}</Text></View>)}</OasisSurface>
+      <View style={styles.actions}>{me!==item.seller_id&&<Pressable accessibilityRole="button" accessibilityLabel={favorite?'إزالة المنتج من المفضلة':'حفظ المنتج في المفضلة'} disabled={actionBusy} onPress={()=>void toggleFavorite()} style={styles.secondaryAction}><Heart size={18} color={favorite?OASIS.colors.danger:OASIS.colors.primary} fill={favorite?OASIS.colors.danger:'none'}/><Text style={styles.manageBtnText}>{favorite?'محفوظ':'حفظ الإعلان'}</Text></Pressable>}</View>
       {!!actionError&&<Text accessibilityRole="alert" style={[styles.muted,{color:OASIS.colors.danger}]}>{actionError}</Text>}
-      {!seller&&<OasisSurface oasisSurface="card" style={styles.card}><View style={styles.location}><ShieldCheck size={18} color={OASIS.colors.primary}/><Text style={[styles.muted,{flex:1}]}>بيانات صاحب الإعلان غير متاحة ضمن نطاقك أو إعدادات خصوصيته.</Text></View></OasisSurface>}
+
+      <OasisSurface oasisSurface="card" style={styles.card}><View style={styles.location}><ShieldCheck size={20} color={OASIS.colors.primary}/><Text style={styles.sellerTitle}>موثوقية البائع</Text></View><Text style={styles.description}>{trust?.verified?'حساب موثّق في حيّنا':trust?'الحساب غير موثّق':'تعذر التحقق من التوثيق حاليًا'}</Text><Text style={styles.muted}>{trust?.review_subject==='business'?(trust.review_count>0?`تقييم المنشأة: ${trust.rating} من ٥ · ${trust.review_count.toLocaleString('ar-SA')} مراجعة فعلية`:'لا توجد تقييمات للمنشأة بعد'):'لا يتوفر سجل تقييمات مرتبط بهذا المنتج؛ لا يمثل التوثيق ضمانًا للمنتج.'}</Text>{item.business_id&&trust?.review_subject==='business'&&<Pressable accessibilityRole="button" onPress={()=>router.push({pathname:'/business',params:{id:item.business_id}})} style={styles.secondaryAction}><Text style={styles.manageBtnText}>عرض المنشأة ومراجعاتها</Text></Pressable>}</OasisSurface>
       {business && <Pressable oasisKind="card" style={styles.sellerCard} onPress={() => router.push({ pathname: '/business', params: { id: business.id } })}>
         {business.logo_url ? <Image source={{ uri: business.logo_url }} style={styles.avatar} /> : <View style={styles.avatarFallback}><ShoppingBag size={20} color="#b7791f" /></View>}
         <View style={styles.sellerCopy}><Text style={styles.sellerTitle}>{business.name}</Text><Text style={styles.muted}>{business.is_verified ? 'منشأة موثقة في حيّنا' : 'عرض صفحة المنشأة'}</Text></View>
@@ -129,20 +150,20 @@ export default function MarketplaceItemPage() {
         <ArrowUpRight size={18} color={OASIS.colors.primary} />
       </Pressable>}
       {me === item.seller_id && <Pressable oasisKind="action" style={styles.manageBtn} onPress={() => router.push({ pathname: '/profile', params: { tab: 'content' } })}><Text style={styles.manageBtnText}>إدارة من حسابي</Text></Pressable>}
-      <OasisSurface oasisSurface="card" style={styles.card}><View style={styles.location}><Info size={17} color={OASIS.colors.primary}/><Text style={[styles.muted,{flex:1}]}>الموقع المعروض عام. يتم الاتفاق على التسليم والتكلفة عبر وسائل التواصل المسموحة لصاحب الإعلان.</Text></View></OasisSurface>
+      <OasisSurface oasisSurface="card" style={styles.card}><View style={styles.location}><Info size={17} color={OASIS.colors.primary}/><Text style={[styles.muted,{flex:1}]}>الموقع المعروض عام: المدينة والحي فقط. اتفق على نقطة التسليم الدقيقة داخل المحادثة الخاصة، ولا تنشر عنوان منزلك في الإعلان.</Text></View></OasisSurface>
       <OasisSurface oasisSurface="card" style={styles.card}><View style={styles.location}><ShoppingBag size={18} color={OASIS.colors.primary}/><Text style={styles.sellerTitle}>كيف أطلب المنتج؟</Text></View><Text style={styles.description}>١. أرسل الكمية والملاحظات للبائع.{"\n"}٢. اتفقا على التوفر والسعر والتسليم.{"\n"}٣. تأكد من المنتج قبل إتمام الاتفاق.</Text><Text style={styles.muted}>الطلب عبر المحادثة، ولا يمثل حجزًا للمخزون أو عملية دفع داخل التطبيق.</Text></OasisSurface>
       <Pressable accessibilityRole="button" onPress={()=>router.push({pathname:'/report',params:{type:'product',id:item.id}})} style={{minHeight:44,flexDirection:'row-reverse',alignItems:'center',justifyContent:'center',gap:7}}><Flag size={15} color={OASIS.colors.muted}/><Text style={styles.muted}>الإبلاغ عن الإعلان</Text></Pressable>
     </ScrollView>
     <View pointerEvents="box-none" style={{position:'absolute',left:0,right:0,bottom,alignItems:'center'}}>
       <OasisSurface oasisSurface="card" style={{width:'92%',maxWidth:828,borderRadius:22,borderWidth:1,borderColor:OASIS.colors.line,padding:12,flexDirection:'row-reverse',alignItems:'center',gap:12}}>
         <View style={{flex:1,gap:4}}><Text style={styles.muted}>{me===item.seller_id?'هذا منتجك':'السعر المعلن'}</Text><Text style={[styles.price,{fontSize:16}]}>{productDisplayPrice(item.price,item.item_type)}</Text></View>
-        <Pressable accessibilityRole="button" accessibilityLabel={me===item.seller_id?'إدارة المنتج':'اطلب المنتج'} disabled={me!==item.seller_id&&(item.status!=='available'||!!me&&!canMessage)} onPress={()=>{if(me===item.seller_id)setEditing(true);else if(!me)router.push('/auth');else setOrderOpen(true);}} style={[styles.messageAction,{flex:1,opacity:me!==item.seller_id&&(item.status!=='available'||!!me&&!canMessage)? .45:1,borderRadius:16}]}><ShoppingBag size={19} color="#fff"/><Text style={{color:'#fff',fontWeight:'800',fontSize:13}}>{me===item.seller_id?'إدارة المنتج':item.status!=='available'?'غير متاح':!me?'سجّل الدخول للطلب':canMessage?'اطلب المنتج':'الطلب غير متاح'}</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel={contact.label} accessibilityHint={contact.reason} disabled={contact.action==='restricted'||contact.action==='unavailable'} onPress={()=>{if(me===item.seller_id)setEditing(true);else if(!me)router.push('/auth');else if(contact.action==='retry')void load();else setOrderOpen(true);}} style={[styles.messageAction,{flex:1,opacity:contact.action==='restricted'||contact.action==='unavailable'? .45:1,borderRadius:16}]}><ShoppingBag size={19} color="#fff"/><Text style={{color:'#fff',fontWeight:'800',fontSize:13,flexShrink:1,textAlign:'center'}}>{contact.label}</Text></Pressable>
       </OasisSurface>
     </View>
   </View>;
 }
 
-const styles = StyleSheet.create({
+const createStyles = () => StyleSheet.create({
   imageFrame:{position:'relative',borderRadius:22,overflow:'hidden',backgroundColor:OASIS.colors.surface,borderWidth:1,borderColor:OASIS.colors.line},
   zoomBadge:{position:'absolute',bottom:12,left:12,borderRadius:16,backgroundColor:'rgba(4,45,32,.85)',paddingHorizontal:10,paddingVertical:7,flexDirection:'row-reverse',alignItems:'center',gap:6},
   specRow:{flexDirection:'row-reverse',alignItems:'center',gap:10,paddingVertical:10,borderTopWidth:1,borderTopColor:OASIS.colors.line},

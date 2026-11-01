@@ -29,6 +29,7 @@ declare viewer public.profiles; target public.profiles; actor uuid:=auth.uid();b
  if coalesce(target.is_banned,false) or coalesce(target.hide_name,false) or target.profile_privacy='hidden' then return false;end if;
  if exists(select 1 from public.blocks where (blocker_id=actor and blocked_id=p_target) or (blocker_id=p_target and blocked_id=actor)) then return false;end if;
  if target.profile_privacy='private' and not exists(select 1 from public.follows where follower_id=actor and following_id=p_target) then return false;end if;
+ if nullif(app_private.neighbor_area_key(viewer.region),'') is null or viewer.region in ('الكل','كل المملكة','المملكة','المملكة العربية السعودية') or app_private.neighbor_area_key(viewer.region)<>app_private.neighbor_area_key(target.region) then return false;end if;
  if nullif(app_private.neighbor_area_key(viewer.city),'') is null or viewer.city in ('كل المدن','كل المملكة','كل مناطق المملكة') or app_private.neighbor_area_key(viewer.city)<>app_private.neighbor_area_key(target.city) then return false;end if;
  if p_scope='district' and (nullif(app_private.neighbor_area_key(viewer.district),'') is null or viewer.district in ('كل الأحياء','كل أحياء المدينة','جميع الأحياء') or app_private.neighbor_area_key(viewer.district)<>app_private.neighbor_area_key(target.district)) then return false;end if;
  return true;
@@ -53,6 +54,7 @@ declare viewer public.profiles; target public.profiles; actor uuid:=auth.uid();b
  if coalesce(target.is_banned,false) or coalesce(target.hide_name,false) or target.profile_privacy='hidden' then return false;end if;
  if exists(select 1 from public.blocks where (blocker_id=actor and blocked_id=p_target) or (blocker_id=p_target and blocked_id=actor)) then return false;end if;
  if target.profile_privacy='private' and not exists(select 1 from public.follows where follower_id=actor and following_id=p_target) then return false;end if;
+ if nullif(app_private.neighbor_area_key(viewer.region),'') is null or viewer.region in ('الكل','كل المملكة','المملكة','المملكة العربية السعودية') or app_private.neighbor_area_key(viewer.region)<>app_private.neighbor_area_key(target.region) then return false;end if;
  if nullif(app_private.neighbor_area_key(viewer.city),'') is null or viewer.city in ('كل المدن','كل المملكة','كل مناطق المملكة') or app_private.neighbor_area_key(viewer.city)<>app_private.neighbor_area_key(target.city) then return false;end if;
  if p_scope='district' and (nullif(app_private.neighbor_area_key(viewer.district),'') is null or viewer.district in ('كل الأحياء','كل أحياء المدينة','جميع الأحياء') or app_private.neighbor_area_key(viewer.district)<>app_private.neighbor_area_key(target.district)) then return false;end if;
  return true;
@@ -63,13 +65,14 @@ create or replace function public.hayna_can_dm(p_sender uuid,p_recipient uuid) r
 language plpgsql stable security definer set search_path=pg_catalog as $$
 declare recipient public.profiles; sender public.profiles;begin
  if p_sender is null or p_recipient is null or p_sender=p_recipient or auth.uid() is distinct from p_sender then return false;end if;
- if not app_private.neighbor_can_browse(p_recipient,'district') then return false;end if;
  select * into recipient from public.profiles where id=p_recipient;
+ if not found then return false;end if;
  select * into sender from public.profiles where id=p_sender;
+ if not found then return false;end if;
  -- Staff viewing authority never bypasses the recipient's communication preferences or locality.
  if coalesce(sender.is_banned,false) or coalesce(recipient.is_banned,false) or coalesce(recipient.hide_name,false) or recipient.profile_privacy='hidden' or recipient.allow_dms='nobody' then return false;end if;
  if recipient.profile_privacy='private' and not exists(select 1 from public.follows where follower_id=p_sender and following_id=p_recipient) then return false;end if;
- if nullif(app_private.neighbor_area_key(sender.city),'') is null or nullif(app_private.neighbor_area_key(sender.district),'') is null or sender.district in ('كل الأحياء','كل أحياء المدينة','جميع الأحياء') or app_private.neighbor_area_key(sender.city)<>app_private.neighbor_area_key(recipient.city) or app_private.neighbor_area_key(sender.district)<>app_private.neighbor_area_key(recipient.district) then return false;end if;
+ if nullif(app_private.neighbor_area_key(sender.region),'') is null or app_private.neighbor_area_key(sender.region) in (app_private.neighbor_area_key('الكل'),app_private.neighbor_area_key('كل المملكة'),app_private.neighbor_area_key('المملكة'),app_private.neighbor_area_key('المملكة العربية السعودية')) or app_private.neighbor_area_key(sender.region) is distinct from app_private.neighbor_area_key(recipient.region) then return false;end if;
  if exists(select 1 from public.blocks where (blocker_id=p_sender and blocked_id=p_recipient) or (blocker_id=p_recipient and blocked_id=p_sender)) then return false;end if;
  if recipient.allow_dms='followers' and not exists(select 1 from public.follows where follower_id=p_sender and following_id=p_recipient) then return false;end if;
  return true;
@@ -84,7 +87,7 @@ declare target uuid; visible boolean;begin
  if auth.uid() is null then return jsonb_build_object('can_view',false,'can_message',false);end if;
  select id into target from public.profiles where id::text=p_lookup or username=ltrim(p_lookup,'@') limit 1;
  visible:=target is not null and app_private.neighbor_can_browse(target,p_scope);
- return jsonb_build_object('can_view',visible,'can_message',visible and public.hayna_can_dm(auth.uid(),target),'target_id',case when visible then target else null end);
+ return jsonb_build_object('can_view',visible,'can_message',public.hayna_can_dm(auth.uid(),target),'target_id',case when visible then target else null end);
 end $$;
 revoke all on function public.hayna_neighbor_access(text,text) from public;
 grant execute on function public.hayna_neighbor_access(text,text) to anon,authenticated;
@@ -134,7 +137,7 @@ using (sender_id=auth.uid())
 with check (sender_id=auth.uid() and public.hayna_can_message_conversation(conversation_id,auth.uid()));
 
 create policy neighbor_contact_city_boundary on public.profile_contact_numbers as restrictive for select to anon,authenticated
-using (user_id=auth.uid() or public.hayna_can_dm(auth.uid(),user_id));
+using (user_id=auth.uid() or (public.hayna_neighbor_access(user_id::text,'district') @> '{"can_view":true,"can_message":true}'::jsonb));
 create policy neighbor_customization_city_boundary on public.profile_customizations as restrictive for select to anon,authenticated
 using (app_private.neighbor_can_view(user_id,'city'));
 revoke usage on schema app_private from anon,authenticated;

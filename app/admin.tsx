@@ -1369,6 +1369,7 @@ export default function AdminScreen() {
           <View style={{ flex: 1, gap: 5 }}><Text style={{ fontSize: 16, fontWeight: '700', color: OASIS.colors.deep, textAlign: 'right' }}>مركز تواصل منصة حيّنا</Text><Text style={{ fontSize: 12, lineHeight: 20, color: OASIS.colors.muted, textAlign: 'right' }}>الترحيب التلقائي · التحديثات الرسمية · معاينة الرسائل وسجل التسليم</Text></View>
           <ChevronLeft size={18} color={OASIS.colors.primary} />
         </Pressable>}
+        {(activeTab==='overview'||activeTab==='config')&&<Pressable accessibilityRole="button" onPress={()=>router.push('/admin-marketplace')} style={{padding:18,marginBottom:14,borderRadius:16,backgroundColor:OASIS.colors.soft,gap:6}}><Text style={{color:OASIS.colors.primary,fontWeight:'800',fontSize:16,textAlign:'right'}}>إدارة السوق والدفع</Text><Text style={{color:OASIS.colors.muted,textAlign:'right',lineHeight:22}}>جاهزية PayPal واختبار الاتصال ومراجعة الإعلانات المدفوعة</Text></Pressable>}
         {/* TAB 0: UNIFIED TASK CENTER */}
         {activeTab === 'tasks' && (
           <AdminTaskCenter

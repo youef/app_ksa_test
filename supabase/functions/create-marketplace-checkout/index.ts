@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { handlePayPalCheckout } from '../_shared/paypal-marketplace.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -45,6 +46,7 @@ serve(async (req) => {
     const user = authData.user;
     const admin = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
     const body = await req.json().catch(() => ({}));
+    if(gateway==='paypal')return await handlePayPalCheckout(body,authClient,admin,user.id,baseUrl,name=>Deno.env.get(name));
     const ready = ['moyasar','tap'].includes(gateway) && Boolean(gateway==='moyasar'?moyasarSecret:tapSecret);
     if(body.kind==='status')return json({ready,gateway,reason:ready?null:'payment_configuration_missing'});
     if(!ready)return json({error:'الدفع الإلكتروني غير متاح حاليًا. يمكنك إدارة عروضك وتفعيل الباقة المجانية.',code:'payment_configuration_missing'},503);

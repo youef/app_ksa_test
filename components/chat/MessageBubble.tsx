@@ -1,3 +1,5 @@
+import { productMessageId } from '@/lib/productMessage';
+import { ProductMessageCard } from './ProductMessageCard';
 import { memo, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -196,6 +198,7 @@ function MessageBubbleBase({
     };
   }, [media]);
 
+  const productId=productMessageId(msg.body);
   const isMine = msg.sender_id === currentUserId;
   const isRead =
     Array.isArray(msg.read_by) &&
@@ -247,7 +250,7 @@ function MessageBubbleBase({
             isMine ? styles.msgBubbleMine : styles.msgBubbleOther,
           ]}
         >
-          {place ? (
+          {productId ? <ProductMessageCard itemId={productId} body={msg.body} messageId={msg.id} userId={currentUserId} isBuyerMessage={isMine}/> : place ? (
             <View
               style={[
                 styles.locationCardOuter,

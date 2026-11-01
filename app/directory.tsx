@@ -14,6 +14,7 @@ type Entry = { id: string; kind: 'business' | 'service'; name: string; descripti
 export default function Directory() {
   useTheme();
   const c = OASIS.colors, bottom = useBottomNavInset(24);
+  const [scope,setScope]=useState<'city'|'district'>('city');
   const [items, setItems] = useState<Entry[]>([]), [query, setQuery] = useState(''), [search, setSearch] = useState('');
   const [kind, setKind] = useState<DirectoryKind>('all'), [sort, setSort] = useState<DirectorySort>('recent'), [verified, setVerified] = useState(false);
   const [location, setLocation] = useState({ city: 'كل المدن', district: 'كل الأحياء' }), [revision, setRevision] = useState(0);
@@ -36,8 +37,8 @@ export default function Directory() {
       const loc = await getActiveLocation();
       if (ticket !== request.current) return;
       setLocation(loc);
-      // The directory is city-wide: the saved neighborhood must never hide other districts.
-      const result = await fetchDirectoryPage(supabase, { location: { ...loc, district: 'كل الأحياء' }, kind, search, verified, sort, page: targetPage });
+      // City-wide is the default; neighborhood filtering is an explicit choice before pagination.
+      const result = await fetchDirectoryPage(supabase, { location: { ...loc, district: scope==='city'?'كل الأحياء':loc.district }, kind, search, verified, sort, page: targetPage });
       if (ticket !== request.current) return;
       setItems(previous => {
         const merged = append ? [...previous, ...result.items] : result.items;
@@ -49,12 +50,13 @@ export default function Directory() {
     } finally {
       if (ticket === request.current) { setLoading(false); setRefreshing(false); setMoreBusy(false); moreLock.current = false; }
     }
-  }, [kind, search, verified, sort, revision]);
+  }, [kind, search, verified, sort, revision,scope]);
   useFocusEffect(useCallback(() => { void load(); return () => { request.current++; moreLock.current = false; }; }, [load]));
-  const reset = () => { setQuery(''); setKind('all'); setVerified(false); setSort('recent'); };
-  const locationLabel = isAllKingdom(location.city) ? 'كل مدن المملكة' : 'مدينة ' + location.city + ' · جميع الأحياء';
+  const reset = () => { setQuery(''); setKind('all'); setVerified(false); setSort('recent');setScope('city'); };
+  const locationLabel = isAllKingdom(location.city) ? 'كل مدن المملكة' : 'مدينة ' + location.city + (scope==='city'?' · جميع الأحياء':' · '+location.district);
   return <View style={s.screen}>
     <AppHeader variant="sub" title="دليل المدينة" subtitle={locationLabel} fallbackRoute="/more" />
+    <View style={[s.row,{paddingHorizontal:18,paddingVertical:8}]}>{(['city','district']as const).map(value=><Pressable key={value} accessibilityRole="button" accessibilityState={{selected:scope===value}} disabled={value==='district'&&(!location.district||location.district.startsWith('كل '))} onPress={()=>setScope(value)} style={[s.chip,{backgroundColor:scope===value?c.soft:c.surface,borderColor:c.line}]}><MapPin size={16} color={c.primary}/><Text style={[s.chipText,{color:c.primary}]}>{value==='city'?'مدينتي كاملة':'حيّي'}</Text></Pressable>)}</View>
     <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={[s.page, { paddingBottom: bottom }]} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load(false, true)} tintColor={c.primary} />}>
       <OasisSurface oasisSurface="card" style={[s.intro, { borderColor: c.line }]}>
         <View style={[s.introIcon, { backgroundColor: c.soft }]}><BriefcaseBusiness size={25} color={c.primary} /></View>
@@ -77,7 +79,7 @@ export default function Directory() {
       {loading ? <View style={s.state}><ActivityIndicator color={c.primary} size="large" /><Text style={[s.secondary, { color: c.muted }]}>جارٍ تحميل دليل المدينة…</Text></View> : <>
         {items.map(item => <DirectoryCard key={item.kind + item.id} item={item} />)}
         {!!error && <OasisSurface oasisSurface="card" style={s.state}><Text style={[s.secondary, { color: c.muted }]}>{error}</Text><Pressable style={[s.action, { backgroundColor: c.primary }]} onPress={() => void load(items.length > 0)}><Text style={s.white}>إعادة المحاولة</Text></Pressable></OasisSurface>}
-        {!items.length && !error && <OasisSurface oasisSurface="card" style={s.state}><SlidersHorizontal size={32} color={c.primary} /><Text style={[s.introTitle, { color: c.ink }]}>لم نعثر على نتائج مطابقة</Text><Text style={[s.secondary, { color: c.muted }]}>جرّب اسمًا آخر أو خفّف الفلاتر. الدليل يشمل جميع أحياء مدينتك.</Text><Pressable onPress={reset} style={[s.action, { backgroundColor: c.primary }]}><Text style={s.white}>مسح الفلاتر</Text></Pressable></OasisSurface>}
+        {!items.length && !error && <OasisSurface oasisSurface="card" style={s.state}><SlidersHorizontal size={32} color={c.primary} /><Text style={[s.introTitle, { color: c.ink }]}>لم نعثر على نتائج مطابقة</Text><Text style={[s.secondary, { color: c.muted }]}>جرّب اسمًا آخر أو خفّف الفلاتر أو وسّع البحث إلى المدينة.</Text><Pressable onPress={reset} style={[s.action, { backgroundColor: c.primary }]}><Text style={s.white}>مسح الفلاتر</Text></Pressable></OasisSurface>}
         {hasMore && !error && <Pressable disabled={moreBusy} onPress={() => void load(true)} style={[s.more, { backgroundColor: c.surface, borderColor: c.line }]}>{moreBusy ? <ActivityIndicator color={c.primary} /> : <Text style={{ color: c.primary, fontWeight: '700' }}>عرض المزيد</Text>}</Pressable>}
       </>}
       {canManage && <Pressable onPress={() => router.push('/marketplace-dashboard')} style={[s.manage, { backgroundColor: c.soft }]}><Store size={20} color={c.primary} /><View style={s.grow}><Text style={[s.resultTitle, { color: c.primary }]}>مساحة أعمالي</Text><Text style={[s.secondary, { color: c.muted }]}>إدارة المنشأة والخدمات من مكان واحد</Text></View><ArrowUpLeft size={19} color={c.primary} /></Pressable>}
