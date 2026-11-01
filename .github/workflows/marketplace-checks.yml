@@ -24,4 +24,4 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - name: Verify location, publishing, profile RLS and payment callbacks
-        run: node --test tests/marketplaceWorkspace.database.test.cjs tests/marketplaceWorkspace.test.cjs tests/marketplaceWebhooks.test.cjs tests/productLocation.test.cjs tests/productDeviceLocation.test.cjs tests/productDetails.test.cjs tests/servicePublishingRules.test.cjs tests/neighborPrivacy.database.test.cjs tests/directoryPresentation.test.cjs
+        run: node --test tests/marketplaceWorkspace.database.test.cjs tests/marketplaceWorkspace.test.cjs tests/marketplaceWebhooks.test.cjs tests/productLocation.test.cjs tests/productDeviceLocation.test.cjs tests/productDetails.test.cjs tests/servicePublishingRules.test.cjs tests/neighborPrivacy.database.test.cjs tests/orderNotificationPrivileges.database.test.cjs tests/directoryPresentation.test.cjs
