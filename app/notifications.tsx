@@ -93,7 +93,7 @@ export default function Notifications() {
       if (notificationResult.error) throw notificationResult.error;
       const raw = (notificationResult.data || []) as NotificationItem[];
       // Direct messages already have a dedicated inbox entry; do not duplicate them here.
-      const visible = raw.filter(item => item.type !== 'message' && item.target_type !== 'conversation');
+      const visible = raw.filter(item => item.type !== 'message' && item.target_type !== 'conversation' && item.data?.in_app_allowed !== false);
       const actorIds = [...new Set(visible.map(item => {
         const data = item.data || {};
         return data.actor_id || data.author_id || data.follower_id || data.reviewer_id || data.sender_id || null;
