@@ -104,6 +104,13 @@ export default function OrderDetails(){
    setNotice('تم تحديث حالة الطلب.');
   });
  }
+ async function productAction(next:'accept'|'ready'|'complete'|'reject'|'cancel'){
+  await run(async()=>{
+   const result=await supabase.rpc('hayna_update_product_request',{p_request:id,p_version:order.version,p_action:next});
+   if(result.error)throw result.error;
+   setNotice('تم تحديث حالة طلب المنتج.');
+  });
+ }
  async function chooseImages(dispute=false){
   const result=await ImagePicker.launchImageLibraryAsync({mediaTypes:['images'],allowsMultipleSelection:true,selectionLimit:3,quality:0.7,base64:true});
   if(!result.canceled){const items=result.assets.slice(0,3);if(dispute)setCasePhotos(items);else setPhotos(items);}
@@ -174,6 +181,11 @@ export default function OrderDetails(){
      {isSeller&&kind==='service'&&order.status==='accepted'?button('بدء التنفيذ',()=>void changeStatus('start')):null}
      {isSeller&&kind==='service'&&order.status==='in_progress'?button('جاهز للاستلام',()=>void changeStatus('ready')):null}
      {isBuyer&&kind==='service'&&order.status==='ready'?button('تأكيد الاستلام الفعلي',()=>Alert.alert('تأكيد الاستلام','هل استلمت الخدمة بالفعل؟ لا يمكن التراجع عن هذا الإجراء.',[{text:'إلغاء',style:'cancel'},{text:'تأكيد',onPress:()=>void changeStatus('received')}])):null}
+     {kind==='product'&&isSeller&&order.status==='pending'?<>{button('قبول طلب المنتج',()=>void productAction('accept'))}{button('رفض الطلب',()=>void productAction('reject'))}</>:null}
+     {kind==='product'&&isSeller&&order.status==='accepted'?button('المنتج جاهز للاستلام',()=>void productAction('ready')):null}
+     {kind==='product'&&isBuyer&&order.status==='ready'?button('تأكيد استلام المنتج',()=>Alert.alert('تأكيد الاستلام','هل استلمت المنتج بالفعل؟',[{text:'إلغاء',style:'cancel'},{text:'تأكيد',onPress:()=>void productAction('complete')}])):null}
+     {kind==='product'&&isBuyer&&order.status==='pending'?button('إلغاء الطلب',()=>void productAction('cancel')):null}
+     {kind==='product'&&order.conversation_id?button('فتح محادثة البائع والمشتري',()=>router.push({pathname:'/conversation',params:{id:order.conversation_id}})):null}
     </>)}
     {history.length?box(<>{title('سجل حالة الطلب')}{history.map(x=><View key={x.id} style={S.line}>{hint((statusNames[x.old_status]||x.old_status)+' ← '+(statusNames[x.new_status]||x.new_status))}{hint(date(x.created_at))}</View>)}</>):null}
     {completed?box(<>{title('التقييم بعد الاستلام')}
