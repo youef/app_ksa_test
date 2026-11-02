@@ -1,7 +1,6 @@
 import type { ReactNode, ComponentProps } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { OasisSurface } from '@/components/oasis/OasisPrimitives';
-import type { OasisAsset } from '@/components/oasis/assets';
 import { useTheme } from '@/context/ThemeContext';
 
 /* -------------------------------------------------------------------------- */
@@ -25,11 +24,7 @@ export type OasisGlassFrameProps = {
 /*                               Config                                       */
 /* -------------------------------------------------------------------------- */
 
-<<<<<<< HEAD
-const SURFACE_ASSET: Record<GlassFrameVariant, OasisAsset> = {
-=======
 const SURFACE_ASSET = {
->>>>>>> eeec32c (fix: validate commerce release and regional privacy boundaries)
   weather: 'cards/notice-small',
   location: 'cards/default-small',
 } as const satisfies Record<GlassFrameVariant, NonNullable<ComponentProps<typeof OasisSurface>['oasisAsset']>>;
