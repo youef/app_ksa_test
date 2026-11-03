@@ -1,7 +1,7 @@
 import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
-import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Platform, ActivityIndicator, RefreshControl, Alert } from 'react-native';
+import { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, Platform, ActivityIndicator, RefreshControl, Alert, Linking } from 'react-native';
 import { router } from 'expo-router';
 import * as Location from 'expo-location';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -38,6 +38,8 @@ import {
 import { supabase } from '@/lib/supabase';
 import { useBottomNavInset } from '@/lib/bottomNav';
 import { sendPushToMultipleUsers } from '@/lib/pushSender';
+import { getActiveLocation } from '@/lib/locationSync';
+import { SAUDI_WEATHER_REGIONS, SAUDI_WEATHER_CITIES, findSaudiWeatherCity, saudiWeatherTimeKey, formatSaudiWeatherTime } from '@/lib/saudiWeather';
 
 type WeatherData = {
   city: string;
@@ -47,6 +49,7 @@ type WeatherData = {
   longitude: number;
   current: any;
   hourly: any;
+  minute?: any;
   daily: any;
   air?: any | null;
 };
@@ -148,10 +151,7 @@ function aqiInfo(aqi?: number | null) {
   return { label: 'ضار بالصحة', color: '#7f1d1d', bg: '#fecaca', bar: OASIS.colors.danger };
 }
 
-function formatClock(value?: string | null) {
-  if (!value) return '--';
-  return new Date(value).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
-}
+function formatClock(value?: string | null) { return formatSaudiWeatherTime(value); }
 
 function round(value: any): string {
   return value == null || Number.isNaN(Number(value)) ? '--' : String(Math.round(Number(value)));
@@ -182,7 +182,7 @@ function buildAlerts(weather: WeatherData | null): WeatherAlert[] {
   else if (Number.isFinite(temp) && (temp >= 42 || feels >= 45)) alerts.push({ id: 'heat', severity: 'warning', icon: 'heat', title: 'حرارة مرتفعة جداً', message: 'قلّل الأنشطة الخارجية وقت الظهيرة.' });
   else if (Number.isFinite(temp) && temp >= 38) alerts.push({ id: 'heat', severity: 'info', icon: 'heat', title: 'أجواء حارة', message: 'خذ قسطاً من الراحة في الظل واشرب الماء.' });
 
-  if (nowRain >= 0.5 || rainSum >= 20) alerts.push({ id: 'rain', severity: 'danger', icon: 'rain', title: 'أمطار غزيرة', message: 'احتمال تجمّع المياه؛ تجنّب الأودية والمناطق المنخفضة.' });
+  if (nowRain >= 5 || rainSum >= 40) alerts.push({ id: 'rain', severity: 'danger', icon: 'rain', title: 'هطول كثيف متوقع من النموذج', message: 'احتمال تجمّع المياه؛ تجنّب الأودية والمناطق المنخفضة.' });
   else if (rainProb >= 60 || rainSum >= 5) alerts.push({ id: 'rain', severity: 'warning', icon: 'rain', title: 'احتمال هطول قوي', message: 'خذ مظلتك وتابع تحديثات الطقس.' });
   else if (rainProb >= 40 || nowRain > 0) alerts.push({ id: 'rain', severity: 'info', icon: 'rain', title: 'احتمال هطول', message: 'قد تظهر أمطار متفرقة.' });
 
@@ -197,7 +197,7 @@ function buildAlerts(weather: WeatherData | null): WeatherAlert[] {
 
   if ((Number.isFinite(pm25) && pm25 >= 35) || (Number.isFinite(dust) && dust >= 100)) alerts.push({ id: 'health', severity: 'info', icon: 'health', title: 'تنبيه لمن لديهم ربو أو حساسية', message: 'احمل بخّاخك وتجنّب الجهد الخارجي عند تدهور الهواء.' });
 
-  if (!alerts.length) alerts.push({ id: 'ok', severity: 'info', icon: 'ok', title: 'الأجواء مستقرّة', message: 'لا توجد تنبيهات جوّية مهمة الآن.' });
+  if (!alerts.length) alerts.push({ id: 'ok', severity: 'info', icon: 'ok', title: 'لا مؤشرات جوية بارزة في النموذج', message: 'تقييم آلي وليس تأكيداً لعدم وجود إنذارات رسمية.' });
   return alerts;
 }
 
@@ -227,26 +227,32 @@ export default function WeatherScreen() {
   const [cityInput, setCityInput] = useState('');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [sharing, setSharing] = useState(false);
+  const [regionSelection, setRegionSelection] = useState('كل المناطق');
+  const [viewHourCount, setViewHourCount] = useState<12 | 48>(12);
+  const weatherRequestId = useRef(0);
 
   const fetchWeather = async (latitude: number, longitude: number, meta: { city: string; region: string; district: string }) => {
-    const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + latitude +
-      '&longitude=' + longitude +
-      '&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,pressure_msl,cloud_cover' +
-      '&hourly=temperature_2m,precipitation_probability,weather_code,wind_speed_10m,relative_humidity_2m' +
-      '&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max,precipitation_sum,precipitation_probability_max,wind_speed_10m_max&forecast_days=7&timezone=auto';
-    const response = await fetch(url);
-    if (!response.ok) throw new Error('خدمة الطقس غير متاحة حالياً.');
+    const requestId = ++weatherRequestId.current;
+    const query = new URLSearchParams({
+      latitude: String(latitude), longitude: String(longitude),
+      timezone: 'Asia/Riyadh', forecast_days: '16',
+      current: 'temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,pressure_msl,cloud_cover,visibility,dew_point_2m',
+      hourly: 'temperature_2m,precipitation_probability,precipitation,weather_code,wind_speed_10m,wind_gusts_10m,relative_humidity_2m,visibility,uv_index',
+      minutely_15: 'temperature_2m,precipitation,weather_code,wind_speed_10m',
+      forecast_minutely_15: '24',
+      daily: 'weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max',
+    });
+    const response = await fetch('https://api.open-meteo.com/v1/forecast?' + query.toString());
+    if (!response.ok) throw new Error('خدمة الطقس غير متاحة حالياً (' + response.status + ').');
     const data = await response.json();
-    if (!data.current || !data.daily) throw new Error('وصلت بيانات طقس غير مكتملة.');
+    if (!data.current || !data.daily?.time?.length || !data.hourly?.time?.length) throw new Error('وصلت بيانات طقس غير مكتملة.');
     let air: any = null;
     try {
-      const airResponse = await fetch('https://air-quality-api.open-meteo.com/v1/air-quality?latitude=' + latitude + '&longitude=' + longitude + '&current=us_aqi,pm10,pm2_5,dust&timezone=auto');
-      if (airResponse.ok) {
-        const airData = await airResponse.json();
-        air = airData.current || null;
-      }
+      const airResponse = await fetch('https://air-quality-api.open-meteo.com/v1/air-quality?latitude=' + latitude + '&longitude=' + longitude + '&current=us_aqi,pm10,pm2_5,dust&timezone=Asia%2FRiyadh');
+      if (airResponse.ok) air = (await airResponse.json()).current || null;
     } catch {}
-    setWeather({ city: meta.city || 'موقعك الحالي', region: meta.region || '', district: meta.district || '', latitude, longitude, current: data.current, hourly: data.hourly, daily: data.daily, air });
+    if (requestId !== weatherRequestId.current) return;
+    setWeather({ city: meta.city || 'موقعك الحالي', region: meta.region || '', district: meta.district || '', latitude, longitude, current: data.current, hourly: data.hourly, minute: data.minutely_15 || null, daily: data.daily, air });
     setLastUpdated(new Date());
     setError('');
   };
@@ -260,13 +266,19 @@ export default function WeatherScreen() {
     setLoading(true);
     setError('');
     try {
-      const geoResponse = await fetch('https://geocoding-api.open-meteo.com/v1/search?name=' +
-        encodeURIComponent(trimmed) + '&count=1&language=ar&format=json');
-      if (!geoResponse.ok) throw new Error('تعذّر الاتصال بخدمة تحديد المدينة.');
-      const geo = await geoResponse.json();
-      const place = geo.results && geo.results[0];
-      if (!place) throw new Error('لم نعثر على المدينة. جرّب كتابة اسمها بالعربية أو الإنجليزية.');
-      await fetchWeather(place.latitude, place.longitude, { city: place.name || trimmed, region: place.admin1 || '', district: '' });
+      const known = findSaudiWeatherCity(trimmed);
+      if (known) {
+        setRegionSelection(known.region);
+        await fetchWeather(known.latitude, known.longitude, { city: known.name, region: known.region, district: '' });
+      } else {
+        const geoResponse = await fetch('https://geocoding-api.open-meteo.com/v1/search?name=' +
+          encodeURIComponent(trimmed) + '&count=10&countryCode=SA&language=ar&format=json');
+        if (!geoResponse.ok) throw new Error('تعذّر الاتصال بخدمة تحديد المدينة.');
+        const geo = await geoResponse.json();
+        const place = (geo.results || []).find((p: any) => p.country_code === 'SA');
+        if (!place) throw new Error('لم نجد مدينة بهذا الاسم داخل المملكة. جرّب اسمها بالعربية أو الإنجليزية.');
+        await fetchWeather(place.latitude, place.longitude, { city: place.name || trimmed, region: place.admin1 || '', district: '' });
+      }
     } catch (err: any) {
       setError(err?.message || 'تعذّر تحميل بيانات الطقس. حاول مرة أخرى.');
     } finally {
@@ -286,6 +298,8 @@ export default function WeatherScreen() {
       const meta = await resolvePlace(latitude, longitude);
       if (!meta.city) meta.city = 'موقعك الحالي';
       setCityInput(meta.city === 'موقعك الحالي' ? '' : meta.city);
+      const known = findSaudiWeatherCity(meta.city);
+      if (known) setRegionSelection(known.region);
       await fetchWeather(latitude, longitude, meta);
     } catch (err: any) {
       setError(err?.message || 'تعذّر تحديد موقعك.');
@@ -299,6 +313,8 @@ export default function WeatherScreen() {
     try {
       if (weather) await fetchWeather(weather.latitude, weather.longitude, { city: weather.city, region: weather.region, district: weather.district });
       else if (cityInput.trim()) await loadWeatherForCity(cityInput);
+    } catch (err: any) {
+      setError(err?.message || 'تعذّر تحديث الطقس.');
     } finally {
       setRefreshing(false);
     }
@@ -310,11 +326,16 @@ export default function WeatherScreen() {
       try {
         const { data } = await supabase.auth.getSession();
         const user = data.session?.user;
-        if (!user) return;
-        const { data: profile } = await supabase.from('profiles').select('city').eq('id', user.id).maybeSingle();
-        if (active && profile?.city) {
-          setCityInput(profile.city);
-          loadWeatherForCity(profile.city);
+        const saved = await getActiveLocation().catch(() => null);
+        let city = saved?.city && !saved.city.startsWith('كل ') ? saved.city : '';
+        if (!city && user) {
+          const { data: profile } = await supabase.from('profiles').select('city').eq('id', user.id).maybeSingle();
+          city = profile?.city || '';
+        }
+        if (active) {
+          const selected = city || 'الرياض';
+          setCityInput(selected);
+          void loadWeatherForCity(selected);
         }
       } catch {}
     })();
@@ -323,18 +344,47 @@ export default function WeatherScreen() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!weather) return;
+    const timer = setInterval(() => {
+      void fetchWeather(weather.latitude, weather.longitude, {
+        city: weather.city, region: weather.region, district: weather.district,
+      }).catch(() => setError('تعذّر التحديث التلقائي؛ ما زال آخر توقع متاحاً.'));
+    }, 15 * 60 * 1000);
+    return () => clearInterval(timer);
+  }, [weather?.latitude, weather?.longitude, weather?.city, weather?.region, weather?.district]);
+
   const hourlyIndices = (() => {
     if (!weather?.hourly?.time) return [];
-    const now = new Date();
-    let start = weather.hourly.time.findIndex((time: string) => new Date(time).getTime() >= now.getTime() - 3600000);
-    if (start < 0) start = 0;
-    return Array.from({ length: 12 }, (_, i) => start + i).filter((index) => index < weather.hourly.time.length);
+    const nowHour = saudiWeatherTimeKey().slice(0, 13);
+    const found = weather.hourly.time.findIndex((time: string) => time.slice(0, 13) >= nowHour);
+    const start = Math.max(0, found);
+    return Array.from({ length: viewHourCount }, (_, i) => start + i).filter(i => i < weather.hourly.time.length);
   })();
+
+  const minuteIndices = (() => {
+    if (!weather?.minute?.time?.length) return [];
+    const now = saudiWeatherTimeKey();
+    const found = weather.minute.time.findIndex((time: string) => time >= now);
+    const start = Math.max(0, found);
+    return Array.from({ length: 12 }, (_, i) => start + i).filter(i => i < weather.minute.time.length);
+  })();
+
+  const next24Hours = (() => {
+    if (!weather?.hourly?.time?.length) return [];
+    const found = weather.hourly.time.findIndex((time: string) => time.slice(0, 13) >= saudiWeatherTimeKey().slice(0, 13));
+    const start = Math.max(0, found);
+    return Array.from({ length: 24 }, (_, i) => start + i).filter(i => i < weather.hourly.time.length);
+  })();
+  const maxRainChance = next24Hours.length ? Math.max(...next24Hours.map(i => Number(weather?.hourly?.precipitation_probability?.[i] || 0))) : 0;
+  const nextRainIndex = next24Hours.find(i => Number(weather?.hourly?.precipitation_probability?.[i] || 0) >= 50);
+  const rainAmount24 = next24Hours.reduce((total, i) => total + Number(weather?.hourly?.precipitation?.[i] || 0), 0);
+  const maxGust24 = next24Hours.length ? Math.max(...next24Hours.map(i => Number(weather?.hourly?.wind_gusts_10m?.[i] || 0))) : 0;
 
   const dayLabel = (value: string, index: number) => {
     if (index === 0) return 'اليوم';
     if (index === 1) return 'غداً';
-    return new Intl.DateTimeFormat('ar-SA', { weekday: 'short' }).format(new Date(value + 'T12:00:00'));
+    return new Intl.DateTimeFormat('ar-SA', { weekday: 'short', timeZone: 'Asia/Riyadh' }).format(new Date(value + 'T12:00:00+03:00'));
   };
 
   const weekMin = weather?.daily?.temperature_2m_min ? Math.min(...weather.daily.temperature_2m_min) : 0;
