@@ -546,7 +546,7 @@ export default function WeatherScreen() {
                   <AlertIcon kind={topAlert.icon} size={16} color={OASIS.colors.surface} />
                 </View>
                 <View style={styles.alertBannerCopy}>
-                  <Text style={[styles.alertBadge, { color: bannerMeta.accent }]}>{bannerMeta.label} · {alerts.length}</Text>
+                  <Text style={[styles.alertBadge, { color: bannerMeta.accent }]}>تقدير آلي · {bannerMeta.label} · {alerts.length}</Text>
                   <Text style={[styles.alertTitle, { color: bannerMeta.text }]}>{topAlert.title}</Text>
                 </View>
               </View>
@@ -586,6 +586,29 @@ export default function WeatherScreen() {
               />
               <MapPin size={16} color="#94a3b8" />
             </View>
+            <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingBottom: 8 }}>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: OASIS.colors.ink }}>مناطق ومدن السعودية 🇸🇦</Text>
+              <SaudiLiveClock />
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row-reverse', gap: 7, paddingHorizontal: 12, paddingBottom: 9 }}>
+              {['كل المناطق', ...SAUDI_WEATHER_REGIONS].map(region => (
+                <Pressable key={region} onPress={() => setRegionSelection(region)}
+                  style={{ backgroundColor: regionSelection === region ? OASIS.colors.primary : OASIS.colors.background, borderRadius: 13, paddingHorizontal: 10, paddingVertical: 9, borderWidth: 1, borderColor: OASIS.colors.line }}>
+                  <Text style={{ color: regionSelection === region ? OASIS.colors.surface : OASIS.colors.ink, fontSize: 11, fontWeight: '700' }}>{region}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row-reverse', gap: 7, paddingHorizontal: 12 }}>
+              {SAUDI_WEATHER_CITIES.filter(city => regionSelection === 'كل المناطق'
+                ? ['الرياض', 'مكة المكرمة', 'جدة', 'المدينة المنورة', 'الدمام', 'بريدة', 'عرعر', 'أبها', 'تبوك', 'جازان', 'نجران', 'حائل', 'سكاكا', 'الباحة'].includes(city.name)
+                : city.region === regionSelection).map(city => (
+                <Pressable key={city.name} disabled={loading} onPress={() => { setCityInput(city.name); void loadWeatherForCity(city.name); }}
+                  style={{ flexDirection: 'row-reverse', gap: 4, alignItems: 'center', padding: 9, borderRadius: 11, backgroundColor: weather?.city === city.name ? OASIS.colors.deep : OASIS.colors.soft }}>
+                  <MapPin size={12} color={weather?.city === city.name ? '#fff' : OASIS.colors.primary} />
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: weather?.city === city.name ? '#fff' : OASIS.colors.deep }}>{city.name}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
           </OasisSurface>
 
@@ -618,7 +641,7 @@ export default function WeatherScreen() {
                     <Pressable oasisKind="icon" onPress={refresh} disabled={loading} style={styles.refreshButton} accessibilityLabel="تحديث الطقس">
                       {loading ? <ActivityIndicator size="small" color={OASIS.colors.surface} /> : <RefreshCw size={16} color={OASIS.colors.surface} />}
                     </Pressable>
-                    <Text style={styles.panelUpdated}>آخر تحديث {lastUpdated ? lastUpdated.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }) : ''}</Text>
+                    <Text style={styles.panelUpdated}>وقت النموذج {formatSaudiWeatherTime(weather.current.time)} · جلب {lastUpdated ? lastUpdated.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Riyadh' }) : '--'}</Text>
                   </View>
                   <View style={styles.panelLocation}>
                     <MapPin size={13} color={OASIS.colors.soft} />
@@ -659,14 +682,54 @@ export default function WeatherScreen() {
                   <Metric icon={<Gauge size={17} color="#b45309" />} bg={OASIS.colors.warningSoft} label="الضغط" value={round(weather.current.pressure_msl)} unit="hPa" />
                   <Metric icon={<Sun size={17} color="#d97706" />} bg="#fff7ed" label="مؤشر UV" value={round(weather.daily.uv_index_max?.[0])} unit="" />
                   <Metric icon={<Umbrella size={17} color="#ea580c" />} bg="#fff7ed" label="احتمال الهطول" value={round(weather.daily.precipitation_probability_max?.[0])} unit="%" />
+                  <Metric icon={<Eye size={17} color="#0e7490" />} bg={OASIS.colors.infoSoft} label="مدى الرؤية" value={weather.current.visibility == null ? '--' : (Number(weather.current.visibility) / 1000).toFixed(1)} unit="كم" />
+                  <Metric icon={<Droplets size={17} color="#0891b2" />} bg="#ecfeff" label="نقطة الندى" value={round(weather.current.dew_point_2m)} unit="°" />
                 </View>
 
+                {/* Outlook for the next 24 hours */}
+                <View style={styles.blockHeader}><Text style={styles.blockTitle}>ملخص الـ24 ساعة القادمة</Text><Text style={styles.blockHint}>توقع آلي</Text></View>
+                <View style={{ flexDirection: 'row-reverse', gap: 6, paddingHorizontal: 12, paddingBottom: 8 }}>
+                  {[
+                    { label: 'فرصة المطر', value: round(maxRainChance) + '%' },
+                    { label: 'مجموع الهطول', value: rainAmount24.toFixed(1) + ' مم' },
+                    { label: 'هبّات الرياح', value: round(maxGust24) + ' كم/س' },
+                  ].map(item => (
+                    <View key={item.label} style={{ flex: 1, alignItems: 'flex-end', padding: 10, gap: 6, backgroundColor: OASIS.colors.background, borderRadius: 12 }}>
+                      <Text style={{ color: OASIS.colors.muted, fontSize: 10 }}>{item.label}</Text>
+                      <Text style={{ color: OASIS.colors.ink, fontSize: 15, fontWeight: '800' }}>{item.value}</Text>
+                    </View>
+                  ))}
+                </View>
+                <Text style={{ color: OASIS.colors.muted, fontSize: 10.5, lineHeight: 18, paddingHorizontal: 14, textAlign: 'right', paddingBottom: 8 }}>
+                  {nextRainIndex == null ? 'لا توجد ساعة تتجاوز فيها فرصة المطر 50% خلال 24 ساعة بحسب النموذج.' : 'أول فرصة مطر 50% فأعلى: ' + formatSaudiWeatherTime(weather.hourly.time[nextRainIndex])}
+                </Text>
+                {minuteIndices.length ? (
+                  <>
+                    <View style={styles.blockHeader}><Text style={styles.blockTitle}>كل 15 دقيقة</Text><Text style={styles.blockHint}>توقعات قصيرة المدى</Text></View>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hourlyList}>
+                      {minuteIndices.map(index => (
+                        <View key={weather.minute.time[index]} style={{ minWidth: 80, alignItems: 'center', gap: 6, paddingVertical: 12, paddingHorizontal: 9, borderRadius: 13, backgroundColor: '#eff6ff' }}>
+                          <Text style={styles.hourText}>{formatSaudiWeatherTime(weather.minute.time[index])}</Text>
+                          <WeatherGlyph code={weather.minute.weather_code?.[index] ?? 0} size={21} />
+                          <Text style={styles.hourTemp}>{round(weather.minute.temperature_2m?.[index])}°</Text>
+                          <Text style={{ color: '#0369a1', fontSize: 10 }}>{weather.minute.precipitation?.[index] == null ? '--' : Number(weather.minute.precipitation[index]).toFixed(1)} مم</Text>
+                        </View>
+                      ))}
+                    </ScrollView>
+                    <Text style={{ color: OASIS.colors.muted, fontSize: 10.5, lineHeight: 17, textAlign: 'right', paddingHorizontal: 14, paddingBottom: 9 }}>هذه تقديرات مستوفاة من بيانات كل ساعة في السعودية، وليست قياسات أو راداراً مباشراً.</Text>
+                  </>
+                ) : null}
                 {/* Hourly */}
-                <View style={styles.blockHeader}><Text style={styles.blockTitle}>توقعات الساعات القادمة</Text><Text style={styles.blockHint}>12 ساعة</Text></View>
+                <View style={styles.blockHeader}>
+                  <Text style={styles.blockTitle}>توقعات الساعة</Text>
+                  <Pressable onPress={() => setViewHourCount(count => count === 12 ? 48 : 12)} style={{ backgroundColor: OASIS.colors.soft, paddingHorizontal: 11, paddingVertical: 6, borderRadius: 9 }}>
+                    <Text style={{ color: OASIS.colors.primary, fontWeight: '700', fontSize: 11 }}>{viewHourCount === 12 ? 'عرض 48 ساعة' : 'عرض 12 ساعة'}</Text>
+                  </Pressable>
+                </View>
                 <ScrollView style={{ direction: 'rtl' }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.hourlyList, { direction: 'ltr' }]}>
                   {hourlyIndices.map((index) => (
                     <OasisSurface oasisSurface="card" key={weather.hourly.time[index]} style={styles.hourCard}>
-                      <Text style={styles.hourText}>{new Date(weather.hourly.time[index]).toLocaleTimeString('ar-SA', { hour: '2-digit', hour12: true })}</Text>
+                      <Text style={styles.hourText}>{formatSaudiWeatherTime(weather.hourly.time[index])}</Text>
                       <WeatherGlyph code={weather.hourly.weather_code[index]} size={23} />
                       <Text style={styles.hourTemp}>{round(weather.hourly.temperature_2m[index])}°</Text>
                       <View style={styles.hourMeta}><Droplets size={10} color={OASIS.colors.info} /><Text style={styles.hourMetaText}>{weather.hourly.precipitation_probability[index] ?? 0}%</Text></View>
@@ -678,7 +741,7 @@ export default function WeatherScreen() {
                 <View style={styles.divider} />
 
                 {/* Daily with range bars */}
-                <View style={styles.blockHeader}><Text style={styles.blockTitle}>توقعات 7 أيام</Text><Text style={styles.blockHint}>العظمى / الصغرى</Text></View>
+                <View style={styles.blockHeader}><Text style={styles.blockTitle}>توقعات حتى 16 يوماً</Text><Text style={styles.blockHint}>العظمى / الصغرى</Text></View>
                 {weather.daily.time.map((date: string, index: number) => {
                   const low = weather.daily.temperature_2m_min[index];
                   const high = weather.daily.temperature_2m_max[index];
@@ -692,7 +755,7 @@ export default function WeatherScreen() {
                         <View style={[styles.dayRangeBar, { marginLeft: (left + '%') as any, width: (width + '%') as any }]} />
                       </View>
                       <View style={styles.dayCondition}>
-                        <Text style={styles.dayConditionText}>{weatherDescription(weather.daily.weather_code[index])}</Text>
+                        <Text style={styles.dayConditionText}>{weatherDescription(weather.daily.weather_code[index])} · {round(weather.daily.precipitation_probability_max?.[index])}% مطر</Text>
                         <WeatherGlyph code={weather.daily.weather_code[index]} size={21} />
                       </View>
                       <Text style={styles.dayName}>{dayLabel(date, index)}</Text>
@@ -761,7 +824,7 @@ export default function WeatherScreen() {
                 </OasisSurface>
 
                 <View style={styles.weatherFooter}>
-                  <Text style={styles.sourceText}>المصدر: Open-Meteo · آخر تحديث {lastUpdated ? lastUpdated.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }) : ''}</Text>
+                  <Text style={styles.sourceText}>المصدر: Open-Meteo · وقت النموذج {formatSaudiWeatherTime(weather.current.time)} · آخر جلب {lastUpdated ? lastUpdated.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Riyadh' }) : ''}</Text>
                   <Text style={styles.uvText}>مؤشر الأشعة فوق البنفسجية اليوم: {round(weather.daily.uv_index_max?.[0])}</Text>
                 </View>
               </>
@@ -769,11 +832,34 @@ export default function WeatherScreen() {
           </OasisSurface>
 
           <OasisSurface oasisSurface="card" style={styles.infoCard}>
-            <Text style={styles.infoTitle}>عن بيانات الطقس</Text>
-            <Text style={styles.infoText}>تعرض هذه الصفحة بيانات الطقس والتوقعات من Open-Meteo، وجودة الهواء من Open-Meteo Air Quality. قد تختلف التوقعات عن الظروف الفعلية، ويظهر وقت آخر تحديث أعلى البطاقة.</Text>
+            <Text style={styles.infoTitle}>تنبيهات المركز الوطني للأرصاد</Text>
+            <Text style={styles.infoText}>التنبيهات المعروضة في الصفحة ناتجة عن معايير آلية وليست تحذيرات رسمية. عند تقلبات الطقس تأكد من المركز الوطني للأرصاد.</Text>
+            <Pressable onPress={() => void Linking.openURL('https://www.ncm.gov.sa/en/early-warning')}
+              style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 12, backgroundColor: OASIS.colors.deep, borderRadius: 12 }}>
+              <TriangleAlert size={16} color={OASIS.colors.surface} />
+              <Text style={{ color: OASIS.colors.surface, fontSize: 12, fontWeight: '700' }}>فتح خريطة الإنذار المبكر الرسمية</Text>
+            </Pressable>
+            <Text style={styles.infoTitle}>مصدر البيانات ودقة التحديث</Text>
+            <Text style={styles.infoText}>البيانات النموذجية من Open-Meteo وجودة الهواء من Open-Meteo Air Quality. الساعة المحلية تتحدث كل ثانية، ويُعاد جلب توقعات مزود الخدمة كل 15 دقيقة أثناء فتح الصفحة، وليس رصداً جوياً كل ثانية. تقل موثوقية التوقع كلما طالت المدة، وتوقيت العرض هو السعودية.</Text>
           </OasisSurface>
         </View>
       </ScrollView>
+    </View>
+  );
+}
+
+function SaudiLiveClock() {
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  return (
+    <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 5, borderRadius: 15, backgroundColor: OASIS.colors.soft, paddingHorizontal: 8, paddingVertical: 5 }}>
+      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: OASIS.colors.primary }} />
+      <Text style={{ color: OASIS.colors.primary, fontSize: 10, fontWeight: '700' }}>
+        {now.toLocaleTimeString('ar-SA', { timeZone: 'Asia/Riyadh', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+      </Text>
     </View>
   );
 }
