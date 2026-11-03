@@ -1,7 +1,5 @@
 name: Build Hayna Android APK / iOS IPA
 
-# Manual GitHub Actions fallback. EAS Workflows in .eas/workflows/
-# can be run from Expo without adding a GitHub EXPO_TOKEN.
 on:
   workflow_dispatch:
     inputs:
@@ -19,19 +17,13 @@ permissions:
   contents: read
 
 jobs:
-<<<<<<< HEAD
-  android:
-    name: Android APK (preview)
-    if: ${{ inputs.platform == 'both' || inputs.platform == 'android' }}
-=======
   native-setup:
     name: Check signed mobile build setup
-    permissions: {}
     runs-on: ubuntu-latest
     outputs:
       configured: ${{ steps.expo-token.outputs.configured }}
     steps:
-      - name: Check Expo credential availability without exposing it
+      - name: Check Expo credential availability
         id: expo-token
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
@@ -40,31 +32,31 @@ jobs:
             echo "configured=true" >> "$GITHUB_OUTPUT"
           else
             echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::EXPO_TOKEN is missing. Signed APK and TestFlight builds are skipped; platform JavaScript bundles are checked separately."
+            echo "::notice::EXPO_TOKEN is missing. Signed app builds are skipped."
           fi
+
   web:
-    name: Build Web Export
-    permissions:
-      contents: read
+    name: Validate Web Export
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          node-version: 20
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "24"
           cache: npm
-      - run: npm install
-      - run: npx expo export -p web
-      - uses: actions/upload-artifact@v4
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: hayna-web
           path: dist
 
-  eas-build:
-    name: Build Android APK & iOS TestFlight
+  android:
+    name: Android APK (preview)
     needs: native-setup
-    if: needs.native-setup.outputs.configured == 'true'
->>>>>>> eeec32c (fix: validate commerce release and regional privacy boundaries)
+    if: ${{ needs.native-setup.outputs.configured == 'true' && (inputs.platform == 'both' || inputs.platform == 'android') }}
     runs-on: ubuntu-latest
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
@@ -77,24 +69,14 @@ jobs:
         with:
           node-version: "24"
           cache: npm
-      - name: Verify Expo access
-        shell: bash
-        run: |
-          if [ -z "$EXPO_TOKEN" ]; then
-            echo "::error::EXPO_TOKEN is missing. Add it in Settings > Secrets and variables > Actions, or run .eas/workflows/mobile-builds.yml from Expo."
-            exit 1
-          fi
-      - name: Install dependencies
-        run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
       - name: Build Android APK on EAS
         run: npx --yes eas-cli@latest build --platform android --profile preview --non-interactive --wait
-      - name: Download APK from Expo
-        if: ${{ success() }}
-        run: echo "Open https://expo.dev/accounts/yousefalhazmi/projects/hayna/builds to download the signed Android APK."
 
   ios:
-    name: iOS IPA (TestFlight / store)
-    if: ${{ inputs.platform == 'both' || inputs.platform == 'ios' }}
+    name: iOS IPA (TestFlight)
+    needs: native-setup
+    if: ${{ needs.native-setup.outputs.configured == 'true' && (inputs.platform == 'both' || inputs.platform == 'ios') }}
     runs-on: ubuntu-latest
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
@@ -107,17 +89,6 @@ jobs:
         with:
           node-version: "24"
           cache: npm
-      - name: Verify Expo access
-        shell: bash
-        run: |
-          if [ -z "$EXPO_TOKEN" ]; then
-            echo "::error::EXPO_TOKEN is missing. Add it in Settings > Secrets and variables > Actions, or run .eas/workflows/mobile-builds.yml from Expo."
-            exit 1
-          fi
-      - name: Install dependencies
-        run: npm install --no-audit --no-fund
-      - name: Build signed iOS IPA on EAS (no auto-submit)
+      - run: npm ci --no-audit --no-fund
+      - name: Build iOS on EAS
         run: npx --yes eas-cli@latest build --platform ios --profile testflight --non-interactive --wait
-      - name: Download IPA from Expo
-        if: ${{ success() }}
-        run: echo "Open https://expo.dev/accounts/yousefalhazmi/projects/hayna/builds to download the signed iOS IPA. Submission to TestFlight is a separate step."
