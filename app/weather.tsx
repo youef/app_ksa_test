@@ -31,6 +31,7 @@ import {
   Eye,
   TriangleAlert,
   HeartPulse,
+  Satellite,
   Megaphone,
   Bell,
   Send,
@@ -610,6 +611,38 @@ export default function WeatherScreen() {
               ))}
             </ScrollView>
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
+          </OasisSurface>
+
+          {/* Saudi radar & satellite maps: provider controls, attribution and timeline stay visible. */}
+          <OasisSurface oasisSurface="card" style={{ padding: 14, borderRadius: 18, gap: 10 }}>
+            <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 11 }}>
+              <View style={{ padding: 10, borderRadius: 14, backgroundColor: '#dbeafe' }}>
+                <Satellite size={23} color="#0369a1" />
+              </View>
+              <View style={{ flex: 1, alignItems: 'flex-end', gap: 4 }}>
+                <Text style={{ fontSize: 15, fontWeight: '800', color: OASIS.colors.deep }}>رادار الأمطار والسحب في السعودية</Text>
+                <Text style={{ fontSize: 11, color: OASIS.colors.muted, textAlign: 'right', lineHeight: 18 }}>
+                  خريطة تفاعلية · تحريك السحب · استعراض الرصد السابق · مدن المملكة
+                </Text>
+              </View>
+            </View>
+            <Pressable onPress={() => router.push({
+              pathname: '/weather-radar' as any,
+              params: weather ? {
+                city: weather.city,
+                lat: weather.latitude.toFixed(4),
+                lon: weather.longitude.toFixed(4),
+              } : { city: cityInput || 'الرياض' },
+            })} style={{
+              backgroundColor: OASIS.colors.deep, borderRadius: 13, padding: 13,
+              flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 9,
+            }}>
+              <Satellite size={17} color="#fff" />
+              <Text style={{ color: '#fff', fontSize: 13, fontWeight: '800' }}>افتح رادار السعودية المباشر</Text>
+            </Pressable>
+            <Text style={{ fontSize: 10.5, color: OASIS.colors.muted, textAlign: 'right', lineHeight: 17 }}>
+              عرض من مزود خارجي. تتفاوت تغطية الرادار؛ الرصد الرسمي السعودي متاح عبر أنواء.
+            </Text>
           </OasisSurface>
 
           {weather ? (
