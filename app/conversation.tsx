@@ -424,38 +424,8 @@ export default function Conversation() {
         p_note: finalNote,
       });
 
-      if (rpcErr) {
-        const senderName = displayName(myProfile) || 'جارك';
-        const payload = JSON.stringify({
-          type: 'appreciation',
-          title: '☕ بطاقة شكر وقهوة الجيران',
-          note: finalNote,
-          points: pts,
-          giver_name: senderName,
-        });
-
-        const { error: msgErr } = await supabase.from('messages').insert({
-          conversation_id: convId,
-          sender_id: currentUserId,
-          body: payload,
-          read_by: [currentUserId],
-        });
-        if (msgErr) throw msgErr;
-
-        try {
-          const { data: curRep } = await supabase
-            .from('reputation')
-            .select('points')
-            .eq('user_id', otherUser.id)
-            .maybeSingle();
-          const nextPts = (curRep?.points || 0) + pts;
-          await supabase.from('reputation').upsert({
-            user_id: otherUser.id,
-            points: nextPts,
-            updated_at: new Date().toISOString(),
-          });
-        } catch {}
-      }
+      // The server RPC is the only authority for appreciation messages and reputation.
+      if (rpcErr) throw rpcErr;
 
       if (otherUser?.id && !otherDnd) {
         const senderName = displayName(myProfile) || 'جارك';
