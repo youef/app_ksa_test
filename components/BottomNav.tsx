@@ -1,6 +1,6 @@
 import { OasisPressable as Pressable } from '@/components/oasis/OasisPrimitives';
 import { useEffect, useState } from 'react';
-import { DeviceEventEmitter, Keyboard, NativeScrollEvent, NativeSyntheticEvent, Platform, StyleSheet, Text, View } from 'react-native';
+import { DeviceEventEmitter, Keyboard, NativeScrollEvent, NativeSyntheticEvent, Platform, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, usePathname } from 'expo-router';
@@ -79,6 +79,8 @@ export default function BottomNav() {
   const { colors, isDark } = useTheme();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions();
+  const edgeToEdge = width <= 600 || (width <= 932 && height <= 500);
   const [hasSession, setHasSession] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
 
@@ -162,12 +164,17 @@ export default function BottomNav() {
 
   if (keyboardVisible || isHiddenRoute) return null;
 
-  const bottomPadding = Math.max(insets.bottom, Platform.OS === 'ios' ? 8 : 7);
+  const bottomPadding = Math.max(insets.bottom, 8);
 
   return (
-    <Animated.View pointerEvents="box-none" style={[styles.dock, { paddingBottom: bottomPadding }, animatedStyle]}>
-      <View style={[styles.surface, { backgroundColor: isDark ? 'rgba(20,36,29,.76)' : 'rgba(255,255,255,.76)', borderColor: isDark ? 'rgba(180,218,197,.2)' : 'rgba(255,255,255,.92)' }]}>
-        <BlurView intensity={80} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFillObject} />
+    <Animated.View pointerEvents="box-none" style={[
+      styles.dock,
+      { paddingBottom: bottomPadding },
+      edgeToEdge && [styles.edgeDock, { backgroundColor: colors.surface, borderTopColor: colors.line }],
+      animatedStyle,
+    ]}>
+      <View style={[styles.surface, { backgroundColor: isDark ? 'rgba(20,36,29,.76)' : 'rgba(255,255,255,.76)', borderColor: isDark ? 'rgba(180,218,197,.2)' : 'rgba(255,255,255,.92)' }, edgeToEdge && styles.edgeSurface]}>
+        {!edgeToEdge && <BlurView intensity={80} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFillObject} />}
         <LinearGradient pointerEvents="none" colors={isDark ? ['rgba(196,238,215,.12)', 'rgba(10,30,20,.08)'] : ['rgba(255,255,255,.68)', 'rgba(232,246,237,.24)']} style={StyleSheet.absoluteFillObject} />
         <View pointerEvents="none" style={[styles.glassHighlight, { backgroundColor: isDark ? 'rgba(213,246,227,.22)' : '#FFFFFF' }]} />
         <View style={styles.row}>
@@ -206,6 +213,8 @@ export default function BottomNav() {
 const styles = StyleSheet.create({
   dock: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 100, backgroundColor: 'transparent', paddingHorizontal: 12, paddingTop: 8 },
   surface: { height: BOTTOM_NAV_HEIGHT - 8, maxWidth: 560, width: '100%', alignSelf: 'center', borderRadius: 999, borderWidth: 1, overflow: 'hidden', shadowColor: '#173F30', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.14, shadowRadius: 18, elevation: 6 },
+  edgeDock: { paddingHorizontal: 0, paddingTop: 7, borderTopWidth: 1 },
+  edgeSurface: { maxWidth: '100%', borderRadius: 0, borderWidth: 0, backgroundColor: 'transparent', elevation: 0, shadowOpacity: 0 },
   glassHighlight: { position: 'absolute', top: 0, right: 22, left: 22, height: 1 },
   row: { flex: 1, flexDirection: 'row-reverse', alignItems: 'center', paddingHorizontal: 4 },
   tab: { flex: 1, minWidth: 0, minHeight: 44, height: '100%', alignItems: 'center', justifyContent: 'center', gap: 3 },

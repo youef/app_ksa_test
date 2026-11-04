@@ -139,12 +139,11 @@ function RootContent() {
       <Head>
         <title>{branding.name || 'حيّنا'}</title>
         <meta name="description" content={branding.description || 'منصة أهل الحي للتواصل والخدمات المحلية'} />
-        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <style type="text/css">{`
           html, body { width: 100%; min-height: 100%; -webkit-text-size-adjust: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
           body, #root, #root * { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
           html, body, #root { background-color: ${isDark ? '#0F0F10' : '#F2F2F7'}; color: ${isDark ? '#FFFFFF' : '#1C1C1E'}; transition: background-color 0.25s, color 0.25s; }
-          #root { isolation: isolate; }
+          #root { height: 100%; height: 100dvh; box-sizing: border-box; overflow: hidden; isolation: isolate; padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
           input, textarea, select { font-size: 16px !important; color-scheme: ${isDark ? 'dark' : 'light'}; }
           input:focus, textarea:focus, select:focus { font-size: 16px !important; }
           input, textarea { caret-color: ${isDark ? '#34D399' : '#047857'}; }

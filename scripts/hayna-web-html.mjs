@@ -11,6 +11,11 @@ export function ensureHaynaWebMetadata(source) {
     const withoutLang = tag.replace(/\s+lang\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/i, '');
     return withoutLang.replace(/>$/, ' lang="ar">');
   });
+  const viewport = '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />';
+  const viewportPattern = /<meta\s+name=["']viewport["'][^>]*>/i;
+  html = viewportPattern.test(html)
+    ? html.replace(viewportPattern, viewport)
+    : html.replace(/<\/head\s*>/i, viewport + '\n</head>');
   const required = [
     [/<meta\s+name=["']description["']/i, '<meta name="description" content="منصة حيّنا المجتمعية للتواصل، الفزعة، سوق الحي، ودليل الخدمات في المملكة العربية السعودية." />'],
     [/<link\s+rel=["']manifest["']/i, '<link rel="manifest" href="/manifest.json" />'],

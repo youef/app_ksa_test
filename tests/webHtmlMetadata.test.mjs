@@ -25,3 +25,12 @@ test('repeated post-processing is idempotent and preserves an existing direction
 test('does not silently accept malformed export', () => {
   assert.throws(() => ensureHaynaWebMetadata('<html><body></body></html>'), /missing html\/head/);
 });
+
+test('exports a single edge-to-edge viewport before JavaScript loads', () => {
+  const original = expoHtml.replace('<title>', '<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"><title>');
+  for (const source of [expoHtml, original]) {
+    const result = ensureHaynaWebMetadata(source);
+    assert.equal(result.match(/name="viewport"/g)?.length, 1);
+    assert.match(result, /name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/);
+  }
+});
