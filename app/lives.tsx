@@ -230,10 +230,12 @@ export default function LivesScreen() {
     achievements: earnedAchievements,
   };
 
+  // Refresh in place: never replace the entire directory with a loading screen.
   const reload = useCallback(() => {
-    setLoading(true);
+    if (refreshing) return;
+    setRefreshing(true);
     void load(leaderboardPeriod);
-  }, [load, leaderboardPeriod]);
+  }, [load, leaderboardPeriod, refreshing]);
 
   const spotlight = tab === 'live' ? visible[0] : undefined;
   const gridStreams = spotlight ? visible.slice(1) : visible;
