@@ -65,6 +65,7 @@ export default function CreateLiveScreen() {
 
         <View style={styles.privacy}><LockKeyhole size={16} color={OASIS.colors.muted} /><Text style={styles.privacyText}>لا نعرض موقعك الدقيق. اختر جمهورًا آمنًا، واستخدم أدوات الحظر والإبلاغ عند الحاجة.</Text></View>
         {formError ? <Text accessibilityRole="alert" style={styles.formError}>{formError}</Text> : null}
+        {formError.startsWith('سجّل الدخول') ? <Pressable accessibilityRole="button" onPress={() => router.push('/auth')} style={styles.signInButton}><Text style={styles.signInText}>تسجيل الدخول</Text></Pressable> : null}
         <Pressable oasisKind="action" accessibilityRole="button" accessibilityLabel={starting ? 'جارٍ تجهيز غرفة البث' : 'ابدأ البث الآن'} disabled={starting || title.trim().length < 3} onPress={() => void startLive()} style={[styles.startButton, (starting || title.trim().length < 3) && { opacity: 0.6 }]}>
           {starting ? <ActivityIndicator color={OASIS.colors.surface} /> : <><Radio size={18} color={OASIS.colors.surface} /><Text style={styles.startText}>ابدأ البث الآن</Text><ChevronLeft size={18} color={OASIS.colors.surface} /></>}
         </Pressable>
@@ -77,6 +78,8 @@ export default function CreateLiveScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: OASIS.colors.background }, content: { padding: 18, paddingBottom: 40 },
   formError: { color: '#b91c1c', textAlign: 'right', fontSize: 13, lineHeight: 21, marginTop: 14, marginBottom: 2 },
+  signInButton: { minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12, borderWidth: 1, borderColor: OASIS.colors.primary, marginTop: 8 },
+  signInText: { color: OASIS.colors.primary, fontWeight: '700', fontSize: 14 },
   notice: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, padding: 14, backgroundColor: OASIS.colors.soft, borderRadius: 16, marginBottom: 14 }, noticeText: { flex: 1, color: OASIS.colors.deep, fontSize: 12, textAlign: 'right', lineHeight: 19, fontWeight: '600' },
   label: { color: OASIS.colors.ink, textAlign: 'right', fontSize: 15, fontWeight: '700', marginBottom: 9, marginTop: 8 }, input: { borderWidth: 1, borderColor: '#cbd5e1', backgroundColor: OASIS.colors.surface, borderRadius: 15, paddingHorizontal: 14, paddingVertical: 13, fontSize: 16, color: OASIS.colors.ink }, counter: { color: '#94a3b8', fontSize: 11, textAlign: 'left', marginTop: 5, marginBottom: 12 },
   chipWrap: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8, marginBottom: 14 }, chip: { paddingHorizontal: 13, paddingVertical: 9, backgroundColor: OASIS.colors.surface, borderWidth: 1, borderColor: OASIS.colors.line, borderRadius: 14 }, chipActive: { backgroundColor: OASIS.colors.soft, borderColor: OASIS.colors.primary }, chipText: { color: OASIS.colors.muted, fontWeight: '700', fontSize: 12 }, chipTextActive: { color: OASIS.colors.primary },
