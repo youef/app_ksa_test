@@ -29,7 +29,7 @@ test('both Node setup steps pin a full action SHA', () => {
 
 
 const protectedWorkflows = [
-  ['expo-build.yml', 2, 2],
+  ['expo-build.yml', 3, 3],
   ['auto-deploy.yml', 1, 1],
   ['retry-vercel-production.yml', 1, 0],
 ];
