@@ -255,7 +255,7 @@ export default function LivesScreen() {
             style={styles.headerCta}
           >
             <Video size={15} color={OASIS.colors.surface} />
-            <Text style={styles.headerCtaText}>بث</Text>
+            
           </HeaderAction>
         )}
       />
@@ -271,6 +271,7 @@ export default function LivesScreen() {
               <Pressable oasisVariant={active ? 'primary' : 'secondary'} oasisKind="chip"
                 key={item.key}
                 accessibilityRole="tab"
+                accessibilityLabel={item.label}
                 accessibilityState={{ selected: active }}
                 onPress={() => setTab(item.key)}
                 style={[styles.tabItem, active && styles.tabItemActive]}
@@ -283,7 +284,7 @@ export default function LivesScreen() {
                     </View>
                   ) : null}
                 </View>
-                <Text style={[styles.tabLabel, active && styles.tabLabelActive]} numberOfLines={1}>{item.label}</Text>
+                {active ? <Text style={[styles.tabLabel, styles.tabLabelActive]} numberOfLines={1}>{item.label}</Text> : null}
               </Pressable>
             );
           })}
@@ -318,11 +319,7 @@ export default function LivesScreen() {
                 <HeroStat icon={<Users size={15} color={OASIS.colors.soft} />} value={compactCount(hostCount)} label="مضيف" />
               </View>
 
-              <Pressable accessibilityRole="button" style={styles.heroCta} onPress={() => router.push('/live/create')}>
-                <View style={styles.heroCtaIcon}><Video size={18} color={OASIS.colors.primary} /></View>
-                <Text style={styles.heroCtaText}>ابدأ بثًا مباشرًا</Text>
-                <ChevronLeft size={18} color={OASIS.colors.deep} />
-              </Pressable>
+
             </LinearGradient>
 
             {categories.length > 1 && (
@@ -681,13 +678,13 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#F4F8F6' },
   content: { padding: 12, paddingTop: 14 },
 
-  headerCta: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, backgroundColor: OASIS.colors.primary, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
+  headerCta: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: OASIS.colors.primary, borderRadius: 14 },
   headerCtaText: { color: OASIS.colors.surface, fontSize: 12.5, fontWeight: '700' },
 
   // Tab bar
   tabBarWrap: { paddingHorizontal: 12, paddingTop: 10, paddingBottom: 10, backgroundColor: OASIS.colors.soft },
   tabBar: { flexDirection: 'row-reverse', gap: 6, backgroundColor: '#FFFFFF', borderRadius: 20, padding: 5, borderWidth: 1, borderColor: '#E1EDE6', shadowColor: OASIS.colors.deep, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 3 },
-  tabItem: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3, paddingVertical: 9, borderRadius: 15 },
+  tabItem: { flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', gap: 3, paddingVertical: 9, borderRadius: 15 },
   tabItemActive: { backgroundColor: OASIS.colors.deep },
   tabIconWrap: { position: 'relative' },
   tabLabel: { fontSize: 11.5, fontWeight: '600', color: OASIS.colors.muted },
@@ -703,7 +700,7 @@ const styles = StyleSheet.create({
   heroLive: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
   heroLiveText: { color: OASIS.colors.surface, fontSize: 14, fontWeight: '700' },
   heroCaption: { color: OASIS.colors.soft, fontSize: 11.5, fontWeight: '700' },
-  heroStats: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(2,44,34,0.28)', borderRadius: 14, paddingVertical: 12, paddingHorizontal: 8, marginBottom: 14 },
+  heroStats: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(2,44,34,0.28)', borderRadius: 14, paddingVertical: 12, paddingHorizontal: 8, marginBottom: 0 },
   heroStat: { flex: 1, alignItems: 'center', gap: 3 },
   heroStatValue: { color: OASIS.colors.surface, fontSize: 19, fontWeight: '700' },
   heroStatLabel: { color: OASIS.colors.soft, fontSize: 11, fontWeight: '700' },
