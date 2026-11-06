@@ -1,7 +1,7 @@
 import { OasisPressable as Pressable, OasisTextInput as TextInput } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
 import { useRef, useState } from 'react';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { AppHeader } from '@/components/shared/AppHeader';
 import { createLiveStream, type LiveStream } from '@/lib/lives';
@@ -53,15 +53,15 @@ export default function CreateLiveScreen() {
       <AppHeader variant="sub" title="تجهيز البث" subtitle="أكمل التفاصيل ثم ابدأ مباشرة" fallbackRoute="/lives" />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" showsVerticalScrollIndicator={false}>
         <View style={styles.notice}><Camera size={20} color={OASIS.colors.primary} /><Text style={styles.noticeText}>قبل البث سنطلب إذن الكاميرا والميكروفون. تستطيع إيقافهما من داخل الغرفة.</Text></View>
-        <Text style={styles.label}>عنوان البث</Text>
+        <View style={styles.sectionHeading}><Text style={styles.sectionStep}>١ / ٣</Text><Text style={styles.label}>عنوان البث</Text></View>
         <TextInput value={title} onChangeText={(value) => { setTitle(value); if (formError) setFormError(''); }} maxLength={100} placeholder="وش ودك تشارك جيرانك؟" placeholderTextColor="#94a3b8" style={styles.input} textAlign="right" />
         <Text style={styles.counter}>{title.length}/100</Text>
 
-        <Text style={styles.label}>التصنيف</Text>
-        <View style={styles.chipWrap}>{CATEGORIES.map((item) => <Pressable oasisVariant={category === item ? 'primary' : 'secondary'} oasisKind="chip" key={item} onPress={() => setCategory(item)} style={[styles.chip, category === item && styles.chipActive]}><Text style={[styles.chipText, category === item && styles.chipTextActive]}>{item}</Text></Pressable>)}</View>
+        <View style={styles.sectionHeading}><Text style={styles.sectionStep}>٢ / ٣</Text><Text style={styles.label}>التصنيف</Text></View>
+        <View style={styles.chipWrap}>{CATEGORIES.map((item) => <Pressable oasisVariant={category === item ? 'primary' : 'secondary'} oasisKind="chip" key={item} accessibilityRole="button" accessibilityState={{ selected: category === item }} onPress={() => setCategory(item)} style={[styles.chip, category === item && styles.chipActive]}><Text style={[styles.chipText, category === item && styles.chipTextActive]}>{item}</Text></Pressable>)}</View>
 
-        <Text style={styles.label}>من يشاهد بثك؟</Text>
-        <View style={{ gap: 9 }}>{AUDIENCES.map((item) => <Pressable key={item.key} onPress={() => setAudience(item.key)} style={[styles.audience, audience === item.key && styles.audienceActive]}><View style={{ flex: 1, alignItems: 'flex-end' }}><Text style={styles.audienceTitle}>{item.title}</Text><Text style={styles.audienceNote}>{item.note}</Text></View><View style={[styles.radio, audience === item.key && styles.radioActive]}>{audience === item.key && <View style={styles.radioDot} />}</View></Pressable>)}</View>
+        <View style={styles.sectionHeading}><Text style={styles.sectionStep}>٣ / ٣</Text><Text style={styles.label}>من يشاهد بثك؟</Text></View>
+        <View style={{ gap: 9 }}>{AUDIENCES.map((item) => <Pressable key={item.key} accessibilityRole="radio" accessibilityState={{ checked: audience === item.key }} accessibilityLabel={`${item.title}، ${item.note}`} onPress={() => { setAudience(item.key); if (formError) setFormError(''); }} style={[styles.audience, audience === item.key && styles.audienceActive]}><View style={{ flex: 1, alignItems: 'flex-end' }}><Text style={styles.audienceTitle}>{item.title}</Text><Text style={styles.audienceNote}>{item.note}</Text></View><View style={[styles.radio, audience === item.key && styles.radioActive]}>{audience === item.key && <View style={styles.radioDot} />}</View></Pressable>)}</View>
 
         <View style={styles.privacy}><LockKeyhole size={16} color={OASIS.colors.muted} /><Text style={styles.privacyText}>لا نعرض موقعك الدقيق. اختر جمهورًا آمنًا، واستخدم أدوات الحظر والإبلاغ عند الحاجة.</Text></View>
         {formError ? <Text accessibilityRole="alert" style={styles.formError}>{formError}</Text> : null}
@@ -69,7 +69,7 @@ export default function CreateLiveScreen() {
         <Pressable oasisKind="action" accessibilityRole="button" accessibilityLabel={starting ? 'جارٍ تجهيز غرفة البث' : 'ابدأ البث الآن'} disabled={starting || title.trim().length < 3} onPress={() => void startLive()} style={[styles.startButton, (starting || title.trim().length < 3) && { opacity: 0.6 }]}>
           {starting ? <ActivityIndicator color={OASIS.colors.surface} /> : <><Radio size={18} color={OASIS.colors.surface} /><Text style={styles.startText}>ابدأ البث الآن</Text><ChevronLeft size={18} color={OASIS.colors.surface} /></>}
         </Pressable>
-        <Text style={styles.footerNote}>عند الضغط على «ابدأ» ستدخل غرفة البث مباشرة.</Text>
+        <Text style={styles.footerNote}>بعد التجهيز ستدخل الغرفة مباشرة، ويمكنك التحكم بالكاميرا والميكروفون من هناك.</Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -77,6 +77,8 @@ export default function CreateLiveScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: OASIS.colors.background }, content: { padding: 18, paddingBottom: 40 },
+  sectionHeading: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, marginBottom: 4 },
+  sectionStep: { fontSize: 11, fontWeight: '700', color: OASIS.colors.primary, backgroundColor: OASIS.colors.soft, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 10 },
   formError: { color: '#b91c1c', textAlign: 'right', fontSize: 13, lineHeight: 21, marginTop: 14, marginBottom: 2 },
   signInButton: { minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12, borderWidth: 1, borderColor: OASIS.colors.primary, marginTop: 8 },
   signInText: { color: OASIS.colors.primary, fontWeight: '700', fontSize: 14 },
@@ -84,5 +86,5 @@ const styles = StyleSheet.create({
   label: { color: OASIS.colors.ink, textAlign: 'right', fontSize: 15, fontWeight: '700', marginBottom: 9, marginTop: 8 }, input: { borderWidth: 1, borderColor: '#cbd5e1', backgroundColor: OASIS.colors.surface, borderRadius: 15, paddingHorizontal: 14, paddingVertical: 13, fontSize: 16, color: OASIS.colors.ink }, counter: { color: '#94a3b8', fontSize: 11, textAlign: 'left', marginTop: 5, marginBottom: 12 },
   chipWrap: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8, marginBottom: 14 }, chip: { paddingHorizontal: 13, paddingVertical: 9, backgroundColor: OASIS.colors.surface, borderWidth: 1, borderColor: OASIS.colors.line, borderRadius: 14 }, chipActive: { backgroundColor: OASIS.colors.soft, borderColor: OASIS.colors.primary }, chipText: { color: OASIS.colors.muted, fontWeight: '700', fontSize: 12 }, chipTextActive: { color: OASIS.colors.primary },
   audience: { backgroundColor: OASIS.colors.surface, borderRadius: 15, padding: 13, borderWidth: 1, borderColor: OASIS.colors.line, flexDirection: 'row-reverse', alignItems: 'center', gap: 12 }, audienceActive: { borderColor: OASIS.colors.primary, backgroundColor: OASIS.colors.soft }, audienceTitle: { color: OASIS.colors.ink, fontWeight: '600', fontSize: 13 }, audienceNote: { color: OASIS.colors.muted, fontSize: 11, marginTop: 3, textAlign: 'right' }, radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#cbd5e1', alignItems: 'center', justifyContent: 'center' }, radioActive: { borderColor: OASIS.colors.primary }, radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: OASIS.colors.primary },
-  privacy: { flexDirection: 'row-reverse', alignItems: 'flex-start', gap: 8, padding: 12, backgroundColor: '#f1f5f9', borderRadius: 13, marginTop: 18 }, privacyText: { flex: 1, color: OASIS.colors.muted, fontSize: 11, textAlign: 'right', lineHeight: 18 }, startButton: { height: 44, borderRadius: 17, marginTop: 14, backgroundColor: OASIS.colors.primary, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 10 }, startText: { color: OASIS.colors.surface, fontSize: 15, fontWeight: '700' }, footerNote: { textAlign: 'center', color: '#94a3b8', fontSize: 11, marginTop: 11 },
+  privacy: { flexDirection: 'row-reverse', alignItems: 'flex-start', gap: 8, padding: 12, backgroundColor: '#f1f5f9', borderRadius: 13, marginTop: 18 }, privacyText: { flex: 1, color: OASIS.colors.muted, fontSize: 11, textAlign: 'right', lineHeight: 18 }, startButton: { minHeight: 52, borderRadius: 17, marginTop: 14, backgroundColor: OASIS.colors.primary, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 10 }, startText: { color: OASIS.colors.surface, fontSize: 15, fontWeight: '700' }, footerNote: { textAlign: 'center', color: '#94a3b8', fontSize: 11, marginTop: 11 },
 });
