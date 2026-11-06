@@ -295,11 +295,11 @@ export default function LivesScreen() {
 
       <ScrollView
         contentContainerStyle={[styles.content, { paddingBottom: bottomNavInset + 28 }]}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load(leaderboardPeriod); }} tintColor={C.accent} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reload} tintColor={C.accent} />}
       >
         {tab === 'live' ? <View style={{ gap: 10, marginBottom: 14 }}>
           <TextInput accessibilityLabel="ابحث عن بث أو مضيف" value={searchQuery} onChangeText={setSearchQuery} placeholder="ابحث عن بث، مضيف، أو مدينة…" style={{ minHeight: 44, borderRadius: 12, borderWidth: 1, borderColor: OASIS.colors.line, backgroundColor: OASIS.colors.surface, paddingHorizontal: 12, textAlign: 'right', color: OASIS.colors.ink }} />
-          <View style={{ flexDirection: 'row-reverse', gap: 8 }}>{([['popular', 'الأكثر مشاهدة'], ['newest', 'بدأ حديثًا']] as const).map(([key, label]) => <Pressable key={key} oasisKind="chip" oasisVariant={sort === key ? 'primary' : 'secondary'} accessibilityState={{ selected: sort === key }} onPress={() => setSort(key)}><Text style={{ color: sort === key ? '#fff' : OASIS.colors.primary, fontSize: 12 }}>{label}</Text></Pressable>)}</View>
+          <View style={{ flexDirection: 'row-reverse', gap: 8 }}>{([['popular', 'الأكثر مشاهدة'], ['newest', 'بدأ حديثًا']] as const).map(([key, label]) => <Pressable key={key} oasisKind="chip" oasisVariant={sort === key ? 'primary' : 'secondary'} accessibilityRole="button" accessibilityLabel={`ترتيب البثوث: ${label}`} accessibilityState={{ selected: sort === key }} onPress={() => setSort(key)}><Text style={{ color: sort === key ? '#fff' : OASIS.colors.primary, fontSize: 12 }}>{label}</Text></Pressable>)}</View>
         </View> : null}
         {/* ================= LIVE TAB ================= */}
         {tab === 'live' && (
@@ -313,7 +313,7 @@ export default function LivesScreen() {
                 <Text style={styles.heroCaption}>شاهد، تفاعل، وادعم مبدعي حيّنا</Text>
               </View>
 
-              <View style={styles.heroStats}>
+              <View style={styles.heroStats} accessibilityLabel={`${accessibleStreams.length} بث مباشر، ${totalViewers} مشاهد، ${hostCount} مضيف`}>
                 <HeroStat icon={<Radio size={15} color={OASIS.colors.soft} />} value={compactCount(accessibleStreams.length)} label="بث مباشر" />
                 <View style={styles.heroDivider} />
                 <HeroStat icon={<Eye size={15} color={OASIS.colors.soft} />} value={compactCount(totalViewers)} label="مشاهد" />
@@ -336,7 +336,7 @@ export default function LivesScreen() {
               {([
                 ['all', 'الكل'], ['following', 'أتابعهم'], ['nearby', 'قريب مني'],
               ] as [Filter, string][]).map(([key, label]) => (
-                <Pressable key={key} onPress={() => setFilter(key)} style={[styles.seg, filter === key && styles.segActive]}>
+                <Pressable key={key} accessibilityRole="button" accessibilityLabel={`عرض ${label}، ${baseCounts[key]} بث`} accessibilityState={{ selected: filter === key }} onPress={() => setFilter(key)} style={[styles.seg, filter === key && styles.segActive]}>
                   <Text style={[styles.segText, filter === key && styles.segTextActive]}>{label}</Text>
                   <View style={[styles.segCount, filter === key && styles.segCountActive]}>
                     <Text style={[styles.segCountText, filter === key && styles.segCountTextActive]}>{baseCounts[key]}</Text>
