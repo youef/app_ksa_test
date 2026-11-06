@@ -105,6 +105,8 @@ export default function LiveRoomScreen() {
   const canTimeoutUsers = role === 'host' || Boolean(moderatorPermissions?.can_timeout_users);
   const canManageFilters = role === 'host' || Boolean(moderatorPermissions?.can_manage_filters);
   const scrollRef = useRef<ScrollView>(null);
+  // Keep the viewer's reading position when new chat messages arrive.
+  const chatFollowLatestRef = useRef(true);
   const mediaApiRef = useRef<LiveMediaApi | null>(null);
   const connectedRef = useRef(false);
   const lastGiftSentAtRef = useRef(0);
@@ -1053,7 +1055,7 @@ export default function LiveRoomScreen() {
 
             {showChat && (
               <View style={styles.chatPanel}>
-                <ScrollView ref={scrollRef} style={styles.messageList} contentContainerStyle={{ justifyContent: 'flex-end', paddingVertical: 5 }} showsVerticalScrollIndicator={false} onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}>
+                <ScrollView ref={scrollRef} style={styles.messageList} contentContainerStyle={{ justifyContent: 'flex-end', paddingVertical: 5 }} showsVerticalScrollIndicator={false} scrollEventThrottle={100} onScroll={(event) => { const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent; chatFollowLatestRef.current = contentSize.height - (contentOffset.y + layoutMeasurement.height) < 72; }} onContentSizeChange={() => { if (chatFollowLatestRef.current) scrollRef.current?.scrollToEnd({ animated: false }); }}>
                   {messages.slice(-10).map((message) => <LiveCommentCard key={message.id} message={message} onLongPress={() => moderateMessage(message)} />)}
                   {messages.length === 0 && <Text style={styles.firstMessage}>كن أول من يحيّي {hostName} 👋</Text>}
                 </ScrollView>

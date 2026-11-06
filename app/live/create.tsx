@@ -1,7 +1,7 @@
 import { OasisPressable as Pressable, OasisTextInput as TextInput } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
-import { useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { AppHeader } from '@/components/shared/AppHeader';
 import { createLiveStream, type LiveStream } from '@/lib/lives';
@@ -21,34 +21,40 @@ export default function CreateLiveScreen() {
   const [category, setCategory] = useState('عام');
   const [audience, setAudience] = useState<LiveStream['audience']>('public');
   const [starting, setStarting] = useState(false);
+  const startingRef = useRef(false);
+  const [formError, setFormError] = useState('');
 
   async function startLive() {
     const cleanTitle = title.trim();
-    if (cleanTitle.length < 3) { Alert.alert('أضف عنوانًا', 'اكتب عنوانًا من 3 أحرف على الأقل حتى يعرف الجيران موضوع البث.'); return; }
+    if (startingRef.current) return;
+    if (cleanTitle.length < 3) { setFormError('اكتب عنوانًا من 3 أحرف على الأقل لبدء البث.'); return; }
+    startingRef.current = true;
+    setFormError('');
     setStarting(true);
     try {
       const { data: auth } = await supabase.auth.getUser();
-      if (!auth.user) { Alert.alert('تسجيل الدخول مطلوب', 'سجّل الدخول لبدء بث مباشر.'); router.push('/auth'); return; }
+      if (!auth.user) { setFormError('سجّل الدخول أولًا، ثم ارجع لإكمال تجهيز البث.'); return; }
       if (audience === 'city') {
         const { data: profile } = await supabase.from('profiles').select('city').eq('id', auth.user.id).maybeSingle();
-        if (!profile?.city) { Alert.alert('أكمل مدينتك أولاً', 'أضف مدينتك إلى ملفك الشخصي قبل اختيار بث المدينة.'); return; }
+        if (!profile?.city) { setFormError('أضف مدينتك في الملف الشخصي أو اختر جمهورًا آخر.'); return; }
       }
       const stream = await createLiveStream({ title: cleanTitle.slice(0, 100), category, audience });
       router.replace({ pathname: '/live/[id]', params: { id: stream.id, role: 'host' } });
     } catch (error) {
-      Alert.alert('تعذر بدء البث', error instanceof Error ? error.message : 'حاول مرة أخرى بعد قليل.');
+      setFormError(error instanceof Error ? error.message : 'تعذر بدء البث. حاول مرة أخرى.');
     } finally {
+      startingRef.current = false;
       setStarting(false);
     }
   }
 
   return (
-    <View style={[styles.screen, { backgroundColor: 'transparent' }]}>
+    <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <AppHeader variant="sub" title="تجهيز البث" subtitle="أكمل التفاصيل ثم ابدأ مباشرة" fallbackRoute="/lives" />
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" showsVerticalScrollIndicator={false}>
         <View style={styles.notice}><Camera size={20} color={OASIS.colors.primary} /><Text style={styles.noticeText}>قبل البث سنطلب إذن الكاميرا والميكروفون. تستطيع إيقافهما من داخل الغرفة.</Text></View>
         <Text style={styles.label}>عنوان البث</Text>
-        <TextInput value={title} onChangeText={setTitle} maxLength={100} placeholder="وش ودك تشارك جيرانك؟" placeholderTextColor="#94a3b8" style={styles.input} textAlign="right" />
+        <TextInput value={title} onChangeText={(value) => { setTitle(value); if (formError) setFormError(''); }} maxLength={100} placeholder="وش ودك تشارك جيرانك؟" placeholderTextColor="#94a3b8" style={styles.input} textAlign="right" />
         <Text style={styles.counter}>{title.length}/100</Text>
 
         <Text style={styles.label}>التصنيف</Text>
@@ -58,17 +64,22 @@ export default function CreateLiveScreen() {
         <View style={{ gap: 9 }}>{AUDIENCES.map((item) => <Pressable key={item.key} onPress={() => setAudience(item.key)} style={[styles.audience, audience === item.key && styles.audienceActive]}><View style={{ flex: 1, alignItems: 'flex-end' }}><Text style={styles.audienceTitle}>{item.title}</Text><Text style={styles.audienceNote}>{item.note}</Text></View><View style={[styles.radio, audience === item.key && styles.radioActive]}>{audience === item.key && <View style={styles.radioDot} />}</View></Pressable>)}</View>
 
         <View style={styles.privacy}><LockKeyhole size={16} color={OASIS.colors.muted} /><Text style={styles.privacyText}>لا نعرض موقعك الدقيق. اختر جمهورًا آمنًا، واستخدم أدوات الحظر والإبلاغ عند الحاجة.</Text></View>
-        <Pressable oasisKind="action" disabled={starting} onPress={() => void startLive()} style={[styles.startButton, starting && { opacity: 0.7 }]}>
+        {formError ? <Text accessibilityRole="alert" style={styles.formError}>{formError}</Text> : null}
+        {formError.startsWith('سجّل الدخول') ? <Pressable accessibilityRole="button" onPress={() => router.push('/auth')} style={styles.signInButton}><Text style={styles.signInText}>تسجيل الدخول</Text></Pressable> : null}
+        <Pressable oasisKind="action" accessibilityRole="button" accessibilityLabel={starting ? 'جارٍ تجهيز غرفة البث' : 'ابدأ البث الآن'} disabled={starting || title.trim().length < 3} onPress={() => void startLive()} style={[styles.startButton, (starting || title.trim().length < 3) && { opacity: 0.6 }]}>
           {starting ? <ActivityIndicator color={OASIS.colors.surface} /> : <><Radio size={18} color={OASIS.colors.surface} /><Text style={styles.startText}>ابدأ البث الآن</Text><ChevronLeft size={18} color={OASIS.colors.surface} /></>}
         </Pressable>
         <Text style={styles.footerNote}>عند الضغط على «ابدأ» ستدخل غرفة البث مباشرة.</Text>
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: OASIS.colors.background }, content: { padding: 18, paddingBottom: 24 },
+  screen: { flex: 1, backgroundColor: OASIS.colors.background }, content: { padding: 18, paddingBottom: 40 },
+  formError: { color: '#b91c1c', textAlign: 'right', fontSize: 13, lineHeight: 21, marginTop: 14, marginBottom: 2 },
+  signInButton: { minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12, borderWidth: 1, borderColor: OASIS.colors.primary, marginTop: 8 },
+  signInText: { color: OASIS.colors.primary, fontWeight: '700', fontSize: 14 },
   notice: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, padding: 14, backgroundColor: OASIS.colors.soft, borderRadius: 16, marginBottom: 14 }, noticeText: { flex: 1, color: OASIS.colors.deep, fontSize: 12, textAlign: 'right', lineHeight: 19, fontWeight: '600' },
   label: { color: OASIS.colors.ink, textAlign: 'right', fontSize: 15, fontWeight: '700', marginBottom: 9, marginTop: 8 }, input: { borderWidth: 1, borderColor: '#cbd5e1', backgroundColor: OASIS.colors.surface, borderRadius: 15, paddingHorizontal: 14, paddingVertical: 13, fontSize: 16, color: OASIS.colors.ink }, counter: { color: '#94a3b8', fontSize: 11, textAlign: 'left', marginTop: 5, marginBottom: 12 },
   chipWrap: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8, marginBottom: 14 }, chip: { paddingHorizontal: 13, paddingVertical: 9, backgroundColor: OASIS.colors.surface, borderWidth: 1, borderColor: OASIS.colors.line, borderRadius: 14 }, chipActive: { backgroundColor: OASIS.colors.soft, borderColor: OASIS.colors.primary }, chipText: { color: OASIS.colors.muted, fontWeight: '700', fontSize: 12 }, chipTextActive: { color: OASIS.colors.primary },
