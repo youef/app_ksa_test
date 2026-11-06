@@ -802,9 +802,9 @@ export default function LiveRoomScreen() {
                   </View>
                   <Text numberOfLines={1} style={styles.hostTitle}>{stream.title}</Text>
                 </View>
-                {role !== 'host' && <Pressable oasisKind="action" onPress={() => void toggleFollow()} style={styles.followButton}><Text style={styles.followText}>{isFollowing ? 'تتابع' : 'متابعة +'}</Text></Pressable>}
+                {role !== 'host' && <Pressable oasisKind="action" accessibilityRole="button" accessibilityLabel={isFollowing ? "إلغاء متابعة المضيف" : "متابعة المضيف"} accessibilityState={{ selected: isFollowing }} onPress={() => void toggleFollow()} style={styles.followButton}><Text style={styles.followText}>{isFollowing ? 'تتابع' : 'متابعة +'}</Text></Pressable>}
               </View>
-              {role === 'host' ? <Pressable oasisKind="action" onPress={confirmEnd} style={styles.endButton}><Text style={styles.endText}>إنهاء</Text></Pressable> : <Pressable oasisKind="icon" onPress={showReport} style={styles.roundButton}><MoreHorizontal color={OASIS.colors.surface} size={20} /></Pressable>}
+              {role === 'host' ? <Pressable oasisKind="action" accessibilityRole="button" accessibilityLabel="إنهاء البث المباشر" onPress={confirmEnd} style={styles.endButton}><Text style={styles.endText}>إنهاء</Text></Pressable> : <Pressable oasisKind="icon" accessibilityLabel="المزيد والإبلاغ عن البث" onPress={showReport} style={styles.roundButton}><MoreHorizontal color={OASIS.colors.surface} size={20} /></Pressable>}
             </View>
 
             {topSupporters.length > 0 && (
@@ -817,9 +817,9 @@ export default function LiveRoomScreen() {
         ) : (
           <View pointerEvents="box-none" style={[styles.hiddenBar, { top: Math.max(insets.top, 12) }]}>
             {role === 'host' ? (
-              <Pressable oasisKind="action" onPress={confirmEnd} style={styles.emergencyButton}><Radio color={OASIS.colors.surface} size={16} /><Text style={styles.emergencyText}>إنهاء</Text></Pressable>
+              <Pressable oasisKind="action" accessibilityRole="button" accessibilityLabel="إنهاء البث المباشر" onPress={confirmEnd} style={styles.emergencyButton}><Radio color={OASIS.colors.surface} size={16} /><Text style={styles.emergencyText}>إنهاء</Text></Pressable>
             ) : <View style={styles.roundButtonSpacer} />}
-            <Pressable onPress={() => setOverlayVisible(true)} style={styles.hiddenHint}><Eye size={15} color={OASIS.colors.surface} /><Text style={styles.hiddenHintText}>اضغط لإظهار الواجهة</Text></Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel="إظهار أدوات البث والتعليقات" onPress={() => setOverlayVisible(true)} style={styles.hiddenHint}><Eye size={15} color={OASIS.colors.surface} /><Text style={styles.hiddenHintText}>اضغط لإظهار الواجهة</Text></Pressable>
             <View style={styles.roundButtonSpacer} />
           </View>
         )}
@@ -1103,8 +1103,8 @@ export default function LiveRoomScreen() {
             )}
 
             <View style={[styles.inputBar, { marginBottom: Math.max(insets.bottom, 8) }]}>
-              <Pressable oasisVariant="primary" oasisKind="action" onPress={() => void sendMessage()} disabled={!chatInput.trim() || sending} style={[styles.sendButton, (!chatInput.trim() || sending) && { opacity: 0.5 }]}><Send color={OASIS.colors.surface} size={16} /></Pressable>
-              <TextInput value={chatInput} onChangeText={setChatInput} placeholder="أضف تعليقًا…" placeholderTextColor="#cbd5e1" maxLength={300} style={styles.chatInput} returnKeyType="send" onSubmitEditing={() => void sendMessage()} />
+              <Pressable oasisVariant="primary" oasisKind="action" accessibilityLabel="إرسال التعليق" accessibilityRole="button" onPress={() => void sendMessage()} disabled={!chatInput.trim() || sending} style={[styles.sendButton, (!chatInput.trim() || sending) && { opacity: 0.5 }]}><Send color={OASIS.colors.surface} size={16} /></Pressable>
+              <TextInput accessibilityLabel="اكتب تعليقًا في البث" value={chatInput} onChangeText={setChatInput} placeholder="أضف تعليقًا…" placeholderTextColor="#cbd5e1" maxLength={300} style={styles.chatInput} returnKeyType="send" onSubmitEditing={() => void sendMessage()} />
               <View style={styles.commentIcon}><MessageCircle size={18} color={OASIS.colors.surface} /></View>
             </View>
           </KeyboardAvoidingView>
