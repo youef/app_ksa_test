@@ -17,3 +17,11 @@ Unified OASIS colors, clearer actions and accessibility labels, responsive cente
 
 ## Next section
 `/notifications` — notification list hierarchy, read/unread indicators, and accessible actions.
+
+## Implementation outcome (after)
+- `app/favorites.tsx`: shared OASIS green accents replace the previously inconsistent purple in primary controls, hero and feedback.
+- Max-width 880px centered content keeps the same bottom-navigation inset on phones, tablets and desktop.
+- Filters expose selection state and count to assistive technology; item actions announce item names; refresh shows progress and disables repeated taps.
+- Empty search results now have a reset button, and the browse-questions action uses `/questions`.
+- `tests/favoritesDesign.test.cjs`: static regression assertions added; GitHub CI is the execution gate. No screenshot-based before/after proof has been collected.
+- PR #96 remains draft pending checks and review. No merge or production deployment is authorized by this batch until gates pass.
