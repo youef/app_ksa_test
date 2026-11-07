@@ -4,7 +4,7 @@ import { OASIS } from '@/lib/oasis';
 import { HeaderAction } from '@/components/shared/AppHeader';
 import { useEffect, useState, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ScrollView, Text, View, StyleSheet, ActivityIndicator, Alert, Modal, Switch, Platform, Image } from 'react-native';
+import { ScrollView, Text, View, StyleSheet, ActivityIndicator, Alert, Modal, Switch, Platform, Image, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -308,7 +308,7 @@ export default function Notifications() {
               borderColor: onlyUnread ? '#a7f3d0' : OASIS.colors.line,
             },
           ]}
-          onPress={() => setOnlyUnread(!onlyUnread)}
+          accessibilityRole="button" accessibilityLabel={`عرض الإشعارات غير المقروءة، ${unreadCount}`} accessibilityState={{ selected: onlyUnread }} onPress={() => setOnlyUnread(!onlyUnread)}
         >
           <View style={[styles.filterDot, onlyUnread && styles.filterDotActive]} />
           <Text style={{ fontSize: 12, fontWeight: '600', color: onlyUnread ? OASIS.colors.primary : OASIS.colors.muted }}>
@@ -328,7 +328,7 @@ export default function Notifications() {
                 borderRadius: 14,
                 backgroundColor: OASIS.colors.soft,
               }}
-              onPress={markAllAsRead}
+              accessibilityRole="button" accessibilityLabel="تحديد جميع الإشعارات كمقروءة" onPress={markAllAsRead}
             >
               <CheckCheck size={14} color={OASIS.colors.primary} />
               <Text style={{ fontSize: 11.5, fontWeight: '600', color: OASIS.colors.primary }}>قراءة الكل</Text>
@@ -338,14 +338,14 @@ export default function Notifications() {
           {items.length > 0 && (
             <Pressable
               style={{
-                width: 32,
-                height: 32,
-                borderRadius: 16,
+                width: 44,
+                 height: 44,
+                 borderRadius: 22,
                 backgroundColor: '#f1f5f9',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
-              onPress={confirmClearAll}
+              accessibilityRole="button" accessibilityLabel="مسح جميع الإشعارات" onPress={confirmClearAll}
             >
               <Trash2 size={14} color="#94a3b8" />
             </Pressable>
@@ -383,7 +383,7 @@ export default function Notifications() {
           ].map(tab => {
             const isActive = activeTab === tab.key;
             return (
-              <Pressable oasisKind="chip" oasisVariant={isActive ? "primary" : "secondary"} accessibilityRole="tab" accessibilityState={{ selected: isActive }}
+              <Pressable oasisKind="chip" oasisVariant={isActive ? "primary" : "secondary"} accessibilityRole="tab" accessibilityLabel={`${tab.label}، ${tab.count} إشعار`} accessibilityState={{ selected: isActive }}
                 key={tab.key}
                 style={[styles.tabItem, isActive && styles.tabItemActive]}
                 onPress={() => setActiveTab(tab.key as NotificationCategory)}
@@ -417,6 +417,7 @@ export default function Notifications() {
           style={styles.feed}
           contentContainerStyle={[styles.feedContent, { paddingBottom: bottomNavInset + 16 }]}
           showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load(); }} tintColor={OASIS.colors.primary} colors={[OASIS.colors.primary]} />}
         >
           {filteredItems.length === 0 ? (
             <View style={styles.emptyContainer}>
@@ -429,6 +430,11 @@ export default function Notifications() {
                   ? 'أنت مطلع على كل ما يهمك أولاً بأول!'
                   : 'ستظهر هنا الردود على استفساراتك، تنبيهات أهالي حيك، وإشعارات الطوارئ.'}
               </Text>
+              {(onlyUnread || activeTab !== 'all') && items.length > 0 ? (
+                <Pressable accessibilityRole="button" accessibilityLabel="إزالة تصفية الإشعارات" onPress={() => { setOnlyUnread(false); setActiveTab('all'); }} style={styles.resetFilters}>
+                  <Text style={styles.resetFiltersText}>عرض جميع الإشعارات</Text>
+                </Pressable>
+              ) : null}
             </View>
           ) : (
             filteredItems.map(item => {
@@ -443,7 +449,7 @@ export default function Notifications() {
                     isRead ? styles.notifCardRead : styles.notifCardUnread,
                     item.type === 'emergency' && !isRead && styles.notifCardEmergency,
                   ]}
-                  onPress={() => handleNotificationPress(item)}
+                  accessibilityRole="button" accessibilityLabel={`${isRead ? 'مقروء' : 'غير مقروء'}: ${item.title}. ${typeConfig.label}`} onPress={() => handleNotificationPress(item)}
                 >
                   {/* Left Action & Menu Buttons */}
                   <View style={styles.cardHeaderRow}>
@@ -549,11 +555,11 @@ export default function Notifications() {
       {/* ======================================================== */}
       {/* 4. NOTIFICATION SETTINGS MODAL                           */}
       {/* ======================================================== */}
-      <Modal visible={settingsOpen} transparent animationType="slide">
+      <Modal visible={settingsOpen} transparent animationType="slide" onRequestClose={() => setSettingsOpen(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Pressable oasisKind="icon" onPress={() => setSettingsOpen(false)} style={styles.modalCloseBtn}>
+              <Pressable oasisKind="icon" accessibilityLabel="إغلاق إعدادات التنبيهات" onPress={() => setSettingsOpen(false)} style={styles.modalCloseBtn}>
                 <X size={20} color={OASIS.colors.muted} />
               </Pressable>
               <Text style={styles.modalTitle}>إعدادات التنبيهات</Text>
@@ -1124,6 +1130,8 @@ const styles = StyleSheet.create({
   },
 
   // Settings Modal
+  resetFilters: { minHeight: 44, borderRadius: 14, backgroundColor: OASIS.colors.soft, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center', marginTop: 14 },
+  resetFiltersText: { color: OASIS.colors.primary, fontSize: 13, fontWeight: '700' },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -1148,9 +1156,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   modalCloseBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: '#f1f5f9',
     alignItems: 'center',
     justifyContent: 'center',
