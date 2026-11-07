@@ -163,10 +163,10 @@ export default function FavoritesScreen() {
   const countStores = countFor('stores');
 
   return (
-    <View style={[styles.screen, { backgroundColor: 'transparent' }]}>
+    <View style={styles.screen}>
       <AppHeader variant="sub" title="المفضلة" subtitle="منتجاتك واستفساراتك وكل ما حفظته" fallbackRoute="/more" />
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingBottom: bottomNavInset + 28 }]}>
-        <LinearGradient colors={['#312E81', '#5B21B6', '#7C3AED']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
+      <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.content, { paddingBottom: bottomNavInset + 28 }]}>
+        <LinearGradient colors={[OASIS.colors.deep, OASIS.colors.primary, '#166B52']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
           <View style={styles.heroTop}>
             <View style={styles.heroIcon}><Heart size={24} color="#F5D0FE" fill="#F5D0FE" /></View>
             <View style={styles.heroBadge}><Sparkles size={12} color="#E9D5FF" /><Text style={styles.heroBadgeText}>مساحتك الخاصة</Text></View>
@@ -184,8 +184,8 @@ export default function FavoritesScreen() {
 
         <OasisSurface oasisSurface="field" style={styles.searchBox}>
           <Search size={18} color="#94A3B8" />
-          <TextInput value={query} onChangeText={setQuery} placeholder="ابحث بالعنوان أو التفاصيل أو الحي..." placeholderTextColor="#94A3B8" style={styles.searchInput} textAlign="right" />
-          <Pressable oasisKind="icon" onPress={() => void load(true)} style={styles.refreshButton} accessibilityRole="button" accessibilityLabel="تحديث المفضلة"><RefreshCw size={15} color={OASIS.colors.muted} /></Pressable>
+          <TextInput accessibilityLabel="البحث في العناصر المحفوظة" value={query} onChangeText={setQuery} placeholder="ابحث بالعنوان أو التفاصيل أو الحي..." placeholderTextColor="#94A3B8" style={styles.searchInput} textAlign="right" />
+          <Pressable oasisKind="icon" disabled={loading || refreshing} onPress={() => void load(true)} style={styles.refreshButton} accessibilityRole="button" accessibilityLabel={refreshing ? 'جارٍ تحديث المفضلة' : 'تحديث المفضلة'}>{refreshing ? <ActivityIndicator size="small" color={OASIS.colors.primary} /> : <RefreshCw size={17} color={OASIS.colors.primary} />}</Pressable>
         </OasisSurface>
         <ScrollView style={{ direction: 'rtl' }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.filters, { direction: 'ltr' }]}>
           {([
@@ -195,7 +195,7 @@ export default function FavoritesScreen() {
             { key: 'requests', label: 'طلبات المساعدة', count: countRequests },
             { key: 'stores', label: 'المتاجر', count: countStores },
           ] as { key: Filter; label: string; count: number }[]).map(f => (
-            <Pressable oasisVariant={filter === f.key ? 'primary' : 'secondary'} oasisKind="chip" key={f.key} onPress={() => setFilter(f.key)} style={[styles.filterChip, filter === f.key && styles.filterChipActive]}>
+            <Pressable oasisVariant={filter === f.key ? 'primary' : 'secondary'} oasisKind="chip" key={f.key} accessibilityRole="button" accessibilityLabel={`${f.label}، ${f.count} عناصر`} accessibilityState={{ selected: filter === f.key }} onPress={() => setFilter(f.key)} style={[styles.filterChip, filter === f.key && styles.filterChipActive]}>
               <Text style={[styles.filterText, filter === f.key && styles.filterTextActive]}>{f.label}</Text>
               <View style={[styles.filterCount, filter === f.key && styles.filterCountActive]}><Text style={[styles.filterCountText, filter === f.key && styles.filterCountTextActive]}>{f.count}</Text></View>
             </Pressable>
@@ -212,7 +212,7 @@ export default function FavoritesScreen() {
             const showImage = ['product', 'service', 'store', 'business'].includes(item.target_type);
             return (
               <OasisSurface oasisSurface="card" key={item.id} style={styles.itemCard}>
-                <Pressable oasisKind="card" onPress={() => item.route && router.push(item.route)} style={styles.cardOpenArea} accessibilityRole="button" accessibilityLabel="فتح التفاصيل">
+                <Pressable oasisKind="card" disabled={!item.route} onPress={() => item.route && router.push(item.route)} style={styles.cardOpenArea} accessibilityRole="button" accessibilityLabel={`فتح تفاصيل ${item.title || meta.label}`}>
                   {showImage ? <View style={styles.imageFrame}>
                     {item.imageUrl ? <Image source={{ uri: item.imageUrl }} style={styles.itemImage} resizeMode="cover" /> : <View style={styles.imagePlaceholder}><ImageIcon size={24} color="#94A3B8" /><Text style={styles.noImageText}>لا توجد صورة</Text></View>}
                     <View style={[styles.imageTypeBadge, { backgroundColor: meta.tint }]}><Icon size={12} color={meta.color} /><Text style={[styles.imageTypeText, { color: meta.color }]}>{meta.label}</Text></View>
@@ -229,8 +229,8 @@ export default function FavoritesScreen() {
                   </View>
                 </Pressable>
                 <View style={styles.cardActions}>
-                  <Pressable oasisKind="action" onPress={() => item.route && router.push(item.route)} style={styles.openButton}><Text style={styles.openButtonText}>عرض التفاصيل</Text><ChevronLeft size={15} color="#6D28D9" /></Pressable>
-                  <Pressable oasisKind="icon" onPress={() => remove(item)} accessibilityRole="button" accessibilityLabel="إزالة من المفضلة" style={styles.removeButton}><Trash2 size={17} color={OASIS.colors.danger} /></Pressable>
+                  <Pressable oasisKind="action" disabled={!item.route} accessibilityRole="button" accessibilityLabel={`عرض تفاصيل ${item.title || meta.label}`} onPress={() => item.route && router.push(item.route)} style={[styles.openButton, !item.route && { opacity: 0.45 }]}><Text style={styles.openButtonText}>عرض التفاصيل</Text><ChevronLeft size={15} color="#6D28D9" /></Pressable>
+                  <Pressable oasisKind="icon" onPress={() => remove(item)} accessibilityRole="button" accessibilityLabel={`إزالة ${item.title || meta.label} من المفضلة`} style={styles.removeButton}><Trash2 size={17} color={OASIS.colors.danger} /></Pressable>
                 </View>
               </OasisSurface>
             );
@@ -239,7 +239,8 @@ export default function FavoritesScreen() {
             <View style={styles.stateIcon}><Inbox size={26} color="#94A3B8" /></View>
             <Text style={styles.stateTitle}>{items.length ? 'لا توجد نتائج مطابقة' : 'لم تحفظ أي عناصر بعد'}</Text>
             <Text style={styles.stateDesc}>{items.length ? 'جرّب تغيير كلمة البحث أو اختيار تصنيف آخر.' : 'عندما تحفظ منتجًا أو استفسارًا أو طلب مساعدة، ستظهر تفاصيله هنا.'}</Text>
-            {!items.length && <View style={styles.emptyActions}><Pressable oasisVariant="primary" oasisKind="action" onPress={() => router.push('/market')} style={styles.primaryButton}><Text style={styles.primaryButtonText}>تصفح سوق الحي</Text><ChevronLeft size={15} color={OASIS.colors.surface} /></Pressable><Pressable oasisKind="action" onPress={() => router.push('/question')} style={styles.outlineButton}><Text style={styles.outlineText}>استكشف الاستفسارات</Text></Pressable></View>}
+            {items.length > 0 && <Pressable oasisKind="action" accessibilityRole="button" accessibilityLabel="مسح البحث والفلاتر" onPress={() => { setQuery(''); setFilter('all'); }} style={styles.outlineButton}><Text style={styles.outlineText}>مسح البحث والفلاتر</Text></Pressable>}
+            {!items.length && <View style={styles.emptyActions}><Pressable oasisVariant="primary" oasisKind="action" onPress={() => router.push('/market')} style={styles.primaryButton}><Text style={styles.primaryButtonText}>تصفح سوق الحي</Text><ChevronLeft size={15} color={OASIS.colors.surface} /></Pressable><Pressable oasisKind="action" onPress={() => router.push('/questions')} style={styles.outlineButton}><Text style={styles.outlineText}>استكشف الاستفسارات</Text></Pressable></View>}
           </OasisSurface>
         }
         <View style={styles.privacyNote}><Bookmark size={15} color="#6D28D9" /><Text style={styles.privacyText}>قائمتك خاصة بك، ويمكنك إزالة أي عنصر منها في أي وقت.</Text></View>
@@ -254,25 +255,25 @@ function Stat({ value, label }: { value: string; label: string }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#F4F7FB' },
-  content: { padding: 14, gap: 13 },
+  content: { width: '100%', maxWidth: 880, alignSelf: 'center', paddingHorizontal: 14, paddingTop: 14, gap: 13 }, 
   hero: { borderRadius: 14, padding: 18, gap: 12 },
   heroTop: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between' },
   heroIcon: { width: 48, height: 48, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center' },
   heroBadge: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, backgroundColor: 'rgba(255,255,255,0.12)', paddingHorizontal: 9, paddingVertical: 6, borderRadius: 30 },
-  heroBadgeText: { fontSize: 11, fontWeight: '700', color: '#E9D5FF' },
+  heroBadgeText: { fontSize: 11, fontWeight: '700', color: '#D1FAE5' },
   heroTitle: { fontSize: 22, fontWeight: '700', color: OASIS.colors.surface, textAlign: 'right' },
-  heroDesc: { fontSize: 12, color: '#EDE9FE', lineHeight: 20, textAlign: 'right' },
+  heroDesc: { fontSize: 12, color: '#ECFDF5', lineHeight: 20, textAlign: 'right' },
   statsRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
   stat: { flex: 1, alignItems: 'center', gap: 4 },
   statValue: { fontSize: 20, fontWeight: '700', color: OASIS.colors.surface },
-  statLabel: { fontSize: 11, color: '#E9D5FF', fontWeight: '700', textAlign: 'center' },
+  statLabel: { fontSize: 11, color: '#D1FAE5', fontWeight: '700', textAlign: 'center' },
   statDivider: { width: 1, height: 30, backgroundColor: 'rgba(255,255,255,0.22)' },
   searchBox: { flexDirection: 'row-reverse', alignItems: 'center', gap: 9, backgroundColor: OASIS.colors.surface, borderWidth: 1, borderColor: OASIS.colors.line, borderRadius: 15, paddingHorizontal: 12 },
   searchInput: { flex: 1, paddingVertical: 12, fontSize: 12, color: OASIS.colors.ink, textAlign: 'right' },
-  refreshButton: { width: 31, height: 31, borderRadius: 10, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' },
+  refreshButton: { width: 44, height: 44, borderRadius: 10, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' },
   filters: { gap: 8, paddingVertical: 2, flexDirection: 'row-reverse' },
-  filterChip: { flexDirection: 'row-reverse', alignItems: 'center', gap: 7, paddingHorizontal: 11, paddingVertical: 8, borderRadius: 14, borderWidth: 1, borderColor: OASIS.colors.line, backgroundColor: OASIS.colors.surface },
-  filterChipActive: { backgroundColor: '#6D28D9', borderColor: '#6D28D9' },
+  filterChip: { flexDirection: 'row-reverse', alignItems: 'center', gap: 7, paddingHorizontal: 11, minHeight: 44, paddingVertical: 8, borderRadius: 14, borderWidth: 1, borderColor: OASIS.colors.line, backgroundColor: OASIS.colors.surface },
+  filterChipActive: { backgroundColor: OASIS.colors.primary, borderColor: OASIS.colors.primary },
   filterText: { fontSize: 11, fontWeight: '600', color: OASIS.colors.muted },
   filterTextActive: { color: OASIS.colors.surface },
   filterCount: { minWidth: 20, height: 20, borderRadius: 10, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
