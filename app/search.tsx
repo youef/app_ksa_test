@@ -460,8 +460,8 @@ export default function SearchPage() {
         }
       />
 
-      <Pressable onPress={() => setLocalOnly(v => !v)} accessibilityRole="button"
-        style={{ alignSelf: 'flex-start', marginHorizontal: 16, marginVertical: 4, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 12, backgroundColor: localOnly ? '#dcfce7' : '#f1f5f9' }}>
+      <Pressable onPress={() => setLocalOnly(v => !v)} accessibilityRole="button" accessibilityLabel="تصفية نتائج البحث حسب مدينتي" accessibilityState={{ selected: localOnly }}
+        style={styles.cityFilter}>
         <Text style={{ color: '#065f46', fontWeight: '600' }}>{localOnly ? '✓ داخل مدينتي' : 'تصفية حسب مدينتي'}</Text>
       </Pressable>
       {/* Modern Search Input Capsule */}
@@ -472,6 +472,7 @@ export default function SearchPage() {
           </View>
 
           <TextInput
+            accessibilityLabel="ابحث في حيّنا عن الجيران والأسئلة والطلبات والمحلات"
             style={styles.searchInput}
             placeholder="ابحث عن جيران، أسئلة، فزعات، محلات..."
             placeholderTextColor="#94a3b8"
@@ -489,7 +490,7 @@ export default function SearchPage() {
           />
 
           {query.length > 0 && (
-            <Pressable oasisKind="icon"
+            <Pressable oasisKind="icon" accessibilityRole="button" accessibilityLabel="مسح نص البحث"
               onPress={() => {
                 setQuery('');
                 setResults({ users: [], questions: [], requests: [], shops: [] });
@@ -506,7 +507,7 @@ export default function SearchPage() {
       {/* Modern Pills Filter Tabs */}
       <View style={styles.tabsWrapper}>
         <ScrollView style={{ direction: 'rtl' }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.tabsScroll, { direction: 'ltr' }]}>
-          <Pressable oasisKind="chip" oasisVariant={activeTab === 'all' ? 'primary' : 'secondary'}
+          <Pressable oasisKind="chip" accessibilityRole="tab" accessibilityLabel="كل النتائج" accessibilityState={{ selected: activeTab === 'all' }} oasisVariant={activeTab === 'all' ? 'primary' : 'secondary'}
             style={[styles.tab, activeTab === 'all' && styles.tabActive]}
             onPress={() => setActiveTab('all')}
           >
@@ -516,7 +517,7 @@ export default function SearchPage() {
             </Text>
           </Pressable>
 
-          <Pressable oasisKind="chip" oasisVariant={activeTab === 'users' ? 'primary' : 'secondary'}
+          <Pressable oasisKind="chip" accessibilityRole="tab" accessibilityState={{ selected: activeTab === 'users' }} oasisVariant={activeTab === 'users' ? 'primary' : 'secondary'}
             style={[styles.tab, activeTab === 'users' && styles.tabActive]}
             onPress={() => setActiveTab('users')}
           >
@@ -527,7 +528,7 @@ export default function SearchPage() {
             </Text>
           </Pressable>
 
-          <Pressable oasisKind="chip" oasisVariant={activeTab === 'questions' ? 'primary' : 'secondary'}
+          <Pressable oasisKind="chip" accessibilityRole="tab" accessibilityState={{ selected: activeTab === 'questions' }} oasisVariant={activeTab === 'questions' ? 'primary' : 'secondary'}
             style={[styles.tab, activeTab === 'questions' && styles.tabActive]}
             onPress={() => setActiveTab('questions')}
           >
@@ -538,7 +539,7 @@ export default function SearchPage() {
             </Text>
           </Pressable>
 
-          <Pressable oasisKind="chip" oasisVariant={activeTab === 'requests' ? 'primary' : 'secondary'}
+          <Pressable oasisKind="chip" accessibilityRole="tab" accessibilityState={{ selected: activeTab === 'requests' }} oasisVariant={activeTab === 'requests' ? 'primary' : 'secondary'}
             style={[styles.tab, activeTab === 'requests' && styles.tabActive]}
             onPress={() => setActiveTab('requests')}
           >
@@ -549,7 +550,7 @@ export default function SearchPage() {
             </Text>
           </Pressable>
 
-          <Pressable oasisKind="chip" oasisVariant={activeTab === 'shops' ? 'primary' : 'secondary'}
+          <Pressable oasisKind="chip" accessibilityRole="tab" accessibilityState={{ selected: activeTab === 'shops' }} oasisVariant={activeTab === 'shops' ? 'primary' : 'secondary'}
             style={[styles.tab, activeTab === 'shops' && styles.tabActive]}
             onPress={() => setActiveTab('shops')}
           >
@@ -569,7 +570,7 @@ export default function SearchPage() {
         showsVerticalScrollIndicator={false}
       >
         {loading && (
-          <View style={styles.loadingContainer}>
+          <View style={styles.loadingContainer} accessibilityLiveRegion="polite" accessibilityLabel="جارٍ البحث عن النتائج">
             <ActivityIndicator size="large" color={OASIS.colors.primary} />
             <Text style={styles.loadingText}>جارٍ البحث في قاعدة بيانات حيك...</Text>
           </View>
@@ -577,7 +578,7 @@ export default function SearchPage() {
 
         {!loading && query.trim().length > 0 && (
           <View style={styles.resultsContainer}>
-            <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }} accessibilityLiveRegion="polite">
               <Text style={{ color: OASIS.colors.ink, fontWeight: '800', fontSize: 14, textAlign: 'right' }}>نتائج الاستكشاف</Text>
               <Text style={{ color: OASIS.colors.muted, fontSize: 11 }}>{selectedCount} نتيجة</Text>
             </View>
@@ -616,7 +617,8 @@ export default function SearchPage() {
                 <Text style={styles.emptySub}>
                   جرب البحث بكلمات عامة مثل (سباك، توصيل، كهرباء، إعارة) أو تصفح الأقسام المقترحة أدناه.
                 </Text>
-                <Pressable oasisKind="action"
+                {activeTab !== 'all' && <Pressable oasisKind="action" accessibilityRole="button" accessibilityLabel="عرض نتائج كل الأقسام" onPress={() => setActiveTab('all')} style={styles.clearSearchBtn}><Text style={styles.clearSearchBtnText}>عرض كل الأقسام</Text></Pressable>}
+                <Pressable oasisKind="action" accessibilityRole="button" accessibilityLabel="مسح البحث والبدء من جديد"
                   style={styles.clearSearchBtn}
                   onPress={() => {
                     setQuery('');
@@ -637,7 +639,7 @@ export default function SearchPage() {
               <View style={{ gap: 8 }}>
                 <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' }}>
                   <Text style={{ color: OASIS.colors.ink, fontWeight: '700', fontSize: 13 }}>آخر عمليات البحث</Text>
-                  <Pressable onPress={() => saveRecentSearches([])}><Text style={{ color: OASIS.colors.muted, fontSize: 11 }}>مسح</Text></Pressable>
+                  <Pressable accessibilityRole="button" accessibilityLabel="مسح عمليات البحث الأخيرة" hitSlop={12} onPress={() => saveRecentSearches([])}><Text style={{ color: OASIS.colors.muted, fontSize: 11 }}>مسح</Text></Pressable>
                 </View>
                 <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 7 }}>
                   {recentSearches.slice(0, 4).map(item => <Pressable key={item} oasisKind="chip" onPress={() => handleSelectKeyword(item)} style={styles.recentChip}><Text style={styles.recentChipText}>{item}</Text></Pressable>)}
@@ -656,6 +658,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: OASIS.colors.background,
   },
+  cityFilter: { alignSelf: 'flex-end', minHeight: 44, justifyContent: 'center', marginHorizontal: 16, marginVertical: 5, paddingHorizontal: 14, borderRadius: 14, borderWidth: 1, borderColor: OASIS.colors.line, backgroundColor: OASIS.colors.soft },
   headerMapBtn: {
     width: 36,
     height: 36,
@@ -678,7 +681,7 @@ const styles = StyleSheet.create({
     backgroundColor: OASIS.colors.background,
     borderRadius: 16,
     paddingHorizontal: 12,
-    height: 44,
+    minHeight: 48,
     borderWidth: 1.5,
     borderColor: OASIS.colors.line,
     gap: 10,
@@ -706,13 +709,13 @@ const styles = StyleSheet.create({
     color: OASIS.colors.ink,
     fontWeight: '700',
     textAlign: 'right',
-    height: 44,
+    minHeight: 48,
     padding: 0,
   },
   clearBtn: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: OASIS.colors.line,
     alignItems: 'center',
     justifyContent: 'center',
