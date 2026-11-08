@@ -18,3 +18,16 @@ Only `app/user.tsx` profile activity section (not the shared profile header or p
 
 ## Acceptance
 TypeScript and available platform bundle CI must pass; no database/API changes. Review before merge. Record after-state and next page in PR.
+
+## After (implemented)
+- Category scroll is labelled as a tab list; each tab announces its category, count and selection state.
+- Activity section title is a semantic heading; header wraps instead of clipping on narrow devices.
+- Market link has a 44-point minimum target; review author navigation announces the author.
+- Loading and error states announce changes politely; retry announces its purpose; empty heading centers.
+- Existing activity cards, routing, data fetching and privacy behavior remain unchanged.
+
+## Verification
+Added `tests/profileActivityDesign.test.cjs` for source-level regression coverage. GitHub TypeScript, platform export and available web checks are release gates; results tracked in PR.
+
+## Next section
+Profile customization entry and featured-content management controls (avoid reworking the shared profile header).
