@@ -461,7 +461,7 @@ export default function SearchPage() {
       />
 
       <Pressable onPress={() => setLocalOnly(v => !v)} accessibilityRole="button" accessibilityLabel="تصفية نتائج البحث حسب مدينتي" accessibilityState={{ selected: localOnly }}
-        style={styles.cityFilter}>
+        style={[styles.cityFilter, localOnly && styles.cityFilterSelected]}>
         <Text style={{ color: '#065f46', fontWeight: '600' }}>{localOnly ? '✓ داخل مدينتي' : 'تصفية حسب مدينتي'}</Text>
       </Pressable>
       {/* Modern Search Input Capsule */}
@@ -659,6 +659,7 @@ const styles = StyleSheet.create({
     backgroundColor: OASIS.colors.background,
   },
   cityFilter: { alignSelf: 'flex-end', minHeight: 44, justifyContent: 'center', marginHorizontal: 16, marginVertical: 5, paddingHorizontal: 14, borderRadius: 14, borderWidth: 1, borderColor: OASIS.colors.line, backgroundColor: OASIS.colors.soft },
+  cityFilterSelected: { borderColor: OASIS.colors.primary, backgroundColor: OASIS.colors.soft },
   headerMapBtn: {
     width: 36,
     height: 36,
