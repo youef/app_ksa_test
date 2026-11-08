@@ -20,3 +20,14 @@ Improve the shared profile header in components/profile/ProfileHeader.tsx, used 
 
 ## Verification and release gate
 Add static regression tests; run TypeScript and Web/platform CI; await required review before merge or deployment. Document after-state and test outcomes in PR. Next target: public profile content cards.
+
+## After implementation (code-level)
+- Icon actions are 44px on every viewport, including small iPhones.
+- Compact actions use flex growth and shrink instead of occupying an entire second row.
+- Follow action announces selected/busy state and statistics announce localized counts.
+- Profile metadata wraps with RTL alignment and readable line height.
+- Cover preview requires a real cover URI.
+- Existing profile data calls and business logic remain unchanged.
+
+## Test results
+Regression test source added. CI results must be reviewed on PR before release. Visual device screenshots not yet available; no claim of on-device validation.
