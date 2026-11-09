@@ -127,7 +127,8 @@ export function ProfileIdentityCard({
                   key={type}
                   onPress={() => onSelectType?.(type)}
                   accessibilityRole="button"
-                  accessibilityLabel={`اختيار ${item.label}`}
+                  accessibilityLabel={`اختيار ${item.label}${active ? '، المحدد حاليًا' : ''}`}
+                  accessibilityState={{ selected: active }}
                   style={[
                     styles.typeOption,
                     active && { backgroundColor: item.softColor, borderColor: item.color + '55' },
@@ -137,7 +138,7 @@ export function ProfileIdentityCard({
                     <TypeIcon size={17} color={item.color} />
                   </View>
                   <Text
-                    numberOfLines={1}
+                    numberOfLines={2}
                     style={[styles.typeOptionText, active && { color: item.color }]}
                   >
                     {item.shortLabel}
@@ -174,9 +175,9 @@ export function ProfileIdentityCard({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: OASIS.colors.surface,
-    borderRadius: 14,
+    borderRadius: 20,
     borderWidth: 1,
-    padding: 15,
+    padding: 18,
     gap: 12,
     shadowColor: OASIS.colors.ink,
     shadowOpacity: 0,
@@ -216,8 +217,8 @@ const styles = StyleSheet.create({
   },
   description: {
     color: OASIS.colors.muted,
-    fontSize: 11,
-    lineHeight: 18,
+    fontSize: 12,
+    lineHeight: 20,
     fontWeight: '600',
     textAlign: 'right',
   },
@@ -228,7 +229,7 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   statusBox: {
-    minHeight: 40,
+    minHeight: 48,
     borderWidth: 1,
     borderRadius: 13,
     paddingHorizontal: 10,
@@ -239,7 +240,7 @@ const styles = StyleSheet.create({
   },
   statusText: {
     flex: 1,
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
     textAlign: 'right',
   },
@@ -273,8 +274,8 @@ const styles = StyleSheet.create({
   typeOption: {
     minWidth: 92,
     flexGrow: 1,
-    flexBasis: '30%',
-    minHeight: 42,
+    flexBasis: '42%',
+    minHeight: 52,
     borderRadius: 13,
     borderWidth: 1,
     borderColor: OASIS.colors.line,
@@ -287,8 +288,8 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   typeOptionIcon: {
-    width: 27,
-    height: 27,
+    width: 30,
+    height: 30,
     borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
@@ -296,7 +297,8 @@ const styles = StyleSheet.create({
   typeOptionText: {
     flex: 1,
     color: OASIS.colors.muted,
-    fontSize: 11,
+    fontSize: 12,
+    lineHeight: 17,
     fontWeight: '700',
     textAlign: 'right',
   },
@@ -308,7 +310,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   manageButton: {
-    minHeight: 42,
+    minHeight: 48,
     borderRadius: 13,
     paddingHorizontal: 12,
     flexDirection: 'row-reverse',
@@ -317,7 +319,7 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   manageText: {
-    fontSize: 11.5,
+    fontSize: 13,
     fontWeight: '700',
   },
 });
