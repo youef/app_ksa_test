@@ -142,7 +142,7 @@ export function ProfileDesignStudio({
               <View style={{width:76,height:76,borderRadius:38,borderWidth:4,borderColor:colors.surface,marginTop:-54,backgroundColor:colors.soft,alignItems:'center',justifyContent:'center'}}>
                 {profile?.avatar_url ? <Image source={{uri:profile.avatar_url}} style={{width:68,height:68,borderRadius:34}}/> : <Text style={{fontSize:28,color:accent,fontWeight:'800'}}>{initials(displayName)}</Text>}
               </View>
-              <View style={{flexDirection:'row-reverse',alignItems:'center',gap:6}}><Text style={{color:colors.ink,fontWeight:'800',fontSize:21,textAlign:'right'}}>{displayName || 'حساب حيّنا'}</Text>{showBadges && <AccountStatusMark role={profile?.role} accountType={profile?.account_type} isVerified={Boolean(profile?.is_verified)}/>}</View>
+              <View style={{flexDirection:'row-reverse',alignItems:'center',gap:6}}><Text numberOfLines={2} style={{color:colors.ink,fontWeight:'800',fontSize:21,textAlign:'right',flexShrink:1}}>{displayName || 'حساب حيّنا'}</Text>{showBadges && <AccountStatusMark role={profile?.role} accountType={profile?.account_type} isVerified={Boolean(profile?.is_verified)}/>}</View>
               <Text style={{color:colors.muted,writingDirection:'ltr'}}>@{profile?.username || 'user'}</Text>
               {sectionVisibility.bio && !!profile?.bio && <Text style={{color:colors.ink,textAlign:'right',lineHeight:22}}>{profile.bio}</Text>}
               <Text style={{color:colors.muted,textAlign:'right',fontSize:12}}>{[profile?.district && 'حي ' + profile.district,profile?.city].filter(Boolean).join('، ')}</Text>
@@ -152,12 +152,12 @@ export function ProfileDesignStudio({
           </View>
 
           <View style={styles.coverActions}>
-            <Pressable style={styles.coverPrimary} onPress={onPickCover} disabled={coverBusy}>
+            <Pressable accessibilityRole="button" accessibilityLabel={coverVisible ? "تغيير صورة غلاف الملف" : "إضافة صورة غلاف الملف"} accessibilityState={{ disabled: coverBusy }} style={styles.coverPrimary} onPress={onPickCover} disabled={coverBusy}>
               {coverBusy ? <ActivityIndicator size="small" color={OASIS.colors.surface} /> : <Camera size={16} color={OASIS.colors.surface} />}
               <Text style={styles.coverPrimaryText}>{coverVisible ? 'تغيير صورة الغلاف' : 'إضافة صورة الغلاف'}</Text>
             </Pressable>
             {coverVisible ? (
-              <Pressable style={styles.coverSecondary} onPress={onRemoveCover} disabled={coverBusy}>
+              <Pressable accessibilityRole="button" accessibilityLabel="إزالة صورة الغلاف" accessibilityState={{ disabled: coverBusy }} style={styles.coverSecondary} onPress={onRemoveCover} disabled={coverBusy}>
                 <Trash2 size={15} color={OASIS.colors.danger} />
                 <Text style={styles.coverSecondaryText}>إزالة</Text>
               </Pressable>
@@ -182,7 +182,7 @@ export function ProfileDesignStudio({
                   key={accentItem.value}
                   style={styles.accentCell}
                   onPress={() => onChange({ accent_color: accentItem.value })}
-                  accessibilityLabel={accentItem.label}
+                  accessibilityLabel={`لون التمييز: ${accentItem.label}`}
                 >
                   <View style={[styles.accentDot, { backgroundColor: accentItem.value }, active && styles.accentDotActive, active && { borderColor: accentItem.value }]}>
                     {active ? <Check size={14} color="#FFFFFF" /> : null}
@@ -200,7 +200,7 @@ export function ProfileDesignStudio({
               return (
                 <Pressable
                   accessibilityRole="radio" accessibilityState={{checked:active}}
-                  key={bannerItem.id}
+                  key={bannerItem.id} accessibilityLabel={`خلفية الملف: ${bannerItem.label}`}
                   style={[styles.bannerTile, active && styles.bannerTileActive, active && { borderColor: accent }]}
                   onPress={() => onChange({ banner_style: bannerItem.id })}
                 >
@@ -224,8 +224,7 @@ export function ProfileDesignStudio({
               return (
                 <Pressable
                   accessibilityRole="checkbox" accessibilityState={{checked:active}}
-                  key={item.key}
-                  style={[styles.sectionChip, active && styles.sectionChipActive, active && { borderColor: accent, backgroundColor: accentSoft(accent, '14') }]}
+                  key={item.key} accessibilityLabel={`إظهار قسم ${item.label}`} style={[styles.sectionChip, active && styles.sectionChipActive, active && { borderColor: accent, backgroundColor: accentSoft(accent, '14') }]}
                   onPress={() => toggleSection(item.key)}
                 >
                   {active ? <Eye size={13} color={accent} /> : <EyeOff size={13} color={OASIS.colors.muted} />}
@@ -268,7 +267,7 @@ export function ProfileDesignStudio({
             <Text style={styles.fieldLabel}>عنوان "الأعمال المميزة"</Text>
             <View style={styles.featuredTitleInputRow}>
               <TextInput
-                value={featuredTitle}
+                accessibilityLabel="عنوان الأعمال المميزة" value={featuredTitle}
                 onChangeText={setFeaturedTitle}
                 placeholder={DEFAULT_FEATURED_TITLE}
                 placeholderTextColor="#94A3B8"
@@ -276,7 +275,7 @@ export function ProfileDesignStudio({
                 style={styles.featuredTitleInput}
               />
               <Pressable
-                style={styles.featuredTitleSave}
+                accessibilityRole="button" accessibilityLabel="حفظ عنوان الأعمال المميزة" style={styles.featuredTitleSave}
                 onPress={() => onSaveFeaturedTitle(featuredTitle.trim() || DEFAULT_FEATURED_TITLE)}
               >
                 <Check size={15} color={OASIS.colors.surface} />
@@ -284,7 +283,7 @@ export function ProfileDesignStudio({
             </View>
           </View>
 
-          <Pressable style={styles.resetButton} onPress={onReset}>
+          <Pressable accessibilityRole="button" accessibilityLabel="استعادة إعدادات المظهر الافتراضية" style={styles.resetButton} onPress={onReset}>
             <RotateCcw size={15} color={OASIS.colors.muted} />
             <Text style={styles.resetText}>استعادة الافتراضي</Text>
           </Pressable>
@@ -306,8 +305,7 @@ export function ProfileDesignStudio({
             const active = activeType === type;
             return (
               <Pressable
-                key={type}
-                style={[styles.typeTab, active && styles.typeTabActive, active && { backgroundColor: accent }]}
+                key={type} accessibilityRole="tab" accessibilityLabel={`${TYPE_LABELS[type]}، ${counts[type]} عناصر`} accessibilityState={{ selected: active }} style={[styles.typeTab, active && styles.typeTabActive, active && { backgroundColor: accent }]}
                 onPress={() => setActiveType(type)}
               >
                 <Text style={[styles.typeTabText, active && styles.typeTabTextActive]}>
@@ -324,8 +322,7 @@ export function ProfileDesignStudio({
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pinnedChips}>
               {featured.map((row) => (
                 <Pressable
-                  key={`${row.item_type}:${row.item_id}`}
-                  style={[styles.pinnedChip, { borderColor: accent }]}
+                  key={`${row.item_type}:${row.item_id}`} accessibilityRole="button" accessibilityLabel={`إزالة ${items.find((it) => it.type === row.item_type && it.id === row.item_id)?.title || "العنصر"} من الأعمال المميزة`} accessibilityState={{ disabled: Boolean(featuredBusy) }} style={[styles.pinnedChip, { borderColor: accent }]}
                   disabled={featuredBusy}
                   onPress={() => onToggleFeatured(row.item_type, row.item_id)}
                 >
@@ -345,8 +342,7 @@ export function ProfileDesignStudio({
               const isPinned = pinned.has(`${item.type}:${item.id}`);
               return (
                 <Pressable
-                  key={`${item.type}:${item.id}`}
-                  style={[styles.featuredRow, isPinned && { borderColor: accent, backgroundColor: accentSoft(accent, '0D') }]}
+                  key={`${item.type}:${item.id}`} accessibilityRole="checkbox" accessibilityLabel={`${item.title}، ${isPinned ? "مثبّت" : "غير مثبّت"}`} accessibilityState={{ checked: isPinned, disabled: Boolean(featuredBusy) }} disabled={featuredBusy} style={[styles.featuredRow, isPinned && { borderColor: accent, backgroundColor: accentSoft(accent, '0D') }]}
                   onPress={() => onToggleFeatured(item.type, item.id)}
                 >
                   <View style={styles.featuredThumb}>
@@ -366,7 +362,7 @@ export function ProfileDesignStudio({
         ) : (
           <View style={styles.emptyState}>
             <Sparkles size={22} color="#94A3B8" />
-            <Text style={styles.emptyTitle}>لا توجد عناصر في هذا القسم</Text>
+            <Text style={styles.emptyTitle}>لا توجد {TYPE_LABELS[activeType]} لعرضها</Text>
             <Text style={styles.emptySub}>أضف منتجات أو خدمات أو استفسارات لتتمكن من تثبيتها هنا.</Text>
           </View>
         )}
@@ -401,16 +397,16 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   previewStatValue: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
   previewStatLabel: { color: 'rgba(255,255,255,0.78)', fontSize: 10, fontWeight: '700', marginTop: 2 },
   coverActions: { flexDirection: 'row-reverse', gap: 8 },
-  coverPrimary: { flex: 1, minHeight: 40, borderRadius: 12, backgroundColor: colors.primary, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  coverPrimary: { flex: 1, minHeight: 44, borderRadius: 12, backgroundColor: colors.primary, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6 },
   coverPrimaryText: { color: colors.surface, fontSize: 11.5, fontWeight: '800' },
-  coverSecondary: { minHeight: 40, borderRadius: 12, paddingHorizontal: 12, backgroundColor: colors.dangerSoft, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 4 },
+  coverSecondary: { minHeight: 44, borderRadius: 12, paddingHorizontal: 12, backgroundColor: colors.dangerSoft, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 4 },
   coverSecondaryText: { color: colors.danger, fontSize: 11, fontWeight: '800' },
   coverHint: { color: colors.muted, fontSize: 10.5, textAlign: 'right', lineHeight: 16 },
   controlsCol: { flex: 1, gap: 12, minWidth: 0 },
   fieldLabel: { color: colors.muted, fontSize: 11, fontWeight: '800', textAlign: 'right', marginBottom: 2 },
   accentGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 },
-  accentCell: { width: 62, alignItems: 'center', gap: 4 },
-  accentDot: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.surface },
+  accentCell: { width: 62, minHeight: 54, justifyContent: 'center', alignItems: 'center', gap: 4 },
+  accentDot: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.surface },
   accentDotActive: { borderWidth: 3 },
   accentLabel: { color: colors.muted, fontSize: 9.5, fontWeight: '700', textAlign: 'center' },
   bannerGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 },
