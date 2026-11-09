@@ -1148,7 +1148,7 @@ export default function AccountCenter() {
             </View>
             {settingsDetailOpen ? (
               <View style={styles.stack}>
-                <Pressable accessibilityRole="button" accessibilityLabel="العودة إلى أقسام الإعدادات" style={styles.settingsBack} onPress={() => {
+                <Pressable accessibilityRole="button" accessibilityLabel="العودة إلى أقسام الإعدادات" accessibilityHint="يعرض جميع أقسام إعدادات حسابك" style={styles.settingsBack} onPress={() => {
                   setSettingsDetailOpen(false);
                   router.setParams({ tab: 'settings', section: undefined });
                 }}>
@@ -1376,6 +1376,7 @@ export default function AccountCenter() {
                             key={id}
                             accessibilityRole="button"
                             accessibilityLabel={'فتح ' + item.label}
+                            accessibilityHint={item.description}
                             style={[styles.settingsListItem, index > 0 && styles.settingsListDivider]}
                             onPress={() => {
                               setSettingsSection(id);
@@ -1385,10 +1386,10 @@ export default function AccountCenter() {
                               scrollRef.current?.scrollTo({ y: 0, animated: true });
                             }}
                           >
-                            <View style={styles.settingsListIcon}><Icon size={19} color={colors.primary} /></View>
+                            <View style={styles.settingsListIcon} accessible={false}><Icon size={20} color={colors.primary} /></View>
                             <View style={styles.settingsListCopy}>
                               <Text style={styles.settingsListTitle}>{item.label}</Text>
-                              <Text style={styles.settingsListSubtitle} numberOfLines={1}>{item.description}</Text>
+                              <Text style={styles.settingsListSubtitle} numberOfLines={2}>{item.description}</Text>
                             </View>
                             <ChevronLeft size={17} color={colors.muted} />
                           </Pressable>
@@ -1581,18 +1582,18 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   areaLeadTitle: { color: colors.ink, fontSize: 17, fontWeight: '800', textAlign: 'right' },
   areaLeadDescription: { color: colors.muted, fontSize: 11.5, lineHeight: 19, textAlign: 'right' },
   settingsList: { gap: 0 },
-  settingsListItem: { flexDirection: 'row-reverse', minHeight: 65, alignItems: 'center', gap: 11, paddingVertical: 9 },
+  settingsListItem: { flexDirection: 'row-reverse', minHeight: 72, alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 2 },
   settingsListDivider: { borderTopWidth: 1, borderColor: colors.line },
-  settingsListIcon: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: colors.soft },
+  settingsListIcon: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: colors.soft },
   settingsListCopy: { flex: 1, alignItems: 'flex-end', gap: 3 },
-  settingsListTitle: { color: colors.ink, fontSize: 12.5, fontWeight: '800', textAlign: 'right' },
-  settingsListSubtitle: { color: colors.muted, fontSize: 11, textAlign: 'right' },
+  settingsListTitle: { color: colors.ink, fontSize: 14, fontWeight: '800', textAlign: 'right' },
+  settingsListSubtitle: { color: colors.muted, fontSize: 12, lineHeight: 18, textAlign: 'right', flexShrink: 1 },
   settingsGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 10 },
   settingsCategory: { flexGrow: 1, flexBasis: '46%', minWidth: 0, minHeight: 156, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, borderRadius: 18, padding: 14, alignItems: 'flex-end', gap: 8 },
   settingsCategoryIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.soft },
   settingsCategoryTitle: { color: colors.ink, fontSize: 13, fontWeight: '800', textAlign: 'right' },
   settingsCategoryDescription: { color: colors.muted, fontSize: 11, lineHeight: 17, textAlign: 'right', minHeight: 35 },
-  settingsBack: { alignSelf: 'flex-end', minHeight: 40, flexDirection: 'row-reverse', alignItems: 'center', gap: 7, paddingHorizontal: 12, borderRadius: 12, backgroundColor: colors.soft },
+  settingsBack: { alignSelf: 'flex-end', minHeight: 44, flexDirection: 'row-reverse', alignItems: 'center', gap: 7, paddingHorizontal: 12, borderRadius: 12, backgroundColor: colors.soft },
   settingsBackText: { color: colors.primary, fontWeight: '700', fontSize: 12 },
   card: { backgroundColor: colors.surface, borderRadius: 14, borderWidth: 1, borderColor: colors.line, padding: 14, gap: 12 },
   sectionHeader: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
