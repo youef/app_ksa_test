@@ -19,3 +19,13 @@ TypeScript check, web/platform bundle jobs, existing tests; ensure no business l
 
 ## Next section
 Profile account verification overview / identity tab, excluding the previously refined profile header and content cards.
+
+## Implemented (after)
+- Nine grouped settings rows retain the existing OASIS design tokens and RTL navigation.
+- Minimum row target: 65 → 72px; icon tile: 36 → 42px; title: 12.5 → 14px; subtitle: 11 → 12px with 18px line height.
+- Subtitle truncation: 1 → 2 lines; details-return control: 40 → 44px.
+- Added per-row accessibility hints and excluded decorative icons from the accessibility tree.
+- Added `tests/settingsHubDesign.test.cjs` covering RTL grouping, tap sizes, readable subtitles, and return navigation.
+
+## Verification status
+Awaiting GitHub Actions TypeScript, web bundle, platform bundle, and available tests. Physical iPhone/Android/iPad testing has not been performed; do not claim visual-device verification. PR remains draft and unmerged pending checks and required review.
