@@ -18,7 +18,7 @@ Only `app/directory.tsx` and directory-specific regression tests. No backend, au
 6. Add source-based regression tests for key UI invariants; validate with existing GitHub CI typecheck and web/platform builds.
 
 ## After / evidence
-To be completed after implementation and CI. Do not merge or deploy before required review and passing checks.
+Implemented: 44×44 search-clear control, minimum 44px filter and reset controls, accessible selected states and descriptive labels for directory filters and cards, visible reset for sort-only changes, alert semantics on error, 112px minimum card height and improved narrow-screen location typography. Preserved OASIS palette, RTL layout, 820px responsive max-width, bottom inset and existing navigation/data queries.\n\nRegression coverage: `tests/directoryDesign.test.cjs` (selection semantics, reset, touch targets, responsive invariants). GitHub Actions TypeScript/Web/platform checks and required review are release gates; record results in PR before merge. No physical-device visual testing in this run.
 
 ## Next section
 Business detail screen (`app/business.tsx`): media, CTA hierarchy, responsive details and loading states.
