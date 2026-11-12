@@ -276,21 +276,21 @@ export default function Home() {
         <View style={[styles.feedSection, layout.feed]}>
           <View style={[layout.feedToolbar, { backgroundColor: colors.surface, borderColor: colors.line }]}>
             <View style={layout.sortRow}>
-              <Pressable oasisKind="plain" hitSlop={{top:5,bottom:5}} style={[layout.filterButton, { backgroundColor: activeFilters.length ? colors.primary : colors.soft }]} onPress={openFilters} accessibilityRole="button" accessibilityLabel="تصفية المنشورات" accessibilityState={{ expanded: filterOpen }}>
+              <Pressable oasisKind="plain" hitSlop={{top:5,bottom:5}} style={[layout.filterButton, { minHeight: 44, minWidth: 72, backgroundColor: activeFilters.length ? colors.primary : colors.soft }]} onPress={openFilters} accessibilityRole="button" accessibilityLabel={`تصفية المنشورات${activeFilters.length ? `، ${activeFilters.length} فلاتر نشطة` : ""}`} accessibilityHint="يفتح خيارات نوع المنشور والحالة والفترة" accessibilityState={{ expanded: filterOpen }}>
                 <SlidersHorizontal size={12} color={activeFilters.length ? colors.surface : colors.primary} />
                 <Text numberOfLines={1} style={[layout.sortText, { color: activeFilters.length ? colors.surface : colors.primary }]}>تصفية{activeFilters.length ? ` ${activeFilters.length}` : ''}</Text>
               </Pressable>
               {([['newest', 'الأحدث'], ['engaged', 'الأكثر تفاعلاً'], ['nearby', 'من حيّنا']] as const).map(([key, label]) => {
                 const selected = sortBy === key;
                 const Icon = key === 'newest' ? Clock3 : key === 'engaged' ? TrendingUp : MapPin;
-                return <Pressable oasisKind="plain" hitSlop={{top:5,bottom:5}} key={key} onPress={() => setSortBy(key)} style={[layout.sortButton, { flex: key === 'engaged' ? 1.5 : 1, backgroundColor: selected ? colors.primary : 'transparent' }]} accessibilityRole="button" accessibilityState={{ selected }}>
+                return <Pressable oasisKind="plain" hitSlop={{top:5,bottom:5}} key={key} onPress={() => setSortBy(key)} style={[layout.sortButton, { minHeight: 44, flex: key === 'engaged' ? 1.5 : 1, backgroundColor: selected ? colors.primary : 'transparent' }]} accessibilityRole="button" accessibilityLabel={`ترتيب المنشورات: ${label}`} accessibilityState={{ selected }}>
                   <Icon size={12} color={selected ? colors.surface : colors.muted} />
                   <Text numberOfLines={1} style={[layout.sortText, { color: selected ? colors.surface : colors.muted }]}>{label}</Text>
                 </Pressable>;
               })}
             </View>
             {!!activeFilters.length && <View style={layout.activeFilters}>
-              {activeFilters.map(key => <Pressable oasisKind="plain" key={key} onPress={() => setAppliedFilters(current => ({ ...current, [key]: key === 'period' ? 'كل الأوقات' : 'الكل' }))} accessibilityRole="button" accessibilityLabel={`إزالة تصفية ${appliedFilters[key]}`} style={[layout.filterChip, { borderColor: colors.line, backgroundColor: colors.soft }]}><Text style={[layout.filterChipText, { color: colors.primary }]}>{appliedFilters[key]}</Text><X size={13} color={colors.primary} /></Pressable>)}
+              {activeFilters.map(key => <Pressable oasisKind="plain" key={key} onPress={() => setAppliedFilters(current => ({ ...current, [key]: key === 'period' ? 'كل الأوقات' : 'الكل' }))} accessibilityRole="button" accessibilityLabel={`إزالة تصفية ${appliedFilters[key]}`} style={[layout.filterChip, { minHeight: 44, borderColor: colors.line, backgroundColor: colors.soft }]}><Text style={[layout.filterChipText, { color: colors.primary }]}>{appliedFilters[key]}</Text><X size={13} color={colors.primary} /></Pressable>)}
             </View>}
           </View>
 
