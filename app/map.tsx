@@ -1,3 +1,4 @@
+import { rtlScrollStyle, rtlContentStyle } from '@/lib/rtl';
 import { oasisAssets } from '@/components/oasis/assets';
 import { OasisPressable as Pressable, OasisTextInput as TextInput } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
@@ -181,7 +182,7 @@ export default function MapScreen() {
 
   const filters = (
     <View style={styles.filters}>
-      <ScrollView style={{ direction: 'rtl' }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.chipRow, { direction: 'ltr' }]}>
+      <ScrollView style={rtlScrollStyle} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.chipRow, rtlContentStyle]}>
         {chip('all', 'الكل', C.ink, kindCounts.all || 0)}
         {MAP_PIN_ORDER.map((value) => {
           const meta = MAP_PIN_KINDS[value];
@@ -274,7 +275,7 @@ export default function MapScreen() {
                     onLocate={locateMe}
                   />
                 </View>
-                <ScrollView style={{ direction: 'rtl' }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[{ flexDirection: 'row-reverse', gap: 7, paddingTop: 13 }, { direction: 'ltr' }]}>
+                <ScrollView style={rtlScrollStyle} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[{ flexDirection: 'row-reverse', gap: 7, paddingTop: 13 }, rtlContentStyle]}>
                   {chip('all', 'الكل', '#173B31', kindCounts.all || 0)}
                   {MAP_PIN_ORDER.map(value => { const meta = MAP_PIN_KINDS[value]; return chip(value, meta.short, meta.color, kindCounts[value] || 0); })}
                 </ScrollView>
@@ -282,7 +283,7 @@ export default function MapScreen() {
 
               <View style={{ backgroundColor: OASIS.colors.surface, borderRadius: 14, borderWidth: 1, borderColor: '#E2EAE4', padding: 16 }}>
                 <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}><Text style={{ fontSize: 17, fontWeight: '700', color: '#173B31' }}>الأماكن القريبة</Text><Text style={{ fontSize: 12, color: '#6B8176' }}>{visiblePlaces.length} نتيجة</Text></View>
-                <ScrollView style={{ direction: 'rtl' }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[{ flexDirection: 'row-reverse', gap: 8, paddingBottom: 12 }, { direction: 'ltr' }]}>
+                <ScrollView style={rtlScrollStyle} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[{ flexDirection: 'row-reverse', gap: 8, paddingBottom: 12 }, rtlContentStyle]}>
                   {placeChip(ALL_PLACES_KEY, 'كل الأماكن')}
                   {PLACE_CATEGORIES.map(category => placeChip(category.key, category.label))}
                 </ScrollView>
@@ -334,7 +335,7 @@ export default function MapScreen() {
           </HeaderAction>
         }
       />
-      <Map style={styles.map} mapStyle={STYLE_URL}>
+      <Map style={styles.map} mapStyle={STYLE_URL} touchZoom={false} doubleTapZoom={false} doubleTapHoldZoom={false}>
         <Camera
           key={`${city}:${selectedPlace?.id || selected?.id || ''}:${myLocation?.latitude || ''}:${myLocation?.longitude || ''}`}
           defaultSettings={{
@@ -384,14 +385,14 @@ export default function MapScreen() {
           placeholderTextColor={C.muted}
           style={styles.search}
         />
-        <ScrollView style={{ direction: 'rtl' }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.chipRow, { direction: 'ltr' }]}>
+        <ScrollView style={rtlScrollStyle} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.chipRow, rtlContentStyle]}>
           {placeChip(ALL_PLACES_KEY, 'الكل')}
           {PLACE_CATEGORIES.map((category) =>
             placeChip(category.key, `${category.label}`),
           )}
         </ScrollView>
         {filters}
-        <ScrollView style={{ direction: 'rtl' }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.chipRow, { direction: 'ltr' }]}>
+        <ScrollView style={rtlScrollStyle} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.chipRow, rtlContentStyle]}>
           <Pressable oasisVariant={sortMode === 'distance' ? 'primary' : 'secondary'} oasisKind="chip" onPress={() => setSortMode('distance')} style={[styles.sortChip, sortMode === 'distance' && styles.sortChipActive]}><Text style={[styles.sortText, sortMode === 'distance' && styles.sortTextActive]}>الأقرب</Text></Pressable>
           <Pressable oasisVariant={sortMode === 'open' ? 'primary' : 'secondary'} oasisKind="chip" onPress={() => setSortMode('open')} style={[styles.sortChip, sortMode === 'open' && styles.sortChipActive]}><Text style={[styles.sortText, sortMode === 'open' && styles.sortTextActive]}>مفتوح أولاً</Text></Pressable>
           <Pressable oasisVariant={sortMode === 'rating' ? 'primary' : 'secondary'} oasisKind="chip" onPress={() => setSortMode('rating')} style={[styles.sortChip, sortMode === 'rating' && styles.sortChipActive]}><Text style={[styles.sortText, sortMode === 'rating' && styles.sortTextActive]}>الأعلى تقييماً</Text></Pressable>

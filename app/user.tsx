@@ -1,3 +1,4 @@
+import { shareContent } from '@/lib/shareContent';
 import { ProfileHeader } from '@/components/profile/ProfileHeader';
 import { OasisEmptyIllustration } from '@/components/oasis/OasisEmptyIllustration';
 import { OasisPressable as Pressable, OasisSurface } from '@/components/oasis/OasisPrimitives';
@@ -8,7 +9,7 @@ import { bannerColors } from '@/lib/profileTheme';
 import { profileCoverUrl } from '@/lib/profileCover';
 import { HeaderAction, AppHeader } from '@/components/shared/AppHeader';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Modal, Platform, RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions, Share } from 'react-native';
+import { ActivityIndicator, Alert, Image, Modal, Platform, RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import {
@@ -477,16 +478,11 @@ export default function UserProfile() {
     const profileUrl = `https://appksatest.vercel.app/user?username=${encodeURIComponent(profile.username || id)}`;
     const url = typeof window !== 'undefined' ? `${window.location.origin}/user?username=${encodeURIComponent(profile.username || id)}` : profileUrl;
     const text = `ملف الجار ${displayName} على منصة حيّنا:\n${url}`;
-    if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
-      try {
-        await navigator.clipboard.writeText(text);
-        setShareNotice('تم نسخ رابط الملف الشخصي');
-        return;
-      } catch {}
-    }
     try {
-      await Share.share({ message: text, url });
-    } catch {}
+      await shareContent({ message: text, url });
+    } catch {
+      setShareNotice('تعذرت مشاركة رابط الملف الشخصي');
+    }
   };
 
   function openOptionsMenu() { setMenuOpen(true); }

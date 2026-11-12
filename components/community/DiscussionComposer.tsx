@@ -3,7 +3,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
+  type Ref,
   useState,
 } from 'react';
 import {
@@ -26,6 +26,7 @@ import { useTheme } from '@/context/ThemeContext';
 
 type Props = {
   value: string;
+  inputRef?: Ref<TextInput>;
   onChangeText: (value: string) => void;
   onSend: () => void;
   placeholder?: string;
@@ -68,6 +69,7 @@ function emitWebFocusEvent(focused: boolean) {
 
 function DiscussionComposerBase({
   value,
+  inputRef,
   onChangeText,
   onSend,
   placeholder = 'اكتب ردك…',
@@ -148,6 +150,7 @@ function DiscussionComposerBase({
         ]}
       >
         <TextInput
+          ref={inputRef}
           testID="discussion-composer-input"
           accessibilityLabel={placeholder}
           value={value}

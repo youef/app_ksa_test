@@ -22,8 +22,8 @@ const TEXT_ATTR = 'data-hayna-dark-text';
 
 type Rgba = { r: number; g: number; b: number; a: number };
 
-const PAGE_BG = '#0F0F10';
-const DARK_BORDER = '#2C2C2E';
+const PAGE_BG = '#101714';
+const DARK_BORDER = '#304238';
 
 const BORDER_PROPS = [
   'border-color',

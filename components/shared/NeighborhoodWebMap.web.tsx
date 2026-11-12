@@ -59,7 +59,7 @@ export default function NeighborhoodWebMap({ pins, places, center, city, onSelec
   const mapCenter: [number, number] = center ? [center.lat, center.lng] : [24.7136, 46.6753];
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: 360, borderRadius: 17, overflow: 'hidden', background: '#e8eee8' }}>
-      <MapContainer center={mapCenter} zoom={city ? 12 : 5} scrollWheelZoom style={{ width: '100%', height: '100%', minHeight: 360 }}>
+      <MapContainer center={mapCenter} zoom={city ? 12 : 5} scrollWheelZoom={false} doubleClickZoom={false} touchZoom={false} boxZoom={false} keyboard={false} zoomControl={false} style={{ width: '100%', height: '100%', minHeight: 360 }}>
         <MapJourney center={center} location={myLocation} destination={destination} onLocation={onLocation} />
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'

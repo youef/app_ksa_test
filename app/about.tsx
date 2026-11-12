@@ -1,15 +1,14 @@
+import { shareContent } from '@/lib/shareContent';
 import { OasisPressable as Pressable, OasisSurface } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
 import { HeaderAction } from '@/components/shared/AppHeader';
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Platform, Linking, Alert, Share } from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet, ScrollView, Linking, Alert } from 'react-native';
 import AppHeader from '@/components/shared/AppHeader';
 import { useBottomNavInset } from '@/lib/bottomNav';
 import {
   BadgeCheck,
-  Check,
   Code2,
-  Copy,
   Globe,
   HeartHandshake,
   Mail,
@@ -28,7 +27,6 @@ const APP_VERSION = '2.6.0';
 
 export default function AboutScreen() {
   const bottomNavInset = useBottomNavInset();
-  const [copied, setCopied] = useState(false);
 
   const handleWhatsApp = () => {
     const msg = encodeURIComponent(
@@ -51,23 +49,9 @@ export default function AboutScreen() {
     ).catch(() => {});
   };
 
-  const handleCopyPhone = async () => {
-    try {
-      if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
-        await navigator.clipboard.writeText(DEVELOPER_PHONE);
-      } else {
-        Alert.alert('رقم التواصل', DEVELOPER_PHONE);
-      }
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
-    } catch {
-      Alert.alert('رقم التواصل', DEVELOPER_PHONE);
-    }
-  };
-
   const handleShareApp = async () => {
     try {
-      await Share.share({
+      await shareContent({
         title: 'منصة حيّنا',
         message: 'منصة حيّنا 🇸🇦 — مجتمع الحي وخدماته وسوقه في مكان واحد.\nhttps://appksatest.vercel.app',
       });
@@ -147,9 +131,6 @@ export default function AboutScreen() {
                 <Text style={styles.developerRole}>تطوير وهندسة منصة حيّنا</Text>
                 <Text style={styles.developerPhone}>{DEVELOPER_PHONE}</Text>
               </View>
-              <Pressable oasisKind="icon" onPress={handleCopyPhone} style={styles.copyButton} accessibilityRole="button" accessibilityLabel="نسخ رقم التواصل">
-                {copied ? <Check size={17} color="#075e54" /> : <Copy size={17} color="#075e54" />}
-              </Pressable>
             </OasisSurface>
 
             <Pressable oasisKind="action" style={styles.whatsappButton} onPress={handleWhatsApp} accessibilityRole="button">
@@ -221,7 +202,6 @@ const styles = StyleSheet.create({
   developerName: { color: '#1f2937', fontSize: 14, fontWeight: '700' },
   developerRole: { color: OASIS.colors.muted, fontSize: 11.5 },
   developerPhone: { color: '#075e54', fontSize: 12, fontWeight: '600', letterSpacing: 0.3 },
-  copyButton: { width: 36, height: 36, borderRadius: 14, backgroundColor: '#e8f5ef', alignItems: 'center', justifyContent: 'center' },
   whatsappButton: {
     flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 9,
     backgroundColor: '#25d366', borderRadius: 12, paddingVertical: 13, marginTop: 2,

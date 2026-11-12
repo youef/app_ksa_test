@@ -17,6 +17,7 @@ import BottomNav from '@/components/BottomNav';
 import AppBackground from '@/components/shared/AppBackground';
 import { PlatformConfigProvider, usePlatformConfig } from '@/lib/platformConfig';
 import { installDarkModeWebFixes } from '@/lib/darkModeWeb';
+import { installWebInteractions, WEB_INTERACTION_STYLES } from '@/lib/webInteractions';
 import { loadBannedWords } from '@/lib/profanity';
 
 const ACCOUNT_ONLY_ROUTES = [
@@ -31,6 +32,10 @@ function needsAccount(pathname: string) {
 }
 
 export default function RootLayout() {
+  useEffect(() => {
+    if (Platform.OS === 'web') return installWebInteractions();
+  }, []);
+
   return (
     <ThemeProvider>
       <PlatformConfigProvider><RootContent /></PlatformConfigProvider>
@@ -114,7 +119,7 @@ function RootContent() {
   const navigationTheme = useMemo(() => {
     const theme = isDark ? DarkTheme : DefaultTheme;
     return { ...theme, colors: { ...theme.colors, background: 'transparent' } };
-  }, [isDark]);
+  }, [isDark, colors.background]);
   const path = pathname.replace(/\/+$/, '') || '/';
   const liveFullScreen = path === '/live' || path.startsWith('/live/');
   const storyFullScreen = ['/stories', '/create-story', '/story', '/story-viewers', '/story-settings'].some(route => path === route || path.startsWith(route + '/'));
@@ -128,7 +133,7 @@ function RootContent() {
       document.documentElement.classList.remove('dark');
       document.documentElement.setAttribute('data-theme', 'light');
       document.documentElement.style.colorScheme = 'light';
-      document.body.style.backgroundColor = '#F2F2F7';
+      document.body.style.backgroundColor = colors.background;
       return;
     }
     return installDarkModeWebFixes();
@@ -140,9 +145,10 @@ function RootContent() {
         <title>{branding.name || 'حيّنا'}</title>
         <meta name="description" content={branding.description || 'منصة أهل الحي للتواصل والخدمات المحلية'} />
         <style type="text/css">{`
+          ${WEB_INTERACTION_STYLES}
           html, body { width: 100%; min-height: 100%; -webkit-text-size-adjust: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
           body, #root, #root * { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
-          html, body, #root { background-color: ${isDark ? '#0F0F10' : '#F2F2F7'}; color: ${isDark ? '#FFFFFF' : '#1C1C1E'}; transition: background-color 0.25s, color 0.25s; }
+          html, body, #root { background-color: ${colors.background}; color: ${colors.ink}; transition: background-color 0.25s, color 0.25s; }
           #root { height: 100%; height: 100dvh; box-sizing: border-box; overflow: hidden; isolation: isolate; padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
           input, textarea, select { font-size: 16px !important; color-scheme: ${isDark ? 'dark' : 'light'}; }
           input:focus, textarea:focus, select:focus { font-size: 16px !important; }
@@ -150,8 +156,8 @@ function RootContent() {
           [role="button"]:focus-visible, [role="tab"]:focus-visible { outline: 2px solid ${isDark ? '#34D399' : '#047857'}; outline-offset: 3px; }
           ::selection { background: ${isDark ? '#0D2419' : '#BBD9C3'}; color: ${isDark ? '#34D399' : '#064E3B'}; }
           ::-webkit-scrollbar { width: 6px; height: 6px; }
-          ::-webkit-scrollbar-track { background: ${isDark ? '#1C1C1E' : '#F2F2F7'}; }
-          ::-webkit-scrollbar-thumb { background: ${isDark ? '#3A3A3C' : '#C7C7CC'}; border-radius: 3px; }
+          ::-webkit-scrollbar-track { background: ${colors.surface}; }
+          ::-webkit-scrollbar-thumb { background: ${colors.line}; border-radius: 3px; }
           @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; } }
 
         `}</style>

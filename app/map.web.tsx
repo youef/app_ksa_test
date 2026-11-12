@@ -26,7 +26,7 @@ import {
   Star,
   Store,
   X,
-  Plus, Minus, Compass, ShieldCheck, ArrowUpRight, RefreshCw, ListFilter, Map as MapIcon, Check, ChevronRight,
+  Compass, ShieldCheck, ArrowUpRight, RefreshCw, ListFilter, Map as MapIcon, Check, ChevronRight,
 } from 'lucide-react-native';
 
 import { mapSymbolSvg } from '@/lib/mapSymbols';
@@ -411,6 +411,11 @@ export default function WebMap() {
       minZoom: 5,
       maxZoom: 19,
       zoomControl: false,
+      scrollWheelZoom: false,
+      doubleClickZoom: false,
+      touchZoom: false,
+      boxZoom: false,
+      keyboard: false,
     });
 
     L.control.scale({ position: 'bottomleft', imperial: false }).addTo(map);
@@ -455,7 +460,9 @@ export default function WebMap() {
         clickableIcons: false,
         streetViewControl: false,
         fullscreenControl: false,
-        gestureHandling: 'greedy',
+        gestureHandling: 'none',
+        disableDoubleClickZoom: true,
+        keyboardShortcuts: false,
         styles: MAP_ID ? undefined : MAP_STYLES,
         mapTypeControl: false,
         zoomControl: false,
@@ -568,7 +575,7 @@ export default function WebMap() {
         if (group.length > 1) {
           const lat = group.reduce((sum, p) => sum + p.lat, 0) / group.length;
           const lng = group.reduce((sum, p) => sum + p.lng, 0) / group.length;
-          const cluster = L.marker([lat, lng], { title: `${group.length} منشورًا، اضغط للتكبير`, icon: L.divIcon({ className: 'hayna-cluster', html: `<span>${group.length}</span>`, iconSize: [46, 46], iconAnchor: [23, 23] }) });
+          const cluster = L.marker([lat, lng], { title: `${group.length} منشورًا، اضغط لعرض المنشورات`, icon: L.divIcon({ className: 'hayna-cluster', html: `<span>${group.length}</span>`, iconSize: [46, 46], iconAnchor: [23, 23] }) });
           const list = document.createElement('div');
           list.dir = 'rtl';
           list.style.cssText = 'max-height:240px;overflow:auto;min-width:210px;font-family:inherit';
@@ -580,7 +587,6 @@ export default function WebMap() {
             list.appendChild(button);
           });
           cluster.bindPopup(list, { maxWidth: 280 });
-          cluster.on('click', () => { if (zoomLevel < 19) { cluster.closePopup(); leafletInstanceRef.current.fitBounds(L.latLngBounds(group.map(p => [p.lat, p.lng])), { padding: [65, 65], maxZoom: Math.min(19, zoomLevel + 3) }); } });
           cluster.addTo(pinLayer);
           return;
         }
@@ -846,10 +852,6 @@ export default function WebMap() {
     [engine],
   );
 
-  const zoom = (delta: number) => {
-    if (engine === 'leaflet') leafletInstanceRef.current?.setZoom(leafletInstanceRef.current.getZoom() + delta);
-    else if (googleMapRef.current) googleMapRef.current.setZoom(googleMapRef.current.getZoom() + delta);
-  };
   const resetView = () => {
     const center = findPlaceCenter(city) || KSA_CENTER;
     if (engine === 'leaflet') leafletInstanceRef.current?.flyTo([center.lat, center.lng], city ? 12 : 6);
@@ -924,7 +926,7 @@ export default function WebMap() {
             <div className="mx-map-top"><div className="mx-map-badge"><span className="mx-status-dot" /><strong>{city || 'المملكة العربية السعودية'}</strong><span>منظور الحي</span></div><button className="mx-map-layer" onClick={() => { setMapNotice(null); setHeatOn(false); setEngine(v => v === 'leaflet' ? 'google' : 'leaflet'); }} aria-label="تبديل مصدر الخريطة"><Layers size={17} color="#17664F" /><span>{engine === 'leaflet' ? 'الخريطة الأساسية' : 'خرائط Google'}</span></button></div>
             {mapMoved && mapReady && <button className="mx-search-area" disabled={placesLoading} onClick={() => { if (tab === 'community') setQuery(''); void runPlaceSearch(placeCategory, tab === 'places' ? query : '', true); }}><RefreshCw size={15} color="#17664F" />{placesLoading ? 'جارٍ البحث…' : 'ابحث في هذه المنطقة'}</button>}
             {(!mapReady || mapError) && <div className="mx-map-loading" role="status"><Compass size={32} color="#17664F" /><strong>{mapError ? 'الخريطة غير متاحة حاليًا' : 'نجهّز لك صورة أوضح للحي…'}</strong>{mapError && <button className="mx-primary" onClick={() => setRetry(v => v + 1)}>إعادة المحاولة</button>}</div>}
-            <div className="mx-map-tools"><button aria-label="العودة إلى نطاق المدينة" onClick={resetView}><Compass size={20} color="#17664F" /></button><span /><button aria-label="تكبير الخريطة" onClick={() => zoom(1)} disabled={!mapReady}><Plus size={20} color="#334E40" /></button><button aria-label="تصغير الخريطة" onClick={() => zoom(-1)} disabled={!mapReady}><Minus size={20} color="#334E40" /></button><span /><button aria-label="تحديد موقعي" disabled={locating} onClick={() => void locateMe()}><LocateFixed size={20} color="#17664F" /></button>{engine === 'leaflet' && tab === 'community' && <button aria-label="إظهار كثافة نشاط الحي" aria-pressed={heatOn} className={heatOn ? 'active' : ''} onClick={() => setHeatOn(v => !v)}><Flame size={19} color={heatOn ? '#B27128' : '#71867A'} /></button>}</div>
+            <div className="mx-map-tools"><button aria-label="العودة إلى نطاق المدينة" onClick={resetView}><Compass size={20} color="#17664F" /></button><span /><button aria-label="تحديد موقعي" disabled={locating} onClick={() => void locateMe()}><LocateFixed size={20} color="#17664F" /></button>{engine === 'leaflet' && tab === 'community' && <button aria-label="إظهار كثافة نشاط الحي" aria-pressed={heatOn} className={heatOn ? 'active' : ''} onClick={() => setHeatOn(v => !v)}><Flame size={19} color={heatOn ? '#B27128' : '#71867A'} /></button>}</div>
             <div className="mx-map-bottom"><div className="mx-map-key"><strong>دليل الخريطة</strong><span><i style={{ background: '#17664F' }} />نشاط الحي</span><span><i style={{ background: '#0F766E' }} />أماكن وخدمات</span>{heatOn && <span><i style={{ background: '#E6A34F' }} />كثافة النشاط</span>}</div><button className="mx-my-location" disabled={locating} onClick={() => void locateMe()}><LocateFixed size={17} color="#fff" />{locating ? 'جارٍ تحديد موقعك…' : 'اكتشف بالقرب مني'}</button></div>
             {myLocation && <div className="mx-accuracy">دقة الجهاز: {myLocation.accuracy != null ? `± ${Math.round(myLocation.accuracy)} م` : 'غير متاحة'}</div>}
           </section>

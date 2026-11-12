@@ -8,6 +8,7 @@ import { OASIS, type OasisVariant, type OasisButtonSize } from '@/lib/oasis';
 import { oasisAssets, type OasisAsset } from './assets';
 import { useTheme } from '@/context/ThemeContext';
 
+export type { OasisVariant, OasisButtonSize };
 export type OasisKind = 'auto' | 'plain' | 'action' | 'icon' | 'chip' | 'card';
 type ActionProps = PressableProps & { oasisKind?: OasisKind; oasisVariant?: OasisVariant; oasisSize?: OasisButtonSize; oasisSurfaceState?: 'default' | 'selected' | 'unread' | 'notice' | 'error' };
 const SIZE_HEIGHT = { xs: 32, sm: 36, icon: 44, md: 44, form: 44, lg: 48, hero: 48 } as const;
@@ -91,10 +92,10 @@ export const OasisPressable = forwardRef<React.ElementRef<typeof NativePressable
       minHeight: kind === 'chip' ? 32 : Math.max(SIZE_HEIGHT[size], OASIS.touchTarget),
       height: undefined,
       paddingHorizontal: original.paddingHorizontal ?? (kind === 'chip' ? 12 : 18),
-      paddingVertical: kind === 'chip' ? 5 : 10, alignItems: 'center', justifyContent: 'center', borderRadius: kind === 'chip' ? 8 : 10,
+      paddingVertical: kind === 'chip' ? 5 : 10, alignItems: 'center', justifyContent: 'center', borderRadius: kind === 'chip' ? OASIS.radius.pill : OASIS.radius.input,
       backgroundColor, borderWidth: 0, shadowOpacity: 0, elevation: 0,
-    } : kind === 'icon' ? { minWidth: 44, minHeight: 44, borderRadius: 10, backgroundColor: filled ? backgroundColor : 'transparent', borderWidth: 0, alignItems: 'center', justifyContent: 'center', shadowOpacity: 0, elevation: 0 } : kind === 'card' ? { borderRadius: 14, borderWidth: 1, borderColor: oasisSurfaceState === 'unread' || oasisSurfaceState === 'selected' || props.accessibilityState?.selected ? '#B8DDCB' : isDark ? colors.line : (original.borderColor || colors.line), backgroundColor: isDarkSurface(original) ? original.backgroundColor : oasisSurfaceState === 'unread' ? (isDark ? colors.soft : colors.soft) : isDark ? colors.surface : (original.backgroundColor || colors.surface), shadowOpacity: 0, elevation: 0 } : undefined;
-    return { original, geometry, kind, color: props.disabled ? colors.muted : filled ? colors.surface : colors.primary };
+    } : kind === 'icon' ? { minWidth: 44, minHeight: 44, borderRadius: OASIS.radius.input, backgroundColor: filled ? backgroundColor : 'transparent', borderWidth: 0, alignItems: 'center', justifyContent: 'center', shadowOpacity: 0, elevation: 0 } : kind === 'card' ? { borderRadius: OASIS.radius.card, borderWidth: 1, borderColor: oasisSurfaceState === 'unread' || oasisSurfaceState === 'selected' || props.accessibilityState?.selected ? '#B8DDCB' : isDark ? colors.line : (original.borderColor || colors.line), backgroundColor: isDarkSurface(original) ? original.backgroundColor : oasisSurfaceState === 'unread' ? (isDark ? colors.soft : colors.soft) : isDark ? colors.surface : (original.backgroundColor || colors.surface), shadowOpacity: 0, elevation: 0 } : undefined;
+    return { original, geometry, kind, color: props.disabled ? colors.muted : filled ? (isDark ? colors.background : '#FFFFFF') : colors.primary };
   };
   return <NativePressable {...props} hitSlop={props.hitSlop ?? (oasisKind === 'chip' ? { top: 6, bottom: 6, left: 0, right: 0 } : undefined)} ref={ref} accessibilityRole={props.accessibilityRole || (props.onPress ? 'button' : undefined)}
     accessibilityState={{ ...props.accessibilityState, disabled: props.disabled || props.accessibilityState?.disabled }}
@@ -123,7 +124,7 @@ export const OasisSurface = forwardRef<View, SurfaceProps>(function OasisSurface
       {...props}
       ref={ref}
       style={[
-        { backgroundColor: defaultBg, borderRadius: oasisSurface === 'icon' || oasisSurface === 'field' ? 10 : 14 },
+        { backgroundColor: defaultBg, borderRadius: oasisSurface === 'sheet' ? OASIS.radius.sheet : oasisSurface === 'icon' || oasisSurface === 'field' ? OASIS.radius.input : OASIS.radius.card },
         style,
         isDark && isDefaultWhite && {
           backgroundColor: colors.surface,
@@ -138,18 +139,18 @@ export const OasisSurface = forwardRef<View, SurfaceProps>(function OasisSurface
 });
 
 /** Direct native input preserves flex layout, refs and Dynamic Type. */
-export const OasisTextInput = forwardRef<NativeTextInput, TextInputProps & { 'aria-invalid'?: boolean | 'true' | 'false' }>(function OasisTextInput({ style, onFocus, onBlur, placeholderTextColor, selectionColor, ...props }, ref) {
+export const OasisTextInput = forwardRef<NativeTextInput, TextInputProps & { 'aria-invalid'?: boolean | 'true' | 'false'; disabled?: boolean }>(function OasisTextInput({ style, onFocus, onBlur, placeholderTextColor, selectionColor, disabled, editable, ...props }, ref) {
   const { colors, isDark } = useTheme();
   const [focused, setFocused] = useState(false);
   const flat = StyleSheet.flatten(style) || {};
   const framed = Boolean(flat.borderWidth || flat.backgroundColor && flat.backgroundColor !== 'transparent');
   const invalid = props['aria-invalid'] === true || props['aria-invalid'] === 'true' || [colors.danger, '#dc2626', '#c2413a'].includes(String(flat.borderColor));
-  return <NativeTextInput {...props} ref={ref}
+  return <NativeTextInput {...props} ref={ref} editable={disabled ? false : editable}
     onFocus={e => { setFocused(true); onFocus?.(e); }} onBlur={e => { setFocused(false); onBlur?.(e); }}
     placeholderTextColor={placeholderTextColor || colors.muted} selectionColor={selectionColor || colors.primary}
     style={[{ fontSize: 16, color: colors.ink, textAlign: 'right', minWidth: 0 }, style,
       isDark && { color: colors.ink },
-      framed && { borderRadius: 10, minHeight: props.multiline ? 100 : 44, borderColor: invalid ? colors.danger : focused ? colors.primary : colors.line, backgroundColor: isDark && (flat.backgroundColor === '#fff' || flat.backgroundColor === '#ffffff') ? colors.surface : flat.backgroundColor },
+      framed && { borderRadius: OASIS.radius.input, minHeight: props.multiline ? 100 : 44, borderColor: invalid ? colors.danger : focused ? colors.primary : colors.line, backgroundColor: isDark && (flat.backgroundColor === '#fff' || flat.backgroundColor === '#ffffff') ? colors.surface : flat.backgroundColor },
       Platform.OS === 'web' && { outlineStyle: 'none', outlineWidth: 0 } as unknown as TextStyle]} />;
 });
 const styles = StyleSheet.create({ fill: { width: '100%', height: '100%' }, artworkHost: { position: 'relative', backgroundColor: 'transparent', borderColor: 'transparent' }, disabled: { opacity: .65 } });

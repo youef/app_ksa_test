@@ -31,6 +31,6 @@ test('exports a single edge-to-edge viewport before JavaScript loads', () => {
   for (const source of [expoHtml, original]) {
     const result = ensureHaynaWebMetadata(source);
     assert.equal(result.match(/name="viewport"/g)?.length, 1);
-    assert.match(result, /name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/);
+    assert.match(result, /name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/);
   }
 });

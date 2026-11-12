@@ -19,7 +19,7 @@ export const OASIS = {
     return getActiveColors();
   },
   heights: { chip: 32, compact: 36, icon: 44, standard: 44, form: 44, prominent: 48, hero: 48 },
-  radius: { input: 10, card: 14, sheet: 20, pill: 999 },
+  radius: { input: 12, card: 16, sheet: 24, pill: 999 },
   spacing: { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, section: 24, page: 32 },
   maxWidth: { form: 440, feed: 680, chat: 960, page: 1200 },
   touchTarget: 44,

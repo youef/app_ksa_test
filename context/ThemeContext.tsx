@@ -11,14 +11,14 @@ export type ThemeMode = 'light' | 'dark' | 'system';
 // ─── Color Palettes ──────────────────────────────────────────────────────────
 
 export const LIGHT_COLORS = {
-  background: '#F2F2F7',
+  background: '#F3F7F4',
   surface: '#FFFFFF',
-  ink: '#1C1C1E',
-  muted: '#636366',
-  line: '#E5E5EA',
+  ink: '#182821',
+  muted: '#52645A',
+  line: '#DCE6DF',
   primary: '#047857',
   deep: '#064E3B',
-  soft: '#EAF5EF',
+  soft: '#E5F3EB',
   gold: '#C4A45F',
   danger: '#B93838',
   dangerSoft: '#FFF0EC',
@@ -32,11 +32,11 @@ export const LIGHT_COLORS = {
 } as const;
 
 export const DARK_COLORS = {
-  background: '#0F0F10',
-  surface: '#1C1C1E',
+  background: '#101714',
+  surface: '#1A2520',
   ink: '#FFFFFF',
-  muted: '#F2F2F7',
-  line: '#2C2C2E',
+  muted: '#BACBC1',
+  line: '#304238',
   primary: '#34D399',
   deep: '#059669',
   soft: '#0D2419',

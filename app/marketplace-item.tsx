@@ -4,7 +4,7 @@ import { HeaderAction, AppHeader } from '@/components/shared/AppHeader';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { ArrowUpRight, MapPin, Package, Share2, ShoppingBag, UserRound, Heart, MessageCircle, ShieldCheck, Flag, CalendarDays, Tag, Ruler, Truck, Info, ZoomIn } from 'lucide-react-native';
+import { ArrowUpRight, MapPin, Package, Share2, ShoppingBag, UserRound, Heart, MessageCircle, ShieldCheck, Flag, CalendarDays, Tag, Ruler, Truck, Info, ImageIcon } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { AccountIdentityBadge } from '@/components/profile/AccountIdentityBadge';
 import { ImagePreviewModal } from '@/components/shared/ImagePreviewModal';
@@ -104,7 +104,7 @@ export default function MarketplaceItemPage() {
     <ProductRequestSheet visible={orderOpen} item={item} userId={me} onClose={()=>setOrderOpen(false)}/>
     <ProductEditorSheet item={editing?item:null} onClose={()=>setEditing(false)} onSaved={()=>void load()}/>
     <ScrollView contentContainerStyle={[styles.page,{paddingBottom:bottom+120}]}>
-      {item.image_url && !imageFailed ? <Pressable accessibilityRole="button" accessibilityLabel="عرض صورة المنتج كاملة" onPress={()=>setImageOpen(true)} style={styles.imageFrame}><Image source={{ uri: item.image_url }} style={styles.image} onError={()=>setImageFailed(true)} resizeMode="contain"/><View style={styles.zoomBadge}><ZoomIn size={16} color="#fff"/><Text style={{color:'#fff',fontSize:11}}>عرض الصورة كاملة</Text></View></Pressable> : <View style={styles.imageFallback}><ShoppingBag size={42} color={OASIS.colors.primary} /><Text style={styles.muted}>إعلان من سوق الحي</Text></View>}
+      {item.image_url && !imageFailed ? <Pressable accessibilityRole="button" accessibilityLabel="عرض صورة المنتج كاملة" onPress={()=>setImageOpen(true)} style={styles.imageFrame}><Image source={{ uri: item.image_url }} style={styles.image} onError={()=>setImageFailed(true)} resizeMode="contain"/><View style={styles.previewBadge}><ImageIcon size={16} color="#fff"/><Text style={{color:'#fff',fontSize:11}}>عرض الصورة كاملة</Text></View></Pressable> : <View style={styles.imageFallback}><ShoppingBag size={42} color={OASIS.colors.primary} /><Text style={styles.muted}>إعلان من سوق الحي</Text></View>}
       <OasisSurface oasisSurface="card" style={styles.card}>
         <View style={styles.row}><View style={styles.typePill}><Text style={styles.typeText}>{item.item_type || 'إعلان'}</Text></View><Text style={[styles.status,{color:item.status==='available'?OASIS.colors.primary:OASIS.colors.muted}]}>{item.status === 'available' ? 'متاح' : item.status === 'sold' ? 'تم البيع' : 'غير متاح'}</Text></View>
         <Text style={styles.title}>{item.title || 'إعلان بدون عنوان'}</Text>
@@ -148,7 +148,7 @@ export default function MarketplaceItemPage() {
 
 const styles = StyleSheet.create({
   imageFrame:{position:'relative',borderRadius:22,overflow:'hidden',backgroundColor:OASIS.colors.surface,borderWidth:1,borderColor:OASIS.colors.line},
-  zoomBadge:{position:'absolute',bottom:12,left:12,borderRadius:16,backgroundColor:'rgba(4,45,32,.85)',paddingHorizontal:10,paddingVertical:7,flexDirection:'row-reverse',alignItems:'center',gap:6},
+  previewBadge:{position:'absolute',bottom:12,left:12,borderRadius:16,backgroundColor:'rgba(4,45,32,.85)',paddingHorizontal:10,paddingVertical:7,flexDirection:'row-reverse',alignItems:'center',gap:6},
   specRow:{flexDirection:'row-reverse',alignItems:'center',gap:10,paddingVertical:10,borderTopWidth:1,borderTopColor:OASIS.colors.line},
   actions:{flexDirection:'row-reverse',flexWrap:'wrap',gap:10},
   secondaryAction:{minHeight:48,borderRadius:24,paddingHorizontal:18,flexDirection:'row-reverse',gap:8,alignItems:'center',justifyContent:'center',backgroundColor:OASIS.colors.surface,borderWidth:1,borderColor:OASIS.colors.line},

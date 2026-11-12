@@ -1,3 +1,4 @@
+import { shareContent } from '@/lib/shareContent';
 import { DiscussionComposer } from '@/components/community/DiscussionComposer';
 import { discussionStyles } from '@/components/community/discussionStyles';
 import { PROFILE_READ_FIELDS } from '@/lib/profileFields';
@@ -5,8 +6,8 @@ import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface 
 import { OASIS } from '@/lib/oasis';
 import { useTheme } from '@/context/ThemeContext';
 import { HeaderAction } from '@/components/shared/AppHeader';
-import { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View, KeyboardAvoidingView, Platform, ActivityIndicator, Share, Image, ImageBackground, Modal } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert, ScrollView, StyleSheet, Text, View, KeyboardAvoidingView, Platform, ActivityIndicator, Image, ImageBackground, Modal, type TextInput as NativeTextInput } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
@@ -54,19 +55,43 @@ const QUICK_QUESTION_RESPONSES = [
 ];
 
 export default function Question() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  return <QuestionDiscussion key={id} id={id} />;
+}
+
+type PendingAnswer = {
+  id: string;
+  author_id: string;
+  parent_answer_id: string | null;
+  body: string;
+  created_at: string;
+  profiles: any;
+  votes: [];
+  previousIds: Set<string>;
+};
+
+function QuestionDiscussion({ id }: { id: string }) {
   const insets = useSafeAreaInsets();
+  const replyInput = useRef<NativeTextInput>(null);
   const { colors } = useTheme();
   const { showIsland } = useDynamicIsland();
   const [viewerProfile, setViewerProfile] = useState<any>(null);
-  const { id } = useLocalSearchParams<{ id: string }>();
   const [q, setQ] = useState<any>();
-  const [answers, setAnswers] = useState<any[]>([]);
+  const [savedAnswers, setSavedAnswers] = useState<any[]>([]);
+  const [pendingAnswer, setPendingAnswer] = useState<PendingAnswer | null>(null);
+  const answerRequest = useRef(0);
+  const sendingAnswer = useRef(false);
+  const matchingAnswer = pendingAnswer && savedAnswers.find(item =>
+    !pendingAnswer.previousIds.has(item.id) && item.author_id === pendingAnswer.author_id &&
+    item.body === pendingAnswer.body && (item.parent_answer_id ?? null) === pendingAnswer.parent_answer_id
+  );
+  const answers = pendingAnswer && !matchingAnswer ? [pendingAnswer, ...savedAnswers] : savedAnswers;
+
   const [body, setBody] = useState('');
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [voting, setVoting] = useState<string | null>(null);
-  const [replyTo, setReplyTo] = useState<any | null>(null);
+  const [replyTo, setReplyTo] = useState<{ id: string; author_id?: string; profiles?: { display_name?: string; username?: string } } | null>(null);
   const [sharingWith, setSharingWith] = useState<string | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
   const [favoriteBusy, setFavoriteBusy] = useState(false);
@@ -104,27 +129,12 @@ export default function Question() {
             p_district: location.district,
           })
         );
-    const [questionResult, b] = await Promise.all([
-      questionPromise,
-      supabase.from('answers').select('*').eq('question_id', id).order('created_at'),
-    ]);
+    const questionResult = await questionPromise;
     const question = Array.isArray(questionResult.data) ? questionResult.data[0] : questionResult.data;
-
-    if (question) {
-      const userIds = [question.author_id, ...(b.data || []).map((ans: any) => ans.author_id)];
-      const uniqueIds = Array.from(new Set(userIds.filter(Boolean)));
-
-      const { data: profilesData } = await supabase.from('profiles').select(PROFILE_READ_FIELDS).in('id', uniqueIds);
-      const profilesMap = (profilesData || []).reduce((acc: any, p: any) => ({ ...acc, [p.id]: p }), {});
-
-      question.profiles = profilesMap[question.author_id];
-      if (b.data) {
-        b.data.forEach((ans: any) => {
-          ans.profiles = profilesMap[ans.author_id];
-        });
-      }
+    if (question?.author_id) {
+      const { data: profile } = await supabase.from('profiles').select(PROFILE_READ_FIELDS).eq('id', question.author_id).maybeSingle();
+      question.profiles = profile;
     }
-
     setQ(question);
     if (id) {
       if (user) {
@@ -132,72 +142,102 @@ export default function Question() {
         setIsFavorite(Boolean(favoriteRow));
       } else setIsFavorite(false);
     }
-    const answerIds = (b.data || []).map((x: any) => x.id);
-    let votes: any[] = [];
-    if (answerIds.length) {
-      const { data: vd } = await supabase
-        .from('answer_votes')
-        .select('answer_id,voter_id,vote')
-        .in('answer_id', answerIds);
-      votes = vd || [];
-    }
-    const voteMap = votes.reduce((m: any, v: any) => {
-      (m[v.answer_id] ||= []).push(v);
-      return m;
-    }, {});
-    (b.data || []).forEach((ans: any) => {
-      ans.votes = voteMap[ans.id] || [];
-    });
-    setAnswers(b.data ?? []);
     if (showLoading) setLoading(false);
   }
+
+  const loadAnswers = useCallback(async () => {
+    const request = ++answerRequest.current;
+    const { data: rows, error } = await supabase.from('answers').select('*').eq('question_id', id).order('created_at');
+    if (error || request !== answerRequest.current) return;
+    if (!rows?.length) {
+      setSavedAnswers([]);
+      return;
+    }
+
+    const authorIds = Array.from(new Set(rows.map(row => row.author_id).filter(Boolean)));
+    const [profiles, votes] = await Promise.all([
+      authorIds.length ? supabase.from('profiles').select(PROFILE_READ_FIELDS).in('id', authorIds) : { data: [] },
+      supabase.from('answer_votes').select('answer_id,voter_id,vote').in('answer_id', rows.map(row => row.id)),
+    ]);
+    if (request !== answerRequest.current) return;
+    const profilesById = new Map((profiles.data || []).map((profile: any) => [profile.id, profile]));
+    const votesByAnswer = new Map<string, any[]>();
+    for (const vote of votes.data || []) {
+      const group = votesByAnswer.get(vote.answer_id) ?? [];
+      group.push(vote);
+      votesByAnswer.set(vote.answer_id, group);
+    }
+    setSavedAnswers(previous => {
+      const byId = new Map(previous.map(row => [row.id, row]));
+      return rows.map(row => ({
+        ...row,
+        profiles: profilesById.get(row.author_id) ?? byId.get(row.id)?.profiles,
+        votes: votes.data ? votesByAnswer.get(row.id) ?? [] : byId.get(row.id)?.votes ?? [],
+      }));
+    });
+  }, [id]);
 
   useEffect(() => {
     void load();
   }, [id]);
 
-  // Keep the discussion and in-app notifications fresh across web and native clients.
   useEffect(() => {
     if (!id) return;
+    const refresh = () => { void loadAnswers(); };
     const channel = supabase
-      .channel(`question-discussion-${id}-${currentUserId || 'guest'}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'answers', filter: `question_id=eq.${id}` }, () => {
-        void load(false);
-      });
-    if (currentUserId) {
-      channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${currentUserId}` }, (payload: any) => {
-        const notification = payload.new;
-        if (notification?.target_type === 'question' && notification?.target_id === id && notification?.type === 'answer') {
-          Alert.alert(notification.title || 'رد جديد على استفسارك', notification.body || 'وصل رد جديد إلى النقاش.');
+      .channel("question-discussion-" + id + "-" + (currentUserId || "guest"))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'answers', filter: 'question_id=eq.' + id }, payload => {
+        if (payload.eventType === 'INSERT' && payload.new.id) {
+          const row = payload.new;
+          setSavedAnswers(previous => previous.some(item => item.id === row.id)
+            ? previous
+            : [...previous, { ...row, votes: [] }]);
         }
-      });
-    }
-    channel.subscribe();
-    return () => { void supabase.removeChannel(channel); };
-  }, [id, currentUserId]);
+        refresh();
+      })
+      .subscribe(status => { if (status === 'SUBSCRIBED') refresh(); });
+    refresh();
+    const fallback = setInterval(refresh, 8000);
+    return () => {
+      ++answerRequest.current;
+      clearInterval(fallback);
+      void supabase.removeChannel(channel);
+    };
+  }, [id, currentUserId, loadAnswers]);
 
   async function answer() {
-    if (!body.trim()) return;
-    setSubmitting(true);
-    const { data: auth } = await supabase.auth.getSession();
-    if (!auth.session?.user) {
-      setSubmitting(false);
-      return requireAccount('سجّل الدخول أو أنشئ حساباً للرد على السؤال.');
-    }
+    const text = body.trim();
+    if (!text || sendingAnswer.current || pendingAnswer) return;
+    if (!currentUserId) return requireAccount('سجّل الدخول أو أنشئ حساباً للرد على السؤال.');
+    if (q.status !== 'open') return Alert.alert('الردود مغلقة', 'تم إغلاق النقاش بعد اعتماد الإجابة.');
 
-    if (q.status !== 'open') {
-      setSubmitting(false);
-      return Alert.alert('الردود مغلقة', 'تم إغلاق النقاش بعد اعتماد الإجابة.');
-    }
+    const target = replyTo;
+    const pending: PendingAnswer = {
+      id: 'pending-answer',
+      author_id: currentUserId,
+      parent_answer_id: target?.id ?? null,
+      body: text,
+      created_at: new Date().toISOString(),
+      profiles: viewerProfile,
+      votes: [],
+      previousIds: new Set(savedAnswers.map(item => item.id)),
+    };
+    sendingAnswer.current = true;
+    setPendingAnswer(pending);
+    setBody('');
+    setReplyTo(null);
 
-    const { error } = await supabase.rpc('hayna_create_question_answer', {
+    const { data, error } = await supabase.rpc('hayna_create_question_answer', {
       p_question_id: id,
-      p_body: body.trim(),
-      p_parent_answer_id: replyTo?.id ?? null,
-    });
+      p_body: text,
+      p_parent_answer_id: pending.parent_answer_id,
+    }).then(result => result, () => ({ data: null, error: { message: '' } }));
+    sendingAnswer.current = false;
 
-    setSubmitting(false);
     if (error) {
+      setPendingAnswer(null);
+      setBody(current => current || body);
+      setReplyTo(current => current ?? target);
       const code = error.message || '';
       const message =
         code.includes('AUTH_REQUIRED')
@@ -215,22 +255,28 @@ export default function Question() {
       return;
     }
 
-    setBody('');
-    setReplyTo(null);
-    // Best-effort in-app notification to the question owner and the replied-to author.
-    try {
-      const recipients = new Set<string>();
-      if (q?.author_id && q.author_id !== auth.session.user.id) recipients.add(q.author_id);
-      if (replyTo?.author_id && replyTo.author_id !== auth.session.user.id) recipients.add(replyTo.author_id);
-      if (recipients.size) {
-        await supabase.from('notifications').insert(Array.from(recipients).map(user_id => ({
-          user_id, type: 'answer', title: replyTo ? '💬 رد جديد على تعليقك' : '💬 وصل رد جديد على استفسارك',
-          body: `${(auth.session.user.user_metadata?.display_name || 'أحد الجيران')} أضاف ردًا: «${body.trim().slice(0, 120)}»`,
-          target_type: 'question', target_id: id,
-        })));
-      }
-    } catch { /* The answer remains successful if optional notifications are unavailable. */ }
-    void load(false);
+    const confirmed = Array.isArray(data) ? data[0] : data;
+    if (confirmed?.id) {
+      setSavedAnswers(previous => {
+        const existing = previous.find(item => item.id === confirmed.id);
+        const merged = { ...confirmed, profiles: existing?.profiles ?? viewerProfile, votes: existing?.votes ?? [] };
+        return existing ? previous.map(item => item.id === confirmed.id ? merged : item) : [...previous, merged];
+      });
+    }
+    setPendingAnswer(null);
+    void loadAnswers();
+
+    const recipients = new Set([q.author_id, target?.author_id]);
+    recipients.delete(currentUserId);
+    recipients.delete(undefined);
+    recipients.delete(null);
+    if (recipients.size) {
+      void supabase.from('notifications').insert(Array.from(recipients).map(user_id => ({
+        user_id, type: 'answer', title: target ? '💬 رد جديد على تعليقك' : '💬 وصل رد جديد على استفسارك',
+        body: (viewerProfile?.display_name || "أحد الجيران") + " أضاف ردًا: «" + text.slice(0, 120) + "»",
+        target_type: 'question', target_id: id,
+      }))).then(() => {}, () => {});
+    }
   }
 
   async function voteAnswer(answerId: string, value: number) {
@@ -251,7 +297,7 @@ export default function Question() {
           vote: value,
         });
       }
-      load();
+      void loadAnswers();
     } catch {
       // Ignored
     } finally {
@@ -441,15 +487,8 @@ export default function Question() {
   const handleShare = async () => {
     const shareUrl = typeof window !== 'undefined' ? window.location.href : `https://hayna.app/question?id=${id}`;
     const shareText = `استفسار في حيّنا: «${q?.title}»\n${shareUrl}`;
-    if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
-      try {
-        await navigator.clipboard.writeText(shareText);
-        Alert.alert('تم نسخ الرابط 📋', 'تم نسخ رابط السؤال لمشاركته في مجموعات الحي.');
-        return;
-      } catch {}
-    }
     try {
-      await Share.share({ message: shareText, url: shareUrl, title: q?.title });
+      await shareContent({ message: shareText, url: shareUrl, title: q?.title });
     } catch {}
   };
 
@@ -603,7 +642,7 @@ export default function Question() {
       if (error) throw error;
       if (!updated) throw new Error('يمكن لصاحب الرد فقط تعديله.');
       setEditingAnswer(null); setEditAnswerBody('');
-      await load(false);
+      await loadAnswers();
     } catch (error: any) {
       Alert.alert('تعذر تعديل الرد', error?.message || 'تحقق من صلاحياتك وحاول مجددًا.');
     } finally { setSavingAnswerEdit(false); }
@@ -620,7 +659,7 @@ export default function Question() {
           const { data: deleted, error } = await supabase.from('answers').delete().eq('id', answer.id).eq('author_id', currentUserId).select('id').maybeSingle();
           if (error) throw error;
           if (!deleted) throw new Error('يمكن لصاحب الرد فقط حذفه.');
-          await load(false);
+          await loadAnswers();
         } catch (error: any) {
           Alert.alert('تعذر حذف الرد', error?.message || 'حاول مرة أخرى.');
         } finally { setDeletingAnswerId(null); }
@@ -632,7 +671,7 @@ export default function Question() {
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0} style={[styles.container, { backgroundColor: 'transparent' }]}>
       <AppHeader
         variant="sub"
-        title="استفسار ونقاش الحي"
+        title="سؤال الحي"
         subtitle={locationLabel}
         fallbackRoute="/questions"
         rightAction={
@@ -648,63 +687,49 @@ export default function Question() {
       />
 
       <ScrollView
-        contentContainerStyle={[discussionStyles.page, { paddingBottom: 20 }]}
+        contentContainerStyle={[discussionStyles.page, styles.detailPage]}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         showsVerticalScrollIndicator={false}
       >
         <TwitterInquiryCard detailMode type="question" data={{ ...q, answers, answers_count: answers.length }} currentUserId={currentUserId} currentUserProfile={viewerProfile} isGuest={!currentUserId} onQuickReply={async () => {}} onToast={message => showIsland(message, undefined, 'success')} onDeleted={() => void load(false)} />
 
-        {/* Quick Suggested Responses Pills */}
-        {!isSolved && currentUserId && (
-          <View style={[styles.quickPillsSection, { backgroundColor: colors.surface, borderColor: colors.line }]}>
-            <Text style={styles.quickPillsTitle}>ابدأ ردك</Text>
-            <View style={styles.quickPillsWrap}>
-              {QUICK_QUESTION_RESPONSES.map((resp, idx) => (
-                <Pressable oasisKind="chip"
-                  key={idx}
-                  style={styles.quickResponsePill}
-                  onPress={() => setBody(resp)}
-                >
-                  <Text style={styles.quickResponseText}>{resp}</Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-        )}
-
         {/* Answers / Discussion Section */}
         <View style={styles.answersSection}>
-          <View style={[discussionStyles.card, { backgroundColor: colors.surface, borderColor: colors.line }]}>
-          <View style={styles.answersHeader}>
+          <View style={[styles.discussionHeader, { backgroundColor: colors.surface, borderColor: colors.line }]}>
             <View style={styles.answersHeaderLeft}>
-              <Text style={styles.answersCountBadge}>{answers.length}</Text>
-              <Text style={styles.answersTitle}>إجابات وردود الجيران</Text>
+              <View style={[styles.discussionIcon, { backgroundColor: colors.soft }]}><MessageCircle size={19} color={colors.primary} /></View>
+              <Text accessibilityRole="header" style={[styles.answersTitle, { color: colors.ink }]}>ردود الجيران</Text>
+              <Text accessibilityLabel={answers.length + " رد"} style={[styles.answersCountBadge, { backgroundColor: colors.soft, color: colors.primary }]}>{answers.length.toLocaleString("ar-SA")}</Text>
             </View>
-            <Text style={styles.answersSubtitle}>
-              {answers.length === 0 ? 'كن أول من يجيب ويفيد الجار' : `${answers.length} ردود مسجلة`}
-            </Text>
-          </View>
-          <View style={styles.answerSortRow}>
-            <Text style={styles.answerSortLabel}>ترتيب الردود</Text>
-            <Pressable oasisKind="chip" onPress={() => setAnswerSort('newest')} accessibilityRole="button" accessibilityState={{selected: answerSort === 'newest'}} style={[styles.answerSortButton, answerSort === 'newest' && styles.answerSortButtonActive]}>
-              <Clock size={13} color={answerSort === 'newest' ? OASIS.colors.primary : OASIS.colors.muted} /><Text style={[styles.answerSortButtonText, answerSort === 'newest' && styles.answerSortButtonTextActive]}>الأحدث</Text>
-            </Pressable>
-            <Pressable oasisKind="chip" onPress={() => setAnswerSort('useful')} accessibilityRole="button" accessibilityState={{selected: answerSort === 'useful'}} style={[styles.answerSortButton, answerSort === 'useful' && styles.answerSortButtonActive]}>
-              <ThumbsUp size={13} color={answerSort === 'useful' ? OASIS.colors.primary : OASIS.colors.muted} /><Text style={[styles.answerSortButtonText, answerSort === 'useful' && styles.answerSortButtonTextActive]}>الأكثر فائدة</Text>
-            </Pressable>
-          </View>
-
+            {answers.length > 1 && (
+              <View style={[styles.answerSortRow, { backgroundColor: colors.background }]} accessibilityLabel="ترتيب الردود">
+                {(['newest', 'useful'] as const).map(sort => {
+                  const selected = answerSort === sort;
+                  const Icon = sort === 'newest' ? Clock : ThumbsUp;
+                  return (
+                    <Pressable key={sort} oasisKind="plain" onPress={() => setAnswerSort(sort)} accessibilityRole="button" accessibilityState={{ selected }}
+                      style={[styles.sortOption, selected && { backgroundColor: colors.surface }]}>
+                      <Icon size={14} color={selected ? colors.primary : colors.muted} />
+                      <Text style={[styles.sortOptionLabel, { color: selected ? colors.primary : colors.muted }]}>
+                        {sort === 'newest' ? 'الأحدث' : 'الأكثر فائدة'}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
           </View>
           {answers.length === 0 ? (
-            <View style={styles.emptyState}>
-              <MessageCircle size={38} color="#94a3b8" />
+            <View style={[styles.emptyState, { backgroundColor: colors.surface, borderColor: colors.line }]}>
+              <View style={[styles.discussionIcon, { backgroundColor: colors.soft }]}><MessageCircle size={20} color={colors.primary} /></View>
               <Text style={styles.emptyStateTitle}>لا توجد ردود بعد</Text>
-              <Text style={styles.emptyStateText}>شارك بمعلوماتك أو تجربتك لمساعدة أهل حيّك!</Text>
+              <Text style={styles.emptyStateText}>أضف إجابة أو شارك تجربتك مع جيرانك.</Text>
             </View>
           ) : (
             threadedAnswers.map(({ answer: a, depth }) => {
               const isBest = q.best_answer_id === a.id;
+              const isPending = a.id === pendingAnswer?.id;
               const ansAuthorName = a.profiles?.hide_name
                 ? 'مستخدم مجهول'
                 : a.profiles?.display_name || a.profiles?.username || 'أحد الجيران';
@@ -715,12 +740,12 @@ export default function Question() {
               return (
                 <OasisSurface oasisSurface="card"
                   key={a.id}
-                  style={[styles.answerCard, depth > 0 && { marginRight: Math.min(depth, 4) * 14, borderRightWidth: 3, borderRightColor: '#a7f3d0' }, isBest && styles.bestAnswerCard]}
+                  style={[styles.answerCard, { backgroundColor: isBest ? colors.soft : colors.surface, borderColor: isBest ? colors.primary : colors.line }, depth > 0 && { marginRight: Math.min(depth, 3) * 10, borderRightWidth: 3, borderRightColor: colors.primary }]}
                 >
                   {isBest && (
-                    <View style={styles.bestBanner}>
-                      <Award size={15} color="#166534" />
-                      <Text style={styles.bestBannerText}>الإجابة المعتمدة من صاحب السؤال ⭐ (+10 نقاط)</Text>
+                    <View style={[styles.bestBanner, { backgroundColor: colors.surface, borderColor: colors.line }]}>
+                      <Award size={15} color={colors.primary} />
+                      <Text style={[styles.bestBannerText, { color: colors.primary }]}>الإجابة المعتمدة من صاحب السؤال (+10 نقاط)</Text>
                     </View>
                   )}
 
@@ -744,30 +769,35 @@ export default function Question() {
 
                         </View>
                         <Text style={styles.dateTextSmall}>
-                          {a.created_at ? relativeTime(a.created_at) : ''}
+                          {isPending ? 'جارٍ الإرسال…' : a.created_at ? relativeTime(a.created_at) : ''}
                         </Text>
                       </View>
                     </Pressable>
                   </View>
 
                   {a.parent_answer_id && (
-                    <View style={styles.replyToPill}>
+                    <View style={[styles.replyToPill, { backgroundColor: colors.background }]}>
                       <Reply size={12} color={OASIS.colors.primary} />
                       <Text style={styles.replyToText}>رد على: {(answers.find((parent: any) => parent.id === a.parent_answer_id)?.body || 'رد محذوف').slice(0, 70)}</Text>
                     </View>
                   )}
 
-                  <Text style={styles.answerBody}>{a.body}</Text>
+                  <Text style={[styles.answerBody, { color: colors.ink }]}>{a.body}</Text>
 
                   {/* Actions Row */}
-                  <View style={styles.answerActions}>
+                  {!isPending && <View style={styles.answerActions}>
                     <View style={styles.actionsRightGroup}>
                       <Pressable oasisKind="chip"
-                        onPress={() => currentUserId ? setReplyTo(a) : requireAccount('سجّل الدخول للرد على التعليقات.')}
+                        disabled={isSolved}
+                        onPress={() => {
+                          if (!currentUserId) return requireAccount('سجّل الدخول للرد على التعليقات.');
+                          setReplyTo(a);
+                          replyInput.current?.focus();
+                        }}
                         style={styles.replyBtn}
                       >
                         <Reply size={13} color={OASIS.colors.muted} />
-                        <Text style={styles.replyBtnText}>الرد على رد</Text>
+                        <Text style={styles.replyBtnText}>رد</Text>
                       </Pressable>
                       {currentUserId && a.author_id === currentUserId && <>
                         <Pressable oasisKind="chip" onPress={() => { setEditingAnswer(a); setEditAnswerBody(a.body || ''); }} style={styles.replyBtn}>
@@ -822,7 +852,7 @@ export default function Question() {
                         <Text style={styles.shareLocationBtnText}>موقعي (خاص)</Text>
                       </Pressable>
                     )}
-                  </View>
+                  </View>}
                 </OasisSurface>
               );
             })
@@ -833,10 +863,12 @@ export default function Question() {
       {/* Bottom Input Area */}
       {!currentUserId ? (
         <Pressable
-          style={[styles.guestPrompt, { paddingBottom: Math.max(insets.bottom, Platform.OS === 'ios' ? 12 : 8) }]}
+          oasisKind="plain"
+          accessibilityRole="button"
+          style={[styles.guestPrompt, { backgroundColor: colors.soft, borderTopColor: colors.line, paddingBottom: Math.max(insets.bottom, Platform.OS === 'ios' ? 12 : 8) }]}
           onPress={() => requireAccount('سجّل الدخول أو أنشئ حساباً للرد والتصويت في نقاشات الحي.')}
         >
-          <Text style={styles.guestPromptText}>سجّل الدخول للمشاركة في النقاش</Text>
+          <Text style={[styles.guestPromptText, { color: colors.primary }]}>سجّل الدخول للمشاركة</Text>
           <MessageCircle size={18} color={OASIS.colors.primary} />
         </Pressable>
       ) : (
@@ -859,7 +891,21 @@ export default function Question() {
               <Text style={styles.closedNoticeText}>تم إغلاق الردود بعد اعتماد الإجابة الصحيحة</Text>
             </View>
           ) : (
-            <DiscussionComposer value={body} onChangeText={setBody} onSend={() => void answer()} busy={submitting} disabled={isSolved} />
+            <>
+              {!body && !replyTo && (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.suggestionRow}>
+                  {QUICK_QUESTION_RESPONSES.map(response => (
+                    <Pressable key={response} oasisKind="plain" accessibilityRole="button" style={[styles.suggestion, { backgroundColor: colors.soft }]}
+                      onPress={() => { setBody(response); replyInput.current?.focus(); }}>
+                      <Text style={[styles.suggestionLabel, { color: colors.primary }]}>{response}</Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              )}
+              <DiscussionComposer inputRef={replyInput} value={body} onChangeText={setBody}
+                placeholder={replyTo ? 'اكتب ردك على التعليق…' : 'شارك بإجابة أو تجربة…'}
+                onSend={() => void answer()} busy={Boolean(pendingAnswer)} />
+            </>
           )}
         </OasisSurface>
       )}
@@ -995,6 +1041,14 @@ export default function Question() {
 }
 
 const styles = StyleSheet.create({
+  detailPage: { gap: 18, paddingTop: 14, paddingBottom: 22 },
+  discussionHeader: { padding: 14, gap: 12, borderRadius: 20, borderWidth: 1 },
+  discussionIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  sortOption: { flex: 1, minHeight: 40, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 7, paddingHorizontal: 8, borderRadius: 10 },
+  sortOptionLabel: { fontSize: 12, fontWeight: '700' },
+  suggestionRow: { flexDirection: 'row-reverse', gap: 8, paddingBottom: 8 },
+  suggestion: { minHeight: 34, justifyContent: 'center', borderRadius: 16, paddingHorizontal: 11 },
+  suggestionLabel: { fontSize: 12, fontWeight: '600' },
   container: {
     flex: 1,
     backgroundColor: '#f4f8f6',
@@ -1257,61 +1311,9 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     lineHeight: 16,
   },
-  quickPillsSection: {
-    padding: 16,
-    borderRadius: 20,
-    borderWidth: 1,
-    gap: 12,
-  },
-  quickPillsTitle: {
-    fontSize: 12.5,
-    fontWeight: '600',
-    color: OASIS.colors.muted,
-    textAlign: 'right',
-  },
-  quickPillsWrap: {
-    flexDirection: 'row-reverse',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  quickResponsePill: {
-    maxWidth: '100%',
-    backgroundColor: OASIS.colors.surface,
-    paddingHorizontal: 11,
-    paddingVertical: 7,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: OASIS.colors.line,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  quickResponseText: {
-    flexShrink: 1,
-    textAlign: 'right',
-    lineHeight: 20,
-    fontSize: 12,
-    fontWeight: '700',
-    color: OASIS.colors.ink,
-  },
-  answerSortRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  answerSortLabel: { color: OASIS.colors.muted, fontSize: 12, fontWeight: '600', marginLeft: 'auto' },
-  answerSortButton: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, borderWidth: 1, borderColor: OASIS.colors.line, backgroundColor: OASIS.colors.surface, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 7 },
-  answerSortButtonActive: { borderColor: '#6ee7b7', backgroundColor: OASIS.colors.soft },
-  answerSortButtonText: { color: OASIS.colors.muted, fontSize: 11, fontWeight: '600' },
-  answerSortButtonTextActive: { color: OASIS.colors.primary },
+  answerSortRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, padding: 4, borderRadius: 14 },
   answersSection: {
     gap: 12,
-  },
-  answersHeader: {
-    flexWrap: 'wrap',
-    gap: 8,
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 2,
   },
   answersHeaderLeft: {
     flexShrink: 1,
@@ -1334,20 +1336,15 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     textAlign: 'right',
     lineHeight: 24,
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: 18,
+    fontWeight: '800',
     color: OASIS.colors.ink,
-  },
-  answersSubtitle: {
-    fontSize: 12,
-    color: OASIS.colors.muted,
-    fontWeight: '600',
   },
   emptyState: {
     backgroundColor: OASIS.colors.surface,
     borderRadius: 20,
     padding: 28,
-    minHeight: 200,
+    minHeight: 160,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -1378,10 +1375,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0,
     shadowRadius: 4,
     elevation: 1,
-  },
-  bestAnswerCard: {
-    borderColor: '#86efac',
-    backgroundColor: OASIS.colors.soft,
   },
   bestBanner: {
     flexDirection: 'row-reverse',
@@ -1467,8 +1460,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   answerBody: {
-    fontSize: 14,
-    lineHeight: 25,
+    fontSize: 15,
+    lineHeight: 27,
     color: OASIS.colors.ink,
     textAlign: 'right',
   },

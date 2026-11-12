@@ -1,8 +1,9 @@
+import { shareContent } from '@/lib/shareContent';
 import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
 import { useTheme } from '@/context/ThemeContext';
 import { useState, useEffect } from 'react';
-import { Alert, Image, Modal, StyleSheet, Text, View, Platform, Share } from 'react-native';
+import { Alert, Image, Modal, StyleSheet, Text, View, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -77,6 +78,7 @@ export default function TwitterInquiryCard({
 }: TwitterInquiryCardProps) {
   const { colors, isDark } = useTheme();
   const isReq = type === 'request';
+  const isQuestionDetail = detailMode && !isReq;
   const isAdmin = Boolean(currentUserId && currentUserProfile?.role === 'admin');
   const isOwner = Boolean(currentUserId && currentUserId === (isReq ? data.requester_id : data.author_id));
   const name = data.profiles?.hide_name ? 'جار مجهول 🕶️' : (data.profiles?.display_name || data.profiles?.username || 'ابن الحي');
@@ -288,17 +290,10 @@ export default function TwitterInquiryCard({
     const pageUrl = (Platform.OS === 'web' && typeof window !== 'undefined')
       ? `${(window as any).location.origin}/${isReq ? 'request' : 'question'}?id=${data.id}`
       : `https://appksa-main.vercel.app/${isReq ? 'request' : 'question'}?id=${data.id}`;
-    if (Platform.OS === 'web' && typeof navigator !== 'undefined' && (navigator as any).clipboard) {
-      try {
-        await (navigator as any).clipboard.writeText(pageUrl);
-        onToast('تم نسخ الرابط 🔗');
-        return;
-      } catch {}
-    }
     try {
-      await Share.share({ title: data.title, message: `${data.title}\n${pageUrl}`, url: pageUrl });
+      await shareContent({ title: data.title, message: `${data.title}\n${pageUrl}`, url: pageUrl });
     } catch {
-      onToast('تم نسخ الرابط');
+      onToast('تعذرت مشاركة الرابط');
     }
   }
 
@@ -436,9 +431,9 @@ export default function TwitterInquiryCard({
   }
 
   return (
-    <OasisSurface oasisSurface="card" style={[s.xCard, detailMode && s.xCardDetail, isDark && { backgroundColor: colors.surface, borderColor: colors.line }, !expanded && s.xCardCollapsed, isEmergency && s.xCardEmergency, isToolSharing && s.xCardToolSharing]}>
+    <OasisSurface oasisSurface="card" style={[s.xCard, detailMode && s.xCardDetail, isQuestionDetail && s.xQuestionDetail, isDark && { backgroundColor: colors.surface, borderColor: colors.line }, !expanded && s.xCardCollapsed, isEmergency && s.xCardEmergency, isToolSharing && s.xCardToolSharing]}>
       {/* Top Header */}
-      <View style={[s.xHeader, isDark && { borderBottomColor: colors.line }]}>
+      <View style={[s.xHeader, isQuestionDetail && s.xDetailHeader, isDark && { borderBottomColor: colors.line }]}>
         <Pressable
           onPress={() => isGuest ? requireAccount() : data.profiles?.id && router.push({ pathname: '/user', params: { id: data.profiles.id } })}
           style={s.xAvatarWrap}
@@ -490,17 +485,17 @@ export default function TwitterInquiryCard({
       </View>
 
       {/* Main Content Area */}
-      <Pressable onPress={detailMode ? undefined : navigateToDetails} style={s.xContentArea} accessibilityRole={detailMode ? undefined : "button"} accessibilityLabel={detailMode ? undefined : "فتح تفاصيل المنشور"}>
-        <Text style={[s.xTitle, isDark && { color: colors.ink }, isEmergency && { color: '#991b1b' }]} numberOfLines={detailMode ? undefined : 2}>{data.title}</Text>
+      <Pressable onPress={detailMode ? undefined : navigateToDetails} style={[s.xContentArea, isQuestionDetail && s.xDetailContent]} accessibilityRole={detailMode ? undefined : "button"} accessibilityLabel={detailMode ? undefined : "فتح تفاصيل المنشور"}>
+        <Text accessibilityRole={isQuestionDetail ? "header" : undefined} style={[s.xTitle, isQuestionDetail && s.xDetailTitle, isDark && { color: colors.ink }, isEmergency && { color: '#991b1b' }]} numberOfLines={detailMode ? undefined : 2}>{data.title}</Text>
         {(data.body || data.description) && (
           <>
-            <Text style={[s.xBodyText, isDark && { color: colors.muted }]} numberOfLines={detailMode ? undefined : 2}>{isReq ? data.description : data.body}</Text>
+            <Text style={[s.xBodyText, isQuestionDetail && s.xDetailBody, isDark && { color: colors.muted }]} numberOfLines={detailMode ? undefined : 2}>{isReq ? data.description : data.body}</Text>
             {!detailMode && String(isReq ? data.description : data.body || '').length > 130 && <Text style={s.xReadMore}>عرض المزيد وفتح التفاصيل ←</Text>}
           </>
         )}
         {isPinned && <View style={{ alignSelf: 'flex-start', flexDirection: 'row-reverse', alignItems: 'center', gap: 4, backgroundColor: '#fff7ed', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5, marginTop: 8 }}><Text style={{ color: '#c2410c', fontSize: 11, fontWeight: '600' }}>📌 مثبت في الملف الشخصي</Text></View>}
         {isFeatured && <View style={{ alignSelf: 'flex-start', backgroundColor: '#fee2e2', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5, marginTop: 7 }}><Text style={{ color: '#991b1b', fontSize: 11, fontWeight: '700' }}>📢 تنبيه مثبت من إدارة الحي</Text></View>}
-        <View style={s.xCompactStatus}>
+        <View style={[s.xCompactStatus, isQuestionDetail && s.xDetailStatus]}>
           <View style={[s.xCompactStatusDot, resolutionStatus !== 'open' && s.xCompactStatusDotResolved]} />
           <Text style={s.xCompactStatusText}>{statusLabels[resolutionStatus] || 'مفتوح'}</Text>
         </View>
@@ -550,7 +545,7 @@ export default function TwitterInquiryCard({
         </Pressable>
       )}
 
-      <View style={[s.xReactionsRow, { justifyContent: 'space-between' }]}>
+      <View style={[s.xReactionsRow, isQuestionDetail && s.xDetailReactions, { justifyContent: 'space-between' }]}>
         <Text style={s.xTimeAgo}>{formatArabicTimeAgo(data.created_at)}</Text>
         <Pressable oasisKind="action" style={[s.xActionBtn, myReaction && s.xActionBtnActive]} onPress={() => {
           if (isGuest || !currentUserId) return requireAccount('سجّل الدخول لاختيار تفاعلك مع منشورات جيرانك.');
@@ -563,7 +558,7 @@ export default function TwitterInquiryCard({
       </View>
 
       {/* Action Bar */}
-      <View style={s.xActionBar}>
+      <View style={[s.xActionBar, isQuestionDetail && s.xDetailActions]}>
         <Pressable oasisKind="action" style={s.xActionBtn} onPress={detailMode ? undefined : navigateToDetails} accessibilityRole={detailMode ? undefined : "button"} accessibilityLabel={detailMode ? "عدد الردود" : "فتح الردود في صفحة المنشور"}>
           <MessageCircle size={17} color={OASIS.colors.muted} />
           <Text style={s.xActionCounter}>{answersCount}</Text>
@@ -820,6 +815,14 @@ const s = StyleSheet.create({
   },
   // Natural height prevents text, chips and actions from being clipped on different devices.
   xCardDetail: { borderRadius: 22, padding: 18 },
+  xQuestionDetail: { borderRadius: 24, padding: 18, gap: 0, borderTopWidth: 3, borderTopColor: OASIS.colors.primary },
+  xDetailHeader: { marginBottom: 10, paddingBottom: 10 },
+  xDetailContent: { marginBottom: 8 },
+  xDetailStatus: { alignSelf: 'flex-end' },
+  xDetailReactions: { marginTop: 6, marginBottom: 2, paddingTop: 4 },
+  xDetailActions: { marginHorizontal: -18, marginBottom: -18, paddingVertical: 2 },
+  xDetailTitle: { fontSize: 24, lineHeight: 34, fontWeight: '800' },
+  xDetailBody: { fontSize: 16, lineHeight: 28 },
   xCardCollapsed: {},
   xCardEmergency: {
     borderColor: '#fca5a5',
