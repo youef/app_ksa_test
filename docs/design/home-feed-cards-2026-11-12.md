@@ -13,3 +13,16 @@ Author-name and overflow actions lack consistent explicit accessible labels; boo
 
 ## Validation gates
 Run TypeScript, Web export and available tests; manual iPhone, Android, iPad and web review for Safe Area, RTL and large text. Keep PR draft, no merge/deploy before checks and approval.
+
+## After implementation
+- Author avatar/name and overflow actions have 44px minimum target sizes.
+- Compact post detail action now includes its title in the screen-reader label.
+- Bookmark and share have accessible names; bookmark exposes selected state.
+- View count has an explicit accessibility label.
+- Existing Oasis colors, RTL flex structure, loading/error handling, Safe Area and navigation were not modified.
+
+## Results and outstanding checks
+Source changes committed. TypeScript, Web export and test suite not yet verified; device screenshots/review pending. Do not merge or deploy until all required checks pass.
+
+## Next section
+Home feed empty state and filtered-no-results messaging (separate design batch).
