@@ -1,4 +1,5 @@
 import { memo, useEffect, useMemo, useState } from 'react';
+import { useTheme } from '@/context/ThemeContext';
 import {
   ActivityIndicator,
   Image,
@@ -157,6 +158,7 @@ function MessageBubbleBase({
   isAnonymous,
   onPreviewImage,
 }: MessageBubbleProps) {
+  const { colors } = useTheme();
   const media = useMemo(() => parseImageMessage(msg.body), [msg.body]);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [imageFailed, setImageFailed] = useState(false);
@@ -218,7 +220,7 @@ function MessageBubbleBase({
   return (
     <View testID="lr-hide" accessible={false} collapsable={false}>
       {showDate && (
-        <Text style={styles.dateDivider}>{formatDateLabel(msg.created_at)}</Text>
+        <Text style={[styles.dateDivider, { color: colors.muted, backgroundColor: colors.surface }]}>{formatDateLabel(msg.created_at)}</Text>
       )}
 
       <View style={[styles.msgRow, isMine && styles.msgRowMine]}>
@@ -245,6 +247,7 @@ function MessageBubbleBase({
           style={[
             styles.msgBubble,
             isMine ? styles.msgBubbleMine : styles.msgBubbleOther,
+            { backgroundColor: isMine ? colors.soft : colors.surface, borderColor: colors.line },
           ]}
         >
           {place ? (
@@ -368,13 +371,13 @@ function MessageBubbleBase({
               </LinearGradient>
             </View>
           ) : (
-            <Text style={[styles.msgText, isMine && styles.msgTextMine]}>
+            <Text style={[styles.msgText, { color: colors.ink }]}>
               {msg.body}
             </Text>
           )}
 
           <View style={[styles.msgMeta, isMine && styles.msgMetaMine]}>
-            <Text style={[styles.msgTime, isMine && styles.msgTimeMine]}>
+            <Text style={[styles.msgTime, { color: colors.muted }]}>
               {formatMsgTime(msg.created_at)}
             </Text>
             {isMine &&

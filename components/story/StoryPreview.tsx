@@ -7,8 +7,6 @@ import {
   Camera,
   Check,
   Layers,
-  Minus,
-  Plus,
   RotateCcw,
   RotateCw,
   Send,
@@ -83,7 +81,7 @@ export function StoryPreview(props: Props) {
   const [audience, setAudience] = useState<Audience>('everyone');
   const [customAudience, setCustomAudience] = useState('');
   const [textColor, setTextColor] = useState<string>(OASIS.colors.surface);
-  const [fontSize, setFontSize] = useState(24);
+  const fontSize = 24;
   const [fontFamily, setFontFamily] = useState('System');
   const [rotation, setRotation] = useState(0);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
@@ -335,21 +333,6 @@ export function StoryPreview(props: Props) {
       >
         <Text style={styles.sectionTitle}>تنسيق النص</Text>
         <View style={styles.controlRow}>
-          <Pressable
-            style={styles.smallControl}
-            onPress={() => setFontSize((size) => clamp(size - 2, 14, 48))}
-            accessibilityLabel="تصغير النص"
-          >
-            <Minus size={17} color={SC.white} />
-          </Pressable>
-          <Text style={styles.controlValue}>{fontSize}</Text>
-          <Pressable
-            style={styles.smallControl}
-            onPress={() => setFontSize((size) => clamp(size + 2, 14, 48))}
-            accessibilityLabel="تكبير النص"
-          >
-            <Plus size={17} color={SC.white} />
-          </Pressable>
           <Pressable
             style={styles.smallControl}
             onPress={() => setRotation((value) => (value + 5) % 360)}

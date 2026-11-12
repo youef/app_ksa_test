@@ -8,7 +8,13 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
+  Text,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
 } from 'react-native';
+import { ArrowDown } from 'lucide-react-native';
+import { OasisPressable as Pressable } from '@/components/oasis/OasisPrimitives';
+import { useTheme } from '@/context/ThemeContext';
 import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { containsProfanity, findProfanity, banAccountOnViolation } from '@/lib/profanity';
@@ -38,6 +44,7 @@ import { ChatModals } from '@/components/chat/ChatModals';
 import { sendPushToUser } from '@/lib/pushSender';
 
 export default function Conversation() {
+  const { colors } = useTheme();
   const params = useLocalSearchParams<{ id?: string; userId?: string; target?: string }>();
   const rawId = Array.isArray(params.id) ? params.id[0] : params.id;
   const rawUserId = Array.isArray(params.userId)
@@ -75,6 +82,24 @@ export default function Conversation() {
   const [appreciationNote, setAppreciationNote] = useState('كفو يا جارنا، بيض الله وجهك 🤍');
   const [sendingAppreciation, setSendingAppreciation] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
+  const nearLatest = useRef(true);
+  const [showJump, setShowJump] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const onPreviewImage = useCallback((url: string) => setPreviewImageUrl(url), []);
+  const jumpToLatest = useCallback(() => {
+    nearLatest.current = true;
+    setShowJump(false);
+    scrollRef.current?.scrollToEnd({ animated: true });
+  }, []);
+  const trackScroll = useCallback(({ nativeEvent }: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { contentOffset, contentSize, layoutMeasurement } = nativeEvent;
+    const atEnd = contentSize.height - layoutMeasurement.height - contentOffset.y < 100;
+    if (atEnd !== nearLatest.current) {
+      nearLatest.current = atEnd;
+      setShowJump(!atEnd);
+    }
+  }, []);
   const [webViewport, setWebViewport] = useState<{ top: number; height: number } | null>(null);
 
   const insets = useSafeAreaInsets();
@@ -105,27 +130,35 @@ export default function Conversation() {
     };
   }, []);
 
-  const load = useCallback(async (activeIdOverride?: string) => {
-    const idToUse = activeIdOverride || convId;
-    if (!idToUse) return;
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) return router.replace('/auth');
-    setCurrentUserId(u.user.id);
+  const load = useCallback(async (idToUse: string, userId: string, isActive: () => boolean) => {
+    const [messagesResult, membersResult, profileResult, settings, dnd] = await Promise.all([
+      supabase.from('messages').select('*').eq('conversation_id', idToUse).order('created_at'),
+      supabase.from('conversation_members').select('user_id').eq('conversation_id', idToUse).neq('user_id', userId),
+      supabase.from('profiles').select(PROFILE_READ_FIELDS).eq('id', userId).maybeSingle(),
+      loadConvSettings(userId, [idToUse]),
+      loadDnd(userId),
+    ]);
+    if (messagesResult.error || membersResult.error) throw messagesResult.error || membersResult.error;
+    if (!isActive()) return;
+    const msgs = messagesResult.data;
+    const otherId = membersResult.data?.[0]?.user_id;
+    const [otherProfile, otherSettings, mineBlocks, theirBlocks] = otherId ? await Promise.all([
+      supabase.from('profiles').select(PROFILE_READ_FIELDS).eq('id', otherId).maybeSingle(),
+      loadDnd(otherId),
+      supabase.from('blocks').select('id').eq('blocker_id', userId).eq('blocked_id', otherId).maybeSingle(),
+      supabase.from('blocks').select('id').eq('blocker_id', otherId).eq('blocked_id', userId).maybeSingle(),
+    ]) : [null, null, null, null] as const;
+    if (!isActive()) return;
+    if (mineBlocks?.error || theirBlocks?.error) throw mineBlocks?.error || theirBlocks?.error;
 
-    const { data: myProf } = await supabase
-      .from('profiles')
-      .select(PROFILE_READ_FIELDS)
-      .eq('id', u.user.id)
-      .maybeSingle();
-    setMyProfile(myProf);
-
-    // 1. Messages
-    const { data: msgs } = await supabase
-      .from('messages')
-      .select('*')
-      .eq('conversation_id', idToUse)
-      .order('created_at', { ascending: true });
-
+    setMyProfile(profileResult.data);
+    setOtherUser(otherProfile?.data ?? null);
+    setOtherDnd(otherSettings ? isDndActiveNow(otherSettings) : false);
+    setIsMuted(Boolean(settings[idToUse]?.muted));
+    setIsCleared(Boolean(settings[idToUse]?.clearedAt));
+    setDndActive(isDndActiveNow(dnd));
+    setBlockedByMe(Boolean(mineBlocks?.data));
+    setBlockedMe(Boolean(theirBlocks?.data));
     setMessages(prev => {
       const loaded = msgs ?? [];
       const loadedIds = new Set(loaded.map(m => m.id));
@@ -141,65 +174,11 @@ export default function Conversation() {
       });
       return [...loaded, ...liveOnly].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
     });
-
-    // 2. Other member + profile
-    const { data: members } = await supabase
-      .from('conversation_members')
-      .select('user_id')
-      .eq('conversation_id', idToUse)
-      .neq('user_id', u.user.id);
-
-    const otherId = members && members.length > 0 ? members[0].user_id : null;
-    if (otherId) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select(PROFILE_READ_FIELDS)
-        .eq('id', otherId)
-        .single();
-      setOtherUser(profile);
-      setOtherDnd(await isDndActiveNow(await loadDnd(otherId)));
-    }
-
-    // 3. My settings
-    const settings = await loadConvSettings(u.user.id, [idToUse]);
-    const mine = settings[idToUse];
-    setIsMuted(!!mine?.muted);
-    setIsCleared(!!mine?.clearedAt);
-
-    // 4. DND state
-    const mine_dnd = await loadDnd(u.user.id);
-    setDndActive(isDndActiveNow(mine_dnd));
-    await syncDndWithNotifications(u.user.id);
-
-    // 5. Blocks in both directions
-    if (otherId) {
-      const [{ data: mineBlocks }, { data: theirBlocks }] = await Promise.all([
-        supabase
-          .from('blocks')
-          .select('id')
-          .eq('blocker_id', u.user.id)
-          .eq('blocked_id', otherId)
-          .maybeSingle(),
-        supabase
-          .from('blocks')
-          .select('id')
-          .eq('blocker_id', otherId)
-          .eq('blocked_id', u.user.id)
-          .maybeSingle(),
-      ]);
-      setBlockedByMe(!!mineBlocks);
-      setBlockedMe(!!theirBlocks);
-    }
-
     setLoading(false);
-
-    // 6. Mark read
-    if (msgs && msgs.length > 0) {
-      void markConversationRead(idToUse, u.user.id);
-    }
-
-    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: false }), 50);
-  }, [convId]);
+    setLoadFailed(false);
+    if (msgs?.length) void markConversationRead(idToUse, userId);
+    void syncDndWithNotifications(userId).catch(() => {});
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -281,7 +260,6 @@ export default function Conversation() {
               return [...prev, newMsg];
             });
             setOtherTyping(false);
-            requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
             if (newMsg.sender_id !== userId) {
               void markConversationRead(activeId, userId);
             }
@@ -325,8 +303,10 @@ export default function Conversation() {
         }
       });
 
-      await load(activeId);
-    })();
+      await load(activeId, userId, () => alive);
+    })().catch(() => {
+      if (alive) { setLoadFailed(true); setLoading(false); }
+    });
 
     return () => {
       alive = false;
@@ -337,7 +317,7 @@ export default function Conversation() {
         void supabase.removeChannel(ch);
       }
     };
-  }, [convId, load]);
+  }, [convId, rawUserId, load, loadAttempt]);
 
   async function broadcastTyping(typing: boolean) {
     try {
@@ -399,7 +379,7 @@ export default function Conversation() {
         });
         if (error) throw error;
       }
-      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
+      requestAnimationFrame(jumpToLatest);
     } catch (e: any) {
       Alert.alert('تعذر إرسال الصورة', e?.message || 'حدث خطأ أثناء رفع الصورة');
     } finally {
@@ -471,7 +451,7 @@ export default function Conversation() {
         'تم الإهداء بنجاح ☕',
         `أرسلت بطاقة شكر وقهوة لـ ${otherName}، وتمت إضافة +10 نقاط لسمعته ⭐`
       );
-      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+      requestAnimationFrame(jumpToLatest);
     } catch (e: any) {
       Alert.alert('تعذّر الإرسال', e?.message || 'حدث خطأ أثناء إرسال بطاقة التقدير.');
     } finally {
@@ -521,7 +501,7 @@ export default function Conversation() {
         });
       }
 
-      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
+      requestAnimationFrame(jumpToLatest);
     } catch (e: any) {
       Alert.alert('تعذّر إرسال الموقع', e?.message || 'حدث خطأ أثناء إرسال الموقع');
     } finally {
@@ -562,7 +542,7 @@ export default function Conversation() {
       _optimisticKey: optimisticKey,
     };
     setMessages(prev => [...prev, optimisticMessage]);
-    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 10);
+    requestAnimationFrame(jumpToLatest);
     setBody('');
     void broadcastTyping(false);
     if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
@@ -592,7 +572,7 @@ export default function Conversation() {
       });
     }
 
-    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 20);
+    requestAnimationFrame(jumpToLatest);
   }
 
   async function toggleMute() {
@@ -682,6 +662,19 @@ export default function Conversation() {
     ]);
   }
 
+  if (loadFailed) {
+    return (
+      <View style={styles.center}>
+        <Text style={{ color: colors.ink }}>تعذّر تحميل المحادثة</Text>
+        <Pressable oasisKind="plain" accessibilityRole="button" style={{ padding: 14 }} onPress={() => {
+          setLoadFailed(false);
+          setLoading(true);
+          setLoadAttempt(attempt => attempt + 1);
+        }}><Text style={{ color: colors.primary, fontWeight: "700" }}>إعادة المحاولة</Text></Pressable>
+      </View>
+    );
+  }
+
   if (loading || resolvingConv) {
     return (
       <View style={[styles.center, { backgroundColor: 'transparent' }]}>
@@ -712,12 +705,18 @@ export default function Conversation() {
         onUnblockPress={confirmToggleBlock}
       />
 
-      <ScrollView
+      <View style={styles.timeline}>
+        <ScrollView
         ref={scrollRef}
         style={[styles.messagesList, { backgroundColor: 'transparent' }]}
         contentContainerStyle={[styles.messagesContent, { paddingBottom: 16 }]}
         showsVerticalScrollIndicator={false}
-        onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}
+        keyboardShouldPersistTaps="handled"
+        onScroll={trackScroll}
+        scrollEventThrottle={32}
+        onContentSizeChange={() => {
+          if (nearLatest.current) scrollRef.current?.scrollToEnd({ animated: false });
+        }}
       >
         {messages.length === 0 ? (
           <EmptyChatState
@@ -737,12 +736,20 @@ export default function Conversation() {
               otherUser={otherUser}
               otherName={otherName}
               isAnonymous={isAnonymous}
-              onPreviewImage={url => setPreviewImageUrl(url)}
+              onPreviewImage={onPreviewImage}
             />
           ))
         )}
         <View style={{ height: 16 }} />
-      </ScrollView>
+        </ScrollView>
+        {showJump && (
+        <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="الانتقال إلى أحدث رسالة" onPress={jumpToLatest}
+          style={[styles.jumpToLatest, { backgroundColor: colors.surface, borderColor: colors.line }]}>
+          <ArrowDown size={17} color={colors.primary} />
+          <Text style={[styles.jumpLabel, { color: colors.primary }]}>أحدث الرسائل</Text>
+        </Pressable>
+      )}
+      </View>
 
       <ChatInputBar
         body={body}

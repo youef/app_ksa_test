@@ -11,7 +11,7 @@ export function ensureHaynaWebMetadata(source) {
     const withoutLang = tag.replace(/\s+lang\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/i, '');
     return withoutLang.replace(/>$/, ' lang="ar">');
   });
-  const viewport = '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />';
+  const viewport = '<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />';
   const viewportPattern = /<meta\s+name=["']viewport["'][^>]*>/i;
   html = viewportPattern.test(html)
     ? html.replace(viewportPattern, viewport)

@@ -1630,7 +1630,7 @@ export default function AdminScreen() {
                         <Text style={styles.dossierNoteTitle}>
                           {v.verification_type === 'freelance' ? 'وثيقة العمل الحر' : 'السجل التجاري'} — رقم مقدم من المستخدم
                         </Text>
-                        <Text selectable style={[styles.dossierNoteText, { fontWeight: '800', writingDirection: 'ltr', textAlign: 'right' }]}>{v.document_number}</Text>
+                        <Text style={[styles.dossierNoteText, { fontWeight: '800', writingDirection: 'ltr', textAlign: 'right' }]}>{v.document_number}</Text>
                         <Text style={[styles.dossierNoteText, { color: '#9A3412' }]}>
                           لم يتحقق حيّنا من الرقم آليًا. افتح الخدمة الحكومية وتأكد من صلاحية المستند ومن أن صاحب الحساب مالكه أو مفوّض رسميًا، ثم اتخذ القرار.
                         </Text>

@@ -1,3 +1,4 @@
+import { shareContent } from '@/lib/shareContent';
 import { DiscussionComposer } from '@/components/community/DiscussionComposer';
 import { discussionStyles } from '@/components/community/discussionStyles';
 import { useTheme } from '@/context/ThemeContext';
@@ -7,7 +8,7 @@ import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface 
 import { OASIS } from '@/lib/oasis';
 import { HeaderAction } from '@/components/shared/AppHeader';
 import { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View, ActivityIndicator, Platform, Image, Modal, Share, KeyboardAvoidingView } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, View, ActivityIndicator, Platform, Image, Modal, KeyboardAvoidingView } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { sendPushToUser } from '@/lib/pushSender';
@@ -187,16 +188,9 @@ export default function Request() {
     const shareUrl = typeof window !== 'undefined' ? window.location.href : `https://hayna.app/request?id=${id}`;
     const shareText = `طلب فزعة في حي ${request?.district || 'الحي'}: «${request?.title || 'طلب مساعدة'}» عبر منصة حيّنا\n${shareUrl}`;
 
-    if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
-      try {
-        await navigator.clipboard.writeText(shareText);
-        Alert.alert('تم نسخ الرابط 📋', 'تم نسخ رابط الطلب بنجاح، يمكنك مشاركته مع جيرانك في مجموعات الواتساب.');
-        return;
-      } catch {}
-    }
 
     try {
-      await Share.share({
+      await shareContent({
         message: shareText,
         url: shareUrl,
         title: request?.title || 'طلب فزعة في حيّنا',

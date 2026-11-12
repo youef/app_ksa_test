@@ -173,7 +173,7 @@ export default function AdminAnnouncements() {
           <Text style={{ color: c.ink, textAlign: 'right' }}>الانتهاء: {new Date(ad.expires_at).toLocaleString('ar-SA')}</Text>
           <Text style={{ color: c.ink, textAlign: 'right' }}>الحالة: {new Date(ad.expires_at).getTime() > Date.now() ? 'نشط' : 'منتهي'}</Text>
           <Text style={{ color: c.ink, textAlign: 'right' }}>الإجراء: {ad.action_type === 'internal' ? 'انتقال داخل التطبيق' : ad.action_type === 'external' ? 'رابط خارجي' : 'بدون إجراء'}</Text>
-          {ad.action_target ? <Text selectable style={{ color: c.primary, textAlign: 'right' }}>المسار: {ad.action_target}</Text> : null}
+          {ad.action_target ? <Text style={{ color: c.primary, textAlign: 'right' }}>المسار: {ad.action_target}</Text> : null}
         </View> : null}
         <Pressable onPress={() => void remove(ad)} disabled={busy} style={s.delete}><Trash2 size={17} color={c.danger} /><Text style={{ color: c.danger, fontWeight: '700' }}>حذف الإعلان</Text></Pressable>
       </View>)}

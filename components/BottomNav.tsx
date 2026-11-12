@@ -197,7 +197,7 @@ export default function BottomNav() {
                 }}
                 style={({ pressed }) => [styles.tab, pressed && styles.pressed]}
               >
-                <View style={[styles.iconWrap, { backgroundColor: isDark ? 'rgba(198,230,213,.06)' : 'rgba(4,120,87,.04)' }, isActive && { backgroundColor: isDark ? 'rgba(52,211,153,.16)' : 'rgba(4,120,87,.1)' }, isCreate && styles.createIcon]}>
+                <View style={[styles.iconWrap, { backgroundColor: 'transparent' }, isActive && { backgroundColor: colors.soft }, isCreate && styles.createIcon]}>
                   <Icon size={isCreate ? 21 : 20} color={isCreate ? '#FFFFFF' : isActive ? colors.primary : colors.muted} strokeWidth={isActive || isCreate ? 2.3 : 1.8} />
                 </View>
                 <Text numberOfLines={1} style={[styles.label, { color: isActive ? colors.primary : colors.muted }, isActive && styles.activeLabel]}>{tab.label}</Text>
@@ -218,9 +218,9 @@ const styles = StyleSheet.create({
   glassHighlight: { position: 'absolute', top: 0, right: 22, left: 22, height: 1 },
   row: { flex: 1, flexDirection: 'row-reverse', alignItems: 'center', paddingHorizontal: 4 },
   tab: { flex: 1, minWidth: 0, minHeight: 44, height: '100%', alignItems: 'center', justifyContent: 'center', gap: 3 },
-  iconWrap: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  iconWrap: { width: 44, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   createIcon: { backgroundColor: '#047857', width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: 'rgba(255,255,255,.45)', shadowColor: '#047857', shadowOffset: { width: 0, height: 3 }, shadowOpacity: .18, shadowRadius: 6 },
-  label: { fontSize: 10, lineHeight: 14, fontWeight: '500' },
+  label: { fontSize: 11, lineHeight: 15, fontWeight: '500' },
   activeLabel: { fontWeight: '700' },
-  pressed: { opacity: 0.7, transform: [{ scale: 0.95 }] },
+  pressed: { opacity: 0.7 },
 });

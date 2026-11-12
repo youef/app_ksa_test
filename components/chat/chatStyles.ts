@@ -271,6 +271,9 @@ export const chatStyles = StyleSheet.create({
   },
 
   /* ------------------------------- Messages ------------------------------- */
+  timeline: { flex: 1, minHeight: 0 },
+  jumpToLatest: { position: 'absolute', bottom: 10, alignSelf: 'center', minHeight: 44, flexDirection: 'row-reverse', alignItems: 'center', gap: 7, paddingHorizontal: 14, borderWidth: 1, borderRadius: 24 },
+  jumpLabel: { fontSize: 12, fontWeight: '700' },
   messagesList: {
     flex: 1,
     width: '100%',
@@ -280,8 +283,8 @@ export const chatStyles = StyleSheet.create({
     width: '100%',
     maxWidth: 900,
     alignSelf: 'center',
-    paddingHorizontal: 18,
-    paddingTop: 16,
+    paddingHorizontal: 14,
+    paddingTop: 12,
     paddingBottom: 12,
     minHeight: '100%',
   },
@@ -328,12 +331,12 @@ export const chatStyles = StyleSheet.create({
     color: OASIS.colors.muted,
   },
   msgBubble: {
-    maxWidth: Platform.OS === 'web' ? 560 : '82%',
+    maxWidth: '82%',
     minWidth: 0,
     flexShrink: 1,
-    borderRadius: 14,
-    paddingHorizontal: 15,
-    paddingVertical: 10,
+    borderRadius: 18,
+    paddingHorizontal: 13,
+    paddingVertical: 9,
   },
   msgBubbleMine: {
     backgroundColor: T.mintBg,
@@ -348,8 +351,8 @@ export const chatStyles = StyleSheet.create({
     ...shadow(OASIS.colors.ink, 1, 5),
   },
   msgText: {
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 15,
+    lineHeight: 23,
     color: OASIS.colors.ink,
     textAlign: 'right',
     flexShrink: 1,

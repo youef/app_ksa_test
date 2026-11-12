@@ -636,13 +636,6 @@ export default function CreateStory() {
                   <Pressable key={color} onPress={() => setTextColor(color)}
                     style={[s.storyTextColorDot, { backgroundColor: color }, textColor === color && s.storyTextColorDotActive]} />
                 ))}
-                <Pressable oasisKind="plain" style={s.optionsChip} onPress={() => setFontSize((n) => Math.max(16, n - 2))}>
-                  <Text style={s.optionsChipText}>A−</Text>
-                </Pressable>
-                <Text style={s.optionsChipText}>{fontSize}</Text>
-                <Pressable oasisKind="plain" style={s.optionsChip} onPress={() => setFontSize((n) => Math.min(48, n + 2))}>
-                  <Text style={s.optionsChipText}>A+</Text>
-                </Pressable>
                 <Pressable oasisKind="plain" style={s.optionsChip} onPress={() => setTextRotation((n) => (n + 5) % 360)}>
                   <Text style={s.optionsChipText}>تدوير ↻</Text>
                 </Pressable>

@@ -1,3 +1,4 @@
+import { WEB_INTERACTION_STYLES, WEB_VIEWPORT } from '@/lib/webInteractions';
 import { OASIS } from '@/lib/oasis';
 import { ScrollViewStyleReset } from 'expo-router/html';
 import type { PropsWithChildren } from 'react';
@@ -14,9 +15,10 @@ export default function Root({ children }: PropsWithChildren) {
         <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
         <meta
           name="viewport"
-          content="width=device-width, initial-scale=1, viewport-fit=cover"
+          content={WEB_VIEWPORT}
         />
         <style>{`
+          ${WEB_INTERACTION_STYLES}
           html, body { width: 100%; min-height: 100%; -webkit-text-size-adjust: 100%; }
           input, textarea, select { font-size: 16px !important; }
           input:focus, textarea:focus, select:focus { font-size: 16px !important; }

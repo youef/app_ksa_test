@@ -1,8 +1,10 @@
+import { rtlScrollStyle, rtlContentStyle } from '@/lib/rtl';
+import { shareContent } from '@/lib/shareContent';
 import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
 import { HeaderAction, AppHeader } from '@/components/shared/AppHeader';
 import { useEffect, useState, useMemo } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View, ActivityIndicator, Platform, Image, Modal, Share, Linking, useWindowDimensions, KeyboardAvoidingView } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, View, ActivityIndicator, Platform, Image, Modal, Linking, useWindowDimensions, KeyboardAvoidingView } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import {
@@ -18,8 +20,6 @@ import {
   Sparkles,
   Truck,
   ExternalLink,
-  Copy,
-  Check,
   Maximize2,
   X,
   Phone,
@@ -60,7 +60,6 @@ export default function Service() {
   const [canContact,setCanContact]=useState(false);
   const [activeImage, setActiveImage] = useState(0);
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
-  const [copiedLink, setCopiedLink] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
@@ -195,12 +194,7 @@ export default function Service() {
     const text = `شوف هذا العرض في سوق حيّنا: «${service.name}» — ${formatServicePrice(service)}\n${url}`;
 
     try {
-      if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
-        await navigator.clipboard.writeText(url);
-        setCopiedLink(true);
-        setTimeout(() => setCopiedLink(false), 2500);
-      }
-      await Share.share({
+      await shareContent({
         message: text,
         title: service.name,
       });
@@ -332,7 +326,7 @@ export default function Service() {
                 justifyContent: 'center',
               }}
             >
-              {copiedLink ? <Check size={16} color={OASIS.colors.primary} /> : <Share2 size={16} color={OASIS.colors.muted} />}
+              <Share2 size={16} color={OASIS.colors.muted} />
             </HeaderAction>
             <HeaderAction
               accessibilityLabel="الإبلاغ عن العرض" onPress={() => router.push({ pathname: '/report', params: { type: 'service', id: service.id } })}
@@ -695,7 +689,7 @@ export default function Service() {
                 </Pressable>
                 <Text style={styles.relatedTitle}>عروض أخرى من الحي</Text>
               </View>
-              <ScrollView style={{ direction: 'rtl' }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.relatedRow, { direction: 'ltr' }]}>
+              <ScrollView style={rtlScrollStyle} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.relatedRow, rtlContentStyle]}>
                 {related.map((rel) => {
                   const cover = rel.cover_url || (Array.isArray(rel.images) && rel.images[0]);
                   return (

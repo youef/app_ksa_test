@@ -85,7 +85,7 @@ export default function More() {
     : profile?.display_name || profile?.username || 'حسابي';
 
   return (
-    <View style={[styles.screen, { backgroundColor: colors.background }, { backgroundColor: 'transparent' }]}>
+    <View style={styles.screen}>
       <AppHeader variant="tab" title="المزيد" subtitle="حسابك وخدمات حيّك في مكان واحد" />
 
       <ScrollView
@@ -176,8 +176,8 @@ function MenuGroup({ title, items, query = '' }: { title: string; items: MenuIte
   if (!visible.length) return null;
   return (
     <View style={styles.group}>
-      <Text style={[styles.groupTitle, isDark && { color: colors.muted }]}>{title}</Text>
-      <OasisSurface oasisSurface="card" style={[styles.groupCard, isDark && { backgroundColor: colors.surface, borderColor: colors.line }]}>
+      <Text style={[styles.groupTitle, { color: colors.ink, backgroundColor: colors.surface + 'EC' }]}>{title}</Text>
+      <OasisSurface oasisSurface="card" style={[styles.groupCard, { backgroundColor: colors.surface + 'EC', borderColor: colors.line }]}>
         {visible.map((item, index) => {
           const Icon = item.Icon;
           return (
@@ -200,7 +200,7 @@ function MenuGroup({ title, items, query = '' }: { title: string; items: MenuIte
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#F7F9F8' },
+  screen: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: 14, gap: 16, maxWidth: 820, width: '100%', alignSelf: 'center' },
   accountCard: { minHeight: 92, borderRadius: 14, backgroundColor: OASIS.colors.surface, borderWidth: 1, borderColor: '#DDEAE4', padding: 13, flexDirection: 'row-reverse', alignItems: 'center', gap: 11 },
   avatarWrap: { width: 56, height: 56, borderRadius: 28, backgroundColor: OASIS.colors.soft, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderWidth: 2, borderColor: OASIS.colors.soft },
@@ -210,7 +210,7 @@ const styles = StyleSheet.create({
   accountSub: { color: OASIS.colors.muted, fontSize: 11, marginTop: 2, textAlign: 'right' },
   badges: { flexDirection: 'row-reverse', gap: 5, flexWrap: 'wrap', marginTop: 6 },
   group: { gap: 7 },
-  groupTitle: { color: OASIS.colors.muted, fontSize: 11, fontWeight: '700', textAlign: 'right', paddingHorizontal: 4 },
+  groupTitle: { color: OASIS.colors.muted, fontSize: 11, fontWeight: '700', textAlign: 'right', paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, alignSelf: 'flex-end' },
   groupCard: { backgroundColor: OASIS.colors.surface, borderRadius: 14, borderWidth: 1, borderColor: OASIS.colors.line, overflow: 'hidden' },
   row: { minHeight: 56, paddingHorizontal: 12, flexDirection: 'row-reverse', alignItems: 'center', gap: 10 },
   rowIcon: { width: 39, height: 39, borderRadius: 12, backgroundColor: OASIS.colors.soft, alignItems: 'center', justifyContent: 'center' },

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Image, Linking, Platform, ScrollView, Text, View, useWindowDimensions } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { CloudRain, CloudSun, ExternalLink, MapPin, Pause, Play, RefreshCw, Satellite, ChevronRight, Clock, ZoomIn, ZoomOut } from 'lucide-react-native';
+import { CloudRain, CloudSun, ExternalLink, MapPin, Pause, Play, RefreshCw, Satellite, ChevronRight, Clock } from 'lucide-react-native';
 import { AppHeader } from '@/components/shared/AppHeader';
 import { OasisPressable as Pressable, OasisSurface } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
@@ -57,7 +57,6 @@ export default function SaudiWeatherRadarScreen() {
   const [selectedCity, setSelectedCity] = useState(initialCity);
   const [region, setRegion] = useState(initialCity.region);
   const [layer, setLayer] = useState<RadarLayer>('radar');
-  const [mapZoom, setMapZoom] = useState(BASE_ZOOM);
   const [frames, setFrames] = useState(imergFrames);
   const [frameIndex, setFrameIndex] = useState(HISTORY_FRAMES - 1);
   const [playing, setPlaying] = useState(false);
@@ -79,13 +78,13 @@ export default function SaudiWeatherRadarScreen() {
     const url = new URL('/embed/map', EMBED_ORIGIN);
     url.searchParams.set('lat', lat.toFixed(4));
     url.searchParams.set('lon', lon.toFixed(4));
-    url.searchParams.set('zoom', String(mapZoom));
+    url.searchParams.set('zoom', String(BASE_ZOOM));
     url.searchParams.set('layer', layer === 'satellite' ? 'satellite' : 'radar');
     url.searchParams.set('theme', 'light');
     url.searchParams.set('controls', '1');
     url.searchParams.set('timeline', '1');
     return url.toString();
-  }, [lat, lon, layer, mapZoom]);
+  }, [lat, lon, layer]);
 
   useEffect(() => {
     if (!playing || layer !== 'nasa') return;
@@ -96,7 +95,7 @@ export default function SaudiWeatherRadarScreen() {
   useEffect(() => {
     setNasaError(false);
     setNasaLoading(layer === 'nasa');
-  }, [layer, frameIndex, selectedCity, mapZoom, refreshToken]);
+  }, [layer, frameIndex, selectedCity, refreshToken]);
 
   const selectCity = (city: typeof selectedCity) => {
     setSelectedCity(city);
@@ -120,7 +119,7 @@ export default function SaudiWeatherRadarScreen() {
             <View style={{ backgroundColor: '#dcfce7', borderRadius: 13, padding: 9 }}><CloudRain size={20} color={OASIS.colors.primary} /></View>
             <View style={{ flex: 1, alignItems: 'flex-end', gap: 4 }}>
               <Text style={{ color: OASIS.colors.ink, fontSize: 17, fontWeight: '800' }}>مراقبة المطر والسحب</Text>
-              <Text style={{ color: OASIS.colors.muted, fontSize: 11 }}>اختر المدينة، ثم حرّك الخريطة أو ارجع إلى الرصد السابق</Text>
+              <Text style={{ color: OASIS.colors.muted, fontSize: 11 }}>اختر المدينة ومصدر عرض الهطول والسحب</Text>
             </View>
             <Pressable onPress={refresh} accessibilityLabel="تحديث الخرائط" style={{ padding: 9, backgroundColor: OASIS.colors.soft, borderRadius: 12 }}>
               <RefreshCw size={17} color={OASIS.colors.primary} />
@@ -174,13 +173,13 @@ export default function SaudiWeatherRadarScreen() {
               {Platform.OS === 'web' ? (
                 <View style={{ width: '100%', height: width < 600 ? 440 : 550, borderRadius: 15, overflow: 'hidden', backgroundColor: '#dce9ef' }}>
                   {React.createElement('iframe', {
+                    tabIndex: -1,
                     key: embedUrl + ':' + refreshToken,
-                    src: embedUrl,
-                    title: 'خريطة الطقس التفاعلية من WeatherScope',
+                    src: embedUrl.replace('controls=1', 'controls=0').replace('timeline=1', 'timeline=0'),
+                    title: 'معاينة خريطة الطقس من WeatherScope',
                     loading: 'lazy',
-                    allowFullScreen: true,
                     referrerPolicy: 'strict-origin-when-cross-origin',
-                    style: { width: '100%', height: '100%', border: 0, display: 'block' },
+                    style: { pointerEvents: 'none', width: '100%', height: '100%', border: 0, display: 'block' },
                   })}
                 </View>
               ) : (
@@ -206,13 +205,11 @@ export default function SaudiWeatherRadarScreen() {
               <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 9 }}>
                 <Text style={{ color: OASIS.colors.ink, fontSize: 12, fontWeight: '800' }}>{saudiTime(frames[frameIndex])}</Text>
                 <View style={{ flexDirection: 'row-reverse', gap: 7 }}>
-                  <Pressable onPress={() => setMapZoom(z => Math.min(10, z + 1))} accessibilityLabel="تكبير" style={actionStyle(false)}><ZoomIn size={16} color={OASIS.colors.primary} /></Pressable>
-                  <Pressable onPress={() => setMapZoom(z => Math.max(4, z - 1))} accessibilityLabel="تصغير" style={actionStyle(false)}><ZoomOut size={16} color={OASIS.colors.primary} /></Pressable>
                 </View>
               </View>
               <View style={{ width: '100%', aspectRatio: 1024 / 700, minHeight: 200, overflow: 'hidden', borderRadius: 14, backgroundColor: '#cbd5e1', alignItems: 'center', justifyContent: 'center' }}>
-                <Image key={nasaMapUrl(lat, lon, mapZoom, frames[frameIndex])}
-                  source={{ uri: nasaMapUrl(lat, lon, mapZoom, frames[frameIndex]) }}
+                <Image key={nasaMapUrl(lat, lon, BASE_ZOOM, frames[frameIndex])}
+                  source={{ uri: nasaMapUrl(lat, lon, BASE_ZOOM, frames[frameIndex]) }}
                   resizeMode="stretch" style={{ width: '100%', height: '100%' }}
                   onLoadStart={() => setNasaLoading(true)}
                   onLoadEnd={() => setNasaLoading(false)}

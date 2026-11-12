@@ -231,7 +231,7 @@ export default function Home() {
   }, [feed.hasMore, feed.loadingMore, feed.loading, feed.loadMore]);
 
   return (
-    <View style={[styles.container, layout.page, { backgroundColor: colors.background }, { backgroundColor: 'transparent' }]}>
+    <View style={[styles.container, layout.page]}>
 
       <AppHeader
         variant="home"
@@ -242,15 +242,15 @@ export default function Home() {
         unreadMessagesCount={feed.unreadMessagesCount}
       />
 
-      <View style={{ flex: 1, backgroundColor: 'transparent' }}>
+      <View style={layout.body}>
       <ScrollView
         ref={scrollRef}
-        style={{ flex: 1, backgroundColor: 'transparent' }}
+        style={layout.body}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         onScroll={handleFeedScroll}
         scrollEventThrottle={300}
-        contentContainerStyle={{ paddingBottom: bottomNavInset + 24, paddingTop: 16, gap: 16, backgroundColor: 'transparent', flexGrow: 1 }}
+        contentContainerStyle={{ paddingBottom: bottomNavInset + 24, paddingTop: 16, gap: 16, flexGrow: 1 }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -395,6 +395,7 @@ export default function Home() {
 
 const layout = StyleSheet.create({
   page: { backgroundColor: 'transparent' },
+  body: { flex: 1, backgroundColor: 'transparent' },
   contextRow: { width: '100%', maxWidth: 820, alignSelf: 'center', flexDirection: 'row-reverse', flexWrap: 'wrap', alignItems: 'stretch', gap: 10, paddingHorizontal: 16 },
   locationTile: { flex: 1.6, minWidth: 160 },
   weatherTile: { flex: 1, minWidth: 120 },

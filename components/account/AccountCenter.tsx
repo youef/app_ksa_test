@@ -1,3 +1,4 @@
+import { shareContent } from '@/lib/shareContent';
 import { PROFILE_READ_FIELDS } from '@/lib/profileFields';
 import { AppearanceSettings } from '@/components/account/AppearanceSettings';
 import { useTheme } from '@/context/ThemeContext';
@@ -11,7 +12,7 @@ import { OasisArtwork } from '@/components/oasis/OasisPrimitives';
 import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Image, ImageBackground, Platform, RefreshControl, ScrollView, Share, StyleSheet, Switch, Text, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Image, ImageBackground, Platform, RefreshControl, ScrollView, StyleSheet, Switch, Text, View, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -419,8 +420,7 @@ export default function AccountCenter() {
     const path = '/user?username=' + encodeURIComponent(profile?.username || userId);
     const url = Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.origin + path : 'https://appksatest.vercel.app' + path;
     try {
-      if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {await navigator.clipboard.writeText(url);notify('تم نسخ الرابط','يمكنك الآن مشاركة ملفك الشخصي.');}
-      else await Share.share({message:url});
+      await shareContent({message:url});
     } catch {notify('تعذر مشاركة الرابط','حاول مرة أخرى.');}
   }
   async function saveProfile() {

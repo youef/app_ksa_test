@@ -54,7 +54,7 @@ export default function PlatformInbox() {
       {[...messages].reverse().map(message => <View key={message.id} style={[s.bubble, { backgroundColor: colors.surface, borderColor: colors.line }]}>
         <Text style={[s.tag, { color: colors.primary }]}>{message.type === 'welcome' ? 'أهلًا بك' : message.type === 'update' ? 'جديد المنصة' : 'رسالة رسمية'}</Text>
         {message.title ? <Text style={[s.title, { color: colors.ink }]}>{message.title}</Text> : null}
-        <Text selectable style={[s.body, { color: colors.ink }]}>{message.body}</Text>
+        <Text style={[s.body, { color: colors.ink }]}>{message.body}</Text>
         <Text style={[s.date, { color: colors.muted }]}>{new Date(message.created_at).toLocaleString('ar-SA', { dateStyle: 'medium', timeStyle: 'short' })}</Text>
       </View>)}
       {loading ? <ActivityIndicator color={colors.primary} /> : hasMore ? <Pressable oasisKind="action" onPress={() => void load(true)}><Text style={{ color: colors.primary }}>الرسائل السابقة</Text></Pressable> : null}

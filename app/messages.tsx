@@ -2,8 +2,9 @@ import { PROFILE_READ_FIELDS } from '@/lib/profileFields';
 import { OasisEmptyIllustration } from '@/components/oasis/OasisEmptyIllustration';
 import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
+import { useTheme } from '@/context/ThemeContext';
 import { HeaderAction } from '@/components/shared/AppHeader';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, RefreshControl, ActivityIndicator, Modal, Alert, Platform } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { supabase } from '@/lib/supabase';
@@ -63,7 +64,10 @@ type Conv = {
 };
 
 export default function Messages() {
+  const { colors } = useTheme();
   const bottomNavInset = useBottomNavInset();
+  const loadVersion = useRef(0);
+  const [loadError, setLoadError] = useState(false);
   const [conversations, setConversations] = useState<Conv[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -85,130 +89,143 @@ export default function Messages() {
   const dndNow = isDndActiveNow(dnd);
 
   const load = useCallback(async () => {
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) return router.replace('/auth');
-    setCurrentUserId(u.user.id);
-
-    // Platform messages (welcome/updates)
+    const version = ++loadVersion.current;
+    setLoadError(false);
     try {
-      const [latest, unread] = await Promise.all([
-        supabase.from('platform_messages').select('id,body,created_at').eq('recipient_id', u.user.id).order('created_at', { ascending: false }).limit(1),
-        supabase.from('platform_messages').select('id', { count: 'exact', head: true }).eq('recipient_id', u.user.id).eq('read', false),
+      const { data: u, error: authError } = await supabase.auth.getUser();
+      if (version !== loadVersion.current) return;
+      if (authError && authError.name !== 'AuthSessionMissingError') throw authError;
+      if (!u.user) return router.replace('/auth');
+      const userId = u.user.id;
+      setCurrentUserId(userId);
+
+      void Promise.all([
+        supabase.from('platform_messages').select('id,body,created_at').eq('recipient_id', userId).order('created_at', { ascending: false }).limit(1),
+        supabase.from('platform_messages').select('id', { count: 'exact', head: true }).eq('recipient_id', userId).eq('read', false),
+      ]).then(([latest, unread]) => {
+        if (version !== loadVersion.current) return;
+        if (!latest.error) setPlatformMessages(latest.data || []);
+        if (!unread.error) setPlatformUnreadCount(unread.count || 0);
+      }).catch(() => {});
+
+      void loadDnd(userId).then(settings => {
+        if (version !== loadVersion.current) return;
+        setDnd(settings);
+        void syncDndWithNotifications(userId).catch(() => {});
+      }).catch(() => {});
+
+      const [membership, myBlocks, blockedBy] = await Promise.all([
+        supabase.from('conversation_members').select('conversation_id').eq('user_id', userId),
+        supabase.from('blocks').select('blocked_id').eq('blocker_id', userId),
+        supabase.from('blocks').select('blocker_id').eq('blocked_id', userId),
       ]);
-      if (latest.error) throw latest.error;
-      if (unread.error) throw unread.error;
-      setPlatformMessages(latest.data || []);
-      setPlatformUnreadCount(unread.count || 0);
+      if (version !== loadVersion.current) return;
+      if (membership.error) throw membership.error;
+      const myConvs = membership.data;
+      const bIds = Array.from(new Set((myBlocks.data || []).map(row => row.blocked_id))) as string[];
+      const brIds = Array.from(new Set((blockedBy.data || []).map(row => row.blocker_id))) as string[];
+      setBlockedIds(bIds);
+      setBlockerIds(brIds);
+      if (!myConvs || myConvs.length === 0) {
+        setConversations([]);
+        return;
+      }
+
+      const convIds = myConvs.map(c => c.conversation_id);
+
+      const [messagesRes, allMembersRes, settings] = await Promise.all([
+        supabase
+          .from('messages')
+          .select('id, conversation_id, sender_id, body, created_at, read_by')
+          .in('conversation_id', convIds)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('conversation_members')
+          .select('conversation_id, user_id')
+          .in('conversation_id', convIds)
+          .neq('user_id', userId),
+        loadConvSettings(userId, convIds),
+      ]);
+
+      if (messagesRes.error || allMembersRes.error) throw messagesRes.error || allMembersRes.error;
+      const messages = messagesRes.data || [];
+      const allMembers = allMembersRes.data || [];
+
+      const otherUserIds = [...new Set(allMembers.map((m: any) => m.user_id))];
+      const { data: profiles, error: profileError } =
+        otherUserIds.length > 0
+          ? await supabase.from('profiles').select(PROFILE_READ_FIELDS).in('id', otherUserIds)
+          : { data: [], error: null };
+
+      if (version !== loadVersion.current) return;
+      if (profileError) throw profileError;
+      const profileMap = (profiles || []).reduce((acc: any, p: any) => ({ ...acc, [p.id]: p }), {});
+
+      const convMap: Record<string, any> = {};
+      messages.forEach((msg: any) => {
+        if (!convMap[msg.conversation_id]) convMap[msg.conversation_id] = msg;
+      });
+
+      const memberByConversation = new Map(allMembers.map(member => [member.conversation_id, member]));
+      const convList: Conv[] = convIds
+        .map(convId => {
+          const otherMember = memberByConversation.get(convId);
+          const otherProfile = otherMember ? profileMap[otherMember.user_id] : null;
+          const lastMsg = convMap[convId];
+          const setting = settings[convId];
+          const otherId = otherMember?.user_id || '';
+
+          return {
+            id: convId,
+            other: otherProfile,
+            lastMessage: lastMsg,
+            isUnread:
+              !!lastMsg &&
+              lastMsg.sender_id !== userId &&
+              !(lastMsg.read_by || []).includes(userId),
+            isBlocked: otherId ? bIds.includes(otherId) || brIds.includes(otherId) : false,
+            iBlocked: otherId ? bIds.includes(otherId) : false,
+            blockedMe: otherId ? brIds.includes(otherId) : false,
+            isMuted: !!setting?.muted,
+            isCleared: !!setting?.clearedAt,
+            otherUserId: otherId,
+            name: displayName(otherProfile),
+          };
+        })
+        .filter(c => c.other);
+
+      convList.sort((a, b) =>
+        (b.lastMessage?.created_at || '').localeCompare(a.lastMessage?.created_at || '')
+      );
+
+      setConversations(convList);
     } catch {
-      setPlatformMessages([]);
-      setPlatformUnreadCount(0);
+      if (version === loadVersion.current) setLoadError(true);
+    } finally {
+      if (version === loadVersion.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
-
-    // 1. DND state (with schedule)
-    const dndSettings = await loadDnd(u.user.id);
-    setDnd(dndSettings);
-    await syncDndWithNotifications(u.user.id);
-
-    // 2. Blocked user IDs (both directions so the UI can explain a locked chat)
-    const [{ data: myBlocks }, { data: blockedBy }] = await Promise.all([
-      supabase.from('blocks').select('blocked_id').eq('blocker_id', u.user.id),
-      supabase.from('blocks').select('blocker_id').eq('blocked_id', u.user.id),
-    ]);
-
-    const bIds = [...new Set((myBlocks || []).map((b: any) => b.blocked_id))] as string[];
-    const brIds = [...new Set((blockedBy || []).map((b: any) => b.blocker_id))] as string[];
-    setBlockedIds(bIds);
-    setBlockerIds(brIds);
-
-    // 3. My conversations
-    const { data: myConvs } = await supabase
-      .from('conversation_members')
-      .select('conversation_id')
-      .eq('user_id', u.user.id);
-
-    if (!myConvs || myConvs.length === 0) {
-      setConversations([]);
-      setLoading(false);
-      return;
-    }
-
-    const convIds = myConvs.map(c => c.conversation_id);
-
-    const [messagesRes, allMembersRes, settings] = await Promise.all([
-      supabase
-        .from('messages')
-        .select('*')
-        .in('conversation_id', convIds)
-        .order('created_at', { ascending: false }),
-      supabase
-        .from('conversation_members')
-        .select('conversation_id, user_id')
-        .in('conversation_id', convIds)
-        .neq('user_id', u.user.id),
-      loadConvSettings(u.user.id, convIds),
-    ]);
-
-    const messages = messagesRes.data || [];
-    const allMembers = allMembersRes.data || [];
-
-    const otherUserIds = [...new Set(allMembers.map((m: any) => m.user_id))];
-    const { data: profiles } =
-      otherUserIds.length > 0
-        ? await supabase.from('profiles').select(PROFILE_READ_FIELDS).in('id', otherUserIds)
-        : { data: [] };
-
-    const profileMap = (profiles || []).reduce((acc: any, p: any) => ({ ...acc, [p.id]: p }), {});
-
-    const convMap: Record<string, any> = {};
-    messages.forEach((msg: any) => {
-      if (!convMap[msg.conversation_id]) convMap[msg.conversation_id] = msg;
-    });
-
-    const convList: Conv[] = convIds
-      .map(convId => {
-        const otherMember = allMembers.find((m: any) => m.conversation_id === convId);
-        const otherProfile = otherMember ? profileMap[otherMember.user_id] : null;
-        const lastMsg = convMap[convId];
-        const setting = settings[convId];
-        const otherId = otherMember?.user_id || '';
-
-        return {
-          id: convId,
-          other: otherProfile,
-          lastMessage: lastMsg,
-          isUnread:
-            !!lastMsg &&
-            lastMsg.sender_id !== u.user.id &&
-            !(lastMsg.read_by || []).includes(u.user.id),
-          isBlocked: otherId ? bIds.includes(otherId) || brIds.includes(otherId) : false,
-          iBlocked: otherId ? bIds.includes(otherId) : false,
-          blockedMe: otherId ? brIds.includes(otherId) : false,
-          isMuted: !!setting?.muted,
-          isCleared: !!setting?.clearedAt,
-          otherUserId: otherId,
-          name: displayName(otherProfile),
-        };
-      })
-      .filter(c => c.other);
-
-    convList.sort((a, b) =>
-      (b.lastMessage?.created_at || '').localeCompare(a.lastMessage?.created_at || '')
-    );
-
-    setConversations(convList);
-    setLoading(false);
   }, []);
 
   useFocusEffect(
     useCallback(() => {
       void load();
       let debounce: ReturnType<typeof setTimeout> | undefined;
-      const channel = supabase.channel('official-chat-list')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'platform_messages' }, () => {
-          clearTimeout(debounce);
-          debounce = setTimeout(() => { void load(); }, 500);
-        }).subscribe();
-      return () => { clearTimeout(debounce); void supabase.removeChannel(channel); };
+      const refreshSoon = () => {
+        if (debounce) return;
+        debounce = setTimeout(() => { debounce = undefined; void load(); }, 180);
+      };
+      const channel = supabase.channel('chat-list-' + Math.random().toString(36).slice(2))
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'platform_messages' }, refreshSoon)
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, refreshSoon)
+        .subscribe();
+      return () => {
+        ++loadVersion.current;
+        clearTimeout(debounce);
+        void supabase.removeChannel(channel);
+      };
     }, [load])
   );
 
@@ -354,8 +371,8 @@ export default function Messages() {
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <AppHeader
         variant="tab"
-        title="الرسائل والمحادثات"
-        subtitle={unreadCount > 0 ? `${unreadCount} محادثة جديدة غير مقروءة` : 'تواصل وتنسيق مع جيران حيك'}
+        title="المحادثات"
+        subtitle={unreadCount > 0 ? `${unreadCount} محادثة جديدة غير مقروءة` : undefined}
         rightAction={
           <View style={styles.headerRightActions}>
             {silentUnread > 0 && (
@@ -387,19 +404,20 @@ export default function Messages() {
       />
 
       {/* Modern Search & Filter Capsule */}
-      <View style={styles.searchSection}>
+      <View style={[styles.searchSection, { backgroundColor: colors.surface, borderColor: colors.line }]}>
         <OasisSurface oasisSurface="field" style={styles.searchBox}>
           <Search size={17} color={OASIS.colors.primary} />
           <TextInput
             style={styles.searchInput}
-            placeholder="ابحث في محادثاتك مع الجيران..."
+            accessibilityLabel="ابحث في المحادثات"
+            placeholder="ابحث في المحادثات"
             placeholderTextColor="#94a3b8"
             value={searchQuery}
             onChangeText={setSearchQuery}
             selectionColor={OASIS.colors.primary}
           />
           {searchQuery.length > 0 && (
-            <Pressable oasisKind="icon" onPress={() => setSearchQuery('')} hitSlop={6} style={styles.clearSearchBtn}>
+            <Pressable oasisKind="icon" onPress={() => setSearchQuery('')} accessibilityLabel="مسح البحث" hitSlop={6} style={styles.clearSearchBtn}>
               <X size={14} color={OASIS.colors.muted} />
             </Pressable>
           )}
@@ -407,7 +425,7 @@ export default function Messages() {
 
         {/* Filter Pills */}
         <View style={styles.filtersRow}>
-          <Pressable oasisVariant={!onlyUnread ? 'primary' : 'secondary'} oasisKind="chip"
+          <Pressable oasisKind="plain" accessibilityRole="button" accessibilityState={{ selected: !onlyUnread }}
             style={[styles.filterPill, !onlyUnread && styles.filterPillActive]}
             onPress={() => setOnlyUnread(false)}
           >
@@ -417,7 +435,7 @@ export default function Messages() {
             </Text>
           </Pressable>
 
-          <Pressable oasisVariant={onlyUnread ? 'primary' : 'secondary'} oasisKind="chip"
+          <Pressable oasisKind="plain" accessibilityRole="button" accessibilityState={{ selected: onlyUnread }}
             style={[styles.filterPill, onlyUnread && styles.filterPillActive]}
             onPress={() => setOnlyUnread(true)}
           >
@@ -448,6 +466,11 @@ export default function Messages() {
         </View>
       )}
 
+      {loadError && (
+        <Pressable oasisKind="plain" accessibilityRole="button" onPress={() => void load()} style={[styles.retryBanner, { backgroundColor: colors.dangerSoft }]}>
+          <Text style={[styles.filterPillText, { color: colors.danger }]}>تعذّر تحديث المحادثات · إعادة المحاولة</Text>
+        </Pressable>
+      )}
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={OASIS.colors.primary} />
@@ -466,7 +489,6 @@ export default function Messages() {
               onRefresh={async () => {
                 setRefreshing(true);
                 await load();
-                setRefreshing(false);
               }}
               tintColor={OASIS.colors.primary}
             />
@@ -476,7 +498,7 @@ export default function Messages() {
             {showPlatformConversation ? (
               <Pressable oasisKind="card" accessibilityRole="button" accessibilityLabel="محادثة منصة حيّنا الرسمية" onPress={() => router.push('/platform-inbox')} style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 12, padding: 14, marginBottom: 14, backgroundColor: OASIS.colors.surface, borderRadius: 14, borderWidth: 1, borderColor: OASIS.colors.line }}>
                 <View style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: OASIS.colors.soft, alignItems: 'center', justifyContent: 'center' }}><CheckCircle2 size={24} color={OASIS.colors.primary} /></View>
-                <View style={{ flex: 1, gap: 5 }}><Text style={{ textAlign: 'right', fontSize: 15, fontWeight: '700', color: OASIS.colors.ink }}>منصة حيّنا ✓</Text><Text numberOfLines={1} style={{ textAlign: 'right', fontSize: 12, color: OASIS.colors.muted }}>{platformMessages[0]?.body || 'الحساب الرسمي · الترحيب وأخبار المنصة'}</Text></View>
+                <View style={{ flex: 1, gap: 5 }}><Text style={{ textAlign: 'right', fontSize: 15, fontWeight: '700', color: OASIS.colors.ink }}>منصة حيّنا</Text><Text numberOfLines={1} style={{ textAlign: 'right', fontSize: 12, color: OASIS.colors.muted }}>{platformMessages[0]?.body || 'الحساب الرسمي · الترحيب وأخبار المنصة'}</Text></View>
                 {platformUnreadCount > 0 ? <View style={{ minWidth: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: OASIS.colors.primary }}><Text style={{ fontSize: 11, color: '#fff' }}>جديد</Text></View> : <ChevronLeft size={18} color={OASIS.colors.muted} />}
               </Pressable>
             ) : null}
@@ -502,7 +524,7 @@ export default function Messages() {
               <>
                 {filtered.some(c => c.isUnread && !c.isMuted && !dndNow) && (
                   <View style={styles.sectionHeaderRow}>
-                    <Text style={styles.sectionLabel}>غير مقروء 🔔</Text>
+                    <Text style={styles.sectionLabel}>غير مقروء</Text>
                   </View>
                 )}
 
@@ -806,7 +828,7 @@ function ConvCard({
   const { lastMessage, isUnread, isBlocked, isMuted, id, other, name } = conv;
   const avatar = other?.avatar_url;
   const isLastMine = lastMessage?.sender_id === currentUserId;
-  const isRead = isLastMine ? true : (lastMessage?.read_by || []).includes(currentUserId);
+  const isRead = Boolean(conv.otherUserId && (lastMessage?.read_by || []).includes(conv.otherUserId));
   const timeStr = lastMessage?.created_at ? formatTime(lastMessage.created_at) : '';
 
   const preview = isBlocked
@@ -818,7 +840,8 @@ function ConvCard({
     : formatMessagePreview(lastMessage?.body, isLastMine);
 
   return (
-    <Pressable oasisKind="card" oasisSurfaceState={isUnread ? "unread" : "default"}
+    <Pressable oasisKind="card" accessibilityRole="button" accessibilityLabel={isUnread ? name + '، غير مقروء' : name}
+      oasisSurfaceState={isUnread ? "unread" : "default"}
       style={[
         styles.convCard,
         isUnread && styles.convCardUnread,
@@ -904,6 +927,7 @@ function formatTime(dateStr: string): string {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: OASIS.colors.background },
+  retryBanner: { width: '92%', maxWidth: 700, alignSelf: 'center', alignItems: 'center', padding: 12, borderRadius: 14, marginBottom: 8 },
   headerRightActions: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
@@ -934,12 +958,14 @@ const styles = StyleSheet.create({
   },
   dndBtnActive: { backgroundColor: 'transparent', borderWidth: 0 },
   searchSection: {
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 6,
-    backgroundColor: OASIS.colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    width: '96%',
+    maxWidth: 720,
+    alignSelf: 'center',
+    marginTop: 12,
+    marginBottom: 8,
+    padding: 10,
+    borderRadius: 18,
+    borderWidth: 1,
     gap: 8,
   },
   searchBox: {
@@ -980,9 +1006,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 5,
     paddingHorizontal: 12,
+    minHeight: 38,
     paddingVertical: 6,
     borderRadius: 12,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: OASIS.colors.soft,
     borderWidth: 1,
     borderColor: OASIS.colors.line,
   },
