@@ -436,7 +436,7 @@ export default function TwitterInquiryCard({
       <View style={[s.xHeader, isQuestionDetail && s.xDetailHeader, isDark && { borderBottomColor: colors.line }]}>
         <Pressable
           onPress={() => isGuest ? requireAccount() : data.profiles?.id && router.push({ pathname: '/user', params: { id: data.profiles.id } })}
-          style={s.xAvatarWrap}
+          style={[s.xAvatarWrap, { minWidth: 44, minHeight: 44, justifyContent: 'center', alignItems: 'center' }]}
           accessibilityRole="button"
           accessibilityLabel="الملف الشخصي للكاتب"
         >
@@ -452,7 +452,7 @@ export default function TwitterInquiryCard({
 
         <View style={s.xAuthorMeta}>
           <View style={s.xAuthorRow}>
-            <Pressable onPress={() => isGuest ? requireAccount() : data.profiles?.id && router.push({ pathname: '/user', params: { id: data.profiles.id } })}>
+            <Pressable onPress={() => isGuest ? requireAccount() : data.profiles?.id && router.push({ pathname: '/user', params: { id: data.profiles.id } })} accessibilityRole="button" accessibilityLabel={`عرض الملف الشخصي: ${name}`} style={{ minHeight: 44, justifyContent: 'center' }}>
               <Text style={[s.xAuthorName, isDark && { color: colors.ink }]} numberOfLines={1}>{name}</Text>
             </Pressable>
             {isEmergency ? (
@@ -479,13 +479,13 @@ export default function TwitterInquiryCard({
           </View>
         </View>
 
-        <Pressable oasisKind="icon" onPress={handleMoreOptions} style={s.xMoreBtn} accessibilityRole="button" accessibilityLabel="خيارات">
+        <Pressable oasisKind="icon" onPress={handleMoreOptions} style={[s.xMoreBtn, { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }]} accessibilityRole="button" accessibilityLabel="خيارات المنشور">
           <MoreHorizontal size={18} color="#94a3b8" />
         </Pressable>
       </View>
 
       {/* Main Content Area */}
-      <Pressable onPress={detailMode ? undefined : navigateToDetails} style={[s.xContentArea, isQuestionDetail && s.xDetailContent]} accessibilityRole={detailMode ? undefined : "button"} accessibilityLabel={detailMode ? undefined : "فتح تفاصيل المنشور"}>
+      <Pressable onPress={detailMode ? undefined : navigateToDetails} style={[s.xContentArea, isQuestionDetail && s.xDetailContent]} accessibilityRole={detailMode ? undefined : "button"} accessibilityLabel={detailMode ? undefined : `فتح تفاصيل المنشور: ${data.title || 'منشور الحي'}`}>
         <Text accessibilityRole={isQuestionDetail ? "header" : undefined} style={[s.xTitle, isQuestionDetail && s.xDetailTitle, isDark && { color: colors.ink }, isEmergency && { color: '#991b1b' }]} numberOfLines={detailMode ? undefined : 2}>{data.title}</Text>
         {(data.body || data.description) && (
           <>
@@ -565,17 +565,17 @@ export default function TwitterInquiryCard({
         </Pressable>
 
         {!isGuest && (
-          <Pressable oasisKind="action" style={s.xActionBtn} onPress={handleBookmark}>
+          <Pressable oasisKind="action" style={[s.xActionBtn, { minWidth: 44, minHeight: 44 }]} onPress={handleBookmark} accessibilityRole="button" accessibilityLabel={bookmarked ? "إزالة المنشور من المحفوظات" : "حفظ المنشور"} accessibilityState={{ selected: bookmarked }}>
             <Bookmark size={17} color={bookmarked ? OASIS.colors.warning : OASIS.colors.muted} fill={bookmarked ? OASIS.colors.warning : 'none'} />
             {bookmarked && <Text style={[s.xActionCounter, { color: OASIS.colors.warning, fontSize: 11 }]}>محفوظ</Text>}
           </Pressable>
         )}
 
-        <Pressable oasisKind="icon" style={s.xActionBtn} onPress={handleShare}>
+        <Pressable oasisKind="icon" style={[s.xActionBtn, { minWidth: 44, minHeight: 44 }]} onPress={handleShare} accessibilityRole="button" accessibilityLabel="مشاركة المنشور">
           <Share2 size={17} color={OASIS.colors.muted} />
         </Pressable>
 
-        <View style={s.xActionBtn}>
+        <View style={s.xActionBtn} accessible accessibilityLabel={`عدد المشاهدات ${viewsCount}`}>
           <Eye size={16} color="#94a3b8" />
           <Text style={s.xActionViews}>{viewsCount}</Text>
         </View>
