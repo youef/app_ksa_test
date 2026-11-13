@@ -13,7 +13,7 @@ Only the bottom-of-feed pagination area in `app/home.tsx`. Keep existing fetch a
 The footer displayed only a spinner while loading; the action had no explicit loading state for screen readers, and the end of results had no visual closure.
 
 ## After / validation
-Pending implementation and validation. Record actual results below, not assumed results.
+Implemented in `app/home.tsx`: loading footer now includes a spinner plus Arabic status text and busy/disabled accessibility state; manual fallback remains 48px high; a quiet end-of-feed message appears when visible posts exist and there are no more pages. Uses current theme colors and existing responsive feed width. No data-fetch logic was changed.\n\nValidation: source diff inspected; local TypeScript, Web build, and automated tests could not be executed because this runner cannot resolve github.com for a local checkout. CI status and human review must be verified on the PR before merging.
 
 ## Next section
 Home feed refresh feedback and scroll-to-top affordance.
