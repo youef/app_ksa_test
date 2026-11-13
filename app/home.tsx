@@ -317,20 +317,29 @@ export default function Home() {
             ))
           )}
 
-          {!feed.loading && feed.hasMore && items.length > 0 && (
-            <Pressable oasisKind="action"
-              style={styles.loadMoreBtn}
-              onPress={feed.loadMore}
-              disabled={feed.loadingMore}
-              accessibilityRole="button"
-              accessibilityLabel="تحميل المزيد"
-            >
-              {feed.loadingMore ? (
-                <ActivityIndicator color={OASIS.colors.primary} />
+          {!feed.loading && filteredItems.length > 0 && (
+            <View style={layout.paginationFooter}>
+              {feed.hasMore ? (
+                <Pressable
+                  oasisKind="action"
+                  style={[layout.paginationButton, { backgroundColor: colors.surface, borderColor: colors.line }]}
+                  onPress={() => { void feed.loadMore(); }}
+                  disabled={feed.loadingMore}
+                  accessibilityRole="button"
+                  accessibilityLabel={feed.loadingMore ? 'جارٍ تحميل المزيد من منشورات الحي' : 'عرض المزيد من منشورات الحي'}
+                  accessibilityState={{ disabled: feed.loadingMore, busy: feed.loadingMore }}
+                >
+                  {feed.loadingMore && <ActivityIndicator size="small" color={colors.primary} />}
+                  <Text style={[layout.paginationText, { color: colors.primary }]}>
+                    {feed.loadingMore ? 'جارٍ تحميل المزيد…' : 'عرض المزيد من المنشورات'}
+                  </Text>
+                </Pressable>
               ) : (
-                <Text style={styles.loadMoreText}>حمّل المزيد</Text>
+                <Text accessibilityRole="text" style={[layout.paginationEnd, { color: colors.muted }]}>
+                  وصلت إلى نهاية منشورات الحي
+                </Text>
               )}
-            </Pressable>
+            </View>
           )}
 
 
@@ -410,6 +419,10 @@ const layout = StyleSheet.create({
   activeFilters: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 },
   filterChip: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: 10, minHeight: 32, paddingHorizontal: 8, maxWidth: '100%' },
   filterChipText: { fontSize: 12, lineHeight: 20, flexShrink: 1 },
+  paginationFooter: { alignItems: 'center', justifyContent: 'center', minHeight: 72, paddingVertical: 12, paddingHorizontal: 12 },
+  paginationButton: { minHeight: 48, width: '100%', maxWidth: 360, borderRadius: 16, borderWidth: 1, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 10 },
+  paginationText: { fontSize: 14, lineHeight: 22, fontWeight: '700', textAlign: 'center', flexShrink: 1 },
+  paginationEnd: { fontSize: 12, lineHeight: 20, textAlign: 'center' },
   filterOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(15,23,42,0.45)' },
   filterSheet: { width: '100%', maxWidth: 520, maxHeight: '90%', borderWidth: 1, borderRadius: 24, padding: 18 },
 });
