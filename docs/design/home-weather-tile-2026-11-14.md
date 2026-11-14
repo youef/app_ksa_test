@@ -12,3 +12,17 @@ Only `components/home/AtmosphereBar.tsx`, the weather tile shown beside the loca
 
 ## Verification plan
 Run `npm run typecheck`, `npm run build`, and available tests; inspect narrow iPhone, Android, iPad, and web layout including RTL and dark mode. Keep PR draft until checks and review succeed.
+
+## Implemented — before / after
+- **Before:** ambiguous compact loading message and static weather icon during loading. **After:** explicit «جارٍ جلب الطقس…» and a native activity indicator while loading; an existing weather reading remains visible during refresh.
+- **Before:** generic screen-reader button name. **After:** one state-aware Arabic button label containing temperature/condition or unavailable/loading state and destination.
+- **Before:** compact label could crowd the icon. **After:** RTL row, text shrinking/truncation and 44px minimum touch height.
+- No weather data fetching, navigation destination, or global styles changed.
+
+## Results and blockers
+- GitHub branch and code changes committed successfully.
+- Local checkout failed on 2026-11-14: `Could not resolve host: github.com` (DNS). Thus TypeScript, Expo Web build, automated tests, and device previews could not be run locally. No passing CI status is claimed.
+- PR must remain draft; no merge or deployment until checks and review pass.
+
+## Next section
+Home location scope tile: modal readability, selected-state affordance, and accessible close controls, without changing geolocation logic.
