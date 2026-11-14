@@ -57,6 +57,7 @@ export function ProfileHeader(props: Props) {
   const name = anonymous ? 'جار مجهول' : props.displayName || profile.display_name || profile.username || 'جار';
   const heroColors = !customization?.banner_style || customization.banner_style === 'emerald' ? identity.heroColors : bannerColors(customization.banner_style);
   const button = [styles.button, { backgroundColor: colors.surface, borderColor: colors.line }];
+  const compact = width < 600;
   const action = (label: string, Icon: typeof Edit3, onPress?: () => void) => <Pressable key={label} accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={button}><Icon size={16} color={colors.ink} /><Text style={{ color: colors.ink, fontWeight: '700', fontSize: 12 }}>{label}</Text></Pressable>;
 
   async function callContact() {
@@ -78,23 +79,23 @@ export function ProfileHeader(props: Props) {
     <LinearGradient colors={heroColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ height: width < 600 ? 150 : 210, overflow: 'hidden' }}>
       {!anonymous && props.coverUri && !coverFailed && <Image source={{ uri: props.coverUri }} style={StyleSheet.absoluteFillObject} resizeMode="cover" onError={() => setCoverFailed(true)} />}
       <View style={styles.glow} />
-      {!anonymous && !locked && !coverFailed && props.onCoverPreview && <Pressable accessibilityRole="button" accessibilityLabel="عرض صورة الغلاف" onPress={props.onCoverPreview} style={StyleSheet.absoluteFillObject}/>}
+      {!anonymous && !locked && !coverFailed && !!props.coverUri && props.onCoverPreview && <Pressable accessibilityRole="button" accessibilityLabel="عرض صورة الغلاف" onPress={props.onCoverPreview} style={StyleSheet.absoluteFillObject}/>}
       {own && <Pressable accessibilityRole="button" accessibilityLabel="تغيير صورة الغلاف" disabled={props.coverBusy} style={styles.coverButton} onPress={props.onCoverPress || props.onDesign}>{props.coverBusy ? <ActivityIndicator color="#fff" /> : <Camera size={16} color="#fff" />}<Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>تعديل الغلاف</Text></Pressable>}
     </LinearGradient>
     <View style={[styles.body, width < 600 && styles.bodyCompact]}>
       <View style={[styles.top, width < 380 && styles.topCompact]}>
-        <Pressable accessibilityRole="button" accessibilityLabel={props.editableAvatar ? 'تغيير الصورة الشخصية' : props.hasStories && !props.onStoriesPress ? 'عرض اليوميات النشطة' : 'الصورة الشخصية'} disabled={props.avatarBusy || !props.onAvatarPress || anonymous || locked} onPress={props.onAvatarPress} style={[styles.avatarFrame, { backgroundColor: colors.surface, borderColor: props.hasStories ? accent : colors.surface }]}>
+        <Pressable accessibilityRole="button" accessibilityLabel={props.editableAvatar ? 'تغيير الصورة الشخصية' : props.hasStories ? 'عرض اليوميات النشطة' : 'الصورة الشخصية'} accessibilityState={{ disabled: props.avatarBusy || !props.onAvatarPress || anonymous || locked, busy: Boolean(props.avatarBusy) }} disabled={props.avatarBusy || !props.onAvatarPress || anonymous || locked} onPress={props.onAvatarPress} style={[styles.avatarFrame, { backgroundColor: colors.surface, borderColor: props.hasStories ? accent : colors.surface }]}>
           {profile.avatar_url && !anonymous && !avatarFailed && !profile.avatar_url.includes('blank-profile-picture') ? <Image source={{ uri: profile.avatar_url }} style={styles.avatar} onError={() => setAvatarFailed(true)} /> : <View style={[styles.avatar, { backgroundColor: colors.soft, justifyContent: 'center', alignItems: 'center' }]}><Text style={{ color: accent, fontSize: 34, fontWeight: '800' }}>{name[0]?.toUpperCase()}</Text></View>}
           {props.avatarBusy && <View style={[StyleSheet.absoluteFillObject, styles.avatarLoading]}><ActivityIndicator color="#fff" /></View>}
           {props.editableAvatar && <View style={[styles.camera, { backgroundColor: accent, borderColor: colors.surface }]}><Camera size={14} color="#fff" /></View>}
         </Pressable>
         <View style={[styles.actions, width < 380 && styles.actionsCompact]}>
           {own ? <>
-            <Pressable accessibilityRole="button" accessibilityLabel="إعدادات الحساب" hitSlop={4} style={[button, { width: width < 600 ? 36 : 44, paddingHorizontal: 0 }]} onPress={props.onSettings}><Settings size={18} color={colors.ink} /></Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel="إعدادات الحساب" hitSlop={4} style={[button, styles.iconButton]} onPress={props.onSettings}><Settings size={18} color={colors.ink} /></Pressable>
             {action('تعديل ملفي', Edit3, props.onEdit)}
-            {width < 600 ? <Pressable accessibilityRole="button" accessibilityLabel="تخصيص" hitSlop={4} onPress={props.onDesign} style={[button,{width:36,paddingHorizontal:0}]}><Palette size={18} color={colors.ink}/></Pressable> : action('تخصيص', Palette, props.onDesign)}
+            {compact ? <Pressable accessibilityRole="button" accessibilityLabel="تخصيص الملف الشخصي" hitSlop={4} onPress={props.onDesign} style={[button,styles.iconButton]}><Palette size={18} color={colors.ink}/></Pressable> : action('تخصيص', Palette, props.onDesign)}
           </> : props.hideContactActions ? null : <>
-            <Pressable accessibilityRole="button" disabled={props.busy || locked && profile.is_banned === true} onPress={props.onFollow} style={[button, { backgroundColor: props.following ? colors.surface : accent }]}><Text style={{ color: props.following ? colors.ink : '#fff', fontWeight: '700' }}>{props.following ? 'تتابعه' : 'متابعة'}</Text></Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel={props.following ? 'إلغاء متابعة الحساب' : 'متابعة الحساب'} accessibilityState={{ selected: Boolean(props.following), busy: Boolean(props.busy) }} disabled={props.busy || locked && profile.is_banned === true} onPress={props.onFollow} style={[button, { backgroundColor: props.following ? colors.surface : accent }]}><Text style={{ color: props.following ? colors.ink : '#fff', fontWeight: '700' }}>{props.following ? 'تتابعه' : 'متابعة'}</Text></Pressable>
             {props.canMessage !== false && props.onMessage && <Pressable accessibilityRole="button" accessibilityLabel="مراسلة" disabled={props.busy || profile.is_banned === true} onPress={props.onMessage} style={button}><MessageCircle size={18} color={colors.ink} /></Pressable>}
           </>}
         </View>
@@ -110,16 +111,16 @@ export function ProfileHeader(props: Props) {
           {!!callError && <Text accessibilityRole="alert" style={{ color: colors.danger, fontSize: 12, textAlign: 'right' }}>{callError}</Text>}
         </View>}
         {!anonymous && <View style={styles.metadata}>
-          <View style={styles.row}><MapPin size={15} color={colors.muted} /><Text style={{ color: colors.muted, fontSize: 12 }}>{[profile.district && 'حي ' + profile.district, profile.city].filter(Boolean).join('، ') || 'المملكة العربية السعودية'}</Text></View>
-          {!!profile.created_at && <View style={styles.row}><CalendarDays size={15} color={colors.muted} /><Text style={{ color: colors.muted, fontSize: 12 }}>انضم في {new Date(profile.created_at).toLocaleDateString('ar-SA', { month: 'long', year: 'numeric' })}</Text></View>}
+          <View style={styles.row}><MapPin size={15} color={colors.muted} /><Text style={[styles.metadataText, { color: colors.muted }]}>{[profile.district && 'حي ' + profile.district, profile.city].filter(Boolean).join('، ') || 'المملكة العربية السعودية'}</Text></View>
+          {!!profile.created_at && <View style={styles.row}><CalendarDays size={15} color={colors.muted} /><Text style={[styles.metadataText, { color: colors.muted }]}>انضم في {new Date(profile.created_at).toLocaleDateString('ar-SA', { month: 'long', year: 'numeric' })}</Text></View>}
         </View>}
         {!anonymous && customization?.show_stats !== false && <View style={[styles.stats, { backgroundColor: colors.soft, borderColor: colors.line }]}>
-          <Pressable style={styles.stat} accessibilityRole="button" accessibilityLabel="عرض المتابعين" disabled={locked} onPress={props.onFollowers}>
+          <Pressable style={styles.stat} accessibilityRole="button" accessibilityLabel={`عرض ${stats.followers.toLocaleString('ar-SA')} متابع`} disabled={locked} onPress={props.onFollowers}>
             <Text style={[styles.statValue, { color: colors.ink }]}>{stats.followers.toLocaleString('ar-SA')}</Text>
             <Text style={[styles.statLabel, { color: colors.muted }]}>متابع</Text>
           </Pressable>
           <View style={[styles.statDivider, { backgroundColor: colors.line }]} />
-          <Pressable style={styles.stat} accessibilityRole="button" accessibilityLabel="عرض الحسابات التي يتابعها" disabled={locked} onPress={props.onFollowing}>
+          <Pressable style={styles.stat} accessibilityRole="button" accessibilityLabel={`عرض ${stats.following.toLocaleString('ar-SA')} حساب يتابعه`} disabled={locked} onPress={props.onFollowing}>
             <Text style={[styles.statValue, { color: colors.ink }]}>{stats.following.toLocaleString('ar-SA')}</Text>
             <Text style={[styles.statLabel, { color: colors.muted }]}>يتابع</Text>
           </Pressable>
@@ -139,8 +140,11 @@ const styles = StyleSheet.create({
   card: { borderRadius: 24, overflow: 'hidden', borderWidth: 1 },
   body: { paddingHorizontal: 28, paddingBottom: 24 },
   bodyCompact: { paddingHorizontal: 16, paddingBottom: 20 },
-  topCompact: { flexWrap: 'wrap', rowGap: 0 },
-  actionsCompact: { flexBasis: '100%', paddingTop: 8 },
+  topCompact: { flexWrap: 'wrap', rowGap: 4 },
+  iconButton: { minWidth: 44, width: 44, minHeight: 44, paddingHorizontal: 0 },
+  metadataText: { flexShrink: 1, fontSize: 12, lineHeight: 19, textAlign: 'right' },
+
+  actionsCompact: { flexGrow: 1, flexShrink: 1, paddingTop: 8 },
   top: { flexDirection: 'row-reverse', alignItems: 'flex-start', gap: 12, marginBottom: 14 },
   avatarFrame: { marginTop: -52, width: 104, height: 104, borderRadius: 52, padding: 2, borderWidth: 2 },
   avatar: { width: 96, height: 96, borderRadius: 48 },
