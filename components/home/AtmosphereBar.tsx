@@ -1,6 +1,6 @@
 import { OasisPressable as Pressable } from '@/components/oasis/OasisPrimitives';
 import { memo, useMemo } from 'react';
-import { Text, View } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { CloudSun } from 'lucide-react-native';
 import { styles } from './homeStyles';
@@ -16,80 +16,64 @@ type Props = {
 
 const ATMO_TEXT_FALLBACK = '#345348';
 
-function AtmosphereBarBase({
-  weather,
-  weatherLoading,
-  compact = false,
-}: Props) {
+function AtmosphereBarBase({ weather, weatherLoading, compact = false }: Props) {
   const { colors, isDark } = useTheme();
 
-  // كل الحسابات النصية في useMemo واحد لتقليل overhead
-  const { description, displayText } = useMemo(() => {
+  const displayText = useMemo(() => {
     if (!weather) {
-      return {
-        description: null,
-        displayText: compact
-          ? weatherLoading
-            ? 'جارٍ الطقس...'
-            : 'الطقس غير متاح'
-          : weatherLoading
-            ? 'جارٍ جلب الطقس الحالي...'
-            : 'الطقس غير متاح حالياً',
-      };
+      return weatherLoading ? 'جارٍ جلب الطقس…' : 'الطقس غير متاح';
     }
 
-    const desc = describeWeatherCode(weather.weatherCode);
-    const tempValue = `${Math.round(weather.temperature)}°`;
+    const description = describeWeatherCode(weather.weatherCode);
+    const temperature = `${Math.round(weather.temperature)}°`;
+    if (compact) return description ? `${temperature} · ${description}` : temperature;
 
-    if (compact) {
-      return {
-        description: desc,
-        displayText: desc ? `${tempValue} · ${desc}` : tempValue,
-      };
-    }
-
-    const parts: string[] = [`${tempValue}C`];
-    if (desc) parts.push(desc);
-    const loc = weather.locationName?.trim();
-    if (loc) parts.push(loc);
-
-    return { description: desc, displayText: parts.join(' · ') };
+    const parts = [`${temperature}C`];
+    if (description) parts.push(description);
+    const location = weather.locationName?.trim();
+    if (location) parts.push(location);
+    return parts.join(' · ');
   }, [weather, weatherLoading, compact]);
 
-  // لون النص: احترام الثيم مع fallback آمن
   const textColor = isDark
     ? colors.ink
     : (colors as { atmoText?: string }).atmoText ?? ATMO_TEXT_FALLBACK;
 
-  const frameStyle = compact
-    ? styles.glassFrameCompact
-    : styles.glassFrameDefault;
+  const accessibleStatus = weather
+    ? `الطقس الحالي: ${displayText}${weatherLoading ? '، جارٍ تحديث القراءة' : ''}`
+    : weatherLoading
+      ? 'جارٍ تحميل حالة الطقس'
+      : 'حالة الطقس غير متاحة حالياً';
 
   return (
-    <OasisGlassFrame style={frameStyle}>
+    <OasisGlassFrame style={compact ? styles.glassFrameCompact : styles.glassFrameDefault}>
       <Pressable
         onPress={() => router.push('/weather')}
         accessibilityRole="button"
-        accessibilityLabel="فتح صفحة الطقس"
-        accessibilityHint="يعرض تفاصيل حالة الطقس في حيّك"
+        accessibilityLabel={`${accessibleStatus}، عرض تفاصيل الطقس`}
+        accessibilityHint="يفتح صفحة الطقس في حيّك"
         accessibilityState={{ busy: weatherLoading }}
         style={[
           styles.atmoBarBase,
           compact ? styles.atmoBarCompact : styles.atmoBarFull,
+          { minHeight: 44, justifyContent: 'center' },
         ]}
         hitSlop={4}
       >
-        <View style={styles.atmoContent}>
-          <CloudSun size={compact ? 14 : 16} color={colors.primary} />
+        <View style={[styles.atmoContent, { flexDirection: 'row-reverse', alignItems: 'center', minWidth: 0 }]}>
+          {weatherLoading ? (
+            <ActivityIndicator size="small" color={colors.primary} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" />
+          ) : (
+            <CloudSun size={compact ? 16 : 18} color={colors.primary} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" />
+          )}
           <Text
             style={[
               styles.atmoBarText,
-              { color: textColor },
+              { color: textColor, flexShrink: 1, textAlign: 'right' },
               compact ? styles.atmoBarTextCompact : styles.atmoBarTextFull,
             ]}
-            numberOfLines={compact ? 1 : 1}
+            numberOfLines={1}
             ellipsizeMode="tail"
-            accessibilityLiveRegion="polite"
           >
             {displayText}
           </Text>
