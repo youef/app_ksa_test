@@ -3,7 +3,7 @@ import { OASIS } from '@/lib/oasis';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, DeviceEventEmitter, Modal, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { onNavScroll } from '@/components/BottomNav';
-import { SlidersHorizontal, X, Check, Clock3, TrendingUp, MapPin, LayoutGrid, HandHelping, PackageOpen, CircleHelp, Store, Siren, UserRound, Hourglass, MessageCircle, CircleCheck, CalendarDays, CalendarRange, CalendarClock, RotateCcw, ListFilter } from 'lucide-react-native';
+import { SlidersHorizontal, X, Check, Clock3, TrendingUp, MapPin, LayoutGrid, HandHelping, PackageOpen, CircleHelp, Store, Siren, UserRound, Hourglass, MessageCircle, CircleCheck, CalendarDays, CalendarRange, CalendarClock, RotateCcw, ListFilter, ArrowUp } from 'lucide-react-native';
 
 const FILTER_OPTION_ICONS: Record<string, typeof Check> = {
   'الكل': LayoutGrid,
@@ -67,6 +67,7 @@ export default function Home() {
   const [draftPeriod, setDraftPeriod] = useState('كل الأوقات');
   const [appliedFilters, setAppliedFilters] = useState({ kind: 'الكل', status: 'الكل', period: 'كل الأوقات' });
   const [refreshing, setRefreshing] = useState(false);
+  const [showScrollTop, setShowScrollTop] = useState(false);
   const activeFilters = (Object.keys(appliedFilters) as (keyof typeof appliedFilters)[]).filter(key => appliedFilters[key] !== (key === 'period' ? 'كل الأوقات' : 'الكل'));
   const openFilters = () => {
     setDraftKind(appliedFilters.kind);
@@ -216,14 +217,21 @@ export default function Home() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await feed.reload();
-    setRefreshing(false);
+    try {
+      await feed.reload();
+    } finally {
+      setRefreshing(false);
+    }
   }, [feed.reload]);
 
   // Infinite feed: fetch the next batch when the user scrolls near the end.
   const handleFeedScroll = useCallback(({ nativeEvent }: any) => {
     onNavScroll({ nativeEvent } as any);
     const { contentOffset, contentSize, layoutMeasurement } = nativeEvent;
+    setShowScrollTop(previous => {
+      const next = contentOffset.y > 700;
+      return previous === next ? previous : next;
+    });
     const nearEnd = contentOffset.y + layoutMeasurement.height >= contentSize.height - 520;
     if (nearEnd && feed.hasMore && !feed.loadingMore && !feed.loading) {
       void feed.loadMore();
@@ -336,6 +344,20 @@ export default function Home() {
 
         </View>
       </ScrollView>
+      {showScrollTop && (
+        <View pointerEvents="box-none" style={[layout.scrollTopDock, { bottom: bottomNavInset + 12 }]}>
+          <Pressable
+            oasisKind="plain"
+            onPress={() => scrollRef.current?.scrollTo({ y: 0, animated: true })}
+            style={[layout.scrollTopButton, { backgroundColor: colors.surface, borderColor: colors.line }]}
+            accessibilityRole="button"
+            accessibilityLabel="العودة إلى أعلى المنشورات"
+            accessibilityHint="ينقلك إلى بداية الصفحة الرئيسية"
+          >
+            <ArrowUp size={20} color={colors.primary} />
+          </Pressable>
+        </View>
+      )}
       </View>
 
       <Modal visible={filterOpen} transparent animationType="slide" onRequestClose={() => setFilterOpen(false)}>
@@ -394,6 +416,8 @@ export default function Home() {
 }
 
 const layout = StyleSheet.create({
+  scrollTopDock: { position: 'absolute', right: 16, left: 16, alignItems: 'flex-end' },
+  scrollTopButton: { width: 48, height: 48, borderRadius: 24, borderWidth: 1, alignItems: 'center', justifyContent: 'center', elevation: 3, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 8, shadowOffset: { width: 0, height: 2 } },
   page: { backgroundColor: 'transparent' },
   body: { flex: 1, backgroundColor: 'transparent' },
   contextRow: { width: '100%', maxWidth: 820, alignSelf: 'center', flexDirection: 'row-reverse', flexWrap: 'wrap', alignItems: 'stretch', gap: 10, paddingHorizontal: 16 },
