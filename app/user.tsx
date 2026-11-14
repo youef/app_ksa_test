@@ -651,8 +651,8 @@ export default function UserProfile() {
           )}
 
           {/* Activity Category Tabs */}
-          <OasisSurface oasisSurface="card" style={styles.tabsCard}>
-            <ScrollView ref={tabsScrollRef} onLayout={event => {tabViewport.current=event.nativeEvent.layout.width;revealActiveTab();}} onContentSizeChange={() => revealActiveTab()} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
+          <OasisSurface oasisSurface="card" style={styles.tabsCard} accessibilityLabel="أقسام نشاط الملف الشخصي">
+            <ScrollView accessibilityRole="tablist" accessibilityLabel="تصفية نشاط الملف الشخصي" ref={tabsScrollRef} onLayout={event => {tabViewport.current=event.nativeEvent.layout.width;revealActiveTab();}} onContentSizeChange={() => revealActiveTab()} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
               {visibleTabs.map(({ id: key, label, icon: Icon }) => {
                 const count =
                   key === 'market'
@@ -668,7 +668,7 @@ export default function UserProfile() {
                     : stats.answers;
                 const active = tab === key;
                 return (
-                  <Pressable oasisKind="plain" accessibilityRole="tab" accessibilityState={{selected: active}}
+                  <Pressable oasisKind="plain" accessibilityRole="tab" accessibilityLabel={`${label}، ${count} عنصر`} accessibilityState={{selected: active}}
                     key={key}
                     onLayout={event => {tabMetrics.current[key]=event.nativeEvent.layout;if(key===tab) revealActiveTab(key);}}
                     onPress={() => { setTab(key); void loadTabData(key, id, currentUserId); }}
@@ -714,11 +714,11 @@ export default function UserProfile() {
             <View style={styles.content}>
               <View style={styles.contentHead}>
                 <View>
-                  <Text style={styles.contentTitle}>{TABS.find(x => x.id === tab)?.label}</Text>
+                  <Text accessibilityRole="header" style={styles.contentTitle}>{TABS.find(x => x.id === tab)?.label}</Text>
                   <Text style={styles.contentSub}>{currentData.length} عنصر · من نشاط الجار</Text>
                 </View>
                 {tab === 'market' && (
-                  <Pressable style={styles.marketLink} onPress={() => router.push('/market')}>
+                  <Pressable accessibilityRole="button" accessibilityLabel="الانتقال إلى سوق الحي" style={styles.marketLink} onPress={() => router.push('/market')}>
                     <Text style={styles.marketLinkText}>سوق الحي</Text>
                     <ChevronLeft size={14} color={OASIS.colors.primary} />
                   </Pressable>
@@ -726,16 +726,16 @@ export default function UserProfile() {
               </View>
 
               {tabLoading && !loadedTabs.includes(tab) ? (
-                <View style={styles.empty}><ActivityIndicator size="small" color={OASIS.colors.primary} /><Text style={styles.emptyText}>جارٍ تحميل القسم...</Text></View>
+                <View style={styles.empty} accessibilityLiveRegion="polite"><ActivityIndicator size="small" color={OASIS.colors.primary} /><Text style={styles.emptyText}>جارٍ تحميل القسم...</Text></View>
               ) : tabError && !loadedTabs.includes(tab) ? (
-                <View style={styles.empty}><Text style={styles.emptyTitle}>تعذر تحميل القسم</Text><Text style={styles.emptyText}>تحقق من الاتصال ثم أعد المحاولة.</Text><Pressable oasisVariant="primary" oasisKind="action" style={styles.primaryBtn} onPress={() => void loadTabData(tab, id, currentUserId, true)}><Text style={styles.primaryBtnText}>إعادة المحاولة</Text></Pressable></View>
+                <View style={styles.empty} accessibilityLiveRegion="polite"><Text style={styles.emptyTitle}>تعذر تحميل القسم</Text><Text style={styles.emptyText}>تحقق من الاتصال ثم أعد المحاولة.</Text><Pressable oasisVariant="primary" oasisKind="action" style={styles.primaryBtn} accessibilityRole="button" accessibilityLabel="إعادة تحميل نشاط الملف الشخصي" onPress={() => void loadTabData(tab, id, currentUserId, true)}><Text style={styles.primaryBtnText}>إعادة المحاولة</Text></Pressable></View>
               ) : currentData.length === 0 ? (
                 <Empty tab={tab} own={own} />
               ) : (
                 <View style={[styles.grid, { gap: 12 }]}>
                   {tab === 'reviews' ? currentData.map((item: any) => (
                     <OasisSurface oasisSurface="card" key={item.id} style={styles.reviewCard}>
-                      <Pressable style={styles.reviewAuthor} onPress={() => item.reviewer?.id && router.push({ pathname: '/user', params: { id: item.reviewer.id } })}>
+                      <Pressable accessibilityRole="button" accessibilityLabel={`عرض ملف ${item.reviewer?.display_name || item.reviewer?.username || 'المراجع'}`} style={styles.reviewAuthor} onPress={() => item.reviewer?.id && router.push({ pathname: '/user', params: { id: item.reviewer.id } })}>
                         {item.reviewer?.avatar_url ? <Image source={{ uri: item.reviewer.avatar_url }} style={styles.reviewAvatar} /> : <View style={styles.reviewAvatarFallback}><User size={16} color={OASIS.colors.primary} /></View>}
                         <View style={{ flex: 1 }}>
                           <Text style={styles.reviewAuthorName}>{item.reviewer?.display_name || item.reviewer?.username || 'مستخدم'}</Text>
@@ -1196,11 +1196,11 @@ const styles = StyleSheet.create({
   tabCount: { color: '#94a3b8', fontSize: 11, fontWeight: '600' },
   tabCountActive: { color: OASIS.colors.soft },
   content: { marginTop: 22 },
-  contentHead: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 14 },
+  contentHead: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 14 },
   contentTitle: { lineHeight: 28, color: OASIS.colors.ink, fontSize: 17, fontWeight: '700', textAlign: 'right' },
   featuredEmpty: { alignItems: 'center', gap: 10, paddingVertical: 18 },
   contentSub: { color: OASIS.colors.muted, fontSize: 11, marginTop: 2, fontWeight: '600', textAlign: 'right' },
-  marketLink: { flexDirection: 'row-reverse', alignItems: 'center', gap: 2 },
+  marketLink: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', minHeight: 44, paddingHorizontal: 10, gap: 5, borderRadius: 12 },
   marketLinkText: { color: OASIS.colors.primary, fontSize: 12, fontWeight: '700' },
   grid: { flexDirection: 'row-reverse', flexWrap: 'wrap' },
   activityCard: {
@@ -1251,7 +1251,7 @@ const styles = StyleSheet.create({
   lockText: { color: OASIS.colors.muted, fontSize: 12, textAlign: 'center', lineHeight: 18, marginTop: 4, maxWidth: 380 },
   empty: { padding: 28, minHeight: 220, justifyContent: 'center', backgroundColor: OASIS.colors.surface, borderRadius: 14, borderWidth: 1, borderColor: OASIS.colors.line, alignItems: 'center' },
   emptyIcon: { width: 54, height: 54, borderRadius: 14, backgroundColor: OASIS.colors.soft, alignItems: 'center', justifyContent: 'center' },
-  emptyTitle: { color: OASIS.colors.ink, fontSize: 15, fontWeight: '700', marginTop: 10 },
+  emptyTitle: { color: OASIS.colors.ink, fontSize: 15, fontWeight: '700', marginTop: 10, textAlign: 'center' },
   emptyText: { color: OASIS.colors.muted, fontSize: 12, textAlign: 'center', lineHeight: 18, marginTop: 4, maxWidth: 380 },
   primaryBtn: {
     marginTop: 14,
