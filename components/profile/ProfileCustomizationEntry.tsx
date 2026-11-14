@@ -3,7 +3,7 @@ import { OASIS } from '@/lib/oasis';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { Palette, Pin, ChevronLeft } from 'lucide-react-native';
+import { Palette, ChevronLeft } from 'lucide-react-native';
 
 type Props = { accentColor?: string; compact?: boolean };
 
@@ -11,7 +11,7 @@ export function ProfileCustomizationEntry({ accentColor = OASIS.colors.primary, 
   return (
     <Pressable oasisKind="card"
       accessibilityRole="button"
-      accessibilityLabel="فتح تخصيص الملف وإدارة الأعمال المميزة"
+      accessibilityLabel="فتح استوديو تخصيص الملف الشخصي والأعمال المميزة"
       onPress={() => router.push({ pathname: '/profile', params: { tab: 'settings', section: 'design' } })}
       style={({ pressed }) => [
         styles.card,
@@ -27,7 +27,6 @@ export function ProfileCustomizationEntry({ accentColor = OASIS.colors.primary, 
         <Text style={styles.description}>مظهر الملف، الإحصائيات، الشارات والأعمال المثبتة</Text>
       </View>
       <View style={styles.trailing}>
-        <Pin size={15} color={accentColor} />
         <ChevronLeft size={18} color={accentColor} />
       </View>
     </Pressable>
@@ -35,9 +34,9 @@ export function ProfileCustomizationEntry({ accentColor = OASIS.colors.primary, 
 }
 
 const styles = StyleSheet.create({
-  card: { marginHorizontal: 16, marginTop: 12, padding: 14, borderWidth: 1, borderRadius: 16, flexDirection: 'row-reverse', alignItems: 'center', gap: 12 },
+  card: { marginHorizontal: 16, marginTop: 12, padding: 14, minHeight: 68, borderWidth: 1, borderRadius: 16, flexDirection: 'row-reverse', alignItems: 'center', gap: 12 },
   compact: { marginHorizontal: 0, marginTop: 8 },
-  iconWrap: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  iconWrap: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   copy: { flex: 1, gap: 4 },
   title: { fontSize: 14, fontWeight: '700', color: OASIS.colors.ink, textAlign: 'right' },
   description: { fontSize: 11, lineHeight: 17, color: OASIS.colors.muted, textAlign: 'right' },
