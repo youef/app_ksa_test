@@ -416,7 +416,7 @@ export default function Home() {
 }
 
 const layout = StyleSheet.create({
-  scrollTopDock: { position: 'absolute', right: 16, left: 16, alignItems: 'flex-end', pointerEvents: 'box-none' },
+  scrollTopDock: { position: 'absolute', right: 16, left: 16, alignItems: 'flex-end' },
   scrollTopButton: { width: 48, height: 48, borderRadius: 24, borderWidth: 1, alignItems: 'center', justifyContent: 'center', elevation: 3, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 8, shadowOffset: { width: 0, height: 2 } },
   page: { backgroundColor: 'transparent' },
   body: { flex: 1, backgroundColor: 'transparent' },
