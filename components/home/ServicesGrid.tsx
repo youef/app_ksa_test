@@ -4,7 +4,7 @@ import {
 } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
 import { memo } from 'react';
-import { Text, View } from 'react-native';
+import { Text, View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import { Briefcase, Camera, Map, MessageCircle, Wrench } from 'lucide-react-native';
 import type { ReactNode } from 'react';
@@ -59,7 +59,7 @@ function ServicePillBase({
   return (
     <Pressable
       oasisKind="chip"
-      style={styles.servicePill}
+      style={{ alignItems: 'center', justifyContent: 'center', width: '100%', minHeight: 104, paddingHorizontal: 6, paddingVertical: 10, borderRadius: 18 }}
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={badge ? `${label}، ${badge}` : label}
@@ -68,7 +68,7 @@ function ServicePillBase({
     >
       <OasisSurface
         oasisSurface="icon"
-        style={[styles.serviceIconBox, { backgroundColor: bg }]}
+        style={[styles.serviceIconBox, { backgroundColor: bg, width: 48, height: 48, borderRadius: 15, marginBottom: 9 }]}
       >
         {icon}
         {badge ? (
@@ -84,7 +84,7 @@ function ServicePillBase({
           </View>
         ) : null}
       </OasisSurface>
-      <Text style={styles.serviceLabel} numberOfLines={1}>
+      <Text style={[styles.serviceLabel, { fontSize: 13, lineHeight: 19, minHeight: 38, textAlign: "center", writingDirection: "rtl" }]} numberOfLines={2}>
         {label}
       </Text>
     </Pressable>
@@ -104,6 +104,7 @@ type ServicesGridProps = {
 };
 
 function ServicesGridBase({ isGuest, onTools }: ServicesGridProps) {
+  const { width } = useWindowDimensions();
   // تعريف الخدمات مرة واحدة
   const services: ServiceConfig[] = [
     {
@@ -181,11 +182,16 @@ function ServicesGridBase({ isGuest, onTools }: ServicesGridProps) {
     router.push(service.route);
   };
 
+  const columns = width < 370 ? 2 : width < 650 ? 3 : width < 900 ? 4 : 5;
+  const gap = 10;
+  const containerWidth = Math.min(width - 32, 980);
+  const itemWidth = Math.max(0, (containerWidth - gap * (columns - 1)) / columns);
+
   return (
-    <View style={styles.servicesGrid}>
+    <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', justifyContent: 'center', alignSelf: 'center', width: '100%', maxWidth: 1012, paddingHorizontal: 16, marginTop: 14, marginBottom: 8, gap }}>
       {visible.map((service) => (
+        <View key={service.key} style={{ width: itemWidth, minWidth: 0 }}>
         <ServicePill
-          key={service.key}
           icon={service.icon}
           bg={service.bg}
           label={service.label}
@@ -194,6 +200,7 @@ function ServicesGridBase({ isGuest, onTools }: ServicesGridProps) {
           hint={service.hint}
           onPress={() => handlePress(service)}
         />
+        </View>
       ))}
     </View>
   );
