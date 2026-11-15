@@ -14,7 +14,7 @@ The home story strip uses fixed-width story cards, a permanent More action, and 
 Only `components/home/StoriesRow.tsx` and its design record. No security or other app changes.
 
 ## After / verification
-Pending implementation and CI checks.
+Implemented in `components/home/StoriesRow.tsx`: themed More action, accessible story button descriptions including verified/text status, decorative avatar hidden from the screen reader, and eight visible stories on widths >= 768px (four on phones). Source-level review complete. TypeScript/Web/tests and device visual review not yet verified; leave draft PR unmerged. Existing Vercel preview deployments have been BLOCKED by verified-commit policy; this branch must be checked independently.
 
 ## Next
 Home feed post-card typography and long Arabic text wrapping.
