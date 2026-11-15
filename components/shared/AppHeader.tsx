@@ -96,7 +96,7 @@ export function AppHeader({ variant = 'sub', title, subtitle, fallbackRoute = '/
   const avatar = (uri: string | null | undefined) => <View style={styles.avatarRing}>{uri && failedImage !== uri ? <Image source={{ uri }} style={styles.avatar} onError={() => setFailedImage(uri)} /> : <View style={[styles.avatar, styles.avatarFallback]}><UserRound size={20} color={OASIS.colors.primary} /></View>}</View>;
   const home = variant === 'home';
   const identity = titleContent || <>
-    {home ? <View accessible accessibilityRole="image" accessibilityLabel="شعار حيّنا" style={styles.brand}>
+    {home ? <View accessible accessibilityRole="image" accessibilityLabel="حيّنا، الصفحة الرئيسية" style={styles.brand}>
       {failedLogo ? <Home size={28} color={color} /> : <Image accessible={false} source={{ uri: logoUri || FALLBACK_LOGO_URI }} resizeMode="contain" style={styles.logo} onError={() => setFailedLogo(true)} />}
     </View> : <View style={styles.identityRow}>
       {variant === 'chat' ? <View>{avatar(avatarUrl)}{isOnline ? <View style={styles.onlineDot} /> : null}</View> : null}
@@ -105,13 +105,13 @@ export function AppHeader({ variant = 'sub', title, subtitle, fallbackRoute = '/
   </>;
   return <AppHeaderFrame tone={tone} safeArea={safeArea} style={style}>
     <View style={[styles.side, styles.leading]}>
-      {home ? isGuest ? <HeaderAction tone={tone} accessibilityLabel="تسجيل الدخول" onPress={() => router.push('/auth')}><LogIn size={21} color={OASIS.colors.primary} /></HeaderAction> : <HeaderAction bare tone={tone} accessibilityLabel="الملف الشخصي" onPress={() => router.push('/profile')}>{avatar(profile?.avatar_url)}</HeaderAction> : showBack ? <HeaderAction tone={tone} accessibilityLabel="رجوع" onPress={goBack}><ChevronRight size={23} color={color} /></HeaderAction> : null}
+      {home ? isGuest ? <HeaderAction tone={tone} accessibilityLabel="تسجيل الدخول" accessibilityHint="فتح صفحة تسجيل الدخول" onPress={() => router.push('/auth')}><LogIn size={21} color={OASIS.colors.primary} /></HeaderAction> : <HeaderAction bare tone={tone} accessibilityLabel="فتح الملف الشخصي" accessibilityHint="الانتقال إلى حسابك" onPress={() => router.push('/profile')}>{avatar(profile?.avatar_url)}</HeaderAction> : showBack ? <HeaderAction tone={tone} accessibilityLabel="رجوع" onPress={goBack}><ChevronRight size={23} color={color} /></HeaderAction> : null}
     </View>
     {onTitlePress ? <Pressable accessibilityRole="button" accessibilityLabel={displayTitle} onPress={onTitlePress} style={styles.center}>{identity}</Pressable> : <View style={styles.center}>{identity}</View>}
     <View style={styles.side}>
       {home ? !isGuest ? <View style={styles.actions}>
-          <HeaderAction bare style={styles.glassIcon} tone={tone} accessibilityLabel={unreadCount > 0 ? `الإشعارات، ${unreadCount} غير مقروء` : 'الإشعارات'} onPress={() => router.push('/notifications')}><Bell size={20} color={color} />{unreadCount > 0 ? <View style={styles.badge}><Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text></View> : null}</HeaderAction>
-          <HeaderAction bare style={styles.glassIcon} tone={tone} accessibilityLabel={unreadMessagesCount > 0 ? `الدردشة، ${unreadMessagesCount} غير مقروء` : 'الدردشة'} onPress={() => router.push('/messages')}><MessageCircle size={20} color={color} />{unreadMessagesCount > 0 ? <View style={styles.badge}><Text style={styles.badgeText}>{unreadMessagesCount > 99 ? '99+' : unreadMessagesCount}</Text></View> : null}</HeaderAction>
+          <HeaderAction bare style={styles.glassIcon} tone={tone} accessibilityLabel={unreadCount > 0 ? `الإشعارات، ${unreadCount} غير مقروء` : 'الإشعارات'} onPress={() => router.push('/notifications')}><Bell size={20} color={color} />{unreadCount > 0 ? <View accessible={false} importantForAccessibility="no-hide-descendants" style={styles.badge}><Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text></View> : null}</HeaderAction>
+          <HeaderAction bare style={styles.glassIcon} tone={tone} accessibilityLabel={unreadMessagesCount > 0 ? `الدردشة، ${unreadMessagesCount} غير مقروء` : 'الدردشة'} onPress={() => router.push('/messages')}><MessageCircle size={20} color={color} />{unreadMessagesCount > 0 ? <View accessible={false} importantForAccessibility="no-hide-descendants" style={styles.badge}><Text style={styles.badgeText}>{unreadMessagesCount > 99 ? '99+' : unreadMessagesCount}</Text></View> : null}</HeaderAction>
         </View> : null : <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.actions, { direction: 'ltr' }]} style={[styles.actionScroll, { direction: 'rtl' }]}>{decorateHeaderActions(rightAction)}</ScrollView>}
     </View>
   </AppHeaderFrame>;
