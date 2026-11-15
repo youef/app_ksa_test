@@ -6,11 +6,11 @@ Scope: shared AppHeader home variant only, keeping other variants and navigation
 ## Before
 Home logo exposed only as image; notification badges visually repeat the unread count already announced by the button; fixed header side widths may crowd compact screens.
 
-## Proposed after
-Accessible home brand name, decorative badges hidden from screen readers, responsive side widths on narrow phones while keeping 44px actions, and readable labels. Verify TypeScript, web build, available tests and iPhone/Android/iPad/web review before merge.
+## After
+Implemented accessible home brand name and clarified profile/sign-in hints; unread count badges are decorative for screen readers because the parent action already announces the count. Existing RTL, Safe Area, Oasis colors, 44px actions and header dimensions are preserved. Responsive side-width changes were intentionally deferred to avoid altering shared layouts without device verification. Verify TypeScript, web build, available tests and iPhone/Android/iPad/web review before merge.
 
 ## Verification
-Pending implementation and checks. Do not merge or deploy before checks and review.
+Implementation committed. Local clone failed due DNS (`Could not resolve host: github.com`); TypeScript, web build, tests and device checks are unverified. Do not merge or deploy before checks and review.
 
 ## Next section
 Stories strip in home feed.
