@@ -1,12 +1,10 @@
 import { OasisPressable as Pressable } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
 import React from 'react';
-import { View, Text, StyleSheet, Dimensions, Animated } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ShieldCheck, QrCode } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
-
-const { width } = Dimensions.get('window');
 
 interface ResidentCardProps {
   name: string;
@@ -39,11 +37,11 @@ export default function ResidentCard({ name, district, city, isVerified, onPress
 
           {/* User Details */}
           <View style={styles.detailsContainer}>
-            <Text style={styles.userName} numberOfLines={1}>{name || 'جار مجهول'}</Text>
+            <Text style={styles.userName} numberOfLines={2} ellipsizeMode="tail" adjustsFontSizeToFit={false}>{name || 'جار مجهول'}</Text>
             <View style={styles.locationRow}>
-              <Text style={styles.locationText}>{district ? `حي ${district}` : 'غير محدد'}</Text>
+              <Text numberOfLines={1} style={styles.locationText}>{district ? `حي ${district}` : 'غير محدد'}</Text>
               <Text style={styles.locationDot}>•</Text>
-              <Text style={styles.locationText}>{city || 'غير محدد'}</Text>
+              <Text numberOfLines={1} style={styles.locationText}>{city || 'غير محدد'}</Text>
             </View>
           </View>
 
@@ -60,7 +58,7 @@ export default function ResidentCard({ name, district, city, isVerified, onPress
               )}
             </View>
 
-            <Pressable oasisKind="icon" onPress={onPressQR} style={styles.qrButton}>
+            <Pressable oasisKind="icon" onPress={onPressQR} accessibilityRole="button" accessibilityLabel="عرض رمز QR لبطاقة ساكن الحي" style={styles.qrButton}>
               <QrCode size={40} color={OASIS.colors.surface} strokeWidth={1.5} />
             </Pressable>
           </View>
@@ -72,7 +70,9 @@ export default function ResidentCard({ name, district, city, isVerified, onPress
 
 const styles = StyleSheet.create({
   cardContainer: {
-    width: width - 32,
+    width: '100%',
+    maxWidth: 540,
+    minWidth: 0,
     alignSelf: 'center',
     marginVertical: 16,
     shadowColor: '#000',
@@ -83,18 +83,19 @@ const styles = StyleSheet.create({
   },
   card: {
     borderRadius: 14,
-    height: 200,
+    minHeight: 216,
     overflow: 'hidden',
   },
   glassOverlay: {
     flex: 1,
-    padding: 14,
+    padding: 18,
     justifyContent: 'space-between',
   },
   headerRow: {
     flexDirection: 'row-reverse',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    gap: 12,
   },
   emblemContainer: {
     width: 48,
@@ -111,6 +112,8 @@ const styles = StyleSheet.create({
   },
   brandContainer: {
     alignItems: 'flex-start',
+    flexShrink: 1,
+    minWidth: 0,
   },
   brandTitle: {
     color: OASIS.colors.surface,
@@ -132,15 +135,20 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '600',
     marginBottom: 4,
+    textAlign: 'right',
   },
   locationRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
+    minWidth: 0,
   },
   locationText: {
     color: 'rgba(255,255,255,0.9)',
     fontSize: 14,
     fontWeight: '500',
+    flexShrink: 1,
+    minWidth: 0,
+    textAlign: 'right',
   },
   locationDot: {
     color: 'rgba(255,255,255,0.5)',
@@ -151,6 +159,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
+    gap: 12,
   },
   badgeContainer: {
     flexDirection: 'row-reverse',
@@ -161,6 +170,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.2)',
+    flexShrink: 1,
   },
   badgeText: {
     color: OASIS.colors.soft,
@@ -179,5 +189,9 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.3)',
+    minWidth: 56,
+    minHeight: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
