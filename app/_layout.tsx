@@ -150,6 +150,14 @@ function RootContent() {
           body, #root, #root * { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
           html, body, #root { background-color: ${colors.background}; color: ${colors.ink}; transition: background-color 0.25s, color 0.25s; }
           #root { height: 100%; height: 100dvh; box-sizing: border-box; overflow: hidden; isolation: isolate; padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
+          /* Safari keeps its browser controls; installed iOS PWAs use the full
+             display and must keep the header below the status bar / Dynamic Island. */
+          @media (display-mode: standalone) {
+            #root { padding-top: env(safe-area-inset-top, 0px); }
+          }
+          @supports (-webkit-touch-callout: none) {
+            html, body { min-height: -webkit-fill-available; }
+          }
           input, textarea, select { font-size: 16px !important; color-scheme: ${isDark ? 'dark' : 'light'}; }
           input:focus, textarea:focus, select:focus { font-size: 16px !important; }
           input, textarea { caret-color: ${isDark ? '#34D399' : '#047857'}; }
