@@ -6,11 +6,11 @@ Scope only `components/home/ServicesGrid.tsx`. Current shortcuts use a fixed six
 ## Before
 Fixed six-column item widths, tiny icons and single-line truncation on narrow screens.
 
-## Intended after
-Responsive RTL shortcut tiles with readable multiline labels, predictable touch areas and consistent visual rhythm.
+## After
+Implemented responsive RTL shortcut tiles with 2/3/4/5 columns by viewport width, 48px icon surfaces, minimum 104px tile height, two-line labels and consistent 10px gaps. Navigation, account gating and guest visibility remain unchanged.
 
 ## Verification
-Pending implementation and checks.
+Implementation committed. Local repository checkout failed (`Could not resolve host: github.com`), so TypeScript, web build, automated tests and device checks are not verified. PR remains draft; do not merge until checks and review pass.
 
 ## Next section
 Home header visual hierarchy and safe-area spacing.
