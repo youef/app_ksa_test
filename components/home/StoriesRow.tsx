@@ -1,7 +1,7 @@
 import { OasisPressable as Pressable } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
 import { memo, useMemo } from 'react';
-import { Image, ScrollView, Text, View } from 'react-native';
+import { Image, ScrollView, Text, View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ShieldCheck, ChevronLeft, UserRound } from 'lucide-react-native';
@@ -15,7 +15,8 @@ type Props = {
   selectedDistrict: string;
 };
 
-const MAX_VISIBLE = 4;
+const MAX_VISIBLE_PHONE = 4;
+const MAX_VISIBLE_TABLET = 8;
 
 /* -------------------------------------------------------------------------- */
 /*                              Pure Helpers                                  */
@@ -60,11 +61,13 @@ function firstChar(value: unknown, fallback = 'ق'): string {
 
 function StoriesRowBase({ stories, selectedDistrict }: Props) {
   const { colors, isDark } = useTheme();
+  const { width } = useWindowDimensions();
+  const maxVisible = width >= 768 ? MAX_VISIBLE_TABLET : MAX_VISIBLE_PHONE;
 
-  // 4 قصص كحد أقصى — محسوبة مرة واحدة
+  // More stories on wide layouts without altering the phone's compact strip.
   const visibleStories = useMemo(
-    () => stories.slice(0, MAX_VISIBLE),
-    [stories],
+    () => stories.slice(0, maxVisible),
+    [stories, maxVisible],
   );
 
   return (
@@ -117,6 +120,7 @@ function StoriesRowBase({ stories, selectedDistrict }: Props) {
               <Image
                 source={{ uri: avatarUrl }}
                 style={styles.storyImg}
+                accessible={false}
                 accessibilityIgnoresInvertColors
               />
             );
@@ -138,7 +142,7 @@ function StoriesRowBase({ stories, selectedDistrict }: Props) {
                 router.push({ pathname: '/story', params: { id: story.id } })
               }
               accessibilityRole="button"
-              accessibilityLabel={`يوميات ${authorName}`}
+              accessibilityLabel={`يوميات ${authorName}${verified ? "، حساب موثق" : ""}${story.type === "text" ? "، قصة نصية" : ""}`}
               accessibilityHint="يفتح القصة"
             >
               <LinearGradient
@@ -190,9 +194,9 @@ function StoriesRowBase({ stories, selectedDistrict }: Props) {
           accessibilityHint="يفتح كل اليوميات"
         >
           <View style={styles.storyMoreCircle}>
-            <ChevronLeft size={22} color={OASIS.colors.primary} />
+            <ChevronLeft size={22} color={colors.primary} />
           </View>
-          <Text style={styles.storyName}>المزيد</Text>
+          <Text style={[styles.storyName, { color: colors.ink }]}>المزيد</Text>
         </Pressable>
       </ScrollView>
     </View>
