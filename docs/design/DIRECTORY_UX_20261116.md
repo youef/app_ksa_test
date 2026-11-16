@@ -15,7 +15,9 @@
 Search clear button was 36pt wide; filter tabs lacked explicit labels; chips were 42pt high; retry/reset controls lacked accessibility labels; card metadata could compress beside thumbnails.
 
 ## After / verification
-Pending implementation and test results.
+Implemented: accessible Arabic labels and selection states for tabs and verified-only filter; 44pt clear/search reset/filter touch targets; more readable metadata and narrower card thumbnails; accessible retry, empty reset and load-more actions. No data flow or routes changed.
+
+Verification: reviewed source and package scripts. Required commands are `npm run typecheck`, `npm run build` and `node --test tests/*.test.mjs` (when present). They have **not** run in this environment; no successful TypeScript/Web/test result or device visual review is claimed. PR remains draft and must not be merged or deployed before checks and review.
 
 ## Next page
 `app/messages.tsx` — chat list scanning, unread badges and narrow-screen layouts.
