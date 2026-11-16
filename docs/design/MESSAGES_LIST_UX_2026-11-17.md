@@ -22,3 +22,11 @@ Run TypeScript, web export, and available tests; inspect results and obtain requ
 
 ## Next section
 `app/conversation.tsx` conversation composer, message bubble density and keyboard/safe-area behavior.
+
+## Implemented / validation
+- 44pt search-clear, filters and sheet-close targets; 52pt sheet rows.
+- Context-aware unread-only empty state and reset filters action.
+- RTL text overflow constraints and official unread badge fitting.
+- Accessible filter/retry/sheet labels.
+- TypeScript, Web export and automated tests NOT RUN: local git clone failed (`Could not resolve host: github.com`), dependencies unavailable.
+- Device review pending. Do not merge/deploy until tests and review pass.
