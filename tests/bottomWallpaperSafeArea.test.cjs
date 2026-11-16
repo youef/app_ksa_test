@@ -11,9 +11,11 @@ test('the document wallpaper extends behind the iOS PWA lower safe area', () => 
   assert.match(source, /node\.style\.backgroundPosition = 'center bottom'/);
   assert.match(source, /background\.opacity/);
   assert.match(source, /return \(\) => nodes\.forEach/);
-  assert.match(read('app/_layout.tsx'), /min-height: 100lvh/);
-  assert.match(read('app/+html.tsx'), /min-height: 100lvh/);
-  assert.match(read('scripts/hayna-web-html.mjs'), /min-height:100lvh/);
+  assert.match(read('app/_layout.tsx'), /height: 100vh; min-height: 100vh/);
+  assert.match(read('app/+html.tsx'), /height: 100vh; min-height: 100vh/);
+  assert.match(read('scripts/hayna-web-html.mjs'), /height:100vh;min-height:100vh/);
+  assert.match(read('app/_layout.tsx'), /@media \(display-mode: standalone\) \{ #root \{ height: 100vh; bottom: auto; \} \}/);
+  assert.match(read('scripts/hayna-web-html.mjs'), /background-position:center bottom/);
 });
 test('home panels have 12pt side gutters while the wallpaper remains full bleed', () => {
   const home = read('app/home.tsx');

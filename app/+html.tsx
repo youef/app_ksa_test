@@ -19,8 +19,9 @@ export default function Root({ children }: PropsWithChildren) {
         />
         <style>{`
           ${WEB_INTERACTION_STYLES}
-          html, body { width: 100%; height: 100%; min-height: 100lvh; margin: 0; padding: 0; overflow: hidden; -webkit-text-size-adjust: 100%; }
+          html, body { width: 100%; height: 100vh; min-height: 100vh; margin: 0; padding: 0; overflow: hidden; -webkit-text-size-adjust: 100%; background-image: url('/welcome/hayna-app-background.png'); background-size: cover; background-position: center bottom; background-repeat: no-repeat; }
           #root { position: fixed; inset: 0; width: 100%; height: auto; min-height: 0; overflow: hidden; }
+          @media (display-mode: standalone) { #root { height: 100vh; bottom: auto; } }
           input, textarea, select { font-size: 16px !important; }
           input:focus, textarea:focus, select:focus { font-size: 16px !important; }
         `}</style>

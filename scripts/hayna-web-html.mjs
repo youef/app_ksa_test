@@ -17,7 +17,7 @@ export function ensureHaynaWebMetadata(source) {
     ? html.replace(viewportPattern, viewport)
     : html.replace(/<\/head\s*>/i, viewport + '\n</head>');
   // Apply viewport anchoring before the JS bundle hydrates, including in iOS standalone PWAs.
-  const fullScreenStyle = '<style id="hayna-full-screen-root">html,body{width:100%;height:100%;min-height:100lvh;margin:0;padding:0;overflow:hidden}#root{position:fixed;inset:0;width:100%;height:auto;min-height:0;overflow:hidden}</style>';
+  const fullScreenStyle = '<style id="hayna-full-screen-root">html,body{width:100%;height:100vh;min-height:100vh;margin:0;padding:0;overflow:hidden;background-image:url('/welcome/hayna-app-background.png');background-size:cover;background-position:center bottom;background-repeat:no-repeat}#root{position:fixed;inset:0;width:100%;height:auto;min-height:0;overflow:hidden}@media(display-mode:standalone){#root{height:100vh;bottom:auto}}</style>';
   if (!html.includes('id="hayna-full-screen-root"')) {
     html = html.replace(/<\/head\s*>/i, fullScreenStyle + '\n</head>');
   }
