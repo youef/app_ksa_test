@@ -2,7 +2,7 @@ import { OasisPressable as Pressable } from '@/components/oasis/OasisPrimitives'
 import { OASIS } from '@/lib/oasis';
 import { useEffect, useMemo, useState } from 'react';
 import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
-import { ActivityIndicator, Image, Platform, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Platform, StatusBar, Text, View } from 'react-native';
 import { Redirect, router, Stack, usePathname } from 'expo-router';
 import Head from 'expo-router/head';
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
@@ -14,6 +14,7 @@ import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
 import { initLogRocket } from '@/lib/logrocket';
 import BottomNav from '@/components/BottomNav';
+import ConnectivityScreen from '@/components/shared/ConnectivityScreen';
 import AppBackground from '@/components/shared/AppBackground';
 import { PlatformConfigProvider, usePlatformConfig } from '@/lib/platformConfig';
 import { installDarkModeWebFixes } from '@/lib/darkModeWeb';
@@ -33,7 +34,9 @@ function needsAccount(pathname: string) {
 
 export default function RootLayout() {
   useEffect(() => {
-    if (Platform.OS === 'web') return installWebInteractions();
+    if (Platform.OS !== 'web') return;
+    if (!__DEV__ && 'serviceWorker' in navigator) void navigator.serviceWorker.register('/sw.js').catch(() => {});
+    return installWebInteractions();
   }, []);
 
   return (
@@ -150,11 +153,6 @@ function RootContent() {
           body, #root, #root * { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
           html, body, #root { background-color: ${colors.background}; color: ${colors.ink}; transition: background-color 0.25s, color 0.25s; }
           #root { height: 100%; height: 100dvh; box-sizing: border-box; overflow: hidden; isolation: isolate; padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
-          /* Safari keeps its browser controls; installed iOS PWAs use the full
-             display and must keep the header below the status bar / Dynamic Island. */
-          @media (display-mode: standalone) {
-            #root { padding-top: env(safe-area-inset-top, 0px); }
-          }
           @supports (-webkit-touch-callout: none) {
             html, body { min-height: -webkit-fill-available; }
           }
@@ -172,23 +170,25 @@ function RootContent() {
       </Head>
 
       <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+        <StatusBar barStyle={isDark || liveFullScreen ? "light-content" : "dark-content"} translucent={Platform.OS === "android" ? true : undefined} backgroundColor={Platform.OS === "android" ? "transparent" : undefined} />
         <DynamicIslandProvider>
           <DialogProvider>
-            <AppBackground style={{ flex: 1, position: 'relative', width: '100%', maxWidth: path.startsWith('/admin') ? 1440 : path === '/map' || path.startsWith('/live/') ? 1280 : path === '/' ? 1100 : 820, alignSelf: 'center' }}>
+            <AppBackground style={{ flex: 1 }}>
+              <View style={{ flex: 1, position: 'relative', width: '100%', maxWidth: path.startsWith('/admin') ? 1440 : path === '/map' || path.startsWith('/live/') ? 1280 : path === '/' ? 1100 : 820, alignSelf: 'center' }}>
               {!configReady ? <PendingScreen /> : maintenance.enabled && sessionReady && !isAdmin && path !== '/auth' ? <View style={{ flex: 1, backgroundColor: OASIS.colors.background, alignItems: 'center', justifyContent: 'center', padding: 16 }}><Text style={{ fontSize: 28 }}>🛠️</Text><Text style={{ fontSize: 20, fontWeight: '700', color: OASIS.colors.ink, marginTop: 14 }}>نعتذر، المنصة تحت الصيانة</Text><Text style={{ fontSize: 15, color: OASIS.colors.muted, textAlign: 'center', lineHeight: 25, marginTop: 10 }}>{maintenance.message || 'نعمل على تحسين تجربتكم، يرجى العودة لاحقاً.'}</Text><Pressable onPress={() => router.push('/auth')} style={{ marginTop: 16, backgroundColor: OASIS.colors.primary, paddingHorizontal: 22, paddingVertical: 12, borderRadius: 14 }}><Text style={{ color: OASIS.colors.surface, fontWeight: '600' }}>دخول المدير</Text></Pressable></View> : maintenance.enabled && isAdmin && path !== '/admin' ? <Redirect href="/admin" /> : protectCurrentRoute ? (sessionReady ? <Redirect href="/auth" /> : <PendingScreen />) : routeBlocked ? <Redirect href="/home" /> : (
                 <NavigationThemeProvider value={navigationTheme}><Stack
                   screenOptions={{
                     headerShown: false,
-                    // Native gets a short slide; web swaps screens without a blank animation frame.
-                    animation: Platform.OS === 'web' ? 'none' : 'slide_from_right',
-                    animationDuration: Platform.OS === 'web' ? 0 : 180,
+                    animation: 'none',
                     contentStyle: { backgroundColor: 'transparent', flex: 1 },
                     freezeOnBlur: false,
                     gestureEnabled: true,
                   }}
                 /></NavigationThemeProvider>
               )}
-              {!(maintenance.enabled && sessionReady && !isAdmin) && !liveFullScreen && !storyFullScreen && !hideBottomNav && path !== '/map' && !path.startsWith('/map/') && <BottomNav />}
+              {!(maintenance.enabled && sessionReady && !isAdmin) && !liveFullScreen && !storyFullScreen && !hideBottomNav && path !== '/+not-found' && path !== '/map' && !path.startsWith('/map/') && <BottomNav />}
+              </View>
+              <ConnectivityScreen />
             </AppBackground>
           </DialogProvider>
         </DynamicIslandProvider>

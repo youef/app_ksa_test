@@ -80,7 +80,7 @@ export default function BottomNav() {
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
-  const edgeToEdge = width <= 600 || (width <= 932 && height <= 500);
+  const edgeToEdge = Platform.OS !== 'web' || width <= 600 || (width <= 932 && height <= 500);
   const [hasSession, setHasSession] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
 

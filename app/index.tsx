@@ -2,7 +2,7 @@ import { OASIS } from '@/lib/oasis';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator, Image, ImageBackground, Platform, Pressable,
-  StatusBar, StyleSheet, Text, View, useWindowDimensions,
+  StyleSheet, Text, View, useWindowDimensions,
 } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -94,7 +94,6 @@ export default function Index() {
 
   if (signedIn) {
     return <View style={styles.loading}>
-      <StatusBar barStyle="dark-content" backgroundColor={OASIS.colors.background} />
       <Image source={{ uri: logoUri }} style={styles.loadingLogo} resizeMode="contain" />
       <ActivityIndicator color={OASIS.colors.primary} />
     </View>;
@@ -102,7 +101,6 @@ export default function Index() {
 
   return (
     <View style={[styles.page, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={colors.background} translucent={false} />
       <View style={styles.background}>
         <View pointerEvents="none" style={[styles.headerBackground, { height: Math.min(height * 0.6, 520) }]}>
         <ImageBackground source={background.source} onError={background.onError} resizeMode="cover" style={StyleSheet.absoluteFillObject} imageStyle={{ opacity: background.opacity }}>
