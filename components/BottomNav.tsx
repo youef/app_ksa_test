@@ -162,24 +162,22 @@ export default function BottomNav() {
 
   if (keyboardVisible || isHiddenRoute) return null;
 
-  // iOS standalone PWAs can report a bottom inset much larger than reality.
-  // Use a bounded extension so the navigation never becomes a giant footer.
+  // Float above the home indicator; let the wallpaper show beneath.
   const safeBottom = getBottomDockInset(insets.bottom);
 
   return (
     <Animated.View pointerEvents="box-none" style={[
       styles.dock,
+      { bottom: safeBottom },
       Platform.OS === 'web' && styles.webFixedDock,
       animatedStyle,
     ]}>
       <View style={[styles.surface, {
-        height: BOTTOM_NAV_HEIGHT + safeBottom,
-        paddingBottom: safeBottom,
-        backgroundColor: isDark ? 'rgba(16,32,27,.25)' : 'rgba(255,255,255,.28)',
-        borderColor: isDark ? 'rgba(221,255,240,.26)' : 'rgba(255,255,255,.65)',
+        backgroundColor: isDark ? 'rgba(16,32,27,.52)' : 'rgba(255,255,255,.60)',
+        borderColor: isDark ? 'rgba(221,255,240,.28)' : 'rgba(255,255,255,.92)',
       }]}>
-        <BlurView intensity={55} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFillObject} />
-        <LinearGradient pointerEvents="none" colors={isDark ? ['rgba(196,238,215,.08)', 'rgba(10,30,20,.03)'] : ['rgba(255,255,255,.27)', 'rgba(232,246,237,.07)']} style={StyleSheet.absoluteFillObject} />
+        <BlurView intensity={75} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFillObject} />
+        <LinearGradient pointerEvents="none" colors={isDark ? ['rgba(196,238,215,.10)', 'rgba(10,30,20,.04)'] : ['rgba(255,255,255,.38)', 'rgba(232,246,237,.12)']} style={StyleSheet.absoluteFillObject} />
         <View pointerEvents="none" style={[styles.glassHighlight, { backgroundColor: isDark ? 'rgba(213,246,227,.22)' : '#FFFFFF' }]} />
         <View style={styles.row}>
           {TABS.map((tab) => {
@@ -199,12 +197,12 @@ export default function BottomNav() {
                   if (isActive && tab.key === '/home') { setNavHidden(false); DeviceEventEmitter.emit('hayna:home-scroll-top'); return; }
                   if (normalize(pathname) !== tab.key) router.navigate(tab.key as never);
                 }}
-                style={({ pressed }) => [styles.tab, pressed && styles.pressed]}
+                style={({ pressed }) => [styles.tab, isActive && styles.activeTab, pressed && styles.pressed]}
               >
-                <View style={[styles.iconWrap, { backgroundColor: 'transparent' }, isActive && { backgroundColor: colors.soft }, isCreate && styles.createIcon]}>
-                  <Icon size={isCreate ? 21 : 20} color={isCreate ? '#FFFFFF' : isActive ? colors.primary : colors.muted} strokeWidth={isActive || isCreate ? 2.3 : 1.8} />
+                <View style={[styles.iconWrap, isCreate && styles.createIcon]}>
+                  <Icon size={isCreate ? 21 : 20} color={isCreate || isActive ? '#FFFFFF' : colors.muted} strokeWidth={isActive || isCreate ? 2.3 : 1.8} />
                 </View>
-                <Text numberOfLines={1} style={[styles.label, { color: isActive ? colors.primary : colors.muted }, isActive && styles.activeLabel]}>{tab.label}</Text>
+                <Text numberOfLines={1} style={[styles.label, { color: isActive ? '#FFFFFF' : colors.muted }, isActive && styles.activeLabel]}>{tab.label}</Text>
               </Pressable>
             );
           })}
@@ -215,14 +213,14 @@ export default function BottomNav() {
 }
 
 const styles = StyleSheet.create({
-  dock: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 100, backgroundColor: 'transparent' },
-  // Web PWAs must anchor to the actual viewport, not a shortened navigation wrapper.
+  dock: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 100, backgroundColor: 'transparent', paddingHorizontal: 14 },
+  // iOS PWA: fixed within the viewport without covering the lower wallpaper strip.
   webFixedDock: { position: 'fixed' as unknown as 'absolute' },
-  // A compact rounded sheet flush with the bottom edge; no tall opaque footer.
-  surface: { width: '100%', alignSelf: 'center', borderTopLeftRadius: 32, borderTopRightRadius: 32, borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderWidth: 1, borderBottomWidth: 0, overflow: 'hidden', shadowColor: '#173F30', shadowOffset: { width: 0, height: -3 }, shadowOpacity: 0.10, shadowRadius: 16, elevation: 3 },
+  surface: { width: '100%', maxWidth: 560, height: BOTTOM_NAV_HEIGHT, alignSelf: 'center', borderRadius: 999, borderWidth: 1, overflow: 'hidden', shadowColor: '#173F30', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.13, shadowRadius: 22, elevation: 5 },
   glassHighlight: { position: 'absolute', top: 0, right: 22, left: 22, height: 1 },
-  row: { flex: 1, width: '100%', maxWidth: 560, alignSelf: 'center', flexDirection: 'row-reverse', alignItems: 'center', paddingHorizontal: 4 },
+  row: { flex: 1, width: '100%', flexDirection: 'row-reverse', alignItems: 'center', paddingHorizontal: 4 },
   tab: { flex: 1, minWidth: 0, minHeight: 44, height: '100%', alignItems: 'center', justifyContent: 'center', gap: 3 },
+  activeTab: { backgroundColor: '#047857', borderRadius: 999 },
   iconWrap: { width: 42, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   createIcon: { backgroundColor: '#047857', width: 40, height: 40, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,.45)', shadowColor: '#047857', shadowOffset: { width: 0, height: 3 }, shadowOpacity: .18, shadowRadius: 6 },
   label: { fontSize: 11, lineHeight: 15, fontWeight: '500' },

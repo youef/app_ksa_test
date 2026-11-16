@@ -5,15 +5,18 @@ const fs = require('node:fs');
 const path = require('node:path');
 const source = fs.readFileSync(path.join(__dirname, '../lib/bottomNav.ts'), 'utf8');
 const nav = fs.readFileSync(path.join(__dirname, '../components/BottomNav.tsx'), 'utf8');
-test('web bottom safe-area cannot cause an enormous footer on iPhone', () => {
-  assert.match(source, /platform === 'web'\) return 24/);
-  assert.match(source, /Math\.min\(Math\.max\(safe, 8\), 34\)/);
+test('web PWA leaves a safe wallpaper gap under the floating dock', () => {
+  assert.match(source, /platform === 'web'\) return 36/);
   assert.match(source, /BOTTOM_NAV_HEIGHT = 68/);
-  assert.match(nav, /height: BOTTOM_NAV_HEIGHT \+ safeBottom/);
-  assert.match(nav, /paddingBottom: safeBottom/);
+  assert.match(nav, /\{ bottom: safeBottom \}/);
+  assert.match(nav, /height: BOTTOM_NAV_HEIGHT/);
+  assert.doesNotMatch(nav, /height: BOTTOM_NAV_HEIGHT \+ safeBottom/);
+  assert.doesNotMatch(nav, /paddingBottom: safeBottom/);
 });
-test('bottom sheet is attached to the viewport and remains translucent', () => {
-  assert.match(nav, /bottom: 0, zIndex: 100/);
+test('capsule is inset at both sides and all four corners are rounded', () => {
+  assert.match(nav, /paddingHorizontal: 14/);
+  assert.match(nav, /borderRadius: 999/);
   assert.match(nav, /webFixedDock/);
-  assert.match(nav, /rgba\(16,32,27,\.25\)/);
+  assert.match(nav, /rgba\(255,255,255,\.60\)/);
+  assert.match(nav, /activeTab: \{ backgroundColor: '#047857'/);
 });

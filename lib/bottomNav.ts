@@ -4,7 +4,7 @@ import { usePathname } from 'expo-router';
 // Keep the glass dock compact even when mobile web reports an inflated safe-area inset.
 export const BOTTOM_NAV_HEIGHT = 68;
 export function getBottomDockInset(bottom: number, platform: string = Platform.OS): number {
-  if (platform === 'web') return 24;
+  if (platform === 'web') return 36;
   const safe = Number.isFinite(bottom) ? Math.max(bottom, 0) : 0;
   return Math.min(Math.max(safe, 8), 34);
 }
