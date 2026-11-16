@@ -12,6 +12,8 @@ test('single-output Expo HTML gains Arabic language and installable web metadata
   }
   assert.match(result, /rel="manifest" href="\/manifest\.json"/);
   assert.match(result, /rel="apple-touch-icon"/);
+  assert.match(result, /id="hayna-full-screen-root"/);
+  assert.match(result, /#root\{position:fixed;inset:0/);
   assert.match(result, /<script src="\/_expo\/static\/js\/web\/entry\.js" defer><\/script>/);
 });
 

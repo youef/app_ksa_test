@@ -16,8 +16,9 @@ test('the home feed and announcements use the entire usable horizontal viewport'
 
 test('the rounded dock is more transparent and lower while retaining safe clearance', () => {
   const nav = read('components/BottomNav.tsx');
-  assert.match(nav, /borderRadius: 999/);
-  assert.match(nav, /Math\.max\(6, insets\.bottom - 12\)/);
+  assert.match(nav, /borderTopLeftRadius: 32/);
+  assert.match(nav, /paddingBottom: safeBottom/);
+  assert.match(nav, /Math\.max\(insets\.bottom, Platform\.OS === 'web' \? 14 : 8\)/);
   assert.match(nav, /rgba\(16,32,27,\.36\)/);
   assert.match(nav, /<BlurView intensity=\{80\}/);
 });
