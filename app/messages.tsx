@@ -417,7 +417,7 @@ export default function Messages() {
             selectionColor={OASIS.colors.primary}
           />
           {searchQuery.length > 0 && (
-            <Pressable oasisKind="icon" onPress={() => setSearchQuery('')} accessibilityLabel="مسح البحث" hitSlop={6} style={styles.clearSearchBtn}>
+            <Pressable oasisKind="icon" onPress={() => setSearchQuery('')} accessibilityRole="button" accessibilityLabel="مسح البحث" style={styles.clearSearchBtn}>
               <X size={14} color={OASIS.colors.muted} />
             </Pressable>
           )}
@@ -425,7 +425,7 @@ export default function Messages() {
 
         {/* Filter Pills */}
         <View style={styles.filtersRow}>
-          <Pressable oasisKind="plain" accessibilityRole="button" accessibilityState={{ selected: !onlyUnread }}
+          <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="عرض كل المحادثات" accessibilityState={{ selected: !onlyUnread }}
             style={[styles.filterPill, !onlyUnread && styles.filterPillActive]}
             onPress={() => setOnlyUnread(false)}
           >
@@ -435,7 +435,7 @@ export default function Messages() {
             </Text>
           </Pressable>
 
-          <Pressable oasisKind="plain" accessibilityRole="button" accessibilityState={{ selected: onlyUnread }}
+          <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="عرض المحادثات غير المقروءة" accessibilityState={{ selected: onlyUnread }}
             style={[styles.filterPill, onlyUnread && styles.filterPillActive]}
             onPress={() => setOnlyUnread(true)}
           >
@@ -467,7 +467,7 @@ export default function Messages() {
       )}
 
       {loadError && (
-        <Pressable oasisKind="plain" accessibilityRole="button" onPress={() => void load()} style={[styles.retryBanner, { backgroundColor: colors.dangerSoft }]}>
+        <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="إعادة محاولة تحميل المحادثات" onPress={() => void load()} style={[styles.retryBanner, { backgroundColor: colors.dangerSoft }]}>
           <Text style={[styles.filterPillText, { color: colors.danger }]}>تعذّر تحديث المحادثات · إعادة المحاولة</Text>
         </Pressable>
       )}
@@ -499,7 +499,7 @@ export default function Messages() {
               <Pressable oasisKind="card" accessibilityRole="button" accessibilityLabel="محادثة منصة حيّنا الرسمية" onPress={() => router.push('/platform-inbox')} style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 12, padding: 14, marginBottom: 14, backgroundColor: OASIS.colors.surface, borderRadius: 14, borderWidth: 1, borderColor: OASIS.colors.line }}>
                 <View style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: OASIS.colors.soft, alignItems: 'center', justifyContent: 'center' }}><CheckCircle2 size={24} color={OASIS.colors.primary} /></View>
                 <View style={{ flex: 1, gap: 5 }}><Text style={{ textAlign: 'right', fontSize: 15, fontWeight: '700', color: OASIS.colors.ink }}>منصة حيّنا</Text><Text numberOfLines={1} style={{ textAlign: 'right', fontSize: 12, color: OASIS.colors.muted }}>{platformMessages[0]?.body || 'الحساب الرسمي · الترحيب وأخبار المنصة'}</Text></View>
-                {platformUnreadCount > 0 ? <View style={{ minWidth: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: OASIS.colors.primary }}><Text style={{ fontSize: 11, color: '#fff' }}>جديد</Text></View> : <ChevronLeft size={18} color={OASIS.colors.muted} />}
+                {platformUnreadCount > 0 ? <View style={{ minHeight: 24, paddingHorizontal: 8, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: OASIS.colors.primary }}><Text style={{ fontSize: 11, color: '#fff' }}>جديد</Text></View> : <ChevronLeft size={18} color={OASIS.colors.muted} />}
               </Pressable>
             ) : null}
 
@@ -507,14 +507,18 @@ export default function Messages() {
               <View style={styles.emptyState}>
                 <View style={{ alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}><OasisEmptyIllustration kind="empty-chat" /></View>
                 <Text style={styles.emptyTitle}>
-                  {searchQuery ? 'لا توجد نتائج لبحثك' : 'لا توجد محادثات بعد'}
+                  {searchQuery ? 'لا توجد نتائج لبحثك' : onlyUnread ? 'لا توجد محادثات غير مقروءة' : 'لا توجد محادثات بعد'}
                 </Text>
                 <Text style={styles.emptySub}>
                   {searchQuery
                     ? 'جرب البحث باسم جار آخر أو كلمة مفتاحية أخرى.'
-                    : 'تواصل مع جيران حيك، استفسر عن خدماتهم، أو نسق معهم مباشرة.'}
+                    : onlyUnread ? 'كل محادثاتك مقروءة. يمكنك العودة إلى جميع المحادثات.' : 'تواصل مع جيران حيك، استفسر عن خدماتهم، أو نسق معهم مباشرة.'}
                 </Text>
-                {!searchQuery && (
+                {(searchQuery || onlyUnread) ? (
+                  <Pressable oasisKind="action" accessibilityRole="button" accessibilityLabel="مسح البحث والفلاتر" style={styles.startChatBtn} onPress={() => { setSearchQuery(''); setOnlyUnread(false); }}>
+                    <Text style={styles.startChatBtnText}>عرض كل المحادثات</Text>
+                  </Pressable>
+                ) : (
                   <Pressable oasisKind="action" style={styles.startChatBtn} onPress={() => router.push('/search')}>
                     <Text style={styles.startChatBtnText}>ابحث عن جار وابدأ محادثة 💬</Text>
                   </Pressable>
@@ -762,7 +766,7 @@ function SheetRow({
   onPress: () => void;
 }) {
   return (
-    <Pressable style={styles.sheetRow} onPress={onPress}>
+    <Pressable accessibilityRole="button" accessibilityLabel={label} style={styles.sheetRow} onPress={onPress}>
       <View style={styles.sheetRowIconBox}>{icon}</View>
       <View style={{ flex: 1, alignItems: 'flex-end' }}>
         <Text style={[styles.sheetRowText, danger && { color: OASIS.colors.danger }]}>{label}</Text>
@@ -989,9 +993,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   clearSearchBtn: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: 44,
+    height: 44,
+    borderRadius: 12,
     backgroundColor: OASIS.colors.line,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1006,7 +1010,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 5,
     paddingHorizontal: 12,
-    minHeight: 38,
+    minHeight: 44,
     paddingVertical: 6,
     borderRadius: 12,
     backgroundColor: OASIS.colors.soft,
@@ -1139,14 +1143,14 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: OASIS.colors.surface,
   },
-  convContent: { flex: 1 },
+  convContent: { flex: 1, minWidth: 0 },
   convTopRow: {
     flexDirection: 'row-reverse',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 4,
   },
-  nameBadgesRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, flex: 1 },
+  nameBadgesRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 },
   convName: { fontSize: 14.5, fontWeight: '600', color: OASIS.colors.ink, flexShrink: 1, textAlign: 'right' },
   convNameUnread: { fontWeight: '700', color: OASIS.colors.primary },
   blockedPill: { backgroundColor: '#fee2e2', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6 },
@@ -1158,7 +1162,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  lastMsgRow: { flexDirection: 'row-reverse', alignItems: 'center', flex: 1 },
+  lastMsgRow: { flexDirection: 'row-reverse', alignItems: 'center', flex: 1, minWidth: 0 },
   lastMsg: { fontSize: 12.5, color: OASIS.colors.muted, flex: 1, textAlign: 'right' },
   lastMsgUnread: { color: OASIS.colors.ink, fontWeight: '700' },
   unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: OASIS.colors.primary, marginRight: 6 },
@@ -1216,11 +1220,12 @@ const styles = StyleSheet.create({
   },
   sheetTitle: { fontSize: 15.5, fontWeight: '700', color: OASIS.colors.ink, textAlign: 'right' },
   sheetSub: { fontSize: 11.5, color: OASIS.colors.muted, fontWeight: '600', marginTop: 2, textAlign: 'right' },
-  sheetClose: { padding: 4, borderRadius: 10, backgroundColor: '#f1f5f9' },
+  sheetClose: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: OASIS.colors.background },
   sheetRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 12,
+    minHeight: 52,
     paddingVertical: 11,
     borderBottomWidth: 1,
     borderColor: OASIS.colors.background,
