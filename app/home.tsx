@@ -49,6 +49,7 @@ import { styles } from '@/components/home/homeStyles';
 import { requireAccount } from '@/lib/authGate';
 import { useTheme } from '@/context/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import FirstRunPermissions from '@/components/home/FirstRunPermissions';
 
 
 export default function Home() {
@@ -261,7 +262,7 @@ export default function Home() {
           />
         }
       >
-        <View style={layout.contextRow}>
+        <View style={[layout.contextRow, { paddingHorizontal: Math.max(insets.left, insets.right) }]}>
           <View style={layout.locationTile}>
             <LocationScopeBar compact location={{ region: loc.region, city: loc.city, district: loc.district }} onLocationChanged={loc.apply} />
           </View>
@@ -271,9 +272,9 @@ export default function Home() {
         </View>
         <CommunityShortcuts signedIn={Boolean(feed.currentUserId)} />
 
-        {flags.stories !== false && Boolean(feed.currentUserId) && <View style={layout.sectionShell}><View style={[layout.stories, { backgroundColor: colors.surface, borderColor: colors.line }]}><StoriesRow profile={feed.profile} stories={feed.stories} selectedDistrict={loc.district} /></View></View>}
+        {flags.stories !== false && Boolean(feed.currentUserId) && <View style={[layout.sectionShell, { paddingHorizontal: Math.max(insets.left, insets.right) }]}><View style={[layout.stories, { backgroundColor: colors.surface, borderColor: colors.line }]}><StoriesRow profile={feed.profile} stories={feed.stories} selectedDistrict={loc.district} /></View></View>}
 
-        <View style={[styles.feedSection, layout.feed]}>
+        <View style={[styles.feedSection, layout.feed, { paddingHorizontal: Math.max(insets.left, insets.right) }]}>
           <View style={[layout.feedToolbar, { backgroundColor: colors.surface, borderColor: colors.line }]}>
             <View style={layout.sortRow}>
               <Pressable oasisKind="plain" hitSlop={{top:5,bottom:5}} style={[layout.filterButton, { backgroundColor: activeFilters.length ? colors.primary : colors.soft }]} onPress={openFilters} accessibilityRole="button" accessibilityLabel="تصفية المنشورات" accessibilityState={{ expanded: filterOpen }}>
@@ -388,6 +389,7 @@ export default function Home() {
           </View>
         </View>
       </Modal>
+      {currentUserId ? <FirstRunPermissions userId={currentUserId} onLocation={loc.persistLocation} /> : null}
 
     </View>
   );
@@ -396,12 +398,12 @@ export default function Home() {
 const layout = StyleSheet.create({
   page: { backgroundColor: 'transparent' },
   body: { flex: 1, backgroundColor: 'transparent' },
-  contextRow: { width: '100%', maxWidth: 820, alignSelf: 'center', flexDirection: 'row-reverse', flexWrap: 'wrap', alignItems: 'stretch', gap: 10, paddingHorizontal: 16 },
+  contextRow: { width: '100%', flexDirection: 'row-reverse', flexWrap: 'wrap', alignItems: 'stretch', gap: 10, paddingHorizontal: 0 },
   locationTile: { flex: 1.6, minWidth: 160 },
   weatherTile: { flex: 1, minWidth: 120 },
-  sectionShell: { width: '100%', maxWidth: 820, alignSelf: 'center', paddingHorizontal: 16 },
-  stories: { paddingVertical: 6, width: '100%', maxWidth: 788, alignSelf: 'center', borderWidth: 1, borderRadius: 22, overflow: 'hidden' },
-  feed: { width: '100%', maxWidth: 820, marginTop: 0, paddingHorizontal: 16 },
+  sectionShell: { width: '100%', paddingHorizontal: 0 },
+  stories: { paddingVertical: 6, width: '100%', borderWidth: 1, borderRadius: 22, overflow: 'hidden' },
+  feed: { width: '100%', marginTop: 0, paddingHorizontal: 0 },
   feedToolbar: { borderWidth: 1, borderRadius: 16, padding: 4, gap: 8, marginBottom: 12 },
   filterButton: { flex: 0.9, minWidth: 0, height: 34, paddingHorizontal: 3, borderRadius: 11, flexDirection: 'row-reverse', gap: 3, alignItems: 'center', justifyContent: 'center' },
   sortRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4 },

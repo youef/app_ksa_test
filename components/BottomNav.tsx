@@ -163,7 +163,7 @@ export default function BottomNav() {
   if (keyboardVisible || isHiddenRoute) return null;
 
   // Float above the gesture/home indicator while the wallpaper fills behind the dock.
-  const bottomPadding = Math.max(insets.bottom, 10);
+  const bottomPadding = Math.max(6, insets.bottom - 12);
 
   return (
     <Animated.View pointerEvents="box-none" style={[
@@ -171,9 +171,9 @@ export default function BottomNav() {
       { paddingBottom: bottomPadding },
       animatedStyle,
     ]}>
-      <View style={[styles.surface, { backgroundColor: isDark ? 'rgba(20,36,29,.82)' : 'rgba(255,255,255,.82)', borderColor: isDark ? 'rgba(180,218,197,.28)' : 'rgba(255,255,255,.96)' }]}>
+      <View style={[styles.surface, { backgroundColor: isDark ? 'rgba(16,32,27,.36)' : 'rgba(255,255,255,.36)', borderColor: isDark ? 'rgba(221,255,240,.26)' : 'rgba(255,255,255,.65)' }]}>
         <BlurView intensity={80} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFillObject} />
-        <LinearGradient pointerEvents="none" colors={isDark ? ['rgba(196,238,215,.12)', 'rgba(10,30,20,.08)'] : ['rgba(255,255,255,.68)', 'rgba(232,246,237,.24)']} style={StyleSheet.absoluteFillObject} />
+        <LinearGradient pointerEvents="none" colors={isDark ? ['rgba(196,238,215,.08)', 'rgba(10,30,20,.03)'] : ['rgba(255,255,255,.27)', 'rgba(232,246,237,.07)']} style={StyleSheet.absoluteFillObject} />
         <View pointerEvents="none" style={[styles.glassHighlight, { backgroundColor: isDark ? 'rgba(213,246,227,.22)' : '#FFFFFF' }]} />
         <View style={styles.row}>
           {TABS.map((tab) => {
@@ -210,7 +210,7 @@ export default function BottomNav() {
 
 const styles = StyleSheet.create({
   dock: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 100, backgroundColor: 'transparent', paddingHorizontal: 14, paddingTop: 8 },
-  surface: { height: BOTTOM_NAV_HEIGHT - 8, maxWidth: 560, width: '100%', alignSelf: 'center', borderRadius: 999, borderWidth: 1, overflow: 'hidden', shadowColor: '#173F30', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.14, shadowRadius: 18, elevation: 6 },
+  surface: { height: BOTTOM_NAV_HEIGHT - 8, maxWidth: 560, width: '100%', alignSelf: 'center', borderRadius: 999, borderWidth: 1, overflow: 'hidden', shadowColor: '#173F30', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.10, shadowRadius: 15, elevation: 3 },
   glassHighlight: { position: 'absolute', top: 0, right: 22, left: 22, height: 1 },
   row: { flex: 1, flexDirection: 'row-reverse', alignItems: 'center', paddingHorizontal: 4 },
   tab: { flex: 1, minWidth: 0, minHeight: 44, height: '100%', alignItems: 'center', justifyContent: 'center', gap: 3 },

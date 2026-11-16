@@ -9,7 +9,7 @@ import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-c
 import { DynamicIslandProvider } from '@/context/DynamicIslandContext';
 import { ThemeProvider, useTheme } from '@/context/ThemeContext';
 import DialogProvider from '@/lib/dialog';
-import { registerPushToken, syncDndWithNotifications } from '@/lib/notifications';
+import { refreshGrantedPushToken, syncDndWithNotifications } from '@/lib/notifications';
 import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
 import { initLogRocket } from '@/lib/logrocket';
@@ -86,7 +86,7 @@ function RootContent() {
           }
           setIsAdmin(profile?.role === 'admin');
           // An unavailable notification service should not block app startup.
-          void registerPushToken().catch(() => {});
+          void refreshGrantedPushToken().catch(() => {});
         } else {
           setIsAdmin(false);
         }
@@ -110,7 +110,7 @@ function RootContent() {
         setIsAdmin(profile?.role === 'admin');
       });
       setSessionReady(true);
-      if (session?.user) void registerPushToken().catch(() => {});
+      if (session?.user) void refreshGrantedPushToken().catch(() => {});
     });
 
     const timer = setInterval(() => void syncDndWithNotifications(), 5 * 60_000);

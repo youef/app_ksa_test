@@ -77,22 +77,23 @@ async function registerWebPushToken(): Promise<string> {
     throw new Error('على الآيفون، أضف حيّنا إلى الشاشة الرئيسية أولاً: اضغط مشاركة في Safari ثم «إضافة إلى الشاشة الرئيسية»، وافتح حيّنا من الأيقونة الجديدة ثم فعّل الإشعارات.');
   }
 
-  const { data: u } = await supabase.auth.getUser();
-  if (!u.user) throw new Error('سجّل الدخول قبل تفعيل الإشعارات.');
-
-  const publicKey = await getWebPushPublicKey();
   const currentPermission = Notification.permission;
   if (currentPermission === 'denied') {
     throw new Error('إذن الإشعارات مرفوض من إعدادات المتصفح. افتح إعدادات الموقع appksatest.vercel.app واسمح بالإشعارات، ثم أعد المحاولة.');
   }
 
-  const permission = currentPermission === 'granted'
-    ? 'granted'
-    : await Notification.requestPermission();
+  // Invoke the permission prompt before any await; Safari requires user activation.
+  const permissionRequest = currentPermission === 'granted'
+    ? Promise.resolve('granted')
+    : Notification.requestPermission();
+  const permission = await permissionRequest;
   if (permission !== 'granted') {
     throw new Error('لم تمنح إذن الإشعارات. اختر «سماح» في نافذة المتصفح ثم أعد المحاولة.');
   }
 
+  const { data: u } = await supabase.auth.getUser();
+  if (!u.user) throw new Error('سجّل الدخول قبل تفعيل الإشعارات.');
+  const publicKey = await getWebPushPublicKey();
   const registration = await navigator.serviceWorker.register('/sw.js');
   await navigator.serviceWorker.ready;
 
@@ -168,6 +169,21 @@ export async function registerPushToken(): Promise<string | null> {
     console.warn('registerPushToken error', err);
     if (err instanceof Error) throw err;
     throw new Error('تعذر تسجيل الإشعارات. تحقق من اتصال الإنترنت ثم أعد المحاولة.');
+  }
+}
+
+/** Refresh push registration without asking for new permissions at login. */
+export async function refreshGrantedPushToken(): Promise<void> {
+  try {
+    if (Platform.OS === 'web') {
+      if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+    } else {
+      const permissions = await Notifications.getPermissionsAsync();
+      if (!permissions.granted) return;
+    }
+    await registerPushToken();
+  } catch (error) {
+    console.warn('refreshGrantedPushToken skipped:', error);
   }
 }
 

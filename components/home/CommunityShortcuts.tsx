@@ -328,10 +328,9 @@ export default memo(CommunityShortcutsBase);
 const s = StyleSheet.create({
   outer: {
     gap: 8,
-    maxWidth: 820,
     width: '100%',
     alignSelf: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: 0,
   },
   header: {
     flexDirection: 'row-reverse',

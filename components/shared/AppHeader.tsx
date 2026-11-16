@@ -119,7 +119,7 @@ export function AppHeader({ variant = 'sub', title, subtitle, fallbackRoute = '/
 
 const styles = StyleSheet.create({
   container: { width: '100%', backgroundColor: 'transparent', borderBottomWidth: 1, zIndex: 20, flexShrink: 0, overflow: 'hidden' },
-  content: { position: 'relative', height: APP_HEADER_HEIGHT, width: '100%', maxWidth: 1100, alignSelf: 'center', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: HEADER_HORIZONTAL_PADDING, gap: 4 },
+  content: { position: 'relative', height: APP_HEADER_HEIGHT, width: '100%', alignSelf: 'center', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: HEADER_HORIZONTAL_PADDING, gap: 4 },
   side: { width: HEADER_SIDE_WIDTH, flexShrink: 0, alignItems: 'flex-start', justifyContent: 'center', height: HEADER_ACTION_SIZE },
   leading: { alignItems: 'flex-end' },
   center: { flex: 1, minWidth: 0, minHeight: HEADER_ACTION_SIZE, alignItems: 'center', justifyContent: 'center' },
