@@ -9,7 +9,7 @@ test('the home feed and announcements use the entire usable horizontal viewport'
   const home = read('app/home.tsx');
   const banners = read('components/home/CommunityShortcuts.tsx');
   assert.match(home, /feed: \{ width: '100%', marginTop: 0, paddingHorizontal: 0/);
-  assert.match(home, /Math\.max\(insets\.left, insets\.right\)/);
+  assert.match(home, /Math\.max\(12, insets\.left, insets\.right\)/);
   assert.doesNotMatch(banners, /maxWidth: 820/);
   assert.match(banners, /paddingHorizontal: 0/);
 });

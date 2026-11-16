@@ -156,7 +156,7 @@ function RootContent() {
         <meta name="description" content={branding.description || 'منصة أهل الحي للتواصل والخدمات المحلية'} />
         <style type="text/css">{`
           ${WEB_INTERACTION_STYLES}
-          html, body { width: 100%; height: 100%; min-height: 100%; margin: 0; padding: 0; overflow: hidden; -webkit-text-size-adjust: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+          html, body { width: 100%; height: 100%; min-height: 100lvh; margin: 0; padding: 0; overflow: hidden; -webkit-text-size-adjust: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
           body, #root, #root * { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
           html, body, #root { background-color: ${colors.background}; color: ${colors.ink}; transition: background-color 0.25s, color 0.25s; }
           #root { position: fixed; inset: 0; width: 100%; height: auto; min-height: 0; box-sizing: border-box; overflow: hidden; isolation: isolate; padding: 0; margin: 0; }

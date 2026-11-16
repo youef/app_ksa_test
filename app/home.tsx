@@ -262,7 +262,7 @@ export default function Home() {
           />
         }
       >
-        <View style={[layout.contextRow, { paddingHorizontal: Math.max(insets.left, insets.right) }]}>
+        <View style={[layout.contextRow, { paddingHorizontal: Math.max(12, insets.left, insets.right) }]}>
           <View style={layout.locationTile}>
             <LocationScopeBar compact location={{ region: loc.region, city: loc.city, district: loc.district }} onLocationChanged={loc.apply} />
           </View>
@@ -270,11 +270,13 @@ export default function Home() {
             <AtmosphereBar compact weather={loc.weather} weatherLoading={loc.weatherLoading} />
           </View>
         </View>
-        <CommunityShortcuts signedIn={Boolean(feed.currentUserId)} />
+        <View style={{ paddingHorizontal: Math.max(12, insets.left, insets.right) }}>
+          <CommunityShortcuts signedIn={Boolean(feed.currentUserId)} />
+        </View>
 
-        {flags.stories !== false && Boolean(feed.currentUserId) && <View style={[layout.sectionShell, { paddingHorizontal: Math.max(insets.left, insets.right) }]}><View style={[layout.stories, { backgroundColor: colors.surface, borderColor: colors.line }]}><StoriesRow profile={feed.profile} stories={feed.stories} selectedDistrict={loc.district} /></View></View>}
+        {flags.stories !== false && Boolean(feed.currentUserId) && <View style={[layout.sectionShell, { paddingHorizontal: Math.max(12, insets.left, insets.right) }]}><View style={[layout.stories, { backgroundColor: colors.surface, borderColor: colors.line }]}><StoriesRow profile={feed.profile} stories={feed.stories} selectedDistrict={loc.district} /></View></View>}
 
-        <View style={[styles.feedSection, layout.feed, { paddingHorizontal: Math.max(insets.left, insets.right) }]}>
+        <View style={[styles.feedSection, layout.feed, { paddingHorizontal: Math.max(12, insets.left, insets.right) }]}>
           <View style={[layout.feedToolbar, { backgroundColor: colors.surface, borderColor: colors.line }]}>
             <View style={layout.sortRow}>
               <Pressable oasisKind="plain" hitSlop={{top:5,bottom:5}} style={[layout.filterButton, { backgroundColor: activeFilters.length ? colors.primary : colors.soft }]} onPress={openFilters} accessibilityRole="button" accessibilityLabel="تصفية المنشورات" accessibilityState={{ expanded: filterOpen }}>
