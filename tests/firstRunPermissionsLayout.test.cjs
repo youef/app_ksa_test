@@ -18,9 +18,9 @@ test('the rounded dock is more transparent and lower while retaining safe cleara
   const nav = read('components/BottomNav.tsx');
   assert.match(nav, /borderTopLeftRadius: 32/);
   assert.match(nav, /paddingBottom: safeBottom/);
-  assert.match(nav, /Math\.max\(insets\.bottom, Platform\.OS === 'web' \? 14 : 8\)/);
-  assert.match(nav, /rgba\(16,32,27,\.36\)/);
-  assert.match(nav, /<BlurView intensity=\{80\}/);
+  assert.match(nav, /getBottomDockInset\(insets\.bottom\)/);
+  assert.match(nav, /rgba\(16,32,27,\.25\)/);
+  assert.match(nav, /<BlurView intensity=\{55\}/);
 });
 
 test('first-run permission prompts require user gesture and are keyed per user', () => {

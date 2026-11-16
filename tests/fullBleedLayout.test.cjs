@@ -12,8 +12,9 @@ test('bottom navigation is a rounded glass sheet reaching the device bottom', ()
   assert.match(nav, /borderBottomLeftRadius: 0/);
   assert.match(nav, /height: BOTTOM_NAV_HEIGHT \+ safeBottom/);
   assert.match(nav, /paddingBottom: safeBottom/);
+  assert.match(nav, /getBottomDockInset\(insets\.bottom\)/);
   assert.match(nav, /webFixedDock/);
-  assert.match(nav, /<BlurView intensity=\{80\}/);
+  assert.match(nav, /<BlurView intensity=\{55\}/);
   assert.doesNotMatch(nav, /edgeSurface|edgeDock|edgeToEdge/);
   assert.match(nav, /createIcon: \{[^\n]+borderRadius: 20/);
 });

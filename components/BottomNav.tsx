@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Home, Compass, Plus, Store, MoreHorizontal } from 'lucide-react-native';
 import Animated, { makeMutable, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { supabase } from '@/lib/supabase';
-import { BOTTOM_NAV_HEIGHT } from '@/lib/bottomNav';
+import { BOTTOM_NAV_HEIGHT, getBottomDockInset } from '@/lib/bottomNav';
 import { useTheme } from '@/context/ThemeContext';
 
 export { BOTTOM_NAV_HEIGHT };
@@ -162,9 +162,9 @@ export default function BottomNav() {
 
   if (keyboardVisible || isHiddenRoute) return null;
 
-  // Extend the frosted surface through the home-indicator area,
-  // while keeping the clickable tabs above the system gesture region.
-  const safeBottom = Math.max(insets.bottom, Platform.OS === 'web' ? 14 : 8);
+  // iOS standalone PWAs can report a bottom inset much larger than reality.
+  // Use a bounded extension so the navigation never becomes a giant footer.
+  const safeBottom = getBottomDockInset(insets.bottom);
 
   return (
     <Animated.View pointerEvents="box-none" style={[
@@ -175,10 +175,10 @@ export default function BottomNav() {
       <View style={[styles.surface, {
         height: BOTTOM_NAV_HEIGHT + safeBottom,
         paddingBottom: safeBottom,
-        backgroundColor: isDark ? 'rgba(16,32,27,.36)' : 'rgba(255,255,255,.36)',
+        backgroundColor: isDark ? 'rgba(16,32,27,.25)' : 'rgba(255,255,255,.28)',
         borderColor: isDark ? 'rgba(221,255,240,.26)' : 'rgba(255,255,255,.65)',
       }]}>
-        <BlurView intensity={80} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFillObject} />
+        <BlurView intensity={55} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFillObject} />
         <LinearGradient pointerEvents="none" colors={isDark ? ['rgba(196,238,215,.08)', 'rgba(10,30,20,.03)'] : ['rgba(255,255,255,.27)', 'rgba(232,246,237,.07)']} style={StyleSheet.absoluteFillObject} />
         <View pointerEvents="none" style={[styles.glassHighlight, { backgroundColor: isDark ? 'rgba(213,246,227,.22)' : '#FFFFFF' }]} />
         <View style={styles.row}>
@@ -218,7 +218,7 @@ const styles = StyleSheet.create({
   dock: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 100, backgroundColor: 'transparent' },
   // Web PWAs must anchor to the actual viewport, not a shortened navigation wrapper.
   webFixedDock: { position: 'fixed' as unknown as 'absolute' },
-  // Rounded at the top and seamless at the bottom, including under the home indicator.
+  // A compact rounded sheet flush with the bottom edge; no tall opaque footer.
   surface: { width: '100%', alignSelf: 'center', borderTopLeftRadius: 32, borderTopRightRadius: 32, borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderWidth: 1, borderBottomWidth: 0, overflow: 'hidden', shadowColor: '#173F30', shadowOffset: { width: 0, height: -3 }, shadowOpacity: 0.10, shadowRadius: 16, elevation: 3 },
   glassHighlight: { position: 'absolute', top: 0, right: 22, left: 22, height: 1 },
   row: { flex: 1, width: '100%', maxWidth: 560, alignSelf: 'center', flexDirection: 'row-reverse', alignItems: 'center', paddingHorizontal: 4 },
