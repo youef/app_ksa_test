@@ -149,10 +149,10 @@ function RootContent() {
         <meta name="description" content={branding.description || 'منصة أهل الحي للتواصل والخدمات المحلية'} />
         <style type="text/css">{`
           ${WEB_INTERACTION_STYLES}
-          html, body { width: 100%; min-height: 100%; -webkit-text-size-adjust: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+          html, body { width: 100%; min-height: 100%; margin: 0; padding: 0; overflow: hidden; -webkit-text-size-adjust: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
           body, #root, #root * { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
           html, body, #root { background-color: ${colors.background}; color: ${colors.ink}; transition: background-color 0.25s, color 0.25s; }
-          #root { height: 100%; height: 100dvh; box-sizing: border-box; overflow: hidden; isolation: isolate; padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
+          #root { width: 100%; height: 100%; min-height: 100svh; height: 100dvh; box-sizing: border-box; overflow: hidden; isolation: isolate; padding: 0; margin: 0; }
           @supports (-webkit-touch-callout: none) {
             html, body { min-height: -webkit-fill-available; }
           }
@@ -174,7 +174,7 @@ function RootContent() {
         <DynamicIslandProvider>
           <DialogProvider>
             <AppBackground style={{ flex: 1 }}>
-              <View style={{ flex: 1, position: 'relative', width: '100%', maxWidth: path.startsWith('/admin') ? 1440 : path === '/map' || path.startsWith('/live/') ? 1280 : path === '/' ? 1100 : 820, alignSelf: 'center' }}>
+              <View style={{ flex: 1, position: 'relative', width: '100%', minWidth: 0 }}>
               {!configReady ? <PendingScreen /> : maintenance.enabled && sessionReady && !isAdmin && path !== '/auth' ? <View style={{ flex: 1, backgroundColor: OASIS.colors.background, alignItems: 'center', justifyContent: 'center', padding: 16 }}><Text style={{ fontSize: 28 }}>🛠️</Text><Text style={{ fontSize: 20, fontWeight: '700', color: OASIS.colors.ink, marginTop: 14 }}>نعتذر، المنصة تحت الصيانة</Text><Text style={{ fontSize: 15, color: OASIS.colors.muted, textAlign: 'center', lineHeight: 25, marginTop: 10 }}>{maintenance.message || 'نعمل على تحسين تجربتكم، يرجى العودة لاحقاً.'}</Text><Pressable onPress={() => router.push('/auth')} style={{ marginTop: 16, backgroundColor: OASIS.colors.primary, paddingHorizontal: 22, paddingVertical: 12, borderRadius: 14 }}><Text style={{ color: OASIS.colors.surface, fontWeight: '600' }}>دخول المدير</Text></Pressable></View> : maintenance.enabled && isAdmin && path !== '/admin' ? <Redirect href="/admin" /> : protectCurrentRoute ? (sessionReady ? <Redirect href="/auth" /> : <PendingScreen />) : routeBlocked ? <Redirect href="/home" /> : (
                 <NavigationThemeProvider value={navigationTheme}><Stack
                   screenOptions={{

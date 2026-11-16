@@ -27,7 +27,7 @@ export function useAppHeaderHeight() {
 export function AppHeaderFrame({ children, tone = 'light', safeArea = true, style }: { children: ReactNode; tone?: HeaderTone; safeArea?: boolean; style?: StyleProp<ViewStyle> }) {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
-  return <View testID="app-header" style={[styles.container, { backgroundColor: tone === 'overlay' ? 'transparent' : colors.surface, borderBottomColor: tone === 'overlay' ? 'transparent' : colors.line }, { paddingTop: safeArea ? headerTopInset(insets.top) : 0 }, style]}>
+  return <View testID="app-header" style={[styles.container, { backgroundColor: tone === 'overlay' ? 'transparent' : colors.surface, borderBottomColor: tone === 'overlay' ? 'transparent' : colors.line }, { paddingTop: safeArea ? headerTopInset(insets.top) : 0, paddingLeft: safeArea ? insets.left : 0, paddingRight: safeArea ? insets.right : 0 }, style]}>
     <HeaderArtwork dark={tone === 'overlay' || isDark} />
     <View testID="app-header-content" style={styles.content}>{children}</View>
   </View>;

@@ -10,7 +10,7 @@ export default function AppBackground({ children, style, ...props }: ViewProps) 
   const background = usePageBackground(path === '/conversation' ? 'chat' : 'app');
   const enabled = path !== '/' && path !== '/index' && path !== '/auth' && !path.startsWith('/auth/');
   return <View {...props} testID="app-background" style={[{ flex: 1 }, style, { backgroundColor: colors.background }]}>
-    {enabled ? <View pointerEvents="none" style={StyleSheet.absoluteFillObject}><Image accessible={false} source={background.source} onError={background.onError} resizeMode="cover" style={{ width: '100%', height: '100%', opacity: background.opacity }} /></View> : null}
+    {enabled ? <View pointerEvents="none" style={StyleSheet.absoluteFillObject}><Image accessible={false} source={background.source} onError={background.onError} resizeMode="cover" style={[StyleSheet.absoluteFillObject, { opacity: background.opacity }]} /></View> : null}
     {children}
   </View>;
 }
