@@ -16,6 +16,7 @@ import { initLogRocket } from '@/lib/logrocket';
 import BottomNav from '@/components/BottomNav';
 import ConnectivityScreen from '@/components/shared/ConnectivityScreen';
 import AppBackground from '@/components/shared/AppBackground';
+import GlobalSwipeRefresh from '@/components/shared/GlobalSwipeRefresh';
 import { PlatformConfigProvider, usePlatformConfig } from '@/lib/platformConfig';
 import { installDarkModeWebFixes } from '@/lib/darkModeWeb';
 import { installWebInteractions, WEB_INTERACTION_STYLES } from '@/lib/webInteractions';
@@ -57,6 +58,7 @@ function PendingScreen() {
 
 function RootContent() {
   const pathname = usePathname();
+  const [refreshEpoch, setRefreshEpoch] = useState(0);
   const { maintenance, flags, branding, ready: configReady } = usePlatformConfig();
   const [sessionReady, setSessionReady] = useState(false);
   const [hasSession, setHasSession] = useState(false);
@@ -129,6 +131,11 @@ function RootContent() {
   const hideBottomNav = path.startsWith('/admin') || ['/ask', '/service', '/new-service', '/new-listing', '/weather-radar'].some(route => path === route || path.startsWith(route + '/'));
   const hiddenRoute = Object.entries(flags).some(([key, enabled]) => enabled === false && ({ market: ['/market', '/service', '/new-service', '/new-listing'], directory: ['/directory', '/business'], search: ['/search'], stories: ['/stories', '/story', '/create-story'], weather: ['/weather', '/weather-radar'], carpooling: ['/carpooling'], urgent_alerts: ['/emergency-alert'], questions: ['/questions', '/question'], live: ['/lives', '/live'], map: ['/map'] }[key] || []).some(route => path === route || path.startsWith(route + '/')));
   const routeBlocked = hiddenRoute && path !== '/admin';
+  // Feed screens already use native RefreshControl; never intercept their scrolling.
+  const nativeRefreshRoutes = ['/home', '/questions', '/market', '/directory', '/stories', '/messages', '/weather', '/lives', '/tools', '/carpooling', '/user', '/business', '/admin'];
+  const hasNativeRefresh = nativeRefreshRoutes.some(route => path === route || path.startsWith(route + '/'));
+  const editingRoutes = ['/auth', '/ask', '/create-story', '/new-service', '/new-listing', '/conversation', '/live', '/map', '/set-location', '/settings'];
+  const disableSwipeRefresh = hasNativeRefresh || editingRoutes.some(route => path === route || path.startsWith(route + '/')) || path === '/' || path === '/+not-found';
 
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof document === 'undefined') return;
@@ -176,7 +183,7 @@ function RootContent() {
             <AppBackground style={{ flex: 1 }}>
               <View style={{ flex: 1, position: 'relative', width: '100%', minWidth: 0 }}>
               {!configReady ? <PendingScreen /> : maintenance.enabled && sessionReady && !isAdmin && path !== '/auth' ? <View style={{ flex: 1, backgroundColor: OASIS.colors.background, alignItems: 'center', justifyContent: 'center', padding: 16 }}><Text style={{ fontSize: 28 }}>🛠️</Text><Text style={{ fontSize: 20, fontWeight: '700', color: OASIS.colors.ink, marginTop: 14 }}>نعتذر، المنصة تحت الصيانة</Text><Text style={{ fontSize: 15, color: OASIS.colors.muted, textAlign: 'center', lineHeight: 25, marginTop: 10 }}>{maintenance.message || 'نعمل على تحسين تجربتكم، يرجى العودة لاحقاً.'}</Text><Pressable onPress={() => router.push('/auth')} style={{ marginTop: 16, backgroundColor: OASIS.colors.primary, paddingHorizontal: 22, paddingVertical: 12, borderRadius: 14 }}><Text style={{ color: OASIS.colors.surface, fontWeight: '600' }}>دخول المدير</Text></Pressable></View> : maintenance.enabled && isAdmin && path !== '/admin' ? <Redirect href="/admin" /> : protectCurrentRoute ? (sessionReady ? <Redirect href="/auth" /> : <PendingScreen />) : routeBlocked ? <Redirect href="/home" /> : (
-                <NavigationThemeProvider value={navigationTheme}><Stack
+                <GlobalSwipeRefresh disabled={disableSwipeRefresh} onRefresh={() => setRefreshEpoch(value => value + 1)}><NavigationThemeProvider value={navigationTheme}><Stack key={refreshEpoch}
                   screenOptions={{
                     headerShown: false,
                     animation: 'none',
@@ -184,7 +191,7 @@ function RootContent() {
                     freezeOnBlur: false,
                     gestureEnabled: true,
                   }}
-                /></NavigationThemeProvider>
+                /></NavigationThemeProvider></GlobalSwipeRefresh>
               )}
               {!(maintenance.enabled && sessionReady && !isAdmin) && !liveFullScreen && !storyFullScreen && !hideBottomNav && path !== '/+not-found' && path !== '/map' && !path.startsWith('/map/') && <BottomNav />}
               </View>
