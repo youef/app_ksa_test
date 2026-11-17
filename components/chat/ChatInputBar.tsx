@@ -6,7 +6,7 @@ import {
   OasisTextInput as TextInput,
 } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
-import { Plus, X, Paperclip, MapPin, Coffee, Smile, Send } from 'lucide-react-native';
+import { Plus, X, Paperclip, MapPin, Coffee, Smile, Send, Timer } from 'lucide-react-native';
 import { chatStyles as styles } from './chatStyles';
 
 /* -------------------------------------------------------------------------- */
@@ -50,6 +50,8 @@ export interface ChatInputBarProps {
   onShareLocation: () => void;
   onOpenAppreciation: () => void;
   bottomSafe: number;
+  temporarySeconds: number;
+  onTemporarySecondsChange: (seconds: number) => void;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -73,8 +75,11 @@ function ChatInputBarBase({
   onShareLocation,
   onOpenAppreciation,
   bottomSafe,
+  temporarySeconds,
+  onTemporarySecondsChange,
 }: ChatInputBarProps) {
   const [toolsOpen, setToolsOpen] = useState(false);
+  const [timerOpen, setTimerOpen] = useState(false);
 
   const hasBody = body.trim().length > 0;
   const canSend = hasBody && !sending && !uploadingMedia && !sharingLocation;
@@ -136,6 +141,19 @@ function ChatInputBarBase({
         { paddingBottom: Math.max(bottomSafe, 8) },
       ]}
     >
+      {timerOpen && (
+        <View style={{ paddingHorizontal: 14, paddingBottom: 10, gap: 8 }}>
+          <Text style={{ color: OASIS.colors.ink, textAlign: 'right', fontWeight: '700' }}>مدة ظهور الرسالة المؤقتة</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row-reverse', gap: 8, alignItems: 'center' }}>
+            {([{ seconds: 0, label: 'عادية' }, { seconds: 10, label: '10 ثوانٍ' }, { seconds: 60, label: 'دقيقة' }, { seconds: 3600, label: 'ساعة' }, { seconds: 86400, label: '24 ساعة' }] as const).map(option => (
+              <Pressable key={option.seconds} oasisKind="chip" onPress={() => { onTemporarySecondsChange(option.seconds); setTimerOpen(false); }} accessibilityRole="button" accessibilityState={{ selected: temporarySeconds === option.seconds }} style={{ minHeight: 44, justifyContent: 'center', borderRadius: 20, paddingHorizontal: 14, borderWidth: 1, borderColor: temporarySeconds === option.seconds ? OASIS.colors.primary : OASIS.colors.line, backgroundColor: temporarySeconds === option.seconds ? OASIS.colors.soft : OASIS.colors.surface }}>
+                <Text style={{ color: OASIS.colors.ink, fontWeight: temporarySeconds === option.seconds ? '700' : '500' }}>{option.label}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+          <Text style={{ color: OASIS.colors.muted, fontSize: 11, textAlign: 'right' }}>تختفي من واجهة المحادثة بعد انتهاء الوقت. لا يضمن هذا حذفها من الخادم أو الإشعارات.</Text>
+        </View>
+      )}
       {toolsOpen && (
         <View>
           <ScrollView
@@ -250,6 +268,9 @@ function ChatInputBarBase({
       )}
 
       <View style={styles.inputArea}>
+        <Pressable oasisKind="icon" onPress={() => { setTimerOpen(v => !v); setToolsOpen(false); onCloseStickers(); }} accessibilityRole="button" accessibilityLabel={temporarySeconds ? `مؤقت الرسائل مفعل: ${temporarySeconds} ثانية` : 'تفعيل مؤقت الرسالة'} accessibilityState={{ expanded: timerOpen }} style={[styles.attachCircleBtn, temporarySeconds > 0 && { borderColor: OASIS.colors.primary, backgroundColor: OASIS.colors.soft }]}>
+          <Timer size={20} color={OASIS.colors.primary} />
+        </Pressable>
         <Pressable
           oasisKind="icon"
           oasisVariant="ghost"
