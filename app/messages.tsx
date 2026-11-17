@@ -786,6 +786,7 @@ function formatMessagePreview(bodyStr?: string | null, isMine = false): string {
       const parsed = JSON.parse(trimmed);
       if (parsed && typeof parsed === 'object') {
         const type = parsed.type;
+        if (type === 'temporary_secure') return '🔒 رسالة مؤقتة · تُفتح مرة واحدة ويبدأ المؤقت';
         if (type === 'temporary_text') {
           return Number(parsed.expires_at) <= Date.now() ? '⏱️ انتهت الرسالة المؤقتة' : '⏱️ رسالة مؤقتة';
         }
