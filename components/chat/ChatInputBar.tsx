@@ -80,9 +80,11 @@ function ChatInputBarBase({
 }: ChatInputBarProps) {
   const [toolsOpen, setToolsOpen] = useState(false);
   const [timerOpen, setTimerOpen] = useState(false);
+  const [confirmedDuration, setConfirmedDuration] = useState<number | null>(null);
+  const durationLabel = temporarySeconds === 10 ? '10 ثوانٍ' : temporarySeconds === 60 ? 'دقيقة' : temporarySeconds === 3600 ? 'ساعة' : temporarySeconds === 86400 ? '24 ساعة' : 'عادية';
 
   const hasBody = body.trim().length > 0;
-  const canSend = hasBody && !sending && !uploadingMedia && !sharingLocation;
+  const canSend = hasBody && !sending && !uploadingMedia && !sharingLocation && (temporarySeconds === 0 || confirmedDuration === temporarySeconds);
 
   const handleToggleTools = useCallback(() => {
     setToolsOpen((v) => !v);
@@ -97,6 +99,7 @@ function ChatInputBarBase({
   const handleSend = useCallback(() => {
     if (!canSend) return;
     onSend();
+    setConfirmedDuration(null);
     setToolsOpen(false);
     onCloseStickers();
   }, [canSend, onSend, onCloseStickers]);
@@ -146,12 +149,20 @@ function ChatInputBarBase({
           <Text style={{ color: OASIS.colors.ink, textAlign: 'right', fontWeight: '700' }}>مدة ظهور الرسالة المؤقتة</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row-reverse', gap: 8, alignItems: 'center' }}>
             {([{ seconds: 0, label: 'عادية' }, { seconds: 10, label: '10 ثوانٍ' }, { seconds: 60, label: 'دقيقة' }, { seconds: 3600, label: 'ساعة' }, { seconds: 86400, label: '24 ساعة' }] as const).map(option => (
-              <Pressable key={option.seconds} oasisKind="chip" onPress={() => { onTemporarySecondsChange(option.seconds); setTimerOpen(false); }} accessibilityRole="button" accessibilityState={{ selected: temporarySeconds === option.seconds }} style={{ minHeight: 44, justifyContent: 'center', borderRadius: 20, paddingHorizontal: 14, borderWidth: 1, borderColor: temporarySeconds === option.seconds ? OASIS.colors.primary : OASIS.colors.line, backgroundColor: temporarySeconds === option.seconds ? OASIS.colors.soft : OASIS.colors.surface }}>
+              <Pressable key={option.seconds} oasisKind="chip" onPress={() => { onTemporarySecondsChange(option.seconds); setConfirmedDuration(null); setTimerOpen(false); }} accessibilityRole="button" accessibilityState={{ selected: temporarySeconds === option.seconds }} style={{ minHeight: 44, justifyContent: 'center', borderRadius: 20, paddingHorizontal: 14, borderWidth: 1, borderColor: temporarySeconds === option.seconds ? OASIS.colors.primary : OASIS.colors.line, backgroundColor: temporarySeconds === option.seconds ? OASIS.colors.soft : OASIS.colors.surface }}>
                 <Text style={{ color: OASIS.colors.ink, fontWeight: temporarySeconds === option.seconds ? '700' : '500' }}>{option.label}</Text>
               </Pressable>
             ))}
           </ScrollView>
           <Text style={{ color: OASIS.colors.muted, fontSize: 11, textAlign: 'right' }}>تختفي من واجهة المحادثة بعد انتهاء الوقت. لا يضمن هذا حذفها من الخادم أو الإشعارات.</Text>
+        </View>
+      )}
+      {temporarySeconds > 0 && (
+        <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 8, gap: 8 }}>
+          <Text style={{ color: OASIS.colors.ink, textAlign: 'right', flex: 1 }}>⏱️ رسالة مؤقتة: {durationLabel}</Text>
+          <Pressable oasisKind="chip" accessibilityRole="button" accessibilityLabel={confirmedDuration === temporarySeconds ? 'المدة مؤكدة' : `تأكيد مدة ${durationLabel}`} onPress={() => setConfirmedDuration(temporarySeconds)} style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: 16, borderRadius: 18, backgroundColor: confirmedDuration === temporarySeconds ? OASIS.colors.soft : OASIS.colors.primary }}>
+            <Text style={{ fontWeight: '700', color: confirmedDuration === temporarySeconds ? OASIS.colors.primary : OASIS.colors.surface }}>{confirmedDuration === temporarySeconds ? '✓ تم التأكيد' : 'تأكيد المدة'}</Text>
+          </Pressable>
         </View>
       )}
       {toolsOpen && (
