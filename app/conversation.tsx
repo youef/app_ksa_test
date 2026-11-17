@@ -38,7 +38,7 @@ import { getCurrentDeviceLocation, reverseGeocodeDeviceLocation } from '@/lib/de
 import { chatStyles as styles } from '@/components/chat/chatStyles';
 import { ChatHeader } from '@/components/chat/ChatHeader';
 import { EmptyChatState } from '@/components/chat/EmptyChatState';
-import { MessageBubble, MessageItem } from '@/components/chat/MessageBubble';
+import { MessageBubble, MessageItem, parseTemporaryMessage } from '@/components/chat/MessageBubble';
 import { ChatInputBar } from '@/components/chat/ChatInputBar';
 import { ChatModals } from '@/components/chat/ChatModals';
 import { sendPushToUser } from '@/lib/pushSender';
@@ -57,6 +57,8 @@ export default function Conversation() {
   const [resolvingConv, setResolvingConv] = useState<boolean>(!rawId && !!rawUserId);
   const [messages, setMessages] = useState<MessageItem[]>([]);
   const [body, setBody] = useState('');
+  const [temporarySeconds, setTemporarySeconds] = useState(0);
+  const [clockNow, setClockNow] = useState(() => Date.now());
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [currentUserId, setCurrentUserId] = useState('');
@@ -100,6 +102,14 @@ export default function Conversation() {
       setShowJump(!atEnd);
     }
   }, []);
+  useEffect(() => {
+    const timer = setInterval(() => setClockNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  const visibleMessages = messages.filter(message => {
+    const temporary = parseTemporaryMessage(message.body);
+    return !temporary || temporary.expiresAt > clockNow;
+  });
   const [webViewport, setWebViewport] = useState<{ top: number; height: number } | null>(null);
 
   const insets = useSafeAreaInsets();
@@ -531,12 +541,15 @@ export default function Conversation() {
 
     setSending(true);
     const trimmed = body.trim();
+    const messageBody = temporarySeconds > 0
+      ? JSON.stringify({ type: 'temporary_text', text: trimmed, expires_at: Date.now() + temporarySeconds * 1000 })
+      : trimmed;
     const optimisticKey = `${currentUserId}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const optimisticMessage: MessageItem = {
       id: `optimistic-${optimisticKey}`,
       conversation_id: convId,
       sender_id: currentUserId,
-      body: trimmed,
+      body: messageBody,
       read_by: [currentUserId],
       created_at: new Date().toISOString(),
       _optimisticKey: optimisticKey,
@@ -550,7 +563,7 @@ export default function Conversation() {
     const { error } = await supabase.from('messages').insert({
       conversation_id: convId,
       sender_id: currentUserId,
-      body: trimmed,
+      body: messageBody,
       read_by: [currentUserId],
     });
 
@@ -567,7 +580,7 @@ export default function Conversation() {
       const senderName = displayName(myProfile) || 'جارك بالحي';
       void sendPushToUser(otherUser.id, {
         title: `رسالة من ${senderName}`,
-        body: trimmed,
+        body: temporarySeconds > 0 ? '⏱️ رسالة مؤقتة' : trimmed,
         data: { url: `/conversation?id=${convId}` },
       });
     }
@@ -718,7 +731,7 @@ export default function Conversation() {
           if (nearLatest.current) scrollRef.current?.scrollToEnd({ animated: false });
         }}
       >
-        {messages.length === 0 ? (
+        {visibleMessages.length === 0 ? (
           <EmptyChatState
             otherUser={otherUser}
             otherName={otherName}
@@ -727,16 +740,17 @@ export default function Conversation() {
             isCleared={isCleared}
           />
         ) : (
-          messages.map((msg, index) => (
+          visibleMessages.map((msg, index) => (
             <MessageBubble
               key={msg.id}
               msg={msg}
-              prevMsg={index > 0 ? messages[index - 1] : undefined}
+              prevMsg={index > 0 ? visibleMessages[index - 1] : undefined}
               currentUserId={currentUserId}
               otherUser={otherUser}
               otherName={otherName}
               isAnonymous={isAnonymous}
               onPreviewImage={onPreviewImage}
+              now={clockNow}
             />
           ))
         )}
@@ -768,6 +782,8 @@ export default function Conversation() {
         onShareLocation={shareExactLocation}
         onOpenAppreciation={() => setAppreciationModalOpen(true)}
         bottomSafe={bottomSafe}
+        temporarySeconds={temporarySeconds}
+        onTemporarySecondsChange={setTemporarySeconds}
       />
 
       <ChatModals
