@@ -77,7 +77,7 @@ function ChatInputBarBase({
   const [toolsOpen, setToolsOpen] = useState(false);
 
   const hasBody = body.trim().length > 0;
-  const canSend = (hasBody || uploadingMedia) && !sending;
+  const canSend = hasBody && !sending && !uploadingMedia && !sharingLocation;
 
   const handleToggleTools = useCallback(() => {
     setToolsOpen((v) => !v);
@@ -256,6 +256,7 @@ function ChatInputBarBase({
           style={styles.attachCircleBtn}
           onPress={handleToggleTools}
           accessibilityRole="button"
+          accessibilityHint="صور، موقع، وبطاقات شكر"
           accessibilityLabel={
             toolsOpen ? 'إغلاق أدوات المحادثة' : 'فتح أدوات المحادثة'
           }
@@ -273,7 +274,7 @@ function ChatInputBarBase({
             style={styles.textInput}
             value={body}
             onChangeText={onBodyChange}
-            placeholder="اكتب رسالة لجيرانك..."
+            placeholder="رسالة إلى جارك..."
             placeholderTextColor={OASIS.colors.muted}
             multiline
             maxLength={MAX_LENGTH}
@@ -305,7 +306,7 @@ function ChatInputBarBase({
           onPress={handleSend}
           disabled={!canSend}
           accessibilityRole="button"
-          accessibilityLabel="إرسال الرسالة"
+          accessibilityLabel={sending ? "جارٍ إرسال الرسالة" : "إرسال الرسالة"}
           accessibilityState={{ disabled: !canSend, busy: sending || uploadingMedia }}
         >
           {uploadingMedia || sending ? (
