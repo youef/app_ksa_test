@@ -133,6 +133,7 @@ export default function SearchPage() {
   const [query, setQuery] = useState(params.q || '');
   const [activeTab, setActiveTab] = useState<Tab>(['all', 'users', 'questions', 'requests', 'shops'].includes(params.tab || '') ? params.tab! : 'all');
   const [loading, setLoading] = useState(false);
+  const [searchError, setSearchError] = useState(false);
   const [localOnly, setLocalOnly] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const searchSequence = useRef(0);
@@ -175,6 +176,7 @@ export default function SearchPage() {
       } else {
         searchSequence.current += 1;
         setLoading(false);
+        setSearchError(false);
         setResults({ users: [], questions: [], requests: [], shops: [] });
       }
     }, 350);
@@ -202,6 +204,7 @@ export default function SearchPage() {
     }
 
     setLoading(true);
+    setSearchError(false);
     setResults({ users: [], questions: [], requests: [], shops: [] });
     try {
       // Query the live Supabase tables directly. Each table query respects its
@@ -240,6 +243,7 @@ export default function SearchPage() {
         }
       }
 
+      setSearchError(false);
       setResults({
         users: visibleUsers.filter(inCity),
         questions: questionsResult.filter(inCity),
@@ -249,6 +253,7 @@ export default function SearchPage() {
     } catch (error) {
       console.warn('Search failed:', error);
       if (sequence === searchSequence.current) {
+        setSearchError(true);
         setResults({ users: [], questions: [], requests: [], shops: [] });
       }
     } finally {
@@ -283,7 +288,7 @@ export default function SearchPage() {
               <Text style={styles.userAvatarLetter}>{u.display_name?.[0] || u.username?.[0] || 'ج'}</Text>
             </View>
           )}
-          <View style={styles.onlineBadge} />
+          {u.is_verified === true ? <View style={styles.onlineBadge} accessibilityLabel="حساب موثق" /> : null}
         </View>
 
         <View style={styles.userInfo}>
@@ -460,7 +465,7 @@ export default function SearchPage() {
         }
       />
 
-      <Pressable onPress={() => setLocalOnly(v => !v)} accessibilityRole="button"
+      <Pressable onPress={() => setLocalOnly(v => !v)} accessibilityRole="switch" accessibilityState={{ checked: localOnly }} accessibilityLabel="تصفية نتائج البحث حسب مدينتي"
         style={{ alignSelf: 'flex-start', marginHorizontal: 16, marginVertical: 4, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 12, backgroundColor: localOnly ? '#dcfce7' : '#f1f5f9' }}>
         <Text style={{ color: '#065f46', fontWeight: '600' }}>{localOnly ? '✓ داخل مدينتي' : 'تصفية حسب مدينتي'}</Text>
       </Pressable>
@@ -473,6 +478,7 @@ export default function SearchPage() {
 
           <TextInput
             style={styles.searchInput}
+            accessibilityLabel="البحث في الجيران والأسئلة والطلبات والمحلات"
             placeholder="ابحث عن جيران، أسئلة، فزعات، محلات..."
             placeholderTextColor="#94a3b8"
             value={query}
@@ -489,7 +495,7 @@ export default function SearchPage() {
           />
 
           {query.length > 0 && (
-            <Pressable oasisKind="icon"
+            <Pressable oasisKind="icon" accessibilityRole="button" accessibilityLabel="مسح عبارة البحث"
               onPress={() => {
                 setQuery('');
                 setResults({ users: [], questions: [], requests: [], shops: [] });
@@ -509,6 +515,7 @@ export default function SearchPage() {
           <Pressable oasisKind="chip" oasisVariant={activeTab === 'all' ? 'primary' : 'secondary'}
             style={[styles.tab, activeTab === 'all' && styles.tabActive]}
             onPress={() => setActiveTab('all')}
+            accessibilityRole="tab" accessibilityLabel="الكل" accessibilityState={{ selected: activeTab === 'all' }}
           >
 
             <Text style={[styles.tabText, activeTab === 'all' && styles.tabTextActive]}>
@@ -519,6 +526,7 @@ export default function SearchPage() {
           <Pressable oasisKind="chip" oasisVariant={activeTab === 'users' ? 'primary' : 'secondary'}
             style={[styles.tab, activeTab === 'users' && styles.tabActive]}
             onPress={() => setActiveTab('users')}
+            accessibilityRole="tab" accessibilityLabel="الجيران" accessibilityState={{ selected: activeTab === 'users' }}
           >
 
             <Users size={13} color={activeTab === 'users' ? OASIS.colors.surface : OASIS.colors.muted} />
@@ -530,6 +538,7 @@ export default function SearchPage() {
           <Pressable oasisKind="chip" oasisVariant={activeTab === 'questions' ? 'primary' : 'secondary'}
             style={[styles.tab, activeTab === 'questions' && styles.tabActive]}
             onPress={() => setActiveTab('questions')}
+            accessibilityRole="tab" accessibilityLabel="الأسئلة" accessibilityState={{ selected: activeTab === 'questions' }}
           >
 
             <MessageCircle size={13} color={activeTab === 'questions' ? OASIS.colors.surface : OASIS.colors.muted} />
@@ -541,6 +550,7 @@ export default function SearchPage() {
           <Pressable oasisKind="chip" oasisVariant={activeTab === 'requests' ? 'primary' : 'secondary'}
             style={[styles.tab, activeTab === 'requests' && styles.tabActive]}
             onPress={() => setActiveTab('requests')}
+            accessibilityRole="tab" accessibilityLabel="الطلبات" accessibilityState={{ selected: activeTab === 'requests' }}
           >
 
             <Truck size={13} color={activeTab === 'requests' ? OASIS.colors.surface : OASIS.colors.muted} />
@@ -552,6 +562,7 @@ export default function SearchPage() {
           <Pressable oasisKind="chip" oasisVariant={activeTab === 'shops' ? 'primary' : 'secondary'}
             style={[styles.tab, activeTab === 'shops' && styles.tabActive]}
             onPress={() => setActiveTab('shops')}
+            accessibilityRole="tab" accessibilityLabel="المحلات" accessibilityState={{ selected: activeTab === 'shops' }}
           >
 
             <Store size={13} color={activeTab === 'shops' ? OASIS.colors.surface : OASIS.colors.muted} />
@@ -575,7 +586,17 @@ export default function SearchPage() {
           </View>
         )}
 
-        {!loading && query.trim().length > 0 && (
+        {!loading && searchError && query.trim().length > 0 && (
+          <View style={styles.feedbackPanel} accessibilityRole="alert">
+            <Text style={styles.feedbackTitle}>تعذّر إكمال البحث</Text>
+            <Text style={styles.feedbackDescription}>تأكد من الاتصال وحاول مرة أخرى. لم نفقد عبارة البحث التي كتبتها.</Text>
+            <Pressable oasisKind="action" accessibilityRole="button" accessibilityLabel="إعادة محاولة البحث" style={styles.retryButton} onPress={() => void performSearch()}>
+              <Text style={styles.retryButtonText}>إعادة المحاولة</Text>
+            </Pressable>
+          </View>
+        )}
+
+        {!loading && !searchError && query.trim().length > 0 && (
           <View style={styles.resultsContainer}>
             <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
               <Text style={{ color: OASIS.colors.ink, fontWeight: '800', fontSize: 14, textAlign: 'right' }}>نتائج الاستكشاف</Text>
@@ -678,7 +699,7 @@ const styles = StyleSheet.create({
     backgroundColor: OASIS.colors.background,
     borderRadius: 16,
     paddingHorizontal: 12,
-    height: 44,
+    minHeight: 52,
     borderWidth: 1.5,
     borderColor: OASIS.colors.line,
     gap: 10,
@@ -706,13 +727,13 @@ const styles = StyleSheet.create({
     color: OASIS.colors.ink,
     fontWeight: '700',
     textAlign: 'right',
-    height: 44,
+    minHeight: 48,
     padding: 0,
   },
   clearBtn: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     backgroundColor: OASIS.colors.line,
     alignItems: 'center',
     justifyContent: 'center',
@@ -734,16 +755,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     paddingHorizontal: 14,
-    paddingVertical: 7.5,
-    borderRadius: 12,
+    minHeight: 44,
+    paddingVertical: 10,
+    borderRadius: 14,
     overflow: 'hidden',
     backgroundColor: '#f1f5f9',
     borderWidth: 1,
     borderColor: OASIS.colors.line,
   },
   tabActive: {
-    backgroundColor: 'transparent',
-    borderColor: 'transparent',
+    backgroundColor: OASIS.colors.primary,
+    borderColor: OASIS.colors.primary,
     shadowOpacity: 0,
     elevation: 0,
   },
@@ -760,7 +782,25 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     paddingTop: 12,
+    width: '100%',
+    maxWidth: 860,
+    alignSelf: 'center',
   },
+  feedbackPanel: {
+    marginHorizontal: 16,
+    marginTop: 20,
+    padding: 20,
+    borderRadius: 20,
+    backgroundColor: OASIS.colors.surface,
+    borderWidth: 1,
+    borderColor: OASIS.colors.line,
+    alignItems: 'flex-end',
+    gap: 10,
+  },
+  feedbackTitle: { color: OASIS.colors.ink, fontSize: 16, fontWeight: '800', textAlign: 'right' },
+  feedbackDescription: { color: OASIS.colors.muted, fontSize: 13, lineHeight: 21, textAlign: 'right' },
+  retryButton: { minHeight: 44, paddingHorizontal: 20, justifyContent: 'center', borderRadius: 12, backgroundColor: OASIS.colors.primary },
+  retryButtonText: { color: OASIS.colors.surface, fontWeight: '700' },
   loadingContainer: {
     paddingVertical: 60,
     alignItems: 'center',
