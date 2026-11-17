@@ -16,6 +16,7 @@ import {
   Sparkles,
   Check,
   CheckCheck,
+  Timer,
 } from 'lucide-react-native';
 import {
   OasisSurface,
@@ -58,11 +59,20 @@ export interface MessageBubbleProps {
   otherName: string;
   isAnonymous: boolean;
   onPreviewImage: (url: string) => void;
+  now?: number;
 }
 
 /* -------------------------------------------------------------------------- */
 /*                                Parsers                                     */
 /* -------------------------------------------------------------------------- */
+
+export function parseTemporaryMessage(value: string): { text: string; expiresAt: number } | null {
+  try {
+    const data = JSON.parse(value);
+    if (data?.type !== 'temporary_text' || typeof data.text !== 'string' || !Number.isFinite(data.expires_at)) return null;
+    return { text: data.text, expiresAt: data.expires_at };
+  } catch { return null; }
+}
 
 export function parseImageMessage(value: string) {
   return parseChatImage(value);
@@ -157,11 +167,14 @@ function MessageBubbleBase({
   otherName,
   isAnonymous,
   onPreviewImage,
+  now = Date.now(),
 }: MessageBubbleProps) {
   const { colors } = useTheme();
   const media = useMemo(() => parseImageMessage(msg.body), [msg.body]);
+  const temporary = useMemo(() => parseTemporaryMessage(msg.body), [msg.body]);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [imageFailed, setImageFailed] = useState(false);
+  const [temporaryOpened, setTemporaryOpened] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -369,6 +382,19 @@ function MessageBubbleBase({
                   </Text>
                 </View>
               </LinearGradient>
+            </View>
+          ) : temporary ? (
+            <View style={{ gap: 6 }}>
+              {!temporaryOpened && !isMine ? (
+                <Pressable oasisKind="action" onPress={() => setTemporaryOpened(true)} accessibilityRole="button" accessibilityLabel="فتح الرسالة المؤقتة" style={{ minHeight: 60, minWidth: 160, justifyContent: 'center', alignItems: 'center', gap: 5 }}>
+                  <Timer size={24} color={OASIS.colors.primary} />
+                  <Text style={{ color: colors.ink, fontWeight: '700' }}>رسالة مؤقتة · اضغط للفتح</Text>
+                </Pressable>
+              ) : <Text style={[styles.msgText, { color: colors.ink }]}>{temporary.text}</Text>}
+              <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}>
+                <Timer size={12} color={colors.muted} />
+                <Text style={{ color: colors.muted, fontSize: 11 }}>{`تنتهي خلال ${Math.max(0, Math.ceil((temporary.expiresAt - now) / 1000))} ثانية من الإرسال`}</Text>
+              </View>
             </View>
           ) : (
             <Text style={[styles.msgText, { color: colors.ink }]}>
