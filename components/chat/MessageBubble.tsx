@@ -175,6 +175,31 @@ function MessageBubbleBase({
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [imageFailed, setImageFailed] = useState(false);
   const [temporaryOpened, setTemporaryOpened] = useState(false);
+  const [secureText, setSecureText] = useState<string | null>(null);
+  const [secureExpiry, setSecureExpiry] = useState<number | null>(null);
+  const [openingSecure, setOpeningSecure] = useState(false);
+  const secureTemporary = useMemo(() => { try { const data = JSON.parse(msg.body); return data?.type === 'temporary_secure'; } catch { return false; } }, [msg.body]);
+  useEffect(() => {
+    if (!secureTemporary || msg.id.startsWith('optimistic-')) return;
+    let alive = true;
+    void supabase.from('hayna_temporary_message_payloads').select('content,expires_at').eq('message_id',msg.id).maybeSingle().then(({data}) => {
+      if (!alive || !data) return;
+      setSecureText(data.content);
+      if (data.expires_at) { setSecureExpiry(new Date(data.expires_at).getTime()); setTemporaryOpened(true); }
+    });
+    return () => { alive = false; };
+  }, [secureTemporary, msg.id]);
+  const openSecure = async () => {
+    if (openingSecure) return;
+    setOpeningSecure(true);
+    const { data, error } = await supabase.rpc('hayna_open_temporary_message', { p_message: msg.id });
+    setOpeningSecure(false);
+    const opened = Array.isArray(data) ? data[0] : null;
+    if (error || !opened) { setSecureText(null); setSecureExpiry(Date.now()); return; }
+    setSecureText(opened.content);
+    setSecureExpiry(new Date(opened.expires_at).getTime());
+    setTemporaryOpened(true);
+  };
 
   useEffect(() => {
     let active = true;
@@ -382,6 +407,22 @@ function MessageBubbleBase({
                   </Text>
                 </View>
               </LinearGradient>
+            </View>
+          ) : secureTemporary ? (
+            <View style={{ gap: 8, minWidth: 170 }}>
+              {secureExpiry !== null && secureExpiry <= now ? (
+                <Text style={{ color: colors.muted, textAlign: 'right' }}>انتهت الرسالة المؤقتة ⏱️</Text>
+              ) : secureText !== null && (isMine || temporaryOpened) ? (
+                <View style={{ gap: 6 }}>
+                  <Text style={[styles.msgText, { color: colors.ink }]}>{secureText}</Text>
+                  {secureExpiry !== null ? <Text style={{ color: colors.muted, fontSize: 11 }}>{`متبقٍ ${Math.max(0, Math.ceil((secureExpiry-now)/1000))} ثانية`}</Text> : <Text style={{ color: colors.muted, fontSize: 11 }}>بانتظار فتح المستلم</Text>}
+                </View>
+              ) : isMine ? <Text style={{ color: colors.muted }}>رسالة مؤقتة · بانتظار الفتح</Text> : (
+                <Pressable oasisKind="action" onPress={() => void openSecure()} disabled={openingSecure} accessibilityRole="button" accessibilityLabel="فتح رسالة مؤقتة وبدء العد التنازلي" style={{ minHeight: 64, alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                  <Timer size={24} color={OASIS.colors.primary} />
+                  <Text style={{ color: colors.ink, fontWeight: '700' }}>{openingSecure ? 'جارٍ الفتح...' : 'رسالة مؤقتة · اضغط للفتح'}</Text>
+                </Pressable>
+              )}
             </View>
           ) : temporary ? (
             <View style={{ gap: 6 }}>
