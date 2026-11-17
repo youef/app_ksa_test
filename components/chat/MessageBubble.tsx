@@ -182,13 +182,17 @@ function MessageBubbleBase({
   useEffect(() => {
     if (!secureTemporary || msg.id.startsWith('optimistic-')) return;
     let alive = true;
-    void supabase.from('hayna_temporary_message_payloads').select('content,expires_at').eq('message_id',msg.id).maybeSingle().then(({data}) => {
-      if (!alive || !data) return;
+    const refresh = async () => {
+      const { data } = await supabase.from('hayna_temporary_message_payloads').select('content,expires_at').eq('message_id', msg.id).maybeSingle();
+      if (!alive) return;
+      if (!data) { setSecureText(null); return; }
       setSecureText(data.content);
       if (data.expires_at) { setSecureExpiry(new Date(data.expires_at).getTime()); setTemporaryOpened(true); }
-    });
-    return () => { alive = false; };
-  }, [secureTemporary, msg.id]);
+    };
+    void refresh();
+    const timer = msg.sender_id === currentUserId ? setInterval(() => void refresh(), 5000) : null;
+    return () => { alive = false; if (timer) clearInterval(timer); };
+  }, [secureTemporary, msg.id, msg.sender_id, currentUserId]);
   const openSecure = async () => {
     if (openingSecure) return;
     setOpeningSecure(true);
