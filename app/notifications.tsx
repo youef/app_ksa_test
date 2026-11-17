@@ -290,6 +290,8 @@ export default function Notifications() {
         justifyContent: 'space-between',
         paddingHorizontal: 16,
         paddingVertical: 10,
+        flexWrap: 'wrap',
+        gap: 8,
         backgroundColor: OASIS.colors.surface,
         borderBottomWidth: 1,
         borderBottomColor: '#f1f5f9',
@@ -301,13 +303,18 @@ export default function Notifications() {
               alignItems: 'center',
               gap: 6,
               paddingHorizontal: 12,
-              paddingVertical: 6,
-              borderRadius: 16,
+              minHeight: 44,
+              justifyContent: 'center',
+              paddingVertical: 9,
+              borderRadius: 22,
               backgroundColor: onlyUnread ? OASIS.colors.soft : '#f1f5f9',
               borderWidth: 1,
               borderColor: onlyUnread ? '#a7f3d0' : OASIS.colors.line,
             },
           ]}
+          accessibilityRole="button"
+          accessibilityLabel={onlyUnread ? 'إظهار جميع الإشعارات' : `إظهار غير المقروء، ${unreadCount} إشعار`}
+          accessibilityState={{ selected: onlyUnread }}
           onPress={() => setOnlyUnread(!onlyUnread)}
         >
           <View style={[styles.filterDot, onlyUnread && styles.filterDotActive]} />
@@ -324,10 +331,14 @@ export default function Notifications() {
                 alignItems: 'center',
                 gap: 4,
                 paddingHorizontal: 10,
-                paddingVertical: 6,
-                borderRadius: 14,
+                minHeight: 44,
+                justifyContent: 'center',
+                paddingVertical: 9,
+                borderRadius: 22,
                 backgroundColor: OASIS.colors.soft,
               }}
+              accessibilityRole="button"
+              accessibilityLabel="تحديد جميع الإشعارات كمقروءة"
               onPress={markAllAsRead}
             >
               <CheckCheck size={14} color={OASIS.colors.primary} />
@@ -338,13 +349,15 @@ export default function Notifications() {
           {items.length > 0 && (
             <Pressable
               style={{
-                width: 32,
-                height: 32,
-                borderRadius: 16,
+                width: 44,
+                height: 44,
+                borderRadius: 22,
                 backgroundColor: '#f1f5f9',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
+              accessibilityRole="button"
+              accessibilityLabel="حذف جميع الإشعارات"
               onPress={confirmClearAll}
             >
               <Trash2 size={14} color="#94a3b8" />
@@ -429,6 +442,11 @@ export default function Notifications() {
                   ? 'أنت مطلع على كل ما يهمك أولاً بأول!'
                   : 'ستظهر هنا الردود على استفساراتك، تنبيهات أهالي حيك، وإشعارات الطوارئ.'}
               </Text>
+              {onlyUnread && (
+                <Pressable oasisKind="action" accessibilityRole="button" accessibilityLabel="عرض جميع الإشعارات" onPress={() => setOnlyUnread(false)} style={styles.emptyResetButton}>
+                  <Text style={styles.emptyResetText}>عرض جميع الإشعارات</Text>
+                </Pressable>
+              )}
             </View>
           ) : (
             filteredItems.map(item => {
@@ -895,8 +913,9 @@ const styles = StyleSheet.create({
     gap: 6,
     backgroundColor: '#f1f5f9',
     paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 14,
+    paddingVertical: 11,
+    minHeight: 44,
+    borderRadius: 22,
     borderWidth: 1,
     borderColor: OASIS.colors.line,
   },
@@ -935,7 +954,26 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   feedContent: {
-    padding: 14,
+    width: '100%',
+    maxWidth: 820,
+    alignSelf: 'center',
+    paddingHorizontal: 14,
+    paddingTop: 16,
+  },
+  emptyResetButton: {
+    minHeight: 44,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 22,
+    backgroundColor: OASIS.colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  emptyResetText: {
+    color: OASIS.colors.surface,
+    fontWeight: '700',
+    fontSize: 13,
   },
   loadingContainer: {
     flex: 1,
@@ -960,9 +998,9 @@ const styles = StyleSheet.create({
   actorLink: { color: OASIS.colors.primary, fontSize: 11, fontWeight: '600' },
   notifCard: {
     backgroundColor: OASIS.colors.surface,
-    borderRadius: 14,
-    padding: 12,
-    marginBottom: 8,
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 10,
     borderWidth: 1,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -978,8 +1016,7 @@ const styles = StyleSheet.create({
   },
   notifCardRead: {
     borderColor: OASIS.colors.line,
-    backgroundColor: 'rgba(255,255,255,0.7)',
-    opacity: 0.85,
+    backgroundColor: OASIS.colors.surface,
   },
   notifCardEmergency: {
     borderColor: OASIS.colors.danger,
