@@ -103,7 +103,7 @@ export default function Conversation() {
   const [webViewport, setWebViewport] = useState<{ top: number; height: number } | null>(null);
 
   const insets = useSafeAreaInsets();
-  const bottomSafe = Math.max(insets.bottom, 10);
+  const bottomSafe = Platform.OS === 'web' ? Math.max(insets.bottom, 8) : Math.max(insets.bottom, 10);
   const otherName = displayName(otherUser, 'المحادثة');
   const isAnonymous = otherUser?.hide_name === true;
   const anyBlock = blockedByMe || blockedMe;
@@ -709,7 +709,7 @@ export default function Conversation() {
         <ScrollView
         ref={scrollRef}
         style={[styles.messagesList, { backgroundColor: 'transparent' }]}
-        contentContainerStyle={[styles.messagesContent, { paddingBottom: 16 }]}
+        contentContainerStyle={[styles.messagesContent, { paddingBottom: 24 }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         onScroll={trackScroll}
@@ -743,7 +743,7 @@ export default function Conversation() {
         <View style={{ height: 16 }} />
         </ScrollView>
         {showJump && (
-        <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="الانتقال إلى أحدث رسالة" onPress={jumpToLatest}
+        <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="الانتقال إلى أحدث رسالة" accessibilityHint="ينقلك إلى أسفل المحادثة" onPress={jumpToLatest}
           style={[styles.jumpToLatest, { backgroundColor: colors.surface, borderColor: colors.line }]}>
           <ArrowDown size={17} color={colors.primary} />
           <Text style={[styles.jumpLabel, { color: colors.primary }]}>أحدث الرسائل</Text>
