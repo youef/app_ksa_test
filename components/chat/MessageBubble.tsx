@@ -174,6 +174,7 @@ function MessageBubbleBase({
   const temporary = useMemo(() => parseTemporaryMessage(msg.body), [msg.body]);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [imageFailed, setImageFailed] = useState(false);
+  const [temporaryOpened, setTemporaryOpened] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -384,10 +385,15 @@ function MessageBubbleBase({
             </View>
           ) : temporary ? (
             <View style={{ gap: 6 }}>
-              <Text style={[styles.msgText, { color: colors.ink }]}>{temporary.text}</Text>
+              {!temporaryOpened && !isMine ? (
+                <Pressable oasisKind="action" onPress={() => setTemporaryOpened(true)} accessibilityRole="button" accessibilityLabel="فتح الرسالة المؤقتة" style={{ minHeight: 60, minWidth: 160, justifyContent: 'center', alignItems: 'center', gap: 5 }}>
+                  <Timer size={24} color={OASIS.colors.primary} />
+                  <Text style={{ color: colors.ink, fontWeight: '700' }}>رسالة مؤقتة · اضغط للفتح</Text>
+                </Pressable>
+              ) : <Text style={[styles.msgText, { color: colors.ink }]}>{temporary.text}</Text>}
               <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 4 }}>
                 <Timer size={12} color={colors.muted} />
-                <Text style={{ color: colors.muted, fontSize: 11 }}>{`تختفي خلال ${Math.max(0, Math.ceil((temporary.expiresAt - now) / 1000))} ثانية`}</Text>
+                <Text style={{ color: colors.muted, fontSize: 11 }}>{`تنتهي خلال ${Math.max(0, Math.ceil((temporary.expiresAt - now) / 1000))} ثانية من الإرسال`}</Text>
               </View>
             </View>
           ) : (
