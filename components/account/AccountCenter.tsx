@@ -1,3 +1,4 @@
+import { ContentSkeleton } from '@/components/shared/ContentSkeleton';
 import { shareContent } from '@/lib/shareContent';
 import { PROFILE_READ_FIELDS } from '@/lib/profileFields';
 import { AppearanceSettings } from '@/components/account/AppearanceSettings';
@@ -838,8 +839,7 @@ export default function AccountCenter() {
   if (loading) {
     return (
       <View style={[styles.loadingScreen, { backgroundColor: 'transparent' }]}>
-        <ActivityIndicator size="large" color={OASIS.colors.primary} />
-        <Text style={styles.loadingText}>جاري تجهيز مركز حسابك...</Text>
+        <ContentSkeleton variant="profile" />
       </View>
     );
   }
