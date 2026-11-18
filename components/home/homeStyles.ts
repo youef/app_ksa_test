@@ -90,7 +90,7 @@ const badgeBase = {
 /* -------------------------------------------------------------------------- */
 
 export const styles = StyleSheet.create({
-  glassFrameCompact: { marginHorizontal: 16, marginBottom: 8, borderRadius: 16, minHeight: 44 },
+  glassFrameCompact: { marginHorizontal: 0, marginBottom: 0, borderRadius: 14, minHeight: 44 },
   glassFrameDefault: { marginHorizontal: 16, marginBottom: 10, borderRadius: 18, minHeight: 44 },
   atmoBarBase: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 12 },
   atmoBarCompact: { paddingVertical: 6 },
