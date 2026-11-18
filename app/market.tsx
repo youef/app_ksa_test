@@ -1,3 +1,4 @@
+import { ContentSkeleton } from '@/components/shared/ContentSkeleton';
 import { MarketPromotions } from '@/components/market/MarketPromotions';
 import { OasisEmptyIllustration } from '@/components/oasis/OasisEmptyIllustration';
 import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
@@ -1100,7 +1101,7 @@ export default function Market() {
         <View style={styles.inner}>
           {partialLoadError && !loading && !loadError && <Pressable accessibilityRole="button" onPress={()=>void loadAllData()} style={styles.partialNotice}><Text style={styles.partialNoticeText}>تعذر تحميل بعض الأقسام. اضغط لإعادة المحاولة.</Text></Pressable>}
           {loading ? (
-            <ScreenState type="loading" title="جاري التجهيز والتحميل" message="نرتب لك محتوى الحي الأقرب إليك" />
+            <ContentSkeleton variant="market" />
           ) : loadError ? (
             <View style={{ paddingVertical: 16 }}>
               <ScreenState type="error" title="تعذر تحميل المحتوى" message="اسحب للتحديث وحاول مرة أخرى" />
