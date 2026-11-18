@@ -23,3 +23,24 @@ test('directory filters expose selection and refresh without blanking results', 
   assert.match(source, /accessibilityLabel=\{\x60عرض \$\{label\}، \$\{baseCounts\[key\]\} بث\x60\}/);
   assert.match(source, /accessibilityState=\{\{ selected: filter === key \}\}/);
 });
+
+test('live host toolbar keeps priority controls accessible and avoids duplicate end actions', () => {
+  const control = fs.readFileSync(path.join(__dirname, '../components/lives/LiveHostControlBar.tsx'), 'utf8');
+  const room = read('live/[id].tsx');
+  for (const action of ['onToggleCamera', 'onToggleMic', 'onGuests', 'onComments', 'onModeration', 'onShare']) {
+    assert.ok(control.includes(action), `Missing live control: ${action}`);
+  }
+  assert.match(control, /accessibilityLabel="طي أدوات البث"/);
+  assert.match(control, /accessibilityLabel="فتح أدوات البث"/);
+  assert.match(control, /accessibilityState=\{\{ expanded: moreOpen \}\}/);
+  assert.doesNotMatch(control, /onEnd/);
+  assert.match(room, /accessibilityLabel="إنهاء البث المباشر"/);
+});
+
+test('live room applies safe area only below message composer', () => {
+  const room = read('live/[id].tsx');
+  const control = fs.readFileSync(path.join(__dirname, '../components/lives/LiveHostControlBar.tsx'), 'utf8');
+  assert.doesNotMatch(room, /bottomInset=\{insets\.bottom\}/);
+  assert.match(room, /marginBottom: Math\.max\(insets\.bottom, 10\)/);
+  assert.doesNotMatch(control, /Math\.max\(bottomInset/);
+});
