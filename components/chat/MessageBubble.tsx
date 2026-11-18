@@ -17,6 +17,7 @@ import {
   Check,
   CheckCheck,
   Timer,
+  Link2,
 } from 'lucide-react-native';
 import {
   OasisSurface,
@@ -85,6 +86,17 @@ export function isUserFriendlyCaption(name?: string): boolean {
   if (/\.(webp|jpg|jpeg|png|gif|heic|svg)$/i.test(trimmed)) return false;
   if (/^[0-9a-fA-F-]{20,}/.test(trimmed)) return false;
   return true;
+}
+
+/** Detect explicit http(s) links only; keep original URLs for opening, but display a short label. */
+function messageSegments(value: string): Array<{ text: string; url?: string }> {
+  return value.split(/(https?:\/\/[^\s]+)/gi).filter(Boolean).map(part => {
+    if (!/^https?:\/\//i.test(part)) return { text: part };
+    const url = part.replace(/[.,!?،؛)\]]+$/u, '');
+    if (!url) return { text: part };
+    const visible = url.replace(/^https?:\/\//i, '');
+    return { text: visible.length > 54 ? visible.slice(0, 51) + '…' : visible, url };
+  });
 }
 
 export function parseLocationMessage(value: string) {
@@ -281,16 +293,16 @@ function MessageBubbleBase({
                 </View>
                 <View style={styles.locationInfoCol}>
                   <Text style={styles.locationHeaderTitle}>
-                    {isMine ? '📍 موقعي الدقيق المشترك' : '📍 موقع الجار المشترك'}
+                    {isMine ? 'الموقع الذي شاركته' : 'موقع مشارك من الجار'}
                   </Text>
                   <Text style={styles.locationDistrictTitle} numberOfLines={1}>
-                    {place.label ? `حي ${place.label}` : 'موقع على الخريطة'}
+                    {place.label ? (/^حي\s/.test(place.label) ? place.label : `حي ${place.label}`) : 'موقع على الخريطة'}
                   </Text>
                 </View>
               </View>
 
               <Pressable
-                oasisKind="action"
+                oasisKind="plain"
                 style={styles.locationNavBtn}
                 onPress={() =>
                   Linking.openURL(navigationUrl(place.lat, place.lng)).catch(
@@ -397,9 +409,19 @@ function MessageBubbleBase({
               </View>
             </View>
           ) : (
-            <Text style={[styles.msgText, { color: colors.ink }]}>
-              {msg.body}
-            </Text>
+            <View style={styles.msgRichText}>
+              {messageSegments(msg.body).map((segment, i) => segment.url ? (
+                <Pressable oasisKind="plain" key={i} onPress={() => Linking.openURL(segment.url!).catch(() => undefined)}
+                  accessibilityRole="link" accessibilityLabel={`فتح الرابط ${segment.text}`}
+                  style={styles.msgLinkRow}>
+                  <Link2 size={14} color={OASIS.colors.primary}/>
+                  <Text numberOfLines={1} style={styles.msgLinkText}>{segment.text}</Text>
+                  <ExternalLink size={12} color={OASIS.colors.primary}/>
+                </Pressable>
+              ) : (
+                <Text key={i} style={[styles.msgText, { color: colors.ink }]}>{segment.text}</Text>
+              ))}
+            </View>
           )}
 
           <View style={[styles.msgMeta, isMine && styles.msgMetaMine]}>
