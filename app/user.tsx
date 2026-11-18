@@ -569,7 +569,7 @@ export default function UserProfile() {
       : answers;
 
   return (
-    <View style={[styles.screen, {backgroundColor: colors.background}, { backgroundColor: 'transparent' }]}>
+    <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <ImagePreviewModal uri={previewImage?.uri || null} title={previewImage?.title || 'الصورة'} onClose={()=>setPreviewImage(null)}/>
       <Modal visible={confirmBlock} transparent animationType="fade" onRequestClose={() => {if (!busy) setConfirmBlock(false);}}>
         <View style={social.menuOverlay}><View style={[social.menu,{backgroundColor:colors.surface}]} accessibilityViewIsModal>
@@ -629,7 +629,7 @@ export default function UserProfile() {
         }
         contentContainerStyle={styles.page}
       >
-        <View style={[styles.shell, { paddingTop: 14 }]}>
+        <View style={[styles.shell, { paddingTop: 10 }]}>
           <ProfileHeader contactPhone={contact && contact.profileId === profile.id && (lookupKey === profile.id || lookupKey === profile.username) ? contact.phone : ''} profile={profile} customization={profileCustomization} displayName={displayName} coverUri={coverUrl} stats={{...stats, contributions:totalContributions}} own={own} anonymous={anonymous} locked={locked} following={following} followedBy={followedBy} busy={busy || blocked || blockedByOther} canMessage={canMessage} hideContactActions={locked || blocked || blockedByOther} hasStories={hasActiveStories} onStoriesPress={()=>void openProfileStories()} onAvatarPress={()=>{if(!anonymous&&!locked&&profile.avatar_url)setPreviewImage({uri:profile.avatar_url,title:'الصورة الشخصية'});}} onCoverPreview={()=>{if(!anonymous&&!locked)setPreviewImage({uri:coverUrl,title:'صورة الغلاف'});}} onEdit={() => router.push('/profile?section=edit')} onDesign={() => router.push('/profile?tab=settings&section=design')} onSettings={() => router.push('/profile?tab=settings')} onFollowers={() => setConnections('followers')} onFollowing={() => setConnections('following')} onFollow={() => void toggleFollow()} onMessage={() => void openMessage()} />
           {!locked && (featuredItems.length > 0 || own) && (
             <View style={styles.content}>
@@ -641,11 +641,20 @@ export default function UserProfile() {
                 {own && featuredItems.length > 0 && <Pressable style={styles.marketLink} onPress={() => router.push({ pathname: '/profile', params: { tab: 'settings', section: 'design' } })}><Text style={[styles.marketLinkText, { color: accentColor }]}>إدارة</Text><Edit3 size={14} color={accentColor} /></Pressable>}
               </View>}
               {featuredItems.length > 0 ? (
-                <View style={[styles.grid, { gap: 12 }]}>
+                <View style={[styles.grid, { gap: 9 }]}>
                   {featuredItems.map(item => <ActivityCard key={item._featuredType + ':' + item.id} type={item._featuredType === 'question' ? 'questions' : item._featuredType === 'service' ? 'services' : item._featuredType === 'request' ? 'requests' : 'market'} item={item} width={cardWidth} />)}
                 </View>
               ) : (
-                <Pressable oasisKind="plain" onPress={() => router.push('/profile?tab=settings&section=design')} style={{flexDirection:'row-reverse',alignItems:'center',gap:12,padding:16,borderWidth:1,borderColor:colors.line,borderRadius:16,backgroundColor:colors.surface}}><Sparkles size={19} color={accentColor}/><View style={{flex:1,gap:4}}><Text style={{color:colors.ink,textAlign:'right',fontWeight:'700',fontSize:13}}>أبرز أفضل مشاركاتك</Text><Text style={{color:colors.muted,textAlign:'right',fontSize:12}}>اختر مساهمات لتثبيتها في ملفك</Text></View><ChevronLeft size={18} color={colors.muted}/></Pressable>
+                <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="اختيار مشاركات مميزة للملف"
+                  onPress={() => router.push('/profile?tab=settings&section=design')}
+                  style={[styles.featuredPrompt, { backgroundColor: colors.surface, borderColor: colors.line }]}>
+                  <View style={[styles.featuredPromptIcon, { backgroundColor: colors.soft }]}><Sparkles size={17} color={accentColor}/></View>
+                  <View style={styles.featuredPromptCopy}>
+                    <Text style={[styles.featuredPromptTitle, { color: colors.ink }]}>ميّز أفضل مشاركاتك</Text>
+                    <Text numberOfLines={1} style={[styles.featuredPromptSub, { color: colors.muted }]}>ثبّت ما تود إبرازه في ملفك العام</Text>
+                  </View>
+                  <ChevronLeft size={16} color={colors.muted}/>
+                </Pressable>
               )}
             </View>
           )}
@@ -950,8 +959,8 @@ function ActivityCard({ type, item, width, author }: { type: Tab; item: any; wid
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: OASIS.colors.background },
-  page: { paddingBottom: 110 },
-  shell: { width: '100%', maxWidth: 820, alignSelf: 'center', paddingHorizontal: 16 },
+  page: { paddingBottom: 100 },
+  shell: { width: '100%', maxWidth: 820, alignSelf: 'center', paddingHorizontal: 14 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: OASIS.colors.background, padding: 16 },
   loadingText: { marginTop: 10, color: OASIS.colors.primary, fontWeight: '600', fontSize: 13 },
   hero: { borderRadius: 14, padding: 18, overflow: 'hidden', minHeight: 250 },
@@ -1177,17 +1186,17 @@ const styles = StyleSheet.create({
   stat: { flex: 1, alignItems: 'center', paddingVertical: 8, borderLeftWidth: 1, borderLeftColor: '#f1f5f9' },
   statValue: { color: OASIS.colors.ink, fontSize: 17, fontWeight: '700' },
   statLabel: { color: OASIS.colors.muted, fontSize: 11, fontWeight: '700', marginTop: 2 },
-  tabsCard: { marginTop: 20, backgroundColor: OASIS.colors.surface, borderRadius: 20, borderWidth: 1, borderColor: OASIS.colors.line, padding: 6, overflow: 'hidden' },
-  tabs: { flexDirection: 'row-reverse', gap: 6, flexGrow: 1 },
+  tabsCard: { marginTop: 12, backgroundColor: OASIS.colors.surface, borderRadius: 14, borderWidth: 1, borderColor: OASIS.colors.line, padding: 4, overflow: 'hidden' },
+  tabs: { flexDirection: 'row-reverse', gap: 5, flexGrow: 1 },
   tabCountBadge: { minWidth: 22, height: 22, paddingHorizontal: 5, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },
   tab: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 5,
-    paddingHorizontal: 12,
-    minHeight: 46,
-    paddingVertical: 10,
-    borderRadius: 14,
+    paddingHorizontal: 10,
+    minHeight: 40,
+    paddingVertical: 7,
+    borderRadius: 10,
     borderWidth: 1,
   },
   tabActive: { backgroundColor: OASIS.colors.primary },
@@ -1195,9 +1204,14 @@ const styles = StyleSheet.create({
   tabTextActive: { color: OASIS.colors.surface },
   tabCount: { color: '#94a3b8', fontSize: 11, fontWeight: '600' },
   tabCountActive: { color: OASIS.colors.soft },
-  content: { marginTop: 22 },
-  contentHead: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 14 },
-  contentTitle: { lineHeight: 28, color: OASIS.colors.ink, fontSize: 17, fontWeight: '700', textAlign: 'right' },
+  content: { marginTop: 12 },
+  featuredPrompt: { minHeight: 61, flexDirection: 'row-reverse', alignItems: 'center', gap: 10, paddingHorizontal: 11, paddingVertical: 9, borderWidth: 1, borderRadius: 13 },
+  featuredPromptIcon: { width: 33, height: 33, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  featuredPromptCopy: { flex: 1, minWidth: 0, alignItems: 'flex-end', gap: 3 },
+  featuredPromptTitle: { fontSize: 12.5, fontWeight: '700', textAlign: 'right' },
+  featuredPromptSub: { fontSize: 11, textAlign: 'right' },
+  contentHead: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', gap: 9, marginBottom: 10 },
+  contentTitle: { lineHeight: 24, color: OASIS.colors.ink, fontSize: 15, fontWeight: '700', textAlign: 'right' },
   featuredEmpty: { alignItems: 'center', gap: 10, paddingVertical: 18 },
   contentSub: { color: OASIS.colors.muted, fontSize: 11, marginTop: 2, fontWeight: '600', textAlign: 'right' },
   marketLink: { flexDirection: 'row-reverse', alignItems: 'center', gap: 2 },
