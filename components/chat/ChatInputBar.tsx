@@ -279,11 +279,11 @@ function ChatInputBarBase({
       )}
 
       <View style={styles.inputArea}>
-        <Pressable oasisKind="icon" onPress={() => { setTimerOpen(v => !v); setToolsOpen(false); onCloseStickers(); }} accessibilityRole="button" accessibilityLabel={temporarySeconds ? `مؤقت الرسائل مفعل: ${temporarySeconds} ثانية` : 'تفعيل مؤقت الرسالة'} accessibilityState={{ expanded: timerOpen }} style={[styles.attachCircleBtn, temporarySeconds > 0 && { borderColor: OASIS.colors.primary, backgroundColor: OASIS.colors.soft }]}>
+        <Pressable oasisKind="plain" onPress={() => { setTimerOpen(v => !v); setToolsOpen(false); onCloseStickers(); }} accessibilityRole="button" accessibilityLabel={temporarySeconds ? `مؤقت الرسائل مفعل: ${temporarySeconds} ثانية` : 'تفعيل مؤقت الرسالة'} accessibilityState={{ expanded: timerOpen }} style={[styles.attachCircleBtn, temporarySeconds > 0 && { borderColor: OASIS.colors.primary, backgroundColor: OASIS.colors.soft }]}>
           <Timer size={20} color={OASIS.colors.primary} />
         </Pressable>
         <Pressable
-          oasisKind="icon"
+          oasisKind="plain"
           oasisVariant="ghost"
           style={styles.attachCircleBtn}
           onPress={handleToggleTools}
@@ -313,7 +313,7 @@ function ChatInputBarBase({
             accessibilityLabel="حقل كتابة الرسالة"
           />
           <Pressable
-            oasisKind="icon"
+            oasisKind="plain"
             style={styles.emojiInsideBtn}
             onPress={handleToggleStickers}
             accessibilityRole="button"
@@ -329,7 +329,7 @@ function ChatInputBarBase({
 
         <Pressable
           oasisVariant="primary"
-          oasisKind="icon"
+          oasisKind="plain"
           style={({ pressed }) => [
             styles.sendButton,
             !canSend && styles.sendButtonDisabled,
@@ -344,7 +344,7 @@ function ChatInputBarBase({
           {uploadingMedia || sending ? (
             <ActivityIndicator size="small" color={OASIS.colors.surface} />
           ) : (
-            <Send size={18} color={OASIS.colors.surface} style={{ marginLeft: 2 }} />
+            <Send size={18} color={canSend ? OASIS.colors.surface : OASIS.colors.muted} style={{ marginLeft: 2 }} />
           )}
         </Pressable>
       </View>
