@@ -322,7 +322,7 @@ export default function WeatherScreen() {
         await fetchWeather(place.latitude, place.longitude, { city: place.name || trimmed, region: place.admin1 || '', district: '' });
       }
     } catch (err: any) {
-      if (weatherRequestId.current) setError(err?.message || 'تعذّر تحميل بيانات الطقس. حاول مرة أخرى.');
+      setError(err?.message || 'تعذّر تحميل بيانات الطقس. حاول مرة أخرى.');
     } finally {
       setLoading(false);
     }
@@ -377,9 +377,10 @@ export default function WeatherScreen() {
     let active = true;
     (async () => {
       try {
-        const { data } = await supabase.auth.getSession();
-        const user = data.session?.user;
-        const saved = await getActiveLocation().catch(() => null);
+        const [sessionResult, saved] = await Promise.all([
+          supabase.auth.getSession(), getActiveLocation().catch(() => null),
+        ]);
+        const user = sessionResult.data.session?.user;
         let city = saved?.city && !saved.city.startsWith('كل ') ? saved.city : '';
         if (!city && user) {
           const { data: profile } = await supabase.from('profiles').select('city').eq('id', user.id).maybeSingle();
@@ -661,7 +662,15 @@ export default function WeatherScreen() {
             </View>
           )}
 
-          {weather && topAlert ? (
+          {weather && topAlert ? (topAlert.id === 'ok' ? (
+            <View style={styles.okStrip}>
+              <View style={styles.okStripIcon}><CloudSun size={17} color={OASIS.colors.primary}/></View>
+              <View style={styles.okStripCopy}>
+                <Text style={styles.okStripTitle}>أجواء مستقرة بحسب النموذج</Text>
+                <Text style={styles.okStripDesc}>تقدير آلي وليس بديلًا عن الإنذارات الرسمية</Text>
+              </View>
+            </View>
+          ) : (
             <View style={[styles.alertBanner, { backgroundColor: bannerMeta.bg, borderColor: bannerMeta.border }]}>
               <View style={styles.alertBannerTop}>
                 <View style={[styles.alertIconWrap, { backgroundColor: bannerMeta.accent }]}>
@@ -684,7 +693,7 @@ export default function WeatherScreen() {
                 </View>
               ) : null}
             </View>
-          ) : null}
+          )) : null}
 
           {/* City search */}
           <OasisSurface oasisSurface="card" style={styles.searchCard}>
@@ -1028,12 +1037,46 @@ function LocationItem({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
-  searchCard: { backgroundColor: OASIS.colors.surface, borderRadius: 14, borderWidth: 1, borderColor: OASIS.colors.line, overflow: 'hidden' },
-  citySearchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12 },
-  locationButton: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, backgroundColor: OASIS.colors.soft, borderRadius: 11, paddingHorizontal: 11, paddingVertical: 10 },
+  weatherHeroCard: { borderRadius: 19, borderWidth: 0, elevation: 0, shadowOpacity: 0 },
+  snapshotGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 7 },
+  snapshotTile: { flexGrow: 1, flexBasis: '21%', minWidth: 72, minHeight: 88, justifyContent: 'center', alignItems: 'center', gap: 5, paddingHorizontal: 5, paddingVertical: 10, borderRadius: 14, borderWidth: 1, borderColor: OASIS.colors.line, backgroundColor: OASIS.colors.surface },
+  snapshotLabel: { color: OASIS.colors.muted, fontSize: 10, fontWeight: '600', textAlign: 'center' },
+  snapshotValue: { color: OASIS.colors.ink, fontSize: 16, fontWeight: '800', textAlign: 'center' },
+  snapshotUnit: { color: OASIS.colors.muted, fontSize: 9.5, fontWeight: '600' },
+  okStrip: { flexDirection: 'row-reverse', alignItems: 'center', gap: 9, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 13, backgroundColor: OASIS.colors.soft },
+  okStripIcon: { width: 34, height: 34, borderRadius: 11, backgroundColor: OASIS.colors.surface, alignItems: 'center', justifyContent: 'center' },
+  okStripCopy: { flex: 1, alignItems: 'flex-end', gap: 2 },
+  okStripTitle: { color: OASIS.colors.deep, fontSize: 12, fontWeight: '800', textAlign: 'right' },
+  okStripDesc: { color: OASIS.colors.muted, fontSize: 10, textAlign: 'right' },
+  searchCard: { backgroundColor: OASIS.colors.surface, borderRadius: 15, borderWidth: 1, borderColor: OASIS.colors.line, overflow: 'hidden', elevation: 0 }, 
+  cityPickerToggle: { minHeight: 40, flexDirection: 'row-reverse', alignItems: 'center', gap: 7, marginHorizontal: 11, paddingVertical: 6, borderTopWidth: 1, borderTopColor: OASIS.colors.line },
+  cityPickerTitle: { color: OASIS.colors.deep, fontSize: 11.5, fontWeight: '700', flex: 1, textAlign: 'right' },
+  cityPickerSide: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5 },
+  quickLinks: { flexDirection: 'row-reverse', alignItems: 'stretch', gap: 8 },
+  radarShortcut: { flex: 1.5, minWidth: 0, minHeight: 67, borderWidth: 1, borderColor: '#BDE7D7', borderRadius: 15, paddingHorizontal: 10, flexDirection: 'row-reverse', alignItems: 'center', gap: 8, backgroundColor: '#E9F7F0' },
+  radarText: { flex: 1, minWidth: 0, alignItems: 'flex-end', gap: 3 },
+  radarTitle: { color: OASIS.colors.deep, fontSize: 12.5, fontWeight: '800', textAlign: 'right' },
+  radarSub: { color: OASIS.colors.muted, fontSize: 10, textAlign: 'right' },
+  officialShortcut: { flex: 0.8, minWidth: 0, minHeight: 67, alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 8, borderWidth: 1, borderColor: '#F2DFC4', borderRadius: 15, backgroundColor: '#FFF8EB' },
+  officialTitle: { color: '#945A1C', fontSize: 10.5, fontWeight: '700', textAlign: 'center' },
+  locationAccordion: { borderWidth: 1, borderColor: OASIS.colors.line, backgroundColor: OASIS.colors.surface, borderRadius: 13, paddingHorizontal: 11, paddingVertical: 6, gap: 5 },
+  locationCompactRow: { minHeight: 33, flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
+  locationCompactText: { flex: 1, minWidth: 0, fontSize: 11.5, fontWeight: '600', color: OASIS.colors.ink, textAlign: 'right' },
+  detailsToggle: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, minHeight: 64, borderRadius: 15, paddingHorizontal: 13, paddingVertical: 10, backgroundColor: OASIS.colors.surface, borderWidth: 1, borderColor: OASIS.colors.line },
+  detailsToggleCopy: { flex: 1, minWidth: 0, alignItems: 'flex-end', gap: 4 },
+  detailsToggleTitle: { color: OASIS.colors.ink, fontSize: 13.5, fontWeight: '800', textAlign: 'right' },
+  detailsToggleHint: { color: OASIS.colors.muted, fontSize: 10.5, textAlign: 'right' },
+  detailsToggleAction: { color: OASIS.colors.primary, fontSize: 11, fontWeight: '700' },
+  daysToggle: { minHeight: 38, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 12, margin: 9, borderRadius: 11, backgroundColor: OASIS.colors.soft },
+  daysToggleText: { fontSize: 11, fontWeight: '700', color: OASIS.colors.primary },
+  sourcesToggle: { flexDirection: 'row-reverse', alignItems: 'center', gap: 7, borderRadius: 13, paddingHorizontal: 11, minHeight: 41, backgroundColor: OASIS.colors.surface, borderWidth: 1, borderColor: OASIS.colors.line },
+  sourcesLabel: { flex: 1, textAlign: 'right', color: OASIS.colors.muted, fontSize: 11, fontWeight: '700' },
+
+  citySearchRow: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 10, paddingVertical: 9 },
+  locationButton: { flexDirection: 'row-reverse', minHeight: 40, alignItems: 'center', justifyContent: 'center', gap: 5, backgroundColor: OASIS.colors.soft, borderRadius: 11, paddingHorizontal: 10, paddingVertical: 8 },
   locationButtonText: { color: OASIS.colors.primary, fontSize: 11.5, fontWeight: '700' },
   searchButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', backgroundColor: OASIS.colors.primary, borderRadius: 11 },
-  cityInput: { flex: 1, minWidth: 80, backgroundColor: OASIS.colors.background, borderWidth: 1, borderColor: OASIS.colors.line, borderRadius: 11, paddingHorizontal: 11, paddingVertical: 9, color: OASIS.colors.ink, fontSize: 12.5 },
+  cityInput: { flex: 1, minWidth: 80, minHeight: 40, backgroundColor: OASIS.colors.background, borderWidth: 1, borderColor: OASIS.colors.line, borderRadius: 11, paddingHorizontal: 10, paddingVertical: 8, color: OASIS.colors.ink, fontSize: 13 },
   errorText: { color: OASIS.colors.danger, fontSize: 11.5, textAlign: 'right', paddingHorizontal: 14, paddingBottom: 10, lineHeight: 17 },
 
   locationCard: { backgroundColor: OASIS.colors.surface, borderRadius: 14, borderWidth: 1, borderColor: OASIS.colors.line, padding: 14, gap: 10 },
@@ -1046,19 +1089,19 @@ const styles = StyleSheet.create({
   panelLocation: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, marginTop: 8 },
   panelLocationText: { color: OASIS.colors.soft, fontSize: 11, fontWeight: '700', textAlign: 'right' },
 
-  card: { backgroundColor: OASIS.colors.surface, borderRadius: 14, borderWidth: 1, borderColor: OASIS.colors.line, overflow: 'hidden', shadowColor: OASIS.colors.ink, shadowOpacity: 0, shadowRadius: 12, elevation: 2 },
-  currentPanel: { padding: 17, minHeight: 196 },
+  card: { backgroundColor: OASIS.colors.surface, borderRadius: 16, borderWidth: 1, borderColor: OASIS.colors.line, overflow: 'hidden', shadowOpacity: 0, elevation: 0 },
+  currentPanel: { paddingHorizontal: 17, paddingTop: 13, paddingBottom: 15, minHeight: 184 },
   panelTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   panelUpdated: { color: OASIS.colors.soft, fontSize: 11, fontWeight: '700' },
   refreshButton: { width: 34, height: 34, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
-  currentMain: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 16 },
+  currentMain: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 11 },
   tempAndIcon: { flexDirection: 'row-reverse', alignItems: 'center', gap: 9 },
-  temperature: { color: OASIS.colors.surface, fontSize: 51, fontWeight: '300', letterSpacing: -2 },
+  temperature: { color: OASIS.colors.surface, fontSize: 50, fontWeight: '600', letterSpacing: -1.5 },
   tempCopy: { alignItems: 'flex-end', gap: 5 },
   conditionText: { color: OASIS.colors.surface, fontSize: 16, fontWeight: '700' },
   feelsLike: { color: '#dbeafe', fontSize: 11.5 },
   hiLo: { color: '#c7f9e5', fontSize: 11, fontWeight: '700' },
-  sunTimes: { flexDirection: 'row-reverse', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 13, padding: 10, gap: 13 },
+  sunTimes: { flexDirection: 'row-reverse', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.13)', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 8, gap: 9 },
   sunTimeItem: { flex: 1, flexDirection: 'row-reverse', alignItems: 'center', gap: 5 },
   sunTimeText: { color: OASIS.colors.line, fontSize: 11 },
   sunTimeValue: { color: OASIS.colors.surface, fontSize: 11, fontWeight: '600' },
@@ -1118,13 +1161,13 @@ const styles = StyleSheet.create({
   sourceText: { color: '#94a3b8', fontSize: 11, textAlign: 'right' },
   uvText: { color: OASIS.colors.muted, fontSize: 11, textAlign: 'right', fontWeight: '700' },
 
-  alertBanner: { marginHorizontal: 12, marginTop: 10, marginBottom: 2, borderRadius: 14, borderWidth: 1, padding: 14, gap: 8 },
+  alertBanner: { borderRadius: 15, borderWidth: 1, padding: 11, gap: 6 },
   alertBannerTop: { flexDirection: 'row-reverse', alignItems: 'center', gap: 9 },
   alertIconWrap: { width: 34, height: 34, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   alertBannerCopy: { flex: 1, alignItems: 'flex-end', gap: 2 },
   alertBadge: { fontSize: 11, fontWeight: '700' },
-  alertTitle: { fontSize: 14.5, fontWeight: '700', textAlign: 'right' },
-  alertMessage: { fontSize: 11.5, lineHeight: 18, textAlign: 'right' },
+  alertTitle: { fontSize: 13.5, fontWeight: '800', textAlign: 'right' },
+  alertMessage: { fontSize: 11, lineHeight: 18, textAlign: 'right' },
   alertList: { gap: 6, marginTop: 4, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.06)', paddingTop: 8 },
   alertRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 7 },
   alertRowText: { fontSize: 11, fontWeight: '700', textAlign: 'right', flex: 1 },
@@ -1178,6 +1221,6 @@ const screenStyles = StyleSheet.create({
     justifyContent: 'center',
   },
   heroTemp: { color: OASIS.colors.surface, fontSize: 24, fontWeight: '700' },
-  scroll: { paddingTop: 16 },
-  content: { width: '100%', maxWidth: 800, alignSelf: 'center', paddingHorizontal: 16, gap: 16 },
+  scroll: { paddingTop: 11 },
+  content: { width: '100%', maxWidth: 800, alignSelf: 'center', paddingHorizontal: 13, gap: 11 },
 });
