@@ -304,12 +304,14 @@ export default function LivesScreen() {
                 </Pressable>
               )}
             </View>
-            <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="إنشاء بث مباشر"
-              style={[styles.createLiveBtn, { backgroundColor: colors.primary }]}
-              onPress={() => router.push('/live/create')}>
-              <Video size={17} color="#FFFFFF"/>
-              <Text style={styles.createLiveText}>ابدأ بث</Text>
-            </Pressable>
+            {!loading && accessibleStreams.length > 0 && (
+              <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="إنشاء بث مباشر"
+                style={[styles.createLiveBtn, { backgroundColor: colors.primary }]}
+                onPress={() => router.push('/live/create')}>
+                <Video size={17} color="#FFFFFF"/>
+                <Text style={styles.createLiveText}>ابدأ بث</Text>
+              </Pressable>
+            )}
           </View>
           <View style={styles.sortRow}>
             {([['popular', 'الأكثر مشاهدة'], ['newest', 'بدأ حديثًا']] as const).map(([key, label]) => (
@@ -381,7 +383,12 @@ export default function LivesScreen() {
                 <Text style={[styles.emptyTitle, { color: colors.ink }]}>{searchQuery.trim() ? 'لا توجد بثوث تطابق بحثك' : filter === 'following' ? 'لا يوجد بث لمتابَعيك الآن' : filter === 'nearby' ? 'لا يوجد بث قريب الآن' : 'ما فيه بث مباشر الآن'}</Text>
                 <Text style={[styles.emptyText, { color: colors.muted }]}>{searchQuery.trim() || category !== 'all' ? 'جرّب كلمات أخرى أو أعد ضبط الفلاتر.' : 'ابدأ بثك الأول وخل جيرانك ينضمون لك.'}</Text>
                 {searchQuery.trim() || category !== 'all' || filter !== 'all' ? <Pressable oasisKind="plain" accessibilityRole="button" style={[styles.resetButton, { backgroundColor: colors.soft }]} onPress={() => { setSearchQuery(''); setCategory('all'); setFilter('all'); }}><Text style={[styles.resetButtonText, { color: colors.primary }]}>عرض كل البثوث</Text></Pressable> : null}
-                <Pressable oasisKind="plain" accessibilityRole="button" onPress={() => router.push('/live/create')} style={[styles.emptyCreate, { backgroundColor: colors.primary }]}><Text style={styles.emptyCreateText}>ابدأ بثك الأول</Text></Pressable>
+                {!searchQuery.trim() && category === 'all' && filter === 'all' && accessibleStreams.length === 0 && (
+                  <Pressable oasisKind="plain" accessibilityRole="button" onPress={() => router.push('/live/create')}
+                    style={[styles.emptyCreate, { backgroundColor: colors.primary }]}>
+                    <Text style={styles.emptyCreateText}>ابدأ بثك الأول</Text>
+                  </Pressable>
+                )}
               </View>
             ) : (
               <View>
