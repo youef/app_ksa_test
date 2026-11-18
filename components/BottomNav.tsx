@@ -26,7 +26,7 @@ const ROUTE_PARENT: Array<[string, string]> = [
   ['/story', '/home'], ['/user', '/more'], ['/settings', '/profile'],
   ['/account-type', '/profile'], ['/profile-customization', '/profile'], ['/market', '/market'], ['/service', '/market'],
   ['/new-service', '/profile'], ['/new-listing', '/profile'], ['/directory', '/search'], ['/business', '/search'],
-  ['/requests', '/home'], ['/conversation', '/messages'], ['/notifications', '/more'],
+  ['/requests', '/home'], ['/conversation', '/messages'], ['/notifications', '/more'], ['/kingdom', '/more'],
 ];
 
 // المسارات التي يجب إخفاء شريط التنقل فيها بالكامل
