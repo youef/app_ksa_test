@@ -408,10 +408,33 @@ export default function Notifications() {
       {/* 3. NOTIFICATIONS FEED                                    */}
       {/* ======================================================== */}
       {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={OASIS.colors.primary} />
+        <ScrollView
+          style={styles.feed}
+          contentContainerStyle={[styles.feedContent, { paddingBottom: bottomNavInset + 16 }]}
+          accessibilityLabel="جاري تحميل الإشعارات"
+          accessibilityState={{ busy: true }}
+          showsVerticalScrollIndicator={false}
+        >
           <Text style={styles.loadingText}>جاري مزامنة الإشعارات...</Text>
-        </View>
+          {[0, 1, 2, 3].map(index => (
+            <View
+              key={index}
+              accessible={false}
+              importantForAccessibility="no-hide-descendants"
+              style={[styles.notifCard, { backgroundColor: OASIS.colors.surface, opacity: 1 - index * 0.12 }]}
+            >
+              <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 12 }}>
+                <View style={{ width: 44, height: 44, borderRadius: 16, backgroundColor: OASIS.colors.soft }} />
+                <View style={{ flex: 1, gap: 9 }}>
+                  <View style={{ height: 13, width: '64%', borderRadius: 7, backgroundColor: OASIS.colors.line }} />
+                  <View style={{ height: 10, width: '90%', borderRadius: 6, backgroundColor: OASIS.colors.soft }} />
+                  <View style={{ height: 10, width: '48%', borderRadius: 6, backgroundColor: OASIS.colors.soft }} />
+                </View>
+              </View>
+              <View style={{ marginTop: 14, width: 82, height: 20, borderRadius: 10, backgroundColor: OASIS.colors.soft }} />
+            </View>
+          ))}
+        </ScrollView>
       ) : (
         <ScrollView
           style={styles.feed}
