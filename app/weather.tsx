@@ -8,6 +8,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { AppHeader } from '@/components/shared/AppHeader';
 import {
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   MapPin,
   RefreshCw,
   Search,
@@ -41,6 +43,10 @@ import { useBottomNavInset } from '@/lib/bottomNav';
 import { sendPushToMultipleUsers } from '@/lib/pushSender';
 import { getActiveLocation } from '@/lib/locationSync';
 import { SAUDI_WEATHER_REGIONS, SAUDI_WEATHER_CITIES, findSaudiWeatherCity, saudiWeatherTimeKey, formatSaudiWeatherTime } from '@/lib/saudiWeather';
+
+// Short-lived in-memory cache keeps switching between cities instant without persisting coordinates.
+const WEATHER_CACHE_TTL_MS = 10 * 60 * 1000;
+const weatherCache = new Map<string, { data: WeatherData; fetchedAt: number }>();
 
 type WeatherData = {
   city: string;
@@ -230,10 +236,27 @@ export default function WeatherScreen() {
   const [sharing, setSharing] = useState(false);
   const [regionSelection, setRegionSelection] = useState('كل المناطق');
   const [viewHourCount, setViewHourCount] = useState<12 | 48>(12);
+  const [cityPickerOpen, setCityPickerOpen] = useState(false);
+  const [detailsExpanded, setDetailsExpanded] = useState(false);
+  const [locationDetailsOpen, setLocationDetailsOpen] = useState(false);
+  const [showAllDays, setShowAllDays] = useState(false);
   const weatherRequestId = useRef(0);
 
-  const fetchWeather = async (latitude: number, longitude: number, meta: { city: string; region: string; district: string }) => {
+  const fetchWeather = async (
+    latitude: number, longitude: number,
+    meta: { city: string; region: string; district: string },
+    force = false,
+  ) => {
     const requestId = ++weatherRequestId.current;
+    const key = latitude.toFixed(3) + ':' + longitude.toFixed(3);
+    const cached = weatherCache.get(key);
+    if (!force && cached && Date.now() - cached.fetchedAt < WEATHER_CACHE_TTL_MS) {
+      setWeather({ ...cached.data, ...meta, latitude, longitude });
+      setLastUpdated(new Date(cached.fetchedAt));
+      setError('');
+      return;
+    }
+
     const query = new URLSearchParams({
       latitude: String(latitude), longitude: String(longitude),
       timezone: 'Asia/Riyadh', forecast_days: '16',
@@ -243,19 +266,36 @@ export default function WeatherScreen() {
       forecast_minutely_15: '24',
       daily: 'weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max',
     });
+
+    // Air-quality requests are independent. Show forecast as soon as it arrives.
+    const airPromise = fetch('https://air-quality-api.open-meteo.com/v1/air-quality?latitude=' + latitude + '&longitude=' + longitude + '&current=us_aqi,pm10,pm2_5,dust&timezone=Asia%2FRiyadh')
+      .then(async response => response.ok ? (await response.json()).current || null : null)
+      .catch(() => null);
     const response = await fetch('https://api.open-meteo.com/v1/forecast?' + query.toString());
     if (!response.ok) throw new Error('خدمة الطقس غير متاحة حالياً (' + response.status + ').');
     const data = await response.json();
     if (!data.current || !data.daily?.time?.length || !data.hourly?.time?.length) throw new Error('وصلت بيانات طقس غير مكتملة.');
-    let air: any = null;
-    try {
-      const airResponse = await fetch('https://air-quality-api.open-meteo.com/v1/air-quality?latitude=' + latitude + '&longitude=' + longitude + '&current=us_aqi,pm10,pm2_5,dust&timezone=Asia%2FRiyadh');
-      if (airResponse.ok) air = (await airResponse.json()).current || null;
-    } catch {}
     if (requestId !== weatherRequestId.current) return;
-    setWeather({ city: meta.city || 'موقعك الحالي', region: meta.region || '', district: meta.district || '', latitude, longitude, current: data.current, hourly: data.hourly, minute: data.minutely_15 || null, daily: data.daily, air });
-    setLastUpdated(new Date());
+
+    const updatedAt = Date.now();
+    const next: WeatherData = {
+      city: meta.city || 'موقعك الحالي', region: meta.region || '', district: meta.district || '',
+      latitude, longitude, current: data.current, hourly: data.hourly,
+      minute: data.minutely_15 || null, daily: data.daily, air: cached?.data.air || null,
+    };
+    weatherCache.set(key, { data: next, fetchedAt: updatedAt });
+    if (weatherCache.size > 16) weatherCache.delete(weatherCache.keys().next().value!);
+    setWeather(next);
+    setLastUpdated(new Date(updatedAt));
     setError('');
+
+    void airPromise.then(air => {
+      if (!air || requestId !== weatherRequestId.current) return;
+      setWeather(previous => previous && previous.latitude === latitude && previous.longitude === longitude
+        ? { ...previous, air } : previous);
+      const entry = weatherCache.get(key);
+      if (entry) weatherCache.set(key, { ...entry, data: { ...entry.data, air } });
+    });
   };
 
   const loadWeatherForCity = async (cityName: string) => {
@@ -281,7 +321,7 @@ export default function WeatherScreen() {
         await fetchWeather(place.latitude, place.longitude, { city: place.name || trimmed, region: place.admin1 || '', district: '' });
       }
     } catch (err: any) {
-      setError(err?.message || 'تعذّر تحميل بيانات الطقس. حاول مرة أخرى.');
+      if (weatherRequestId.current) setError(err?.message || 'تعذّر تحميل بيانات الطقس. حاول مرة أخرى.');
     } finally {
       setLoading(false);
     }
@@ -296,12 +336,23 @@ export default function WeatherScreen() {
       const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
       const latitude = position.coords.latitude;
       const longitude = position.coords.longitude;
-      const meta = await resolvePlace(latitude, longitude);
-      if (!meta.city) meta.city = 'موقعك الحالي';
-      setCityInput(meta.city === 'موقعك الحالي' ? '' : meta.city);
-      const known = findSaudiWeatherCity(meta.city);
-      if (known) setRegionSelection(known.region);
-      await fetchWeather(latitude, longitude, meta);
+      // Get the weather immediately; the optional place name can resolve afterward.
+      const placePromise = resolvePlace(latitude, longitude);
+      await fetchWeather(latitude, longitude, { city: 'موقعك الحالي', region: '', district: '' }, true);
+      const currentRequest = weatherRequestId.current;
+      void placePromise.then(meta => {
+        if (currentRequest !== weatherRequestId.current) return;
+        const city = meta.city || 'موقعك الحالي';
+        setCityInput(city === 'موقعك الحالي' ? '' : city);
+        const known = findSaudiWeatherCity(city);
+        if (known) setRegionSelection(known.region);
+        setWeather(previous => previous && previous.latitude === latitude && previous.longitude === longitude
+          ? { ...previous, city, region: meta.region, district: meta.district } : previous);
+        const key = latitude.toFixed(3) + ':' + longitude.toFixed(3);
+        const entry = weatherCache.get(key);
+        if (entry) weatherCache.set(key, { ...entry, data: { ...entry.data, city, region: meta.region, district: meta.district } });
+      }).catch(() => {});
+
     } catch (err: any) {
       setError(err?.message || 'تعذّر تحديد موقعك.');
     } finally {
@@ -312,7 +363,7 @@ export default function WeatherScreen() {
   const refresh = async () => {
     setRefreshing(true);
     try {
-      if (weather) await fetchWeather(weather.latitude, weather.longitude, { city: weather.city, region: weather.region, district: weather.district });
+      if (weather) await fetchWeather(weather.latitude, weather.longitude, { city: weather.city, region: weather.region, district: weather.district }, true);
       else if (cityInput.trim()) await loadWeatherForCity(cityInput);
     } catch (err: any) {
       setError(err?.message || 'تعذّر تحديث الطقس.');
@@ -884,14 +935,14 @@ export default function WeatherScreen() {
 function SaudiLiveClock() {
   const [now, setNow] = useState(new Date());
   useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 1000);
+    const timer = setInterval(() => setNow(new Date()), 60 * 1000);
     return () => clearInterval(timer);
   }, []);
   return (
     <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 5, borderRadius: 15, backgroundColor: OASIS.colors.soft, paddingHorizontal: 8, paddingVertical: 5 }}>
       <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: OASIS.colors.primary }} />
       <Text style={{ color: OASIS.colors.primary, fontSize: 10, fontWeight: '700' }}>
-        {now.toLocaleTimeString('ar-SA', { timeZone: 'Asia/Riyadh', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+        {now.toLocaleTimeString('ar-SA', { timeZone: 'Asia/Riyadh', hour: '2-digit', minute: '2-digit' })}
       </Text>
     </View>
   );
