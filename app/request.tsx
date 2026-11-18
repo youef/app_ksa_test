@@ -7,7 +7,7 @@ import { PROFILE_READ_FIELDS } from '@/lib/profileFields';
 import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
 import { HeaderAction } from '@/components/shared/AppHeader';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View, ActivityIndicator, Platform, Image, Modal, KeyboardAvoidingView } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
@@ -95,6 +95,10 @@ const COMPLETION_TEMPLATES = [
 
 export default function Request() {
   const bottomNavInset = useBottomNavInset();
+  const requestScrollRef = useRef<ScrollView>(null);
+  const detailsBodyTop = useRef(0);
+  const offersTop = useRef(0);
+  const offerFormTop = useRef(0);
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { showIsland } = useDynamicIsland();
@@ -594,9 +598,20 @@ export default function Request() {
   const typeInfo = getRequestTypeInfo(request.request_type);
   const TypeIcon = typeInfo.icon;
   const myOffer = offers.find(o => o.helper_id === me);
+  const canOfferHelp = request.status === 'open' && !isOwner && !myOffer;
+  const jumpToHelp = () => {
+    if (canOfferHelp && !me) {
+      requireAccount('سجّل الدخول لتقديم المساعدة لجارك.');
+      return;
+    }
+    const target = canOfferHelp ? offerFormTop.current : offersTop.current;
+    requestScrollRef.current?.scrollTo({
+      y: Math.max(0, detailsBodyTop.current + target - 12), animated: true,
+    });
+  };
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined} keyboardVerticalOffset={0} style={[styles.container, { backgroundColor: 'transparent' }]}>
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined} keyboardVerticalOffset={0} style={[styles.container, { backgroundColor: colors.background }]}>
       <AppHeader
         variant="sub"
         title={request.request_type === 'carpooling' ? 'توصيل المدارس' : 'طلب فزعة بالحي'}
@@ -625,23 +640,60 @@ export default function Request() {
       />
 
       <ScrollView
-        contentContainerStyle={[discussionStyles.page, { paddingBottom: bottomNavInset + 24 }]}
+        ref={requestScrollRef}
+        contentContainerStyle={[discussionStyles.page, styles.requestPage, { paddingBottom: bottomNavInset + 24 }]}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         showsVerticalScrollIndicator={false}
       >
         {request.request_type === 'carpooling' ? <View style={{ backgroundColor: '#ECFDF5', borderColor: '#BBE7CE', borderWidth: 1, borderRadius: 15, padding: 14, marginBottom: 12, gap: 6, flexDirection: 'row-reverse', alignItems: 'flex-start' }}><GraduationCap size={21} color="#047857" /><View style={{ flex: 1, alignItems: 'flex-end' }}><Text style={{ color: '#064E3B', fontWeight: '800', fontSize: 14 }}>تنسيق توصيل المدارس</Text><Text style={{ color: '#376454', fontSize: 12, lineHeight: 21, textAlign: 'right' }}>المنشور مخصص لترتيب التوصيل فقط. لا تشارك بيانات الأطفال أو موقع المنزل أو وقت الالتقاء العلني؛ تأكد من الجهة والسائق واتفق برسائل خاصة.</Text></View></View> : null}
-        <TwitterInquiryCard detailMode type="request" data={{ ...request, profiles: requester, answers_count: offers.length }} currentUserId={me || null} currentUserProfile={viewerProfile} isGuest={!me} onQuickReply={async () => {}} onToast={message => showIsland(message, undefined, 'success')} onDeleted={() => void load()} />
-        <OasisSurface style={[discussionStyles.card, { borderColor: colors.line }]}>
-          <View style={discussionStyles.sectionHeader}><Info size={18} color={colors.primary} /><Text style={[discussionStyles.title, { color: colors.ink }]}>تفاصيل تساعدك على التنسيق</Text></View>
-          {!!request.notes && <View style={[styles.detailNote, { backgroundColor: colors.soft }]}><Text style={[discussionStyles.hint, { color: colors.muted }]}>ملاحظات صاحب الطلب</Text><Text style={[styles.notesText, { color: colors.ink }]}>{request.notes}</Text></View>}
-          <View style={[styles.detailNote, { backgroundColor: colors.soft }]}>
-            <View style={discussionStyles.sectionHeader}><Banknote size={18} color={colors.primary} /><Text style={[discussionStyles.hint, { color: colors.muted }]}>{Number(request.budget) > 0 ? 'المكافأة المقترحة' : 'المكافأة'}</Text></View>
-            <Text style={[styles.detailValue, { color: colors.primary }]}>{Number(request.budget) > 0 ? `${Number(request.budget).toLocaleString('ar-SA')} ر.س` : 'بالتنسيق مع صاحب الطلب'}</Text>
+        <TwitterInquiryCard detailMode requestDetailCompact type="request" data={{ ...request, profiles: requester, answers_count: offers.length }} currentUserId={me || null} currentUserProfile={viewerProfile} isGuest={!me} onQuickReply={async () => {}} onToast={message => showIsland(message, undefined, 'success')} onDeleted={() => void load()} />
+        <View style={[styles.helpShortcut, { backgroundColor: colors.surface, borderColor: colors.line }]}>
+          <View style={[styles.helpShortcutCount, { backgroundColor: colors.soft }]}>
+            <HeartHandshake size={17} color={colors.primary} />
+            <Text style={[styles.helpShortcutCountText, { color: colors.ink }]}>{offers.length} {offers.length === 1 ? 'عرض مساعدة' : 'عروض مساعدة'}</Text>
           </View>
-          <Pressable oasisKind="plain" onPress={() => router.push({ pathname: '/map', params: { district: request.district, city: request.city } })} accessibilityRole="button" style={[styles.openMapBtn, { backgroundColor: colors.surface }]}><MapPin size={17} color={colors.primary} /><Text style={[styles.openMapBtnText, { flex: 1, textAlign: 'right' }]}>عرض الحي على الخريطة</Text><ChevronLeft size={16} color={colors.muted} /></Pressable>
+          <Pressable oasisKind="plain" accessibilityRole="button"
+            accessibilityLabel={canOfferHelp ? 'انتقل إلى تقديم المساعدة' : 'انتقل إلى عروض المساعدة'}
+            onPress={jumpToHelp} style={[styles.helpShortcutButton, { backgroundColor: colors.primary }]}>
+            <Text style={styles.helpShortcutButtonText}>{canOfferHelp ? 'أقدر أساعد' : 'عرض المساعدات'}</Text>
+            <ChevronLeft size={16} color="#FFFFFF" />
+          </Pressable>
+        </View>
+        <OasisSurface style={[discussionStyles.card, styles.requestInfoCard, { borderColor: colors.line, backgroundColor: colors.surface }]}>
+          <View style={styles.requestInfoTitleRow}>
+            <Info size={17} color={colors.primary} />
+            <Text style={[styles.requestInfoTitle, { color: colors.ink }]}>تفاصيل الفزعة</Text>
+          </View>
+          {!!request.notes && (
+            <View style={[styles.detailNote, { backgroundColor: colors.soft }]}>
+              <Text style={[discussionStyles.hint, { color: colors.muted }]}>ملاحظات صاحب الطلب</Text>
+              <Text style={[styles.notesText, { color: colors.ink }]}>{request.notes}</Text>
+            </View>
+          )}
+          <View style={styles.requestInfoGrid}>
+            <View style={[styles.rewardTile, { backgroundColor: colors.soft }]}>
+              <View style={styles.rewardCaption}><Banknote size={15} color={colors.primary} />
+                <Text style={[styles.rewardCaptionText, { color: colors.muted }]}>{Number(request.budget) > 0 ? 'المكافأة المقترحة' : 'المكافأة'}</Text>
+              </View>
+              <Text numberOfLines={2} style={[styles.detailValue, { color: colors.primary }]}>
+                {Number(request.budget) > 0 ? `${Number(request.budget).toLocaleString('ar-SA')} ر.س` : 'بالتنسيق مع صاحب الطلب'}
+              </Text>
+            </View>
+            <Pressable oasisKind="plain" onPress={() => router.push({ pathname: '/map', params: { district: request.district, city: request.city } })}
+              accessibilityRole="button" accessibilityLabel="عرض الحي على الخريطة"
+              style={[styles.mapTile, { backgroundColor: colors.soft }]}>
+              <View style={styles.rewardCaption}><MapPin size={15} color={colors.primary} />
+                <Text style={[styles.rewardCaptionText, { color: colors.muted }]}>الموقع التقريبي</Text>
+              </View>
+              <View style={styles.mapTileLink}>
+                <Text style={[styles.mapTileLinkText, { color: colors.primary }]}>خريطة الحي</Text>
+                <ChevronLeft size={15} color={colors.primary}/>
+              </View>
+            </Pressable>
+          </View>
         </OasisSurface>
-        <View style={styles.bodyContainer}>
+        <View style={styles.bodyContainer} onLayout={event => { detailsBodyTop.current = event.nativeEvent.layout.y; }}>
           {/* Celebratory Banner if completed */}
           {request.status === 'completed' && (
             <LinearGradient
@@ -701,7 +753,8 @@ export default function Request() {
           )}
 
           {/* Offers Received Section */}
-          <OasisSurface oasisSurface="card" style={[discussionStyles.card, { borderColor: colors.line }]}>
+          <OasisSurface oasisSurface="card" onLayout={event => { offersTop.current = event.nativeEvent.layout.y; }}
+            style={[discussionStyles.card, styles.requestSectionCard, { borderColor: colors.line, backgroundColor: colors.surface }]}>
             <View style={styles.cardHeaderRow}>
               <View style={styles.cardHeaderIconBox}>
                 <MessageSquare size={18} color={OASIS.colors.primary} />
@@ -830,7 +883,8 @@ export default function Request() {
 
           {/* Interactive Offer Submission Form (For Neighbors when Request is Open) */}
           {!isOwner && !myOffer && request.status === 'open' && me && (
-            <OasisSurface oasisSurface="card" style={[discussionStyles.card, { borderColor: colors.line }]}>
+            <OasisSurface oasisSurface="card" onLayout={event => { offerFormTop.current = event.nativeEvent.layout.y; }}
+              style={[discussionStyles.card, styles.requestSectionCard, { borderColor: colors.line, backgroundColor: colors.surface }]}>
               <View style={styles.cardHeaderRow}>
                 <View style={styles.cardHeaderIconBox}>
                   <HeartHandshake size={18} color={OASIS.colors.primary} />
@@ -1076,8 +1130,25 @@ export default function Request() {
 }
 
 const styles = StyleSheet.create({
-  detailNote: { padding: 12, borderRadius: 14, gap: 6 },
-  detailValue: { fontSize: 18, lineHeight: 28, fontWeight: '700', textAlign: 'right' },
+  requestPage: { paddingTop: 12, paddingHorizontal: 12, gap: 10 },
+  requestInfoCard: { padding: 12, gap: 10, borderRadius: 16 },
+  requestInfoTitleRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 7 },
+  requestInfoTitle: { fontSize: 14.5, fontWeight: '800', textAlign: 'right' },
+  requestInfoGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 },
+  rewardTile: { flex: 1, minWidth: 145, padding: 10, borderRadius: 12, justifyContent: 'center', gap: 6 },
+  rewardCaption: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5 },
+  rewardCaptionText: { fontSize: 10.5, fontWeight: '600', textAlign: 'right' },
+  mapTile: { flex: 1, minWidth: 130, borderRadius: 12, padding: 10, minHeight: 69, justifyContent: 'center', gap: 6 },
+  mapTileLink: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5 },
+  mapTileLinkText: { fontSize: 12, fontWeight: '700' },
+  helpShortcut: { minHeight: 52, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: 7, borderWidth: 1, borderRadius: 14 },
+  helpShortcutCount: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, flex: 1, minWidth: 0, paddingHorizontal: 9, minHeight: 36, borderRadius: 10 },
+  helpShortcutCountText: { fontSize: 11.5, fontWeight: '700', textAlign: 'right', flexShrink: 1 },
+  helpShortcutButton: { minHeight: 38, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: 11, paddingHorizontal: 11 },
+  helpShortcutButtonText: { color: '#FFFFFF', fontSize: 11.5, fontWeight: '800' },
+  requestSectionCard: { borderRadius: 16, padding: 12, gap: 10 },
+  detailNote: { padding: 10, borderRadius: 11, gap: 5 },
+  detailValue: { fontSize: 13, lineHeight: 20, fontWeight: '800', textAlign: 'right' },
   srOnly: { position: 'absolute', width: 1, height: 1, opacity: 0 },
   container: {
     flex: 1,
@@ -1284,7 +1355,7 @@ const styles = StyleSheet.create({
   },
   bodyContainer: {
     padding: 0,
-    gap: 16,
+    gap: 10,
   },
   completedStatusCard: {
     flexDirection: 'row-reverse',
@@ -1727,11 +1798,11 @@ const styles = StyleSheet.create({
     borderColor: '#a7f3d0',
   },
   noOffersBox: {
-    minHeight: 180,
+    minHeight: 100,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 16,
-    gap: 8,
+    paddingVertical: 12,
+    gap: 6,
   },
   noOffersTitle: {
     color: OASIS.colors.ink,
@@ -2017,8 +2088,8 @@ const styles = StyleSheet.create({
   },
   guidelinesCard: {
     backgroundColor: OASIS.colors.surface,
-    borderRadius: 22,
-    padding: 16,
+    borderRadius: 15,
+    padding: 12,
     borderWidth: 1,
     borderColor: OASIS.colors.line,
     gap: 6,
