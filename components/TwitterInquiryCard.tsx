@@ -563,7 +563,7 @@ export default function TwitterInquiryCard({
       </View>
 
       {/* Action Bar */}
-      <View style={[s.xActionBar, compact && s.xActionBarHome, smallRequestDetail && s.xActionBarRequestDetail, isQuestionDetail && s.xDetailActions]}>
+      <View style={[s.xActionBar, compact && s.xActionBarHome, smallRequestDetail && [s.xActionBarRequestDetail, { backgroundColor: isDark ? colors.surface : '#F8FBF9', borderTopColor: colors.line }], isQuestionDetail && s.xDetailActions]}>
         <Pressable oasisKind={compact || smallRequestDetail ? 'plain' : 'action'} style={[s.xActionBtn, (compact || smallRequestDetail) && s.xActionBtnHome]} onPress={detailMode ? undefined : navigateToDetails} accessibilityRole={detailMode ? undefined : "button"} accessibilityLabel={detailMode ? "عدد الردود" : "فتح الردود في صفحة المنشور"}>
           <MessageCircle size={17} color={OASIS.colors.muted} />
           <Text style={s.xActionCounter}>{answersCount}</Text>
