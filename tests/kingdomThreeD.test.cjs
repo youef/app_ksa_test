@@ -16,7 +16,7 @@ test('Three.js scene is an open world, not a two-dimensional category grid', () 
     'renderer.setAnimationLoop', 'new THREE.PlaneGeometry(WORLD_HALF * 2',
     'generateWorld(scene', 'new THREE.InstancedMesh', 'function castle(',
     'function addHouse(', 'makeRoad(', 'addTower(', 'labelSprite(',
-    'SITES.map', 'buildAvatar(avatarKey)', 'avatar.leftLeg.rotation.x',
+    'for (const site of SITES)', 'buildAvatar(avatarKey)', 'avatar.leftLeg.rotation.x',
     'camera.position.lerp', 'onPointerDown', 'onPointerMove',
     'setPointerCapture', 'control.current.sprint', 'control.current.jump',
   ]) assert.ok(engine.includes(sample), 'Missing: ' + sample);
@@ -54,7 +54,7 @@ test('world controls and game economy remain accessible on web and mobile browse
   assert.match(engine, /onPointerUp=\{endStick\}/);
   assert.match(engine, /onPointerCancel=\{endStick\}/);
   assert.match(engine, /keyboard\.has\('arrowup'\)/);
-  assert.match(engine, /keyboard\.has\('space'\)/);
+  assert.match(engine, /code === 'space'/);
 });
 
 test('avatar persistence checks ownership and disallows arbitrary write access', () => {
