@@ -1,7 +1,7 @@
 import { OasisPressable as Pressable, OasisSurface, OasisTextInput as TextInput } from '@/components/oasis/OasisPrimitives';
 import { discoverLives } from '@/lib/liveDiscovery';
 import { OASIS } from '@/lib/oasis';
-import { HeaderAction, AppHeader } from '@/components/shared/AppHeader';
+import { AppHeader } from '@/components/shared/AppHeader';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Animated, Image, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
@@ -253,17 +253,6 @@ export default function LivesScreen() {
         title="البثوث المباشرة"
         subtitle={accessibleStreams.length > 0 ? `${compactCount(accessibleStreams.length)} على الهواء · ${compactCount(totalViewers)} مشاهد` : 'كن قريبًا من مجتمع حيّك'}
         fallbackRoute="/more"
-        rightAction={(
-          <HeaderAction
-            accessibilityRole="button"
-            accessibilityLabel="ابدأ بثًا مباشرًا"
-            onPress={() => router.push('/live/create')}
-            style={styles.headerCta}
-          >
-            <Video size={15} color={OASIS.colors.surface} />
-            
-          </HeaderAction>
-        )}
       />
 
       {/* ============ Segmented tab bar (fixed) ============ */}
@@ -730,7 +719,7 @@ const styles = StyleSheet.create({
   // Tab bar
   tabBarWrap: { paddingHorizontal: 13, paddingTop: 9, paddingBottom: 7, backgroundColor: OASIS.colors.background },
   tabBar: { flexDirection: 'row-reverse', gap: 5, backgroundColor: OASIS.colors.surface, borderRadius: 14, padding: 4, borderWidth: 1, borderColor: OASIS.colors.line, elevation: 0, shadowOpacity: 0 },
-  tabItem: { flex: 1, minWidth: 0, minHeight: 47, alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 6, borderRadius: 11 },
+  tabItem: { flex: 1, minWidth: 0, minHeight: 48, alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 6, borderRadius: 11 },
   tabItemActive: { backgroundColor: OASIS.colors.deep },
   tabIconWrap: { position: 'relative' },
   tabLabel: { fontSize: 10.5, fontWeight: '700', color: OASIS.colors.muted },
