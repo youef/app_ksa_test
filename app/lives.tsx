@@ -7,6 +7,7 @@ import { ActivityIndicator, Animated, Image, RefreshControl, ScrollView, StyleSh
 import { router, useFocusEffect } from 'expo-router';
 import { useBottomNavInset } from '@/lib/bottomNav';
 import { useNoCopy } from '@/lib/noCopy';
+import { useTheme } from '@/context/ThemeContext';
 import { C } from '@/lib/ui';
 import { supabase } from '@/lib/supabase';
 import {
@@ -32,6 +33,8 @@ import {
   Trophy,
   Users,
   Video,
+  Search,
+  X,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -103,6 +106,7 @@ function LivePulse({ size = 8, color = '#fb3a4b' }: { size?: number; color?: str
 
 export default function LivesScreen() {
   const bottomNavInset = useBottomNavInset();
+  const { colors } = useTheme();
   useNoCopy();
   const [streams, setStreams] = useState<LiveStream[]>([]);
   const [topHosts, setTopHosts] = useState<LiveHostLeader[]>([]);
@@ -243,7 +247,7 @@ export default function LivesScreen() {
   const openStream = (stream: LiveStream) => router.push({ pathname: '/live/[id]', params: { id: stream.id } });
 
   return (
-    <View style={[styles.screen, { backgroundColor: 'transparent' }]}>
+    <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <AppHeader
         variant="tab"
         title="البثوث المباشرة"
@@ -263,20 +267,20 @@ export default function LivesScreen() {
       />
 
       {/* ============ Segmented tab bar (fixed) ============ */}
-      <View style={styles.tabBarWrap}>
-        <View style={styles.tabBar}>
+      <View style={[styles.tabBarWrap, { backgroundColor: colors.background }]}>
+        <View style={[styles.tabBar, { backgroundColor: colors.surface, borderColor: colors.line }]}>
           {TABS.map((item) => {
             const active = tab === item.key;
             const count = badges[item.key];
-            const color = active ? OASIS.colors.surface : OASIS.colors.muted;
+            const color = active ? '#FFFFFF' : colors.muted;
             return (
-              <Pressable oasisVariant={active ? 'primary' : 'secondary'} oasisKind="chip"
+              <Pressable oasisKind="plain"
                 key={item.key}
                 accessibilityRole="tab"
                 accessibilityLabel={item.label}
                 accessibilityState={{ selected: active }}
                 onPress={() => setTab(item.key)}
-                style={[styles.tabItem, active && styles.tabItemActive]}
+                style={[styles.tabItem, active && styles.tabItemActive, active && { backgroundColor: colors.primary }]}
               >
                 <View style={styles.tabIconWrap}>
                   {item.icon(color)}
@@ -286,7 +290,7 @@ export default function LivesScreen() {
                     </View>
                   ) : null}
                 </View>
-                {active ? <Text style={[styles.tabLabel, styles.tabLabelActive]} numberOfLines={1}>{item.label}</Text> : null}
+                <Text style={[styles.tabLabel, { color: active ? '#FFFFFF' : colors.muted }, active && styles.tabLabelActive]} numberOfLines={1}>{item.label}</Text>
               </Pressable>
             );
           })}
@@ -297,14 +301,42 @@ export default function LivesScreen() {
         contentContainerStyle={[styles.content, { paddingBottom: bottomNavInset + 28 }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={reload} tintColor={C.accent} />}
       >
-        {tab === 'live' ? <View style={{ gap: 10, marginBottom: 14 }}>
-          <TextInput accessibilityLabel="ابحث عن بث أو مضيف" value={searchQuery} onChangeText={setSearchQuery} placeholder="ابحث عن بث، مضيف، أو مدينة…" style={{ minHeight: 44, borderRadius: 12, borderWidth: 1, borderColor: OASIS.colors.line, backgroundColor: OASIS.colors.surface, paddingHorizontal: 12, textAlign: 'right', color: OASIS.colors.ink }} />
-          <View style={{ flexDirection: 'row-reverse', gap: 8 }}>{([['popular', 'الأكثر مشاهدة'], ['newest', 'بدأ حديثًا']] as const).map(([key, label]) => <Pressable key={key} oasisKind="chip" oasisVariant={sort === key ? 'primary' : 'secondary'} accessibilityRole="button" accessibilityLabel={`ترتيب البثوث: ${label}`} accessibilityState={{ selected: sort === key }} onPress={() => setSort(key)}><Text style={{ color: sort === key ? '#fff' : OASIS.colors.primary, fontSize: 12 }}>{label}</Text></Pressable>)}</View>
+        {tab === 'live' ? <View style={styles.searchSection}>
+          <View style={styles.searchToolbar}>
+            <View style={[styles.searchBox, { backgroundColor: colors.surface, borderColor: colors.line }]}>
+              <Search size={17} color={colors.primary}/>
+              <TextInput accessibilityLabel="ابحث عن بث أو مضيف" value={searchQuery} onChangeText={setSearchQuery}
+                placeholder="ابحث عن بث أو مضيف…" placeholderTextColor={colors.muted}
+                style={[styles.searchInput, { color: colors.ink }]}/>
+              {searchQuery.length > 0 && (
+                <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="مسح البحث"
+                  onPress={() => setSearchQuery('')} style={styles.searchClear}>
+                  <X size={15} color={colors.muted}/>
+                </Pressable>
+              )}
+            </View>
+            <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="إنشاء بث مباشر"
+              style={[styles.createLiveBtn, { backgroundColor: colors.primary }]}
+              onPress={() => router.push('/live/create')}>
+              <Video size={17} color="#FFFFFF"/>
+              <Text style={styles.createLiveText}>ابدأ بث</Text>
+            </Pressable>
+          </View>
+          <View style={styles.sortRow}>
+            {([['popular', 'الأكثر مشاهدة'], ['newest', 'بدأ حديثًا']] as const).map(([key, label]) => (
+              <Pressable key={key} oasisKind="plain" accessibilityRole="button"
+                accessibilityLabel={`ترتيب البثوث: ${label}`} accessibilityState={{ selected: sort === key }}
+                style={[styles.sortChip, { backgroundColor: sort === key ? colors.soft : colors.surface, borderColor: sort === key ? colors.primary : colors.line }]}
+                onPress={() => setSort(key)}>
+                <Text style={[styles.sortChipText, { color: sort === key ? colors.primary : colors.muted }]}>{label}</Text>
+              </Pressable>
+            ))}
+          </View>
         </View> : null}
         {/* ================= LIVE TAB ================= */}
         {tab === 'live' && (
           <View>
-            <LinearGradient colors={[OASIS.colors.deep, OASIS.colors.primary, OASIS.colors.primary]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
+            {!loading && accessibleStreams.length > 0 && <LinearGradient colors={[OASIS.colors.deep, OASIS.colors.primary, OASIS.colors.primary]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
               <View style={styles.heroTop}>
                 <View style={styles.heroLive}>
                   <LivePulse size={9} color="#fecdd3" />
@@ -322,10 +354,10 @@ export default function LivesScreen() {
               </View>
 
 
-            </LinearGradient>
+            </LinearGradient>}
 
             {categories.length > 1 && (
-              <ScrollView style={{ direction: 'rtl' }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.chipsRow, { direction: 'ltr' }]}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
                 {categories.map((key) => (
                   <Chip key={key} label={key === 'all' ? 'كل الفئات' : key} active={category === key} onPress={() => setCategory(key)} />
                 ))}
@@ -336,7 +368,7 @@ export default function LivesScreen() {
               {([
                 ['all', 'الكل'], ['following', 'أتابعهم'], ['nearby', 'قريب مني'],
               ] as [Filter, string][]).map(([key, label]) => (
-                <Pressable key={key} accessibilityRole="button" accessibilityLabel={`عرض ${label}، ${baseCounts[key]} بث`} accessibilityState={{ selected: filter === key }} onPress={() => setFilter(key)} style={[styles.seg, filter === key && styles.segActive]}>
+                <Pressable oasisKind="plain" key={key} accessibilityRole="button" accessibilityLabel={`عرض ${label}، ${baseCounts[key]} بث`} accessibilityState={{ selected: filter === key }} onPress={() => setFilter(key)} style={[styles.seg, { backgroundColor: filter === key ? colors.soft : colors.surface, borderColor: filter === key ? colors.primary : colors.line }]}>
                   <Text style={[styles.segText, filter === key && styles.segTextActive]}>{label}</Text>
                   <View style={[styles.segCount, filter === key && styles.segCountActive]}>
                     <Text style={[styles.segCountText, filter === key && styles.segCountTextActive]}>{baseCounts[key]}</Text>
@@ -346,7 +378,7 @@ export default function LivesScreen() {
             </View>
 
             <View style={styles.sectionRow}>
-              <Text style={styles.sectionTitle}>اكتشف البثوث المباشرة</Text>
+              <Text style={[styles.sectionTitle, { color: colors.ink }]}>اكتشف البثوث المباشرة</Text>
               <View style={styles.countPill}><LivePulse size={7} /><Text style={styles.countPillText}>{visible.length} بث</Text></View>
             </View>
 
@@ -355,19 +387,19 @@ export default function LivesScreen() {
             ) : error ? (
               <View style={styles.empty}><Radio color={OASIS.colors.danger} size={32} /><Text style={styles.emptyTitle}>تعذر تحميل البثوث</Text><Text style={styles.emptyText}>{error}</Text><Pressable onPress={reload} style={styles.retry}><Text style={styles.retryText}>إعادة المحاولة</Text></Pressable></View>
             ) : visible.length === 0 ? (
-              <View style={styles.empty}>
-                <Radio color={OASIS.colors.primary} size={34} />
+              <View style={[styles.empty, { backgroundColor: colors.surface, borderColor: colors.line }]}>
+                <Radio color={colors.primary} size={30} />
                 <Text style={styles.emptyTitle}>{searchQuery.trim() ? 'لا توجد بثوث تطابق بحثك' : filter === 'following' ? 'لا يوجد بث لمتابَعيك الآن' : filter === 'nearby' ? 'لا يوجد بث قريب الآن' : 'ما فيه بث مباشر الآن'}</Text>
                 <Text style={styles.emptyText}>{searchQuery.trim() || category !== 'all' ? 'جرّب كلمات أخرى أو أعد ضبط الفلاتر.' : 'ابدأ بثك الأول وخل جيرانك ينضمون لك.'}</Text>
-                {searchQuery.trim() || category !== 'all' || filter !== 'all' ? <Pressable oasisKind="action" onPress={() => { setSearchQuery(''); setCategory('all'); setFilter('all'); }}><Text style={{ color: OASIS.colors.primary }}>عرض كل البثوث</Text></Pressable> : null}
-                <Pressable onPress={() => router.push('/live/create')} style={styles.emptyCreate}><Text style={styles.emptyCreateText}>ابدأ بثك الأول</Text></Pressable>
+                {searchQuery.trim() || category !== 'all' || filter !== 'all' ? <Pressable oasisKind="plain" accessibilityRole="button" style={[styles.resetButton, { backgroundColor: colors.soft }]} onPress={() => { setSearchQuery(''); setCategory('all'); setFilter('all'); }}><Text style={[styles.resetButtonText, { color: colors.primary }]}>عرض كل البثوث</Text></Pressable> : null}
+                <Pressable oasisKind="plain" accessibilityRole="button" onPress={() => router.push('/live/create')} style={[styles.emptyCreate, { backgroundColor: colors.primary }]}><Text style={styles.emptyCreateText}>ابدأ بثك الأول</Text></Pressable>
               </View>
             ) : (
               <View>
                 {spotlight && <SpotlightCard stream={spotlight} onPress={() => openStream(spotlight)} />}
                 {gridStreams.length > 0 && (
                   <View style={styles.grid} onLayout={event => setGridWidth(event.nativeEvent.layout.width)}>
-                    {gridStreams.map((stream) => <View key={stream.id} style={{ width: gridWidth ? Math.floor((gridWidth - (gridWidth >= 700 ? 24 : 12) - 1) / (gridWidth >= 700 ? 3 : 2)) : '48%' }}><LiveCard stream={stream} onPress={() => openStream(stream)} /></View>)}
+                    {gridStreams.map((stream) => <View key={stream.id} style={{ width: gridWidth ? Math.floor((gridWidth - (gridWidth >= 700 ? 20 : 10) - 1) / (gridWidth >= 700 ? 3 : 2)) : '48%' }}><LiveCard stream={stream} onPress={() => openStream(stream)} /></View>)}
                   </View>
                 )}
               </View>
@@ -483,7 +515,7 @@ export default function LivesScreen() {
           </View>
         )}
 
-        <View style={styles.privacyHint}><MapPin size={15} color={OASIS.colors.muted} /><Text style={styles.privacyText}>نُظهر المدينة والحي فقط بحسب إعدادات البث، ولا نشارك موقعك الدقيق.</Text></View>
+        <View style={[styles.privacyHint, { backgroundColor: colors.soft }]}><MapPin size={15} color={colors.muted} /><Text style={[styles.privacyText, { color: colors.muted }]}>نُظهر المدينة والحي فقط بحسب إعدادات البث، ولا نشارك موقعك الدقيق.</Text></View>
       </ScrollView>
     </View>
   );
@@ -582,7 +614,7 @@ function LiveCard({ stream, onPress }: { stream: LiveStream; onPress: () => void
               <Text numberOfLines={1} style={styles.cardHostName}>{profile?.display_name || profile?.username || 'جارٍ'}</Text>
               {profile?.is_verified && <BadgeCheck size={13} color={OASIS.colors.primary} />}
             </View>
-            <Text numberOfLines={1} style={styles.cardHostArea}>{profile?.district ? `حي ${profile.district}` : profile?.city || 'من حيّنا'}</Text>
+            <Text numberOfLines={1} style={styles.cardHostArea}>{profile?.district ? (/^حي\s/.test(profile.district) ? profile.district : `حي ${profile.district}`) : profile?.city || 'من حيّنا'}</Text>
           </View>
           {profile?.avatar_url ? <Image source={{ uri: profile.avatar_url }} style={styles.cardHostAvatar} /> : <View style={styles.cardHostAvatarFallback}><Text style={styles.cardHostAvatarLetter}>ح</Text></View>}
         </View>
@@ -678,18 +710,30 @@ function AchievementCard({ item }: { item: LiveAchievement }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#F4F8F6' },
-  content: { padding: 12, paddingTop: 14 },
+  content: { paddingHorizontal: 13, paddingTop: 12, paddingBottom: 12 },
+  searchSection: { gap: 9, marginBottom: 11 },
+  searchToolbar: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
+  searchBox: { flex: 1, minWidth: 0, minHeight: 44, paddingHorizontal: 11, borderWidth: 1, borderRadius: 13, flexDirection: 'row-reverse', alignItems: 'center', gap: 7 },
+  searchInput: { flex: 1, minWidth: 0, minHeight: 42, fontSize: 12.5, textAlign: 'right', paddingVertical: 6 },
+  searchClear: { width: 31, height: 36, alignItems: 'center', justifyContent: 'center' },
+  createLiveBtn: { minHeight: 44, paddingHorizontal: 12, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 13 },
+  createLiveText: { fontSize: 11.5, fontWeight: '800', color: '#FFFFFF' },
+  sortRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 7 },
+  sortChip: { minHeight: 33, paddingHorizontal: 11, borderWidth: 1, borderRadius: 11, justifyContent: 'center' },
+  sortChipText: { fontSize: 11.5, fontWeight: '700' },
+  resetButton: { minHeight: 35, paddingHorizontal: 14, borderRadius: 11, justifyContent: 'center' },
+  resetButtonText: { fontSize: 12, fontWeight: '700' },
 
   headerCta: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: OASIS.colors.primary, borderRadius: 14 },
   headerCtaText: { color: OASIS.colors.surface, fontSize: 12.5, fontWeight: '700' },
 
   // Tab bar
-  tabBarWrap: { paddingHorizontal: 12, paddingTop: 10, paddingBottom: 10, backgroundColor: OASIS.colors.soft },
-  tabBar: { flexDirection: 'row-reverse', gap: 6, backgroundColor: '#FFFFFF', borderRadius: 20, padding: 5, borderWidth: 1, borderColor: '#E1EDE6', shadowColor: OASIS.colors.deep, shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 3 },
-  tabItem: { flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', gap: 3, paddingVertical: 9, borderRadius: 15 },
+  tabBarWrap: { paddingHorizontal: 13, paddingTop: 9, paddingBottom: 7, backgroundColor: OASIS.colors.background },
+  tabBar: { flexDirection: 'row-reverse', gap: 5, backgroundColor: OASIS.colors.surface, borderRadius: 14, padding: 4, borderWidth: 1, borderColor: OASIS.colors.line, elevation: 0, shadowOpacity: 0 },
+  tabItem: { flex: 1, minWidth: 0, minHeight: 47, alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 6, borderRadius: 11 },
   tabItemActive: { backgroundColor: OASIS.colors.deep },
   tabIconWrap: { position: 'relative' },
-  tabLabel: { fontSize: 11.5, fontWeight: '600', color: OASIS.colors.muted },
+  tabLabel: { fontSize: 10.5, fontWeight: '700', color: OASIS.colors.muted },
   tabLabelActive: { color: OASIS.colors.surface },
   tabBadge: { position: 'absolute', top: -6, left: -10, minWidth: 16, height: 16, borderRadius: 8, paddingHorizontal: 3, backgroundColor: OASIS.colors.soft, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#a7f3d0' },
   tabBadgeActive: { backgroundColor: OASIS.colors.primary, borderColor: OASIS.colors.deep },
@@ -697,32 +741,32 @@ const styles = StyleSheet.create({
   tabBadgeTextActive: { color: OASIS.colors.surface },
 
   // Hero
-  hero: { borderRadius: 22, padding: 18, marginBottom: 18, overflow: 'hidden', borderWidth: 1, borderColor: '#0F6B4F' },
-  heroTop: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
+  hero: { borderRadius: 16, padding: 12, marginBottom: 12, overflow: 'hidden', borderWidth: 1, borderColor: '#0F6B4F' },
+  heroTop: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, gap: 7 },
   heroLive: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
-  heroLiveText: { color: OASIS.colors.surface, fontSize: 14, fontWeight: '700' },
+  heroLiveText: { color: OASIS.colors.surface, fontSize: 12.5, fontWeight: '700' },
   heroCaption: { color: OASIS.colors.soft, fontSize: 11.5, fontWeight: '700' },
-  heroStats: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(2,44,34,0.28)', borderRadius: 14, paddingVertical: 12, paddingHorizontal: 8, marginBottom: 0 },
+  heroStats: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(2,44,34,0.22)', borderRadius: 12, paddingVertical: 8, paddingHorizontal: 7, marginBottom: 0 },
   heroStat: { flex: 1, alignItems: 'center', gap: 3 },
-  heroStatValue: { color: OASIS.colors.surface, fontSize: 19, fontWeight: '700' },
+  heroStatValue: { color: OASIS.colors.surface, fontSize: 16, fontWeight: '700' },
   heroStatLabel: { color: OASIS.colors.soft, fontSize: 11, fontWeight: '700' },
-  heroDivider: { width: 1, height: 34, backgroundColor: 'rgba(209,250,229,0.25)' },
+  heroDivider: { width: 1, height: 27, backgroundColor: 'rgba(209,250,229,0.25)' },
   heroCta: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, backgroundColor: OASIS.colors.surface, borderRadius: 16, paddingVertical: 11, paddingHorizontal: 12 },
   heroCtaIcon: { width: 34, height: 34, borderRadius: 12, backgroundColor: OASIS.colors.soft, alignItems: 'center', justifyContent: 'center' },
   heroCtaText: { flex: 1, color: OASIS.colors.deep, fontSize: 14.5, fontWeight: '700', textAlign: 'right' },
 
   // Chips
-  chipsRow: { flexDirection: 'row-reverse', gap: 8, paddingBottom: 14 },
-  chip: { paddingHorizontal: 15, paddingVertical: 8, borderRadius: 999, backgroundColor: OASIS.colors.surface, borderWidth: 1, borderColor: OASIS.colors.line },
+  chipsRow: { flexDirection: 'row-reverse', gap: 7, paddingBottom: 10 },
+  chip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 12, backgroundColor: OASIS.colors.surface, borderWidth: 1, borderColor: OASIS.colors.line },
   chipActive: { backgroundColor: OASIS.colors.deep, borderColor: OASIS.colors.deep },
   chipText: { color: OASIS.colors.muted, fontSize: 12.5, fontWeight: '600' },
   chipTextActive: { color: OASIS.colors.surface },
 
   // Sub-filter segmented
-  segRow: { flexDirection: 'row-reverse', gap: 8, marginBottom: 18 },
-  seg: { flex: 1, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 14, backgroundColor: OASIS.colors.surface, borderWidth: 1, borderColor: OASIS.colors.line },
+  segRow: { flexDirection: 'row-reverse', gap: 7, marginBottom: 13 },
+  seg: { flex: 1, minWidth: 0, minHeight: 39, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 6, paddingVertical: 7, borderRadius: 12, backgroundColor: OASIS.colors.surface, borderWidth: 1, borderColor: OASIS.colors.line },
   segActive: { backgroundColor: OASIS.colors.soft, borderColor: '#a7f3d0' },
-  segText: { color: OASIS.colors.muted, fontSize: 12.5, fontWeight: '600' },
+  segText: { color: OASIS.colors.muted, fontSize: 11.5, fontWeight: '700' },
   segTextActive: { color: OASIS.colors.primary },
   segCount: { minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 5, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' },
   segCountActive: { backgroundColor: OASIS.colors.primary },
@@ -732,14 +776,14 @@ const styles = StyleSheet.create({
   // Sections
   sectionRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   sectionHeading: { flex: 1, alignItems: 'flex-end' },
-  sectionTitle: { color: OASIS.colors.ink, fontSize: 19, fontWeight: '700', textAlign: 'right' },
+  sectionTitle: { color: OASIS.colors.ink, fontSize: 15, fontWeight: '800', textAlign: 'right' },
   sectionSub: { color: OASIS.colors.muted, fontSize: 11.5, fontWeight: '700', marginTop: 2, textAlign: 'right' },
   countPill: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, backgroundColor: OASIS.colors.soft, borderRadius: 999, paddingHorizontal: 11, paddingVertical: 6 },
   countPillText: { color: OASIS.colors.primary, fontSize: 12, fontWeight: '600' },
 
   // Covers
-  cover: { height: 295, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', backgroundColor: '#061E16' },
-  coverTall: { height: 225 },
+  cover: { height: 232, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', backgroundColor: '#061E16' },
+  coverTall: { height: 176 },
   coverOrbA: { position: 'absolute', top: -30, left: -20, width: 110, height: 110, borderRadius: 55, backgroundColor: 'rgba(16,185,129,0.28)' },
   coverOrbB: { position: 'absolute', bottom: -40, right: -24, width: 130, height: 130, borderRadius: 65, backgroundColor: 'rgba(4,120,87,0.35)' },
   coverAvatarRing: { width: 78, height: 78, borderRadius: 39, borderWidth: 2, borderColor: '#6ee7b7', backgroundColor: OASIS.colors.primary, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
@@ -747,10 +791,10 @@ const styles = StyleSheet.create({
   coverAvatarLetter: { color: OASIS.colors.surface, fontWeight: '700', fontSize: 30 },
 
   // Spotlight
-  spotlight: { borderRadius: 24, overflow: 'hidden', marginBottom: 16, backgroundColor: '#082f25', borderWidth: 1, borderColor: '#24694f' },
+  spotlight: { borderRadius: 16, overflow: 'hidden', marginBottom: 12, backgroundColor: '#082f25', borderWidth: 1, borderColor: '#24694f' },
   spotlightTopRow: { position: 'absolute', top: 12, right: 12, left: 12, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between' },
-  spotlightBottom: { padding: 16, gap: 7 },
-  spotlightTitle: { color: OASIS.colors.surface, fontSize: 17, fontWeight: '700', textAlign: 'right' },
+  spotlightBottom: { padding: 12, gap: 6 },
+  spotlightTitle: { color: OASIS.colors.surface, fontSize: 15, fontWeight: '800', textAlign: 'right' },
   spotlightMetaRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5 },
   spotlightHost: { color: '#a7f3d0', fontSize: 12, fontWeight: '600', maxWidth: '80%' },
   spotlightChips: { flexDirection: 'row-reverse', alignItems: 'center', gap: 7, marginTop: 4, flexWrap: 'wrap' },
@@ -760,13 +804,13 @@ const styles = StyleSheet.create({
   spotlightJoinText: { color: OASIS.colors.deep, fontSize: 12, fontWeight: '700' },
 
   // Live grid card
-  grid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 12, alignItems: 'flex-start' },
-  card: { width: '100%', height: 295, backgroundColor: '#08241c', borderRadius: 22, overflow: 'hidden', borderWidth: 1, borderColor: '#255941', shadowColor: '#052318', shadowOpacity: 0.12, shadowRadius: 15, shadowOffset: { width: 0, height: 6 }, elevation: 3 },
+  grid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 10, alignItems: 'flex-start' },
+  card: { width: '100%', height: 232, backgroundColor: '#08241c', borderRadius: 15, overflow: 'hidden', borderWidth: 1, borderColor: '#255941', shadowOpacity: 0, elevation: 0 },
   cardTopRow: { position: 'absolute', top: 12, right: 10, left: 10, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between' },
   viewersPill: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, backgroundColor: 'rgba(2,6,23,0.42)', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 },
   viewersPillText: { color: OASIS.colors.surface, fontSize: 11, fontWeight: '700' },
-  cardBody: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 13, paddingTop: 14, paddingBottom: 15, gap: 5, backgroundColor: 'rgba(1,20,15,0.76)' },
-  cardTitle: { color: '#FFFFFF', fontSize: 14.5, fontWeight: '800', textAlign: 'right', minHeight: 34 },
+  cardBody: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 10, paddingTop: 10, paddingBottom: 10, gap: 4, backgroundColor: 'rgba(1,20,15,0.79)' },
+  cardTitle: { color: '#FFFFFF', fontSize: 13, lineHeight: 19, fontWeight: '800', textAlign: 'right', minHeight: 33 },
   cardMetaRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5 },
   cardCategory: { color: '#A7F3D0', fontSize: 11, fontWeight: '600', maxWidth: '60%' },
   cardDot: { color: '#cbd5e1', fontSize: 11 },
@@ -775,8 +819,8 @@ const styles = StyleSheet.create({
   cardHostNameRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 3 },
   cardHostName: { color: '#FFFFFF', fontSize: 12, fontWeight: '700', maxWidth: 96 },
   cardHostArea: { color: '#b4d5c4', fontSize: 11, marginTop: 1, textAlign: 'right' },
-  cardHostAvatar: { width: 32, height: 32, borderRadius: 16, borderWidth: 1, borderColor: '#6ee7b7' },
-  cardHostAvatarFallback: { width: 30, height: 30, borderRadius: 15, backgroundColor: OASIS.colors.soft, alignItems: 'center', justifyContent: 'center' },
+  cardHostAvatar: { width: 27, height: 27, borderRadius: 14, borderWidth: 1, borderColor: '#6ee7b7' },
+  cardHostAvatarFallback: { width: 27, height: 27, borderRadius: 14, backgroundColor: OASIS.colors.soft, alignItems: 'center', justifyContent: 'center' },
   cardHostAvatarLetter: { color: OASIS.colors.primary, fontWeight: '700' },
 
   // On-air badges
@@ -786,7 +830,7 @@ const styles = StyleSheet.create({
   audienceChipText: { color: OASIS.colors.line, fontSize: 11, fontWeight: '600' },
 
   // Trending
-  trendingCard: { flexDirection: 'row-reverse', alignItems: 'center', gap: 11, backgroundColor: OASIS.colors.surface, borderRadius: 14, padding: 10, borderWidth: 1, borderColor: OASIS.colors.line, shadowColor: OASIS.colors.ink, shadowOpacity: 0, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 2 },
+  trendingCard: { flexDirection: 'row-reverse', alignItems: 'center', gap: 9, backgroundColor: OASIS.colors.surface, borderRadius: 13, padding: 9, borderWidth: 1, borderColor: OASIS.colors.line, shadowOpacity: 0, elevation: 0 },
   trendingRank: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   trendingRankText: { color: OASIS.colors.surface, fontSize: 12.5, fontWeight: '700' },
   trendingCover: { width: 78, height: 78, borderRadius: 14, overflow: 'hidden' },
@@ -859,14 +903,14 @@ const styles = StyleSheet.create({
   // States
   state: { paddingVertical: 50, alignItems: 'center', gap: 12 },
   stateText: { color: OASIS.colors.muted, fontSize: 13 },
-  empty: { backgroundColor: OASIS.colors.surface, borderRadius: 14, borderWidth: 1, borderColor: OASIS.colors.line, padding: 16, alignItems: 'center', gap: 9, shadowColor: OASIS.colors.ink, shadowOpacity: 0, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } },
+  empty: { backgroundColor: OASIS.colors.surface, borderRadius: 15, borderWidth: 1, borderColor: OASIS.colors.line, padding: 17, alignItems: 'center', gap: 9, shadowOpacity: 0 },
   emptyTitle: { color: OASIS.colors.ink, fontSize: 16, fontWeight: '700', textAlign: 'center' },
   emptyText: { color: OASIS.colors.muted, fontSize: 13, textAlign: 'center', lineHeight: 21 },
   retry: { paddingVertical: 9, paddingHorizontal: 18, backgroundColor: OASIS.colors.soft, borderRadius: 15, marginTop: 5 },
   retryText: { color: OASIS.colors.primary, fontWeight: '600' },
-  emptyCreate: { marginTop: 6, backgroundColor: OASIS.colors.primary, borderRadius: 14, paddingHorizontal: 18, paddingVertical: 10 },
+  emptyCreate: { minHeight: 38, marginTop: 6, backgroundColor: OASIS.colors.primary, borderRadius: 12, paddingHorizontal: 15, paddingVertical: 9, justifyContent: 'center' },
   emptyCreateText: { color: OASIS.colors.surface, fontWeight: '700' },
 
-  privacyHint: { flexDirection: 'row-reverse', alignItems: 'flex-start', gap: 7, padding: 12, marginTop: 18, backgroundColor: '#f1f5f9', borderRadius: 14 },
+  privacyHint: { flexDirection: 'row-reverse', alignItems: 'flex-start', gap: 7, padding: 10, marginTop: 13, backgroundColor: OASIS.colors.soft, borderRadius: 12 },
   privacyText: { flex: 1, color: OASIS.colors.muted, fontSize: 11, textAlign: 'right', lineHeight: 17 },
 });
