@@ -89,7 +89,7 @@ const SCHOOL_DAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأ
 function schoolTitle(mode: SchoolMode, level: SchoolLevel, trip: SchoolTrip, district: string) {
   const prefix = mode === 'need' ? 'مطلوب توصيل مدرسي' : 'مقاعد لتوصيل مدرسي';
   const type = SCHOOL_TRIPS.find(item => item.key === trip)?.label || 'ذهاب وعودة';
-  return `${prefix} - ${level} - ${type}${district.trim() ? ` - حي ${district.trim()}` : ''}`;
+  return `${prefix} - ${level} - ${type}${district.trim() ? ` - ${/^حي\s/.test(district.trim()) ? district.trim() : `حي ${district.trim()}`}` : ''}`;
 }
 
 export default function AskScreen() {
@@ -415,14 +415,26 @@ export default function AskScreen() {
     }
   }
   return (
-    <KeyboardAvoidingView style={[styles.screen, { backgroundColor: 'transparent' }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <AppHeader variant="sub" title="منشور جديد" fallbackRoute="/home" onBackPress={goBack} />
       <ScrollView ref={scrollRef} style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'} showsVerticalScrollIndicator={false}>
         <View style={styles.progress} accessibilityLabel={`الخطوة ${step} من 2`}>
-          <Text style={[styles.stepLabel, styles.stepActive]}>١ · التصنيف</Text><View style={styles.stepConnector} /><Text style={[styles.stepLabel, step === 2 && styles.stepActive]}>٢ · التفاصيل والنشر</Text>
+          <View style={[styles.stepPill, step === 1 && styles.stepPillActive]}>
+            <View style={[styles.stepNumber, step === 1 && styles.stepNumberActive]}>
+              {step === 2 ? <Check size={12} color={colors.primary}/> : <Text style={styles.stepNumberTextActive}>١</Text>}
+            </View>
+            <Text style={[styles.stepLabel, step === 1 && styles.stepActive]}>التصنيف</Text>
+          </View>
+          <View style={[styles.stepConnector, step === 2 && { backgroundColor: colors.primary }]}/>
+          <View style={[styles.stepPill, step === 2 && styles.stepPillActive]}>
+            <View style={[styles.stepNumber, step === 2 && styles.stepNumberActive]}>
+              <Text style={step === 2 ? styles.stepNumberTextActive : styles.stepNumberText}>٢</Text>
+            </View>
+            <Text style={[styles.stepLabel, step === 2 && styles.stepActive]}>التفاصيل والنشر</Text>
+          </View>
         </View>
         <Text accessibilityRole="header" style={styles.heading}>{step === 1 ? 'وش ودّك تشارك اليوم؟' : postType === 'school_transport' ? 'رتّب توصيل المدارس' : 'اكتب منشورك'}</Text>
-        <Text style={styles.subtitle}>{step === 1 ? 'اختر نوع مشاركتك، ثم اكتب التفاصيل.' : postType === 'school_transport' ? 'انشر طلبًا أو عرضًا واضحًا دون معلومات الطلاب الخاصة.' : 'عنوان واضح وتفاصيل مختصرة توصل طلبك أسرع.'}</Text>
+        <Text style={styles.subtitle}>{step === 1 ? 'اختر التصنيف الأنسب، وتقدر تغيّره قبل النشر.' : postType === 'school_transport' ? 'انشر طلبًا أو عرضًا واضحًا دون معلومات الطلاب الخاصة.' : 'عنوان واضح وتفاصيل مختصرة توصل طلبك أسرع.'}</Text>
 
         {step === 1 ? (
           <>
@@ -432,9 +444,14 @@ export default function AskScreen() {
               const Icon = type.icon;
               return (
                 <Pressable oasisKind="plain" key={type.key} testID={`post-type-${type.key}`} accessibilityRole="button" accessibilityLabel={`${type.label}، ${type.hint}`} accessibilityState={{ selected: active }} onPress={() => { setPostType(type.key); setFieldErrors({}); setShowTemplates(false); setShowPreview(false); }} style={({ pressed }) => [styles.typeCard, active && styles.typeSelected, pressed && styles.pressed]}>
-                  <View style={styles.typeTop}><View style={[styles.typeIcon, active && styles.typeIconSelected]}><Icon size={21} color={active ? colors.primary : colors.muted} strokeWidth={1.8} /></View>{active ? <View style={[styles.selection, styles.selectionActive]}><Check size={13} color="#FFFFFF" strokeWidth={3} /></View> : null}</View>
-                  <Text style={[styles.typeLabel, active && styles.selectedText]}>{type.label}</Text>
-                  <Text style={styles.typeHint}>{type.hint}</Text>
+                  <View style={styles.typeTop}>
+                    <View style={[styles.typeIcon, active && styles.typeIconSelected]}>
+                      <Icon size={19} color={active ? colors.primary : colors.muted} strokeWidth={1.8} />
+                    </View>
+                    <View style={[styles.selection, active && styles.selectionActive]}>{active ? <Check size={13} color="#FFFFFF" strokeWidth={3}/> : null}</View>
+                  </View>
+                  <Text numberOfLines={1} style={[styles.typeLabel, active && styles.selectedText]}>{type.label}</Text>
+                  <Text numberOfLines={2} style={styles.typeHint}>{type.hint}</Text>
                 </Pressable>
               );
             })}
@@ -443,7 +460,12 @@ export default function AskScreen() {
         ) : (
           <View style={styles.details}>
             <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel={`نوع المنشور ${selectedType.label}، تغيير`} onPress={() => changeStep(1)} disabled={busy} style={styles.selectedRow}>
-              <View style={styles.selectedIdentity}><selectedType.icon size={19} color={colors.primary} /><Text style={styles.selectedName}>{selectedType.label}</Text></View>
+              <View style={styles.selectedIdentity}>
+                <View style={styles.selectedIconBox}><selectedType.icon size={18} color={colors.primary}/></View>
+                <View style={styles.selectedCopy}>
+                  <Text style={styles.selectedCaption}>نوع المنشور</Text><Text style={styles.selectedName}>{selectedType.label}</Text>
+                </View>
+              </View>
               <Text style={styles.changeText}>تغيير</Text>
             </Pressable>
             {postType !== 'school_transport' ? <View style={styles.field}>
@@ -498,7 +520,7 @@ export default function AskScreen() {
             <View style={styles.locationCard}>
               <View style={styles.locationText}>
                 <Text style={styles.locationTitle}>منطقة النشر</Text>
-                <Text style={styles.locationValue}>{city ? [city, district && `حي ${district}`].filter(Boolean).join(' · ') : 'لم يتم تحديد المدينة'}</Text>
+                <Text style={styles.locationValue}>{city ? [city, district && (/^حي\s/.test(district) ? district : `حي ${district}`)].filter(Boolean).join(' · ') : 'لم يتم تحديد المدينة'}</Text>
                 <Text style={styles.locationHint}>نشارك المدينة والحي فقط، وليس إحداثياتك الدقيقة.</Text>
               </View>
               <Pressable oasisKind="plain" accessibilityRole="button" disabled={busy} accessibilityLabel="تعديل موقع النشر" onPress={() => setEditingLocation(true)} style={styles.locationChange}><MapPin size={17} color={colors.primary} /><Text style={styles.locationChangeText}>تعديل</Text></Pressable>
@@ -517,12 +539,20 @@ export default function AskScreen() {
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) }]}>
         <View style={styles.footerContent}>
           <View style={styles.audience}><Users size={15} color="#73877a" /><Text style={styles.audienceText}>{postType === 'school_transport' ? 'توصيل المدارس · بدون بيانات أطفال' : 'لجيران حيّك'}</Text></View>
-          <Pressable oasisKind="plain" testID="ask-primary" accessibilityRole="button" accessibilityLabel={step === 1 ? 'التالي، كتابة التفاصيل' : 'نشر في الحي'} accessibilityState={{ disabled: busy, busy }} disabled={busy} onPress={() => { if (step === 1) changeStep(2); else void save(); }} style={({ pressed }) => [styles.primary, (busy || pressed) && styles.pressed]}>
+          <View style={styles.footerActions}>
+            {step === 2 && (
+              <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="العودة إلى التصنيفات" disabled={busy}
+                onPress={() => changeStep(1)} style={styles.backStep}>
+                <Text style={styles.backStepText}>السابق</Text>
+              </Pressable>
+            )}
+          <Pressable oasisKind="plain" testID="ask-primary" accessibilityRole="button" accessibilityLabel={step === 1 ? `التالي، تفاصيل ${selectedType.label}` : 'نشر في الحي'} accessibilityState={{ disabled: busy, busy }} disabled={busy} onPress={() => { if (step === 1) changeStep(2); else void save(); }} style={({ pressed }) => [styles.primary, (busy || pressed) && styles.pressed]}>
 
             {busy ? <ActivityIndicator color="#FFFFFF" size="small" /> : null}
-            <Text style={styles.primaryText}>{busy ? 'جارٍ النشر…' : step === 1 ? 'التالي' : postType === 'school_transport' ? 'نشر طلب التوصيل' : 'نشر في الحي'}</Text>
+            <Text style={styles.primaryText}>{busy ? 'جارٍ النشر…' : step === 1 ? `التالي · ${selectedType.label}` : postType === 'school_transport' ? 'نشر طلب التوصيل' : 'نشر في الحي'}</Text>
             {!busy && step === 1 ? <ArrowLeft size={18} color="#FFFFFF" /> : null}
           </Pressable>
+          </View>
         </View>
       </View>
       <PublishLocationEditor
@@ -544,40 +574,49 @@ export default function AskScreen() {
 }
 
 function createStyles(c: OasisColors) { return StyleSheet.create({
-  screen: { flex: 1, backgroundColor: 'transparent' },
+  screen: { flex: 1, backgroundColor: c.background },
   scroll: { flex: 1 },
-  content: { flexGrow: 1, padding: 18, paddingBottom: 22, width: '100%', maxWidth: 560, alignSelf: 'center' },
-  progress: { direction: 'ltr', flexDirection: 'row-reverse', alignItems: 'center', gap: 9, marginBottom: 18 },
-  stepLabel: { fontSize: 11, color: c.muted, fontWeight: '500' },
-  stepActive: { color: c.primary, fontWeight: '700' },
-  stepConnector: { width: 26, height: 1, backgroundColor: c.line },
+  content: { flexGrow: 1, paddingHorizontal: 15, paddingTop: 16, paddingBottom: 18, width: '100%', maxWidth: 560, alignSelf: 'center' },
+  stepPill: { minHeight: 35, flexDirection: 'row-reverse', alignItems: 'center', gap: 7, paddingHorizontal: 9, backgroundColor: c.surface, borderWidth: 1, borderColor: c.line, borderRadius: 11 },
+  stepPillActive: { backgroundColor: c.soft, borderColor: c.primary },
+  stepNumber: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: c.soft },
+  stepNumberActive: { backgroundColor: c.primary },
+  stepNumberText: { fontSize: 11, color: c.muted, fontWeight: '800' },
+  stepNumberTextActive: { fontSize: 11, color: '#FFFFFF', fontWeight: '800' },
+  progress: { flexDirection: 'row-reverse', alignItems: 'center', gap: 7, marginBottom: 18 },
+  stepLabel: { color: c.muted, fontSize: 11.5, fontWeight: '700' },
+  stepActive: { color: c.primary, fontWeight: '800' },
+  stepConnector: { flex: 1, minWidth: 8, height: 2, backgroundColor: c.line, borderRadius: 2 },
   disclosure: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, minHeight: 44, paddingHorizontal: 3 },
   disclosureText: { flex: 1, fontSize: 12, color: c.primary, textAlign: 'right', fontWeight: '600' },
-  heading: { color: c.ink, fontSize: 21, lineHeight: 31, fontWeight: '700', textAlign: 'right', writingDirection: 'rtl' },
-  subtitle: { color: c.muted, fontSize: 12, lineHeight: 21, textAlign: 'right', marginTop: 4, marginBottom: 20, writingDirection: 'rtl' },
-  typeGrid: { direction: 'ltr', flexDirection: 'row-reverse', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 10 },
-  typeCard: { width: '48.5%', minHeight: 112, backgroundColor: c.surface, borderRadius: 17, borderWidth: 1, borderColor: c.line, padding: 12, alignItems: 'flex-end' },
-  typeSelected: { backgroundColor: c.soft, borderColor: OASIS.colors.primary },
-  typeTop: { direction: 'ltr', flexDirection: 'row-reverse', width: '100%', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  typeIcon: { width: 32, height: 32, backgroundColor: c.soft, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  typeIconSelected: { backgroundColor: c.soft },
-  selection: { width: 19, height: 19, borderRadius: 10, borderWidth: 1, borderColor: '#cedbd2', alignItems: 'center', justifyContent: 'center' },
-  selectionActive: { backgroundColor: '#047857', borderColor: '#047857' },
-  typeLabel: { color: c.ink, fontSize: 14, fontWeight: '600', textAlign: 'right' },
+  heading: { color: c.ink, fontSize: 20, lineHeight: 29, fontWeight: '800', textAlign: 'right', writingDirection: 'rtl' },
+  subtitle: { color: c.muted, fontSize: 12, lineHeight: 20, textAlign: 'right', marginTop: 4, marginBottom: 15, writingDirection: 'rtl' },
+  typeGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', justifyContent: 'space-between', gap: 9 },
+  typeCard: { width: '48.5%', minHeight: 103, backgroundColor: c.surface, borderRadius: 15, borderWidth: 1.2, borderColor: c.line, paddingHorizontal: 11, paddingVertical: 10, alignItems: 'flex-end' },
+  typeSelected: { backgroundColor: c.soft, borderColor: c.primary, borderWidth: 1.5 },
+  typeTop: { flexDirection: 'row-reverse', width: '100%', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  typeIcon: { width: 34, height: 34, backgroundColor: c.soft, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  typeIconSelected: { backgroundColor: c.surface },
+  selection: { width: 20, height: 20, borderRadius: 10, borderWidth: 1.5, borderColor: c.line, alignItems: 'center', justifyContent: 'center' },
+  selectionActive: { backgroundColor: c.primary, borderColor: c.primary },
+  typeLabel: { color: c.ink, fontSize: 13.5, fontWeight: '800', textAlign: 'right' },
   selectedText: { color: c.primary },
-  typeHint: { fontSize: 10, lineHeight: 17, color: c.muted, textAlign: 'right', marginTop: 3, writingDirection: 'rtl' },
-  details: { gap: 14 },
-  selectedRow: { direction: 'ltr', flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', backgroundColor: c.soft, borderRadius: 15, paddingHorizontal: 14, minHeight: 52 },
-  selectedIdentity: { direction: 'ltr', flexDirection: 'row-reverse', gap: 8, alignItems: 'center' },
-  selectedName: { fontSize: 14, fontWeight: '600', color: c.primary },
-  changeText: { fontSize: 12, color: c.primary },
-  field: { gap: 9 },
+  typeHint: { fontSize: 10.5, lineHeight: 16, color: c.muted, textAlign: 'right', marginTop: 3, writingDirection: 'rtl' },
+  details: { gap: 12 },
+  selectedRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', backgroundColor: c.surface, borderRadius: 14, borderWidth: 1, borderColor: c.line, paddingHorizontal: 11, minHeight: 56 },
+  selectedIdentity: { flexDirection: 'row-reverse', flex: 1, minWidth: 0, gap: 8, alignItems: 'center' },
+  selectedIconBox: { width: 35, height: 35, borderRadius: 11, backgroundColor: c.soft, alignItems: 'center', justifyContent: 'center' },
+  selectedCopy: { alignItems: 'flex-end', gap: 2 },
+  selectedCaption: { fontSize: 10, color: c.muted, textAlign: 'right' },
+  selectedName: { fontSize: 13, fontWeight: '800', color: c.primary },
+  changeText: { fontSize: 11.5, fontWeight: '700', color: c.primary },
+  field: { gap: 7 },
   labelRow: { direction: 'ltr', flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
   label: { fontSize: 13, fontWeight: '600', color: c.ink, textAlign: 'right' },
   optional: { fontWeight: '400', color: c.muted, fontSize: 11 },
   count: { fontSize: 11, color: c.muted },
   titleInput: { fontSize: 16, lineHeight: 25, minHeight: 50, borderWidth: 1, borderRadius: 13, backgroundColor: c.surface, borderColor: c.line, padding: 12, color: c.ink, textAlign: 'right', writingDirection: 'rtl' },
-  bodyInput: { minHeight: 128, borderRadius: 13, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface, padding: 12, fontSize: 16, lineHeight: 26, color: c.ink, textAlign: 'right', writingDirection: 'rtl' },
+  bodyInput: { minHeight: 112, borderRadius: 13, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface, padding: 12, fontSize: 15, lineHeight: 24, color: c.ink, textAlign: 'right', writingDirection: 'rtl' },
   budgetInput: { borderWidth: 1, borderColor: c.line, backgroundColor: c.surface, borderRadius: 14, minHeight: 44, padding: 12, fontSize: 16, color: c.ink, textAlign: 'right' },
   invalidInput: { borderColor: '#c2413a' },
   templates: { gap: 10 },
@@ -587,12 +626,15 @@ function createStyles(c: OasisColors) { return StyleSheet.create({
   notice: { direction: 'ltr', flexDirection: 'row-reverse', alignItems: 'flex-start', gap: 9, backgroundColor: c.warningSoft, borderRadius: 14, padding: 13 },
   noticeText: { flex: 1, fontSize: 12, lineHeight: 21, color: c.warning, textAlign: 'right', writingDirection: 'rtl' },
   error: { fontSize: 12, lineHeight: 21, color: c.danger, textAlign: 'right', writingDirection: 'rtl' },
-  footer: { borderTopWidth: 1, borderTopColor: c.line, backgroundColor: c.surface, paddingHorizontal: 18, paddingTop: 10 },
-  footerContent: { width: '100%', maxWidth: 524, alignSelf: 'center', gap: 7 },
-  audience: { direction: 'ltr', flexDirection: 'row-reverse', gap: 5, alignItems: 'center', justifyContent: 'center' },
+  footer: { borderTopWidth: 1, borderTopColor: c.line, backgroundColor: c.surface, paddingHorizontal: 15, paddingTop: 9 },
+  footerActions: { flexDirection: 'row-reverse', alignItems: 'center', gap: 9 },
+  backStep: { minWidth: 72, minHeight: 47, alignItems: 'center', justifyContent: 'center', borderRadius: 13, backgroundColor: c.soft, borderWidth: 1, borderColor: c.line },
+  backStepText: { color: c.primary, fontSize: 12, fontWeight: '800' },
+  footerContent: { width: '100%', maxWidth: 524, alignSelf: 'center', gap: 6 },
+  audience: { flexDirection: 'row-reverse', gap: 6, alignItems: 'center', justifyContent: 'center' },
   audienceText: { fontSize: 11, color: c.muted },
-  primary: { direction: 'ltr', flexDirection: 'row-reverse', gap: 9, alignItems: 'center', justifyContent: 'center', minHeight: 48, padding: 12, backgroundColor: '#047857', borderRadius: 24 },
-  primaryText: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
+  primary: { flex: 1, flexDirection: 'row-reverse', gap: 9, alignItems: 'center', justifyContent: 'center', minHeight: 47, paddingHorizontal: 13, paddingVertical: 10, backgroundColor: c.primary, borderRadius: 14 },
+  primaryText: { color: '#FFFFFF', fontSize: 13.5, fontWeight: '800' },
   schoolHeading: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, padding: 13, borderRadius: 16, backgroundColor: c.soft },
   schoolHeadingTitle: { textAlign: 'right', color: c.primary, fontWeight: '800', fontSize: 15 },
   schoolHeadingDesc: { textAlign: 'right', color: c.muted, fontSize: 11.5, lineHeight: 19, marginTop: 2 },
