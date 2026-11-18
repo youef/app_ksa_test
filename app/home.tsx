@@ -232,7 +232,7 @@ export default function Home() {
   }, [feed.hasMore, feed.loadingMore, feed.loading, feed.loadMore]);
 
   return (
-    <View style={[styles.container, layout.page]}>
+    <View style={[styles.container, layout.page, { backgroundColor: colors.background }]}>
 
       <AppHeader
         variant="home"
@@ -251,7 +251,7 @@ export default function Home() {
         keyboardShouldPersistTaps="handled"
         onScroll={handleFeedScroll}
         scrollEventThrottle={300}
-        contentContainerStyle={{ paddingBottom: bottomNavInset + 24, paddingTop: 16, gap: 16, flexGrow: 1 }}
+        contentContainerStyle={{ paddingBottom: bottomNavInset + 24, paddingTop: 12, gap: 12, flexGrow: 1 }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -270,11 +270,15 @@ export default function Home() {
             <AtmosphereBar compact weather={loc.weather} weatherLoading={loc.weatherLoading} />
           </View>
         </View>
-        <View style={{ paddingHorizontal: Math.max(12, insets.left, insets.right) }}>
-          <CommunityShortcuts signedIn={Boolean(feed.currentUserId)} />
-        </View>
+        <CommunityShortcuts signedIn={Boolean(feed.currentUserId)} />
 
-        {flags.stories !== false && Boolean(feed.currentUserId) && <View style={[layout.sectionShell, { paddingHorizontal: Math.max(12, insets.left, insets.right) }]}><View style={[layout.stories, { backgroundColor: colors.surface, borderColor: colors.line }]}><StoriesRow profile={feed.profile} stories={feed.stories} selectedDistrict={loc.district} /></View></View>}
+        {flags.stories !== false && Boolean(feed.currentUserId) && feed.stories.length > 0 && (
+          <View style={[layout.sectionShell, { paddingHorizontal: Math.max(12, insets.left, insets.right) }]}>
+            <View style={[layout.stories, { backgroundColor: colors.surface, borderColor: colors.line }]}>
+              <StoriesRow profile={feed.profile} stories={feed.stories} selectedDistrict={loc.district} />
+            </View>
+          </View>
+        )}
 
         <View style={[styles.feedSection, layout.feed, { paddingHorizontal: Math.max(12, insets.left, insets.right) }]}>
           <View style={[layout.feedToolbar, { backgroundColor: colors.surface, borderColor: colors.line }]}>
@@ -306,6 +310,7 @@ export default function Home() {
           ) : (
             filteredItems.map(item => (
               <TwitterInquiryCard
+                compact
                 key={`${activeTab}-${item.type}-${item.data.id}`}
                 type={item.type}
                 data={item.data}
@@ -400,13 +405,13 @@ export default function Home() {
 const layout = StyleSheet.create({
   page: { backgroundColor: 'transparent' },
   body: { flex: 1, backgroundColor: 'transparent' },
-  contextRow: { width: '100%', flexDirection: 'row-reverse', flexWrap: 'wrap', alignItems: 'stretch', gap: 10, paddingHorizontal: 0 },
+  contextRow: { width: '100%', flexDirection: 'row-reverse', flexWrap: 'wrap', alignItems: 'stretch', gap: 8, paddingHorizontal: 0 },
   locationTile: { flex: 1.6, minWidth: 160 },
   weatherTile: { flex: 1, minWidth: 120 },
   sectionShell: { width: '100%', paddingHorizontal: 0 },
-  stories: { paddingVertical: 6, width: '100%', borderWidth: 1, borderRadius: 22, overflow: 'hidden' },
+  stories: { paddingVertical: 3, width: '100%', borderWidth: 1, borderRadius: 16, overflow: 'hidden' },
   feed: { width: '100%', marginTop: 0, paddingHorizontal: 0 },
-  feedToolbar: { borderWidth: 1, borderRadius: 16, padding: 4, gap: 8, marginBottom: 12 },
+  feedToolbar: { borderWidth: 1, borderRadius: 14, padding: 4, gap: 8, marginBottom: 10 },
   filterButton: { flex: 0.9, minWidth: 0, height: 34, paddingHorizontal: 3, borderRadius: 11, flexDirection: 'row-reverse', gap: 3, alignItems: 'center', justifyContent: 'center' },
   sortRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4 },
   sortButton: { minWidth: 0, height: 34, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', borderRadius: 11, gap: 3, paddingHorizontal: 3 },
