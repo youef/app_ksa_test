@@ -17,9 +17,11 @@ test('the document wallpaper extends behind the iOS PWA lower safe area', () => 
   assert.match(read('app/_layout.tsx'), /@media \(display-mode: standalone\) \{ #root \{ height: 100vh; bottom: auto; \} \}/);
   assert.match(read('scripts/hayna-web-html.mjs'), /background-position:center bottom/);
 });
-test('home panels have 12pt side gutters while the wallpaper remains full bleed', () => {
+test('home sections and the self-contained announcement retain single side gutters', () => {
   const home = read('app/home.tsx');
-  assert.equal((home.match(/Math\.max\(12, insets\.left, insets\.right\)/g) || []).length, 4);
+  assert.equal((home.match(/Math\.max\(12, insets\.left, insets\.right\)/g) || []).length, 3);
+  assert.match(read('components/home/CommunityShortcuts.tsx'), /paddingHorizontal: 16/);
+  assert.doesNotMatch(home, /<View style=\{\{ paddingHorizontal: Math\.max\(12, insets\.left, insets\.right\) \}\}>\s*<CommunityShortcuts/);
   assert.match(home, /feed: \{ width: '100%', marginTop: 0, paddingHorizontal: 0/);
   assert.match(read('components/shared/AppBackground.tsx'), /StyleSheet\.absoluteFillObject/);
 });

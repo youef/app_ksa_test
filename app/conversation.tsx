@@ -110,10 +110,12 @@ export default function Conversation() {
       if (atEnd) markVisibleRead();
     }
   }, [markVisibleRead]);
+  const hasTemporaryMessages = messages.some(message => Boolean(parseTemporaryMessage(message.body)));
   useEffect(() => {
+    if (!hasTemporaryMessages) return;
     const timer = setInterval(() => setClockNow(Date.now()), 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [hasTemporaryMessages]);
   const visibleMessages = messages.filter(message => {
     const temporary = parseTemporaryMessage(message.body);
     return !temporary || temporary.expiresAt > clockNow;
@@ -739,7 +741,7 @@ export default function Conversation() {
     <KeyboardAvoidingView
       style={[styles.container, Platform.OS === 'web' && webViewport
           ? ({ position: 'fixed', top: webViewport.top, height: webViewport.height, minHeight: 0 } as any)
-          : null, { backgroundColor: 'transparent' }]}
+          : null, { backgroundColor: colors.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ChatHeader
@@ -760,8 +762,8 @@ export default function Conversation() {
       <View style={styles.timeline}>
         <ScrollView
         ref={scrollRef}
-        style={[styles.messagesList, { backgroundColor: 'transparent' }]}
-        contentContainerStyle={[styles.messagesContent, { paddingBottom: 24 }]}
+        style={[styles.messagesList, { backgroundColor: colors.background }]}
+        contentContainerStyle={styles.messagesContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         onScroll={trackScroll}
@@ -793,7 +795,7 @@ export default function Conversation() {
             />
           ))
         )}
-        <View style={{ height: 16 }} />
+        <View style={{ height: 8 }} />
         </ScrollView>
         {showJump && (
         <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="الانتقال إلى أحدث رسالة" accessibilityHint="ينقلك إلى أسفل المحادثة" onPress={jumpToLatest}
