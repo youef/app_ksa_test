@@ -377,7 +377,7 @@ export default function Messages() {
   const silentUnread = conversations.filter(c => c.isUnread && (c.isMuted || dndNow)).length;
 
   return (
-    <View style={[styles.container, { backgroundColor: 'transparent' }]}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <AppHeader
         variant="tab"
         title="المحادثات"
@@ -413,7 +413,7 @@ export default function Messages() {
       />
 
       {/* Modern Search & Filter Capsule */}
-      <View style={[styles.searchSection, { backgroundColor: colors.surface, borderColor: colors.line }]}>
+      <View style={[styles.searchSection, { backgroundColor: colors.background, borderColor: colors.line }]}>
         <OasisSurface oasisSurface="field" style={styles.searchBox}>
           <Search size={17} color={OASIS.colors.primary} />
           <TextInput
@@ -426,7 +426,7 @@ export default function Messages() {
             selectionColor={OASIS.colors.primary}
           />
           {searchQuery.length > 0 && (
-            <Pressable oasisKind="icon" onPress={() => setSearchQuery('')} accessibilityRole="button" accessibilityLabel="مسح البحث" style={styles.clearSearchBtn}>
+            <Pressable oasisKind="plain" onPress={() => setSearchQuery('')} accessibilityRole="button" accessibilityLabel="مسح البحث" style={styles.clearSearchBtn}>
               <X size={14} color={OASIS.colors.muted} />
             </Pressable>
           )}
@@ -439,7 +439,7 @@ export default function Messages() {
             onPress={() => { setOnlyUnread(false); setOnlyMuted(false); }}
           >
             <MessageCircle size={13} color={!onlyUnread && !onlyMuted ? OASIS.colors.surface : OASIS.colors.muted} />
-            <Text style={[styles.filterPillText, !onlyUnread && !onlyMuted && styles.filterPillTextActive]}>
+            <Text numberOfLines={1} style={[styles.filterPillText, !onlyUnread && !onlyMuted && styles.filterPillTextActive]}>
               الكل ({conversations.length + 1})
             </Text>
           </Pressable>
@@ -449,7 +449,7 @@ export default function Messages() {
             onPress={() => { setOnlyUnread(true); setOnlyMuted(false); }}
           >
             <Filter size={13} color={onlyUnread ? OASIS.colors.surface : OASIS.colors.muted} />
-            <Text style={[styles.filterPillText, onlyUnread && styles.filterPillTextActive]}>
+            <Text numberOfLines={1} style={[styles.filterPillText, onlyUnread && styles.filterPillTextActive]}>
               غير مقروء
             </Text>
             {totalUnreadCount > 0 && (
@@ -464,7 +464,7 @@ export default function Messages() {
             onPress={() => { setOnlyMuted(true); setOnlyUnread(false); }}
           >
             <BellOff size={13} color={onlyMuted ? OASIS.colors.surface : OASIS.colors.muted} />
-            <Text style={[styles.filterPillText, onlyMuted && styles.filterPillTextActive]}>المكتومة ({mutedCount})</Text>
+            <Text numberOfLines={1} style={[styles.filterPillText, onlyMuted && styles.filterPillTextActive]}>المكتومة ({mutedCount})</Text>
           </Pressable>
         </View>
       </View>
@@ -513,10 +513,16 @@ export default function Messages() {
         >
           <View style={styles.inner}>
             {showPlatformConversation ? (
-              <Pressable oasisKind="card" accessibilityRole="button" accessibilityLabel="محادثة منصة حيّنا الرسمية" onPress={() => router.push('/platform-inbox')} style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 12, padding: 14, marginBottom: 14, backgroundColor: OASIS.colors.surface, borderRadius: 14, borderWidth: 1, borderColor: OASIS.colors.line }}>
-                <View style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: OASIS.colors.soft, alignItems: 'center', justifyContent: 'center' }}><CheckCircle2 size={24} color={OASIS.colors.primary} /></View>
-                <View style={{ flex: 1, gap: 5 }}><Text style={{ textAlign: 'right', fontSize: 15, fontWeight: '700', color: OASIS.colors.ink }}>منصة حيّنا</Text><Text numberOfLines={1} style={{ textAlign: 'right', fontSize: 12, color: OASIS.colors.muted }}>{platformMessages[0]?.body || 'الحساب الرسمي · الترحيب وأخبار المنصة'}</Text></View>
-                {platformUnreadCount > 0 ? <View style={{ minHeight: 24, paddingHorizontal: 8, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: OASIS.colors.primary }}><Text style={{ fontSize: 11, color: '#fff' }}>جديد</Text></View> : <ChevronLeft size={18} color={OASIS.colors.muted} />}
+              <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="محادثة منصة حيّنا الرسمية" onPress={() => router.push('/platform-inbox')} style={[styles.platformCard, { backgroundColor: colors.surface, borderColor: colors.line }]}>
+                <View style={styles.platformAvatar}><CheckCircle2 size={22} color={OASIS.colors.primary} /></View>
+                <View style={styles.platformCopy}>
+                  <View style={styles.platformTitleRow}>
+                    <Text style={styles.platformTitle}>منصة حيّنا</Text>
+                    <Text style={styles.officialLabel}>رسمي</Text>
+                  </View>
+                  <Text numberOfLines={1} style={styles.platformPreview}>{platformMessages[0]?.body || 'الترحيب وأخبار المنصة'}</Text>
+                </View>
+                {platformUnreadCount > 0 ? <View style={styles.platformNewBadge}><Text style={styles.platformNewText}>{platformUnreadCount}</Text></View> : <ChevronLeft size={16} color={OASIS.colors.muted} />}
               </Pressable>
             ) : null}
 
@@ -578,6 +584,14 @@ export default function Messages() {
                     />
                   ))}
               </>
+            )}
+            {!searchQuery.trim() && !onlyUnread && !onlyMuted && conversations.length < 4 && (
+              <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="بدء محادثة مع جار جديد"
+                style={styles.discoverNeighbors} onPress={() => router.push('/search')}>
+                <Plus size={16} color={OASIS.colors.primary}/>
+                <Text style={styles.discoverNeighborsText}>ابدأ محادثة جديدة مع أحد جيرانك</Text>
+                <ChevronLeft size={15} color={OASIS.colors.primary}/>
+              </Pressable>
             )}
           </View>
         </ScrollView>
@@ -958,7 +972,7 @@ function formatTime(dateStr: string): string {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: OASIS.colors.background },
+  container: { flex: 1, backgroundColor: '#F8FAF9' },
   retryBanner: { width: '92%', maxWidth: 700, alignSelf: 'center', alignItems: 'center', padding: 12, borderRadius: 14, marginBottom: 8 },
   headerRightActions: {
     flexDirection: 'row-reverse',
@@ -990,25 +1004,26 @@ const styles = StyleSheet.create({
   },
   dndBtnActive: { backgroundColor: 'transparent', borderWidth: 0 },
   searchSection: {
-    width: '96%',
+    width: '100%',
     maxWidth: 720,
     alignSelf: 'center',
-    marginTop: 12,
-    marginBottom: 8,
-    padding: 10,
-    borderRadius: 18,
-    borderWidth: 1,
+    marginTop: 8,
+    marginBottom: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 0,
+    borderWidth: 0,
     gap: 8,
   },
   searchBox: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    backgroundColor: OASIS.colors.background,
-    borderRadius: 16,
+    backgroundColor: OASIS.colors.surface,
+    borderRadius: 13,
     paddingHorizontal: 12,
-    height: 46,
-    borderWidth: 1.5,
-    borderColor: OASIS.colors.line,
+    height: 44,
+    borderWidth: 1,
+    borderColor: '#DFE8E2',
     gap: 8,
   },
   searchInput: {
@@ -1018,42 +1033,46 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     height: 42,
     padding: 0,
-    fontWeight: '700',
+    fontWeight: '500',
   },
   clearSearchBtn: {
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: OASIS.colors.line,
+    backgroundColor: OASIS.colors.soft,
     alignItems: 'center',
     justifyContent: 'center',
   },
   filtersRow: {
     flexDirection: 'row-reverse',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 4,
+    flexWrap: 'nowrap',
+    gap: 7,
+    marginBottom: 1,
   },
   filterPill: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 12,
-    minHeight: 44,
+    flex: 1,
+    minWidth: 0,
+    justifyContent: 'center',
+    gap: 4,
+    paddingHorizontal: 7,
+    minHeight: 38,
     paddingVertical: 6,
-    borderRadius: 12,
-    backgroundColor: OASIS.colors.soft,
+    borderRadius: 11,
+    backgroundColor: '#EDF5F0',
     borderWidth: 1,
-    borderColor: OASIS.colors.line,
+    borderColor: '#DCE9DF',
   },
   filterPillActive: {
     backgroundColor: OASIS.colors.primary,
     borderColor: OASIS.colors.primary,
   },
   filterPillText: {
-    fontSize: 11.5,
+    fontSize: 11,
     fontWeight: '600',
     color: OASIS.colors.muted,
+    flexShrink: 1,
   },
   filterPillTextActive: {
     color: OASIS.colors.surface,
@@ -1095,8 +1114,19 @@ const styles = StyleSheet.create({
   },
   dndBannerActionText: { color: OASIS.colors.surface, fontSize: 11, fontWeight: '600' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 14 },
-  list: { flex: 1, paddingTop: 10 },
+  list: { flex: 1, paddingTop: 7 },
   inner: { width: '100%', maxWidth: 720, alignSelf: 'center', paddingHorizontal: 16 },
+  platformCard: { flexDirection:'row-reverse',alignItems:'center',gap:11,paddingHorizontal:12,paddingVertical:11,marginBottom:8,borderRadius:14,borderWidth:1,minHeight:76 },
+  platformAvatar: { width:44,height:44,borderRadius:16,backgroundColor:'#E9F6EE',alignItems:'center',justifyContent:'center' },
+  platformCopy: { flex:1,minWidth:0,gap:4 },
+  platformTitleRow: { flexDirection:'row-reverse',alignItems:'center',gap:7 },
+  platformTitle: { textAlign:'right',fontSize:13.5,fontWeight:'700',color:OASIS.colors.ink },
+  officialLabel: { fontSize:10,color:OASIS.colors.primary,backgroundColor:OASIS.colors.soft,paddingHorizontal:7,paddingVertical:2,borderRadius:7 },
+  platformPreview: { textAlign:'right',fontSize:11.5,color:OASIS.colors.muted },
+  platformNewBadge: { minWidth:22,height:22,paddingHorizontal:5,borderRadius:11,alignItems:'center',justifyContent:'center',backgroundColor:OASIS.colors.primary },
+  platformNewText: { fontSize:11,color:'#FFFFFF',fontWeight:'700' },
+  discoverNeighbors: { minHeight:44,marginTop:12,paddingHorizontal:10,flexDirection:'row-reverse',alignItems:'center',justifyContent:'center',gap:7,borderRadius:12,backgroundColor:'#EFF6F2' },
+  discoverNeighborsText: { fontSize:11.5,color:OASIS.colors.primary,fontWeight:'600' },
   sectionHeaderRow: {
     marginBottom: 8,
     marginTop: 6,
@@ -1122,16 +1152,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: OASIS.colors.surface,
     borderRadius: 14,
-    padding: 13,
-    marginBottom: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    marginBottom: 7,
     borderWidth: 1,
-    borderColor: OASIS.colors.line,
-    gap: 12,
-    shadowColor: OASIS.colors.ink,
-    shadowOffset: { width: 0, height: 2 },
+    borderColor: '#E2EAE5',
+    gap: 10,
     shadowOpacity: 0,
-    shadowRadius: 5,
-    elevation: 1,
+    elevation: 0,
   },
   convCardUnread: {
     borderColor: '#a7f3d0',
@@ -1140,11 +1168,11 @@ const styles = StyleSheet.create({
   convCardBlocked: { opacity: 0.7, backgroundColor: OASIS.colors.dangerSoft, borderColor: '#fee2e2' },
   convCardMuted: { backgroundColor: OASIS.colors.background, borderColor: OASIS.colors.line },
   avatarWrap: { position: 'relative' },
-  avatar: { width: 50, height: 50, borderRadius: 25, borderWidth: 1.5, borderColor: OASIS.colors.line },
+  avatar: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: OASIS.colors.line },
   avatarFallback: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: OASIS.colors.soft,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1180,11 +1208,11 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   nameBadgesRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 },
-  convName: { fontSize: 14.5, fontWeight: '600', color: OASIS.colors.ink, flexShrink: 1, textAlign: 'right' },
+  convName: { fontSize: 13.5, fontWeight: '600', color: OASIS.colors.ink, flexShrink: 1, textAlign: 'right' },
   convNameUnread: { fontWeight: '700', color: OASIS.colors.primary },
   blockedPill: { backgroundColor: '#fee2e2', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6 },
   blockedPillText: { color: OASIS.colors.danger, fontSize: 11, fontWeight: '600' },
-  convTime: { fontSize: 11, color: '#94a3b8', fontWeight: '600', marginRight: 6 },
+  convTime: { fontSize: 10.5, color: '#87998C', fontWeight: '600', marginRight: 6 },
   convTimeUnread: { color: OASIS.colors.primary, fontWeight: '600' },
   convBottomRow: {
     flexDirection: 'row-reverse',
@@ -1192,10 +1220,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   lastMsgRow: { flexDirection: 'row-reverse', alignItems: 'center', flex: 1, minWidth: 0 },
-  lastMsg: { fontSize: 12.5, color: OASIS.colors.muted, flex: 1, textAlign: 'right' },
+  lastMsg: { fontSize: 11.5, color: OASIS.colors.muted, flex: 1, textAlign: 'right' },
   lastMsgUnread: { color: OASIS.colors.ink, fontWeight: '700' },
   unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: OASIS.colors.primary, marginRight: 6 },
-  emptyState: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60, paddingHorizontal: 20 },
+  emptyState: { alignItems: 'center', justifyContent: 'center', paddingVertical: 35, paddingHorizontal: 20 },
   emptyIcon: {
     width: 72,
     height: 72,
