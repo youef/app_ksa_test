@@ -1030,6 +1030,7 @@ const styles = StyleSheet.create({
   },
   filtersRow: {
     flexDirection: 'row-reverse',
+    flexWrap: 'wrap',
     gap: 8,
     marginBottom: 4,
   },
