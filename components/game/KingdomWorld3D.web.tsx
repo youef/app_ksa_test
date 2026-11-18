@@ -463,7 +463,9 @@ export default function KingdomWorld3D({ avatarKey, paused, initialX = 0, initia
         const nx = THREE.MathUtils.clamp(px + dx * speed * dt, -WORLD_HALF + 11, WORLD_HALF - 11);
         const nz = THREE.MathUtils.clamp(pz + dz * speed * dt, -WORLD_HALF + 11, WORLD_HALF - 11);
         px = nx; pz = nz;
-        avatar.group.rotation.y = THREE.MathUtils.lerp(avatar.group.rotation.y, Math.atan2(dx, dz) + Math.PI, Math.min(1, dt * 12));
+        const targetYaw = Math.atan2(dx, dz);
+        const yawDiff = Math.atan2(Math.sin(targetYaw - avatar.group.rotation.y), Math.cos(targetYaw - avatar.group.rotation.y));
+        avatar.group.rotation.y += yawDiff * Math.min(1, dt * 12);
         walkClock += dt * (speed > 15 ? 12 : 8.6);
       }
       if (!disabled && control.current.jump && jump <= .01) {
