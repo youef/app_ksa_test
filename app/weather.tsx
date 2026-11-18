@@ -240,6 +240,8 @@ export default function WeatherScreen() {
   const [detailsExpanded, setDetailsExpanded] = useState(false);
   const [locationDetailsOpen, setLocationDetailsOpen] = useState(false);
   const [showAllDays, setShowAllDays] = useState(false);
+  const [showExtraMetrics, setShowExtraMetrics] = useState(false);
+  const [showOtherAlerts, setShowOtherAlerts] = useState(false);
   const [sourcesExpanded, setSourcesExpanded] = useState(false);
   const weatherRequestId = useRef(0);
 
@@ -631,7 +633,7 @@ export default function WeatherScreen() {
                 </>
               ) : (
                 <View style={styles.emptyWeather}>
-                  {loading ? <ActivityIndicator size="large" color={OASIS.colors.surface} /> : <><CloudSun size={40} color="#fde68a" /><Text style={styles.emptyTitle}>اعرف أجواء مدينتك</Text><Text style={styles.emptySub}>طقس فعلي وتوقعات محدثة من Open-Meteo</Text></>}
+                  {loading ? <ActivityIndicator size="large" color={OASIS.colors.surface} /> : <><CloudSun size={40} color="#fde68a" /><Text style={styles.emptyTitle}>اعرف أجواء مدينتك</Text><Text style={styles.emptySub}>توقعات نموذجية محدثة من Open-Meteo</Text></>}
                 </View>
               )}
             </LinearGradient>
@@ -682,7 +684,16 @@ export default function WeatherScreen() {
                 </View>
               </View>
               <Text style={[styles.alertMessage, { color: bannerMeta.text }]}>{topAlert.message}</Text>
-              {sortedAlerts.length > 1 ? (
+              {sortedAlerts.length > 1 && (
+                <Pressable oasisKind="plain" accessibilityRole="button"
+                  accessibilityLabel={showOtherAlerts ? 'إخفاء المؤشرات الجوية الأخرى' : 'عرض المؤشرات الجوية الأخرى'}
+                  accessibilityState={{ expanded: showOtherAlerts }} style={styles.alertExtraToggle}
+                  onPress={() => setShowOtherAlerts(v => !v)}>
+                  <Text style={[styles.alertExtraText, { color: bannerMeta.text }]}>{showOtherAlerts ? 'إخفاء التفاصيل' : `مؤشرات أخرى (${sortedAlerts.length - 1})`}</Text>
+                  {showOtherAlerts ? <ChevronUp size={15} color={bannerMeta.text}/> : <ChevronDown size={15} color={bannerMeta.text}/>}
+                </Pressable>
+              )}
+              {showOtherAlerts && sortedAlerts.length > 1 ? (
                 <View style={styles.alertList}>
                   {sortedAlerts.slice(1).map((a) => (
                     <View key={a.id} style={styles.alertRow}>
@@ -698,14 +709,15 @@ export default function WeatherScreen() {
           {/* City search */}
           <OasisSurface oasisSurface="card" style={styles.searchCard}>
             <View style={styles.citySearchRow}>
-              <Pressable oasisKind="action" style={styles.locationButton} onPress={useDeviceLocation} disabled={loading}>
+              <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="حساب الطقس حسب موقع الجهاز" style={styles.locationButton} onPress={useDeviceLocation} disabled={loading}>
                 <Navigation size={15} color={OASIS.colors.primary} />
                 <Text style={styles.locationButtonText}>موقعي</Text>
               </Pressable>
-              <Pressable oasisKind="icon" style={styles.searchButton} onPress={() => loadWeatherForCity(cityInput)} disabled={loading || !cityInput.trim()}>
+              <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="البحث عن طقس المدينة" style={styles.searchButton} onPress={() => loadWeatherForCity(cityInput)} disabled={loading || !cityInput.trim()}>
                 <Search size={15} color={OASIS.colors.surface} />
               </Pressable>
               <TextInput
+                accessibilityLabel="اسم مدينة سعودية"
                 value={cityInput}
                 onChangeText={setCityInput}
                 placeholder="اكتب اسم المدينة"
@@ -715,7 +727,6 @@ export default function WeatherScreen() {
                 returnKeyType="search"
                 onSubmitEditing={() => loadWeatherForCity(cityInput)}
               />
-              <MapPin size={16} color="#94a3b8" />
             </View>
             <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="اختيار مدينة من مناطق السعودية"
               accessibilityState={{ expanded: cityPickerOpen }}
@@ -737,7 +748,7 @@ export default function WeatherScreen() {
               {SAUDI_WEATHER_CITIES.filter(city => regionSelection === 'كل المناطق'
                 ? ['الرياض', 'مكة المكرمة', 'جدة', 'المدينة المنورة', 'الدمام', 'بريدة', 'عرعر', 'أبها', 'تبوك', 'جازان', 'نجران', 'حائل', 'سكاكا', 'الباحة'].includes(city.name)
                 : city.region === regionSelection).map(city => (
-                <Pressable key={city.name} disabled={loading} onPress={() => { setCityInput(city.name); void loadWeatherForCity(city.name); }}
+                <Pressable key={city.name} disabled={loading} onPress={() => { setCityInput(city.name); setCityPickerOpen(false); void loadWeatherForCity(city.name); }}
                   style={{ flexDirection: 'row-reverse', gap: 4, alignItems: 'center', padding: 9, borderRadius: 11, backgroundColor: weather?.city === city.name ? OASIS.colors.deep : OASIS.colors.soft }}>
                   <MapPin size={12} color={weather?.city === city.name ? '#fff' : OASIS.colors.primary} />
                   <Text style={{ fontSize: 11, fontWeight: '700', color: weather?.city === city.name ? '#fff' : OASIS.colors.deep }}>{city.name}</Text>
@@ -815,13 +826,21 @@ export default function WeatherScreen() {
                   <Metric icon={<Droplets size={17} color="#0891b2" />} bg="#ecfeff" label="الرطوبة" value={round(weather.current.relative_humidity_2m)} unit="%" />
                   <Metric icon={<Wind size={17} color={OASIS.colors.primary} />} bg={OASIS.colors.soft} label={'الرياح' + (windDir(weather.current.wind_direction_10m) ? ' · ' + windDir(weather.current.wind_direction_10m) : '')} value={round(weather.current.wind_speed_10m)} unit="كم/س" />
                   <Metric icon={<Gauge size={17} color="#7c3aed" />} bg="#f5f3ff" label="هبّات الرياح" value={round(weather.current.wind_gusts_10m)} unit="كم/س" />
+                  {showExtraMetrics && <>
                   <Metric icon={<Cloud size={17} color="#0891b2" />} bg={OASIS.colors.infoSoft} label="الغيوم" value={round(weather.current.cloud_cover)} unit="%" />
                   <Metric icon={<Gauge size={17} color="#b45309" />} bg={OASIS.colors.warningSoft} label="الضغط" value={round(weather.current.pressure_msl)} unit="hPa" />
                   <Metric icon={<Sun size={17} color="#d97706" />} bg="#fff7ed" label="مؤشر UV" value={round(weather.daily.uv_index_max?.[0])} unit="" />
                   <Metric icon={<Umbrella size={17} color="#ea580c" />} bg="#fff7ed" label="احتمال الهطول" value={round(weather.daily.precipitation_probability_max?.[0])} unit="%" />
                   <Metric icon={<Eye size={17} color="#0e7490" />} bg={OASIS.colors.infoSoft} label="مدى الرؤية" value={weather.current.visibility == null ? '--' : (Number(weather.current.visibility) / 1000).toFixed(1)} unit="كم" />
                   <Metric icon={<Droplets size={17} color="#0891b2" />} bg="#ecfeff" label="نقطة الندى" value={round(weather.current.dew_point_2m)} unit="°" />
+                  </>}
                 </View>
+                <Pressable oasisKind="plain" accessibilityRole="button"
+                  accessibilityLabel={showExtraMetrics ? 'إخفاء المؤشرات الجوية التفصيلية' : 'عرض كل المؤشرات الجوية'}
+                  accessibilityState={{ expanded: showExtraMetrics }} onPress={() => setShowExtraMetrics(v => !v)} style={styles.metricToggle}>
+                  <Text style={styles.metricToggleText}>{showExtraMetrics ? 'إخفاء المؤشرات الإضافية' : 'عرض بقية المؤشرات'}</Text>
+                  {showExtraMetrics ? <ChevronUp size={15} color={OASIS.colors.primary}/> : <ChevronDown size={15} color={OASIS.colors.primary}/>}
+                </Pressable>
 
                 {/* Outlook for the next 24 hours */}
                 <View style={styles.blockHeader}><Text style={styles.blockTitle}>ملخص الـ24 ساعة القادمة</Text><Text style={styles.blockHint}>توقع آلي</Text></View>
@@ -863,7 +882,7 @@ export default function WeatherScreen() {
                     <Text style={{ color: OASIS.colors.primary, fontWeight: '700', fontSize: 11 }}>{viewHourCount === 12 ? 'عرض 48 ساعة' : 'عرض 12 ساعة'}</Text>
                   </Pressable>
                 </View>
-                <ScrollView style={{ direction: 'rtl' }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.hourlyList, { direction: 'ltr' }]}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hourlyList}>
                   {hourlyIndices.map((index) => (
                     <OasisSurface oasisSurface="card" key={weather.hourly.time[index]} style={styles.hourCard}>
                       <Text style={styles.hourText}>{formatSaudiWeatherTime(weather.hourly.time[index])}</Text>
@@ -1037,9 +1056,13 @@ function LocationItem({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
-  weatherHeroCard: { borderRadius: 19, borderWidth: 0, elevation: 0, shadowOpacity: 0 },
+  weatherHeroCard: { borderRadius: 18, borderWidth: 0, elevation: 0, shadowOpacity: 0 },
+  alertExtraToggle: { minHeight: 34, borderRadius: 10, paddingHorizontal: 10, flexDirection: 'row-reverse', alignItems: 'center', alignSelf: 'flex-end', justifyContent: 'center', gap: 6 },
+  alertExtraText: { fontSize: 10.5, fontWeight: '800' },
+  metricToggle: { alignSelf: 'center', minHeight: 37, marginBottom: 10, paddingHorizontal: 12, borderRadius: 11, backgroundColor: OASIS.colors.soft, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  metricToggleText: { color: OASIS.colors.primary, fontWeight: '800', fontSize: 11.5 },
   snapshotGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 7 },
-  snapshotTile: { flexGrow: 1, flexBasis: '21%', minWidth: 72, minHeight: 88, justifyContent: 'center', alignItems: 'center', gap: 5, paddingHorizontal: 5, paddingVertical: 10, borderRadius: 14, borderWidth: 1, borderColor: OASIS.colors.line, backgroundColor: OASIS.colors.surface },
+  snapshotTile: { flexGrow: 1, flexBasis: '21%', minWidth: 72, minHeight: 78, justifyContent: 'center', alignItems: 'center', gap: 4, paddingHorizontal: 5, paddingVertical: 8, borderRadius: 13, borderWidth: 1, borderColor: OASIS.colors.line, backgroundColor: OASIS.colors.surface },
   snapshotLabel: { color: OASIS.colors.muted, fontSize: 10, fontWeight: '600', textAlign: 'center' },
   snapshotValue: { color: OASIS.colors.ink, fontSize: 16, fontWeight: '800', textAlign: 'center' },
   snapshotUnit: { color: OASIS.colors.muted, fontSize: 9.5, fontWeight: '600' },
@@ -1073,10 +1096,10 @@ const styles = StyleSheet.create({
   sourcesLabel: { flex: 1, textAlign: 'right', color: OASIS.colors.muted, fontSize: 11, fontWeight: '700' },
 
   citySearchRow: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 10, paddingVertical: 9 },
-  locationButton: { flexDirection: 'row-reverse', minHeight: 40, alignItems: 'center', justifyContent: 'center', gap: 5, backgroundColor: OASIS.colors.soft, borderRadius: 11, paddingHorizontal: 10, paddingVertical: 8 },
+  locationButton: { flexDirection: 'row-reverse', minHeight: 42, alignItems: 'center', justifyContent: 'center', gap: 5, backgroundColor: OASIS.colors.soft, borderRadius: 11, paddingHorizontal: 9, paddingVertical: 7 },
   locationButtonText: { color: OASIS.colors.primary, fontSize: 11.5, fontWeight: '700' },
-  searchButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', backgroundColor: OASIS.colors.primary, borderRadius: 11 },
-  cityInput: { flex: 1, minWidth: 80, minHeight: 40, backgroundColor: OASIS.colors.background, borderWidth: 1, borderColor: OASIS.colors.line, borderRadius: 11, paddingHorizontal: 10, paddingVertical: 8, color: OASIS.colors.ink, fontSize: 13 },
+  searchButton: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', backgroundColor: OASIS.colors.primary, borderRadius: 11 },
+  cityInput: { flex: 1, minWidth: 0, minHeight: 42, backgroundColor: OASIS.colors.background, borderWidth: 1, borderColor: OASIS.colors.line, borderRadius: 11, paddingHorizontal: 10, paddingVertical: 8, color: OASIS.colors.ink, fontSize: 13 },
   errorText: { color: OASIS.colors.danger, fontSize: 11.5, textAlign: 'right', paddingHorizontal: 14, paddingBottom: 10, lineHeight: 17 },
 
   locationCard: { backgroundColor: OASIS.colors.surface, borderRadius: 14, borderWidth: 1, borderColor: OASIS.colors.line, padding: 14, gap: 10 },
@@ -1090,7 +1113,7 @@ const styles = StyleSheet.create({
   panelLocationText: { color: OASIS.colors.soft, fontSize: 11, fontWeight: '700', textAlign: 'right' },
 
   card: { backgroundColor: OASIS.colors.surface, borderRadius: 16, borderWidth: 1, borderColor: OASIS.colors.line, overflow: 'hidden', shadowOpacity: 0, elevation: 0 },
-  currentPanel: { paddingHorizontal: 17, paddingTop: 13, paddingBottom: 15, minHeight: 184 },
+  currentPanel: { paddingHorizontal: 15, paddingTop: 13, paddingBottom: 14, minHeight: 182 },
   panelTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   panelUpdated: { color: OASIS.colors.soft, fontSize: 11, fontWeight: '700' },
   refreshButton: { width: 34, height: 34, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
@@ -1111,7 +1134,7 @@ const styles = StyleSheet.create({
   emptySub: { color: '#e0f2fe', fontSize: 11, textAlign: 'center', lineHeight: 17 },
 
   metricsGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', padding: 11, gap: 8 },
-  metricCard: { width: '48%', flexGrow: 1, flexBasis: '44%', backgroundColor: OASIS.colors.surface, borderWidth: 1, borderColor: '#f1f5f9', borderRadius: 15, padding: 11, alignItems: 'flex-end', gap: 5 },
+  metricCard: { width: '48%', flexGrow: 1, flexBasis: '44%', backgroundColor: OASIS.colors.surface, borderWidth: 1, borderColor: OASIS.colors.line, borderRadius: 12, padding: 10, alignItems: 'flex-end', gap: 5 },
   metricIcon: { width: 30, height: 30, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   metricLabel: { color: OASIS.colors.muted, fontSize: 11, fontWeight: '700' },
   metricValue: { color: OASIS.colors.ink, fontSize: 18, fontWeight: '700' },
@@ -1130,7 +1153,7 @@ const styles = StyleSheet.create({
 
   divider: { height: 1, backgroundColor: OASIS.colors.line, marginTop: 6, marginBottom: 4 },
 
-  dayRow: { flexDirection: 'row-reverse', alignItems: 'center', paddingHorizontal: 15, paddingVertical: 12, borderTopWidth: 1, borderTopColor: '#f1f5f9', gap: 9 },
+  dayRow: { flexDirection: 'row-reverse', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10, borderTopWidth: 1, borderTopColor: OASIS.colors.line, gap: 7 },
   dayName: { color: OASIS.colors.ink, fontSize: 11.5, fontWeight: '600', width: 44, textAlign: 'right' },
   dayCondition: { flex: 1, flexDirection: 'row-reverse', alignItems: 'center', gap: 7 },
   dayConditionText: { color: OASIS.colors.muted, fontSize: 11 },
