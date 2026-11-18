@@ -30,3 +30,13 @@ test('weather separates estimated notices from official warnings', () => {
   assert.match(weather, /ncm\.gov\.sa\/en\/early-warning/);
   assert.match(weather, /accessibilityRole="button" accessibilityLabel="فتح إنذارات المركز الوطني للأرصاد"/);
 });
+
+test('weather detail density stays manageable while preserving data on demand', () => {
+  assert.match(weather, /accessibilityState=\{\{ expanded: showExtraMetrics \}\}/);
+  assert.match(weather, /showExtraMetrics && <>/);
+  assert.match(weather, /accessibilityState=\{\{ expanded: showOtherAlerts \}\}/);
+  assert.match(weather, /showOtherAlerts && sortedAlerts\.length > 1/);
+  assert.match(weather, /accessibilityLabel="اسم مدينة سعودية"/);
+  assert.match(weather, /setCityPickerOpen\(false\); void loadWeatherForCity\(city\.name\)/);
+  assert.match(weather, /weather\.daily\.time\.slice\(0, showAllDays \? 16 : 7\)/);
+});
