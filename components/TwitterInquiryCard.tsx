@@ -63,6 +63,7 @@ export interface TwitterInquiryCardProps {
   onDeleted?: () => void;
   detailMode?: boolean;
   compact?: boolean;
+  requestDetailCompact?: boolean;
 }
 
 export default function TwitterInquiryCard({
@@ -77,10 +78,12 @@ export default function TwitterInquiryCard({
   onDeleted,
   detailMode = false,
   compact = false,
+  requestDetailCompact = false,
 }: TwitterInquiryCardProps) {
   const { colors, isDark } = useTheme();
   const isReq = type === 'request';
   const isQuestionDetail = detailMode && !isReq;
+  const smallRequestDetail = detailMode && isReq && requestDetailCompact;
   const isAdmin = Boolean(currentUserId && currentUserProfile?.role === 'admin');
   const isOwner = Boolean(currentUserId && currentUserId === (isReq ? data.requester_id : data.author_id));
   const name = data.profiles?.hide_name ? 'جار مجهول 🕶️' : (data.profiles?.display_name || data.profiles?.username || 'ابن الحي');
@@ -433,9 +436,9 @@ export default function TwitterInquiryCard({
   }
 
   return (
-    <OasisSurface oasisSurface="card" style={[s.xCard, compact && s.xCardHome, detailMode && s.xCardDetail, isQuestionDetail && s.xQuestionDetail, isDark && { backgroundColor: colors.surface, borderColor: colors.line }, !expanded && s.xCardCollapsed, isEmergency && s.xCardEmergency, isToolSharing && s.xCardToolSharing]}>
+    <OasisSurface oasisSurface="card" style={[s.xCard, compact && s.xCardHome, detailMode && s.xCardDetail, smallRequestDetail && s.xCardRequestDetail, isQuestionDetail && s.xQuestionDetail, isDark && { backgroundColor: colors.surface, borderColor: colors.line }, !expanded && s.xCardCollapsed, isEmergency && s.xCardEmergency, isToolSharing && s.xCardToolSharing]}>
       {/* Top Header */}
-      <View style={[s.xHeader, compact && s.xHeaderHome, isQuestionDetail && s.xDetailHeader, isDark && { borderBottomColor: colors.line }]}>
+      <View style={[s.xHeader, compact && s.xHeaderHome, smallRequestDetail && s.xHeaderRequestDetail, isQuestionDetail && s.xDetailHeader, isDark && { borderBottomColor: colors.line }]}>
         <Pressable
           onPress={() => isGuest ? requireAccount() : data.profiles?.id && router.push({ pathname: '/user', params: { id: data.profiles.id } })}
           style={s.xAvatarWrap}
@@ -443,9 +446,9 @@ export default function TwitterInquiryCard({
           accessibilityLabel="الملف الشخصي للكاتب"
         >
           {avatar ? (
-            <Image source={{ uri: avatar }} style={[s.xAvatarImg, compact && s.xAvatarHome]} />
+            <Image source={{ uri: avatar }} style={[s.xAvatarImg, (compact || smallRequestDetail) && s.xAvatarHome]} />
           ) : (
-            <View style={[s.xAvatarFallback, compact && s.xAvatarHome, isEmergency && { backgroundColor: OASIS.colors.danger }]}>
+            <View style={[s.xAvatarFallback, (compact || smallRequestDetail) && s.xAvatarHome, isEmergency && { backgroundColor: OASIS.colors.danger }]}>
               <User size={20} color={OASIS.colors.surface} />
             </View>
           )}
@@ -455,7 +458,7 @@ export default function TwitterInquiryCard({
         <View style={s.xAuthorMeta}>
           <View style={s.xAuthorRow}>
             <Pressable onPress={() => isGuest ? requireAccount() : data.profiles?.id && router.push({ pathname: '/user', params: { id: data.profiles.id } })}>
-              <Text style={[s.xAuthorName, compact && s.xAuthorHome, isDark && { color: colors.ink }]} numberOfLines={1}>{name}</Text>
+              <Text style={[s.xAuthorName, (compact || smallRequestDetail) && s.xAuthorHome, isDark && { color: colors.ink }]} numberOfLines={1}>{name}</Text>
             </Pressable>
             {isEmergency ? (
               <View style={s.xEmergencyBadge}><Flame size={11} color={OASIS.colors.danger} /><Text style={s.xEmergencyBadgeText}>عاجل</Text></View>
@@ -475,37 +478,37 @@ export default function TwitterInquiryCard({
 
           <View style={s.xLocationRow}>
             <MapPin size={11} color={OASIS.colors.primary} />
-            <Text style={[s.xLocationText, compact && s.xLocationHome]} numberOfLines={1}>
-              {data.district ? `حي ${data.district}` : 'الحي'}{data.city ? ` · ${data.city}` : ''}
+            <Text style={[s.xLocationText, (compact || smallRequestDetail) && s.xLocationHome]} numberOfLines={1}>
+              {data.district ? (/^حي\s/.test(data.district) ? data.district : `حي ${data.district}`) : 'الحي'}{data.city ? ` · ${data.city}` : ''}
             </Text>
           </View>
         </View>
 
-        <Pressable oasisKind="icon" onPress={handleMoreOptions} style={s.xMoreBtn} accessibilityRole="button" accessibilityLabel="خيارات">
+        <Pressable oasisKind={smallRequestDetail ? "plain" : "icon"} onPress={handleMoreOptions} style={[s.xMoreBtn, smallRequestDetail && s.xMoreRequestDetail]} accessibilityRole="button" accessibilityLabel="خيارات">
           <MoreHorizontal size={18} color="#94a3b8" />
         </Pressable>
       </View>
 
       {/* Main Content Area */}
-      <Pressable onPress={detailMode ? undefined : navigateToDetails} style={[s.xContentArea, compact && s.xContentHome, isQuestionDetail && s.xDetailContent]} accessibilityRole={detailMode ? undefined : "button"} accessibilityLabel={detailMode ? undefined : "فتح تفاصيل المنشور"}>
-        <Text accessibilityRole={isQuestionDetail ? "header" : undefined} style={[s.xTitle, compact && s.xTitleHome, isQuestionDetail && s.xDetailTitle, isDark && { color: colors.ink }, isEmergency && { color: '#991b1b' }]} numberOfLines={detailMode ? undefined : 2}>{data.title}</Text>
+      <Pressable onPress={detailMode ? undefined : navigateToDetails} style={[s.xContentArea, compact && s.xContentHome, smallRequestDetail && s.xContentRequestDetail, isQuestionDetail && s.xDetailContent]} accessibilityRole={detailMode ? undefined : "button"} accessibilityLabel={detailMode ? undefined : "فتح تفاصيل المنشور"}>
+        <Text accessibilityRole={isQuestionDetail ? "header" : undefined} style={[s.xTitle, compact && s.xTitleHome, smallRequestDetail && s.xTitleRequestDetail, isQuestionDetail && s.xDetailTitle, isDark && { color: colors.ink }, isEmergency && { color: '#991b1b' }]} numberOfLines={detailMode ? undefined : 2}>{data.title}</Text>
         {(data.body || data.description) && (
           <>
-            <Text style={[s.xBodyText, compact && s.xBodyHome, isQuestionDetail && s.xDetailBody, isDark && { color: colors.muted }]} numberOfLines={detailMode ? undefined : 2}>{isReq ? data.description : data.body}</Text>
+            <Text style={[s.xBodyText, compact && s.xBodyHome, smallRequestDetail && s.xBodyRequestDetail, isQuestionDetail && s.xDetailBody, isDark && { color: colors.muted }]} numberOfLines={detailMode ? undefined : 2}>{isReq ? data.description : data.body}</Text>
             {!detailMode && String(isReq ? data.description : data.body || '').length > 130 && <Text style={s.xReadMore}>عرض المزيد وفتح التفاصيل ←</Text>}
           </>
         )}
         {isPinned && <View style={{ alignSelf: 'flex-start', flexDirection: 'row-reverse', alignItems: 'center', gap: 4, backgroundColor: '#fff7ed', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5, marginTop: 8 }}><Text style={{ color: '#c2410c', fontSize: 11, fontWeight: '600' }}>📌 مثبت في الملف الشخصي</Text></View>}
         {isFeatured && <View style={{ alignSelf: 'flex-start', backgroundColor: '#fee2e2', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5, marginTop: 7 }}><Text style={{ color: '#991b1b', fontSize: 11, fontWeight: '700' }}>📢 تنبيه مثبت من إدارة الحي</Text></View>}
-        <View style={[s.xCompactStatus, compact && s.xStatusHome, isQuestionDetail && s.xDetailStatus]}>
+        <View style={[s.xCompactStatus, compact && s.xStatusHome, smallRequestDetail && s.xStatusRequestDetail, isQuestionDetail && s.xDetailStatus]}>
           <View style={[s.xCompactStatusDot, resolutionStatus !== 'open' && s.xCompactStatusDotResolved]} />
           <Text style={s.xCompactStatusText}>{statusLabels[resolutionStatus] || 'مفتوح'}</Text>
         </View>
-        <View style={[s.xHashtagRow, compact && s.xHashtagsHome]}>
+        <View style={[s.xHashtagRow, compact && s.xHashtagsHome, smallRequestDetail && s.xHashtagsRequestDetail]}>
           {data.district && (
-            <View style={[s.xHashPill, compact && s.xHashPillHome]}><Text style={s.xHashText}>#{data.district.replace(/\s+/g, '_')}</Text></View>
+            <View style={[s.xHashPill, (compact || smallRequestDetail) && s.xHashPillHome]}><Text style={s.xHashText}>#{data.district.replace(/\s+/g, '_')}</Text></View>
           )}
-          {!compact && <View style={s.xHashPill}><Text style={s.xHashText}>#أهل_الحي</Text></View>}
+          {!compact && !smallRequestDetail && <View style={s.xHashPill}><Text style={s.xHashText}>#أهل_الحي</Text></View>}
           {isToolSharing && (
             <View style={[s.xHashPill, { backgroundColor: OASIS.colors.soft }]}><Text style={[s.xHashText, { color: OASIS.colors.primary }]}>#إعارة_مجانية</Text></View>
           )}
@@ -547,9 +550,9 @@ export default function TwitterInquiryCard({
         </Pressable>
       )}
 
-      <View style={[s.xReactionsRow, compact && s.xReactionsHome, isQuestionDetail && s.xDetailReactions, { justifyContent: 'space-between' }]}>
+      <View style={[s.xReactionsRow, compact && s.xReactionsHome, smallRequestDetail && s.xReactionsRequestDetail, isQuestionDetail && s.xDetailReactions, { justifyContent: 'space-between' }]}>
         <Text style={s.xTimeAgo}>{formatArabicTimeAgo(data.created_at)}</Text>
-        <Pressable oasisKind={compact ? 'plain' : 'action'} style={[s.xActionBtn, compact && s.xActionBtnHome, myReaction && s.xActionBtnActive]} onPress={() => {
+        <Pressable oasisKind={compact || smallRequestDetail ? 'plain' : 'action'} style={[s.xActionBtn, (compact || smallRequestDetail) && s.xActionBtnHome, myReaction && s.xActionBtnActive]} onPress={() => {
           if (isGuest || !currentUserId) return requireAccount('سجّل الدخول لاختيار تفاعلك مع منشورات جيرانك.');
           setReactionPickerOpen(true);
         }} accessibilityRole="button" accessibilityLabel="اختيار التفاعل" accessibilityState={{ expanded: reactionPickerOpen }}>
@@ -560,20 +563,20 @@ export default function TwitterInquiryCard({
       </View>
 
       {/* Action Bar */}
-      <View style={[s.xActionBar, compact && s.xActionBarHome, isQuestionDetail && s.xDetailActions]}>
-        <Pressable oasisKind={compact ? 'plain' : 'action'} style={[s.xActionBtn, compact && s.xActionBtnHome]} onPress={detailMode ? undefined : navigateToDetails} accessibilityRole={detailMode ? undefined : "button"} accessibilityLabel={detailMode ? "عدد الردود" : "فتح الردود في صفحة المنشور"}>
+      <View style={[s.xActionBar, compact && s.xActionBarHome, smallRequestDetail && s.xActionBarRequestDetail, isQuestionDetail && s.xDetailActions]}>
+        <Pressable oasisKind={compact || smallRequestDetail ? 'plain' : 'action'} style={[s.xActionBtn, (compact || smallRequestDetail) && s.xActionBtnHome]} onPress={detailMode ? undefined : navigateToDetails} accessibilityRole={detailMode ? undefined : "button"} accessibilityLabel={detailMode ? "عدد الردود" : "فتح الردود في صفحة المنشور"}>
           <MessageCircle size={17} color={OASIS.colors.muted} />
           <Text style={s.xActionCounter}>{answersCount}</Text>
         </Pressable>
 
         {!isGuest && (
-          <Pressable oasisKind={compact ? 'plain' : 'action'} style={[s.xActionBtn, compact && s.xActionBtnHome]} onPress={handleBookmark}>
+          <Pressable oasisKind={compact ? 'plain' : 'action'} style={[s.xActionBtn, (compact || smallRequestDetail) && s.xActionBtnHome]} onPress={handleBookmark}>
             <Bookmark size={17} color={bookmarked ? OASIS.colors.warning : OASIS.colors.muted} fill={bookmarked ? OASIS.colors.warning : 'none'} />
             {bookmarked && <Text style={[s.xActionCounter, { color: OASIS.colors.warning, fontSize: 11 }]}>محفوظ</Text>}
           </Pressable>
         )}
 
-        <Pressable oasisKind={compact ? 'plain' : 'icon'} style={[s.xActionBtn, compact && s.xActionBtnHome]} onPress={handleShare}>
+        <Pressable oasisKind={compact || smallRequestDetail ? 'plain' : 'icon'} style={[s.xActionBtn, (compact || smallRequestDetail) && s.xActionBtnHome]} onPress={handleShare}>
           <Share2 size={17} color={OASIS.colors.muted} />
         </Pressable>
 
@@ -830,6 +833,17 @@ const s = StyleSheet.create({
   xReactionsHome: { marginTop: 5, marginBottom: 5, paddingTop: 7 },
   xActionBtnHome: { minWidth: 38, minHeight: 36, paddingHorizontal: 6, paddingVertical: 6, backgroundColor: 'transparent' },
   xActionBarHome: { marginHorizontal: -12, marginBottom: -12, paddingVertical: 4, paddingHorizontal: 9, backgroundColor: '#F9FBFA', borderBottomLeftRadius: 17, borderBottomRightRadius: 17 },
+  // A scoped detail treatment, leaving question details and all feed cards untouched.
+  xCardRequestDetail: { borderRadius: 16, padding: 13, marginBottom: 0, borderColor: '#DDE9E1', shadowOpacity: 0, elevation: 0 },
+  xHeaderRequestDetail: { paddingBottom: 10, marginBottom: 10 },
+  xMoreRequestDetail: { width: 34, height: 34, minHeight: 34, minWidth: 34, backgroundColor: 'transparent' },
+  xContentRequestDetail: { marginBottom: 3 },
+  xTitleRequestDetail: { fontSize: 17.5, lineHeight: 26, fontWeight: '800', marginBottom: 7 },
+  xBodyRequestDetail: { fontSize: 13.5, lineHeight: 22, marginBottom: 4 },
+  xStatusRequestDetail: { marginTop: 7, marginBottom: 6, paddingHorizontal: 9, paddingVertical: 4 },
+  xHashtagsRequestDetail: { marginTop: 3, gap: 5 },
+  xReactionsRequestDetail: { marginTop: 10, marginBottom: 4, paddingTop: 8 },
+  xActionBarRequestDetail: { marginHorizontal: -13, marginBottom: -13, paddingVertical: 4, paddingHorizontal: 9, borderBottomLeftRadius: 16, borderBottomRightRadius: 16, backgroundColor: '#F8FBF9' },
   // Natural height prevents text, chips and actions from being clipped on different devices.
   xCardDetail: { borderRadius: 22, padding: 18 },
   xQuestionDetail: { borderRadius: 24, padding: 18, gap: 0, borderTopWidth: 3, borderTopColor: OASIS.colors.primary },
