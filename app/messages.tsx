@@ -438,8 +438,8 @@ export default function Messages() {
             style={[styles.filterPill, !onlyUnread && !onlyMuted && styles.filterPillActive]}
             onPress={() => { setOnlyUnread(false); setOnlyMuted(false); }}
           >
-            <MessageCircle size={13} color={!onlyUnread ? OASIS.colors.surface : OASIS.colors.muted} />
-            <Text style={[styles.filterPillText, !onlyUnread && styles.filterPillTextActive]}>
+            <MessageCircle size={13} color={!onlyUnread && !onlyMuted ? OASIS.colors.surface : OASIS.colors.muted} />
+            <Text style={[styles.filterPillText, !onlyUnread && !onlyMuted && styles.filterPillTextActive]}>
               الكل ({conversations.length + 1})
             </Text>
           </Pressable>
