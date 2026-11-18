@@ -29,7 +29,7 @@ test('publishing keeps safety checks and private location editor', () => {
 });
 
 test('compact category cards have RTL layout and distinct selected state', () => {
-  assert.ok(screen.includes("typeGrid: { flexDirection: 'row-reverse'"));
+  assert.ok(screen.includes("typeGrid: { direction: 'ltr', flexDirection: 'row-reverse'"));
   assert.ok(screen.includes("typeCard: { width: '48.5%', minHeight: 103"));
   assert.ok(screen.includes('styles.selectionActive'));
   assert.ok(screen.includes('numberOfLines={2} style={styles.typeHint}'));
