@@ -538,7 +538,7 @@ export default function StoryViewer() {
 
   if (loading) {
     return (
-      <View style={[styles.loadingScreen, { backgroundColor: colors.background }, { backgroundColor: 'transparent' }]}>
+      <View style={[styles.loadingScreen, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={OASIS.colors.primary} />
       </View>
     );
@@ -546,7 +546,7 @@ export default function StoryViewer() {
 
   if (!currentStory || findProhibitedStoryWord(currentStory, getCachedBannedWords())) {
     return (
-      <View style={[styles.loadingScreen, { backgroundColor: colors.background }, { backgroundColor: 'transparent' }]}>
+      <View style={[styles.loadingScreen, { backgroundColor: colors.background }]}>
         <Text style={[styles.notFoundText, { color: colors.ink }]}>هذه اليومية غير متاحة أو انتهت مدتها</Text>
         <Pressable oasisKind="action" style={styles.backBtn} onPress={() => router.canGoBack() ? router.back() : router.replace('/home')}>
           <Text style={styles.backBtnText}>العودة</Text>
@@ -566,7 +566,7 @@ export default function StoryViewer() {
       : [OASIS.colors.deep, OASIS.colors.primary] as [string, string];
 
   return (
-    <KeyboardAvoidingView style={[{ flex: 1 }, { backgroundColor: 'transparent' }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={styles.container} {...panResponder.panHandlers}>
         {/* Story Background */}
         {currentStory.type === 'image' && currentStory.image_url ? (
@@ -622,7 +622,6 @@ export default function StoryViewer() {
                 </View>
                 <View style={styles.storyOverlayNameBox}>
                   <Text numberOfLines={1} style={styles.storyOverlayName}>{author?.hide_name ? 'مجهول' : (author?.display_name || author?.username || 'جار')}</Text>
-                  {author?.hide_name && Boolean(author?.username) && <Text style={styles.storyOverlayMeta} numberOfLines={1}>@{String(author.username).replace(/^@/, '')}</Text>}
                   <Text style={styles.storyOverlayMeta}>{currentIndex + 1} / {storiesList.length}</Text>
                 </View>
               </View>
@@ -649,6 +648,8 @@ export default function StoryViewer() {
             {/* Left Tap Zone -> Previous Story */}
             <Pressable
               style={styles.tapZoneLeft}
+              accessibilityRole="button"
+              accessibilityLabel="عرض اليومية السابقة"
               onPress={handlePrevStory}
               onPressIn={handleStoryPressIn}
               onLongPress={handleStoryLongPress}
@@ -659,6 +660,8 @@ export default function StoryViewer() {
             {/* Right Tap Zone -> Next Story */}
             <Pressable
               style={styles.tapZoneRight}
+              accessibilityRole="button"
+              accessibilityLabel="عرض اليومية التالية"
               onPress={handleNextStory}
               onPressIn={handleStoryPressIn}
               onLongPress={handleStoryLongPress}
