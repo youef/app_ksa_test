@@ -83,7 +83,7 @@ function labelSprite(text: string) {
   sprite.scale.set(12, 2.95, 1);
   return sprite;
 }
-function buildAvatar(key: AvatarKey) {
+export function buildAvatar(key: AvatarKey) {
   const profile = AVATARS.find(a => a.key === key) || AVATARS[0];
   const group = new THREE.Group();
   const costume = surfaceMaterial(profile.color, .7);
@@ -448,6 +448,7 @@ export default function KingdomWorld3D({ avatarKey, paused, initialX = 0, initia
       const dt = Math.min(clock.getDelta(), .055);
       const time = clock.elapsedTime;
       const disabled = pausedRef.current;
+      if (disabled) return;
       const strafe = disabled ? 0 : (Number(keyboard.has('keyd') || keyboard.has('arrowright'))
         - Number(keyboard.has('keya') || keyboard.has('arrowleft')) + control.current.x);
       const forward = disabled ? 0 : (Number(keyboard.has('keyw') || keyboard.has('arrowup'))
