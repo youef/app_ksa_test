@@ -46,6 +46,14 @@ interface NotificationItem {
   data?: Record<string, any> | null;
   actor?: NotificationActor | null;
 }
+ 
+function notificationMatchesCategory(n: NotificationItem, category: NotificationCategory): boolean {
+  if (category === 'all') return true;
+  if (category === 'emergency') return n.type === 'emergency' || n.title?.includes('تنبيه') || n.title?.includes('طوارئ') || false;
+  if (category === 'answers') return n.type === 'answer' || n.target_type === 'question' || n.type === 'message';
+  if (category === 'community') return n.type === 'request' || n.target_type === 'request' || n.type === 'service' || n.target_type === 'service' || n.target_type === 'order' || !!n.title?.includes('إعارة');
+  return n.type === 'story' || n.target_type === 'story' || !!n.title?.includes('يوميات');
+}
 
 export default function Notifications() {
   const bottomNavInset = useBottomNavInset();
@@ -54,6 +62,9 @@ export default function Notifications() {
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<NotificationCategory>('all');
   const [onlyUnread, setOnlyUnread] = useState(false);
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
+  const [clearingAll, setClearingAll] = useState(false);
+  const [clearError, setClearError] = useState('');
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   // Settings Modal State
@@ -178,22 +189,27 @@ export default function Notifications() {
     await supabase.from('notifications').delete().eq('id', id);
   }
 
-  // Clear all notifications
+  // Keep the destructive confirmation usable in Expo web and on native devices.
   function confirmClearAll() {
-    if (items.length === 0) return;
-    Alert.alert('مسح جميع الإشعارات', 'هل أنت متأكد من مسح جميع الإشعارات من قائمتك؟', [
-      { text: 'إلغاء', style: 'cancel' },
-      {
-        text: 'مسح الكل',
-        style: 'destructive',
-        onPress: async () => {
-          setItems([]);
-          if (currentUserId) {
-            await supabase.from('notifications').delete().eq('user_id', currentUserId);
-          }
-        },
-      },
-    ]);
+    if (!items.length) return;
+    setClearError('');
+    setClearConfirmOpen(true);
+  }
+
+  async function clearAllNotifications() {
+    if (!currentUserId || clearingAll) return;
+    setClearingAll(true);
+    setClearError('');
+    try {
+      const { error } = await supabase.from('notifications').delete().eq('user_id', currentUserId);
+      if (error) throw error;
+      setItems([]);
+      setClearConfirmOpen(false);
+    } catch {
+      setClearError('تعذّر حذف الإشعارات. تأكد من الاتصال وحاول مجددًا.');
+    } finally {
+      setClearingAll(false);
+    }
   }
 
   // Interactive Click on Notification -> Navigate to Target
@@ -236,38 +252,15 @@ export default function Notifications() {
   }
 
 
-  // Filtering Logic
-  const filteredItems = useMemo(() => {
-    return items.filter(n => {
-      // 1. Unread Filter
-      if (onlyUnread && !!n.read_at) return false;
-
-      // 2. Tab Filter
-      if (activeTab === 'all') return true;
-      if (activeTab === 'emergency') {
-        return (
-          n.type === 'emergency' ||
-          (n.title && n.title.includes('تنبيه')) ||
-          (n.title && n.title.includes('طوارئ'))
-        );
-      }
-      if (activeTab === 'answers') {
-        return n.type === 'answer' || n.target_type === 'question' || n.type === 'message';
-      }
-      if (activeTab === 'community') {
-        return n.type === 'request' || n.target_type === 'request' || n.type === 'service' || n.target_type === 'service' || n.target_type==='order' || (n.title && n.title.includes('إعارة'));
-      }
-      if (activeTab === 'stories') {
-        return n.type === 'story' || n.target_type === 'story' || (n.title && n.title.includes('يوميات'));
-      }
-      return true;
-    });
-  }, [items, activeTab, onlyUnread, notifPrefFollows, notifPrefReviews, notifPrefAnswers, notifPrefCommunity, notifPrefStories, notifPrefEmergency]);
+  // Use one category matcher for both displayed notifications and tab totals.
+  const filteredItems = useMemo(() => items.filter(n => (!onlyUnread || !n.read_at) && notificationMatchesCategory(n, activeTab)),
+    [items, activeTab, onlyUnread]);
+  const countForCategory = (category: NotificationCategory) => items.filter(n => (!onlyUnread || !n.read_at) && notificationMatchesCategory(n, category)).length;
 
   const unreadCount = items.filter(i => !i.read_at && i.type !== 'message' && i.target_type !== 'conversation').length;
 
   return (
-    <View style={[styles.container, { backgroundColor: 'transparent' }]}>
+    <View style={styles.container}>
       <AppHeader
         variant="sub"
         title="مركز الإشعارات"
@@ -283,71 +276,27 @@ export default function Notifications() {
         }
       />
 
-      {/* Action bar inside header */}
-      <View style={{
-        flexDirection: 'row-reverse',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        paddingVertical: 10,
-        backgroundColor: OASIS.colors.surface,
-        borderBottomWidth: 1,
-        borderBottomColor: '#f1f5f9',
-      }}>
-        <Pressable
-          style={[
-            {
-              flexDirection: 'row-reverse',
-              alignItems: 'center',
-              gap: 6,
-              paddingHorizontal: 12,
-              paddingVertical: 6,
-              borderRadius: 16,
-              backgroundColor: onlyUnread ? OASIS.colors.soft : '#f1f5f9',
-              borderWidth: 1,
-              borderColor: onlyUnread ? '#a7f3d0' : OASIS.colors.line,
-            },
-          ]}
-          onPress={() => setOnlyUnread(!onlyUnread)}
-        >
+      {/* Compact inbox actions: readability and destructive actions stay separate. */}
+      <View style={styles.inboxActionBar}>
+        <Pressable oasisKind="plain" accessibilityRole="button"
+          accessibilityLabel={onlyUnread ? 'عرض جميع الإشعارات' : 'عرض الإشعارات غير المقروءة'}
+          accessibilityState={{ selected: onlyUnread }} style={[styles.unreadToggle, onlyUnread && styles.unreadToggleActive]}
+          onPress={() => setOnlyUnread(value => !value)}>
           <View style={[styles.filterDot, onlyUnread && styles.filterDotActive]} />
-          <Text style={{ fontSize: 12, fontWeight: '600', color: onlyUnread ? OASIS.colors.primary : OASIS.colors.muted }}>
-            غير المقروء ({unreadCount})
-          </Text>
+          <Text style={[styles.unreadToggleText, onlyUnread && styles.unreadToggleTextActive]}>غير المقروء ({unreadCount})</Text>
         </Pressable>
-
-        <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8 }}>
+        <View style={styles.headerTools}>
           {unreadCount > 0 && (
-            <Pressable
-              style={{
-                flexDirection: 'row-reverse',
-                alignItems: 'center',
-                gap: 4,
-                paddingHorizontal: 10,
-                paddingVertical: 6,
-                borderRadius: 14,
-                backgroundColor: OASIS.colors.soft,
-              }}
-              onPress={markAllAsRead}
-            >
-              <CheckCheck size={14} color={OASIS.colors.primary} />
-              <Text style={{ fontSize: 11.5, fontWeight: '600', color: OASIS.colors.primary }}>قراءة الكل</Text>
+            <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="تحديد جميع الإشعارات كمقروءة"
+              onPress={() => void markAllAsRead()} style={styles.markAllAction}>
+              <CheckCheck size={17} color={OASIS.colors.primary} />
+              <Text style={styles.markAllActionText}>قراءة الكل</Text>
             </Pressable>
           )}
-
           {items.length > 0 && (
-            <Pressable
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: 16,
-                backgroundColor: '#f1f5f9',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-              onPress={confirmClearAll}
-            >
-              <Trash2 size={14} color="#94a3b8" />
+            <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="مسح جميع الإشعارات"
+              onPress={confirmClearAll} style={styles.clearAllAction}>
+              <Trash2 size={17} color={OASIS.colors.muted} />
             </Pressable>
           )}
         </View>
@@ -359,31 +308,15 @@ export default function Notifications() {
       <View style={styles.tabsWrapper}>
         <ScrollView style={{ direction: 'rtl' }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.tabsScroll, { direction: 'ltr' }]}>
           {[
-            { key: 'all', label: 'الكل', count: items.length },
-            {
-              key: 'emergency',
-              label: '🚨 طوارئ وبلاغات',
-              count: items.filter(i => i.type === 'emergency' || i.title?.includes('طوارئ') || i.title?.includes('تنبيه')).length,
-            },
-            {
-              key: 'answers',
-              label: '💬 أسئلة وردود',
-              count: items.filter(i => i.type === 'answer' || i.target_type === 'question').length,
-            },
-            {
-              key: 'community',
-              label: '🤝 طلبات وإعارة',
-              count: items.filter(i => i.type === 'request' || i.target_type === 'request').length,
-            },
-            {
-              key: 'stories',
-              label: '📸 يوميات الحي',
-              count: items.filter(i => i.type === 'story' || i.target_type === 'story').length,
-            },
+            { key: 'all', label: 'الكل', count: countForCategory('all') },
+            { key: 'emergency', label: 'طوارئ وبلاغات', count: countForCategory('emergency') },
+            { key: 'answers', label: 'أسئلة وردود', count: countForCategory('answers') },
+            { key: 'community', label: 'طلبات ومجتمع', count: countForCategory('community') },
+            { key: 'stories', label: 'اليوميات', count: countForCategory('stories') },
           ].map(tab => {
             const isActive = activeTab === tab.key;
             return (
-              <Pressable oasisKind="chip" oasisVariant={isActive ? "primary" : "secondary"} accessibilityRole="tab" accessibilityState={{ selected: isActive }}
+              <Pressable oasisKind="plain" accessibilityRole="tab" accessibilityState={{ selected: isActive }}
                 key={tab.key}
                 style={[styles.tabItem, isActive && styles.tabItemActive]}
                 onPress={() => setActiveTab(tab.key as NotificationCategory)}
@@ -443,108 +376,92 @@ export default function Notifications() {
                     isRead ? styles.notifCardRead : styles.notifCardUnread,
                     item.type === 'emergency' && !isRead && styles.notifCardEmergency,
                   ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${item.title}. ${item.body || ''}. ${isRead ? 'مقروء' : 'جديد'}`}
                   onPress={() => handleNotificationPress(item)}
                 >
-                  {/* Left Action & Menu Buttons */}
-                  <View style={styles.cardHeaderRow}>
-                  {/* Actor identity: tap the avatar/name to open the author's profile. */}
-                  {item.actor && (
-                    <Pressable
-                      style={styles.actorRow}
-                      onPress={e => {
-                        e.stopPropagation();
-                        if (item.actor?.id) {
-                          void markAsRead(item.id);
-                          router.push({ pathname: '/user', params: { id: item.actor.id } });
-                        }
-                      }}
-                      accessibilityRole="button"
-                      accessibilityLabel={`عرض الملف الشخصي لـ ${item.actor.display_name || item.actor.username || 'المستخدم'}`}
-                    >
-                      {item.actor.avatar_url ? (
-                        <Image source={{ uri: item.actor.avatar_url }} style={styles.actorAvatar} />
-                      ) : (
-                        <View style={styles.actorAvatarFallback}><Text style={styles.actorAvatarInitial}>{(item.actor.display_name || item.actor.username || 'م')[0]}</Text></View>
-                      )}
-                      <View style={styles.actorCopy}>
-                        <Text numberOfLines={1} style={styles.actorName}>{item.actor.display_name || item.actor.username || 'مستخدم'} {item.actor.is_verified ? '✓' : ''}</Text>
-                        {!!item.actor.username && <Text numberOfLines={1} style={styles.actorHandle}>@{item.actor.username}</Text>}
-                      </View>
-                      
-                    </Pressable>
-                  )}
-
-                    <View style={styles.actionIconGroup}>
-                      <Pressable oasisKind="icon"
-                        style={styles.smallActionBtn}
-                        accessibilityLabel={isRead ? 'تحديد كغير مقروء' : 'تحديد كمقروء'}
-                        onPress={e => {
-                          e.stopPropagation();
-                          toggleReadStatus(item);
-                        }}
-                        hitSlop={8}
-                      >
-                        <CheckCheck size={16} color={isRead ? '#94a3b8' : OASIS.colors.primary} />
-                      </Pressable>
-
-                      <Pressable oasisKind="plain"
-                        style={styles.smallActionBtn}
-                        accessibilityLabel="حذف الإشعار"
-                        onPress={e => {
-                          e.stopPropagation();
-                          deleteNotification(item.id);
-                        }}
-                        hitSlop={8}
-                      >
-                        <Trash2 size={15} color={OASIS.colors.danger} />
-                      </Pressable>
-                    </View>
-
-
-                  </View>
-
-                  {/* Body Content */}
                   <View style={styles.cardBodyRow}>
+                    <LinearGradient colors={typeConfig.gradColors} style={styles.leadingIconBox}>
+                      {typeConfig.icon}
+                    </LinearGradient>
                     <View style={styles.textContainer}>
                       <View style={styles.titleRow}>
                         {!isRead && <View style={styles.unreadPillDot} />}
-                        <Text style={[styles.cardTitle, isRead && styles.cardTitleRead]}>
-                          {item.title}
-                        </Text>
+                        <Text numberOfLines={2} style={[styles.cardTitle, isRead && styles.cardTitleRead]}>{item.title}</Text>
                       </View>
-                      <Text style={[styles.cardBody, isRead && styles.cardBodyRead]}>
-                        {item.body}
-                      </Text>
+                      {!!item.body && (
+                        <Text numberOfLines={3} style={[styles.cardBody, isRead && styles.cardBodyRead]}>{item.body}</Text>
+                      )}
+                      {item.actor && (
+                        <Pressable oasisKind="plain" style={styles.actorRow} accessibilityRole="button"
+                          accessibilityLabel={`عرض ملف ${item.actor.display_name || item.actor.username || 'المستخدم'}`}
+                          onPress={e => {
+                            e.stopPropagation();
+                            if (item.actor?.id) {
+                              void markAsRead(item.id);
+                              router.push({ pathname: '/user', params: { id: item.actor.id } });
+                            }
+                          }}>
+                          {item.actor.avatar_url
+                            ? <Image source={{ uri: item.actor.avatar_url }} style={styles.actorAvatar} />
+                            : <View style={styles.actorAvatarFallback}><Text style={styles.actorAvatarInitial}>{(item.actor.display_name || item.actor.username || 'م')[0]}</Text></View>}
+                          <Text numberOfLines={1} style={styles.actorName}>{item.actor.display_name || item.actor.username || 'مستخدم'} {item.actor.is_verified ? '✓' : ''}</Text>
+                        </Pressable>
+                      )}
                     </View>
-
-                    {/* Leading Contextual Icon */}
-                    <LinearGradient
-                      colors={typeConfig.gradColors}
-                      style={styles.leadingIconBox}
-                    >
-                      {typeConfig.icon}
-                    </LinearGradient>
                   </View>
-
-                  <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
-                    {/* Notification Category Tag & Time */}
+                  <View style={styles.cardFooterRow}>
                     <View style={styles.cardTagRow}>
                       <Text style={styles.timeText}>{formatTimeAgo(item.created_at)}</Text>
                       <View style={[styles.typeBadge, { backgroundColor: typeConfig.bgColor }]}>
-                        <Text style={[styles.typeBadgeText, { color: typeConfig.textColor }]}>
-                          {typeConfig.label}
-                        </Text>
+                        <Text style={[styles.typeBadgeText, { color: typeConfig.textColor }]}>{typeConfig.label}</Text>
                       </View>
-                    </View>                  </View>
+                    </View>
+                    <View style={styles.actionIconGroup}>
+                      <Pressable oasisKind="plain" accessibilityRole="button"
+                        accessibilityLabel={isRead ? 'تحديد الإشعار كغير مقروء' : 'تحديد الإشعار كمقروء'}
+                        style={styles.smallActionBtn}
+                        onPress={e => { e.stopPropagation(); void toggleReadStatus(item); }} hitSlop={8}>
+                        <CheckCheck size={17} color={isRead ? OASIS.colors.muted : OASIS.colors.primary} />
+                      </Pressable>
+                      <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="حذف الإشعار"
+                        style={[styles.smallActionBtn, styles.deleteActionBtn]}
+                        onPress={e => { e.stopPropagation(); void deleteNotification(item.id); }} hitSlop={8}>
+                        <Trash2 size={16} color={OASIS.colors.danger} />
+                      </Pressable>
+                    </View>
+                  </View>
 
                 </Pressable>
               );
             })
           )}
 
-          <View style={{ height: 60 }} />
+
         </ScrollView>
       )}
+
+      <Modal visible={clearConfirmOpen} transparent animationType="fade" onRequestClose={() => { if (!clearingAll) setClearConfirmOpen(false); }}>
+        <View style={styles.clearOverlay}>
+          <View style={styles.clearConfirmCard}>
+            <View style={styles.clearConfirmIcon}><Trash2 size={22} color={OASIS.colors.danger}/></View>
+            <Text style={styles.clearConfirmTitle}>مسح جميع الإشعارات؟</Text>
+            <Text style={styles.clearConfirmDesc}>سيتم حذف {items.length} إشعار من مركز الإشعارات، ولا يمكن التراجع عن الحذف.</Text>
+            {!!clearError && <Text accessibilityRole="alert" style={styles.clearConfirmError}>{clearError}</Text>}
+            <View style={styles.clearConfirmActions}>
+              <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="إلغاء مسح الإشعارات"
+                disabled={clearingAll} onPress={() => setClearConfirmOpen(false)} style={styles.clearCancelButton}>
+                <Text style={styles.clearCancelText}>إلغاء</Text>
+              </Pressable>
+              <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="تأكيد مسح جميع الإشعارات"
+                disabled={clearingAll} onPress={() => void clearAllNotifications()} style={[styles.clearDestructiveButton, clearingAll && { opacity: 0.6 }]}>
+                {clearingAll ? <ActivityIndicator size="small" color="#FFFFFF"/> : <Trash2 size={16} color="#FFFFFF"/>}
+                <Text style={styles.clearDestructiveText}>مسح الكل</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* ======================================================== */}
       {/* 4. NOTIFICATION SETTINGS MODAL                           */}
@@ -750,6 +667,29 @@ function formatTimeAgo(dateStr: string) {
 }
 
 const styles = StyleSheet.create({
+  clearOverlay: { flex: 1, backgroundColor: 'rgba(0,13,10,0.58)', justifyContent: 'center', paddingHorizontal: 22 },
+  clearConfirmCard: { backgroundColor: OASIS.colors.surface, borderRadius: 20, padding: 20, alignItems: 'center', gap: 11, borderWidth: 1, borderColor: OASIS.colors.line },
+  clearConfirmIcon: { width: 48, height: 48, borderRadius: 15, backgroundColor: OASIS.colors.dangerSoft, alignItems: 'center', justifyContent: 'center' },
+  clearConfirmTitle: { color: OASIS.colors.ink, fontSize: 17, fontWeight: '800', textAlign: 'center' },
+  clearConfirmDesc: { color: OASIS.colors.muted, fontSize: 12.5, lineHeight: 20, textAlign: 'center' },
+  clearConfirmError: { color: OASIS.colors.danger, fontSize: 11.5, textAlign: 'center' },
+  clearConfirmActions: { width: '100%', flexDirection: 'row-reverse', gap: 10, marginTop: 7 },
+  clearCancelButton: { flex: 1, minHeight: 44, justifyContent: 'center', alignItems: 'center', backgroundColor: OASIS.colors.background, borderRadius: 12, borderWidth: 1, borderColor: OASIS.colors.line },
+  clearCancelText: { color: OASIS.colors.ink, fontSize: 13, fontWeight: '700' },
+  clearDestructiveButton: { flex: 1, minHeight: 44, flexDirection: 'row-reverse', justifyContent: 'center', alignItems: 'center', gap: 7, borderRadius: 12, backgroundColor: OASIS.colors.danger },
+  clearDestructiveText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
+  inboxActionBar: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingHorizontal: 14, paddingVertical: 8, backgroundColor: OASIS.colors.surface, borderBottomWidth: 1, borderBottomColor: OASIS.colors.line },
+  unreadToggle: { minHeight: 37, flexDirection: 'row-reverse', alignItems: 'center', gap: 7, borderRadius: 12, paddingHorizontal: 10, backgroundColor: OASIS.colors.background, borderWidth: 1, borderColor: OASIS.colors.line },
+  unreadToggleActive: { backgroundColor: OASIS.colors.soft, borderColor: '#91D9B9' },
+  unreadToggleText: { fontSize: 11.5, fontWeight: '700', color: OASIS.colors.muted },
+  unreadToggleTextActive: { color: OASIS.colors.primary },
+  headerTools: { flexDirection: 'row-reverse', alignItems: 'center', gap: 7 },
+  markAllAction: { minHeight: 37, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 11, paddingHorizontal: 11, backgroundColor: OASIS.colors.soft },
+  markAllActionText: { fontSize: 11.5, fontWeight: '700', color: OASIS.colors.primary },
+  clearAllAction: { width: 37, height: 37, justifyContent: 'center', alignItems: 'center', borderRadius: 11, backgroundColor: OASIS.colors.background, borderWidth: 1, borderColor: OASIS.colors.line },
+  cardFooterRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: OASIS.colors.line },
+  deleteActionBtn: { backgroundColor: '#FFF3F1' },
+
   container: {
     flex: 1,
     backgroundColor: OASIS.colors.background,
@@ -878,46 +818,18 @@ const styles = StyleSheet.create({
   },
 
   // Tabs
-  tabsWrapper: {
-    backgroundColor: OASIS.colors.surface,
-    borderBottomWidth: 1,
-    borderColor: OASIS.colors.line,
-    paddingVertical: 10,
-  },
-  tabsScroll: {
-    paddingHorizontal: 16,
-    flexDirection: 'row-reverse',
-    gap: 8,
-  },
-  tabItem: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#f1f5f9',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: OASIS.colors.line,
-  },
+  tabsWrapper: { backgroundColor: OASIS.colors.surface, borderBottomWidth: 1, borderColor: OASIS.colors.line, paddingVertical: 8 },
+  tabsScroll: { flexDirection: 'row-reverse', gap: 7, paddingHorizontal: 14, alignItems: 'center' },
+  tabItem: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 36, backgroundColor: OASIS.colors.soft, paddingHorizontal: 11, paddingVertical: 7, borderRadius: 12, borderWidth: 1, borderColor: 'transparent' },
   tabItemActive: {
     backgroundColor: OASIS.colors.primary,
     borderColor: OASIS.colors.primary,
   },
-  tabLabel: {
-    color: OASIS.colors.muted,
-    fontSize: 12,
-    fontWeight: '600',
-  },
+  tabLabel: { color: OASIS.colors.deep, fontSize: 11.5, fontWeight: '700' },
   tabLabelActive: {
     color: OASIS.colors.surface,
   },
-  tabCountBadge: {
-    backgroundColor: OASIS.colors.line,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 8,
-  },
+  tabCountBadge: { minWidth: 22, minHeight: 21, backgroundColor: 'rgba(0,70,52,0.07)', paddingHorizontal: 6, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   tabCountBadgeActive: {
     backgroundColor: 'rgba(255,255,255,0.3)',
   },
@@ -934,9 +846,7 @@ const styles = StyleSheet.create({
   feed: {
     flex: 1,
   },
-  feedContent: {
-    padding: 14,
-  },
+  feedContent: { paddingHorizontal: 12, paddingTop: 12, paddingBottom: 12 },
   loadingContainer: {
     flex: 1,
     alignItems: 'center',
@@ -950,146 +860,36 @@ const styles = StyleSheet.create({
   },
 
   // Cards
-  actorRow: { flex: 1, minWidth: 0, minHeight: 44, flexDirection: 'row-reverse', alignItems: 'center', gap: 7 },
-  actorAvatar: { width: 28, height: 28, borderRadius: 14, backgroundColor: OASIS.colors.line },
-  actorAvatarFallback: { width: 28, height: 28, borderRadius: 14, backgroundColor: OASIS.colors.soft, alignItems: 'center', justifyContent: 'center' },
-  actorAvatarInitial: { color: OASIS.colors.primary, fontWeight: '700', fontSize: 15 },
+  actorRow: { minHeight: 26, maxWidth: '100%', alignSelf: 'flex-end', flexDirection: 'row-reverse', alignItems: 'center', gap: 6, marginTop: 6, paddingHorizontal: 5, paddingVertical: 3, borderRadius: 9, backgroundColor: OASIS.colors.soft },
+  actorAvatar: { width: 20, height: 20, borderRadius: 10, backgroundColor: OASIS.colors.line },
+  actorAvatarFallback: { width: 20, height: 20, borderRadius: 10, backgroundColor: OASIS.colors.background, alignItems: 'center', justifyContent: 'center' },
+  actorAvatarInitial: { color: OASIS.colors.primary, fontWeight: '800', fontSize: 11 },
   actorCopy: { flex: 1, minWidth: 0, alignItems: 'flex-end' },
-  actorName: { color: OASIS.colors.ink, fontSize: 12.5, fontWeight: '700', textAlign: 'right' },
-  actorHandle: { color: OASIS.colors.muted, fontSize: 11, marginTop: 2, textAlign: 'right' },
+  actorName: { color: OASIS.colors.primary, fontSize: 10.5, fontWeight: '700', textAlign: 'right', flexShrink: 1 },
+  actorHandle: { color: OASIS.colors.muted, fontSize: 10, marginTop: 2, textAlign: 'right' },
   actorLink: { color: OASIS.colors.primary, fontSize: 11, fontWeight: '600' },
-  notifCard: {
-    backgroundColor: OASIS.colors.surface,
-    borderRadius: 14,
-    padding: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  notifCardUnread: {
-    borderColor: OASIS.colors.primary,
-    backgroundColor: OASIS.colors.surface,
-    shadowColor: OASIS.colors.primary,
-    shadowOpacity: 0,
-  },
-  notifCardRead: {
-    borderColor: OASIS.colors.line,
-    backgroundColor: 'rgba(255,255,255,0.7)',
-    opacity: 0.85,
-  },
-  notifCardEmergency: {
-    borderColor: OASIS.colors.danger,
-    backgroundColor: '#fff5f5',
-  },
-  cardHeaderRow: {
-    flexDirection: 'row-reverse',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  cardTagRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 8,
-  },
-  typeBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  typeBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  timeText: {
-    color: '#94a3b8',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  actionIconGroup: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 6,
-  },
-  smallActionBtn: {
-    minWidth: 44,
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 4,
-  },
-  cardBodyRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'flex-start',
-    gap: 12,
-  },
-  leadingIconBox: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  textContainer: {
-    flex: 1,
-    alignItems: 'flex-end',
-  },
-  titleRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 4,
-  },
-  unreadPillDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: OASIS.colors.primary,
-  },
-  cardTitle: {
-    color: OASIS.colors.ink,
-    fontSize: 15,
-    fontWeight: '700',
-    textAlign: 'right',
-  },
-  cardTitleRead: {
-    color: OASIS.colors.muted,
-    fontWeight: '700',
-  },
-  cardBody: {
-    color: OASIS.colors.ink,
-    fontSize: 13,
-    fontWeight: '500',
-    lineHeight: 20,
-    textAlign: 'right',
-  },
-  cardBodyRead: {
-    color: OASIS.colors.muted,
-  },
-  cardFooterAction: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 12,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderColor: '#f1f5f9',
-    alignSelf: 'flex-start',
-  },
-  footerActionText: {
-    color: OASIS.colors.primary,
-    fontSize: 12,
-    fontWeight: '600',
-  },
+  notifCard: { backgroundColor: OASIS.colors.surface, borderRadius: 15, padding: 11, marginBottom: 8, borderWidth: 1, borderColor: OASIS.colors.line, shadowOpacity: 0, elevation: 0 },
+  notifCardUnread: { borderColor: '#ACDDC5', backgroundColor: '#F4FBF7' },
+  notifCardRead: { borderColor: OASIS.colors.line, backgroundColor: OASIS.colors.surface },
+  notifCardEmergency: { borderColor: '#F3B4B4', backgroundColor: '#FFF9F8' },
+  cardHeaderRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' },
+  cardTagRow: { flex: 1, minWidth: 0, flexDirection: 'row-reverse', alignItems: 'center', gap: 7, flexWrap: 'wrap' },
+  typeBadge: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 9 },
+  typeBadgeText: { fontSize: 10.5, fontWeight: '700' },
+  timeText: { color: OASIS.colors.muted, fontSize: 10.5, fontWeight: '600' },
+  actionIconGroup: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5 },
+  smallActionBtn: { width: 34, height: 34, justifyContent: 'center', alignItems: 'center', borderRadius: 10, backgroundColor: OASIS.colors.soft },
+  cardBodyRow: { flexDirection: 'row-reverse', alignItems: 'flex-start', gap: 10 },
+  leadingIconBox: { width: 37, height: 37, borderRadius: 11, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
+  textContainer: { flex: 1, minWidth: 0, alignItems: 'flex-end', gap: 3 },
+  titleRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, minWidth: 0 },
+  unreadPillDot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: OASIS.colors.primary },
+  cardTitle: { flexShrink: 1, color: OASIS.colors.ink, fontSize: 13.5, lineHeight: 21, fontWeight: '800', textAlign: 'right' },
+  cardTitleRead: { color: OASIS.colors.muted, fontWeight: '700' },
+  cardBody: { color: OASIS.colors.ink, fontSize: 12, fontWeight: '500', lineHeight: 19, textAlign: 'right' },
+  cardBodyRead: { color: OASIS.colors.muted },
+  cardFooterAction: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, marginTop: 8, paddingTop: 8, alignSelf: 'flex-start' },
+  footerActionText: { color: OASIS.colors.primary, fontSize: 11.5, fontWeight: '700' },
 
   // Empty State
   emptyContainer: {
