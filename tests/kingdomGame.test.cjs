@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const game = fs.readFileSync(path.join(__dirname, '../app/kingdom.tsx'), 'utf8');
-const sql = fs.readFileSync(path.join(__dirname, '../supabase/migrations/20261119001500_hayna_anonymous_island_strategy.sql'), 'utf8');
+const sql = fs.readFileSync(path.join(__dirname, '../supabase/migrations/20261118211700_hayna_anonymous_island_strategy.sql'), 'utf8');
 const more = fs.readFileSync(path.join(__dirname, '../app/more.tsx'), 'utf8');
 const layout = fs.readFileSync(path.join(__dirname, '../app/_layout.tsx'), 'utf8');
 const bottomNav = fs.readFileSync(path.join(__dirname, '../components/BottomNav.tsx'), 'utf8');
