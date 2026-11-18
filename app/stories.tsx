@@ -275,7 +275,7 @@ export default function StoriesScreen() {
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}
             {...(Platform.OS === 'web' ? { dir: 'rtl' } : {})} contentContainerStyle={styles.ringsScroll}>
-            <Pressable style={styles.ringItem} accessibilityRole="button" accessibilityLabel="أضف يومياتك" onPress={() => router.push(needsLogin ? '/auth' : '/create-story')}><View style={[styles.ringOuter, styles.ringSeen, { borderColor: colors.line, backgroundColor: colors.soft }]}><Plus size={21} color={colors.primary} /></View><Text numberOfLines={1} style={[styles.ringName, isDark && { color: colors.ink }]}>يومياتك</Text></Pressable>
+            <Pressable style={styles.ringItem} accessibilityRole="button" accessibilityLabel="أضف يومياتك" onPress={() => router.push(needsLogin ? '/auth' : '/create-story')}><View style={[styles.ringOuter, styles.ringSeen, { borderColor: colors.line, backgroundColor: colors.soft }]}><Plus size={21} color={colors.primary} /></View><Text numberOfLines={1} style={[styles.ringName, { color: colors.ink }]}>يومياتك</Text></Pressable>
             {storyRings.map((group: any) => {
               const author = group.author;
               const name = displayName(author);
