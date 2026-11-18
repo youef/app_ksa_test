@@ -30,7 +30,7 @@ const ROUTE_PARENT: Array<[string, string]> = [
 ];
 
 // المسارات التي يجب إخفاء شريط التنقل فيها بالكامل
-const HIDDEN_PREFIXES = ['/auth', '/questions', '/question', '/conversation', '/ask'];
+const HIDDEN_PREFIXES = ['/auth', '/questions', '/question', '/conversation', '/ask', '/kingdom'];
 const HIDDEN_EXACT = ['/', '/index'];
 
 // ───────── منطق إخفاء/إظهار الشريط عند السكرول ─────────
