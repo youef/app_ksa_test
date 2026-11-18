@@ -358,9 +358,9 @@ export default function LivesScreen() {
                 ['all', 'الكل'], ['following', 'أتابعهم'], ['nearby', 'قريب مني'],
               ] as [Filter, string][]).map(([key, label]) => (
                 <Pressable oasisKind="plain" key={key} accessibilityRole="button" accessibilityLabel={`عرض ${label}، ${baseCounts[key]} بث`} accessibilityState={{ selected: filter === key }} onPress={() => setFilter(key)} style={[styles.seg, { backgroundColor: filter === key ? colors.soft : colors.surface, borderColor: filter === key ? colors.primary : colors.line }]}>
-                  <Text style={[styles.segText, filter === key && styles.segTextActive]}>{label}</Text>
+                  <Text style={[styles.segText, { color: filter === key ? colors.primary : colors.muted }, filter === key && styles.segTextActive]}>{label}</Text>
                   <View style={[styles.segCount, filter === key && styles.segCountActive]}>
-                    <Text style={[styles.segCountText, filter === key && styles.segCountTextActive]}>{baseCounts[key]}</Text>
+                    <Text style={[styles.segCountText, { color: filter === key ? '#FFFFFF' : colors.muted }, filter === key && styles.segCountTextActive]}>{baseCounts[key]}</Text>
                   </View>
                 </Pressable>
               ))}
@@ -378,8 +378,8 @@ export default function LivesScreen() {
             ) : visible.length === 0 ? (
               <View style={[styles.empty, { backgroundColor: colors.surface, borderColor: colors.line }]}>
                 <Radio color={colors.primary} size={30} />
-                <Text style={styles.emptyTitle}>{searchQuery.trim() ? 'لا توجد بثوث تطابق بحثك' : filter === 'following' ? 'لا يوجد بث لمتابَعيك الآن' : filter === 'nearby' ? 'لا يوجد بث قريب الآن' : 'ما فيه بث مباشر الآن'}</Text>
-                <Text style={styles.emptyText}>{searchQuery.trim() || category !== 'all' ? 'جرّب كلمات أخرى أو أعد ضبط الفلاتر.' : 'ابدأ بثك الأول وخل جيرانك ينضمون لك.'}</Text>
+                <Text style={[styles.emptyTitle, { color: colors.ink }]}>{searchQuery.trim() ? 'لا توجد بثوث تطابق بحثك' : filter === 'following' ? 'لا يوجد بث لمتابَعيك الآن' : filter === 'nearby' ? 'لا يوجد بث قريب الآن' : 'ما فيه بث مباشر الآن'}</Text>
+                <Text style={[styles.emptyText, { color: colors.muted }]}>{searchQuery.trim() || category !== 'all' ? 'جرّب كلمات أخرى أو أعد ضبط الفلاتر.' : 'ابدأ بثك الأول وخل جيرانك ينضمون لك.'}</Text>
                 {searchQuery.trim() || category !== 'all' || filter !== 'all' ? <Pressable oasisKind="plain" accessibilityRole="button" style={[styles.resetButton, { backgroundColor: colors.soft }]} onPress={() => { setSearchQuery(''); setCategory('all'); setFilter('all'); }}><Text style={[styles.resetButtonText, { color: colors.primary }]}>عرض كل البثوث</Text></Pressable> : null}
                 <Pressable oasisKind="plain" accessibilityRole="button" onPress={() => router.push('/live/create')} style={[styles.emptyCreate, { backgroundColor: colors.primary }]}><Text style={styles.emptyCreateText}>ابدأ بثك الأول</Text></Pressable>
               </View>
