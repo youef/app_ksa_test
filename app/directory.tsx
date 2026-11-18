@@ -74,7 +74,7 @@ export default function Directory() {
         <Pressable accessibilityRole="button" accessibilityLabel={sort === 'recent' ? 'الترتيب الحالي الأحدث، التغيير إلى أبجدي' : 'الترتيب الحالي أبجدي، التغيير إلى الأحدث'} onPress={() => setSort(value => value === 'recent' ? 'name' : 'recent')} style={[s.chip, { backgroundColor: c.surface, borderColor: c.line }]}><ArrowDownAZ size={16} color={c.muted} /><Text style={[s.chipText, { color: c.muted }]}>{sort === 'recent' ? 'الأحدث' : 'أبجديًا'}</Text></Pressable>
       </View>
       <View style={[s.row, { justifyContent: 'space-between' }]}><Text style={[s.resultTitle, { color: c.ink }]}>{loading ? 'نبحث في نطاقك…' : items.length.toLocaleString('ar-SA') + ' نتيجة معروضة'}</Text>{(search || kind !== 'all' || verified) && <Pressable accessibilityRole="button" accessibilityLabel="إعادة ضبط فلاتر الدليل" onPress={reset} style={s.reset}><Text style={{ color: c.primary, fontSize: 12 }}>إعادة الضبط</Text></Pressable>}</View>
-      {loading ? <View style={s.state}><ActivityIndicator color={c.primary} size="large" /><Text style={[s.secondary, { color: c.muted }]}>جارٍ تحميل دليل المدينة…</Text></View> : <>
+      {loading ? <DirectoryLoadingSkeleton /> : <>
         {items.map(item => <DirectoryCard key={item.kind + item.id} item={item} />)}
         {!!error && <OasisSurface oasisSurface="card" style={s.state}><Text style={[s.secondary, { color: c.muted }]}>{error}</Text><Pressable accessibilityRole="button" accessibilityLabel="إعادة محاولة تحميل نتائج الدليل" style={[s.action, { backgroundColor: c.primary }]} onPress={() => void load(items.length > 0)}><Text style={s.white}>إعادة المحاولة</Text></Pressable></OasisSurface>}
         {!items.length && !error && <OasisSurface oasisSurface="card" style={s.state}><SlidersHorizontal size={32} color={c.primary} /><Text style={[s.introTitle, { color: c.ink }]}>لم نعثر على نتائج مطابقة</Text><Text style={[s.secondary, { color: c.muted }]}>جرّب اسمًا آخر أو خفّف الفلاتر. الدليل يشمل جميع أحياء مدينتك.</Text><Pressable accessibilityRole="button" accessibilityLabel="مسح فلاتر الدليل" onPress={reset} style={[s.action, { backgroundColor: c.primary }]}><Text style={s.white}>مسح الفلاتر</Text></Pressable></OasisSurface>}
@@ -82,6 +82,20 @@ export default function Directory() {
       </>}
       {canManage && <Pressable onPress={() => router.push('/marketplace-dashboard')} style={[s.manage, { backgroundColor: c.soft }]}><Store size={20} color={c.primary} /><View style={s.grow}><Text style={[s.resultTitle, { color: c.primary }]}>مساحة أعمالي</Text><Text style={[s.secondary, { color: c.muted }]}>إدارة المنشأة والخدمات من مكان واحد</Text></View><ArrowUpLeft size={19} color={c.primary} /></Pressable>}
     </ScrollView>
+  </View>;
+}
+function DirectoryLoadingSkeleton() {
+  const c = OASIS.colors;
+  return <View accessibilityRole="progressbar" accessibilityLabel="جارٍ تحميل المنشآت والخدمات" style={s.skeletonList}>
+    {[0, 1, 2, 3].map(index => <View key={index} style={[s.skeletonCard, { backgroundColor: c.surface, borderColor: c.line }]}>
+      <View style={[s.skeletonImage, { backgroundColor: c.soft }]} />
+      <View style={s.skeletonCopy}>
+        <View style={[s.skeletonLine, { width: '35%', backgroundColor: c.soft }]} />
+        <View style={[s.skeletonLine, { width: '85%', height: 17, backgroundColor: c.soft }]} />
+        <View style={[s.skeletonLine, { width: index % 2 ? '58%' : '70%', backgroundColor: c.soft }]} />
+      </View>
+    </View>)}
+    <Text style={[s.secondary, { color: c.muted, textAlign: 'center' }]}>نجهّز نتائج دليل المدينة…</Text>
   </View>;
 }
 function DirectoryCard({ item }: { item: Entry }) {
@@ -105,5 +119,6 @@ const s = StyleSheet.create({
   segment: { flexDirection: 'row-reverse', borderWidth: 1, borderRadius: 18, padding: 4, gap: 4 }, segmentButton: { flex: 1, minHeight: 44, borderRadius: 14, flexDirection: 'row-reverse', justifyContent: 'center', alignItems: 'center', gap: 6 },
   row: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 }, chip: { flexDirection: 'row-reverse', alignItems: 'center', minHeight: 44, gap: 6, borderWidth: 1, borderRadius: 16, paddingHorizontal: 13 }, chipText: { fontSize: 12, fontWeight: '700' },
   reset: { minHeight: 44, minWidth: 72, alignItems: 'center', justifyContent: 'center' }, resultTitle: { fontSize: 14, fontWeight: '700', textAlign: 'right' }, card: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, padding: 12, borderWidth: 1, borderRadius: 22 }, visual: { width: 72, height: 78, borderRadius: 17, overflow: 'hidden', justifyContent: 'center', alignItems: 'center' }, image: { width: '100%', height: '100%' }, type: { fontSize: 11, fontWeight: '700', flexShrink: 1 }, cardTitle: { fontSize: 15, lineHeight: 23, fontWeight: '800', textAlign: 'right' }, area: { flex: 1, minWidth: 0, fontSize: 11, textAlign: 'right' },
+  skeletonList: { gap: 12 }, skeletonCard: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, padding: 12, minHeight: 112, borderWidth: 1, borderRadius: 22 }, skeletonImage: { width: 72, height: 78, borderRadius: 17 }, skeletonCopy: { flex: 1, gap: 12, alignItems: 'flex-end' }, skeletonLine: { height: 12, borderRadius: 8 },
   state: { minHeight: 200, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12, borderRadius: 22 }, action: { minHeight: 44, paddingHorizontal: 20, borderRadius: 14, justifyContent: 'center' }, white: { color: '#fff', fontWeight: '700' }, more: { minHeight: 48, borderRadius: 16, borderWidth: 1, alignItems: 'center', justifyContent: 'center' }, manage: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, padding: 16, borderRadius: 20, marginTop: 8 },
 });
