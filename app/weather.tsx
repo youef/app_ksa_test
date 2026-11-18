@@ -8,6 +8,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { AppHeader } from '@/components/shared/AppHeader';
 import {
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   MapPin,
   RefreshCw,
   Search,
@@ -41,6 +43,10 @@ import { useBottomNavInset } from '@/lib/bottomNav';
 import { sendPushToMultipleUsers } from '@/lib/pushSender';
 import { getActiveLocation } from '@/lib/locationSync';
 import { SAUDI_WEATHER_REGIONS, SAUDI_WEATHER_CITIES, findSaudiWeatherCity, saudiWeatherTimeKey, formatSaudiWeatherTime } from '@/lib/saudiWeather';
+
+// Short-lived in-memory cache keeps switching between cities instant without persisting coordinates.
+const WEATHER_CACHE_TTL_MS = 10 * 60 * 1000;
+const weatherCache = new Map<string, { data: WeatherData; fetchedAt: number }>();
 
 type WeatherData = {
   city: string;
@@ -230,10 +236,28 @@ export default function WeatherScreen() {
   const [sharing, setSharing] = useState(false);
   const [regionSelection, setRegionSelection] = useState('كل المناطق');
   const [viewHourCount, setViewHourCount] = useState<12 | 48>(12);
+  const [cityPickerOpen, setCityPickerOpen] = useState(false);
+  const [detailsExpanded, setDetailsExpanded] = useState(false);
+  const [locationDetailsOpen, setLocationDetailsOpen] = useState(false);
+  const [showAllDays, setShowAllDays] = useState(false);
+  const [sourcesExpanded, setSourcesExpanded] = useState(false);
   const weatherRequestId = useRef(0);
 
-  const fetchWeather = async (latitude: number, longitude: number, meta: { city: string; region: string; district: string }) => {
+  const fetchWeather = async (
+    latitude: number, longitude: number,
+    meta: { city: string; region: string; district: string },
+    force = false,
+  ) => {
     const requestId = ++weatherRequestId.current;
+    const key = latitude.toFixed(3) + ':' + longitude.toFixed(3);
+    const cached = weatherCache.get(key);
+    if (!force && cached && Date.now() - cached.fetchedAt < WEATHER_CACHE_TTL_MS) {
+      setWeather({ ...cached.data, ...meta, latitude, longitude });
+      setLastUpdated(new Date(cached.fetchedAt));
+      setError('');
+      return;
+    }
+
     const query = new URLSearchParams({
       latitude: String(latitude), longitude: String(longitude),
       timezone: 'Asia/Riyadh', forecast_days: '16',
@@ -243,19 +267,36 @@ export default function WeatherScreen() {
       forecast_minutely_15: '24',
       daily: 'weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max',
     });
+
+    // Air-quality requests are independent. Show forecast as soon as it arrives.
+    const airPromise = fetch('https://air-quality-api.open-meteo.com/v1/air-quality?latitude=' + latitude + '&longitude=' + longitude + '&current=us_aqi,pm10,pm2_5,dust&timezone=Asia%2FRiyadh')
+      .then(async response => response.ok ? (await response.json()).current || null : null)
+      .catch(() => null);
     const response = await fetch('https://api.open-meteo.com/v1/forecast?' + query.toString());
     if (!response.ok) throw new Error('خدمة الطقس غير متاحة حالياً (' + response.status + ').');
     const data = await response.json();
     if (!data.current || !data.daily?.time?.length || !data.hourly?.time?.length) throw new Error('وصلت بيانات طقس غير مكتملة.');
-    let air: any = null;
-    try {
-      const airResponse = await fetch('https://air-quality-api.open-meteo.com/v1/air-quality?latitude=' + latitude + '&longitude=' + longitude + '&current=us_aqi,pm10,pm2_5,dust&timezone=Asia%2FRiyadh');
-      if (airResponse.ok) air = (await airResponse.json()).current || null;
-    } catch {}
     if (requestId !== weatherRequestId.current) return;
-    setWeather({ city: meta.city || 'موقعك الحالي', region: meta.region || '', district: meta.district || '', latitude, longitude, current: data.current, hourly: data.hourly, minute: data.minutely_15 || null, daily: data.daily, air });
-    setLastUpdated(new Date());
+
+    const updatedAt = Date.now();
+    const next: WeatherData = {
+      city: meta.city || 'موقعك الحالي', region: meta.region || '', district: meta.district || '',
+      latitude, longitude, current: data.current, hourly: data.hourly,
+      minute: data.minutely_15 || null, daily: data.daily, air: cached?.data.air || null,
+    };
+    weatherCache.set(key, { data: next, fetchedAt: updatedAt });
+    if (weatherCache.size > 16) weatherCache.delete(weatherCache.keys().next().value!);
+    setWeather(next);
+    setLastUpdated(new Date(updatedAt));
     setError('');
+
+    void airPromise.then(air => {
+      if (!air || requestId !== weatherRequestId.current) return;
+      setWeather(previous => previous && previous.latitude === latitude && previous.longitude === longitude
+        ? { ...previous, air } : previous);
+      const entry = weatherCache.get(key);
+      if (entry) weatherCache.set(key, { ...entry, data: { ...entry.data, air } });
+    });
   };
 
   const loadWeatherForCity = async (cityName: string) => {
@@ -296,12 +337,23 @@ export default function WeatherScreen() {
       const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
       const latitude = position.coords.latitude;
       const longitude = position.coords.longitude;
-      const meta = await resolvePlace(latitude, longitude);
-      if (!meta.city) meta.city = 'موقعك الحالي';
-      setCityInput(meta.city === 'موقعك الحالي' ? '' : meta.city);
-      const known = findSaudiWeatherCity(meta.city);
-      if (known) setRegionSelection(known.region);
-      await fetchWeather(latitude, longitude, meta);
+      // Get the weather immediately; the optional place name can resolve afterward.
+      const placePromise = resolvePlace(latitude, longitude);
+      await fetchWeather(latitude, longitude, { city: 'موقعك الحالي', region: '', district: '' }, true);
+      const currentRequest = weatherRequestId.current;
+      void placePromise.then(meta => {
+        if (currentRequest !== weatherRequestId.current) return;
+        const city = meta.city || 'موقعك الحالي';
+        setCityInput(city === 'موقعك الحالي' ? '' : city);
+        const known = findSaudiWeatherCity(city);
+        if (known) setRegionSelection(known.region);
+        setWeather(previous => previous && previous.latitude === latitude && previous.longitude === longitude
+          ? { ...previous, city, region: meta.region, district: meta.district } : previous);
+        const key = latitude.toFixed(3) + ':' + longitude.toFixed(3);
+        const entry = weatherCache.get(key);
+        if (entry) weatherCache.set(key, { ...entry, data: { ...entry.data, city, region: meta.region, district: meta.district } });
+      }).catch(() => {});
+
     } catch (err: any) {
       setError(err?.message || 'تعذّر تحديد موقعك.');
     } finally {
@@ -312,7 +364,7 @@ export default function WeatherScreen() {
   const refresh = async () => {
     setRefreshing(true);
     try {
-      if (weather) await fetchWeather(weather.latitude, weather.longitude, { city: weather.city, region: weather.region, district: weather.district });
+      if (weather) await fetchWeather(weather.latitude, weather.longitude, { city: weather.city, region: weather.region, district: weather.district }, true);
       else if (cityInput.trim()) await loadWeatherForCity(cityInput);
     } catch (err: any) {
       setError(err?.message || 'تعذّر تحديث الطقس.');
@@ -325,9 +377,10 @@ export default function WeatherScreen() {
     let active = true;
     (async () => {
       try {
-        const { data } = await supabase.auth.getSession();
-        const user = data.session?.user;
-        const saved = await getActiveLocation().catch(() => null);
+        const [sessionResult, saved] = await Promise.all([
+          supabase.auth.getSession(), getActiveLocation().catch(() => null),
+        ]);
+        const user = sessionResult.data.session?.user;
         let city = saved?.city && !saved.city.startsWith('كل ') ? saved.city : '';
         if (!city && user) {
           const { data: profile } = await supabase.from('profiles').select('city').eq('id', user.id).maybeSingle();
@@ -510,7 +563,7 @@ export default function WeatherScreen() {
   };
 
   return (
-    <View style={[screenStyles.container, { backgroundColor: 'transparent' }]}>
+    <View style={screenStyles.container}>
       <AppHeader
         variant="sub"
         title="طقس الحي"
@@ -540,128 +593,7 @@ export default function WeatherScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={OASIS.colors.primary} colors={[OASIS.colors.primary]} />}
       >
         <View style={screenStyles.content}>
-          {weather && topAlert ? (
-            <View style={[styles.alertBanner, { backgroundColor: bannerMeta.bg, borderColor: bannerMeta.border }]}>
-              <View style={styles.alertBannerTop}>
-                <View style={[styles.alertIconWrap, { backgroundColor: bannerMeta.accent }]}>
-                  <AlertIcon kind={topAlert.icon} size={16} color={OASIS.colors.surface} />
-                </View>
-                <View style={styles.alertBannerCopy}>
-                  <Text style={[styles.alertBadge, { color: bannerMeta.accent }]}>تقدير آلي · {bannerMeta.label} · {alerts.length}</Text>
-                  <Text style={[styles.alertTitle, { color: bannerMeta.text }]}>{topAlert.title}</Text>
-                </View>
-              </View>
-              <Text style={[styles.alertMessage, { color: bannerMeta.text }]}>{topAlert.message}</Text>
-              {sortedAlerts.length > 1 ? (
-                <View style={styles.alertList}>
-                  {sortedAlerts.slice(1).map((a) => (
-                    <View key={a.id} style={styles.alertRow}>
-                      <AlertIcon kind={a.icon} size={13} color={bannerMeta.accent} />
-                      <Text style={[styles.alertRowText, { color: bannerMeta.text }]}>{a.title}</Text>
-                    </View>
-                  ))}
-                </View>
-              ) : null}
-            </View>
-          ) : null}
-
-          {/* City search */}
-          <OasisSurface oasisSurface="card" style={styles.searchCard}>
-            <View style={styles.citySearchRow}>
-              <Pressable oasisKind="action" style={styles.locationButton} onPress={useDeviceLocation} disabled={loading}>
-                <Navigation size={15} color={OASIS.colors.primary} />
-                <Text style={styles.locationButtonText}>موقعي</Text>
-              </Pressable>
-              <Pressable oasisKind="icon" style={styles.searchButton} onPress={() => loadWeatherForCity(cityInput)} disabled={loading || !cityInput.trim()}>
-                <Search size={15} color={OASIS.colors.surface} />
-              </Pressable>
-              <TextInput
-                value={cityInput}
-                onChangeText={setCityInput}
-                placeholder="اكتب اسم المدينة"
-                placeholderTextColor="#94a3b8"
-                style={styles.cityInput}
-                textAlign="right"
-                returnKeyType="search"
-                onSubmitEditing={() => loadWeatherForCity(cityInput)}
-              />
-              <MapPin size={16} color="#94a3b8" />
-            </View>
-            <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingBottom: 8 }}>
-              <Text style={{ fontSize: 12, fontWeight: '700', color: OASIS.colors.ink }}>مناطق ومدن السعودية 🇸🇦</Text>
-              <SaudiLiveClock />
-            </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row-reverse', gap: 7, paddingHorizontal: 12, paddingBottom: 9 }}>
-              {['كل المناطق', ...SAUDI_WEATHER_REGIONS].map(region => (
-                <Pressable key={region} onPress={() => setRegionSelection(region)}
-                  style={{ backgroundColor: regionSelection === region ? OASIS.colors.primary : OASIS.colors.background, borderRadius: 13, paddingHorizontal: 10, paddingVertical: 9, borderWidth: 1, borderColor: OASIS.colors.line }}>
-                  <Text style={{ color: regionSelection === region ? OASIS.colors.surface : OASIS.colors.ink, fontSize: 11, fontWeight: '700' }}>{region}</Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row-reverse', gap: 7, paddingHorizontal: 12 }}>
-              {SAUDI_WEATHER_CITIES.filter(city => regionSelection === 'كل المناطق'
-                ? ['الرياض', 'مكة المكرمة', 'جدة', 'المدينة المنورة', 'الدمام', 'بريدة', 'عرعر', 'أبها', 'تبوك', 'جازان', 'نجران', 'حائل', 'سكاكا', 'الباحة'].includes(city.name)
-                : city.region === regionSelection).map(city => (
-                <Pressable key={city.name} disabled={loading} onPress={() => { setCityInput(city.name); void loadWeatherForCity(city.name); }}
-                  style={{ flexDirection: 'row-reverse', gap: 4, alignItems: 'center', padding: 9, borderRadius: 11, backgroundColor: weather?.city === city.name ? OASIS.colors.deep : OASIS.colors.soft }}>
-                  <MapPin size={12} color={weather?.city === city.name ? '#fff' : OASIS.colors.primary} />
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: weather?.city === city.name ? '#fff' : OASIS.colors.deep }}>{city.name}</Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-            {error ? <Text style={styles.errorText}>{error}</Text> : null}
-          </OasisSurface>
-
-          {/* Saudi radar & satellite maps: provider controls, attribution and timeline stay visible. */}
-          <OasisSurface oasisSurface="card" style={{ padding: 14, borderRadius: 18, gap: 10 }}>
-            <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 11 }}>
-              <View style={{ padding: 10, borderRadius: 14, backgroundColor: '#dbeafe' }}>
-                <Satellite size={23} color="#0369a1" />
-              </View>
-              <View style={{ flex: 1, alignItems: 'flex-end', gap: 4 }}>
-                <Text style={{ fontSize: 15, fontWeight: '800', color: OASIS.colors.deep }}>رادار الأمطار والسحب في السعودية</Text>
-                <Text style={{ fontSize: 11, color: OASIS.colors.muted, textAlign: 'right', lineHeight: 18 }}>
-                  خريطة تفاعلية · تحريك السحب · استعراض الرصد السابق · مدن المملكة
-                </Text>
-              </View>
-            </View>
-            <Pressable onPress={() => router.push({
-              pathname: '/weather-radar' as any,
-              params: weather ? {
-                city: weather.city,
-                lat: weather.latitude.toFixed(4),
-                lon: weather.longitude.toFixed(4),
-              } : { city: cityInput || 'الرياض' },
-            })} style={{
-              backgroundColor: OASIS.colors.deep, borderRadius: 13, padding: 13,
-              flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 9,
-            }}>
-              <Satellite size={17} color="#fff" />
-              <Text style={{ color: '#fff', fontSize: 13, fontWeight: '800' }}>افتح رادار السعودية المباشر</Text>
-            </Pressable>
-            <Text style={{ fontSize: 10.5, color: OASIS.colors.muted, textAlign: 'right', lineHeight: 17 }}>
-              عرض من مزود خارجي. تتفاوت تغطية الرادار؛ الرصد الرسمي السعودي متاح عبر أنواء.
-            </Text>
-          </OasisSurface>
-
-          {weather ? (
-            <OasisSurface oasisSurface="card" style={styles.locationCard}>
-              <View style={styles.locationCardHeader}>
-                <MapPin size={15} color={OASIS.colors.primary} />
-                <Text style={styles.locationCardTitle}>الموقع المستخدم لحساب الطقس</Text>
-              </View>
-              <View style={styles.locationGrid}>
-                <LocationItem label="المنطقة" value={weather.region} />
-                <LocationItem label="المدينة" value={weather.city} />
-                <LocationItem label="الحي" value={weather.district} />
-                <LocationItem label="الإحداثيات" value={weather.latitude.toFixed(3) + '، ' + weather.longitude.toFixed(3)} />
-              </View>
-            </OasisSurface>
-          ) : null}
-
-          {/* Current conditions */}
-          <OasisSurface oasisSurface="card" style={styles.card}>
+          <OasisSurface oasisSurface="card" style={[styles.card, styles.weatherHeroCard]}>
             <LinearGradient
               colors={weather?.current?.is_day ? ['#0f766e', '#0e7490', '#155e75'] : ['#1e3a5f', OASIS.colors.ink, OASIS.colors.muted]}
               start={{ x: 0, y: 0 }}
@@ -703,6 +635,178 @@ export default function WeatherScreen() {
                 </View>
               )}
             </LinearGradient>
+          </OasisSurface>
+
+          {weather && (
+            <View style={styles.snapshotGrid}>
+              <View style={styles.snapshotTile}>
+                <Droplets size={17} color="#0891b2"/>
+                <Text style={styles.snapshotLabel}>الرطوبة</Text>
+                <Text style={styles.snapshotValue}>{round(weather.current.relative_humidity_2m)}%</Text>
+              </View>
+              <View style={styles.snapshotTile}>
+                <Wind size={17} color={OASIS.colors.primary}/>
+                <Text style={styles.snapshotLabel}>الرياح</Text>
+                <Text style={styles.snapshotValue}>{round(weather.current.wind_speed_10m)} <Text style={styles.snapshotUnit}>كم/س</Text></Text>
+              </View>
+              <View style={styles.snapshotTile}>
+                <Umbrella size={17} color="#0284c7"/>
+                <Text style={styles.snapshotLabel}>فرصة المطر</Text>
+                <Text style={styles.snapshotValue}>{round(weather.daily.precipitation_probability_max?.[0])}%</Text>
+              </View>
+              <View style={styles.snapshotTile}>
+                <Activity size={17} color="#7c3aed"/>
+                <Text style={styles.snapshotLabel}>جودة الهواء</Text>
+                <Text style={styles.snapshotValue}>{weather.air?.us_aqi == null ? '—' : round(weather.air.us_aqi)}</Text>
+              </View>
+            </View>
+          )}
+
+          {weather && topAlert ? (topAlert.id === 'ok' ? (
+            <View style={styles.okStrip}>
+              <View style={styles.okStripIcon}><CloudSun size={17} color={OASIS.colors.primary}/></View>
+              <View style={styles.okStripCopy}>
+                <Text style={styles.okStripTitle}>أجواء مستقرة بحسب النموذج</Text>
+                <Text style={styles.okStripDesc}>تقدير آلي وليس بديلًا عن الإنذارات الرسمية</Text>
+              </View>
+            </View>
+          ) : (
+            <View style={[styles.alertBanner, { backgroundColor: bannerMeta.bg, borderColor: bannerMeta.border }]}>
+              <View style={styles.alertBannerTop}>
+                <View style={[styles.alertIconWrap, { backgroundColor: bannerMeta.accent }]}>
+                  <AlertIcon kind={topAlert.icon} size={16} color={OASIS.colors.surface} />
+                </View>
+                <View style={styles.alertBannerCopy}>
+                  <Text style={[styles.alertBadge, { color: bannerMeta.accent }]}>تقدير آلي · {bannerMeta.label} · {alerts.length}</Text>
+                  <Text style={[styles.alertTitle, { color: bannerMeta.text }]}>{topAlert.title}</Text>
+                </View>
+              </View>
+              <Text style={[styles.alertMessage, { color: bannerMeta.text }]}>{topAlert.message}</Text>
+              {sortedAlerts.length > 1 ? (
+                <View style={styles.alertList}>
+                  {sortedAlerts.slice(1).map((a) => (
+                    <View key={a.id} style={styles.alertRow}>
+                      <AlertIcon kind={a.icon} size={13} color={bannerMeta.accent} />
+                      <Text style={[styles.alertRowText, { color: bannerMeta.text }]}>{a.title}</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+            </View>
+          )) : null}
+
+          {/* City search */}
+          <OasisSurface oasisSurface="card" style={styles.searchCard}>
+            <View style={styles.citySearchRow}>
+              <Pressable oasisKind="action" style={styles.locationButton} onPress={useDeviceLocation} disabled={loading}>
+                <Navigation size={15} color={OASIS.colors.primary} />
+                <Text style={styles.locationButtonText}>موقعي</Text>
+              </Pressable>
+              <Pressable oasisKind="icon" style={styles.searchButton} onPress={() => loadWeatherForCity(cityInput)} disabled={loading || !cityInput.trim()}>
+                <Search size={15} color={OASIS.colors.surface} />
+              </Pressable>
+              <TextInput
+                value={cityInput}
+                onChangeText={setCityInput}
+                placeholder="اكتب اسم المدينة"
+                placeholderTextColor="#94a3b8"
+                style={styles.cityInput}
+                textAlign="right"
+                returnKeyType="search"
+                onSubmitEditing={() => loadWeatherForCity(cityInput)}
+              />
+              <MapPin size={16} color="#94a3b8" />
+            </View>
+            <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="اختيار مدينة من مناطق السعودية"
+              accessibilityState={{ expanded: cityPickerOpen }}
+              onPress={() => setCityPickerOpen(v => !v)} style={styles.cityPickerToggle}>
+              <MapPin size={15} color={OASIS.colors.primary}/>
+              <Text style={styles.cityPickerTitle}>تصفح مناطق ومدن السعودية</Text>
+              <View style={styles.cityPickerSide}><SaudiLiveClock />{cityPickerOpen ? <ChevronUp size={17} color={OASIS.colors.primary}/> : <ChevronDown size={17} color={OASIS.colors.primary}/>}</View>
+            </Pressable>
+            {cityPickerOpen && (<>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row-reverse', gap: 7, paddingHorizontal: 12, paddingBottom: 9 }}>
+              {['كل المناطق', ...SAUDI_WEATHER_REGIONS].map(region => (
+                <Pressable key={region} onPress={() => setRegionSelection(region)}
+                  style={{ backgroundColor: regionSelection === region ? OASIS.colors.primary : OASIS.colors.background, borderRadius: 13, paddingHorizontal: 10, paddingVertical: 9, borderWidth: 1, borderColor: OASIS.colors.line }}>
+                  <Text style={{ color: regionSelection === region ? OASIS.colors.surface : OASIS.colors.ink, fontSize: 11, fontWeight: '700' }}>{region}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row-reverse', gap: 7, paddingHorizontal: 12 }}>
+              {SAUDI_WEATHER_CITIES.filter(city => regionSelection === 'كل المناطق'
+                ? ['الرياض', 'مكة المكرمة', 'جدة', 'المدينة المنورة', 'الدمام', 'بريدة', 'عرعر', 'أبها', 'تبوك', 'جازان', 'نجران', 'حائل', 'سكاكا', 'الباحة'].includes(city.name)
+                : city.region === regionSelection).map(city => (
+                <Pressable key={city.name} disabled={loading} onPress={() => { setCityInput(city.name); void loadWeatherForCity(city.name); }}
+                  style={{ flexDirection: 'row-reverse', gap: 4, alignItems: 'center', padding: 9, borderRadius: 11, backgroundColor: weather?.city === city.name ? OASIS.colors.deep : OASIS.colors.soft }}>
+                  <MapPin size={12} color={weather?.city === city.name ? '#fff' : OASIS.colors.primary} />
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: weather?.city === city.name ? '#fff' : OASIS.colors.deep }}>{city.name}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+            </>)}
+            {error ? <Text accessibilityRole="alert" style={styles.errorText}>{error}</Text> : null}
+          </OasisSurface>
+
+          {/* Radar and official warnings remain accessible without loading a map on this page. */}
+          <View style={styles.quickLinks}>
+            <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="فتح رادار الأمطار والسحب"
+              onPress={() => router.push({
+                pathname: '/weather-radar' as any,
+                params: weather ? { city: weather.city, lat: weather.latitude.toFixed(4), lon: weather.longitude.toFixed(4) } : { city: cityInput || 'الرياض' },
+              })}
+              style={styles.radarShortcut}>
+              <Satellite size={21} color="#0f766e"/>
+              <View style={styles.radarText}>
+                <Text style={styles.radarTitle}>رادار الأمطار</Text>
+                <Text style={styles.radarSub}>السحب والهطول · خريطة تفاعلية</Text>
+              </View>
+              <ChevronRight size={17} color={OASIS.colors.primary}/>
+            </Pressable>
+            <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="فتح إنذارات المركز الوطني للأرصاد"
+              onPress={() => void Linking.openURL('https://www.ncm.gov.sa/en/early-warning')}
+              style={styles.officialShortcut}>
+              <TriangleAlert size={19} color="#b45309"/>
+              <Text style={styles.officialTitle}>الإنذارات الرسمية</Text>
+            </Pressable>
+          </View>
+
+          {weather && (
+            <View style={styles.locationAccordion}>
+              <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="تفاصيل موقع حساب الطقس"
+                accessibilityState={{ expanded: locationDetailsOpen }}
+                onPress={() => setLocationDetailsOpen(v => !v)} style={styles.locationCompactRow}>
+                <MapPin size={16} color={OASIS.colors.primary}/>
+                <Text style={styles.locationCompactText} numberOfLines={1}>توقعات {weather.city}{weather.district ? ' · ' + weather.district : ''}</Text>
+                {locationDetailsOpen ? <ChevronUp size={16} color={OASIS.colors.muted}/> : <ChevronDown size={16} color={OASIS.colors.muted}/>}
+              </Pressable>
+              {locationDetailsOpen && (
+                <View style={styles.locationGrid}>
+                  <LocationItem label="المنطقة" value={weather.region} />
+                  <LocationItem label="المدينة" value={weather.city} />
+                  <LocationItem label="الحي" value={weather.district} />
+                  <LocationItem label="الإحداثيات" value={weather.latitude.toFixed(3) + '، ' + weather.longitude.toFixed(3)} />
+                </View>
+              )}
+            </View>
+          )}
+
+          {weather && (
+            <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="عرض تفاصيل التوقعات والساعات والأيام"
+              accessibilityState={{ expanded: detailsExpanded }} onPress={() => setDetailsExpanded(v => !v)}
+              style={styles.detailsToggle}>
+              <View style={styles.detailsToggleCopy}>
+                <Text style={styles.detailsToggleTitle}>التوقعات والتفاصيل</Text>
+                <Text style={styles.detailsToggleHint}>الساعات القادمة · 16 يومًا · جودة الهواء</Text>
+              </View>
+              <Text style={styles.detailsToggleAction}>{detailsExpanded ? 'إخفاء' : 'عرض التفاصيل'}</Text>
+              {detailsExpanded ? <ChevronUp size={17} color={OASIS.colors.primary}/> : <ChevronDown size={17} color={OASIS.colors.primary}/>}
+            </Pressable>
+          )}
+
+          {/* Expanded forecast details are mounted only when requested. */}
+          {weather && detailsExpanded && (
+          <OasisSurface oasisSurface="card" style={styles.card}>
 
             {weather && (
               <>
@@ -775,7 +879,7 @@ export default function WeatherScreen() {
 
                 {/* Daily with range bars */}
                 <View style={styles.blockHeader}><Text style={styles.blockTitle}>توقعات حتى 16 يوماً</Text><Text style={styles.blockHint}>العظمى / الصغرى</Text></View>
-                {weather.daily.time.map((date: string, index: number) => {
+                {weather.daily.time.slice(0, showAllDays ? 16 : 7).map((date: string, index: number) => {
                   const low = weather.daily.temperature_2m_min[index];
                   const high = weather.daily.temperature_2m_max[index];
                   const left = Math.max(0, Math.min(100, ((low - weekMin) / weekSpan) * 100));
@@ -795,6 +899,12 @@ export default function WeatherScreen() {
                     </View>
                   );
                 })}
+
+                <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel={showAllDays ? 'عرض أول سبعة أيام' : 'عرض جميع الأيام الستة عشر'}
+                  onPress={() => setShowAllDays(v => !v)} style={styles.daysToggle}>
+                  <Text style={styles.daysToggleText}>{showAllDays ? 'عرض أول 7 أيام' : 'عرض توقعات 16 يومًا'}</Text>
+                  {showAllDays ? <ChevronUp size={15} color={OASIS.colors.primary}/> : <ChevronDown size={15} color={OASIS.colors.primary}/>}
+                </Pressable>
 
                 <View style={styles.divider} />
 
@@ -863,7 +973,16 @@ export default function WeatherScreen() {
               </>
             )}
           </OasisSurface>
+          )}
 
+          <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="مصادر الطقس والتنبيهات الرسمية"
+            accessibilityState={{ expanded: sourcesExpanded }} onPress={() => setSourcesExpanded(v => !v)}
+            style={styles.sourcesToggle}>
+            <Info size={16} color={OASIS.colors.primary}/>
+            <Text style={styles.sourcesLabel}>مصادر الطقس والتنبيهات الرسمية</Text>
+            {sourcesExpanded ? <ChevronUp size={17} color={OASIS.colors.primary}/> : <ChevronDown size={17} color={OASIS.colors.primary}/>}
+          </Pressable>
+          {sourcesExpanded && (
           <OasisSurface oasisSurface="card" style={styles.infoCard}>
             <Text style={styles.infoTitle}>تنبيهات المركز الوطني للأرصاد</Text>
             <Text style={styles.infoText}>التنبيهات المعروضة في الصفحة ناتجة عن معايير آلية وليست تحذيرات رسمية. عند تقلبات الطقس تأكد من المركز الوطني للأرصاد.</Text>
@@ -873,8 +992,9 @@ export default function WeatherScreen() {
               <Text style={{ color: OASIS.colors.surface, fontSize: 12, fontWeight: '700' }}>فتح خريطة الإنذار المبكر الرسمية</Text>
             </Pressable>
             <Text style={styles.infoTitle}>مصدر البيانات ودقة التحديث</Text>
-            <Text style={styles.infoText}>البيانات النموذجية من Open-Meteo وجودة الهواء من Open-Meteo Air Quality. الساعة المحلية تتحدث كل ثانية، ويُعاد جلب توقعات مزود الخدمة كل 15 دقيقة أثناء فتح الصفحة، وليس رصداً جوياً كل ثانية. تقل موثوقية التوقع كلما طالت المدة، وتوقيت العرض هو السعودية.</Text>
+            <Text style={styles.infoText}>البيانات النموذجية من Open-Meteo وجودة الهواء من Open-Meteo Air Quality. الساعة المحلية تتحدث كل دقيقة، ويُعاد جلب توقعات مزود الخدمة كل 15 دقيقة أثناء فتح الصفحة، وليس رصداً جوياً كل ثانية. تقل موثوقية التوقع كلما طالت المدة، وتوقيت العرض هو السعودية.</Text>
           </OasisSurface>
+          )}
         </View>
       </ScrollView>
     </View>
@@ -884,14 +1004,14 @@ export default function WeatherScreen() {
 function SaudiLiveClock() {
   const [now, setNow] = useState(new Date());
   useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 1000);
+    const timer = setInterval(() => setNow(new Date()), 60 * 1000);
     return () => clearInterval(timer);
   }, []);
   return (
     <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 5, borderRadius: 15, backgroundColor: OASIS.colors.soft, paddingHorizontal: 8, paddingVertical: 5 }}>
       <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: OASIS.colors.primary }} />
       <Text style={{ color: OASIS.colors.primary, fontSize: 10, fontWeight: '700' }}>
-        {now.toLocaleTimeString('ar-SA', { timeZone: 'Asia/Riyadh', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+        {now.toLocaleTimeString('ar-SA', { timeZone: 'Asia/Riyadh', hour: '2-digit', minute: '2-digit' })}
       </Text>
     </View>
   );
@@ -917,12 +1037,46 @@ function LocationItem({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
-  searchCard: { backgroundColor: OASIS.colors.surface, borderRadius: 14, borderWidth: 1, borderColor: OASIS.colors.line, overflow: 'hidden' },
-  citySearchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12 },
-  locationButton: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, backgroundColor: OASIS.colors.soft, borderRadius: 11, paddingHorizontal: 11, paddingVertical: 10 },
+  weatherHeroCard: { borderRadius: 19, borderWidth: 0, elevation: 0, shadowOpacity: 0 },
+  snapshotGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 7 },
+  snapshotTile: { flexGrow: 1, flexBasis: '21%', minWidth: 72, minHeight: 88, justifyContent: 'center', alignItems: 'center', gap: 5, paddingHorizontal: 5, paddingVertical: 10, borderRadius: 14, borderWidth: 1, borderColor: OASIS.colors.line, backgroundColor: OASIS.colors.surface },
+  snapshotLabel: { color: OASIS.colors.muted, fontSize: 10, fontWeight: '600', textAlign: 'center' },
+  snapshotValue: { color: OASIS.colors.ink, fontSize: 16, fontWeight: '800', textAlign: 'center' },
+  snapshotUnit: { color: OASIS.colors.muted, fontSize: 9.5, fontWeight: '600' },
+  okStrip: { flexDirection: 'row-reverse', alignItems: 'center', gap: 9, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 13, backgroundColor: OASIS.colors.soft },
+  okStripIcon: { width: 34, height: 34, borderRadius: 11, backgroundColor: OASIS.colors.surface, alignItems: 'center', justifyContent: 'center' },
+  okStripCopy: { flex: 1, alignItems: 'flex-end', gap: 2 },
+  okStripTitle: { color: OASIS.colors.deep, fontSize: 12, fontWeight: '800', textAlign: 'right' },
+  okStripDesc: { color: OASIS.colors.muted, fontSize: 10, textAlign: 'right' },
+  searchCard: { backgroundColor: OASIS.colors.surface, borderRadius: 15, borderWidth: 1, borderColor: OASIS.colors.line, overflow: 'hidden', elevation: 0 }, 
+  cityPickerToggle: { minHeight: 40, flexDirection: 'row-reverse', alignItems: 'center', gap: 7, marginHorizontal: 11, paddingVertical: 6, borderTopWidth: 1, borderTopColor: OASIS.colors.line },
+  cityPickerTitle: { color: OASIS.colors.deep, fontSize: 11.5, fontWeight: '700', flex: 1, textAlign: 'right' },
+  cityPickerSide: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5 },
+  quickLinks: { flexDirection: 'row-reverse', alignItems: 'stretch', gap: 8 },
+  radarShortcut: { flex: 1.5, minWidth: 0, minHeight: 67, borderWidth: 1, borderColor: '#BDE7D7', borderRadius: 15, paddingHorizontal: 10, flexDirection: 'row-reverse', alignItems: 'center', gap: 8, backgroundColor: '#E9F7F0' },
+  radarText: { flex: 1, minWidth: 0, alignItems: 'flex-end', gap: 3 },
+  radarTitle: { color: OASIS.colors.deep, fontSize: 12.5, fontWeight: '800', textAlign: 'right' },
+  radarSub: { color: OASIS.colors.muted, fontSize: 10, textAlign: 'right' },
+  officialShortcut: { flex: 0.8, minWidth: 0, minHeight: 67, alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 8, borderWidth: 1, borderColor: '#F2DFC4', borderRadius: 15, backgroundColor: '#FFF8EB' },
+  officialTitle: { color: '#945A1C', fontSize: 10.5, fontWeight: '700', textAlign: 'center' },
+  locationAccordion: { borderWidth: 1, borderColor: OASIS.colors.line, backgroundColor: OASIS.colors.surface, borderRadius: 13, paddingHorizontal: 11, paddingVertical: 6, gap: 5 },
+  locationCompactRow: { minHeight: 33, flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
+  locationCompactText: { flex: 1, minWidth: 0, fontSize: 11.5, fontWeight: '600', color: OASIS.colors.ink, textAlign: 'right' },
+  detailsToggle: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, minHeight: 64, borderRadius: 15, paddingHorizontal: 13, paddingVertical: 10, backgroundColor: OASIS.colors.surface, borderWidth: 1, borderColor: OASIS.colors.line },
+  detailsToggleCopy: { flex: 1, minWidth: 0, alignItems: 'flex-end', gap: 4 },
+  detailsToggleTitle: { color: OASIS.colors.ink, fontSize: 13.5, fontWeight: '800', textAlign: 'right' },
+  detailsToggleHint: { color: OASIS.colors.muted, fontSize: 10.5, textAlign: 'right' },
+  detailsToggleAction: { color: OASIS.colors.primary, fontSize: 11, fontWeight: '700' },
+  daysToggle: { minHeight: 38, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 12, margin: 9, borderRadius: 11, backgroundColor: OASIS.colors.soft },
+  daysToggleText: { fontSize: 11, fontWeight: '700', color: OASIS.colors.primary },
+  sourcesToggle: { flexDirection: 'row-reverse', alignItems: 'center', gap: 7, borderRadius: 13, paddingHorizontal: 11, minHeight: 41, backgroundColor: OASIS.colors.surface, borderWidth: 1, borderColor: OASIS.colors.line },
+  sourcesLabel: { flex: 1, textAlign: 'right', color: OASIS.colors.muted, fontSize: 11, fontWeight: '700' },
+
+  citySearchRow: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 10, paddingVertical: 9 },
+  locationButton: { flexDirection: 'row-reverse', minHeight: 40, alignItems: 'center', justifyContent: 'center', gap: 5, backgroundColor: OASIS.colors.soft, borderRadius: 11, paddingHorizontal: 10, paddingVertical: 8 },
   locationButtonText: { color: OASIS.colors.primary, fontSize: 11.5, fontWeight: '700' },
   searchButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', backgroundColor: OASIS.colors.primary, borderRadius: 11 },
-  cityInput: { flex: 1, minWidth: 80, backgroundColor: OASIS.colors.background, borderWidth: 1, borderColor: OASIS.colors.line, borderRadius: 11, paddingHorizontal: 11, paddingVertical: 9, color: OASIS.colors.ink, fontSize: 12.5 },
+  cityInput: { flex: 1, minWidth: 80, minHeight: 40, backgroundColor: OASIS.colors.background, borderWidth: 1, borderColor: OASIS.colors.line, borderRadius: 11, paddingHorizontal: 10, paddingVertical: 8, color: OASIS.colors.ink, fontSize: 13 },
   errorText: { color: OASIS.colors.danger, fontSize: 11.5, textAlign: 'right', paddingHorizontal: 14, paddingBottom: 10, lineHeight: 17 },
 
   locationCard: { backgroundColor: OASIS.colors.surface, borderRadius: 14, borderWidth: 1, borderColor: OASIS.colors.line, padding: 14, gap: 10 },
@@ -935,19 +1089,19 @@ const styles = StyleSheet.create({
   panelLocation: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, marginTop: 8 },
   panelLocationText: { color: OASIS.colors.soft, fontSize: 11, fontWeight: '700', textAlign: 'right' },
 
-  card: { backgroundColor: OASIS.colors.surface, borderRadius: 14, borderWidth: 1, borderColor: OASIS.colors.line, overflow: 'hidden', shadowColor: OASIS.colors.ink, shadowOpacity: 0, shadowRadius: 12, elevation: 2 },
-  currentPanel: { padding: 17, minHeight: 196 },
+  card: { backgroundColor: OASIS.colors.surface, borderRadius: 16, borderWidth: 1, borderColor: OASIS.colors.line, overflow: 'hidden', shadowOpacity: 0, elevation: 0 },
+  currentPanel: { paddingHorizontal: 17, paddingTop: 13, paddingBottom: 15, minHeight: 184 },
   panelTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   panelUpdated: { color: OASIS.colors.soft, fontSize: 11, fontWeight: '700' },
   refreshButton: { width: 34, height: 34, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
-  currentMain: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 16 },
+  currentMain: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 11 },
   tempAndIcon: { flexDirection: 'row-reverse', alignItems: 'center', gap: 9 },
-  temperature: { color: OASIS.colors.surface, fontSize: 51, fontWeight: '300', letterSpacing: -2 },
+  temperature: { color: OASIS.colors.surface, fontSize: 50, fontWeight: '600', letterSpacing: -1.5 },
   tempCopy: { alignItems: 'flex-end', gap: 5 },
   conditionText: { color: OASIS.colors.surface, fontSize: 16, fontWeight: '700' },
   feelsLike: { color: '#dbeafe', fontSize: 11.5 },
   hiLo: { color: '#c7f9e5', fontSize: 11, fontWeight: '700' },
-  sunTimes: { flexDirection: 'row-reverse', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 13, padding: 10, gap: 13 },
+  sunTimes: { flexDirection: 'row-reverse', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.13)', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 8, gap: 9 },
   sunTimeItem: { flex: 1, flexDirection: 'row-reverse', alignItems: 'center', gap: 5 },
   sunTimeText: { color: OASIS.colors.line, fontSize: 11 },
   sunTimeValue: { color: OASIS.colors.surface, fontSize: 11, fontWeight: '600' },
@@ -1007,13 +1161,13 @@ const styles = StyleSheet.create({
   sourceText: { color: '#94a3b8', fontSize: 11, textAlign: 'right' },
   uvText: { color: OASIS.colors.muted, fontSize: 11, textAlign: 'right', fontWeight: '700' },
 
-  alertBanner: { marginHorizontal: 12, marginTop: 10, marginBottom: 2, borderRadius: 14, borderWidth: 1, padding: 14, gap: 8 },
+  alertBanner: { borderRadius: 15, borderWidth: 1, padding: 11, gap: 6 },
   alertBannerTop: { flexDirection: 'row-reverse', alignItems: 'center', gap: 9 },
   alertIconWrap: { width: 34, height: 34, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   alertBannerCopy: { flex: 1, alignItems: 'flex-end', gap: 2 },
   alertBadge: { fontSize: 11, fontWeight: '700' },
-  alertTitle: { fontSize: 14.5, fontWeight: '700', textAlign: 'right' },
-  alertMessage: { fontSize: 11.5, lineHeight: 18, textAlign: 'right' },
+  alertTitle: { fontSize: 13.5, fontWeight: '800', textAlign: 'right' },
+  alertMessage: { fontSize: 11, lineHeight: 18, textAlign: 'right' },
   alertList: { gap: 6, marginTop: 4, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.06)', paddingTop: 8 },
   alertRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 7 },
   alertRowText: { fontSize: 11, fontWeight: '700', textAlign: 'right', flex: 1 },
@@ -1067,6 +1221,6 @@ const screenStyles = StyleSheet.create({
     justifyContent: 'center',
   },
   heroTemp: { color: OASIS.colors.surface, fontSize: 24, fontWeight: '700' },
-  scroll: { paddingTop: 16 },
-  content: { width: '100%', maxWidth: 800, alignSelf: 'center', paddingHorizontal: 16, gap: 16 },
+  scroll: { paddingTop: 11 },
+  content: { width: '100%', maxWidth: 800, alignSelf: 'center', paddingHorizontal: 13, gap: 11 },
 });
