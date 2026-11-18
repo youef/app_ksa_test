@@ -25,6 +25,7 @@ import {
   CheckCircle2,
   Trash2,
   ArrowRight,
+  Compass,
 } from 'lucide-react-native';
 import { areaLabel } from '@/lib/privacy';
 import { relativeTime } from '@/lib/mapPins';
@@ -127,6 +128,20 @@ const TRENDING_KEYWORDS = [
   'غسيل سيارات',
 ];
 
+const EXPLORE_LINKS = [
+  {id:'users',label:'الجيران',description:'تعرف على أهل الحي',Icon:Users},
+  {id:'questions',label:'الأسئلة',description:'اسأل واستفد',Icon:MessageCircle},
+  {id:'requests',label:'الطلبات',description:'فزعات ومساعدة',Icon:Truck},
+  {id:'shops',label:'المحلات',description:'خدمات قريبة منك',Icon:Store},
+] as const;
+const SEARCH_SUGGESTIONS: Record<Tab,string[]> = {
+  all:TRENDING_KEYWORDS.slice(0,6),
+  users:[],
+  questions:['مدارس','جامعة','صيانة','خدمات'],
+  requests:['توصيل','إعارة','مساعدة','نقل'],
+  shops:['بقالة','سباك','حلاق','مغسلة'],
+};
+
 export default function SearchPage() {
   const params = useLocalSearchParams<{ q?: string; tab?: Tab }>();
   const bottomNavInset = useBottomNavInset();
@@ -137,6 +152,7 @@ export default function SearchPage() {
   const [localOnly, setLocalOnly] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const searchSequence = useRef(0);
+  const searchFieldRef = useRef<import('react-native').TextInput>(null);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [results, setResults] = useState<{
     users: Row[];
@@ -151,7 +167,7 @@ export default function SearchPage() {
       if (!mounted || !value) return;
       try {
         const saved = JSON.parse(value);
-        if (Array.isArray(saved)) setRecentSearches(saved.filter((s): s is string => typeof s === 'string').slice(0, 8));
+        if (Array.isArray(saved)) setRecentSearches(saved.filter((s): s is string => typeof s === 'string' && s.trim().length >= 2).slice(0, 8));
       } catch { /* Ignore corrupt local search history. */ }
     }).catch(() => {});
     return () => { mounted = false; };
@@ -186,7 +202,7 @@ export default function SearchPage() {
   const handleSelectKeyword = (rawKeyword: string) => {
     const cleanWord = rawKeyword.replace(/[🔧⚡🚗🛠️❄️🛒✂️🚙]/gu, '').trim();
     setQuery(cleanWord);
-    saveRecentSearches([cleanWord, ...recentSearches.filter(s => s !== cleanWord)].slice(0, 8));
+    if (cleanWord.length >= 2) saveRecentSearches([cleanWord, ...recentSearches.filter(s => s !== cleanWord)].slice(0, 8));
   };
 
   const removeRecentSearch = (itemToRemove: string) => {
@@ -272,6 +288,9 @@ export default function SearchPage() {
 
   const total = results.users.length + results.questions.length + results.requests.length + results.shops.length;
   const selectedCount = activeTab === 'all' ? total : results[activeTab].length;
+  const visibleRecent = recentSearches.filter(word=>word.trim().length>=2).slice(0,4);
+  const selectedExplore = EXPLORE_LINKS.find(tab=>tab.id===activeTab);
+  const SelectedExploreIcon = selectedExplore?.Icon || Compass;
 
   const renderUser = (u: any) => (
     <Pressable oasisKind="card"
@@ -450,7 +469,7 @@ export default function SearchPage() {
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: 'transparent' }]}>
+    <View style={styles.container}>
       <AppHeader
         variant="tab"
         title="استكشف"
@@ -465,53 +484,38 @@ export default function SearchPage() {
         }
       />
 
-      <Pressable onPress={() => setLocalOnly(v => !v)} accessibilityRole="switch" accessibilityState={{ checked: localOnly }} accessibilityLabel="تصفية نتائج البحث حسب مدينتي"
-        style={{ alignSelf: 'flex-start', marginHorizontal: 16, marginVertical: 4, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 12, backgroundColor: localOnly ? '#dcfce7' : '#f1f5f9' }}>
-        <Text style={{ color: '#065f46', fontWeight: '600' }}>{localOnly ? '✓ داخل مدينتي' : 'تصفية حسب مدينتي'}</Text>
-      </Pressable>
-      {/* Modern Search Input Capsule */}
+      {/* Search and location tools in one compact area */}
       <View style={styles.searchBarContainer}>
-        <OasisSurface oasisSurface="field" style={[styles.searchBox, isFocused && styles.searchBoxFocused]}>
-          <View style={styles.searchIconBadge}>
-            <SearchIcon size={17} color={OASIS.colors.primary} />
-          </View>
-
-          <TextInput
-            style={styles.searchInput}
+        <OasisSurface oasisSurface="field" style={[styles.searchBox,isFocused && styles.searchBoxFocused]}>
+          <View style={styles.searchIconBadge}><SearchIcon size={17} color={OASIS.colors.primary}/></View>
+          <TextInput ref={searchFieldRef} style={styles.searchInput}
             accessibilityLabel="البحث في الجيران والأسئلة والطلبات والمحلات"
-            placeholder="ابحث عن جيران، أسئلة، فزعات، محلات..."
-            placeholderTextColor="#94a3b8"
-            value={query}
-            onChangeText={setQuery}
-            onFocus={() => setIsFocused(true)}
-            onBlur={() => setIsFocused(false)}
-            selectionColor={OASIS.colors.primary}
-            returnKeyType="search"
-            onSubmitEditing={() => {
-              if (query.trim()) {
-                handleSelectKeyword(query.trim());
-              }
-            }}
-          />
-
-          {query.length > 0 && (
-            <Pressable oasisKind="icon" accessibilityRole="button" accessibilityLabel="مسح عبارة البحث"
-              onPress={() => {
-                setQuery('');
-                setResults({ users: [], questions: [], requests: [], shops: [] });
-              }}
-              style={styles.clearBtn}
-              hitSlop={8}
-            >
-              <X size={15} color={OASIS.colors.muted} />
-            </Pressable>
+            placeholder={activeTab==='users'?'ابحث باسم الجار...':activeTab==='questions'?'ابحث في الأسئلة...':activeTab==='requests'?'ابحث في الطلبات...':activeTab==='shops'?'ابحث عن محل أو خدمة...':'ابحث عن جيران، أسئلة، خدمات...'}
+            placeholderTextColor="#94a3b8" value={query} onChangeText={setQuery}
+            onFocus={()=>setIsFocused(true)} onBlur={()=>setIsFocused(false)}
+            selectionColor={OASIS.colors.primary} returnKeyType="search"
+            onSubmitEditing={()=>{if(query.trim())handleSelectKeyword(query.trim());}}/>
+          {query.length>0 && (
+            <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="مسح عبارة البحث"
+              onPress={()=>{setQuery('');setResults({users:[],questions:[],requests:[],shops:[]});}}
+              style={styles.clearBtn} hitSlop={8}><X size={15} color={OASIS.colors.muted}/></Pressable>
           )}
         </OasisSurface>
+        <View style={styles.scopeRow}>
+          <Pressable oasisKind="plain" accessibilityRole="switch" accessibilityLabel="تصفية نتائج البحث حسب مدينتي"
+            accessibilityState={{checked:localOnly}} onPress={()=>setLocalOnly(value=>!value)}
+            style={[styles.scopeToggle,localOnly && styles.scopeToggleActive]}>
+            <MapPin size={14} color={OASIS.colors.primary}/>
+            <Text style={styles.scopeToggleText}>{localOnly?'داخل مدينتي فقط':'حسب مدينتي'}</Text>
+            {localOnly && <CheckCircle2 size={13} color={OASIS.colors.primary}/>}
+          </Pressable>
+          <Text style={styles.scopeCaption}>بحث موحّد في مجتمع حيّنا</Text>
+        </View>
       </View>
 
       {/* Modern Pills Filter Tabs */}
       <View style={styles.tabsWrapper}>
-        <ScrollView style={{ direction: 'rtl' }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.tabsScroll, { direction: 'ltr' }]}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} {...(Platform.OS === 'web' ? {dir:'rtl'} : {})} contentContainerStyle={styles.tabsScroll}>
           <Pressable oasisKind="chip" oasisVariant={activeTab === 'all' ? 'primary' : 'secondary'}
             style={[styles.tab, activeTab === 'all' && styles.tabActive]}
             onPress={() => setActiveTab('all')}
@@ -652,18 +656,79 @@ export default function SearchPage() {
         )}
 
         {!loading && !query.trim() && (
-          <View style={{ paddingTop: 12, gap: 12 }}>
-            <Text style={{ color: OASIS.colors.muted, textAlign: 'right', fontSize: 12 }}>ابحث في حيّك أو اختر تصنيفًا بالأعلى.</Text>
-            {recentSearches.length > 0 && (
-              <View style={{ gap: 8 }}>
-                <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={{ color: OASIS.colors.ink, fontWeight: '700', fontSize: 13 }}>آخر عمليات البحث</Text>
-                  <Pressable onPress={() => saveRecentSearches([])}><Text style={{ color: OASIS.colors.muted, fontSize: 11 }}>مسح</Text></Pressable>
-                </View>
-                <View style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 7 }}>
-                  {recentSearches.slice(0, 4).map(item => <Pressable key={item} oasisKind="chip" onPress={() => handleSelectKeyword(item)} style={styles.recentChip}><Text style={styles.recentChipText}>{item}</Text></Pressable>)}
+          <View style={styles.discoveryStart}>
+            <View style={styles.discoveryIntro}>
+              <View style={styles.discoveryIntroIcon}><SelectedExploreIcon size={22} color={OASIS.colors.primary}/></View>
+              <View style={styles.discoveryIntroCopy}>
+                <Text style={styles.discoveryIntroTitle}>{activeTab==='all'?'اكتشف القريب منك':`ابحث في ${selectedExplore?.label||'حيّك'}`}</Text>
+                <Text style={styles.discoveryIntroSub}>{activeTab==='all'?'الجيران والأسئلة والطلبات والمحلات في مكان واحد.':'اكتب كلمة أو اسمًا بالأعلى، أو استخدم اقتراحات البحث.'}</Text>
+              </View>
+              {activeTab!=='all' && (
+                <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="الكتابة في البحث"
+                  onPress={()=>searchFieldRef.current?.focus()} style={styles.discoveryFocus}>
+                  <SearchIcon size={18} color={OASIS.colors.primary}/>
+                </Pressable>
+              )}
+            </View>
+            {activeTab==='all' && (
+              <View style={styles.discoveryBlock}>
+                <Text style={styles.discoveryBlockTitle}>استكشف الأقسام</Text>
+                <View style={styles.discoveryGrid}>
+                  {EXPLORE_LINKS.map(({id,label,description,Icon})=>(
+                    <Pressable oasisKind="plain" key={id} accessibilityRole="button" accessibilityLabel={`البحث في ${label}`}
+                      onPress={()=>{setActiveTab(id);searchFieldRef.current?.focus();}} style={styles.discoveryShortcut}>
+                      <View style={styles.shortcutIcon}><Icon size={19} color={OASIS.colors.primary}/></View>
+                      <View style={styles.shortcutCopy}>
+                        <Text style={styles.shortcutTitle}>{label}</Text>
+                        <Text style={styles.shortcutSub} numberOfLines={1}>{description}</Text>
+                      </View>
+                      <ChevronLeft size={13} color="#9DABA2"/>
+                    </Pressable>
+                  ))}
                 </View>
               </View>
+            )}
+            {visibleRecent.length>0 && (
+              <View style={styles.discoveryBlock}>
+                <View style={styles.discoveryHeader}>
+                  <Text style={styles.discoveryBlockTitle}>بحثت مؤخرًا</Text>
+                  <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="مسح سجل البحث"
+                    onPress={()=>saveRecentSearches([])} style={styles.clearHistory}>
+                    <Trash2 size={13} color={OASIS.colors.muted}/><Text style={styles.clearHistoryText}>مسح الكل</Text>
+                  </Pressable>
+                </View>
+                <View style={styles.suggestions}>
+                  {visibleRecent.map(item=>(
+                    <View key={item} style={styles.recentItem}>
+                      <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel={`إعادة البحث عن ${item}`}
+                        onPress={()=>handleSelectKeyword(item)} style={styles.recentKeyword}>
+                        <Clock size={13} color={OASIS.colors.muted}/><Text style={styles.recentText} numberOfLines={1}>{item}</Text>
+                      </Pressable>
+                      <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel={`حذف بحث ${item}`}
+                        onPress={()=>removeRecentSearch(item)} style={styles.recentRemove}><X size={12} color={OASIS.colors.muted}/></Pressable>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+            {SEARCH_SUGGESTIONS[activeTab].length>0 && (
+              <View style={styles.discoveryBlock}>
+                <Text style={styles.discoveryBlockTitle}>جرّب البحث عن</Text>
+                <View style={styles.suggestions}>
+                  {SEARCH_SUGGESTIONS[activeTab].map(word=>(
+                    <Pressable oasisKind="plain" key={word} accessibilityRole="button" accessibilityLabel={`البحث عن ${word}`}
+                      onPress={()=>handleSelectKeyword(word)} style={styles.suggestionChip}>
+                      <SearchIcon size={13} color={OASIS.colors.primary}/><Text style={styles.suggestionText}>{word}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+            )}
+            {activeTab!=='all' && (
+              <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="عرض جميع أقسام الاستكشاف"
+                onPress={()=>setActiveTab('all')} style={styles.backToAll}>
+                <Text style={styles.backToAllText}>جميع الأقسام</Text><ArrowRight size={15} color={OASIS.colors.primary}/>
+              </Pressable>
             )}
           </View>
         )}
@@ -675,7 +740,7 @@ export default function SearchPage() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: OASIS.colors.background,
+    backgroundColor: '#F9FBF9',
   },
   headerMapBtn: {
     width: 36,
@@ -687,23 +752,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#a7f3d0',
   },
-  searchBarContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 8,
-    backgroundColor: OASIS.colors.surface,
-  },
-  searchBox: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    backgroundColor: OASIS.colors.background,
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    minHeight: 52,
-    borderWidth: 1.5,
-    borderColor: OASIS.colors.line,
-    gap: 10,
-  },
+  searchBarContainer: {paddingHorizontal:16,paddingTop:12,paddingBottom:9,backgroundColor:'#F9FBF9'},
+  scopeRow: {flexDirection:'row-reverse',alignItems:'center',justifyContent:'space-between',gap:8,marginTop:9},
+  scopeToggle: {minHeight:34,flexDirection:'row-reverse',alignItems:'center',gap:6,paddingHorizontal:11,borderRadius:12,backgroundColor:'#EDF5F0'},
+  scopeToggleActive: {backgroundColor:'#DFF2E5'},
+  scopeToggleText: {color:'#17654D',fontSize:11.5,fontWeight:'700'},
+  scopeCaption: {color:'#85968A',fontSize:11},
+  searchBox: {flexDirection:'row-reverse',alignItems:'center',backgroundColor:'#FFFFFF',borderRadius:14,paddingHorizontal:11,minHeight:48,borderWidth:1,borderColor:'#DCE8E0',gap:9},
   searchBoxFocused: {
     borderColor: OASIS.colors.primary,
     backgroundColor: OASIS.colors.surface,
@@ -711,7 +766,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0,
     shadowRadius: 6,
-    elevation: 2,
+    elevation: 0,
   },
   searchIconBadge: {
     width: 30,
@@ -721,15 +776,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  searchInput: {
-    flex: 1,
-    fontSize: 13.5,
-    color: OASIS.colors.ink,
-    fontWeight: '700',
-    textAlign: 'right',
-    minHeight: 48,
-    padding: 0,
-  },
+  searchInput: {flex:1,fontSize:14,color:OASIS.colors.ink,fontWeight:'500',textAlign:'right',minHeight:46,padding:0},
   clearBtn: {
     width: 44,
     height: 44,
@@ -738,31 +785,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tabsWrapper: {
-    backgroundColor: OASIS.colors.surface,
-    paddingHorizontal: 16,
-    paddingBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-  },
+  tabsWrapper: {backgroundColor:'#F9FBF9',paddingHorizontal:16,paddingBottom:10,borderBottomWidth:1,borderBottomColor:'#E7EEE9'},
   tabsScroll: {
     flexDirection: 'row-reverse',
     gap: 8,
     alignItems: 'center',
   },
-  tab: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 14,
-    minHeight: 44,
-    paddingVertical: 10,
-    borderRadius: 14,
-    overflow: 'hidden',
-    backgroundColor: '#f1f5f9',
-    borderWidth: 1,
-    borderColor: OASIS.colors.line,
-  },
+  tab: {flexDirection:'row-reverse',alignItems:'center',gap:6,paddingHorizontal:13,minHeight:38,paddingVertical:7,borderRadius:19,overflow:'hidden',backgroundColor:'#EDF4EF',borderWidth:1,borderColor:'#E3ECE5'},
   tabActive: {
     backgroundColor: OASIS.colors.primary,
     borderColor: OASIS.colors.primary,
@@ -1374,4 +1403,31 @@ const styles = StyleSheet.create({
   recentChipDelete: {
     padding: 3,
   },
+  discoveryStart: {paddingHorizontal:16,paddingTop:4,paddingBottom:8,gap:19},
+  discoveryIntro: {flexDirection:'row-reverse',alignItems:'center',gap:12,padding:14,borderRadius:16,backgroundColor:'#EFF6F1',borderWidth:1,borderColor:'#DEEBE2'},
+  discoveryIntroIcon: {width:42,height:42,borderRadius:13,backgroundColor:'#DCEFE3',alignItems:'center',justifyContent:'center'},
+  discoveryIntroCopy: {flex:1,alignItems:'flex-end',gap:3},
+  discoveryIntroTitle: {fontSize:15,fontWeight:'800',color:'#173E30',textAlign:'right'},
+  discoveryIntroSub: {fontSize:11.5,fontWeight:'500',color:'#667D70',lineHeight:18,textAlign:'right'},
+  discoveryFocus: {width:38,height:38,borderRadius:12,backgroundColor:'#FFFFFF',alignItems:'center',justifyContent:'center'},
+  discoveryBlock: {gap:10},
+  discoveryBlockTitle: {fontSize:14,fontWeight:'700',color:OASIS.colors.ink,textAlign:'right'},
+  discoveryGrid: {flexDirection:'row-reverse',flexWrap:'wrap',columnGap:10,rowGap:10},
+  discoveryShortcut: {width:'48%',minHeight:78,flexDirection:'row-reverse',alignItems:'center',gap:7,paddingHorizontal:10,paddingVertical:10,borderRadius:14,backgroundColor:'#FFFFFF',borderWidth:1,borderColor:'#E1EAE4'},
+  shortcutIcon: {width:33,height:33,borderRadius:11,alignItems:'center',justifyContent:'center',backgroundColor:'#EDF5F0'},
+  shortcutCopy: {flex:1,minWidth:0,alignItems:'flex-end',gap:2},
+  shortcutTitle: {fontSize:12.5,fontWeight:'700',color:OASIS.colors.ink,textAlign:'right'},
+  shortcutSub: {fontSize:10.5,fontWeight:'500',color:'#7B9083',textAlign:'right'},
+  discoveryHeader: {flexDirection:'row-reverse',alignItems:'center',justifyContent:'space-between',gap:8},
+  clearHistory: {flexDirection:'row-reverse',alignItems:'center',gap:4,padding:5},
+  clearHistoryText: {fontSize:11,color:OASIS.colors.muted},
+  suggestions: {flexDirection:'row-reverse',flexWrap:'wrap',gap:8},
+  suggestionChip: {flexDirection:'row-reverse',alignItems:'center',gap:6,minHeight:36,paddingVertical:7,paddingHorizontal:11,borderRadius:18,backgroundColor:'#FFFFFF',borderWidth:1,borderColor:'#DDE8E0'},
+  suggestionText: {fontSize:11.5,fontWeight:'600',color:'#2E5946'},
+  recentItem: {flexDirection:'row-reverse',alignItems:'center',borderRadius:12,backgroundColor:'#FFFFFF',borderWidth:1,borderColor:'#E0E9E3'},
+  recentKeyword: {flexDirection:'row-reverse',alignItems:'center',gap:5,paddingVertical:9,paddingHorizontal:10,maxWidth:185},
+  recentText: {fontSize:11.5,fontWeight:'600',color:OASIS.colors.ink},
+  recentRemove: {minWidth:27,minHeight:36,alignItems:'center',justifyContent:'center',paddingHorizontal:6},
+  backToAll: {flexDirection:'row-reverse',alignItems:'center',alignSelf:'flex-end',gap:7,paddingVertical:8,paddingHorizontal:2},
+  backToAllText: {color:OASIS.colors.primary,fontSize:12,fontWeight:'700'},
 });
