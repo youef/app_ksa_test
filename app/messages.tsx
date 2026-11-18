@@ -373,7 +373,6 @@ export default function Messages() {
 
   const showPlatformConversation = !onlyMuted && (!normalizedQuery || normalizeChatSearch('منصة حينا رسائل المنصة الرسمية').includes(normalizedQuery)) && (!onlyUnread || platformUnreadCount > 0);
   const totalUnreadCount = conversations.filter(c => c.isUnread).length + (platformUnreadCount > 0 ? 1 : 0);
-  const unreadCount = conversations.filter(c => c.isUnread && !c.isMuted && !dndNow).length + (platformUnreadCount > 0 ? 1 : 0);
   const mutedCount = conversations.filter(c => c.isMuted).length;
   const silentUnread = conversations.filter(c => c.isUnread && (c.isMuted || dndNow)).length;
 
