@@ -30,6 +30,9 @@ test('notification tab counts and feed use the same category definition', () => 
 test('inbox actions preserve confirmation on bulk delete and allow unread filtering', () => {
   assert.match(source, /accessibilityState=\{\{ selected: onlyUnread \}\}/);
   assert.match(source, /onPress=\{confirmClearAll\}/);
-  assert.match(source, /Alert\.alert\('مسح جميع الإشعارات'/);
+  assert.match(source, /visible=\{clearConfirmOpen\}/);
+  assert.match(source, /accessibilityLabel="تأكيد مسح جميع الإشعارات"/);
+  assert.match(source, /await supabase\.from\('notifications'\)\.delete\(\)\.eq\('user_id', currentUserId\)/);
+  assert.match(source, /setClearError\('تعذّر حذف الإشعارات/);
   assert.match(source, /onPress=\{\(\) => void markAllAsRead\(\)\}/);
 });
