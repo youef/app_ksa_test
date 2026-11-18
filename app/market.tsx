@@ -4,7 +4,7 @@ import { OasisEmptyIllustration } from '@/components/oasis/OasisEmptyIllustratio
 import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
 import { OASIS, useTheme } from '@/lib/oasis';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { View, Text, StyleSheet, Platform, ScrollView, Image, RefreshControl, Share, useWindowDimensions, Linking, Modal, Alert, ImageBackground, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Platform, ScrollView, Image, RefreshControl, Share, useWindowDimensions, Linking, Modal, Alert, ImageBackground, ActivityIndicator, AccessibilityInfo } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { useBottomNavInset } from '@/lib/bottomNav';
 import ScreenState from '@/components/shared/ScreenState';
@@ -138,6 +138,13 @@ export default function Market() {
   const [loadingAttendees, setLoadingAttendees] = useState(false);
   const [attendeeActionBusy, setAttendeeActionBusy] = useState(false);
   const [savedItems, setSavedItems] = useState<Record<string, boolean>>({});
+  const [reduceMotion, setReduceMotion] = useState(false);
+  useEffect(() => {
+    let mounted = true;
+    AccessibilityInfo.isReduceMotionEnabled().then(enabled => { if (mounted) setReduceMotion(enabled); }).catch(() => {});
+    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);
+    return () => { mounted = false; subscription.remove(); };
+  }, []);
 
   // Location State
   const [profile, setProfile] = useState<any>(null);
@@ -628,7 +635,10 @@ export default function Market() {
           <View style={styles.cardTopActions}>
             <Pressable
               hitSlop={8}
-              style={[styles.shareFab, isSaved && { backgroundColor: OASIS.colors.dangerSoft }]}
+              accessibilityRole="button"
+              accessibilityLabel={isSaved ? 'إزالة من المفضلة' : 'حفظ في المفضلة'}
+              accessibilityState={{ selected: isSaved }}
+              style={({ pressed }) => [styles.shareFab, isSaved && { backgroundColor: OASIS.colors.dangerSoft }, pressed && { opacity: 0.82 }, pressed && !reduceMotion && { transform: [{ scale: 0.93 }] }]}
               onPress={(e: any) => {
                 e?.stopPropagation?.();
                 void toggleSaveItem(item.id, favoriteType);
@@ -738,7 +748,10 @@ export default function Market() {
           <View style={styles.cardTopActions}>
             <Pressable
               hitSlop={8}
-              style={[styles.shareFab, isSaved && { backgroundColor: OASIS.colors.dangerSoft }]}
+              accessibilityRole="button"
+              accessibilityLabel={isSaved ? 'إزالة من المفضلة' : 'حفظ في المفضلة'}
+              accessibilityState={{ selected: isSaved }}
+              style={({ pressed }) => [styles.shareFab, isSaved && { backgroundColor: OASIS.colors.dangerSoft }, pressed && { opacity: 0.82 }, pressed && !reduceMotion && { transform: [{ scale: 0.93 }] }]}
               onPress={(e: any) => {
                 e?.stopPropagation?.();
                 void toggleSaveItem(b.id, 'store');
