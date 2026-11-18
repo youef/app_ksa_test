@@ -26,7 +26,7 @@ const ACCOUNT_ONLY_ROUTES = [
   '/profile', '/settings', '/messages', '/platform-inbox', '/conversation',
   '/ask', '/create-story', '/story', '/stories', '/story-settings', '/story-viewers', '/notifications',
   '/new-service', '/new-listing', '/service', '/business', '/directory', '/user', '/report', '/admin', '/support',
-  '/live',
+  '/live', '/kingdom',
 ];
 
 function needsAccount(pathname: string) {
