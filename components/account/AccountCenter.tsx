@@ -838,16 +838,16 @@ export default function AccountCenter() {
 
   if (loading) {
     return (
-      <View style={[styles.loadingScreen, { backgroundColor: 'transparent' }]}>
+      <View style={styles.loadingScreen}>
         <ContentSkeleton variant="profile" />
       </View>
     );
   }
 
-  if (!profile) return <View style={[styles.loadingScreen, {backgroundColor:colors.background}, { backgroundColor: 'transparent' }]}><UserX size={42} color={colors.muted}/><Text style={{color:colors.ink,fontSize:20,fontWeight:'700'}}>تعذر تحميل حسابك</Text><Text style={{color:colors.muted,textAlign:'center',padding:20}}>{loadError || 'سجل الدخول لعرض بياناتك.'}</Text><Pressable oasisKind="action" oasisVariant="primary" onPress={() => void load()}><Text>إعادة المحاولة</Text></Pressable><Pressable onPress={() => router.replace('/auth')}><Text style={{color:colors.primary}}>تسجيل الدخول</Text></Pressable></View>;
+  if (!profile) return <View style={[styles.loadingScreen, {backgroundColor:colors.background}]}><UserX size={42} color={colors.muted}/><Text style={{color:colors.ink,fontSize:20,fontWeight:'700'}}>تعذر تحميل حسابك</Text><Text style={{color:colors.muted,textAlign:'center',padding:20}}>{loadError || 'سجل الدخول لعرض بياناتك.'}</Text><Pressable oasisKind="action" oasisVariant="primary" onPress={() => void load()}><Text>إعادة المحاولة</Text></Pressable><Pressable onPress={() => router.replace('/auth')}><Text style={{color:colors.primary}}>تسجيل الدخول</Text></Pressable></View>;
 
   return (
-    <View style={[styles.screen, {backgroundColor:colors.background}, { backgroundColor: 'transparent' }]}>
+    <View style={[styles.screen, {backgroundColor:colors.background}]}>
       <ProfileConnections userId={userId} kind={connections} onClose={() => setConnections(null)} />
       <Modal visible={!!confirmation} transparent animationType="fade" onRequestClose={() => setConfirmation(null)}><View style={accountStyles.overlay}><View style={[accountStyles.dialog,{backgroundColor:colors.surface}]} accessibilityViewIsModal><Text style={{color:colors.ink,fontSize:21,fontWeight:'800',textAlign:'right'}}>{confirmation?.title}</Text><Text style={{color:colors.muted,lineHeight:25,textAlign:'right'}}>{confirmation?.message}</Text>{confirmation?.buttons.map((item,index) => <Pressable key={index} oasisKind="action" oasisVariant={item.style === 'destructive' ? 'danger' : 'secondary'} onPress={() => {setConfirmation(null);item.onPress?.();}}><Text>{item.text}</Text></Pressable>)}</View></View></Modal>
       <AppHeader
@@ -1543,7 +1543,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   loadingScreen: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: colors.background },
   loadingText: { color: colors.muted, fontSize: 12, fontWeight: '700' },
   headerAction: { width: 36, height: 36, borderRadius: 14, backgroundColor: colors.soft, alignItems: 'center', justifyContent: 'center' },
-  content: { paddingHorizontal: 14, paddingTop: 14, gap: 16, maxWidth: 920, width: '100%', alignSelf: 'center' },
+  content: { paddingHorizontal: 14, paddingTop: 11, gap: 12, maxWidth: 920, width: '100%', alignSelf: 'center' },
   profileHero: { borderWidth: 1, borderColor: colors.line, flexDirection: 'row-reverse', alignItems: 'center', gap: 12, padding: 16, minHeight: 138, borderRadius: 18, overflow: 'hidden' },
   profileHeroWide: { minHeight: 156, padding: 20 },
   heroCoverButton: { position: 'absolute', left: 12, top: 12, minHeight: 32, borderRadius: 10, paddingHorizontal: 9, backgroundColor: 'rgba(0,0,0,0.42)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)', flexDirection: 'row-reverse', alignItems: 'center', gap: 5, zIndex: 3 },
@@ -1564,18 +1564,18 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   stat: { flex: 1, alignItems: 'center', paddingVertical: 11, borderLeftWidth: 1, borderLeftColor: '#F1F5F9' },
   statValue: { color: colors.ink, fontSize: 16, fontWeight: '700' },
   statLabel: { color: colors.muted, fontSize: 11, fontWeight: '700', marginTop: 2 },
-  tabs: { flexDirection:'row-reverse',backgroundColor:colors.surface,borderRadius:18,padding:5,borderWidth:1,borderColor:colors.line,gap:4 },
-  tabButton: { flex: 1, minWidth: 0, minHeight: 49, borderRadius: 13, flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4 },
+  tabs: { flexDirection:'row-reverse',backgroundColor:colors.surface,borderRadius:14,padding:4,borderWidth:1,borderColor:colors.line,gap:4 },
+  tabButton: { flex: 1, minWidth: 0, minHeight: 42, borderRadius: 10, flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 },
   tabButtonActive: { backgroundColor: colors.soft, borderWidth: 1, borderColor: colors.primary + '36' },
-  tabButtonText: { color: colors.muted, fontSize: 11, fontWeight: '700' },
+  tabButtonText: { color: colors.muted, fontSize: 10.5, fontWeight: '700' },
   tabButtonTextActive: { color: colors.primary },
-  stack: { gap: 14 },
+  stack: { gap: 11 },
   businessSummary: { borderRadius: 14, padding: 14, gap: 5 },
   businessSummaryTitle: { color: colors.ink, fontSize: 13, fontWeight: '800', textAlign: 'right' },
   businessSummarySub: { color: colors.muted, fontSize: 11.5, lineHeight: 18, textAlign: 'right' },
-  profileActions: { flexDirection: 'row-reverse', gap: 10 },
-  profileAction: { flex: 1, minHeight: 46, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: colors.line, borderRadius: 14, backgroundColor: colors.surface },
-  profileActionText: { fontSize: 12, fontWeight: '700', color: colors.ink },
+  profileActions: { flexDirection: 'row-reverse', gap: 8 },
+  profileAction: { flex: 1, minHeight: 40, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: colors.line, borderRadius: 12, backgroundColor: colors.surface },
+  profileActionText: { fontSize: 11.5, fontWeight: '700', color: colors.ink },
   areaLead: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, backgroundColor: colors.surface, borderRadius: 18, borderWidth: 1, borderColor: colors.line, padding: 16 },
   areaLeadIcon: { width: 43, height: 43, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.soft },
   areaLeadTitle: { color: colors.ink, fontSize: 17, fontWeight: '800', textAlign: 'right' },
@@ -1594,7 +1594,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   settingsCategoryDescription: { color: colors.muted, fontSize: 11, lineHeight: 17, textAlign: 'right', minHeight: 35 },
   settingsBack: { alignSelf: 'flex-end', minHeight: 40, flexDirection: 'row-reverse', alignItems: 'center', gap: 7, paddingHorizontal: 12, borderRadius: 12, backgroundColor: colors.soft },
   settingsBackText: { color: colors.primary, fontWeight: '700', fontSize: 12 },
-  card: { backgroundColor: colors.surface, borderRadius: 14, borderWidth: 1, borderColor: colors.line, padding: 14, gap: 12 },
+  card: { backgroundColor: colors.surface, borderRadius: 13, borderWidth: 1, borderColor: colors.line, padding: 12, gap: 11 },
   sectionHeader: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   sectionHeaderCopy: { flex: 1, alignItems: 'flex-end' },
   sectionTitle: { color: colors.ink, fontSize: 15, fontWeight: '700', textAlign: 'right' },
