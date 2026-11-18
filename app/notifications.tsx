@@ -62,6 +62,9 @@ export default function Notifications() {
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<NotificationCategory>('all');
   const [onlyUnread, setOnlyUnread] = useState(false);
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
+  const [clearingAll, setClearingAll] = useState(false);
+  const [clearError, setClearError] = useState('');
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   // Settings Modal State
@@ -186,22 +189,27 @@ export default function Notifications() {
     await supabase.from('notifications').delete().eq('id', id);
   }
 
-  // Clear all notifications
+  // Keep the destructive confirmation usable in Expo web and on native devices.
   function confirmClearAll() {
-    if (items.length === 0) return;
-    Alert.alert('مسح جميع الإشعارات', 'هل أنت متأكد من مسح جميع الإشعارات من قائمتك؟', [
-      { text: 'إلغاء', style: 'cancel' },
-      {
-        text: 'مسح الكل',
-        style: 'destructive',
-        onPress: async () => {
-          setItems([]);
-          if (currentUserId) {
-            await supabase.from('notifications').delete().eq('user_id', currentUserId);
-          }
-        },
-      },
-    ]);
+    if (!items.length) return;
+    setClearError('');
+    setClearConfirmOpen(true);
+  }
+
+  async function clearAllNotifications() {
+    if (!currentUserId || clearingAll) return;
+    setClearingAll(true);
+    setClearError('');
+    try {
+      const { error } = await supabase.from('notifications').delete().eq('user_id', currentUserId);
+      if (error) throw error;
+      setItems([]);
+      setClearConfirmOpen(false);
+    } catch {
+      setClearError('تعذّر حذف الإشعارات. تأكد من الاتصال وحاول مجددًا.');
+    } finally {
+      setClearingAll(false);
+    }
   }
 
   // Interactive Click on Notification -> Navigate to Target
@@ -298,7 +306,7 @@ export default function Notifications() {
       {/* 2. CATEGORY TABS (SCROLLABLE PILLS)                      */}
       {/* ======================================================== */}
       <View style={styles.tabsWrapper}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsScroll}>
+        <ScrollView style={{ direction: 'rtl' }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.tabsScroll, { direction: 'ltr' }]}>
           {[
             { key: 'all', label: 'الكل', count: countForCategory('all') },
             { key: 'emergency', label: 'طوارئ وبلاغات', count: countForCategory('emergency') },
@@ -432,6 +440,28 @@ export default function Notifications() {
 
         </ScrollView>
       )}
+
+      <Modal visible={clearConfirmOpen} transparent animationType="fade" onRequestClose={() => { if (!clearingAll) setClearConfirmOpen(false); }}>
+        <View style={styles.clearOverlay}>
+          <View style={styles.clearConfirmCard}>
+            <View style={styles.clearConfirmIcon}><Trash2 size={22} color={OASIS.colors.danger}/></View>
+            <Text style={styles.clearConfirmTitle}>مسح جميع الإشعارات؟</Text>
+            <Text style={styles.clearConfirmDesc}>سيتم حذف {items.length} إشعار من مركز الإشعارات، ولا يمكن التراجع عن الحذف.</Text>
+            {!!clearError && <Text accessibilityRole="alert" style={styles.clearConfirmError}>{clearError}</Text>}
+            <View style={styles.clearConfirmActions}>
+              <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="إلغاء مسح الإشعارات"
+                disabled={clearingAll} onPress={() => setClearConfirmOpen(false)} style={styles.clearCancelButton}>
+                <Text style={styles.clearCancelText}>إلغاء</Text>
+              </Pressable>
+              <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="تأكيد مسح جميع الإشعارات"
+                disabled={clearingAll} onPress={() => void clearAllNotifications()} style={[styles.clearDestructiveButton, clearingAll && { opacity: 0.6 }]}>
+                {clearingAll ? <ActivityIndicator size="small" color="#FFFFFF"/> : <Trash2 size={16} color="#FFFFFF"/>}
+                <Text style={styles.clearDestructiveText}>مسح الكل</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* ======================================================== */}
       {/* 4. NOTIFICATION SETTINGS MODAL                           */}
@@ -637,6 +667,17 @@ function formatTimeAgo(dateStr: string) {
 }
 
 const styles = StyleSheet.create({
+  clearOverlay: { flex: 1, backgroundColor: 'rgba(0,13,10,0.58)', justifyContent: 'center', paddingHorizontal: 22 },
+  clearConfirmCard: { backgroundColor: OASIS.colors.surface, borderRadius: 20, padding: 20, alignItems: 'center', gap: 11, borderWidth: 1, borderColor: OASIS.colors.line },
+  clearConfirmIcon: { width: 48, height: 48, borderRadius: 15, backgroundColor: OASIS.colors.dangerSoft, alignItems: 'center', justifyContent: 'center' },
+  clearConfirmTitle: { color: OASIS.colors.ink, fontSize: 17, fontWeight: '800', textAlign: 'center' },
+  clearConfirmDesc: { color: OASIS.colors.muted, fontSize: 12.5, lineHeight: 20, textAlign: 'center' },
+  clearConfirmError: { color: OASIS.colors.danger, fontSize: 11.5, textAlign: 'center' },
+  clearConfirmActions: { width: '100%', flexDirection: 'row-reverse', gap: 10, marginTop: 7 },
+  clearCancelButton: { flex: 1, minHeight: 44, justifyContent: 'center', alignItems: 'center', backgroundColor: OASIS.colors.background, borderRadius: 12, borderWidth: 1, borderColor: OASIS.colors.line },
+  clearCancelText: { color: OASIS.colors.ink, fontSize: 13, fontWeight: '700' },
+  clearDestructiveButton: { flex: 1, minHeight: 44, flexDirection: 'row-reverse', justifyContent: 'center', alignItems: 'center', gap: 7, borderRadius: 12, backgroundColor: OASIS.colors.danger },
+  clearDestructiveText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
   inboxActionBar: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingHorizontal: 14, paddingVertical: 8, backgroundColor: OASIS.colors.surface, borderBottomWidth: 1, borderBottomColor: OASIS.colors.line },
   unreadToggle: { minHeight: 37, flexDirection: 'row-reverse', alignItems: 'center', gap: 7, borderRadius: 12, paddingHorizontal: 10, backgroundColor: OASIS.colors.background, borderWidth: 1, borderColor: OASIS.colors.line },
   unreadToggleActive: { backgroundColor: OASIS.colors.soft, borderColor: '#91D9B9' },
