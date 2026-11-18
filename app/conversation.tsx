@@ -72,6 +72,7 @@ export default function Conversation() {
   const [otherTyping, setOtherTyping] = useState(false);
   const [isOnline, setIsOnline] = useState(false);
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const incomingTypingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const channelRef = useRef<any>(null);
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
@@ -86,22 +87,29 @@ export default function Conversation() {
   const scrollRef = useRef<ScrollView>(null);
   const nearLatest = useRef(true);
   const [showJump, setShowJump] = useState(false);
+  const [unseenCount, setUnseenCount] = useState(0);
   const [loadFailed, setLoadFailed] = useState(false);
   const [loadAttempt, setLoadAttempt] = useState(0);
   const onPreviewImage = useCallback((url: string) => setPreviewImageUrl(url), []);
+  const markVisibleRead = useCallback(() => {
+    setUnseenCount(0);
+    if (convId && currentUserId) void markConversationRead(convId, currentUserId);
+  }, [convId, currentUserId]);
   const jumpToLatest = useCallback(() => {
     nearLatest.current = true;
     setShowJump(false);
     scrollRef.current?.scrollToEnd({ animated: true });
-  }, []);
+    markVisibleRead();
+  }, [markVisibleRead]);
   const trackScroll = useCallback(({ nativeEvent }: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { contentOffset, contentSize, layoutMeasurement } = nativeEvent;
     const atEnd = contentSize.height - layoutMeasurement.height - contentOffset.y < 100;
     if (atEnd !== nearLatest.current) {
       nearLatest.current = atEnd;
       setShowJump(!atEnd);
+      if (atEnd) markVisibleRead();
     }
-  }, []);
+  }, [markVisibleRead]);
   useEffect(() => {
     const timer = setInterval(() => setClockNow(Date.now()), 1000);
     return () => clearInterval(timer);
@@ -150,7 +158,9 @@ export default function Conversation() {
     ]);
     if (messagesResult.error || membersResult.error) throw messagesResult.error || membersResult.error;
     if (!isActive()) return;
-    const msgs = messagesResult.data;
+    const clearedAt = settings[idToUse]?.clearedAt;
+    const clearedTimestamp = clearedAt ? new Date(clearedAt).getTime() : 0;
+    const msgs = (messagesResult.data || []).filter(msg => new Date(msg.created_at).getTime() > clearedTimestamp);
     const otherId = membersResult.data?.[0]?.user_id;
     const [otherProfile, otherSettings, mineBlocks, theirBlocks] = otherId ? await Promise.all([
       supabase.from('profiles').select(PROFILE_READ_FIELDS).eq('id', otherId).maybeSingle(),
@@ -165,15 +175,16 @@ export default function Conversation() {
     setOtherUser(otherProfile?.data ?? null);
     setOtherDnd(otherSettings ? isDndActiveNow(otherSettings) : false);
     setIsMuted(Boolean(settings[idToUse]?.muted));
-    setIsCleared(Boolean(settings[idToUse]?.clearedAt));
+    setIsCleared(Boolean(clearedAt));
     setDndActive(isDndActiveNow(dnd));
     setBlockedByMe(Boolean(mineBlocks?.data));
     setBlockedMe(Boolean(theirBlocks?.data));
     setMessages(prev => {
-      const loaded = msgs ?? [];
+      const loaded = msgs;
       const loadedIds = new Set(loaded.map(m => m.id));
       const liveOnly = prev.filter(m => {
-        if (!m.id || !String(m.id).startsWith('optimistic-')) return !loadedIds.has(m.id);
+        if (m.conversation_id !== idToUse || new Date(m.created_at).getTime() <= clearedTimestamp || loadedIds.has(m.id)) return false;
+        if (!m.id || !String(m.id).startsWith('optimistic-')) return true;
         const duplicate = loaded.some(
           loadedMessage =>
             loadedMessage.sender_id === m.sender_id &&
@@ -186,7 +197,8 @@ export default function Conversation() {
     });
     setLoading(false);
     setLoadFailed(false);
-    if (msgs?.length) void markConversationRead(idToUse, userId);
+    setUnseenCount(0);
+    if (msgs.length) void markConversationRead(idToUse, userId);
     void syncDndWithNotifications(userId).catch(() => {});
   }, []);
 
@@ -271,7 +283,11 @@ export default function Conversation() {
             });
             setOtherTyping(false);
             if (newMsg.sender_id !== userId) {
-              void markConversationRead(activeId, userId);
+              if (nearLatest.current) {
+                void markConversationRead(activeId, userId);
+              } else {
+                setUnseenCount(count => count + 1);
+              }
             }
           }
         )
@@ -289,9 +305,30 @@ export default function Conversation() {
             setMessages(prev => prev.map(m => m.id === updatedMsg.id ? updatedMsg : m));
           }
         )
+        .on(
+          'postgres_changes',
+          {
+            event: 'DELETE',
+            schema: 'public',
+            table: 'messages',
+            filter: `conversation_id=eq.${activeId}`,
+          },
+          payload => {
+            if (!alive) return;
+            const deletedId = (payload.old as { id?: string } | null)?.id;
+            if (deletedId) setMessages(prev => prev.filter(m => m.id !== deletedId));
+          }
+        )
         .on('broadcast', { event: 'typing' }, ({ payload }: any) => {
           if (!alive || payload?.userId === userId) return;
-          setOtherTyping(!!payload?.typing);
+          if (incomingTypingTimeoutRef.current) clearTimeout(incomingTypingTimeoutRef.current);
+          const typing = Boolean(payload?.typing);
+          setOtherTyping(typing);
+          if (typing) {
+            incomingTypingTimeoutRef.current = setTimeout(() => {
+              if (alive) setOtherTyping(false);
+            }, 3500);
+          }
         })
         .on('presence', { event: 'sync' }, () => {
           if (!alive) return;
@@ -321,6 +358,7 @@ export default function Conversation() {
     return () => {
       alive = false;
       if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+      if (incomingTypingTimeoutRef.current) clearTimeout(incomingTypingTimeoutRef.current);
       channelRef.current = null;
       if (ch) {
         void ch.untrack();
@@ -662,6 +700,7 @@ export default function Conversation() {
     if (!result.ok) return Alert.alert('تعذّر المسح', result.error);
 
     setMessages([]);
+    setUnseenCount(0);
     setIsCleared(true);
     Alert.alert('تم المسح ✓', 'حُذفت الرسائل من عندك فقط، وآخر رسالة لك محفوظة عند الطرف الآخر.');
   }
@@ -760,7 +799,7 @@ export default function Conversation() {
         <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="الانتقال إلى أحدث رسالة" accessibilityHint="ينقلك إلى أسفل المحادثة" onPress={jumpToLatest}
           style={[styles.jumpToLatest, { backgroundColor: colors.surface, borderColor: colors.line }]}>
           <ArrowDown size={17} color={colors.primary} />
-          <Text style={[styles.jumpLabel, { color: colors.primary }]}>أحدث الرسائل</Text>
+          <Text style={[styles.jumpLabel, { color: colors.primary }]}>{unseenCount > 0 ? `${unseenCount} رسالة جديدة` : 'أحدث الرسائل'}</Text>
         </Pressable>
       )}
       </View>

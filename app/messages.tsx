@@ -83,6 +83,7 @@ export default function Messages() {
   const [target, setTarget] = useState<Conv | null>(null);
   const [busy, setBusy] = useState(false);
   const [onlyUnread, setOnlyUnread] = useState(false);
+  const [onlyMuted, setOnlyMuted] = useState(false);
   const [platformMessages, setPlatformMessages] = useState<any[]>([]);
   const [platformUnreadCount, setPlatformUnreadCount] = useState(0);
 
@@ -159,11 +160,18 @@ export default function Messages() {
 
       if (version !== loadVersion.current) return;
       if (profileError) throw profileError;
-      const profileMap = (profiles || []).reduce((acc: any, p: any) => ({ ...acc, [p.id]: p }), {});
+      const profileMap = Object.fromEntries((profiles || []).map((profile: any) => [profile.id, profile]));
 
       const convMap: Record<string, any> = {};
+      const unreadConversationIds = new Set<string>();
       messages.forEach((msg: any) => {
+        // A conversation cleared "for me" must not show old previews or old unread messages.
+        const clearedAt = settings[msg.conversation_id]?.clearedAt;
+        if (clearedAt && new Date(msg.created_at).getTime() <= new Date(clearedAt).getTime()) return;
         if (!convMap[msg.conversation_id]) convMap[msg.conversation_id] = msg;
+        if (msg.sender_id !== userId && !(msg.read_by || []).includes(userId)) {
+          unreadConversationIds.add(msg.conversation_id);
+        }
       });
 
       const memberByConversation = new Map(allMembers.map(member => [member.conversation_id, member]));
@@ -179,10 +187,7 @@ export default function Messages() {
             id: convId,
             other: otherProfile,
             lastMessage: lastMsg,
-            isUnread:
-              !!lastMsg &&
-              lastMsg.sender_id !== userId &&
-              !(lastMsg.read_by || []).includes(userId),
+            isUnread: unreadConversationIds.has(convId),
             isBlocked: otherId ? bIds.includes(otherId) || brIds.includes(otherId) : false,
             iBlocked: otherId ? bIds.includes(otherId) : false,
             blockedMe: otherId ? brIds.includes(otherId) : false,
@@ -219,7 +224,8 @@ export default function Messages() {
       };
       const channel = supabase.channel('chat-list-' + Math.random().toString(36).slice(2))
         .on('postgres_changes', { event: '*', schema: 'public', table: 'platform_messages' }, refreshSoon)
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, refreshSoon)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, refreshSoon)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'conversation_members' }, refreshSoon)
         .subscribe();
       return () => {
         ++loadVersion.current;
@@ -357,14 +363,17 @@ export default function Messages() {
     ]);
   }
 
+  const normalizedQuery = normalizeChatSearch(searchQuery);
   const filtered = conversations.filter(c => {
-    const matchesSearch = !searchQuery.trim() || c.name.toLowerCase().includes(searchQuery.trim().toLowerCase());
-    return matchesSearch && (!onlyUnread || c.isUnread);
+    const lastIsMine = c.lastMessage?.sender_id === currentUserId;
+    const preview = c.isCleared && !c.lastMessage ? '' : formatMessagePreview(c.lastMessage?.body, lastIsMine);
+    const matchesSearch = !normalizedQuery || normalizeChatSearch(c.name).includes(normalizedQuery) || normalizeChatSearch(preview).includes(normalizedQuery);
+    return matchesSearch && (!onlyUnread || c.isUnread) && (!onlyMuted || c.isMuted);
   });
 
-  const officialQuery = searchQuery.trim().replace(/[\u064B-\u065F\u0670\u0640]/g, '');
-  const showPlatformConversation = (!officialQuery || 'منصة حينا رسائل المنصة الرسمية'.includes(officialQuery)) && (!onlyUnread || platformUnreadCount > 0);
-  const unreadCount = conversations.filter(c => c.isUnread && !c.isMuted && !dndNow).length + (platformUnreadCount > 0 ? 1 : 0);
+  const showPlatformConversation = !onlyMuted && (!normalizedQuery || normalizeChatSearch('منصة حينا رسائل المنصة الرسمية').includes(normalizedQuery)) && (!onlyUnread || platformUnreadCount > 0);
+  const totalUnreadCount = conversations.filter(c => c.isUnread).length + (platformUnreadCount > 0 ? 1 : 0);
+  const mutedCount = conversations.filter(c => c.isMuted).length;
   const silentUnread = conversations.filter(c => c.isUnread && (c.isMuted || dndNow)).length;
 
   return (
@@ -372,7 +381,7 @@ export default function Messages() {
       <AppHeader
         variant="tab"
         title="المحادثات"
-        subtitle={unreadCount > 0 ? `${unreadCount} محادثة جديدة غير مقروءة` : undefined}
+        subtitle={totalUnreadCount > 0 ? `${totalUnreadCount} محادثة غير مقروءة` : undefined}
         rightAction={
           <View style={styles.headerRightActions}>
             {silentUnread > 0 && (
@@ -410,7 +419,7 @@ export default function Messages() {
           <TextInput
             style={styles.searchInput}
             accessibilityLabel="ابحث في المحادثات"
-            placeholder="ابحث في المحادثات"
+            placeholder="ابحث بالاسم أو الرسالة"
             placeholderTextColor="#94a3b8"
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -425,29 +434,37 @@ export default function Messages() {
 
         {/* Filter Pills */}
         <View style={styles.filtersRow}>
-          <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="عرض كل المحادثات" accessibilityState={{ selected: !onlyUnread }}
-            style={[styles.filterPill, !onlyUnread && styles.filterPillActive]}
-            onPress={() => setOnlyUnread(false)}
+          <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="عرض كل المحادثات" accessibilityState={{ selected: !onlyUnread && !onlyMuted }}
+            style={[styles.filterPill, !onlyUnread && !onlyMuted && styles.filterPillActive]}
+            onPress={() => { setOnlyUnread(false); setOnlyMuted(false); }}
           >
-            <MessageCircle size={13} color={!onlyUnread ? OASIS.colors.surface : OASIS.colors.muted} />
-            <Text style={[styles.filterPillText, !onlyUnread && styles.filterPillTextActive]}>
+            <MessageCircle size={13} color={!onlyUnread && !onlyMuted ? OASIS.colors.surface : OASIS.colors.muted} />
+            <Text style={[styles.filterPillText, !onlyUnread && !onlyMuted && styles.filterPillTextActive]}>
               الكل ({conversations.length + 1})
             </Text>
           </Pressable>
 
           <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="عرض المحادثات غير المقروءة" accessibilityState={{ selected: onlyUnread }}
             style={[styles.filterPill, onlyUnread && styles.filterPillActive]}
-            onPress={() => setOnlyUnread(true)}
+            onPress={() => { setOnlyUnread(true); setOnlyMuted(false); }}
           >
             <Filter size={13} color={onlyUnread ? OASIS.colors.surface : OASIS.colors.muted} />
             <Text style={[styles.filterPillText, onlyUnread && styles.filterPillTextActive]}>
               غير مقروء
             </Text>
-            {unreadCount > 0 && (
+            {totalUnreadCount > 0 && (
               <View style={styles.unreadCounterBadge}>
-                <Text style={styles.unreadCounterText}>{unreadCount}</Text>
+                <Text style={styles.unreadCounterText}>{totalUnreadCount}</Text>
               </View>
             )}
+          </Pressable>
+
+          <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="عرض المحادثات المكتومة" accessibilityState={{ selected: onlyMuted }}
+            style={[styles.filterPill, onlyMuted && styles.filterPillActive]}
+            onPress={() => { setOnlyMuted(true); setOnlyUnread(false); }}
+          >
+            <BellOff size={13} color={onlyMuted ? OASIS.colors.surface : OASIS.colors.muted} />
+            <Text style={[styles.filterPillText, onlyMuted && styles.filterPillTextActive]}>المكتومة ({mutedCount})</Text>
           </Pressable>
         </View>
       </View>
@@ -507,15 +524,15 @@ export default function Messages() {
               <View style={styles.emptyState}>
                 <View style={{ alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}><OasisEmptyIllustration kind="empty-chat" /></View>
                 <Text style={styles.emptyTitle}>
-                  {searchQuery ? 'لا توجد نتائج لبحثك' : onlyUnread ? 'لا توجد محادثات غير مقروءة' : 'لا توجد محادثات بعد'}
+                  {searchQuery ? 'لا توجد نتائج لبحثك' : onlyUnread ? 'لا توجد محادثات غير مقروءة' : onlyMuted ? 'لا توجد محادثات مكتومة' : 'لا توجد محادثات بعد'}
                 </Text>
                 <Text style={styles.emptySub}>
                   {searchQuery
                     ? 'جرب البحث باسم جار آخر أو كلمة مفتاحية أخرى.'
-                    : onlyUnread ? 'كل محادثاتك مقروءة. يمكنك العودة إلى جميع المحادثات.' : 'تواصل مع جيران حيك، استفسر عن خدماتهم، أو نسق معهم مباشرة.'}
+                    : onlyUnread ? 'كل محادثاتك مقروءة. يمكنك العودة إلى جميع المحادثات.' : onlyMuted ? 'لم تكتم أي محادثة بعد. يمكنك كتم أي محادثة بالضغط المطوّل عليها.' : 'تواصل مع جيران حيك، استفسر عن خدماتهم، أو نسق معهم مباشرة.'}
                 </Text>
-                {(searchQuery || onlyUnread) ? (
-                  <Pressable oasisKind="action" accessibilityRole="button" accessibilityLabel="مسح البحث والفلاتر" style={styles.startChatBtn} onPress={() => { setSearchQuery(''); setOnlyUnread(false); }}>
+                {(searchQuery || onlyUnread || onlyMuted) ? (
+                  <Pressable oasisKind="action" accessibilityRole="button" accessibilityLabel="مسح البحث والفلاتر" style={styles.startChatBtn} onPress={() => { setSearchQuery(''); setOnlyUnread(false); setOnlyMuted(false); }}>
                     <Text style={styles.startChatBtnText}>عرض كل المحادثات</Text>
                   </Pressable>
                 ) : (
@@ -776,6 +793,14 @@ function SheetRow({
   );
 }
 
+function normalizeChatSearch(value: string): string {
+  return value.toLowerCase().normalize('NFKC')
+    .replace(/[\u064B-\u065F\u0670\u0640]/g, '')
+    .replace(/[إأآٱ]/g, 'ا')
+    .replace(/ى/g, 'ي')
+    .trim();
+}
+
 function formatMessagePreview(bodyStr?: string | null, isMine = false): string {
   if (!bodyStr) return 'ابدأ المحادثة';
   const trimmed = bodyStr.trim();
@@ -1005,6 +1030,7 @@ const styles = StyleSheet.create({
   },
   filtersRow: {
     flexDirection: 'row-reverse',
+    flexWrap: 'wrap',
     gap: 8,
     marginBottom: 4,
   },
