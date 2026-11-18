@@ -6,7 +6,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { AppHeader } from '@/components/shared/AppHeader';
 import { useBottomNavInset } from '@/lib/bottomNav';
-import { Plus, ShieldCheck, UserPlus, Check, Eye } from 'lucide-react-native';
+import { Plus, ShieldCheck, UserPlus, Check, Eye, Radio, Sparkles } from 'lucide-react-native';
 import { getActiveLocation, isAllKingdom } from '@/lib/locationSync';
 import { isActiveStory, storyDiscoveryMembership } from '@/lib/storyActivity';
 import { getCachedSeenStoryIds, getLocalSeenStoryIds, rememberSeenStories } from '@/lib/storySeen';
@@ -30,11 +30,12 @@ export default function StoriesScreen() {
   const [likeCounts, setLikeCounts] = useState<Record<string, number>>({});
   const [followerCounts, setFollowerCounts] = useState<Record<string, number>>({});
   const [visibleTrendingCount, setVisibleTrendingCount] = useState(8);
+  const [storyFilter, setStoryFilter] = useState<'all' | 'unseen' | 'following'>('all');
   const [gridWidth, setGridWidth] = useState(0);
   const columns = gridWidth >= 640 ? 3 : 2;
   // Reserve one pixel for onLayout rounding on fractional browser viewports.
   const cardWidth = gridWidth ? Math.floor((gridWidth - 10 * (columns - 1) - 1) / columns) : undefined;
-  const mediaHeight = cardWidth ? Math.min(160, Math.round(cardWidth * .88)) : 144;
+  const mediaHeight = cardWidth ? Math.min(166, Math.round(cardWidth * .93)) : 142;
 
   const loadInFlight = useRef(false);
   const lastRefreshAt = useRef(0);
@@ -209,8 +210,14 @@ export default function StoriesScreen() {
     return bUnseen - aUnseen || trendingScore(b) - trendingScore(a) || new Date(b.newestAt).getTime() - new Date(a.newestAt).getTime();
   });
   // ألوان الإطار: أخضر للجديد، رمادي للمشاهَد
-  const trendBorderColor = (hasUnseen: boolean) => hasUnseen ? '#22c55e' : '#8E8E93';
-  const ringColor = (hasUnseen: boolean) => hasUnseen ? OASIS.colors.primary : '#8E8E93';
+  const trendBorderColor = (hasUnseen: boolean) => hasUnseen ? '#74C99B' : colors.line;
+  const ringColor = (hasUnseen: boolean) => hasUnseen ? colors.primary : colors.line;
+  const unseenCount = trendingAuthors.filter((g: any) => g.hasUnseen).length;
+  const followedCount = trendingAuthors.filter((g: any) => followingIds.includes(String(g.authorId))).length;
+  const visibleAuthors = trendingAuthors.filter((g: any) =>
+    storyFilter === 'all' || (storyFilter === 'unseen' && g.hasUnseen) ||
+    (storyFilter === 'following' && followingIds.includes(String(g.authorId)))
+  );
   const displayName = (author: any) => author?.hide_name ? 'مجهول' : (author?.display_name?.trim() || 'جار الحي');
   async function toggleFollow(authorId: string) {
     if (!viewerId || authorId === viewerId) return;
@@ -241,12 +248,11 @@ export default function StoriesScreen() {
   }
   loadMoreRef.current = () => {
     if (loadInFlight.current) return;
-    if (visibleTrendingCount < trendingAuthors.length) setVisibleTrendingCount(count => Math.min(count + 8, trendingAuthors.length));
-    else if (Date.now() - lastRefreshAt.current > 3000) void loadAllStories(true);
+    if (visibleTrendingCount < visibleAuthors.length) setVisibleTrendingCount(count => Math.min(count + 8, visibleAuthors.length));
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }, { backgroundColor: 'transparent' }]}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <AppHeader
         variant="sub"
         title="اليوميات"
@@ -254,10 +260,22 @@ export default function StoriesScreen() {
 
       />
 
-      <View style={[styles.ringsSection, isDark && { backgroundColor: colors.surface, borderBottomColor: colors.line }]}>
-
-          <ScrollView style={{ direction: 'rtl' }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.ringsScroll, { direction: 'ltr' }]}>
-            <Pressable style={styles.ringItem} accessibilityRole="button" accessibilityLabel="أضف يومياتك" onPress={() => router.push(needsLogin ? '/auth' : '/create-story')}><View style={[styles.ringOuter, styles.ringSeen]}><Plus size={22} color={colors.primary} /></View><Text numberOfLines={1} style={[styles.ringName, isDark && { color: colors.ink }]}>يومياتك</Text></Pressable>
+      <View style={[styles.ringsSection, { backgroundColor: colors.surface, borderBottomColor: colors.line }]}>
+          <View style={styles.ringsHeadingRow}>
+            <View style={styles.ringsHeadingCopy}>
+              <Text style={[styles.ringsHeading, { color: colors.ink }]}>يوميات أهل حيّنا</Text>
+              <Text style={[styles.ringsSubtitle, { color: colors.muted }]}>تختفي بعد 24 ساعة</Text>
+            </View>
+            <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="إنشاء يومية جديدة"
+              onPress={() => router.push(needsLogin ? '/auth' : '/create-story')}
+              style={[styles.createShortcut, { backgroundColor: colors.soft }]}>
+              <Plus size={16} color={colors.primary}/>
+              <Text style={[styles.createShortcutText, { color: colors.primary }]}>إضافة يومية</Text>
+            </Pressable>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}
+            {...(Platform.OS === 'web' ? { dir: 'rtl' } : {})} contentContainerStyle={styles.ringsScroll}>
+            <Pressable style={styles.ringItem} accessibilityRole="button" accessibilityLabel="أضف يومياتك" onPress={() => router.push(needsLogin ? '/auth' : '/create-story')}><View style={[styles.ringOuter, styles.ringSeen, { borderColor: colors.line, backgroundColor: colors.soft }]}><Plus size={21} color={colors.primary} /></View><Text numberOfLines={1} style={[styles.ringName, isDark && { color: colors.ink }]}>يومياتك</Text></Pressable>
             {storyRings.map((group: any) => {
               const author = group.author;
               const name = displayName(author);
@@ -272,7 +290,7 @@ export default function StoriesScreen() {
                     </View>
                     
                   </View>
-                  <Text style={styles.ringName} numberOfLines={1}>{name}</Text>
+                  <Text style={[styles.ringName, { color: colors.ink }]} numberOfLines={1}>{name}</Text>
                 </Pressable>
               );
             })}
@@ -299,31 +317,57 @@ export default function StoriesScreen() {
           />
         }
       >
-        <View style={styles.trendingSectionTitleRow}><View style={styles.trendingSectionAccent} /><View style={{ flex: 1, alignItems: 'flex-end' }}><Text style={styles.sectionHeading}>ترند المدينة</Text></View></View>
+        <View style={styles.trendingSectionTitleRow}>
+          <View style={styles.trendingSectionAccent} />
+          <View style={styles.trendingHeadingCopy}>
+            <Text style={[styles.sectionHeading, { color: colors.ink }]}>اكتشف يوميات مدينتك</Text>
+            <Text style={[styles.sectionSubheading, { color: colors.muted }]}>{trendingAuthors.length} حساب لديه يوميات نشطة</Text>
+          </View>
+          <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="استكشف البث المباشر"
+            onPress={() => router.push('/lives')} style={[styles.liveShortcut, { backgroundColor: colors.soft }]}>
+            <Radio size={16} color={colors.primary}/>
+          </Pressable>
+        </View>
+        <View style={styles.filtersRow}>
+          {([
+            ['all', 'الكل', trendingAuthors.length],
+            ['unseen', 'الجديد', unseenCount],
+            ['following', 'أتابعهم', followedCount],
+          ] as const).map(([key,label,count]) => (
+            <Pressable oasisKind="plain" key={key} accessibilityRole="button"
+              accessibilityState={{ selected: storyFilter === key }}
+              accessibilityLabel={`${label}، ${count} حساب`}
+              onPress={() => { setStoryFilter(key); setVisibleTrendingCount(8); }}
+              style={[styles.filterButton, { borderColor: storyFilter === key ? colors.primary : colors.line, backgroundColor: storyFilter === key ? colors.primary : colors.surface }]}>
+              <Text style={[styles.filterLabel, { color: storyFilter === key ? '#FFFFFF' : colors.muted }]}>{label}</Text>
+              <Text style={[styles.filterCount, { color: storyFilter === key ? '#FFFFFF' : colors.primary }]}>{count}</Text>
+            </Pressable>
+          ))}
+        </View>
         {errorText ? <Pressable accessibilityRole="button" onPress={() => void loadAllStories()} style={{ padding: 16 }}><Text style={{ color: '#A65A49', textAlign: 'right' }}>تعذر تحميل اليوميات. اضغط لإعادة المحاولة.</Text></Pressable> : null}
         {loading && !refreshing ? (
           <View style={styles.loadingBox}>
             <ActivityIndicator size="large" color={OASIS.colors.primary} />
             <Text style={styles.loadingText}>جارٍ جلب يوميات جيرانك...</Text>
           </View>
-        ) : errorText ? null : trendingAuthors.length === 0 ? (
+        ) : errorText ? null : visibleAuthors.length === 0 ? (
           <View style={styles.emptyBox}>
-            <Text style={styles.emptyTitle}>{needsLogin ? 'سجل الدخول لمشاهدة اليوميات' : !currentCity ? 'حدد مدينتك أولاً' : 'أنت مطّلع على يوميات مدينتك'}</Text>
+            <Text style={[styles.emptyTitle, { color: colors.ink }]}>{needsLogin ? 'سجّل الدخول لمشاهدة اليوميات' : storyFilter === 'unseen' ? 'شاهدت اليوميات الجديدة' : storyFilter === 'following' ? 'ما فيه يوميات لمن تتابعهم' : !currentCity ? 'حدد مدينتك أولًا' : 'لا توجد يوميات نشطة حاليًا'}</Text>
             <Text style={styles.emptySub}>
-              ستظهر هنا اليوميات التي لم تشاهدها. اسحب للتحديث واكتشاف الجديد.
+              {storyFilter === 'all' ? 'عندما ينشر جيرانك يوميات جديدة ستظهر هنا. اسحب للتحديث.' : 'اختر الكل لعرض اليوميات الأخرى أو اسحب للتحديث.'}
             </Text>
             <Pressable oasisKind="action"
               style={styles.emptyActionBtn}
-              onPress={() => router.push(needsLogin ? '/auth' : !currentCity ? '/profile' : '/create-story')}
+              onPress={() => storyFilter !== 'all' ? setStoryFilter('all') : router.push(needsLogin ? '/auth' : !currentCity ? '/profile' : '/create-story')}
             >
               <Plus size={16} color={OASIS.colors.surface} strokeWidth={2.5} />
-              <Text style={styles.emptyActionBtnText}>{needsLogin ? 'تسجيل الدخول' : !currentCity ? 'تحديث ملفي' : 'شارك يومياتك'}</Text>
+              <Text style={styles.emptyActionBtnText}>{storyFilter !== 'all' ? 'عرض كل اليوميات' : needsLogin ? 'تسجيل الدخول' : !currentCity ? 'تحديث ملفي' : 'شارك يومياتك'}</Text>
             </Pressable>
           </View>
         ) : (
           <>
             <View style={styles.storiesGrid} onLayout={event => setGridWidth(event.nativeEvent.layout.width)}>
-              {trendingAuthors.slice(0, visibleTrendingCount).map((group: any) => {
+              {visibleAuthors.slice(0, visibleTrendingCount).map((group: any) => {
                 const story = group.latestStory;
                 const author = group.author;
                 const name = displayName(author);
@@ -334,8 +378,8 @@ export default function StoriesScreen() {
                 const cardBorder = trendBorderColor(group.hasUnseen);
                 return (
                   <Pressable oasisKind="plain" key={group.authorId}
-                    style={[styles.storyCard, isDark && { backgroundColor: colors.surface }, { width: cardWidth || '48%', borderColor: cardBorder, opacity: isSeen ? 0.82 : 1 }]}
-                    onPress={() => openAuthorStories(group.stories, trendingAuthors)}
+                    style={[styles.storyCard, { backgroundColor: colors.surface, width: cardWidth || '48%', borderColor: cardBorder }]}
+                    onPress={() => openAuthorStories(group.stories, visibleAuthors)}
                     accessibilityRole="button" accessibilityLabel={"فتح يوميات " + name}>
                     <View style={[styles.storyCardMedia, { backgroundColor: bg, height: mediaHeight }]}>
                       {hasMedia ? <Image accessible={false} source={{ uri: story.image_url }} style={styles.storyCardImage} resizeMode="cover" /> :
@@ -348,9 +392,9 @@ export default function StoriesScreen() {
                       </View>
                     </View>
                     {/* عدد المشاهدات */}
-                    <View style={styles.viewCountRow}>
+                    <View style={[styles.viewCountRow, { backgroundColor: colors.surface, borderBottomColor: colors.line }]}>
                       <Eye size={11} color={OASIS.colors.muted} />
-                      <Text style={styles.viewCountText}>{group.totalViews > 0 ? group.totalViews.toLocaleString('ar-SA') : '٠'} مشاهدة</Text>
+                      <Text style={[styles.viewCountText, { color: colors.muted }]}>{group.totalViews > 0 ? group.totalViews.toLocaleString('ar-SA') : '٠'} مشاهدة</Text>
                     </View>
                     <View style={styles.cardFooter}>
                       <View style={styles.cardAvatarWrap}>
@@ -359,8 +403,8 @@ export default function StoriesScreen() {
                         {verified && <View style={styles.cardVerifyBadge}><ShieldCheck size={9} color={OASIS.colors.surface} /></View>}
                       </View>
                       <View style={styles.cardCopy}>
-                        <Text style={styles.cardAuthorName} numberOfLines={1}>{name}</Text>
-                        <Text style={styles.cardTimeText} numberOfLines={1}>{relativeTime(story.created_at)}</Text>
+                        <Text style={[styles.cardAuthorName, { color: colors.ink }]} numberOfLines={1}>{name}</Text>
+                        <Text style={[styles.cardTimeText, { color: colors.muted }]} numberOfLines={1}>{relativeTime(story.created_at)}</Text>
                       </View>
                       {group.authorId !== viewerId ? <Pressable oasisKind="plain" accessibilityRole="button" accessibilityState={{ selected: followingIds.includes(group.authorId) }} accessibilityLabel={(followingIds.includes(group.authorId) ? 'إلغاء متابعة ' : 'متابعة ') + name} onPress={event => { event.stopPropagation(); void toggleFollow(group.authorId); }} style={styles.followButton}>
                         {followingIds.includes(group.authorId) ? <Check size={17} color={OASIS.colors.primary} /> : <UserPlus size={17} color={OASIS.colors.primary} />}
@@ -372,6 +416,13 @@ export default function StoriesScreen() {
             </View>
 
           </>
+        )}
+        {!loading && !errorText && visibleAuthors.length > visibleTrendingCount && (
+          <Pressable oasisKind="plain" accessibilityRole="button" onPress={() => setVisibleTrendingCount(n => Math.min(n + 8, visibleAuthors.length))}
+            style={[styles.loadMoreButton, { backgroundColor: colors.surface, borderColor: colors.line }]}>
+            <Sparkles size={15} color={colors.primary}/>
+            <Text style={[styles.loadMoreText, { color: colors.primary }]}>عرض المزيد من اليوميات</Text>
+          </Pressable>
         )}
       </ScrollView>
     </View>
@@ -389,7 +440,21 @@ function previewTextColor(background: string) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: OASIS.colors.background },
-  scroll: { padding: 12 },
+  scroll: { paddingHorizontal: 13, paddingTop: 13, paddingBottom: 10 },
+  ringsHeadingRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingHorizontal: 13, marginBottom: 9 },
+  ringsHeadingCopy: { flex: 1, alignItems: 'flex-end', gap: 2 },
+  ringsHeading: { fontSize: 13.5, fontWeight: '800', textAlign: 'right' },
+  ringsSubtitle: { fontSize: 10.5, textAlign: 'right' },
+  createShortcut: { minHeight: 35, borderRadius: 11, paddingHorizontal: 10, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 5 },
+  createShortcutText: { fontSize: 11, fontWeight: '700' },
+  trendingHeadingCopy: { flex: 1, alignItems: 'flex-end', gap: 3 },
+  liveShortcut: { width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  filtersRow: { flexDirection: 'row-reverse', gap: 7, marginBottom: 13 },
+  filterButton: { flex: 1, minWidth: 0, minHeight: 36, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 12, borderWidth: 1, paddingHorizontal: 8 },
+  filterLabel: { fontSize: 11.5, fontWeight: '700' },
+  filterCount: { fontSize: 10.5, fontWeight: '800' },
+  loadMoreButton: { minHeight: 40, marginTop: 14, borderWidth: 1, borderRadius: 13, flexDirection: 'row-reverse', gap: 7, alignItems: 'center', justifyContent: 'center' },
+  loadMoreText: { fontSize: 12, fontWeight: '700' },
   loadingBox: { paddingVertical: 36, alignItems: 'center', justifyContent: 'center', gap: 10 },
   loadingText: { fontSize: 13, color: OASIS.colors.muted },
   emptyBox: { backgroundColor: OASIS.colors.surface, borderRadius: 14, padding: 16, alignItems: 'center', borderWidth: 1, borderColor: OASIS.colors.line, gap: 10 },
@@ -397,11 +462,11 @@ const styles = StyleSheet.create({
   emptySub: { fontSize: 13, color: OASIS.colors.muted, textAlign: 'center', lineHeight: 20 },
   emptyActionBtn: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, backgroundColor: OASIS.colors.primary, paddingHorizontal: 16, marginTop: 4 },
   emptyActionBtnText: { color: OASIS.colors.surface, fontSize: 14, fontWeight: '600' },
-  ringsSection: { backgroundColor: OASIS.colors.surface, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: OASIS.colors.line, paddingVertical: 10 },
-  sectionHeading: { color: OASIS.colors.ink, fontSize: 17, fontWeight: '600' },
+  ringsSection: { backgroundColor: OASIS.colors.surface, borderBottomWidth: 1, borderBottomColor: OASIS.colors.line, paddingTop: 12, paddingBottom: 10 },
+  sectionHeading: { color: OASIS.colors.ink, fontSize: 15, fontWeight: '800' },
   sectionSubheading: { color: OASIS.colors.muted, fontSize: 12, lineHeight: 18 },
   ringsScroll: { flexDirection: 'row-reverse', paddingHorizontal: 12, gap: 12, paddingVertical: 2 },
-  ringItem: { width: 60, alignItems: 'center', gap: 5 },
+  ringItem: { width: 62, alignItems: 'center', gap: 5 },
   ringOuter: { width: 48, height: 48, borderRadius: 24, padding: 2, borderWidth: 2, alignItems: 'center', justifyContent: 'center', position: 'relative' },
   ringSeen: { borderColor: OASIS.colors.line },
   ringInner: { width: 40, height: 40, borderRadius: 20, overflow: 'hidden', backgroundColor: OASIS.colors.background },
@@ -409,10 +474,10 @@ const styles = StyleSheet.create({
   ringAvatarFallback: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: OASIS.colors.soft },
   ringInitial: { color: OASIS.colors.primary, fontSize: 17, fontWeight: '600' },
   ringName: { color: OASIS.colors.ink, fontSize: 11, textAlign: 'center', maxWidth: 60 },
-  trendingSectionTitleRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 7, marginBottom: 12 },
+  trendingSectionTitleRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginBottom: 12 },
   trendingSectionAccent: { width: 3, height: 18, borderRadius: 2, backgroundColor: OASIS.colors.primary },
-  storiesGrid: { direction: 'ltr', flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 10 },
-  storyCard: { borderRadius: 14, overflow: 'hidden', backgroundColor: OASIS.colors.surface, borderWidth: 2, borderColor: OASIS.colors.primary },
+  storiesGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 10 },
+  storyCard: { borderRadius: 15, overflow: 'hidden', backgroundColor: OASIS.colors.surface, borderWidth: 1, borderColor: OASIS.colors.line },
   storyCardMedia: { position: 'relative', overflow: 'hidden' },
   storyCardImage: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
   storyTextCard: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12, paddingVertical: 12 },
@@ -421,7 +486,7 @@ const styles = StyleSheet.create({
   seenBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
   viewCountRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: OASIS.colors.background, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: OASIS.colors.line },
   viewCountText: { color: OASIS.colors.muted, fontSize: 11, fontWeight: '600' },
-  cardFooter: { flexDirection: 'row-reverse', alignItems: 'center', paddingRight: 8, paddingLeft: 2, gap: 6, minHeight: 52 },
+  cardFooter: { flexDirection: 'row-reverse', alignItems: 'center', paddingRight: 9, paddingLeft: 4, gap: 6, minHeight: 47 },
   cardAvatarWrap: { position: 'relative' },
   cardAvatar: { width: 26, height: 26, borderRadius: 13 },
   cardAvatarFallback: { width: 26, height: 26, borderRadius: 13, backgroundColor: OASIS.colors.soft, alignItems: 'center', justifyContent: 'center' },
