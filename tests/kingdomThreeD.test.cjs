@@ -49,7 +49,7 @@ test('world controls and game economy remain accessible on web and mobile browse
   assert.match(page, /hayna_game_command/);
   assert.match(page, /<svg viewBox="0 0 320 320"/);
   assert.match(page, /state\.targets\.map/);
-  assert.match(page, /state\.leaders\.map/);
+  assert.match(page, /state\?\.leaders\.map/);
   assert.match(engine, /onPointerDown=\{startStick\}/);
   assert.match(engine, /onPointerUp=\{endStick\}/);
   assert.match(engine, /onPointerCancel=\{endStick\}/);
