@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type CSSProperties } from 'react';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import KingdomWorld3D, { AVATARS, SITES, WORLD_HALF, type AvatarKey, type GameSite, type WorldPosition } from '@/components/game/KingdomWorld3D.web';
+import AvatarPreview3D from '@/components/game/AvatarPreview3D.web';
 
 type GameAction = 'collect' | 'recruit' | 'fortify' | 'upgrade' | 'pirates' | 'attack';
 type Captain = { id: string; alias: string; avatar_key?: AvatarKey; gold: number; timber: number; food: number; troops: number; fortress: number; level: number; trophies: number; wins: number; last_attack_at: string | null };
@@ -37,6 +38,7 @@ export default function Kingdom3D() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [avatarOpen, setAvatarOpen] = useState(false);
+  const [previewKey, setPreviewKey] = useState<AvatarKey>('knight');
   const [panel, setPanel] = useState<Panel>('none');
   const [target, setTarget] = useState<Target | null>(null);
   const [message, setMessage] = useState('');
@@ -60,6 +62,7 @@ export default function Kingdom3D() {
     if (!payload?.joined || !payload?.me) throw Error('تعذّر إنشاء الجزيرة الخاصة بك');
     setState(payload);
     setAvatar(payload.me.avatar_key || 'knight');
+    setPreviewKey(payload.me.avatar_key || 'knight');
     return auth.user.id;
   }, []);
 
@@ -151,7 +154,7 @@ export default function Kingdom3D() {
           <strong style={{ display: 'block', fontSize: 17 }}>🏰 ممالك حيّنا <span style={{ fontSize: 10, color: '#98E8CB' }}>3D</span></strong>
           <span style={{ color: '#D2EFE1', fontSize: 10, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{me?.alias || 'عالمك المفتوح'} · المستوى {num(me?.level || 1)}</span>
         </div>
-        <button type="button" onClick={() => setAvatarOpen(true)} style={{ ...smallButton, display: 'flex', alignItems: 'center', gap: 6, padding: '6px 9px' }}>
+        <button type="button" onClick={() => { setPreviewKey(avatar); setAvatarOpen(true); }} style={{ ...smallButton, display: 'flex', alignItems: 'center', gap: 6, padding: '6px 9px' }}>
           <span style={{ fontSize: 22 }}>{avatarProfile.emoji}</span><span style={{ fontSize: 11 }}>شخصيتي</span>
         </button>
         <button type="button" aria-label="فتح مساعدة التحكم" onClick={() => setPanel(panel === 'help' ? 'none' : 'help')} style={smallButton}>؟</button>
@@ -290,18 +293,28 @@ export default function Kingdom3D() {
           <div><strong style={{ fontSize: 20 }}>اختر بطلك</strong><div style={muted}>٦ شخصيات أصلية بأساليب وأزياء مختلفة</div></div>
           <button type="button" onClick={() => setAvatarOpen(false)} aria-label="إغلاق اختيار الشخصية" style={smallButton}>✕</button>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 10, marginTop: 15 }}>
-          {AVATARS.map(person => <button type="button" key={person.key} disabled={busy} aria-label={'اختيار شخصية ' + person.name}
-            onClick={() => void chooseAvatar(person.key)}
+        <div style={{ marginTop: 13 }}>
+          <AvatarPreview3D avatarKey={previewKey}/>
+          <div style={{ fontSize: 12, color: '#D6F7E9', textAlign: 'center', marginTop: 7 }}>
+            معاينة متحركة · {AVATARS.find(a => a.key === previewKey)?.name}
+          </div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 9, marginTop: 13 }}>
+          {AVATARS.map(person => <button type="button" key={person.key} disabled={busy} aria-label={'معاينة شخصية ' + person.name}
+            onClick={() => setPreviewKey(person.key)}
             style={{ textAlign: 'center', minHeight: 144, padding: 12, color: '#FFFFFF', borderRadius: 16, cursor: 'pointer',
-              border: avatar === person.key ? '2px solid #FFE39D' : '1px solid rgba(255,255,255,.3)',
+              border: previewKey === person.key ? '2px solid #FFE39D' : '1px solid rgba(255,255,255,.3)',
               background: 'linear-gradient(150deg,' + person.color + ',#123C40)', display: 'grid', placeItems: 'center', gap: 5 }}>
             <span style={{ fontSize: 39, lineHeight: 1.2 }}>{person.emoji}</span>
-            <b style={{ fontSize: 15 }}>{person.name} {avatar === person.key ? '✓' : ''}</b>
+            <b style={{ fontSize: 15 }}>{person.name} {previewKey === person.key ? '✓' : ''}</b>
             <span style={{ fontSize: 10.5, opacity: .9 }}>{person.title}</span>
           </button>)}
         </div>
-        <p style={{ ...muted, marginBottom: 0, textAlign: 'center' }}>كل شخصية تقدر تمشي وتركض وتقفز، ويمكنك تغييرها لاحقًا.</p>
+        <button type="button" disabled={busy} onClick={() => void chooseAvatar(previewKey)}
+          style={{ ...primary, width: '100%', marginTop: 13, minHeight: 47, fontSize: 14, opacity: busy ? .65 : 1 }}>
+          {busy ? 'جارٍ حفظ شخصيتك…' : 'اعتماد شخصية ' + (AVATARS.find(a => a.key === previewKey)?.name || '')}
+        </button>
+        <p style={{ ...muted, marginBottom: 0, textAlign: 'center' }}>شاهد الشخصية ثلاثية الأبعاد قبل اعتمادها. تقدر تغيرها في أي وقت.</p>
       </section>
     </div>}
 
