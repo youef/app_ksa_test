@@ -15,7 +15,7 @@ import { relativeTime } from '@/lib/mapPins';
 import { useTheme } from '@/context/ThemeContext';
 
 export default function StoriesScreen() {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const bottomNavInset = useBottomNavInset();
   const [viewerId, setViewerId] = useState('');
   const [errorText, setErrorText] = useState('');
@@ -351,9 +351,9 @@ export default function StoriesScreen() {
             <Text style={styles.loadingText}>جارٍ جلب يوميات جيرانك...</Text>
           </View>
         ) : errorText ? null : visibleAuthors.length === 0 ? (
-          <View style={styles.emptyBox}>
+          <View style={[styles.emptyBox, { backgroundColor: colors.surface, borderColor: colors.line }]}>
             <Text style={[styles.emptyTitle, { color: colors.ink }]}>{needsLogin ? 'سجّل الدخول لمشاهدة اليوميات' : storyFilter === 'unseen' ? 'شاهدت اليوميات الجديدة' : storyFilter === 'following' ? 'ما فيه يوميات لمن تتابعهم' : !currentCity ? 'حدد مدينتك أولًا' : 'لا توجد يوميات نشطة حاليًا'}</Text>
-            <Text style={styles.emptySub}>
+            <Text style={[styles.emptySub, { color: colors.muted }]}>
               {storyFilter === 'all' ? 'عندما ينشر جيرانك يوميات جديدة ستظهر هنا. اسحب للتحديث.' : 'اختر الكل لعرض اليوميات الأخرى أو اسحب للتحديث.'}
             </Text>
             <Pressable oasisKind="action"
