@@ -204,7 +204,7 @@ function CommunityShortcutsBase({ signedIn }: Props) {
       backgroundColor: isDark ? c.soft : c.surface,
       borderColor: c.line,
     },
-    ratio !== null ? { aspectRatio: ratio, minHeight: undefined, maxHeight: undefined } : undefined,
+    ratio !== null ? { aspectRatio: Math.max(2.4, Math.min(ratio, 4.6)) } : undefined,
   ];
 
   const canAct = hasAction(ad);
@@ -330,7 +330,7 @@ const s = StyleSheet.create({
     gap: 8,
     width: '100%',
     alignSelf: 'center',
-    paddingHorizontal: 0,
+    paddingHorizontal: 16,
   },
   header: {
     flexDirection: 'row-reverse',
@@ -348,9 +348,9 @@ const s = StyleSheet.create({
   banner: {
     width: '100%',
     aspectRatio: DEFAULT_ASPECT_RATIO,
-    minHeight: 112,
-    maxHeight: 200,
-    borderRadius: 22,
+    minHeight: 94,
+    maxHeight: 148,
+    borderRadius: 16,
     borderWidth: 1,
     overflow: 'hidden',
     padding: 0,
