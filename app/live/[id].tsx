@@ -719,7 +719,7 @@ export default function LiveRoomScreen() {
   if (error || !stream) return <View style={[styles.errorScreen, { backgroundColor: 'rgba(7,28,19,.82)' }]}><StatusBar barStyle="light-content" /><View style={styles.errorIcon}><Radio color={OASIS.colors.surface} size={30} /></View><Text style={styles.errorTitle}>{error || 'تعذر فتح البث'}</Text><Text style={styles.errorHint}>تأكد من الاتصال بالإنترنت وحاول مرة أخرى.</Text><Pressable oasisKind="action" onPress={() => router.replace('/lives')} style={styles.returnButton}><Text style={styles.returnText}>العودة للبثوث</Text></Pressable></View>;
 
   return (
-    <View style={[styles.screen, { backgroundColor: 'transparent' }]}>
+    <View style={styles.screen}>
       <StatusBar barStyle="light-content" />
       <View style={styles.stage}>
         <LiveMedia
@@ -774,8 +774,8 @@ export default function LiveRoomScreen() {
 
         {overlayVisible && (
           <>
-            <LinearGradient colors={['rgba(2,6,23,0.78)', 'rgba(2,6,23,0.32)', 'rgba(2,6,23,0)']} locations={[0, 0.55, 1]} pointerEvents="none" style={[styles.topGradient, { height: 210 + insets.top }]} />
-            <LinearGradient colors={['rgba(2,6,23,0)', 'rgba(2,6,23,0.5)', 'rgba(2,6,23,0.9)']} locations={[0, 0.5, 1]} pointerEvents="none" style={[styles.bottomGradient, { height: 340 + insets.bottom }]} />
+            <LinearGradient colors={['rgba(2,6,23,0.78)', 'rgba(2,6,23,0.32)', 'rgba(2,6,23,0)']} locations={[0, 0.55, 1]} pointerEvents="none" style={[styles.topGradient, { height: 160 + insets.top }]} />
+            <LinearGradient colors={['rgba(2,6,23,0)', 'rgba(2,6,23,0.5)', 'rgba(2,6,23,0.9)']} locations={[0, 0.5, 1]} pointerEvents="none" style={[styles.bottomGradient, { height: 260 + insets.bottom }]} />
           </>
         )}
 
@@ -791,10 +791,10 @@ export default function LiveRoomScreen() {
                 )}
               </View>} rightAction={<HeaderAction tone="overlay" accessibilityLabel="مشاهدو البث" onPress={() => setPeoplePanel('viewers')}><Users color={OASIS.colors.surface} size={17}/><Text style={styles.viewerCount}>{viewerCount}</Text></HeaderAction>} />
 
-            <View pointerEvents="box-none" style={[styles.hostOverlay, { top: appHeaderHeight + 8 }]}>
+            <View pointerEvents="box-none" style={[styles.hostOverlay, { top: appHeaderHeight + 7 }]}>
               <View style={styles.hostMeta}>
                 {stream.profiles?.avatar_url ? <Image source={{ uri: stream.profiles.avatar_url }} style={styles.hostAvatar} /> : <View style={styles.hostAvatarFallback}><Text style={{ color: OASIS.colors.primary, fontWeight: '700' }}>ح</Text></View>}
-                <View style={{ alignItems: 'flex-end', maxWidth: 175 }}>
+                <View style={{ flex: 1, minWidth: 0, alignItems: 'flex-end' }}>
                   <View style={styles.hostNameRow}>
                     <Text numberOfLines={1} style={styles.hostName}>{hostName}</Text>
                     {stream.profiles?.is_verified && <BadgeCheck color="#34d399" size={14} />}
@@ -802,9 +802,9 @@ export default function LiveRoomScreen() {
                   </View>
                   <Text numberOfLines={1} style={styles.hostTitle}>{stream.title}</Text>
                 </View>
-                {role !== 'host' && <Pressable oasisKind="action" accessibilityRole="button" accessibilityLabel={isFollowing ? "إلغاء متابعة المضيف" : "متابعة المضيف"} accessibilityState={{ selected: isFollowing }} onPress={() => void toggleFollow()} style={styles.followButton}><Text style={styles.followText}>{isFollowing ? 'تتابع' : 'متابعة +'}</Text></Pressable>}
+                {role !== 'host' && <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel={isFollowing ? "إلغاء متابعة المضيف" : "متابعة المضيف"} accessibilityState={{ selected: isFollowing }} onPress={() => void toggleFollow()} style={styles.followButton}><Text style={styles.followText}>{isFollowing ? 'تتابع' : 'متابعة +'}</Text></Pressable>}
               </View>
-              {role === 'host' ? <Pressable oasisKind="action" accessibilityRole="button" accessibilityLabel="إنهاء البث المباشر" onPress={confirmEnd} style={styles.endButton}><Text style={styles.endText}>إنهاء</Text></Pressable> : <Pressable oasisKind="icon" accessibilityLabel="المزيد والإبلاغ عن البث" onPress={showReport} style={styles.roundButton}><MoreHorizontal color={OASIS.colors.surface} size={20} /></Pressable>}
+              {role === 'host' ? <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="إنهاء البث المباشر" onPress={confirmEnd} style={styles.endButton}><Text style={styles.endText}>إنهاء</Text></Pressable> : <Pressable oasisKind="icon" accessibilityLabel="المزيد والإبلاغ عن البث" onPress={showReport} style={styles.roundButton}><MoreHorizontal color={OASIS.colors.surface} size={20} /></Pressable>}
             </View>
 
             {topSupporters.length > 0 && (
@@ -1070,14 +1070,12 @@ export default function LiveRoomScreen() {
                 cameraOn={mediaState.cameraEnabled}
                 micOn={mediaState.microphoneEnabled}
                 micLocked={role === 'guest' && guestMutedByHost}
-                bottomInset={insets.bottom}
                 onToggleCamera={() => mediaApiRef.current?.setCameraEnabled(!mediaState.cameraEnabled)}
                 onToggleMic={() => mediaApiRef.current?.setMicrophoneEnabled(!mediaState.microphoneEnabled)}
                 onGuests={() => setHostSheet('guests')}
                 onComments={() => setHostSheet('comments')}
                 onModeration={() => setModerationOpen(true)}
                 onShare={() => void shareLive()}
-                onEnd={confirmEnd}
               />
             ) : (
               <>
@@ -1102,10 +1100,10 @@ export default function LiveRoomScreen() {
               </>
             )}
 
-            <View style={[styles.inputBar, { marginBottom: Math.max(insets.bottom, 8) }]}>
-              <Pressable oasisVariant="primary" oasisKind="action" accessibilityLabel="إرسال التعليق" accessibilityRole="button" onPress={() => void sendMessage()} disabled={!chatInput.trim() || sending} style={[styles.sendButton, (!chatInput.trim() || sending) && { opacity: 0.5 }]}><Send color={OASIS.colors.surface} size={16} /></Pressable>
-              <TextInput accessibilityLabel="اكتب تعليقًا في البث" value={chatInput} onChangeText={setChatInput} placeholder="أضف تعليقًا…" placeholderTextColor="#cbd5e1" maxLength={300} style={styles.chatInput} returnKeyType="send" onSubmitEditing={() => void sendMessage()} />
-              <View style={styles.commentIcon}><MessageCircle size={18} color={OASIS.colors.surface} /></View>
+            <View style={[styles.inputBar, { marginBottom: Math.max(insets.bottom, 10) }]}>
+              <Pressable oasisKind="plain" accessibilityLabel="إرسال التعليق" accessibilityRole="button" onPress={() => void sendMessage()} disabled={!chatInput.trim() || sending} style={[styles.sendButton, (!chatInput.trim() || sending) && { opacity: 0.5 }]}><Send color={OASIS.colors.surface} size={16} /></Pressable>
+              <TextInput accessibilityLabel="اكتب تعليقًا في البث" value={chatInput} onChangeText={setChatInput} placeholder="أضف تعليقًا…" placeholderTextColor="#BFCFC4" maxLength={300} style={styles.chatInput} returnKeyType="send" onSubmitEditing={() => void sendMessage()} />
+              <View style={styles.commentIcon}><MessageCircle size={19} color="#9FE7C3" /></View>
             </View>
           </KeyboardAvoidingView>
         )}
