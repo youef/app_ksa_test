@@ -82,10 +82,13 @@ export default function More() {
   const [confirmLogout, setConfirmLogout] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState('');
+  const [profileError, setProfileError] = useState(false);
 
   // Refresh the card on return from account editing instead of showing stale identity data.
   useFocusEffect(useCallback(() => {
     let active = true;
+    setLoading(true);
+    setProfileError(false);
     void (async () => {
       try {
         const { data: auth } = await supabase.auth.getUser();
@@ -93,12 +96,13 @@ export default function More() {
         const id = auth.user?.id ?? '';
         setUserId(id);
         if (!id) { setProfile(null); return; }
-        const { data } = await supabase.from('profiles')
+        const { data, error } = await supabase.from('profiles')
           .select('id,display_name,username,avatar_url,role,account_type,is_verified,freelance_trade')
           .eq('id', id).maybeSingle();
+        if (error) throw error;
         if (active) setProfile(data || null);
       } catch {
-        if (active) { setProfile(null); setUserId(''); }
+        if (active) { setProfile(null); setUserId(''); setProfileError(true); }
       } finally {
         if (active) setLoading(false);
       }
@@ -165,7 +169,7 @@ export default function More() {
             {profile?.avatar_url ? <Image source={{ uri: profile.avatar_url }} style={styles.avatar} /> : <UserRound size={24} color={colors.primary} />}
           </View>
           <View style={styles.accountCopy}>
-            {loading ? <ActivityIndicator size="small" color={colors.primary} /> : (
+            {loading ? <View accessibilityLabel="جاري تحميل بيانات الحساب" style={styles.loadingAccount}><ActivityIndicator size="small" color={colors.primary} /><Text style={[styles.accountSub, { color: colors.muted }]}>جاري تحميل الحساب…</Text></View> : (
               <>
                 <View style={styles.accountTitleRow}>
                   <Text numberOfLines={1} style={[styles.accountTitle, { color: colors.ink }]}>
@@ -174,7 +178,7 @@ export default function More() {
                   {profile && <AccountStatusMark role={profile.role} accountType={profile.account_type} isVerified={Boolean(profile.is_verified)} size={16} />}
                 </View>
                 <Text numberOfLines={1} style={[styles.accountSub, { color: colors.muted }]}>
-                  {profile?.username ? `@${profile.username}` : profile ? 'الملف الشخصي والإعدادات' : 'سجّل الدخول للاستفادة من خدمات الحي'}
+                  {profileError ? 'تعذر تحديث بيانات الحساب، افتح الصفحة للمحاولة مجددًا' : profile?.username ? `@${profile.username}` : profile ? 'الملف الشخصي والإعدادات' : 'سجّل الدخول للاستفادة من خدمات الحي'}
                 </Text>
                 {isAdmin && (
                   <View style={styles.adminPill}><Crown size={12} color="#6D28D9"/><Text style={styles.adminPillText}>إدارة حيّنا</Text></View>
@@ -200,13 +204,13 @@ export default function More() {
 
         <View style={[styles.searchBox, { backgroundColor: colors.surface, borderColor: colors.line }]}>
           <Search size={19} color={colors.primary} />
-          <TextInput accessibilityLabel="البحث في خدمات حيّنا والإعدادات"
+          <TextInput accessibilityLabel="البحث في خدمات حيّنا والإعدادات" returnKeyType="search"
             value={query} onChangeText={setQuery} placeholder="ابحث عن خدمة أو إعداد…"
             placeholderTextColor={colors.muted} selectionColor={colors.primary}
             style={[styles.searchInput, { color: colors.ink }]} />
           {query.length > 0 && (
             <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="مسح البحث"
-              style={[styles.searchClear, { backgroundColor: colors.soft }]} onPress={() => setQuery('')}>
+              hitSlop={8} style={[styles.searchClear, { backgroundColor: colors.soft }]} onPress={() => setQuery('')}>
               <X size={16} color={colors.muted} />
             </Pressable>
           )}
@@ -357,6 +361,7 @@ const styles = StyleSheet.create({
   avatarWrap: { width: 50, height: 50, borderRadius: 25, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   avatar: { width: '100%', height: '100%' },
   accountCopy: { flex: 1, minWidth: 0, gap: 3, alignItems: 'flex-end' },
+  loadingAccount: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, minHeight: 38 },
   accountTitleRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, maxWidth: '100%' },
   accountTitle: { fontSize: 15, fontWeight: '700', textAlign: 'right', flexShrink: 1 },
   accountSub: { fontSize: 11.5, textAlign: 'right' },
