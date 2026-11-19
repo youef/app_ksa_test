@@ -9,7 +9,7 @@ import { OasisPressable as Pressable, OasisTextInput as TextInput } from '@/comp
 import { useTheme } from '@/context/ThemeContext';
 import { useBottomNavInset } from '@/lib/bottomNav';
 import { supabase } from '@/lib/supabase';
-import { availableProductFulfillments, marketCartTotals, formatCartMoney, type MarketCartLine } from '@/lib/marketCart';
+import { availableProductFulfillments, marketCartTotals, formatCartMoney, marketCartPriceChanged, marketCartDeliveryChanged, type MarketCartLine } from '@/lib/marketCart';
 import { productDisplayPrice } from '@/lib/productDetails';
 
 type Product = { id: string; seller_id: string; title: string; description: string; price: number | null; item_type: string; image_url: string | null; status: string; city: string; district: string | null };
@@ -125,9 +125,9 @@ export default function MarketCart() {
   const unsavedNotes=lines.some(line=>(notes[line.item_id]??'')!==(line.note||''));
   const changedPrices=lines.filter(line=>{
     const item=products[line.item_id];
-    return item && (item.price==null?null:Number(item.price))!==(line.expected_price==null?null:Number(line.expected_price));
+    return item && marketCartPriceChanged(item.price,line.expected_price);
   });
-  const deliveryChanges=lines.some(line=>{const product=products[line.item_id];return product?.status==='available'&&!availableProductFulfillments(product.description).includes(line.fulfillment);});
+  const deliveryChanges=lines.some(line=>{const product=products[line.item_id];return product?.status==='available'&&marketCartDeliveryChanged(product.description,line.fulfillment);});
   const changing=busy!=='';
   const sellersCount=new Set(lines.map(line=>products[line.item_id]?.seller_id).filter(Boolean)).size;
   return <View style={{flex:1,backgroundColor:c.background}}>
