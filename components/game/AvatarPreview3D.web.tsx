@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { buildAvatar, type AvatarKey } from './KingdomWorld3D.web';
+import { loadKingdomCharacter } from './KingdomAssets.web';
 
 export default function AvatarPreview3D({ avatarKey }: { avatarKey: AvatarKey }) {
   const holder = useRef<HTMLDivElement | null>(null);
@@ -29,6 +30,7 @@ export default function AvatarPreview3D({ avatarKey }: { avatarKey: AvatarKey })
     camera.lookAt(0, 1.38, 0);
     const rig = buildAvatar(avatarKey);
     scene.add(rig.group);
+    const importedCharacter = loadKingdomCharacter(avatarKey, rig.group, () => { rig.body.visible = false; }, () => {});
     const floor = new THREE.Mesh(
       new THREE.CylinderGeometry(2.1, 2.4, .38, 48),
       new THREE.MeshStandardMaterial({ color: '#B0D6B1', roughness: .92 })
@@ -55,10 +57,12 @@ export default function AvatarPreview3D({ avatarKey }: { avatarKey: AvatarKey })
       rig.rightArm.rotation.x = -Math.sin(t * 1.6) * .13;
       rig.leftLeg.rotation.x = Math.sin(t * 1.3) * .06;
       rig.rightLeg.rotation.x = -Math.sin(t * 1.3) * .06;
+      importedCharacter.update(delta, false, false, false);
       renderer.render(scene, camera);
     });
     return () => {
       renderer.setAnimationLoop(null);
+      importedCharacter.dispose();
       observer.disconnect();
       scene.traverse(obj => {
         const mesh = obj as THREE.Mesh;

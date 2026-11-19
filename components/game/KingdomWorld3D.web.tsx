@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
+import { loadKingdomCharacter, populateKingdom } from './KingdomAssets.web';
 
 export type AvatarKey = 'knight' | 'ranger' | 'warrior' | 'desert' | 'captain' | 'mage';
 export type GameSite = 'castle' | 'forest' | 'farm' | 'barracks' | 'harbor' | 'mine' | 'arena' | 'village';
@@ -153,10 +154,11 @@ function siteAt(x: number, z: number): WorldPosition {
     const d = Math.hypot(x - p.x, z - p.z);
     if (d < distance) { distance = d; nearest = p; }
   }
-  return { x, z, site: distance < 16 ? nearest.key : null, siteName: nearest.name, distance };
+  return { x, z, site: distance < (nearest.key === 'castle' ? 28 : 16) ? nearest.key : null, siteName: nearest.name, distance };
 }
 function addHouse(scene: THREE.Scene, x: number, z: number, roof = '#BB694C', scale = 1) {
   const group = new THREE.Group();
+  group.name = 'fallback:house:' + x + ':' + z;
   group.position.set(x, height(x, z), z);
   group.scale.setScalar(scale);
   scene.add(group);
@@ -174,6 +176,7 @@ function addTower(parent: THREE.Group, x: number, z: number) {
 }
 function castle(scene: THREE.Scene, x: number, z: number) {
   const c = new THREE.Group(); c.position.set(x, height(x, z), z); scene.add(c);
+  c.name = 'fallback:castle';
   box(c, '#E6D3AE', 25, 10, 21, 0, 5, 0);
   box(c, '#C3AF8C', 29, 7, 4, 0, 3.5, 13);
   box(c, '#C3AF8C', 29, 7, 4, 0, 3.5, -13);
@@ -261,6 +264,7 @@ function generateWorld(scene: THREE.Scene, detail: boolean) {
     box(platform, '#B5A487', 2.1, 6, 2.1, Math.sin(a) * 17, 3, Math.cos(a) * 17);
   }
   const mine = new THREE.Group();
+  mine.name = 'fallback:mine';
   mine.position.set(77, height(77, -85), -85); scene.add(mine);
   const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(11, 1), surfaceMaterial('#8E938C'));
   rock.scale.set(1.3, .8, 1); rock.position.y = 6; mine.add(rock);
@@ -359,6 +363,7 @@ export default function KingdomWorld3D({ avatarKey, paused, initialX = 0, initia
   const onRememberRef = useRef(onRemember);
   const pausedRef = useRef(paused);
   const [stick, setStick] = useState({ x: 0, y: 0, active: false });
+  const [assetStatus, setAssetStatus] = useState('جارٍ تحميل شخصيات ومباني المملكة…');
   const control = useRef({ x: 0, y: 0, sprint: false, jump: false });
   useEffect(() => { onPositionRef.current = onPosition; }, [onPosition]);
   useEffect(() => { onErrorRef.current = onError; }, [onError]);
@@ -390,6 +395,15 @@ export default function KingdomWorld3D({ avatarKey, paused, initialX = 0, initia
     const { clouds, markers } = generateWorld(scene, !mobile);
     const avatar = buildAvatar(avatarKey);
     scene.add(avatar.group);
+    setAssetStatus('جارٍ تحميل شخصيات ومباني المملكة…');
+    const worldAssets = populateKingdom(scene, height, (loaded, failed, total) => {
+      setAssetStatus(loaded + failed === total
+        ? failed ? `اكتمل العالم · تعذر تحميل ${failed} من المجسمات` : 'عالم KayKit جاهز · اسحب لتدوير الكاميرا'
+        : `تحميل المباني ${loaded + failed} / ${total}`);
+    });
+    const importedCharacter = loadKingdomCharacter(avatarKey, avatar.group,
+      () => { avatar.body.visible = false; renderer.domElement.dataset.character = avatarKey; },
+      () => setAssetStatus('تعذر تحميل الشخصية الإضافية؛ يمكنك اللعب بالشخصية الأساسية'));
     let px = THREE.MathUtils.clamp(initialX, -150, 150);
     let pz = THREE.MathUtils.clamp(initialZ, -150, 150);
     const keyboard = new Set<string>();
@@ -463,7 +477,11 @@ export default function KingdomWorld3D({ avatarKey, paused, initialX = 0, initia
         const dz = (-Math.sin(yaw) * r - Math.cos(yaw) * f);
         const nx = THREE.MathUtils.clamp(px + dx * speed * dt, -WORLD_HALF + 11, WORLD_HALF - 11);
         const nz = THREE.MathUtils.clamp(pz + dz * speed * dt, -WORLD_HALF + 11, WORLD_HALF - 11);
-        px = nx; pz = nz;
+        // Slide along walls rather than stopping both axes at a corner.
+        // A saved position inside a newly loaded building can always move out.
+        const escaping = !worldAssets.canMove(px, pz);
+        if (escaping || worldAssets.canMove(nx, pz)) px = nx;
+        if (escaping || worldAssets.canMove(px, nz)) pz = nz;
         const targetYaw = Math.atan2(dx, dz);
         const yawDiff = Math.atan2(Math.sin(targetYaw - avatar.group.rotation.y), Math.cos(targetYaw - avatar.group.rotation.y));
         avatar.group.rotation.y += yawDiff * Math.min(1, dt * 12);
@@ -484,6 +502,7 @@ export default function KingdomWorld3D({ avatarKey, paused, initialX = 0, initia
       avatar.leftArm.rotation.x = -swing * .65;
       avatar.rightArm.rotation.x = swing * .65;
       avatar.body.position.y = moving ? Math.abs(Math.sin(walkClock)) * .07 : Math.sin(time * 1.7) * .025;
+      importedCharacter.update(dt, moving, keyboard.has('shiftleft') || keyboard.has('shiftright') || control.current.sprint, jump > .05);
       const horizontal = Math.cos(pitch) * distance;
       cameraGoal.set(px + Math.sin(yaw) * horizontal, height(px, pz) + 2.7 + Math.sin(pitch) * distance, pz + Math.cos(yaw) * horizontal);
       camera.position.lerp(cameraGoal, Math.min(1, dt * 5));
@@ -504,6 +523,8 @@ export default function KingdomWorld3D({ avatarKey, paused, initialX = 0, initia
     });
     return () => {
       renderer.setAnimationLoop(null);
+      importedCharacter.dispose();
+      worldAssets.dispose();
       observer.disconnect();
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
@@ -548,6 +569,7 @@ export default function KingdomWorld3D({ avatarKey, paused, initialX = 0, initia
   };
   return <div style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden', touchAction: 'none', backgroundColor: '#9FD8DC' }}>
     <div ref={holder} style={{ position: 'absolute', inset: 0, touchAction: 'none' }} role="img" aria-label="عالم ممالك حيّنا ثلاثي الأبعاد، حرّك الشخصية باستخدام العصا أو الأسهم أو WASD" />
+    <div role="status" style={{ position: 'absolute', bottom: 8, left: '50%', transform: 'translateX(-50%)', maxWidth: '60%', padding: '5px 10px', borderRadius: 9, background: 'rgba(5,42,41,.8)', color: '#fff', fontSize: 11, textAlign: 'center', pointerEvents: 'none' }}>{assetStatus}</div>
     <div aria-label="عصا الحركة" role="group"
       onPointerDown={startStick} onPointerMove={updateStick} onPointerUp={endStick} onPointerCancel={endStick}
       style={{ position: 'absolute', bottom: 'max(30px, env(safe-area-inset-bottom))', left: 22, width: 116, height: 116, border: '2px solid rgba(255,255,255,.5)',

@@ -1,0 +1,2 @@
+# Preserve upstream bytes so the pinned KayKit SHA256 manifest verifies on every OS.
+public/kingdom/kaykit/** -text -whitespace
