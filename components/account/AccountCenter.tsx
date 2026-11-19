@@ -199,6 +199,7 @@ export default function AccountCenter() {
   const [contentFilter, setContentFilter] = useState<ContentFilter>('all');
 
   const [verification, setVerification] = useState<any | null>(null);
+  const [verificationQueryError, setVerificationQueryError] = useState(false);
   const [identityOpen, setIdentityOpen] = useState(false);
   const [identityType, setIdentityType] = useState<AccountKind>('standard');
   const [professionalName, setProfessionalName] = useState('');
@@ -317,6 +318,7 @@ export default function AccountCenter() {
       setRequests(requestRes.data || []);
       setBusiness(businessRes.data || null);
       setVerification(verificationRes.data || null);
+      setVerificationQueryError(Boolean(verificationRes.error));
       setCustomization(customizationRes.data || {
         accent_color: OASIS.colors.primary,
         banner_style: 'emerald',
@@ -383,7 +385,22 @@ export default function AccountCenter() {
     ? profile.freelance_trade
     : profile?.display_name || profile?.username || 'حساب حيّنا';
 
-  const verificationPending = (verification?.status || '').toLowerCase() === 'pending';
+  const verificationStatus = String(verification?.status || '').toLowerCase();
+  const verificationPending = verificationStatus === 'pending';
+  const verificationRejected = verificationStatus === 'rejected' && !profile?.is_verified;
+  const simpleVerificationNeedsEvidence = identityType !== 'standard' || !Boolean(profile?.is_verified);
+  const simpleVerificationCanSubmit = (identityType === 'standard' || Boolean(professionalName.trim()))
+    && (!simpleVerificationNeedsEvidence || Boolean(evidence));
+  const verificationStateLabel = verificationQueryError && !profile?.is_verified ? 'تعذر التحقق من الطلب' : verificationPending ? 'طلب قيد المراجعة' : profile?.is_verified ? 'حساب موثّق' : verificationRejected ? 'لم يُعتمد الطلب الأخير' : 'الحساب غير موثّق';
+  const verificationStateMessage = verificationQueryError && !profile?.is_verified
+    ? 'تعذر تحديث حالة الطلب من الخادم. أعد المحاولة قبل تقديم طلب جديد.'
+    : verificationPending
+    ? 'تم استلام الطلب. ستظهر النتيجة هنا بعد مراجعة الإدارة، دون تغيير صفة حسابك حاليًا.'
+    : profile?.is_verified
+      ? 'حسابك معتمد حاليًا. أي تغيير في الصفة يخضع لمراجعة مستقلة.'
+      : verificationRejected
+        ? 'يمكنك تحديث البيانات وإرسال طلب جديد لمراجعته. لا تتغير صلاحيات حسابك قبل الاعتماد.'
+        : 'يمكنك التقديم لتوثيق حسابك أو طلب صفة مهنية. الاعتماد يتطلب مراجعة الإدارة.';
   const totalOwned = products.length + services.length + questions.length + requests.length;
   const IdentityMetaIcon = identityMeta.Icon;
 
@@ -852,8 +869,8 @@ export default function AccountCenter() {
       <Modal visible={!!confirmation} transparent animationType="fade" onRequestClose={() => setConfirmation(null)}><View style={accountStyles.overlay}><View style={[accountStyles.dialog,{backgroundColor:colors.surface}]} accessibilityViewIsModal><Text style={{color:colors.ink,fontSize:21,fontWeight:'800',textAlign:'right'}}>{confirmation?.title}</Text><Text style={{color:colors.muted,lineHeight:25,textAlign:'right'}}>{confirmation?.message}</Text>{confirmation?.buttons.map((item,index) => <Pressable key={index} oasisKind="action" oasisVariant={item.style === 'destructive' ? 'danger' : 'secondary'} onPress={() => {setConfirmation(null);item.onPress?.();}}><Text>{item.text}</Text></Pressable>)}</View></View></Modal>
       <AppHeader
         variant="tab"
-        title={tab === 'settings' ? 'الإعدادات' : tab === 'verification' ? 'التوثيق' : tab === 'content' ? 'أعمالي ومحتواي' : editing ? 'تعديل الملف' : 'ملفي الشخصي'}
-        subtitle={tab === 'settings' ? (settingsDetailOpen ? SETTINGS_SECTIONS.find(item => item.id === settingsSection)?.label : 'أقسام حسابك') : tab === 'verification' ? 'هوية الحساب والوثائق' : tab === 'content' ? 'المنتجات والخدمات والمشاركات' : 'هويتك في حيّنا'}
+        title={tab === 'settings' ? 'الإعدادات' : tab === 'verification' ? 'توثيق الحساب' : tab === 'content' ? 'أعمالي ومحتواي' : editing ? 'تعديل الملف' : 'ملفي الشخصي'}
+        subtitle={tab === 'settings' ? (settingsDetailOpen ? SETTINGS_SECTIONS.find(item => item.id === settingsSection)?.label : 'أقسام حسابك') : tab === 'verification' ? 'حالة التوثيق وطلبات الاعتماد' : tab === 'content' ? 'المنتجات والخدمات والمشاركات' : 'هويتك في حيّنا'}
         rightAction={tab === 'settings' ? undefined : (
           <Pressable
             style={styles.headerAction}
@@ -874,13 +891,13 @@ export default function AccountCenter() {
       >
         {!!notice && <View accessibilityRole="alert" style={[accountStyles.notice,{backgroundColor:colors.soft,borderColor:colors.line}]}><View style={{flex:1,alignItems:'flex-end',gap:4}}><Text style={{color:colors.ink,fontWeight:'800'}}>{notice.title}</Text><Text style={{color:colors.muted,fontSize:12,lineHeight:20,textAlign:'right'}}>{notice.message}</Text></View><Pressable accessibilityLabel="إغلاق الرسالة" onPress={() => setNotice(null)}><Text style={{color:colors.primary,padding:8}}>إغلاق</Text></Pressable></View>}
         {!!loadError && <Text accessibilityRole="alert" style={{color:colors.danger,textAlign:'right'}}>{loadError}</Text>}
-        <View style={styles.tabs}>
+        <View style={[styles.tabs, tab === 'verification' && styles.verificationTabs]}>
           <HubTabButton active={tab === 'profile'} label="ملفي" Icon={CircleUserRound} onPress={() => navigateTab('profile')} />
           <HubTabButton active={tab === 'verification'} label="التوثيق" Icon={ShieldCheck} onPress={() => navigateTab('verification')} />
           <HubTabButton active={tab === 'content'} label="أعمالي" Icon={LayoutGrid} onPress={() => navigateTab('content')} />
           <HubTabButton active={tab === 'settings'} label="الإعدادات" Icon={Settings} onPress={() => navigateTab('settings')} />
         </View>
-        {tab === 'profile' ? (<ProfileHeader profile={editing ? {...profile,display_name:displayName,username,bio} : profile} customization={customization} displayName={editing ? displayName || 'اسمك الظاهر' : publicName} coverUri={coverState === 'missing' ? '' : profileCoverUrl(userId,coverVersion)} stats={{...stats,contributions}} own editableAvatar avatarBusy={avatarBusy} coverBusy={coverBusy} onAvatarPress={() => void pickAvatar()} onCoverPress={() => void pickCover()} onEdit={() => {if (!editing) beginEditing();}} onDesign={() => {navigateTab('settings','design');}} onSettings={() => navigateTab('settings')} onFollowers={() => setConnections('followers')} onFollowing={() => setConnections('following')} />) : <View style={[accountStyles.accountContext,{backgroundColor:colors.surface,borderColor:colors.line}]}>
+        {tab === 'profile' ? (<ProfileHeader profile={editing ? {...profile,display_name:displayName,username,bio} : profile} customization={customization} displayName={editing ? displayName || 'اسمك الظاهر' : publicName} coverUri={coverState === 'missing' ? '' : profileCoverUrl(userId,coverVersion)} stats={{...stats,contributions}} own editableAvatar avatarBusy={avatarBusy} coverBusy={coverBusy} onAvatarPress={() => void pickAvatar()} onCoverPress={() => void pickCover()} onEdit={() => {if (!editing) beginEditing();}} onDesign={() => {navigateTab('settings','design');}} onSettings={() => navigateTab('settings')} onFollowers={() => setConnections('followers')} onFollowing={() => setConnections('following')} />) : tab === 'verification' ? null : <View style={[accountStyles.accountContext,{backgroundColor:colors.surface,borderColor:colors.line}]}>
           {profile.avatar_url ? <Image source={{uri:profile.avatar_url}} style={{width:42,height:42,borderRadius:21}}/> : <View style={{width:42,height:42,borderRadius:21,backgroundColor:colors.soft,alignItems:'center',justifyContent:'center'}}><Text style={{color:colors.primary,fontWeight:'800'}}>{publicName[0]}</Text></View>}
           <View style={{flex:1,alignItems:'flex-end',gap:4}}><Text style={{color:colors.ink,fontWeight:'700',fontSize:14}}>{publicName}</Text><Text style={{color:colors.muted,fontSize:12,writingDirection:'ltr'}}>@{profile.username}</Text></View>
           <Pressable accessibilityLabel="عرض الملف العام" oasisKind="plain" onPress={openPublicProfile} style={{padding:10}}><Eye size={19} color={colors.primary}/></Pressable>
@@ -927,105 +944,126 @@ export default function AccountCenter() {
         ) : null}
 
         {tab === 'verification' ? (
-          <View style={styles.stack}>
-            <View style={styles.areaLead}>
-              <View style={styles.areaLeadIcon}><ShieldCheck size={22} color={colors.primary} /></View>
-              <View style={{ flex: 1, alignItems: 'flex-end', gap: 3 }}>
-                <Text style={styles.areaLeadTitle}>مركز توثيق حسابك</Text>
-                <Text style={styles.areaLeadDescription}>الصفة المهنية والوثائق الرسمية في مكان واحد. لا يُمنح أي اعتماد قبل مراجعة الإدارة.</Text>
-              </View>
-            </View>
-            <SectionCard>
-              <View style={styles.sectionHeader}>
-                <View style={styles.sectionHeaderCopy}>
-                  <Text style={styles.sectionTitle}>هوية الحساب والتوثيق</Text>
-                  <Text style={styles.sectionSub}>نوع الحساب والتوثيق منفصلان، ولا تتغير الصفة العامة حتى تعتمدها الإدارة</Text>
+          <View style={styles.verificationStack}>
+            <View style={styles.verificationHero}>
+              <View style={styles.verifyHeading}>
+                <View style={styles.verifySymbol}><ShieldCheck size={21} color={colors.primary} /></View>
+                <View style={styles.verifyHeadingCopy}>
+                  <Text accessibilityRole="header" style={styles.verifyTitle}>هوية حسابك</Text>
+                  <Text style={styles.verifyIntro}>حالة التوثيق ونوع الحساب في مكان واحد</Text>
+                </View>
+                <View style={[styles.verifyStatusBadge,{backgroundColor:verificationQueryError?colors.dangerSoft:verificationPending?OASIS.colors.warningSoft:profile.is_verified?colors.soft:verificationRejected?colors.dangerSoft:colors.background}]}>
+                  <Text style={[styles.verifyStatusText,{color:verificationQueryError?colors.danger:verificationPending?'#A16207':profile.is_verified?colors.primary:verificationRejected?colors.danger:colors.muted}]}>{verificationStateLabel}</Text>
                 </View>
               </View>
-
-              <View style={styles.identitySummary}>
-                <View style={styles.identitySummaryCopy}>
-                  <Text style={styles.identityCurrent}>{identityMeta.publicTitle}</Text>
-                  <Text style={styles.identityDescription}>{profile.freelance_trade || identityMeta.description}</Text>
+              <View style={[styles.verifyAccountRow,{borderColor:colors.line}]}>
+                {profile.avatar_url ? <Image source={{uri:profile.avatar_url}} style={styles.verifyAvatar} /> : (
+                  <View style={[styles.verifyAvatar,styles.verifyAvatarFallback]}><UserRound size={23} color={colors.primary}/></View>
+                )}
+                <View style={styles.verifyAccountCopy}>
+                  <Text style={styles.verifyName} numberOfLines={1}>{publicName}</Text>
+                  <Text style={styles.verifyHandle} numberOfLines={1}>{'@'+(profile.username || 'hayna')}</Text>
                 </View>
-                <View style={[styles.statusChip, { backgroundColor: verificationPending ? OASIS.colors.warningSoft : profile.is_verified ? identityMeta.softColor : OASIS.colors.background }]}>
-
-                  <Text style={[styles.statusChipText, { color: verificationPending ? '#B45309' : profile.is_verified ? identityMeta.color : OASIS.colors.muted }]}>
-                    {verificationPending ? 'طلب الحساب قيد المراجعة' : profile.is_verified ? 'حساب معتمد سابقًا' : 'الحساب غير موثّق'}
+                <View style={[styles.verifyTypeBadge,{backgroundColor:identityMeta.softColor}]}>
+                  <IdentityMetaIcon size={16} color={identityMeta.color}/>
+                  <Text style={[styles.verifyTypeText,{color:identityMeta.color}]} numberOfLines={1}>{identityMeta.publicTitle}</Text>
+                </View>
+              </View>
+              <Text style={styles.verifyStateMessage}>{verificationStateMessage}</Text>
+              {verification?.created_at ? (
+                <View style={styles.verifyRequestMeta}>
+                  <Text style={styles.verifyRequestMetaText}>
+                    {verificationPending ? 'تاريخ تقديم الطلب: ' : verificationRejected ? 'آخر طلب: ' : 'آخر طلب توثيق: '}
+                    {new Date(verification.created_at).toLocaleDateString('ar-SA')}
                   </Text>
+                  {verification?.reviewed_at && !verificationPending ? <Text style={styles.verifyRequestMetaText}>تاريخ المراجعة: {new Date(verification.reviewed_at).toLocaleDateString('ar-SA')}</Text> : null}
                 </View>
+              ) : null}
+            </View>
+
+            <View style={styles.verifyPanel}>
+              <View style={styles.verifyPanelHeading}>
+                <Text style={styles.verifyPanelTitle}>نوع الحساب وطلب التوثيق</Text>
+                <Text style={styles.verifyPanelDesc}>نوع حسابك الحالي: {accountTypeLabel(profile.account_type)}. اختيار نوع جديد لا يغير الصفة أو الصلاحيات حتى موافقة الإدارة.</Text>
               </View>
+              {verificationQueryError ? (
+                <View style={[styles.verifyPendingNote,{backgroundColor:colors.dangerSoft}]}>
+                  <RefreshCw size={19} color={colors.danger}/>
+                  <Text accessibilityRole="alert" style={[styles.verifyPendingText,{color:colors.danger}]}>تعذر التحقق من الطلب السابق. حدّث الحالة قبل إرسال طلب جديد منعًا للتكرار.</Text>
+                </View>
+              ) : verificationPending ? (
+                <View style={[styles.verifyPendingNote,{backgroundColor:OASIS.colors.warningSoft}]}>
+                  <ShieldCheck size={20} color="#A16207" />
+                  <Text style={[styles.verifyPendingText,{color:'#92400E'}]}>طلبك قيد المراجعة حاليًا. يمكنك متابعة حالته هنا، ولا تحتاج إلى رفع المستند مرة أخرى.</Text>
+                </View>
+              ) : (
+                <Pressable oasisKind="action" oasisVariant="primary" accessibilityRole="button" accessibilityLabel={identityOpen?'إغلاق نموذج طلب التوثيق':'فتح نموذج نوع الحساب والتوثيق'} accessibilityState={{expanded:identityOpen}} style={[styles.verifyPrimaryAction,{backgroundColor:identityOpen?colors.soft:colors.primary}]} onPress={()=>setIdentityOpen(v=>!v)}>
+                  <Text style={[styles.verifyPrimaryActionText,{color:identityOpen?colors.primary:colors.surface}]}>{identityOpen?'إغلاق نموذج التوثيق':profile.is_verified?'تحديث نوع الحساب أو التوثيق':'بدء طلب التوثيق'}</Text>
+                  <ChevronLeft size={18} color={identityOpen?colors.primary:colors.surface} style={identityOpen?{transform:[{rotate:'-90deg'}]}:undefined} />
+                </Pressable>
+              )}
 
-              <Pressable style={styles.identityManage} onPress={() => setIdentityOpen((value) => !value)}>
-                <Text style={styles.identityManageText}>{identityOpen ? 'إغلاق إدارة الهوية' : 'تغيير نوع الحساب أو طلب التوثيق'}</Text>
-                <ChevronLeft size={16} color={OASIS.colors.primary} />
-              </Pressable>
-
-              {identityOpen ? (
-                <View style={styles.identityEditor}>
-                  <Text style={styles.sectionSub}>اختر نوع الحساب لعرض متطلبات التوثيق الخاصة به فقط.</Text>
-                  <View style={styles.typeGrid}>
-                    {ACCOUNT_TYPES.map((type) => {
-                      const meta = getAccountIdentityMeta('user', type.key, false);
-                      const Icon = meta.Icon;
-                      const active = identityType === type.key;
+              {identityOpen && !verificationPending && !verificationQueryError ? (
+                <View style={styles.verifyEditor}>
+                  <View style={styles.verifyFormLead}>
+                    <Text style={styles.verifyFormTitle}>1. اختر صفة الحساب</Text>
+                    <Text style={styles.verifyFormHint}>تختلف المستندات المطلوبة حسب نوع النشاط.</Text>
+                  </View>
+                  <View style={styles.verifyTypeGrid}>
+                    {ACCOUNT_TYPES.map(type=>{
+                      const meta=getAccountIdentityMeta('user',type.key,false);
+                      const Icon=meta.Icon;
+                      const selected=identityType===type.key;
                       return (
-                        <Pressable
-                          key={type.key}
-                          style={[styles.typeChoice, active && { borderColor: meta.color, backgroundColor: meta.softColor }]}
-                          onPress={() => { setIdentityType(type.key); setProfessionalName(type.key === profile.account_type ? (profile.freelance_trade || '') : ''); setEvidence(null); }}
-                        >
-                          <View style={[styles.typeChoiceIcon, { backgroundColor: meta.backgroundColor }]}><Icon size={18} color={meta.color} /></View>
-                          <View style={styles.typeChoiceCopy}>
-                            <Text style={[styles.typeChoiceTitle, active && { color: meta.color }]}>{type.label}</Text>
-                            <Text style={styles.typeChoiceSub}>{type.description}</Text>
+                        <Pressable key={type.key} oasisKind="plain" accessibilityRole="radio" accessibilityState={{checked:selected}} accessibilityLabel={type.label+'، '+type.description} onPress={()=>{setIdentityType(type.key);setProfessionalName(type.key===profile.account_type?(profile.freelance_trade||''):'');setEvidence(null);}} style={[styles.verifyTypeOption,width<370?styles.verifyTypeFull:styles.verifyTypeHalf,selected&&{backgroundColor:meta.softColor,borderColor:meta.color}]}>
+                          <View style={[styles.verifyTypeIcon,{backgroundColor:selected?colors.surface:colors.soft}]}><Icon size={18} color={selected?meta.color:colors.muted}/></View>
+                          <View style={styles.verifyTypeCopy}>
+                            <Text style={[styles.verifyTypeName,selected&&{color:meta.color}]}>{type.label}</Text>
+                            <Text style={styles.verifyTypeDescription} numberOfLines={2}>{type.description}</Text>
                           </View>
-                          {active ? <Check size={16} color={meta.color} /> : null}
+                          {selected?<Check size={17} color={meta.color}/>:null}
                         </Pressable>
                       );
                     })}
                   </View>
-
-                  <View style={styles.identityFormHeading}>
-                    <Text style={styles.identityCurrent}>{ACCOUNT_TYPES.find(type => type.key === identityType)?.label}</Text>
-                    <Text style={styles.identityDescription}>
-                      {identityType === 'merchant'
-                        ? 'التحقق من بيانات المنشأة وسجلها التجاري.'
-                        : identityType === 'freelance'
-                        ? 'التحقق من وثيقة العمل الحر من منصة العمل الحر.'
-                        : identityType === 'standard'
-                        ? 'طلب توثيق الحساب الشخصي بالمراجعة الإدارية.'
-                        : 'إثبات صفة الحساب المهنية أو المجتمعية.'}
-                    </Text>
+                  <View style={styles.verifyFormLead}>
+                    <Text style={styles.verifyFormTitle}>2. أرفق المستند المناسب</Text>
+                    <Text style={styles.verifyFormHint}>{identityType==='merchant'?'التحقق من بيانات المنشأة وسجلها التجاري.':identityType==='freelance'?'التحقق من وثيقة العمل الحر.':identityType==='standard'?'يُطلب إثبات هوية لمراجعة توثيق الحساب الشخصي.':'أرفق ما يثبت الصفة المهنية أو المجتمعية.'}</Text>
                   </View>
-                  {(identityType === 'merchant' || identityType === 'freelance') ? (
-                    <OfficialDocumentVerification key={identityType} kind={identityType === 'merchant' ? 'business' : 'freelance'} userId={userId} />
+                  {(identityType==='merchant'||identityType==='freelance') ? (
+                    <OfficialDocumentVerification key={identityType} kind={identityType==='merchant'?'business':'freelance'} userId={userId}/>
                   ) : (
-                    <View style={styles.identityEditor}>
-                      {identityType !== 'standard' ? (
-                        <Field
-                          label={identityType === 'idea' ? 'اسم المبادرة أو المشروع' : 'اسم النشاط أو الخدمة'}
-                          value={professionalName}
-                          onChangeText={setProfessionalName}
-                          placeholder={identityType === 'idea' ? 'مثال: مبادرة أهل الحي' : 'مثال: صيانة الأجهزة المنزلية'}
-                        />
-                      ) : null}
-                      <Pressable oasisKind="action" style={styles.evidenceButton} onPress={() => void chooseEvidence()}>
-                        <Package size={16} color={colors.primary} />
+                    <View style={styles.verifyFormFields}>
+                      {identityType!=='standard' ? <Field label={identityType==='idea'?'اسم المبادرة أو المشروع':'اسم النشاط أو الخدمة'} value={professionalName} onChangeText={setProfessionalName} placeholder={identityType==='idea'?'مثال: مبادرة أهل الحي':'مثال: صيانة الأجهزة المنزلية'}/> : null}
+                      <Pressable oasisKind="action" accessibilityRole="button" accessibilityLabel={evidence?'تغيير صورة الإثبات':'اختيار صورة الإثبات'} style={styles.evidenceButton} onPress={()=>void chooseEvidence()}>
+                        <Package size={18} color={colors.primary}/>
                         <View style={styles.evidenceCopy}>
-                          <Text style={styles.evidenceTitle}>{evidence ? 'تم اختيار الإثبات' : 'رفع إثبات الصفة'}</Text>
-                          <Text style={styles.evidenceSub}>{evidence?.fileName || 'الصورة خاصة بفريق المراجعة وليست عامة'}</Text>
+                          <Text style={styles.evidenceTitle}>{evidence?'تم اختيار الإثبات · تغيير الصورة':'اختيار صورة الإثبات'}</Text>
+                          <Text style={styles.evidenceSub} numberOfLines={2}>{evidence?.fileName||'يُرسل الإثبات للمراجعة ولا يظهر في ملفك العام'}</Text>
                         </View>
+                        {evidence?<Check size={17} color={colors.primary}/>:<ChevronLeft size={17} color={colors.primary}/>}
                       </Pressable>
-                      <Pressable oasisVariant="primary" oasisKind="action" style={styles.primaryButton} onPress={() => void submitIdentityRequest()} disabled={identitySaving || verificationPending}>
-                        {identitySaving ? <ActivityIndicator size="small" color={OASIS.colors.surface} /> : <ShieldCheck size={16} color={OASIS.colors.surface} />}
-                        <Text style={styles.primaryButtonText}>{verificationPending ? 'بانتظار مراجعة الإدارة' : 'إرسال طلب توثيق هذا النوع'}</Text>
+                      <View style={[styles.verifyReadiness,{backgroundColor:simpleVerificationCanSubmit?colors.soft:colors.background,borderColor:colors.line}]}>
+                        <Text style={[styles.verifyFormHint,{color:simpleVerificationCanSubmit?colors.primary:colors.muted}]}>
+                          {identityType!=='standard'&&!professionalName.trim()?'أكمل اسم النشاط أو المبادرة أولًا.':simpleVerificationNeedsEvidence&&!evidence?'أرفق صورة الإثبات للمتابعة.':'جاهز للإرسال. ستراجع الإدارة الطلب قبل اعتماد أي تغيير.'}
+                        </Text>
+                      </View>
+                      <Pressable oasisKind="action" oasisVariant="primary" accessibilityRole="button" accessibilityLabel="إرسال طلب التوثيق للمراجعة" accessibilityState={{disabled:identitySaving||!simpleVerificationCanSubmit}} style={[styles.verifySubmitButton,(identitySaving||!simpleVerificationCanSubmit)&&{opacity:0.52}]} onPress={()=>void submitIdentityRequest()} disabled={identitySaving||!simpleVerificationCanSubmit}>
+                        {identitySaving?<ActivityIndicator size="small" color={colors.surface}/>:<ShieldCheck size={18} color={colors.surface}/>}
+                        <Text style={styles.verifySubmitText}>{identitySaving?'جارٍ إرسال الطلب…':'إرسال الطلب للمراجعة'}</Text>
                       </Pressable>
                     </View>
                   )}
                 </View>
               ) : null}
-            </SectionCard>
+            </View>
+            <View style={styles.verifyHelp}>
+              <Text style={styles.verifyHelpText}>الاعتماد لا يصدر إلا بعد مراجعة الإدارة.</Text>
+              <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="تحديث حالة طلب التوثيق" disabled={refreshing} onPress={()=>{setRefreshing(true);void load(true);}} style={styles.verifyRefresh}>
+                {refreshing?<ActivityIndicator size="small" color={colors.primary}/>:<RefreshCw size={17} color={colors.primary}/>}
+                <Text style={styles.verifyRefreshText}>تحديث الحالة</Text>
+              </Pressable>
+            </View>
           </View>
         ) : null}
 
@@ -1539,6 +1577,56 @@ function OwnedRow({ kind, item, onPress }: { kind: string; item: any; onPress: (
 }
 
 const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
+  verificationTabs: {minHeight:62,padding:3,borderRadius:16,marginBottom:1},
+  verificationStack: {gap:11},
+  verificationHero: {backgroundColor:colors.surface,borderWidth:1,borderColor:colors.line,borderRadius:20,padding:16,gap:13},
+  verifyHeading: {flexDirection:'row-reverse',alignItems:'center',flexWrap:'wrap',columnGap:10,rowGap:7},
+  verifySymbol: {width:42,height:42,borderRadius:14,backgroundColor:colors.soft,alignItems:'center',justifyContent:'center'},
+  verifyHeadingCopy: {flex:1,minWidth:135,alignItems:'flex-end',gap:3},
+  verifyTitle: {color:colors.ink,fontSize:18,fontWeight:'800',textAlign:'right'},
+  verifyIntro: {color:colors.muted,fontSize:12,lineHeight:19,textAlign:'right'},
+  verifyStatusBadge: {minHeight:33,paddingHorizontal:11,paddingVertical:7,borderRadius:999,alignItems:'center',justifyContent:'center',maxWidth:'100%'},
+  verifyStatusText: {fontSize:11.5,fontWeight:'800',textAlign:'center'},
+  verifyAccountRow: {flexDirection:'row-reverse',alignItems:'center',gap:11,borderTopWidth:1,paddingTop:13},
+  verifyAvatar: {width:48,height:48,borderRadius:16},
+  verifyAvatarFallback: {backgroundColor:colors.soft,alignItems:'center',justifyContent:'center'},
+  verifyAccountCopy: {flex:1,minWidth:0,alignItems:'flex-end',gap:4},
+  verifyName: {color:colors.ink,fontSize:16,fontWeight:'800',textAlign:'right'},
+  verifyHandle: {color:colors.muted,fontSize:12,fontWeight:'600',textAlign:'right'},
+  verifyTypeBadge: {flexDirection:'row-reverse',alignItems:'center',gap:5,minHeight:33,borderRadius:11,paddingHorizontal:8,maxWidth:'48%'},
+  verifyTypeText: {fontSize:11,fontWeight:'700',textAlign:'right',flexShrink:1},
+  verifyStateMessage: {color:colors.muted,fontSize:12.5,lineHeight:23,textAlign:'right'},
+  verifyRequestMeta: {flexDirection:'row-reverse',flexWrap:'wrap',gap:9,marginTop:-2},
+  verifyRequestMetaText: {color:colors.muted,fontSize:11.5,lineHeight:20,textAlign:'right'},
+  verifyPanel: {backgroundColor:colors.surface,borderWidth:1,borderColor:colors.line,borderRadius:20,padding:16,gap:13},
+  verifyPanelHeading: {gap:5,alignItems:'flex-end'},
+  verifyPanelTitle: {color:colors.ink,fontSize:16,fontWeight:'800',textAlign:'right'},
+  verifyPanelDesc: {color:colors.muted,fontSize:12,lineHeight:22,textAlign:'right'},
+  verifyPrimaryAction: {minHeight:52,borderRadius:14,flexDirection:'row-reverse',alignItems:'center',justifyContent:'center',gap:9,paddingHorizontal:14},
+  verifyPrimaryActionText: {fontSize:14,fontWeight:'800',textAlign:'center'},
+  verifyPendingNote: {flexDirection:'row-reverse',alignItems:'center',gap:9,paddingHorizontal:13,paddingVertical:13,borderRadius:14},
+  verifyPendingText: {flex:1,fontSize:12,lineHeight:21,textAlign:'right'},
+  verifyEditor: {gap:14,borderTopWidth:1,borderTopColor:colors.line,paddingTop:15},
+  verifyFormLead: {gap:5,alignItems:'flex-end'},
+  verifyFormTitle: {color:colors.ink,fontSize:14,fontWeight:'800',textAlign:'right'},
+  verifyFormHint: {color:colors.muted,fontSize:12,lineHeight:21,textAlign:'right'},
+  verifyTypeGrid: {flexDirection:'row-reverse',flexWrap:'wrap',gap:9},
+  verifyTypeOption: {borderWidth:1,borderColor:colors.line,borderRadius:14,backgroundColor:colors.surface,padding:11,flexDirection:'row-reverse',alignItems:'center',gap:8,minHeight:82},
+  verifyTypeHalf: {flexBasis:'46%',flexGrow:1,minWidth:0},
+  verifyTypeFull: {width:'100%'},
+  verifyTypeIcon: {width:33,height:33,borderRadius:11,alignItems:'center',justifyContent:'center'},
+  verifyTypeCopy: {flex:1,minWidth:0,alignItems:'flex-end',gap:3},
+  verifyTypeName: {fontSize:12.5,color:colors.ink,fontWeight:'800',textAlign:'right'},
+  verifyTypeDescription: {fontSize:11,color:colors.muted,lineHeight:17,textAlign:'right'},
+  verifyFormFields: {gap:11},
+  verifyReadiness: {paddingHorizontal:12,paddingVertical:10,borderWidth:1,borderRadius:13},
+  verifySubmitButton: {minHeight:52,borderRadius:14,backgroundColor:colors.primary,flexDirection:'row-reverse',alignItems:'center',justifyContent:'center',gap:9,paddingHorizontal:12},
+  verifySubmitText: {fontSize:13.5,fontWeight:'800',color:colors.surface,textAlign:'center'},
+  verifyHelp: {flexDirection:'row-reverse',alignItems:'center',gap:9,paddingHorizontal:9,paddingVertical:5},
+  verifyHelpText: {flex:1,minWidth:0,fontSize:11.5,color:colors.muted,lineHeight:20,textAlign:'right'},
+  verifyRefresh: {minHeight:44,borderRadius:13,flexDirection:'row-reverse',alignItems:'center',gap:6,paddingHorizontal:12,backgroundColor:colors.soft},
+  verifyRefreshText: {fontSize:11.5,color:colors.primary,fontWeight:'800'},
+
   screen: { flex: 1, backgroundColor: colors.background },
   loadingScreen: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: colors.background },
   loadingText: { color: colors.muted, fontSize: 12, fontWeight: '700' },
