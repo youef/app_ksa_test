@@ -254,22 +254,56 @@ export default function NewListing() {
   }
 
   if (loading) {
-    return <View style={[styles.center, { backgroundColor: 'transparent' }]}><ActivityIndicator size="large" color={OASIS.colors.primary} /><Text style={styles.loading}>جاري تجهيز الإضافة...</Text></View>;
+    return <View style={[styles.screen,{backgroundColor:'transparent'}]}>
+      <AppHeader variant="sub" title="إضافة إعلان" subtitle="تجهيز حسابك" fallbackRoute="/market"/>
+      <View style={styles.center} accessibilityRole="progressbar" accessibilityLabel="جارٍ تجهيز حساب النشر">
+        <View style={styles.loadingCard}><View style={[styles.skeleton,{width:'65%',height:25}]}/><View style={[styles.skeleton,{width:'88%',height:14}]}/><View style={[styles.skeleton,{width:'100%',height:120}]}/><View style={[styles.skeleton,{width:'100%',height:46}]}/></View>
+        <Text style={styles.loading}>نتحقق من بياناتك وصلاحيات النشر…</Text>
+      </View>
+    </View>;
+  }
+
+  if (setupError) {
+    return <View style={[styles.screen,{backgroundColor:'transparent'}]}>
+      <AppHeader variant="sub" title="إضافة إعلان" subtitle="تعذر تجهيز الصفحة" fallbackRoute="/market"/>
+      <View style={styles.center}><View accessibilityRole="alert" style={styles.setupCard}>
+        <Info size={30} color={OASIS.colors.danger}/>
+        <Text style={styles.heroTitle}>تعذر تحميل بيانات حسابك</Text>
+        <Text style={styles.setupMessage}>{setupError}</Text>
+        <Pressable oasisKind="action" oasisVariant="primary" style={styles.fullAction} onPress={()=>setSetupAttempt(v=>v+1)}><RefreshCw size={17} color={OASIS.colors.surface}/><Text style={styles.submitText}>إعادة المحاولة</Text></Pressable>
+        <Pressable oasisKind="plain" style={styles.fullActionSecondary} onPress={()=>router.replace('/profile')}><Text style={styles.locateText}>فتح مركز الحساب</Text></Pressable>
+      </View></View>
+    </View>;
+  }
+
+  if (publishedId) {
+    return <View style={[styles.screen,{backgroundColor:'transparent'}]}>
+      <AppHeader variant="sub" title="تم حفظ الإعلان" subtitle="اكتمل النشر" fallbackRoute="/market"/>
+      <ScrollView contentContainerStyle={[styles.content,{paddingBottom:Math.max(safeArea.bottom+28,36)}]}>
+        <OasisSurface oasisSurface="card" style={styles.successCard}>
+          <View style={styles.successIcon}><CheckCircle2 size={38} color={OASIS.colors.primary}/></View>
+          <Text accessibilityRole="header" style={styles.heroTitle}>تم حفظ إعلانك بنجاح</Text>
+          <Text style={styles.setupMessage}>أُضيف الإعلان إلى سوق الحي وربط بحسابك. يمكنك معاينته أو متابعة إعلاناتك من ملفك الشخصي.</Text>
+          <Pressable oasisKind="action" oasisVariant="primary" style={styles.fullAction} onPress={()=>router.replace({pathname:'/marketplace-item',params:{id:publishedId}})}><ShoppingBag size={18} color={OASIS.colors.surface}/><Text style={styles.submitText}>عرض الإعلان</Text></Pressable>
+          <Pressable oasisKind="plain" style={styles.fullActionSecondary} onPress={()=>router.replace({pathname:'/profile',params:{tab:'content'}})}><Text style={styles.locateText}>الانتقال إلى إعلاناتي</Text></Pressable>
+        </OasisSurface>
+      </ScrollView>
+    </View>;
   }
 
   if (!kind) {
     return (
       <View style={[styles.screen, { backgroundColor: 'transparent' }]}>
         <AppHeader variant="sub" title="إضافة جديدة" subtitle="اختر نوع ما تريد نشره" fallbackRoute="/profile?tab=content" />
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView contentContainerStyle={[styles.content,{paddingHorizontal:width<380?12:18,paddingBottom:Math.max(safeArea.bottom+28,36)}]}>
           <Text style={styles.heroTitle}>ماذا تريد أن تضيف؟</Text>
-          <Text style={styles.heroSub}>كل عنصر ينشر من هنا يرتبط بملفك تلقائيًا، وبمنشأتك إذا كان حسابك تجاريًا.</Text>
+          <Text style={styles.heroSub}>تُربط إعلاناتك بملفك الشخصي، وتحدد صلاحيات الحساب أنواع الإعلانات المتاحة لك.</Text>
 
           <Pressable oasisKind="card" style={styles.kindCard} onPress={() => chooseKind('product')}>
             <View style={[styles.kindIcon, { backgroundColor: OASIS.colors.soft }]}><ShoppingBag size={26} color={OASIS.colors.primary} /></View>
             <View style={styles.kindCopy}>
               <Text style={styles.kindTitle}>منتج أو سلعة</Text>
-              <Text style={styles.kindSub}>{isMerchant ? 'منتج تجاري باسم منشأتك' : 'بيع شخصي أو تبرع أو إعارة'}</Text>
+              <Text style={styles.kindSub}>{isMerchant ? 'منتج تجاري باسم منشأتك' : 'إعلان مرتبط بحسابك حسب صلاحيات النشر'}</Text>
             </View>
             <ChevronLeft size={20} color="#94A3B8" />
           </Pressable>
@@ -282,6 +316,7 @@ export default function NewListing() {
             </View>
             <ChevronLeft size={20} color="#94A3B8" />
           </Pressable>
+          {!!formError && <View accessibilityRole="alert" style={styles.errorBox}><Text style={styles.errorText}>{formError}</Text><Pressable style={styles.fullActionSecondary} onPress={()=>router.push('/profile')}><Text style={styles.locateText}>مراجعة صلاحيات الحساب</Text></Pressable></View>}
         </ScrollView>
       </View>
     );
@@ -290,7 +325,7 @@ export default function NewListing() {
   return (
     <View style={[styles.screen, { backgroundColor: 'transparent' }]}>
       <AppHeader variant="sub" title="إضافة منتج" subtitle={isMerchant ? 'سيظهر باسم المنشأة في السوق' : 'إعلان شخصي مرتبط بملفك'} fallbackRoute="/profile?tab=content" />
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={[styles.content,{paddingHorizontal:width<380?12:18,paddingBottom:Math.max(safeArea.bottom+28,36)}]} keyboardShouldPersistTaps="handled">
         <View style={styles.intro}>
           <View style={styles.introIcon}><Package size={24} color={OASIS.colors.primary}/></View>
           <Text style={styles.heroTitle}>عرض واضح، وتفاصيل موثوقة</Text>
