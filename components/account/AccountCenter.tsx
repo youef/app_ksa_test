@@ -199,6 +199,7 @@ export default function AccountCenter() {
   const [contentFilter, setContentFilter] = useState<ContentFilter>('all');
 
   const [verification, setVerification] = useState<any | null>(null);
+  const [verificationQueryError, setVerificationQueryError] = useState(false);
   const [identityOpen, setIdentityOpen] = useState(false);
   const [identityType, setIdentityType] = useState<AccountKind>('standard');
   const [professionalName, setProfessionalName] = useState('');
@@ -317,6 +318,7 @@ export default function AccountCenter() {
       setRequests(requestRes.data || []);
       setBusiness(businessRes.data || null);
       setVerification(verificationRes.data || null);
+      setVerificationQueryError(Boolean(verificationRes.error));
       setCustomization(customizationRes.data || {
         accent_color: OASIS.colors.primary,
         banner_style: 'emerald',
@@ -386,8 +388,10 @@ export default function AccountCenter() {
   const verificationStatus = String(verification?.status || '').toLowerCase();
   const verificationPending = verificationStatus === 'pending';
   const verificationRejected = verificationStatus === 'rejected' && !profile?.is_verified;
-  const verificationStateLabel = verificationPending ? 'طلب قيد المراجعة' : profile?.is_verified ? 'حساب موثّق' : verificationRejected ? 'لم يُعتمد الطلب الأخير' : 'الحساب غير موثّق';
-  const verificationStateMessage = verificationPending
+  const verificationStateLabel = verificationQueryError && !profile?.is_verified ? 'تعذر التحقق من الطلب' : verificationPending ? 'طلب قيد المراجعة' : profile?.is_verified ? 'حساب موثّق' : verificationRejected ? 'لم يُعتمد الطلب الأخير' : 'الحساب غير موثّق';
+  const verificationStateMessage = verificationQueryError && !profile?.is_verified
+    ? 'تعذر تحديث حالة الطلب من الخادم. أعد المحاولة قبل تقديم طلب جديد.'
+    : verificationPending
     ? 'تم استلام الطلب. ستظهر النتيجة هنا بعد مراجعة الإدارة، دون تغيير صفة حسابك حاليًا.'
     : profile?.is_verified
       ? 'حسابك معتمد حاليًا. أي تغيير في الصفة يخضع لمراجعة مستقلة.'
@@ -945,8 +949,8 @@ export default function AccountCenter() {
                   <Text accessibilityRole="header" style={styles.verifyTitle}>هوية حسابك</Text>
                   <Text style={styles.verifyIntro}>حالة التوثيق ونوع الحساب في مكان واحد</Text>
                 </View>
-                <View style={[styles.verifyStatusBadge,{backgroundColor:verificationPending?OASIS.colors.warningSoft:profile.is_verified?colors.soft:verificationRejected?colors.dangerSoft:colors.background}]}>
-                  <Text style={[styles.verifyStatusText,{color:verificationPending?'#A16207':profile.is_verified?colors.primary:verificationRejected?colors.danger:colors.muted}]}>{verificationStateLabel}</Text>
+                <View style={[styles.verifyStatusBadge,{backgroundColor:verificationQueryError?colors.dangerSoft:verificationPending?OASIS.colors.warningSoft:profile.is_verified?colors.soft:verificationRejected?colors.dangerSoft:colors.background}]}>
+                  <Text style={[styles.verifyStatusText,{color:verificationQueryError?colors.danger:verificationPending?'#A16207':profile.is_verified?colors.primary:verificationRejected?colors.danger:colors.muted}]}>{verificationStateLabel}</Text>
                 </View>
               </View>
               <View style={[styles.verifyAccountRow,{borderColor:colors.line}]}>
@@ -979,7 +983,12 @@ export default function AccountCenter() {
                 <Text style={styles.verifyPanelTitle}>نوع الحساب وطلب التوثيق</Text>
                 <Text style={styles.verifyPanelDesc}>نوع حسابك الحالي: {accountTypeLabel(profile.account_type)}. اختيار نوع جديد لا يغير الصفة أو الصلاحيات حتى موافقة الإدارة.</Text>
               </View>
-              {verificationPending ? (
+              {verificationQueryError ? (
+                <View style={[styles.verifyPendingNote,{backgroundColor:colors.dangerSoft}]}>
+                  <RefreshCw size={19} color={colors.danger}/>
+                  <Text accessibilityRole="alert" style={[styles.verifyPendingText,{color:colors.danger}]}>تعذر التحقق من الطلب السابق. حدّث الحالة قبل إرسال طلب جديد منعًا للتكرار.</Text>
+                </View>
+              ) : verificationPending ? (
                 <View style={[styles.verifyPendingNote,{backgroundColor:OASIS.colors.warningSoft}]}>
                   <ShieldCheck size={20} color="#A16207" />
                   <Text style={[styles.verifyPendingText,{color:'#92400E'}]}>طلبك قيد المراجعة حاليًا. يمكنك متابعة حالته هنا، ولا تحتاج إلى رفع المستند مرة أخرى.</Text>
@@ -991,7 +1000,7 @@ export default function AccountCenter() {
                 </Pressable>
               )}
 
-              {identityOpen && !verificationPending ? (
+              {identityOpen && !verificationPending && !verificationQueryError ? (
                 <View style={styles.verifyEditor}>
                   <View style={styles.verifyFormLead}>
                     <Text style={styles.verifyFormTitle}>1. اختر صفة الحساب</Text>
@@ -1042,8 +1051,11 @@ export default function AccountCenter() {
               ) : null}
             </View>
             <View style={styles.verifyHelp}>
-              <ShieldCheck size={17} color={colors.muted}/>
-              <Text style={styles.verifyHelpText}>الاعتماد يصدر بعد مراجعة الإدارة فقط. يمكنك سحب الشاشة لتحديث حالة الطلب.</Text>
+              <Text style={styles.verifyHelpText}>الاعتماد لا يصدر إلا بعد مراجعة الإدارة.</Text>
+              <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="تحديث حالة طلب التوثيق" disabled={refreshing} onPress={()=>{setRefreshing(true);void load(true);}} style={styles.verifyRefresh}>
+                {refreshing?<ActivityIndicator size="small" color={colors.primary}/>:<RefreshCw size={17} color={colors.primary}/>}
+                <Text style={styles.verifyRefreshText}>تحديث الحالة</Text>
+              </Pressable>
             </View>
           </View>
         ) : null}
@@ -1603,7 +1615,9 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   verifySubmitButton: {minHeight:52,borderRadius:14,backgroundColor:colors.primary,flexDirection:'row-reverse',alignItems:'center',justifyContent:'center',gap:9,paddingHorizontal:12},
   verifySubmitText: {fontSize:13.5,fontWeight:'800',color:colors.surface,textAlign:'center'},
   verifyHelp: {flexDirection:'row-reverse',alignItems:'center',gap:9,paddingHorizontal:9,paddingVertical:5},
-  verifyHelpText: {flex:1,fontSize:11.5,color:colors.muted,lineHeight:20,textAlign:'right'},
+  verifyHelpText: {flex:1,minWidth:0,fontSize:11.5,color:colors.muted,lineHeight:20,textAlign:'right'},
+  verifyRefresh: {minHeight:44,borderRadius:13,flexDirection:'row-reverse',alignItems:'center',gap:6,paddingHorizontal:12,backgroundColor:colors.soft},
+  verifyRefreshText: {fontSize:11.5,color:colors.primary,fontWeight:'800'},
 
   screen: { flex: 1, backgroundColor: colors.background },
   loadingScreen: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: colors.background },
