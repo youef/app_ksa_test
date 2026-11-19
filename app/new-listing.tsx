@@ -299,7 +299,7 @@ export default function NewListing() {
           <Text style={styles.heroTitle}>ماذا تريد أن تضيف؟</Text>
           <Text style={styles.heroSub}>تُربط إعلاناتك بملفك الشخصي، وتحدد صلاحيات الحساب أنواع الإعلانات المتاحة لك.</Text>
 
-          <Pressable oasisKind="card" style={styles.kindCard} onPress={() => chooseKind('product')}>
+          <Pressable oasisKind="card" accessibilityRole="button" accessibilityLabel="إضافة منتج أو سلعة" accessibilityHint={capabilities.can_publish_products ? "فتح نموذج منتج جديد" : "تتطلب صلاحية نشر المنتجات"} style={[styles.kindCard,!capabilities.can_publish_products&&styles.kindDisabled]} onPress={() => chooseKind('product')}>
             <View style={[styles.kindIcon, { backgroundColor: OASIS.colors.soft }]}><ShoppingBag size={26} color={OASIS.colors.primary} /></View>
             <View style={styles.kindCopy}>
               <Text style={styles.kindTitle}>منتج أو سلعة</Text>
@@ -308,7 +308,7 @@ export default function NewListing() {
             <ChevronLeft size={20} color="#94A3B8" />
           </Pressable>
 
-          <Pressable oasisKind="card" style={[styles.kindCard, !capabilities.can_publish_services && styles.kindDisabled]} onPress={() => chooseKind('service')}>
+          <Pressable oasisKind="card" accessibilityRole="button" accessibilityLabel="إضافة خدمة مهنية" accessibilityHint={capabilities.can_publish_services ? "فتح نموذج الخدمة" : "تتطلب حسابًا مهنيًا معتمدًا"} style={[styles.kindCard,!capabilities.can_publish_services&&styles.kindDisabled]} onPress={() => chooseKind('service')}>
             <View style={[styles.kindIcon, { backgroundColor: OASIS.colors.infoSoft }]}><Wrench size={26} color="#2563EB" /></View>
             <View style={styles.kindCopy}>
               <Text style={styles.kindTitle}>خدمة مهنية</Text>
@@ -330,7 +330,9 @@ export default function NewListing() {
           <View style={styles.introIcon}><Package size={24} color={OASIS.colors.primary}/></View>
           <Text style={styles.heroTitle}>عرض واضح، وتفاصيل موثوقة</Text>
           <Text style={styles.heroSub}>صوّر المنتج، أضف تفاصيله، ثم أكّد وجودك معه قبل النشر.</Text>
-          <View style={styles.steps}>{[['١','التفاصيل'],['٢','الموقع الحالي'],['٣','المراجعة']].map(([n,label])=><View key={n} style={styles.step}><Text style={styles.stepNumber}>{n}</Text><Text style={styles.hint}>{label}</Text></View>)}</View>
+          <View style={styles.progressSummary}><Text style={styles.sectionTitle}>جاهزية الإعلان</Text><Text style={styles.progressCount}>{completed} من {checklist.length} مكتمل</Text></View>
+          <View style={styles.progressTrack}><View style={[styles.progressFill,{width:completed===4?'100%':completed===3?'75%':completed===2?'50%':completed===1?'25%':'0%'}]}/></View>
+          <View style={styles.checklist}>{checklist.map(item=><View key={item.label} style={[styles.checklistChip,item.done&&styles.checklistDone]}>{item.done?<Check size={14} color={OASIS.colors.primary}/>:<View style={styles.checklistDot}/>}<Text style={[styles.checklistText,item.done&&{color:OASIS.colors.primary}]}>{item.label}</Text></View>)}</View>
         </View>
         {!capabilities.can_publish_products && <View style={styles.errorBox}><Text style={styles.errorText}>نشر المنتجات للحساب التجاري المعتمد. يمكنك مراجعة حالة التوثيق في ملفك الشخصي.</Text></View>}
         <OasisSurface oasisSurface="card" style={styles.ownerCard}>
@@ -348,12 +350,15 @@ export default function NewListing() {
           {image ? (
             <View style={styles.imagePreview}>
               <Image source={{ uri: image.uri }} style={styles.image} />
-              <Pressable accessibilityLabel="حذف صورة المنتج" disabled={busy} style={styles.removeImage} onPress={() => {setImage(null);setPreview(false);}}><X size={15} color={OASIS.colors.danger} /></Pressable>
+              <View style={styles.imageControls}>
+                <Pressable accessibilityRole="button" accessibilityLabel="استبدال صورة المنتج" disabled={busy} style={styles.replaceImage} onPress={() => void chooseImage(false)}><Camera size={16} color={OASIS.colors.primary}/><Text style={styles.locateText}>تغيير الصورة</Text></Pressable>
+                <Pressable accessibilityRole="button" accessibilityLabel="حذف صورة المنتج" disabled={busy} style={styles.removeImage} onPress={() => {setImage(null);setPreview(false);}}><X size={18} color={OASIS.colors.danger} /></Pressable>
+              </View>
             </View>
           ) : (
             <View style={styles.imageActions}>
-              <Pressable style={styles.imageButton} onPress={() => void chooseImage(false)}><ImagePlus size={20} color="#0F766E" /><Text style={styles.imageButtonText}>اختيار صورة</Text></Pressable>
-              <Pressable style={styles.imageButton} onPress={() => void chooseImage(true)}><Camera size={20} color="#0F766E" /><Text style={styles.imageButtonText}>الكاميرا</Text></Pressable>
+              <Pressable accessibilityRole="button" accessibilityLabel="اختيار صورة من المعرض" disabled={busy} style={styles.imageButton} onPress={() => void chooseImage(false)}><ImagePlus size={20} color="#0F766E" /><Text style={styles.imageButtonText}>اختيار صورة</Text></Pressable>
+              <Pressable accessibilityRole="button" accessibilityLabel="التقاط صورة بالكاميرا" disabled={busy} style={styles.imageButton} onPress={() => void chooseImage(true)}><Camera size={20} color="#0F766E" /><Text style={styles.imageButtonText}>الكاميرا</Text></Pressable>
             </View>
           )}
         </OasisSurface>
@@ -367,7 +372,7 @@ export default function NewListing() {
                 ['تبرع', Gift],
                 ['إعارة', Package],
               ] as const).map(([value, Icon]) => (
-                <Pressable key={value} disabled={busy} style={[styles.mode, mode === value && styles.modeActive]} onPress={() => setMode(value)}>
+                <Pressable key={value} accessibilityRole="button" accessibilityState={{selected:mode===value}} disabled={busy} style={[styles.mode, mode === value && styles.modeActive]} onPress={() => setMode(value)}>
                   <Icon size={16} color={mode === value ? OASIS.colors.surface : OASIS.colors.muted} />
                   <Text style={[styles.modeText, mode === value && styles.modeTextActive]}>{value}</Text>
                 </Pressable>
@@ -384,7 +389,7 @@ export default function NewListing() {
           <Text style={styles.label}>حالة المنتج</Text>
           <View style={styles.choices}>{['جديد','كالجديد','مستعمل بحالة جيدة','يحتاج صيانة'].map(value=><Choice key={value} label={value} selected={condition===value} disabled={busy} onPress={()=>setCondition(value)}/>)}</View>
           <Field label="وصف المنتج *" maxLength={2000} editable={!busy} value={description} onChangeText={setDescription} placeholder="اذكر مدة الاستخدام، المحتويات والملحقات، وأي عيوب أو إصلاحات سابقة..." multiline />
-          <View style={styles.twoColumns}><View style={{flex:1}}><Field label="العلامة التجارية — اختياري" maxLength={60} editable={!busy} value={brand} onChangeText={setBrand} placeholder="مثال: سامسونج"/></View><View style={{flex:1}}><Field label="الموديل — اختياري" maxLength={60} editable={!busy} value={model} onChangeText={setModel} placeholder="اسم أو رقم الموديل"/></View></View>
+          <View style={styles.twoColumns}><View style={width<520?styles.stackedField:styles.columnField}><Field label="العلامة التجارية — اختياري" maxLength={60} editable={!busy} value={brand} onChangeText={setBrand} placeholder="مثال: سامسونج"/></View><View style={width<520?styles.stackedField:styles.columnField}><Field label="الموديل — اختياري" maxLength={60} editable={!busy} value={model} onChangeText={setModel} placeholder="اسم أو رقم الموديل"/></View></View>
           <Field label="المقاسات — اختياري" maxLength={100} editable={!busy} value={dimensions} onChangeText={setDimensions} placeholder="مثال: العرض ١٢٠ × العمق ٦٠ سم"/>
         </OasisSurface>
 
@@ -414,13 +419,13 @@ export default function NewListing() {
         </OasisSurface>
 
         {!!formError && <View accessibilityRole="alert" style={styles.errorBox}><Text style={styles.errorText}>{formError}</Text></View>}
-        {preview && <OasisSurface oasisSurface="card" style={styles.card}><View style={styles.sectionHeading}><ClipboardCheck size={18} color={OASIS.colors.primary}/><Text style={styles.sectionTitle}>مراجعة الإعلان</Text></View>{image && <Image source={{uri:image.uri}} style={styles.reviewImage}/>}<Text style={styles.heroTitle}>{title.trim()}</Text><Text style={styles.ownerName}>{negotiable ? 'السعر بالتفاوض' : `${parseProductPrice(price)?.toLocaleString('ar-SA')} ر.س`}</Text><Text style={styles.hint}>{detailDescription}</Text><Text style={styles.hint}>{city} · {district} · يظهر الموقع العام فقط</Text></OasisSurface>}
+        {preview && <OasisSurface oasisSurface="card" style={styles.card}><View style={styles.sectionHeading}><ClipboardCheck size={18} color={OASIS.colors.primary}/><Text style={styles.sectionTitle}>مراجعة الإعلان</Text></View>{image && <Image source={{uri:image.uri}} style={styles.reviewImage}/>}<Text style={styles.heroTitle}>{title.trim()}</Text><Text style={styles.ownerName}>{previewPriceLabel}</Text><Text style={styles.hint}>{detailDescription}</Text><Text style={styles.hint}>{city} · {district} · يظهر الموقع العام فقط</Text><Pressable accessibilityRole="button" style={styles.fullActionSecondary} onPress={()=>setPreview(false)}><Text style={styles.locateText}>العودة لتعديل البيانات</Text></Pressable></OasisSurface>}
         {!preview && <Pressable oasisKind="plain" style={styles.locateButton} disabled={busy||locating} onPress={()=>{const error=validateProduct();setFormError(error);if(!error)setPreview(true);}}><ClipboardCheck size={18} color={OASIS.colors.primary}/><Text style={styles.locateText}>معاينة الإعلان قبل النشر</Text></Pressable>}
 
-        <Pressable oasisVariant="primary" oasisKind="action" accessibilityLabel="تأكيد الموقع ونشر المنتج" style={[styles.submit,(!position || !productPresent || !capabilities.can_publish_products) && {opacity:.5}]} onPress={() => void saveProduct()} disabled={busy || locating || !position || !productPresent || !capabilities.can_publish_products}>
+        <Pressable oasisVariant="primary" oasisKind="action" accessibilityLabel={preview?"تأكيد الموقع ونشر المنتج":"راجع معاينة الإعلان أولًا"} accessibilityState={{disabled:busy||locating||!preview||!position||!productPresent||!capabilities.can_publish_products}} style={[styles.submit,(!preview || !position || !productPresent || !capabilities.can_publish_products) && {opacity:.5}]} onPress={() => void saveProduct()} disabled={busy || locating || !preview || !position || !productPresent || !capabilities.can_publish_products}>
 
           {busy ? <ActivityIndicator color={OASIS.colors.surface} /> : <ShoppingBag size={18} color={OASIS.colors.surface} />}
-          <Text style={styles.submitText}>{busy ? busyMessage : 'تأكيد الموقع ونشر المنتج'}</Text>
+          <Text style={styles.submitText}>{busy ? busyMessage : preview ? 'تأكيد الموقع ونشر المنتج' : 'راجع المعاينة أولًا'}</Text>
         </Pressable>
       </ScrollView>
     </View>
