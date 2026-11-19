@@ -1,9 +1,9 @@
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Image, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { uuid } from 'expo-modules-core';
 import { router, useFocusEffect } from 'expo-router';
-import { CheckCircle2, ChevronLeft, Minus, Package, Plus, RefreshCw, ShoppingBag, Trash2, Truck, Wallet } from 'lucide-react-native';
+import { CheckCircle2, ChevronLeft, Minus, Package, Plus, RefreshCw, ShoppingBag, Trash2, Truck, Wallet, MapPin } from 'lucide-react-native';
 import { AppHeader } from '@/components/shared/AppHeader';
 import { OasisPressable as Pressable, OasisTextInput as TextInput } from '@/components/oasis/OasisPrimitives';
 import { useTheme } from '@/context/ThemeContext';
@@ -16,6 +16,8 @@ type Product = { id: string; seller_id: string; title: string; description: stri
 
 export default function MarketCart() {
   const { colors: c } = useTheme(), bottom = useBottomNavInset();
+  const {width}=useWindowDimensions();
+  const wide=width>=900;
   const [uid,setUid] = useState('');
   const [lines,setLines] = useState<MarketCartLine[]>([]);
   const [products,setProducts] = useState<Record<string,Product>>({});
@@ -127,18 +129,29 @@ export default function MarketCart() {
   });
   const changing=busy!=='';
   const sellersCount=new Set(lines.map(line=>products[line.item_id]?.seller_id).filter(Boolean)).size;
-  return <View style={{flex:1,backgroundColor:'transparent'}}>
-    <AppHeader variant="sub" title="سلة سوق الحي" subtitle="كل الطلبات · الدفع عند الاستلام" fallbackRoute="/market"/>
-    <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{setRefreshing(true);void load();}}/>}
-      contentContainerStyle={[styles.wrap,{paddingBottom:bottom+36}]}>
-      <View style={[styles.banner,{backgroundColor:c.soft,borderColor:c.line}]}>
-        <Wallet size={20} color={c.primary}/>
+  return <View style={{flex:1,backgroundColor:c.background}}>
+    <AppHeader variant="sub" title="سلة سوق الحي" subtitle="راجع منتجاتك وأرسل طلبك" fallbackRoute="/market"/>
+    <ScrollView keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{setRefreshing(true);void load();}} tintColor={c.primary}/>}
+      contentContainerStyle={[styles.wrap,{paddingBottom:bottom+28}]}>
+      {!!lines.length&&<View style={[styles.banner,{backgroundColor:c.soft,borderColor:c.line}]}>
+        <Wallet size={19} color={c.primary}/>
         <View style={{flex:1,gap:2}}>
-          <Text style={[styles.label,{color:c.ink}]}>الدفع نقدًا عند الاستلام</Text>
-          <Text style={[styles.hint,{color:c.muted}]}>لا رسوم مسبقة. تكلفة التوصيل بالتنسيق مع التاجر.</Text>
+          <Text style={[styles.label,{color:c.ink}]}>الدفع عند الاستلام فقط</Text>
+          <Text style={[styles.hint,{color:c.muted}]}>لا دفع مسبق · التوصيل بالاتفاق مع التاجر</Text>
         </View>
-      </View>
-      {loading&&<View style={styles.center}><ActivityIndicator color={c.primary}/><Text style={{color:c.muted}}>جارٍ تحميل سلتك…</Text></View>}
+        <Text style={[styles.bannerCount,{color:c.primary}]}>{lines.length.toLocaleString('ar-SA')} منتجات</Text>
+      </View>}
+      {loading&&<View accessibilityLabel="جارٍ تحميل سلة المشتريات" style={styles.skeletonList}>
+        {[0,1].map(index=><View key={index} style={[styles.card,{backgroundColor:c.surface,borderColor:c.line,minHeight:142,gap:14}]}>
+          <View style={styles.productRow}><View style={[styles.thumbnail,{backgroundColor:c.soft}]}/>
+            <View style={{flex:1,gap:10,alignItems:'flex-end'}}>
+              <View style={[styles.skeletonBar,{width:'67%',backgroundColor:c.line}]}/>
+              <View style={[styles.skeletonBar,{width:'41%',backgroundColor:c.soft}]}/>
+            </View>
+          </View>
+          <View style={[styles.skeletonBar,{width:'55%',backgroundColor:c.line}]}/>
+        </View>)}
+      </View>}
       {!!error&&<View accessibilityRole="alert" style={[styles.notice,{borderColor:c.danger}]}><Text style={[styles.hint,{color:c.danger}]}>{error}</Text><Pressable onPress={()=>void load()} style={styles.link}><RefreshCw size={16} color={c.primary}/><Text style={{color:c.primary}}>تحديث السلة</Text></Pressable></View>}
       {!!notice&&<Text accessibilityRole="alert" style={[styles.hint,{color:c.primary,fontWeight:'700'}]}>{notice}</Text>}
       {!!orders.length&&<View style={[styles.card,{backgroundColor:c.surface,borderColor:c.line}]}>
