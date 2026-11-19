@@ -7,6 +7,7 @@ import {OasisPressable as Pressable} from '@/components/oasis/OasisPrimitives';
 import {supabase} from '@/lib/supabase';
 import {productOrderStatus,productOrderStages,formatCartMoney} from '@/lib/marketCart';
 import {useTheme} from '@/context/ThemeContext';
+import {useBottomNavInset} from '@/lib/bottomNav';
 
 type OrderKind='service'|'product';
 type Ticket={id:string;ticket_number:number;category:string;status:string;description:string;created_at:string};
@@ -36,7 +37,8 @@ async function uploadPhoto(bucket:string,path:string,asset:ImagePicker.ImagePick
 export default function OrderDetails(){
  const {id,kind:rawKind}=useLocalSearchParams<{id?:string;kind?:string}>();
  const kind:OrderKind=rawKind==='product'?'product':'service';
- const {colors:c}=useTheme();
+ const {colors:c}=useTheme();const bottom=useBottomNavInset();
+ const [showReference,setShowReference]=useState(false),[showPreferences,setShowPreferences]=useState(false),[showDisputes,setShowDisputes]=useState(false),[showHistory,setShowHistory]=useState(false);
  const [uid,setUid]=useState(''),[order,setOrder]=useState<any>(null),[review,setReview]=useState<any>(null),[reply,setReply]=useState<any>(null);
  const [tickets,setTickets]=useState<Ticket[]>([]),[history,setHistory]=useState<any[]>([]);
  const [messages,setMessages]=useState<Message[]>([]),[attachments,setAttachments]=useState<Attachment[]>([]);
@@ -209,34 +211,45 @@ export default function OrderDetails(){
  const input=(v:string,set:(v:string)=>void,placeholder:string,multi=false)=><TextInput value={v} onChangeText={set} placeholder={placeholder} placeholderTextColor={c.muted} multiline={multi} textAlign="right" style={[S.input,{color:c.ink,borderColor:c.line,backgroundColor:c.soft,minHeight:multi?90:44}]} />;
  const button=(txt:string,cb:()=>void,disabled=false)=><Pressable accessibilityRole="button" accessibilityLabel={txt} disabled={busy||disabled} onPress={cb} style={[S.button,{backgroundColor:c.primary,opacity:busy||disabled?.5:1}]}><Text style={S.buttonText}>{txt}</Text></Pressable>;
  return <View style={{flex:1,backgroundColor:'transparent'}}><AppHeader title="تفاصيل الطلب" subtitle="السوق · حيّنا" fallbackRoute={kind==='product'?'/product-orders':'/marketplace-dashboard?tab=services'}/>
-  <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{setRefreshing(true);void load();}}/>} contentContainerStyle={S.wrap}>
+  <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{setRefreshing(true);void load();}}/>} contentContainerStyle={[S.wrap,{paddingBottom:bottom+24}]}>
    {loading?<ActivityIndicator color={c.primary}/>:null}
    {!!error&&<Text accessibilityRole="alert" style={S.error}>{error}</Text>}
    {!!notice&&<Text style={[S.notice,{color:c.primary}]}>{notice}</Text>}
    {order?<>
-    {box(<>{title(label)}{hint('رقم الطلب: '+String(order.id))}{title(kind==='product'?productOrderStatus(order.status):statusNames[order.status]||order.status)}
-     <View style={S.stepRow}>{steps[kind].map((step,i)=><View key={step} style={[S.step,{backgroundColor:!['cancelled','rejected'].includes(order.status)&&steps[kind].indexOf(order.status)>=i?c.primary:c.soft}]}><Text style={{fontSize:10,color:!['cancelled','rejected'].includes(order.status)&&steps[kind].indexOf(order.status)>=i?'#fff':c.ink,textAlign:'center'}}>{kind==='product'?productOrderStages[i]?.label||statusNames[step]:statusNames[step]}</Text></View>)}</View>
-     {order.amount_halalas!=null?hint('قيمة الطلب: '+(Number(order.amount_halalas)/100).toFixed(2)+' ر.س'):null}
+    {box(<>{title(label)}
+      <Pressable accessibilityRole="button" accessibilityState={{expanded:showReference}} onPress={()=>setShowReference(v=>!v)} style={S.referenceAction}>
+        <Text numberOfLines={showReference?undefined:1} style={[S.hint,{color:c.muted,flex:1}]}>رقم الطلب: {showReference?String(order.id):'#'+String(order.id).slice(0,8)}</Text>
+        <Text style={{color:c.primary,fontSize:12,fontWeight:'700'}}>{showReference?'إخفاء':'عرض الرقم'}</Text>
+      </Pressable>{title(kind==='product'?productOrderStatus(order.status):statusNames[order.status]||order.status)}
+     {kind==='product'?<View accessibilityLabel={'مراحل الطلب: '+productOrderStatus(order.status)} style={S.trackRow}>
+        {productOrderStages.map((step,index)=>{
+          const current=productOrderStages.findIndex(item=>item.status===order.status);
+          const done=current>=index&&!['rejected','cancelled'].includes(order.status);
+          return <View key={step.status} style={S.trackItem}><View style={[S.trackBar,{backgroundColor:done?c.primary:c.line}]}/><Text numberOfLines={2} style={[S.trackLabel,{color:done?c.primary:c.muted}]}>{step.label}</Text></View>;
+        })}
+      </View>:<View style={S.stepRow}>{steps.service.map((step,index)=><View key={step} style={[S.step,{backgroundColor:steps.service.indexOf(order.status)>=index?c.primary:c.soft}]}><Text style={{fontSize:10,color:steps.service.indexOf(order.status)>=index?'#fff':c.ink,textAlign:'center'}}>{statusNames[step]}</Text></View>)}</View>}
+      {order.amount_halalas!=null?hint('قيمة الطلب: '+(Number(order.amount_halalas)/100).toFixed(2)+' ر.س'):null}
      {isSeller&&kind==='service'&&order.status==='paid'?button('قبول الطلب',()=>void changeStatus('accept')):null}
      {isSeller&&kind==='service'&&order.status==='accepted'?button('بدء التنفيذ',()=>void changeStatus('start')):null}
      {isSeller&&kind==='service'&&order.status==='in_progress'?button('جاهز للاستلام',()=>void changeStatus('ready')):null}
      {isBuyer&&kind==='service'&&order.status==='ready'?button('تأكيد الاستلام الفعلي',()=>Alert.alert('تأكيد الاستلام','هل استلمت الخدمة بالفعل؟ لا يمكن التراجع عن هذا الإجراء.',[{text:'إلغاء',style:'cancel'},{text:'تأكيد',onPress:()=>void changeStatus('received')}])):null}
-     {kind==='product'&&isSeller&&order.status==='pending'?<>{button('قبول طلب المنتج',()=>void productAction('accept'))}{button('رفض الطلب',()=>void productAction('reject'))}</>:null}
+     {kind==='product'&&isSeller&&order.status==='pending'?<>{button('قبول طلب المنتج',()=>void productAction('accept'))}{<Pressable accessibilityRole="button" disabled={busy} onPress={()=>void productAction('reject')} style={S.dangerLink}><Text style={[S.dangerText,{color:c.danger}]}>رفض الطلب</Text></Pressable>}</>:null}
      {kind==='product'&&isSeller&&order.status==='accepted'?button('جاهز للتسليم أو التوصيل',()=>void productAction('ready')):null}
      {kind==='product'&&isBuyer&&order.status==='ready'?button('تأكيد استلام المنتج',()=>Alert.alert('تأكيد الاستلام','هل استلمت المنتج بالفعل؟ الدفع نقدًا عند الاستلام فقط، ولا يُخصم أي مبلغ داخل التطبيق.',[{text:'إلغاء',style:'cancel'},{text:'تأكيد',onPress:()=>void productAction('complete')}])):null}
-     {kind==='product'&&isBuyer&&order.status==='pending'?button('إلغاء الطلب',()=>void productAction('cancel')):null}
-     {kind==='product'&&order.conversation_id?button('فتح محادثة البائع والمشتري',()=>router.push({pathname:'/conversation',params:{id:order.conversation_id}})):null}
+     {kind==='product'&&isBuyer&&order.status==='pending'?<Pressable accessibilityRole="button" disabled={busy} onPress={()=>void productAction('cancel')} style={S.dangerLink}><Text style={[S.dangerText,{color:c.danger}]}>إلغاء الطلب</Text></Pressable>:null}
+     {kind==='product'&&order.conversation_id?<Pressable accessibilityRole="button" disabled={busy} style={[S.secondaryAction,{borderColor:c.line,backgroundColor:c.surface}]} onPress={()=>router.push({pathname:'/conversation',params:{id:order.conversation_id}})}><Text style={{color:c.primary,fontWeight:'700'}}>محادثة التاجر والمشتري</Text></Pressable>:null}
      {kind==='product'?<View style={{gap:10,borderWidth:1,borderColor:c.line,borderRadius:16,padding:14,backgroundColor:c.soft}}>
-       {title('الدفع عند الاستلام فقط')}
-       {hint('لا يوجد دفع إلكتروني أو خصم مسبق. تُسلّم القيمة نقدًا عند استلام المنتج بعد الاتفاق على تكلفة التوصيل.')}
-       {order.unit_price!=null?hint('قيمة المنتجات: '+formatCartMoney(Math.round(Number(order.unit_price)*100)*Number(order.quantity))):hint('المنتج بدون سعر محدد؛ اتفق مع التاجر على التفاصيل قبل التسليم.')}
-       {order.cash_collected_at?hint('سجّل التاجر استلام المبلغ النقدي بتاريخ '+date(order.cash_collected_at)):hint('لم يُسجّل التاجر تحصيل المبلغ النقدي بعد.')}
+       <View style={S.summaryPair}>
+         <View style={{flex:1,gap:3}}><Text style={[S.hint,{color:c.muted}]}>الدفع عند الاستلام فقط</Text><Text style={[S.title,{color:c.primary}]}>{order.unit_price!=null?formatCartMoney(Math.round(Number(order.unit_price)*100)*Number(order.quantity)):'السعر بالاتفاق'}</Text></View>
+         <View style={{flex:1,gap:3}}><Text style={[S.hint,{color:c.muted}]}>حالة التحصيل</Text><Text style={[S.hint,{color:order.cash_collected_at?c.primary:c.ink,fontWeight:'700'}]}>{order.cash_collected_at?'سُجّل التحصيل':'لم يُحصّل بعد'}</Text></View>
+       </View>
+       {hint('لا دفع مسبق، وتُنسّق رسوم التوصيل مع التاجر.')}
        {isSeller&&order.unit_price>0&&!order.cash_collected_at&&['ready','completed'].includes(order.status)?button('أؤكد تحصيل المبلغ نقدًا فعليًا',()=>void recordCash()):null}
      </View>:null}
      {kind==='product'?<View style={{gap:9}}>
        {title('التوصيل والتواصل')}
-       {hint('طريقة التسليم: '+(order.fulfillment||'بالاتفاق مع التاجر'))}
-       {order.scheduled_delivery_at?hint('موعد التسليم: '+date(order.scheduled_delivery_at)):hint('لم يُحدّد موعد التسليم بعد.')}
+       <View style={S.infoRow}><Text style={[S.hint,{color:c.muted}]}>طريقة التسليم</Text><Text style={[S.hint,{color:c.ink,fontWeight:'700'}]}>{order.fulfillment||'بالاتفاق مع التاجر'}</Text></View>
+       <View style={S.infoRow}><Text style={[S.hint,{color:c.muted}]}>موعد التسليم</Text><Text style={[S.hint,{color:c.ink,fontWeight:'700'}]}>{order.scheduled_delivery_at?date(order.scheduled_delivery_at):'لم يُحدد بعد'}</Text></View>
        {order.delivery_note?hint('تفاصيل التسليم: '+order.delivery_note):null}
        {isSeller&&['accepted','ready'].includes(order.status)?<>
          {hint('أدخل موعدًا اتفقت عليه مع العميل. لا تضع عنوان منزل دقيقًا في ملاحظات التسليم.')}
@@ -249,7 +262,7 @@ export default function OrderDetails(){
      {kind==='service'&&order.delivery_note?hint('تفاصيل التسليم: '+order.delivery_note):null}
      {kind==='service'&&isSeller&&['accepted','in_progress'].includes(order.status)?<>{title('تعديل موعد وتفاصيل التسليم')}{input(deliveryWhen,setDeliveryWhen,'الموعد: 2026-11-05T18:00 (اختياري)')}{input(deliveryNote,setDeliveryNote,'تفاصيل التسليم',true)}{button('حفظ الموعد وإبلاغ المشتري',()=>void saveDelivery())}</>:null}
     </>)}
-    {history.length?box(<>{title('سجل حالة الطلب')}{history.map(x=><View key={x.id} style={S.line}>{hint((statusNames[x.old_status]||x.old_status)+' ← '+(statusNames[x.new_status]||x.new_status))}{hint(date(x.created_at))}</View>)}</>):null}
+    {history.length?box(<><Pressable accessibilityRole="button" accessibilityState={{expanded:showHistory}} onPress={()=>setShowHistory(v=>!v)} style={S.foldHead}><Text style={[S.title,{color:c.ink}]}>سجل حالة الطلب</Text><Text style={{color:c.primary,fontSize:12}}>{showHistory?'إخفاء':history.length+' تحديثات'}</Text></Pressable>{showHistory&&history.map(x=><View key={x.id} style={S.line}>{hint((statusNames[x.old_status]||x.old_status)+' ← '+(statusNames[x.new_status]||x.new_status))}{hint(date(x.created_at))}</View>)}</>):null}
     {completed?box(<>{title('التقييم بعد الاستلام')}
      {review?<>{hint('التقييم: '+review.rating+' من 5')}{hint(review.body||'بدون تعليق')}{review.photo_paths?.map((path:string)=><Image key={path} source={{uri:supabase.storage.from('order-review-images').getPublicUrl(path).data.publicUrl}} style={S.photo}/>)}
       {reply?<>{title('رد البائع')}{hint(reply.body)}{isSeller&&!editingReply?button('تعديل ردي',()=>{setSellerReply(reply.body);setEditingReply(true);}):null}</>:null}
@@ -257,8 +270,19 @@ export default function OrderDetails(){
       {isSeller||isBuyer?<>{input(reportReason,setReportReason,'سبب الإبلاغ عن هذا التقييم',true)}{button('الإبلاغ عن التقييم',()=>void reportReview(),reportReason.trim().length<5)}</>:null}
      </>:isBuyer?<>{hint('يمكن إضافة تقييم واحد فقط لهذا الطلب المكتمل.')}<View style={S.stepRow}>{[1,2,3,4,5].map(n=><Pressable key={n} accessibilityLabel={'تقييم '+n} onPress={()=>setStars(n)}><Text style={{fontSize:25,color:n<=stars?'#E4A11B':c.muted}}>★</Text></Pressable>)}</View>{input(comment,setComment,'اكتب تجربتك (اختياري)',true)}{button('إضافة صور للتقييم (3 كحد أقصى)',()=>void chooseImages())}{photos.length?hint('تم اختيار '+photos.length+' صورة'):null}{button('نشر التقييم',()=>void submitReview())}</>:hint('التقييم متاح للمشتري فقط بعد تأكيد الاستلام.')}
     </>):null}
-    {box(<>{title('تفضيلات إشعارات الطلبات')}{hint('يمكنك تحديد إشعارات الطلبات داخل التطبيق وإشعارات الهاتف بصورة مستقلة.')}{button(inApp?'إيقاف إشعارات الطلبات داخل التطبيق':'تفعيل إشعارات الطلبات داخل التطبيق',()=>void savePreferences(!inApp,push))}{button(push?'إيقاف إشعارات الهاتف للطلبات':'تفعيل إشعارات الهاتف للطلبات',()=>void savePreferences(inApp,!push))}</>)}
-    {box(<>{title('مركز مشكلات الطلبات')}{hint('تذاكر خاصة بين مقدم البلاغ والإدارة، مرتبطة بالطلب نفسه.')}
+    {box(<>
+      <Pressable accessibilityRole="button" accessibilityState={{expanded:showPreferences}} onPress={()=>setShowPreferences(v=>!v)} style={S.foldHead}>
+       <Text style={[S.title,{color:c.ink}]}>إشعارات الطلب</Text><Text style={{color:c.primary,fontSize:12}}>{showPreferences?'إخفاء':'الإعدادات'}</Text>
+      </Pressable>
+      {showPreferences&&<>{hint('حدد كيف تصلك تحديثات هذا الطلب.')}{button(inApp?'إيقاف إشعارات الطلب داخل التطبيق':'تفعيل إشعارات الطلب داخل التطبيق',()=>void savePreferences(!inApp,push))}{button(push?'إيقاف إشعارات الهاتف':'تفعيل إشعارات الهاتف',()=>void savePreferences(inApp,!push))}</>}
+     </>)}
+    {box(<>
+     <Pressable accessibilityRole="button" accessibilityState={{expanded:showDisputes}} onPress={()=>setShowDisputes(v=>!v)} style={S.foldHead}>
+       <Text style={[S.title,{color:c.ink}]}>المساعدة ومشكلات الطلب</Text>
+       <Text style={{color:c.primary,fontSize:12}}>{showDisputes?'إخفاء':tickets.length?String(tickets.length)+' بلاغات':'فتح الخيارات'}</Text>
+     </Pressable>
+     {showDisputes&&<>
+       {hint('بلاغ خاص بينك وبين الإدارة، مرتبط بهذا الطلب.')}
      {tickets.map(t=><Pressable key={t.id} onPress={()=>void loadTicket(t)} style={S.line}><Text style={{color:c.primary,fontWeight:'700',textAlign:'right'}}>تذكرة #{t.ticket_number} · {t.status}</Text>{hint(t.description)}</Pressable>)}
      {!ticket?<>{title('فتح بلاغ جديد')}<View style={S.stepRow}>{Object.entries(disputeKinds).map(([k,v])=><Pressable key={k} onPress={()=>setCategory(k)} style={[S.choice,{backgroundColor:category===k?c.primary:c.soft}]}><Text style={{fontSize:11,color:category===k?'white':c.ink}}>{v}</Text></Pressable>)}</View>
       {input(description,setDescription,'اشرح المشكلة والتفاصيل',true)}
@@ -270,14 +294,26 @@ export default function OrderDetails(){
        {input(message,setMessage,'اكتب ردك للإدارة',true)}{button('إرسال رسالة',()=>void sendMessage(),!message.trim())}
        {button('العودة إلى قائمة البلاغات',()=>setTicket(null))}
       </>}
+     </>}
     </>)}
    </>:!loading?hint('تعذر عرض الطلب. تحقق من الرابط أو صلاحية الحساب.'):null}
   </ScrollView>
  </View>;
 }
 const styles=StyleSheet.create({
- wrap:{padding:14,paddingBottom:56,gap:14,width:'100%',maxWidth:760,alignSelf:'center'},
- card:{borderWidth:1,borderRadius:17,padding:16,gap:12},
+ wrap:{paddingHorizontal:14,paddingTop:12,gap:11,width:'100%',maxWidth:760,alignSelf:'center'},
+ referenceAction:{flexDirection:'row-reverse',alignItems:'center',gap:12,minHeight:44},
+ trackRow:{flexDirection:'row-reverse',gap:5,marginTop:5},
+ trackItem:{flex:1,minWidth:0,gap:6},
+ trackBar:{height:5,borderRadius:4},
+ trackLabel:{fontSize:10,lineHeight:16,textAlign:'center'},
+ summaryPair:{flexDirection:'row-reverse',gap:12,justifyContent:'space-between'},
+ infoRow:{flexDirection:'row-reverse',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:8,minHeight:34},
+ dangerLink:{minHeight:44,borderWidth:1,borderColor:'#F2CDCD',backgroundColor:'#FFF9F9',borderRadius:14,alignItems:'center',justifyContent:'center'},
+ dangerText:{fontSize:13,fontWeight:'700'},
+ secondaryAction:{minHeight:46,borderWidth:1,borderRadius:14,justifyContent:'center',alignItems:'center'},
+ foldHead:{flexDirection:'row-reverse',alignItems:'center',justifyContent:'space-between',minHeight:44,gap:10},
+ card:{borderWidth:1,borderRadius:18,padding:15,gap:10},
  title:{fontSize:17,fontWeight:'700',textAlign:'right'},
  hint:{fontSize:12,lineHeight:20,textAlign:'right'},
  line:{paddingVertical:9,borderBottomWidth:0.5,borderColor:'#DDE7E4',gap:4},
