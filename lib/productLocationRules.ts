@@ -29,3 +29,12 @@ export function parseProductPrice(value: string): number | null {
   if (!normalized) return null;
   return /^\d{1,7}(\.\d{1,2})?$/.test(normalized) && Number(normalized)>0 ? Number(normalized) : NaN;
 }
+
+/** Price shown before a product listing is sent to the marketplace. */
+export function formatProductListingPrice(mode: 'بيع' | 'تبرع' | 'إعارة', negotiable: boolean, price: string, isMerchant = false): string {
+  if (!isMerchant && mode === 'تبرع') return 'مجانًا · تبرع';
+  if (!isMerchant && mode === 'إعارة') return 'إعارة · دون سعر';
+  if (negotiable) return 'السعر بالتفاوض';
+  const amount = parseProductPrice(price);
+  return amount === null || !Number.isFinite(amount) ? 'لم يحدد السعر بعد' : `${amount.toLocaleString('ar-SA')} ر.س`;
+}
