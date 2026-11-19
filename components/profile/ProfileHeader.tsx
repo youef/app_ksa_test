@@ -58,7 +58,7 @@ export function ProfileHeader(props: Props) {
   const identity = getAccountIdentityMeta(profile.role, profile.account_type, Boolean(profile.is_verified));
   const experience = publicProfileRoleCopy(profile);
   const verification = publicProfileVerification({...profile, verification_status:props.verificationRequestStatus ?? profile.verification_status}, Boolean(own));
-  const ExperienceIcon = identity.Icon;
+  const ExperienceIcon = experience.kind === 'admin' ? Settings : identity.Icon;
   const showProfessionalApproval = experience.kind === 'merchant' && profile.is_verified_merchant === true;
   const accent = customization?.accent_color || identity.color;
   const name = anonymous ? 'جار مجهول' : props.displayName || profile.display_name || profile.username || 'جار';
