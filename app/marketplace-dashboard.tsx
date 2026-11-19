@@ -149,11 +149,11 @@ export default function MarketplaceDashboard(){
       </Pressable>)}
     </View>
     {data.orders?.length>0&&<Pressable oasisKind="plain" accessibilityRole="button"
-      accessibilityLabel="آخر عملية في سجل المدفوعات" onPress={()=>setTab('orders')}
+      accessibilityLabel="فتح عملية مسجلة من سجل المدفوعات" onPress={()=>setTab('orders')}
       style={[s.lastPayment,{backgroundColor:c.surface,borderColor:c.line}]}>
       <View style={[s.quickIcon,{backgroundColor:c.soft}]}><Wallet size={19} color={c.primary}/></View>
       <View style={s.attentionCopy}>
-        <Text style={[s.quickLabel,{color:c.ink}]}>آخر عملية في السجل</Text>
+        <Text style={[s.quickLabel,{color:c.ink}]}>عملية مسجلة في المدفوعات</Text>
         <Text style={[s.quickDesc,{color:c.muted}]}>{statuses[data.orders[0].status]||'حالة غير معروفة'} · {money(data.orders[0].amount_halalas)}</Text>
       </View>
       <ChevronLeft size={18} color={c.primary}/>
