@@ -46,7 +46,7 @@ import { ProfileCustomizationEntry } from '@/components/profile/ProfileCustomiza
 import { AccountStatusMark, getAccountIdentityMeta } from '@/components/profile/AccountIdentityBadge';
 import { C } from '@/lib/ui';
 import { getBlockStatus, setBlock } from '@/lib/chatControls';
-import { profileActivityOrder, profileOwnerLinks, profileStartingTab, publicProfileRoleCopy, type ProfileCapabilityFlags, type ActivityTab } from '@/lib/profileExperience';
+import { profileActivityOrder, profileOwnerLinks, profileStartingTab, profileTabLabel, publicProfileRoleCopy, type ProfileCapabilityFlags, type ActivityTab } from '@/lib/profileExperience';
 import { getNeighborAccess } from '@/lib/neighborAccess';
 import { ImagePreviewModal } from '@/components/shared/ImagePreviewModal';
 
@@ -550,6 +550,27 @@ export default function UserProfile() {
   const isAdmin = profile.role === 'admin';
   const totalContributions = stats.market + stats.services + stats.requests + stats.questions + (own ? stats.answers : 0);
   const identityMeta = getAccountIdentityMeta(profile.role, profile.account_type, Boolean(profile.is_verified));
+  const roleCopy = publicProfileRoleCopy(profile);
+  const ownerLinks = own ? profileOwnerLinks(myCapabilities || undefined) : [];
+  const roleActions = own ? [
+    {key:'profile',label:'إدارة الملف',Icon:Edit3},
+    ...ownerLinks.filter(key=>key!=='promotion').map(key=>({
+      key,label:key==='products'?'إضافة منتج':key==='services'?'إضافة خدمة':'إدارة منشأتي',
+      Icon:key==='services'?Wrench:key==='business'?Package:ShoppingBag,
+    })),
+    ...(ownerLinks.includes('promotion')?[{key:'promotion',label:'لوحة النشاط',Icon:Sparkles}]:[]),
+    {key:'orders',label:'طلباتي',Icon:Package},
+    ...(myCapabilities?.role==='admin'?[{key:'admin',label:'إدارة المنصة',Icon:ShieldCheck}]:[]),
+  ] : [];
+  function openRoleAction(key:string) {
+    if(key==='profile')router.push('/profile?tab=profile');
+    else if(key==='products')router.push('/new-listing');
+    else if(key==='services')router.push('/new-service');
+    else if(key==='business')router.push('/profile?tab=content');
+    else if(key==='promotion')router.push('/marketplace-dashboard');
+    else if(key==='orders')router.push('/product-orders');
+    else if(key==='admin'&&myCapabilities?.role==='admin')router.push('/admin');
+  }
   const accentColor = profileCustomization?.accent_color || identityMeta.color;
   const heroColors: [string, string, string] = (profileCustomization?.banner_style || 'emerald') === 'emerald'
     ? identityMeta.heroColors
@@ -642,7 +663,29 @@ export default function UserProfile() {
         contentContainerStyle={styles.page}
       >
         <View style={[styles.shell, { paddingTop: 10 }]}>
-          <ProfileHeader contactPhone={contact && contact.profileId === profile.id && (lookupKey === profile.id || lookupKey === profile.username) ? contact.phone : ''} profile={profile} customization={profileCustomization} displayName={displayName} coverUri={coverUrl} stats={{...stats, contributions:totalContributions}} own={own} anonymous={anonymous} locked={locked} following={following} followedBy={followedBy} busy={busy || blocked || blockedByOther} canMessage={canMessage} hideContactActions={locked || blocked || blockedByOther} hasStories={hasActiveStories} onStoriesPress={()=>void openProfileStories()} onAvatarPress={()=>{if(!anonymous&&!locked&&profile.avatar_url)setPreviewImage({uri:profile.avatar_url,title:'الصورة الشخصية'});}} onCoverPreview={()=>{if(!anonymous&&!locked)setPreviewImage({uri:coverUrl,title:'صورة الغلاف'});}} onEdit={() => router.push('/profile?section=edit')} onDesign={() => router.push('/profile?tab=settings&section=design')} onSettings={() => router.push('/profile?tab=settings')} onFollowers={() => setConnections('followers')} onFollowing={() => setConnections('following')} onFollow={() => void toggleFollow()} onMessage={() => void openMessage()} />
+          <ProfileHeader contactPhone={contact && contact.profileId === profile.id && (lookupKey === profile.id || lookupKey === profile.username) ? contact.phone : ''} profile={profile} customization={profileCustomization} displayName={displayName} coverUri={coverUrl} stats={{...stats, contributions:totalContributions}} own={own} anonymous={anonymous} locked={locked} following={following} followedBy={followedBy} busy={busy || blocked || blockedByOther} canMessage={canMessage} hideContactActions={locked || blocked || blockedByOther} hasStories={hasActiveStories} onStoriesPress={()=>void openProfileStories()} onAvatarPress={()=>{if(!anonymous&&!locked&&profile.avatar_url)setPreviewImage({uri:profile.avatar_url,title:'الصورة الشخصية'});}} onCoverPreview={()=>{if(!anonymous&&!locked)setPreviewImage({uri:coverUrl,title:'صورة الغلاف'});}} onEdit={() => router.push('/profile?section=edit')} onDesign={() => router.push('/profile?tab=settings&section=design')} onSettings={() => router.push('/profile?tab=settings')} onVerify={() => router.push('/profile?tab=verification')} onFollowers={() => setConnections('followers')} onFollowing={() => setConnections('following')} onFollow={() => void toggleFollow()} onMessage={() => void openMessage()} />
+          {!locked && (own || linkedBusiness) && <View style={[styles.roleHub,{backgroundColor:colors.surface,borderColor:colors.line}]}>
+            <View style={styles.roleHubHead}>
+              <View style={[styles.roleHubIcon,{backgroundColor:identityMeta.softColor}]}><identityMeta.Icon size={19} color={identityMeta.color}/></View>
+              <View style={styles.roleHubCopy}>
+                <Text accessibilityRole="header" style={[styles.roleHubTitle,{color:colors.ink}]}>{own?'مساحة حسابك':'المنشأة المرتبطة بالحساب'}</Text>
+                <Text numberOfLines={2} style={[styles.roleHubDesc,{color:colors.muted}]}>
+                  {own?(roleCopy.kind==='merchant'?'أدر متجرك وطلبات عملائك حسب صلاحياتك':roleCopy.kind==='freelance'||roleCopy.kind==='provider'?'أبرز خدماتك وأعمالك المهنية':roleCopy.kind==='admin'?'أدوات الحساب والإدارة':'تفاعل مع الجيران وأدر مشاركاتك'):'استعرض معلومات المنشأة وخدماتها المعتمدة'}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.roleActions}>
+              {roleActions.map(({key,label,Icon})=><Pressable key={key} oasisKind="plain" accessibilityRole="button" accessibilityLabel={label}
+                onPress={()=>openRoleAction(key)} style={[styles.roleAction,{borderColor:colors.line,backgroundColor:colors.background}]}>
+                <Icon size={16} color={colors.primary}/><Text style={[styles.roleActionText,{color:colors.ink}]}>{label}</Text>
+              </Pressable>)}
+              {linkedBusiness&&<Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel={'فتح المنشأة '+linkedBusiness.name}
+                onPress={()=>router.push({pathname:'/business',params:{id:linkedBusiness.id}})}
+                style={[styles.roleAction,{borderColor:colors.primary,backgroundColor:colors.soft}]}>
+                <Package size={16} color={colors.primary}/><Text numberOfLines={1} style={[styles.roleActionText,{color:colors.primary}]}>{linkedBusiness.name}</Text><ChevronLeft size={15} color={colors.primary}/>
+              </Pressable>}
+            </View>
+          </View>}
           {!locked && (featuredItems.length > 0 || own) && (
             <View style={styles.content}>
               {featuredItems.length > 0 && <View style={styles.contentHead}>
@@ -696,7 +739,7 @@ export default function UserProfile() {
                     style={[styles.tab, { backgroundColor: active ? colors.soft : colors.surface, borderColor: active ? accentColor : 'transparent' }]}
                   >
                     <Icon size={15} color={active ? accentColor : colors.muted} />
-                    <Text style={[styles.tabText, active && {color: accentColor}]}>{label}</Text>
+                    <Text style={[styles.tabText, active && {color: accentColor}]}>{profileTabLabel(profile,key)}</Text>
                     <View style={[styles.tabCountBadge, { backgroundColor: active ? colors.surface : colors.soft }]}><Text style={[styles.tabCount, { color: active ? accentColor : colors.muted }]}>{count}</Text></View>
                   </Pressable>
                 );
@@ -735,8 +778,8 @@ export default function UserProfile() {
             <View style={styles.content}>
               <View style={styles.contentHead}>
                 <View>
-                  <Text style={styles.contentTitle}>{TABS.find(x => x.id === tab)?.label}</Text>
-                  <Text style={styles.contentSub}>{currentData.length} عنصر · من نشاط الجار</Text>
+                  <Text style={styles.contentTitle}>{profileTabLabel(profile,tab)}</Text>
+                  <Text style={styles.contentSub}>{currentData.length} عنصر معروض · {own?'من نشاط حسابك':'من نشاط الحساب'}</Text>
                 </View>
                 {tab === 'market' && (
                   <Pressable style={styles.marketLink} onPress={() => router.push('/market')}>
@@ -1222,6 +1265,15 @@ const styles = StyleSheet.create({
   featuredPromptCopy: { flex: 1, minWidth: 0, alignItems: 'flex-end', gap: 3 },
   featuredPromptTitle: { fontSize: 12.5, fontWeight: '700', textAlign: 'right' },
   featuredPromptSub: { fontSize: 11, textAlign: 'right' },
+  roleHub:{borderWidth:1,borderRadius:17,padding:12,gap:11,marginTop:12},
+  roleHubHead:{flexDirection:'row-reverse',alignItems:'center',gap:9},
+  roleHubIcon:{width:39,height:39,borderRadius:13,alignItems:'center',justifyContent:'center'},
+  roleHubCopy:{flex:1,minWidth:0,alignItems:'flex-end',gap:3},
+  roleHubTitle:{fontSize:14,fontWeight:'800',textAlign:'right'},
+  roleHubDesc:{fontSize:11.5,lineHeight:18,textAlign:'right'},
+  roleActions:{flexDirection:'row-reverse',flexWrap:'wrap',gap:7},
+  roleAction:{minHeight:44,borderWidth:1,borderRadius:12,flexDirection:'row-reverse',alignItems:'center',justifyContent:'center',gap:6,paddingHorizontal:11,maxWidth:'100%'},
+  roleActionText:{fontSize:12,fontWeight:'700',textAlign:'right',flexShrink:1},
   contentHead: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', gap: 9, marginBottom: 10 },
   contentTitle: { lineHeight: 24, color: OASIS.colors.ink, fontSize: 15, fontWeight: '700', textAlign: 'right' },
   featuredEmpty: { alignItems: 'center', gap: 10, paddingVertical: 18 },
