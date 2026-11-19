@@ -50,25 +50,55 @@ export default function MarketCart() {
   },[]);
   useFocusEffect(useCallback(()=>{void load();},[load]));
 
-  async function update(item:MarketCartLine,quantity=item.quantity,fulfillment=item.fulfillment,note=notes[item.item_id]??''){
-    if(busy)return;setBusy(item.item_id);setError('');setNotice('');
+  // The previous UI refetched both cart and products after every tap.
+  // Update optimistically and use the validated server response instead.
+  async function update(item:MarketCartLine,quantity=item.quantity,fulfillment=item.fulfillment,note=item.note||''):Promise<boolean>{
+    if(busy)return false;
+    const previous=lines.find(line=>line.item_id===item.item_id)||item;
+    setBusy(item.item_id);setError('');setNotice('');
+    setLines(current=>current.map(line=>line.item_id===item.item_id
+      ? {...line,quantity,fulfillment,note}
+      : line));
     try {
-      const res=await supabase.rpc('hayna_market_cart_set',{p_item:item.item_id,p_quantity:quantity,p_fulfillment:fulfillment,p_note:note});
+      const res=await supabase.rpc('hayna_market_cart_set',{
+        p_item:item.item_id,p_quantity:quantity,p_fulfillment:fulfillment,p_note:note
+      });
       if(res.error)throw res.error;
+      const confirmed=res.data as MarketCartLine | null;
+      if(!confirmed||confirmed.item_id!==item.item_id)throw new Error('تعذر تأكيد تحديث السلة.');
+      setLines(current=>current.map(line=>line.item_id===item.item_id?confirmed:line));
+      setProducts(current=>{
+        const product=current[item.item_id];
+        if(!product)return current;
+        const price=confirmed.expected_price==null?null:Number(confirmed.expected_price);
+        return {...current,[item.item_id]:{...product,price}};
+      });
+      if(note!==(item.note||''))setNotes(current=>({...current,[item.item_id]:note}));
       await AsyncStorage.removeItem(batchKey).catch(()=>{});
-      await load();
-    }catch(cause){setError((cause as Error).message||'تعذر تحديث المنتج في السلة.');}
-    finally{setBusy('');}
+      return true;
+    }catch(cause){
+      setLines(current=>current.map(line=>line.item_id===item.item_id?previous:line));
+      setError((cause as Error).message||'تعذر تحديث المنتج. حاول مجددًا.');
+      return false;
+    }finally{setBusy('');}
   }
+
   async function remove(itemId:string){
-    if(busy)return;setBusy(itemId);setError('');setNotice('');
+    if(busy)return;
+    const previous=lines;
+    setBusy(itemId);setError('');setNotice('');
+    setLines(current=>current.filter(line=>line.item_id!==itemId));
     try {
       const res=await supabase.rpc('hayna_market_cart_remove',{p_item:itemId});
       if(res.error)throw res.error;
+      setProducts(current=>{const next={...current};delete next[itemId];return next;});
+      setNotes(current=>{const next={...current};delete next[itemId];return next;});
+      if(editingNote===itemId)setEditingNote(null);
       await AsyncStorage.removeItem(batchKey).catch(()=>{});
-      await load();
-    }catch(cause){setError((cause as Error).message||'تعذر حذف المنتج من السلة.');}
-    finally{setBusy('');}
+    }catch(cause){
+      setLines(previous);
+      setError((cause as Error).message||'تعذر إزالة المنتج. حاول مجددًا.');
+    }finally{setBusy('');}
   }
   async function checkout(){
     if(busy||!uid||!lines.length)return;
@@ -82,7 +112,7 @@ export default function MarketCart() {
       const created=(response.data?.orders||[]) as Array<{id:string;item_id:string}>;
       if(!created.length)throw new Error('تعذر تأكيد تسجيل الطلبات. أعد المحاولة بنفس مرجع السلة.');
       await AsyncStorage.removeItem(batchKey).catch(()=>{});
-      setOrders(created);setLines([]);setProducts({});
+      setOrders(created);setLines([]);setProducts({});setNotes({});setEditingNote(null);
       setNotice('تم إرسال الطلبات بنجاح، وسيؤكد كل تاجر التوفر وموعد الاستلام.');
     }catch(cause){setError((cause as Error).message||'تعذر إرسال السلة. راجع المنتجات ثم أعد المحاولة.');}
     finally{setBusy('');}
@@ -96,6 +126,7 @@ export default function MarketCart() {
     return item && (item.price==null?null:Number(item.price))!==(line.expected_price==null?null:Number(line.expected_price));
   });
   const changing=busy!=='';
+  const sellersCount=new Set(lines.map(line=>products[line.item_id]?.seller_id).filter(Boolean)).size;
   return <View style={{flex:1,backgroundColor:'transparent'}}>
     <AppHeader variant="sub" title="سلة سوق الحي" subtitle="كل الطلبات · الدفع عند الاستلام" fallbackRoute="/market"/>
     <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{setRefreshing(true);void load();}}/>}
