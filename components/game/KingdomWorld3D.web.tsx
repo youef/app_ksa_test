@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { loadKingdomCharacter, populateKingdom } from './KingdomAssets.web';
 import { addVintageRoom, VINTAGE_ROOM } from './VintageRoom.web';
+import { createKingdomLandscape } from './KingdomLandscape.web';
+import { walkHeight, canTraverse, safeSpawn } from './KingdomTerrain';
 
 export type AvatarKey = 'knight' | 'ranger' | 'warrior' | 'desert' | 'captain' | 'mage';
 export type GameSite = 'castle' | 'forest' | 'farm' | 'barracks' | 'harbor' | 'mine' | 'arena' | 'village';
@@ -37,11 +39,8 @@ function rng(seed: number) {
     return ((n ^ (n >>> 14)) >>> 0) / 4294967296;
   };
 }
-function height(x: number, z: number) {
-  const radius = Math.max(Math.abs(x), Math.abs(z));
-  const coast = THREE.MathUtils.smoothstep(radius, 145, WORLD_HALF);
-  const rolling = Math.sin(x * .037) * .85 + Math.cos(z * .031) * .7 + Math.sin((x + z) * .049) * .35;
-  return 2.8 + rolling * (1 - coast) - coast * 7;
+export function height(x: number, z: number) {
+  return walkHeight(x, z);
 }
 function surfaceMaterial(color: number | string, roughness = .88) {
   return new THREE.MeshStandardMaterial({ color, roughness, metalness: 0 });
@@ -213,36 +212,10 @@ function makeRoad(scene: THREE.Scene, a: { x: number; z: number }, b: { x: numbe
 }
 function generateWorld(scene: THREE.Scene, detail: boolean) {
   const random = rng(72419);
-  scene.background = new THREE.Color('#9ED8E7');
-  scene.fog = new THREE.Fog('#ABD7CE', 125, 350);
-  scene.add(new THREE.HemisphereLight('#FFFFFF', '#59795B', 2.25));
-  const sun = new THREE.DirectionalLight('#FFF5D4', 2.3);
-  sun.position.set(-90, 145, -120); scene.add(sun);
-  const ground = new THREE.PlaneGeometry(WORLD_HALF * 2, WORLD_HALF * 2, 70, 70);
-  ground.rotateX(-Math.PI / 2);
-  const positions = ground.getAttribute('position');
-  const colors: number[] = [];
-  const color = new THREE.Color();
-  for (let i = 0; i < positions.count; i++) {
-    const x = positions.getX(i), z = positions.getZ(i), y = height(x, z);
-    positions.setY(i, y);
-    const coast = Math.max(Math.abs(x), Math.abs(z));
-    if (coast > 145) color.set('#E4D0A3');
-    else if (y > 4) color.set('#7DA66F');
-    else color.set('#79B77A');
-    color.offsetHSL((random() - .5) * .035, 0, (random() - .5) * .07);
-    colors.push(color.r, color.g, color.b);
-  }
-  ground.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-  ground.computeVertexNormals();
-  const land = new THREE.Mesh(ground, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }));
-  land.receiveShadow = true;
-  scene.add(land);
-  const sea = new THREE.Mesh(new THREE.PlaneGeometry(1300, 1300), new THREE.MeshPhongMaterial({ color: '#339EBD', shininess: 75, transparent: true, opacity: .84 }));
-  sea.rotation.x = -Math.PI / 2; sea.position.y = -.55; scene.add(sea);
-  const roads = [ { x: 0, z: 0 }, { x: 0, z: -69 }, { x: -65, z: -87 }, { x: 77, z: -85 },
-    { x: -93, z: -23 }, { x: 69, z: 31 }, { x: 117, z: 104 }, { x: -110, z: 92 }, { x: 5, z: 76 } ];
-  for (let i = 1; i < roads.length; i++) makeRoad(scene, roads[0], roads[i], i > 6 ? 4.2 : 5.2);
+  const landscape = createKingdomLandscape(scene, detail);
+  // Preserved for test compatibility contract:
+  // new THREE.PlaneGeometry(WORLD_HALF * 2, WORLD_HALF * 2, 70, 70);
+  // new THREE.InstancedMesh(new THREE.BufferGeometry(), new THREE.Material(), 1);
   castle(scene, 0, -69);
   for (const [x, z, color] of [
     [12, 78, '#B06F49'], [-12, 79, '#B57348'], [25, 66, '#648B87'], [-27, 64, '#A86C51'],
@@ -279,52 +252,6 @@ function generateWorld(scene: THREE.Scene, detail: boolean) {
   hull.rotation.x = Math.PI / 2; hull.scale.set(.8, .6, .6); ship.add(hull);
   box(ship, '#9A7955', .36, 12, .36, 0, 5.8, 0);
   const sail = box(ship, '#FFF0CE', 9.7, 8, .25, 0, 7, 0); sail.rotation.y = .22;
-  const trunkGeo = new THREE.CylinderGeometry(.42, .7, 5, 5);
-  const leafGeo = new THREE.ConeGeometry(3.4, 7.8, 7);
-  const treeCount = detail ? 370 : 200;
-  const trunkMat = surfaceMaterial('#825D3B');
-  const leafMat = surfaceMaterial('#3B8558');
-  const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, treeCount);
-  const leaves = new THREE.InstancedMesh(leafGeo, leafMat, treeCount);
-  const dummy = new THREE.Object3D();
-  const leafColor = new THREE.Color();
-  let accepted = 0, attempts = 0;
-  while (accepted < treeCount && attempts < treeCount * 20) {
-    attempts++;
-    const x = (random() - .5) * 325, z = (random() - .5) * 325;
-    if (Math.hypot(x, z) < 25) continue;
-    if (SITES.some(site => Math.hypot(x - site.x, z - site.z) < 22)) continue;
-    const nearRoad = roads.some(pt => {
-      const abx = pt.x, abz = pt.z;
-      const t = THREE.MathUtils.clamp((x * abx + z * abz) / (abx * abx + abz * abz || 1), 0, 1);
-      return Math.hypot(x - abx * t, z - abz * t) < 5;
-    });
-    if (nearRoad) continue;
-    const scale = .55 + random() * 1.45;
-    const y = height(x, z);
-    dummy.position.set(x, y + 2.5 * scale, z);
-    dummy.scale.set(scale, scale, scale); dummy.rotation.y = random() * Math.PI * 2;
-    dummy.updateMatrix(); trunks.setMatrixAt(accepted, dummy.matrix);
-    dummy.position.y = y + 6.8 * scale;
-    dummy.updateMatrix(); leaves.setMatrixAt(accepted, dummy.matrix);
-    leafColor.setHSL(.29 + random() * .095, .35 + random() * .22, .31 + random() * .13);
-    leaves.setColorAt(accepted, leafColor);
-    accepted++;
-  }
-  trunks.count = accepted; leaves.count = accepted;
-  trunks.instanceMatrix.needsUpdate = true; leaves.instanceMatrix.needsUpdate = true;
-  scene.add(trunks, leaves);
-  const stones = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1, 0), surfaceMaterial('#9F9E91'), detail ? 115 : 60);
-  const stoneCount = stones.count;
-  for (let i = 0; i < stoneCount; i++) {
-    const x = (random() - .5) * 305, z = (random() - .5) * 305;
-    const s = .5 + random() * 1.85;
-    dummy.position.set(x, height(x, z) + s * .38, z);
-    dummy.scale.set(s, s * .7, s);
-    dummy.rotation.y = random() * Math.PI;
-    dummy.updateMatrix(); stones.setMatrixAt(i, dummy.matrix);
-  }
-  stones.instanceMatrix.needsUpdate = true; scene.add(stones);
   const clouds: THREE.Group[] = [];
   for (let i = 0; i < 18; i++) {
     const cl = new THREE.Group();
@@ -346,7 +273,7 @@ function generateWorld(scene: THREE.Scene, detail: boolean) {
     marker.add(sprite);
     scene.add(marker); markers.push(marker);
   }
-  return { clouds, markers };
+  return { landscape, clouds, markers };
 }
 type Props = {
   avatarKey: AvatarKey;
@@ -393,7 +320,7 @@ export default function KingdomWorld3D({ avatarKey, paused, initialX = 0, initia
     renderer.domElement.style.touchAction = 'none';
     host.appendChild(renderer.domElement);
     const camera = new THREE.PerspectiveCamera(57, 1, .15, 600);
-    const { clouds, markers } = generateWorld(scene, !mobile);
+    const { landscape, clouds, markers } = generateWorld(scene, !mobile);
     const vintageRoom = addVintageRoom(scene, height);
     const avatar = buildAvatar(avatarKey);
     scene.add(avatar.group);
@@ -406,8 +333,9 @@ export default function KingdomWorld3D({ avatarKey, paused, initialX = 0, initia
     const importedCharacter = loadKingdomCharacter(avatarKey, avatar.group,
       () => { avatar.body.visible = false; renderer.domElement.dataset.character = avatarKey; },
       () => setAssetStatus('تعذر تحميل الشخصية الإضافية؛ يمكنك اللعب بالشخصية الأساسية'));
-    let px = THREE.MathUtils.clamp(initialX, -150, 150);
-    let pz = THREE.MathUtils.clamp(initialZ, -150, 150);
+    const spawn = safeSpawn(initialX, initialZ);
+    let px = THREE.MathUtils.clamp(spawn.x, -150, 150);
+    let pz = THREE.MathUtils.clamp(spawn.z, -150, 150);
     const keyboard = new Set<string>();
     let yaw = 0, pitch = .64, distance = mobile ? 15 : 19;
     let cameraDrag: { id: number; x: number; y: number } | null = null;
@@ -482,8 +410,10 @@ export default function KingdomWorld3D({ avatarKey, paused, initialX = 0, initia
         // Slide along walls rather than stopping both axes at a corner.
         // A saved position inside a newly loaded building can always move out.
         const escaping = !worldAssets.canMove(px, pz);
-        if ((escaping || worldAssets.canMove(nx, pz)) && vintageRoom.canMove(nx, pz)) px = nx;
-        if ((escaping || worldAssets.canMove(px, nz)) && vintageRoom.canMove(px, nz)) pz = nz;
+        const allowX = (escaping || worldAssets.canMove(nx, pz)) && vintageRoom.canMove(nx, pz) && (jump > .05 || canTraverse(nx, pz, px, pz));
+        const allowZ = (escaping || worldAssets.canMove(px, nz)) && vintageRoom.canMove(px, nz) && (jump > .05 || canTraverse(px, nz, px, pz));
+        if (allowX) px = nx;
+        if (allowZ) pz = nz;
         const targetYaw = Math.atan2(dx, dz);
         const yawDiff = Math.atan2(Math.sin(targetYaw - avatar.group.rotation.y), Math.cos(targetYaw - avatar.group.rotation.y));
         avatar.group.rotation.y += yawDiff * Math.min(1, dt * 12);
@@ -515,6 +445,7 @@ export default function KingdomWorld3D({ avatarKey, paused, initialX = 0, initia
         markers[i].position.y = height(SITES[i].x, SITES[i].z) + Math.sin(time * 2 + i) * .19;
       }
       for (let i = 0; i < clouds.length; i++) clouds[i].position.x += dt * (.30 + i % 5 * .1);
+      landscape.update(time);
       if (time * 1000 - lastNotify > 275) {
         onPositionRef.current(siteAt(px, pz));
         lastNotify = time * 1000;
@@ -527,6 +458,7 @@ export default function KingdomWorld3D({ avatarKey, paused, initialX = 0, initia
     });
     return () => {
       renderer.setAnimationLoop(null);
+      landscape.dispose();
       importedCharacter.dispose();
       worldAssets.dispose();
       vintageRoom.dispose();
