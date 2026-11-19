@@ -25,7 +25,7 @@ import { loadBannedWords } from '@/lib/profanity';
 const ACCOUNT_ONLY_ROUTES = [
   '/profile', '/settings', '/messages', '/platform-inbox', '/conversation',
   '/ask', '/create-story', '/story', '/stories', '/story-settings', '/story-viewers', '/notifications',
-  '/new-service', '/new-listing', '/service', '/business', '/directory', '/user', '/report', '/admin', '/support',
+  '/new-service', '/new-listing', '/market-cart', '/product-orders', '/order-details', '/service', '/business', '/directory', '/user', '/report', '/admin', '/support',
   '/live', '/kingdom',
 ];
 
