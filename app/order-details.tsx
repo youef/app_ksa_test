@@ -226,6 +226,25 @@ export default function OrderDetails(){
      {kind==='product'&&isBuyer&&order.status==='ready'?button('تأكيد استلام المنتج',()=>Alert.alert('تأكيد الاستلام','هل استلمت المنتج بالفعل؟ الدفع نقدًا عند الاستلام فقط، ولا يُخصم أي مبلغ داخل التطبيق.',[{text:'إلغاء',style:'cancel'},{text:'تأكيد',onPress:()=>void productAction('complete')}])):null}
      {kind==='product'&&isBuyer&&order.status==='pending'?button('إلغاء الطلب',()=>void productAction('cancel')):null}
      {kind==='product'&&order.conversation_id?button('فتح محادثة البائع والمشتري',()=>router.push({pathname:'/conversation',params:{id:order.conversation_id}})):null}
+     {kind==='product'?<View style={{gap:10,borderWidth:1,borderColor:c.line,borderRadius:16,padding:14,backgroundColor:c.soft}}>
+       {title('الدفع عند الاستلام فقط')}
+       {hint('لا يوجد دفع إلكتروني أو خصم مسبق. تُسلّم القيمة نقدًا عند استلام المنتج بعد الاتفاق على تكلفة التوصيل.')}
+       {order.unit_price!=null?hint('قيمة المنتجات: '+formatCartMoney(Math.round(Number(order.unit_price)*100)*Number(order.quantity))):hint('المنتج بدون سعر محدد؛ اتفق مع التاجر على التفاصيل قبل التسليم.')}
+       {order.cash_collected_at?hint('سجّل التاجر استلام المبلغ النقدي بتاريخ '+date(order.cash_collected_at)):hint('لم يُسجّل التاجر تحصيل المبلغ النقدي بعد.')}
+       {isSeller&&order.unit_price>0&&!order.cash_collected_at&&['ready','completed'].includes(order.status)?button('أؤكد تحصيل المبلغ نقدًا فعليًا',()=>void recordCash()):null}
+     </View>:null}
+     {kind==='product'?<View style={{gap:9}}>
+       {title('التوصيل والتواصل')}
+       {hint('طريقة التسليم: '+(order.fulfillment||'بالاتفاق مع التاجر'))}
+       {order.scheduled_delivery_at?hint('موعد التسليم: '+date(order.scheduled_delivery_at)):hint('لم يُحدّد موعد التسليم بعد.')}
+       {order.delivery_note?hint('تفاصيل التسليم: '+order.delivery_note):null}
+       {isSeller&&['accepted','ready'].includes(order.status)?<>
+         {hint('أدخل موعدًا اتفقت عليه مع العميل. لا تضع عنوان منزل دقيقًا في ملاحظات التسليم.')}
+         {input(deliveryWhen,setDeliveryWhen,'YYYY-MM-DDTHH:mm (اختياري)')}
+         {input(deliveryNote,setDeliveryNote,'ملاحظات التسليم العامة',true)}
+         {button('حفظ موعد وتفاصيل التسليم',()=>void saveProductDelivery())}
+       </>:null}
+     </View>:null}
      {kind==='service'&&order.scheduled_delivery_at?hint('موعد التسليم: '+date(order.scheduled_delivery_at)):null}
      {kind==='service'&&order.delivery_note?hint('تفاصيل التسليم: '+order.delivery_note):null}
      {kind==='service'&&isSeller&&['accepted','in_progress'].includes(order.status)?<>{title('تعديل موعد وتفاصيل التسليم')}{input(deliveryWhen,setDeliveryWhen,'الموعد: 2026-11-05T18:00 (اختياري)')}{input(deliveryNote,setDeliveryNote,'تفاصيل التسليم',true)}{button('حفظ الموعد وإبلاغ المشتري',()=>void saveDelivery())}</>:null}
