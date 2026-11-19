@@ -1,8 +1,8 @@
 import { rtlScrollStyle, rtlContentStyle } from '@/lib/rtl';
 import React,{useCallback,useEffect,useRef,useState} from 'react';
-import {ActivityIndicator,Alert,AppState,Linking,RefreshControl,ScrollView,StyleSheet,Text,View}from'react-native';
+import {ActivityIndicator,Alert,AppState,Linking,RefreshControl,ScrollView,StyleSheet,Text,View,useWindowDimensions}from'react-native';
 import {router,useFocusEffect,useLocalSearchParams}from'expo-router';
-import {BadgeCheck,BarChart3,Check,ChevronLeft,Clock,CreditCard,Crown,Eye,Megaphone,Package,Pause,Play,RefreshCw,ShieldCheck,ShoppingBag,Store,Tag,Wallet}from'lucide-react-native';
+import {BadgeCheck,BarChart3,Check,ChevronLeft,Clock,CreditCard,Crown,Eye,Megaphone,Package,Pause,Play,RefreshCw,ShieldCheck,ShoppingBag,Store,Tag,Wallet,Truck,FileClock}from'lucide-react-native';
 import {OasisPressable as Pressable}from'@/components/oasis/OasisPrimitives';
 import {AppHeader}from'@/components/shared/AppHeader';
 import {MarketField,MarketChoice}from'@/components/market/MarketComposer';
@@ -13,27 +13,46 @@ import {marketplaceMoney as money,marketplaceStatus as statuses,safeMarketplaceC
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {ConfirmActionModal} from '@/components/shared/ConfirmActionModal';
 import {readCampaignDraft} from '@/lib/campaignDraft';
+import {marketDashboardCount,marketDashboardAttentionLine} from '@/lib/marketDashboardPresentation';
 import {Save,Trash2,MapPin,ArrowDownToLine,ArrowUpFromLine} from 'lucide-react-native';
 type Tab='overview'|'plans'|'ads'|'orders'|'services';
 const tabs=[['overview','نظرة عامة',BarChart3],['plans','الباقات',Crown],['ads','الترويج',Megaphone],['services','طلبات الخدمات',Package],['orders','المدفوعات',CreditCard]]as const;
 
 export default function MarketplaceDashboard(){
  const {colors:c}=useTheme(),bottom=useBottomNavInset(),params=useLocalSearchParams<{service_id?:string;payment?:string;tab?:string}>();
+ const {width}=useWindowDimensions();
+ const isWide=width>=860;
  const [data,setData]=useState<any>(null),[tab,setTab]=useState<Tab>('overview'),[loading,setLoading]=useState(true),[refreshing,setRefreshing]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(''),[ready,setReady]=useState(false);
  const [title,setTitle]=useState(''),[description,setDescription]=useState(''),[service,setService]=useState(params.service_id||''),[preview,setPreview]=useState(false);
  const [requestedService,setRequestedService]=useState<any>(null),[requestedServiceError,setRequestedServiceError]=useState(''),[buyerNote,setBuyerNote]=useState('');
  const [userId,setUserId]=useState(''),[draftPackage,setDraftPackage]=useState(''),[draftSavedAt,setDraftSavedAt]=useState<number|null>(null),[clearDraftConfirm,setClearDraftConfirm]=useState(false),[completeConfirm,setCompleteConfirm]=useState<any>(null);
+ const [productActivity,setProductActivity]=useState<{incoming:number|null;ready:number|null}>({incoming:null,ready:null});
  const [serviceView,setServiceView]=useState<'all'|'incoming'|'outgoing'>('all'),[serviceStatus,setServiceStatus]=useState('all'),[serviceRows,setServiceRows]=useState<any[]>([]),[serviceMore,setServiceMore]=useState(false),[serviceLoading,setServiceLoading]=useState(false),[serviceError,setServiceError]=useState('');
  const draftLoaded=useRef(''),draftDirty=useRef(false),servicePage=useRef(0),serviceRequest=useRef(0),serviceLock=useRef(false),viewer=useRef('');
  const lock=useRef(false),sequence=useRef(0),mounted=useRef(false),requestKeys=useRef(new Map<string,string>());
  const load=useCallback(async()=>{
   const seq=++sequence.current;
   try{const auth=await supabase.auth.getUser();if(!auth.data.user){router.replace('/auth');return;}
-   if(viewer.current!==auth.data.user.id){viewer.current=auth.data.user.id;setUserId(auth.data.user.id);setData(null);setTitle('');setDescription('');setService(params.service_id||'');setDraftPackage('');setDraftSavedAt(null);draftLoaded.current='';draftDirty.current=false;}
+   if(viewer.current!==auth.data.user.id){viewer.current=auth.data.user.id;setUserId(auth.data.user.id);setData(null);setProductActivity({incoming:null,ready:null});setReady(false);setTitle('');setDescription('');setService(params.service_id||'');setDraftPackage('');setDraftSavedAt(null);draftLoaded.current='';draftDirty.current=false;}
+   // Read-only product-order counts link COD orders to the workspace.
+   // They must not delay the core workspace, and missing counts never become zero.
+   const productCountsPromise=Promise.all([
+     supabase.from('marketplace_product_requests').select('id',{count:'exact',head:true}).eq('seller_id',auth.data.user.id).eq('status','pending'),
+     supabase.from('marketplace_product_requests').select('id',{count:'exact',head:true}).eq('buyer_id',auth.data.user.id).eq('status','ready'),
+   ]);
+   const checkoutStatusPromise=supabase.functions.invoke('create-marketplace-checkout',{body:{kind:'status'}});
    const response=await supabase.rpc('hayna_marketplace_workspace');if(response.error)throw response.error;
    if(!mounted.current||seq!==sequence.current)return;setData(response.data);setError('');
-   const status=await supabase.functions.invoke('create-marketplace-checkout',{body:{kind:'status'}});
-   if(mounted.current&&seq===sequence.current)setReady(!status.error&&status.data?.ready===true);
+   // Display workspace immediately; payment readiness is independent and may be slower.
+   void checkoutStatusPromise.then(status=>{
+     if(mounted.current&&seq===sequence.current)setReady(!status.error&&status.data?.ready===true);
+   }).catch(()=>{if(mounted.current&&seq===sequence.current)setReady(false);});
+   void productCountsPromise.then(([incoming,ready])=>{
+     if(mounted.current&&seq===sequence.current)setProductActivity({
+       incoming:incoming.error||incoming.count==null?null:incoming.count,
+       ready:ready.error||ready.count==null?null:ready.count,
+     });
+   }).catch(()=>{if(mounted.current&&seq===sequence.current)setProductActivity({incoming:null,ready:null});});
   }catch{if(mounted.current&&seq===sequence.current){setReady(false);setError('تعذر تحميل لوحة السوق. أعد المحاولة؛ لن نعرض بيانات ناقصة كأنها مكتملة.');}}
   finally{if(mounted.current&&seq===sequence.current){setLoading(false);setRefreshing(false);}}
  },[params.service_id]);
@@ -58,17 +77,98 @@ export default function MarketplaceDashboard(){
  const heading=(text:string)=><Text style={[s.heading,{color:c.ink}]}>{text}</Text>;
  const hint=(text:string)=><Text style={[s.hint,{color:c.muted}]}>{text}</Text>;
  const badge=(status:string)=><View style={[s.badge,{backgroundColor:c.soft}]}><Text style={{color:c.primary,fontSize:10,fontWeight:'600'}}>{statuses[status]||status}</Text></View>;
- if(loading)return <View style={s.center}><ActivityIndicator color={c.primary}/><Text style={[s.hint,{color:c.muted}]}>نحمّل نشاطك في السوق…</Text></View>;
- return <View style={{flex:1,backgroundColor:'transparent'}}><AppHeader title="لوحة السوق" subtitle="نشاطك ومزاياك في مكان واحد" fallbackRoute="/profile?tab=content"/><ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{setRefreshing(true);void load();}} tintColor={c.primary}/>} contentContainerStyle={[s.content,{paddingBottom:bottom+24}]}>
-  <View style={s.hero}><View style={s.row}><View style={s.heroIcon}><Store size={25} color="#FFFFFF"/></View><View style={{flex:1,gap:5}}><Text style={s.heroTitle}>مساحة نمو نشاطك</Text><Text style={s.heroHint}>{data?.professional?'حساب مهني معتمد':'طلباتك ومدفوعاتك الخاصة'}{data?.location?.city?` · ${data.location.city}`:''}</Text></View><BadgeCheck size={23} color="#B9E6D6"/></View><Text style={s.heroHint}>إدارة العروض والترويج وطلبات الخدمات، ببيانات فعلية وتأكيد دفع آمن.</Text></View>
+ if(loading)return <View style={[s.center,{backgroundColor:c.background}]}><ActivityIndicator color={c.primary}/><Text style={[s.hint,{color:c.muted}]}>نحمّل نشاطك في السوق…</Text></View>;
+ return <View style={{flex:1,backgroundColor:c.background}}><AppHeader title="لوحة السوق" subtitle="منتجاتك وطلباتك في مكان واحد" fallbackRoute="/profile?tab=content"/><ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{setRefreshing(true);void load();}} tintColor={c.primary}/>} contentContainerStyle={[s.content,{paddingBottom:bottom+24}]}>
+  <View style={s.hero}>
+    <View style={s.heroTop}>
+      <View style={s.heroIcon}><Store size={23} color="#FFFFFF"/></View>
+      <View style={s.heroCopy}>
+        <Text accessibilityRole="header" style={s.heroTitle}>مساحة نشاطك</Text>
+        <Text style={s.heroHint}>{data?.professional?'حساب مهني معتمد':'منتجاتك وطلباتك الخاصة'}{data?.location?.city?' · '+data.location.city:''}</Text>
+      </View>
+      {data?.professional?<BadgeCheck size={22} color="#B9E6D6"/>:null}
+    </View>
+    <Text style={s.heroCaption}>منتجاتك وطلبات العملاء والخدمات والمدفوعات، مرتبطة من مكان واحد.</Text>
+  </View>
   {error?<View accessibilityRole="alert" style={[s.card,{backgroundColor:c.dangerSoft,borderColor:c.line}]}><Text style={{color:c.danger,textAlign:'right',lineHeight:24}}>{error}</Text>{button('إعادة المحاولة',()=>void load(),RefreshCw)}</View>:null}
   {notice?card(<Text accessibilityLiveRegion="polite" style={{color:c.primary,textAlign:'right',lineHeight:23}}>{notice}</Text>):null}
   {params.service_id&&data?card(<><Package size={24} color={c.primary}/>{heading('طلب الخدمة')}{requestedServiceError?hint(requestedServiceError):!requestedService?<ActivityIndicator color={c.primary}/>:<>{heading(requestedService.name)}{requestedService.price_type==='fixed'&&Number(requestedService.price_from)>0?hint(money(Math.round(Number(requestedService.price_from)*100))):hint('السعر يحتاج اتفاقًا مع مقدم الخدمة')}{requestedService.provider_id===userId?hint('هذه خدمتك؛ لا يمكنك شراء خدمتك.'):requestedService.available_now===false?hint('الخدمة غير متاحة حاليًا.'):requestedService.price_type!=='fixed'||!(Number(requestedService.price_from)>0)?hint('لا يمكن تجهيز الدفع قبل اعتماد سعر ثابت.'): <><MarketField label="ملاحظات لمقدم الخدمة · اختياري" value={buyerNote} onChangeText={setBuyerNote} maxLength={500} multiline/>{button(ready?'الطلب والدفع الآمن':'بانتظار تفعيل بوابة الدفع',()=>void checkout({kind:'service_order',service_id:requestedService.id,note:buyerNote.trim()}),CreditCard,!ready,true)}{hint('السعر والتوفر يؤكدهما الخادم. يبدأ الطلب كمدفوع فقط بعد تأكيد البوابة، ثم يقبله مقدم الخدمة.')}</>}{button('تفاصيل الخدمة والتواصل',()=>router.push({pathname:'/service',params:{id:requestedService.id}}),Package)}</>}</>):null}
-  {data?<><ScrollView horizontal style={rtlScrollStyle} showsHorizontalScrollIndicator={false} contentContainerStyle={[s.tabs,rtlContentStyle]}>{tabs.filter(([key])=>data.professional||!['plans','ads'].includes(key)).map(([key,label,Icon])=><Pressable key={key} oasisKind="plain" accessibilityRole="tab" accessibilityState={{selected:tab===key}} onPress={()=>{setTab(key);setError('');}} style={[s.tab,{backgroundColor:tab===key?'#047857':c.surface,borderColor:c.line}]}><Icon size={16} color={tab===key?'#FFFFFF':c.muted}/><Text style={{color:tab===key?'#FFFFFF':c.muted,fontSize:11,fontWeight:'600'}}>{label}</Text></Pressable>)}</ScrollView>
+  {data?<><ScrollView horizontal style={rtlScrollStyle} showsHorizontalScrollIndicator={false} contentContainerStyle={[s.tabs,rtlContentStyle]}>{tabs.filter(([key])=>data.professional||!['plans','ads'].includes(key)).map(([key,label,Icon])=><Pressable key={key} oasisKind="plain" accessibilityRole="tab" accessibilityState={{selected:tab===key}} onPress={()=>{setTab(key);setError('');}} style={[s.tab,{backgroundColor:tab===key?c.primary:c.surface,borderColor:c.line}]}><Icon size={16} color={tab===key?'#FFFFFF':c.muted}/><Text style={{color:tab===key?'#FFFFFF':c.ink,fontSize:12,fontWeight:'700'}}>{label}</Text></Pressable>)}</ScrollView>
   {tab==='overview'?<>
-   <View style={s.stats}>{[[data.stats.products,'منتج متاح',ShoppingBag],[data.stats.services,'خدمة معتمدة',Package],[data.stats.active_campaigns,'حملة نشطة',Megaphone],[data.stats.pending_services,'طلب يحتاج متابعة',Clock]].map(([value,label,Icon]:any)=>card(<><Icon size={20} color={c.primary}/><Text style={{color:c.ink,fontSize:25,fontWeight:'700'}}>{Number(value).toLocaleString('ar-SA')}</Text><Text style={[s.hint,{color:c.muted}]}>{label}</Text></>,label,true))}</View>
-   {card(<>{heading('إدارة نشاطك')}<View style={s.row}>{data.professional?button('عروضي ومنشأتي',()=>router.push('/profile?tab=content'),Store):button('توثيق الحساب المهني',()=>router.push('/profile?tab=verification'),ShieldCheck)}{button('تصفح السوق',()=>router.push('/market'),ShoppingBag)}</View>{data.admin?button('مراجعة الإعلانات',()=>router.push('/admin-marketplace'),ShieldCheck):null}</>)}
-   {data.subscription?card(<><View style={s.spread}>{badge('active')}<Crown size={23} color={c.primary}/></View>{heading(`باقتك: ${data.subscription.name}`)}{hint(`صالحة حتى ${new Date(data.subscription.current_period_end).toLocaleDateString('ar-SA')} · لا يوجد خصم تلقائي`)}{data.subscription.cancel_at_period_end?hint('محدد عدم التجديد بعد انتهاء المدة.'):button('عدم التجديد بعد انتهاء المدة',()=>void manage('subscription',data.subscription.id,'cancel_renewal'),Clock)}</>):data.professional?card(<>{heading('ابدأ بالباقة الأساسية')}{hint('فعّل ملف نشاطك مجانًا، واستعرض خيارات الترويج عند الحاجة.')}{button('استعراض الباقات',()=>setTab('plans'),Crown)}</>):null}
+    <View style={s.sectionTitleRow}>
+      <Text accessibilityRole="header" style={[s.sectionTitle,{color:c.ink}]}>نظرة سريعة</Text>
+      <Text style={[s.sectionHint,{color:c.muted}]}>بيانات حسابك الفعلية</Text>
+    </View>
+    <View style={s.stats}>
+      {([
+        {value:data.stats?.products,label:'المنتجات المتاحة',Icon:ShoppingBag,onPress:()=>router.push('/profile?tab=content')},
+        {value:data.stats?.services,label:'الخدمات المعتمدة',Icon:Package,onPress:()=>router.push('/profile?tab=content')},
+        {value:data.stats?.active_campaigns,label:'الحملات النشطة',Icon:Megaphone,onPress:()=>data.professional?setTab('ads'):router.push('/profile?tab=verification')},
+        {value:data.stats?.pending_services,label:'طلبات الخدمات',Icon:Clock,onPress:()=>setTab('services')},
+      ]).map(metric=><Pressable key={metric.label} oasisKind="plain" accessibilityRole="button"
+        accessibilityLabel={metric.label+'، '+marketDashboardCount(metric.value)}
+        accessibilityHint="فتح القسم المرتبط بهذا المؤشر" onPress={metric.onPress}
+        style={[s.statCard,{width:isWide?'23.7%':'48.3%',backgroundColor:c.surface,borderColor:c.line}]}>
+        <View style={s.statTop}>
+          <View style={[s.statIcon,{backgroundColor:c.soft}]}><metric.Icon size={19} color={c.primary}/></View>
+          <ChevronLeft size={15} color={c.muted}/>
+        </View>
+        <Text style={[s.statNumber,{color:c.ink}]}>{marketDashboardCount(metric.value)}</Text>
+        <Text numberOfLines={2} style={[s.statLabel,{color:c.muted}]}>{metric.label}</Text>
+      </Pressable>)}
+    </View>
+    {!!marketDashboardAttentionLine(productActivity.incoming,productActivity.ready)&&<View style={[s.attentionCard,{backgroundColor:c.soft,borderColor:c.line}]}>
+      <View style={[s.attentionIcon,{backgroundColor:c.surface}]}><FileClock size={19} color={c.primary}/></View>
+      <View style={s.attentionCopy}>
+        <Text style={[s.attentionTitle,{color:c.ink}]}>طلبات تحتاج انتباهك</Text>
+        <Text style={[s.attentionBody,{color:c.muted}]}>{marketDashboardAttentionLine(productActivity.incoming,productActivity.ready)}</Text>
+      </View>
+      <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="فتح طلبات المنتجات التي تحتاج متابعة" onPress={()=>router.push('/product-orders')}
+        style={[s.attentionButton,{backgroundColor:c.primary}]}>
+        <ChevronLeft size={20} color="#FFFFFF"/>
+      </Pressable>
+    </View>}
+    <View style={s.sectionTitleRow}>
+      <Text accessibilityRole="header" style={[s.sectionTitle,{color:c.ink}]}>اختصارات نشاطك</Text>
+      <Text style={[s.sectionHint,{color:c.muted}]}>كل شيء بضغطة</Text>
+    </View>
+    <View style={s.quickGrid}>
+      {([
+        {label:'إدارة عروضي',detail:'منتجاتك وخدماتك',Icon:Store,onPress:()=>router.push('/profile?tab=content')},
+        {label:'طلبات المنتجات',detail:'شراء وبيع · نقدًا عند الاستلام',Icon:Truck,onPress:()=>router.push('/product-orders')},
+        {label:'طلبات الخدمات',detail:'متابعة تنفيذ الخدمات',Icon:Package,onPress:()=>setTab('services')},
+        data.professional
+          ? {label:'حملاتي وترويجي',detail:'إعلاناتك وحملاتك',Icon:Megaphone,onPress:()=>setTab('ads')}
+          : {label:'توثيق نشاطي',detail:'متابعة اعتماد الحساب',Icon:ShieldCheck,onPress:()=>router.push('/profile?tab=verification')},
+      ]).map(item=><Pressable key={item.label} oasisKind="plain" accessibilityRole="button" accessibilityLabel={item.label}
+        accessibilityHint={item.detail} onPress={item.onPress}
+        style={[s.quickCard,{width:isWide?'23.7%':'48.3%',borderColor:c.line,backgroundColor:c.surface}]}>
+        <View style={[s.quickIcon,{backgroundColor:c.soft}]}><item.Icon size={19} color={c.primary}/></View>
+        <Text numberOfLines={1} style={[s.quickLabel,{color:c.ink}]}>{item.label}</Text>
+        <Text numberOfLines={2} style={[s.quickDesc,{color:c.muted}]}>{item.detail}</Text>
+      </Pressable>)}
+    </View>
+    {data.orders?.length>0&&<Pressable oasisKind="plain" accessibilityRole="button"
+      accessibilityLabel="فتح عملية مسجلة من سجل المدفوعات" onPress={()=>setTab('orders')}
+      style={[s.lastPayment,{backgroundColor:c.surface,borderColor:c.line}]}>
+      <View style={[s.quickIcon,{backgroundColor:c.soft}]}><Wallet size={19} color={c.primary}/></View>
+      <View style={s.attentionCopy}>
+        <Text style={[s.quickLabel,{color:c.ink}]}>عملية مسجلة في المدفوعات</Text>
+        <Text style={[s.quickDesc,{color:c.muted}]}>{statuses[data.orders[0].status]||'حالة غير معروفة'} · {money(data.orders[0].amount_halalas)}</Text>
+      </View>
+      <ChevronLeft size={18} color={c.primary}/>
+    </Pressable>}
+    {data.admin?button('مراجعة الإعلانات',()=>router.push('/admin-marketplace'),ShieldCheck):null}
+    {data.subscription?card(<>
+      <View style={s.spread}>{badge('active')}<Crown size={22} color={c.primary}/></View>
+      {heading('باقتك: '+data.subscription.name)}
+      {hint('صالحة حتى '+new Date(data.subscription.current_period_end).toLocaleDateString('ar-SA')+' · لا يوجد خصم تلقائي')}
+      {data.subscription.cancel_at_period_end?hint('محدد عدم التجديد بعد انتهاء المدة.'):button('عدم التجديد بعد انتهاء المدة',()=>void manage('subscription',data.subscription.id,'cancel_renewal'),Clock)}
+    </>):data.professional?card(<>
+      {heading('ابدأ بالباقة الأساسية')}
+      {hint('فعّل ملف نشاطك مجانًا، واستعرض خيارات الترويج عند الحاجة.')}
+      {button('استعراض الباقات',()=>setTab('plans'),Crown)}
+    </>):null}
   </>:null}
   {tab==='plans'&&data.professional?<>{!ready?card(<><ShieldCheck size={21} color={c.primary}/>{heading('الدفع الإلكتروني غير متاح حاليًا')}{hint('الباقة الأساسية وإدارة النشاط متاحتان. تظهر الباقات المدفوعة للمراجعة، ويُتاح الدفع بعد اكتمال إعداد البوابة.')}</>):null}{data.plans.map((plan:any)=>card(<><View style={s.spread}><Text style={{color:c.primary,fontSize:22,fontWeight:'700'}}>{plan.price_halalas?money(plan.price_halalas):'مجانية'}</Text><Crown size={22} color={c.primary}/></View>{heading(plan.name)}{hint(`${plan.period_days} يومًا · ${plan.description}`)}{hint('إدارة نشاطك وعروضك من لوحة واحدة. الترويج يُشترى بشكل مستقل ويخضع للمراجعة.')}{data.subscription?.plan_id===plan.id?badge('active'):plan.price_halalas===0?button('تفعيل الباقة المجانية',()=>void action('free-plan',async()=>{const result=await supabase.rpc('hayna_activate_free_marketplace_plan');if(result.error)throw new Error(marketplaceError(result.error));setNotice('تم تفعيل الباقة المتاحة لحسابك.');}),Check,false,true):button(ready?'الانتقال للدفع الآمن':'بانتظار تفعيل بوابة الدفع',()=>void checkout({kind:'subscription',plan_slug:plan.slug}),CreditCard,!ready||data.subscription?.price_halalas>0,true)}</>,plan.id))}</>:null}
   {tab==='ads'&&data.professional?<>
@@ -84,4 +184,46 @@ export default function MarketplaceDashboard(){
  <ConfirmActionModal visible={clearDraftConfirm} title="حذف المسودة المحلية؟" description="ستُحذف مسودة الإعلان من هذا الجهاز. الحملات المنشورة والمدفوعات تبقى محفوظة." destructive confirmLabel="حذف المسودة" busy={!!busy} error={error} onCancel={()=>setClearDraftConfirm(false)} onConfirm={()=>void clearDraft()}/>
  {busy?<View accessibilityLiveRegion="polite" style={[s.busy,{backgroundColor:c.surface,borderColor:c.line}]}><ActivityIndicator size="small" color={c.primary}/><Text style={{color:c.primary,fontSize:12}}>جارٍ تنفيذ الإجراء…</Text></View>:null}</View>;
 }
-const s=StyleSheet.create({content:{padding:16,gap:15,width:'100%',maxWidth:780,alignSelf:'center'},center:{flex:1,alignItems:'center',justifyContent:'center',gap:14},hero:{backgroundColor:'#064E3B',padding:20,borderRadius:24,gap:13},heroIcon:{width:49,height:49,borderRadius:25,backgroundColor:'rgba(255,255,255,.12)',alignItems:'center',justifyContent:'center'},heroTitle:{color:'#FFFFFF',fontSize:21,fontWeight:'700',textAlign:'right'},heroHint:{color:'#D1EADF',fontSize:11,lineHeight:21,textAlign:'right'},row:{flexDirection:'row-reverse',alignItems:'center',gap:10},spread:{flexDirection:'row-reverse',alignItems:'center',justifyContent:'space-between',gap:12},card:{borderRadius:19,padding:16,borderWidth:1,gap:12,flexGrow:1},heading:{fontSize:15,fontWeight:'700',textAlign:'right',lineHeight:24},hint:{fontSize:11,lineHeight:22,textAlign:'right'},tabs:{flexDirection:'row-reverse',gap:7},tab:{minHeight:44,paddingHorizontal:13,borderWidth:1,borderRadius:22,flexDirection:'row-reverse',alignItems:'center',gap:6},button:{minHeight:44,paddingHorizontal:14,paddingVertical:10,borderWidth:1,borderRadius:22,flexDirection:'row-reverse',alignItems:'center',justifyContent:'center',gap:7},badge:{alignSelf:'flex-start',borderRadius:12,paddingHorizontal:10,paddingVertical:6},stats:{flexDirection:'row-reverse',flexWrap:'wrap',gap:10},preview:{padding:15,borderRadius:15,gap:8},busy:{position:'absolute',bottom:20,alignSelf:'center',paddingVertical:11,paddingHorizontal:18,borderRadius:24,borderWidth:1,flexDirection:'row-reverse',gap:9,alignItems:'center'}});
+const s=StyleSheet.create({
+  content:{paddingHorizontal:14,paddingTop:13,gap:12,width:'100%',maxWidth:980,alignSelf:'center'},
+  center:{flex:1,alignItems:'center',justifyContent:'center',gap:14},
+  hero:{backgroundColor:'#064E3B',paddingHorizontal:17,paddingVertical:17,borderRadius:20,gap:12},
+  heroTop:{flexDirection:'row-reverse',alignItems:'center',gap:11},
+  heroIcon:{width:46,height:46,borderRadius:16,backgroundColor:'rgba(255,255,255,0.13)',alignItems:'center',justifyContent:'center'},
+  heroCopy:{flex:1,minWidth:0,gap:4,alignItems:'flex-end'},
+  heroTitle:{color:'#FFFFFF',fontSize:20,fontWeight:'800',textAlign:'right'},
+  heroHint:{color:'#D1EADF',fontSize:12,lineHeight:19,textAlign:'right'},
+  heroCaption:{color:'#D1EADF',fontSize:12,lineHeight:19,textAlign:'right'},
+  row:{flexDirection:'row-reverse',alignItems:'center',gap:10,flexWrap:'wrap'},
+  spread:{flexDirection:'row-reverse',alignItems:'center',justifyContent:'space-between',gap:12},
+  card:{borderRadius:18,padding:15,borderWidth:1,gap:11,flexGrow:1},
+  heading:{fontSize:15,fontWeight:'700',textAlign:'right',lineHeight:24},
+  hint:{fontSize:12,lineHeight:21,textAlign:'right'},
+  tabs:{flexDirection:'row-reverse',gap:8,paddingVertical:3},
+  tab:{minHeight:45,paddingHorizontal:14,borderWidth:1,borderRadius:15,flexDirection:'row-reverse',alignItems:'center',gap:7},
+  button:{minHeight:44,paddingHorizontal:14,paddingVertical:10,borderWidth:1,borderRadius:14,flexDirection:'row-reverse',alignItems:'center',justifyContent:'center',gap:7},
+  badge:{alignSelf:'flex-start',borderRadius:12,paddingHorizontal:10,paddingVertical:6},
+  sectionTitleRow:{flexDirection:'row-reverse',alignItems:'center',justifyContent:'space-between',gap:10,paddingHorizontal:2},
+  sectionTitle:{fontSize:16,fontWeight:'800',textAlign:'right'},
+  sectionHint:{fontSize:11.5,textAlign:'left'},
+  stats:{flexDirection:'row-reverse',flexWrap:'wrap',justifyContent:'space-between',columnGap:9,rowGap:10},
+  statCard:{borderWidth:1,borderRadius:18,paddingHorizontal:13,paddingVertical:12,minHeight:124,justifyContent:'space-between',gap:8,alignItems:'flex-end'},
+  statTop:{width:'100%',flexDirection:'row-reverse',justifyContent:'space-between',alignItems:'center'},
+  statIcon:{width:34,height:34,borderRadius:12,alignItems:'center',justifyContent:'center'},
+  statNumber:{fontSize:26,fontWeight:'800',fontVariant:['tabular-nums'],textAlign:'right',lineHeight:32},
+  statLabel:{fontSize:12,lineHeight:18,fontWeight:'600',textAlign:'right'},
+  attentionCard:{minHeight:80,borderWidth:1,borderRadius:17,paddingHorizontal:12,paddingVertical:12,gap:10,flexDirection:'row-reverse',alignItems:'center'},
+  attentionIcon:{width:39,height:39,borderRadius:13,justifyContent:'center',alignItems:'center'},
+  attentionCopy:{flex:1,minWidth:0,alignItems:'flex-end',gap:3},
+  attentionTitle:{fontSize:13,fontWeight:'800',textAlign:'right'},
+  attentionBody:{fontSize:11.5,lineHeight:19,textAlign:'right'},
+  attentionButton:{width:44,minHeight:44,borderRadius:14,alignItems:'center',justifyContent:'center'},
+  quickGrid:{flexDirection:'row-reverse',flexWrap:'wrap',justifyContent:'space-between',columnGap:9,rowGap:10},
+  quickCard:{borderWidth:1,borderRadius:17,padding:12,minHeight:109,alignItems:'flex-end',gap:6},
+  lastPayment:{minHeight:66,borderWidth:1,borderRadius:16,paddingHorizontal:13,paddingVertical:11,flexDirection:'row-reverse',alignItems:'center',gap:10},
+  quickIcon:{width:34,height:34,borderRadius:12,alignItems:'center',justifyContent:'center'},
+  quickLabel:{fontSize:13,fontWeight:'800',textAlign:'right'},
+  quickDesc:{fontSize:11,lineHeight:17,textAlign:'right'},
+  preview:{padding:14,borderRadius:15,gap:8},
+  busy:{position:'absolute',bottom:20,alignSelf:'center',paddingVertical:11,paddingHorizontal:18,borderRadius:24,borderWidth:1,flexDirection:'row-reverse',gap:9,alignItems:'center'},
+});
