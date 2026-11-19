@@ -7,6 +7,7 @@ import {OasisPressable as Pressable} from '@/components/oasis/OasisPrimitives';
 import {supabase} from '@/lib/supabase';
 import {productOrderStatus,productOrderStages,formatCartMoney} from '@/lib/marketCart';
 import {useTheme} from '@/context/ThemeContext';
+import {useBottomNavInset} from '@/lib/bottomNav';
 
 type OrderKind='service'|'product';
 type Ticket={id:string;ticket_number:number;category:string;status:string;description:string;created_at:string};
@@ -36,7 +37,8 @@ async function uploadPhoto(bucket:string,path:string,asset:ImagePicker.ImagePick
 export default function OrderDetails(){
  const {id,kind:rawKind}=useLocalSearchParams<{id?:string;kind?:string}>();
  const kind:OrderKind=rawKind==='product'?'product':'service';
- const {colors:c}=useTheme();
+ const {colors:c}=useTheme();const bottom=useBottomNavInset();
+ const [showReference,setShowReference]=useState(false),[showPreferences,setShowPreferences]=useState(false),[showDisputes,setShowDisputes]=useState(false),[showHistory,setShowHistory]=useState(false);
  const [uid,setUid]=useState(''),[order,setOrder]=useState<any>(null),[review,setReview]=useState<any>(null),[reply,setReply]=useState<any>(null);
  const [tickets,setTickets]=useState<Ticket[]>([]),[history,setHistory]=useState<any[]>([]);
  const [messages,setMessages]=useState<Message[]>([]),[attachments,setAttachments]=useState<Attachment[]>([]);
@@ -209,23 +211,33 @@ export default function OrderDetails(){
  const input=(v:string,set:(v:string)=>void,placeholder:string,multi=false)=><TextInput value={v} onChangeText={set} placeholder={placeholder} placeholderTextColor={c.muted} multiline={multi} textAlign="right" style={[S.input,{color:c.ink,borderColor:c.line,backgroundColor:c.soft,minHeight:multi?90:44}]} />;
  const button=(txt:string,cb:()=>void,disabled=false)=><Pressable accessibilityRole="button" accessibilityLabel={txt} disabled={busy||disabled} onPress={cb} style={[S.button,{backgroundColor:c.primary,opacity:busy||disabled?.5:1}]}><Text style={S.buttonText}>{txt}</Text></Pressable>;
  return <View style={{flex:1,backgroundColor:'transparent'}}><AppHeader title="تفاصيل الطلب" subtitle="السوق · حيّنا" fallbackRoute={kind==='product'?'/product-orders':'/marketplace-dashboard?tab=services'}/>
-  <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{setRefreshing(true);void load();}}/>} contentContainerStyle={S.wrap}>
+  <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{setRefreshing(true);void load();}}/>} contentContainerStyle={[S.wrap,{paddingBottom:bottom+24}]}>
    {loading?<ActivityIndicator color={c.primary}/>:null}
    {!!error&&<Text accessibilityRole="alert" style={S.error}>{error}</Text>}
    {!!notice&&<Text style={[S.notice,{color:c.primary}]}>{notice}</Text>}
    {order?<>
-    {box(<>{title(label)}{hint('رقم الطلب: '+String(order.id))}{title(kind==='product'?productOrderStatus(order.status):statusNames[order.status]||order.status)}
-     <View style={S.stepRow}>{steps[kind].map((step,i)=><View key={step} style={[S.step,{backgroundColor:!['cancelled','rejected'].includes(order.status)&&steps[kind].indexOf(order.status)>=i?c.primary:c.soft}]}><Text style={{fontSize:10,color:!['cancelled','rejected'].includes(order.status)&&steps[kind].indexOf(order.status)>=i?'#fff':c.ink,textAlign:'center'}}>{kind==='product'?productOrderStages[i]?.label||statusNames[step]:statusNames[step]}</Text></View>)}</View>
-     {order.amount_halalas!=null?hint('قيمة الطلب: '+(Number(order.amount_halalas)/100).toFixed(2)+' ر.س'):null}
+    {box(<>{title(label)}
+      <Pressable accessibilityRole="button" accessibilityState={{expanded:showReference}} onPress={()=>setShowReference(v=>!v)} style={S.referenceAction}>
+        <Text numberOfLines={showReference?undefined:1} style={[S.hint,{color:c.muted,flex:1}]}>رقم الطلب: {showReference?String(order.id):'#'+String(order.id).slice(0,8)}</Text>
+        <Text style={{color:c.primary,fontSize:12,fontWeight:'700'}}>{showReference?'إخفاء':'عرض الرقم'}</Text>
+      </Pressable>{title(kind==='product'?productOrderStatus(order.status):statusNames[order.status]||order.status)}
+     {kind==='product'?<View accessibilityLabel={'مراحل الطلب: '+productOrderStatus(order.status)} style={S.trackRow}>
+        {productOrderStages.map((step,index)=>{
+          const current=productOrderStages.findIndex(item=>item.status===order.status);
+          const done=current>=index&&!['rejected','cancelled'].includes(order.status);
+          return <View key={step.status} style={S.trackItem}><View style={[S.trackBar,{backgroundColor:done?c.primary:c.line}]}/><Text numberOfLines={2} style={[S.trackLabel,{color:done?c.primary:c.muted}]}>{step.label}</Text></View>;
+        })}
+      </View>:<View style={S.stepRow}>{steps.service.map((step,index)=><View key={step} style={[S.step,{backgroundColor:steps.service.indexOf(order.status)>=index?c.primary:c.soft}]}><Text style={{fontSize:10,color:steps.service.indexOf(order.status)>=index?'#fff':c.ink,textAlign:'center'}}>{statusNames[step]}</Text></View>)}</View>}
+      {order.amount_halalas!=null?hint('قيمة الطلب: '+(Number(order.amount_halalas)/100).toFixed(2)+' ر.س'):null}
      {isSeller&&kind==='service'&&order.status==='paid'?button('قبول الطلب',()=>void changeStatus('accept')):null}
      {isSeller&&kind==='service'&&order.status==='accepted'?button('بدء التنفيذ',()=>void changeStatus('start')):null}
      {isSeller&&kind==='service'&&order.status==='in_progress'?button('جاهز للاستلام',()=>void changeStatus('ready')):null}
      {isBuyer&&kind==='service'&&order.status==='ready'?button('تأكيد الاستلام الفعلي',()=>Alert.alert('تأكيد الاستلام','هل استلمت الخدمة بالفعل؟ لا يمكن التراجع عن هذا الإجراء.',[{text:'إلغاء',style:'cancel'},{text:'تأكيد',onPress:()=>void changeStatus('received')}])):null}
-     {kind==='product'&&isSeller&&order.status==='pending'?<>{button('قبول طلب المنتج',()=>void productAction('accept'))}{button('رفض الطلب',()=>void productAction('reject'))}</>:null}
+     {kind==='product'&&isSeller&&order.status==='pending'?<>{button('قبول طلب المنتج',()=>void productAction('accept'))}{<Pressable accessibilityRole="button" disabled={busy} onPress={()=>void productAction('reject')} style={S.dangerLink}><Text style={[S.dangerText,{color:c.danger}]}>رفض الطلب</Text></Pressable>}</>:null}
      {kind==='product'&&isSeller&&order.status==='accepted'?button('جاهز للتسليم أو التوصيل',()=>void productAction('ready')):null}
      {kind==='product'&&isBuyer&&order.status==='ready'?button('تأكيد استلام المنتج',()=>Alert.alert('تأكيد الاستلام','هل استلمت المنتج بالفعل؟ الدفع نقدًا عند الاستلام فقط، ولا يُخصم أي مبلغ داخل التطبيق.',[{text:'إلغاء',style:'cancel'},{text:'تأكيد',onPress:()=>void productAction('complete')}])):null}
-     {kind==='product'&&isBuyer&&order.status==='pending'?button('إلغاء الطلب',()=>void productAction('cancel')):null}
-     {kind==='product'&&order.conversation_id?button('فتح محادثة البائع والمشتري',()=>router.push({pathname:'/conversation',params:{id:order.conversation_id}})):null}
+     {kind==='product'&&isBuyer&&order.status==='pending'?<Pressable accessibilityRole="button" disabled={busy} onPress={()=>void productAction('cancel')} style={S.dangerLink}><Text style={[S.dangerText,{color:c.danger}]}>إلغاء الطلب</Text></Pressable>:null}
+     {kind==='product'&&order.conversation_id?<Pressable accessibilityRole="button" disabled={busy} style={[S.secondaryAction,{borderColor:c.line,backgroundColor:c.surface}]} onPress={()=>router.push({pathname:'/conversation',params:{id:order.conversation_id}})}><Text style={{color:c.primary,fontWeight:'700'}}>محادثة التاجر والمشتري</Text></Pressable>:null}
      {kind==='product'?<View style={{gap:10,borderWidth:1,borderColor:c.line,borderRadius:16,padding:14,backgroundColor:c.soft}}>
        {title('الدفع عند الاستلام فقط')}
        {hint('لا يوجد دفع إلكتروني أو خصم مسبق. تُسلّم القيمة نقدًا عند استلام المنتج بعد الاتفاق على تكلفة التوصيل.')}
@@ -276,8 +288,18 @@ export default function OrderDetails(){
  </View>;
 }
 const styles=StyleSheet.create({
- wrap:{padding:14,paddingBottom:56,gap:14,width:'100%',maxWidth:760,alignSelf:'center'},
- card:{borderWidth:1,borderRadius:17,padding:16,gap:12},
+ wrap:{paddingHorizontal:14,paddingTop:12,gap:11,width:'100%',maxWidth:760,alignSelf:'center'},
+ referenceAction:{flexDirection:'row-reverse',alignItems:'center',gap:12,minHeight:44},
+ trackRow:{flexDirection:'row-reverse',gap:5,marginTop:5},
+ trackItem:{flex:1,minWidth:0,gap:6},
+ trackBar:{height:5,borderRadius:4},
+ trackLabel:{fontSize:10,lineHeight:16,textAlign:'center'},
+ summaryPair:{flexDirection:'row-reverse',gap:12,justifyContent:'space-between'},
+ infoRow:{flexDirection:'row-reverse',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:8,minHeight:34},
+ dangerLink:{minHeight:44,borderWidth:1,borderColor:'#F2CDCD',backgroundColor:'#FFF9F9',borderRadius:14,alignItems:'center',justifyContent:'center'},
+ dangerText:{fontSize:13,fontWeight:'700'},
+ secondaryAction:{minHeight:46,borderWidth:1,borderRadius:14,justifyContent:'center',alignItems:'center'},
+ card:{borderWidth:1,borderRadius:18,padding:15,gap:10},
  title:{fontSize:17,fontWeight:'700',textAlign:'right'},
  hint:{fontSize:12,lineHeight:20,textAlign:'right'},
  line:{paddingVertical:9,borderBottomWidth:0.5,borderColor:'#DDE7E4',gap:4},
