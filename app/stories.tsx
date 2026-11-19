@@ -1,7 +1,7 @@
 import { OasisPressable as Pressable } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, ActivityIndicator, RefreshControl, Platform, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, RefreshControl, Platform, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { AppHeader } from '@/components/shared/AppHeader';
@@ -346,9 +346,25 @@ export default function StoriesScreen() {
         </View>
         {errorText ? <Pressable accessibilityRole="button" onPress={() => void loadAllStories()} style={{ padding: 16 }}><Text style={{ color: '#A65A49', textAlign: 'right' }}>تعذر تحميل اليوميات. اضغط لإعادة المحاولة.</Text></Pressable> : null}
         {loading && !refreshing ? (
-          <View style={styles.loadingBox}>
-            <ActivityIndicator size="large" color={OASIS.colors.primary} />
-            <Text style={styles.loadingText}>جارٍ جلب يوميات جيرانك...</Text>
+          <View accessible accessibilityRole="progressbar" accessibilityLabel="جارٍ تحميل يوميات مدينتك" style={styles.loadingBox}>
+            <Text style={[styles.loadingText, { color: colors.muted, alignSelf: 'flex-end' }]}>جارٍ جلب يوميات جيرانك...</Text>
+            <View style={styles.storiesGrid}>
+              {[0, 1, 2, 3].map(index => (
+                <View key={index} style={[styles.storyCard, styles.skeletonCard, { backgroundColor: colors.surface, borderColor: colors.line }]}>
+                  <View style={[styles.skeletonMedia, { backgroundColor: colors.soft }]} />
+                  <View style={[styles.skeletonViews, { borderBottomColor: colors.line }]}>
+                    <View style={[styles.skeletonLine, { width: 66, backgroundColor: colors.soft }]} />
+                  </View>
+                  <View style={styles.cardFooter}>
+                    <View style={[styles.skeletonAvatar, { backgroundColor: colors.soft }]} />
+                    <View style={styles.skeletonCopy}>
+                      <View style={[styles.skeletonLine, { width: '76%', backgroundColor: colors.soft }]} />
+                      <View style={[styles.skeletonLine, { width: '48%', backgroundColor: colors.soft }]} />
+                    </View>
+                  </View>
+                </View>
+              ))}
+            </View>
           </View>
         ) : errorText ? null : visibleAuthors.length === 0 ? (
           <View style={[styles.emptyBox, { backgroundColor: colors.surface, borderColor: colors.line }]}>
@@ -455,7 +471,13 @@ const styles = StyleSheet.create({
   filterCount: { fontSize: 10.5, fontWeight: '800' },
   loadMoreButton: { minHeight: 40, marginTop: 14, borderWidth: 1, borderRadius: 13, flexDirection: 'row-reverse', gap: 7, alignItems: 'center', justifyContent: 'center' },
   loadMoreText: { fontSize: 12, fontWeight: '700' },
-  loadingBox: { paddingVertical: 36, alignItems: 'center', justifyContent: 'center', gap: 10 },
+  loadingBox: { paddingVertical: 8, gap: 12 },
+  skeletonCard: { width: '48%', flexGrow: 1, maxWidth: '49%' },
+  skeletonMedia: { height: 142 },
+  skeletonViews: { height: 25, paddingHorizontal: 10, justifyContent: 'center', borderBottomWidth: StyleSheet.hairlineWidth },
+  skeletonLine: { height: 9, borderRadius: 6 },
+  skeletonAvatar: { width: 26, height: 26, borderRadius: 13 },
+  skeletonCopy: { flex: 1, gap: 6, alignItems: 'flex-end' },
   loadingText: { fontSize: 13, color: OASIS.colors.muted },
   emptyBox: { backgroundColor: OASIS.colors.surface, borderRadius: 14, padding: 16, alignItems: 'center', borderWidth: 1, borderColor: OASIS.colors.line, gap: 10 },
   emptyTitle: { fontSize: 16, fontWeight: '600', color: OASIS.colors.ink, textAlign: 'center' },
