@@ -75,7 +75,7 @@ export default function MarketCart() {
     try {
       const stored=await AsyncStorage.getItem(batchKey);
       const batch=stored && /^[0-9a-f-]{36}$/i.test(stored)?stored:uuid.v4();
-      if(!stored)await AsyncStorage.setItem(batchKey,batch);
+      if(!stored||stored!==batch)await AsyncStorage.setItem(batchKey,batch);
       const response=await supabase.rpc('hayna_market_cart_checkout',{p_batch:batch});
       if(response.error)throw response.error;
       const created=(response.data?.orders||[]) as Array<{id:string;item_id:string}>;
@@ -89,6 +89,11 @@ export default function MarketCart() {
 
   const totals=marketCartTotals(lines);
   const unavailable=lines.filter(line=>products[line.item_id]?.status!=='available');
+  const unsavedNotes=lines.some(line=>(notes[line.item_id]??'')!==(line.note||''));
+  const changedPrices=lines.filter(line=>{
+    const item=products[line.item_id];
+    return item && (item.price==null?null:Number(item.price))!==(line.expected_price==null?null:Number(line.expected_price));
+  });
   const changing=busy!=='';
   return <View style={{flex:1,backgroundColor:'transparent'}}>
     <AppHeader variant="sub" title="سلة سوق الحي" subtitle="كل الطلبات · الدفع عند الاستلام" fallbackRoute="/market"/>
@@ -125,6 +130,10 @@ export default function MarketCart() {
             </View>
           </Pressable>
           {!listed&&<Text accessibilityRole="alert" style={[styles.hint,{color:c.danger}]}>المنتج غير متاح. أزله من السلة قبل الإرسال.</Text>}
+          {listed&&changedPrices.some(row=>row.item_id===line.item_id)&&<View style={[styles.notice,{borderColor:c.danger}]}>
+            <Text accessibilityRole="alert" style={[styles.hint,{color:c.danger}]}>تغيّر سعر المنتج منذ إضافته للسلة. راجع السعر الجديد قبل الطلب.</Text>
+            <Pressable accessibilityRole="button" disabled={changing} onPress={()=>void update(line)} style={styles.link}><RefreshCw size={16} color={c.primary}/><Text style={{color:c.primary,fontWeight:'700'}}>تحديث السعر بعد المراجعة</Text></Pressable>
+          </View>}
           <View style={styles.between}>
             <Text style={[styles.label,{color:c.ink}]}>الكمية</Text>
             <View style={styles.buttons}>
@@ -150,7 +159,8 @@ export default function MarketCart() {
         <View style={styles.between}><Text style={[styles.label,{color:c.ink}]}>إجمالي الأسعار المحددة</Text><Text style={[styles.price,{color:c.primary}]}>{formatCartMoney(totals.halalas)}</Text></View>
         {totals.unknown>0&&<Text style={[styles.hint,{color:c.muted}]}>{totals.unknown.toLocaleString('ar-SA')} منتج بسعر يُتفق عليه أو بدون مقابل؛ لا يُحتسب في المجموع المعروض.</Text>}
         <View style={styles.between}><Truck size={18} color={c.primary}/><Text style={[styles.hint,{flex:1,color:c.muted}]}>رسوم التوصيل غير مشمولة، ويُتفق عليها مع التاجر قبل التسليم. لا تشارك بياناتك الخاصة في ملاحظات عامة.</Text></View>
-        <Pressable accessibilityRole="button" accessibilityLabel="إرسال طلبات السلة والدفع فقط عند الاستلام" disabled={changing||unavailable.length>0} onPress={()=>void checkout()} style={[styles.primary,{backgroundColor:c.primary,opacity:changing||unavailable.length?.5:1}]}>
+        {unsavedNotes&&<Text accessibilityRole="alert" style={[styles.hint,{color:c.danger}]}>هناك ملاحظات لم تُحفظ بعد. احفظها على كل منتج قبل تأكيد الطلب.</Text>}
+        <Pressable accessibilityRole="button" accessibilityLabel="إرسال طلبات السلة والدفع فقط عند الاستلام" disabled={changing||unavailable.length>0||changedPrices.length>0||unsavedNotes} onPress={()=>void checkout()} style={[styles.primary,{backgroundColor:c.primary,opacity:changing||unavailable.length>0||changedPrices.length>0||unsavedNotes?0.5:1}]}>
           {busy==='checkout'?<ActivityIndicator color="#fff"/>:<ShoppingBag size={19} color="#fff"/>}<Text style={styles.white}>تأكيد الطلبات · الدفع عند الاستلام</Text>
         </Pressable>
         <Text style={[styles.hint,{color:c.muted,textAlign:'center'}]}>إرسال الطلب لا يحصّل أي مبلغ. قبول التاجر والتسليم يتمان بعد الإرسال، مع تتبع مستقل لكل منتج.</Text>
