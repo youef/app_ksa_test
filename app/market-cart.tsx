@@ -175,7 +175,7 @@ export default function MarketCart() {
         const lineTotal=line.expected_price==null?null:Math.round(Number(line.expected_price)*100)*line.quantity;
         return <View key={line.item_id} style={[styles.card,{backgroundColor:c.surface,borderColor:c.line,width:wide?'49%':'100%'}]}>
           <Pressable accessibilityRole="button" accessibilityLabel={'عرض '+(item?.title||'المنتج')} onPress={()=>item&&router.push({pathname:'/marketplace-item',params:{id:item.id}})} style={styles.productRow}>
-            {item?.image_url?<Image source={{uri:item.image_url}} resizeMode="cover" style={styles.thumbnail}/>:<View style={[styles.thumbnail,styles.center,{backgroundColor:c.soft}]}><Package size={22} color={c.primary}/></View>}
+            {item?.image_url?<Image source={{uri:item.image_url}} resizeMode="cover" style={styles.thumbnail}/>:<View style={[styles.thumbnail,{backgroundColor:c.soft,alignItems:"center",justifyContent:"center"}]}><Package size={22} color={c.primary}/></View>}
             <View style={styles.productInfo}>
               <Text numberOfLines={1} style={[styles.heading,{color:c.ink}]}>{item?.title||'المنتج لم يعد متاحًا'}</Text>
               <Text style={[styles.price,{color:c.primary}]}>{item?productDisplayPrice(item.price,item.item_type):'غير متاح'}</Text>
@@ -195,12 +195,12 @@ export default function MarketCart() {
             <View style={[styles.stepper,{borderColor:c.line,backgroundColor:c.soft}]}>
               <Pressable accessibilityRole="button" accessibilityLabel={'زيادة كمية '+(item?.title||'المنتج')} accessibilityState={{disabled:changing||line.quantity>=20||!listed||priceChanged}} disabled={changing||line.quantity>=20||!listed||priceChanged}
                 onPress={()=>void update(line,line.quantity+1)} style={styles.qtyButton}>
-                <Plus size={20} color={line.quantity>=20||!listed?c.muted:c.primary}/>
+                <Plus size={20} color={line.quantity>=20||!listed||priceChanged||changing?c.muted:c.primary}/>
               </Pressable>
               <Text accessibilityLabel={'الكمية '+line.quantity} style={[styles.qtyValue,{color:c.ink}]}>{line.quantity.toLocaleString('ar-SA')}</Text>
               <Pressable accessibilityRole="button" accessibilityLabel={'تقليل كمية '+(item?.title||'المنتج')} accessibilityState={{disabled:changing||line.quantity<=1||!listed||priceChanged}} disabled={changing||line.quantity<=1||!listed||priceChanged}
                 onPress={()=>void update(line,line.quantity-1)} style={styles.qtyButton}>
-                <Minus size={20} color={line.quantity<=1||!listed?c.muted:c.primary}/>
+                <Minus size={20} color={line.quantity<=1||!listed||priceChanged||changing?c.muted:c.primary}/>
               </Pressable>
             </View>
             {working?<ActivityIndicator size="small" color={c.primary}/>:line.quantity>1&&lineTotal!==null&&!priceChanged?
