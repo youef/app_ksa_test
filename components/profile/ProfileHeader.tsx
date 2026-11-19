@@ -13,6 +13,7 @@ type Props = {
   profile: any;
   contactPhone?: string;
   customization?: any;
+  verificationRequestStatus?: string | null;
   coverUri: string;
   displayName?: string;
   stats: { followers: number; following: number; contributions: number; reputation: number };
@@ -56,7 +57,7 @@ export function ProfileHeader(props: Props) {
   useEffect(() => setAvatarFailed(false), [profile.avatar_url]);
   const identity = getAccountIdentityMeta(profile.role, profile.account_type, Boolean(profile.is_verified));
   const experience = publicProfileRoleCopy(profile);
-  const verification = publicProfileVerification(profile, Boolean(own));
+  const verification = publicProfileVerification({...profile, verification_status:props.verificationRequestStatus ?? profile.verification_status}, Boolean(own));
   const ExperienceIcon = identity.Icon;
   const showProfessionalApproval = experience.kind === 'merchant' && profile.is_verified_merchant === true;
   const accent = customization?.accent_color || identity.color;
