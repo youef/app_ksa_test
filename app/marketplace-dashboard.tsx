@@ -76,15 +76,86 @@ export default function MarketplaceDashboard(){
  const badge=(status:string)=><View style={[s.badge,{backgroundColor:c.soft}]}><Text style={{color:c.primary,fontSize:10,fontWeight:'600'}}>{statuses[status]||status}</Text></View>;
  if(loading)return <View style={[s.center,{backgroundColor:c.background}]}><ActivityIndicator color={c.primary}/><Text style={[s.hint,{color:c.muted}]}>نحمّل نشاطك في السوق…</Text></View>;
  return <View style={{flex:1,backgroundColor:c.background}}><AppHeader title="لوحة السوق" subtitle="منتجاتك وطلباتك في مكان واحد" fallbackRoute="/profile?tab=content"/><ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{setRefreshing(true);void load();}} tintColor={c.primary}/>} contentContainerStyle={[s.content,{paddingBottom:bottom+24}]}>
-  <View style={s.hero}><View style={s.row}><View style={s.heroIcon}><Store size={25} color="#FFFFFF"/></View><View style={{flex:1,gap:5}}><Text style={s.heroTitle}>مساحة نمو نشاطك</Text><Text style={s.heroHint}>{data?.professional?'حساب مهني معتمد':'طلباتك ومدفوعاتك الخاصة'}{data?.location?.city?` · ${data.location.city}`:''}</Text></View><BadgeCheck size={23} color="#B9E6D6"/></View><Text style={s.heroHint}>إدارة العروض والترويج وطلبات الخدمات، ببيانات فعلية وتأكيد دفع آمن.</Text></View>
+  <View style={s.hero}>
+    <View style={s.heroTop}>
+      <View style={s.heroIcon}><Store size={23} color="#FFFFFF"/></View>
+      <View style={s.heroCopy}>
+        <Text accessibilityRole="header" style={s.heroTitle}>مساحة نشاطك</Text>
+        <Text style={s.heroHint}>{data?.professional?'حساب مهني معتمد':'منتجاتك وطلباتك الخاصة'}{data?.location?.city?' · '+data.location.city:''}</Text>
+      </View>
+      {data?.professional?<BadgeCheck size={22} color="#B9E6D6"/>:null}
+    </View>
+    <Text style={s.heroCaption}>منتجاتك وطلبات العملاء والخدمات والمدفوعات، مرتبطة من مكان واحد.</Text>
+  </View>
   {error?<View accessibilityRole="alert" style={[s.card,{backgroundColor:c.dangerSoft,borderColor:c.line}]}><Text style={{color:c.danger,textAlign:'right',lineHeight:24}}>{error}</Text>{button('إعادة المحاولة',()=>void load(),RefreshCw)}</View>:null}
   {notice?card(<Text accessibilityLiveRegion="polite" style={{color:c.primary,textAlign:'right',lineHeight:23}}>{notice}</Text>):null}
   {params.service_id&&data?card(<><Package size={24} color={c.primary}/>{heading('طلب الخدمة')}{requestedServiceError?hint(requestedServiceError):!requestedService?<ActivityIndicator color={c.primary}/>:<>{heading(requestedService.name)}{requestedService.price_type==='fixed'&&Number(requestedService.price_from)>0?hint(money(Math.round(Number(requestedService.price_from)*100))):hint('السعر يحتاج اتفاقًا مع مقدم الخدمة')}{requestedService.provider_id===userId?hint('هذه خدمتك؛ لا يمكنك شراء خدمتك.'):requestedService.available_now===false?hint('الخدمة غير متاحة حاليًا.'):requestedService.price_type!=='fixed'||!(Number(requestedService.price_from)>0)?hint('لا يمكن تجهيز الدفع قبل اعتماد سعر ثابت.'): <><MarketField label="ملاحظات لمقدم الخدمة · اختياري" value={buyerNote} onChangeText={setBuyerNote} maxLength={500} multiline/>{button(ready?'الطلب والدفع الآمن':'بانتظار تفعيل بوابة الدفع',()=>void checkout({kind:'service_order',service_id:requestedService.id,note:buyerNote.trim()}),CreditCard,!ready,true)}{hint('السعر والتوفر يؤكدهما الخادم. يبدأ الطلب كمدفوع فقط بعد تأكيد البوابة، ثم يقبله مقدم الخدمة.')}</>}{button('تفاصيل الخدمة والتواصل',()=>router.push({pathname:'/service',params:{id:requestedService.id}}),Package)}</>}</>):null}
-  {data?<><ScrollView horizontal style={rtlScrollStyle} showsHorizontalScrollIndicator={false} contentContainerStyle={[s.tabs,rtlContentStyle]}>{tabs.filter(([key])=>data.professional||!['plans','ads'].includes(key)).map(([key,label,Icon])=><Pressable key={key} oasisKind="plain" accessibilityRole="tab" accessibilityState={{selected:tab===key}} onPress={()=>{setTab(key);setError('');}} style={[s.tab,{backgroundColor:tab===key?'#047857':c.surface,borderColor:c.line}]}><Icon size={16} color={tab===key?'#FFFFFF':c.muted}/><Text style={{color:tab===key?'#FFFFFF':c.muted,fontSize:11,fontWeight:'600'}}>{label}</Text></Pressable>)}</ScrollView>
+  {data?<><ScrollView horizontal style={rtlScrollStyle} showsHorizontalScrollIndicator={false} contentContainerStyle={[s.tabs,rtlContentStyle]}>{tabs.filter(([key])=>data.professional||!['plans','ads'].includes(key)).map(([key,label,Icon])=><Pressable key={key} oasisKind="plain" accessibilityRole="tab" accessibilityState={{selected:tab===key}} onPress={()=>{setTab(key);setError('');}} style={[s.tab,{backgroundColor:tab===key?c.primary:c.surface,borderColor:c.line}]}><Icon size={16} color={tab===key?'#FFFFFF':c.muted}/><Text style={{color:tab===key?'#FFFFFF':c.ink,fontSize:12,fontWeight:'700'}}>{label}</Text></Pressable>)}</ScrollView>
   {tab==='overview'?<>
-   <View style={s.stats}>{[[data.stats.products,'منتج متاح',ShoppingBag],[data.stats.services,'خدمة معتمدة',Package],[data.stats.active_campaigns,'حملة نشطة',Megaphone],[data.stats.pending_services,'طلب يحتاج متابعة',Clock]].map(([value,label,Icon]:any)=>card(<><Icon size={20} color={c.primary}/><Text style={{color:c.ink,fontSize:25,fontWeight:'700'}}>{Number(value).toLocaleString('ar-SA')}</Text><Text style={[s.hint,{color:c.muted}]}>{label}</Text></>,label,true))}</View>
-   {card(<>{heading('إدارة نشاطك')}<View style={s.row}>{data.professional?button('عروضي ومنشأتي',()=>router.push('/profile?tab=content'),Store):button('توثيق الحساب المهني',()=>router.push('/profile?tab=verification'),ShieldCheck)}{button('تصفح السوق',()=>router.push('/market'),ShoppingBag)}</View>{data.admin?button('مراجعة الإعلانات',()=>router.push('/admin-marketplace'),ShieldCheck):null}</>)}
-   {data.subscription?card(<><View style={s.spread}>{badge('active')}<Crown size={23} color={c.primary}/></View>{heading(`باقتك: ${data.subscription.name}`)}{hint(`صالحة حتى ${new Date(data.subscription.current_period_end).toLocaleDateString('ar-SA')} · لا يوجد خصم تلقائي`)}{data.subscription.cancel_at_period_end?hint('محدد عدم التجديد بعد انتهاء المدة.'):button('عدم التجديد بعد انتهاء المدة',()=>void manage('subscription',data.subscription.id,'cancel_renewal'),Clock)}</>):data.professional?card(<>{heading('ابدأ بالباقة الأساسية')}{hint('فعّل ملف نشاطك مجانًا، واستعرض خيارات الترويج عند الحاجة.')}{button('استعراض الباقات',()=>setTab('plans'),Crown)}</>):null}
+    <View style={s.sectionTitleRow}>
+      <Text accessibilityRole="header" style={[s.sectionTitle,{color:c.ink}]}>نظرة سريعة</Text>
+      <Text style={[s.sectionHint,{color:c.muted}]}>بيانات حسابك الفعلية</Text>
+    </View>
+    <View style={s.stats}>
+      {([
+        {value:data.stats?.products,label:'المنتجات المتاحة',Icon:ShoppingBag,onPress:()=>router.push('/profile?tab=content')},
+        {value:data.stats?.services,label:'الخدمات المعتمدة',Icon:Package,onPress:()=>router.push('/profile?tab=content')},
+        {value:data.stats?.active_campaigns,label:'الحملات النشطة',Icon:Megaphone,onPress:()=>data.professional?setTab('ads'):router.push('/profile?tab=verification')},
+        {value:data.stats?.pending_services,label:'طلبات الخدمات',Icon:Clock,onPress:()=>setTab('services')},
+      ]).map(metric=><Pressable key={metric.label} oasisKind="plain" accessibilityRole="button"
+        accessibilityLabel={metric.label+'، '+marketDashboardCount(metric.value)}
+        accessibilityHint="فتح القسم المرتبط بهذا المؤشر" onPress={metric.onPress}
+        style={[s.statCard,{width:isWide?'23.7%':'48.3%',backgroundColor:c.surface,borderColor:c.line}]}>
+        <View style={s.statTop}>
+          <View style={[s.statIcon,{backgroundColor:c.soft}]}><metric.Icon size={19} color={c.primary}/></View>
+          <ChevronLeft size={15} color={c.muted}/>
+        </View>
+        <Text style={[s.statNumber,{color:c.ink}]}>{marketDashboardCount(metric.value)}</Text>
+        <Text numberOfLines={2} style={[s.statLabel,{color:c.muted}]}>{metric.label}</Text>
+      </Pressable>)}
+    </View>
+    {!!marketDashboardAttentionLine(productActivity.incoming,productActivity.ready)&&<View style={[s.attentionCard,{backgroundColor:c.soft,borderColor:c.line}]}>
+      <View style={[s.attentionIcon,{backgroundColor:c.surface}]}><FileClock size={19} color={c.primary}/></View>
+      <View style={s.attentionCopy}>
+        <Text style={[s.attentionTitle,{color:c.ink}]}>طلبات تحتاج انتباهك</Text>
+        <Text style={[s.attentionBody,{color:c.muted}]}>{marketDashboardAttentionLine(productActivity.incoming,productActivity.ready)}</Text>
+      </View>
+      <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="فتح طلبات المنتجات التي تحتاج متابعة" onPress={()=>router.push('/product-orders')}
+        style={[s.attentionButton,{backgroundColor:c.primary}]}>
+        <ChevronLeft size={20} color="#FFFFFF"/>
+      </Pressable>
+    </View>}
+    <View style={s.sectionTitleRow}>
+      <Text accessibilityRole="header" style={[s.sectionTitle,{color:c.ink}]}>اختصارات نشاطك</Text>
+      <Text style={[s.sectionHint,{color:c.muted}]}>كل شيء بضغطة</Text>
+    </View>
+    <View style={s.quickGrid}>
+      {([
+        {label:'إدارة عروضي',detail:'منتجاتك وخدماتك',Icon:Store,onPress:()=>router.push('/profile?tab=content')},
+        {label:'طلبات المنتجات',detail:'شراء وبيع · نقدًا عند الاستلام',Icon:Truck,onPress:()=>router.push('/product-orders')},
+        {label:'طلبات الخدمات',detail:'متابعة تنفيذ الخدمات',Icon:Package,onPress:()=>setTab('services')},
+        data.professional
+          ? {label:'حملاتي وترويجي',detail:'إعلاناتك وحملاتك',Icon:Megaphone,onPress:()=>setTab('ads')}
+          : {label:'توثيق نشاطي',detail:'متابعة اعتماد الحساب',Icon:ShieldCheck,onPress:()=>router.push('/profile?tab=verification')},
+      ]).map(item=><Pressable key={item.label} oasisKind="plain" accessibilityRole="button" accessibilityLabel={item.label}
+        accessibilityHint={item.detail} onPress={item.onPress}
+        style={[s.quickCard,{width:isWide?'23.7%':'48.3%',borderColor:c.line,backgroundColor:c.surface}]}>
+        <View style={[s.quickIcon,{backgroundColor:c.soft}]}><item.Icon size={19} color={c.primary}/></View>
+        <Text numberOfLines={1} style={[s.quickLabel,{color:c.ink}]}>{item.label}</Text>
+        <Text numberOfLines={2} style={[s.quickDesc,{color:c.muted}]}>{item.detail}</Text>
+      </Pressable>)}
+    </View>
+    {data.admin?button('مراجعة الإعلانات',()=>router.push('/admin-marketplace'),ShieldCheck):null}
+    {data.subscription?card(<>
+      <View style={s.spread}>{badge('active')}<Crown size={22} color={c.primary}/></View>
+      {heading('باقتك: '+data.subscription.name)}
+      {hint('صالحة حتى '+new Date(data.subscription.current_period_end).toLocaleDateString('ar-SA')+' · لا يوجد خصم تلقائي')}
+      {data.subscription.cancel_at_period_end?hint('محدد عدم التجديد بعد انتهاء المدة.'):button('عدم التجديد بعد انتهاء المدة',()=>void manage('subscription',data.subscription.id,'cancel_renewal'),Clock)}
+    </>):data.professional?card(<>
+      {heading('ابدأ بالباقة الأساسية')}
+      {hint('فعّل ملف نشاطك مجانًا، واستعرض خيارات الترويج عند الحاجة.')}
+      {button('استعراض الباقات',()=>setTab('plans'),Crown)}
+    </>):null}
   </>:null}
   {tab==='plans'&&data.professional?<>{!ready?card(<><ShieldCheck size={21} color={c.primary}/>{heading('الدفع الإلكتروني غير متاح حاليًا')}{hint('الباقة الأساسية وإدارة النشاط متاحتان. تظهر الباقات المدفوعة للمراجعة، ويُتاح الدفع بعد اكتمال إعداد البوابة.')}</>):null}{data.plans.map((plan:any)=>card(<><View style={s.spread}><Text style={{color:c.primary,fontSize:22,fontWeight:'700'}}>{plan.price_halalas?money(plan.price_halalas):'مجانية'}</Text><Crown size={22} color={c.primary}/></View>{heading(plan.name)}{hint(`${plan.period_days} يومًا · ${plan.description}`)}{hint('إدارة نشاطك وعروضك من لوحة واحدة. الترويج يُشترى بشكل مستقل ويخضع للمراجعة.')}{data.subscription?.plan_id===plan.id?badge('active'):plan.price_halalas===0?button('تفعيل الباقة المجانية',()=>void action('free-plan',async()=>{const result=await supabase.rpc('hayna_activate_free_marketplace_plan');if(result.error)throw new Error(marketplaceError(result.error));setNotice('تم تفعيل الباقة المتاحة لحسابك.');}),Check,false,true):button(ready?'الانتقال للدفع الآمن':'بانتظار تفعيل بوابة الدفع',()=>void checkout({kind:'subscription',plan_slug:plan.slug}),CreditCard,!ready||data.subscription?.price_halalas>0,true)}</>,plan.id))}</>:null}
   {tab==='ads'&&data.professional?<>
