@@ -237,16 +237,19 @@ export default function UserProfile() {
     if (!lookupKey) return;
     if (!silent) setLoading(true);
     setLoadError(false);
-    setResolvedProfileId('');
-    setFeaturedItems([]);
-    setProfileCustomization(null);
-    setMyCapabilities(null);
-    setLinkedBusiness(null);
-    setLatestVerificationStatus(null);
-    setLoadedTabs([]);
-    setTabError(false);
-    setBlocked(false); setBlockedByOther(false); setFollowing(false); setFollowedBy(false);
-    setCanMessage(false);setScopeDenied(false);setProfile(null);setPreviewImage(null);
+    // Keep the current screen stable during refresh; only a different route clears identity immediately.
+    if (!silent) {
+      setResolvedProfileId('');
+      setFeaturedItems([]);
+      setProfileCustomization(null);
+      setMyCapabilities(null);
+      setLinkedBusiness(null);
+      setLatestVerificationStatus(null);
+      setLoadedTabs([]);
+      setTabError(false);
+      setBlocked(false); setBlockedByOther(false); setFollowing(false); setFollowedBy(false);
+      setCanMessage(false);setScopeDenied(false);setProfile(null);setPreviewImage(null);
+    }
     try {
       const { data: sessionData } = await supabase.auth.getSession();
       const me = sessionData?.session?.user?.id || null;
@@ -427,6 +430,20 @@ export default function UserProfile() {
   };
 
   useFocusEffect(useCallback(() => { void load(); }, [lookupKey]));
+  // Best effort live updates for admin-approved type and verification changes.
+  // Focus refresh / pull-to-refresh remain authoritative if the table is not in Realtime publication.
+  useEffect(() => {
+    if (!profile?.id) return;
+    const channel = supabase.channel('public-profile-identity-' + profile.id)
+      .on('postgres_changes', {event:'UPDATE',schema:'public',table:'profiles',filter:'id=eq.'+profile.id},
+        (payload) => {
+          const next = payload.new as Record<string,unknown>;
+          if (['role','account_type','is_verified','is_verified_merchant','verification_status','freelance_trade']
+              .some(key => Object.prototype.hasOwnProperty.call(next,key))) void load(true);
+        }).subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [profile?.id, lookupKey]);
+
 
   useEffect(() => {
     if (!id || !profile || loading) return;
