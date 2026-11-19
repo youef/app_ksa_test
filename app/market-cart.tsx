@@ -325,6 +325,7 @@ const styles=StyleSheet.create({
   deliveryLabel:{fontSize:12,fontWeight:'700',textAlign:'right',flexShrink:1},
   cardActions:{borderTopWidth:1,paddingTop:8,flexDirection:'row-reverse',alignItems:'center',justifyContent:'space-between',gap:9},
   inlineAction:{minHeight:44,flexDirection:'row-reverse',alignItems:'center',justifyContent:'center',gap:5,paddingHorizontal:5},
+  link:{minHeight:44,flexDirection:'row-reverse',alignItems:'center',gap:7,paddingHorizontal:10,justifyContent:'center'},
   actionText:{fontSize:12,fontWeight:'800',textAlign:'center'},
   savedNote:{fontSize:11.5,lineHeight:20,textAlign:'right'},
   noteEditor:{gap:9},
