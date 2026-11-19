@@ -20,6 +20,7 @@ export default function MarketCart() {
   const [lines,setLines] = useState<MarketCartLine[]>([]);
   const [products,setProducts] = useState<Record<string,Product>>({});
   const [notes,setNotes] = useState<Record<string,string>>({});
+  const [editingNote,setEditingNote] = useState<string | null>(null);
   const [loading,setLoading] = useState(true), [refreshing,setRefreshing] = useState(false), [busy,setBusy] = useState('');
   const [error,setError] = useState(''), [notice,setNotice] = useState('');
   const [orders,setOrders] = useState<Array<{id:string;item_id:string}>>([]);
@@ -98,11 +99,12 @@ export default function MarketCart() {
   return <View style={{flex:1,backgroundColor:'transparent'}}>
     <AppHeader variant="sub" title="سلة سوق الحي" subtitle="كل الطلبات · الدفع عند الاستلام" fallbackRoute="/market"/>
     <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{setRefreshing(true);void load();}}/>}
-      contentContainerStyle={[styles.wrap,{paddingBottom:bottom+96}]}>
+      contentContainerStyle={[styles.wrap,{paddingBottom:bottom+36}]}>
       <View style={[styles.banner,{backgroundColor:c.soft,borderColor:c.line}]}>
-        <Wallet size={24} color={c.primary}/>
-        <View style={{flex:1,gap:5}}><Text style={[styles.heading,{color:c.ink}]}>ادفع فقط عند استلام المنتج</Text>
-          <Text style={[styles.hint,{color:c.muted}]}>لا يوجد دفع إلكتروني أو رسوم مسبقة. تُرسَل الطلبات لكل تاجر على حدة، ويتم الاتفاق على تكلفة التوصيل في المحادثة.</Text>
+        <Wallet size={20} color={c.primary}/>
+        <View style={{flex:1,gap:2}}>
+          <Text style={[styles.label,{color:c.ink}]}>الدفع نقدًا عند الاستلام</Text>
+          <Text style={[styles.hint,{color:c.muted}]}>لا رسوم مسبقة. تكلفة التوصيل بالتنسيق مع التاجر.</Text>
         </View>
       </View>
       {loading&&<View style={styles.center}><ActivityIndicator color={c.primary}/><Text style={{color:c.muted}}>جارٍ تحميل سلتك…</Text></View>}
@@ -142,50 +144,55 @@ export default function MarketCart() {
               <Pressable accessibilityRole="button" accessibilityLabel="تقليل الكمية" disabled={changing||line.quantity<=1||!listed} onPress={()=>void update(line,line.quantity-1)} style={[styles.iconButton,{backgroundColor:c.soft}]}><Minus size={19} color={c.primary}/></Pressable>
             </View>
           </View>
-          <Text style={[styles.label,{color:c.ink}]}>طريقة التسليم</Text>
-          <View style={styles.buttons}>{options.map(option=><Pressable key={option} disabled={changing||!listed} accessibilityRole="button" accessibilityState={{selected:line.fulfillment===option}} onPress={()=>void update(line,line.quantity,option)} style={[styles.chip,{borderColor:c.line,backgroundColor:line.fulfillment===option?c.primary:c.soft}]}>
-            <Text style={{color:line.fulfillment===option?'white':c.ink,fontSize:12,fontWeight:'700'}}>{option}</Text>
-          </Pressable>)}</View>
-          <Text style={[styles.label,{color:c.ink}]}>ملاحظة خاصة للتاجر · اختياري</Text>
-          <TextInput value={notes[line.item_id]??''} onChangeText={v=>setNotes(old=>({...old,[line.item_id]:v}))} maxLength={400} multiline textAlign="right" accessibilityLabel="ملاحظة للتاجر" placeholder="اللون أو المقاس أو الوقت المقترح…" placeholderTextColor={c.muted} style={[styles.input,{borderColor:c.line,color:c.ink,backgroundColor:c.soft}]} />
-          <View style={styles.between}>
-            <Pressable disabled={changing||!listed} accessibilityRole="button" onPress={()=>void update(line)} style={[styles.link,{minHeight:44}]}><Text style={{color:c.primary,fontWeight:'700'}}>حفظ الملاحظة</Text></Pressable>
-            <Pressable accessibilityRole="button" accessibilityLabel="إزالة المنتج من السلة" disabled={changing} onPress={()=>void remove(line.item_id)} style={styles.link}><Trash2 size={17} color={c.danger}/><Text style={{color:c.danger,fontWeight:'700'}}>إزالة</Text></Pressable>
+          <View style={[styles.deliveryRow,{borderTopColor:c.line}]}>
+            <Text style={[styles.label,{color:c.ink}]}>التسليم</Text>
+            <View style={styles.buttons}>{options.map(option=><Pressable key={option} disabled={changing||!listed} accessibilityRole="button" accessibilityState={{selected:line.fulfillment===option}} onPress={()=>void update(line,line.quantity,option)} style={[styles.chip,{borderColor:line.fulfillment===option?c.primary:c.line,backgroundColor:line.fulfillment===option?c.soft:c.surface}]}>
+              <Text style={{color:line.fulfillment===option?c.primary:c.muted,fontSize:12,fontWeight:'700'}}>{option}</Text>
+            </Pressable>)}</View>
           </View>
+          {editingNote===line.item_id ? <>
+            <TextInput value={notes[line.item_id]??''} onChangeText={v=>setNotes(old=>({...old,[line.item_id]:v}))} maxLength={400} multiline textAlign="right" accessibilityLabel="ملاحظة خاصة بالتاجر" placeholder="اكتب ملاحظة للتاجر (اختياري)" placeholderTextColor={c.muted} style={[styles.input,{borderColor:c.line,color:c.ink,backgroundColor:c.soft}]} />
+            <Pressable disabled={changing||!listed} accessibilityRole="button" onPress={()=>{void (async()=>{await update(line);setEditingNote(null);})();}} style={[styles.link,{alignSelf:'flex-start'}]}><Text style={{color:c.primary,fontWeight:'700'}}>حفظ الملاحظة</Text></Pressable>
+          </> : <Pressable accessibilityRole="button" accessibilityLabel={(line.note?'تعديل الملاحظة: ':'إضافة ملاحظة للتاجر')+ (line.note||'')} onPress={()=>setEditingNote(line.item_id)} style={styles.optionalNote}>
+            <Text style={[styles.hint,{color:c.primary}]} numberOfLines={1}>{line.note?('ملاحظتك: '+line.note):'+ إضافة ملاحظة للتاجر (اختياري)'}</Text>
+          </Pressable>}
+          <Pressable accessibilityRole="button" accessibilityLabel="إزالة المنتج من السلة" disabled={changing} onPress={()=>void remove(line.item_id)} style={[styles.link,{alignSelf:'flex-start'}]}><Trash2 size={16} color={c.danger}/><Text style={{color:c.danger,fontWeight:'700'}}>إزالة المنتج</Text></Pressable>
         </View>;
       })}
       {!!lines.length&&<View style={[styles.card,{backgroundColor:c.surface,borderColor:c.line}]}>
         <View style={styles.between}><Text style={[styles.heading,{color:c.ink}]}>ملخص السلة</Text><Text style={[styles.label,{color:c.muted}]}>{totals.count.toLocaleString('ar-SA')} قطعة · {lines.length.toLocaleString('ar-SA')} منتج</Text></View>
         <View style={styles.between}><Text style={[styles.label,{color:c.ink}]}>إجمالي الأسعار المحددة</Text><Text style={[styles.price,{color:c.primary}]}>{formatCartMoney(totals.halalas)}</Text></View>
         {totals.unknown>0&&<Text style={[styles.hint,{color:c.muted}]}>{totals.unknown.toLocaleString('ar-SA')} منتج بسعر يُتفق عليه أو بدون مقابل؛ لا يُحتسب في المجموع المعروض.</Text>}
-        <View style={styles.between}><Truck size={18} color={c.primary}/><Text style={[styles.hint,{flex:1,color:c.muted}]}>رسوم التوصيل غير مشمولة، ويُتفق عليها مع التاجر قبل التسليم. لا تشارك بياناتك الخاصة في ملاحظات عامة.</Text></View>
+        <Text style={[styles.hint,{color:c.muted}]}>لا تشمل الأسعار رسوم التوصيل، وتُؤكد مع كل تاجر.</Text>
         {unsavedNotes&&<Text accessibilityRole="alert" style={[styles.hint,{color:c.danger}]}>هناك ملاحظات لم تُحفظ بعد. احفظها على كل منتج قبل تأكيد الطلب.</Text>}
         <Pressable accessibilityRole="button" accessibilityLabel="إرسال طلبات السلة والدفع فقط عند الاستلام" disabled={changing||unavailable.length>0||changedPrices.length>0||unsavedNotes} onPress={()=>void checkout()} style={[styles.primary,{backgroundColor:c.primary,opacity:changing||unavailable.length>0||changedPrices.length>0||unsavedNotes?0.5:1}]}>
           {busy==='checkout'?<ActivityIndicator color="#fff"/>:<ShoppingBag size={19} color="#fff"/>}<Text style={styles.white}>تأكيد الطلبات · الدفع عند الاستلام</Text>
         </Pressable>
-        <Text style={[styles.hint,{color:c.muted,textAlign:'center'}]}>إرسال الطلب لا يحصّل أي مبلغ. قبول التاجر والتسليم يتمان بعد الإرسال، مع تتبع مستقل لكل منتج.</Text>
+        <Text style={[styles.hint,{color:c.muted,textAlign:'center'}]}>ستظهر حالة كل طلب في «طلباتي» بعد إرساله.</Text>
       </View>}
     </ScrollView>
   </View>;
 }
 const styles=StyleSheet.create({
-  wrap:{width:'100%',maxWidth:880,alignSelf:'center',padding:16,gap:15},
-  banner:{padding:17,borderWidth:1,borderRadius:22,flexDirection:'row-reverse',alignItems:'flex-start',gap:12},
-  card:{borderWidth:1,borderRadius:22,padding:17,gap:13},
+  wrap:{width:'100%',maxWidth:760,alignSelf:'center',paddingHorizontal:14,paddingTop:14,gap:11},
+  banner:{paddingHorizontal:14,paddingVertical:12,borderWidth:1,borderRadius:16,flexDirection:'row-reverse',alignItems:'center',gap:10},
+  card:{borderWidth:1,borderRadius:19,padding:14,gap:10},
   heading:{fontSize:16,fontWeight:'800',textAlign:'right',lineHeight:24},
   label:{fontSize:13,fontWeight:'700',textAlign:'right'},
   hint:{fontSize:12.5,lineHeight:22,textAlign:'right'},
   price:{fontSize:17,fontWeight:'800',textAlign:'right'},
   white:{color:'#fff',fontSize:14,fontWeight:'800',textAlign:'center'},
   productRow:{flexDirection:'row-reverse',alignItems:'center',gap:13,minHeight:90},
-  thumbnail:{width:90,height:88,borderRadius:16,overflow:'hidden'},
+  thumbnail:{width:78,height:78,borderRadius:14,overflow:'hidden'},
   between:{flexDirection:'row-reverse',alignItems:'center',justifyContent:'space-between',gap:10},
   buttons:{flexDirection:'row-reverse',alignItems:'center',flexWrap:'wrap',gap:8},
   iconButton:{width:44,height:44,borderRadius:14,alignItems:'center',justifyContent:'center'},
   chip:{minHeight:44,borderWidth:1,borderRadius:15,paddingHorizontal:13,paddingVertical:10,justifyContent:'center'},
-  input:{borderWidth:1,borderRadius:14,minHeight:70,padding:12,textAlignVertical:'top',fontSize:14},
+  input:{borderWidth:1,borderRadius:12,minHeight:54,maxHeight:130,padding:12,textAlignVertical:'top',fontSize:14},
+  optionalNote:{minHeight:44,justifyContent:'center',alignSelf:'stretch'},
+  deliveryRow:{flexDirection:'row-reverse',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:8,paddingTop:10,borderTopWidth:1},
   link:{minHeight:44,flexDirection:'row-reverse',alignItems:'center',gap:7,paddingHorizontal:10,justifyContent:'center'},
-  primary:{minHeight:54,borderRadius:17,flexDirection:'row-reverse',alignItems:'center',justifyContent:'center',gap:10,paddingHorizontal:14},
+  primary:{minHeight:52,borderRadius:16,flexDirection:'row-reverse',alignItems:'center',justifyContent:'center',gap:10,paddingHorizontal:14},
   center:{alignItems:'center',justifyContent:'center',gap:12,minHeight:120},
   notice:{padding:13,borderWidth:1,borderRadius:15,gap:9},
 });
