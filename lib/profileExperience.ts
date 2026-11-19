@@ -46,6 +46,15 @@ export function publicProfileRoleCopy(profile:PublicProfileIdentity) {
  }[kind];
  return {...data,kind,professional:kind==='merchant'||kind==='freelance'||kind==='provider'||kind==='idea'?professional:''};
 }
+export function profileTabLabel(profile:PublicProfileIdentity,tab:ActivityTab):string {
+ const kind=publicProfileType(profile);
+ const common:Record<ActivityTab,string>={questions:'الاستفسارات',answers:'الإجابات',services:'الخدمات',requests:'الطلبات',market:'السوق',reviews:'التقييمات'};
+ if(kind==='merchant' && tab==='market')return 'منتجات المحل';
+ if(kind==='merchant' && tab==='reviews')return 'آراء العملاء';
+ if((kind==='freelance'||kind==='provider')&&tab==='services')return 'الأعمال والخدمات';
+ if(kind==='idea'&&tab==='requests')return 'طلبات المبادرة';
+ return common[tab];
+}
 export function profileActivityOrder(profile:PublicProfileIdentity,order?:unknown):ActivityTab[]{
  const preferred=PRIORITY[publicProfileType(profile)];
  // Respect deliberate profile design edits; ignore the generic order saved by the default studio.
