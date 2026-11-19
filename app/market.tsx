@@ -1,5 +1,6 @@
 import { ContentSkeleton } from '@/components/shared/ContentSkeleton';
 import { MarketPromotions } from '@/components/market/MarketPromotions';
+import { BusinessDetailsSheet } from '@/components/market/BusinessDetailsSheet';
 import { OasisEmptyIllustration } from '@/components/oasis/OasisEmptyIllustration';
 import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
 import { OASIS, useTheme } from '@/lib/oasis';
@@ -1255,120 +1256,7 @@ export default function Market() {
       {/* ======================================================== */}
       {/* MODAL 1: BUSINESS DETAILS                                */}
       {/* ======================================================== */}
-      {selectedBusiness && (
-        <Modal visible={!!selectedBusiness} animationType="slide" transparent onRequestClose={() => setSelectedBusiness(null)}>
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { maxHeight: '90%' }]}>
-              <View style={styles.modalHeader}>
-                <Pressable oasisKind="icon" onPress={() => setSelectedBusiness(null)} style={styles.modalCloseBtn}>
-                  <X size={18} color={OASIS.colors.ink} />
-                </Pressable>
-                <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-                  <Store size={18} color={OASIS.colors.info} />
-                  <Text style={styles.modalTitle}>تفاصيل المحل التجاري</Text>
-                </View>
-              </View>
-
-              <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
-                <View style={[styles.detailHeroBox, { backgroundColor: selectedBusiness.bg || OASIS.colors.infoSoft }]}>
-                  <View style={styles.detailHeroIconCircle}>
-                    <Text style={{ fontSize: 22 }}><selectedBusiness.Icon size={34} color={selectedBusiness.color || OASIS.colors.info} /></Text>
-                  </View>
-                  <View style={{ alignItems: 'center', marginTop: 10, gap: 4 }}>
-                    <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-                      <Text style={styles.detailHeroTitle}>{selectedBusiness.name}</Text>
-                      {selectedBusiness.is_verified && <ShieldCheck size={18} color={OASIS.colors.primary} />}
-                    </View>
-                    <View style={styles.detailBadgeRow}>
-                      <Text style={[styles.detailCatPill, { color: selectedBusiness.color || OASIS.colors.info }]}>
-                        {selectedBusiness.categoryLabel}
-                      </Text>
-                      <View style={styles.detailRatingPill}>
-                        <Star size={13} color={OASIS.colors.warning} fill={OASIS.colors.warning} />
-                        <Text style={{ fontSize: 12, fontWeight: '700', color: OASIS.colors.ink }}>{selectedBusiness.rating == null ? 'لا توجد تقييمات بعد' : selectedBusiness.rating.toFixed(1)}</Text>
-                        <Text style={{ fontSize: 11, color: OASIS.colors.muted }}>({selectedBusiness.reviews} تقييم)</Text>
-                      </View>
-                    </View>
-                  </View>
-                </View>
-
-                <View style={styles.detailStatusBanner}>
-                  <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-                    <Clock size={16} color={OASIS.colors.primary} />
-                    <Text style={{ fontSize: 13, fontWeight: '600', color: OASIS.colors.ink }}>
-                      {selectedBusiness.hours || 'متاح لخدمة الحي'}
-                    </Text>
-                  </View>
-                  <View style={[styles.statusTag, selectedBusiness.openNow ? styles.statusTagOpen : styles.statusTagClosed]}>
-                    <Text style={[styles.statusTagText, selectedBusiness.openNow ? { color: '#15803d' } : { color: OASIS.colors.danger }]}>
-                      {selectedBusiness.openNow == null ? 'لم تُحدد حالة العمل' : selectedBusiness.openNow ? 'مفتوح الآن' : 'مغلق حالياً'}
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.detailLocationBanner}>
-                  <MapPin size={16} color={OASIS.colors.primary} />
-                  <Text style={styles.detailLocationText}>
-                    الموقع: {selectedBusiness.district ? `حي ${selectedBusiness.district}` : ''} {selectedBusiness.city ? `· ${selectedBusiness.city}` : ''}
-                  </Text>
-                </View>
-
-                <View style={styles.detailActionsGrid}>
-                  {Boolean(selectedBusiness.phone) && (
-                    <Pressable style={styles.detailActionBtnCall} onPress={() => openPhone(selectedBusiness.phone)}>
-                      <Phone size={16} color={OASIS.colors.info} />
-                      <Text style={styles.detailActionBtnCallText}>اتصال مباشر</Text>
-                    </Pressable>
-                  )}
-                  {Boolean(selectedBusiness.whatsapp) && (
-                    <Pressable
-                      style={styles.detailActionBtnWa}
-                      onPress={() => openWhatsApp(selectedBusiness.whatsapp, `مرحباً «${selectedBusiness.name}»، شفت بطاقتكم في تطبيق حيّنا وحاب أستفسر`)}
-                    >
-                      <MessageCircle size={16} color="#15803d" />
-                      <Text style={styles.detailActionBtnWaText}>واتساب</Text>
-                    </Pressable>
-                  )}
-                  <Pressable
-                    style={styles.detailActionBtnMap}
-                    onPress={() => openMaps(`${selectedBusiness.name} ${selectedBusiness.district || ''} ${selectedBusiness.city || ''}`)}
-                  >
-                    <Navigation size={16} color={OASIS.colors.primary} />
-                    <Text style={styles.detailActionBtnMapText}>الخريطة</Text>
-                  </Pressable>
-                  <Pressable style={styles.detailActionBtnShare} onPress={() => void shareBusiness(selectedBusiness)}>
-                    <Share2 size={16} color={OASIS.colors.muted} />
-                    <Text style={styles.detailActionBtnShareText}>مشاركة</Text>
-                  </Pressable>
-                </View>
-
-                <View style={styles.detailSectionBox}>
-                  <Text style={styles.detailSectionTitle}>نبذة عن المنشأة ℹ️</Text>
-                  <Text style={styles.detailSectionDesc}>
-                    {selectedBusiness.description || 'منشأة معتمدة تقدم خدماتها لسكان الحي بأعلى معايير الجودة والمصداقية.'}
-                  </Text>
-                </View>
-
-                {selectedBusiness.features && selectedBusiness.features.length > 0 && (
-                  <View style={styles.detailSectionBox}>
-                    <Text style={styles.detailSectionTitle}>المميزات والخدمات المقدمة ⭐</Text>
-                    <View style={{ gap: 8, marginTop: 6 }}>
-                      {selectedBusiness.features.map((feat: string, idx: number) => (
-                        <View key={idx} style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 8 }}>
-                          <CheckCircle2 size={16} color={OASIS.colors.primary} />
-                          <Text style={{ fontSize: 13, color: OASIS.colors.ink, fontWeight: '700' }}>{feat}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  </View>
-                )}
-
-                <View style={{ height: 20 }} />
-              </ScrollView>
-            </View>
-          </View>
-        </Modal>
-      )}
+      {selectedBusiness && <BusinessDetailsSheet business={selectedBusiness} onClose={() => setSelectedBusiness(null)} />}
 
       {/* ======================================================== */}
       {/* MODAL 2: COMMUNITY EVENT DETAILS                         */}
