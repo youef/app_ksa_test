@@ -990,17 +990,15 @@ export default function Market() {
               </Pressable>
             </View>
 
-            {/* Buyer tools: product checkout is cash-on-delivery, separate from paid merchant plans. */}
-            <View style={{flexDirection:'row-reverse',flexWrap:'wrap',gap:9,marginBottom:12}}>
-              <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="فتح سلة المشتريات" onPress={()=>router.push('/market-cart')}
-                style={{minHeight:48,borderRadius:16,flexDirection:'row-reverse',alignItems:'center',gap:9,paddingHorizontal:15,backgroundColor:OASIS.colors.soft,borderWidth:1,borderColor:OASIS.colors.line}}>
-                <ShoppingCart size={19} color={OASIS.colors.primary}/><Text style={{color:OASIS.colors.primary,fontSize:13,fontWeight:'800'}}>سلة المشتريات</Text>
+            {/* Compact marketplace actions, without repeating the bottom-bar add action. */}
+            <View style={styles.buyerQuickRow}>
+              <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="سلة المشتريات" onPress={()=>router.push('/market-cart')} style={styles.buyerQuickButton}>
+                <ShoppingCart size={18} color={OASIS.colors.primary}/><Text style={styles.buyerQuickText}>السلة</Text>
               </Pressable>
-              <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="تتبع طلبات المنتجات" onPress={()=>router.push('/product-orders')}
-                style={{minHeight:48,borderRadius:16,flexDirection:'row-reverse',alignItems:'center',gap:9,paddingHorizontal:15,backgroundColor:OASIS.colors.surface,borderWidth:1,borderColor:OASIS.colors.line}}>
-                <ClipboardList size={19} color={OASIS.colors.primary}/><Text style={{color:OASIS.colors.primary,fontSize:13,fontWeight:'800'}}>طلباتي والتوصيل</Text>
+              <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="طلباتي وتتبع التوصيل" onPress={()=>router.push('/product-orders')} style={styles.buyerQuickButton}>
+                <ClipboardList size={18} color={OASIS.colors.primary}/><Text style={styles.buyerQuickText}>طلباتي</Text>
               </Pressable>
-              <View style={{justifyContent:'center',flex:1,minWidth:100,alignItems:'flex-end'}}><Text style={{textAlign:'right',fontSize:11.5,color:OASIS.colors.muted}}>الدفع عند الاستلام فقط</Text></View>
+              <Text style={styles.codCaption} numberOfLines={1}>الدفع عند الاستلام</Text>
             </View>
             {/* Contextual Search Input & Action Button */}
             <View style={styles.searchRow}>
@@ -1029,11 +1027,10 @@ export default function Market() {
                 )}
               </OasisSurface>
 
-              <Pressable oasisKind="action" id="market-add" accessibilityRole="button" accessibilityLabel={addBtnLabel} style={styles.addBtn} onPress={handleAddPress}>
-
+              {width >= 760 && <Pressable oasisKind="action" id="market-add" accessibilityRole="button" accessibilityLabel={addBtnLabel} style={styles.addBtn} onPress={handleAddPress}>
                 <Plus size={18} color={OASIS.colors.surface} />
-                <Text style={styles.addBtnText}>{width < 500 ? 'إضافة' : addBtnLabel}</Text>
-              </Pressable>
+                <Text style={styles.addBtnText}>{addBtnLabel}</Text>
+              </Pressable>}
             </View>
 
             <View style={styles.scopeBar}>
@@ -1796,8 +1793,12 @@ const styles = StyleSheet.create({
   },
   headerAddBtnText: { color: OASIS.colors.primary, fontSize: 12, fontWeight: '600' },
 
+  buyerQuickRow: {flexDirection:'row-reverse',alignItems:'center',gap:8,marginBottom:8},
+  buyerQuickButton: {minHeight:44,paddingHorizontal:13,borderWidth:1,borderColor:OASIS.colors.line,borderRadius:14,backgroundColor:OASIS.colors.surface,flexDirection:'row-reverse',alignItems:'center',justifyContent:'center',gap:6},
+  buyerQuickText: {color:OASIS.colors.primary,fontSize:12.5,fontWeight:'700'},
+  codCaption: {flex:1,minWidth:0,fontSize:11.5,color:OASIS.colors.muted,textAlign:'left'},
   discoveryChips: {flexDirection:'row-reverse',alignItems:'center',gap:7,paddingTop:8,paddingBottom:3},
-  discoveryChip: {flexDirection:'row-reverse',alignItems:'center',gap:5,paddingHorizontal:10,minHeight:32,borderRadius:16,borderWidth:1,borderColor:'#DFE8E2',backgroundColor:'#FFFFFF'},
+  discoveryChip: {flexDirection:'row-reverse',alignItems:'center',gap:5,paddingHorizontal:11,minHeight:40,borderRadius:16,borderWidth:1,borderColor:'#DFE8E2',backgroundColor:'#FFFFFF'},
   discoveryChipActive: { backgroundColor:OASIS.colors.soft,borderColor:OASIS.colors.primary },
   discoveryChipText: { fontSize:11,fontWeight:'600',color:OASIS.colors.muted },
   browseToolbar: { flexDirection:'row-reverse',alignItems:'center',justifyContent:'space-between',gap:8,marginTop:10 },
@@ -1877,9 +1878,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 5,
-    minHeight: 38,
-    paddingVertical: 6,
-    borderRadius: 10,
+    minHeight: 44,
+    paddingVertical: 8,
+    borderRadius: 12,
   },
   segmentBtnActive: {
     backgroundColor: OASIS.colors.primary,
@@ -2003,7 +2004,7 @@ const styles = StyleSheet.create({
   availableDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#22c55e' },
   availableBadgeText: { fontSize: 11, fontWeight: '700', color: '#15803d' },
   cardTopActions: { position: 'absolute', bottom: 8, left: 8, flexDirection: 'row', gap: 5 },
-  shareFab: {width:30,height:30,borderRadius:15,backgroundColor:'rgba(255,255,255,0.96)',alignItems:'center',justifyContent:'center',shadowOpacity:0,elevation:0},
+  shareFab: {width:38,height:38,borderRadius:19,backgroundColor:'rgba(255,255,255,0.96)',alignItems:'center',justifyContent:'center',shadowOpacity:0,elevation:0},
   cardBody: {paddingHorizontal:10,paddingTop:9,paddingBottom:11},
   cardTitle: {fontSize:14,fontWeight:'700',color:OASIS.colors.ink,textAlign:'right'},
   cardSub: {fontSize:11.5,color:OASIS.colors.muted,textAlign:'right',marginTop:3,lineHeight:17},
