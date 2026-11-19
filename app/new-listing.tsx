@@ -441,6 +441,15 @@ function Choice({label,selected,disabled,onPress}:{label:string;selected:boolean
 }
 
 const styles = StyleSheet.create({
+  loadingCard: { width: '92%', maxWidth: 540, gap: 15, backgroundColor: OASIS.colors.surface, padding: 18, borderRadius: 22, borderWidth: 1, borderColor: OASIS.colors.line },
+  skeleton: { borderRadius: 12, backgroundColor: OASIS.colors.soft },
+  setupCard: { width: '92%', maxWidth: 540, backgroundColor: OASIS.colors.surface, borderRadius: 22, borderWidth: 1, borderColor: OASIS.colors.line, padding: 22, alignItems: 'center', gap: 16 },
+  setupMessage: { color: OASIS.colors.muted, fontSize: 14, lineHeight: 25, textAlign: 'center' },
+  fullAction: { minHeight: 52, width: '100%', borderRadius: 16, backgroundColor: OASIS.colors.primary, flexDirection: 'row-reverse', justifyContent: 'center', alignItems: 'center', gap: 9, paddingHorizontal: 16 },
+  fullActionSecondary: { minHeight: 48, alignSelf: 'stretch', borderRadius: 15, borderColor: OASIS.colors.line, borderWidth: 1, backgroundColor: OASIS.colors.soft, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 15 },
+  successCard: { width: '100%', minHeight: 380, borderRadius: 24, borderWidth: 1, borderColor: OASIS.colors.line, backgroundColor: OASIS.colors.surface, padding: 24, gap: 17, alignItems: 'center', justifyContent: 'center' },
+  successIcon: { width: 82, height: 82, borderRadius: 41, backgroundColor: OASIS.colors.soft, alignItems: 'center', justifyContent: 'center' },
+
   screen: { flex: 1, backgroundColor: '#F7F9F8' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#F7F9F8' },
   loading: { color: OASIS.colors.muted, fontSize: 12, fontWeight: '700' },
