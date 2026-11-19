@@ -53,6 +53,7 @@ export default function NewListing() {
   const [price, setPrice] = useState('');
   const [mode, setMode] = useState<ProductMode>('بيع');
   const [image, setImage] = useState<LocalServiceImage | null>(null);
+  const [imageError, setImageError] = useState('');
   const [busy, setBusy] = useState(false);
   const [busyMessage, setBusyMessage] = useState('جارٍ التحقق من الموقع…');
   const [city, setCity] = useState('');
@@ -196,10 +197,11 @@ export default function NewListing() {
   async function chooseImage(fromCamera = false) {
     if(busy)return;
     try {
+      setImageError('');
       const result = await pickServiceImages(1, fromCamera);
       if (result[0]) {setImage(result[0]);setPreview(false);}
     } catch (error: any) {
-      Alert.alert('الصورة', error?.message || 'تعذر اختيار الصورة.');
+      if (alive.current) setImageError(error?.message || 'تعذر اختيار الصورة.');
     }
   }
 
@@ -225,7 +227,13 @@ export default function NewListing() {
       if(freshProfile.error)throw freshProfile.error;
       const current=await currentProductLocation(freshProfile.data);
       confirmProductPosition(position!,current.fix);
-      if(permissions.data?.can_manage_business){const business=await supabase.rpc('hayna_ensure_my_business');if(business.error)throw business.error;}
+      let businessId: string | null = null;
+      if (permissions.data?.can_manage_business) {
+        const business = await supabase.rpc('hayna_ensure_my_business');
+        if (business.error) throw business.error;
+        if (typeof business.data !== 'string' || !business.data) throw new Error('تعذر ربط المنتج بمنشأتك. أعد المحاولة من حسابك المعتمد.');
+        businessId = business.data;
+      }
       setBusyMessage('جارٍ رفع صورة المنتج…');
       const urls = image ? await uploadServiceImages(profile.id, [image]) : [];
       setBusyMessage('جارٍ تأكيد وجودك في الموقع قبل النشر…');
@@ -234,6 +242,7 @@ export default function NewListing() {
       setBusyMessage('جارٍ حفظ الإعلان…');
       const inserted = await supabase.from('marketplace_items').insert({
         seller_id: profile.id,
+        business_id: businessId,
         title: title.trim(),
         description: detailDescription,
         price: mode === 'بيع' && !negotiable ? parseProductPrice(price) : null,
@@ -361,6 +370,7 @@ export default function NewListing() {
               <Pressable accessibilityRole="button" accessibilityLabel="التقاط صورة بالكاميرا" disabled={busy} style={styles.imageButton} onPress={() => void chooseImage(true)}><Camera size={20} color="#0F766E" /><Text style={styles.imageButtonText}>الكاميرا</Text></Pressable>
             </View>
           )}
+          {!!imageError && <Text accessibilityRole="alert" style={styles.errorText}>{imageError}</Text>}
         </OasisSurface>
 
         {!isMerchant ? (
