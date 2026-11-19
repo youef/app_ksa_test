@@ -120,6 +120,7 @@ export default function UserProfile() {
   const [profileCustomization, setProfileCustomization] = useState<any>(null);
   const [myCapabilities, setMyCapabilities] = useState<ProfileCapabilityFlags | null>(null);
   const [linkedBusiness, setLinkedBusiness] = useState<{id:string;name:string}|null>(null);
+  const [latestVerificationStatus,setLatestVerificationStatus]=useState<string|null>(null);
 
   const visibleTabs = useMemo(() => {
     const priority = profileActivityOrder(profile || {}, profileCustomization?.section_order);
@@ -241,6 +242,7 @@ export default function UserProfile() {
     setProfileCustomization(null);
     setMyCapabilities(null);
     setLinkedBusiness(null);
+    setLatestVerificationStatus(null);
     setLoadedTabs([]);
     setTabError(false);
     setBlocked(false); setBlockedByOther(false); setFollowing(false); setFollowedBy(false);
@@ -325,15 +327,19 @@ export default function UserProfile() {
 
       const contactResult = await loadProfileContact(p.id, true).catch(() => null);
       if (contactRevision === contactRequest.current && contactResult) setContact({ profileId: p.id, phone: contactResult.phone });
-      const [customizationResult, featuredResult, capabilityResult, businessResult] = await Promise.all([
+      const [customizationResult, featuredResult, capabilityResult, businessResult, verificationResult] = await Promise.all([
         supabase.from('profile_customizations').select('accent_color,banner_style,show_stats,show_badges,featured_title,profile_type,section_visibility,section_order').eq('user_id', p.id).maybeSingle(),
         supabase.from('profile_featured_items').select('item_type,item_id,position').eq('user_id', p.id).order('position', { ascending: true }).limit(10),
         me === p.id ? supabase.rpc('hayna_my_account_capabilities') : Promise.resolve({data:null,error:null}),
         p.account_type === 'merchant'
           ? supabase.from('businesses').select('id,name').eq('owner_id',p.id).eq('moderation_status','approved').is('archived_at',null).limit(1).maybeSingle()
           : Promise.resolve({data:null,error:null}),
+        me===p.id
+          ? supabase.from('verification_requests').select('status').eq('user_id',p.id).is('document_number',null).order('created_at',{ascending:false}).limit(1).maybeSingle()
+          : Promise.resolve({data:null,error:null}),
       ]);
       setProfileCustomization(customizationResult.data || null);
+      setLatestVerificationStatus(me===p.id&&!verificationResult.error?verificationResult.data?.status||null:null);
       setMyCapabilities(me===p.id && !capabilityResult.error && (!capabilityResult.data?.user_id || capabilityResult.data.user_id===p.id) ? capabilityResult.data as ProfileCapabilityFlags : null);
       setLinkedBusiness(!businessResult.error && businessResult.data ? businessResult.data as {id:string;name:string} : null);
       const featuredRows = featuredResult.data || [];
@@ -663,7 +669,7 @@ export default function UserProfile() {
         contentContainerStyle={styles.page}
       >
         <View style={[styles.shell, { paddingTop: 10 }]}>
-          <ProfileHeader contactPhone={contact && contact.profileId === profile.id && (lookupKey === profile.id || lookupKey === profile.username) ? contact.phone : ''} profile={profile} customization={profileCustomization} displayName={displayName} coverUri={coverUrl} stats={{...stats, contributions:totalContributions}} own={own} anonymous={anonymous} locked={locked} following={following} followedBy={followedBy} busy={busy || blocked || blockedByOther} canMessage={canMessage} hideContactActions={locked || blocked || blockedByOther} hasStories={hasActiveStories} onStoriesPress={()=>void openProfileStories()} onAvatarPress={()=>{if(!anonymous&&!locked&&profile.avatar_url)setPreviewImage({uri:profile.avatar_url,title:'الصورة الشخصية'});}} onCoverPreview={()=>{if(!anonymous&&!locked)setPreviewImage({uri:coverUrl,title:'صورة الغلاف'});}} onEdit={() => router.push('/profile?section=edit')} onDesign={() => router.push('/profile?tab=settings&section=design')} onSettings={() => router.push('/profile?tab=settings')} onVerify={() => router.push('/profile?tab=verification')} onFollowers={() => setConnections('followers')} onFollowing={() => setConnections('following')} onFollow={() => void toggleFollow()} onMessage={() => void openMessage()} />
+          <ProfileHeader contactPhone={contact && contact.profileId === profile.id && (lookupKey === profile.id || lookupKey === profile.username) ? contact.phone : ''} profile={profile} customization={profileCustomization} verificationRequestStatus={own?latestVerificationStatus:undefined} displayName={displayName} coverUri={coverUrl} stats={{...stats, contributions:totalContributions}} own={own} anonymous={anonymous} locked={locked} following={following} followedBy={followedBy} busy={busy || blocked || blockedByOther} canMessage={canMessage} hideContactActions={locked || blocked || blockedByOther} hasStories={hasActiveStories} onStoriesPress={()=>void openProfileStories()} onAvatarPress={()=>{if(!anonymous&&!locked&&profile.avatar_url)setPreviewImage({uri:profile.avatar_url,title:'الصورة الشخصية'});}} onCoverPreview={()=>{if(!anonymous&&!locked)setPreviewImage({uri:coverUrl,title:'صورة الغلاف'});}} onEdit={() => router.push('/profile?section=edit')} onDesign={() => router.push('/profile?tab=settings&section=design')} onSettings={() => router.push('/profile?tab=settings')} onVerify={() => router.push('/profile?tab=verification')} onFollowers={() => setConnections('followers')} onFollowing={() => setConnections('following')} onFollow={() => void toggleFollow()} onMessage={() => void openMessage()} />
           {!locked && (own || linkedBusiness) && <View style={[styles.roleHub,{backgroundColor:colors.surface,borderColor:colors.line}]}>
             <View style={styles.roleHubHead}>
               <View style={[styles.roleHubIcon,{backgroundColor:identityMeta.softColor}]}><identityMeta.Icon size={19} color={identityMeta.color}/></View>
