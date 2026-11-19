@@ -7,6 +7,7 @@ import { loadProfileContact } from '@/lib/profileContact';
 import { useTheme } from '@/context/ThemeContext';
 import { bannerColors } from '@/lib/profileTheme';
 import { AccountStatusMark, getAccountIdentityMeta } from './AccountIdentityBadge';
+import { publicProfileRoleCopy, publicProfileVerification } from '@/lib/profileExperience';
 
 type Props = {
   profile: any;
@@ -33,6 +34,7 @@ type Props = {
   onEdit?: () => void;
   onDesign?: () => void;
   onSettings?: () => void;
+  onVerify?: () => void;
   onFollowers?: () => void;
   onFollowing?: () => void;
   onFollow?: () => void;
@@ -53,6 +55,10 @@ export function ProfileHeader(props: Props) {
   useEffect(() => setCoverFailed(false), [props.coverUri]);
   useEffect(() => setAvatarFailed(false), [profile.avatar_url]);
   const identity = getAccountIdentityMeta(profile.role, profile.account_type, Boolean(profile.is_verified));
+  const experience = publicProfileRoleCopy(profile);
+  const verification = publicProfileVerification(profile, Boolean(own));
+  const ExperienceIcon = identity.Icon;
+  const showProfessionalApproval = experience.kind === 'merchant' && profile.is_verified_merchant === true;
   const accent = customization?.accent_color || identity.color;
   const name = anonymous ? 'جار مجهول' : props.displayName || profile.display_name || profile.username || 'جار';
   const heroColors = !customization?.banner_style || customization.banner_style === 'emerald' ? identity.heroColors : bannerColors(customization.banner_style);
@@ -97,7 +103,7 @@ export function ProfileHeader(props: Props) {
         <View style={styles.identity}>
           <View style={styles.nameRow}>
             <Text numberOfLines={2} style={[styles.name, { color: colors.ink }]}>{name}</Text>
-            {!anonymous && customization?.show_badges !== false && <AccountStatusMark role={profile.role} accountType={profile.account_type} isVerified={Boolean(profile.is_verified)} size={17} />}
+            {!anonymous && !locked && customization?.show_badges !== false && <AccountStatusMark role={profile.role} accountType={profile.account_type} isVerified={Boolean(profile.is_verified)} size={17} />}
             {profile.profile_privacy === 'private' && <Lock size={15} color={colors.muted} />}
           </View>
           {!anonymous && <Text numberOfLines={1} style={[styles.handle, { color: colors.muted }]}>@{profile.username}</Text>}
@@ -125,6 +131,32 @@ export function ProfileHeader(props: Props) {
           {!locked && props.hasStories && props.onStoriesPress && action('اليوميات', CirclePlay, props.onStoriesPress)}
         </View>
       )}
+      {!anonymous && !locked && <View accessibilityLabel={experience.label + '، ' + verification.label}
+        style={[styles.rolePanel,{backgroundColor:colors.background,borderColor:colors.line}]}>
+        <View style={[styles.roleIcon,{backgroundColor:identity.softColor}]}>
+          <ExperienceIcon size={20} color={identity.color}/>
+        </View>
+        <View style={styles.roleContent}>
+          <Text style={[styles.roleTitle,{color:colors.ink}]}>{experience.title}</Text>
+          <Text style={[styles.roleCaption,{color:colors.muted}]}>{experience.professional || experience.detail}</Text>
+          <View style={styles.roleTags}>
+            <View style={[styles.roleChip,{backgroundColor:identity.softColor}]}>
+              <Text style={[styles.roleChipText,{color:identity.color}]}>{experience.label}</Text>
+            </View>
+            <View style={[styles.roleChip,{backgroundColor:verification.state==='verified'||verification.state==='official'?colors.soft:colors.surface,borderWidth:1,borderColor:colors.line}]}>
+              <Text style={[styles.roleChipText,{color:verification.state==='verified'||verification.state==='official'?colors.primary:colors.muted}]}>{verification.label}</Text>
+            </View>
+            {showProfessionalApproval&&<View style={[styles.roleChip,{backgroundColor:colors.soft}]}>
+              <Text style={[styles.roleChipText,{color:colors.primary}]}>اعتماد النشاط التجاري</Text>
+            </View>}
+          </View>
+        </View>
+        {own && props.onVerify && verification.state!=='official' && <Pressable accessibilityRole="button"
+          accessibilityLabel={verification.state==='verified'?'إدارة توثيق الحساب':'متابعة توثيق الحساب'}
+          onPress={props.onVerify} style={[styles.verifyShortcut,{backgroundColor:colors.surface,borderColor:colors.line}]}>
+          <Text style={[styles.verifyShortcutText,{color:colors.primary}]}>التوثيق</Text>
+        </Pressable>}
+      </View>}
       <View style={styles.details}>
         {!locked && profile.bio && customization?.section_visibility?.bio !== false && <Text style={{ color: colors.ink, fontSize: 15, lineHeight: 26, textAlign: 'right', marginVertical: 4 }}>{profile.bio}</Text>}
         {!anonymous && !locked && !profile.is_banned && !props.hideContactActions && !!props.contactPhone && <View style={{ gap: 6, alignItems: 'flex-end' }}>
@@ -178,6 +210,16 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row-reverse', flexWrap: 'wrap', alignItems: 'center', gap: 7, marginBottom: 10 },
   button: { minWidth: 44, minHeight: 44, borderWidth: 1, borderRadius: 11, paddingHorizontal: 11, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6 },
   iconButton: { width: 44, paddingHorizontal: 0 },
+  rolePanel: { width:'100%', flexDirection:'row-reverse',alignItems:'flex-start',gap:10,paddingHorizontal:12,paddingVertical:11,borderRadius:15,borderWidth:1,marginBottom:12 },
+  roleIcon: {width:41,height:41,borderRadius:13,alignItems:'center',justifyContent:'center'},
+  roleContent: {flex:1,minWidth:0,alignItems:'flex-end',gap:5},
+  roleTitle: {fontSize:13.5,fontWeight:'800',textAlign:'right'},
+  roleCaption: {fontSize:11.5,lineHeight:19,textAlign:'right'},
+  roleTags: {flexDirection:'row-reverse',flexWrap:'wrap',gap:5},
+  roleChip: {minHeight:26,paddingHorizontal:8,paddingVertical:5,borderRadius:9,justifyContent:'center'},
+  roleChipText: {fontSize:10.5,fontWeight:'700',textAlign:'right'},
+  verifyShortcut: {minHeight:44,borderWidth:1,borderRadius:12,paddingHorizontal:9,justifyContent:'center',alignItems:'center',alignSelf:'center'},
+  verifyShortcutText: {fontSize:11,fontWeight:'800'},
   details: { alignItems: 'flex-end', gap: 8 },
   row: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, flexWrap: 'wrap' },
   metadata: { width: '100%', flexDirection: 'row-reverse', flexWrap: 'wrap', columnGap: 13, rowGap: 6, marginTop: 1 },
