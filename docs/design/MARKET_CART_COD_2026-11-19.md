@@ -22,3 +22,24 @@
 
 ## Later enhancement
 Opt-in delivery driver assignment and confirmation code after courier permissions/privacy workflows are designed; not part of this batch.
+
+## Implementation and before → after
+- **Cart**: previously no cart → persistent account-backed cart with quantity, delivery choices, optional per-item notes, price refresh, and one-click removal.
+- **Checkout**: previously one product request at a time → atomic multi-item transaction with one existing product request and chat per product; full rollback if a line fails, plus stable checkout UUID to retry network failures.
+- **Payment**: product orders now explicitly `cash_on_delivery` in database, with no card collection or hosted checkout; seller can confirm actual cash receipt after a product is ready.
+- **Buyer tracking**: dedicated outgoing orders tab with stage progress and order details; **seller**: incoming orders tab, accept, prepare and mark ready.
+- **Delivery**: seller can save a scheduled delivery date and general notes on accepted/ready product orders; buyer can read them on order details. Precise addresses are not stored.
+- **Communication**: each order still uses its existing Supabase private conversation, respecting neighbor privacy and messaging permissions.
+- **Interface**: market and product cards link to cart/orders; Arabic RTL, device-responsive layout, 44px controls, clear empty/loading/errors and safe-area padding.
+- **Existing billing**: separately paid marketplace subscriptions, service orders and sponsored ads remain untouched by this product COD change.
+
+## Applied and verified backend
+The additive schema was applied to the active Hayna project, `vkeuyompnddqfvulalkk`. SQL checks confirmed:
+- 4 COD/delivery fields on product requests, 5 new RPCs and 2 cart RLS policies.
+- Cart table RLS is enabled; anonymous cart reads and checkout execution are denied.
+- Authenticated clients have cart SELECT but no direct INSERT permission: all writes require server RPC validations.
+
+## Risks and verification
+- Test the order lifecycle with two authorized real test accounts, including delivery scheduling and seller COD acknowledgment, before relying on a live transaction.
+- Confirm full CI results for `tests/marketCart.test.cjs`, TypeScript and platform exports; no emulator or signed-in end-to-end run was available via the GitHub connector.
+- Order stage tracking is progress/status, not live GPS courier tracking; no third-party driver assignment.
