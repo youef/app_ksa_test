@@ -15,7 +15,7 @@ import { productDisplayPrice } from '@/lib/productDetails';
 type Product = { id: string; seller_id: string; title: string; description: string; price: number | null; item_type: string; image_url: string | null; status: string; city: string; district: string | null };
 
 export default function MarketCart() {
-  const { colors: c } = useTheme(), bottom = useBottomNavInset();
+  const { colors: c, isDark } = useTheme(), bottom = useBottomNavInset();
   const {width}=useWindowDimensions();
   const wide=width>=900;
   const [uid,setUid] = useState('');
@@ -127,6 +127,7 @@ export default function MarketCart() {
     const item=products[line.item_id];
     return item && (item.price==null?null:Number(item.price))!==(line.expected_price==null?null:Number(line.expected_price));
   });
+  const deliveryChanges=lines.some(line=>{const product=products[line.item_id];return product?.status==='available'&&!availableProductFulfillments(product.description).includes(line.fulfillment);});
   const changing=busy!=='';
   const sellersCount=new Set(lines.map(line=>products[line.item_id]?.seller_id).filter(Boolean)).size;
   return <View style={{flex:1,backgroundColor:c.background}}>
@@ -221,7 +222,13 @@ export default function MarketCart() {
           </View>
           <View style={[styles.cardActions,{borderTopColor:c.line}]}>
             <Pressable accessibilityRole="button" accessibilityLabel={line.note?'تعديل ملاحظة التاجر':'إضافة ملاحظة اختيارية للتاجر'} accessibilityState={{expanded:editingNote===line.item_id}}
-              disabled={changing} onPress={()=>setEditingNote(editingNote===line.item_id?null:line.item_id)} style={styles.inlineAction}>
+              disabled={changing} onPress={()=>{
+                if(editingNote){
+                  const previous=lines.find(row=>row.item_id===editingNote);
+                  setNotes(current=>({...current,[editingNote]:previous?.note||''}));
+                }
+                setEditingNote(editingNote===line.item_id?null:line.item_id);
+              }} style={styles.inlineAction}>
               <Plus size={15} color={c.primary}/>
               <Text numberOfLines={1} style={[styles.actionText,{color:c.primary}]}>{line.note?'تعديل الملاحظة':'ملاحظة للتاجر'}</Text>
             </Pressable>
@@ -231,14 +238,14 @@ export default function MarketCart() {
           {line.note&&editingNote!==line.item_id?<Text numberOfLines={2} style={[styles.savedNote,{color:c.muted}]}>{line.note}</Text>:null}
           {editingNote===line.item_id&&<View style={styles.noteEditor}>
             <TextInput value={notes[line.item_id]??''} onChangeText={value=>setNotes(current=>({...current,[line.item_id]:value}))}
-              maxLength={400} multiline textAlign="right" accessibilityLabel="ملاحظة خاصة بالتاجر" placeholder="مثلاً: المقاس أو الوقت المناسب للاستلام"
+              maxLength={400} multiline editable={!changing} textAlign="right" accessibilityLabel="ملاحظة خاصة بالتاجر" placeholder="مثلاً: المقاس أو الوقت المناسب للاستلام"
               placeholderTextColor={c.muted} style={[styles.input,{borderColor:c.line,color:c.ink,backgroundColor:c.soft}]}/>
             <View style={styles.noteActions}>
               <Pressable accessibilityRole="button" disabled={changing||!listed||priceChanged} onPress={()=>void (async()=>{
                 const saved=await update(line,line.quantity,line.fulfillment,notes[line.item_id]??'');
                 if(saved)setEditingNote(null);
               })()} style={[styles.noteSave,{backgroundColor:c.primary,opacity:changing||!listed||priceChanged?0.5:1}]}>
-                <Text style={[styles.actionText,{color:c.surface}]}>حفظ الملاحظة</Text>
+                <Text style={[styles.actionText,{color:isDark?c.background:'#fff'}]}>حفظ الملاحظة</Text>
               </Pressable>
               <Pressable accessibilityRole="button" disabled={changing} onPress={()=>{
                 setNotes(current=>({...current,[line.item_id]:line.note||''}));
@@ -249,40 +256,83 @@ export default function MarketCart() {
         </View>;
       })}
       </View>
-      {!!lines.length&&<View style={[styles.card,{backgroundColor:c.surface,borderColor:c.line}]}>
-        <View style={styles.between}><Text style={[styles.heading,{color:c.ink}]}>ملخص السلة</Text><Text style={[styles.label,{color:c.muted}]}>{totals.count.toLocaleString('ar-SA')} قطعة · {lines.length.toLocaleString('ar-SA')} منتج</Text></View>
-        <View style={styles.between}><Text style={[styles.label,{color:c.ink}]}>إجمالي الأسعار المحددة</Text><Text style={[styles.price,{color:c.primary}]}>{formatCartMoney(totals.halalas)}</Text></View>
-        {totals.unknown>0&&<Text style={[styles.hint,{color:c.muted}]}>{totals.unknown.toLocaleString('ar-SA')} منتج بسعر يُتفق عليه أو بدون مقابل؛ لا يُحتسب في المجموع المعروض.</Text>}
-        <Text style={[styles.hint,{color:c.muted}]}>لا تشمل الأسعار رسوم التوصيل، وتُؤكد مع كل تاجر.</Text>
-        {unsavedNotes&&<Text accessibilityRole="alert" style={[styles.hint,{color:c.danger}]}>هناك ملاحظات لم تُحفظ بعد. احفظها على كل منتج قبل تأكيد الطلب.</Text>}
-        <Pressable accessibilityRole="button" accessibilityLabel="إرسال طلبات السلة والدفع فقط عند الاستلام" disabled={changing||unavailable.length>0||changedPrices.length>0||unsavedNotes} onPress={()=>void checkout()} style={[styles.primary,{backgroundColor:c.primary,opacity:changing||unavailable.length>0||changedPrices.length>0||unsavedNotes?0.5:1}]}>
-          {busy==='checkout'?<ActivityIndicator color="#fff"/>:<ShoppingBag size={19} color="#fff"/>}<Text style={styles.white}>تأكيد الطلبات · الدفع عند الاستلام</Text>
+      {!!lines.length&&<View style={[styles.summaryCard,{backgroundColor:c.surface,borderColor:c.line}]}>
+        <View style={styles.between}>
+          <Text accessibilityRole="header" style={[styles.heading,{color:c.ink}]}>ملخص السلة</Text>
+          <Text style={[styles.hint,{color:c.muted}]}>{totals.count.toLocaleString('ar-SA')} قطعة · {lines.length.toLocaleString('ar-SA')} منتج</Text>
+        </View>
+        <View style={[styles.summaryMain,{borderTopColor:c.line}]}>
+          <View style={{flex:1,gap:3}}>
+            <Text style={[styles.hint,{color:c.muted}]}>إجمالي المنتجات</Text>
+            <Text style={[styles.summaryPrice,{color:c.primary}]}>{formatCartMoney(totals.halalas)}</Text>
+          </View>
+          <View style={[styles.summaryTag,{backgroundColor:c.soft}]}>
+            <Wallet size={16} color={c.primary}/>
+            <Text style={[styles.actionText,{color:c.primary}]}>عند الاستلام</Text>
+          </View>
+        </View>
+        {totals.unknown>0&&<Text style={[styles.hint,{color:c.muted}]}>{totals.unknown.toLocaleString('ar-SA')} منتج بدون سعر محدد، لا يدخل في الإجمالي.</Text>}
+        {sellersCount>1&&<Text style={[styles.hint,{color:c.muted}]}>{sellersCount.toLocaleString('ar-SA')} تجار · يُرسل لكل تاجر طلب مستقل.</Text>}
+        <Text style={[styles.hint,{color:c.muted}]}>رسوم التوصيل غير مشمولة، ويتم الاتفاق عليها مع التاجر.</Text>
+        {unavailable.length>0&&<Text accessibilityRole="alert" style={[styles.hint,{color:c.danger}]}>أزل المنتجات غير المتاحة للمتابعة.</Text>}
+        {changedPrices.length>0&&<Text accessibilityRole="alert" style={[styles.hint,{color:c.danger}]}>راجع الأسعار الجديدة قبل تأكيد الطلب.</Text>}
+        {deliveryChanges&&<Text accessibilityRole="alert" style={[styles.hint,{color:c.danger}]}>تغيّرت خيارات التسليم لمنتج. حدّثها قبل الطلب.</Text>}
+        {unsavedNotes&&<Text accessibilityRole="alert" style={[styles.hint,{color:c.danger}]}>احفظ ملاحظاتك أو ألغِ التعديل قبل إرسال الطلب.</Text>}
+        <Pressable accessibilityRole="button" accessibilityLabel="تأكيد طلبات السلة والدفع عند الاستلام" accessibilityState={{disabled:changing||!!error||unavailable.length>0||changedPrices.length>0||deliveryChanges||unsavedNotes}}
+          disabled={changing||!!error||unavailable.length>0||changedPrices.length>0||deliveryChanges||unsavedNotes} onPress={()=>void checkout()}
+          style={[styles.primary,{backgroundColor:c.primary,opacity:changing||!!error||unavailable.length>0||changedPrices.length>0||deliveryChanges||unsavedNotes?0.5:1}]}>
+          {busy==='checkout'?<ActivityIndicator color={isDark?c.background:'#fff'}/>:<ShoppingBag size={19} color={isDark?c.background:'#fff'}/>}
+          <Text style={[styles.white,{color:isDark?c.background:'#fff'}]}>{busy==='checkout'?'جارٍ تأكيد الطلب…':'تأكيد الطلبات'}</Text>
+          {busy!=='checkout'&&<ChevronLeft size={19} color={isDark?c.background:'#fff'}/>}
         </Pressable>
-        <Text style={[styles.hint,{color:c.muted,textAlign:'center'}]}>ستظهر حالة كل طلب في «طلباتي» بعد إرساله.</Text>
+        <Text style={[styles.hint,{color:c.muted,textAlign:'center'}]}>يمكنك متابعة كل طلب ومحادثته من صفحة «طلباتي».</Text>
       </View>}
     </ScrollView>
   </View>;
 }
 const styles=StyleSheet.create({
-  wrap:{width:'100%',maxWidth:760,alignSelf:'center',paddingHorizontal:14,paddingTop:14,gap:11},
-  banner:{paddingHorizontal:14,paddingVertical:12,borderWidth:1,borderRadius:16,flexDirection:'row-reverse',alignItems:'center',gap:10},
-  card:{borderWidth:1,borderRadius:19,padding:14,gap:10},
+  wrap:{width:'100%',maxWidth:900,alignSelf:'center',paddingHorizontal:14,paddingTop:12,gap:13},
+  banner:{paddingHorizontal:13,paddingVertical:11,borderWidth:1,borderRadius:16,flexDirection:'row-reverse',alignItems:'center',gap:10},
+  bannerCount:{fontSize:11,fontWeight:'800'},
+  cards:{width:'100%',flexDirection:'row-reverse',flexWrap:'wrap',justifyContent:'space-between',gap:12},
+  skeletonList:{width:'100%',gap:12},
+  skeletonBar:{height:13,borderRadius:8},
+  card:{borderWidth:1,borderRadius:19,padding:14,gap:11},
+  summaryCard:{borderWidth:1,borderRadius:19,padding:15,gap:13},
+  summaryMain:{borderTopWidth:1,paddingTop:11,flexDirection:'row-reverse',alignItems:'center',justifyContent:'space-between',gap:10},
+  summaryPrice:{fontSize:22,fontWeight:'800',textAlign:'right'},
+  summaryTag:{flexDirection:'row-reverse',alignItems:'center',gap:6,paddingHorizontal:10,minHeight:34,borderRadius:12},
   heading:{fontSize:16,fontWeight:'800',textAlign:'right',lineHeight:24},
-  label:{fontSize:13,fontWeight:'700',textAlign:'right'},
-  hint:{fontSize:12.5,lineHeight:22,textAlign:'right'},
+  label:{fontSize:13,fontWeight:'800',textAlign:'right'},
+  hint:{fontSize:12,lineHeight:20,textAlign:'right'},
   price:{fontSize:17,fontWeight:'800',textAlign:'right'},
-  white:{color:'#fff',fontSize:14,fontWeight:'800',textAlign:'center'},
-  productRow:{flexDirection:'row-reverse',alignItems:'center',gap:13,minHeight:90},
-  thumbnail:{width:78,height:78,borderRadius:14,overflow:'hidden'},
+  white:{fontSize:14,fontWeight:'800',textAlign:'center'},
+  productRow:{flexDirection:'row-reverse',alignItems:'center',gap:11,minHeight:70},
+  productInfo:{flex:1,minWidth:0,gap:4,alignItems:'flex-end'},
+  thumbnail:{width:70,height:70,borderRadius:15,overflow:'hidden'},
+  locationRow:{flexDirection:'row-reverse',alignItems:'center',gap:4,width:'100%'},
+  locationText:{fontSize:11.5,textAlign:'right',flexShrink:1},
   between:{flexDirection:'row-reverse',alignItems:'center',justifyContent:'space-between',gap:10},
-  buttons:{flexDirection:'row-reverse',alignItems:'center',flexWrap:'wrap',gap:8},
-  iconButton:{width:44,height:44,borderRadius:14,alignItems:'center',justifyContent:'center'},
-  chip:{minHeight:44,borderWidth:1,borderRadius:15,paddingHorizontal:13,paddingVertical:10,justifyContent:'center'},
-  input:{borderWidth:1,borderRadius:12,minHeight:54,maxHeight:130,padding:12,textAlignVertical:'top',fontSize:14},
-  optionalNote:{minHeight:44,justifyContent:'center',alignSelf:'stretch'},
-  deliveryRow:{flexDirection:'row-reverse',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:8,paddingTop:10,borderTopWidth:1},
-  link:{minHeight:44,flexDirection:'row-reverse',alignItems:'center',gap:7,paddingHorizontal:10,justifyContent:'center'},
-  primary:{minHeight:52,borderRadius:16,flexDirection:'row-reverse',alignItems:'center',justifyContent:'center',gap:10,paddingHorizontal:14},
-  center:{alignItems:'center',justifyContent:'center',gap:12,minHeight:120},
-  notice:{padding:13,borderWidth:1,borderRadius:15,gap:9},
+  itemControls:{borderTopWidth:1,paddingTop:10,flexDirection:'row-reverse',alignItems:'center',justifyContent:'space-between',gap:9},
+  stepper:{borderWidth:1,borderRadius:14,flexDirection:'row-reverse',alignItems:'center',overflow:'hidden'},
+  qtyButton:{width:44,minHeight:44,alignItems:'center',justifyContent:'center'},
+  qtyValue:{fontSize:15,fontWeight:'800',minWidth:23,textAlign:'center'},
+  unitTotal:{fontSize:12,fontWeight:'800',textAlign:'left'},
+  buttons:{flexDirection:'row-reverse',alignItems:'center',flexWrap:'wrap',gap:7},
+  chip:{minHeight:40,borderWidth:1,borderRadius:13,paddingHorizontal:12,paddingVertical:8,justifyContent:'center'},
+  deliveryRow:{flexDirection:'row-reverse',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:9},
+  singleDelivery:{minHeight:39,paddingHorizontal:10,borderRadius:13,flexDirection:'row-reverse',alignItems:'center',justifyContent:'center',gap:7,maxWidth:'77%'},
+  deliveryLabel:{fontSize:12,fontWeight:'700',textAlign:'right',flexShrink:1},
+  cardActions:{borderTopWidth:1,paddingTop:8,flexDirection:'row-reverse',alignItems:'center',justifyContent:'space-between',gap:9},
+  inlineAction:{minHeight:44,flexDirection:'row-reverse',alignItems:'center',justifyContent:'center',gap:5,paddingHorizontal:5},
+  actionText:{fontSize:12,fontWeight:'800',textAlign:'center'},
+  savedNote:{fontSize:11.5,lineHeight:20,textAlign:'right'},
+  noteEditor:{gap:9},
+  noteActions:{flexDirection:'row-reverse',alignItems:'center',gap:10},
+  noteSave:{minHeight:44,borderRadius:13,paddingHorizontal:16,alignItems:'center',justifyContent:'center'},
+  noteCancel:{minHeight:44,borderRadius:13,paddingHorizontal:14,alignItems:'center',justifyContent:'center'},
+  input:{borderWidth:1,borderRadius:13,minHeight:65,maxHeight:124,padding:12,textAlignVertical:'top',fontSize:14},
+  primary:{minHeight:53,borderRadius:16,flexDirection:'row-reverse',alignItems:'center',justifyContent:'center',gap:10,paddingHorizontal:14},
+  center:{alignItems:'center',justifyContent:'center',gap:12,minHeight:112},
+  notice:{padding:12,borderWidth:1,borderRadius:13,gap:8},
 });
