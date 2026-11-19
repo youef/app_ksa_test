@@ -1,11 +1,13 @@
 import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ImageBackground, ActivityIndicator, Alert, Image, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
   Camera,
   Check,
+  CheckCircle2,
   ChevronLeft,
   Gift,
   ImagePlus,
@@ -19,7 +21,7 @@ import {
 
 import { AppHeader } from '@/components/shared/AppHeader';
 import { supabase } from '@/lib/supabase';
-import { containsProfanity, findProfanity, banAccountOnViolation } from '@/lib/profanity';
+import { findProfanity, banAccountOnViolation } from '@/lib/profanity';
 import { reverseGeocodeDeviceLocation } from '@/lib/deviceLocation';
 import { normalizeSaudiLocationName } from '@/lib/saudiLocations';
 import { readCurrentProductPosition } from '@/lib/productDeviceLocation';
@@ -36,7 +38,12 @@ type ProductMode = 'بيع' | 'تبرع' | 'إعارة';
 export default function NewListing() {
   const params = useLocalSearchParams<{ kind?: string }>();
   const requestedKind = Array.isArray(params.kind) ? params.kind[0] : params.kind;
+  const safeArea = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const [loading, setLoading] = useState(true);
+  const [setupError, setSetupError] = useState('');
+  const [setupAttempt, setSetupAttempt] = useState(0);
+  const [publishedId, setPublishedId] = useState<string | null>(null);
   const [capabilities, setCapabilities] = useState<any>({});
   const [profile, setProfile] = useState<any>(null);
   const [kind, setKind] = useState<Kind | null>(requestedKind === 'product' || requestedKind === 'service' ? requestedKind : null);
@@ -67,8 +74,12 @@ export default function NewListing() {
   const locationSequence = useRef(0);
   const alive = useRef(true);
   useEffect(() => {alive.current=true;return () => {alive.current=false;locationSequence.current++;};}, []);
+  // Require a new preview whenever details or the verified position change.
+  useEffect(() => {setPreview(false);}, [title, description, image, mode, category, condition, brand, model, dimensions, delivery, price, negotiable, position, productPresent]);
 
   useEffect(() => {
+    setLoading(true);
+    setSetupError('');
     void (async () => {
       try {
         const { data: auth } = await supabase.auth.getUser();
@@ -83,7 +94,8 @@ export default function NewListing() {
         if(!alive.current)return;
         if(p.error)throw p.error;
         if(caps.error)throw caps.error;
-        setProfile(p.data || null);
+        if(!p.data)throw new Error('ملف الحساب غير مكتمل. افتح مركز الحساب لإكمال بياناتك ثم أعد المحاولة.');
+        setProfile(p.data);
         setCapabilities(caps.data || {});
 
         if (requestedKind === 'service') {
@@ -96,12 +108,12 @@ export default function NewListing() {
           return;
         }
       } catch(cause) {
-        if(alive.current)setFormError((cause as Error)?.message || 'تعذر تجهيز بيانات الحساب. أعد فتح الصفحة.');
+        if(alive.current)setSetupError((cause as Error)?.message || 'تعذر تجهيز بيانات الحساب. تحقق من الاتصال ثم أعد المحاولة.');
       } finally {
         if(alive.current)setLoading(false);
       }
     })();
-  }, [requestedKind]);
+  }, [requestedKind, setupAttempt]);
 
   const isMerchant = profile?.account_type === 'merchant' && profile?.is_verified && profile?.is_verified_merchant;
   const ownerLabel = useMemo(() => {
@@ -112,14 +124,14 @@ export default function NewListing() {
   function chooseKind(next: Kind) {
     if (next === 'service') {
       if (!capabilities.can_publish_services) {
-        Alert.alert('الخدمات للحسابات المهنية', 'حوّل نوع حسابك إلى عمل حر أو مقدم خدمة أو تجاري من مركز الحساب، ثم انتظر اعتماد الإدارة.');
+        setFormError('إضافة الخدمات تتطلب حسابًا مهنيًا معتمدًا. يمكنك تعديل نوع حسابك من الملف الشخصي.');
         return;
       }
       router.replace('/new-service');
       return;
     }
     if (!capabilities.can_publish_products) {
-      Alert.alert('يتطلب حسابًا تجاريًا معتمدًا', 'راجع توثيق حسابك وصلاحية نشر المنتجات من مركز الحساب.');
+      setFormError('نشر المنتجات يتطلب حسابًا تجاريًا معتمدًا. راجع حالة توثيقك وصلاحيات النشر في مركز الحساب.');
       return;
     }
     setKind('product');
@@ -170,6 +182,16 @@ export default function NewListing() {
   }
 
   const detailDescription = [description.trim(), '\nتفاصيل المنتج', `التصنيف: ${category}`, `الحالة: ${condition}`, brand.trim() && `العلامة التجارية: ${brand.trim()}`, model.trim() && `الموديل: ${model.trim()}`, dimensions.trim() && `المقاسات: ${dimensions.trim()}`, `الاستلام: ${delivery}`].filter(Boolean).join('\n');
+  const parsedPrice = parseProductPrice(price);
+  const validSalePrice = mode !== 'بيع' || negotiable || (parsedPrice !== null && Number.isFinite(parsedPrice));
+  const previewPriceLabel = !isMerchant && mode === 'تبرع' ? 'مجانًا · تبرع' : !isMerchant && mode === 'إعارة' ? 'إعارة · دون سعر' : negotiable ? 'السعر بالتفاوض' : parsedPrice !== null && Number.isFinite(parsedPrice) ? `${parsedPrice.toLocaleString('ar-SA')} ر.س` : 'لم يحدد السعر بعد';
+  const checklist = [
+    { label: 'الصورة', done: !!image },
+    { label: 'المعلومات', done: title.trim().length >= 4 && description.trim().length >= 20 && validSalePrice },
+    { label: 'الموقع', done: !!position && !productPositionError(position) },
+    { label: 'التأكيد', done: productPresent && !!position },
+  ];
+  const completed = checklist.filter(item => item.done).length;
 
   async function chooseImage(fromCamera = false) {
     if(busy)return;
@@ -182,18 +204,17 @@ export default function NewListing() {
   }
 
   async function saveProduct() {
-    if (!profile?.id || saveLock.current || locating) return;
+    if (!profile?.id || saveLock.current || locating || busy) return;
     const validation=validateProduct();if(validation){setFormError(validation);return;}
-
-    const detected = findProfanity(`${title} ${detailDescription}`);
-    if (detected) {
-      await banAccountOnViolation(profile.id, 'product', `${title} ${description}`, detected);
-      Alert.alert('تم حظر الحساب', 'تم اكتشاف محتوى مخالف. تم إغلاق حسابك.');
-      router.replace('/banned');
-      return;
-    }
+    if (!preview) {setFormError('اعرض المعاينة وراجع تفاصيل الإعلان قبل إرساله للنشر.');return;}
     saveLock.current=true;setBusy(true);setFormError('');setBusyMessage('جارٍ التحقق من الحساب وموقع المنتج…');
     try {
+      const detected = findProfanity(`${title} ${detailDescription}`);
+      if (detected) {
+        await banAccountOnViolation(profile.id, 'product', `${title} ${description}`, detected);
+        router.replace('/banned');
+        return;
+      }
       const {data:auth,error:authError}=await supabase.auth.getUser();
       if(authError || auth.user?.id!==profile.id)throw new Error('انتهت جلسة الحساب. سجّل الدخول مجددًا.');
       const [permissions,freshProfile]=await Promise.all([
@@ -223,9 +244,7 @@ export default function NewListing() {
         status: 'available',
       }).select('id').single();
       if (inserted.error) throw inserted.error;
-
-      Alert.alert('تم النشر', isMerchant ? 'تم ربط المنتج بمنشأتك وحسابك تلقائيًا.' : 'تم ربط الإعلان بملفك الشخصي.');
-      router.replace({ pathname: '/profile', params: { tab: 'content' } });
+       setPublishedId(inserted.data.id);
     } catch (error: any) {
       setFormError(error?.message || 'تعذر نشر المنتج. حاول مرة أخرى.');
       setProductPresent(false);setPosition(null);setPreview(false);
