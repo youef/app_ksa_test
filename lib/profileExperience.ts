@@ -6,7 +6,7 @@ export type PublicProfileIdentity = {
  is_verified_merchant?:boolean|null; verification_status?:string|null; freelance_trade?:string|null;
 };
 export type ProfileCapabilityFlags = {
- can_publish_products?:boolean; can_publish_services?:boolean;
+ role?:string|null; can_publish_products?:boolean; can_publish_services?:boolean;
  can_manage_business?:boolean; can_promote?:boolean;
 };
 const DEFAULT_ORDER=['stats','identity','featured','bio','services','questions','products','requests','reviews','achievements'];
