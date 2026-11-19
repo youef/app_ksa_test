@@ -1,0 +1,222 @@
+{
+  "license": "CC0-1.0",
+  "assets": [
+    {
+      "id": "house",
+      "svg": "house.svg",
+      "png": "house.png",
+      "icon": "house.ico",
+      "model": "house.gltf"
+    },
+    {
+      "id": "market",
+      "svg": "market.svg",
+      "png": "market.png",
+      "icon": "market.ico",
+      "model": "market.gltf"
+    },
+    {
+      "id": "barracks",
+      "svg": "barracks.svg",
+      "png": "barracks.png",
+      "icon": "barracks.ico",
+      "model": "barracks.gltf"
+    },
+    {
+      "id": "storehouse",
+      "svg": "storehouse.svg",
+      "png": "storehouse.png",
+      "icon": "storehouse.ico",
+      "model": "storehouse.gltf"
+    },
+    {
+      "id": "workshop",
+      "svg": "workshop.svg",
+      "png": "workshop.png",
+      "icon": "workshop.ico",
+      "model": "workshop.gltf"
+    },
+    {
+      "id": "castle",
+      "svg": "castle.svg",
+      "png": "castle.png",
+      "icon": "castle.ico",
+      "model": "castle.gltf"
+    },
+    {
+      "id": "tower",
+      "svg": "tower.svg",
+      "png": "tower.png",
+      "icon": "tower.ico",
+      "model": "tower.gltf"
+    },
+    {
+      "id": "wall",
+      "svg": "wall.svg",
+      "png": "wall.png",
+      "icon": "wall.ico",
+      "model": "wall.gltf"
+    },
+    {
+      "id": "farm",
+      "svg": "farm.svg",
+      "png": "farm.png",
+      "icon": "farm.ico",
+      "model": "farm.gltf"
+    },
+    {
+      "id": "forest",
+      "svg": "forest.svg",
+      "png": "forest.png",
+      "icon": "forest.ico",
+      "model": "forest.gltf"
+    },
+    {
+      "id": "mine",
+      "svg": "mine.svg",
+      "png": "mine.png",
+      "icon": "mine.ico",
+      "model": "mine.gltf"
+    },
+    {
+      "id": "harbor",
+      "svg": "harbor.svg",
+      "png": "harbor.png",
+      "icon": "harbor.ico",
+      "model": "harbor.gltf"
+    },
+    {
+      "id": "commander",
+      "svg": "commander.svg",
+      "png": "commander.png",
+      "icon": "commander.ico",
+      "model": "commander.gltf"
+    },
+    {
+      "id": "guard",
+      "svg": "guard.svg",
+      "png": "guard.png",
+      "icon": "guard.ico",
+      "model": "guard.gltf"
+    },
+    {
+      "id": "archer",
+      "svg": "archer.svg",
+      "png": "archer.png",
+      "icon": "archer.ico",
+      "model": "archer.gltf"
+    },
+    {
+      "id": "worker",
+      "svg": "worker.svg",
+      "png": "worker.png",
+      "icon": "worker.ico",
+      "model": "worker.gltf"
+    },
+    {
+      "id": "merchant",
+      "svg": "merchant.svg",
+      "png": "merchant.png",
+      "icon": "merchant.ico",
+      "model": "merchant.gltf"
+    },
+    {
+      "id": "scout",
+      "svg": "scout.svg",
+      "png": "scout.png",
+      "icon": "scout.ico",
+      "model": "scout.gltf"
+    },
+    {
+      "id": "grass",
+      "svg": "grass.svg",
+      "png": "grass.png",
+      "icon": "grass.ico",
+      "model": "grass.gltf"
+    },
+    {
+      "id": "sand",
+      "svg": "sand.svg",
+      "png": "sand.png",
+      "icon": "sand.ico",
+      "model": "sand.gltf"
+    },
+    {
+      "id": "water",
+      "svg": "water.svg",
+      "png": "water.png",
+      "icon": "water.ico",
+      "model": "water.gltf"
+    },
+    {
+      "id": "road",
+      "svg": "road.svg",
+      "png": "road.png",
+      "icon": "road.ico",
+      "model": "road.gltf"
+    },
+    {
+      "id": "gold",
+      "svg": "gold.svg",
+      "png": "gold.png",
+      "icon": "gold.ico",
+      "model": "gold.gltf"
+    },
+    {
+      "id": "food",
+      "svg": "food.svg",
+      "png": "food.png",
+      "icon": "food.ico",
+      "model": "food.gltf"
+    },
+    {
+      "id": "wood",
+      "svg": "wood.svg",
+      "png": "wood.png",
+      "icon": "wood.ico",
+      "model": "wood.gltf"
+    },
+    {
+      "id": "shield",
+      "svg": "shield.svg",
+      "png": "shield.png",
+      "icon": "shield.ico",
+      "model": "shield.gltf"
+    },
+    {
+      "id": "build",
+      "svg": "build.svg",
+      "png": "build.png",
+      "icon": "build.ico",
+      "model": "build.gltf"
+    },
+    {
+      "id": "attack",
+      "svg": "attack.svg",
+      "png": "attack.png",
+      "icon": "attack.ico",
+      "model": "attack.gltf"
+    },
+    {
+      "id": "upgrade",
+      "svg": "upgrade.svg",
+      "png": "upgrade.png",
+      "icon": "upgrade.ico",
+      "model": "upgrade.gltf"
+    },
+    {
+      "id": "save",
+      "svg": "save.svg",
+      "png": "save.png",
+      "icon": "save.ico",
+      "model": "save.gltf"
+    },
+    {
+      "id": "world-map",
+      "svg": "world-map.svg",
+      "png": "world-map.png",
+      "icon": "world-map.ico",
+      "model": "world-map.gltf"
+    }
+  ]
+}
