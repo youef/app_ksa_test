@@ -1,8 +1,8 @@
 import { rtlScrollStyle, rtlContentStyle } from '@/lib/rtl';
 import React,{useCallback,useEffect,useRef,useState} from 'react';
-import {ActivityIndicator,Alert,AppState,Linking,RefreshControl,ScrollView,StyleSheet,Text,View}from'react-native';
+import {ActivityIndicator,Alert,AppState,Linking,RefreshControl,ScrollView,StyleSheet,Text,View,useWindowDimensions}from'react-native';
 import {router,useFocusEffect,useLocalSearchParams}from'expo-router';
-import {BadgeCheck,BarChart3,Check,ChevronLeft,Clock,CreditCard,Crown,Eye,Megaphone,Package,Pause,Play,RefreshCw,ShieldCheck,ShoppingBag,Store,Tag,Wallet}from'lucide-react-native';
+import {BadgeCheck,BarChart3,Check,ChevronLeft,Clock,CreditCard,Crown,Eye,Megaphone,Package,Pause,Play,RefreshCw,ShieldCheck,ShoppingBag,Store,Tag,Wallet,Truck,CheckCircle2,ArrowUpLeft,FileClock}from'lucide-react-native';
 import {OasisPressable as Pressable}from'@/components/oasis/OasisPrimitives';
 import {AppHeader}from'@/components/shared/AppHeader';
 import {MarketField,MarketChoice}from'@/components/market/MarketComposer';
@@ -13,25 +13,41 @@ import {marketplaceMoney as money,marketplaceStatus as statuses,safeMarketplaceC
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {ConfirmActionModal} from '@/components/shared/ConfirmActionModal';
 import {readCampaignDraft} from '@/lib/campaignDraft';
+import {marketDashboardCount,marketDashboardHasAttention,marketDashboardAttentionLine} from '@/lib/marketDashboardPresentation';
 import {Save,Trash2,MapPin,ArrowDownToLine,ArrowUpFromLine} from 'lucide-react-native';
 type Tab='overview'|'plans'|'ads'|'orders'|'services';
 const tabs=[['overview','نظرة عامة',BarChart3],['plans','الباقات',Crown],['ads','الترويج',Megaphone],['services','طلبات الخدمات',Package],['orders','المدفوعات',CreditCard]]as const;
 
 export default function MarketplaceDashboard(){
  const {colors:c}=useTheme(),bottom=useBottomNavInset(),params=useLocalSearchParams<{service_id?:string;payment?:string;tab?:string}>();
+ const {width}=useWindowDimensions();
+ const isWide=width>=860;
  const [data,setData]=useState<any>(null),[tab,setTab]=useState<Tab>('overview'),[loading,setLoading]=useState(true),[refreshing,setRefreshing]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(''),[ready,setReady]=useState(false);
  const [title,setTitle]=useState(''),[description,setDescription]=useState(''),[service,setService]=useState(params.service_id||''),[preview,setPreview]=useState(false);
  const [requestedService,setRequestedService]=useState<any>(null),[requestedServiceError,setRequestedServiceError]=useState(''),[buyerNote,setBuyerNote]=useState('');
  const [userId,setUserId]=useState(''),[draftPackage,setDraftPackage]=useState(''),[draftSavedAt,setDraftSavedAt]=useState<number|null>(null),[clearDraftConfirm,setClearDraftConfirm]=useState(false),[completeConfirm,setCompleteConfirm]=useState<any>(null);
+ const [productActivity,setProductActivity]=useState<{incoming:number|null;ready:number|null}>({incoming:null,ready:null});
  const [serviceView,setServiceView]=useState<'all'|'incoming'|'outgoing'>('all'),[serviceStatus,setServiceStatus]=useState('all'),[serviceRows,setServiceRows]=useState<any[]>([]),[serviceMore,setServiceMore]=useState(false),[serviceLoading,setServiceLoading]=useState(false),[serviceError,setServiceError]=useState('');
  const draftLoaded=useRef(''),draftDirty=useRef(false),servicePage=useRef(0),serviceRequest=useRef(0),serviceLock=useRef(false),viewer=useRef('');
  const lock=useRef(false),sequence=useRef(0),mounted=useRef(false),requestKeys=useRef(new Map<string,string>());
  const load=useCallback(async()=>{
   const seq=++sequence.current;
   try{const auth=await supabase.auth.getUser();if(!auth.data.user){router.replace('/auth');return;}
-   if(viewer.current!==auth.data.user.id){viewer.current=auth.data.user.id;setUserId(auth.data.user.id);setData(null);setTitle('');setDescription('');setService(params.service_id||'');setDraftPackage('');setDraftSavedAt(null);draftLoaded.current='';draftDirty.current=false;}
+   if(viewer.current!==auth.data.user.id){viewer.current=auth.data.user.id;setUserId(auth.data.user.id);setData(null);setProductActivity({incoming:null,ready:null});setTitle('');setDescription('');setService(params.service_id||'');setDraftPackage('');setDraftSavedAt(null);draftLoaded.current='';draftDirty.current=false;}
+   // Read-only product-order counts link COD orders to the workspace.
+   // They must not delay the core workspace, and missing counts never become zero.
+   const productCountsPromise=Promise.all([
+     supabase.from('marketplace_product_requests').select('id',{count:'exact',head:true}).eq('seller_id',auth.data.user.id).eq('status','pending'),
+     supabase.from('marketplace_product_requests').select('id',{count:'exact',head:true}).eq('buyer_id',auth.data.user.id).eq('status','ready'),
+   ]);
    const response=await supabase.rpc('hayna_marketplace_workspace');if(response.error)throw response.error;
    if(!mounted.current||seq!==sequence.current)return;setData(response.data);setError('');
+   void productCountsPromise.then(([incoming,ready])=>{
+     if(mounted.current&&seq===sequence.current)setProductActivity({
+       incoming:incoming.error||incoming.count==null?null:incoming.count,
+       ready:ready.error||ready.count==null?null:ready.count,
+     });
+   }).catch(()=>{if(mounted.current&&seq===sequence.current)setProductActivity({incoming:null,ready:null});});
    const status=await supabase.functions.invoke('create-marketplace-checkout',{body:{kind:'status'}});
    if(mounted.current&&seq===sequence.current)setReady(!status.error&&status.data?.ready===true);
   }catch{if(mounted.current&&seq===sequence.current){setReady(false);setError('تعذر تحميل لوحة السوق. أعد المحاولة؛ لن نعرض بيانات ناقصة كأنها مكتملة.');}}
@@ -58,8 +74,8 @@ export default function MarketplaceDashboard(){
  const heading=(text:string)=><Text style={[s.heading,{color:c.ink}]}>{text}</Text>;
  const hint=(text:string)=><Text style={[s.hint,{color:c.muted}]}>{text}</Text>;
  const badge=(status:string)=><View style={[s.badge,{backgroundColor:c.soft}]}><Text style={{color:c.primary,fontSize:10,fontWeight:'600'}}>{statuses[status]||status}</Text></View>;
- if(loading)return <View style={s.center}><ActivityIndicator color={c.primary}/><Text style={[s.hint,{color:c.muted}]}>نحمّل نشاطك في السوق…</Text></View>;
- return <View style={{flex:1,backgroundColor:'transparent'}}><AppHeader title="لوحة السوق" subtitle="نشاطك ومزاياك في مكان واحد" fallbackRoute="/profile?tab=content"/><ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{setRefreshing(true);void load();}} tintColor={c.primary}/>} contentContainerStyle={[s.content,{paddingBottom:bottom+24}]}>
+ if(loading)return <View style={[s.center,{backgroundColor:c.background}]}><ActivityIndicator color={c.primary}/><Text style={[s.hint,{color:c.muted}]}>نحمّل نشاطك في السوق…</Text></View>;
+ return <View style={{flex:1,backgroundColor:c.background}}><AppHeader title="لوحة السوق" subtitle="منتجاتك وطلباتك في مكان واحد" fallbackRoute="/profile?tab=content"/><ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{setRefreshing(true);void load();}} tintColor={c.primary}/>} contentContainerStyle={[s.content,{paddingBottom:bottom+24}]}>
   <View style={s.hero}><View style={s.row}><View style={s.heroIcon}><Store size={25} color="#FFFFFF"/></View><View style={{flex:1,gap:5}}><Text style={s.heroTitle}>مساحة نمو نشاطك</Text><Text style={s.heroHint}>{data?.professional?'حساب مهني معتمد':'طلباتك ومدفوعاتك الخاصة'}{data?.location?.city?` · ${data.location.city}`:''}</Text></View><BadgeCheck size={23} color="#B9E6D6"/></View><Text style={s.heroHint}>إدارة العروض والترويج وطلبات الخدمات، ببيانات فعلية وتأكيد دفع آمن.</Text></View>
   {error?<View accessibilityRole="alert" style={[s.card,{backgroundColor:c.dangerSoft,borderColor:c.line}]}><Text style={{color:c.danger,textAlign:'right',lineHeight:24}}>{error}</Text>{button('إعادة المحاولة',()=>void load(),RefreshCw)}</View>:null}
   {notice?card(<Text accessibilityLiveRegion="polite" style={{color:c.primary,textAlign:'right',lineHeight:23}}>{notice}</Text>):null}
