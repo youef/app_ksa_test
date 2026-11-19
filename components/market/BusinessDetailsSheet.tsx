@@ -23,6 +23,7 @@ type BusinessPreview = {
   reviews?: number;
   phone?: string;
   whatsapp?: string;
+  features?: unknown;
   Icon?: React.ComponentType<{ size?: number; color?: string }>;
 };
 type BusinessPublic = {
@@ -60,6 +61,7 @@ export function BusinessDetailsSheet({business, onClose}: {business: BusinessPre
   const [hoursExpanded, setHoursExpanded] = useState(false);
   const [now, setNow] = useState(new Date());
   const [retry, setRetry] = useState(0);
+  const [actionError, setActionError] = useState('');
   const [imageFailed, setImageFailed] = useState(false);
 
   useEffect(() => {
@@ -106,6 +108,7 @@ export function BusinessDetailsSheet({business, onClose}: {business: BusinessPre
   }, [business.id, retry]);
 
   const opening = useMemo(() => businessOpening(periods, now), [periods, now]);
+  const features = Array.isArray(business.features) ? business.features.filter((item):item is string=>typeof item==='string'&&item.trim().length>0).slice(0,8) : [];
   const location = [sanitize(details?.address), [sanitize(details?.district || business.district), sanitize(details?.city || business.city)].filter(Boolean).join(' · ')].filter(Boolean).join('، ');
   const locationSearch = [sanitize(details?.name || business.name), sanitize(details?.district || business.district), sanitize(details?.city || business.city)].filter(Boolean).join(' ');
   const description = sanitize(details?.description || business.description);
@@ -122,7 +125,7 @@ export function BusinessDetailsSheet({business, onClose}: {business: BusinessPre
   const statusColor = hoursError ? c.danger : opening.hasSchedule ? (opening.open ? c.primary : c.muted) : c.muted;
 
   async function open(url: string) {
-    try { await Linking.openURL(url); } catch { /* The original screen remains available for another contact option. */ }
+    try { setActionError(''); await Linking.openURL(url); } catch { setActionError('تعذر فتح جهة التواصل. تحقق من توفر التطبيق أو جرّب وسيلة أخرى.'); }
   }
   function fullPage() {
     onClose();
@@ -214,6 +217,7 @@ export function BusinessDetailsSheet({business, onClose}: {business: BusinessPre
             {website&&contact('الموقع الإلكتروني',Globe2,()=>void open(website))}
             {contact('مشاركة',Share2,()=>void Share.share({message:'تعرّف على '+(details?.name||business.name)+' في حيّنا: https://appksatest.vercel.app/business?id='+encodeURIComponent(business.id)}).catch(()=>{}))}
           </View>
+          {!!actionError&&<Text accessibilityRole="alert" style={[styles.subText,{color:c.danger}]}>{actionError}</Text>}
           {!phone&&!whatsapp&&!website&&<Text style={[styles.subText,{color:c.muted,textAlign:'right'}]}>لم تُنشر بيانات اتصال تجارية مباشرة. يمكنك الاطلاع على صفحة المنشأة.</Text>}
 
           <View style={[styles.section,{borderColor:c.line}]}>
@@ -225,6 +229,13 @@ export function BusinessDetailsSheet({business, onClose}: {business: BusinessPre
             </View>}
           </View>
 
+          {!!features.length&&<View style={[styles.section,{borderColor:c.line}]}>
+            <View style={styles.sectionHeader}><BadgeCheck size={18} color={c.primary}/><Text style={[styles.sectionTitle,{color:c.ink}]}>المزايا المعلنة</Text></View>
+            <View style={styles.featuresList}>{features.map((feature,index)=><View key={index} style={[styles.featurePill,{backgroundColor:c.soft}]}>
+              <ShieldCheck size={14} color={c.primary}/>
+              <Text style={[styles.featureText,{color:c.ink}]}>{feature}</Text>
+            </View>)}</View>
+          </View>}
           <View style={[styles.section,{borderColor:c.line}]}>
             <View style={styles.sectionHeader}><MapPin size={18} color={c.primary}/><Text style={[styles.sectionTitle,{color:c.ink}]}>الموقع والعنوان</Text></View>
             <Text style={[styles.description,{color:c.ink}]}>{location||'لم يُنشر عنوان المنشأة بعد.'}</Text>
@@ -308,6 +319,9 @@ const styles=StyleSheet.create({
   sectionTitle:{fontSize:14,fontWeight:'800',textAlign:'right'},
   description:{fontSize:12.5,lineHeight:23,textAlign:'right'},
   hourRow:{paddingVertical:9,borderTopWidth:1,flexDirection:'row-reverse',alignItems:'center',justifyContent:'space-between',gap:12},
+  featuresList:{flexDirection:'row-reverse',flexWrap:'wrap',gap:7},
+  featurePill:{borderRadius:11,paddingHorizontal:9,paddingVertical:8,minHeight:35,flexDirection:'row-reverse',alignItems:'center',gap:6},
+  featureText:{fontSize:11.5,fontWeight:'600',textAlign:'right'},
   hourDay:{fontSize:12,fontWeight:'700'},
   hourTime:{fontSize:11.5,textAlign:'left',flexShrink:1},
   actionGrid:{flexDirection:'row-reverse',flexWrap:'wrap',gap:8},
