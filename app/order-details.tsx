@@ -239,16 +239,17 @@ export default function OrderDetails(){
      {kind==='product'&&isBuyer&&order.status==='pending'?<Pressable accessibilityRole="button" disabled={busy} onPress={()=>void productAction('cancel')} style={S.dangerLink}><Text style={[S.dangerText,{color:c.danger}]}>إلغاء الطلب</Text></Pressable>:null}
      {kind==='product'&&order.conversation_id?<Pressable accessibilityRole="button" disabled={busy} style={[S.secondaryAction,{borderColor:c.line,backgroundColor:c.surface}]} onPress={()=>router.push({pathname:'/conversation',params:{id:order.conversation_id}})}><Text style={{color:c.primary,fontWeight:'700'}}>محادثة التاجر والمشتري</Text></Pressable>:null}
      {kind==='product'?<View style={{gap:10,borderWidth:1,borderColor:c.line,borderRadius:16,padding:14,backgroundColor:c.soft}}>
-       {title('الدفع عند الاستلام فقط')}
-       {hint('لا يوجد دفع إلكتروني أو خصم مسبق. تُسلّم القيمة نقدًا عند استلام المنتج بعد الاتفاق على تكلفة التوصيل.')}
-       {order.unit_price!=null?hint('قيمة المنتجات: '+formatCartMoney(Math.round(Number(order.unit_price)*100)*Number(order.quantity))):hint('المنتج بدون سعر محدد؛ اتفق مع التاجر على التفاصيل قبل التسليم.')}
-       {order.cash_collected_at?hint('سجّل التاجر استلام المبلغ النقدي بتاريخ '+date(order.cash_collected_at)):hint('لم يُسجّل التاجر تحصيل المبلغ النقدي بعد.')}
+       <View style={S.summaryPair}>
+         <View style={{flex:1,gap:3}}><Text style={[S.hint,{color:c.muted}]}>الدفع عند الاستلام فقط</Text><Text style={[S.title,{color:c.primary}]}>{order.unit_price!=null?formatCartMoney(Math.round(Number(order.unit_price)*100)*Number(order.quantity)):'السعر بالاتفاق'}</Text></View>
+         <View style={{flex:1,gap:3}}><Text style={[S.hint,{color:c.muted}]}>حالة التحصيل</Text><Text style={[S.hint,{color:order.cash_collected_at?c.primary:c.ink,fontWeight:'700'}]}>{order.cash_collected_at?'سُجّل التحصيل':'لم يُحصّل بعد'}</Text></View>
+       </View>
+       {hint('لا دفع مسبق، وتُنسّق رسوم التوصيل مع التاجر.')}
        {isSeller&&order.unit_price>0&&!order.cash_collected_at&&['ready','completed'].includes(order.status)?button('أؤكد تحصيل المبلغ نقدًا فعليًا',()=>void recordCash()):null}
      </View>:null}
      {kind==='product'?<View style={{gap:9}}>
        {title('التوصيل والتواصل')}
-       {hint('طريقة التسليم: '+(order.fulfillment||'بالاتفاق مع التاجر'))}
-       {order.scheduled_delivery_at?hint('موعد التسليم: '+date(order.scheduled_delivery_at)):hint('لم يُحدّد موعد التسليم بعد.')}
+       <View style={S.infoRow}><Text style={[S.hint,{color:c.muted}]}>طريقة التسليم</Text><Text style={[S.hint,{color:c.ink,fontWeight:'700'}]}>{order.fulfillment||'بالاتفاق مع التاجر'}</Text></View>
+       <View style={S.infoRow}><Text style={[S.hint,{color:c.muted}]}>موعد التسليم</Text><Text style={[S.hint,{color:c.ink,fontWeight:'700'}]}>{order.scheduled_delivery_at?date(order.scheduled_delivery_at):'لم يُحدد بعد'}</Text></View>
        {order.delivery_note?hint('تفاصيل التسليم: '+order.delivery_note):null}
        {isSeller&&['accepted','ready'].includes(order.status)?<>
          {hint('أدخل موعدًا اتفقت عليه مع العميل. لا تضع عنوان منزل دقيقًا في ملاحظات التسليم.')}
@@ -261,7 +262,7 @@ export default function OrderDetails(){
      {kind==='service'&&order.delivery_note?hint('تفاصيل التسليم: '+order.delivery_note):null}
      {kind==='service'&&isSeller&&['accepted','in_progress'].includes(order.status)?<>{title('تعديل موعد وتفاصيل التسليم')}{input(deliveryWhen,setDeliveryWhen,'الموعد: 2026-11-05T18:00 (اختياري)')}{input(deliveryNote,setDeliveryNote,'تفاصيل التسليم',true)}{button('حفظ الموعد وإبلاغ المشتري',()=>void saveDelivery())}</>:null}
     </>)}
-    {history.length?box(<>{title('سجل حالة الطلب')}{history.map(x=><View key={x.id} style={S.line}>{hint((statusNames[x.old_status]||x.old_status)+' ← '+(statusNames[x.new_status]||x.new_status))}{hint(date(x.created_at))}</View>)}</>):null}
+    {history.length?box(<><Pressable accessibilityRole="button" accessibilityState={{expanded:showHistory}} onPress={()=>setShowHistory(v=>!v)} style={S.foldHead}><Text style={[S.title,{color:c.ink}]}>سجل حالة الطلب</Text><Text style={{color:c.primary,fontSize:12}}>{showHistory?'إخفاء':history.length+' تحديثات'}</Text></Pressable>{showHistory&&history.map(x=><View key={x.id} style={S.line}>{hint((statusNames[x.old_status]||x.old_status)+' ← '+(statusNames[x.new_status]||x.new_status))}{hint(date(x.created_at))}</View>)}</>):null}
     {completed?box(<>{title('التقييم بعد الاستلام')}
      {review?<>{hint('التقييم: '+review.rating+' من 5')}{hint(review.body||'بدون تعليق')}{review.photo_paths?.map((path:string)=><Image key={path} source={{uri:supabase.storage.from('order-review-images').getPublicUrl(path).data.publicUrl}} style={S.photo}/>)}
       {reply?<>{title('رد البائع')}{hint(reply.body)}{isSeller&&!editingReply?button('تعديل ردي',()=>{setSellerReply(reply.body);setEditingReply(true);}):null}</>:null}
@@ -269,7 +270,12 @@ export default function OrderDetails(){
       {isSeller||isBuyer?<>{input(reportReason,setReportReason,'سبب الإبلاغ عن هذا التقييم',true)}{button('الإبلاغ عن التقييم',()=>void reportReview(),reportReason.trim().length<5)}</>:null}
      </>:isBuyer?<>{hint('يمكن إضافة تقييم واحد فقط لهذا الطلب المكتمل.')}<View style={S.stepRow}>{[1,2,3,4,5].map(n=><Pressable key={n} accessibilityLabel={'تقييم '+n} onPress={()=>setStars(n)}><Text style={{fontSize:25,color:n<=stars?'#E4A11B':c.muted}}>★</Text></Pressable>)}</View>{input(comment,setComment,'اكتب تجربتك (اختياري)',true)}{button('إضافة صور للتقييم (3 كحد أقصى)',()=>void chooseImages())}{photos.length?hint('تم اختيار '+photos.length+' صورة'):null}{button('نشر التقييم',()=>void submitReview())}</>:hint('التقييم متاح للمشتري فقط بعد تأكيد الاستلام.')}
     </>):null}
-    {box(<>{title('تفضيلات إشعارات الطلبات')}{hint('يمكنك تحديد إشعارات الطلبات داخل التطبيق وإشعارات الهاتف بصورة مستقلة.')}{button(inApp?'إيقاف إشعارات الطلبات داخل التطبيق':'تفعيل إشعارات الطلبات داخل التطبيق',()=>void savePreferences(!inApp,push))}{button(push?'إيقاف إشعارات الهاتف للطلبات':'تفعيل إشعارات الهاتف للطلبات',()=>void savePreferences(inApp,!push))}</>)}
+    {box(<>
+      <Pressable accessibilityRole="button" accessibilityState={{expanded:showPreferences}} onPress={()=>setShowPreferences(v=>!v)} style={S.foldHead}>
+       <Text style={[S.title,{color:c.ink}]}>إشعارات الطلب</Text><Text style={{color:c.primary,fontSize:12}}>{showPreferences?'إخفاء':'الإعدادات'}</Text>
+      </Pressable>
+      {showPreferences&&<>{hint('حدد كيف تصلك تحديثات هذا الطلب.')}{button(inApp?'إيقاف إشعارات الطلب داخل التطبيق':'تفعيل إشعارات الطلب داخل التطبيق',()=>void savePreferences(!inApp,push))}{button(push?'إيقاف إشعارات الهاتف':'تفعيل إشعارات الهاتف',()=>void savePreferences(inApp,!push))}</>}
+     </>)}
     {box(<>{title('مركز مشكلات الطلبات')}{hint('تذاكر خاصة بين مقدم البلاغ والإدارة، مرتبطة بالطلب نفسه.')}
      {tickets.map(t=><Pressable key={t.id} onPress={()=>void loadTicket(t)} style={S.line}><Text style={{color:c.primary,fontWeight:'700',textAlign:'right'}}>تذكرة #{t.ticket_number} · {t.status}</Text>{hint(t.description)}</Pressable>)}
      {!ticket?<>{title('فتح بلاغ جديد')}<View style={S.stepRow}>{Object.entries(disputeKinds).map(([k,v])=><Pressable key={k} onPress={()=>setCategory(k)} style={[S.choice,{backgroundColor:category===k?c.primary:c.soft}]}><Text style={{fontSize:11,color:category===k?'white':c.ink}}>{v}</Text></Pressable>)}</View>
@@ -299,6 +305,7 @@ const styles=StyleSheet.create({
  dangerLink:{minHeight:44,borderWidth:1,borderColor:'#F2CDCD',backgroundColor:'#FFF9F9',borderRadius:14,alignItems:'center',justifyContent:'center'},
  dangerText:{fontSize:13,fontWeight:'700'},
  secondaryAction:{minHeight:46,borderWidth:1,borderRadius:14,justifyContent:'center',alignItems:'center'},
+ foldHead:{flexDirection:'row-reverse',alignItems:'center',justifyContent:'space-between',minHeight:44,gap:10},
  card:{borderWidth:1,borderRadius:18,padding:15,gap:10},
  title:{fontSize:17,fontWeight:'700',textAlign:'right'},
  hint:{fontSize:12,lineHeight:20,textAlign:'right'},
