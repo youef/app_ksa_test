@@ -25,7 +25,7 @@ import { findProfanity, banAccountOnViolation } from '@/lib/profanity';
 import { reverseGeocodeDeviceLocation } from '@/lib/deviceLocation';
 import { normalizeSaudiLocationName } from '@/lib/saudiLocations';
 import { readCurrentProductPosition } from '@/lib/productDeviceLocation';
-import { confirmProductPosition, parseProductPrice, productPositionError, type ProductPosition } from '@/lib/productLocationRules';
+import { confirmProductPosition, parseProductPrice, productPositionError, formatProductListingPrice, type ProductPosition } from '@/lib/productLocationRules';
 import {
   type LocalServiceImage,
   pickServiceImages,
@@ -185,7 +185,7 @@ export default function NewListing() {
   const detailDescription = [description.trim(), '\nتفاصيل المنتج', `التصنيف: ${category}`, `الحالة: ${condition}`, brand.trim() && `العلامة التجارية: ${brand.trim()}`, model.trim() && `الموديل: ${model.trim()}`, dimensions.trim() && `المقاسات: ${dimensions.trim()}`, `الاستلام: ${delivery}`].filter(Boolean).join('\n');
   const parsedPrice = parseProductPrice(price);
   const validSalePrice = mode !== 'بيع' || negotiable || (parsedPrice !== null && Number.isFinite(parsedPrice));
-  const previewPriceLabel = !isMerchant && mode === 'تبرع' ? 'مجانًا · تبرع' : !isMerchant && mode === 'إعارة' ? 'إعارة · دون سعر' : negotiable ? 'السعر بالتفاوض' : parsedPrice !== null && Number.isFinite(parsedPrice) ? `${parsedPrice.toLocaleString('ar-SA')} ر.س` : 'لم يحدد السعر بعد';
+  const previewPriceLabel = formatProductListingPrice(mode, negotiable, price, isMerchant);
   const checklist = [
     { label: 'الصورة', done: !!image },
     { label: 'المعلومات', done: title.trim().length >= 4 && description.trim().length >= 20 && validSalePrice },
