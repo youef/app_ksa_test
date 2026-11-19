@@ -46,6 +46,7 @@ import { ProfileCustomizationEntry } from '@/components/profile/ProfileCustomiza
 import { AccountStatusMark, getAccountIdentityMeta } from '@/components/profile/AccountIdentityBadge';
 import { C } from '@/lib/ui';
 import { getBlockStatus, setBlock } from '@/lib/chatControls';
+import { profileActivityOrder, profileOwnerLinks, profileStartingTab, profileTabLabel, publicProfileRoleCopy, type ProfileCapabilityFlags, type ActivityTab } from '@/lib/profileExperience';
 import { getNeighborAccess } from '@/lib/neighborAccess';
 import { ImagePreviewModal } from '@/components/shared/ImagePreviewModal';
 
@@ -117,16 +118,18 @@ export default function UserProfile() {
   const [loadError, setLoadError] = useState(false);
   const [featuredItems, setFeaturedItems] = useState<any[]>([]);
   const [profileCustomization, setProfileCustomization] = useState<any>(null);
+  const [myCapabilities, setMyCapabilities] = useState<ProfileCapabilityFlags | null>(null);
+  const [linkedBusiness, setLinkedBusiness] = useState<{id:string;name:string}|null>(null);
+  const [latestVerificationStatus,setLatestVerificationStatus]=useState<string|null>(null);
 
-  const visibleTabs = useMemo(() => TABS.filter(({id: key}) => {
-    if (key === 'answers') return currentUserId === id;
-    const section = key === 'market' ? 'products' : key;
-    return profileCustomization?.section_visibility?.[section] !== false;
-  }).sort((a,b) => {
-    const order: string[] = profileCustomization?.section_order || [];
-    const index = (key: Tab) => { const value = order.indexOf(key === 'market' ? 'products' : key === 'answers' ? 'questions' : key); return value < 0 ? 999 : value; };
-    return index(a.id) - index(b.id);
-  }), [currentUserId,id,profileCustomization]);
+  const visibleTabs = useMemo(() => {
+    const priority = profileActivityOrder(profile || {}, profileCustomization?.section_order);
+    return TABS.filter(({id:key}) => {
+      if(key==='answers')return currentUserId===id;
+      const section=key==='market'?'products':key;
+      return profileCustomization?.section_visibility?.[section] !== false;
+    }).sort((a,b)=>priority.indexOf(a.id)-priority.indexOf(b.id));
+  },[currentUserId,id,profile?.account_type,profile?.role,profileCustomization]);
   useEffect(() => { if (!loading && visibleTabs.length && !visibleTabs.some(item => item.id === tab)) setTab(visibleTabs[0].id); }, [loading,visibleTabs,tab]);
 
   function revealActiveTab(key:Tab=tab) {
@@ -149,11 +152,15 @@ export default function UserProfile() {
     try {
       let result: any;
       if (tabToLoad === 'market') {
-        result = await supabase.from('marketplace_items').select('id,title,description,price,item_type,district,image_url,status,created_at').eq('seller_id', profileId).order('created_at', { ascending: false }).limit(18);
+        let query=supabase.from('marketplace_items').select('id,title,description,price,item_type,district,image_url,status,created_at').eq('seller_id', profileId);
+        if(viewerId!==profileId)query=query.eq('status','available');
+        result = await query.order('created_at', { ascending: false }).limit(18);
         if (result.error) throw result.error;
         setItems(result.data || []);
       } else if (tabToLoad === 'services') {
-        result = await supabase.from('services').select('id,name,description,category,district,price_from,price_to,available_now,is_verified,cover_url,created_at').eq('provider_id', profileId).order('created_at', { ascending: false }).limit(18);
+        let query=supabase.from('services').select('id,name,description,category,district,price_from,price_to,available_now,is_verified,cover_url,created_at').eq('provider_id', profileId);
+        if(viewerId!==profileId)query=query.eq('moderation_status','approved');
+        result=await query.order('created_at',{ascending:false}).limit(18);
         if (result.error) throw result.error;
         setServices(result.data || []);
       } else if (tabToLoad === 'requests') {
@@ -230,19 +237,25 @@ export default function UserProfile() {
     if (!lookupKey) return;
     if (!silent) setLoading(true);
     setLoadError(false);
-    setResolvedProfileId('');
-    setFeaturedItems([]);
-    setProfileCustomization(null);
-    setLoadedTabs([]);
-    setTabError(false);
-    setBlocked(false); setBlockedByOther(false); setFollowing(false); setFollowedBy(false);
-    setCanMessage(false);setScopeDenied(false);setProfile(null);setPreviewImage(null);
+    // Keep the current screen stable during refresh; only a different route clears identity immediately.
+    if (!silent) {
+      setResolvedProfileId('');
+      setFeaturedItems([]);
+      setProfileCustomization(null);
+      setMyCapabilities(null);
+      setLinkedBusiness(null);
+      setLatestVerificationStatus(null);
+      setLoadedTabs([]);
+      setTabError(false);
+      setBlocked(false); setBlockedByOther(false); setFollowing(false); setFollowedBy(false);
+      setCanMessage(false);setScopeDenied(false);setProfile(null);setPreviewImage(null);
+    }
     try {
       const { data: sessionData } = await supabase.auth.getSession();
       const me = sessionData?.session?.user?.id || null;
       setCurrentUserId(me);
       const access=await getNeighborAccess(lookupKey);
-      if(!access.can_view){setScopeDenied(true);return;}
+      if(!access.can_view){setScopeDenied(true);setProfile(null);setMyCapabilities(null);setLinkedBusiness(null);setItems([]);setServices([]);setFeaturedItems([]);return;}
       setCanMessage(access.can_message);
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(lookupKey);
       const { data: p, error } = await supabase.from('profiles').select('id,username,display_name,avatar_url,role,is_verified,is_verified_merchant,verification_status,account_type,freelance_trade,city,district,bio,is_geoverified,badges,profile_privacy,hide_name,is_banned,allow_dms,created_at')
@@ -317,22 +330,45 @@ export default function UserProfile() {
 
       const contactResult = await loadProfileContact(p.id, true).catch(() => null);
       if (contactRevision === contactRequest.current && contactResult) setContact({ profileId: p.id, phone: contactResult.phone });
-      const [customizationResult, featuredResult] = await Promise.all([
+      const [customizationResult, featuredResult, capabilityResult, businessResult, verificationResult] = await Promise.all([
         supabase.from('profile_customizations').select('accent_color,banner_style,show_stats,show_badges,featured_title,profile_type,section_visibility,section_order').eq('user_id', p.id).maybeSingle(),
         supabase.from('profile_featured_items').select('item_type,item_id,position').eq('user_id', p.id).order('position', { ascending: true }).limit(10),
+        me === p.id ? supabase.rpc('hayna_my_account_capabilities') : Promise.resolve({data:null,error:null}),
+        p.account_type === 'merchant'
+          ? supabase.from('businesses').select('id,name').eq('owner_id',p.id).eq('moderation_status','approved').is('archived_at',null).limit(1).maybeSingle()
+          : Promise.resolve({data:null,error:null}),
+        me===p.id
+          ? supabase.from('verification_requests').select('status').eq('user_id',p.id).is('document_number',null).order('created_at',{ascending:false}).limit(1).maybeSingle()
+          : Promise.resolve({data:null,error:null}),
       ]);
       setProfileCustomization(customizationResult.data || null);
+      setLatestVerificationStatus(me===p.id&&!verificationResult.error?verificationResult.data?.status||null:null);
+      setMyCapabilities(me===p.id && !capabilityResult.error && (!capabilityResult.data?.user_id || capabilityResult.data.user_id===p.id) ? capabilityResult.data as ProfileCapabilityFlags : null);
+      setLinkedBusiness(!businessResult.error && businessResult.data ? businessResult.data as {id:string;name:string} : null);
       const featuredRows = featuredResult.data || [];
       const resolvedFeatured = await Promise.all(featuredRows.map(async (featured: any) => {
         let query: any;
         if (featured.item_type === 'question') query = await supabase.from('questions').select('id,title,body,district,created_at,category').eq('id', featured.item_id).maybeSingle();
-        else if (featured.item_type === 'service') query = await supabase.from('services').select('id,name,description,district,created_at,category,cover_url,price_from,price_to,available_now').eq('id', featured.item_id).maybeSingle();
-        else if (featured.item_type === 'request') query = await supabase.from('requests').select('id,title,description,district,created_at,status,budget,is_urgent').eq('id', featured.item_id).maybeSingle();
-        else if (featured.item_type === 'market') query = await supabase.from('marketplace_items').select('id,title,description,district,created_at,status,price,image_url,item_type').eq('id', featured.item_id).maybeSingle();
+        else if (featured.item_type === 'service') {
+          let row=supabase.from('services').select('id,name,description,district,created_at,category,cover_url,price_from,price_to,available_now').eq('id',featured.item_id);
+          if(me!==p.id)row=row.eq('moderation_status','approved');
+          query=await row.maybeSingle();
+        } else if (featured.item_type === 'request') query = await supabase.from('requests').select('id,title,description,district,created_at,status,budget,is_urgent').eq('id', featured.item_id).maybeSingle();
+        else if (featured.item_type === 'market') {
+          let row=supabase.from('marketplace_items').select('id,title,description,district,created_at,status,price,image_url,item_type').eq('id',featured.item_id);
+          if(me!==p.id)row=row.eq('status','available');
+          query=await row.maybeSingle();
+        }
         return query?.data ? { ...query.data, _featuredType: featured.item_type } : null;
       }));
       setFeaturedItems(resolvedFeatured.filter(Boolean));
 
+      let marketCountQuery=supabase.from('marketplace_items').select('id',{count:'exact',head:true}).eq('seller_id',p.id);
+      let serviceCountQuery=supabase.from('services').select('id',{count:'exact',head:true}).eq('provider_id',p.id);
+      if(me!==p.id){
+        marketCountQuery=marketCountQuery.eq('status','available');
+        serviceCountQuery=serviceCountQuery.eq('moderation_status','approved');
+      }
       const [
         marketCount,
         serviceCount,
@@ -343,8 +379,8 @@ export default function UserProfile() {
         answerCount,
         repRes,
       ] = await Promise.all([
-        supabase.from('marketplace_items').select('id', { count: 'exact', head: true }).eq('seller_id', p.id),
-        supabase.from('services').select('id', { count: 'exact', head: true }).eq('provider_id', p.id),
+        marketCountQuery,
+        serviceCountQuery,
         supabase.from('requests').select('id', { count: 'exact', head: true }).eq('requester_id', p.id),
         supabase.from('questions').select('id', { count: 'exact', head: true }).eq('author_id', p.id),
         supabase.from('follows').select('id', { count: 'exact', head: true }).eq('following_id', p.id),
@@ -365,32 +401,17 @@ export default function UserProfile() {
       });
       setItems([]); setServices([]); setRequests([]); setQuestions([]); setAnswers([]);
       setLoadedTabs([]);
-      const initialTab: Tab =
-        p.account_type === 'merchant'
-          ? (marketCount.count || 0) > 0
-            ? 'market'
-            : (serviceCount.count || 0) > 0
-              ? 'services'
-              : (questionCount.count || 0) > 0
-                ? 'questions'
-                : 'market'
-          : p.account_type === 'freelance' || p.account_type === 'provider'
-            ? (serviceCount.count || 0) > 0
-              ? 'services'
-              : (questionCount.count || 0) > 0
-                ? 'questions'
-                : (marketCount.count || 0) > 0
-                  ? 'market'
-                  : 'services'
-            : (questionCount.count || 0) > 0
-              ? 'questions'
-              : (serviceCount.count || 0) > 0
-                ? 'services'
-                : (requestCount.count || 0) > 0
-                  ? 'requests'
-                  : (marketCount.count || 0) > 0
-                    ? 'market'
-                    : 'questions';
+      const counts: Partial<Record<ActivityTab,number>> = {
+        questions:questionCount.count||0,requests:requestCount.count||0,
+        market:marketCount.count||0,services:serviceCount.count||0,
+        reviews:0,answers:me===p.id?(answerCount.count||0):0,
+      };
+      const orderedTabs = profileActivityOrder(p,customizationResult.data?.section_order);
+      const visibleAtLoad=orderedTabs.filter((key)=>{
+        if(key==='answers')return me===p.id;
+        return customizationResult.data?.section_visibility?.[key==='market'?'products':key]!==false;
+      });
+      const initialTab:Tab=profileStartingTab(p,counts,visibleAtLoad,customizationResult.data?.section_order)||'questions';
       if (me === p.id && (answerCount.count || 0) > 0 && !(questionCount.count || serviceCount.count || requestCount.count || marketCount.count)) {
         setTab('answers');
         await loadTabData('answers', p.id, me, true);
@@ -409,6 +430,20 @@ export default function UserProfile() {
   };
 
   useFocusEffect(useCallback(() => { void load(); }, [lookupKey]));
+  // Best effort live updates for admin-approved type and verification changes.
+  // Focus refresh / pull-to-refresh remain authoritative if the table is not in Realtime publication.
+  useEffect(() => {
+    if (!profile?.id) return;
+    const channel = supabase.channel('public-profile-identity-' + profile.id)
+      .on('postgres_changes', {event:'UPDATE',schema:'public',table:'profiles',filter:'id=eq.'+profile.id},
+        (payload) => {
+          const next = payload.new as Record<string,unknown>;
+          if (['role','account_type','is_verified','is_verified_merchant','verification_status','freelance_trade']
+              .some(key => Object.prototype.hasOwnProperty.call(next,key))) void load(true);
+        }).subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [profile?.id, lookupKey]);
+
 
   useEffect(() => {
     if (!id || !profile || loading) return;
@@ -538,6 +573,27 @@ export default function UserProfile() {
   const isAdmin = profile.role === 'admin';
   const totalContributions = stats.market + stats.services + stats.requests + stats.questions + (own ? stats.answers : 0);
   const identityMeta = getAccountIdentityMeta(profile.role, profile.account_type, Boolean(profile.is_verified));
+  const roleCopy = publicProfileRoleCopy(profile);
+  const ownerLinks = own ? profileOwnerLinks(myCapabilities || undefined) : [];
+  const roleActions = own ? [
+    {key:'profile',label:'إدارة الملف',Icon:Edit3},
+    ...ownerLinks.filter(key=>key!=='promotion').map(key=>({
+      key,label:key==='products'?'إضافة منتج':key==='services'?'إضافة خدمة':'إدارة منشأتي',
+      Icon:key==='services'?Wrench:key==='business'?Package:ShoppingBag,
+    })),
+    ...(ownerLinks.includes('promotion')?[{key:'promotion',label:'لوحة النشاط',Icon:Sparkles}]:[]),
+    {key:'orders',label:'طلباتي',Icon:Package},
+    ...(myCapabilities?.role==='admin'?[{key:'admin',label:'إدارة المنصة',Icon:ShieldCheck}]:[]),
+  ] : [];
+  function openRoleAction(key:string) {
+    if(key==='profile')router.push('/profile?tab=profile');
+    else if(key==='products')router.push('/new-listing');
+    else if(key==='services')router.push('/new-service');
+    else if(key==='business')router.push('/profile?tab=content');
+    else if(key==='promotion')router.push('/marketplace-dashboard');
+    else if(key==='orders')router.push('/product-orders');
+    else if(key==='admin'&&myCapabilities?.role==='admin')router.push('/admin');
+  }
   const accentColor = profileCustomization?.accent_color || identityMeta.color;
   const heroColors: [string, string, string] = (profileCustomization?.banner_style || 'emerald') === 'emerald'
     ? identityMeta.heroColors
@@ -630,7 +686,29 @@ export default function UserProfile() {
         contentContainerStyle={styles.page}
       >
         <View style={[styles.shell, { paddingTop: 10 }]}>
-          <ProfileHeader contactPhone={contact && contact.profileId === profile.id && (lookupKey === profile.id || lookupKey === profile.username) ? contact.phone : ''} profile={profile} customization={profileCustomization} displayName={displayName} coverUri={coverUrl} stats={{...stats, contributions:totalContributions}} own={own} anonymous={anonymous} locked={locked} following={following} followedBy={followedBy} busy={busy || blocked || blockedByOther} canMessage={canMessage} hideContactActions={locked || blocked || blockedByOther} hasStories={hasActiveStories} onStoriesPress={()=>void openProfileStories()} onAvatarPress={()=>{if(!anonymous&&!locked&&profile.avatar_url)setPreviewImage({uri:profile.avatar_url,title:'الصورة الشخصية'});}} onCoverPreview={()=>{if(!anonymous&&!locked)setPreviewImage({uri:coverUrl,title:'صورة الغلاف'});}} onEdit={() => router.push('/profile?section=edit')} onDesign={() => router.push('/profile?tab=settings&section=design')} onSettings={() => router.push('/profile?tab=settings')} onFollowers={() => setConnections('followers')} onFollowing={() => setConnections('following')} onFollow={() => void toggleFollow()} onMessage={() => void openMessage()} />
+          <ProfileHeader contactPhone={contact && contact.profileId === profile.id && (lookupKey === profile.id || lookupKey === profile.username) ? contact.phone : ''} profile={profile} customization={profileCustomization} verificationRequestStatus={own?latestVerificationStatus:undefined} displayName={displayName} coverUri={coverUrl} stats={{...stats, contributions:totalContributions}} own={own} anonymous={anonymous} locked={locked} following={following} followedBy={followedBy} busy={busy || blocked || blockedByOther} canMessage={canMessage} hideContactActions={locked || blocked || blockedByOther} hasStories={hasActiveStories} onStoriesPress={()=>void openProfileStories()} onAvatarPress={()=>{if(!anonymous&&!locked&&profile.avatar_url)setPreviewImage({uri:profile.avatar_url,title:'الصورة الشخصية'});}} onCoverPreview={()=>{if(!anonymous&&!locked)setPreviewImage({uri:coverUrl,title:'صورة الغلاف'});}} onEdit={() => router.push('/profile?section=edit')} onDesign={() => router.push('/profile?tab=settings&section=design')} onSettings={() => router.push('/profile?tab=settings')} onVerify={() => router.push('/profile?tab=verification')} onFollowers={() => setConnections('followers')} onFollowing={() => setConnections('following')} onFollow={() => void toggleFollow()} onMessage={() => void openMessage()} />
+          {!locked && (own || linkedBusiness) && <View style={[styles.roleHub,{backgroundColor:colors.surface,borderColor:colors.line}]}>
+            <View style={styles.roleHubHead}>
+              <View style={[styles.roleHubIcon,{backgroundColor:identityMeta.softColor}]}><identityMeta.Icon size={19} color={identityMeta.color}/></View>
+              <View style={styles.roleHubCopy}>
+                <Text accessibilityRole="header" style={[styles.roleHubTitle,{color:colors.ink}]}>{own?'مساحة حسابك':'المنشأة المرتبطة بالحساب'}</Text>
+                <Text numberOfLines={2} style={[styles.roleHubDesc,{color:colors.muted}]}>
+                  {own?(roleCopy.kind==='merchant'?'أدر متجرك وطلبات عملائك حسب صلاحياتك':roleCopy.kind==='freelance'||roleCopy.kind==='provider'?'أبرز خدماتك وأعمالك المهنية':roleCopy.kind==='admin'?'أدوات الحساب والإدارة':'تفاعل مع الجيران وأدر مشاركاتك'):'استعرض معلومات المنشأة وخدماتها المعتمدة'}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.roleActions}>
+              {roleActions.map(({key,label,Icon})=><Pressable key={key} oasisKind="plain" accessibilityRole="button" accessibilityLabel={label}
+                onPress={()=>openRoleAction(key)} style={[styles.roleAction,{borderColor:colors.line,backgroundColor:colors.background}]}>
+                <Icon size={16} color={colors.primary}/><Text style={[styles.roleActionText,{color:colors.ink}]}>{label}</Text>
+              </Pressable>)}
+              {linkedBusiness&&<Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel={'فتح المنشأة '+linkedBusiness.name}
+                onPress={()=>router.push({pathname:'/business',params:{id:linkedBusiness.id}})}
+                style={[styles.roleAction,{borderColor:colors.primary,backgroundColor:colors.soft}]}>
+                <Package size={16} color={colors.primary}/><Text numberOfLines={1} style={[styles.roleActionText,{color:colors.primary}]}>{linkedBusiness.name}</Text><ChevronLeft size={15} color={colors.primary}/>
+              </Pressable>}
+            </View>
+          </View>}
           {!locked && (featuredItems.length > 0 || own) && (
             <View style={styles.content}>
               {featuredItems.length > 0 && <View style={styles.contentHead}>
@@ -662,7 +740,7 @@ export default function UserProfile() {
           {/* Activity Category Tabs */}
           <OasisSurface oasisSurface="card" style={styles.tabsCard}>
             <ScrollView ref={tabsScrollRef} onLayout={event => {tabViewport.current=event.nativeEvent.layout.width;revealActiveTab();}} onContentSizeChange={() => revealActiveTab()} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
-              {visibleTabs.map(({ id: key, label, icon: Icon }) => {
+              {visibleTabs.map(({ id: key, icon: Icon }) => {
                 const count =
                   key === 'market'
                     ? stats.market
@@ -673,7 +751,7 @@ export default function UserProfile() {
                     : key === 'questions'
                     ? stats.questions
                     : key === 'reviews'
-                    ? reviews.length
+                    ? (loadedTabs.includes('reviews') ? reviews.length : '—')
                     : stats.answers;
                 const active = tab === key;
                 return (
@@ -684,7 +762,7 @@ export default function UserProfile() {
                     style={[styles.tab, { backgroundColor: active ? colors.soft : colors.surface, borderColor: active ? accentColor : 'transparent' }]}
                   >
                     <Icon size={15} color={active ? accentColor : colors.muted} />
-                    <Text style={[styles.tabText, active && {color: accentColor}]}>{label}</Text>
+                    <Text style={[styles.tabText, active && {color: accentColor}]}>{profileTabLabel(profile,key)}</Text>
                     <View style={[styles.tabCountBadge, { backgroundColor: active ? colors.surface : colors.soft }]}><Text style={[styles.tabCount, { color: active ? accentColor : colors.muted }]}>{count}</Text></View>
                   </Pressable>
                 );
@@ -723,8 +801,8 @@ export default function UserProfile() {
             <View style={styles.content}>
               <View style={styles.contentHead}>
                 <View>
-                  <Text style={styles.contentTitle}>{TABS.find(x => x.id === tab)?.label}</Text>
-                  <Text style={styles.contentSub}>{currentData.length} عنصر · من نشاط الجار</Text>
+                  <Text style={styles.contentTitle}>{profileTabLabel(profile,tab)}</Text>
+                  <Text style={styles.contentSub}>{currentData.length} عنصر معروض · {own?'من نشاط حسابك':'من نشاط الحساب'}</Text>
                 </View>
                 {tab === 'market' && (
                   <Pressable style={styles.marketLink} onPress={() => router.push('/market')}>
@@ -1210,6 +1288,15 @@ const styles = StyleSheet.create({
   featuredPromptCopy: { flex: 1, minWidth: 0, alignItems: 'flex-end', gap: 3 },
   featuredPromptTitle: { fontSize: 12.5, fontWeight: '700', textAlign: 'right' },
   featuredPromptSub: { fontSize: 11, textAlign: 'right' },
+  roleHub:{borderWidth:1,borderRadius:17,padding:12,gap:11,marginTop:12},
+  roleHubHead:{flexDirection:'row-reverse',alignItems:'center',gap:9},
+  roleHubIcon:{width:39,height:39,borderRadius:13,alignItems:'center',justifyContent:'center'},
+  roleHubCopy:{flex:1,minWidth:0,alignItems:'flex-end',gap:3},
+  roleHubTitle:{fontSize:14,fontWeight:'800',textAlign:'right'},
+  roleHubDesc:{fontSize:11.5,lineHeight:18,textAlign:'right'},
+  roleActions:{flexDirection:'row-reverse',flexWrap:'wrap',gap:7},
+  roleAction:{minHeight:44,borderWidth:1,borderRadius:12,flexDirection:'row-reverse',alignItems:'center',justifyContent:'center',gap:6,paddingHorizontal:11,maxWidth:'100%'},
+  roleActionText:{fontSize:12,fontWeight:'700',textAlign:'right',flexShrink:1},
   contentHead: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', gap: 9, marginBottom: 10 },
   contentTitle: { lineHeight: 24, color: OASIS.colors.ink, fontSize: 15, fontWeight: '700', textAlign: 'right' },
   featuredEmpty: { alignItems: 'center', gap: 10, paddingVertical: 18 },
