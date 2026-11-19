@@ -2,7 +2,7 @@ import { rtlScrollStyle, rtlContentStyle } from '@/lib/rtl';
 import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {ActivityIndicator,Alert,AppState,Linking,RefreshControl,ScrollView,StyleSheet,Text,View,useWindowDimensions}from'react-native';
 import {router,useFocusEffect,useLocalSearchParams}from'expo-router';
-import {BadgeCheck,BarChart3,Check,ChevronLeft,Clock,CreditCard,Crown,Eye,Megaphone,Package,Pause,Play,RefreshCw,ShieldCheck,ShoppingBag,Store,Tag,Wallet,Truck,CheckCircle2,ArrowUpLeft,FileClock}from'lucide-react-native';
+import {BadgeCheck,BarChart3,Check,ChevronLeft,Clock,CreditCard,Crown,Eye,Megaphone,Package,Pause,Play,RefreshCw,ShieldCheck,ShoppingBag,Store,Tag,Wallet,Truck,FileClock}from'lucide-react-native';
 import {OasisPressable as Pressable}from'@/components/oasis/OasisPrimitives';
 import {AppHeader}from'@/components/shared/AppHeader';
 import {MarketField,MarketChoice}from'@/components/market/MarketComposer';
@@ -13,7 +13,7 @@ import {marketplaceMoney as money,marketplaceStatus as statuses,safeMarketplaceC
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {ConfirmActionModal} from '@/components/shared/ConfirmActionModal';
 import {readCampaignDraft} from '@/lib/campaignDraft';
-import {marketDashboardCount,marketDashboardHasAttention,marketDashboardAttentionLine} from '@/lib/marketDashboardPresentation';
+import {marketDashboardCount,marketDashboardAttentionLine} from '@/lib/marketDashboardPresentation';
 import {Save,Trash2,MapPin,ArrowDownToLine,ArrowUpFromLine} from 'lucide-react-native';
 type Tab='overview'|'plans'|'ads'|'orders'|'services';
 const tabs=[['overview','نظرة عامة',BarChart3],['plans','الباقات',Crown],['ads','الترويج',Megaphone],['services','طلبات الخدمات',Package],['orders','المدفوعات',CreditCard]]as const;
@@ -171,4 +171,45 @@ export default function MarketplaceDashboard(){
  <ConfirmActionModal visible={clearDraftConfirm} title="حذف المسودة المحلية؟" description="ستُحذف مسودة الإعلان من هذا الجهاز. الحملات المنشورة والمدفوعات تبقى محفوظة." destructive confirmLabel="حذف المسودة" busy={!!busy} error={error} onCancel={()=>setClearDraftConfirm(false)} onConfirm={()=>void clearDraft()}/>
  {busy?<View accessibilityLiveRegion="polite" style={[s.busy,{backgroundColor:c.surface,borderColor:c.line}]}><ActivityIndicator size="small" color={c.primary}/><Text style={{color:c.primary,fontSize:12}}>جارٍ تنفيذ الإجراء…</Text></View>:null}</View>;
 }
-const s=StyleSheet.create({content:{padding:16,gap:15,width:'100%',maxWidth:780,alignSelf:'center'},center:{flex:1,alignItems:'center',justifyContent:'center',gap:14},hero:{backgroundColor:'#064E3B',padding:20,borderRadius:24,gap:13},heroIcon:{width:49,height:49,borderRadius:25,backgroundColor:'rgba(255,255,255,.12)',alignItems:'center',justifyContent:'center'},heroTitle:{color:'#FFFFFF',fontSize:21,fontWeight:'700',textAlign:'right'},heroHint:{color:'#D1EADF',fontSize:11,lineHeight:21,textAlign:'right'},row:{flexDirection:'row-reverse',alignItems:'center',gap:10},spread:{flexDirection:'row-reverse',alignItems:'center',justifyContent:'space-between',gap:12},card:{borderRadius:19,padding:16,borderWidth:1,gap:12,flexGrow:1},heading:{fontSize:15,fontWeight:'700',textAlign:'right',lineHeight:24},hint:{fontSize:11,lineHeight:22,textAlign:'right'},tabs:{flexDirection:'row-reverse',gap:7},tab:{minHeight:44,paddingHorizontal:13,borderWidth:1,borderRadius:22,flexDirection:'row-reverse',alignItems:'center',gap:6},button:{minHeight:44,paddingHorizontal:14,paddingVertical:10,borderWidth:1,borderRadius:22,flexDirection:'row-reverse',alignItems:'center',justifyContent:'center',gap:7},badge:{alignSelf:'flex-start',borderRadius:12,paddingHorizontal:10,paddingVertical:6},stats:{flexDirection:'row-reverse',flexWrap:'wrap',gap:10},preview:{padding:15,borderRadius:15,gap:8},busy:{position:'absolute',bottom:20,alignSelf:'center',paddingVertical:11,paddingHorizontal:18,borderRadius:24,borderWidth:1,flexDirection:'row-reverse',gap:9,alignItems:'center'}});
+const s=StyleSheet.create({
+  content:{paddingHorizontal:14,paddingTop:13,gap:12,width:'100%',maxWidth:980,alignSelf:'center'},
+  center:{flex:1,alignItems:'center',justifyContent:'center',gap:14},
+  hero:{backgroundColor:'#064E3B',paddingHorizontal:17,paddingVertical:17,borderRadius:20,gap:12},
+  heroTop:{flexDirection:'row-reverse',alignItems:'center',gap:11},
+  heroIcon:{width:46,height:46,borderRadius:16,backgroundColor:'rgba(255,255,255,0.13)',alignItems:'center',justifyContent:'center'},
+  heroCopy:{flex:1,minWidth:0,gap:4,alignItems:'flex-end'},
+  heroTitle:{color:'#FFFFFF',fontSize:20,fontWeight:'800',textAlign:'right'},
+  heroHint:{color:'#D1EADF',fontSize:12,lineHeight:19,textAlign:'right'},
+  heroCaption:{color:'#D1EADF',fontSize:12,lineHeight:19,textAlign:'right'},
+  row:{flexDirection:'row-reverse',alignItems:'center',gap:10,flexWrap:'wrap'},
+  spread:{flexDirection:'row-reverse',alignItems:'center',justifyContent:'space-between',gap:12},
+  card:{borderRadius:18,padding:15,borderWidth:1,gap:11,flexGrow:1},
+  heading:{fontSize:15,fontWeight:'700',textAlign:'right',lineHeight:24},
+  hint:{fontSize:12,lineHeight:21,textAlign:'right'},
+  tabs:{flexDirection:'row-reverse',gap:8,paddingVertical:3},
+  tab:{minHeight:45,paddingHorizontal:14,borderWidth:1,borderRadius:15,flexDirection:'row-reverse',alignItems:'center',gap:7},
+  button:{minHeight:44,paddingHorizontal:14,paddingVertical:10,borderWidth:1,borderRadius:14,flexDirection:'row-reverse',alignItems:'center',justifyContent:'center',gap:7},
+  badge:{alignSelf:'flex-start',borderRadius:12,paddingHorizontal:10,paddingVertical:6},
+  sectionTitleRow:{flexDirection:'row-reverse',alignItems:'center',justifyContent:'space-between',gap:10,paddingHorizontal:2},
+  sectionTitle:{fontSize:16,fontWeight:'800',textAlign:'right'},
+  sectionHint:{fontSize:11.5,textAlign:'left'},
+  stats:{flexDirection:'row-reverse',flexWrap:'wrap',justifyContent:'space-between',columnGap:9,rowGap:10},
+  statCard:{borderWidth:1,borderRadius:18,paddingHorizontal:13,paddingVertical:12,minHeight:124,justifyContent:'space-between',gap:8,alignItems:'flex-end'},
+  statTop:{width:'100%',flexDirection:'row-reverse',justifyContent:'space-between',alignItems:'center'},
+  statIcon:{width:34,height:34,borderRadius:12,alignItems:'center',justifyContent:'center'},
+  statNumber:{fontSize:26,fontWeight:'800',fontVariant:['tabular-nums'],textAlign:'right',lineHeight:32},
+  statLabel:{fontSize:12,lineHeight:18,fontWeight:'600',textAlign:'right'},
+  attentionCard:{minHeight:80,borderWidth:1,borderRadius:17,paddingHorizontal:12,paddingVertical:12,gap:10,flexDirection:'row-reverse',alignItems:'center'},
+  attentionIcon:{width:39,height:39,borderRadius:13,justifyContent:'center',alignItems:'center'},
+  attentionCopy:{flex:1,minWidth:0,alignItems:'flex-end',gap:3},
+  attentionTitle:{fontSize:13,fontWeight:'800',textAlign:'right'},
+  attentionBody:{fontSize:11.5,lineHeight:19,textAlign:'right'},
+  attentionButton:{width:44,minHeight:44,borderRadius:14,alignItems:'center',justifyContent:'center'},
+  quickGrid:{flexDirection:'row-reverse',flexWrap:'wrap',justifyContent:'space-between',columnGap:9,rowGap:10},
+  quickCard:{borderWidth:1,borderRadius:17,padding:12,minHeight:109,alignItems:'flex-end',gap:6},
+  quickIcon:{width:34,height:34,borderRadius:12,alignItems:'center',justifyContent:'center'},
+  quickLabel:{fontSize:13,fontWeight:'800',textAlign:'right'},
+  quickDesc:{fontSize:11,lineHeight:17,textAlign:'right'},
+  preview:{padding:14,borderRadius:15,gap:8},
+  busy:{position:'absolute',bottom:20,alignSelf:'center',paddingVertical:11,paddingHorizontal:18,borderRadius:24,borderWidth:1,flexDirection:'row-reverse',gap:9,alignItems:'center'},
+});
