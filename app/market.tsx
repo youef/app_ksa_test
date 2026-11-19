@@ -10,7 +10,7 @@ import { useBottomNavInset } from '@/lib/bottomNav';
 import ScreenState from '@/components/shared/ScreenState';
 import AppHeader from '@/components/shared/AppHeader';
 import {
-  ShoppingBag, TrendingUp, SlidersHorizontal, Utensils, Pill, Shirt, Scissors, Wrench, Croissant, UsersRound, HeartHandshake, Trophy, Palette, House, Package, Image as ImageIcon, CircleCheck, ChevronDown,
+  ShoppingBag, ShoppingCart, ClipboardList, TrendingUp, SlidersHorizontal, Utensils, Pill, Shirt, Scissors, Wrench, Croissant, UsersRound, HeartHandshake, Trophy, Palette, House, Package, Image as ImageIcon, CircleCheck, ChevronDown,
   MapPin,
   ShieldCheck,
   Plus,
@@ -990,6 +990,18 @@ export default function Market() {
               </Pressable>
             </View>
 
+            {/* Buyer tools: product checkout is cash-on-delivery, separate from paid merchant plans. */}
+            <View style={{flexDirection:'row-reverse',flexWrap:'wrap',gap:9,marginBottom:12}}>
+              <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="فتح سلة المشتريات" onPress={()=>router.push('/market-cart')}
+                style={{minHeight:48,borderRadius:16,flexDirection:'row-reverse',alignItems:'center',gap:9,paddingHorizontal:15,backgroundColor:OASIS.colors.soft,borderWidth:1,borderColor:OASIS.colors.line}}>
+                <ShoppingCart size={19} color={OASIS.colors.primary}/><Text style={{color:OASIS.colors.primary,fontSize:13,fontWeight:'800'}}>سلة المشتريات</Text>
+              </Pressable>
+              <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="تتبع طلبات المنتجات" onPress={()=>router.push('/product-orders')}
+                style={{minHeight:48,borderRadius:16,flexDirection:'row-reverse',alignItems:'center',gap:9,paddingHorizontal:15,backgroundColor:OASIS.colors.surface,borderWidth:1,borderColor:OASIS.colors.line}}>
+                <ClipboardList size={19} color={OASIS.colors.primary}/><Text style={{color:OASIS.colors.primary,fontSize:13,fontWeight:'800'}}>طلباتي والتوصيل</Text>
+              </Pressable>
+              <View style={{justifyContent:'center',flex:1,minWidth:100,alignItems:'flex-end'}}><Text style={{textAlign:'right',fontSize:11.5,color:OASIS.colors.muted}}>الدفع عند الاستلام فقط</Text></View>
+            </View>
             {/* Contextual Search Input & Action Button */}
             <View style={styles.searchRow}>
               <OasisSurface oasisSurface="field" style={styles.searchBox}>
