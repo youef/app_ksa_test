@@ -181,6 +181,8 @@ export default function Kingdom3D() {
         style={{ ...smallButton, fontSize: 18, width: 47, height: 47, padding: 0, background: panel === key ? '#087D63' : 'rgba(5,48,47,.83)', backdropFilter: 'blur(12px)' }}>{symbol}</button>)}
       <button type="button" aria-label="تحديث رصيد اللعبة" style={{ ...smallButton, width: 47, height: 47, padding: 0, fontSize: 19 }}
         onClick={() => void reload().catch((e: any) => setError(e?.message || 'تعذّر التحديث'))}>⟳</button>
+      <a href="/kingdom/kaykit/catalog.html" target="_blank" rel="noopener noreferrer" aria-label="مكتبة المجسمات المجانية وتنزيلها"
+        style={{ ...smallButton, display: 'grid', placeItems: 'center', width: 47, height: 47, padding: 0, fontSize: 19, textDecoration: 'none' }}>📦</a>
     </nav>}
 
     {!loading && me && <div style={{ position: 'absolute', top: 'calc(' + safe + ' + 112px)', left: 11, borderRadius: 12,
