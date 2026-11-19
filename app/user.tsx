@@ -717,7 +717,7 @@ export default function UserProfile() {
           {/* Activity Category Tabs */}
           <OasisSurface oasisSurface="card" style={styles.tabsCard}>
             <ScrollView ref={tabsScrollRef} onLayout={event => {tabViewport.current=event.nativeEvent.layout.width;revealActiveTab();}} onContentSizeChange={() => revealActiveTab()} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
-              {visibleTabs.map(({ id: key, label, icon: Icon }) => {
+              {visibleTabs.map(({ id: key, icon: Icon }) => {
                 const count =
                   key === 'market'
                     ? stats.market
@@ -728,7 +728,7 @@ export default function UserProfile() {
                     : key === 'questions'
                     ? stats.questions
                     : key === 'reviews'
-                    ? reviews.length
+                    ? (loadedTabs.includes('reviews') ? reviews.length : '—')
                     : stats.answers;
                 const active = tab === key;
                 return (
