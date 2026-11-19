@@ -4,7 +4,7 @@ import { HeaderAction, AppHeader } from '@/components/shared/AppHeader';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { ArrowUpRight, MapPin, Package, Share2, ShoppingBag, UserRound, Heart, MessageCircle, ShieldCheck, Flag, CalendarDays, Tag, Ruler, Truck, Info, ImageIcon } from 'lucide-react-native';
+import { ArrowUpRight, MapPin, Package, Share2, ShoppingBag, ShoppingCart, UserRound, Heart, MessageCircle, ShieldCheck, Flag, CalendarDays, Tag, Ruler, Truck, Info, ImageIcon } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { AccountIdentityBadge } from '@/components/profile/AccountIdentityBadge';
 import { ImagePreviewModal } from '@/components/shared/ImagePreviewModal';
@@ -88,6 +88,23 @@ export default function MarketplaceItemPage() {
     catch(cause){setActionError((cause as Error).message||'تعذر فتح المحادثة.');}finally{setActionBusy(false);}
   }
 
+  async function addToCart(){
+    if(actionBusy)return;
+    if(!me){router.push('/auth');return;}
+    if(item.status!=='available'||me===item.seller_id)return;
+    setActionBusy(true);setActionError('');
+    try{
+      const existing=await supabase.from('hayna_market_cart_items').select('item_id').eq('buyer_id',me).eq('item_id',item.id).maybeSingle();
+      if(existing.error)throw existing.error;
+      if(!existing.data){
+        const result=await supabase.rpc('hayna_market_cart_set',{p_item:item.id,p_quantity:1,p_fulfillment:null,p_note:''});
+        if(result.error)throw result.error;
+      }
+      router.push('/market-cart');
+    }catch(cause){setActionError((cause as Error).message||'تعذر إضافة المنتج إلى السلة.');}
+    finally{setActionBusy(false);}
+  }
+
   const share = async () => {
     if (!item) return;
     const url = `https://appksatest.vercel.app/marketplace-item?id=${encodeURIComponent(item.id)}`;
@@ -113,7 +130,7 @@ export default function MarketplaceItemPage() {
         {(item.city || item.district) && <View style={styles.location}><MapPin size={16} color={OASIS.colors.muted} /><Text style={styles.muted}>{[item.district && `حي ${item.district}`, item.city].filter(Boolean).join(' · ')}</Text></View>}
       </OasisSurface>
       <OasisSurface oasisSurface="card" style={styles.card}><View style={styles.location}><Package size={18} color={OASIS.colors.primary}/><Text style={styles.sellerTitle}>عن المنتج</Text></View><Text style={styles.description}>{details.body||'لم يضف صاحب الإعلان وصفًا تفصيليًا.'}</Text>{details.specs.map(spec=><View key={spec.label} style={styles.specRow}>{spec.label==='المقاسات'?<Ruler size={17} color={OASIS.colors.primary}/>:spec.label==='الاستلام'?<Truck size={17} color={OASIS.colors.primary}/>:<Tag size={17} color={OASIS.colors.primary}/>}<Text style={styles.muted}>{spec.label}</Text><Text style={[styles.description,{flex:1}]}>{spec.value}</Text></View>)}</OasisSurface>
-      <View style={styles.actions}>{me!==item.seller_id&&<Pressable accessibilityRole="button" accessibilityLabel={favorite?'إزالة المنتج من المفضلة':'حفظ المنتج في المفضلة'} disabled={actionBusy} onPress={()=>void toggleFavorite()} style={styles.secondaryAction}><Heart size={18} color={favorite?OASIS.colors.danger:OASIS.colors.primary} fill={favorite?OASIS.colors.danger:'none'}/><Text style={styles.manageBtnText}>{favorite?'محفوظ':'حفظ الإعلان'}</Text></Pressable>}{canMessage&&me!==item.seller_id&&item.status==='available'&&<Pressable accessibilityRole="button" disabled={actionBusy} onPress={()=>void messageSeller()} style={styles.messageAction}><MessageCircle size={18} color="#fff"/><Text style={{color:'#fff',fontWeight:'600'}}>تواصل مع صاحب الإعلان</Text></Pressable>}</View>
+      <View style={styles.actions}>{me!==item.seller_id&&item.status==='available'&&<Pressable accessibilityRole="button" accessibilityLabel="إضافة المنتج إلى السلة" disabled={actionBusy||!!me&&!canMessage} onPress={()=>void addToCart()} style={styles.secondaryAction}><ShoppingCart size={18} color={OASIS.colors.primary}/><Text style={styles.manageBtnText}>إضافة للسلة</Text></Pressable>}{me!==item.seller_id&&<Pressable accessibilityRole="button" accessibilityLabel={favorite?'إزالة المنتج من المفضلة':'حفظ المنتج في المفضلة'} disabled={actionBusy} onPress={()=>void toggleFavorite()} style={styles.secondaryAction}><Heart size={18} color={favorite?OASIS.colors.danger:OASIS.colors.primary} fill={favorite?OASIS.colors.danger:'none'}/><Text style={styles.manageBtnText}>{favorite?'محفوظ':'حفظ الإعلان'}</Text></Pressable>}{canMessage&&me!==item.seller_id&&item.status==='available'&&<Pressable accessibilityRole="button" disabled={actionBusy} onPress={()=>void messageSeller()} style={styles.messageAction}><MessageCircle size={18} color="#fff"/><Text style={{color:'#fff',fontWeight:'600'}}>تواصل مع صاحب الإعلان</Text></Pressable>}</View>
       {!!actionError&&<Text accessibilityRole="alert" style={[styles.muted,{color:OASIS.colors.danger}]}>{actionError}</Text>}
       {!seller&&<OasisSurface oasisSurface="card" style={styles.card}><View style={styles.location}><ShieldCheck size={18} color={OASIS.colors.primary}/><Text style={[styles.muted,{flex:1}]}>بيانات صاحب الإعلان غير متاحة ضمن نطاقك أو إعدادات خصوصيته.</Text></View></OasisSurface>}
       {business && <Pressable oasisKind="card" style={styles.sellerCard} onPress={() => router.push({ pathname: '/business', params: { id: business.id } })}>
@@ -133,13 +150,14 @@ export default function MarketplaceItemPage() {
         <ArrowUpRight size={18} color={OASIS.colors.primary} />
       </Pressable>}
       {me === item.seller_id && <Pressable oasisKind="action" style={styles.manageBtn} onPress={() => router.push({ pathname: '/profile', params: { tab: 'content' } })}><Text style={styles.manageBtnText}>إدارة من حسابي</Text></Pressable>}
-      <OasisSurface oasisSurface="card" style={styles.card}><View style={styles.location}><Info size={17} color={OASIS.colors.primary}/><Text style={[styles.muted,{flex:1}]}>الموقع المعروض عام. يتم الاتفاق على التسليم والتكلفة عبر وسائل التواصل المسموحة لصاحب الإعلان.</Text></View></OasisSurface>
+      <OasisSurface oasisSurface="card" style={styles.card}><View style={styles.location}><Info size={17} color={OASIS.colors.primary}/><Text style={[styles.muted,{flex:1}]}>الدفع نقدًا عند الاستلام فقط، دون رسوم مسبقة أو بوابة إلكترونية للمنتجات. تُناقش طريقة التسليم وتكلفة التوصيل في محادثة الطلب، ولا تُعرض بيانات الموقع الدقيق للعموم.</Text></View></OasisSurface>
       <OasisSurface oasisSurface="card" style={styles.card}><View style={styles.location}><ShoppingBag size={18} color={OASIS.colors.primary}/><Text style={styles.sellerTitle}>كيف أطلب المنتج؟</Text></View><Text style={styles.description}>١. أرسل الكمية والملاحظات للبائع.{"\n"}٢. اتفقا على التوفر والسعر والتسليم.{"\n"}٣. تأكد من المنتج قبل إتمام الاتفاق.</Text><Text style={styles.muted}>يُسجل الطلب في السوق، وبعد موافقة البائع يُحجز المنتج. ولا يُسجل أي دفع داخل التطبيق لهذه الخطوة.</Text></OasisSurface>
       <Pressable accessibilityRole="button" onPress={()=>router.push({pathname:'/report',params:{type:'product',id:item.id}})} style={{minHeight:44,flexDirection:'row-reverse',alignItems:'center',justifyContent:'center',gap:7}}><Flag size={15} color={OASIS.colors.muted}/><Text style={styles.muted}>الإبلاغ عن الإعلان</Text></Pressable>
     </ScrollView>
     <View pointerEvents="box-none" style={{position:'absolute',left:0,right:0,bottom,alignItems:'center'}}>
       <OasisSurface oasisSurface="card" style={{width:'92%',maxWidth:828,borderRadius:22,borderWidth:1,borderColor:OASIS.colors.line,padding:12,flexDirection:'row-reverse',alignItems:'center',gap:12}}>
         <View style={{flex:1,gap:4}}><Text style={styles.muted}>{me===item.seller_id?'هذا منتجك':'السعر المعلن'}</Text><Text style={[styles.price,{fontSize:16}]}>{productDisplayPrice(item.price,item.item_type)}</Text></View>
+        {me!==item.seller_id&&item.status==='available'&&<Pressable accessibilityRole="button" accessibilityLabel="إضافة إلى سلة المشتريات" disabled={actionBusy||!!me&&!canMessage} onPress={()=>void addToCart()} style={[styles.secondaryAction,{minHeight:50,paddingHorizontal:13,borderRadius:16,opacity:!!me&&!canMessage?.5:1}]}><ShoppingCart size={20} color={OASIS.colors.primary}/></Pressable>}
         <Pressable accessibilityRole="button" accessibilityLabel={me===item.seller_id?'إدارة المنتج':'اطلب المنتج'} disabled={me!==item.seller_id&&(item.status!=='available'||!!me&&!canMessage)} onPress={()=>{if(me===item.seller_id)setEditing(true);else if(!me)router.push('/auth');else setOrderOpen(true);}} style={[styles.messageAction,{flex:1,opacity:me!==item.seller_id&&(item.status!=='available'||!!me&&!canMessage)? .45:1,borderRadius:16}]}><ShoppingBag size={19} color="#fff"/><Text style={{color:'#fff',fontWeight:'800',fontSize:13}}>{me===item.seller_id?'إدارة المنتج':item.status!=='available'?'غير متاح':!me?'سجّل الدخول للطلب':canMessage?'اطلب المنتج':'الطلب غير متاح'}</Text></Pressable>
       </OasisSurface>
     </View>
