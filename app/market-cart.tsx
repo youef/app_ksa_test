@@ -163,46 +163,92 @@ export default function MarketCart() {
         <ShoppingBag size={43} color={c.primary}/><Text style={[styles.heading,{color:c.ink}]}>سلتك فارغة</Text><Text style={[styles.hint,{color:c.muted}]}>أضف منتجات من سوق الحي؛ وسنحتفظ بها في حسابك حتى تجهز لطلبها.</Text>
         <Pressable accessibilityRole="button" onPress={()=>router.push('/market')} style={[styles.primary,{backgroundColor:c.primary}]}><Text style={styles.white}>تصفح السوق</Text></Pressable>
       </View>}
+      <View style={styles.cards}>
       {lines.map(line=>{
         const item=products[line.item_id];
         const options=availableProductFulfillments(item?.description);
         const listed=item?.status==='available';
-        return <View key={line.item_id} style={[styles.card,{backgroundColor:c.surface,borderColor:c.line}]}>
-          <Pressable accessibilityRole="button" onPress={()=>item&&router.push({pathname:'/marketplace-item',params:{id:item.id}})} style={styles.productRow}>
-            {item?.image_url?<Image source={{uri:item.image_url}} style={styles.thumbnail}/>:<View style={[styles.thumbnail,styles.center,{backgroundColor:c.soft}]}><Package size={23} color={c.primary}/></View>}
-            <View style={{flex:1,gap:6}}><Text numberOfLines={2} style={[styles.heading,{color:c.ink}]}>{item?.title||'هذا المنتج لم يعد متاحًا'}</Text>
+        const priceChanged=listed&&changedPrices.some(row=>row.item_id===line.item_id);
+        const deliveryChanged=listed&&!options.includes(line.fulfillment);
+        const working=busy===line.item_id;
+        const lineTotal=line.expected_price==null?null:Math.round(Number(line.expected_price)*100)*line.quantity;
+        return <View key={line.item_id} style={[styles.card,{backgroundColor:c.surface,borderColor:c.line,width:wide?'49%':'100%'}]}>
+          <Pressable accessibilityRole="button" accessibilityLabel={'عرض '+(item?.title||'المنتج')} onPress={()=>item&&router.push({pathname:'/marketplace-item',params:{id:item.id}})} style={styles.productRow}>
+            {item?.image_url?<Image source={{uri:item.image_url}} resizeMode="cover" style={styles.thumbnail}/>:<View style={[styles.thumbnail,styles.center,{backgroundColor:c.soft}]}><Package size={22} color={c.primary}/></View>}
+            <View style={styles.productInfo}>
+              <Text numberOfLines={1} style={[styles.heading,{color:c.ink}]}>{item?.title||'المنتج لم يعد متاحًا'}</Text>
               <Text style={[styles.price,{color:c.primary}]}>{item?productDisplayPrice(item.price,item.item_type):'غير متاح'}</Text>
-              <Text style={[styles.hint,{color:c.muted}]}>{item?.district?('حي '+item.district+' · '):''}{item?.city||''}</Text>
+              {!!item&&<View style={styles.locationRow}><MapPin size={13} color={c.muted}/><Text numberOfLines={1} style={[styles.locationText,{color:c.muted}]}>{item.district?'حي '+item.district+' · ':''}{item.city||''}</Text></View>}
             </View>
+            <ChevronLeft size={17} color={c.muted}/>
           </Pressable>
-          {!listed&&<Text accessibilityRole="alert" style={[styles.hint,{color:c.danger}]}>المنتج غير متاح. أزله من السلة قبل الإرسال.</Text>}
-          {listed&&changedPrices.some(row=>row.item_id===line.item_id)&&<View style={[styles.notice,{borderColor:c.danger}]}>
-            <Text accessibilityRole="alert" style={[styles.hint,{color:c.danger}]}>تغيّر سعر المنتج منذ إضافته للسلة. راجع السعر الجديد قبل الطلب.</Text>
-            <Pressable accessibilityRole="button" disabled={changing} onPress={()=>void update(line)} style={styles.link}><RefreshCw size={16} color={c.primary}/><Text style={{color:c.primary,fontWeight:'700'}}>تحديث السعر بعد المراجعة</Text></Pressable>
+          {!listed&&<Text accessibilityRole="alert" style={[styles.hint,{color:c.danger}]}>هذا المنتج لم يعد متاحًا. أزله من السلة للمتابعة.</Text>}
+          {priceChanged&&<View style={[styles.notice,{borderColor:c.warning,backgroundColor:c.warningSoft}]}>
+            <Text accessibilityRole="alert" style={[styles.hint,{color:c.ink}]}>تغيّر سعر هذا المنتج. راجع السعر الجديد قبل إتمام الطلب.</Text>
+            <Pressable accessibilityRole="button" disabled={changing} onPress={()=>void update(line)} style={styles.inlineAction}>
+              <RefreshCw size={15} color={c.primary}/><Text style={[styles.actionText,{color:c.primary}]}>اعتماد السعر بعد المراجعة</Text>
+            </Pressable>
           </View>}
-          <View style={styles.between}>
+          <View style={[styles.itemControls,{borderTopColor:c.line}]}>
             <Text style={[styles.label,{color:c.ink}]}>الكمية</Text>
-            <View style={styles.buttons}>
-              <Pressable accessibilityRole="button" accessibilityLabel="زيادة الكمية" disabled={changing||line.quantity>=20||!listed} onPress={()=>void update(line,line.quantity+1)} style={[styles.iconButton,{backgroundColor:c.soft}]}><Plus size={19} color={c.primary}/></Pressable>
-              <Text style={[styles.heading,{color:c.ink,minWidth:28,textAlign:'center'}]}>{line.quantity.toLocaleString('ar-SA')}</Text>
-              <Pressable accessibilityRole="button" accessibilityLabel="تقليل الكمية" disabled={changing||line.quantity<=1||!listed} onPress={()=>void update(line,line.quantity-1)} style={[styles.iconButton,{backgroundColor:c.soft}]}><Minus size={19} color={c.primary}/></Pressable>
+            <View style={[styles.stepper,{borderColor:c.line,backgroundColor:c.soft}]}>
+              <Pressable accessibilityRole="button" accessibilityLabel={'زيادة كمية '+(item?.title||'المنتج')} accessibilityState={{disabled:changing||line.quantity>=20||!listed||priceChanged}} disabled={changing||line.quantity>=20||!listed||priceChanged}
+                onPress={()=>void update(line,line.quantity+1)} style={styles.qtyButton}>
+                <Plus size={20} color={line.quantity>=20||!listed?c.muted:c.primary}/>
+              </Pressable>
+              <Text accessibilityLabel={'الكمية '+line.quantity} style={[styles.qtyValue,{color:c.ink}]}>{line.quantity.toLocaleString('ar-SA')}</Text>
+              <Pressable accessibilityRole="button" accessibilityLabel={'تقليل كمية '+(item?.title||'المنتج')} accessibilityState={{disabled:changing||line.quantity<=1||!listed||priceChanged}} disabled={changing||line.quantity<=1||!listed||priceChanged}
+                onPress={()=>void update(line,line.quantity-1)} style={styles.qtyButton}>
+                <Minus size={20} color={line.quantity<=1||!listed?c.muted:c.primary}/>
+              </Pressable>
             </View>
+            {working?<ActivityIndicator size="small" color={c.primary}/>:line.quantity>1&&lineTotal!==null&&!priceChanged?
+              <Text style={[styles.unitTotal,{color:c.primary}]}>{formatCartMoney(lineTotal)}</Text>:null}
           </View>
-          <View style={[styles.deliveryRow,{borderTopColor:c.line}]}>
+          <View style={styles.deliveryRow}>
             <Text style={[styles.label,{color:c.ink}]}>التسليم</Text>
-            <View style={styles.buttons}>{options.map(option=><Pressable key={option} disabled={changing||!listed} accessibilityRole="button" accessibilityState={{selected:line.fulfillment===option}} onPress={()=>void update(line,line.quantity,option)} style={[styles.chip,{borderColor:line.fulfillment===option?c.primary:c.line,backgroundColor:line.fulfillment===option?c.soft:c.surface}]}>
-              <Text style={{color:line.fulfillment===option?c.primary:c.muted,fontSize:12,fontWeight:'700'}}>{option}</Text>
-            </Pressable>)}</View>
+            {options.length===1?<View style={[styles.singleDelivery,{backgroundColor:c.soft}]}>
+              <Truck size={16} color={c.primary}/>
+              <Text style={[styles.deliveryLabel,{color:c.primary}]} numberOfLines={1}>{deliveryChanged?'طريقة التسليم تغيّرت':line.fulfillment}</Text>
+              {deliveryChanged&&<Pressable accessibilityRole="button" disabled={changing} onPress={()=>void update(line,line.quantity,options[0])} style={styles.inlineAction}>
+                <Text style={[styles.actionText,{color:c.primary}]}>تحديث</Text>
+              </Pressable>}
+            </View>:<View style={styles.buttons}>{options.map(option=><Pressable key={option} disabled={changing||!listed||priceChanged} accessibilityRole="button" accessibilityState={{selected:line.fulfillment===option}}
+              onPress={()=>void update(line,line.quantity,option)}
+              style={[styles.chip,{borderColor:line.fulfillment===option?c.primary:c.line,backgroundColor:line.fulfillment===option?c.soft:c.surface}]}>
+              <Text style={[styles.actionText,{color:line.fulfillment===option?c.primary:c.muted}]}>{option}</Text>
+            </Pressable>)}</View>}
           </View>
-          {editingNote===line.item_id ? <>
-            <TextInput value={notes[line.item_id]??''} onChangeText={v=>setNotes(old=>({...old,[line.item_id]:v}))} maxLength={400} multiline textAlign="right" accessibilityLabel="ملاحظة خاصة بالتاجر" placeholder="اكتب ملاحظة للتاجر (اختياري)" placeholderTextColor={c.muted} style={[styles.input,{borderColor:c.line,color:c.ink,backgroundColor:c.soft}]} />
-            <Pressable disabled={changing||!listed} accessibilityRole="button" onPress={()=>{void (async()=>{await update(line);setEditingNote(null);})();}} style={[styles.link,{alignSelf:'flex-start'}]}><Text style={{color:c.primary,fontWeight:'700'}}>حفظ الملاحظة</Text></Pressable>
-          </> : <Pressable accessibilityRole="button" accessibilityLabel={(line.note?'تعديل الملاحظة: ':'إضافة ملاحظة للتاجر')+ (line.note||'')} onPress={()=>setEditingNote(line.item_id)} style={styles.optionalNote}>
-            <Text style={[styles.hint,{color:c.primary}]} numberOfLines={1}>{line.note?('ملاحظتك: '+line.note):'+ إضافة ملاحظة للتاجر (اختياري)'}</Text>
-          </Pressable>}
-          <Pressable accessibilityRole="button" accessibilityLabel="إزالة المنتج من السلة" disabled={changing} onPress={()=>void remove(line.item_id)} style={[styles.link,{alignSelf:'flex-start'}]}><Trash2 size={16} color={c.danger}/><Text style={{color:c.danger,fontWeight:'700'}}>إزالة المنتج</Text></Pressable>
+          <View style={[styles.cardActions,{borderTopColor:c.line}]}>
+            <Pressable accessibilityRole="button" accessibilityLabel={line.note?'تعديل ملاحظة التاجر':'إضافة ملاحظة اختيارية للتاجر'} accessibilityState={{expanded:editingNote===line.item_id}}
+              disabled={changing} onPress={()=>setEditingNote(editingNote===line.item_id?null:line.item_id)} style={styles.inlineAction}>
+              <Plus size={15} color={c.primary}/>
+              <Text numberOfLines={1} style={[styles.actionText,{color:c.primary}]}>{line.note?'تعديل الملاحظة':'ملاحظة للتاجر'}</Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel={'إزالة '+(item?.title||'المنتج')+' من السلة'} disabled={changing} onPress={()=>void remove(line.item_id)}
+              style={styles.inlineAction}><Trash2 size={16} color={c.danger}/><Text style={[styles.actionText,{color:c.danger}]}>إزالة</Text></Pressable>
+          </View>
+          {line.note&&editingNote!==line.item_id?<Text numberOfLines={2} style={[styles.savedNote,{color:c.muted}]}>{line.note}</Text>:null}
+          {editingNote===line.item_id&&<View style={styles.noteEditor}>
+            <TextInput value={notes[line.item_id]??''} onChangeText={value=>setNotes(current=>({...current,[line.item_id]:value}))}
+              maxLength={400} multiline textAlign="right" accessibilityLabel="ملاحظة خاصة بالتاجر" placeholder="مثلاً: المقاس أو الوقت المناسب للاستلام"
+              placeholderTextColor={c.muted} style={[styles.input,{borderColor:c.line,color:c.ink,backgroundColor:c.soft}]}/>
+            <View style={styles.noteActions}>
+              <Pressable accessibilityRole="button" disabled={changing||!listed||priceChanged} onPress={()=>void (async()=>{
+                const saved=await update(line,line.quantity,line.fulfillment,notes[line.item_id]??'');
+                if(saved)setEditingNote(null);
+              })()} style={[styles.noteSave,{backgroundColor:c.primary,opacity:changing||!listed||priceChanged?0.5:1}]}>
+                <Text style={[styles.actionText,{color:c.surface}]}>حفظ الملاحظة</Text>
+              </Pressable>
+              <Pressable accessibilityRole="button" disabled={changing} onPress={()=>{
+                setNotes(current=>({...current,[line.item_id]:line.note||''}));
+                setEditingNote(null);
+              }} style={styles.noteCancel}><Text style={[styles.actionText,{color:c.muted}]}>إلغاء</Text></Pressable>
+            </View>
+          </View>}
         </View>;
       })}
+      </View>
       {!!lines.length&&<View style={[styles.card,{backgroundColor:c.surface,borderColor:c.line}]}>
         <View style={styles.between}><Text style={[styles.heading,{color:c.ink}]}>ملخص السلة</Text><Text style={[styles.label,{color:c.muted}]}>{totals.count.toLocaleString('ar-SA')} قطعة · {lines.length.toLocaleString('ar-SA')} منتج</Text></View>
         <View style={styles.between}><Text style={[styles.label,{color:c.ink}]}>إجمالي الأسعار المحددة</Text><Text style={[styles.price,{color:c.primary}]}>{formatCartMoney(totals.halalas)}</Text></View>
