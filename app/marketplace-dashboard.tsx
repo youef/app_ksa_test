@@ -33,23 +33,26 @@ export default function MarketplaceDashboard(){
  const load=useCallback(async()=>{
   const seq=++sequence.current;
   try{const auth=await supabase.auth.getUser();if(!auth.data.user){router.replace('/auth');return;}
-   if(viewer.current!==auth.data.user.id){viewer.current=auth.data.user.id;setUserId(auth.data.user.id);setData(null);setProductActivity({incoming:null,ready:null});setTitle('');setDescription('');setService(params.service_id||'');setDraftPackage('');setDraftSavedAt(null);draftLoaded.current='';draftDirty.current=false;}
+   if(viewer.current!==auth.data.user.id){viewer.current=auth.data.user.id;setUserId(auth.data.user.id);setData(null);setProductActivity({incoming:null,ready:null});setReady(false);setTitle('');setDescription('');setService(params.service_id||'');setDraftPackage('');setDraftSavedAt(null);draftLoaded.current='';draftDirty.current=false;}
    // Read-only product-order counts link COD orders to the workspace.
    // They must not delay the core workspace, and missing counts never become zero.
    const productCountsPromise=Promise.all([
      supabase.from('marketplace_product_requests').select('id',{count:'exact',head:true}).eq('seller_id',auth.data.user.id).eq('status','pending'),
      supabase.from('marketplace_product_requests').select('id',{count:'exact',head:true}).eq('buyer_id',auth.data.user.id).eq('status','ready'),
    ]);
+   const checkoutStatusPromise=supabase.functions.invoke('create-marketplace-checkout',{body:{kind:'status'}});
    const response=await supabase.rpc('hayna_marketplace_workspace');if(response.error)throw response.error;
    if(!mounted.current||seq!==sequence.current)return;setData(response.data);setError('');
+   // Display workspace immediately; payment readiness is independent and may be slower.
+   void checkoutStatusPromise.then(status=>{
+     if(mounted.current&&seq===sequence.current)setReady(!status.error&&status.data?.ready===true);
+   }).catch(()=>{if(mounted.current&&seq===sequence.current)setReady(false);});
    void productCountsPromise.then(([incoming,ready])=>{
      if(mounted.current&&seq===sequence.current)setProductActivity({
        incoming:incoming.error||incoming.count==null?null:incoming.count,
        ready:ready.error||ready.count==null?null:ready.count,
      });
    }).catch(()=>{if(mounted.current&&seq===sequence.current)setProductActivity({incoming:null,ready:null});});
-   const status=await supabase.functions.invoke('create-marketplace-checkout',{body:{kind:'status'}});
-   if(mounted.current&&seq===sequence.current)setReady(!status.error&&status.data?.ready===true);
   }catch{if(mounted.current&&seq===sequence.current){setReady(false);setError('تعذر تحميل لوحة السوق. أعد المحاولة؛ لن نعرض بيانات ناقصة كأنها مكتملة.');}}
   finally{if(mounted.current&&seq===sequence.current){setLoading(false);setRefreshing(false);}}
  },[params.service_id]);
@@ -145,6 +148,16 @@ export default function MarketplaceDashboard(){
         <Text numberOfLines={2} style={[s.quickDesc,{color:c.muted}]}>{item.detail}</Text>
       </Pressable>)}
     </View>
+    {data.orders?.length>0&&<Pressable oasisKind="plain" accessibilityRole="button"
+      accessibilityLabel="آخر عملية في سجل المدفوعات" onPress={()=>setTab('orders')}
+      style={[s.lastPayment,{backgroundColor:c.surface,borderColor:c.line}]}>
+      <View style={[s.quickIcon,{backgroundColor:c.soft}]}><Wallet size={19} color={c.primary}/></View>
+      <View style={s.attentionCopy}>
+        <Text style={[s.quickLabel,{color:c.ink}]}>آخر عملية في السجل</Text>
+        <Text style={[s.quickDesc,{color:c.muted}]}>{statuses[data.orders[0].status]||'حالة غير معروفة'} · {money(data.orders[0].amount_halalas)}</Text>
+      </View>
+      <ChevronLeft size={18} color={c.primary}/>
+    </Pressable>}
     {data.admin?button('مراجعة الإعلانات',()=>router.push('/admin-marketplace'),ShieldCheck):null}
     {data.subscription?card(<>
       <View style={s.spread}>{badge('active')}<Crown size={22} color={c.primary}/></View>
@@ -207,6 +220,7 @@ const s=StyleSheet.create({
   attentionButton:{width:44,minHeight:44,borderRadius:14,alignItems:'center',justifyContent:'center'},
   quickGrid:{flexDirection:'row-reverse',flexWrap:'wrap',justifyContent:'space-between',columnGap:9,rowGap:10},
   quickCard:{borderWidth:1,borderRadius:17,padding:12,minHeight:109,alignItems:'flex-end',gap:6},
+  lastPayment:{minHeight:66,borderWidth:1,borderRadius:16,paddingHorizontal:13,paddingVertical:11,flexDirection:'row-reverse',alignItems:'center',gap:10},
   quickIcon:{width:34,height:34,borderRadius:12,alignItems:'center',justifyContent:'center'},
   quickLabel:{fontSize:13,fontWeight:'800',textAlign:'right'},
   quickDesc:{fontSize:11,lineHeight:17,textAlign:'right'},
