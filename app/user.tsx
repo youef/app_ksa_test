@@ -151,11 +151,15 @@ export default function UserProfile() {
     try {
       let result: any;
       if (tabToLoad === 'market') {
-        result = await supabase.from('marketplace_items').select('id,title,description,price,item_type,district,image_url,status,created_at').eq('seller_id', profileId).order('created_at', { ascending: false }).limit(18);
+        let query=supabase.from('marketplace_items').select('id,title,description,price,item_type,district,image_url,status,created_at').eq('seller_id', profileId);
+        if(viewerId!==profileId)query=query.eq('status','available');
+        result = await query.order('created_at', { ascending: false }).limit(18);
         if (result.error) throw result.error;
         setItems(result.data || []);
       } else if (tabToLoad === 'services') {
-        result = await supabase.from('services').select('id,name,description,category,district,price_from,price_to,available_now,is_verified,cover_url,created_at').eq('provider_id', profileId).order('created_at', { ascending: false }).limit(18);
+        let query=supabase.from('services').select('id,name,description,category,district,price_from,price_to,available_now,is_verified,cover_url,created_at').eq('provider_id', profileId);
+        if(viewerId!==profileId)query=query.eq('moderation_status','approved');
+        result=await query.order('created_at',{ascending:false}).limit(18);
         if (result.error) throw result.error;
         setServices(result.data || []);
       } else if (tabToLoad === 'requests') {
@@ -330,19 +334,32 @@ export default function UserProfile() {
           : Promise.resolve({data:null,error:null}),
       ]);
       setProfileCustomization(customizationResult.data || null);
-      setMyCapabilities(me===p.id && !capabilityResult.error && capabilityResult.data?.user_id === p.id ? capabilityResult.data as ProfileCapabilityFlags : null);
+      setMyCapabilities(me===p.id && !capabilityResult.error && (!capabilityResult.data?.user_id || capabilityResult.data.user_id===p.id) ? capabilityResult.data as ProfileCapabilityFlags : null);
       setLinkedBusiness(!businessResult.error && businessResult.data ? businessResult.data as {id:string;name:string} : null);
       const featuredRows = featuredResult.data || [];
       const resolvedFeatured = await Promise.all(featuredRows.map(async (featured: any) => {
         let query: any;
         if (featured.item_type === 'question') query = await supabase.from('questions').select('id,title,body,district,created_at,category').eq('id', featured.item_id).maybeSingle();
-        else if (featured.item_type === 'service') query = await supabase.from('services').select('id,name,description,district,created_at,category,cover_url,price_from,price_to,available_now').eq('id', featured.item_id).maybeSingle();
-        else if (featured.item_type === 'request') query = await supabase.from('requests').select('id,title,description,district,created_at,status,budget,is_urgent').eq('id', featured.item_id).maybeSingle();
-        else if (featured.item_type === 'market') query = await supabase.from('marketplace_items').select('id,title,description,district,created_at,status,price,image_url,item_type').eq('id', featured.item_id).maybeSingle();
+        else if (featured.item_type === 'service') {
+          let row=supabase.from('services').select('id,name,description,district,created_at,category,cover_url,price_from,price_to,available_now').eq('id',featured.item_id);
+          if(me!==p.id)row=row.eq('moderation_status','approved');
+          query=await row.maybeSingle();
+        } else if (featured.item_type === 'request') query = await supabase.from('requests').select('id,title,description,district,created_at,status,budget,is_urgent').eq('id', featured.item_id).maybeSingle();
+        else if (featured.item_type === 'market') {
+          let row=supabase.from('marketplace_items').select('id,title,description,district,created_at,status,price,image_url,item_type').eq('id',featured.item_id);
+          if(me!==p.id)row=row.eq('status','available');
+          query=await row.maybeSingle();
+        }
         return query?.data ? { ...query.data, _featuredType: featured.item_type } : null;
       }));
       setFeaturedItems(resolvedFeatured.filter(Boolean));
 
+      let marketCountQuery=supabase.from('marketplace_items').select('id',{count:'exact',head:true}).eq('seller_id',p.id);
+      let serviceCountQuery=supabase.from('services').select('id',{count:'exact',head:true}).eq('provider_id',p.id);
+      if(me!==p.id){
+        marketCountQuery=marketCountQuery.eq('status','available');
+        serviceCountQuery=serviceCountQuery.eq('moderation_status','approved');
+      }
       const [
         marketCount,
         serviceCount,
@@ -353,8 +370,8 @@ export default function UserProfile() {
         answerCount,
         repRes,
       ] = await Promise.all([
-        supabase.from('marketplace_items').select('id', { count: 'exact', head: true }).eq('seller_id', p.id),
-        supabase.from('services').select('id', { count: 'exact', head: true }).eq('provider_id', p.id),
+        marketCountQuery,
+        serviceCountQuery,
         supabase.from('requests').select('id', { count: 'exact', head: true }).eq('requester_id', p.id),
         supabase.from('questions').select('id', { count: 'exact', head: true }).eq('author_id', p.id),
         supabase.from('follows').select('id', { count: 'exact', head: true }).eq('following_id', p.id),
