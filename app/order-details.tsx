@@ -5,6 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 import {AppHeader} from '@/components/shared/AppHeader';
 import {OasisPressable as Pressable} from '@/components/oasis/OasisPrimitives';
 import {supabase} from '@/lib/supabase';
+import {productOrderStatus,productOrderStages,formatCartMoney} from '@/lib/marketCart';
 import {useTheme} from '@/context/ThemeContext';
 
 type OrderKind='service'|'product';
@@ -15,6 +16,7 @@ const statusNames:Record<string,string>={pending:'بانتظار موافقة ا
 const disputeKinds:Record<string,string>={delay:'تأخير التسليم',quality:'جودة المنتج أو الخدمة',not_received:'لم أستلم الطلب',incorrect_details:'اختلاف التفاصيل',payment:'مشكلة دفع',other:'مشكلة أخرى'};
 const steps:Record<OrderKind,string[]>={service:['paid','accepted','in_progress','ready','completed'],product:['pending','accepted','ready','completed']};
 const date=(value:string)=>new Date(value).toLocaleString('ar-SA',{dateStyle:'medium',timeStyle:'short'});
+const localDateInput=(iso:string)=>{const d=new Date(iso);return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);};
 function bytesFromBase64(value:string):Uint8Array{
  const alphabet='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
  const clean=value.replace(/[^A-Za-z0-9+/]/g,'');
@@ -58,7 +60,7 @@ export default function OrderDetails(){
    if(orderError)throw orderError;
    if(!orderRow){setError('الطلب غير موجود أو ليس لديك صلاحية عرضه.');setOrder(null);return;}
    setOrder(orderRow);
-   setDeliveryWhen(orderRow.scheduled_delivery_at?new Date(orderRow.scheduled_delivery_at).toISOString().slice(0,16):'');setDeliveryNote(orderRow.delivery_note||'');
+   setDeliveryWhen(orderRow.scheduled_delivery_at?localDateInput(orderRow.scheduled_delivery_at):'');setDeliveryNote(orderRow.delivery_note||'');
    const prefs=await supabase.from('order_notification_preferences').select('in_app_enabled,push_enabled').eq('user_id',auth.user.id).maybeSingle();
    if(!prefs.error){setInApp(prefs.data?.in_app_enabled!==false);setPush(prefs.data?.push_enabled!==false);}
    const [rv,ds,hs]=await Promise.all([
@@ -89,6 +91,7 @@ export default function OrderDetails(){
   setSigned(Object.fromEntries(files));
  },[]);
  useEffect(()=>{void load();},[load]);
+ useEffect(()=>{if(kind!=='product'||!id)return;const channel=supabase.channel('hayna-order-'+id).on('postgres_changes',{event:'UPDATE',schema:'public',table:'marketplace_product_requests',filter:'id=eq.'+id},()=>{void load();}).subscribe();return()=>{void supabase.removeChannel(channel);};},[kind,id,load]);
  async function run(action:()=>Promise<void>){
   if(busy)return;setBusy(true);setError('');setNotice('');
   try{await action();await load();}catch(e:any){setError(e?.message||'تعذر تنفيذ العملية.');}
@@ -139,6 +142,24 @@ export default function OrderDetails(){
    if(r.error)throw r.error;setNotice('حُفظ موعد التسليم وأُرسل تنبيه إلى المشتري.');
   });
  }
+ async function saveProductDelivery(){
+  await run(async()=>{
+   if(kind!=='product'||!isSeller)return;
+   const when=deliveryWhen.trim()?new Date(deliveryWhen.trim()):null;
+   if(when&&(!Number.isFinite(when.getTime())||when.getTime()<Date.now()))throw new Error('اختر موعدًا مستقبليًا صحيحًا للتسليم.');
+   const result=await supabase.rpc('hayna_product_order_update_delivery',{p_order:id,p_delivery_at:when?when.toISOString():null,p_note:deliveryNote.trim()});
+   if(result.error)throw result.error;
+   setNotice('تم تحديث تفاصيل التسليم ويمكن للمشتري الاطلاع عليها.');
+  });
+ }
+ async function recordCash(){
+  await run(async()=>{
+   if(kind!=='product'||!isSeller)return;
+   const result=await supabase.rpc('hayna_product_order_record_cash',{p_order:id});
+   if(result.error)throw result.error;
+   setNotice('سُجّل إقرارك بتحصيل المبلغ نقدًا عند التسليم.');
+  });
+ }
  async function savePreferences(inAppValue:boolean,pushValue:boolean){
   await run(async()=>{
    const r=await supabase.from('order_notification_preferences').upsert({user_id:uid,in_app_enabled:inAppValue,push_enabled:pushValue,updated_at:new Date().toISOString()},{onConflict:'user_id'});
@@ -187,24 +208,43 @@ export default function OrderDetails(){
  const hint=(txt:string)=><Text style={[S.hint,{color:c.muted}]}>{txt}</Text>;
  const input=(v:string,set:(v:string)=>void,placeholder:string,multi=false)=><TextInput value={v} onChangeText={set} placeholder={placeholder} placeholderTextColor={c.muted} multiline={multi} textAlign="right" style={[S.input,{color:c.ink,borderColor:c.line,backgroundColor:c.soft,minHeight:multi?90:44}]} />;
  const button=(txt:string,cb:()=>void,disabled=false)=><Pressable accessibilityRole="button" accessibilityLabel={txt} disabled={busy||disabled} onPress={cb} style={[S.button,{backgroundColor:c.primary,opacity:busy||disabled?.5:1}]}><Text style={S.buttonText}>{txt}</Text></Pressable>;
- return <View style={{flex:1,backgroundColor:'transparent'}}><AppHeader title="تفاصيل الطلب" subtitle="السوق · حيّنا" fallbackRoute="/marketplace-dashboard?tab=services"/>
+ return <View style={{flex:1,backgroundColor:'transparent'}}><AppHeader title="تفاصيل الطلب" subtitle="السوق · حيّنا" fallbackRoute={kind==='product'?'/product-orders':'/marketplace-dashboard?tab=services'}/>
   <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{setRefreshing(true);void load();}}/>} contentContainerStyle={S.wrap}>
    {loading?<ActivityIndicator color={c.primary}/>:null}
    {!!error&&<Text accessibilityRole="alert" style={S.error}>{error}</Text>}
    {!!notice&&<Text style={[S.notice,{color:c.primary}]}>{notice}</Text>}
    {order?<>
-    {box(<>{title(label)}{hint('رقم الطلب: '+String(order.id))}{title(statusNames[order.status]||order.status)}
-     <View style={S.stepRow}>{steps[kind].map((step,i)=><View key={step} style={[S.step,{backgroundColor:steps[kind].indexOf(order.status)>=i?c.primary:c.soft}]}><Text style={{fontSize:10,color:steps[kind].indexOf(order.status)>=i?'#fff':c.ink,textAlign:'center'}}>{statusNames[step]}</Text></View>)}</View>
+    {box(<>{title(label)}{hint('رقم الطلب: '+String(order.id))}{title(kind==='product'?productOrderStatus(order.status):statusNames[order.status]||order.status)}
+     <View style={S.stepRow}>{steps[kind].map((step,i)=><View key={step} style={[S.step,{backgroundColor:!['cancelled','rejected'].includes(order.status)&&steps[kind].indexOf(order.status)>=i?c.primary:c.soft}]}><Text style={{fontSize:10,color:!['cancelled','rejected'].includes(order.status)&&steps[kind].indexOf(order.status)>=i?'#fff':c.ink,textAlign:'center'}}>{kind==='product'?productOrderStages[i]?.label||statusNames[step]:statusNames[step]}</Text></View>)}</View>
      {order.amount_halalas!=null?hint('قيمة الطلب: '+(Number(order.amount_halalas)/100).toFixed(2)+' ر.س'):null}
      {isSeller&&kind==='service'&&order.status==='paid'?button('قبول الطلب',()=>void changeStatus('accept')):null}
      {isSeller&&kind==='service'&&order.status==='accepted'?button('بدء التنفيذ',()=>void changeStatus('start')):null}
      {isSeller&&kind==='service'&&order.status==='in_progress'?button('جاهز للاستلام',()=>void changeStatus('ready')):null}
      {isBuyer&&kind==='service'&&order.status==='ready'?button('تأكيد الاستلام الفعلي',()=>Alert.alert('تأكيد الاستلام','هل استلمت الخدمة بالفعل؟ لا يمكن التراجع عن هذا الإجراء.',[{text:'إلغاء',style:'cancel'},{text:'تأكيد',onPress:()=>void changeStatus('received')}])):null}
      {kind==='product'&&isSeller&&order.status==='pending'?<>{button('قبول طلب المنتج',()=>void productAction('accept'))}{button('رفض الطلب',()=>void productAction('reject'))}</>:null}
-     {kind==='product'&&isSeller&&order.status==='accepted'?button('المنتج جاهز للاستلام',()=>void productAction('ready')):null}
-     {kind==='product'&&isBuyer&&order.status==='ready'?button('تأكيد استلام المنتج',()=>Alert.alert('تأكيد الاستلام','هل استلمت المنتج بالفعل؟',[{text:'إلغاء',style:'cancel'},{text:'تأكيد',onPress:()=>void productAction('complete')}])):null}
+     {kind==='product'&&isSeller&&order.status==='accepted'?button('جاهز للتسليم أو التوصيل',()=>void productAction('ready')):null}
+     {kind==='product'&&isBuyer&&order.status==='ready'?button('تأكيد استلام المنتج',()=>Alert.alert('تأكيد الاستلام','هل استلمت المنتج بالفعل؟ الدفع نقدًا عند الاستلام فقط، ولا يُخصم أي مبلغ داخل التطبيق.',[{text:'إلغاء',style:'cancel'},{text:'تأكيد',onPress:()=>void productAction('complete')}])):null}
      {kind==='product'&&isBuyer&&order.status==='pending'?button('إلغاء الطلب',()=>void productAction('cancel')):null}
      {kind==='product'&&order.conversation_id?button('فتح محادثة البائع والمشتري',()=>router.push({pathname:'/conversation',params:{id:order.conversation_id}})):null}
+     {kind==='product'?<View style={{gap:10,borderWidth:1,borderColor:c.line,borderRadius:16,padding:14,backgroundColor:c.soft}}>
+       {title('الدفع عند الاستلام فقط')}
+       {hint('لا يوجد دفع إلكتروني أو خصم مسبق. تُسلّم القيمة نقدًا عند استلام المنتج بعد الاتفاق على تكلفة التوصيل.')}
+       {order.unit_price!=null?hint('قيمة المنتجات: '+formatCartMoney(Math.round(Number(order.unit_price)*100)*Number(order.quantity))):hint('المنتج بدون سعر محدد؛ اتفق مع التاجر على التفاصيل قبل التسليم.')}
+       {order.cash_collected_at?hint('سجّل التاجر استلام المبلغ النقدي بتاريخ '+date(order.cash_collected_at)):hint('لم يُسجّل التاجر تحصيل المبلغ النقدي بعد.')}
+       {isSeller&&order.unit_price>0&&!order.cash_collected_at&&['ready','completed'].includes(order.status)?button('أؤكد تحصيل المبلغ نقدًا فعليًا',()=>void recordCash()):null}
+     </View>:null}
+     {kind==='product'?<View style={{gap:9}}>
+       {title('التوصيل والتواصل')}
+       {hint('طريقة التسليم: '+(order.fulfillment||'بالاتفاق مع التاجر'))}
+       {order.scheduled_delivery_at?hint('موعد التسليم: '+date(order.scheduled_delivery_at)):hint('لم يُحدّد موعد التسليم بعد.')}
+       {order.delivery_note?hint('تفاصيل التسليم: '+order.delivery_note):null}
+       {isSeller&&['accepted','ready'].includes(order.status)?<>
+         {hint('أدخل موعدًا اتفقت عليه مع العميل. لا تضع عنوان منزل دقيقًا في ملاحظات التسليم.')}
+         {input(deliveryWhen,setDeliveryWhen,'YYYY-MM-DDTHH:mm (اختياري)')}
+         {input(deliveryNote,setDeliveryNote,'ملاحظات التسليم العامة',true)}
+         {button('حفظ موعد وتفاصيل التسليم',()=>void saveProductDelivery())}
+       </>:null}
+     </View>:null}
      {kind==='service'&&order.scheduled_delivery_at?hint('موعد التسليم: '+date(order.scheduled_delivery_at)):null}
      {kind==='service'&&order.delivery_note?hint('تفاصيل التسليم: '+order.delivery_note):null}
      {kind==='service'&&isSeller&&['accepted','in_progress'].includes(order.status)?<>{title('تعديل موعد وتفاصيل التسليم')}{input(deliveryWhen,setDeliveryWhen,'الموعد: 2026-11-05T18:00 (اختياري)')}{input(deliveryNote,setDeliveryNote,'تفاصيل التسليم',true)}{button('حفظ الموعد وإبلاغ المشتري',()=>void saveDelivery())}</>:null}
