@@ -57,7 +57,7 @@ export function ProfileHeader(props: Props) {
   const name = anonymous ? 'جار مجهول' : props.displayName || profile.display_name || profile.username || 'جار';
   const heroColors = !customization?.banner_style || customization.banner_style === 'emerald' ? identity.heroColors : bannerColors(customization.banner_style);
   const button = [styles.button, { backgroundColor: colors.surface, borderColor: colors.line }];
-  const action = (label: string, Icon: typeof Edit3, onPress?: () => void) => <Pressable key={label} accessibilityRole="button" accessibilityLabel={label} hitSlop={5} onPress={onPress} style={button}><Icon size={16} color={colors.ink} /><Text style={{ color: colors.ink, fontWeight: '700', fontSize: 11.5 }}>{label}</Text></Pressable>;
+  const action = (label: string, Icon: typeof Edit3, onPress?: () => void) => <Pressable key={label} accessibilityRole="button" accessibilityLabel={label} hitSlop={6} disabled={!onPress} onPress={onPress} style={button}><Icon size={16} color={colors.ink} /><Text style={{ color: colors.ink, fontWeight: '700', fontSize: 11.5 }}>{label}</Text></Pressable>;
 
   async function callContact() {
     if (calling) return;
@@ -108,9 +108,9 @@ export function ProfileHeader(props: Props) {
         <View style={styles.actions}>
           {own ? <>
             {action('تعديل ملفي', Edit3, props.onEdit)}
-            <Pressable accessibilityRole="button" accessibilityLabel="تخصيص المظهر" hitSlop={6} onPress={props.onDesign}
+            <Pressable accessibilityRole="button" accessibilityLabel="تخصيص المظهر" hitSlop={6} disabled={!props.onDesign} onPress={props.onDesign}
               style={[button, styles.iconButton]}><Palette size={17} color={colors.primary} /></Pressable>
-            <Pressable accessibilityRole="button" accessibilityLabel="إعدادات الحساب" hitSlop={6} onPress={props.onSettings}
+            <Pressable accessibilityRole="button" accessibilityLabel="إعدادات الحساب" hitSlop={6} disabled={!props.onSettings} onPress={props.onSettings}
               style={[button, styles.iconButton]}><Settings size={17} color={colors.primary} /></Pressable>
           </> : props.hideContactActions ? null : <>
             <Pressable accessibilityRole="button" disabled={props.busy || (locked && profile.is_banned === true)}
@@ -162,7 +162,7 @@ const styles = StyleSheet.create({
   cover: { overflow: 'hidden' },
   coverImage: { opacity: 0.34 },
   glow: { position: 'absolute', width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(255,255,255,0.08)', bottom: -85, right: -20 },
-  coverButton: { position: 'absolute', left: 12, top: 11, minHeight: 32, flexDirection: 'row-reverse', alignItems: 'center', gap: 6, borderRadius: 11, paddingHorizontal: 10, backgroundColor: 'rgba(5,22,16,0.56)' },
+  coverButton: { position: 'absolute', left: 12, top: 11, minHeight: 44, flexDirection: 'row-reverse', alignItems: 'center', gap: 6, borderRadius: 11, paddingHorizontal: 10, backgroundColor: 'rgba(5,22,16,0.56)' },
   body: { paddingHorizontal: 18, paddingBottom: 14 },
   bodyCompact: { paddingHorizontal: 13, paddingBottom: 13 },
   top: { flexDirection: 'row-reverse', alignItems: 'center', gap: 11, marginBottom: 5 },
@@ -176,13 +176,13 @@ const styles = StyleSheet.create({
   handle: { fontSize: 11.5, fontWeight: '600', textAlign: 'right', writingDirection: 'ltr' },
   followedBy: { fontSize: 10.5, fontWeight: '700', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 8 },
   actions: { flexDirection: 'row-reverse', flexWrap: 'wrap', alignItems: 'center', gap: 7, marginBottom: 10 },
-  button: { minWidth: 39, minHeight: 38, borderWidth: 1, borderRadius: 11, paddingHorizontal: 11, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  iconButton: { width: 39, paddingHorizontal: 0 },
+  button: { minWidth: 44, minHeight: 44, borderWidth: 1, borderRadius: 11, paddingHorizontal: 11, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  iconButton: { width: 44, paddingHorizontal: 0 },
   details: { alignItems: 'flex-end', gap: 8 },
   row: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, flexWrap: 'wrap' },
   metadata: { width: '100%', flexDirection: 'row-reverse', flexWrap: 'wrap', columnGap: 13, rowGap: 6, marginTop: 1 },
   stats: { width: '100%', flexDirection: 'row-reverse', alignItems: 'center', borderWidth: 1, borderRadius: 13, paddingVertical: 2, marginTop: 3 },
-  stat: { flex: 1, minWidth: 0, minHeight: 51, alignItems: 'center', justifyContent: 'center', gap: 1, paddingVertical: 5 },
+  stat: { flex: 1, minWidth: 0, minHeight: 56, alignItems: 'center', justifyContent: 'center', gap: 1, paddingVertical: 5 },
   statValue: { fontSize: 17, lineHeight: 23, fontWeight: '800' },
   statLabel: { fontSize: 10.5, lineHeight: 15, fontWeight: '600' },
   statDivider: { width: 1, height: 27 },
