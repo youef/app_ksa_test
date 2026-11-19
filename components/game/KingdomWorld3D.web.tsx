@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { loadKingdomCharacter, populateKingdom } from './KingdomAssets.web';
+import { addVintageRoom, VINTAGE_ROOM } from './VintageRoom.web';
 
 export type AvatarKey = 'knight' | 'ranger' | 'warrior' | 'desert' | 'captain' | 'mage';
 export type GameSite = 'castle' | 'forest' | 'farm' | 'barracks' | 'harbor' | 'mine' | 'arena' | 'village';
@@ -393,6 +394,7 @@ export default function KingdomWorld3D({ avatarKey, paused, initialX = 0, initia
     host.appendChild(renderer.domElement);
     const camera = new THREE.PerspectiveCamera(57, 1, .15, 600);
     const { clouds, markers } = generateWorld(scene, !mobile);
+    const vintageRoom = addVintageRoom(scene, height);
     const avatar = buildAvatar(avatarKey);
     scene.add(avatar.group);
     setAssetStatus('جارٍ تحميل شخصيات ومباني المملكة…');
@@ -480,8 +482,8 @@ export default function KingdomWorld3D({ avatarKey, paused, initialX = 0, initia
         // Slide along walls rather than stopping both axes at a corner.
         // A saved position inside a newly loaded building can always move out.
         const escaping = !worldAssets.canMove(px, pz);
-        if (escaping || worldAssets.canMove(nx, pz)) px = nx;
-        if (escaping || worldAssets.canMove(px, nz)) pz = nz;
+        if ((escaping || worldAssets.canMove(nx, pz)) && vintageRoom.canMove(nx, pz)) px = nx;
+        if ((escaping || worldAssets.canMove(px, nz)) && vintageRoom.canMove(px, nz)) pz = nz;
         const targetYaw = Math.atan2(dx, dz);
         const yawDiff = Math.atan2(Math.sin(targetYaw - avatar.group.rotation.y), Math.cos(targetYaw - avatar.group.rotation.y));
         avatar.group.rotation.y += yawDiff * Math.min(1, dt * 12);
@@ -503,8 +505,10 @@ export default function KingdomWorld3D({ avatarKey, paused, initialX = 0, initia
       avatar.rightArm.rotation.x = swing * .65;
       avatar.body.position.y = moving ? Math.abs(Math.sin(walkClock)) * .07 : Math.sin(time * 1.7) * .025;
       importedCharacter.update(dt, moving, keyboard.has('shiftleft') || keyboard.has('shiftright') || control.current.sprint, jump > .05);
-      const horizontal = Math.cos(pitch) * distance;
-      cameraGoal.set(px + Math.sin(yaw) * horizontal, height(px, pz) + 2.7 + Math.sin(pitch) * distance, pz + Math.cos(yaw) * horizontal);
+      const indoors = vintageRoom.inside(px, pz);
+      const cameraDistance = indoors ? Math.min(distance, 5.7) : distance;
+      const horizontal = Math.cos(pitch) * cameraDistance;
+      cameraGoal.set(px + Math.sin(yaw) * horizontal, height(px, pz) + 2.7 + Math.sin(pitch) * cameraDistance, pz + Math.cos(yaw) * horizontal);
       camera.position.lerp(cameraGoal, Math.min(1, dt * 5));
       camera.lookAt(px, height(px, pz) + 1.85, pz);
       for (let i = 0; i < markers.length; i++) {
@@ -525,6 +529,7 @@ export default function KingdomWorld3D({ avatarKey, paused, initialX = 0, initia
       renderer.setAnimationLoop(null);
       importedCharacter.dispose();
       worldAssets.dispose();
+      vintageRoom.dispose();
       observer.disconnect();
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
@@ -569,6 +574,7 @@ export default function KingdomWorld3D({ avatarKey, paused, initialX = 0, initia
   };
   return <div style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden', touchAction: 'none', backgroundColor: '#9FD8DC' }}>
     <div ref={holder} style={{ position: 'absolute', inset: 0, touchAction: 'none' }} role="img" aria-label="عالم ممالك حيّنا ثلاثي الأبعاد، حرّك الشخصية باستخدام العصا أو الأسهم أو WASD" />
+    <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 2, padding: '8px 12px', background: 'rgba(5,42,41,.85)', borderRadius: 12, color: '#fff', fontSize: 12, pointerEvents: 'none' }}>🏠 غرفة قديمة عند X:{VINTAGE_ROOM.x} Z:{VINTAGE_ROOM.z} · ادخل من الباب المفتوح</div>
     <div role="status" style={{ position: 'absolute', bottom: 8, left: '50%', transform: 'translateX(-50%)', maxWidth: '60%', padding: '5px 10px', borderRadius: 9, background: 'rgba(5,42,41,.8)', color: '#fff', fontSize: 11, textAlign: 'center', pointerEvents: 'none' }}>{assetStatus}</div>
     <div aria-label="عصا الحركة" role="group"
       onPointerDown={startStick} onPointerMove={updateStick} onPointerUp={endStick} onPointerCancel={endStick}
