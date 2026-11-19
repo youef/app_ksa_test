@@ -33,6 +33,7 @@ const { ProfileHeader } = loadSource('components/profile/ProfileHeader.tsx', {
   '@/lib/profileContact': { loadProfileContact: async () => null },
   '@/context/ThemeContext': { useTheme: () => ({ colors }) },
   '@/lib/profileTheme': { bannerColors: () => ['#111', '#222', '#333'] },
+  '@/lib/profileExperience': loadSource('lib/profileExperience.ts'),
   'expo-linear-gradient': { LinearGradient: view },
 });
 function renderHeader(profile, customization) {
