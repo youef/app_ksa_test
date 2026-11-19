@@ -58,8 +58,8 @@ export function profileActivityOrder(profile:PublicProfileIdentity,order?:unknow
  };
  return [...preferred].sort((a,b)=>withIndex(a)-withIndex(b));
 }
-export function profileStartingTab(profile:PublicProfileIdentity,counts:Partial<Record<ActivityTab,number>>,visible:ActivityTab[]):ActivityTab|undefined {
- const ordered=profileActivityOrder(profile).filter(t=>visible.includes(t));
+export function profileStartingTab(profile:PublicProfileIdentity,counts:Partial<Record<ActivityTab,number>>,visible:ActivityTab[],customOrder?:unknown):ActivityTab|undefined {
+ const ordered=profileActivityOrder(profile,customOrder).filter(t=>visible.includes(t));
  return ordered.find(tab=>Number(counts[tab]||0)>0)||ordered[0];
 }
 export function profileOwnerLinks(caps:ProfileCapabilityFlags|undefined):Array<'products'|'services'|'business'|'promotion'>{
