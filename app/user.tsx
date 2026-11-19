@@ -46,6 +46,7 @@ import { ProfileCustomizationEntry } from '@/components/profile/ProfileCustomiza
 import { AccountStatusMark, getAccountIdentityMeta } from '@/components/profile/AccountIdentityBadge';
 import { C } from '@/lib/ui';
 import { getBlockStatus, setBlock } from '@/lib/chatControls';
+import { profileActivityOrder, profileOwnerLinks, profileStartingTab, publicProfileRoleCopy, type ProfileCapabilityFlags, type ActivityTab } from '@/lib/profileExperience';
 import { getNeighborAccess } from '@/lib/neighborAccess';
 import { ImagePreviewModal } from '@/components/shared/ImagePreviewModal';
 
@@ -117,16 +118,17 @@ export default function UserProfile() {
   const [loadError, setLoadError] = useState(false);
   const [featuredItems, setFeaturedItems] = useState<any[]>([]);
   const [profileCustomization, setProfileCustomization] = useState<any>(null);
+  const [myCapabilities, setMyCapabilities] = useState<ProfileCapabilityFlags | null>(null);
+  const [linkedBusiness, setLinkedBusiness] = useState<{id:string;name:string}|null>(null);
 
-  const visibleTabs = useMemo(() => TABS.filter(({id: key}) => {
-    if (key === 'answers') return currentUserId === id;
-    const section = key === 'market' ? 'products' : key;
-    return profileCustomization?.section_visibility?.[section] !== false;
-  }).sort((a,b) => {
-    const order: string[] = profileCustomization?.section_order || [];
-    const index = (key: Tab) => { const value = order.indexOf(key === 'market' ? 'products' : key === 'answers' ? 'questions' : key); return value < 0 ? 999 : value; };
-    return index(a.id) - index(b.id);
-  }), [currentUserId,id,profileCustomization]);
+  const visibleTabs = useMemo(() => {
+    const priority = profileActivityOrder(profile || {}, profileCustomization?.section_order);
+    return TABS.filter(({id:key}) => {
+      if(key==='answers')return currentUserId===id;
+      const section=key==='market'?'products':key;
+      return profileCustomization?.section_visibility?.[section] !== false;
+    }).sort((a,b)=>priority.indexOf(a.id)-priority.indexOf(b.id));
+  },[currentUserId,id,profile?.account_type,profile?.role,profileCustomization]);
   useEffect(() => { if (!loading && visibleTabs.length && !visibleTabs.some(item => item.id === tab)) setTab(visibleTabs[0].id); }, [loading,visibleTabs,tab]);
 
   function revealActiveTab(key:Tab=tab) {
@@ -233,6 +235,8 @@ export default function UserProfile() {
     setResolvedProfileId('');
     setFeaturedItems([]);
     setProfileCustomization(null);
+    setMyCapabilities(null);
+    setLinkedBusiness(null);
     setLoadedTabs([]);
     setTabError(false);
     setBlocked(false); setBlockedByOther(false); setFollowing(false); setFollowedBy(false);
@@ -317,11 +321,17 @@ export default function UserProfile() {
 
       const contactResult = await loadProfileContact(p.id, true).catch(() => null);
       if (contactRevision === contactRequest.current && contactResult) setContact({ profileId: p.id, phone: contactResult.phone });
-      const [customizationResult, featuredResult] = await Promise.all([
+      const [customizationResult, featuredResult, capabilityResult, businessResult] = await Promise.all([
         supabase.from('profile_customizations').select('accent_color,banner_style,show_stats,show_badges,featured_title,profile_type,section_visibility,section_order').eq('user_id', p.id).maybeSingle(),
         supabase.from('profile_featured_items').select('item_type,item_id,position').eq('user_id', p.id).order('position', { ascending: true }).limit(10),
+        me === p.id ? supabase.rpc('hayna_my_account_capabilities') : Promise.resolve({data:null,error:null}),
+        p.account_type === 'merchant'
+          ? supabase.from('businesses').select('id,name').eq('owner_id',p.id).eq('moderation_status','approved').is('archived_at',null).limit(1).maybeSingle()
+          : Promise.resolve({data:null,error:null}),
       ]);
       setProfileCustomization(customizationResult.data || null);
+      setMyCapabilities(me===p.id && !capabilityResult.error && capabilityResult.data?.user_id === p.id ? capabilityResult.data as ProfileCapabilityFlags : null);
+      setLinkedBusiness(!businessResult.error && businessResult.data ? businessResult.data as {id:string;name:string} : null);
       const featuredRows = featuredResult.data || [];
       const resolvedFeatured = await Promise.all(featuredRows.map(async (featured: any) => {
         let query: any;
@@ -365,32 +375,17 @@ export default function UserProfile() {
       });
       setItems([]); setServices([]); setRequests([]); setQuestions([]); setAnswers([]);
       setLoadedTabs([]);
-      const initialTab: Tab =
-        p.account_type === 'merchant'
-          ? (marketCount.count || 0) > 0
-            ? 'market'
-            : (serviceCount.count || 0) > 0
-              ? 'services'
-              : (questionCount.count || 0) > 0
-                ? 'questions'
-                : 'market'
-          : p.account_type === 'freelance' || p.account_type === 'provider'
-            ? (serviceCount.count || 0) > 0
-              ? 'services'
-              : (questionCount.count || 0) > 0
-                ? 'questions'
-                : (marketCount.count || 0) > 0
-                  ? 'market'
-                  : 'services'
-            : (questionCount.count || 0) > 0
-              ? 'questions'
-              : (serviceCount.count || 0) > 0
-                ? 'services'
-                : (requestCount.count || 0) > 0
-                  ? 'requests'
-                  : (marketCount.count || 0) > 0
-                    ? 'market'
-                    : 'questions';
+      const counts: Partial<Record<ActivityTab,number>> = {
+        questions:questionCount.count||0,requests:requestCount.count||0,
+        market:marketCount.count||0,services:serviceCount.count||0,
+        reviews:0,answers:me===p.id?(answerCount.count||0):0,
+      };
+      const orderedTabs = profileActivityOrder(p,customizationResult.data?.section_order);
+      const visibleAtLoad=orderedTabs.filter((key)=>{
+        if(key==='answers')return me===p.id;
+        return customizationResult.data?.section_visibility?.[key==='market'?'products':key]!==false;
+      });
+      const initialTab:Tab=profileStartingTab(p,counts,visibleAtLoad,customizationResult.data?.section_order)||'questions';
       if (me === p.id && (answerCount.count || 0) > 0 && !(questionCount.count || serviceCount.count || requestCount.count || marketCount.count)) {
         setTab('answers');
         await loadTabData('answers', p.id, me, true);
