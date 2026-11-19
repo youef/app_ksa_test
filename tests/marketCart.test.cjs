@@ -1,7 +1,7 @@
 const test = require('node:test'), assert = require('node:assert/strict'), fs = require('node:fs'), Module = require('node:module'), ts = require('typescript');
 const file = require.resolve('../lib/marketCart.ts'), m = new Module(file);
 m._compile(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,file);
-const {availableProductFulfillments,marketCartTotals,formatCartMoney,productOrderStatus}=m.exports;
+const {availableProductFulfillments,marketCartTotals,formatCartMoney,productOrderStatus,marketCartPriceChanged,marketCartDeliveryChanged}=m.exports;
 test('delivery options mirror the product description',()=>{
  assert.deepEqual(availableProductFulfillments('اسم منتج\nالاستلام: استلام أو توصيل'),['استلام من الموقع','توصيل بالتنسيق']);
  assert.deepEqual(availableProductFulfillments('الاستلام: توصيل بالتنسيق'),['توصيل بالتنسيق']);
@@ -17,4 +17,13 @@ test('product order stages are transparent to buyer and seller',()=>{
  assert.equal(productOrderStatus('accepted'),'قيد التجهيز');
  assert.equal(productOrderStatus('ready'),'جاهز للتسليم أو التوصيل');
  assert.equal(productOrderStatus('cancelled'),'ملغي');
+});
+
+test('cart requires deliberate review after price or delivery changes',()=>{
+ assert.equal(marketCartPriceChanged(150,150),false);
+ assert.equal(marketCartPriceChanged(155,150),true);
+ assert.equal(marketCartPriceChanged(null,null),false);
+ assert.equal(marketCartPriceChanged(null,0),true);
+ assert.equal(marketCartDeliveryChanged('الاستلام: استلام أو توصيل','توصيل بالتنسيق'),false);
+ assert.equal(marketCartDeliveryChanged('الاستلام: استلام من الموقع','توصيل بالتنسيق'),true);
 });

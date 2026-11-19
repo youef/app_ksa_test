@@ -13,6 +13,15 @@ export function availableProductFulfillments(description?: string | null): strin
   if (value === 'استلام أو توصيل') return ['استلام من الموقع', 'توصيل بالتنسيق'];
   return ['بالاتفاق مع البائع'];
 }
+/** Product details are for display; the server still validates the live checkout price. */
+export function marketCartPriceChanged(listed: number | null, expected: number | null): boolean {
+  const current=listed==null?null:Number(listed);
+  const saved=expected==null?null:Number(expected);
+  return !Object.is(current,saved);
+}
+export function marketCartDeliveryChanged(description: string | null | undefined, fulfillment: string): boolean {
+  return !availableProductFulfillments(description).includes(fulfillment);
+}
 export function marketCartTotals(lines: Array<Pick<MarketCartLine,'quantity'|'expected_price'>>): { halalas: number; unknown: number; count: number } {
   let halalas = 0, unknown = 0, count = 0;
   for (const line of lines) {
