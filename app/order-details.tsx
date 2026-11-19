@@ -276,7 +276,13 @@ export default function OrderDetails(){
       </Pressable>
       {showPreferences&&<>{hint('حدد كيف تصلك تحديثات هذا الطلب.')}{button(inApp?'إيقاف إشعارات الطلب داخل التطبيق':'تفعيل إشعارات الطلب داخل التطبيق',()=>void savePreferences(!inApp,push))}{button(push?'إيقاف إشعارات الهاتف':'تفعيل إشعارات الهاتف',()=>void savePreferences(inApp,!push))}</>}
      </>)}
-    {box(<>{title('مركز مشكلات الطلبات')}{hint('تذاكر خاصة بين مقدم البلاغ والإدارة، مرتبطة بالطلب نفسه.')}
+    {box(<>
+     <Pressable accessibilityRole="button" accessibilityState={{expanded:showDisputes}} onPress={()=>setShowDisputes(v=>!v)} style={S.foldHead}>
+       <Text style={[S.title,{color:c.ink}]}>المساعدة ومشكلات الطلب</Text>
+       <Text style={{color:c.primary,fontSize:12}}>{showDisputes?'إخفاء':tickets.length?String(tickets.length)+' بلاغات':'فتح الخيارات'}</Text>
+     </Pressable>
+     {showDisputes&&<>
+       {hint('بلاغ خاص بينك وبين الإدارة، مرتبط بهذا الطلب.')}
      {tickets.map(t=><Pressable key={t.id} onPress={()=>void loadTicket(t)} style={S.line}><Text style={{color:c.primary,fontWeight:'700',textAlign:'right'}}>تذكرة #{t.ticket_number} · {t.status}</Text>{hint(t.description)}</Pressable>)}
      {!ticket?<>{title('فتح بلاغ جديد')}<View style={S.stepRow}>{Object.entries(disputeKinds).map(([k,v])=><Pressable key={k} onPress={()=>setCategory(k)} style={[S.choice,{backgroundColor:category===k?c.primary:c.soft}]}><Text style={{fontSize:11,color:category===k?'white':c.ink}}>{v}</Text></Pressable>)}</View>
       {input(description,setDescription,'اشرح المشكلة والتفاصيل',true)}
@@ -288,6 +294,7 @@ export default function OrderDetails(){
        {input(message,setMessage,'اكتب ردك للإدارة',true)}{button('إرسال رسالة',()=>void sendMessage(),!message.trim())}
        {button('العودة إلى قائمة البلاغات',()=>setTicket(null))}
       </>}
+     </>}
     </>)}
    </>:!loading?hint('تعذر عرض الطلب. تحقق من الرابط أو صلاحية الحساب.'):null}
   </ScrollView>
