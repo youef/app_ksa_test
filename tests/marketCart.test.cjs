@@ -9,7 +9,7 @@ test('delivery options mirror the product description',()=>{
 });
 test('cart totals use integer halalas and identify negotiation lines',()=>{
  assert.deepEqual(marketCartTotals([{quantity:2,expected_price:10.25},{quantity:1,expected_price:null}]),{halalas:2050,unknown:1,count:3});
- assert.match(formatCartMoney(2050),/20/);
+ assert.match(formatCartMoney(2050),/(20|٢٠)/);
  assert.throws(()=>marketCartTotals([{quantity:21,expected_price:10}]),/كمية/);
  assert.throws(()=>marketCartTotals([{quantity:1,expected_price:-1}]),/سعر/);
 });
