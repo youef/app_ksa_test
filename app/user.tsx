@@ -255,7 +255,7 @@ export default function UserProfile() {
       const me = sessionData?.session?.user?.id || null;
       setCurrentUserId(me);
       const access=await getNeighborAccess(lookupKey);
-      if(!access.can_view){setScopeDenied(true);return;}
+      if(!access.can_view){setScopeDenied(true);setProfile(null);setMyCapabilities(null);setLinkedBusiness(null);setItems([]);setServices([]);setFeaturedItems([]);return;}
       setCanMessage(access.can_message);
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(lookupKey);
       const { data: p, error } = await supabase.from('profiles').select('id,username,display_name,avatar_url,role,is_verified,is_verified_merchant,verification_status,account_type,freelance_trade,city,district,bio,is_geoverified,badges,profile_privacy,hide_name,is_banned,allow_dms,created_at')
