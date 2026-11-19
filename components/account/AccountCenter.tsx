@@ -388,6 +388,9 @@ export default function AccountCenter() {
   const verificationStatus = String(verification?.status || '').toLowerCase();
   const verificationPending = verificationStatus === 'pending';
   const verificationRejected = verificationStatus === 'rejected' && !profile?.is_verified;
+  const simpleVerificationNeedsEvidence = identityType !== 'standard' || !Boolean(profile?.is_verified);
+  const simpleVerificationCanSubmit = (identityType === 'standard' || Boolean(professionalName.trim()))
+    && (!simpleVerificationNeedsEvidence || Boolean(evidence));
   const verificationStateLabel = verificationQueryError && !profile?.is_verified ? 'تعذر التحقق من الطلب' : verificationPending ? 'طلب قيد المراجعة' : profile?.is_verified ? 'حساب موثّق' : verificationRejected ? 'لم يُعتمد الطلب الأخير' : 'الحساب غير موثّق';
   const verificationStateMessage = verificationQueryError && !profile?.is_verified
     ? 'تعذر تحديث حالة الطلب من الخادم. أعد المحاولة قبل تقديم طلب جديد.'
@@ -1040,8 +1043,12 @@ export default function AccountCenter() {
                         </View>
                         {evidence?<Check size={17} color={colors.primary}/>:<ChevronLeft size={17} color={colors.primary}/>}
                       </Pressable>
-                      <Text style={styles.verifyFormHint}>3. تُرسل البيانات إلى الإدارة للمراجعة. لا يتغير نوع الحساب المعتمد بمجرد إرسال الطلب.</Text>
-                      <Pressable oasisKind="action" oasisVariant="primary" accessibilityRole="button" accessibilityLabel="إرسال طلب التوثيق للمراجعة" style={styles.verifySubmitButton} onPress={()=>void submitIdentityRequest()} disabled={identitySaving}>
+                      <View style={[styles.verifyReadiness,{backgroundColor:simpleVerificationCanSubmit?colors.soft:colors.background,borderColor:colors.line}]}>
+                        <Text style={[styles.verifyFormHint,{color:simpleVerificationCanSubmit?colors.primary:colors.muted}]}>
+                          {identityType!=='standard'&&!professionalName.trim()?'أكمل اسم النشاط أو المبادرة أولًا.':simpleVerificationNeedsEvidence&&!evidence?'أرفق صورة الإثبات للمتابعة.':'جاهز للإرسال. ستراجع الإدارة الطلب قبل اعتماد أي تغيير.'}
+                        </Text>
+                      </View>
+                      <Pressable oasisKind="action" oasisVariant="primary" accessibilityRole="button" accessibilityLabel="إرسال طلب التوثيق للمراجعة" accessibilityState={{disabled:identitySaving||!simpleVerificationCanSubmit}} style={[styles.verifySubmitButton,(identitySaving||!simpleVerificationCanSubmit)&&{opacity:0.52}]} onPress={()=>void submitIdentityRequest()} disabled={identitySaving||!simpleVerificationCanSubmit}>
                         {identitySaving?<ActivityIndicator size="small" color={colors.surface}/>:<ShieldCheck size={18} color={colors.surface}/>}
                         <Text style={styles.verifySubmitText}>{identitySaving?'جارٍ إرسال الطلب…':'إرسال الطلب للمراجعة'}</Text>
                       </Pressable>
@@ -1612,6 +1619,7 @@ const createStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleShe
   verifyTypeName: {fontSize:12.5,color:colors.ink,fontWeight:'800',textAlign:'right'},
   verifyTypeDescription: {fontSize:11,color:colors.muted,lineHeight:17,textAlign:'right'},
   verifyFormFields: {gap:11},
+  verifyReadiness: {paddingHorizontal:12,paddingVertical:10,borderWidth:1,borderRadius:13},
   verifySubmitButton: {minHeight:52,borderRadius:14,backgroundColor:colors.primary,flexDirection:'row-reverse',alignItems:'center',justifyContent:'center',gap:9,paddingHorizontal:12},
   verifySubmitText: {fontSize:13.5,fontWeight:'800',color:colors.surface,textAlign:'center'},
   verifyHelp: {flexDirection:'row-reverse',alignItems:'center',gap:9,paddingHorizontal:9,paddingVertical:5},
