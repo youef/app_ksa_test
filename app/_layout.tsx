@@ -26,7 +26,7 @@ const ACCOUNT_ONLY_ROUTES = [
   '/profile', '/settings', '/messages', '/platform-inbox', '/conversation',
   '/ask', '/create-story', '/story', '/stories', '/story-settings', '/story-viewers', '/notifications',
   '/new-service', '/new-listing', '/market-cart', '/product-orders', '/order-details', '/service', '/business', '/directory', '/user', '/report', '/admin', '/support',
-  '/live', '/kingdom',
+  '/live', '/kingdom', '/kingdom-world',
 ];
 
 function needsAccount(pathname: string) {
@@ -128,7 +128,7 @@ function RootContent() {
   const path = pathname.replace(/\/+$/, '') || '/';
   const liveFullScreen = path === '/live' || path.startsWith('/live/');
   const storyFullScreen = ['/stories', '/create-story', '/story', '/story-viewers', '/story-settings'].some(route => path === route || path.startsWith(route + '/'));
-  const hideBottomNav = path.startsWith('/admin') || ['/ask', '/service', '/new-service', '/new-listing', '/weather-radar'].some(route => path === route || path.startsWith(route + '/'));
+  const hideBottomNav = path.startsWith('/admin') || ['/ask', '/service', '/new-service', '/new-listing', '/weather-radar', '/kingdom-world'].some(route => path === route || path.startsWith(route + '/'));
   const hiddenRoute = Object.entries(flags).some(([key, enabled]) => enabled === false && ({ market: ['/market', '/service', '/new-service', '/new-listing'], directory: ['/directory', '/business'], search: ['/search'], stories: ['/stories', '/story', '/create-story'], weather: ['/weather', '/weather-radar'], carpooling: ['/carpooling'], urgent_alerts: ['/emergency-alert'], questions: ['/questions', '/question'], live: ['/lives', '/live'], map: ['/map'] }[key] || []).some(route => path === route || path.startsWith(route + '/')));
   const routeBlocked = hiddenRoute && path !== '/admin';
   // Feed screens already use native RefreshControl; never intercept their scrolling.
