@@ -17,7 +17,7 @@
 ## النتائج
 - تم تطبيق تغييرات `app/ask.tsx` وتحديث `tests/askWizardLayout.test.cjs` لتأكيد المقاسات الجديدة.
 - تمت مراجعة diff؛ التغييرات محصورة في شاشة الإنشاء وتخطيطها.
-- فحوص GitHub Actions (TypeScript وplatform-bundles) ومعاينة Vercel **قيد الانتظار** عند فتح PR #171. لم يتوفر checkout محلي لتشغيلها مباشرة.
+- أُضيف تشغيل `node --test tests/askWizardLayout.test.cjs` إلى workflow الخاص بفحص الصفحة؛ فحوص GitHub Actions (TypeScript، اختبارات التخطيط، platform-bundles) ومعاينة Vercel **قيد الانتظار** عند آخر متابعة. لم يتوفر checkout محلي لتشغيلها مباشرة.
 - مراجعة أجهزة iPhone/Android/iPad/Web ولوحة المفاتيح وSafe Area لم تُجرَ بعد.
 
 ## الصفحة التالية
