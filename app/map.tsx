@@ -109,7 +109,12 @@ export default function MapScreen() {
     }
     const center = findPlaceCenter(active.city);
     const origin = originOverride ?? myLocation ?? (center ? { latitude: center.lat, longitude: center.lng } : null);
-    if (!origin) return;
+    if (!origin) {
+      setPlaces([]);
+      setPlacesError('');
+      setPlacesLoading(false);
+      return;
+    }
     setPlacesLoading(true);
     setPlacesError('');
     try {
