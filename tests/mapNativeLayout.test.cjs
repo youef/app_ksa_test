@@ -31,6 +31,8 @@ test('map search and filters expose keyboard and selection accessibility', () =>
   assert.match(screen, /accessibilityState=\{\{ selected: active \}\}/);
   assert.match(screen, /hitSlop=\{\{ top: 6, bottom: 6, left: 4, right: 4 \}\}/);
   assert.match(screen, /minHeight: 44/);
+  assert.match(screen, /accessibilityLabel="إغلاق تفاصيل المكان" hitSlop=\{8\}/);
+  assert.match(screen, /minHeight: 44, justifyContent: 'center', paddingHorizontal: 14/);
 });
 
 test('map loading, failure, retry, and contextual empty states are explicit', () => {
