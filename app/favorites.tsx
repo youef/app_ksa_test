@@ -206,8 +206,8 @@ export default function FavoritesScreen() {
         </ScrollView>
 
         {loading ? <OasisSurface oasisSurface="card" style={styles.stateCard}><ActivityIndicator size="large" color={OASIS.colors.primary} /><Text style={styles.stateTitle}>جارٍ تحميل مفضّلتك</Text><Text style={styles.stateDesc}>نجهّز العناصر المحفوظة وتفاصيلها.</Text></OasisSurface> :
-          !signedIn ? <OasisSurface oasisSurface="card" style={styles.stateCard}><View style={styles.stateIcon}><LogIn size={25} color="#6D28D9" /></View><Text style={styles.stateTitle}>سجّل الدخول لعرض المفضلة</Text><Text style={styles.stateDesc}>ستجد هنا المنتجات والاستفسارات التي تحفظها على حسابك.</Text><Pressable oasisVariant="primary" oasisKind="action" onPress={() => router.push('/auth')} style={styles.primaryButton}><Text style={styles.primaryButtonText}>تسجيل الدخول</Text><ChevronLeft size={16} color={OASIS.colors.surface} /></Pressable></OasisSurface> :
-          error ? <OasisSurface oasisSurface="card" style={styles.stateCard}><Text style={styles.stateTitle}>تعذر تحميل المفضلة</Text><Text style={styles.stateDesc}>{error}</Text><Pressable oasisKind="action" onPress={() => void load()} style={styles.outlineButton}><RefreshCw size={15} color="#6D28D9" /><Text style={styles.outlineText}>إعادة المحاولة</Text></Pressable></OasisSurface> :
+          !signedIn ? <OasisSurface oasisSurface="card" style={styles.stateCard}><View style={styles.stateIcon}><LogIn size={25} color={OASIS.colors.primary} /></View><Text style={styles.stateTitle}>سجّل الدخول لعرض المفضلة</Text><Text style={styles.stateDesc}>ستجد هنا المنتجات والاستفسارات التي تحفظها على حسابك.</Text><Pressable oasisVariant="primary" oasisKind="action" onPress={() => router.push('/auth')} style={styles.primaryButton}><Text style={styles.primaryButtonText}>تسجيل الدخول</Text><ChevronLeft size={16} color={OASIS.colors.surface} /></Pressable></OasisSurface> :
+          error ? <OasisSurface oasisSurface="card" style={styles.stateCard}><Text style={styles.stateTitle}>تعذر تحميل المفضلة</Text><Text style={styles.stateDesc}>{error}</Text><Pressable oasisKind="action" onPress={() => void load()} style={styles.outlineButton}><RefreshCw size={15} color={OASIS.colors.primary} /><Text style={styles.outlineText}>إعادة المحاولة</Text></Pressable></OasisSurface> :
           visible.length ? <View style={[styles.listWrap, wideLayout && styles.listWrapWide]}>{visible.map(item => {
             const meta = typeMeta(item.target_type);
             const Icon = meta.icon;
@@ -233,7 +233,7 @@ export default function FavoritesScreen() {
                   </View>
                 </Pressable>
                 <View style={styles.cardActions}>
-                  <Pressable oasisKind="action" onPress={() => item.route && router.push(item.route)} accessibilityRole="button" accessibilityLabel={`عرض تفاصيل ${item.title || meta.label}`} style={styles.openButton}><Text style={styles.openButtonText}>عرض التفاصيل</Text><ChevronLeft size={15} color="#6D28D9" /></Pressable>
+                  <Pressable oasisKind="action" onPress={() => item.route && router.push(item.route)} accessibilityRole="button" accessibilityLabel={`عرض تفاصيل ${item.title || meta.label}`} style={styles.openButton}><Text style={styles.openButtonText}>عرض التفاصيل</Text><ChevronLeft size={15} color={OASIS.colors.primary} /></Pressable>
                   <Pressable oasisKind="icon" onPress={() => remove(item)} accessibilityRole="button" accessibilityLabel={`إزالة ${item.title || meta.label} من المفضلة`} style={styles.removeButton}><Trash2 size={17} color={OASIS.colors.danger} /></Pressable>
                 </View>
               </OasisSurface>
@@ -247,7 +247,7 @@ export default function FavoritesScreen() {
             {!items.length && <View style={styles.emptyActions}><Pressable oasisVariant="primary" oasisKind="action" onPress={() => router.push('/market')} style={styles.primaryButton}><Text style={styles.primaryButtonText}>تصفح سوق الحي</Text><ChevronLeft size={15} color={OASIS.colors.surface} /></Pressable><Pressable oasisKind="action" onPress={() => router.push('/question')} style={styles.outlineButton}><Text style={styles.outlineText}>استكشف الاستفسارات</Text></Pressable></View>}
           </OasisSurface>
         }
-        <View style={styles.privacyNote}><Bookmark size={15} color="#6D28D9" /><Text style={styles.privacyText}>قائمتك خاصة بك، ويمكنك إزالة أي عنصر منها في أي وقت.</Text></View>
+        <View style={styles.privacyNote}><Bookmark size={15} color={OASIS.colors.primary} /><Text style={styles.privacyText}>قائمتك خاصة بك، ويمكنك إزالة أي عنصر منها في أي وقت.</Text></View>
       </ScrollView>
     </View>
   );
