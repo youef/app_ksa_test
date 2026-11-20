@@ -67,3 +67,6 @@ Keep the PR as draft until automated checks pass and a maintainer review is reco
 - Automated TypeScript, Expo Web build, and focused map regression are wired to run on this PR; results must be read from the PR checks before merge.
 - iPhone/Android/iPad visual and assistive-technology review still requires physical/simulator QA.
 - Keep this PR in draft until all automated checks pass and a maintainer review is recorded.
+
+## Next page
+- `app/cities.tsx` — improve the city/district picker hierarchy, selected-location feedback, search/empty states, and safe-area/touch behavior after this map batch is reviewed. This is a separate route and does not overlap the open map web PRs.
