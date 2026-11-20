@@ -494,7 +494,7 @@ export default function SearchPage() {
             placeholderTextColor="#94a3b8" value={query} onChangeText={setQuery}
             onFocus={()=>setIsFocused(true)} onBlur={()=>setIsFocused(false)}
             selectionColor={OASIS.colors.primary} returnKeyType="search"
-            onSubmitEditing={()=>{if(query.trim())handleSelectKeyword(query.trim());}}/>
+            onSubmitEditing={()=>{if(query.trim()){handleSelectKeyword(query.trim());searchFieldRef.current?.blur();}}}/>
           {query.length>0 && (
             <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="مسح عبارة البحث"
               onPress={()=>{setQuery('');setResults({users:[],questions:[],requests:[],shops:[]});}}
@@ -584,7 +584,7 @@ export default function SearchPage() {
         showsVerticalScrollIndicator={false}
       >
         {loading && (
-          <View style={styles.loadingContainer}>
+          <View style={styles.loadingContainer} accessibilityRole="progressbar" accessibilityLabel="جارٍ البحث في قاعدة بيانات حيك...">
             <ActivityIndicator size="large" color={OASIS.colors.primary} />
             <Text style={styles.loadingText}>جارٍ البحث في قاعدة بيانات حيك...</Text>
           </View>
@@ -604,7 +604,7 @@ export default function SearchPage() {
           <View style={styles.resultsContainer}>
             <View style={{ flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
               <Text style={{ color: OASIS.colors.ink, fontWeight: '800', fontSize: 14, textAlign: 'right' }}>نتائج الاستكشاف</Text>
-              <Text style={{ color: OASIS.colors.muted, fontSize: 11 }}>{selectedCount} نتيجة</Text>
+              <Text accessibilityLiveRegion="polite" style={{ color: OASIS.colors.muted, fontSize: 11 }}>{selectedCount} نتيجة</Text>
             </View>
             {/* Compact results without redundant section headers */}
             {(activeTab === 'all' || activeTab === 'users') && results.users.length > 0 && (
@@ -754,7 +754,7 @@ const styles = StyleSheet.create({
   },
   searchBarContainer: {paddingHorizontal:16,paddingTop:12,paddingBottom:9,backgroundColor:'#F9FBF9'},
   scopeRow: {flexDirection:'row-reverse',alignItems:'center',justifyContent:'space-between',gap:8,marginTop:9},
-  scopeToggle: {minHeight:34,flexDirection:'row-reverse',alignItems:'center',gap:6,paddingHorizontal:11,borderRadius:12,backgroundColor:'#EDF5F0'},
+  scopeToggle: {minHeight:44,flexDirection:'row-reverse',alignItems:'center',gap:6,paddingHorizontal:11,borderRadius:12,backgroundColor:'#EDF5F0'},
   scopeToggleActive: {backgroundColor:'#DFF2E5'},
   scopeToggleText: {color:'#17654D',fontSize:11.5,fontWeight:'700'},
   scopeCaption: {color:'#85968A',fontSize:11},
@@ -791,7 +791,7 @@ const styles = StyleSheet.create({
     gap: 8,
     alignItems: 'center',
   },
-  tab: {flexDirection:'row-reverse',alignItems:'center',gap:6,paddingHorizontal:13,minHeight:38,paddingVertical:7,borderRadius:19,overflow:'hidden',backgroundColor:'#EDF4EF',borderWidth:1,borderColor:'#E3ECE5'},
+  tab: {flexDirection:'row-reverse',alignItems:'center',gap:6,paddingHorizontal:13,minHeight:44,paddingVertical:9,borderRadius:19,overflow:'hidden',backgroundColor:'#EDF4EF',borderWidth:1,borderColor:'#E3ECE5'},
   tabActive: {
     backgroundColor: OASIS.colors.primary,
     borderColor: OASIS.colors.primary,
@@ -911,9 +911,9 @@ const styles = StyleSheet.create({
   },
   userCard: {
     backgroundColor: OASIS.colors.surface,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 8,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 10,
     borderWidth: 1,
     borderColor: OASIS.colors.line
   },
@@ -1013,9 +1013,9 @@ const styles = StyleSheet.create({
   },
   postCard: {
     backgroundColor: OASIS.colors.surface,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 8,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 10,
     borderWidth: 1,
     borderColor: OASIS.colors.line
   },
@@ -1162,9 +1162,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 4,
+    minHeight: 44,
     backgroundColor: OASIS.colors.infoSoft,
     paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingVertical: 7,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#bae6fd',
@@ -1409,7 +1410,7 @@ const styles = StyleSheet.create({
   discoveryIntroCopy: {flex:1,alignItems:'flex-end',gap:3},
   discoveryIntroTitle: {fontSize:15,fontWeight:'800',color:'#173E30',textAlign:'right'},
   discoveryIntroSub: {fontSize:11.5,fontWeight:'500',color:'#667D70',lineHeight:18,textAlign:'right'},
-  discoveryFocus: {width:38,height:38,borderRadius:12,backgroundColor:'#FFFFFF',alignItems:'center',justifyContent:'center'},
+  discoveryFocus: {width:44,height:44,borderRadius:12,backgroundColor:'#FFFFFF',alignItems:'center',justifyContent:'center'},
   discoveryBlock: {gap:10},
   discoveryBlockTitle: {fontSize:14,fontWeight:'700',color:OASIS.colors.ink,textAlign:'right'},
   discoveryGrid: {flexDirection:'row-reverse',flexWrap:'wrap',columnGap:10,rowGap:10},
@@ -1419,15 +1420,15 @@ const styles = StyleSheet.create({
   shortcutTitle: {fontSize:12.5,fontWeight:'700',color:OASIS.colors.ink,textAlign:'right'},
   shortcutSub: {fontSize:10.5,fontWeight:'500',color:'#7B9083',textAlign:'right'},
   discoveryHeader: {flexDirection:'row-reverse',alignItems:'center',justifyContent:'space-between',gap:8},
-  clearHistory: {flexDirection:'row-reverse',alignItems:'center',gap:4,padding:5},
+  clearHistory: {minHeight:44,flexDirection:'row-reverse',alignItems:'center',justifyContent:'center',gap:4,paddingHorizontal:8,
   clearHistoryText: {fontSize:11,color:OASIS.colors.muted},
   suggestions: {flexDirection:'row-reverse',flexWrap:'wrap',gap:8},
-  suggestionChip: {flexDirection:'row-reverse',alignItems:'center',gap:6,minHeight:36,paddingVertical:7,paddingHorizontal:11,borderRadius:18,backgroundColor:'#FFFFFF',borderWidth:1,borderColor:'#DDE8E0'},
+  suggestionChip: {flexDirection:'row-reverse',alignItems:'center',gap:6,minHeight:44,paddingVertical:7,paddingHorizontal:11,borderRadius:18,backgroundColor:'#FFFFFF',borderWidth:1,borderColor:'#DDE8E0'},
   suggestionText: {fontSize:11.5,fontWeight:'600',color:'#2E5946'},
   recentItem: {flexDirection:'row-reverse',alignItems:'center',borderRadius:12,backgroundColor:'#FFFFFF',borderWidth:1,borderColor:'#E0E9E3'},
-  recentKeyword: {flexDirection:'row-reverse',alignItems:'center',gap:5,paddingVertical:9,paddingHorizontal:10,maxWidth:185},
+  recentKeyword: {minHeight:44,flexDirection:'row-reverse',alignItems:'center',gap:5,paddingVertical:9,paddingHorizontal:10,maxWidth:185},
   recentText: {fontSize:11.5,fontWeight:'600',color:OASIS.colors.ink},
-  recentRemove: {minWidth:27,minHeight:36,alignItems:'center',justifyContent:'center',paddingHorizontal:6},
-  backToAll: {flexDirection:'row-reverse',alignItems:'center',alignSelf:'flex-end',gap:7,paddingVertical:8,paddingHorizontal:2},
+  recentRemove: {minWidth:44,minHeight:44,alignItems:'center',justifyContent:'center',paddingHorizontal:6},
+  backToAll: {minHeight:44,flexDirection:'row-reverse',alignItems:'center',alignSelf:'flex-end',gap:7,paddingVertical:8,paddingHorizontal:8,,
   backToAllText: {color:OASIS.colors.primary,fontSize:12,fontWeight:'700'},
 });
