@@ -139,6 +139,8 @@ export default function Market() {
   const [loadingAttendees, setLoadingAttendees] = useState(false);
   const [attendeeActionBusy, setAttendeeActionBusy] = useState(false);
   const [savedItems, setSavedItems] = useState<Record<string, boolean>>({});
+  const [savingFavorites, setSavingFavorites] = useState<Record<string, boolean>>({});
+  const savingFavoritesLock = useRef(new Set<string>());
   const [reduceMotion, setReduceMotion] = useState(false);
   useEffect(() => {
     let mounted = true;
@@ -180,30 +182,39 @@ export default function Market() {
   const favoriteKey = (targetType: 'service' | 'product' | 'store', itemId: string) => `${targetType}:${itemId}`;
 
   const toggleSaveItem = async (itemId: string, targetType: 'service' | 'product' | 'store') => {
-    const { data: auth, error: authError } = await supabase.auth.getUser();
-    if (authError || !auth.user) {
-      Alert.alert('سجّل الدخول أولاً', 'يلزم تسجيل الدخول لحفظ المنتجات والمتاجر في المفضلة.');
-      router.push('/auth');
-      return;
-    }
     const key = favoriteKey(targetType, itemId);
-    const isSaved = Boolean(savedItems[key]);
-    setSavedItems((prev) => ({ ...prev, [key]: !isSaved }));
+    // Lock synchronously: two taps before React re-renders must not race.
+    if (savingFavoritesLock.current.has(key)) return;
+    savingFavoritesLock.current.add(key);
+    setSavingFavorites((prev) => ({ ...prev, [key]: true }));
     try {
-      if (isSaved) {
-        const { error } = await supabase.from('favorite_items').delete()
-          .eq('user_id', auth.user.id).eq('target_type', targetType).eq('target_id', itemId);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from('favorite_items').upsert(
-          { user_id: auth.user.id, target_type: targetType, target_id: itemId },
-          { onConflict: 'user_id,target_type,target_id', ignoreDuplicates: true },
-        );
-        if (error) throw error;
+      const { data: auth, error: authError } = await supabase.auth.getUser();
+      if (authError || !auth.user) {
+        Alert.alert('سجّل الدخول أولاً', 'يلزم تسجيل الدخول لحفظ المنتجات والمتاجر في المفضلة.');
+        router.push('/auth');
+        return;
       }
-    } catch (error: any) {
-      setSavedItems((prev) => ({ ...prev, [key]: isSaved }));
-      Alert.alert('تعذر تحديث المفضلة', error?.message || 'حاول مرة أخرى بعد قليل.');
+      const isSaved = Boolean(savedItems[key]);
+      setSavedItems((prev) => ({ ...prev, [key]: !isSaved }));
+      try {
+        if (isSaved) {
+          const { error } = await supabase.from('favorite_items').delete()
+            .eq('user_id', auth.user.id).eq('target_type', targetType).eq('target_id', itemId);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase.from('favorite_items').upsert(
+            { user_id: auth.user.id, target_type: targetType, target_id: itemId },
+            { onConflict: 'user_id,target_type,target_id', ignoreDuplicates: true },
+          );
+          if (error) throw error;
+        }
+      } catch (error: any) {
+        setSavedItems((prev) => ({ ...prev, [key]: isSaved }));
+        Alert.alert('تعذر تحديث المفضلة', error?.message || 'حاول مرة أخرى بعد قليل.');
+      }
+    } finally {
+      savingFavoritesLock.current.delete(key);
+      setSavingFavorites((prev) => ({ ...prev, [key]: false }));
     }
   };
 
@@ -634,14 +645,16 @@ export default function Market() {
               hitSlop={8}
               accessibilityRole="button"
               accessibilityLabel={isSaved ? 'إزالة من المفضلة' : 'حفظ في المفضلة'}
-              accessibilityState={{ selected: isSaved }}
+              disabled={Boolean(savingFavorites[favoriteKey(favoriteType, item.id)])}
+              accessibilityHint="انتظر حتى يكتمل تحديث المفضلة"
+              accessibilityState={{ selected: isSaved, busy: Boolean(savingFavorites[favoriteKey(favoriteType, item.id)]), disabled: Boolean(savingFavorites[favoriteKey(favoriteType, item.id)]) }}
               style={({ pressed }) => [styles.shareFab, isSaved && { backgroundColor: OASIS.colors.dangerSoft }, pressed && { opacity: 0.82 }, pressed && !reduceMotion && { transform: [{ scale: 0.93 }] }]}
               onPress={(e: any) => {
                 e?.stopPropagation?.();
                 void toggleSaveItem(item.id, favoriteType);
               }}
             >
-              <Heart size={13} color={isSaved ? OASIS.colors.danger : OASIS.colors.muted} fill={isSaved ? OASIS.colors.danger : 'none'} />
+              {savingFavorites[favoriteKey(favoriteType, item.id)] ? <ActivityIndicator size="small" color={OASIS.colors.primary} /> : <Heart size={13} color={isSaved ? OASIS.colors.danger : OASIS.colors.muted} fill={isSaved ? OASIS.colors.danger : 'none'} />}
             </Pressable>
             <Pressable oasisKind="plain"
               hitSlop={8}
@@ -743,14 +756,16 @@ export default function Market() {
               hitSlop={8}
               accessibilityRole="button"
               accessibilityLabel={isSaved ? 'إزالة من المفضلة' : 'حفظ في المفضلة'}
-              accessibilityState={{ selected: isSaved }}
+              disabled={Boolean(savingFavorites[favoriteKey('store', b.id)])}
+              accessibilityHint="انتظر حتى يكتمل تحديث المفضلة"
+              accessibilityState={{ selected: isSaved, busy: Boolean(savingFavorites[favoriteKey('store', b.id)]), disabled: Boolean(savingFavorites[favoriteKey('store', b.id)]) }}
               style={({ pressed }) => [styles.shareFab, isSaved && { backgroundColor: OASIS.colors.dangerSoft }, pressed && { opacity: 0.82 }, pressed && !reduceMotion && { transform: [{ scale: 0.93 }] }]}
               onPress={(e: any) => {
                 e?.stopPropagation?.();
                 void toggleSaveItem(b.id, 'store');
               }}
             >
-              <Heart size={13} color={isSaved ? OASIS.colors.danger : OASIS.colors.muted} fill={isSaved ? OASIS.colors.danger : 'none'} />
+              {savingFavorites[favoriteKey('store', b.id)] ? <ActivityIndicator size="small" color={OASIS.colors.primary} /> : <Heart size={13} color={isSaved ? OASIS.colors.danger : OASIS.colors.muted} fill={isSaved ? OASIS.colors.danger : 'none'} />}
             </Pressable>
             <Pressable oasisKind="plain"
               hitSlop={8}
