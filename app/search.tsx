@@ -1420,7 +1420,7 @@ const styles = StyleSheet.create({
   shortcutTitle: {fontSize:12.5,fontWeight:'700',color:OASIS.colors.ink,textAlign:'right'},
   shortcutSub: {fontSize:10.5,fontWeight:'500',color:'#7B9083',textAlign:'right'},
   discoveryHeader: {flexDirection:'row-reverse',alignItems:'center',justifyContent:'space-between',gap:8},
-  clearHistory: {minHeight:44,flexDirection:'row-reverse',alignItems:'center',justifyContent:'center',gap:4,paddingHorizontal:8,
+  clearHistory: {minHeight:44,flexDirection:'row-reverse',alignItems:'center',justifyContent:'center',gap:4,paddingHorizontal:8},
   clearHistoryText: {fontSize:11,color:OASIS.colors.muted},
   suggestions: {flexDirection:'row-reverse',flexWrap:'wrap',gap:8},
   suggestionChip: {flexDirection:'row-reverse',alignItems:'center',gap:6,minHeight:44,paddingVertical:7,paddingHorizontal:11,borderRadius:18,backgroundColor:'#FFFFFF',borderWidth:1,borderColor:'#DDE8E0'},
@@ -1429,6 +1429,6 @@ const styles = StyleSheet.create({
   recentKeyword: {minHeight:44,flexDirection:'row-reverse',alignItems:'center',gap:5,paddingVertical:9,paddingHorizontal:10,maxWidth:185},
   recentText: {fontSize:11.5,fontWeight:'600',color:OASIS.colors.ink},
   recentRemove: {minWidth:44,minHeight:44,alignItems:'center',justifyContent:'center',paddingHorizontal:6},
-  backToAll: {minHeight:44,flexDirection:'row-reverse',alignItems:'center',alignSelf:'flex-end',gap:7,paddingVertical:8,paddingHorizontal:8,,
+  backToAll: {minHeight:44,flexDirection:'row-reverse',alignItems:'center',alignSelf:'flex-end',gap:7,paddingVertical:8,paddingHorizontal:8},
   backToAllText: {color:OASIS.colors.primary,fontSize:12,fontWeight:'700'},
 });
