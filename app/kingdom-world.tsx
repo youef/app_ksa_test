@@ -1,5 +1,5 @@
 import React from 'react';
-import { Platform, Text, View, useWindowDimensions } from 'react-native';
+import { Platform, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { ArrowRight, Gamepad2 } from 'lucide-react-native';
 import { AppHeader } from '@/components/shared/AppHeader';
@@ -8,7 +8,6 @@ import { OasisPressable as Pressable } from '@/components/oasis/OasisPrimitives'
 
 export default function KingdomWorld() {
   const { colors } = useTheme();
-  const { height } = useWindowDimensions();
   if (Platform.OS === 'web') {
     return <View style={{ flex: 1, backgroundColor: '#102b25' }}>
       {React.createElement('iframe' as any, { title: 'مماليك حيّنا 3D', src: '/mamaleek-hina.html', allow: 'fullscreen; gamepad', style: { width: '100%', height: '100%', border: 0, display: 'block' } })}
