@@ -467,7 +467,7 @@ export default function MapScreen() {
 
       {addMenuOpen ? (
         <View style={[styles.addMenu, { bottom: bottomInset + 70, left: Math.max(12, insets.left + 8), right: Math.max(12, insets.right + 8), maxWidth: viewportWidth >= 768 ? 520 : undefined, alignSelf: 'center' }]}>
-          <View style={styles.addMenuHead}><Text style={styles.addMenuTitle}>وش حاب تضيف للخريطة؟</Text><Pressable onPress={() => setAddMenuOpen(false)}><Text style={styles.closeMenuText}>إغلاق </Text></Pressable></View>
+          <View style={styles.addMenuHead}><Text style={styles.addMenuTitle}>وش حاب تضيف للخريطة؟</Text><Pressable accessibilityLabel="إغلاق قائمة الإضافة" hitSlop={8} onPress={() => setAddMenuOpen(false)}><Text style={styles.closeMenuText}>إغلاق </Text></Pressable></View>
           {addAction('منتج أو خدمة', '', '/new-listing')}
           {addAction('تنبيه طارئ', '', '/ask')}
           {addAction('طلب مساعدة', '', '/ask')}
@@ -478,7 +478,7 @@ export default function MapScreen() {
 
       {selectedPlace ? (
         <View style={[styles.placeDetailSheet, { bottom: detailPanelBottom, left: Math.max(12, insets.left + 8), right: Math.max(12, insets.right + 8), maxWidth: viewportWidth >= 768 ? 520 : undefined, alignSelf: 'center' }]}>
-          <View style={styles.detailHead}><View style={styles.placeBadge}><Store size={20} color="#0F766E" /></View><View style={{ flex: 1 }}><Text style={styles.selectedTitle}>{selectedPlace.name}</Text><Text style={styles.selectedMeta}>{selectedPlace.categoryLabel} · {formatDistance(selectedPlace.distance)}</Text></View><Pressable onPress={() => setSelectedPlace(null)}><X size={20} color="#64746b" /></Pressable></View>
+          <View style={styles.detailHead}><View style={styles.placeBadge}><Store size={20} color="#0F766E" /></View><View style={{ flex: 1 }}><Text style={styles.selectedTitle}>{selectedPlace.name}</Text><Text style={styles.selectedMeta}>{selectedPlace.categoryLabel} · {formatDistance(selectedPlace.distance)}</Text></View><Pressable accessibilityLabel="إغلاق تفاصيل المكان" hitSlop={8} onPress={() => setSelectedPlace(null)}><X size={20} color="#64746b" /></Pressable></View>
           {selectedPlace.address ? <Text style={styles.description}>{selectedPlace.address}</Text> : null}
           <View style={styles.detailFacts}>
             {selectedPlace.openNow != null ? <Text style={[styles.miniChip, selectedPlace.openNow ? { color: '#15803d', backgroundColor: '#dcfce7' } : { color: OASIS.colors.danger, backgroundColor: '#fee2e2' }]}>{selectedPlace.openNow ? 'مفتوح الآن' : 'مغلق حالياً'}</Text> : null}
@@ -668,7 +668,7 @@ const styles = StyleSheet.create({
   addMenu: { position: 'absolute', left: 14, right: 14, bottom: 70, backgroundColor: OASIS.colors.surface, borderRadius: 14, padding: 14, elevation: 12, zIndex: 20, borderWidth: 1, borderColor: C.line },
   addMenuHead: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   addMenuTitle: { fontSize: 15, fontWeight: '700', color: C.ink, textAlign: 'right' },
-  closeMenuText: { color: C.muted, fontSize: 12, fontWeight: '600', padding: 5 },
+  closeMenuText: { minWidth: 64, minHeight: 44, textAlign: 'center', textAlignVertical: 'center', color: C.muted, fontSize: 12, fontWeight: '600', padding: 5 },
   addAction: { minHeight: 48, justifyContent: 'center', paddingVertical: 13, paddingHorizontal: 12, backgroundColor: OASIS.colors.background, borderRadius: 12, marginTop: 6 },
   addActionText: { color: C.ink, fontWeight: '600', textAlign: 'right' },
   placeDetailSheet: { position: 'absolute', left: 12, right: 12, bottom: 250, backgroundColor: OASIS.colors.surface, borderRadius: 14, padding: 14, elevation: 12, zIndex: 10, borderWidth: 1, borderColor: C.line },
@@ -732,9 +732,9 @@ const styles = StyleSheet.create({
   selectedMeta: { fontSize: 12, color: C.accent, fontWeight: '600', marginTop: 4, textAlign: 'right' },
   description: { fontSize: 13, color: C.muted, textAlign: 'right', marginTop: 7, lineHeight: 20 },
   actions: { flexDirection: 'row-reverse', gap: 8, marginTop: 12 },
-  primaryAction: { flex: 1, backgroundColor: C.accent, borderRadius: 12, paddingVertical: 11, alignItems: 'center' },
+  primaryAction: { flex: 1, minHeight: 44, justifyContent: 'center', backgroundColor: C.accent, borderRadius: 12, paddingVertical: 11, alignItems: 'center' },
   primaryActionText: { color: OASIS.colors.surface, fontWeight: '600' },
-  secondaryAction: { paddingHorizontal: 14, borderRadius: 12, paddingVertical: 11, backgroundColor: '#f1f5f9', alignItems: 'center' },
+  secondaryAction: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 14, borderRadius: 12, paddingVertical: 11, backgroundColor: '#f1f5f9', alignItems: 'center' },
   secondaryActionText: { color: C.ink, fontWeight: '600' },
   empty: { textAlign: 'center', color: C.muted, paddingVertical: 16, lineHeight: 20 },
   emptyLoading: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 8 },
