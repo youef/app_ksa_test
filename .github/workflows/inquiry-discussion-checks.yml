@@ -37,6 +37,8 @@ jobs:
         run: node --test tests/shellQuoteAdvisory.test.cjs
       - name: Verify web response security headers
         run: node --test tests/vercelSecurityHeaders.test.cjs
+      - name: Verify ask form layout
+        run: node --test tests/askWizardLayout.test.cjs
       - name: TypeScript check
         run: npm run typecheck
 
