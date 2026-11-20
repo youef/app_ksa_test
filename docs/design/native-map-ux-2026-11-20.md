@@ -34,9 +34,9 @@ Improve the native iOS/Android map screen in `app/map.tsx` only. The web impleme
 
 ## Validation
 - TypeScript: `npm run typecheck`
-- Web export: `npm run export:web` (web route remains unchanged; checks platform resolution)
+- Web export and metadata validation: `npm run build` (includes Expo Web export)
 - Focused UI regression: `node --test tests/mapNativeLayout.test.cjs`
-- Existing available tests: `node --test tests/*.test.cjs tests/*.test.mjs`
+- Unrelated game, television, and security-maintenance test suites are intentionally not part of this UI-only batch.
 - Manual iPhone / Android / iPad safe-area and touch review remains a device QA item.
 
 ## Release guard
@@ -48,7 +48,7 @@ Keep the PR as draft until automated checks pass and a maintainer review is reco
 - The results list is hidden while a marker/place detail panel is open, preventing stacked sheets from obscuring each other on compact screens.
 - Category/sort filters expose selected state; search, place cards, retry controls, location, and back actions have clearer accessibility labels and larger touch areas.
 - Map-pin loading/failure/empty states and nearby-place loading/failure/contextual empty states are visible with retry actions.
-- Added `tests/mapNativeLayout.test.cjs` and a pull-request workflow that runs TypeScript, the Expo Web build, the focused map regression, and the map-specific Node regression test.
+- Added `tests/mapNativeLayout.test.cjs` and a pull-request workflow that runs TypeScript, the Expo Web build, and the focused map regression.
 
 ## Actual before / after
 - Overlay top offset was a fixed 42px and could collide with the header on devices with different status-bar insets → it now follows `useAppHeaderHeight()` plus a consistent gap.
@@ -64,6 +64,6 @@ Keep the PR as draft until automated checks pass and a maintainer review is reco
 - This batch changes presentation and UI recovery only; it does not alter map coordinates, pin filtering rules, privacy behavior, routing destinations, or backend queries.
 
 ## Validation status
-- Automated TypeScript, Expo Web build, focused regression, and existing Node tests are wired to run on this PR; results must be read from the PR checks before merge.
+- Automated TypeScript, Expo Web build, and focused map regression are wired to run on this PR; results must be read from the PR checks before merge.
 - iPhone/Android/iPad visual and assistive-technology review still requires physical/simulator QA.
 - Keep this PR in draft until all automated checks pass and a maintainer review is recorded.
