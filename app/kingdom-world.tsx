@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import React from 'react';
 import { Platform, Text, View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import { ArrowRight, Gamepad2 } from 'lucide-react-native';
@@ -8,11 +8,10 @@ import { OasisPressable as Pressable } from '@/components/oasis/OasisPrimitives'
 
 export default function KingdomWorld() {
   const { colors } = useTheme();
-  const { width, height } = useWindowDimensions();
-  const frameHeight = Math.max(420, height - (Platform.OS === 'web' ? 0 : 110));
+  const { height } = useWindowDimensions();
   if (Platform.OS === 'web') {
     return <View style={{ flex: 1, backgroundColor: '#102b25' }}>
-      <iframe title="مماليك حيّنا 3D" src="/mamaleek-hina.html" allow="fullscreen; gamepad" style={{ width: '100%', height: '100%', border: 0, display: 'block' }} />
+      {React.createElement('iframe' as any, { title: 'مماليك حيّنا 3D', src: '/mamaleek-hina.html', allow: 'fullscreen; gamepad', style: { width: '100%', height: '100%', border: 0, display: 'block' } })}
     </View>;
   }
   return <View style={{ flex: 1, backgroundColor: colors.background }}>
