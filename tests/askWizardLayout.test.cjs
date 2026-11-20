@@ -30,7 +30,10 @@ test('publishing keeps safety checks and private location editor', () => {
 
 test('compact category cards have RTL layout and distinct selected state', () => {
   assert.ok(screen.includes("typeGrid: { direction: 'ltr', flexDirection: 'row-reverse'"));
-  assert.ok(screen.includes("typeCard: { width: '48.5%', minHeight: 103"));
+  assert.ok(screen.includes("typeCard: { width: '48.5%', minHeight: 112"));
+  assert.ok(screen.includes("stepPill: { direction: 'ltr', minHeight: 40"));
+  assert.ok(screen.includes("optionChip: { minHeight: 44"));
+  assert.ok(screen.includes("locationChange: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, minHeight: 44"));
   assert.ok(screen.includes('styles.selectionActive'));
   assert.ok(screen.includes('numberOfLines={2} style={styles.typeHint}'));
   assert.ok(!screen.includes("screen: { flex: 1, backgroundColor: 'transparent' }"));
