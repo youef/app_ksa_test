@@ -48,7 +48,7 @@ Keep the PR as draft until automated checks pass and a maintainer review is reco
 - The results list is hidden while a marker/place detail panel is open, preventing stacked sheets from obscuring each other on compact screens.
 - Category/sort filters expose selected state; search, place cards, retry controls, location, and back actions have clearer accessibility labels and larger touch areas.
 - Map-pin loading/failure/empty states and nearby-place loading/failure/contextual empty states are visible with retry actions.
-- Added `tests/mapNativeLayout.test.cjs` and a pull-request workflow that runs TypeScript, the Expo Web build, the focused map regression, and the existing Node test suite.
+- Added `tests/mapNativeLayout.test.cjs` and a pull-request workflow that runs TypeScript, the Expo Web build, the focused map regression, and the map-specific Node regression test.
 
 ## Actual before / after
 - Overlay top offset was a fixed 42px and could collide with the header on devices with different status-bar insets → it now follows `useAppHeaderHeight()` plus a consistent gap.
