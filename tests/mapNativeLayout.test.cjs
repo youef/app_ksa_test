@@ -14,6 +14,7 @@ test('native map floating surfaces respect the app header and device safe areas'
   assert.match(screen, /bottom: bottomInset \+ 62/);
   assert.match(screen, /bottom: bottomInset \+ 10/);
   assert.match(screen, /maxHeight: placesSheetHeight/);
+  assert.match(screen, /maxHeight: Math\.max\(90, placesSheetHeight - 54\)/);
   assert.match(screen, /maxWidth: viewportWidth >= 768 \? 560 : undefined/);
 });
 
@@ -36,6 +37,8 @@ test('map loading, failure, retry, and contextual empty states are explicit', ()
   assert.match(screen, /pinsError/);
   assert.match(screen, /جارٍ تحميل أنشطة الحي/);
   assert.match(screen, /إعادة تحميل أنشطة الحي/);
+  assert.match(screen, /emptyPinState/);
+  assert.match(screen, /لا توجد أنشطة منشورة في هذه المدينة بعد/);
   assert.match(screen, /placesError/);
   assert.match(screen, /إعادة تحميل الأماكن القريبة/);
   assert.match(screen, /اختر مدينتك أو حدّد موقعك لعرض الأماكن القريبة/);
