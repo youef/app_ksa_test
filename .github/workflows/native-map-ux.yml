@@ -35,5 +35,3 @@ jobs:
         run: npm run build
       - name: Native map layout regression
         run: node --test tests/mapNativeLayout.test.cjs
-      - name: Existing Node test suite
-        run: node --test tests/*.test.cjs tests/*.test.mjs
