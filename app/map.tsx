@@ -466,7 +466,7 @@ export default function MapScreen() {
       </View> : null}
 
       {addMenuOpen ? (
-        <View style={[styles.addMenu, { bottom: bottomInset + 70, left: Math.max(12, insets.left + 8), right: Math.max(12, insets.right + 8), maxWidth: viewportWidth >= 768 ? 520 : undefined }]}>
+        <View style={[styles.addMenu, { bottom: bottomInset + 70, left: Math.max(12, insets.left + 8), right: Math.max(12, insets.right + 8), maxWidth: viewportWidth >= 768 ? 520 : undefined, alignSelf: 'center' }]}>
           <View style={styles.addMenuHead}><Text style={styles.addMenuTitle}>وش حاب تضيف للخريطة؟</Text><Pressable onPress={() => setAddMenuOpen(false)}><Text style={styles.closeMenuText}>إغلاق </Text></Pressable></View>
           {addAction('منتج أو خدمة', '', '/new-listing')}
           {addAction('تنبيه طارئ', '', '/ask')}
@@ -477,7 +477,7 @@ export default function MapScreen() {
       ) : null}
 
       {selectedPlace ? (
-        <View style={[styles.placeDetailSheet, { bottom: detailPanelBottom, left: Math.max(12, insets.left + 8), right: Math.max(12, insets.right + 8), maxWidth: viewportWidth >= 768 ? 520 : undefined }]}>
+        <View style={[styles.placeDetailSheet, { bottom: detailPanelBottom, left: Math.max(12, insets.left + 8), right: Math.max(12, insets.right + 8), maxWidth: viewportWidth >= 768 ? 520 : undefined, alignSelf: 'center' }]}>
           <View style={styles.detailHead}><View style={styles.placeBadge}><Store size={20} color="#0F766E" /></View><View style={{ flex: 1 }}><Text style={styles.selectedTitle}>{selectedPlace.name}</Text><Text style={styles.selectedMeta}>{selectedPlace.categoryLabel} · {formatDistance(selectedPlace.distance)}</Text></View><Pressable onPress={() => setSelectedPlace(null)}><X size={20} color="#64746b" /></Pressable></View>
           {selectedPlace.address ? <Text style={styles.description}>{selectedPlace.address}</Text> : null}
           <View style={styles.detailFacts}>
