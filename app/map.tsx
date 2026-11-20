@@ -2,10 +2,11 @@ import { rtlScrollStyle, rtlContentStyle } from '@/lib/rtl';
 import { oasisAssets } from '@/components/oasis/assets';
 import { OasisPressable as Pressable, OasisTextInput as TextInput } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
-import { HeaderAction, AppHeader } from '@/components/shared/AppHeader';
+import { HeaderAction, AppHeader, useAppHeaderHeight } from '@/components/shared/AppHeader';
 import { MapPin as PinIcon, Store, Search, Navigation, Plus, X, Clock, RefreshCw, TriangleAlert, MessageCircle, Wrench, HandHelping, Car, Calendar, ShoppingBag, LocateFixed } from 'lucide-react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Image, ActivityIndicator, Linking, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, ActivityIndicator, Linking, Platform, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 const Map = Platform.OS !== 'web' ? require('@maplibre/maplibre-react-native').Map : View;
 const Camera = Platform.OS !== 'web' ? require('@maplibre/maplibre-react-native').Camera : View;
 const Marker = Platform.OS !== 'web' ? require('@maplibre/maplibre-react-native').Marker : View;
@@ -58,6 +59,27 @@ export default function MapScreen() {
   const [selectedPlace, setSelectedPlace] = useState<NearbyPlace | null>(null);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [pinsError, setPinsError] = useState(false);
+  const [placesError, setPlacesError] = useState('');
+  const insets = useSafeAreaInsets();
+  const { height: viewportHeight, width: viewportWidth } = useWindowDimensions();
+  const appHeaderHeight = useAppHeaderHeight();
+  const bottomInset = Math.max(insets.bottom, 12);
+  const placesSheetHeight = Math.max(156, Math.min(240, Math.round(viewportHeight * 0.34)));
+  const detailPanelBottom = bottomInset + 66;
+
+  const reloadPins = async (isActive: () => boolean = () => true) => {
+    setLoading(true);
+    setPinsError(false);
+    try {
+      const loaded = await loadMapPins();
+      if (isActive()) { setPins(loaded); setLastUpdated(new Date()); }
+    } catch {
+      if (isActive()) setPinsError(true);
+    } finally {
+      if (isActive()) setLoading(false);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -71,30 +93,30 @@ export default function MapScreen() {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const loaded = await loadMapPins();
-        if (!cancelled) { setPins(loaded); setLastUpdated(new Date()); }
-      } catch (error) {
-        console.warn('map pins failed', error);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    let active = true;
+    void reloadPins(() => active);
+    return () => { active = false; };
   }, []);
 
   const runPlaceSearch = async (category: string, originOverride?: DeviceLocation) => {
     const id = ++searchId.current;
     const active = await getActiveLocation();
-    if (isAllKingdom(active.city) && !originOverride && !myLocation) return;
+    if (isAllKingdom(active.city) && !originOverride && !myLocation) {
+      setPlaces([]);
+      setPlacesError('');
+      setPlacesLoading(false);
+      return;
+    }
     const center = findPlaceCenter(active.city);
     const origin = originOverride ?? myLocation ?? (center ? { latitude: center.lat, longitude: center.lng } : null);
-    if (!origin) return;
+    if (!origin) {
+      setPlaces([]);
+      setPlacesError('');
+      setPlacesLoading(false);
+      return;
+    }
     setPlacesLoading(true);
+    setPlacesError('');
     try {
     const results = await searchNearbyPlaces({
       lat: origin.latitude,
@@ -103,18 +125,23 @@ export default function MapScreen() {
       text: query.trim() || null,
     });
     if (id === searchId.current) { setPlaces(results); setLastUpdated(new Date()); }
-    } catch { if (id === searchId.current) setLocationError('تعذر تحميل الأماكن. حاول مجددًا.'); }
+    } catch { if (id === searchId.current) setPlacesError('تعذر تحميل الأماكن القريبة. تحقق من الاتصال ثم أعد المحاولة.'); }
     finally { if (id === searchId.current) setPlacesLoading(false); }
   };
 
   const locateMe = async () => {
     setLocating(true);
-    const location = await getCurrentDeviceLocation();
-    setLocating(false);
-    if (!location) { setLocationError('تعذر تحديد موقعك. اسمح بالوصول إلى الموقع ثم أعد المحاولة.'); return; }
-    setLocationError('');
-    setMyLocation(location);
-    void runPlaceSearch(placeCategory, location);
+    try {
+      const location = await getCurrentDeviceLocation();
+      if (!location) { setLocationError('تعذر تحديد موقعك. تحقق من إذن الموقع ثم أعد المحاولة.'); return; }
+      setLocationError('');
+      setMyLocation(location);
+      void runPlaceSearch(placeCategory, location);
+    } catch {
+      setLocationError('تعذر تحديد موقعك الآن. حاول مرة أخرى.');
+    } finally {
+      setLocating(false);
+    }
   };
 
   useEffect(() => {
@@ -124,7 +151,7 @@ export default function MapScreen() {
 
   useEffect(() => {
     const timer = setInterval(() => {
-      void loadMapPins().then((fresh) => { setPins(fresh); setLastUpdated(new Date()); }).catch(() => {});
+      void loadMapPins().then((fresh) => { setPins(fresh); setPinsError(false); setLastUpdated(new Date()); }).catch(() => {});
       void runPlaceSearch(placeCategory);
     }, 60_000);
     return () => clearInterval(timer);
@@ -154,6 +181,9 @@ export default function MapScreen() {
       <Pressable oasisKind="chip"
         key={value}
         onPress={() => setKind(value)}
+        accessibilityLabel={`${label}، ${count} عنصر`}
+        accessibilityState={{ selected: active }}
+        hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
         style={[styles.chip, { flexDirection: 'row-reverse', gap: 6, alignItems: 'center' }, active && { backgroundColor: color, borderColor: color }]}
       >
         <Icon size={15} color={active ? OASIS.colors.surface : color} />
@@ -173,6 +203,8 @@ export default function MapScreen() {
           setPlaceCategory(key);
           void runPlaceSearch(key);
         }}
+        accessibilityState={{ selected: active }}
+        hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
         style={[styles.placeChip, active && styles.placeChipActive]}
       >
         <Text style={[styles.placeChipText, active && { color: OASIS.colors.surface }]}>{label}</Text>
@@ -191,11 +223,14 @@ export default function MapScreen() {
       </ScrollView>
 
       <Text style={styles.cityScope}>{city ? `يعرض محتوى ${city}` : 'اختر مدينتك من إعدادات الموقع لعرض محتوى منطقتك'}</Text>
+      {loading ? <View style={styles.inlineStatus}><ActivityIndicator size="small" color={C.accent} /><Text style={styles.inlineStatusText}>جارٍ تحميل أنشطة الحي…</Text></View> : null}
+      {pinsError ? <View style={styles.inlineError}><Text accessibilityRole="alert" style={styles.inlineErrorText}>تعذر تحميل أنشطة الحي.</Text><Pressable oasisKind="action" accessibilityLabel="إعادة تحميل أنشطة الحي" onPress={() => void reloadPins()} style={styles.retryButton}><RefreshCw size={14} color={OASIS.colors.surface} /><Text style={styles.retryButtonText}>إعادة المحاولة</Text></Pressable></View> : null}
+      {!loading && !pinsError && !visiblePins.length && city ? <Text style={styles.emptyPinState}>{query.trim() ? 'لا توجد أنشطة تطابق البحث.' : 'لا توجد أنشطة منشورة في هذه المدينة بعد.'}</Text> : null}
     </View>
   );
 
   const placeCard = (place: NearbyPlace) => (
-    <Pressable oasisKind="card" key={place.id} style={styles.placeCard} onPress={() => { setSelectedPlace(place); setSelected(null); }}>
+    <Pressable oasisKind="card" key={place.id} style={styles.placeCard} accessibilityLabel={`${place.name}، ${place.categoryLabel}، ${formatDistance(place.distance)}`} onPress={() => { setSelectedPlace(place); setSelected(null); }}>
       <View style={styles.placeBadge}>
         <Store size={20} color="#0F766E" />
       </View>
@@ -214,7 +249,7 @@ export default function MapScreen() {
   );
 
   const addAction = (label: string, _icon: string, route: string) => (
-    <Pressable key={label} style={styles.addAction} onPress={() => { setAddMenuOpen(false); router.push(route as never); }}>
+    <Pressable key={label} style={styles.addAction} accessibilityLabel={label} onPress={() => { setAddMenuOpen(false); router.push(route as never); }}>
       <View style={{flexDirection: 'row-reverse', gap: 8, alignItems: 'center'}}><Plus size={18} color="#0f766e" /><Text style={styles.addActionText}>{label}</Text></View>
     </Pressable>
   );
@@ -377,10 +412,13 @@ export default function MapScreen() {
         })}
       </Map>
 
-      <View style={styles.overlay}>
+      <View style={[styles.overlay, { top: appHeaderHeight + 10, left: Math.max(12, insets.left + 8), right: Math.max(12, insets.right + 8), maxWidth: viewportWidth >= 768 ? 600 : undefined }]}>
         <TextInput
           value={query}
           onChangeText={setQuery}
+          onSubmitEditing={() => void runPlaceSearch(placeCategory)}
+          returnKeyType="search"
+          accessibilityLabel="البحث عن نشاط أو مكان في الحي"
           placeholder="ابحث عن نشاط في حيّك..."
           placeholderTextColor={C.muted}
           style={styles.search}
@@ -393,16 +431,16 @@ export default function MapScreen() {
         </ScrollView>
         {filters}
         <ScrollView style={rtlScrollStyle} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.chipRow, rtlContentStyle]}>
-          <Pressable oasisVariant={sortMode === 'distance' ? 'primary' : 'secondary'} oasisKind="chip" onPress={() => setSortMode('distance')} style={[styles.sortChip, sortMode === 'distance' && styles.sortChipActive]}><Text style={[styles.sortText, sortMode === 'distance' && styles.sortTextActive]}>الأقرب</Text></Pressable>
-          <Pressable oasisVariant={sortMode === 'open' ? 'primary' : 'secondary'} oasisKind="chip" onPress={() => setSortMode('open')} style={[styles.sortChip, sortMode === 'open' && styles.sortChipActive]}><Text style={[styles.sortText, sortMode === 'open' && styles.sortTextActive]}>مفتوح أولاً</Text></Pressable>
-          <Pressable oasisVariant={sortMode === 'rating' ? 'primary' : 'secondary'} oasisKind="chip" onPress={() => setSortMode('rating')} style={[styles.sortChip, sortMode === 'rating' && styles.sortChipActive]}><Text style={[styles.sortText, sortMode === 'rating' && styles.sortTextActive]}>الأعلى تقييماً</Text></Pressable>
-          <Pressable oasisVariant={openOnly ? 'primary' : 'secondary'} oasisKind="chip" onPress={() => setOpenOnly((v) => !v)} style={[styles.sortChip, openOnly && styles.sortChipActive]}><Text style={[styles.sortText, openOnly && styles.sortTextActive]}>مفتوح الآن</Text></Pressable>
-          <Pressable oasisVariant={ratedOnly ? 'primary' : 'secondary'} oasisKind="chip" onPress={() => setRatedOnly((v) => !v)} style={[styles.sortChip, ratedOnly && styles.sortChipActive]}><Text style={[styles.sortText, ratedOnly && styles.sortTextActive]}>له تقييم</Text></Pressable>
+          <Pressable oasisVariant={sortMode === 'distance' ? 'primary' : 'secondary'} oasisKind="chip" accessibilityState={{ selected: sortMode === 'distance' }} hitSlop={{ top: 6, bottom: 6 }} onPress={() => setSortMode('distance')} style={[styles.sortChip, sortMode === 'distance' && styles.sortChipActive]}><Text style={[styles.sortText, sortMode === 'distance' && styles.sortTextActive]}>الأقرب</Text></Pressable>
+          <Pressable oasisVariant={sortMode === 'open' ? 'primary' : 'secondary'} oasisKind="chip" accessibilityState={{ selected: sortMode === 'open' }} hitSlop={{ top: 6, bottom: 6 }} onPress={() => setSortMode('open')} style={[styles.sortChip, sortMode === 'open' && styles.sortChipActive]}><Text style={[styles.sortText, sortMode === 'open' && styles.sortTextActive]}>مفتوح أولاً</Text></Pressable>
+          <Pressable oasisVariant={sortMode === 'rating' ? 'primary' : 'secondary'} oasisKind="chip" accessibilityState={{ selected: sortMode === 'rating' }} hitSlop={{ top: 6, bottom: 6 }} onPress={() => setSortMode('rating')} style={[styles.sortChip, sortMode === 'rating' && styles.sortChipActive]}><Text style={[styles.sortText, sortMode === 'rating' && styles.sortTextActive]}>الأعلى تقييماً</Text></Pressable>
+          <Pressable oasisVariant={openOnly ? 'primary' : 'secondary'} oasisKind="chip" accessibilityState={{ selected: openOnly }} hitSlop={{ top: 6, bottom: 6 }} onPress={() => setOpenOnly((v) => !v)} style={[styles.sortChip, openOnly && styles.sortChipActive]}><Text style={[styles.sortText, openOnly && styles.sortTextActive]}>مفتوح الآن</Text></Pressable>
+          <Pressable oasisVariant={ratedOnly ? 'primary' : 'secondary'} oasisKind="chip" accessibilityState={{ selected: ratedOnly }} hitSlop={{ top: 6, bottom: 6 }} onPress={() => setRatedOnly((v) => !v)} style={[styles.sortChip, ratedOnly && styles.sortChipActive]}><Text style={[styles.sortText, ratedOnly && styles.sortTextActive]}>له تقييم</Text></Pressable>
         </ScrollView>
         <View style={styles.filtersRow}>
           <Text style={styles.count}>{visiblePins.length} نشاط · {visiblePlaces.length} مكان قريب</Text>
-          <Pressable oasisKind="action" style={styles.addButton} onPress={() => setAddMenuOpen((v) => !v)}><Text style={styles.addButtonText}>إضافة موقع</Text></Pressable>
-          <Pressable oasisKind="action" style={styles.locationButton} onPress={locateMe} disabled={locating}>
+          <Pressable oasisKind="action" style={styles.addButton} accessibilityLabel="إضافة موقع أو نشاط للحي" onPress={() => setAddMenuOpen((v) => !v)}><Text style={styles.addButtonText}>إضافة موقع</Text></Pressable>
+          <Pressable oasisKind="action" style={styles.locationButton} accessibilityLabel="تحديد موقعي الحالي" onPress={locateMe} disabled={locating}>
             <Text style={styles.locationButtonText}>
               {locating ? 'جارٍ تحديد موقعي…' : 'موقعي'}
             </Text>
@@ -410,7 +448,7 @@ export default function MapScreen() {
         </View>
       </View>
 
-      <View style={styles.placesSheet}>
+      {!selectedPlace && !selected ? <View style={[styles.placesSheet, { bottom: bottomInset + 62, maxHeight: placesSheetHeight, left: Math.max(12, insets.left + 8), right: Math.max(12, insets.right + 8), maxWidth: viewportWidth >= 768 ? 560 : undefined }]}>
         <View style={styles.placesHead}>
           <Text style={styles.placesTitle}>
             {placesLoading ? 'جارٍ تحديث خريطة الحي…' : `أماكن قريبة (${visiblePlaces.length})`}
@@ -418,20 +456,23 @@ export default function MapScreen() {
           {placesLoading ? <ActivityIndicator size="small" color={C.accent} /> : null}
         </View>
         <ScrollView
-          style={styles.placesScroll}
+          style={[styles.placesScroll, { maxHeight: Math.max(90, placesSheetHeight - 54) }]}
           contentContainerStyle={styles.placesContent}
           showsVerticalScrollIndicator={false}
         >
+          {locationError ? <View style={styles.inlineError}><Text accessibilityRole="alert" style={styles.inlineErrorText}>{locationError}</Text><Pressable oasisKind="action" onPress={locateMe} accessibilityLabel="إعادة محاولة تحديد الموقع" style={styles.retryButton}><RefreshCw size={14} color={OASIS.colors.surface} /><Text style={styles.retryButtonText}>حاول مجددًا</Text></Pressable></View> : null}
+          {placesError ? <View style={styles.inlineError}><Text accessibilityRole="alert" style={styles.inlineErrorText}>{placesError}</Text><Pressable oasisKind="action" onPress={() => void runPlaceSearch(placeCategory)} accessibilityLabel="إعادة تحميل الأماكن القريبة" style={styles.retryButton}><RefreshCw size={14} color={OASIS.colors.surface} /><Text style={styles.retryButtonText}>إعادة المحاولة</Text></Pressable></View> : null}
+          {placesLoading && !visiblePlaces.length ? <View style={styles.emptyLoading}><ActivityIndicator size="small" color={C.accent} /><Text style={styles.empty}>جارٍ البحث عن الأماكن القريبة…</Text></View> : null}
           {visiblePlaces.map(placeCard)}
-          {!places.length && !placesLoading ? (
-            <Text style={styles.empty}>فعّل الموقع لعرض المحلات القريبة.</Text>
+          {!visiblePlaces.length && !placesLoading && !placesError && !locationError ? (
+            <Text style={styles.empty}>{!city && !myLocation ? 'اختر مدينتك أو حدّد موقعك لعرض الأماكن القريبة.' : 'لا توجد أماكن مطابقة حاليًا. جرّب فئة أخرى أو غيّر البحث.'}</Text>
           ) : null}
         </ScrollView>
-      </View>
+      </View> : null}
 
       {addMenuOpen ? (
-        <View style={styles.addMenu}>
-          <View style={styles.addMenuHead}><Text style={styles.addMenuTitle}>وش حاب تضيف للخريطة؟</Text><Pressable onPress={() => setAddMenuOpen(false)}><Text style={styles.closeMenuText}>إغلاق </Text></Pressable></View>
+        <View style={[styles.addMenu, { bottom: bottomInset + 70, left: Math.max(12, insets.left + 8), right: Math.max(12, insets.right + 8), maxWidth: viewportWidth >= 768 ? 520 : undefined, alignSelf: 'center' }]}>
+          <View style={styles.addMenuHead}><Text style={styles.addMenuTitle}>وش حاب تضيف للخريطة؟</Text><Pressable accessibilityLabel="إغلاق قائمة الإضافة" hitSlop={8} onPress={() => setAddMenuOpen(false)}><Text style={styles.closeMenuText}>إغلاق </Text></Pressable></View>
           {addAction('منتج أو خدمة', '', '/new-listing')}
           {addAction('تنبيه طارئ', '', '/ask')}
           {addAction('طلب مساعدة', '', '/ask')}
@@ -441,8 +482,8 @@ export default function MapScreen() {
       ) : null}
 
       {selectedPlace ? (
-        <View style={styles.placeDetailSheet}>
-          <View style={styles.detailHead}><View style={styles.placeBadge}><Store size={20} color="#0F766E" /></View><View style={{ flex: 1 }}><Text style={styles.selectedTitle}>{selectedPlace.name}</Text><Text style={styles.selectedMeta}>{selectedPlace.categoryLabel} · {formatDistance(selectedPlace.distance)}</Text></View><Pressable onPress={() => setSelectedPlace(null)}><X size={20} color="#64746b" /></Pressable></View>
+        <View style={[styles.placeDetailSheet, { bottom: detailPanelBottom, left: Math.max(12, insets.left + 8), right: Math.max(12, insets.right + 8), maxWidth: viewportWidth >= 768 ? 520 : undefined, alignSelf: 'center' }]}>
+          <View style={styles.detailHead}><View style={styles.placeBadge}><Store size={20} color="#0F766E" /></View><View style={{ flex: 1 }}><Text style={styles.selectedTitle}>{selectedPlace.name}</Text><Text style={styles.selectedMeta}>{selectedPlace.categoryLabel} · {formatDistance(selectedPlace.distance)}</Text></View><Pressable accessibilityLabel="إغلاق تفاصيل المكان" hitSlop={8} onPress={() => setSelectedPlace(null)}><X size={20} color="#64746b" /></Pressable></View>
           {selectedPlace.address ? <Text style={styles.description}>{selectedPlace.address}</Text> : null}
           <View style={styles.detailFacts}>
             {selectedPlace.openNow != null ? <Text style={[styles.miniChip, selectedPlace.openNow ? { color: '#15803d', backgroundColor: '#dcfce7' } : { color: OASIS.colors.danger, backgroundColor: '#fee2e2' }]}>{selectedPlace.openNow ? 'مفتوح الآن' : 'مغلق حالياً'}</Text> : null}
@@ -458,7 +499,7 @@ export default function MapScreen() {
       ) : null}
 
       {selected ? (
-        <View style={styles.selectedPanel}>
+        <View style={[styles.selectedPanel, { bottom: detailPanelBottom, left: Math.max(12, insets.left + 8), right: Math.max(12, insets.right + 8), maxWidth: viewportWidth >= 768 ? 520 : undefined }]}>
           <Text style={styles.selectedTitle}>{selected.title}</Text>
           <Text style={styles.selectedMeta}>
             {MAP_PIN_KINDS[selected.kind].label} · {selected.area}
@@ -498,7 +539,7 @@ export default function MapScreen() {
         </View>
       ) : null}
 
-      <Pressable style={styles.close} onPress={() => router.back()}>
+      <Pressable style={[styles.close, { bottom: bottomInset + 10, right: Math.max(16, insets.right + 12) }]} accessibilityLabel="العودة إلى الصفحة السابقة" hitSlop={8} onPress={() => router.back()}>
         <Text style={styles.closeText}>رجوع</Text>
       </Pressable>
     </View>
@@ -510,19 +551,24 @@ const styles = StyleSheet.create({
   map: { flex: 1 },
   overlay: {
     position: 'absolute',
-    top: 42,
     left: 12,
     right: 12,
+    alignSelf: 'center',
     backgroundColor: OASIS.colors.surface,
-    borderRadius: 14,
-    padding: 10,
-    elevation: 5,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: C.line,
+    padding: 12,
+    elevation: 8,
   },
   search: {
     backgroundColor: C.bg,
     borderRadius: 12,
     paddingHorizontal: 14,
-    paddingVertical: 11,
+    minHeight: 46,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: C.line,
     color: C.ink,
     textAlign: 'right',
     fontSize: 14,
@@ -531,7 +577,7 @@ const styles = StyleSheet.create({
   chipRow: { flexDirection: 'row-reverse', gap: 6, paddingVertical: 2 },
   chip: {
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 7,
     borderRadius: 14,
     backgroundColor: OASIS.colors.surface,
     borderWidth: 1.5,
@@ -551,7 +597,7 @@ const styles = StyleSheet.create({
   cityScope: { fontSize: 12, fontWeight: '600', color: C.muted, textAlign: 'right', paddingHorizontal: 8 },
   placeChip: {
     paddingHorizontal: 12,
-    paddingVertical: 5,
+    paddingVertical: 8,
     borderRadius: 14,
     backgroundColor: OASIS.colors.soft,
     borderWidth: 1,
@@ -562,9 +608,11 @@ const styles = StyleSheet.create({
   filtersRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginTop: 4 },
   count: { flex: 1, color: C.muted, fontSize: 12, fontWeight: '600' },
   locationButton: {
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
+    minHeight: 44,
+    justifyContent: 'center',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
     backgroundColor: '#eef6ff',
     borderWidth: 1,
     borderColor: '#bfdbfe',
@@ -614,19 +662,19 @@ const styles = StyleSheet.create({
   listBody: { flex: 1 },
   listTitle: { fontSize: 13.5, fontWeight: '600', color: C.ink, lineHeight: 20 },
   listMeta: { fontSize: 11.5, color: C.muted, marginTop: 3, fontWeight: '600' },
-  sortChip: { paddingHorizontal: 11, paddingVertical: 6, borderRadius: 14, backgroundColor: OASIS.colors.background, borderWidth: 1, borderColor: C.line },
+  sortChip: { minHeight: 38, justifyContent: 'center', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 14, backgroundColor: OASIS.colors.background, borderWidth: 1, borderColor: C.line },
   sortChipActive: { backgroundColor: '#134e4a', borderColor: '#134e4a' },
   sortText: { fontSize: 11, fontWeight: '600', color: C.muted },
   sortTextActive: { color: OASIS.colors.surface },
-  addButton: { borderRadius: 11, paddingHorizontal: 11, paddingVertical: 8, backgroundColor: '#0f766e' },
+  addButton: { minHeight: 44, justifyContent: 'center', borderRadius: 12, paddingHorizontal: 13, paddingVertical: 9, backgroundColor: '#0f766e' },
   addButtonText: { color: OASIS.colors.surface, fontSize: 12, fontWeight: '700' },
   addMenuWeb: { backgroundColor: OASIS.colors.surface, borderRadius: 16, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: C.line },
   placeDetailWeb: { backgroundColor: OASIS.colors.surface, borderRadius: 16, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: C.line },
   addMenu: { position: 'absolute', left: 14, right: 14, bottom: 70, backgroundColor: OASIS.colors.surface, borderRadius: 14, padding: 14, elevation: 12, zIndex: 20, borderWidth: 1, borderColor: C.line },
   addMenuHead: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   addMenuTitle: { fontSize: 15, fontWeight: '700', color: C.ink, textAlign: 'right' },
-  closeMenuText: { color: C.muted, fontSize: 12, fontWeight: '600', padding: 5 },
-  addAction: { paddingVertical: 12, paddingHorizontal: 12, backgroundColor: OASIS.colors.background, borderRadius: 12, marginTop: 6 },
+  closeMenuText: { minWidth: 64, minHeight: 44, textAlign: 'center', textAlignVertical: 'center', color: C.muted, fontSize: 12, fontWeight: '600', padding: 5 },
+  addAction: { minHeight: 48, justifyContent: 'center', paddingVertical: 13, paddingHorizontal: 12, backgroundColor: OASIS.colors.background, borderRadius: 12, marginTop: 6 },
   addActionText: { color: C.ink, fontWeight: '600', textAlign: 'right' },
   placeDetailSheet: { position: 'absolute', left: 12, right: 12, bottom: 250, backgroundColor: OASIS.colors.surface, borderRadius: 14, padding: 14, elevation: 12, zIndex: 10, borderWidth: 1, borderColor: C.line },
   detailHead: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10 },
@@ -646,7 +694,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 12,
     right: 12,
-    bottom: 62,
+    alignSelf: 'center',
     maxHeight: 240,
     backgroundColor: OASIS.colors.surface,
     borderRadius: 14,
@@ -660,6 +708,8 @@ const styles = StyleSheet.create({
   placesScroll: { maxHeight: 190 },
   placesContent: { gap: 8, paddingBottom: 4 },
   placeCard: {
+    minHeight: 64,
+    alignItems: 'center',
     flexDirection: 'row-reverse',
     gap: 10,
     backgroundColor: OASIS.colors.background,
@@ -687,19 +737,30 @@ const styles = StyleSheet.create({
   selectedMeta: { fontSize: 12, color: C.accent, fontWeight: '600', marginTop: 4, textAlign: 'right' },
   description: { fontSize: 13, color: C.muted, textAlign: 'right', marginTop: 7, lineHeight: 20 },
   actions: { flexDirection: 'row-reverse', gap: 8, marginTop: 12 },
-  primaryAction: { flex: 1, backgroundColor: C.accent, borderRadius: 12, paddingVertical: 11, alignItems: 'center' },
+  primaryAction: { flex: 1, minHeight: 44, justifyContent: 'center', backgroundColor: C.accent, borderRadius: 12, paddingVertical: 11, alignItems: 'center' },
   primaryActionText: { color: OASIS.colors.surface, fontWeight: '600' },
-  secondaryAction: { paddingHorizontal: 14, borderRadius: 12, paddingVertical: 11, backgroundColor: '#f1f5f9', alignItems: 'center' },
+  secondaryAction: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 14, borderRadius: 12, paddingVertical: 11, backgroundColor: '#f1f5f9', alignItems: 'center' },
   secondaryActionText: { color: C.ink, fontWeight: '600' },
-  empty: { textAlign: 'center', color: C.muted, paddingVertical: 16 },
+  empty: { textAlign: 'center', color: C.muted, paddingVertical: 16, lineHeight: 20 },
+  emptyLoading: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 8 },
+  inlineStatus: { flexDirection: 'row-reverse', alignItems: 'center', gap: 7, paddingHorizontal: 8, paddingVertical: 5 },
+  inlineStatusText: { color: C.muted, fontSize: 11.5, fontWeight: '600' },
+  emptyPinState: { color: C.muted, fontSize: 11.5, textAlign: 'right', paddingHorizontal: 8, paddingVertical: 5 },
+  inlineError: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, backgroundColor: '#FEF2F2', borderColor: '#FECACA', borderWidth: 1, borderRadius: 12, padding: 10, marginTop: 8 },
+  inlineErrorText: { flex: 1, minWidth: 150, color: '#991B1B', fontSize: 11.5, lineHeight: 18, textAlign: 'right' },
+  retryButton: { minHeight: 40, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#0F766E', borderRadius: 10, paddingHorizontal: 11, paddingVertical: 7 },
+  retryButtonText: { color: OASIS.colors.surface, fontSize: 11.5, fontWeight: '700' },
   close: {
     position: 'absolute',
-    bottom: 12,
     right: 16,
+    minWidth: 76,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: C.ink,
     borderRadius: 14,
     paddingHorizontal: 18,
-    paddingVertical: 12,
+    paddingVertical: 10,
     elevation: 6,
   },
   closeText: { color: OASIS.colors.surface, fontWeight: '600' },
