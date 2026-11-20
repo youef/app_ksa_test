@@ -7,7 +7,7 @@ import {
   ChevronLeft, ChevronDown, CircleHelp, Info, LifeBuoy, Map,
   MessageCircle, Radio, ShieldCheck, ShoppingBag, Store, UserRound,
   LogOut, FileText, Mail, GraduationCap, Images, Heart, Settings2,
-  Search, X, Crown, Plus, Castle, type LucideIcon,
+  Search, X, Crown, Plus, Castle, Gamepad2, type LucideIcon,
 } from 'lucide-react-native';
 
 import { AppHeader } from '@/components/shared/AppHeader';
@@ -31,6 +31,7 @@ const DISCOVER: MenuItem[] = [
   { title: 'دليل الأعمال', subtitle: 'محلات وخدمات', href: '/directory', Icon: Store },
   { title: 'البث المباشر', subtitle: 'لقاءات المجتمع', href: '/lives', Icon: Radio },
   { title: 'ممالك حيّنا', subtitle: 'ابنِ جزيرتك وحارب خصومًا مجهولين', href: '/kingdom', Icon: Castle },
+  { title: 'عالم مماليك حيّنا 3D', subtitle: 'استكشف القرية واجمع الموارد', href: '/kingdom-world', Icon: Gamepad2 },
 ];
 
 const HELP: MenuItem[] = [
