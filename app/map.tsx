@@ -219,6 +219,7 @@ export default function MapScreen() {
       <Text style={styles.cityScope}>{city ? `يعرض محتوى ${city}` : 'اختر مدينتك من إعدادات الموقع لعرض محتوى منطقتك'}</Text>
       {loading ? <View style={styles.inlineStatus}><ActivityIndicator size="small" color={C.accent} /><Text style={styles.inlineStatusText}>جارٍ تحميل أنشطة الحي…</Text></View> : null}
       {pinsError ? <View style={styles.inlineError}><Text accessibilityRole="alert" style={styles.inlineErrorText}>تعذر تحميل أنشطة الحي.</Text><Pressable oasisKind="action" accessibilityLabel="إعادة تحميل أنشطة الحي" onPress={() => void reloadPins()} style={styles.retryButton}><RefreshCw size={14} color={OASIS.colors.surface} /><Text style={styles.retryButtonText}>إعادة المحاولة</Text></Pressable></View> : null}
+      {!loading && !pinsError && !visiblePins.length && city ? <Text style={styles.emptyPinState}>{query.trim() ? 'لا توجد أنشطة تطابق البحث.' : 'لا توجد أنشطة منشورة في هذه المدينة بعد.'}</Text> : null}
     </View>
   );
 
@@ -449,7 +450,7 @@ export default function MapScreen() {
           {placesLoading ? <ActivityIndicator size="small" color={C.accent} /> : null}
         </View>
         <ScrollView
-          style={styles.placesScroll}
+          style={[styles.placesScroll, { maxHeight: Math.max(90, placesSheetHeight - 54) }]}
           contentContainerStyle={styles.placesContent}
           showsVerticalScrollIndicator={false}
         >
@@ -738,6 +739,7 @@ const styles = StyleSheet.create({
   emptyLoading: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 8 },
   inlineStatus: { flexDirection: 'row-reverse', alignItems: 'center', gap: 7, paddingHorizontal: 8, paddingVertical: 5 },
   inlineStatusText: { color: C.muted, fontSize: 11.5, fontWeight: '600' },
+  emptyPinState: { color: C.muted, fontSize: 11.5, textAlign: 'right', paddingHorizontal: 8, paddingVertical: 5 },
   inlineError: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, backgroundColor: '#FEF2F2', borderColor: '#FECACA', borderWidth: 1, borderRadius: 12, padding: 10, marginTop: 8 },
   inlineErrorText: { flex: 1, minWidth: 150, color: '#991B1B', fontSize: 11.5, lineHeight: 18, textAlign: 'right' },
   retryButton: { minHeight: 40, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#0F766E', borderRadius: 10, paddingHorizontal: 11, paddingVertical: 7 },
