@@ -104,6 +104,7 @@ export default function MapScreen() {
     if (isAllKingdom(active.city) && !originOverride && !myLocation) {
       setPlaces([]);
       setPlacesError('');
+      setPlacesLoading(false);
       return;
     }
     const center = findPlaceCenter(active.city);
@@ -145,7 +146,7 @@ export default function MapScreen() {
 
   useEffect(() => {
     const timer = setInterval(() => {
-      void loadMapPins().then((fresh) => { setPins(fresh); setLastUpdated(new Date()); }).catch(() => {});
+      void loadMapPins().then((fresh) => { setPins(fresh); setPinsError(false); setLastUpdated(new Date()); }).catch(() => {});
       void runPlaceSearch(placeCategory);
     }, 60_000);
     return () => clearInterval(timer);
