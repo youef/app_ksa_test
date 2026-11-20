@@ -66,7 +66,7 @@ export default function MapScreen() {
   const appHeaderHeight = useAppHeaderHeight();
   const bottomInset = Math.max(insets.bottom, 12);
   const placesSheetHeight = Math.max(156, Math.min(240, Math.round(viewportHeight * 0.34)));
-  const detailPanelBottom = bottomInset + placesSheetHeight + 18;
+  const detailPanelBottom = bottomInset + 66;
 
   const reloadPins = async (isActive: () => boolean = () => true) => {
     setLoading(true);
@@ -441,7 +441,7 @@ export default function MapScreen() {
         </View>
       </View>
 
-      <View style={[styles.placesSheet, { bottom: bottomInset + 62, maxHeight: placesSheetHeight, left: Math.max(12, insets.left + 8), right: Math.max(12, insets.right + 8), maxWidth: viewportWidth >= 768 ? 560 : undefined }]}>
+      {!selectedPlace && !selected ? <View style={[styles.placesSheet, { bottom: bottomInset + 62, maxHeight: placesSheetHeight, left: Math.max(12, insets.left + 8), right: Math.max(12, insets.right + 8), maxWidth: viewportWidth >= 768 ? 560 : undefined }]}>
         <View style={styles.placesHead}>
           <Text style={styles.placesTitle}>
             {placesLoading ? 'جارٍ تحديث خريطة الحي…' : `أماكن قريبة (${visiblePlaces.length})`}
@@ -461,7 +461,7 @@ export default function MapScreen() {
             <Text style={styles.empty}>{!city && !myLocation ? 'اختر مدينتك أو حدّد موقعك لعرض الأماكن القريبة.' : 'لا توجد أماكن مطابقة حاليًا. جرّب فئة أخرى أو غيّر البحث.'}</Text>
           ) : null}
         </ScrollView>
-      </View>
+      </View> : null}
 
       {addMenuOpen ? (
         <View style={[styles.addMenu, { bottom: bottomInset + 70, left: Math.max(12, insets.left + 8), right: Math.max(12, insets.right + 8), maxWidth: viewportWidth >= 768 ? 520 : undefined }]}>
