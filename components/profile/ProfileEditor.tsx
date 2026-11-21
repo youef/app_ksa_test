@@ -2,7 +2,7 @@ import React from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Camera, Check, Save, X } from 'lucide-react-native';
 import { useTheme } from '@/context/ThemeContext';
-import { type ProfileDraft, validateProfileDraft } from '@/lib/profileEditor';
+import { getProfileBioProgress, type ProfileDraft, validateProfileDraft } from '@/lib/profileEditor';
 
 type Props = {
   draft: ProfileDraft;
@@ -21,6 +21,7 @@ export function ProfileEditor(props: Props) {
   const { colors } = useTheme();
   const errors = validateProfileDraft(props.draft);
   const valid = !Object.keys(errors).length;
+  const bioProgress = getProfileBioProgress(props.draft.bio, 160);
   const fields: { key: keyof ProfileDraft; label: string; max: number; hint: string }[] = [
     { key: 'displayName', label: 'الاسم الظاهر', max: 50, hint: 'الاسم الذي يظهر للجيران في ملفك ومشاركاتك.' },
     { key: 'username', label: 'اسم المستخدم', max: 30, hint: 'يبدأ رابط ملفك بهذا الاسم. يخضع تغييره للمدة المسموحة للحساب.' },
@@ -34,8 +35,14 @@ export function ProfileEditor(props: Props) {
       <View style={styles.header}><Text style={{ color: colors.ink, fontWeight: '700' }}>{field.label}</Text><Text style={{ color: colors.muted, fontSize: 11 }}>{[...props.draft[field.key]].length}/{field.max}</Text></View>
       <TextInput accessibilityLabel={field.label} editable={!props.saving} value={props.draft[field.key]} onChangeText={value => props.onChange({ [field.key]: value })} maxLength={field.max} multiline={field.key === 'bio'} autoCapitalize={field.key === 'username' ? 'none' : 'sentences'} autoCorrect={field.key !== 'username'} placeholderTextColor={colors.muted} placeholder={field.key === 'username' ? 'username' : field.label} style={[styles.input, { color: colors.ink, backgroundColor: colors.background, borderColor: errors[field.key] ? colors.danger : colors.line, textAlign: field.key === 'username' ? 'left' : 'right' }, field.key === 'bio' && { minHeight: 110, textAlignVertical: 'top' }]} />
       <Text accessibilityRole={errors[field.key] ? 'alert' : undefined} style={{ color: errors[field.key] ? colors.danger : colors.muted, fontSize: 11, lineHeight: 18, textAlign: 'right' }}>{errors[field.key] || field.hint}</Text>
+      {field.key === 'bio' && <View style={styles.bioMeter}>
+        <View accessibilityRole="progressbar" accessibilityLabel="مؤشر طول النبذة" accessibilityValue={{ min: 0, max: field.max, now: bioProgress.count }} style={[styles.bioTrack, { backgroundColor: colors.line }]}>
+          <View style={[styles.bioFill, { width: `${bioProgress.percent}%`, backgroundColor: bioProgress.nearLimit ? colors.warning : colors.primary }]} />
+        </View>
+        <Text style={[styles.bioMeterText, { color: bioProgress.nearLimit ? colors.warning : colors.muted }]}>{bioProgress.nearLimit ? `اقتربت من الحد · متبقي ${bioProgress.remaining} حرف` : `متبقي ${bioProgress.remaining} حرف`}</Text>
+      </View>}
     </View>)}
     <View style={[styles.footer, { borderColor: colors.line }]}><View style={styles.header}><Check size={15} color={props.dirty ? colors.warning : colors.primary} /><Text style={{ color: props.dirty ? colors.warning : colors.muted, fontSize: 12 }}>{props.dirty ? 'لديك تغييرات غير محفوظة' : 'البيانات مطابقة لملفك المحفوظ'}</Text></View><View style={styles.mediaActions}><Pressable accessibilityRole="button" onPress={props.onSave} disabled={!valid || !props.dirty || props.saving} style={[styles.save, { backgroundColor: !valid || !props.dirty || props.saving ? colors.line : colors.primary }]}>{props.saving ? <ActivityIndicator color={colors.surface} /> : <Save size={17} color={colors.surface} />}<Text style={{ color: colors.surface, fontWeight: '700' }}>{props.saving ? 'جارٍ الحفظ…' : 'حفظ التغييرات'}</Text></Pressable><Pressable accessibilityRole="button" onPress={props.onCancel} disabled={props.saving} style={styles.cancel}><Text style={{ color: colors.muted, fontWeight: '700' }}>إلغاء</Text></Pressable></View></View>
   </View>;
 }
-const styles = StyleSheet.create({ card: { borderWidth: 1, borderRadius: 20, padding: 22, gap: 20 }, header: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 10 }, title: { fontSize: 21, fontWeight: '800' }, icon: { padding: 8 }, input: { borderWidth: 1, borderRadius: 12, padding: 14, fontSize: 15, minHeight: 50 }, mediaActions: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 10 }, mediaButton: { flex: 1, minWidth: 120, padding: 14, borderWidth: 1, borderRadius: 14, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8 }, footer: { borderTopWidth: 1, paddingTop: 18, gap: 14 }, save: { minHeight: 44, borderRadius: 999, paddingHorizontal: 20, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8 }, cancel: { minHeight: 44, paddingHorizontal: 18, justifyContent: 'center' } });
+const styles = StyleSheet.create({ card: { borderWidth: 1, borderRadius: 20, padding: 22, gap: 20 }, header: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 10 }, title: { fontSize: 21, fontWeight: '800' }, icon: { padding: 8 }, input: { borderWidth: 1, borderRadius: 12, padding: 14, fontSize: 15, minHeight: 50 }, mediaActions: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 10 }, mediaButton: { flex: 1, minWidth: 120, padding: 14, borderWidth: 1, borderRadius: 14, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8 }, footer: { borderTopWidth: 1, paddingTop: 18, gap: 14 }, save: { minHeight: 44, borderRadius: 999, paddingHorizontal: 20, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8 }, cancel: { minHeight: 44, paddingHorizontal: 18, justifyContent: 'center' }, bioMeter: { gap: 5 }, bioTrack: { height: 4, borderRadius: 999, overflow: 'hidden', flexDirection: 'row-reverse' }, bioFill: { height: '100%', borderRadius: 999 }, bioMeterText: { fontSize: 10, fontWeight: '700', textAlign: 'right' } });

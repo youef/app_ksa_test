@@ -29,6 +29,7 @@
 
 ### Validation
 - Focused Node tests for helper boundaries and UI source contract.
+- The implementation adds `tests/profileEditorBioMeter.test.cjs` for the progressbar accessibility and RTL/no-motion contract.
 - TypeScript, Expo Web export and full test suite via PR checks if available.
 - Manual iPhone/Android/tablet/Web and VoiceOver/TalkBack QA remains required.
 - Draft only; do not merge or deploy before all checks and reviewer approval.
