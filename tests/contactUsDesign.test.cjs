@@ -19,9 +19,9 @@ test('each field is labeled and uses a practical maximum length', () => {
   for (const label of ['الاسم', 'البريد الإلكتروني، اختياري', 'موضوع الرسالة', 'نص الرسالة']) {
     assert.ok(screen.includes('accessibilityLabel="' + label + '"'), label);
   }
-  assert.match(screen, /maxLength={80}/);
-  assert.match(screen, /maxLength={254}/);
-  assert.match(screen, /maxLength={120}/);
+  assert.match(screen, /maxLength=\\{80\\}/);
+  assert.match(screen, /maxLength=\\{254\\}/);
+  assert.match(screen, /maxLength=\\{120\\}/);
   assert.match(screen, /autoCapitalize="none"/);
   assert.match(screen, /autoCorrect={false}/);
 });
@@ -29,7 +29,7 @@ test('each field is labeled and uses a practical maximum length', () => {
 test('message field provides multiline guidance, limit, and live counter', () => {
   assert.match(screen, /const MESSAGE_LIMIT = 2000/);
   assert.match(screen, /multiline/);
-  assert.match(screen, /maxLength={MESSAGE_LIMIT}/);
+  assert.match(screen, /maxLength=\\{MESSAGE_LIMIT\\}/);
   assert.match(screen, /accessibilityLiveRegion="polite"/);
   assert.match(screen, /message\.length} \/ \{MESSAGE_LIMIT\}/);
   assert.match(screen, /minHeight: 120/);
