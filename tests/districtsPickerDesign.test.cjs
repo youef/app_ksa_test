@@ -8,7 +8,7 @@ const screen = fs.readFileSync(path.join(__dirname, '../app/districts.tsx'), 'ut
 
 test('district search normalizes Arabic labels and query with the shared location helper', () => {
   assert.ok(screen.includes('normalizeSaudiLocationName(search)'));
-  assert.ok(screen.includes('normalizeSaudiLocationName(d.name).includes(normalizedSearch)'));
+  assert.ok(screen.includes('normalizeSaudiLocationName(district.name).includes(normalizedSearch)'));
   assert.ok(screen.includes('const normalizedSearch = useMemo'));
 });
 
@@ -24,8 +24,8 @@ test('search is labeled, announces results and has a 44px clear control', () => 
 test('empty results have distinct copy and a contextual recovery action', () => {
   assert.ok(screen.includes('districts.length === 0'));
   assert.ok(screen.includes('لا توجد أحياء مطابقة'));
-  assert.ok(screen.includes('setSearch(\'\')'));
-  assert.ok(screen.includes('router.replace({ pathname: \'/cities\''));
+  assert.ok(screen.includes("setSearch('')"));
+  assert.ok(screen.includes("router.replace({ pathname: '/cities'"));
 });
 
 test('district cards and icon surfaces meet touch and responsive layout targets', () => {
@@ -40,6 +40,6 @@ test('district cards and icon surfaces meet touch and responsive layout targets'
 
 test('selection errors preserve context and offer a retry', () => {
   assert.ok(screen.includes('تعذر حفظ اختيارك'));
-  assert.ok(screen.includes('onPress: () => selectDistrict(districtName)'));
+  assert.ok(screen.includes('onPress: () => void selectDistrict(districtName)'));
   assert.ok(!screen.includes("catch (e) {\n      router.replace('/home');"));
 });
