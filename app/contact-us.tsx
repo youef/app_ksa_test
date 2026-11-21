@@ -112,6 +112,8 @@ export default function ContactUsScreen() {
           </View>
 
           <Pressable
+            oasisKind="action"
+            oasisVariant="primary"
             style={[styles.btn, sending && styles.btnBusy]}
             onPress={submit}
             disabled={sending}
