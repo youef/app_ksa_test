@@ -45,18 +45,6 @@ export default function Cities() {
         <View style={styles.pageContent}>
           <View style={styles.searchSection}>
             <View style={[styles.searchBar, { borderColor: OASIS.colors.line, backgroundColor: OASIS.colors.surface }]}>
-              <Search size={20} color={OASIS.colors.primary} />
-              <TextInput
-                style={styles.searchInput}
-                value={search}
-                onChangeText={setSearch}
-                placeholder="ابحث عن مدينة أو محافظة..."
-                placeholderTextColor={OASIS.colors.muted}
-                returnKeyType="search"
-                blurOnSubmit
-                autoCorrect={false}
-                accessibilityLabel="البحث عن مدينة أو محافظة"
-              />
               {search.length > 0 ? (
                 <Pressable
                   oasisKind="icon"
@@ -69,6 +57,18 @@ export default function Cities() {
                   <X size={18} color={OASIS.colors.muted} />
                 </Pressable>
               ) : null}
+              <TextInput
+                style={styles.searchInput}
+                value={search}
+                onChangeText={setSearch}
+                placeholder="ابحث عن مدينة أو محافظة..."
+                placeholderTextColor={OASIS.colors.muted}
+                returnKeyType="search"
+                blurOnSubmit
+                autoCorrect={false}
+                accessibilityLabel="البحث عن مدينة أو محافظة"
+              />
+              <Search size={20} color={OASIS.colors.primary} />
             </View>
           </View>
 
