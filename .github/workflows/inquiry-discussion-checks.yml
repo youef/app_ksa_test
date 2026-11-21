@@ -35,6 +35,8 @@ jobs:
         run: node --test tests/workflowLeastPrivilege.test.cjs
       - name: Verify patched shell-quote dependency
         run: node --test tests/shellQuoteAdvisory.test.cjs
+      - name: Verify neighbor appreciation security migration contract
+        run: node --test tests/neighborAppreciationSecurity.test.cjs
       - name: Verify web response security headers
         run: node --test tests/vercelSecurityHeaders.test.cjs
       - name: TypeScript check
