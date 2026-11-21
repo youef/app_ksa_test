@@ -1,7 +1,7 @@
 # Cities picker UX — 2026-11-21
 
 ## Priority and scope
-This batch focuses on `app/cities.tsx` (region → city selection). The current screen already uses the shared `AppHeader`, Oasis palette, RTL row direction, and bottom-navigation inset; preserve those foundations and improve the picker without changing location data, routes, district selection, or global shell.
+This batch focuses on `app/cities.tsx` (region → city selection). The screen already uses the shared `AppHeader`, Oasis palette, RTL row direction, and bottom-navigation inset; preserve those foundations and improve the picker without changing location data, routes, district selection, or global shell.
 
 ## Design plan (recorded before implementation)
 1. **Hierarchy:** Add a compact region-context summary that explains the next step and shows the number of cities in the current filtered result. Keep it lightweight and avoid a second competing header.
@@ -13,23 +13,23 @@ This batch focuses on `app/cities.tsx` (region → city selection). The current 
 
 ## Before (verified source audit)
 - City search used raw `name.includes()`, so Arabic normalization variations did not match.
-- Search had no clear affordance or explicit accessible label / search return behavior.
+- Search had no clear affordance or explicit accessible label / keyboard return behavior.
 - No result count or empty-results recovery; an unmatched query rendered an empty area.
-- City rows had 36 px icon boxes, 14 px padding, and 14 px corners; the list was not width-capped for web/tablet.
+- City rows had a 36 px icon box and 14 px padding; the list was not width-capped for web/tablet.
 - An unconditional 100 px trailing spacer was present.
 
-## After (target)
-- Normalized Arabic filtering via a focused helper, with deterministic tests.
-- Search clear action and result summary.
-- Accessible city-card labels/hints and no-results/reset state.
-- Better card rhythm, 44 px clear/reset controls, and responsive max-width.
-- Remove the redundant trailing spacer; keep only the existing bottom-nav inset.
+## After (implemented)
+- Normalized Arabic filtering through a focused helper and the existing Saudi location normalizer.
+- A region summary with a live result count, clear-search affordance, and search keyboard behavior.
+- Accessible city/district labels and a no-results state with reset.
+- 76 px minimum city rows, 44 px icon/clear targets, 18 px custom radius, theme-token border/surface, and restrained shadow.
+- Centered 720 px max-width layout; redundant spacer removed and bottom-navigation inset retained.
 
-## Verification gates
-- Focused city picker presentation test.
-- TypeScript `npm run typecheck`.
-- Web export `npm run export:web`.
-- Existing tests where available.
-- Review the PR's changed files/checks and preview; real iPhone/Android/iPad/VoiceOver/TalkBack QA remains a human/device gate.
+## Verification
+- Focused city picker tests: **3/3 passed** in isolated Node execution against a copied source snapshot.
+- TSX transpile syntax: **0 diagnostics**.
+- GitHub CI on the latest PR head is still running; TypeScript, Web/Android/iOS export and full-suite status are not yet final for the latest commit.
+- Vercel preview for the latest branch commit is queued, not ready.
+- Real iPhone/Android/iPad and VoiceOver/TalkBack review remains unperformed.
 
 No production merge/deploy is authorized in this batch. Report only checks actually observed.
