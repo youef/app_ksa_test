@@ -41,11 +41,20 @@ test('blank search preserves all cities and unmatched search is empty', () => {
   assert.deepEqual(filterCitiesByQuery(cities, 'مدينة غير موجودة', normalizeArabicLocation), []);
 });
 
-test('city picker keeps accessible clear/reset and empty state affordances', () => {
+test('city picker provides accessible recovery and responsive card targets', () => {
   const screen = fs.readFileSync(path.join(__dirname, '../app/cities.tsx'), 'utf8');
-  assert.ok(screen.includes('accessibilityLabel="البحث عن مدينة أو محافظة"'));
-  assert.ok(screen.includes('accessibilityLabel="مسح البحث"'));
-  assert.ok(screen.includes('لم نعثر على مدينة بهذا الاسم'));
-  assert.ok(screen.includes('accessibilityLabel={'));
-  assert.ok(screen.includes('styles.emptyState'));
+  for (const fragment of [
+    'accessibilityLabel="البحث عن مدينة أو محافظة"',
+    'accessibilityLabel="مسح البحث"',
+    'لم نعثر على مدينة بهذا الاسم',
+    'accessibilityLabel={',
+    'styles.emptyState',
+    'oasisKind="plain"',
+    'minHeight: 76',
+    'width: 44',
+n    'maxWidth: 720',
+    'borderRadius: 18',
+    'keyboardShouldPersistTaps="handled"',
+    'paddingBottom: bottomNavInset',
+  ]) assert.ok(screen.includes(fragment), fragment);
 });
