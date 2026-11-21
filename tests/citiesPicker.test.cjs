@@ -52,7 +52,7 @@ test('city picker provides accessible recovery and responsive card targets', () 
     'oasisKind="plain"',
     'minHeight: 76',
     'width: 44',
-n    'maxWidth: 720',
+    'maxWidth: 720',
     'borderRadius: 18',
     'keyboardShouldPersistTaps="handled"',
     'paddingBottom: bottomNavInset',
