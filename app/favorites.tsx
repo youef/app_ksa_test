@@ -32,7 +32,7 @@ const typeMeta = (raw: string) => {
   if (value === 'store' || value === 'business') return { label: 'متجر أو نشاط', icon: Store, color: OASIS.colors.primary, tint: OASIS.colors.soft, filter: 'stores' as Filter };
   if (value === 'question' || value === 'post') return { label: 'استفسار مجتمعي', icon: MessageCircle, color: '#2563EB', tint: '#DBEAFE', filter: 'questions' as Filter };
   if (value === 'request') return { label: 'طلب مساعدة', icon: Heart, color: '#BE185D', tint: '#FCE7F3', filter: 'requests' as Filter };
-  return { label: 'عنصر محفوظ', icon: Bookmark, color: '#6D28D9', tint: '#EDE9FE', filter: 'all' as Filter };
+  return { label: 'عنصر محفوظ', icon: Bookmark, color: OASIS.colors.primary, tint: OASIS.colors.soft, filter: 'all' as Filter };
 };
 
 function imageFrom(row: any): string | null {
@@ -168,10 +168,10 @@ export default function FavoritesScreen() {
     <View style={[styles.screen, { backgroundColor: 'transparent' }]}>
       <AppHeader variant="sub" title="المفضلة" subtitle="منتجاتك واستفساراتك وكل ما حفظته" fallbackRoute="/more" />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingBottom: bottomNavInset + 28, width: '100%', maxWidth: 1080, alignSelf: 'center', paddingHorizontal: width < 380 ? 12 : 20 }]}>
-        <LinearGradient colors={['#312E81', '#5B21B6', '#7C3AED']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
+        <LinearGradient colors={[OASIS.colors.deep, OASIS.colors.primary, '#059669']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
           <View style={styles.heroTop}>
-            <View style={styles.heroIcon}><Heart size={24} color="#F5D0FE" fill="#F5D0FE" /></View>
-            <View style={styles.heroBadge}><Sparkles size={12} color="#E9D5FF" /><Text style={styles.heroBadgeText}>مساحتك الخاصة</Text></View>
+            <View style={styles.heroIcon}><Heart size={24} color="#D1FAE5" fill="#D1FAE5" /></View>
+            <View style={styles.heroBadge}><Sparkles size={12} color="#D1FAE5" /><Text style={styles.heroBadgeText}>مساحتك الخاصة</Text></View>
           </View>
           <Text style={styles.heroTitle}>كل مفضّلتك في مكان واحد</Text>
           <Text style={styles.heroDesc}>المنتجات والاستفسارات وطلبات المساعدة والمتاجر المحفوظة، مع صورها وتفاصيلها عند توفرها.</Text>
@@ -205,9 +205,9 @@ export default function FavoritesScreen() {
           ))}
         </ScrollView>
 
-        {loading ? <OasisSurface oasisSurface="card" style={styles.stateCard}><ActivityIndicator size="large" color="#6D28D9" /><Text style={styles.stateTitle}>جارٍ تحميل مفضّلتك</Text><Text style={styles.stateDesc}>نجهّز العناصر المحفوظة وتفاصيلها.</Text></OasisSurface> :
-          !signedIn ? <OasisSurface oasisSurface="card" style={styles.stateCard}><View style={styles.stateIcon}><LogIn size={25} color="#6D28D9" /></View><Text style={styles.stateTitle}>سجّل الدخول لعرض المفضلة</Text><Text style={styles.stateDesc}>ستجد هنا المنتجات والاستفسارات التي تحفظها على حسابك.</Text><Pressable oasisVariant="primary" oasisKind="action" onPress={() => router.push('/auth')} style={styles.primaryButton}><Text style={styles.primaryButtonText}>تسجيل الدخول</Text><ChevronLeft size={16} color={OASIS.colors.surface} /></Pressable></OasisSurface> :
-          error ? <OasisSurface oasisSurface="card" style={styles.stateCard}><Text style={styles.stateTitle}>تعذر تحميل المفضلة</Text><Text style={styles.stateDesc}>{error}</Text><Pressable oasisKind="action" onPress={() => void load()} style={styles.outlineButton}><RefreshCw size={15} color="#6D28D9" /><Text style={styles.outlineText}>إعادة المحاولة</Text></Pressable></OasisSurface> :
+        {loading ? <OasisSurface oasisSurface="card" style={styles.stateCard}><ActivityIndicator size="large" color={OASIS.colors.primary} /><Text style={styles.stateTitle}>جارٍ تحميل مفضّلتك</Text><Text style={styles.stateDesc}>نجهّز العناصر المحفوظة وتفاصيلها.</Text></OasisSurface> :
+          !signedIn ? <OasisSurface oasisSurface="card" style={styles.stateCard}><View style={styles.stateIcon}><LogIn size={25} color={OASIS.colors.primary} /></View><Text style={styles.stateTitle}>سجّل الدخول لعرض المفضلة</Text><Text style={styles.stateDesc}>ستجد هنا المنتجات والاستفسارات التي تحفظها على حسابك.</Text><Pressable oasisVariant="primary" oasisKind="action" onPress={() => router.push('/auth')} style={styles.primaryButton}><Text style={styles.primaryButtonText}>تسجيل الدخول</Text><ChevronLeft size={16} color={OASIS.colors.surface} /></Pressable></OasisSurface> :
+          error ? <OasisSurface oasisSurface="card" style={styles.stateCard}><Text style={styles.stateTitle}>تعذر تحميل المفضلة</Text><Text style={styles.stateDesc}>{error}</Text><Pressable oasisKind="action" onPress={() => void load()} style={styles.outlineButton}><RefreshCw size={15} color={OASIS.colors.primary} /><Text style={styles.outlineText}>إعادة المحاولة</Text></Pressable></OasisSurface> :
           visible.length ? <View style={[styles.listWrap, wideLayout && styles.listWrapWide]}>{visible.map(item => {
             const meta = typeMeta(item.target_type);
             const Icon = meta.icon;
@@ -218,6 +218,7 @@ export default function FavoritesScreen() {
                 <Pressable oasisKind="card" onPress={() => item.route && router.push(item.route)} style={styles.cardOpenArea} accessibilityRole="button" accessibilityLabel={`فتح تفاصيل ${item.title || meta.label}`}>
                   {showImage ? <View style={styles.imageFrame}>
                     {item.imageUrl ? <Image source={{ uri: item.imageUrl }} style={styles.itemImage} resizeMode="cover" /> : <View style={styles.imagePlaceholder}><ImageIcon size={24} color="#94A3B8" /><Text style={styles.noImageText}>لا توجد صورة</Text></View>}
+                    <View style={styles.savedImageBadge}><Bookmark size={11} color={OASIS.colors.primary} fill={OASIS.colors.primary} /><Text style={styles.savedImageBadgeText}>محفوظ</Text></View>
                     <View style={[styles.imageTypeBadge, { backgroundColor: meta.tint }]}><Icon size={12} color={meta.color} /><Text style={[styles.imageTypeText, { color: meta.color }]}>{meta.label}</Text></View>
                   </View> : null}
                   <View style={styles.itemMain}>
@@ -232,7 +233,7 @@ export default function FavoritesScreen() {
                   </View>
                 </Pressable>
                 <View style={styles.cardActions}>
-                  <Pressable oasisKind="action" onPress={() => item.route && router.push(item.route)} accessibilityRole="button" accessibilityLabel={`عرض تفاصيل ${item.title || meta.label}`} style={styles.openButton}><Text style={styles.openButtonText}>عرض التفاصيل</Text><ChevronLeft size={15} color="#6D28D9" /></Pressable>
+                  <Pressable oasisKind="action" onPress={() => item.route && router.push(item.route)} accessibilityRole="button" accessibilityLabel={`عرض تفاصيل ${item.title || meta.label}`} style={styles.openButton}><Text style={styles.openButtonText}>عرض التفاصيل</Text><ChevronLeft size={15} color={OASIS.colors.primary} /></Pressable>
                   <Pressable oasisKind="icon" onPress={() => remove(item)} accessibilityRole="button" accessibilityLabel={`إزالة ${item.title || meta.label} من المفضلة`} style={styles.removeButton}><Trash2 size={17} color={OASIS.colors.danger} /></Pressable>
                 </View>
               </OasisSurface>
@@ -246,7 +247,7 @@ export default function FavoritesScreen() {
             {!items.length && <View style={styles.emptyActions}><Pressable oasisVariant="primary" oasisKind="action" onPress={() => router.push('/market')} style={styles.primaryButton}><Text style={styles.primaryButtonText}>تصفح سوق الحي</Text><ChevronLeft size={15} color={OASIS.colors.surface} /></Pressable><Pressable oasisKind="action" onPress={() => router.push('/question')} style={styles.outlineButton}><Text style={styles.outlineText}>استكشف الاستفسارات</Text></Pressable></View>}
           </OasisSurface>
         }
-        <View style={styles.privacyNote}><Bookmark size={15} color="#6D28D9" /><Text style={styles.privacyText}>قائمتك خاصة بك، ويمكنك إزالة أي عنصر منها في أي وقت.</Text></View>
+        <View style={styles.privacyNote}><Bookmark size={15} color={OASIS.colors.primary} /><Text style={styles.privacyText}>قائمتك خاصة بك، ويمكنك إزالة أي عنصر منها في أي وقت.</Text></View>
       </ScrollView>
     </View>
   );
@@ -262,24 +263,24 @@ const styles = StyleSheet.create({
   clearText: { fontSize: 23, lineHeight: 27, color: OASIS.colors.muted },
   listWrapWide: { flexDirection: 'row-reverse', flexWrap: 'wrap', alignItems: 'stretch' },
   itemCardWide: { width: '48.8%', minWidth: 0 },
-  hero: { borderRadius: 14, padding: 18, gap: 12 },
+  hero: { borderRadius: 24, padding: 22, gap: 14, overflow: 'hidden' },
   heroTop: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between' },
-  heroIcon: { width: 48, height: 48, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center' },
-  heroBadge: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, backgroundColor: 'rgba(255,255,255,0.12)', paddingHorizontal: 9, paddingVertical: 6, borderRadius: 30 },
+  heroIcon: { width: 56, height: 56, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center' },
+  heroBadge: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, backgroundColor: 'rgba(255,255,255,0.18)', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 30 },
   heroBadgeText: { fontSize: 11, fontWeight: '700', color: '#E9D5FF' },
-  heroTitle: { fontSize: 22, fontWeight: '700', color: OASIS.colors.surface, textAlign: 'right' },
-  heroDesc: { fontSize: 12, color: '#EDE9FE', lineHeight: 20, textAlign: 'right' },
+  heroTitle: { fontSize: 24, fontWeight: '800', color: OASIS.colors.surface, textAlign: 'right' },
+  heroDesc: { fontSize: 14, color: '#ECFDF5', lineHeight: 23, textAlign: 'right' },
   statsRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
   stat: { flex: 1, alignItems: 'center', gap: 4 },
   statValue: { fontSize: 20, fontWeight: '700', color: OASIS.colors.surface },
-  statLabel: { fontSize: 11, color: '#E9D5FF', fontWeight: '700', textAlign: 'center' },
+  statLabel: { fontSize: 12, color: '#D1FAE5', fontWeight: '700', textAlign: 'center' },
   statDivider: { width: 1, height: 30, backgroundColor: 'rgba(255,255,255,0.22)' },
   searchBox: { flexDirection: 'row-reverse', alignItems: 'center', gap: 9, backgroundColor: OASIS.colors.surface, borderWidth: 1, borderColor: OASIS.colors.line, borderRadius: 15, paddingHorizontal: 12 },
   searchInput: { flex: 1, minWidth: 0, paddingVertical: 14, fontSize: 15, color: OASIS.colors.ink, textAlign: 'right' },
-  refreshButton: { width: 44, height: 44, borderRadius: 10, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' },
+  refreshButton: { width: 48, height: 48, borderRadius: 10, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' },
   filters: { gap: 8, paddingVertical: 2, flexDirection: 'row-reverse' },
   filterChip: { flexDirection: 'row-reverse', alignItems: 'center', gap: 7, paddingHorizontal: 14, minHeight: 44, paddingVertical: 9, borderRadius: 14, borderWidth: 1, borderColor: OASIS.colors.line, backgroundColor: OASIS.colors.surface },
-  filterChipActive: { backgroundColor: '#6D28D9', borderColor: '#6D28D9' },
+  filterChipActive: { backgroundColor: OASIS.colors.primary, borderColor: OASIS.colors.primary },
   filterText: { fontSize: 11, fontWeight: '600', color: OASIS.colors.muted },
   filterTextActive: { color: OASIS.colors.surface },
   filterCount: { minWidth: 20, height: 20, borderRadius: 10, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
@@ -287,18 +288,20 @@ const styles = StyleSheet.create({
   filterCountText: { fontSize: 11, fontWeight: '700', color: OASIS.colors.muted },
   filterCountTextActive: { color: OASIS.colors.surface },
   listWrap: { gap: 11 },
-  itemCard: { backgroundColor: OASIS.colors.surface, borderWidth: 1, borderColor: OASIS.colors.line, borderRadius: 14, padding: 10, gap: 10, overflow: 'hidden' },
+  itemCard: { backgroundColor: OASIS.colors.surface, borderWidth: 1, borderColor: OASIS.colors.line, borderRadius: 22, padding: 12, gap: 10, overflow: 'hidden' },
   cardOpenArea: { flexDirection: 'row-reverse', alignItems: 'stretch', gap: 12 },
-  imageFrame: { width: 112, minHeight: 136, borderRadius: 13, overflow: 'hidden', backgroundColor: '#F1F5F9', position: 'relative' },
-  itemImage: { width: '100%', height: '100%', minHeight: 136, backgroundColor: '#F1F5F9' },
-  imagePlaceholder: { flex: 1, minHeight: 136, alignItems: 'center', justifyContent: 'center', gap: 7, padding: 8 },
+  imageFrame: { width: 126, minHeight: 150, borderRadius: 16, overflow: 'hidden', backgroundColor: '#F1F5F9', position: 'relative' },
+  itemImage: { width: '100%', height: '100%', minHeight: 150, backgroundColor: '#F1F5F9' },
+  imagePlaceholder: { flex: 1, minHeight: 150, alignItems: 'center', justifyContent: 'center', gap: 7, padding: 8 },
   noImageText: { fontSize: 11, color: '#94A3B8', textAlign: 'center' },
+  savedImageBadge: { position: 'absolute', top: 7, right: 7, zIndex: 2, flexDirection: 'row-reverse', alignItems: 'center', gap: 4, backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#A7F3D0', paddingHorizontal: 8, paddingVertical: 5, borderRadius: 12 },
+  savedImageBadgeText: { fontSize: 10, fontWeight: '800', color: OASIS.colors.primary },
   imageTypeBadge: { position: 'absolute', right: 5, bottom: 5, flexDirection: 'row-reverse', alignItems: 'center', gap: 4, paddingHorizontal: 6, paddingVertical: 4, borderRadius: 7 },
   imageTypeText: { fontSize: 11, fontWeight: '700' },
   inlineTypeBadge: { flexDirection: 'row-reverse', alignItems: 'center', alignSelf: 'flex-start', gap: 5, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8 },
   itemMain: { flex: 1, minWidth: 0, gap: 6, alignItems: 'stretch', paddingVertical: 3 },
-  itemTitle: { fontSize: 15, fontWeight: '700', color: OASIS.colors.ink, textAlign: 'right', lineHeight: 20 },
-  itemSubtitle: { fontSize: 11, color: '#6D28D9', textAlign: 'right', fontWeight: '600' },
+  itemTitle: { fontSize: 17, fontWeight: '800', color: OASIS.colors.ink, textAlign: 'right', lineHeight: 20 },
+  itemSubtitle: { fontSize: 12, color: OASIS.colors.primary, textAlign: 'right', fontWeight: '600' },
   savedPostBody: { fontSize: 13, color: OASIS.colors.muted, textAlign: 'right', lineHeight: 18 },
   priceRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, alignSelf: 'flex-start', backgroundColor: OASIS.colors.soft, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8 },
   priceText: { fontSize: 11, color: OASIS.colors.primary, fontWeight: '700' },
@@ -309,17 +312,17 @@ const styles = StyleSheet.create({
   dateRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5 },
   itemDate: { fontSize: 11, color: '#94A3B8', textAlign: 'right' },
   cardActions: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 9 },
-  openButton: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, paddingHorizontal: 14, minHeight: 44, paddingVertical: 9, borderRadius: 9, backgroundColor: '#F5F3FF' },
-  openButtonText: { fontSize: 11, fontWeight: '700', color: '#6D28D9' },
+  openButton: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, paddingHorizontal: 14, minHeight: 48, paddingVertical: 12, borderRadius: 14, backgroundColor: OASIS.colors.soft },
+  openButtonText: { fontSize: 12, fontWeight: '800', color: OASIS.colors.primary },
   removeButton: { width: 44, height: 44, borderRadius: 10, backgroundColor: OASIS.colors.dangerSoft, alignItems: 'center', justifyContent: 'center' },
   stateCard: { backgroundColor: OASIS.colors.surface, borderWidth: 1, borderColor: OASIS.colors.line, borderRadius: 14, padding: 14, alignItems: 'center', gap: 9 },
-  stateIcon: { width: 52, height: 52, borderRadius: 17, backgroundColor: '#F5F3FF', alignItems: 'center', justifyContent: 'center' },
+  stateIcon: { width: 60, height: 60, borderRadius: 20, backgroundColor: OASIS.colors.soft, alignItems: 'center', justifyContent: 'center' },
   stateTitle: { fontSize: 14, fontWeight: '700', color: OASIS.colors.ink, textAlign: 'center' },
   stateDesc: { fontSize: 11.5, color: OASIS.colors.muted, textAlign: 'center', lineHeight: 19 },
-  primaryButton: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 7, backgroundColor: '#6D28D9', paddingHorizontal: 15, paddingVertical: 11, borderRadius: 12 },
+  primaryButton: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 7, backgroundColor: OASIS.colors.primary, paddingHorizontal: 15, paddingVertical: 11, borderRadius: 12 },
   primaryButtonText: { fontSize: 11.5, fontWeight: '700', color: OASIS.colors.surface },
-  outlineButton: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 7, borderWidth: 1, borderColor: '#DDD6FE', backgroundColor: '#FAF5FF', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12 },
-  outlineText: { fontSize: 11, fontWeight: '700', color: '#6D28D9' },
+  outlineButton: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 7, borderWidth: 1, borderColor: OASIS.colors.line, backgroundColor: OASIS.colors.surface, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12 },
+  outlineText: { fontSize: 12, fontWeight: '700', color: OASIS.colors.primary },
   emptyActions: { flexDirection: 'row-reverse', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginTop: 4 },
   privacyNote: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 8 },
   privacyText: { fontSize: 11, color: OASIS.colors.muted, textAlign: 'center' },
