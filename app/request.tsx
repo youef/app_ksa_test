@@ -2047,6 +2047,8 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   quickChip: {
+    minHeight: 44,
+    justifyContent: 'center',
     maxWidth: '100%',
     backgroundColor: '#f5f7f6',
     paddingHorizontal: 10,
@@ -2307,6 +2309,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   editActionBtn: {
+    minHeight: 44,
     flex: 1,
     flexDirection: 'row-reverse',
     alignItems: 'center',
@@ -2331,6 +2334,7 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
   },
   deleteActionBtn: {
+    minHeight: 44,
     flex: 1,
     flexDirection: 'row-reverse',
     alignItems: 'center',
@@ -2426,6 +2430,7 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
   modalSubmitBtn: {
+    minHeight: 44,
     flex: 2,
     backgroundColor: OASIS.colors.primary,
     paddingVertical: 12,
@@ -2443,6 +2448,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   modalCancelBtn: {
+    minHeight: 44,
     flex: 1,
     backgroundColor: '#f1f5f9',
     paddingVertical: 12,
