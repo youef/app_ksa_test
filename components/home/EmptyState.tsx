@@ -180,14 +180,14 @@ function EmptyStateBase({ tab, searching, city, hasExactLocation }: Props) {
   };
 
   return (
-    <View style={styles.emptyContainer}>
-      <View style={styles.emptyIllustrationWrap}>
+    <View style={styles.emptyContainer} accessibilityLabel={`${cfg.title}. ${cfg.sub}`}>
+      <View style={styles.emptyIllustrationWrap} accessible={false} importantForAccessibility="no-hide-descendants">
         <OasisEmptyIllustration
           kind={(cfg.illustrationKind ?? 'empty-feed') as never}
         />
       </View>
 
-      <Text style={styles.emptyTitle}>{cfg.title}</Text>
+      <Text accessibilityRole="header" style={styles.emptyTitle}>{cfg.title}</Text>
       <Text style={styles.emptySub}>{cfg.sub}</Text>
 
       {cfg.cta && (
@@ -197,7 +197,7 @@ function EmptyStateBase({ tab, searching, city, hasExactLocation }: Props) {
           onPress={handleCtaPress}
           accessibilityRole="button"
           accessibilityLabel={cfg.cta.label}
-          accessibilityHint={cfg.sub}
+          accessibilityHint="ينقلك إلى صفحة إنشاء المحتوى"
         >
           <Text style={styles.emptyAskBtnText}>{cfg.cta.label}</Text>
         </Pressable>
