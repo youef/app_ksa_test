@@ -86,7 +86,7 @@ export default function Cities() {
             <View style={styles.content}>
               {cities.map(city => (
                 <Pressable
-                  oasisKind="card"
+                  oasisKind="plain"
                   key={city.id || city.name}
                   testID={`city-card-${city.id || city.name}`}
                   style={styles.cityCard}
