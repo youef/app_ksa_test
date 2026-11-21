@@ -25,13 +25,7 @@
 - No-results/empty-city state is understandable and recoverable.
 - Cards are comfortable to tap (>=44px), RTL, responsive, and screen-reader labeled.
 - Header, bottom navigation inset, GPS lock, route parameters, and city/district data remain unchanged.
-- No changes outside the districts picker, its focused UI test, and this design record.
-
-## Verification plan
-- Focused Node test for the district picker UI contract.
-- TypeScript check and Expo Web export/build in CI (if workflows run for this branch).
-- Full existing tests via CI if available.
-- Manual visual QA on iPhone/Android/iPad/Web and VoiceOver/TalkBack is not claimed unless actually performed.
+- No changes outside the districts picker, its focused UI test, CI validation workflow, and this design record.
 
 ## Before/after summary
 - Raw string search → normalized Saudi Arabic search.
@@ -40,5 +34,14 @@
 - Arbitrary 100px spacer → natural scroll with existing bottom-nav inset.
 - Silent redirect on selection failure → retry/cancel message, remain in picker.
 
+## Verification results
+- **TypeScript:** `npm run typecheck` passed in the focused PR workflow.
+- **Web:** `npm run export:web` passed in the focused PR workflow.
+- **Focused UI contract tests:** passed (5 test cases).
+- **Repository test suite:** `node --test --test-concurrency=2 tests/*.test.cjs` passed in `payment-safety` workflow.
+- Local checkout was unavailable (DNS/network resolution for `github.com` failed), so local commands were not run.
+- Android/iOS JS bundle jobs remain in progress; this is additional validation, not device QA.
+- iPhone/Android/iPad visual review and VoiceOver/TalkBack QA have not been performed.
+
 ## Next screen
-`app/districts.tsx` is this batch. Next, review the neighbourhood onboarding/confirmation experience after this PR is reviewed; do not open a parallel PR on the same file.
+Review the neighbourhood onboarding/confirmation experience after this PR is reviewed; do not open a parallel PR on this same screen.
