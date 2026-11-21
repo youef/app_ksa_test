@@ -37,6 +37,8 @@ test('message field provides multiline guidance, limit, and live counter', () =>
 
 test('submit action is touch-sized and exposes its busy state', () => {
   assert.match(screen, /minHeight: 48/);
+  assert.match(screen, /oasisKind="action"/);
+  assert.match(screen, /oasisVariant="primary"/);
   assert.match(screen, /accessibilityState={{ disabled: sending, busy: sending }}/);
   assert.match(screen, /disabled={sending}/);
   assert.match(screen, /جارٍ الإرسال/);
