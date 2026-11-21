@@ -2,14 +2,15 @@ import { OasisPressable as Pressable, OasisTextInput as TextInput } from '@/comp
 import { OASIS } from '@/lib/oasis';
 import { useBottomNavInset } from '@/lib/bottomNav';
 import { useState, useMemo } from 'react';
-import { ScrollView, StyleSheet, Text, View, Platform } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { buildSaudiLocations } from '@/lib/saudiLocations';
-import { ChevronRight, MapPin, Search, ChevronLeft, Building2 } from 'lucide-react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { buildSaudiLocations, normalizeSaudiLocationName } from '@/lib/saudiLocations';
+import { filterCitiesByQuery } from '@/lib/cityPickerPresentation';
+import { ChevronLeft, MapPin, Search, Building2, X } from 'lucide-react-native';
 import { AppHeader } from '@/components/shared/AppHeader';
 
 const ALL_SAUDI_REGIONS = buildSaudiLocations();
+const numberFormat = new Intl.NumberFormat('ar-SA');
 
 export default function Cities() {
   const bottomNavInset = useBottomNavInset();
@@ -20,60 +21,117 @@ export default function Cities() {
     return ALL_SAUDI_REGIONS.find(r => r.name === regionName) || ALL_SAUDI_REGIONS[0];
   }, [regionName]);
 
-  const cities = useMemo(() => {
-    return region.cities.filter(c => c.name.includes(search.trim()));
-  }, [region, search]);
+  const cities = useMemo(
+    () => filterCitiesByQuery(region.cities, search, normalizeSaudiLocationName),
+    [region, search],
+  );
+  const countLabel = search.trim()
+    ? `عرض ${numberFormat.format(cities.length)} من ${numberFormat.format(region.cities.length)} مدينة`
+    : `تضم المنطقة ${numberFormat.format(region.cities.length)} مدينة ومحافظة`;
 
   return (
-    <View style={[styles.container, { backgroundColor: 'transparent' }]}>
+    <View style={styles.container}>
       <AppHeader
         variant="sub"
         title={region.name}
         subtitle="مدن ومحافظات المنطقة"
         fallbackRoute="/locations"
       />
-      <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: bottomNavInset }]} showsVerticalScrollIndicator={false}>
-        <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 6 }}>
-          <View style={[styles.searchBar, { borderWidth: 1, borderColor: OASIS.colors.line, backgroundColor: OASIS.colors.surface }]}>
-            <TextInput
-              style={styles.searchInput}
-              value={search}
-              onChangeText={setSearch}
-              placeholder="ابحث عن مدينة أو محافظة..."
-              placeholderTextColor="#94a3b8"
-            />
-            <Search size={20} color={OASIS.colors.primary} />
+      <ScrollView
+        contentContainerStyle={[styles.scroll, { paddingBottom: bottomNavInset }]}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.pageContent}>
+          <View style={styles.searchSection}>
+            <View style={[styles.searchBar, { borderColor: OASIS.colors.line, backgroundColor: OASIS.colors.surface }]}>
+              {search.length > 0 ? (
+                <Pressable
+                  oasisKind="icon"
+                  style={styles.clearSearch}
+                  onPress={() => setSearch('')}
+                  accessibilityRole="button"
+                  accessibilityLabel="مسح البحث"
+                  accessibilityHint="عرض جميع مدن المنطقة"
+                >
+                  <X size={18} color={OASIS.colors.muted} />
+                </Pressable>
+              ) : null}
+              <TextInput
+                style={styles.searchInput}
+                value={search}
+                onChangeText={setSearch}
+                placeholder="ابحث عن مدينة أو محافظة..."
+                placeholderTextColor={OASIS.colors.muted}
+                returnKeyType="search"
+                blurOnSubmit
+                autoCorrect={false}
+                accessibilityLabel="البحث عن مدينة أو محافظة"
+              />
+              <Search size={20} color={OASIS.colors.primary} />
+            </View>
           </View>
-        </View>
 
-        <View style={styles.content}>
-          {cities.map(c => (
-            <Pressable oasisKind="card"
-              key={c.name}
-              style={styles.cityCard}
-              onPress={() =>
-                router.push({
-                  pathname: '/districts',
-                  params: { regionName: region.name, cityName: c.name },
-                })
-              }
-            >
-              <ChevronLeft size={18} color="#94a3b8" />
-              <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                <Text style={styles.cityTitle}>{c.name}</Text>
-                <Text style={styles.citySub}>{c.districts.length} حي سكني مسجّل</Text>
-              </View>
-              <View style={styles.cityIconBox}>
-                <Building2 size={20} color={OASIS.colors.primary} />
-              </View>
-            </Pressable>
-          ))}
-        </View>
+          <View style={[styles.regionSummary, { backgroundColor: OASIS.colors.soft, borderColor: OASIS.colors.line }]}>
+            <View style={styles.summaryCopy}>
+              <Text style={styles.summaryTitle}>اختر المدينة للانتقال إلى الأحياء</Text>
+              <Text style={styles.summaryCount}>{countLabel}</Text>
+            </View>
+            <View style={styles.summaryIcon}>
+              <MapPin size={20} color={OASIS.colors.primary} />
+            </View>
+          </View>
 
-        <View style={{ height: 100 }} />
+          {cities.length > 0 ? (
+            <View style={styles.content}>
+              {cities.map(city => (
+                <Pressable
+                  oasisKind="plain"
+                  key={city.id || city.name}
+                  testID={`city-card-${city.id || city.name}`}
+                  style={styles.cityCard}
+                  accessibilityRole="button"
+                  accessibilityLabel={`مدينة ${city.name}، ${numberFormat.format(city.districts.length)} حي مسجل`}
+                  accessibilityHint="اضغط لعرض أحياء المدينة"
+                  onPress={() =>
+                    router.push({
+                      pathname: '/districts',
+                      params: { regionName: region.name, cityName: city.name },
+                    })
+                  }
+                >
+                  <ChevronLeft size={19} color={OASIS.colors.muted} />
+                  <View style={styles.cityCopy}>
+                    <Text style={styles.cityTitle} numberOfLines={1}>{city.name}</Text>
+                    <Text style={styles.citySub}>{numberFormat.format(city.districts.length)} حي سكني مسجّل</Text>
+                  </View>
+                  <View style={styles.cityIconBox}>
+                    <Building2 size={20} color={OASIS.colors.primary} />
+                  </View>
+                </Pressable>
+              ))}
+            </View>
+          ) : (
+            <View style={[styles.emptyState, { backgroundColor: OASIS.colors.surface, borderColor: OASIS.colors.line }]}>
+              <View style={styles.emptyIcon}>
+                <Search size={23} color={OASIS.colors.muted} />
+              </View>
+              <Text style={styles.emptyTitle}>لم نعثر على مدينة بهذا الاسم</Text>
+              <Text style={styles.emptyCopy}>جرّب كتابة اسم أقصر أو تحقق من الإملاء.</Text>
+              <Pressable
+                oasisKind="action"
+                oasisVariant="primary"
+                style={styles.resetSearchButton}
+                onPress={() => setSearch('')}
+                accessibilityRole="button"
+                accessibilityLabel="مسح البحث والعودة لجميع المدن"
+              >
+                <Text style={styles.resetSearchText}>عرض جميع المدن</Text>
+              </Pressable>
+            </View>
+          )}
+        </View>
       </ScrollView>
-
-
     </View>
   );
 }
@@ -84,99 +142,165 @@ const styles = StyleSheet.create({
     backgroundColor: OASIS.colors.background,
   },
   scroll: {
-    paddingBottom: 14,
+    flexGrow: 1,
   },
-  hero: {
-    paddingTop: Platform.OS === 'ios' ? 52 : 40,
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
+  pageContent: {
+    width: '100%',
+    maxWidth: 720,
+    alignSelf: 'center',
   },
-  navBar: {
-    flexDirection: 'row-reverse',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  iconBtn: {
-    padding: 6,
-  },
-  navTitle: {
-    color: OASIS.colors.surface,
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  heroSub: {
-    color: 'rgba(255,255,255,0.85)',
-    fontSize: 13,
-    textAlign: 'right',
-    marginBottom: 16,
-    lineHeight: 18,
+  searchSection: {
+    paddingHorizontal: 16,
+    paddingTop: 14,
   },
   searchBar: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    backgroundColor: OASIS.colors.surface,
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    height: 48,
-    gap: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0,
-    shadowRadius: 6,
-    elevation: 3,
+    minHeight: 52,
+    borderWidth: 1,
+    borderRadius: 17,
+    paddingHorizontal: 10,
+    gap: 8,
   },
   searchInput: {
     flex: 1,
+    minWidth: 0,
+    minHeight: 48,
     color: OASIS.colors.ink,
-    fontSize: 13,
+    fontSize: 15,
+    lineHeight: 22,
     textAlign: 'right',
   },
-  content: {
-    paddingHorizontal: 18,
-    paddingTop: 16,
+  clearSearch: {
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  cityCard: {
+  regionSummary: {
+    marginHorizontal: 16,
+    marginTop: 14,
+    borderWidth: 1,
+    borderRadius: 17,
+    padding: 13,
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: OASIS.colors.surface,
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#f1f5f9',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0,
-    shadowRadius: 6,
-    elevation: 2,
     gap: 12,
   },
+  summaryCopy: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: 'flex-end',
+    gap: 3,
+  },
+  summaryTitle: {
+    color: OASIS.colors.ink,
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 20,
+    textAlign: 'right',
+  },
+  summaryCount: {
+    color: OASIS.colors.muted,
+    fontSize: 12,
+    lineHeight: 18,
+    textAlign: 'right',
+  },
+  summaryIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: OASIS.colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  content: {
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 16,
+    gap: 10,
+  },
+  cityCard: {
+    minHeight: 76,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    backgroundColor: OASIS.colors.surface,
+    borderRadius: 18,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: OASIS.colors.line,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.035,
+    shadowRadius: 5,
+    elevation: 1,
+    gap: 12,
+  },
+  cityCopy: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: 'flex-end',
+    gap: 3,
+  },
   cityIconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     backgroundColor: OASIS.colors.soft,
     alignItems: 'center',
     justifyContent: 'center',
   },
   cityTitle: {
     color: OASIS.colors.ink,
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 15,
+    lineHeight: 22,
+    fontWeight: '700',
+    textAlign: 'right',
   },
   citySub: {
     color: OASIS.colors.muted,
     fontSize: 12,
-    marginTop: 2,
+    lineHeight: 18,
+    textAlign: 'right',
   },
-  bottomNavWrapper: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+  emptyState: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderWidth: 1,
+    borderRadius: 20,
+    padding: 22,
+    alignItems: 'center',
+    gap: 10,
+  },
+  emptyIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: OASIS.colors.soft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyTitle: {
+    color: OASIS.colors.ink,
+    fontSize: 15,
+    lineHeight: 22,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  emptyCopy: {
+    color: OASIS.colors.muted,
+    fontSize: 13,
+    lineHeight: 20,
+    textAlign: 'center',
+  },
+  resetSearchButton: {
+    minHeight: 44,
+    marginTop: 4,
+    paddingHorizontal: 18,
+    borderRadius: 12,
+  },
+  resetSearchText: {
+    fontSize: 14,
+    fontWeight: '700',
   },
 });
