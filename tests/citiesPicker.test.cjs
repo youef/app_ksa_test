@@ -13,12 +13,12 @@ const { filterCitiesByQuery } = helperModule.exports;
 
 function normalizeArabicLocation(value) {
   return value.trim()
-    .replace(/^(مدينة|حي|منطقة)\\s+/u, '')
-    .replace(/[\\u064B-\\u065F\\u0670\\u0640]/g, '')
+    .replace(/^(مدينة|حي|منطقة)\s+/u, '')
+    .replace(/[\u064B-\u065F\u0670\u0640]/g, '')
     .replace(/[أإآٱ]/g, 'ا')
     .replace(/ة/g, 'ه')
     .replace(/ى/g, 'ي')
-    .replace(/\\s+/g, ' ')
+    .replace(/\s+/g, ' ')
     .toLocaleLowerCase('ar');
 }
 
