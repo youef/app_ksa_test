@@ -13,7 +13,7 @@ helperModule._compile(require('typescript').transpileModule(source, {
     target: require('typescript').ScriptTarget.ES2022,
   },
 }).outputText, helperPath);
-const { filterDistrictsByQuery } = helperModule.exports;
+const { filterDistrictsByQuery, formatDistrictLabel } = helperModule.exports;
 
 function normalizeArabicLocation(value) {
   return value.trim()
@@ -36,6 +36,11 @@ test('district search matches Arabic diacritics, prefixes, and tatweel', () => {
   assert.deepEqual(filterDistrictsByQuery(districts, 'العلـيا', normalizeArabicLocation), [districts[0]]);
   assert.deepEqual(filterDistrictsByQuery(districts, 'حي جده', normalizeArabicLocation), [districts[2]]);
   assert.deepEqual(filterDistrictsByQuery(districts, 'الشَّفا', normalizeArabicLocation), [districts[3]]);
+});
+
+test('district label formatting adds حي once', () => {
+  assert.equal(formatDistrictLabel('العليا'), 'حي العليا');
+  assert.equal(formatDistrictLabel('حي العليا'), 'حي العليا');
 });
 
 test('blank district query keeps the original list and unmatched query returns none', () => {
