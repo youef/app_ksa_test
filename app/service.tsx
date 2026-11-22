@@ -431,7 +431,7 @@ export default function Service() {
             <View style={styles.badgesRow}>
               <View style={[styles.statusBadge, service.available_now ? styles.statusBadgeOpen : styles.statusBadgeClosed]}>
                 <View style={[styles.statusDot, { backgroundColor: service.available_now ? OASIS.colors.primary : OASIS.colors.danger }]} />
-                <Text style={[styles.statusBadgeText, { color: service.available_now ? '#15803d' : OASIS.colors.danger }]}>
+                <Text style={[styles.statusBadgeText, { color: service.available_now ? 'OASIS.colors.muted' : OASIS.colors.danger }]}>
                   {service.available_now ? 'متاح للطلب الآن' : 'غير متوفر حالياً'}
                 </Text>
               </View>
@@ -471,19 +471,19 @@ export default function Service() {
           {/* 4. BUSINESS + PROVIDER IDENTITY */}
           {business && (
             <Pressable oasisKind="card"
-              style={[styles.sellerCard, { borderColor: '#fde68a', backgroundColor: OASIS.colors.warningSoft }]}
+              style={[styles.sellerCard, { borderColor: 'OASIS.colors.line', backgroundColor: OASIS.colors.warningSoft }]}
               onPress={() => router.push({ pathname: '/business', params: { id: business.id } })}
             >
               <View style={styles.sellerActionBtn}>
-                <Text style={[styles.sellerActionBtnText, { color: '#b7791f' }]}>المنشأة</Text>
-                <ChevronLeft size={14} color="#b7791f" />
+                <Text style={[styles.sellerActionBtnText, { color: 'OASIS.colors.primary' }]}>المنشأة</Text>
+                <ChevronLeft size={14} color="OASIS.colors.primary" />
               </View>
               <View style={{ flex: 1, alignItems: 'flex-end', gap: 3 }}>
-                <Text style={[styles.sellerName, { color: '#78350f' }]}>{business.name}</Text>
+                <Text style={[styles.sellerName, { color: 'OASIS.colors.ink' }]}>{business.name}</Text>
                 <Text style={styles.sellerSub}>{business.is_verified ? 'منشأة موثقة مرتبطة بصاحب الخدمة' : 'منشأة مرتبطة بالخدمة'}</Text>
               </View>
-              <View style={[styles.sellerAvatarPlaceholder, { backgroundColor: '#fff7ed' }]}>
-                <Store size={20} color="#b7791f" />
+              <View style={[styles.sellerAvatarPlaceholder, { backgroundColor: 'OASIS.colors.soft' }]}>
+                <Store size={20} color="OASIS.colors.primary" />
               </View>
             </Pressable>
           )}
@@ -535,7 +535,7 @@ export default function Service() {
                   <Text style={styles.inlineMessageText}>رسالة داخل التطبيق</Text>
                 </Pressable>
                 {Boolean(service.whatsapp || service.phone) && <Pressable oasisKind="action" style={styles.inlineWhatsAppBtn} onPress={openWhatsApp}><MessageCircle size={16} color={OASIS.colors.primary} /><Text style={styles.inlineWhatsAppText}>واتساب</Text></Pressable>}
-                {Boolean(service.phone || service.whatsapp) && <Pressable oasisKind="action" style={styles.inlinePhoneBtn} onPress={callPhone}><Phone size={16} color="#0369a1" /><Text style={styles.inlinePhoneText}>اتصال</Text></Pressable>}
+                {Boolean(service.phone || service.whatsapp) && <Pressable oasisKind="action" style={styles.inlinePhoneBtn} onPress={callPhone}><Phone size={16} color="OASIS.colors.info" /><Text style={styles.inlinePhoneText}>اتصال</Text></Pressable>}
               </View>
             </OasisSurface>
           )}
@@ -743,7 +743,7 @@ export default function Service() {
               </Text>
             </Pressable>
             {canContact && Boolean(service.whatsapp || service.phone) && (
-              <Pressable accessibilityRole="button" accessibilityLabel="تواصل عبر واتساب" onPress={openWhatsApp} style={{ width: 54, minHeight: 52, borderRadius: 16, borderWidth: 1, borderColor: '#a7f3d0', backgroundColor: '#ecfdf5', justifyContent: 'center', alignItems: 'center' }}>
+              <Pressable accessibilityRole="button" accessibilityLabel="تواصل عبر واتساب" onPress={openWhatsApp} style={{ width: 54, minHeight: 52, borderRadius: 16, borderWidth: 1, borderColor: 'OASIS.colors.line', backgroundColor: 'OASIS.colors.soft', justifyContent: 'center', alignItems: 'center' }}>
                 <MessageCircle size={24} color={OASIS.colors.primary} />
               </Pressable>
             )}
@@ -869,7 +869,7 @@ const styles = StyleSheet.create({
   topNavbar: {
     backgroundColor: OASIS.colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    borderBottomColor: 'OASIS.colors.soft',
     paddingTop: Platform.OS === 'ios' ? 48 : 16,
     paddingBottom: 10,
     paddingHorizontal: 16,
@@ -887,7 +887,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 12,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: 'OASIS.colors.soft',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -908,7 +908,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 12,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: 'OASIS.colors.soft',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -923,7 +923,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: OASIS.colors.line,
     shadowColor: '#000',
-    shadowOpacity: 0,
+    shadowOpacity: 0.06,
     shadowRadius: 10,
     elevation: 3,
     position: 'relative',
@@ -992,9 +992,9 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     padding: 20,
     borderWidth: 1,
-    borderColor: '#eef2f7',
+    borderColor: 'OASIS.colors.line',
     shadowColor: '#000',
-    shadowOpacity: 0,
+    shadowOpacity: 0.04,
     shadowRadius: 8,
     elevation: 2,
     gap: 14,
@@ -1034,28 +1034,30 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: 10,
   },
-  statusBadgeOpen: { backgroundColor: '#dcfce7' },
-  statusBadgeClosed: { backgroundColor: '#fee2e2' },
+  statusBadgeOpen: { backgroundColor: 'OASIS.colors.soft' },
+  statusBadgeClosed: { backgroundColor: 'OASIS.colors.dangerSoft' },
   statusDot: { width: 6, height: 6, borderRadius: 3 },
   statusBadgeText: { fontSize: 11.5, fontWeight: '600' },
   locationBadge: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#f1f5f9',
+    gap: 6,
+    backgroundColor: 'OASIS.colors.soft',
     paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    minHeight: 40,
   },
   locationBadgeText: { fontSize: 11.5, fontWeight: '700', color: OASIS.colors.ink },
   timeBadge: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: OASIS.colors.background,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: 10,
+    gap: 6,
+    backgroundColor: OASIS.colors.soft,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    minHeight: 40,
   },
   timeBadgeText: { fontSize: 11, fontWeight: '600', color: OASIS.colors.muted },
 
@@ -1066,20 +1068,20 @@ const styles = StyleSheet.create({
     gap: 12,
     backgroundColor: OASIS.colors.soft,
     borderWidth: 1,
-    borderColor: '#bbf7d0',
-    borderRadius: 14,
-    padding: 14,
+    borderColor: 'OASIS.colors.line',
+    borderRadius: 18,
+    padding: 16,
   },
   trustIconCircle: {
-    width: 42,
-    height: 42,
+    width: 44,
+    height: 44,
     borderRadius: 14,
-    backgroundColor: '#dcfce7',
+    backgroundColor: 'OASIS.colors.soft',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  trustTitle: { fontSize: 13.5, fontWeight: '700', color: '#166534', textAlign: 'right' },
-  trustDesc: { fontSize: 11.5, color: '#15803d', lineHeight: 17, textAlign: 'right' },
+  trustTitle: { fontSize: 13.5, fontWeight: '700', color: 'OASIS.colors.primary', textAlign: 'right' },
+  trustDesc: { fontSize: 11.5, color: 'OASIS.colors.muted', lineHeight: 17, textAlign: 'right' },
 
   // Seller Card
   sellerCard: {
@@ -1087,10 +1089,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     backgroundColor: OASIS.colors.surface,
-    borderRadius: 14,
-    padding: 14,
+    borderRadius: 16,
+    padding: 16,
     borderWidth: 1,
-    borderColor: '#eef2f7',
+    borderColor: 'OASIS.colors.line',
   },
   sellerAvatar: { width: 48, height: 48, borderRadius: 24 },
   sellerAvatarPlaceholder: {
@@ -1122,8 +1124,8 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#eef2f7',
-    gap: 10,
+    borderColor: 'OASIS.colors.line',
+    gap: 12,
   },
   sectionCardTitle: { fontSize: 15, fontWeight: '700', color: OASIS.colors.ink, textAlign: 'right' },
   sectionCardDesc: { fontSize: 13.5, color: OASIS.colors.ink, lineHeight: 22, textAlign: 'right' },
@@ -1139,22 +1141,22 @@ const styles = StyleSheet.create({
   inlineWhatsAppBtn: { flexGrow: 1, flexBasis: 90, minHeight: 48, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: OASIS.colors.soft, borderRadius: 11, paddingVertical: 11, paddingHorizontal: 12 },
   inlineWhatsAppText: { color: OASIS.colors.primary, fontSize: 12, fontWeight: '600' },
   inlinePhoneBtn: { flexGrow: 1, flexBasis: 90, minHeight: 48, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: OASIS.colors.infoSoft, borderRadius: 11, paddingVertical: 11, paddingHorizontal: 12 },
-  inlinePhoneText: { color: '#0369a1', fontSize: 12, fontWeight: '600' },
+  inlinePhoneText: { color: 'OASIS.colors.info', fontSize: 12, fontWeight: '600' },
   modesContainer: { gap: 8 },
   deliveryModeRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
     backgroundColor: OASIS.colors.background,
-    padding: 12,
-    borderRadius: 14,
+    padding: 14,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#f1f5f9',
+    borderColor: 'OASIS.colors.soft',
   },
   deliveryModeEmojiBox: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     backgroundColor: OASIS.colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1180,12 +1182,12 @@ const styles = StyleSheet.create({
   // Owner Box
   ownerBox: {
     backgroundColor: OASIS.colors.surface,
-    borderRadius: 14,
-    padding: 16,
+    borderRadius: 18,
+    padding: 18,
     borderWidth: 1,
-    borderColor: '#a7f3d0',
+    borderColor: 'OASIS.colors.line',
     alignItems: 'flex-end',
-    gap: 6,
+    gap: 8,
   },
   ownerBoxTitle: { fontSize: 14, fontWeight: '700', color: OASIS.colors.primary },
   ownerBoxDesc: { fontSize: 12, color: OASIS.colors.muted },
@@ -1195,7 +1197,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     minHeight: 44,
     gap: 6,
-    backgroundColor: '#fee2e2',
+    backgroundColor: 'OASIS.colors.dangerSoft',
     paddingHorizontal: 14,
     paddingVertical: 9,
     borderRadius: 12,
@@ -1212,12 +1214,12 @@ const styles = StyleSheet.create({
   relatedCard: {
     width: 160,
     backgroundColor: OASIS.colors.surface,
-    borderRadius: 14,
+    borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: OASIS.colors.line,
   },
-  relatedImgBox: { width: '100%', height: 112, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' },
+  relatedImgBox: { width: '100%', height: 112, backgroundColor: 'OASIS.colors.soft', alignItems: 'center', justifyContent: 'center' },
   relatedInfo: { padding: 10, gap: 4 },
   relatedName: { fontSize: 12, fontWeight: '600', color: OASIS.colors.ink, textAlign: 'right' },
   relatedPrice: { fontSize: 12, fontWeight: '700', color: OASIS.colors.primary, textAlign: 'right' },
@@ -1282,7 +1284,7 @@ const styles = StyleSheet.create({
     gap: 5,
     backgroundColor: OASIS.colors.soft,
     borderWidth: 1,
-    borderColor: '#a7f3d0',
+    borderColor: 'OASIS.colors.line',
     borderRadius: 14,
     paddingVertical: 13,
   },
@@ -1313,6 +1315,7 @@ const styles = StyleSheet.create({
   ownerActionsRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 10,
   },
   ownerEditBtn: {
@@ -1326,15 +1329,15 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#a7f3d0',
+    borderColor: 'OASIS.colors.line',
   },
   ownerEditBtnText: { fontSize: 13, fontWeight: '600', color: OASIS.colors.primary },
-  ownerEditBtnDisabled: { backgroundColor: '#f1f5f9', borderColor: OASIS.colors.line },
+  ownerEditBtnDisabled: { backgroundColor: 'OASIS.colors.soft', borderColor: OASIS.colors.line },
   ownerEditBtnTextDisabled: { fontSize: 13, fontWeight: '600', color: '#94a3b8' },
 
   // Edit limit badges
   editLimitBadgeBase: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, borderWidth: 1 },
-  editLimitBadgeActive: { backgroundColor: OASIS.colors.soft, borderColor: '#a7f3d0' },
+  editLimitBadgeActive: { backgroundColor: OASIS.colors.soft, borderColor: 'OASIS.colors.line' },
   editLimitBadgeExpired: { backgroundColor: OASIS.colors.dangerSoft, borderColor: '#fecaca' },
   editLimitBadgeTextActive: { fontSize: 11, fontWeight: '700', color: OASIS.colors.primary },
   editLimitBadgeTextExpired: { fontSize: 11, fontWeight: '700', color: OASIS.colors.danger },
@@ -1344,14 +1347,18 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.6)',
     justifyContent: 'flex-end',
+    paddingHorizontal: 12,
   },
   editModalCard: {
     backgroundColor: OASIS.colors.surface,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    padding: 14,
+    padding: 16,
     gap: 16,
-    maxHeight: '90%',
+    maxHeight: '88%',
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
   },
   editModalHeader: {
     flexDirection: 'row-reverse',
@@ -1359,13 +1366,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    borderBottomColor: 'OASIS.colors.soft',
   },
   editModalTitle: { fontSize: 17, fontWeight: '700', color: OASIS.colors.ink, textAlign: 'right' },
   editModalSubtitle: { fontSize: 12, color: OASIS.colors.primary, fontWeight: '700', textAlign: 'right', marginTop: 2 },
   editModalCloseBtn: {
     width: 44, height: 44, borderRadius: 14,
-    backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'OASIS.colors.soft', alignItems: 'center', justifyContent: 'center',
   },
   editModalScroll: { flexShrink: 1 },
   editModalBody: { gap: 10, paddingBottom: 8 },
@@ -1382,7 +1389,7 @@ const styles = StyleSheet.create({
   editWarningBox: {
     flexDirection: 'row-reverse', alignItems: 'center', gap: 8,
     backgroundColor: OASIS.colors.warningSoft, padding: 10,
-    borderRadius: 12, borderWidth: 1, borderColor: '#fde68a',
+    borderRadius: 12, borderWidth: 1, borderColor: 'OASIS.colors.line',
   },
   editWarningText: {
     fontSize: 11.5, color: '#92400e', fontWeight: '700',
