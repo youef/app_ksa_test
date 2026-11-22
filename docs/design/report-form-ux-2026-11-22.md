@@ -42,5 +42,14 @@
 - Silent report-history omission → loading, error/retry, empty, and populated states.
 - Fixed small bottom padding → shared bottom-nav inset and centered responsive width.
 
+## Results recorded (2026-11-22)
+- `npm run typecheck`: passed on the latest PR commit.
+- `npm run export:web`: passed on the latest PR commit.
+- `node --test tests/reportDesign.test.cjs`: passed (6 contract tests).
+- Additional repository platform workflow: web and Android JS bundle exports passed; iOS JS bundle was still running when this record was updated.
+- The Vercel preview for the latest commit was canceled before completion to avoid deployment before approval; no production deployment was made.
+- Manual iPhone/Android/iPad, light/dark, keyboard, VoiceOver and TalkBack review remains outstanding.
+- PR #179 remains Draft and unmerged pending the iOS result, manual review and reviewer approval.
+
 ## Next candidate after review
 - `app/service.tsx` — inspect the resident-facing service detail and action hierarchy; do not touch it in this batch.
