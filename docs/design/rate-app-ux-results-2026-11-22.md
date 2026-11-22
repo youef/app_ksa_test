@@ -17,14 +17,15 @@ Only \`app/rate-app.tsx\` was redesigned. Review storage, the \`app_reviews\` ta
 - Before: hard-coded pale background and amber controls, mixed fixed colors, narrow star hit targets, and visually selected chips without semantic checked state.
 - After: theme-responsive surfaces, cohesive dark-green brand header, centered layout, touch-sized rating/reason controls, labeled feedback with live count, and recoverable load-error state.
 
-## Validation
-- Added \`tests/rateAppDesign.test.cjs\` with six focused UI-contract tests.
-- Added \`.github/workflows/rate-app-design.yml\` to run the focused test, TypeScript check, and Expo Web export.
-- Initial push checks are queued/running; results will be recorded after they complete.
-- The existing repository workflow also runs TypeScript and Web/Android/iOS JS bundle exports on branch pushes.
-- Full marketplace safety test suite was not manually invoked. The existing PR-triggered marketplace workflow may automatically run because the PR touches app/tests; that is CI, not a separate task.
+## Validation results (code/test head: f397628)
+- Focused rating-screen UX test: **passed** (6/6).
+- TypeScript: **passed**.
+- Expo Web export: **passed**.
+- Existing platform-bundles workflow: **passed** (Web, Android JS bundle, iOS JS bundle).
+- Existing Marketplace integration safety PR workflow: **passed** (full repository suite; triggered automatically by the PR and not manually run as a separate task).
+- The docs-only commit that records these results is now the latest PR head; CI is rerunning against it before review.
 - Manual iPhone, Android, iPad, Web visual review and VoiceOver/TalkBack remain unperformed.
-- Vercel's automatic preview deployment was canceled before build completion; no production deployment was made.
+- Vercel auto-previews for the implementation commits were canceled before build completion. The preview for the plan-only commit reached Ready and could not be canceled; it contains no screen implementation. No production deployment was made.
 
 ## Next candidate
 \`app/notifications.tsx\` — review notification list hierarchy, unread emphasis, empty/loading/error states, touch targets, RTL and responsive layout. Do not start it in this PR.
