@@ -28,7 +28,7 @@ test('layout centers the content and accounts for safe area and bottom dock', ()
 
 test('star controls have accessible names, selection state and minimum touch size', () => {
   assert.ok(source.includes('minWidth: 44, minHeight: 44'));
-  assert.ok(source.includes('accessibilityLabel={\\'تقييم \\' + ' + n + ' + \\' من 5\\'}'));
+  assert.ok(source.includes("accessibilityLabel={'تقييم ' + n + ' من 5'}"));
   assert.ok(source.includes('accessibilityState={{ selected: n === rating }}'));
   assert.ok(source.includes('size={28}'));
 });
