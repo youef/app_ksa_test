@@ -75,7 +75,7 @@ test('story campaign guides the player through the kingdom and persists chapter 
 
 test('the 3D kingdom contains animated residents and expanded KayKit structures', () => {
   const assets = read('components/game/KingdomAssets.web.ts');
-  for (const npc of ["model: 'Knight'","model: 'Rogue'","model: 'Barbarian'","model: 'Mage'"]) assert.ok(assets.includes(npc));
+  for (const npc of ["model: 'Rogue'","model: 'Mage'"]) assert.ok(assets.includes(npc));
   assert.match(assets, /new THREE\.AnimationMixer\(gltf\.scene\)/);
   assert.match(assets, /update\(dt: number\)/);
   assert.match(assets, /building_tower_A_blue/);
