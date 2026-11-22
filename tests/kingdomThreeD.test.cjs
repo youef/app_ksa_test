@@ -63,6 +63,26 @@ test('world controls and game economy remain accessible on web and mobile browse
   assert.match(engine, /code === 'space'/);
 });
 
+test('story campaign guides the player through the kingdom and persists chapter progress', () => {
+  const storyPage = read('app/kingdom.web.tsx');
+  for (const chapter of ['رسالة من القرية القديمة','إعادة إشعال المملكة','نداء الحراس','أسوار لا تنحني','قراصنة الضباب','راية العهد','توحيد الجزر']) {
+    assert.ok(storyPage.includes(chapter), 'Missing story chapter: ' + chapter);
+  }
+  assert.match(storyPage, /hayna-kingdom-story-/);
+  assert.match(storyPage, /panel === 'story'/);
+  assert.match(storyPage, /STORY_CHAPTERS\[storyProgress\]/);
+});
+
+test('the 3D kingdom contains animated residents and expanded KayKit structures', () => {
+  const assets = read('components/game/KingdomAssets.web.ts');
+  for (const npc of ["model: 'Knight'","model: 'Rogue'","model: 'Barbarian'","model: 'Mage'"]) assert.ok(assets.includes(npc));
+  assert.match(assets, /new THREE\.AnimationMixer\(gltf\.scene\)/);
+  assert.match(assets, /update\(dt: number\)/);
+  assert.match(assets, /building_tower_A_blue/);
+  assert.match(assets, /decoration\/props\/crate_A_big/);
+  assert.match(engine, /worldAssets\.update\(dt\)/);
+});
+
 test('avatar persistence checks ownership and disallows arbitrary write access', () => {
   assert.match(sql, /auth\.uid\(\)/);
   assert.match(sql, /where user_id = v_uid/);
