@@ -25,7 +25,7 @@ UI-only refinement for `app/service.tsx`. No database, data payload, permissions
 | Edit modal | 90% height without inner scroll | 88% max, 560pt width cap, safe-area and scrollable fields |
 
 ## Regression checks
-- Added `tests/serviceDetailDesign.test.cjs` (7 focused static layout/accessibility contract tests).
+- Added `tests/serviceDetailDesign.test.cjs` (7 focused static layout/accessibility contract tests) and a scoped CI step to run it in `inquiry-discussion-checks.yml`.
 - Not executed locally: the repository is not checked out in the execution container. GitHub Actions will be the authoritative TypeScript, Web export and focused test result for this branch.
 - Manual iPhone, Android, iPad, web, keyboard, VoiceOver and TalkBack checks remain pending.
 
