@@ -4,6 +4,7 @@ import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface 
 import { OASIS } from '@/lib/oasis';
 import { HeaderAction, AppHeader } from '@/components/shared/AppHeader';
 import { useEffect, useState, useMemo } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Alert, ScrollView, StyleSheet, Text, View, ActivityIndicator, Platform, Image, Modal, Linking, useWindowDimensions, KeyboardAvoidingView } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
@@ -50,6 +51,7 @@ import { safeServiceMapUrl } from '@/lib/servicePublishingRules';
 export default function Service() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const bottomNavInset = useBottomNavInset();
+  const safeAreaInsets = useSafeAreaInsets();
   const [service, setService] = useState<any>(null);
   const [provider, setProvider] = useState<any>(null);
   const [business, setBusiness] = useState<any>(null);
@@ -68,7 +70,7 @@ export default function Service() {
 
   const { width: winWidth } = useWindowDimensions();
   const isWide = winWidth > 768;
-  const contentWidth = Math.min(winWidth, 800) - 32;
+  const contentWidth = Math.max(0, Math.min(winWidth, 800) - 32);
 
   useEffect(() => {
     async function load() {
@@ -318,10 +320,10 @@ export default function Service() {
             <HeaderAction
               accessibilityLabel="مشاركة العرض" onPress={shareOffer}
               style={{
-                width: 34,
-                height: 34,
-                borderRadius: 17,
-                backgroundColor: '#f1f5f9',
+                width: 44,
+                height: 44,
+                borderRadius: 14,
+                backgroundColor: OASIS.colors.soft,
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
@@ -331,10 +333,10 @@ export default function Service() {
             <HeaderAction
               accessibilityLabel="الإبلاغ عن العرض" onPress={() => router.push({ pathname: '/report', params: { type: 'service', id: service.id } })}
               style={{
-                width: 34,
-                height: 34,
-                borderRadius: 17,
-                backgroundColor: '#f1f5f9',
+                width: 44,
+                height: 44,
+                borderRadius: 14,
+                backgroundColor: OASIS.colors.soft,
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
@@ -346,7 +348,7 @@ export default function Service() {
       />
 
       <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingBottom: bottomNavInset + 28 }]}
+        contentContainerStyle={[styles.scroll, { paddingBottom: Math.max(bottomNavInset + 28, safeAreaInsets.bottom + 92) }]}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.bodyWrap}>
@@ -361,7 +363,7 @@ export default function Service() {
                 scrollEventThrottle={32}
               >
                 {images.map((uri, idx) => (
-                  <Pressable key={idx} onPress={() => setFullscreenImage(uri)} style={{ width: contentWidth, height: contentWidth * 0.72 }}>
+                  <Pressable key={idx} accessibilityRole="button" accessibilityLabel={`عرض الصورة ${idx + 1} من ${images.length}`} accessibilityHint="اضغط لتكبير الصورة" onPress={() => setFullscreenImage(uri)} style={{ width: contentWidth, height: contentWidth * 0.72 }}>
                     <Image source={{ uri }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
                   </Pressable>
                 ))}
@@ -374,14 +376,14 @@ export default function Service() {
                     <Text style={styles.galleryTypePillText}>{type.short || type.label}</Text>
                   </View>
                 )}
-                <View style={styles.imageCounter}>
+                <View style={styles.imageCounter} accessibilityRole="text" accessibilityLabel={`الصورة ${activeImage + 1} من ${images.length}`}>
                   <Maximize2 size={11} color={OASIS.colors.surface} />
                   <Text style={styles.imageCounterText}>{activeImage + 1} / {images.length}</Text>
                 </View>
               </View>
 
               {images.length > 1 && (
-                <View style={styles.dots}>
+                <View style={styles.dots} accessibilityElementsHidden>
                   {images.map((_, i) => (
                     <View key={i} style={[styles.dot, i === activeImage && styles.dotActive]} />
                   ))}
@@ -693,7 +695,7 @@ export default function Service() {
                 {related.map((rel) => {
                   const cover = rel.cover_url || (Array.isArray(rel.images) && rel.images[0]);
                   return (
-                    <Pressable oasisKind="card"
+                    <Pressable oasisKind="card" accessibilityRole="button" accessibilityLabel={`عرض ${rel.name}، ${formatServicePrice(rel)}`} accessibilityHint="فتح تفاصيل العرض"
                       key={rel.id}
                       style={styles.relatedCard}
                       onPress={() => router.push({ pathname: '/service', params: { id: rel.id } })}
@@ -720,7 +722,7 @@ export default function Service() {
 
       {/* Primary action stays visible on mobile and web regardless of the listing's pricing model. */}
       {!isOwner && service.moderation_status === 'approved' && (
-        <View style={{ backgroundColor: OASIS.colors.surface, borderTopWidth: 1, borderTopColor: OASIS.colors.line, paddingHorizontal: 16, paddingTop: 10, paddingBottom: Math.max(14, bottomNavInset) }}>
+        <View style={{ backgroundColor: OASIS.colors.surface, borderTopWidth: 1, borderTopColor: OASIS.colors.line, paddingHorizontal: 16, paddingTop: 10, paddingBottom: Math.max(12, safeAreaInsets.bottom + 12) }}>
           <View style={{ width: '100%', maxWidth: 800, alignSelf: 'center', flexDirection: 'row-reverse', gap: 10 }}>
             <Pressable
               accessibilityRole="button"
@@ -753,13 +755,13 @@ export default function Service() {
       )}
 
       {/* Fullscreen Lightbox Modal */}
-      <Modal visible={Boolean(fullscreenImage)} transparent animationType="fade">
+      <Modal visible={Boolean(fullscreenImage)} transparent animationType="fade" onRequestClose={() => setFullscreenImage(null)}>
         <View style={styles.modalBackdrop}>
-          <Pressable oasisKind="icon" style={styles.modalCloseBtn} onPress={() => setFullscreenImage(null)}>
+          <Pressable oasisKind="icon" accessibilityRole="button" accessibilityLabel="إغلاق الصورة المكبرة" style={[styles.modalCloseBtn, { top: Math.max(safeAreaInsets.top + 16, 30) }]} onPress={() => setFullscreenImage(null)}>
             <X size={26} color={OASIS.colors.surface} />
           </Pressable>
           {fullscreenImage && (
-            <Image source={{ uri: fullscreenImage }} style={styles.modalImage} resizeMode="contain" />
+            <Image accessible accessibilityLabel="الصورة المكبرة" source={{ uri: fullscreenImage }} style={styles.modalImage} resizeMode="contain" />
           )}
         </View>
       </Modal>
@@ -773,7 +775,7 @@ export default function Service() {
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.editModalOverlay}
+          style={[styles.editModalOverlay, { paddingBottom: Math.max(12, safeAreaInsets.bottom) }]}
         >
           <OasisSurface oasisSurface="card" style={styles.editModalCard}>
             <View style={styles.editModalHeader}>
@@ -784,6 +786,7 @@ export default function Service() {
                 </Text>
               </View>
               <Pressable oasisKind="icon"
+                accessibilityRole="button" accessibilityLabel="إغلاق نافذة تعديل العرض"
                 style={styles.editModalCloseBtn}
                 onPress={() => setIsEditModalOpen(false)}
                 disabled={savingEdit}
@@ -792,10 +795,11 @@ export default function Service() {
               </Pressable>
             </View>
 
-            <View style={styles.editModalBody}>
+            <ScrollView style={styles.editModalScroll} contentContainerStyle={styles.editModalBody} keyboardShouldPersistTaps="handled">
               <Text style={styles.editModalLabel}>اسم العرض</Text>
               <TextInput
                 style={styles.editModalInput}
+                accessibilityLabel="اسم العرض"
                 value={editName}
                 onChangeText={setEditName}
                 placeholder="اسم العرض في سوق الحي..."
@@ -807,6 +811,7 @@ export default function Service() {
               <Text style={styles.editModalLabel}>وصف العرض (اختياري)</Text>
               <TextInput
                 style={[styles.editModalInput, styles.editModalTextArea]}
+                accessibilityLabel="وصف العرض، اختياري"
                 value={editDescription}
                 onChangeText={setEditDescription}
                 placeholder="وصف مختصر للعرض والخدمة المقدمة..."
@@ -823,7 +828,7 @@ export default function Service() {
                   تنبيه: يُسمح بتعديل العرض مرتين كحد أقصى حفاظاً على مصداقية العروض في سوق الحي.
                 </Text>
               </View>
-            </View>
+            </ScrollView>
 
             <View style={styles.editModalFooter}>
               <Pressable oasisKind="action"
@@ -914,7 +919,7 @@ const styles = StyleSheet.create({
 
   // Gallery
   galleryCard: {
-    borderRadius: 14,
+    borderRadius: 20,
     overflow: 'hidden',
     backgroundColor: OASIS.colors.line,
     shadowColor: '#000',
@@ -984,8 +989,8 @@ const styles = StyleSheet.create({
   // Info Card
   infoCard: {
     backgroundColor: OASIS.colors.surface,
-    borderRadius: 14,
-    padding: 18,
+    borderRadius: 18,
+    padding: 20,
     borderWidth: 1,
     borderColor: '#eef2f7',
     shadowColor: '#000',
@@ -1102,6 +1107,7 @@ const styles = StyleSheet.create({
   sellerActionBtn: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
+    minHeight: 44,
     gap: 2,
     backgroundColor: OASIS.colors.soft,
     paddingHorizontal: 10,
@@ -1113,8 +1119,8 @@ const styles = StyleSheet.create({
   // Section Cards
   sectionCard: {
     backgroundColor: OASIS.colors.surface,
-    borderRadius: 14,
-    padding: 14,
+    borderRadius: 18,
+    padding: 16,
     borderWidth: 1,
     borderColor: '#eef2f7',
     gap: 10,
@@ -1125,14 +1131,14 @@ const styles = StyleSheet.create({
   // Delivery Modes
   sectionTitleWithIcon: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
   specValueWithIcon: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, flex: 1, justifyContent: 'flex-start' },
-  inlineContactCard: { backgroundColor: OASIS.colors.surface, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: OASIS.colors.line, gap: 10 },
+  inlineContactCard: { backgroundColor: OASIS.colors.surface, borderRadius: 18, padding: 16, borderWidth: 1, borderColor: OASIS.colors.line, gap: 12 },
   inlineContactTitle: { fontSize: 14, fontWeight: '700', color: OASIS.colors.ink, textAlign: 'right' },
   inlineContactActions: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 },
-  inlineMessageBtn: { flexGrow: 1, flexBasis: 140, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 7, backgroundColor: OASIS.colors.primary, borderRadius: 11, paddingVertical: 11, paddingHorizontal: 12 },
+  inlineMessageBtn: { flexGrow: 1, flexBasis: 140, minHeight: 48, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 7, backgroundColor: OASIS.colors.primary, borderRadius: 11, paddingVertical: 11, paddingHorizontal: 12 },
   inlineMessageText: { color: OASIS.colors.surface, fontSize: 12, fontWeight: '700' },
-  inlineWhatsAppBtn: { flexGrow: 1, flexBasis: 85, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: OASIS.colors.soft, borderRadius: 11, paddingVertical: 11, paddingHorizontal: 12 },
+  inlineWhatsAppBtn: { flexGrow: 1, flexBasis: 90, minHeight: 48, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: OASIS.colors.soft, borderRadius: 11, paddingVertical: 11, paddingHorizontal: 12 },
   inlineWhatsAppText: { color: OASIS.colors.primary, fontSize: 12, fontWeight: '600' },
-  inlinePhoneBtn: { flexGrow: 1, flexBasis: 75, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: OASIS.colors.infoSoft, borderRadius: 11, paddingVertical: 11, paddingHorizontal: 12 },
+  inlinePhoneBtn: { flexGrow: 1, flexBasis: 90, minHeight: 48, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: OASIS.colors.infoSoft, borderRadius: 11, paddingVertical: 11, paddingHorizontal: 12 },
   inlinePhoneText: { color: '#0369a1', fontSize: 12, fontWeight: '600' },
   modesContainer: { gap: 8 },
   deliveryModeRow: {
@@ -1186,6 +1192,8 @@ const styles = StyleSheet.create({
   ownerDeleteBtn: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
     gap: 6,
     backgroundColor: '#fee2e2',
     paddingHorizontal: 14,
@@ -1202,15 +1210,15 @@ const styles = StyleSheet.create({
   relatedSeeAll: { fontSize: 12, fontWeight: '600', color: OASIS.colors.primary },
   relatedRow: { flexDirection: 'row-reverse', gap: 10 },
   relatedCard: {
-    width: 145,
+    width: 160,
     backgroundColor: OASIS.colors.surface,
     borderRadius: 14,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: OASIS.colors.line,
   },
-  relatedImgBox: { width: '100%', height: 95, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' },
-  relatedInfo: { padding: 8, gap: 2 },
+  relatedImgBox: { width: '100%', height: 112, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' },
+  relatedInfo: { padding: 10, gap: 4 },
   relatedName: { fontSize: 12, fontWeight: '600', color: OASIS.colors.ink, textAlign: 'right' },
   relatedPrice: { fontSize: 12, fontWeight: '700', color: OASIS.colors.primary, textAlign: 'right' },
 
@@ -1309,6 +1317,7 @@ const styles = StyleSheet.create({
   },
   ownerEditBtn: {
     flex: 1,
+    minHeight: 44,
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1355,19 +1364,21 @@ const styles = StyleSheet.create({
   editModalTitle: { fontSize: 17, fontWeight: '700', color: OASIS.colors.ink, textAlign: 'right' },
   editModalSubtitle: { fontSize: 12, color: OASIS.colors.primary, fontWeight: '700', textAlign: 'right', marginTop: 2 },
   editModalCloseBtn: {
-    width: 32, height: 32, borderRadius: 16,
+    width: 44, height: 44, borderRadius: 14,
     backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center',
   },
-  editModalBody: { gap: 10 },
+  editModalScroll: { flexShrink: 1 },
+  editModalBody: { gap: 10, paddingBottom: 8 },
   editModalLabel: { fontSize: 12.5, fontWeight: '600', color: OASIS.colors.ink, textAlign: 'right' },
   editModalInput: {
     backgroundColor: OASIS.colors.background,
+    minHeight: 48,
     borderWidth: 1.5, borderColor: OASIS.colors.line,
     borderRadius: 14,
     paddingHorizontal: 14, paddingVertical: 10,
     fontSize: 14, color: OASIS.colors.ink, textAlign: 'right',
   },
-  editModalTextArea: { minHeight: 100, textAlignVertical: 'top' },
+  editModalTextArea: { minHeight: 128, textAlignVertical: 'top' },
   editWarningBox: {
     flexDirection: 'row-reverse', alignItems: 'center', gap: 8,
     backgroundColor: OASIS.colors.warningSoft, padding: 10,
@@ -1382,13 +1393,14 @@ const styles = StyleSheet.create({
   },
   editModalSubmitBtn: {
     flex: 2, backgroundColor: OASIS.colors.primary,
-    paddingVertical: 12, borderRadius: 14,
+    minHeight: 48, paddingVertical: 12, borderRadius: 14,
     alignItems: 'center', justifyContent: 'center',
   },
   editModalSubmitBtnDisabled: { backgroundColor: '#94a3b8', opacity: 0.6 },
   editModalSubmitBtnText: { color: OASIS.colors.surface, fontSize: 14, fontWeight: '700' },
   editModalCancelBtn: {
-    flex: 1, backgroundColor: '#f1f5f9',
+    flex: 1, backgroundColor: OASIS.colors.soft,
+    minHeight: 48,
     paddingVertical: 12, borderRadius: 14,
     alignItems: 'center', justifyContent: 'center',
   },
