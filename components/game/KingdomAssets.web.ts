@@ -28,6 +28,12 @@ export const KINGDOM_BUILDINGS: BuildingPlacement[] = [
   { model: 'building_tower_B_blue', x: 26, z: -51, width: 7 },
   { model: 'building_well_blue', x: -1, z: 93, width: 5 },
   { model: 'building_church_blue', x: -35, z: 104, width: 16 },
+  { model: 'building_tower_A_blue', x: -34, z: -66, width: 8 },
+  { model: 'building_tower_B_blue', x: 34, z: -66, width: 8 },
+  { model: 'building_home_A_blue', x: 36, z: 82, width: 10 },
+  { model: 'building_home_B_blue', x: -35, z: 84, width: 10 },
+  { model: 'building_well_blue', x: 16, z: 91, width: 5 },
+  { model: 'building_market_blue', x: 43, z: 65, width: 14 },
 ];
 
 /** Dispose late async results as well as meshes detached during replacement. */
@@ -106,8 +112,22 @@ export function populateKingdom(scene: THREE.Scene, height: (x: number, z: numbe
     { path: 'decoration/props/barrel', x: -33, z: 58, width: 2 },
     { path: 'decoration/props/crate_A_big', x: 113, z: 96, width: 3 },
     { path: 'decoration/props/tent', x: -115, z: 110, width: 8 },
+    { path: 'decoration/props/barrel', x: 35, z: 67, width: 2 },
+    { path: 'decoration/props/barrel', x: 112, z: 108, width: 2 },
+    { path: 'decoration/props/crate_A_big', x: 108, z: 101, width: 3 },
+    { path: 'decoration/props/crate_A_big', x: 121, z: 98, width: 3 },
+    { path: 'decoration/props/tent', x: -122, z: 115, width: 7 },
+    { path: 'decoration/props/weaponrack', x: -78, z: -78, width: 4 },
+    { path: 'decoration/props/target', x: -89, z: -88, width: 3 },
   ];
-  const total = placements.length + scenery.length;
+  const npcSpots = [
+    { model: 'Knight', x: 4, z: 86, rotation: Math.PI },
+    { model: 'Rogue', x: -24, z: 69, rotation: Math.PI / 2 },
+    { model: 'Barbarian', x: -73, z: -79, rotation: -Math.PI / 2 },
+    { model: 'Mage', x: 111, z: 100, rotation: -Math.PI / 2 },
+  ];
+  const npcs: THREE.AnimationMixer[] = [];
+  const total = placements.length + scenery.length + npcSpots.length;
   const progress = () => { if (!disposed) onProgress(loaded, failed, total); };
   const add = (path: string, x: number, z: number, width: number, replacement?: string | string[], solid = false) => loader.load(MEDIEVAL + path + '.gltf', gltf => {
     if (disposed) { disposeObject(gltf.scene); return; }
@@ -126,7 +146,20 @@ export function populateKingdom(scene: THREE.Scene, height: (x: number, z: numbe
   }, undefined, () => { failed++; progress(); });
   for (const item of placements) add('buildings/blue/' + item.model, item.x, item.z, item.width, item.replaces, true);
   for (const item of scenery) add(item.path, item.x, item.z, item.width);
+  for (const npc of npcSpots) loader.load(CHARACTERS + npc.model + '.glb', gltf => {
+    if (disposed) { disposeObject(gltf.scene); return; }
+    const character = normalize(gltf.scene, 2.9, true);
+    character.position.set(npc.x, height(npc.x, npc.z), npc.z);
+    character.rotation.y = npc.rotation;
+    imported.add(character);
+    const mixer = new THREE.AnimationMixer(gltf.scene);
+    const idle = gltf.animations.find(clip => clip.name === 'Idle') || gltf.animations[0];
+    if (idle) mixer.clipAction(idle).play();
+    npcs.push(mixer);
+    loaded++; progress();
+  }, undefined, () => { failed++; progress(); });
   return {
+    update(dt: number) { for (const mixer of npcs) mixer.update(dt); },
     canMove(x: number, z: number) { return !obstacles.some(b => x > b.min.x - .65 && x < b.max.x + .65 && z > b.min.z - .65 && z < b.max.z + .65); },
     dispose() { disposed = true; imported.removeFromParent(); disposeObject(imported); obstacles.length = 0; },
   };
