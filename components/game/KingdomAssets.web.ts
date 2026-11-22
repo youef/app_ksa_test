@@ -121,9 +121,7 @@ export function populateKingdom(scene: THREE.Scene, height: (x: number, z: numbe
     { path: 'decoration/props/target', x: -89, z: -88, width: 3 },
   ];
   const npcSpots = [
-    { model: 'Knight', x: 4, z: 86, rotation: Math.PI },
     { model: 'Rogue', x: -24, z: 69, rotation: Math.PI / 2 },
-    { model: 'Barbarian', x: -73, z: -79, rotation: -Math.PI / 2 },
     { model: 'Mage', x: 111, z: 100, rotation: -Math.PI / 2 },
   ];
   const npcs: THREE.AnimationMixer[] = [];
