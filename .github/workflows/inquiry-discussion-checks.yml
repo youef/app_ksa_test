@@ -39,6 +39,8 @@ jobs:
         run: node --test tests/vercelSecurityHeaders.test.cjs
       - name: Verify ask form layout
         run: node --test tests/askWizardLayout.test.cjs
+      - name: Verify service detail UX
+        run: node --test tests/serviceDetailDesign.test.cjs
       - name: TypeScript check
         run: npm run typecheck
 
