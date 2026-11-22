@@ -1,5 +1,5 @@
 import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
-import { OASIS, useTheme, type OasisColors } from '@/lib/oasis';
+import { useTheme, type OasisColors } from '@/lib/oasis';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
