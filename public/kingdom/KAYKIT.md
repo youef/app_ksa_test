@@ -28,6 +28,6 @@
 
 `python scripts/check-kingdom-kaykit.py` يفحص البصمات وتبعيات المجسمات وحركات الشخصيات. لا يتطلب Python مكتبات إضافية.
 
-`python scripts/package-kingdom-kaykit.py` يعيد بناء كتالوج البحث وحزمتي ZIP. افتح مكتبة المجسمات من زر 📦 داخل اللعبة.
+`python scripts/package-kingdom-kaykit.py` يعيد بناء حزم ZIP الداخلية عند الحاجة. مكتبة الأصول وكتالوج التنزيلات غير معروضين للاعبين؛ تبقى ملفات المجسمات متاحة لمحرك اللعبة فقط.
 
 اختبار المتصفح يستخدم مكوّن العالم الفعلي دون حساب: ابنِ `tests/fixtures/kingdom-review.tsx` بواسطة esbuild مع `--bundle --format=esm --jsx=automatic --outfile=artifacts/qa-runtime/kingdom-bundle.js` ثم اضبط `KINGDOM_TEST_CHROME` لمسار Chromium وشغّل `node scripts/check-kingdom-browser.cjs`. يفحص تحميل العالم، تبديل الشخصيات الخمس، حركة WASD وأخطاء المتصفح، ويحفظ لقطة داخل artifacts/qa-runtime.
