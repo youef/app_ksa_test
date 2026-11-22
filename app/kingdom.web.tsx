@@ -147,7 +147,7 @@ export default function Kingdom3D() {
       const result = data as { message?: string; battle?: Battle };
       setMessage(result?.message || 'تمت العملية بنجاح');
       setBattle(result?.battle || null);
-      if (STORY_CHAPTERS[storyProgress]?.action === action) advanceStory();
+      if (STORY_CHAPTERS[storyProgress]?.action === action && (!result.battle || result.battle.won)) advanceStory();
       setTarget(null);
       await reload();
     } catch (e: any) { setError(e?.message || 'تعذّر تنفيذ العملية'); }
