@@ -11,9 +11,10 @@ test('service detail respects safe-area and scroll clearance', () => {
   assert.ok(source.includes('paddingBottom: Math.max(12, safeAreaInsets.bottom + 12)'));
 });
 
-test('header share and report controls have 44-point hit areas', () => {
-  const hitAreas = source.match(/width: 44,\s*height: 44,\s*borderRadius: 14,\s*backgroundColor: OASIS\.colors\.soft,/g) || [];
-  assert.equal(hitAreas.length, 2);
+test('share and report header controls have 44-point hit areas', () => {
+  const headerActions = source.split('<HeaderAction').slice(1).map((block) => block.split('</HeaderAction>')[0]);
+  const largeTargets = headerActions.filter((block) => block.includes('width: 44,') && block.includes('height: 44,'));
+  assert.equal(largeTargets.length, 2);
 });
 
 test('gallery and related offers are labeled for screen readers', () => {
@@ -32,27 +33,27 @@ test('main detail cards follow the updated spacing and radius rhythm', () => {
 });
 
 test('contact and owner controls preserve larger touch targets', () => {
-  assert.match(source, /inlineMessageBtn: \{[^}]*minHeight: 48/);
-  assert.match(source, /inlineWhatsAppBtn: \{[^}]*minHeight: 48/);
-  assert.match(source, /inlinePhoneBtn: \{[^}]*minHeight: 48/);
-  assert.match(source, /sellerActionBtn: \{[^}]*minHeight: 44/);
-  assert.match(source, /ownerDeleteBtn: \{[^}]*minHeight: 44/);
-  assert.match(source, /ownerEditBtn: \{[^}]*minHeight: 44/);
+  assert.ok(source.includes('inlineMessageBtn: { flexGrow: 1, flexBasis: 140, minHeight: 48'));
+  assert.ok(source.includes('inlineWhatsAppBtn: { flexGrow: 1, flexBasis: 90, minHeight: 48'));
+  assert.ok(source.includes('inlinePhoneBtn: { flexGrow: 1, flexBasis: 90, minHeight: 48'));
+  assert.ok(source.includes('sellerActionBtn: {\n    flexDirection: \'row-reverse\',\n    alignItems: \'center\',\n    minHeight: 44'));
+  assert.ok(source.includes('ownerDeleteBtn: {\n    flexDirection: \'row-reverse\',\n    alignItems: \'center\',\n    justifyContent: \'center\',\n    minHeight: 44'));
+  assert.ok(source.includes('ownerEditBtn: {\n    flex: 1,\n    minHeight: 44'));
 });
 
-test('edit sheet is scrollable and fields have accessible labels', () => {
+test('edit sheet has an internal scroll region and accessible field labels', () => {
   assert.ok(source.includes('<ScrollView style={styles.editModalScroll} contentContainerStyle={styles.editModalBody} keyboardShouldPersistTaps="handled">'));
   assert.ok(source.includes('editModalScroll: { flexShrink: 1 }'));
   assert.ok(source.includes('accessibilityLabel="اسم العرض"'));
   assert.ok(source.includes('accessibilityLabel="وصف العرض، اختياري"'));
-  assert.match(source, /editModalInput: \{[^}]*minHeight: 48/);
+  assert.ok(source.includes('editModalInput: {\n    backgroundColor: OASIS.colors.background,\n    minHeight: 48'));
   assert.ok(source.includes('editModalTextArea: { minHeight: 128'));
-  assert.match(source, /editModalCloseBtn: \{\s*width: 44, height: 44/);
+  assert.ok(source.includes('editModalCloseBtn: {\n    width: 44, height: 44'));
 });
 
 test('contact, edit and delete action handlers are preserved', () => {
-  assert.match(source, /async function openWhatsApp\(\)/);
-  assert.match(source, /async function contactProvider\(\)/);
-  assert.match(source, /async function handleSaveEdit\(\)/);
-  assert.match(source, /async function remove\(\)/);
+  assert.ok(source.includes('async function openWhatsApp()'));
+  assert.ok(source.includes('async function contactProvider()'));
+  assert.ok(source.includes('async function handleSaveEdit()'));
+  assert.ok(source.includes('async function remove()'));
 });
