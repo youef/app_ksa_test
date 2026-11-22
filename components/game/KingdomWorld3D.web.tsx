@@ -327,8 +327,8 @@ export default function KingdomWorld3D({ avatarKey, paused, initialX = 0, initia
     setAssetStatus('جارٍ تحميل شخصيات ومباني المملكة…');
     const worldAssets = populateKingdom(scene, height, (loaded, failed, total) => {
       setAssetStatus(loaded + failed === total
-        ? failed ? `اكتمل العالم · تعذر تحميل ${failed} من المجسمات` : 'عالم KayKit جاهز · اسحب لتدوير الكاميرا'
-        : `تحميل المباني ${loaded + failed} / ${total}`);
+        ? failed ? `اكتمل العالم · تعذر تحميل ${failed} من الأصول` : 'اكتمل العالم · المباني والشخصيات جاهزة'
+        : `تحميل أصول المملكة ${loaded + failed} / ${total}`);
     });
     const importedCharacter = loadKingdomCharacter(avatarKey, avatar.group,
       () => { avatar.body.visible = false; renderer.domElement.dataset.character = avatarKey; },
@@ -435,6 +435,7 @@ export default function KingdomWorld3D({ avatarKey, paused, initialX = 0, initia
       avatar.rightArm.rotation.x = swing * .65;
       avatar.body.position.y = moving ? Math.abs(Math.sin(walkClock)) * .07 : Math.sin(time * 1.7) * .025;
       importedCharacter.update(dt, moving, keyboard.has('shiftleft') || keyboard.has('shiftright') || control.current.sprint, jump > .05);
+      worldAssets.update(dt);
       const indoors = vintageRoom.inside(px, pz);
       const cameraDistance = indoors ? Math.min(distance, 5.7) : distance;
       const horizontal = Math.cos(pitch) * cameraDistance;
