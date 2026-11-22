@@ -1,6 +1,6 @@
 import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
@@ -47,12 +47,15 @@ export default function Report() {
   const [reportsLoading, setReportsLoading] = useState(true);
   const [reportsError, setReportsError] = useState('');
   const [historySignedIn, setHistorySignedIn] = useState<boolean | null>(null);
+  const mountedRef = useRef(true);
 
   const loadMyReports = useCallback(async () => {
+    if (!mountedRef.current) return;
     setReportsLoading(true);
     setReportsError('');
     try {
       const { data: authData, error: authError } = await supabase.auth.getUser();
+      if (!mountedRef.current) return;
       if (authError) throw authError;
       if (!authData.user) {
         setHistorySignedIn(false);
@@ -66,17 +69,20 @@ export default function Report() {
         .eq('reporter_id', authData.user.id)
         .order('created_at', { ascending: false })
         .limit(6);
+      if (!mountedRef.current) return;
       if (error) throw error;
       setMyReports((data || []) as ReportHistoryItem[]);
     } catch {
-      setReportsError('تعذر تحميل سجل البلاغات الآن. تحقق من اتصالك وحاول مرة أخرى.');
+      if (mountedRef.current) setReportsError('تعذر تحميل سجل البلاغات الآن. تحقق من اتصالك وحاول مرة أخرى.');
     } finally {
-      setReportsLoading(false);
+      if (mountedRef.current) setReportsLoading(false);
     }
   }, []);
 
   useEffect(() => {
+    mountedRef.current = true;
     void loadMyReports();
+    return () => { mountedRef.current = false; };
   }, [loadMyReports]);
 
   async function send() {
