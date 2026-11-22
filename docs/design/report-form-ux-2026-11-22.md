@@ -14,12 +14,12 @@
 - The scroll container uses a small fixed bottom padding and the form card has no capped width for tablet/desktop layouts.
 
 ## Design decisions
-1. Preserve `AppHeader`, OASIS theme tokens, existing reason strings, `reports` table, inserted payload, auth redirect, success confirmation, and navigation.
+1. Preserve `AppHeader`, OASIS theme tokens, existing reason strings, the `reports` table and insert payload, auth redirect, success confirmation, and navigation.
 2. Add a concise shield-led introduction explaining that reports are reviewed by the Hayna team; avoid alarmist copy or decorative urgency.
 3. Center the page content with a 760px maximum width and a 22px-radius card; use consistent OASIS surface, border, ink, muted, soft, and danger tokens.
 4. Make each reason a clearly selected semantic radio option with at least a 56px row height, 44px-plus control surface, readable 14px text, and a two-column layout only when the viewport is wide enough.
 5. Give the optional details field a visible label, accessible label/hint, comfortable multiline area (minimum 120px), and clear helper copy.
-6. Make submission a 52px minimum-height action with an accessible busy/disabled state. Keep errors in the form as a recoverable, announced message while preserving the existing alert/success flow.
+6. Make submission a 52px minimum-height action with an accessible busy/disabled state. Keep errors in the form as a recoverable, announced message while preserving the existing success confirmation and auth redirect.
 7. Give private report history explicit loading, retryable error, empty, and populated states. Keep the current six-record limit and query unchanged.
 8. Respect the shared bottom navigation inset and natural keyboard-aware scrolling; rely on `AppHeader` for the top safe area.
 
@@ -31,7 +31,7 @@
 - TypeScript: `npm run typecheck`.
 - Web: `npm run export:web`.
 - Focused UI contract: `node --test tests/reportDesign.test.cjs`.
-- Existing suite: `node --test --test-concurrency=2 tests/*.test.cjs`.
+- Full repository suite is intentionally not run in this batch because it includes unrelated game/streaming suites outside the requested scope.
 - Manual QA still required on iPhone, Android, iPad, and web at narrow and wide widths, in light/dark themes, with VoiceOver/TalkBack and keyboard open. This environment cannot claim physical-device QA.
 
 ## Before / after summary
