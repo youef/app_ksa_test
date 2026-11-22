@@ -11,7 +11,7 @@ type Leader = { alias: string; level: number; trophies: number; wins: number };
 type Log = { id: string; opponent: string; victory: boolean; gold: number; attacked: boolean; when: string };
 type GameState = { joined: boolean; me: Captain; rank: number; targets: Target[]; leaders: Leader[]; history: Log[] };
 type Battle = { won: boolean; attack: number; defense: number; lost_troops: number; gold: number; timber: number };
-type Panel = 'none' | 'map' | 'wars' | 'ranks' | 'help';
+type Panel = 'none' | 'map' | 'wars' | 'ranks' | 'help' | 'story';
 const num = (n: number) => Number(n || 0).toLocaleString('ar-SA');
 const safe = 'env(safe-area-inset-top, 0px)';
 const glass = 'linear-gradient(150deg, rgba(5,46,43,.91), rgba(8,64,56,.88))';
@@ -28,6 +28,18 @@ const quickSites: Record<GameSite, string> = {
   harbor: 'أسطول القراصنة', mine: 'حصاد الذهب', arena: 'حصّن دفاعاتك', village: 'حصاد موارد القرية',
 };
 const gamePos = (x: number, z: number) => ({ x: 160 + x / WORLD_HALF * 145, y: 160 + z / WORLD_HALF * 145 });
+
+type StoryChapter = { title: string; text: string; objective: string; action?: GameAction; site?: GameSite; };
+const STORY_CHAPTERS: StoryChapter[] = [
+  { title: 'رسالة من القرية القديمة', text: 'في ليلة هادئة، وصل إلى قلعتك رسول يحمل ختمًا ملكيًا. أخبرك أن ضبابًا غريبًا يقترب من الوادي، وأن أهل القرية شاهدوا أشرعة سوداء عند الساحل. عليك أن تبدأ من حيث بدأت الحكاية.', objective: 'اعثر على القرية القديمة وتحدث مع أهلها', site: 'village' },
+  { title: 'إعادة إشعال المملكة', text: 'وجدت القرية أبوابها موصدة ومخازنها شبه فارغة. يثق بك أهلها، لكنهم يحتاجون إلى المؤونة والخشب والذهب قبل أن يستطيعوا مساعدتك.', objective: 'اجمع موارد المملكة', action: 'collect' },
+  { title: 'نداء الحراس', text: 'عاد الحداد إلى طرق مطرقته، وبدأت رايات الحراس ترتفع فوق الثكنة. لم يعد الوادي بلا حماية؛ حان وقت تجهيز أول كتيبة.', objective: 'جنّد ثمانية محاربين', action: 'recruit' },
+  { title: 'أسوار لا تنحني', text: 'وصلت أخبار عن دوريات قراصنة قرب النهر. أمرت البنّائين بتقوية الأسوار وتدعيم أبراج المراقبة قبل أن يحل الظلام.', objective: 'حصّن قلعتك', action: 'fortify' },
+  { title: 'قراصنة الضباب', text: 'ظهرت سفن القراصنة عند الميناء. أبحر بأسطولك نحوهم، واختبر شجاعة جيشك في أول مواجهة حقيقية.', objective: 'اهزم قراصنة الضباب', action: 'pirates' },
+  { title: 'راية العهد', text: 'بعد انحسار الضباب، عاد التجار إلى الطرق وامتلأت الأسواق. اجتمع وجهاء المملكة وقرروا أن الوقت حان لرفع القلعة إلى مقام العاصمة.', objective: 'طوّر القلعة إلى المستوى التالي', action: 'upgrade' },
+  { title: 'توحيد الجزر', text: 'وصلت رسالة أخيرة من وراء البحر: جزر أخرى تنتظر قائدًا يعيد الأمن إلى طرق التجارة. جهّز جيشك واختر خصمًا، فهذه المعركة ستحدد مستقبل المملكة.', objective: 'اختر جزيرة منافسة وابدأ الغزو', action: 'attack' },
+];
+
 
 export default function Kingdom3D() {
   const [accountId, setAccountId] = useState('');
@@ -46,7 +58,17 @@ export default function Kingdom3D() {
   const [battle, setBattle] = useState<Battle | null>(null);
   const [tick, setTick] = useState(Date.now());
   const [waypoint, setWaypoint] = useState<GameSite | null>(null);
+  const [storyProgress, setStoryProgress] = useState(0);
   const me = state?.me;
+  const chapter = STORY_CHAPTERS[storyProgress];
+  const advanceStory = useCallback(() => {
+    setStoryProgress(current => {
+      const next = Math.min(STORY_CHAPTERS.length, current + 1);
+      if (accountId) { try { localStorage.setItem('hayna-kingdom-story-' + accountId, String(next)); } catch { /* optional */ } }
+      return next;
+    });
+    setMessage('📜 تقدمت في قصة ممالك حيّنا');
+  }, [accountId]);
   const paused = avatarOpen || panel !== 'none' || Boolean(target);
   const canAttack = (me?.troops || 0) >= 8 && (!me?.last_attack_at || Date.now() - new Date(me.last_attack_at).getTime() >= 120000);
   const cooldown = me?.last_attack_at ? Math.max(0, Math.ceil((120000 - (tick - new Date(me.last_attack_at).getTime())) / 1000)) : 0;
@@ -56,6 +78,7 @@ export default function Kingdom3D() {
     if (authError) throw authError;
     if (!auth.user) { router.replace('/auth'); return; }
     setAccountId(auth.user.id);
+    try { const savedStory = Number(localStorage.getItem('hayna-kingdom-story-' + auth.user.id) || 0); setStoryProgress(Number.isFinite(savedStory) ? Math.max(0, Math.min(STORY_CHAPTERS.length, savedStory)) : 0); } catch { /* Story still works without storage. */ }
     const { data, error: rpcError } = await supabase.rpc(join ? 'hayna_game_join' : 'hayna_game_state');
     if (rpcError) throw rpcError;
     const payload = data as GameState;
@@ -124,13 +147,15 @@ export default function Kingdom3D() {
       const result = data as { message?: string; battle?: Battle };
       setMessage(result?.message || 'تمت العملية بنجاح');
       setBattle(result?.battle || null);
+      if (STORY_CHAPTERS[storyProgress]?.action === action) advanceStory();
       setTarget(null);
       await reload();
     } catch (e: any) { setError(e?.message || 'تعذّر تنفيذ العملية'); }
     finally { setBusy(false); }
-  }, [busy, reload]);
+  }, [busy, reload, storyProgress, advanceStory]);
 
   const site = position.site ? SITES.find(s => s.key === position.site) : null;
+  useEffect(() => { if (chapter?.site && position.site === chapter.site) advanceStory(); }, [position.site, chapter, advanceStory]);
   const waypointTarget = waypoint ? SITES.find(s => s.key === waypoint) : null;
   const waypointDistance = waypointTarget ? Math.round(Math.hypot(waypointTarget.x - position.x, waypointTarget.z - position.z)) : null;
   const playerDot = gamePos(position.x, position.z);
@@ -175,7 +200,7 @@ export default function Kingdom3D() {
 
     {!loading && me && <nav aria-label="أدوات المملكة" style={{ position: 'absolute', top: 'calc(' + safe + ' + 107px)', right: 10, display: 'flex', flexDirection: 'column', gap: 6, width: 112, padding: 7, borderRadius: 17, background: 'rgba(3,39,39,.78)', border: '1px solid rgba(255,255,255,.18)', boxShadow: '0 10px 28px rgba(0,20,22,.28)', backdropFilter: 'blur(14px)' }}>
       {([
-        ['map', '🗺️', 'الخريطة'], ['wars', '⚔️', 'الحروب'], ['ranks', '🏆', 'المتصدرون'], ['help', '❔', 'المساعدة'],
+        ['story', '📜', 'القصة'], ['map', '🗺️', 'الخريطة'], ['wars', '⚔️', 'الحروب'], ['ranks', '🏆', 'المتصدرون'], ['help', '❔', 'المساعدة'],
       ] as const).map(([key, symbol, name]) => <button type="button" key={key} onClick={() => setPanel(panel === key ? 'none' : key)}
         aria-label={name} aria-pressed={panel === key} title={name}
         style={{ ...smallButton, display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 8, width: '100%', minHeight: 39, padding: '8px 10px', fontSize: 12, background: panel === key ? '#087D63' : 'rgba(255,255,255,.08)', borderColor: panel === key ? 'rgba(196,255,226,.55)' : 'rgba(255,255,255,.12)' }}>
@@ -221,9 +246,34 @@ export default function Kingdom3D() {
       background: glass, boxShadow: '0 18px 36px rgba(0,20,22,.42)', border: '1px solid rgba(255,255,255,.2)', borderRadius: 18,
       backdropFilter: 'blur(18px)', padding: 14, overflowY: 'auto', overscrollBehavior: 'contain', touchAction: 'pan-y' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <strong style={{ fontSize: 16 }}>{panel === 'map' ? '🗺️ خريطة العالم' : panel === 'wars' ? '⚔️ ساحة المعارك' : panel === 'ranks' ? '🏆 المتصدرون' : '🎮 طريقة اللعب'}</strong>
+        <strong style={{ fontSize: 16 }}>{panel === 'story' ? '📜 قصة ممالك حيّنا' : panel === 'map' ? '🗺️ خريطة العالم' : panel === 'wars' ? '⚔️ ساحة المعارك' : panel === 'ranks' ? '🏆 المتصدرون' : '🎮 طريقة اللعب'}</strong>
         <button type="button" aria-label="إغلاق اللوحة" onClick={() => setPanel('none')} style={smallButton}>✕</button>
       </div>
+      {panel === 'story' && <div style={{ display: 'grid', gap: 11 }}>
+        <div style={{ ...panelCard, background: 'linear-gradient(145deg,rgba(184,137,65,.22),rgba(255,255,255,.07))' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+            <strong style={{ fontSize: 12 }}>الفصل {num(Math.min(storyProgress + 1, STORY_CHAPTERS.length))} من {num(STORY_CHAPTERS.length)}</strong>
+            <span style={{ fontSize: 11, color: '#F4D995' }}>{Math.round(storyProgress / STORY_CHAPTERS.length * 100)}٪</span>
+          </div>
+          <div style={{ height: 7, background: 'rgba(255,255,255,.13)', borderRadius: 9, overflow: 'hidden', marginTop: 9 }}>
+            <div style={{ width: (storyProgress / STORY_CHAPTERS.length * 100) + '%', height: '100%', background: 'linear-gradient(90deg,#C79A4B,#F3D98D)', borderRadius: 9 }} />
+          </div>
+        </div>
+        {chapter ? <>
+          <div style={{ fontSize: 34, textAlign: 'center', marginTop: 4 }}>📜</div>
+          <strong style={{ fontSize: 16, textAlign: 'center', color: '#F4D995' }}>{chapter.title}</strong>
+          <p style={{ ...muted, fontSize: 12, lineHeight: 2, margin: 0 }}>{chapter.text}</p>
+          <div style={{ ...panelCard, borderColor: 'rgba(244,217,149,.3)' }}>
+            <div style={{ fontSize: 10, color: '#E7C987', marginBottom: 5 }}>المهمة الحالية</div>
+            <strong style={{ fontSize: 12 }}>🎯 {chapter.objective}</strong>
+          </div>
+          {chapter.site && <button type="button" style={primary} onClick={() => { setWaypoint(chapter.site!); setPanel('none'); }}>اعرض وجهة القرية على الخريطة</button>}
+          {chapter.action && <button type="button" style={primary} disabled={busy || (chapter.action === 'attack' && !state?.targets.length)} onClick={() => chapter.action === 'attack' ? setPanel('wars') : void command(chapter.action!)}>{chapter.action === 'attack' ? 'افتح ساحة الغزو' : 'نفّذ المهمة الآن'}</button>}
+        </> : <div style={{ textAlign: 'center', padding: 10 }}>
+          <div style={{ fontSize: 44 }}>👑</div><strong style={{ color: '#F4D995' }}>اكتمل الفصل الأول: عهد المملكة</strong>
+          <p style={muted}>أعدت الأمن إلى الوادي، وأصبحت جزر البحر تعرف رايتك. لكن وراء الأفق حكايات جديدة تنتظر.</p>
+        </div>}
+      </div>}
       {panel === 'map' && <>
         <p style={muted}>العالم واسع. اختر وجهة ثم تحرك نحوها باستخدام عصا التحكم.</p>
         <svg viewBox="0 0 320 320" role="img" aria-label="خريطة العالم فيها القلعة والقرية والغابة والميناء وموقع شخصيتك"
