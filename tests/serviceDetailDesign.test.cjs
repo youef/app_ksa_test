@@ -17,8 +17,8 @@ test('header share and report controls have 44-point hit areas', () => {
 });
 
 test('gallery and related offers are labeled for screen readers', () => {
-  assert.ok(source.includes('accessibilityLabel={`عرض الصورة \${idx + 1} من \${images.length}`}'));
-  assert.ok(source.includes('accessibilityLabel={`الصورة \${activeImage + 1} من \${images.length}`}'));
+  assert.ok(source.includes('accessibilityLabel={`عرض الصورة ${idx + 1} من ${images.length}`}'));
+  assert.ok(source.includes('accessibilityLabel={`الصورة ${activeImage + 1} من ${images.length}`}'));
   assert.ok(source.includes('accessibilityElementsHidden'));
   assert.ok(source.includes('accessibilityHint="فتح تفاصيل العرض"'));
 });
