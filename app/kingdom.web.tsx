@@ -152,7 +152,7 @@ export default function Kingdom3D() {
         <button type="button" style={smallButton} aria-label="العودة إلى تطبيق حيّنا" onClick={() => router.push('/more')}>❯</button>
         <div style={{ flex: 1, minWidth: 0, textAlign: 'right' }}>
           <strong style={{ display: 'block', fontSize: 17 }}>🏰 ممالك حيّنا <span style={{ fontSize: 10, color: '#98E8CB' }}>3D</span></strong>
-          <span style={{ color: '#D2EFE1', fontSize: 10, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{me?.alias || 'عالمك المفتوح'} · المستوى {num(me?.level || 1)}</span>
+          <span style={{ color: '#D2EFE1', fontSize: 10, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{me?.alias || 'عالمك المفتوح'} · المستوى {num(me?.level || 1)} · المركز #{num(state?.rank || 1)} · {num(me?.wins || 0)} انتصار</span>
         </div>
         <button type="button" onClick={() => { setPreviewKey(avatar); setAvatarOpen(true); }} style={{ ...smallButton, display: 'flex', alignItems: 'center', gap: 6, padding: '6px 9px' }}>
           <span style={{ fontSize: 22 }}>{avatarProfile.emoji}</span><span style={{ fontSize: 11 }}>شخصيتي</span>
@@ -173,16 +173,16 @@ export default function Kingdom3D() {
       </div>}
     </header>
 
-    {!loading && me && <nav style={{ position: 'absolute', top: 'calc(' + safe + ' + 107px)', right: 10, display: 'flex', flexDirection: 'column', gap: 7 }}>
+    {!loading && me && <nav aria-label="أدوات المملكة" style={{ position: 'absolute', top: 'calc(' + safe + ' + 107px)', right: 10, display: 'flex', flexDirection: 'column', gap: 6, width: 112, padding: 7, borderRadius: 17, background: 'rgba(3,39,39,.78)', border: '1px solid rgba(255,255,255,.18)', boxShadow: '0 10px 28px rgba(0,20,22,.28)', backdropFilter: 'blur(14px)' }}>
       {([
-        ['map', '🗺️', 'الخريطة'], ['wars', '⚔️', 'الحروب'], ['ranks', '🏆', 'المتصدرون'],
+        ['map', '🗺️', 'الخريطة'], ['wars', '⚔️', 'الحروب'], ['ranks', '🏆', 'المتصدرون'], ['help', '❔', 'المساعدة'],
       ] as const).map(([key, symbol, name]) => <button type="button" key={key} onClick={() => setPanel(panel === key ? 'none' : key)}
-        aria-label={name} aria-pressed={panel === key}
-        style={{ ...smallButton, fontSize: 18, width: 47, height: 47, padding: 0, background: panel === key ? '#087D63' : 'rgba(5,48,47,.83)', backdropFilter: 'blur(12px)' }}>{symbol}</button>)}
-      <button type="button" aria-label="تحديث رصيد اللعبة" style={{ ...smallButton, width: 47, height: 47, padding: 0, fontSize: 19 }}
-        onClick={() => void reload().catch((e: any) => setError(e?.message || 'تعذّر التحديث'))}>⟳</button>
-      <a href="/kingdom/kaykit/catalog.html" target="_blank" rel="noopener noreferrer" aria-label="مكتبة المجسمات المجانية وتنزيلها"
-        style={{ ...smallButton, display: 'grid', placeItems: 'center', width: 47, height: 47, padding: 0, fontSize: 19, textDecoration: 'none' }}>📦</a>
+        aria-label={name} aria-pressed={panel === key} title={name}
+        style={{ ...smallButton, display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 8, width: '100%', minHeight: 39, padding: '8px 10px', fontSize: 12, background: panel === key ? '#087D63' : 'rgba(255,255,255,.08)', borderColor: panel === key ? 'rgba(196,255,226,.55)' : 'rgba(255,255,255,.12)' }}>
+        <span style={{ fontSize: 17 }}>{symbol}</span><span>{name}</span>
+      </button>)}
+      <button type="button" aria-label="تحديث بيانات المملكة" title="تحديث بيانات المملكة" style={{ ...smallButton, display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 8, width: '100%', minHeight: 39, padding: '8px 10px', fontSize: 12 }}
+        onClick={() => void reload().catch((e: any) => setError(e?.message || 'تعذّر التحديث'))}><span style={{ fontSize: 17 }}>⟳</span><span>تحديث</span></button>
     </nav>}
 
     {!loading && me && <div style={{ position: 'absolute', top: 'calc(' + safe + ' + 112px)', left: 11, borderRadius: 12,
