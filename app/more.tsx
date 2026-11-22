@@ -7,7 +7,7 @@ import {
   ChevronLeft, ChevronDown, CircleHelp, Info, LifeBuoy, Map,
   MessageCircle, Radio, ShieldCheck, ShoppingBag, Store, UserRound,
   LogOut, FileText, Mail, GraduationCap, Images, Heart, Settings2,
-  Search, X, Crown, Plus, Castle, BookOpen, type LucideIcon,
+  Search, X, Crown, Plus, Castle, BookOpen, Sparkles, ArrowUpLeft, type LucideIcon,
 } from 'lucide-react-native';
 
 import { AppHeader } from '@/components/shared/AppHeader';
@@ -129,7 +129,7 @@ export default function More() {
   const helpItems = HELP.map(item =>
     !userId && item.href === '/support' ? { ...item, href: '/contact-us' } : item
   );
-  const shownDiscover = discoveryItems.filter(item => matches(item, term));
+  const shownDiscover = discoveryItems.filter(item => (term || item.href !== '/kingdom') && matches(item, term));
   const shownHelp = helpItems.filter(item => matches(item, term));
   const shownAccount = ACCOUNT_ACTIONS.filter(item => matches(item, term));
   const shownAdmin = isAdmin ? ADMIN.filter(item => matches(item, term)) : [];
@@ -162,6 +162,24 @@ export default function More() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
+        <View style={styles.heroCard}>
+          <View pointerEvents="none" style={styles.heroOrbLarge} />
+          <View pointerEvents="none" style={styles.heroOrbSmall} />
+          <View style={styles.heroTopRow}>
+            <View style={styles.heroBadge}><Sparkles size={13} color="#F7D78A" /><Text style={styles.heroBadgeText}>منصة أهل الحي</Text></View>
+            <View style={styles.heroBrandMark}><Castle size={19} color="#F7D78A" /></View>
+          </View>
+          <Text style={styles.heroTitle}>كل حيّنا.. أقرب إليك</Text>
+          <Text style={styles.heroDescription}>اكتشف الخدمات، تواصل مع جيرانك، وأدر تفاصيل يومك من مساحة واحدة.</Text>
+          <View style={styles.heroStats}>
+            <View style={styles.heroStat}><Text style={styles.heroStatValue}>{discoveryItems.length}</Text><Text style={styles.heroStatLabel}>خدمات الحي</Text></View>
+            <View style={styles.heroStatDivider} />
+            <View style={styles.heroStat}><Text style={styles.heroStatValue}>{helpItems.length}</Text><Text style={styles.heroStatLabel}>مراكز المساعدة</Text></View>
+            <View style={styles.heroStatDivider} />
+            <View style={styles.heroStat}><Text style={styles.heroStatValue}>{ACCOUNT_ACTIONS.length}</Text><Text style={styles.heroStatLabel}>أدوات الحساب</Text></View>
+          </View>
+        </View>
+
         <Pressable oasisKind="plain" accessibilityRole="button"
           accessibilityLabel={profile ? 'فتح حسابي وإعدادات الملف الشخصي' : 'تسجيل الدخول إلى حيّنا'}
           style={[styles.accountCard, { backgroundColor: colors.surface, borderColor: colors.line }]}
@@ -219,6 +237,20 @@ export default function More() {
 
         {term && shownAccount.length > 0 && (
           <MenuGroup title="الحساب والإعدادات" items={shownAccount} signedIn={Boolean(userId)} />
+        )}
+
+        {!term && discoveryItems.some(item => item.href === '/kingdom') && (
+          <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel="الدخول إلى ممالك حيّنا"
+            onPress={() => openItem('/kingdom')} style={styles.kingdomFeature}>
+            <View pointerEvents="none" style={styles.kingdomGlow} />
+            <View style={styles.kingdomFeatureIcon}><Castle size={24} color="#F4D58D" /></View>
+            <View style={styles.kingdomFeatureCopy}>
+              <View style={styles.kingdomFeatureEyebrow}><Crown size={11} color="#F4D58D" /><Text style={styles.kingdomFeatureEyebrowText}>تجربة حيّنا المميزة</Text></View>
+              <Text style={styles.kingdomFeatureTitle}>ممالك حيّنا</Text>
+              <Text style={styles.kingdomFeatureSub}>ابنِ جزيرتك، طوّر قلعتك، واكتب حكاية مملكتك</Text>
+            </View>
+            <View style={styles.kingdomFeatureAction}><ArrowUpLeft size={17} color="#153B32" /></View>
+          </Pressable>
         )}
 
         {shownDiscover.length > 0 && (
@@ -357,7 +389,30 @@ function MenuGroup({ title, items, signedIn, compact = false }: {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  content: { width: '100%', maxWidth: 820, alignSelf: 'center', paddingHorizontal: 14, paddingTop: 13, gap: 15 },
+  heroCard: { position: 'relative', overflow: 'hidden', minHeight: 192, borderRadius: 25, paddingHorizontal: 19, paddingTop: 17, paddingBottom: 15, backgroundColor: '#073D36', borderWidth: 1, borderColor: 'rgba(230,199,128,.24)', gap: 8, shadowColor: '#062C28', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.18, shadowRadius: 18, elevation: 5 },
+  heroOrbLarge: { position: 'absolute', width: 190, height: 190, borderRadius: 95, top: -94, left: -55, backgroundColor: 'rgba(211,177,105,.12)' },
+  heroOrbSmall: { position: 'absolute', width: 100, height: 100, borderRadius: 50, bottom: -65, right: 28, backgroundColor: 'rgba(80,160,128,.16)' },
+  heroTopRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center' },
+  heroBadge: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20, backgroundColor: 'rgba(255,255,255,.09)', borderWidth: 1, borderColor: 'rgba(255,255,255,.11)' },
+  heroBadgeText: { color: '#F2E8CF', fontSize: 10.5, fontWeight: '700' },
+  heroBrandMark: { width: 38, height: 38, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(244,213,141,.13)', borderWidth: 1, borderColor: 'rgba(244,213,141,.22)' },
+  heroTitle: { color: '#FFFFFF', fontSize: 23, fontWeight: '900', textAlign: 'right', letterSpacing: -.3, marginTop: 3 },
+  heroDescription: { color: 'rgba(255,255,255,.76)', fontSize: 11.5, fontWeight: '500', textAlign: 'right', lineHeight: 19, maxWidth: 430 },
+  heroStats: { flexDirection: 'row-reverse', alignItems: 'center', alignSelf: 'flex-start', gap: 13, marginTop: 5, paddingTop: 10, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,.14)' },
+  heroStat: { alignItems: 'center', gap: 2, minWidth: 56 },
+  heroStatValue: { color: '#F4D58D', fontSize: 16, fontWeight: '900' },
+  heroStatLabel: { color: 'rgba(255,255,255,.68)', fontSize: 9.5, fontWeight: '600' },
+  heroStatDivider: { width: 1, height: 25, backgroundColor: 'rgba(255,255,255,.17)' },
+  kingdomFeature: { position: 'relative', overflow: 'hidden', minHeight: 112, borderRadius: 21, padding: 14, flexDirection: 'row-reverse', alignItems: 'center', gap: 12, backgroundColor: '#173B32', borderWidth: 1, borderColor: 'rgba(204,166,93,.48)', shadowColor: '#153B32', shadowOffset: { width: 0, height: 6 }, shadowOpacity: .13, shadowRadius: 12, elevation: 3 },
+  kingdomGlow: { position: 'absolute', width: 150, height: 150, borderRadius: 75, right: -70, top: -65, backgroundColor: 'rgba(226,190,112,.13)' },
+  kingdomFeatureIcon: { width: 52, height: 52, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(244,213,141,.13)', borderWidth: 1, borderColor: 'rgba(244,213,141,.25)' },
+  kingdomFeatureCopy: { flex: 1, minWidth: 0, alignItems: 'flex-end', gap: 4 },
+  kingdomFeatureEyebrow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5 },
+  kingdomFeatureEyebrowText: { color: '#E7CA8C', fontSize: 9.5, fontWeight: '800' },
+  kingdomFeatureTitle: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },
+  kingdomFeatureSub: { color: 'rgba(255,255,255,.72)', fontSize: 10.5, textAlign: 'right', lineHeight: 17 },
+  kingdomFeatureAction: { width: 32, height: 32, borderRadius: 11, backgroundColor: '#F4D58D', alignItems: 'center', justifyContent: 'center' },
+  content: { width: '100%', maxWidth: 920, alignSelf: 'center', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 20, gap: 17 },
   accountCard: { flexDirection: 'row-reverse', alignItems: 'center', paddingHorizontal: 13, paddingVertical: 12, gap: 11, borderRadius: 18, borderWidth: 1, minHeight: 84 },
   avatarWrap: { width: 50, height: 50, borderRadius: 25, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   avatar: { width: '100%', height: '100%' },
@@ -369,18 +424,18 @@ const styles = StyleSheet.create({
   adminPill: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, alignSelf: 'flex-end', paddingHorizontal: 8, paddingVertical: 3, marginTop: 2, borderRadius: 9, backgroundColor: '#F3E8FF' },
   adminPillText: { fontSize: 10.5, fontWeight: '700', color: '#6D28D9' },
   quickActions: { flexDirection: 'row-reverse', alignItems: 'center', gap: 9 },
-  quickAction: { flex: 1, minHeight: 63, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center', gap: 6 },
+  quickAction: { flex: 1, minHeight: 70, borderRadius: 17, borderWidth: 1, alignItems: 'center', justifyContent: 'center', gap: 7, shadowColor: '#102F29', shadowOffset: { width: 0, height: 3 }, shadowOpacity: .04, shadowRadius: 7, elevation: 1 },
   quickActionLabel: { fontSize: 11.5, fontWeight: '700' },
-  searchBox: { flexDirection: 'row-reverse', alignItems: 'center', minHeight: 46, gap: 9, paddingHorizontal: 12, borderWidth: 1, borderRadius: 14 },
+  searchBox: { flexDirection: 'row-reverse', alignItems: 'center', minHeight: 52, gap: 10, paddingHorizontal: 14, borderWidth: 1, borderRadius: 17, shadowColor: '#102F29', shadowOffset: { width: 0, height: 3 }, shadowOpacity: .035, shadowRadius: 8, elevation: 1 },
   searchInput: { flex: 1, minWidth: 0, fontSize: 13, fontWeight: '500', textAlign: 'right', paddingVertical: 8 },
   searchClear: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  section: { gap: 9 },
+  section: { gap: 11 },
   compactSection: { gap: 0 },
   sectionHeading: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  sectionTitle: { textAlign: 'right', fontSize: 14.5, fontWeight: '700', paddingHorizontal: 2 },
+  sectionTitle: { textAlign: 'right', fontSize: 15, fontWeight: '800', paddingHorizontal: 2 },
   sectionSubtitle: { fontSize: 11, fontWeight: '500' },
   tileGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 9 },
-  tile: { flexDirection: 'row-reverse', alignItems: 'center', minHeight: 74, borderRadius: 15, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 9, gap: 8 },
+  tile: { flexDirection: 'row-reverse', alignItems: 'center', minHeight: 82, borderRadius: 18, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 11, gap: 10, shadowColor: '#102F29', shadowOffset: { width: 0, height: 3 }, shadowOpacity: .035, shadowRadius: 8, elevation: 1 },
   tileIcon: { width: 34, height: 34, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
   tileCopy: { flex: 1, minWidth: 0, alignItems: 'flex-end', gap: 3 },
   tileTitle: { fontSize: 12.5, fontWeight: '700', textAlign: 'right' },
