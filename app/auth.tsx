@@ -1,5 +1,4 @@
 import { OasisPressable as Pressable, OasisTextInput as TextInput, OasisSurface } from '@/components/oasis/OasisPrimitives';
-import { OASIS } from '@/lib/oasis';
 import { useState, useEffect, useRef } from 'react';
 import { StyleSheet, Text, View, KeyboardAvoidingView, Platform, ScrollView, Image, ImageBackground, type TextInput as NativeTextInput } from 'react-native';
 import { router } from 'expo-router';
