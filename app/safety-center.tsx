@@ -85,10 +85,10 @@ export default function SafetyCenterScreen() {
         <Pressable accessibilityRole="button" accessibilityLabel="سياسة الخصوصية وشروط الاستخدام" onPress={() => open('https://appksatest.vercel.app/privacy')} style={styles.policyRow}>
           <View style={styles.policyIcon}><LockKeyhole size={18} color={OASIS.colors.muted}/></View>
           <View style={{flex:1,gap:3}}><Text style={styles.policyTitle}>سياسة الخصوصية وشروط الاستخدام</Text><Text style={styles.policyDesc}>اعرف كيف نساعد في حماية بياناتك وحقوقك.</Text></View>
-          <ChevronLeft size={17} color="#94A3B8"/>
+          <ChevronLeft size={17} color={OASIS.colors.muted}/>
         </Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel="التواصل مع فريق الثقة والأمان عبر البريد" onPress={() => open('mailto:support@hayna.app?subject=الأمان%20والثقة%20-%20حيّنا')} style={styles.contactRow}>
-          <Mail size={17} color={GREEN}/><Text style={styles.contactText}>التواصل مع فريق الثقة والأمان</Text><ChevronLeft size={15} color={GREEN}/>
+          <Mail size={17} color={OASIS.colors.primary}/><Text style={styles.contactText}>التواصل مع فريق الثقة والأمان</Text><ChevronLeft size={15} color={OASIS.colors.primary}/>
         </Pressable>
       </ScrollView>
     </View>
