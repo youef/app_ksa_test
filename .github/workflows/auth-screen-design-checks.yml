@@ -1,0 +1,39 @@
+name: Auth screen UX checks
+
+on:
+  pull_request:
+    paths:
+      - app/auth.tsx
+      - tests/authScreenDesign.test.cjs
+      - docs/design/auth-screen-ux-2026-11-23.md
+      - docs/design/auth-screen-ux-results-2026-11-23.md
+      - .github/workflows/auth-screen-design-checks.yml
+  push:
+    branches:
+      - design/auth-ux-20261123-1200
+    paths:
+      - app/auth.tsx
+      - tests/authScreenDesign.test.cjs
+      - docs/design/auth-screen-ux-2026-11-23.md
+      - docs/design/auth-screen-ux-results-2026-11-23.md
+      - .github/workflows/auth-screen-design-checks.yml
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run typecheck
+      - run: npm run export:web
+      - run: node --test tests/authScreenDesign.test.cjs
