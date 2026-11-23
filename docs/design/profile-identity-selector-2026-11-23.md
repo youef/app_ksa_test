@@ -39,7 +39,7 @@
 
 ## الاختبارات
 - 7 assertions مركزة على semantics المجموعة/الخيار، selected state، labels/hints، أهداف اللمس، icon size، RTL، وغياب الحركة.
-- workflow مخصص يشغل `npm ci --ignore-scripts`, `npm run typecheck`, `npm run export:web`, و`node --test tests/profileIdentitySelectorDesign.test.cjs`.
+- workflow مخصص يشغل `npm ci --ignore-scripts`, `npm run typecheck`, `npm run export:web`, و`node --test tests/profileIdentitySelectorDesign.test.cjs` عند PR وعند push لهذا الفرع لضمان تشغيله قبل الدمج.
 - QA بصري على أجهزة فعلية وVoiceOver/TalkBack يبقى مراجعة يدوية؛ لا يُدّعى تنفيذه عن بُعد.
 
 ## الدفعة التالية
@@ -50,5 +50,5 @@
 - ارتفاع الخيار صار 48px، hit slop = 4، وسطح الأيقونة 32px.
 - الخيار المختار يملك إطار 2px؛ ترتيب الصف، التفافه، callback، والألوان محفوظة.
 - لا توجد حركة جديدة.
-- **Static preflight على المصدر المسترجع: 7/7 assertions passed.** لم أتمكن من تشغيل Node/npm محليًا بسبب فشل DNS/عدم توفر checkout. سيشغّل PR workflow الاختبار الفعلي، TypeScript، وWeb export.
+- **Static preflight على المصدر المسترجع: 7/7 assertions passed.** فحص صياغة ملف الاختبار محليًا باستخدام `node --check` نجح. لم أتمكن من تشغيل Node tests أو npm محليًا بسبب فشل DNS/عدم توفر checkout؛ workflow على push/PR سيشغّل الاختبارات الفعلية وTypeScript وWeb export.
 - مراجعة أجهزة فعلية وVoiceOver/TalkBack: غير متاحة عن بُعد.

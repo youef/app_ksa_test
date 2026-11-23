@@ -7,6 +7,14 @@ on:
       - tests/profileIdentitySelectorDesign.test.cjs
       - docs/design/profile-identity-selector-2026-11-23.md
       - .github/workflows/profile-identity-selector-checks.yml
+  push:
+    branches:
+      - design/profile-identity-selector-20261123
+    paths:
+      - components/profile/ProfileIdentityCard.tsx
+      - tests/profileIdentitySelectorDesign.test.cjs
+      - docs/design/profile-identity-selector-2026-11-23.md
+      - .github/workflows/profile-identity-selector-checks.yml
 
 permissions:
   contents: read
