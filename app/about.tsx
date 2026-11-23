@@ -57,7 +57,7 @@ export default function AboutScreen() {
     try {
       await shareContent({
         title: 'منصة حيّنا',
-        message: 'منصة حيّنا 🇸🇦 — مجتمع الحي وخدماته وسوقه في مكان واحد.\\nhttps://appksatest.vercel.app',
+        message: 'منصة حيّنا 🇸🇦 — مجتمع الحي وخدماته وسوقه في مكان واحد.\nhttps://appksatest.vercel.app',
       });
     } catch {
       Alert.alert('تعذّرت المشاركة', 'يمكنك مشاركة رابط المنصة يدويًا: https://appksatest.vercel.app');
@@ -146,7 +146,7 @@ export default function AboutScreen() {
                   <BadgeCheck size={18} color={colors.primary} />
                 </View>
                 <Text style={[styles.developerRole, { color: colors.muted }]}>تطوير وهندسة منصة حيّنا</Text>
-                <Text style={[styles.developerPhone, { color: colors.primary }]} accessibilityLabel={`رقم الهاتف ${DEVELOPER_PHONE}`} writingDirection="ltr">{DEVELOPER_PHONE}</Text>
+                <View style={styles.phoneDirection}><Text style={[styles.developerPhone, { color: colors.primary }]} accessibilityLabel={`رقم الهاتف ${DEVELOPER_PHONE}`}>{DEVELOPER_PHONE}</Text></View>
               </View>
             </OasisSurface>
 
@@ -216,6 +216,7 @@ const styles = StyleSheet.create({
   developerName: { fontSize: 14, lineHeight: 21, fontWeight: '800', textAlign: 'right' },
   developerRole: { fontSize: 12.5, lineHeight: 18, textAlign: 'right' },
   developerPhone: { fontSize: 13, lineHeight: 19, fontWeight: '700', letterSpacing: 0.3, textAlign: 'left' },
+  phoneDirection: { direction: 'ltr' },
   whatsappButton: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 9, minHeight: 52, borderRadius: 16, paddingHorizontal: 16, marginTop: 2 },
   whatsappButtonText: { fontSize: 14, lineHeight: 21, fontWeight: '800' },
   secondaryActions: { flexDirection: 'row-reverse', gap: 8 },
