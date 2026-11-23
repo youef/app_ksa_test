@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
   emergencyTitle: { fontSize: 15, fontWeight: '700', color: OASIS.colors.danger, textAlign: 'right' },
   emergencyDesc: { fontSize: 12.5, color: OASIS.colors.ink, textAlign: 'right', lineHeight: 20 },
   emergencyButton: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: OASIS.colors.danger, paddingHorizontal: 16, paddingVertical: 12, minHeight: 50, borderRadius: 15 },
-  emergencyButtonText: { color: OASIS.colors.surface, fontWeight: '700', fontSize: 13 },
+  emergencyButtonText: { color: OASIS.colors.background, fontWeight: '700', fontSize: 13 },
   disclaimerSurface: { backgroundColor: OASIS.colors.warningSoft, borderRadius: 12, padding: 12 },
   disclaimer: { fontSize: 12, color: OASIS.colors.ink, lineHeight: 20, textAlign: 'right' },
   policyRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, minHeight: 82, backgroundColor: OASIS.colors.surface, borderWidth: 1, borderColor: OASIS.colors.line, borderRadius: 18, padding: 15 },
