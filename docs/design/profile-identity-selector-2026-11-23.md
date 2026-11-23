@@ -51,4 +51,4 @@
 - الخيار المختار يملك إطار 2px؛ ترتيب الصف، التفافه، callback، والألوان محفوظة.
 - لا توجد حركة جديدة.
 - **Static preflight على المصدر المسترجع: 7/7 assertions passed.** لم أتمكن من تشغيل Node/npm محليًا بسبب فشل DNS/عدم توفر checkout. سيشغّل PR workflow الاختبار الفعلي، TypeScript، وWeb export.
-- مراجعة أجهزة فعلية وVoiceOver/TalkBack: غير متاحة عن remote.
+- مراجعة أجهزة فعلية وVoiceOver/TalkBack: غير متاحة عن بُعد.
