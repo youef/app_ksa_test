@@ -37,7 +37,7 @@ test('non-hero surfaces use theme-aware semantic OASIS colors', () => {
     'OASIS.colors.dangerSoft',
     'OASIS.colors.warningSoft',
   ]) assert.ok(screen.includes(token), token);
-  assert.doesNotMatch(screen, /const GREEN|#0F766E|#2563EB|#7C3AED|#FFF7F7/);
+  assert.doesNotMatch(screen, /GREEN|#94A3B8|#0F766E|#2563EB|#7C3AED|#FFF7F7/);
 });
 
 test('emergency warning is visible, region-aware and keeps existing call target', () => {
