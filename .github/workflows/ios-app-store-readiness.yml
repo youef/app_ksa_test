@@ -8,6 +8,7 @@ on:
       - eas.json
       - package.json
       - tests/iosAppStoreReadiness.test.cjs
+      - scripts/check-ios-app-icon.cjs
       - docs/ios-app-store-readiness-2026-11-24.md
       - .github/workflows/ios-app-store-readiness.yml
   push:
