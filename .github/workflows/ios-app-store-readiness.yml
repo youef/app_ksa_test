@@ -1,0 +1,34 @@
+name: iOS App Store readiness
+on:
+  pull_request:
+    paths:
+      - app/privacy.tsx
+      - app/terms.tsx
+      - app.json
+      - eas.json
+      - package.json
+      - tests/iosAppStoreReadiness.test.cjs
+      - docs/ios-app-store-readiness-2026-11-24.md
+      - .github/workflows/ios-app-store-readiness.yml
+  push:
+    branches:
+      - compliance/ios-app-store-readiness-20261124
+jobs:
+  ios-readiness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Focused iOS compliance checks
+        run: node --test tests/iosAppStoreReadiness.test.cjs
+      - name: TypeScript
+        run: npm run typecheck
+      - name: Expo Web export
+        run: npx expo export --platform web --output-dir dist/web-check
+      - name: Expo iOS JavaScript bundle export
+        run: npx expo export --platform ios --output-dir dist/ios-js-check
