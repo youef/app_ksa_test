@@ -26,6 +26,8 @@ test('Expo and React Native versions and iOS app identity are pinned as audited'
   assert.equal(eas.build.production.autoIncrement, true);
   assert.equal(eas.build.production.ios.image, 'macos-sequoia-15.6-xcode-26.0');
   assert.equal(eas.build.testflight.ios.image, 'macos-sequoia-15.6-xcode-26.0');
+  assert.equal(eas.build.production.node, '24.11.1');
+  assert.equal(eas.build.testflight.node, '24.11.1');
 });
 
 test('iOS purpose strings cover camera, microphone, photos and location', () => {
