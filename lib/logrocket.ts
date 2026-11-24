@@ -18,7 +18,8 @@ export function initLogRocket() {
 export function shutdownLogRocket() {
   if (!initialized) return;
   try {
-    void LogRocket.shutdown().catch(() => {});
+    // The React Native SDK exposes shutdown as a synchronous void method.
+    LogRocket.shutdown();
   } catch {
     // The app remains usable if telemetry shutdown is unavailable.
   }
