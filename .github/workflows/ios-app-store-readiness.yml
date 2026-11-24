@@ -4,11 +4,16 @@ on:
     paths:
       - app/privacy.tsx
       - app/terms.tsx
+      - app/_layout.tsx
       - app.json
       - eas.json
       - package.json
       - tests/iosAppStoreReadiness.test.cjs
       - scripts/check-ios-app-icon.cjs
+      - lib/logrocket.native.ts
+      - lib/logrocket.web.ts
+      - lib/logrocket.ts
+      - lib/telemetryConsent.ts
       - docs/ios-app-store-readiness-2026-11-24.md
       - .github/workflows/ios-app-store-readiness.yml
   push:
