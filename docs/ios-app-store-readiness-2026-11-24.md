@@ -38,7 +38,7 @@ Branch: `compliance/ios-app-store-readiness-20261124`
 ### App icon finding — still a release blocker
 - Configured source: `public/brand/HAYNA_APP_ICON.png`.
 - PNG IHDR: **929×929**, 8-bit RGBA (color type 6, therefore an alpha channel).
-- App Store icon export must be verified as **1024×1024 without an alpha channel**. The source asset is not itself at that specification. This branch does not replace the brand artwork without a confirmed 1024px non-transparent source or a verified image-processing output. Validate the generated AppIcon in an iOS archive before submission.
+- App Store icon export must be **1024×1024 without an alpha channel**. The source asset is not itself at that specification. This branch adds a CI step that runs Expo prebuild and inspects the generated AppIcon asset; if Expo does not flatten/resize it correctly, CI will fail and a confirmed 1024px non-transparent source asset must be supplied. Validate the generated AppIcon again in a signed iOS archive before submission.
 
 ## Apple requirements checked (2026-11-24)
 - Since 2026-04-28, App Store Connect uploads must be built with Xcode 26 or later and an iOS 26 SDK or later.
