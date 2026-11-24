@@ -46,7 +46,7 @@ test('iOS purpose strings cover camera, microphone, photos and location', () => 
 });
 
 test('privacy policy discloses the service providers and data categories found in source', () => {
-  for (const term of ['Supabase', 'Expo', 'Google Maps', 'MapLibre', 'LiveKit', 'LogRocket', 'الموقع', 'رمز الإشعارات', 'عنوان IP', 'حذف حسابك', 'support@hayna.app']) {
+  for (const term of ['Supabase', 'Expo', 'Google Maps', 'MapLibre', 'LiveKit', 'LogRocket', 'الموقع', 'رمز الإشعارات', 'عنوان IP', 'حذف حسابك', 'support@hayna.app', 'الولايات المتحدة']) {
     assert.ok(privacy.includes(term), `privacy policy must disclose ${term}`);
   }
   assert.ok(privacy.includes('لا نبيع بياناتك'));
