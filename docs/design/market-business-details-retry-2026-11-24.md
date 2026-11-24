@@ -30,8 +30,10 @@ Scope: `components/market/BusinessDetailsSheet.tsx` only, plus one focused Node 
 
 ## Tests
 - Added `tests/businessDetailsPartialRetry.test.cjs` with six source-level regression checks.
-- GitHub Marketplace integration workflow runs `node --test --test-concurrency=2 tests/*.test.cjs` on PRs touching components/tests.
-- TypeScript and Expo Web export are not wired to pull-request events in the inspected workflows; they are not run locally in this connector environment. Do not claim them as passed.
+- GitHub Marketplace integration workflow ran `node --test --test-concurrency=2 tests/*.test.cjs` on this PR and completed successfully (run #45333016890).
+- The PR-triggered `Inquiry discussion checks` workflow includes `npm run typecheck` and Expo Web, Android and iOS JS bundle exports (run #45333016859); these checks were still running at the time this note was prepared. Results are tracked in the PR, not assumed.
+- The connector environment did not provide a local checkout, so commands were executed by GitHub Actions rather than locally.
+- A Vercel preview build started automatically for the branch and was canceled before it became ready to honor the no-deploy instruction; no production deployment was started.
 - Manual device/screen-reader verification remains pending.
 
 ## Next rotation
