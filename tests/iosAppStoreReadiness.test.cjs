@@ -12,7 +12,7 @@ const terms = read('app/terms.tsx');
 const safety = read('app/safety-center.tsx');
 const account = read('components/account/AccountCenter.tsx');
 const deletion = read('supabase/functions/delete-account/index.ts');
-const nativeTelemetry = read('lib/logrocket.native.ts');
+const nativeTelemetry = read('lib/logrocket.native.ts');\nconst webTelemetry = read('lib/logrocket.web.ts');\nconst consent = read('lib/telemetryConsent.ts');\nconst layout = read('app/_layout.tsx');
 const icon = fs.readFileSync('public/brand/HAYNA_APP_ICON.png');
 const audit = read('docs/ios-app-store-readiness-2026-11-24.md');
 const iconCheck = read('scripts/check-ios-app-icon.cjs');
@@ -62,11 +62,11 @@ test('account deletion is reachable in the app and invokes the server deletion f
 });
 
 test('session replay and network sanitization are disclosed', () => {
-  assert.ok(nativeTelemetry.includes('LogRocket.init'));
+  assert.ok(nativeTelemetry.includes('LogRocket.init'));\n  assert.ok(nativeTelemetry.includes('LogRocket.shutdown'));\n  assert.ok(webTelemetry.includes('shouldSendData: () => consentEnabled'));\n  assert.ok(consent.includes("'granted'"));\n  assert.ok(consent.includes('shutdownLogRocket'));\n  assert.ok(layout.includes('getTelemetryConsent().then(granted => {'));
   assert.ok(nativeTelemetry.includes('textSanitizer'));
   assert.ok(nativeTelemetry.includes('headers: {}, body: null'));
   assert.ok(privacy.includes('بيانات الجلسة والتفاعل'));
-  assert.ok(privacy.includes('LogRocket'));
+  assert.ok(privacy.includes('LogRocket'));\n  assert.ok(privacy.includes('متوقف افتراضيًا'));\n  assert.ok(privacy.includes('موافقتك الصريحة'));\n  assert.ok(privacy.includes('setTelemetryConsent'));
 });
 
 test('the configured source icon is square and its App Store export issue remains documented', () => {
