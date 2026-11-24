@@ -175,7 +175,25 @@ export default function PrivacyPolicyScreen() {
           </Pressable>
         </OasisSurface>
 
-        <OasisSurface oasisSurface="card" style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.line }]}>\n          <View style={styles.consentRow}>\n            <View style={styles.consentCopy}>\n              <Text accessibilityRole="header" style={[styles.cardTitle, { color: colors.ink }]}>مشاركة بيانات التشخيص الاختيارية</Text>\n              <Text style={[styles.body, { color: colors.muted }]}>عند التفعيل، يسمح ذلك لـ LogRocket بجمع بيانات تفاعل الجلسات لأغراض التشخيص. هذا الخيار متوقف افتراضيًا ولا يؤثر رفضه في وظائف التطبيق الأساسية.</Text>\n              <Text style={[styles.consentStatus, { color: analyticsEnabled ? colors.primary : colors.muted }]}>{analyticsEnabled ? 'مفعّل بموافقتك' : 'متوقف — لا تُرسل بيانات جلسات'}</Text>\n            </View>\n            <Switch\n              value={analyticsEnabled}\n              onValueChange={updateAnalyticsConsent}\n              disabled={!consentLoaded}\n              accessibilityLabel="السماح بتسجيل جلسات التشخيص الاختياري من LogRocket"\n              accessibilityHint="يمكنك تغيير هذا الاختيار في أي وقت. رفضه لا يعطل ميزات التطبيق."\n              trackColor={{ false: colors.line, true: colors.primary }}\n            />\n          </View>\n        </OasisSurface>\n\n        <Text style={[styles.note, { color: colors.muted }]}>
+        <OasisSurface oasisSurface="card" style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.line }]}>
+          <View style={styles.consentRow}>
+            <View style={styles.consentCopy}>
+              <Text accessibilityRole="header" style={[styles.cardTitle, { color: colors.ink }]}>مشاركة بيانات التشخيص الاختيارية</Text>
+              <Text style={[styles.body, { color: colors.muted }]}>عند التفعيل، يسمح ذلك لـ LogRocket بجمع بيانات تفاعل الجلسات لأغراض التشخيص. هذا الخيار متوقف افتراضيًا ولا يؤثر رفضه في وظائف التطبيق الأساسية.</Text>
+              <Text style={[styles.consentStatus, { color: analyticsEnabled ? colors.primary : colors.muted }]}>{analyticsEnabled ? 'مفعّل بموافقتك' : 'متوقف — لا تُرسل بيانات جلسات'}</Text>
+            </View>
+            <Switch
+              value={analyticsEnabled}
+              onValueChange={updateAnalyticsConsent}
+              disabled={!consentLoaded}
+              accessibilityLabel="السماح بتسجيل جلسات التشخيص الاختياري من LogRocket"
+              accessibilityHint="يمكنك تغيير هذا الاختيار في أي وقت. رفضه لا يعطل ميزات التطبيق."
+              trackColor={{ false: colors.line, true: colors.primary }}
+            />
+          </View>
+        </OasisSurface>
+
+        <Text style={[styles.note, { color: colors.muted }]}>
           لا نبيع بياناتك. قد نحدّث هذه السياسة عند إضافة ميزات أو مزودي خدمة جدد، وسننشر النسخة المحدثة عبر هذا المسار.
         </Text>
 
@@ -205,7 +223,10 @@ const styles = StyleSheet.create({
   body: { flex: 1, fontSize: 12.5, lineHeight: 22, textAlign: 'right' },
   contactButton: { minHeight: 46, borderWidth: 1, borderRadius: 13, paddingHorizontal: 13, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8 },
   contactText: { fontSize: 12.5, fontWeight: '800' },
-  consentRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12 },\n  consentCopy: { flex: 1, alignItems: 'flex-end', gap: 7 },\n  consentStatus: { fontSize: 11.5, fontWeight: '800', textAlign: 'right' },\n  note: { fontSize: 11.5, lineHeight: 19, textAlign: 'center', paddingHorizontal: 8 },
+  consentRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12 },
+  consentCopy: { flex: 1, alignItems: 'flex-end', gap: 7 },
+  consentStatus: { fontSize: 11.5, fontWeight: '800', textAlign: 'right' },
+  note: { fontSize: 11.5, lineHeight: 19, textAlign: 'center', paddingHorizontal: 8 },
   backButton: { minHeight: 48, borderRadius: 14, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 7 },
   backButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
 });
