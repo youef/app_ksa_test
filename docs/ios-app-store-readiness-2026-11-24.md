@@ -32,7 +32,7 @@ Branch: `compliance/ios-app-store-readiness-20261124`
 - The deletion function removes the authenticated account and attempts to remove user media from the configured storage buckets. The app should be tested end-to-end with a real review account; provider logs/backups and any records retained for legal/safety reasons need a documented retention schedule.
 - Photo-library and camera access are requested by image-upload flows; location is requested by location-dependent features; camera/microphone purpose strings exist for live features; the image-picker plugin disables its own microphone permission.
 - Authentication uses the app's own email/password system plus guest access. No Google/Facebook/Apple OAuth provider was found in the current auth source.
-- LogRocket is initialized at app startup on native and web. The native config enables session diagnostics/replay, sanitizes text, and strips request/response headers and bodies. This is a third-party data processor and is now disclosed in the policy. Confirm LogRocket's retention, data residency, contract and App Store privacy-label answers with the account owner.
+- LogRocket was previously initialized at app startup on native and web without a user choice. This PR changes that: recording is disabled by default, starts only after explicit opt-in from the privacy page, and can be withdrawn there. Native shutdown and web shouldSendData gating stop future session data from being sent. The SDK sanitizes text and strips request/response headers and bodies. Confirm LogRocket's retention, data residency, contract and App Store privacy-label answers with the account owner.
 - Google Maps/MapLibre, LiveKit, Supabase, Expo/Apple push delivery and LogRocket are present in the app's configuration or runtime source.
 
 ### App icon finding — still a release blocker
@@ -45,7 +45,7 @@ Branch: `compliance/ios-app-store-readiness-20261124`
 - Since 2026-09-09, uploaded iOS apps must target iOS 13 or later.
 - Account-creating apps must provide in-app account deletion.
 - A third-party social login may trigger the Sign in with Apple equivalent-login rule, subject to Apple's exceptions. The current reviewed auth flow uses the app's own credentials.
-- A privacy policy URL must be provided in App Store Connect and the policy must explain collection, use, sharing and deletion. This PR adds the in-app/web route; the production URL must be tested after merge/deployment.
+- A privacy policy URL must be provided in App Store Connect and the policy must explain collection, use, sharing, retention, consent withdrawal and deletion. This PR adds the in-app/web route and opt-in control for optional LogRocket diagnostics; the production URL must be tested after merge/deployment.
 - User-generated-content features require moderation controls, reporting and blocking; source review shows report and block entry points, but human moderation operations and response SLAs still require owner verification.
 - Digital goods/features sold inside the app generally require In-App Purchase. No IAP SDK was found; confirm no digital purchase flow is being sold through external payment links.
 
