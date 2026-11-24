@@ -32,3 +32,7 @@ jobs:
         run: npx expo export --platform web --output-dir dist/web-check
       - name: Expo iOS JavaScript bundle export
         run: npx expo export --platform ios --output-dir dist/ios-js-check
+      - name: Generate native iOS project and AppIcon assets
+        run: npx expo prebuild --platform ios --no-install --clean
+      - name: Verify App Store icon dimensions and alpha channel
+        run: node scripts/check-ios-app-icon.cjs
