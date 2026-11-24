@@ -12,12 +12,15 @@ export async function getTelemetryConsent(): Promise<boolean> {
   }
 }
 
-/** Persist the choice and immediately apply it to the optional diagnostics SDK. */
+/** Persist the choice before enabling optional diagnostics; withdrawal stops capture even if storage fails. */
 export async function setTelemetryConsent(granted: boolean): Promise<void> {
+  let saved = false;
   try {
     await AsyncStorage.setItem(TELEMETRY_CONSENT_KEY, granted ? 'granted' : 'denied');
+    saved = true;
   } finally {
-    if (granted) initLogRocket();
+    if (granted && saved) initLogRocket();
     else shutdownLogRocket();
   }
+  if (!saved) throw new Error('Unable to save the privacy preference.');
 }
