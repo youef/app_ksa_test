@@ -111,8 +111,12 @@ export default function PrivacyPolicyScreen() {
   }, []);
 
   const updateAnalyticsConsent = async (value: boolean) => {
-    setAnalyticsEnabled(value);
-    await setTelemetryConsent(value);
+    try {
+      await setTelemetryConsent(value);
+      setAnalyticsEnabled(value);
+    } catch {
+      setAnalyticsEnabled(false);
+    }
   };
 
   const openSupport = async () => {
