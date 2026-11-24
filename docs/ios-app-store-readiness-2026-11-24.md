@@ -59,7 +59,7 @@ Branch: `compliance/ios-app-store-readiness-20261124`
 7. Complete App Store Connect metadata: support URL, privacy URL, age-rating answers, content rights, export-compliance answers, screenshots for supported iPhone/iPad sizes, and contact information.
 8. Build and launch a signed iOS archive with Xcode 26+ / iOS 26 SDK or later on an actual Apple toolchain; run iPhone/iPad smoke tests and VoiceOver/Dynamic Type checks.
 9. After production deployment, set App Store Connect Privacy Policy URL to the verified stable main deployment URL: https://appksatest-git-main-yousef8-15e4.vercel.app/privacy.
-9. Complete TestFlight validation and human PR review before any production release.
+10. Complete TestFlight validation and human PR review before any production release.
 
 ## Verification and blockers
 - Focused source/config regression test: added in this branch.
