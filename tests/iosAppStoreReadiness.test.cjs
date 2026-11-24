@@ -15,6 +15,7 @@ const deletion = read('supabase/functions/delete-account/index.ts');
 const nativeTelemetry = read('lib/logrocket.native.ts');
 const icon = fs.readFileSync('public/brand/HAYNA_APP_ICON.png');
 const audit = read('docs/ios-app-store-readiness-2026-11-24.md');
+const iconCheck = read('scripts/check-ios-app-icon.cjs');
 
 test('Expo and React Native versions and iOS app identity are pinned as audited', () => {
   assert.match(pkg.dependencies.expo, /^~54\./);
@@ -70,4 +71,6 @@ test('the configured source icon is square and its App Store export issue remain
   assert.ok(audit.includes('929×929'));
   assert.ok(audit.includes('1024×1024'));
   assert.ok(audit.includes('alpha channel'));
+  assert.ok(iconCheck.includes('1024'));
+  assert.ok(iconCheck.includes('colorType === 4 || item.info.colorType === 6'));
 });
