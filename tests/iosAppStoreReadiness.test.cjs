@@ -24,6 +24,8 @@ test('Expo and React Native versions and iOS app identity are pinned as audited'
   assert.equal(app.ios.supportsTablet, true);
   assert.equal(app.ios.icon, './public/brand/HAYNA_APP_ICON.png');
   assert.equal(eas.build.production.autoIncrement, true);
+  assert.equal(eas.build.production.ios.image, 'macos-sequoia-15.6-xcode-26.0');
+  assert.equal(eas.build.testflight.ios.image, 'macos-sequoia-15.6-xcode-26.0');
 });
 
 test('iOS purpose strings cover camera, microphone, photos and location', () => {
