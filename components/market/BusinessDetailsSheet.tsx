@@ -146,6 +146,16 @@ export function BusinessDetailsSheet({business, onClose}: {business: BusinessPre
       <Text numberOfLines={1} style={[styles.actionText,{color:c.ink}]}>{name}</Text>
     </Pressable>;
 
+  const retryAction = (label: string) => (
+    <Pressable oasisKind="plain" accessibilityRole="button" accessibilityLabel={label}
+      accessibilityState={{disabled:loading,busy:loading}} disabled={loading}
+      onPress={()=>setRetry(value=>value+1)}
+      style={[styles.sectionRetry,{borderColor:c.line,backgroundColor:c.surface}]}>
+      <RefreshCw size={14} color={c.primary}/>
+      <Text style={[styles.sectionRetryText,{color:c.primary}]}>إعادة المحاولة</Text>
+    </Pressable>
+  );
+
   return <Modal transparent visible animationType="slide" onRequestClose={onClose}>
     <View style={styles.overlay}>
       <View accessibilityViewIsModal style={[styles.sheet,{backgroundColor:c.surface,maxHeight:'94%',paddingBottom:Math.max(insets.bottom,12)}]}>
@@ -202,7 +212,11 @@ export function BusinessDetailsSheet({business, onClose}: {business: BusinessPre
           </View>
           {hoursExpanded&&<View style={[styles.section,{borderColor:c.line}]}>
             <Text style={[styles.sectionTitle,{color:c.ink}]}>ساعات العمل الأسبوعية</Text>
-            {loading?<ActivityIndicator color={c.primary}/>:hoursError?<Text style={[styles.subText,{color:c.danger}]}>تعذر جلب الساعات. يمكنك إعادة المحاولة.</Text>:!periods.length?
+            {loading?<ActivityIndicator color={c.primary}/>:hoursError?
+              <View style={styles.errorRecoveryRow}>
+                <Text style={[styles.subText,{color:c.danger,flex:1}]}>تعذر جلب الساعات. أعد المحاولة لتحديث بيانات أوقات العمل.</Text>
+                {retryAction('إعادة تحميل أوقات العمل')}
+              </View>:!periods.length?
               <Text style={[styles.subText,{color:c.muted}]}>لم تُنشر مواعيد عمل رسمية لهذه المنشأة بعد.</Text>:
               DAYS.map((day,index)=><View key={day} style={[styles.hourRow,{borderTopColor:c.line}]}>
                 <Text style={[styles.hourTime,{color:c.muted}]}>{scheduleForDay(periods,index)}</Text>
@@ -246,7 +260,10 @@ export function BusinessDetailsSheet({business, onClose}: {business: BusinessPre
           <View style={[styles.section,{borderColor:c.line}]}>
             <View style={styles.sectionHeader}><Package size={18} color={c.primary}/><Text style={[styles.sectionTitle,{color:c.ink}]}>العروض والخدمات</Text></View>
             {loading?<ActivityIndicator color={c.primary}/>:offersError?
-              <Text style={[styles.subText,{color:c.muted}]}>تعذر تحميل بعض العروض والخدمات.</Text>:
+              <View style={styles.errorRecoveryRow}>
+                <Text style={[styles.subText,{color:c.danger,flex:1}]}>تعذر تحميل بعض العروض والخدمات. أعد المحاولة لتحديثها.</Text>
+                {retryAction('إعادة تحميل العروض والخدمات')}
+              </View>:
               !services.length&&!products.length?<Text style={[styles.description,{color:c.muted}]}>لا توجد عروض منشورة مرتبطة بالمنشأة حاليًا.</Text>:null}
             {services.map(service=><Pressable key={'s'+service.id} oasisKind="plain" accessibilityRole="button" accessibilityLabel={'تفاصيل خدمة '+service.name} onPress={()=>openService(service.id)}
               style={[styles.offerRow,{borderColor:c.line,backgroundColor:c.background}]}>
@@ -274,7 +291,7 @@ export function BusinessDetailsSheet({business, onClose}: {business: BusinessPre
           </View>
           {detailsError&&<View style={[styles.warning,{backgroundColor:c.dangerSoft}]}>
             <Text style={[styles.subText,{color:c.danger,flex:1}]}>بعض البيانات التفصيلية لم تتوفر. قد تكون المنشأة غير متاحة أو حدث خطأ اتصال.</Text>
-            <Pressable oasisKind="plain" accessibilityRole="button" onPress={()=>setRetry(v=>v+1)} style={styles.retry}><RefreshCw size={18} color={c.primary}/></Pressable>
+            {retryAction('إعادة تحميل بيانات المنشأة')}
           </View>}
         </ScrollView>
         <View style={[styles.footer,{borderTopColor:c.line,backgroundColor:c.surface}]}>
@@ -335,7 +352,9 @@ const styles=StyleSheet.create({
   offerTitle:{flex:1,minWidth:0,fontSize:12.5,fontWeight:'700',textAlign:'right'},
   offerKind:{fontSize:11},
   warning:{padding:10,borderRadius:12,flexDirection:'row-reverse',alignItems:'center',gap:7},
-  retry:{width:44,minHeight:44,alignItems:'center',justifyContent:'center'},
+  errorRecoveryRow:{flexDirection:'row-reverse',alignItems:'center',flexWrap:'wrap',gap:10},
+  sectionRetry:{minHeight:44,borderWidth:1,borderRadius:12,paddingHorizontal:12,flexDirection:'row-reverse',alignItems:'center',justifyContent:'center',gap:7},
+  sectionRetryText:{fontSize:11.5,fontWeight:'800'},
   footer:{borderTopWidth:1,paddingHorizontal:14,paddingVertical:10},
   primaryButton:{minHeight:52,borderRadius:15,flexDirection:'row-reverse',alignItems:'center',justifyContent:'center',gap:9,paddingHorizontal:12},
   primaryText:{color:'#FFFFFF',fontSize:14,fontWeight:'800',textAlign:'center'},
