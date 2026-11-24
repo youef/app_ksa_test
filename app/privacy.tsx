@@ -1,5 +1,7 @@
 import React from 'react';
-import { Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { getTelemetryConsent, setTelemetryConsent } from '@/lib/telemetryConsent';
 import { router } from 'expo-router';
 import { Activity, Camera, ChevronLeft, Database, LockKeyhole, Mail, ShieldCheck, UserRoundX } from 'lucide-react-native';
 import { OasisPressable as Pressable, OasisSurface } from '@/components/oasis/OasisPrimitives';
@@ -18,7 +20,7 @@ const SECTIONS: PolicySection[] = [
       'المحتوى الذي تنشئه: الإعلانات والمنتجات والخدمات والأسئلة والطلبات والردود والتعليقات والقصص والصور والملفات والرسائل ومحتوى التفاعل والبث المباشر بحسب الميزات التي تستخدمها.',
       'بيانات الموقع: قد نطلب موقع الجهاز عند استخدام الخريطة أو الطقس أو ميزات تحديد الحي. وقد نستخدم موقعًا تقريبيًا في العرض العام بدلًا من إظهار الإحداثيات الدقيقة.',
       'بيانات الجهاز والتشغيل: رمز الإشعارات، منصة الجهاز، معلومات تقنية لازمة لتشغيل التطبيق، وقد تشمل معلومات الشبكة مثل عنوان IP، وسجلات الأخطاء وبيانات تشخيص الأداء.',
-      'بيانات الجلسة والتفاعل: يستخدم التطبيق LogRocket للمساعدة في تشخيص الأعطال وفهم مشكلات الاستخدام. تتضمن إعدادات العميل تصفية للنصوص، كما تُزال رؤوس وأجسام طلبات الشبكة واستجاباتها قبل إرسالها إلى خدمة التشخيص.',
+      'بيانات الجلسة والتفاعل: لا يبدأ LogRocket تسجيل الجلسات إلا إذا فعّلت خيار التشخيص الاختياري أدناه. عند تفعيله، تُستخدم بيانات التفاعل لتشخيص الأعطال وفهم مشكلات الاستخدام. تتضمن إعدادات العميل تصفية للنصوص، كما تُزال رؤوس وأجسام طلبات الشبكة واستجاباتها قبل إرسالها إلى خدمة التشخيص.',
     ],
   },
   {
@@ -70,7 +72,7 @@ const SECTIONS: PolicySection[] = [
     Icon: Activity,
     paragraphs: [
       'لا يظهر في تكوين التطبيق الحالي تكامل مخصص لشبكات الإعلانات أو لربط نشاطك عبر تطبيقات شركات أخرى لأغراض الإعلانات.',
-      'يستخدم التطبيق LogRocket لأغراض التشخيص وتحسين تجربة الاستخدام، وليس لبيع بياناتك أو عرض إعلانات موجهة.',
+      'تسجيل جلسات LogRocket اختياري ومتوقف افتراضيًا. لا يبدأ إلا بعد موافقتك الصريحة، ويمكنك سحب الموافقة في أي وقت من مفتاح التحكم أدناه. لا نبيع بياناتك ولا نستخدمها لعرض إعلانات موجهة.',
     ],
   },
   {
@@ -94,6 +96,24 @@ const SECTIONS: PolicySection[] = [
 export default function PrivacyPolicyScreen() {
   const bottomInset = useBottomNavInset();
   const { colors } = useTheme();
+  const [analyticsEnabled, setAnalyticsEnabled] = useState(false);
+  const [consentLoaded, setConsentLoaded] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    getTelemetryConsent().then(value => {
+      if (mounted) {
+        setAnalyticsEnabled(value);
+        setConsentLoaded(true);
+      }
+    });
+    return () => { mounted = false; };
+  }, []);
+
+  const updateAnalyticsConsent = async (value: boolean) => {
+    setAnalyticsEnabled(value);
+    await setTelemetryConsent(value);
+  };
 
   const openSupport = async () => {
     try {
@@ -151,7 +171,7 @@ export default function PrivacyPolicyScreen() {
           </Pressable>
         </OasisSurface>
 
-        <Text style={[styles.note, { color: colors.muted }]}>
+        <OasisSurface oasisSurface="card" style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.line }]}>\n          <View style={styles.consentRow}>\n            <View style={styles.consentCopy}>\n              <Text accessibilityRole="header" style={[styles.cardTitle, { color: colors.ink }]}>مشاركة بيانات التشخيص الاختيارية</Text>\n              <Text style={[styles.body, { color: colors.muted }]}>عند التفعيل، يسمح ذلك لـ LogRocket بجمع بيانات تفاعل الجلسات لأغراض التشخيص. هذا الخيار متوقف افتراضيًا ولا يؤثر رفضه في وظائف التطبيق الأساسية.</Text>\n              <Text style={[styles.consentStatus, { color: analyticsEnabled ? colors.primary : colors.muted }]}>{analyticsEnabled ? 'مفعّل بموافقتك' : 'متوقف — لا تُرسل بيانات جلسات'}</Text>\n            </View>\n            <Switch\n              value={analyticsEnabled}\n              onValueChange={updateAnalyticsConsent}\n              disabled={!consentLoaded}\n              accessibilityLabel="السماح بتسجيل جلسات التشخيص الاختياري من LogRocket"\n              accessibilityHint="يمكنك تغيير هذا الاختيار في أي وقت. رفضه لا يعطل ميزات التطبيق."\n              trackColor={{ false: colors.line, true: colors.primary }}\n            />\n          </View>\n        </OasisSurface>\n\n        <Text style={[styles.note, { color: colors.muted }]}>
           لا نبيع بياناتك. قد نحدّث هذه السياسة عند إضافة ميزات أو مزودي خدمة جدد، وسننشر النسخة المحدثة عبر هذا المسار.
         </Text>
 
@@ -181,7 +201,7 @@ const styles = StyleSheet.create({
   body: { flex: 1, fontSize: 12.5, lineHeight: 22, textAlign: 'right' },
   contactButton: { minHeight: 46, borderWidth: 1, borderRadius: 13, paddingHorizontal: 13, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8 },
   contactText: { fontSize: 12.5, fontWeight: '800' },
-  note: { fontSize: 11.5, lineHeight: 19, textAlign: 'center', paddingHorizontal: 8 },
+  consentRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12 },\n  consentCopy: { flex: 1, alignItems: 'flex-end', gap: 7 },\n  consentStatus: { fontSize: 11.5, fontWeight: '800', textAlign: 'right' },\n  note: { fontSize: 11.5, lineHeight: 19, textAlign: 'center', paddingHorizontal: 8 },
   backButton: { minHeight: 48, borderRadius: 14, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 7 },
   backButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
 });
