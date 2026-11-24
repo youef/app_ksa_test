@@ -73,3 +73,10 @@ Branch: `compliance/ios-app-store-readiness-20261124`
 
 ## Next step
 Resolve the icon asset and legal/provider retention confirmations, then run an authenticated EAS iOS build and TestFlight device review. Do not mark this app App Store-ready until every release gate above is verified.
+
+
+## Official references
+- Apple upload SDK and minimum iOS requirements: https://developer.apple.com/news/upcoming-requirements/
+- Apple App Review Guidelines (privacy, account deletion, login, payments and UGC): https://developer.apple.com/app-store/review/guidelines/
+- Expo SDK 54 support matrix: https://docs.expo.dev/versions/v54.0.0/
+- EAS build images and SDK aliases: https://docs.expo.dev/build-reference/infrastructure/
