@@ -69,5 +69,5 @@ test('the configured source icon is square and its App Store export issue remain
   assert.equal(icon.readUInt32BE(16), icon.readUInt32BE(20), 'source icon must be square');
   assert.ok(audit.includes('929×929'));
   assert.ok(audit.includes('1024×1024'));
-  assert.ok(audit.includes('Alpha'));
+  assert.ok(audit.includes('alpha channel'));
 });
