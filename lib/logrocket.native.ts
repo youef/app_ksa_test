@@ -42,6 +42,7 @@ export function initLogRocket() {
 export function shutdownLogRocket() {
   consentEnabled = false;
   if (initialized) {
-    void LogRocket.shutdown().catch(() => {});
+    // The React Native SDK exposes shutdown as a synchronous void method.
+    LogRocket.shutdown();
   }
 }
