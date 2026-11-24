@@ -83,7 +83,7 @@ export default function SafetyCenterScreen() {
           <Text style={styles.disclaimer}>لا تستخدم البلاغ داخل التطبيق بدلًا من الاتصال بالطوارئ عند وجود خطر فوري. قد يختلف رقم الطوارئ حسب المنطقة والخدمة.</Text>
         </OasisSurface>
 
-        <Pressable onPress={() => open('https://appksatest.vercel.app/privacy')} style={styles.policyRow}>
+        <Pressable accessibilityRole="link" onPress={() => router.push('/privacy')} style={styles.policyRow}>
           <View style={styles.policyIcon}><LockKeyhole size={18} color={OASIS.colors.muted}/></View>
           <View style={{flex:1,gap:3}}><Text style={styles.policyTitle}>سياسة الخصوصية وشروط الاستخدام</Text><Text style={styles.policyDesc}>اعرف كيف نساعد في حماية بياناتك وحقوقك.</Text></View>
           <ChevronLeft size={17} color="#94A3B8"/>
