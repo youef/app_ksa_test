@@ -43,6 +43,8 @@ test('iOS purpose strings cover camera, microphone, photos and location', () => 
   assert.match(picker[1].cameraPermission, /الكاميرا/);
   assert.equal(picker[1].microphonePermission, false);
   assert.match(location[1].locationWhenInUsePermission, /موقعك/);
+  const buildProperties = app.plugins.find(plugin => Array.isArray(plugin) && plugin[0] === 'expo-build-properties');
+  assert.equal(buildProperties[1].ios.deploymentTarget, '15.1');
 });
 
 test('privacy policy discloses the service providers and data categories found in source', () => {
