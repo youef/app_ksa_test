@@ -54,7 +54,7 @@ test('privacy policy discloses the service providers and data categories found i
 
 test('privacy policy is discoverable from the in-app terms and safety center', () => {
   assert.ok(terms.includes("router.push('/privacy')"));
-  assert.ok(safety.includes('appksatest.vercel.app/privacy'));
+  assert.ok(safety.includes("router.push('/privacy')"));
 });
 
 test('account deletion is reachable in the app and invokes the server deletion function', () => {
