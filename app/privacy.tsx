@@ -55,7 +55,7 @@ const SECTIONS: PolicySection[] = [
       'LiveKit: لتشغيل ميزات الصوت والفيديو والبث المباشر.',
       'Vercel: لاستضافة صفحات الموقع العامة التي تعرض محتوى وسياسات المنصة.',
       'LogRocket: لتشخيص الأعطال وتحليل تفاعل الجلسات وتحسين الأداء.',
-      'نعالج البيانات مع هذه الجهات بالقدر اللازم لتقديم الميزات. وقد تتم المعالجة على خوادم خارج بلد إقامتك وفق بنية مزود الخدمة وشروطه. لا نبيع بياناتك.',
+      'نعالج البيانات مع هذه الجهات بالقدر اللازم لتقديم الميزات. وتستضيف LogRocket بيانات عملاء SaaS في الولايات المتحدة وفق وثائقها، وقد تتم معالجة بيانات أخرى خارج بلد إقامتك وفق بنية مزود الخدمة وشروطه. لا نبيع بياناتك.',
     ],
   },
   {
@@ -180,7 +180,7 @@ export default function PrivacyPolicyScreen() {
             <View style={styles.consentCopy}>
               <Text accessibilityRole="header" style={[styles.cardTitle, { color: colors.ink }]}>مشاركة بيانات التشخيص الاختيارية</Text>
               <Text style={[styles.body, { color: colors.muted }]}>عند التفعيل، يسمح ذلك لـ LogRocket بجمع بيانات تفاعل الجلسات لأغراض التشخيص. هذا الخيار متوقف افتراضيًا ولا يؤثر رفضه في وظائف التطبيق الأساسية.</Text>
-              <Text style={[styles.consentStatus, { color: analyticsEnabled ? colors.primary : colors.muted }]}>{analyticsEnabled ? 'مفعّل بموافقتك' : 'متوقف — لا تُرسل بيانات جلسات'}</Text>
+              <Text style={[styles.consentStatus, { color: analyticsEnabled ? colors.primary : colors.muted }]}>{analyticsEnabled ? 'مفعّل بموافقتك' : 'متوقف — لا تبدأ جلسات جديدة؛ قد تُعالج البيانات التي جُمعت قبل الإيقاف وفق مدد الاحتفاظ'}</Text>
             </View>
             <Switch
               value={analyticsEnabled}
