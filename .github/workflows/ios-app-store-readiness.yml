@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - app/privacy.tsx
+      - app/safety-center.tsx
       - app/terms.tsx
       - app/_layout.tsx
       - app.json
