@@ -68,9 +68,9 @@ const CLAUSES: Clause[] = [
     title: '7. الخصوصية وحماية البيانات',
     body: [
       'نجمع بيانات ضرورية (الحساب، الموقع، نشاط) لتشغيل المنصة. انظر سياسة الخصوصية.',
-      'لا نبيع بياناتك. نشاركها فقط مع مقدمي خدمات (Supabase، Push) لتشغيل المنصة.',
-      'أنت تتحكم في ظهورك (حساب خاص، إخفاء الاسم، إعدادات DM).',
-      'ممنوع مشاركة بيانات الآخرين (Doxxing).',
+      'لا نبيع بياناتك. نستعين بمقدمي خدمات لتشغيل الميزات، منهم Supabase للحسابات وقاعدة البيانات والملفات، وExpo وخدمات Apple للإشعارات، وGoogle Maps وMapLibre للخرائط، وLiveKit للصوت والفيديو، وLogRocket لتشخيص الأعطال وتحليل تفاعل الجلسات عند موافقتك الاختيارية فقط، وVercel لاستضافة صفحات الموقع العامة.',
+      'نستخدم الموقع والصور والكاميرا والميكروفون عند تشغيل الميزات التي تحتاج إليها وبعد طلب الإذن المناسب من جهازك. يمكنك رفض الإذن، وقد تتوقف الميزة المرتبطة به.',
+      'أنت تتحكم في ظهورك (حساب خاص، إخفاء الاسم، إعدادات DM). راجع سياسة الخصوصية لمعرفة أنواع البيانات وأسباب استخدامها ومزودي الخدمة وطرق حذف الحساب.',
     ],
   },
   {
@@ -175,6 +175,12 @@ export default function TermsScreen() {
           </Text>
         </OasisSurface>
 
+        <Pressable oasisKind="plain" accessibilityRole="link" accessibilityLabel="قراءة سياسة الخصوصية" style={styles.privacyLink} onPress={() => router.push('/privacy')}>
+          <Lock size={16} color={OASIS.colors.primary} />
+          <Text style={styles.privacyLinkText}>قراءة سياسة الخصوصية كاملة</Text>
+          <ChevronLeft size={16} color={OASIS.colors.primary} />
+        </Pressable>
+
         <Pressable oasisKind="action" oasisVariant="primary" style={styles.backBtn} onPress={() => router.back()}>
           <ChevronLeft size={16} color={OASIS.colors.surface} />
           <Text style={styles.backBtnText}>رجوع</Text>
@@ -198,6 +204,8 @@ const styles = StyleSheet.create({
   bulletRow: { flexDirection: 'row-reverse', alignItems: 'flex-start', gap: 6 },
   bullet: { color: OASIS.colors.primary, fontSize: 14, fontWeight: '800', lineHeight: 20 },
   body: { color: '#1C1C1E', fontSize: 12.5, lineHeight: 20, textAlign: 'right', flex: 1 },
+  privacyLink: { minHeight: 46, borderRadius: 12, borderWidth: 1, borderColor: '#DDEAE4', backgroundColor: '#FFFFFF', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 12 },
+  privacyLinkText: { color: OASIS.colors.primary, fontSize: 12.5, fontWeight: '800' },
   backBtn: { minHeight: 44, borderRadius: 12, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: OASIS.colors.primary },
   backBtnText: { color: '#FFFFFF', fontSize: 12.5, fontWeight: '800' },
 });

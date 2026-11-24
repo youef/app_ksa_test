@@ -11,13 +11,15 @@
         "buildType": "apk"
       },
       "ios": {
-        "simulator": true
+        "simulator": true,
+        "image": "macos-sequoia-15.6-xcode-26.0"
       },
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://vkeuyompnddqfvulalkk.supabase.co",
         "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_MASvVnmIu2nN28cY0hqa-A_7kWRo0u_",
         "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyD3dbOJXEPgG1qyNi4Z_sLO46kj6c5bnY8"
-      }
+      },
+      "node": "24.11.1"
     },
     "preview": {
       "distribution": "internal",
@@ -26,26 +28,30 @@
         "image": "latest"
       },
       "ios": {
-        "simulator": false
+        "simulator": false,
+        "image": "macos-sequoia-15.6-xcode-26.0"
       },
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://vkeuyompnddqfvulalkk.supabase.co",
         "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_MASvVnmIu2nN28cY0hqa-A_7kWRo0u_",
         "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyD3dbOJXEPgG1qyNi4Z_sLO46kj6c5bnY8"
       },
-      "channel": "preview"
+      "channel": "preview",
+      "node": "24.11.1"
     },
     "testflight": {
       "distribution": "store",
       "ios": {
-        "simulator": false
+        "simulator": false,
+        "image": "macos-sequoia-15.6-xcode-26.0"
       },
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://vkeuyompnddqfvulalkk.supabase.co",
         "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_MASvVnmIu2nN28cY0hqa-A_7kWRo0u_",
         "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyD3dbOJXEPgG1qyNi4Z_sLO46kj6c5bnY8"
       },
-      "channel": "production"
+      "channel": "production",
+      "node": "24.11.1"
     },
     "production": {
       "autoIncrement": true,
@@ -57,7 +63,11 @@
         "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_MASvVnmIu2nN28cY0hqa-A_7kWRo0u_",
         "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyD3dbOJXEPgG1qyNi4Z_sLO46kj6c5bnY8"
       },
-      "channel": "production"
+      "channel": "production",
+      "ios": {
+        "image": "macos-sequoia-15.6-xcode-26.0"
+      },
+      "node": "24.11.1"
     }
   },
   "submit": {

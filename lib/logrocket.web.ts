@@ -1,6 +1,8 @@
 import LogRocket from 'logrocket';
 
 const LOGROCKET_APP_ID = '6aeahy/hyana';
+let initialized = false;
+let consentEnabled = false;
 
 function originOnly(url: string): string | null {
   try {
@@ -10,8 +12,15 @@ function originOnly(url: string): string | null {
   }
 }
 
+/** Starts session replay only after the user explicitly opts in. */
 export function initLogRocket() {
+  consentEnabled = true;
+  if (initialized) {
+    LogRocket.startNewSession();
+    return;
+  }
   LogRocket.init(LOGROCKET_APP_ID, {
+    shouldSendData: () => consentEnabled,
     dom: {
       textSanitizer: true,
       inputSanitizer: true,
@@ -30,4 +39,11 @@ export function initLogRocket() {
       shouldAggregateConsoleErrors: true,
     },
   });
+  initialized = true;
+}
+
+/** Prevents further session data from being sent after consent is withdrawn. */
+export function shutdownLogRocket() {
+  consentEnabled = false;
+  if (initialized) LogRocket.startNewSession();
 }

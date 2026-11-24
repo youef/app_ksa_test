@@ -13,6 +13,7 @@ import { refreshGrantedPushToken, syncDndWithNotifications } from '@/lib/notific
 import { supabase } from '@/lib/supabase';
 import { C } from '@/lib/ui';
 import { initLogRocket } from '@/lib/logrocket';
+import { getTelemetryConsent } from '@/lib/telemetryConsent';
 import BottomNav from '@/components/BottomNav';
 import ConnectivityScreen from '@/components/shared/ConnectivityScreen';
 import AppBackground from '@/components/shared/AppBackground';
@@ -66,7 +67,9 @@ function RootContent() {
   const protectCurrentRoute = needsAccount(pathname) && (!sessionReady || !hasSession);
 
   useEffect(() => {
-    initLogRocket();
+    void getTelemetryConsent().then(granted => {
+      if (granted) initLogRocket();
+    }).catch(() => {});
     void syncDndWithNotifications().catch(() => {});
 
     const loadSession = async () => {
