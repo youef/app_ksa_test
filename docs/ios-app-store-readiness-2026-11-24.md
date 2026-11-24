@@ -23,7 +23,7 @@ Branch: `compliance/ios-app-store-readiness-20261124`
 
 ## Findings before changes
 ### Fixed in this PR
-- The app had no `app/privacy.tsx` route, while the Safety Center linked to `https://appksatest.vercel.app/privacy`.
+- The app had no `app/privacy.tsx` route, while the Safety Center linked to a hard-coded domain that was not confirmed as a current Vercel project alias.
 - Terms clause 7 listed Supabase and Push only, omitting other processors visible in app configuration/source.
 - A public policy route and accurate in-app disclosure are required for App Store submission.
 
@@ -69,7 +69,7 @@ Branch: `compliance/ios-app-store-readiness-20261124`
 
 ## Before / after
 - Before: a Safety Center link pointed to a missing in-repository privacy route; terms disclosed only Supabase/Push despite other runtime processors.
-- After: a public Expo Router `/privacy` page explains current data categories, permissions, processors, diagnostics, account deletion and support contact; terms now name the service providers and link directly to the policy.
+- After: a public Expo Router `/privacy` page explains current data categories, permissions, processors, diagnostics, account deletion and support contact; the Safety Center and terms now navigate to the in-app route. After production deployment, use the stable Vercel main-branch alias for the App Store Connect privacy URL.
 
 ## Next step
 Resolve the icon asset and legal/provider retention confirmations, then run an authenticated EAS iOS build and TestFlight device review. Do not mark this app App Store-ready until every release gate above is verified.
