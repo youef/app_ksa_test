@@ -116,7 +116,7 @@ export function ProfileIdentityCard({
             <Text style={styles.ownerSub}>اختر الصفة التي تمثلك. الصفات المهنية تُعتمد بعد مراجعة الإدارة.</Text>
           </View>
 
-          <View style={styles.typeGrid}>
+          <View style={styles.typeGrid} accessibilityRole="radiogroup" accessibilityLabel="نوع الحساب" accessibilityHint="اختر الصفة التي تمثلك">
             {ACCOUNT_TYPES.map((type) => {
               const item = getAccountIdentityMeta('user', type, false);
               const TypeIcon = item.Icon;
@@ -126,11 +126,14 @@ export function ProfileIdentityCard({
                 <Pressable
                   key={type}
                   onPress={() => onSelectType?.(type)}
-                  accessibilityRole="button"
+                  accessibilityRole="radio"
                   accessibilityLabel={`اختيار ${item.label}`}
+                  accessibilityState={{ selected: active }}
+                  accessibilityHint={active ? 'الصفة المختارة حاليًا' : 'اضغط لاختيار هذه الصفة'}
+                  hitSlop={4}
                   style={[
                     styles.typeOption,
-                    active && { backgroundColor: item.softColor, borderColor: item.color + '55' },
+                    active && { backgroundColor: item.softColor, borderColor: item.color + '55', borderWidth: 2 },
                   ]}
                 >
                   <View style={[styles.typeOptionIcon, { backgroundColor: item.backgroundColor }]}>
@@ -274,22 +277,22 @@ const styles = StyleSheet.create({
     minWidth: 92,
     flexGrow: 1,
     flexBasis: '30%',
-    minHeight: 42,
+    minHeight: 48,
     borderRadius: 13,
     borderWidth: 1,
     borderColor: OASIS.colors.line,
     backgroundColor: OASIS.colors.background,
     paddingHorizontal: 8,
-    paddingVertical: 7,
+    paddingVertical: 9,
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 6,
     position: 'relative',
   },
   typeOptionIcon: {
-    width: 27,
-    height: 27,
-    borderRadius: 9,
+    width: 32,
+    height: 32,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
