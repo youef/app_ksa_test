@@ -582,7 +582,7 @@ export default function Conversation() {
     setSending(true);
     const trimmed = body.trim();
     const messageBody = temporarySeconds > 0
-      ? JSON.stringify({ type: 'temporary_text', text: trimmed, expires_at: Date.now() + temporarySeconds * 1000 })
+      ? JSON.stringify({ type: 'temporary_secure', duration_seconds: temporarySeconds })
       : trimmed;
     const optimisticKey = `${currentUserId}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const optimisticMessage: MessageItem = {
@@ -600,19 +600,25 @@ export default function Conversation() {
     void broadcastTyping(false);
     if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
 
-    const { error } = await supabase.from('messages').insert({
-      conversation_id: convId,
-      sender_id: currentUserId,
-      body: messageBody,
-      read_by: [currentUserId],
-    });
+    const { error } = temporarySeconds > 0
+      ? await supabase.rpc('hayna_send_temporary_message', {
+          p_conversation: convId, p_text: trimmed, p_duration: temporarySeconds,
+        })
+      : await supabase.from('messages').insert({
+          conversation_id: convId,
+          sender_id: currentUserId,
+          body: messageBody,
+          read_by: [currentUserId],
+        });
 
     setSending(false);
 
     if (error) {
       setMessages(prev => prev.filter(m => m._optimisticKey !== optimisticKey));
       setBody(trimmed);
-      Alert.alert('تعذّر الإرسال', error.message);
+      Alert.alert('تعذّر الإرسال', error.code === '42501' || error.code === 'PGRST301'
+        ? 'لا يمكن الإرسال إلى هذه المحادثة. تأكد من عضويتك وأن الطرف الآخر يسمح بالرسائل ولم يحدث حظر. افتح محادثة جديدة من ملف المستخدم إذا استمرت المشكلة.'
+        : error.message);
       return;
     }
 
