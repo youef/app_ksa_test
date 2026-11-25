@@ -49,10 +49,51 @@ export function ProfileConnections({ userId, kind, onClose }: { userId: string; 
             {person.avatar_url && !person.hide_name ? <Image source={{ uri: person.avatar_url }} style={s.avatar} /> : <View style={[s.avatar, { backgroundColor: colors.soft, alignItems: 'center', justifyContent: 'center' }]}><Users size={20} color={colors.primary} /></View>}
             <View style={{ flex: 1, gap: 4 }}><Text style={{ color: colors.ink, fontWeight: '700', textAlign: 'right' }}>{person.hide_name ? 'جار مجهول' : person.display_name || person.username}</Text>{!person.hide_name && <Text style={{ color: colors.muted, textAlign: 'right' }}>@{person.username}</Text>}</View>
           </Pressable>)}
-          {loading ? <ActivityIndicator color={colors.primary} style={{ margin: 24 }} /> : error ? <Pressable onPress={() => setRetry(value => value + 1)} style={s.empty}><Text style={{ color: colors.primary }}>تعذر التحميل. اضغط لإعادة المحاولة</Text></Pressable> : !people.length ? <View style={s.empty}><Users size={32} color={colors.muted} /><Text style={{ color: colors.muted }}>لا توجد حسابات لعرضها حتى الآن</Text></View> : hasMore ? <Pressable style={s.empty} onPress={() => setPage(value => value + 1)}><Text style={{ color: colors.primary }}>عرض المزيد</Text></Pressable> : null}
+          {loading && !people.length ? (
+            <View
+              testID="profile-connections-skeleton"
+              accessible
+              accessibilityRole="progressbar"
+              accessibilityLabel={kind === 'followers' ? 'جارٍ تحميل المتابعين' : 'جارٍ تحميل الحسابات التي يتابعها'}
+              accessibilityState={{ busy: true }}
+              style={s.skeletonList}
+            >
+              {Array.from({ length: 4 }, (_, index) => (
+                <View
+                  key={`skeleton-${index}`}
+                  accessible={false}
+                  accessibilityElementsHidden
+                  importantForAccessibility="no-hide-descendants"
+                  style={[s.person, s.skeletonPerson, { borderColor: colors.line }]}
+                >
+                  <View style={[s.avatar, s.skeletonAvatar, { backgroundColor: colors.soft }]} />
+                  <View style={s.skeletonCopy}>
+                    <View style={[s.skeletonLine, s.skeletonName, { backgroundColor: colors.line }]} />
+                    <View style={[s.skeletonLine, s.skeletonSubtitle, { backgroundColor: colors.line }]} />
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : loading ? <ActivityIndicator color={colors.primary} style={{ margin: 24 }} /> : error ? <Pressable onPress={() => setRetry(value => value + 1)} style={s.empty}><Text style={{ color: colors.primary }}>تعذر التحميل. اضغط لإعادة المحاولة</Text></Pressable> : !people.length ? <View style={s.empty}><Users size={32} color={colors.muted} /><Text style={{ color: colors.muted }}>لا توجد حسابات لعرضها حتى الآن</Text></View> : hasMore ? <Pressable style={s.empty} onPress={() => setPage(value => value + 1)}><Text style={{ color: colors.primary }}>عرض المزيد</Text></Pressable> : null}
         </ScrollView>
       </View>
     </View>
   </Modal>;
 }
-const s = StyleSheet.create({ overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,.45)', alignItems: 'center', justifyContent: 'center', padding: 20 }, dialog: { width: '100%', maxWidth: 520, maxHeight: '80%', borderRadius: 24, overflow: 'hidden' }, header: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1 }, title: { fontSize: 20, fontWeight: '700' }, close: { padding: 10 }, person: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, paddingVertical: 15, borderBottomWidth: 1 }, avatar: { width: 48, height: 48, borderRadius: 24 }, empty: { padding: 24, alignItems: 'center', gap: 14 } });
+const s = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,.45)', alignItems: 'center', justifyContent: 'center', padding: 20 },
+  dialog: { width: '100%', maxWidth: 520, maxHeight: '80%', borderRadius: 24, overflow: 'hidden' },
+  header: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1 },
+  title: { fontSize: 20, fontWeight: '700' },
+  close: { padding: 10 },
+  person: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, paddingVertical: 15, borderBottomWidth: 1 },
+  avatar: { width: 48, height: 48, borderRadius: 24 },
+  skeletonList: { gap: 0 },
+  skeletonPerson: { minHeight: 76, paddingVertical: 12 },
+  skeletonAvatar: { opacity: 0.72 },
+  skeletonCopy: { flex: 1, alignItems: 'flex-end', gap: 8 },
+  skeletonLine: { height: 10, borderRadius: 6 },
+  skeletonName: { width: '58%' },
+  skeletonSubtitle: { width: '34%' },
+  empty: { padding: 24, alignItems: 'center', gap: 14 },
+});
