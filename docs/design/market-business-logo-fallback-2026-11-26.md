@@ -55,9 +55,13 @@
 - أضيف اختباران إلى `tests/businessDetailsPartialRetry.test.cjs` لحالة fallback وإعادة الضبط.
 - لم تُضف أي حركة أو اعتماد جديد، ولم تُعدّل أي شاشة أخرى.
 
-### التحقق
-- لم يمكن تشغيل الاختبارات محليًا: تعذّر استنساخ المستودع في بيئة التنفيذ بسبب فشل DNS للوصول إلى `github.com`.
-- لم يُدّع نجاح TypeScript أو Expo Web محليًا؛ سيتم الاعتماد على فحوص GitHub Actions المرتبطة بطلب الدمج، وتحديث هذه الوثيقة وملخص PR بنتائجها الفعلية.
+### التحقق الفعلي على الالتزام `a5a4f244`
+- **Marketplace integration safety #374:** نجح كامل الاختبار `node --test --test-concurrency=2 tests/*.test.cjs` — **284/284 ناجح، 0 فشل، 0 متخطٍ**. شمل ذلك الاختبارين الجديدين للشعار واختبارات الاسترداد الستة الموجودة.
+  - [سجل التشغيل](https://github.com/youef/app_ksa_test/actions/runs/45760958202)
+- **Inquiry discussion checks #1722:** فحص TypeScript نجح، وتصدير Web وAndroid JS وiOS JS نجح بالكامل.
+  - [سجل التشغيل](https://github.com/youef/app_ksa_test/actions/runs/45760958138)
+- اكتمل فحص `Vercel Preview Comments` بنجاح؛ لم أطلب نشرًا إنتاجيًا أو تشغيل بناء EAS.
+- تعذّر التشغيل المحلي فقط لأن DNS في بيئة التنفيذ لم يتمكن من حل `github.com` عند محاولة استنساخ المستودع؛ عوّضت ذلك بفحوص CI الفعلية أعلاه.
 - QA مرئي على أجهزة iPhone/Android وVoiceOver/TalkBack ما زال مطلوبًا.
 
 ### نتيجة ما قبل/بعد
