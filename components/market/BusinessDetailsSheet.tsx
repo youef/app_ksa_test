@@ -63,6 +63,7 @@ export function BusinessDetailsSheet({business, onClose}: {business: BusinessPre
   const [retry, setRetry] = useState(0);
   const [actionError, setActionError] = useState('');
   const [imageFailed, setImageFailed] = useState(false);
+  const [logoFailed, setLogoFailed] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 60_000);
@@ -117,6 +118,7 @@ export function BusinessDetailsSheet({business, onClose}: {business: BusinessPre
   const website = businessWebsite(details?.website);
   const cover = details?.cover_url || business.cover_url || business.image_url;
   const logo = details?.logo_url || business.logo_url;
+  useEffect(() => { setLogoFailed(false); }, [business.id, logo]);
   const verified = details ? details.is_verified === true : business.is_verified === true;
   const Icon = business.Icon || Store;
   const ratingCount = Number.isFinite(Number(business.reviews)) ? Math.max(0, Number(business.reviews)) : 0;
@@ -177,7 +179,9 @@ export function BusinessDetailsSheet({business, onClose}: {business: BusinessPre
               : <View style={[styles.cover,{backgroundColor:c.soft,alignItems:'center',justifyContent:'center'}]}><Icon size={48} color={c.primary}/></View>}
             <View style={styles.identityRow}>
               <View style={[styles.logoBox,{borderColor:c.line,backgroundColor:c.surface}]}>
-                {logo?<Image source={{uri:logo}} style={styles.logo} resizeMode="contain"/>:<Icon size={27} color={c.primary}/>}
+                {logo && !logoFailed
+                  ? <Image source={{uri:logo}} style={styles.logo} resizeMode="contain" onError={()=>setLogoFailed(true)}/>
+                  : <Icon size={27} color={c.primary}/>}
               </View>
               <View style={styles.identityCopy}>
                 <Text accessibilityRole="header" numberOfLines={2} style={[styles.businessName,{color:c.ink}]}>{details?.name || business.name}</Text>
