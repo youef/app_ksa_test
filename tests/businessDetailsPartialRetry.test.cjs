@@ -31,3 +31,13 @@ test('retry requests a fresh sheet read without changing the underlying data act
   assert.match(source, /\[business\.id, retry\]/);
   assert.match(source, /router\.push\(\{pathname:'\/business',params:\{id:business\.id\}\}\)/);
 });
+
+
+test('a failed business logo image falls back to the category icon', () => {
+  assert.match(source, /const \[logoFailed, setLogoFailed\] = useState\(false\)/);
+  assert.match(source, /logo && !logoFailed[\s\S]*?onError=\{\(\)=>setLogoFailed\(true\)\}[\s\S]*?<Icon size=\{27\} color=\{c\.primary\}\/\>/);
+});
+
+test('logo failure is reset when the selected business or logo URL changes', () => {
+  assert.match(source, /useEffect\(\(\) => \{ setLogoFailed\(false\); \}, \[business\.id, logo\]\)/);
+});
