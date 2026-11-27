@@ -39,6 +39,22 @@
 - أضيف اختبار انحدار بأربع مجموعات assertions تغطي الهيكل، وإعلان الوصول، واتجاه RTL والأبعاد، وعدم إدخال حركة.
 - محاولة التشغيل المحلي لم تصل إلى GitHub بسبب فشل DNS في بيئة التنفيذ؛ لذلك ستُستخدم فحوص GitHub Actions على رأس PR للتحقق من TypeScript وWeb والاختبارات.
 
-## حدود التحقق
+## نتائج الفحوص الفعلية — 2026-11-27
 
-لا تُدّعي الخطة اختبارًا بصريًا على أجهزة فعلية أو VoiceOver/TalkBack؛ هذه مراجعة يدوية مطلوبة بعد فتح Draft PR.
+على commit `9eec866d0acdd7c342a50341d144dbdfe856cbd8`:
+
+- **Marketplace integration safety:** نجح كامل `tests/*.test.cjs` — **286/286 اختبارًا، 0 فشل**؛ يتضمن ذلك الاختبارات الأربعة الجديدة.
+  - [سجل الاختبارات](https://github.com/youef/app_ksa_test/actions/runs/45947292783)
+- **TypeScript:** نجح `npm run typecheck`.
+- **Expo Web:** نجح `npx expo export --platform web`.
+- **Android JS bundle وiOS JS bundle:** كلاهما نجح.
+  - [سجل TypeScript وplatform bundles لحدث PR](https://github.com/youef/app_ksa_test/actions/runs/45947292710)
+  - [سجل TypeScript وplatform bundles لحدث Push](https://github.com/youef/app_ksa_test/actions/runs/45947265164)
+- **Vercel preview statuses:** نجحت حالتا النشر/المعاينة؛ لم يُنشر إلى الإنتاج.
+- تعذر التشغيل المحلي لأن DNS في بيئة التنفيذ لم يتمكن من حل `github.com`؛ الفحوص أعلاه نُفذت فعليًا في GitHub Actions.
+
+## حدود التحقق والدفعة التالية
+
+- QA بصري على أجهزة فعلية وVoiceOver/TalkBack وDynamic Type لم يُنفّذ، وما زال مطلوبًا قبل الدمج.
+- لم يُدمج PR ولم يُنشر التطبيق.
+- الدفعة التالية بالتناوب: سوق الحي، بعد مراجعة PRs المفتوحة واختيار إصلاح تصميمي واحد غير متعارض.
