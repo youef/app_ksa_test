@@ -13,6 +13,7 @@ function ProfileStoriesLoadingState() {
   return (
     <View
       style={s.loadingState}
+      accessible
       accessibilityRole="progressbar"
       accessibilityLabel="جارٍ تحميل اليوميات"
       accessibilityState={{ busy: true }}
