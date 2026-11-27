@@ -1,13 +1,59 @@
 import { OasisPressable as Pressable, OasisSurface } from '@/components/oasis/OasisPrimitives';
 import { OASIS } from '@/lib/oasis';
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, Image, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { Archive, ChevronLeft, Eye, Heart, Plus, Settings2, Sparkles, Trash2 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { storyExpiryFilter } from '@/lib/storyActivity';
 
 type Entry = { id: string; content: string | null; type: string; image_url: string | null; bg_color: string | null; created_at: string; expires_at: string; view_count: number; allow_replies: boolean; visibility: string };
+
+function ProfileStoriesLoadingState() {
+  return (
+    <View
+      style={s.loadingState}
+      accessibilityRole="progressbar"
+      accessibilityLabel="جارٍ تحميل اليوميات"
+      accessibilityState={{ busy: true }}
+    >
+      <View
+        style={[s.summary, s.skeletonSummary]}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+      >
+        <View style={[s.skeletonSummaryItem, { width: 48 }]} />
+        <View style={[s.skeletonSummaryItem, { width: 58 }]} />
+        <View style={[s.skeletonSummaryItem, { width: 42 }]} />
+      </View>
+      <ScrollView
+        style={{ direction: 'rtl' }}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={[s.list, s.skeletonList, { direction: 'ltr' }]}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+      >
+        {Array.from({ length: 3 }, (_, index) => (
+          <View key={`story-skeleton-${index}`} style={s.item}>
+            <View style={s.skeletonPreview}>
+              <View style={s.skeletonCopy}>
+                <View style={[s.skeletonTextLine, { width: '88%' }]} />
+                <View style={[s.skeletonTextLine, { width: '62%' }]} />
+              </View>
+            </View>
+            <View style={s.skeletonMeta}>
+              <View style={s.skeletonMetaDot} />
+              <View style={[s.skeletonMetaLine, { width: 30 }]} />
+              <View style={s.skeletonMetaDot} />
+              <View style={[s.skeletonMetaLine, { width: 22 }]} />
+            </View>
+          </View>
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
 export function ProfileStories({ userId, own = false }: { userId: string; own?: boolean }) {
   const [archive, setArchive] = useState(false);
   const [rows, setRows] = useState<Entry[]>([]);
@@ -62,7 +108,7 @@ export function ProfileStories({ userId, own = false }: { userId: string; own?: 
   return <OasisSurface oasisSurface="card" style={s.card}>
     <View style={s.heading}><View style={s.icon}><Sparkles size={20} color="#166044" /></View><View style={s.copy}><Text style={s.title}>{own ? 'يومياتي' : 'يوميات الجار'}</Text><Text style={s.hint}>{archive ? 'أرشيفك الخاص؛ لا يظهر للآخرين' : 'لحظات تظهر لأعضاء المجتمع لمدة ٢٤ ساعة'}</Text></View>{own ? <Pressable accessibilityRole="button" accessibilityLabel="إعدادات يومياتي" onPress={() => router.push('/story-settings')} style={s.action}><Settings2 size={18} color="#166044" /></Pressable> : null}</View>
     {own ? <View style={s.tabs}><Pressable oasisVariant={!archive ? 'primary' : 'secondary'} oasisKind="chip" accessibilityRole="button" accessibilityState={{ selected: !archive }} onPress={() => setArchive(false)} style={[s.tab, !archive && s.selected]}><Text style={[s.tabText, !archive && s.selectedText]}>النشطة</Text></Pressable><Pressable oasisVariant={archive ? 'primary' : 'secondary'} oasisKind="chip" accessibilityRole="button" accessibilityState={{ selected: archive }} onPress={() => setArchive(true)} style={[s.tab, archive && s.selected]}><Archive size={14} color={archive ? OASIS.colors.surface : OASIS.colors.muted} /><Text style={[s.tabText, archive && s.selectedText]}>الأرشيف</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="نشر يومية جديدة" onPress={() => router.push('/create-story')} style={s.add}><Plus size={15} color="#166044" /><Text style={s.addText}>إضافة</Text></Pressable></View> : null}
-    {loading ? <ActivityIndicator color="#166044" style={{ padding: 16 }} /> : error ? <Pressable accessibilityRole="button" onPress={() => setRevision(value => value + 1)} style={s.empty}><Text style={s.error}>{error}</Text><Text style={s.addText}>إعادة المحاولة</Text></Pressable> : rows.length ? <>
+    {loading ? <ProfileStoriesLoadingState /> : error ? <Pressable accessibilityRole="button" onPress={() => setRevision(value => value + 1)} style={s.empty}><Text style={s.error}>{error}</Text><Text style={s.addText}>إعادة المحاولة</Text></Pressable> : rows.length ? <>
       <View style={s.summary}><Text style={s.summaryText}>{rows.length} يومية</Text><Text style={s.summaryText}>{rows.reduce((sum, row) => sum + Number(row.view_count || 0), 0)} مشاهدة</Text><Text style={s.summaryText}>{likesAvailable ? Object.values(likes).reduce((sum, value) => sum + value, 0) : '—'} إعجاب</Text></View>
       <ScrollView style={{ direction: 'rtl' }} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[s.list, { direction: 'ltr' }]}>{rows.map(row => <View key={row.id} style={s.item}><Pressable accessibilityRole="button" accessibilityLabel={row.content || 'مشاهدة اليومية'} onPress={() => router.push({ pathname: '/story', params: { id: row.id } })} style={[s.preview, { backgroundColor: row.bg_color || '#166044' }]}>{row.image_url ? <Image source={{ uri: row.image_url }} style={StyleSheet.absoluteFillObject} resizeMode="cover" /> : null}<View style={s.shade}><Text numberOfLines={3} style={s.previewText}>{row.content || 'لحظة من يومي'}</Text><Text style={s.visibility}>{row.visibility === 'followers' ? 'المتابعون' : row.visibility === 'custom' ? 'جمهور مخصص' : 'أعضاء المجتمع'}</Text></View></Pressable>
         <View style={s.itemStats}><Eye size={12} color="#73857B" /><Text style={s.hint}>{row.view_count || 0}</Text><Heart size={12} color="#73857B" /><Text style={s.hint}>{likesAvailable ? likes[row.id] || 0 : '—'}</Text>{own ? <Pressable accessibilityRole="button" accessibilityLabel="مشاهدات اليومية" onPress={() => router.push({ pathname: '/story-viewers', params: { id: row.id } })}><ChevronLeft size={17} color="#166044" /></Pressable> : null}</View>
@@ -72,5 +118,5 @@ export function ProfileStories({ userId, own = false }: { userId: string; own?: 
   </OasisSurface>;
 }
 const s = StyleSheet.create({
-  card: { backgroundColor: OASIS.colors.surface, borderWidth: 1, borderColor: '#E1EBE5', borderRadius: 14, padding: 17, gap: 16, marginVertical: 14 }, heading: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10 }, icon: { width: 42, height: 42, borderRadius: 14, backgroundColor: '#EDF7F0', alignItems: 'center', justifyContent: 'center' }, copy: { flex: 1 }, title: { color: '#173F2F', fontSize: 16, fontWeight: '600', textAlign: 'right' }, hint: { color: '#7B8C80', fontSize: 11, lineHeight: 20, textAlign: 'right' }, action: { padding: 10 }, tabs: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 }, tab: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, paddingHorizontal: 13, minHeight: 36, borderRadius: 10, backgroundColor: '#F3F7F4' }, selected: { backgroundColor: '#166044' }, tabText: { color: '#73857B', fontSize: 11, fontWeight: '700' }, selectedText: { color: OASIS.colors.surface }, add: { flexDirection: 'row-reverse', gap: 5, alignItems: 'center', marginRight: 'auto', padding: 8 }, addText: { color: '#166044', fontSize: 12, fontWeight: '600' }, summary: { flexDirection: 'row-reverse', justifyContent: 'space-between', gap: 8, padding: 12, backgroundColor: '#F4F8F2', borderRadius: 10 }, summaryText: { color: '#4C765B', fontSize: 11, fontWeight: '700' }, list: { flexDirection: 'row-reverse', gap: 12 }, item: { width: 152, gap: 8 }, preview: { height: 190, borderRadius: 16, overflow: 'hidden' }, shade: { flex: 1, justifyContent: 'flex-end', padding: 12, backgroundColor: 'rgba(0,0,0,0.18)' }, previewText: { color: OASIS.colors.surface, fontSize: 14, lineHeight: 24, fontWeight: '600', textAlign: 'right' }, visibility: { color: '#E7F6E9', fontSize: 11, marginTop: 8, textAlign: 'right' }, itemStats: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }, itemControls: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5 }, delete: { padding: 8, marginRight: 'auto' }, empty: { padding: 16, gap: 12, alignItems: 'center' }, emptyTitle: { color: '#73857B', fontSize: 12, textAlign: 'center' }, error: { color: '#AD6555', textAlign: 'center', fontSize: 12 },
+  card: { backgroundColor: OASIS.colors.surface, borderWidth: 1, borderColor: '#E1EBE5', borderRadius: 14, padding: 17, gap: 16, marginVertical: 14 }, heading: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10 }, icon: { width: 42, height: 42, borderRadius: 14, backgroundColor: '#EDF7F0', alignItems: 'center', justifyContent: 'center' }, copy: { flex: 1 }, title: { color: '#173F2F', fontSize: 16, fontWeight: '600', textAlign: 'right' }, hint: { color: '#7B8C80', fontSize: 11, lineHeight: 20, textAlign: 'right' }, action: { padding: 10 }, tabs: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 }, tab: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, paddingHorizontal: 13, minHeight: 36, borderRadius: 10, backgroundColor: '#F3F7F4' }, selected: { backgroundColor: '#166044' }, tabText: { color: '#73857B', fontSize: 11, fontWeight: '700' }, selectedText: { color: OASIS.colors.surface }, add: { flexDirection: 'row-reverse', gap: 5, alignItems: 'center', marginRight: 'auto', padding: 8 }, addText: { color: '#166044', fontSize: 12, fontWeight: '600' }, summary: { flexDirection: 'row-reverse', justifyContent: 'space-between', gap: 8, padding: 12, backgroundColor: '#F4F8F2', borderRadius: 10 }, summaryText: { color: '#4C765B', fontSize: 11, fontWeight: '700' }, loadingState: { gap: 12 }, skeletonSummary: { alignItems: 'center' }, skeletonSummaryItem: { height: 9, borderRadius: 6, backgroundColor: '#DCE9E0' }, list: { flexDirection: 'row-reverse', gap: 12 }, skeletonList: { paddingVertical: 2 }, item: { width: 152, gap: 8 }, preview: { height: 190, borderRadius: 16, overflow: 'hidden' }, skeletonPreview: { height: 190, borderRadius: 16, overflow: 'hidden', backgroundColor: '#E5EEE8', justifyContent: 'flex-end', padding: 12 }, skeletonCopy: { gap: 8 }, skeletonTextLine: { height: 10, borderRadius: 5, backgroundColor: '#CADBCF' }, skeletonMeta: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6, minHeight: 14 }, skeletonMetaDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: '#DCE9E0' }, skeletonMetaLine: { height: 7, borderRadius: 4, backgroundColor: '#DCE9E0' }, shade: { flex: 1, justifyContent: 'flex-end', padding: 12, backgroundColor: 'rgba(0,0,0,0.18)' }, previewText: { color: OASIS.colors.surface, fontSize: 14, lineHeight: 24, fontWeight: '600', textAlign: 'right' }, visibility: { color: '#E7F6E9', fontSize: 11, marginTop: 8, textAlign: 'right' }, itemStats: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }, itemControls: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5 }, delete: { padding: 8, marginRight: 'auto' }, empty: { padding: 16, gap: 12, alignItems: 'center' }, emptyTitle: { color: '#73857B', fontSize: 12, textAlign: 'center' }, error: { color: '#AD6555', textAlign: 'center', fontSize: 12 },
 });
