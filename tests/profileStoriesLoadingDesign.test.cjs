@@ -15,7 +15,7 @@ test('profile stories use a card-shaped skeleton instead of a lone spinner', () 
 });
 
 test('the loading state is announced once and decorative placeholders are hidden', () => {
-  assert.match(source, /accessibilityRole="progressbar"/);
+  assert.match(source, /accessible\s+accessibilityRole="progressbar"/);
   assert.match(source, /accessibilityLabel="جارٍ تحميل اليوميات"/);
   assert.match(source, /accessibilityState=\{\{ busy: true \}\}/);
   assert.equal((source.match(/accessibilityElementsHidden/g) || []).length, 2);
