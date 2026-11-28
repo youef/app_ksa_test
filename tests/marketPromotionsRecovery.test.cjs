@@ -40,3 +40,29 @@ test('failed refresh keeps previously rendered promotions and success clears err
   assert.doesNotMatch(failureBranch[0], /setRows\(/);
   assert.match(source, /setRows\(response\.data \|\| \[\]\);\s*setFailed\(false\)/);
 });
+
+
+test('first city-scoped load exposes a skeleton until the request settles', () => {
+  assert.match(source, /const \[loading, setLoading\] = useState\(\(\) => Boolean\(city && !\/\^كل\|\^جميع\/\.test\(city\)\)\);/);
+  assert.match(source, /const hasScopedCity = Boolean\(city && !\/\^كل\|\^جميع\/\.test\(city\)\);\s*setLoading\(hasScopedCity\);\s*if \(!hasScopedCity\) return;/);
+  assert.match(source, /if \(ticket === requestSequence\.current\) \{\s*setLoading\(false\);/);
+});
+
+test('promotion skeleton is announced as a busy progress bar and hides decorative shapes', () => {
+  assert.match(source, /accessibilityRole="progressbar"/);
+  assert.match(source, /accessibilityLabel="جارٍ تحميل العروض المميزة"/);
+  assert.match(source, /accessibilityState=\{\{ busy: true \}\}/);
+  assert.match(source, /accessibilityElementsHidden importantForAccessibility="no-hide-descendants"/);
+});
+
+test('skeleton appears only before the first visible promotion and does not replace stale cards', () => {
+  assert.match(source, /\{loading && !visible\.length \?/);
+  assert.match(source, /\{visible\.map\(row => \(/);
+  assert.match(source, /if \(!visible\.length && !failed && !loading\) return null;/);
+});
+
+test('loading skeleton is static and does not introduce shimmer or animation', () => {
+  const skeleton = source.match(/\{loading && !visible\.length \? \([\s\S]*?\) : null\}/);
+  assert.ok(skeleton, 'expected a dedicated first-load skeleton');
+  assert.doesNotMatch(skeleton[0], /Animated|shimmer|withRepeat|animation/i);
+});
