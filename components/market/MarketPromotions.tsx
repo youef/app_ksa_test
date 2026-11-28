@@ -21,6 +21,7 @@ export function MarketPromotions({ city, district }: { city: string; district: s
   const { colors: c } = useTheme();
   const [rows, setRows] = useState<Promotion[]>([]);
   const [failed, setFailed] = useState(false);
+  const [loading, setLoading] = useState(() => Boolean(city && !/^كل|^جميع/.test(city)));
   const [retrying, setRetrying] = useState(false);
   const requestSequence = useRef(0);
   const retryingRef = useRef(false);
@@ -48,9 +49,12 @@ export function MarketPromotions({ city, district }: { city: string; district: s
     } catch {
       if (ticket === requestSequence.current) setFailed(true);
     } finally {
-      if (manual && ticket === requestSequence.current) {
-        retryingRef.current = false;
-        setRetrying(false);
+      if (ticket === requestSequence.current) {
+        setLoading(false);
+        if (manual) {
+          retryingRef.current = false;
+          setRetrying(false);
+        }
       }
     }
   }, [city, district]);
@@ -61,7 +65,9 @@ export function MarketPromotions({ city, district }: { city: string; district: s
     setRetrying(false);
     setRows([]);
     setFailed(false);
-    if (!city || /^كل|^جميع/.test(city)) return;
+    const hasScopedCity = Boolean(city && !/^كل|^جميع/.test(city));
+    setLoading(hasScopedCity);
+    if (!hasScopedCity) return;
 
     void load();
     const timer = setInterval(() => void load(), REFRESH_INTERVAL_MS);
@@ -72,10 +78,29 @@ export function MarketPromotions({ city, district }: { city: string; district: s
   }, [city, district, load]);
 
   const visible = rows.filter(row => Date.parse(row.ends_at) > Date.now());
-  if (!visible.length && !failed) return null;
+  if (!visible.length && !failed && !loading) return null;
 
   return (
     <View style={{ gap: 10, marginBottom: 16 }}>
+      {loading && !visible.length ? (
+        <View
+          accessibilityRole="progressbar"
+          accessibilityLabel="جارٍ تحميل العروض المميزة"
+          accessibilityState={{ busy: true }}
+          style={{ padding: 15, borderRadius: 18, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface, gap: 12 }}
+        >
+          <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={{ gap: 12 }}>
+            <View style={{ flexDirection: 'row-reverse', gap: 6, alignItems: 'center' }}>
+              <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: c.soft }} />
+              <View style={{ width: 112, height: 10, borderRadius: 5, backgroundColor: c.soft }} />
+            </View>
+            <View style={{ alignSelf: 'flex-end', width: '72%', height: 16, borderRadius: 6, backgroundColor: c.soft }} />
+            <View style={{ alignSelf: 'flex-end', width: '94%', height: 10, borderRadius: 5, backgroundColor: c.soft }} />
+            <View style={{ alignSelf: 'flex-end', width: '58%', height: 10, borderRadius: 5, backgroundColor: c.soft }} />
+            <View style={{ alignSelf: 'flex-end', width: 116, height: 40, borderRadius: 20, backgroundColor: c.soft }} />
+          </View>
+        </View>
+      ) : null}
       {failed ? (
         <View style={{ padding: 12, borderRadius: 16, borderWidth: 1, borderColor: c.line, backgroundColor: c.dangerSoft, gap: 10 }}>
           <View style={{ flexDirection: 'row-reverse', alignItems: 'flex-start', gap: 8 }}>
